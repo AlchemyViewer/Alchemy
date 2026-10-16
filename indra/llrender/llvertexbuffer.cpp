@@ -26,7 +26,6 @@
 
 #include "linden_common.h"
 
-#include "llfasttimer.h"
 #include "llsys.h"
 #include "llvertexbuffer.h"
 // #include "llrender.h"
@@ -36,8 +35,8 @@
 #include "llshadermgr.h"
 #include "llglslshader.h"
 #include "llmemory.h"
-#include <glm/gtc/type_ptr.hpp>
 
+#include <atomic>
 #include <boost/unordered_map.hpp>
 
 //Next Highest Power Of Two
@@ -259,6 +258,12 @@ static GLWorkQueue* sQueue = nullptr;
 //============================================================================
 // Pool of reusable VertexBuffer state
 
+// The GL context the names in a thread's pool were generated on, bumped by cleanupClass when
+// that context's buffers go. A name of the old context is nobody's on the next one -- a core
+// profile refuses to bind it -- and the pool is thread-local, so each thread empties its own
+// the next time it asks. LLImageGL's texture-name pool works the same way.
+static std::atomic<U32> sBufferNameGeneration{ 1 };
+
 // batch calls to glGenBuffers
 static GLuint gen_buffer()
 {
@@ -267,24 +272,39 @@ static GLuint gen_buffer()
     GLuint ret = 0;
     constexpr U32 pool_size = 4096;
 
-    thread_local static GLuint sNamePool[pool_size];
+    // On the heap: as a thread_local array the pool was 16 KB of static TLS,
+    // which glibc takes out of the stack of every thread, those that never
+    // make a buffer too.
+    thread_local static std::unique_ptr<GLuint[]> sNamePool;
     thread_local static U32 sIndex = 0;
+    thread_local static U32 sNameGeneration = 0;
+
+    const U32 generation = sBufferNameGeneration.load(std::memory_order_relaxed);
+    if (sNameGeneration != generation)
+    {
+        sIndex = 0;
+        sNameGeneration = generation;
+    }
 
     if (sIndex == 0)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("gen buffer");
+        if (!sNamePool)
+        {
+            sNamePool = std::make_unique<GLuint[]>(pool_size);
+        }
         sIndex = pool_size;
 #if !LL_DARWIN
         if (!gGLManager.mIsAMD)
         {
-            glGenBuffers(pool_size, sNamePool);
+            glGenBuffers(pool_size, sNamePool.get());
         }
         else
 #endif
         { // work around for AMD driver bug
             for (U32 i = 0; i < pool_size; ++i)
             {
-                glGenBuffers(1, sNamePool + i);
+                glGenBuffers(1, sNamePool.get() + i);
             }
         }
     }
@@ -293,31 +313,50 @@ static GLuint gen_buffer()
     return ret;
 }
 
+// wait a few frames before actually deleting the buffers to avoid
+// synchronization issues with the GPU
+constexpr U32 BUFFER_FREE_BUCKETS = 4;
+static std::vector<GLuint> sBufferFreeList[BUFFER_FREE_BUCKETS];
+
 static void delete_buffers(S32 count, GLuint* buffers)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
-    // wait a few frames before actually deleting the buffers to avoid
-    // synchronization issues with the GPU
-    constexpr U32 BUCKET_COUNT = 4;
-    static std::vector<GLuint> sFreeList[BUCKET_COUNT];
 
     if (gGLManager.mInited)
     {
         // Move current frame to free list
-        U32 idx = LLImageGL::sFrameCount % BUCKET_COUNT;
+        U32 idx = LLImageGL::sFrameCount % BUFFER_FREE_BUCKETS;
 
         for (S32 i = 0; i < count; ++i)
         {
-            sFreeList[idx].push_back(buffers[i]);
+            sBufferFreeList[idx].push_back(buffers[i]);
         }
 
         // Clear frame -3 (equals +1), this idx will be written over on the next call
-        idx = (LLImageGL::sFrameCount + 1) % BUCKET_COUNT;
+        idx = (LLImageGL::sFrameCount + 1) % BUFFER_FREE_BUCKETS;
 
-        if (!sFreeList[idx].empty())
+        if (!sBufferFreeList[idx].empty())
         {
-            glDeleteBuffers((GLsizei)sFreeList[idx].size(), sFreeList[idx].data());
-            sFreeList[idx].resize(0);
+            glDeleteBuffers((GLsizei)sBufferFreeList[idx].size(), sBufferFreeList[idx].data());
+            sBufferFreeList[idx].resize(0);
+        }
+    }
+}
+
+// Delete everything still waiting out its frames, now, while its context is current. Left
+// for the next context, the names would be deleted there -- where the same numbers can
+// belong to buffers that context has since made.
+static void drain_deleted_buffers()
+{
+    for (std::vector<GLuint>& bucket : sBufferFreeList)
+    {
+        if (!bucket.empty())
+        {
+            if (gGLManager.mInited)
+            {
+                glDeleteBuffers((GLsizei)bucket.size(), bucket.data());
+            }
+            bucket.resize(0);
         }
     }
 }
@@ -639,13 +678,13 @@ void LLVertexBufferData::drawWithMatrix()
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();
-    gGL.loadMatrix(glm::value_ptr(mModelView));
+    gGL.loadMatrix(mModelView);
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
-    gGL.loadMatrix(glm::value_ptr(mProjection));
+    gGL.loadMatrix(mProjection);
     gGL.matrixMode(LLRender::MM_TEXTURE0);
     gGL.pushMatrix();
-    gGL.loadMatrix(glm::value_ptr(mTexture0));
+    gGL.loadMatrix(mTexture0);
 
     mVB->setBuffer();
     mVB->drawArrays(mMode, 0, mCount);
@@ -729,7 +768,7 @@ static const std::string vb_type_name[] =
     "TYPE_WEIGHT",
     "TYPE_WEIGHT4",
     "TYPE_CLOTHWEIGHT",
-    "TYPE_JOINT"
+    "TYPE_JOINT",
     "TYPE_TEXTURE_INDEX",
     "TYPE_MAX",
     "TYPE_INDEX",
@@ -744,6 +783,7 @@ const U32 LLVertexBuffer::sGLMode[LLRender::NUM_MODES] =
     GL_LINES,
     GL_LINE_STRIP,
     GL_LINE_LOOP,
+    GL_PATCHES,
 };
 
 //static
@@ -921,12 +961,16 @@ void LLVertexBuffer::drawRange(U32 mode, U32 start, U32 end, U32 count, U32 indi
     glDrawRangeElements(sGLMode[mode], start, end, count, mIndicesType,
         (GLvoid*) (indices_offset * (size_t) mIndicesStride));
     STOP_GLERROR;
+    ++LLRender::sDrawCalls;
+    LLRender::sDrawElements += count;
 }
 
 void LLVertexBuffer::drawRangeFast(U32 mode, U32 start, U32 end, U32 count, U32 indices_offset) const
 {
     glDrawRangeElements(sGLMode[mode], start, end, count, mIndicesType,
         (GLvoid*)(indices_offset * (size_t)mIndicesStride));
+    ++LLRender::sDrawCalls;
+    LLRender::sDrawElements += count;
 }
 
 
@@ -947,6 +991,8 @@ void LLVertexBuffer::drawArrays(U32 mode, U32 first, U32 count) const
     STOP_GLERROR;
     glDrawArrays(sGLMode[mode], first, count);
     STOP_GLERROR;
+    ++LLRender::sDrawCalls;
+    LLRender::sDrawElements += count;
 }
 
 //static
@@ -994,6 +1040,11 @@ void LLVertexBuffer::cleanupClass()
 {
     unbind();
 
+    // Which attribute arrays are enabled is vertex-array-object state, and the next
+    // context's VAO starts with none. Left as it was, setupClientArrays would take its first
+    // draw's arrays for enabled already and skip the glEnableVertexAttribArray they need.
+    sLastMask = 0;
+
     delete sVBOPool;
     sVBOPool = nullptr;
 
@@ -1009,6 +1060,12 @@ void LLVertexBuffer::cleanupClass()
     delete sQueue;
     sQueue = nullptr;
 #endif
+
+    // Last: the pool's teardown above queued its buffers for deletion.
+    drain_deleted_buffers();
+
+    // What follows is a new context, whose names these were not.
+    sBufferNameGeneration.fetch_add(1, std::memory_order_relaxed);
 }
 
 //----------------------------------------------------------------------------
@@ -1724,60 +1781,66 @@ void LLVertexBuffer::setBuffer()
 
 
 // virtual (default)
+// An offset into the bound buffer, which GL takes as a pointer: made from the
+// integer, as an offset added to a null pointer is undefined.
+static void* buffer_offset(size_t offset)
+{
+    return reinterpret_cast<void*>(offset);
+}
+
 void LLVertexBuffer::setupVertexBuffer()
 {
     STOP_GLERROR;
-    U8* base = nullptr;
 
     U32 data_mask = LLGLSLShader::sCurBoundShaderPtr->mAttributeMask;
 
     if (data_mask & MAP_NORMAL)
     {
         AttributeType loc = TYPE_NORMAL;
-        void* ptr = (void*)(base + mOffsets[TYPE_NORMAL]);
+        void* ptr = buffer_offset(mOffsets[TYPE_NORMAL]);
         glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, LLVertexBuffer::sTypeSize[TYPE_NORMAL], ptr);
     }
     if (data_mask & MAP_TEXCOORD3)
     {
         AttributeType loc = TYPE_TEXCOORD3;
-        void* ptr = (void*)(base + mOffsets[TYPE_TEXCOORD3]);
+        void* ptr = buffer_offset(mOffsets[TYPE_TEXCOORD3]);
         glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD3], ptr);
     }
     if (data_mask & MAP_TEXCOORD2)
     {
         AttributeType loc = TYPE_TEXCOORD2;
-        void* ptr = (void*)(base + mOffsets[TYPE_TEXCOORD2]);
+        void* ptr = buffer_offset(mOffsets[TYPE_TEXCOORD2]);
         glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD2], ptr);
     }
     if (data_mask & MAP_TEXCOORD1)
     {
         AttributeType loc = TYPE_TEXCOORD1;
-        void* ptr = (void*)(base + mOffsets[TYPE_TEXCOORD1]);
+        void* ptr = buffer_offset(mOffsets[TYPE_TEXCOORD1]);
         glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD1], ptr);
     }
     if (data_mask & MAP_TANGENT)
     {
         AttributeType loc = TYPE_TANGENT;
-        void* ptr = (void*)(base + mOffsets[TYPE_TANGENT]);
+        void* ptr = buffer_offset(mOffsets[TYPE_TANGENT]);
         glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, LLVertexBuffer::sTypeSize[TYPE_TANGENT], ptr);
     }
     if (data_mask & MAP_TEXCOORD0)
     {
         AttributeType loc = TYPE_TEXCOORD0;
-        void* ptr = (void*)(base + mOffsets[TYPE_TEXCOORD0]);
+        void* ptr = buffer_offset(mOffsets[TYPE_TEXCOORD0]);
         glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD0], ptr);
     }
     if (data_mask & MAP_COLOR)
     {
         AttributeType loc = TYPE_COLOR;
         //bind emissive instead of color pointer if emissive is present
-        void* ptr = (data_mask & MAP_EMISSIVE) ? (void*)(base + mOffsets[TYPE_EMISSIVE]) : (void*)(base + mOffsets[TYPE_COLOR]);
+        void* ptr = (data_mask & MAP_EMISSIVE) ? buffer_offset(mOffsets[TYPE_EMISSIVE]) : buffer_offset(mOffsets[TYPE_COLOR]);
         glVertexAttribPointer(loc, 4, GL_UNSIGNED_BYTE, GL_TRUE, LLVertexBuffer::sTypeSize[TYPE_COLOR], ptr);
     }
     if (data_mask & MAP_EMISSIVE)
     {
         AttributeType loc = TYPE_EMISSIVE;
-        void* ptr = (void*)(base + mOffsets[TYPE_EMISSIVE]);
+        void* ptr = buffer_offset(mOffsets[TYPE_EMISSIVE]);
         glVertexAttribPointer(loc, 4, GL_UNSIGNED_BYTE, GL_TRUE, LLVertexBuffer::sTypeSize[TYPE_EMISSIVE], ptr);
 
         if (!(data_mask & MAP_COLOR))
@@ -1789,37 +1852,37 @@ void LLVertexBuffer::setupVertexBuffer()
     if (data_mask & MAP_WEIGHT)
     {
         AttributeType loc = TYPE_WEIGHT;
-        void* ptr = (void*)(base + mOffsets[TYPE_WEIGHT]);
+        void* ptr = buffer_offset(mOffsets[TYPE_WEIGHT]);
         glVertexAttribPointer(loc, 1, GL_FLOAT, GL_FALSE, LLVertexBuffer::sTypeSize[TYPE_WEIGHT], ptr);
     }
     if (data_mask & MAP_WEIGHT4)
     {
         AttributeType loc = TYPE_WEIGHT4;
-        void* ptr = (void*)(base + mOffsets[TYPE_WEIGHT4]);
+        void* ptr = buffer_offset(mOffsets[TYPE_WEIGHT4]);
         glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, LLVertexBuffer::sTypeSize[TYPE_WEIGHT4], ptr);
     }
     if (data_mask & MAP_JOINT)
     {
         AttributeType loc = TYPE_JOINT;
-        void* ptr = (void*)(base + mOffsets[TYPE_JOINT]);
+        void* ptr = buffer_offset(mOffsets[TYPE_JOINT]);
         glVertexAttribIPointer(loc, 4, GL_UNSIGNED_SHORT, LLVertexBuffer::sTypeSize[TYPE_JOINT], ptr);
     }
     if (data_mask & MAP_CLOTHWEIGHT)
     {
         AttributeType loc = TYPE_CLOTHWEIGHT;
-        void* ptr = (void*)(base + mOffsets[TYPE_CLOTHWEIGHT]);
+        void* ptr = buffer_offset(mOffsets[TYPE_CLOTHWEIGHT]);
         glVertexAttribPointer(loc, 4, GL_FLOAT, GL_TRUE, LLVertexBuffer::sTypeSize[TYPE_CLOTHWEIGHT], ptr);
     }
     if (data_mask & MAP_TEXTURE_INDEX)
     {
         AttributeType loc = TYPE_TEXTURE_INDEX;
-        void* ptr = (void*)(base + mOffsets[TYPE_VERTEX] + 12);
+        void* ptr = buffer_offset(mOffsets[TYPE_VERTEX] + 12);
         glVertexAttribIPointer(loc, 1, GL_UNSIGNED_INT, LLVertexBuffer::sTypeSize[TYPE_VERTEX], ptr);
     }
     if (data_mask & MAP_VERTEX)
     {
         AttributeType loc = TYPE_VERTEX;
-        void* ptr = (void*)(base + mOffsets[TYPE_VERTEX]);
+        void* ptr = buffer_offset(mOffsets[TYPE_VERTEX]);
         glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, LLVertexBuffer::sTypeSize[TYPE_VERTEX], ptr);
     }
     STOP_GLERROR;

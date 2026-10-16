@@ -173,7 +173,7 @@ bool LLHeadRotMotion::onActivate()
 //-----------------------------------------------------------------------------
 // LLHeadRotMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLHeadRotMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLHeadRotMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLQuaternion    targetHeadRotWorld;
@@ -183,7 +183,7 @@ bool LLHeadRotMotion::onUpdate(F32 time, U8* joint_mask)
     F32 head_slerp_amt = LLSmoothInterpolation::getInterpolant(HEAD_LOOKAT_LAG_HALF_LIFE);
     F32 torso_slerp_amt = LLSmoothInterpolation::getInterpolant(TORSO_LOOKAT_LAG_HALF_LIFE);
 
-    LLVector3* targetPos = (LLVector3*)mCharacter->getAnimationData("LookAtPoint");
+    LLVector3* targetPos = (LLVector3*)mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT);
 
     if (targetPos)
     {
@@ -404,7 +404,7 @@ void LLEyeMotion::adjustEyeTarget(LLVector3* targetPos, LLJointState& left_eye_s
         // calculate vergence
         F32 interocular_dist = (left_eye_state.getJoint()->getWorldPosition() - right_eye_state.getJoint()->getWorldPosition()).magVec();
         vergence = -atan2((interocular_dist / 2.f), lookAtDistance);
-        llclamp(vergence, -F_PI_BY_TWO, 0.f);
+        vergence = llclamp(vergence, -F_PI_BY_TWO, 0.f);
     }
     else
     {
@@ -455,9 +455,25 @@ void LLEyeMotion::adjustEyeTarget(LLVector3* targetPos, LLJointState& left_eye_s
 }
 
 //-----------------------------------------------------------------------------
+// LLEyeMotion::setBlinkWeights()
+//-----------------------------------------------------------------------------
+void LLEyeMotion::setBlinkWeights(F32 left, F32 right)
+{
+    if (mBlinkLeftParam)
+    {
+        mBlinkLeftParam->setWeight(left);
+    }
+    if (mBlinkRightParam)
+    {
+        mBlinkRightParam->setWeight(right);
+    }
+    mCharacter->updateVisualParams();
+}
+
+//-----------------------------------------------------------------------------
 // LLEyeMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLEyeMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     //calculate jitter
@@ -492,6 +508,12 @@ bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
     }
 
     // do blinking
+    if (!mBlinkLeftParam)
+    {
+        mBlinkLeftParam = mCharacter->getVisualParam("Blink_Left");
+        mBlinkRightParam = mCharacter->getVisualParam("Blink_Right");
+    }
+
     if (!mEyesClosed && mEyeBlinkTimer.getElapsedTimeF32() >= mEyeBlinkTime)
     {
         F32 leftEyeBlinkMorph = mEyeBlinkTimer.getElapsedTimeF32() - mEyeBlinkTime;
@@ -499,9 +521,7 @@ bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
 
         leftEyeBlinkMorph = llclamp(leftEyeBlinkMorph / EYE_BLINK_SPEED, 0.f, 1.f);
         rightEyeBlinkMorph = llclamp(rightEyeBlinkMorph / EYE_BLINK_SPEED, 0.f, 1.f);
-        mCharacter->setVisualParamWeight("Blink_Left", leftEyeBlinkMorph);
-        mCharacter->setVisualParamWeight("Blink_Right", rightEyeBlinkMorph);
-        mCharacter->updateVisualParams();
+        setBlinkWeights(leftEyeBlinkMorph, rightEyeBlinkMorph);
 
         if (rightEyeBlinkMorph == 1.f)
         {
@@ -519,9 +539,7 @@ bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
 
             leftEyeBlinkMorph = 1.f - llclamp(leftEyeBlinkMorph / EYE_BLINK_SPEED, 0.f, 1.f);
             rightEyeBlinkMorph = 1.f - llclamp(rightEyeBlinkMorph / EYE_BLINK_SPEED, 0.f, 1.f);
-            mCharacter->setVisualParamWeight("Blink_Left", leftEyeBlinkMorph);
-            mCharacter->setVisualParamWeight("Blink_Right", rightEyeBlinkMorph);
-            mCharacter->updateVisualParams();
+            setBlinkWeights(leftEyeBlinkMorph, rightEyeBlinkMorph);
 
             if (rightEyeBlinkMorph == 0.f)
             {
@@ -532,7 +550,7 @@ bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
         }
     }
 
-    LLVector3* targetPos = (LLVector3*)mCharacter->getAnimationData("LookAtPoint");
+    LLVector3* targetPos = (LLVector3*)mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT);
 
     adjustEyeTarget(targetPos, *mLeftEyeState, *mRightEyeState);
     adjustEyeTarget(targetPos, *mAltLeftEyeState, *mAltRightEyeState);

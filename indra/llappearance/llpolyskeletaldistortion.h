@@ -64,7 +64,6 @@ struct LLPolySkeletalBoneInfo
 
 class alignas(16) LLPolySkeletalDistortionInfo : public LLViewerVisualParamInfo
 {
-    LL_ALIGN_NEW
     friend class LLPolySkeletalDistortion;
 public:
 
@@ -84,7 +83,6 @@ protected:
 //-----------------------------------------------------------------------------
 class alignas(16) LLPolySkeletalDistortion : public LLViewerVisualParam
 {
-    LL_ALIGN_NEW
 public:
     LLPolySkeletalDistortion(LLAvatarAppearance *avatarp);
     ~LLPolySkeletalDistortion();

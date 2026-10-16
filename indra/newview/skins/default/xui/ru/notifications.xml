@@ -657,24 +657,10 @@
 	<notification name="SaveNotecardFailReason">
 		Ошибка при сохранении заметки по следующей причине: [REASON].  Попробуйте сохранить заметку через некоторое время.
 	</notification>
-	<notification name="ScriptCannotUndo">
-		Не удалось отменить все изменения в вашей версии скрипта.
-Загрузить последнюю сохраненную на сервере версию?
-(**Предупреждение** Эту операцию нельзя отменить.)
-		<usetemplate name="okcancelbuttons" notext="Отмена" yestext="OK"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">
-		Не удалось сохранить скрипт: не найден объект, в котором он находится.
-Возможно, объект находится вне допустимого диапазона или удален.
-	</notification>
 	<notification name="StartRegionEmpty">
 		Ваш стартовый регион не определен.
 Введите название региона в поле «Место старта» или выберите в качестве места старта «Мое последнее место» или «Мой дом».
 		<usetemplate name="okbutton" yestext="OK"/>
-	</notification>
-	<notification name="CouldNotStartStopScript">
-		Не удается запустить или остановить скрипт: не найден объект, в котором он находится.
-Возможно, объект находится вне допустимого диапазона или удален.
 	</notification>
 	<notification name="CannotDownloadFile">
 		Невозможно загрузить файл
@@ -1146,10 +1132,6 @@
 Потребуется сбросить имя и настройки нового участка.
 
 Объединить землю?
-		<usetemplate name="okcancelbuttons" notext="Отмена" yestext="OK"/>
-	</notification>
-	<notification name="ConfirmNotecardSave">
-		Эта заметка должна быть сохранена до того, как предмет сможет быть скопирован или просмотрен. Сохранить заметку?
 		<usetemplate name="okcancelbuttons" notext="Отмена" yestext="OK"/>
 	</notification>
 	<notification name="ConfirmItemCopy">
@@ -2601,15 +2583,6 @@
 		Невозможно загрузить заметку.
 Повторите попытку.
 	</notification>
-	<notification name="ScriptMissing">
-		Скрипта нет в базе данных.
-	</notification>
-	<notification name="ScriptNoPermissions">
-		Недостаточно разрешений для просмотра скрипта.
-	</notification>
-	<notification name="UnableToLoadScript">
-		Невозможно загрузить скрипт.  Повторите попытку.
-	</notification>
 	<notification name="IncompleteInventory">
 		Все предлагаемое вами содержимое еще не доступно в данном месте. Попробуйте вновь предложить эти вещи через минуту.
 	</notification>
@@ -3369,7 +3342,6 @@
 Со следующими жителями:
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="Отмена" yestext="OK"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		Раздать можно только одну папку за раз.
@@ -3699,11 +3671,6 @@
 		Выбранный объект влияет на навигационную сетку.  Если заменить его на гибкий путь, он будет удален из навигационной сетки.
 		<usetemplate ignoretext="Выбранный объект влияет на навигационную сетку.  Если заменить его на гибкий путь, он будет удален из навигационной сетки." name="okcancelignore" notext="Отмена" yestext="OK"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">
-		По-видимому, ваше оборудование не удовлетворяет требованиям [APP_NAME]. Для работы [APP_NAME] необходима графическая карта OpenGL с поддержкой мультитекстур. Если у вас есть такая карта, убедитесь, что установлены новейшие версии драйверов для нее и пакеты обновлений и исправления для операционной системы.
-
-Если неполадки продолжаются, посетите сайт [SUPPORT_SITE].
-	</global>
 	<global name="UnsupportedCPUAmount">
 		796
 	</global>

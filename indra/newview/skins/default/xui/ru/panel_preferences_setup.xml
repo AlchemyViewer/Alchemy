@@ -19,8 +19,6 @@
 		<radio_item label="Для ссылок Second Life следует использовать только встроенный браузер" name="external" tool_tip="Используйте встроенный браузер для справки, веб-ссылок и т.д. Для ссылок LindenLab/Second Life следует использовать только встроенный браузер." value="1"/>
 		<radio_item label="Для всех ссылок следует использовать встроенный браузер" name="external_all" tool_tip="Для просмотра справки, ссылок на веб-страницы и т. д. будет использоваться встроенный браузер. Этот браузер открывается как новое окно в [APP_NAME]." value="2"/>
 	</radio_group>
-	<check_box initial_value="true" label="Разрешить плагины" name="browser_plugins_enabled"/>
-	<check_box initial_value="true" label="Принимать файлы cookie" name="cookies_enabled"/>
 	<check_box initial_value="true" label="Разрешить Javascript" name="browser_javascript_enabled"/>
 	<text name="Software updates:">
 		Обновления ПО:
@@ -36,12 +34,4 @@
 		Настройки прокси-сервера:
 	</text>
 	<button label="Задать настройки" label_selected="Обзор" name="set_proxy"/>
-	<text name="os_hibernation_mode">
-		Предотвращать гибернацию ОС, если пользователь не отошел:
-	</text>
-	<combo_box name="os_hibernation_combobox" tool_tip="Предотвращает переход ОС в сон, только если пользователь не отошел">
-		<combo_box.item label="Гибернация разрешена" name="can_hibernate"/>
-		<combo_box.item label="Гибернация запрещена, экран можно выключать" name="cant_hibernate"/>
-		<combo_box.item label="Гибернация запрещена, экран нельзя выключать" name="cant_hibernate_screen"/>
-	</combo_box>
 </panel>

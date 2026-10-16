@@ -52,7 +52,7 @@ void LLClipboard::reset()
     // Clear the clipboard
     mObjects.clear();
     mCutMode = false;
-    mString = LLWString();
+    mString.clear();
 }
 
 // Copy the input uuid to the LL clipboard
@@ -72,7 +72,7 @@ bool LLClipboard::addToClipboard(const LLUUID& src, const LLAssetType::EType typ
         res = true;
         if (LLAssetType::lookupIsAssetIDKnowable(type))
         {
-            LLWString source = utf8str_to_wstring(src.asString());
+            const std::string source = src.asString();
             res = addToClipboard(source, 0, static_cast<S32>(source.size()));
         }
         if (res)
@@ -115,34 +115,49 @@ bool LLClipboard::isOnClipboard(const LLUUID& object) const
 }
 
 // Copy the input string to the LL and the system clipboard
-bool LLClipboard::copyToClipboard(const LLWString &src, S32 pos, S32 len, bool use_primary)
+bool LLClipboard::copyToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary)
 {
-    return addToClipboard(src, pos, len, use_primary);
+    return addToClipboard(src, byte_pos, byte_len, use_primary);
 }
 
 // Concatenate the input string to the LL and the system clipboard
-bool LLClipboard::addToClipboard(const LLWString &src, S32 pos, S32 len, bool use_primary)
+bool LLClipboard::addToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary)
 {
+    std::string& held = use_primary ? mPrimary : mString;
     try
     {
-        mString = src.substr(pos, len);
+        held.assign(src.substr(byte_pos, byte_len));
     }
     catch (const std::exception& e)
     {
         LL_WARNS() << "Can't add the substring to clipboard: " << e.what() << LL_ENDL;
         return false;
     }
-    return (use_primary ? LLView::getWindow()->copyTextToPrimary(mString) : LLView::getWindow()->copyTextToClipboard(mString));
+    // The system clipboard is the window's; without one the text is held
+    // here and nowhere else.
+    LLWindow* window = LLView::getWindow();
+    if (!window)
+    {
+        return true;
+    }
+    return (use_primary ? window->copyTextToPrimary(held) : window->copyTextToClipboard(held));
 }
 
 // Copy the System clipboard to the output string.
 // Manage the LL Clipboard / System clipboard consistency
-bool LLClipboard::pasteFromClipboard(LLWString &dst, bool use_primary)
+bool LLClipboard::pasteFromClipboard(std::string& dst, bool use_primary)
 {
-    bool res = (use_primary ? LLView::getWindow()->pasteTextFromPrimary(dst) : LLView::getWindow()->pasteTextFromClipboard(dst));
+    std::string& held   = use_primary ? mPrimary : mString;
+    LLWindow*    window = LLView::getWindow();
+    if (!window)
+    {
+        dst = held;
+        return !dst.empty();
+    }
+    const bool res = (use_primary ? window->pasteTextFromPrimary(dst) : window->pasteTextFromClipboard(dst));
     if (res)
     {
-        mString = dst;
+        held = dst;
     }
     return res;
 }
@@ -150,6 +165,11 @@ bool LLClipboard::pasteFromClipboard(LLWString &dst, bool use_primary)
 // Return true if there's something on the System clipboard
 bool LLClipboard::isTextAvailable(bool use_primary) const
 {
-    return (use_primary ? LLView::getWindow()->isPrimaryTextAvailable() : LLView::getWindow()->isClipboardTextAvailable());
+    LLWindow* window = LLView::getWindow();
+    if (!window)
+    {
+        return !(use_primary ? mPrimary : mString).empty();
+    }
+    return (use_primary ? window->isPrimaryTextAvailable() : window->isClipboardTextAvailable());
 }
 

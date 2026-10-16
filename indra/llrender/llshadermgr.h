@@ -33,6 +33,8 @@
 #include "llgl.h"
 #include "llglslshader.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 class LLShaderMgr
 {
 public:
@@ -65,7 +67,9 @@ public:
         NORMAL_TEXCOORD,                      //  "normal_texcoord" (GLTF)
         METALLIC_ROUGHNESS_TEXCOORD,          //  "metallic_roughness_texcoord" (GLTF)
 
-        TERRAIN_TEXTURE_TRANSFORMS,           //  "terrain_texture_transforms" (GLTF)
+        TERRAIN_UV_TRANSFORM,                 //  "terrain_uv_transform"
+        TERRAIN_UV_OFFSET,                    //  "terrain_uv_offset"
+        TERRAIN_NORMAL_AXES,                  //  "terrain_normal_axes"
 
         VIEWPORT,                           //  "viewport"
         LIGHT_POSITION,                     //  "light_position"
@@ -212,6 +216,7 @@ public:
         DOF_RES_SCALE,                      //  "res_scale"
         DOF_WIDTH,                          //  "dof_width"
         DOF_HEIGHT,                         //  "dof_height"
+        DOF_UV_SCALE,                       //  "dof_uv_scale"
 
         DEFERRED_DEPTH,                     //  "depthMap"
         DEFERRED_SHADOW0,                   //  "shadowMap0"
@@ -237,11 +242,11 @@ public:
         SKIN_ORIGIN,                        //  "skin_origin" (rigged path: agent-space rebase origin the palette translations were made relative to)
 
         WATER_SCREENTEX,                    //  "screenTex"
-        WATER_EXCLUSIONTEX,                 //  "exclusionTex"
+        WATER_EXCLUSION_DISTORT,            //  "exclusionDistort"  1 where the water below is distorted, 0 where an exclusion prim covers it
         WATER_EYEVEC,                       //  "eyeVec"
         WATER_TIME,                         //  "time"
-        WATER_WAVE_DIR1,                    //  "waveDir1"
-        WATER_WAVE_DIR2,                    //  "waveDir2"
+        WATER_BIG_PHASE,                    //  "waterBigPhase"  the big wave layer's phase at the camera (ALWaterField::wavePhases)
+        WATER_LITTLE_PHASE,                 //  "waterLittlePhase"  the little map's two reads' phases at the camera
         WATER_LIGHT_DIR,                    //  "lightDir"
         WATER_SPECULAR,                     //  "specular"
         WATER_SPECULAR_EXP,                 //  "lightExp"
@@ -250,7 +255,6 @@ public:
         WATER_FOGDENSITY,                   //  "waterFogDensity"
         WATER_FOGKS,                        //  "waterFogKS"
         WATER_REFSCALE,                     //  "refScale"
-        WATER_WATERHEIGHT,                  //  "waterHeight"
         WATER_WATERPLANE,                   //  "waterPlane"
         WATER_WATERSIGN,                    //  "waterSign"
         WATER_NORM_SCALE,                   //  "normScale"
@@ -280,6 +284,15 @@ public:
 
         TERRAIN_ALPHARAMP,                  //  "alpha_ramp"
         TERRAIN_PAINTMAP,                   //  "paint_map"
+
+        TERRAIN_HEIGHT_MAP,                 //  "terrain_height_map"
+        TERRAIN_COMPOSITION_MAP,            //  "terrain_composition_map"
+        TERRAIN_TESS_ORIGIN,                //  "terrain_tess_origin"
+        TERRAIN_TESS_DENSITY,               //  "terrain_tess_density"
+        TERRAIN_GRID_SCALE,                 //  "terrain_grid_scale"
+        TERRAIN_SMOOTHING,                  //  "terrain_smoothing"
+        TERRAIN_PARCEL_OVERLAY,             //  "parcel_overlay"
+        TERRAIN_SHOW_PARCEL_OWNERS,         //  "show_parcel_owners"
 
         TERRAIN_DETAIL0_BASE_COLOR,                //  "detail_0_base_color" (GLTF)
         TERRAIN_DETAIL1_BASE_COLOR,                //  "detail_1_base_color" (GLTF)
@@ -400,7 +413,9 @@ public:
         TONEMAP_MIX,                        //  "tonemap_mix"
         TONEMAP_PARAMS,                     //  "tonemap_params"
         HDRI_SPLIT_SCREEN,                  //  "hdri_split_screen"
-        DIFFUSE_LUMINANCE_SCALE,            //  "diffuse_luminance_scale"
+        METER_PARAMS,                       //  "meter_params"          the exposure meter's per-pass parameters
+        METER_MAP,                          //  "meterMap"              the exposure meter's grid
+        EXPOSURE_HISTOGRAM,                 //  "exposureHistogram"     64x1, per bin (weight, weight * log2 luminance)
 
         // Alchemy-specific uniforms for Sky
         CUSTOM_ALPHA,                       //  "custom_alpha"
@@ -423,7 +438,7 @@ public:
         // Lens Flare
         LENS_FLARE_STRENGTH,                //  "uLensFlareStrength"
         LENS_FLARE_SUN_POS,                 //  "uLensFlareSunPos"
-        LENS_FLARE_SUN_VISIBILITY,          //  "uLensFlareSunVisibility"
+        LENS_FLARE_SUN_VISIBILITY,          //  "uLensFlareSunVisibility"  CPU screen-edge fade, an input to the state pass
         LENS_FLARE_STREAK_LENGTH,           //  "uLensFlareStreakLength"
         LENS_FLARE_STREAK_FALLOFF,          //  "uLensFlareStreakFalloff"
         LENS_FLARE_STREAK_WIDTH,            //  "uLensFlareStreakWidth"
@@ -439,13 +454,14 @@ public:
         LENS_FLARE_HALO_RADIUS,             //  "uLensFlareHaloRadius"
         LENS_FLARE_HALO_WIDTH,              //  "uLensFlareHaloWidth"
         LENS_FLARE_HALO,                    //  "uLensFlareHalo"
-        LENS_FLARE_OCCLUSION_RADIUS,        //  "uLensFlareOcclusionRadius"
+        LENS_FLARE_OCCLUSION_RADIUS,        //  "uLensFlareOcclusionRadius"  probe radius, fraction of screen height
         LENS_FLARE_STARBURST,               //  "uLensFlareStarburst"
         LENS_FLARE_STARBURST_SPIKES,        //  "uLensFlareStarburstSpikes"
         LENS_FLARE_STARBURST_SHARPNESS,     //  "uLensFlareStarburstSharpness"
         LENS_FLARE_STARBURST_FALLOFF,       //  "uLensFlareStarburstFalloff"
-        LENS_FLARE_OCCLUSION_TAPS,          //  "uLensFlareOcclusionTaps"
         LENS_FLARE_LIGHT_COLOR,             //  "uLensFlareLightColor"
+        LENS_FLARE_STATE_MAP,               //  "uLensFlareStateMap"    2x1 written by generateLensFlareState
+        LENS_FLARE_FADE_TIME,               //  "uLensFlareFadeTime"    RenderLensFlareFadeTime, seconds; the shader derives its rates
 
         // Color Correction LUT
         COLOR_GRADE_LUT,                    //  "uColorGradeLut"
@@ -463,7 +479,8 @@ public:
         SPLIT_TONE_HIGHLIGHT_RATIO,         //  "uHighlightRatio"
         SPLIT_TONE_MIDTONE_RATIO,           //  "uMidtoneRatio"
         SPLIT_TONE_MIDTONE_AMOUNT,          //  "uMidtoneAmount"
-        SPLIT_TONE_MID,                     //  "uSplitToneMid"     (0.5 + balance * 0.4)
+        SPLIT_TONE_SHADOW_RAMP,             //  "uSplitToneShadowRamp"    (1/ws, -(mid - ws)/ws)
+        SPLIT_TONE_HIGHLIGHT_RAMP,          //  "uSplitToneHighlightRamp" (1/wh, -mid/wh)
         SPLIT_TONE_AMOUNT,                  //  "uToneAmount"
 
         // Display-space grading — all CPU-precomputed to scale/bias pairs
@@ -477,10 +494,10 @@ public:
         COLOR_GRADE_VIBRANCE,               //  "uVibrance"
         COLOR_GRADE_HUE_SHIFT_NORM,         //  "uHueShiftNorm"     (degrees / 360)
 
-        // Per-channel filmic curves
-        COLOR_GRADE_CURVE_TOE,              //  "uCurveToe"
-        COLOR_GRADE_CURVE_INV_RANGE,        //  "uCurveInvRange"    (1 / (shoulder - toe))
-        COLOR_GRADE_CURVE_STRENGTH,         //  "uCurveStrength"
+        // Tone curve, baked to a 1D LUT by LLPipeline::bakeToneCurveLut
+        COLOR_GRADE_CURVE_LUT,              //  "uToneCurveLut"
+        COLOR_GRADE_CURVE_LUT_SCALE,        //  "uToneCurveLutScale"      (1 - 1/N, 0.5/N)
+        COLOR_GRADE_CURVE_AMOUNT,           //  "uToneCurveAmount"
 
         // Vignette
         VIGNETTE_AMOUNT,                    //  "uVignetteAmount"
@@ -519,12 +536,153 @@ public:
         REFERENCE_WIPE_MODE,                //  "uRefWipeMode"
         REFERENCE_WIPE_POS,                 //  "uRefWipePos"
 
+        // Geometric lens distortion — Brown-Conrady, applied in the final blit
+        LENS_DISTORT_AMOUNT,                //  "uLensDistortAmount"  master gate; 0 = off
+        LENS_DISTORT_K,                     //  "uLensDistortK"       (k1, k2) pre-multiplied by amount on CPU
+        LENS_DISTORT_SCALE,                 //  "uLensDistortScale"   auto-fit rescale (direct multiplier), solved on CPU
+        LENS_DISTORT_SQUEEZE,               //  "uLensDistortSqueeze" (1 / squeeze, 1) pre-reciprocated on CPU
+        LENS_DISTORT_CENTER,                //  "uLensDistortCenter"  decentering offset from frame centre
+        LENS_DISTORT_TANGENTIAL,            //  "uLensDistortTangential" (p1, p2) pre-multiplied by amount on CPU
+
+        // Bokeh — depth of field gather weighting (postDeferredF)
+        BOKEH_HIGHLIGHT_THRESHOLD,          //  "uBokehHighlightThreshold" luma where the boost starts
+        BOKEH_HIGHLIGHT_GAIN,               //  "uBokehHighlightGain"      0 = plain average, the fast path
+        BOKEH_HIGHLIGHT_CLAMP,              //  "uBokehHighlightClamp"     per-sample radiance ceiling; <= 0 disables
+
+        // Bokeh — shaped aperture and defocus fringing (DOF_SHAPED builds only)
+        BOKEH_BLADES,                       //  "uBokehBlades"             0 = circular, 3..11 = polygon
+        BOKEH_APERTURE_ROTATION,            //  "uBokehApertureRotation"   radians, converted from degrees on CPU
+        BOKEH_APERTURE_CURVATURE,           //  "uBokehApertureCurvature"  0 straight blades, 1 fully round
+        BOKEH_APERTURE_CONST,               //  "uBokehApertureConst"      (pi/N, 2pi/N, cos(pi/N)) baked on CPU
+        BOKEH_ANAMORPHIC,                   //  "uBokehAnamorphic"         area-preserving (x, y) stretch baked on CPU
+        BOKEH_CAT_EYE,                      //  "uBokehCatEye"             optical vignetting strength
+        BOKEH_FRINGE_AMOUNT,                //  "uBokehFringeAmount"
+        BOKEH_FRINGE_NEAR_TINT,             //  "uBokehFringeNearTint"
+        BOKEH_FRINGE_FAR_TINT,              //  "uBokehFringeFarTint"
+
+        // Lens dirt — grime on the front element, lit by bloom and flare
+        LENS_DIRT_MAP,                      //  "uLensDirtMap"
+        LENS_DIRT_STRENGTH,                 //  "uLensDirtStrength"        0 disables; forced to 0 when no plate loaded
+        LENS_DIRT_BLOOM_RESPONSE,           //  "uLensDirtBloomResponse"
+        LENS_DIRT_FLARE_RESPONSE,           //  "uLensDirtFlareResponse"
+
+        // Lens dirt generation — read only by the plate generator, which runs
+        // when a parameter moves rather than per frame
+        LENS_DIRT_RESOLUTION,               //  "uDirtResolution"      plate size; only the ratio is read
+        LENS_DIRT_SEED,                     //  "uDirtSeed"
+        LENS_DIRT_GRIME,                    //  "uDirtGrime"           master density
+        LENS_DIRT_MOTE_SCALE,               //  "uDirtMoteScale"
+        LENS_DIRT_SMUDGE,                   //  "uDirtSmudge"
+        LENS_DIRT_SCRATCHES,                //  "uDirtScratches"       0 for undamaged glass
+        LENS_DIRT_TOE,                      //  "uDirtToe"             tone curve exponent
+        LENS_DIRT_GAIN,                     //  "uDirtGain"            tone curve gain
+
+        // Cross-screen (star) filter — streaks every thresholded highlight
+        CROSS_TEXEL,                        //  "uCrossTexel"          1 / source size
+        CROSS_DIR,                          //  "uCrossDir"            unit arm direction, one chain per arm
+        CROSS_LENGTH,                       //  "uCrossLength"
+        CROSS_FALLOFF,                      //  "uCrossFalloff"
+        CROSS_CHROMATIC,                    //  "uCrossChromatic"
+        CROSS_PASS_SCALE,                   //  "uCrossPassScale"      1, 4, 16 across the passes
+        CROSS_STRENGTH,                     //  "uCrossStrength"       1.0 until the final composite
+        CROSS_REGION,                       //  "uCrossRegion"         xy origin, zw scale of the source inside its texture
+        CROSS_CLAMP,                        //  "uCrossClamp"          half a source texel in region units; 0 for a whole texture
+
+        // Lens aberrations -- bokeh shape contributed by the glass rather than
+        // by the iris, so these sit alongside the aperture controls above
+        BOKEH_SPHERICAL,                    //  "uBokehSpherical"      signed; the sign flips across focus
+        BOKEH_FIELD_STRETCH,                //  "uBokehFieldStretch"   + tangential (swirl), - radial (coma)
+        BOKEH_FIELD_FALLOFF,                //  "uBokehFieldFalloff"   exponent on normalised field radius
+        BOKEH_COMA_ASYMMETRY,               //  "uBokehComaAsymmetry"
+
+        CROSS_FILTER_MAP,                   //  "crossFilterMap"       streak accumulator, composited in colorCorrect
+
+        CUTOUT_PREMULTIPLIED,               //  "uCutoutPremultiplied" 1 in a snapshot cutout frame: scene colour is premultiplied by coverage
+
         // End Alchemy Effects Stack
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 
 
+        SH_PARTIAL,                         //  "shPartial"  (row partial sums of the probe SH projection)
+
+        WATER_FAR,                          //  "waterFar"  wave clamp distance, edge water stretch (ALFarPlane::WaterFar)
+        WATER_RIM,                          //  "waterRim"  the edge water's outer rectangle relative to the camera
+
+        EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
+        SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
+
+        MOON_QUAD_CENTER,                   //  "moonQuadCenter"  the moon quad's centre direction, for the stars it covers
+        MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length
+        MOON_QUAD_V,                        //  "moonQuadV"  its up half-extent over its squared length
+
+        // Selection outlines, hover glow and wireframe (ALSelectionOutline)
+        SELECTION_ID,                       //  "selection_id"  the object's id, 1 to 65535
+        SELECTION_PRIORITY,                 //  "selection_priority"  ALSelectionOutline::EPriority
+        SELECTION_SHOW_HIDDEN,              //  "selection_show_hidden"  1 where hidden parts are drawn dimmed
+        SELECTION_OUTLINED,                 //  "selection_outlined"  0 where the id pass holds it for its wireframe alone
+        SELECTION_SCENE_DEPTH,              //  "selection_scene_depth"  1 where the scene's depth decides what is hidden
+        OUTLINE_WIDTH,                      //  "outline_width"  the contour's width in pixels
+        OUTLINE_INNER_WIDTH,                //  "outline_inner_width"  the edges between objects' width in pixels
+        OUTLINE_GLOW_RADIUS,                //  "outline_glow_radius"  the hover glow's reach in pixels, 0 for none
+        OUTLINE_GLOW_BRIGHTNESS,            //  "outline_glow_brightness"  RenderHighlightBrightness
+        WIREFRAME_PASS,                     //  "wireframe_pass"  ALSelectionOutline::EWirePass
+        WIREFRAME_WIDTH,                    //  "wireframe_width"  the lines' width in pixels
+        SELECTION_ID_MAP,                   //  "selectionIdMap"  the id target, read by the passes after the id pass
+        SELECTION_JUMP_MAP,                 //  "selectionJumpMap"  the near sides of jumps the jump pass marks
+        SELECTION_TILE_MAP,                 //  "selectionTileMap"  the tile pass's record of each tile
+        SELECTION_PALETTE,                  //  "selectionPalette"  each id's visible and hidden colours
+        SELECTION_GLOW_REACH_MAP,           //  "selectionGlowReachMap"  the glowing ids within the glow's reach of each tile
+        SELECTION_GLOW_ROW_MAP,             //  "selectionGlowRowMap"  the nearest glowing texel along each texel's row
+        SELECTION_BACKDROP_MAP,             //  "selectionBackdrop"  the window behind the lines, at half its resolution
+        SELECTION_CONTRAST,                 //  "selection_contrast"  how lines are kept apart from the backdrop (EContrast)
+        SELECTION_KEEP_CUT,                 //  "selection_keep_cut"  1 where texels the alpha test cuts are kept as unshown surface
+        SELECTION_TILE_DEPTH_MAP,           //  "selectionTileDepthMap"  each tile's nearest eye distance not glowing
+        OUTLINE_RIM_WIDTH,                  //  "outline_rim_width"  the contour's rim in pixels, 0 for none
+
+        WATER_CELL_MAP,                     //  "waterCellMap"  the cells' water heights and flags (ALWaterSurface)
+        WATER_CELL_SQUARE,                  //  "waterCellSquare"  the cell square: its south-west corner in agent space, a cell's width, the cells a side
+        WATER_DEFAULT_HEIGHT,               //  "waterDefaultHeight"  the water height past the cell square, the agent region's
+        WATER_RINGS,                        //  "waterRings"  the rings: the square's half-size, their count, the rim, and whether the void is drawn
+        WATER_SWEEP_PHASE,                  //  "waterSweepPhase"  LL's wave sweep's phase at the camera
+        WATER_LAYOUT,                       //  "waterLayout"  which part of the field a draw places (ALWaterField::Draw)
+        WATER_GLINT_ROUGHNESS,              //  "waterGlintRoughness"  the roughness of the sun's reflection on each wave face
+        WATER_LATTICE_FRAC,                 //  "waterLatticeFrac"  the camera's place on the tiled layers' lattices, its fraction
+        WATER_LATTICE_BASE,                 //  "waterLatticeBase"  and the low 32 bits of its floor
+        WATER_MAP_MEAN,                     //  "waterMapMean"  the two wave maps' mean normal xy
+        WATER_PATCH_RECT,                   //  "waterPatchRect"  the cells drawn as wave patches, square-local, max exclusive
+        WATER_TESS_DENSITY,                 //  "waterTessDensity"  the waves' tessellation density
+        WATER_MAX_DISPLACEMENT,             //  "waterMaxDisplacement"  the most the waves move the surface, in metres
+        WATER_CULL_PLANES,                  //  "waterCullPlanes"  the view's frustum planes but the far one, agent space
+        WATER_HEIGHT_MAP,                   //  "waterHeightMap"  the current wave map's baked heights
+        WATER_HEIGHT_MAP2,                  //  "waterHeightMap2"  the next wave map's
+        WATER_WAVE_AMP,                     //  "waterWaveAmp"  each map's wave height: the dial times its rise
+        WATER_WAVE_REACH,                   //  "waterWaveReach"  the tessellation reach, and the most the waves move the surface
+        WATER_WAVE_EYE,                     //  "waterWaveEye"  the camera the waves were laid out around, in agent space
+        WATER_RAISE,                        //  "waterRaise"  how far the field a draw places is raised
+
+        // The depth pyramid (ALDepthPyramid): each level the farthest scene depth under its texels
+        DEPTH_PYRAMID,                      //  "depthPyramid"  sampler2D, a built pyramid for its readers
+        DEPTH_PYRAMID_SOURCE,               //  "depthPyramidSource"  sampler2D the build reads: scene depth for level 0, the pyramid's previous level after
+        DEPTH_PYRAMID_TARGET,               //  "depthPyramidTarget"  image2D[5] (r32f), the levels a build dispatch writes
+        DEPTH_PYRAMID_LEVEL,                //  "depthPyramidLevel"  int, the pyramid lod a build dispatch reads, -1 for the depth
+        DEPTH_PYRAMID_SIZE,                 //  "depthPyramidSize"  ivec4, the depth's size in pixels (xy) and the pyramid's levels (z)
+        DEPTH_PYRAMID_COUNT,                //  "depthPyramidCount"  int, the levels a build dispatch writes
+
+        // The waves' patches
+        WATER_OCCLUSION,                    //  "waterOcclusion"  int, whether the control stage culls against the depth pyramid
+        WATER_PATCH_ORDER,                  //  "waterPatchOrder"  ivec4, the order the patches are drawn in
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
+
+    // Shader storage blocks, by block name, set in initAttribsAndUniforms beside the uniforms. Each has fixed binding
+    // points, the same in every program that declares it, as the engine's uniform blocks have theirs: the entries
+    // take them in this order, an array of blocks one for each of its elements. A buffer bound at a block's point is
+    // there for every program, so a pass binds it once whatever it draws or dispatches between.
+    typedef enum
+    {                                       // Block name, element count
+        END_RESERVED_STORAGE_BLOCKS
+    } eGLSLReservedStorageBlocks;
     // clang-format on
 
     // singleton pattern implementation
@@ -537,10 +695,29 @@ public:
     void dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text);
     bool    linkProgramObject(GLuint obj, bool suppress_errors = false, const std::string& shader_name = "unknown");
     bool    validateProgramObject(GLuint obj);
+    // Compile a shared object into mShaderObjects, which owns it from then on: programs attach it by name and never
+    // delete it, and an object it replaces under the same key is deleted. Returns the object, or 0.
     // `cache_key` overrides the map key the compiled object is stored under; empty means the
     // path. Shared objects are compiled once and attached by name, so a source that keys on a
     // compile-time variant axis is compiled once per axis value under distinct keys.
-    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string());
+    // `min_glsl_version` is the least #version the stage compiles at (430 to read storage blocks or images); 0 is the
+    // context's usual, and a compute stage is always 430. A context whose GLSL is below it fails the stage.
+    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string(), U32 min_glsl_version = 0);
+    // Compile a stage the caller owns and deletes, stored nowhere: what a program compiles of its own files. As
+    // loadShaderFile otherwise, from the class `shader_level` names down to the first that compiles.
+    GLuint compileShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, U32 min_glsl_version = 0);
+
+    // Delete a shader object. One still attached to a program is only flagged, and goes when the last program
+    // holding it detaches it.
+    static void deleteShaderObject(GLuint object);
+
+    // Shader objects compileShaderFile has made and deleteShaderObject has not yet deleted: the shared ones, plus any
+    // a program is still linking. A count that only grows is a leak.
+    static U32 sLiveObjects;
+
+    // The binding point of `element` of a reserved storage block (eGLSLReservedStorageBlocks), the same in every
+    // program; -1 for an index or element the table does not have.
+    S32 getStorageBlockBinding(S32 block, U32 element = 0) const;
 
     // Suffixes marking the axis copies of a shared object. Not legal path character sequences,
     // so they cannot collide with a real file.
@@ -577,21 +754,53 @@ public:
     bool loadCachedProgramBinary(LLGLSLShader* shader);
     bool saveCachedProgramBinary(LLGLSLShader* shader);
 
+    // The pipeline stages a shader object can be compiled for, as indices into
+    // mShaderObjects. GLSL links per stage, so an object a program attaches must
+    // have been compiled for the stage it is attached to; the same source can
+    // sit in several maps.
+    enum EShaderStage : U32
+    {
+        STAGE_VERTEX = 0,
+        STAGE_TESS_CONTROL,
+        STAGE_TESS_EVALUATION,
+        STAGE_GEOMETRY,
+        STAGE_FRAGMENT,
+        STAGE_COMPUTE,
+        STAGE_COUNT
+    };
+    static EShaderStage stageIndex(GLenum type);
+    // The "#define <STAGE>_SHADER 1" line loadShaderFile prepends for a stage.
+    static const char* stageDefine(GLenum type);
+
+    // Delete every shared object and forget it. A program built on them goes on drawing, as a linked program needs
+    // none of its objects; one built afterwards needs them compiled again.
+    void clearShaderObjects();
+
 public:
-    // Map of shader names to compiled
-    std::map<std::string, GLuint> mVertexShaderObjects;
-    std::map<std::string, GLuint> mFragmentShaderObjects;
+    // Compiled shared shader objects per stage, keyed by path -- or by the
+    // distinct key an axis copy was stored under (see loadShaderFile). The
+    // manager owns them: unloading a program that attached one leaves it here.
+    boost::unordered_flat_map<std::string, GLuint> mShaderObjects[STAGE_COUNT];
 
     //global (reserved slot) shader parameters
     std::vector<std::string> mReservedAttribs;
 
     std::vector<std::string> mReservedUniforms;
 
+    // The storage blocks, in eGLSLReservedStorageBlocks order: a block's name, and how many elements an array of it
+    // has (1 for a single block). Their binding points together stay within AL_NUM_STORAGE_BINDINGS.
+    struct ReservedStorageBlock
+    {
+        std::string mName;
+        U32         mCount = 1;
+    };
+    std::vector<ReservedStorageBlock> mReservedStorageBlocks;
+
     struct ProgramBinaryData
     {
         GLsizei mBinaryLength = 0;
         GLenum mBinaryFormat = 0;
-        F32 mLastUsedTime = 0.0;
+        F64 mLastUsedTime = 0.0;    // calendar seconds, kept across sessions
     };
     std::map<LLUUID, ProgramBinaryData> mShaderBinaryCache;
     LLUUID mShaderCacheVersion;

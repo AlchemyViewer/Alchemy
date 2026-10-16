@@ -37,9 +37,11 @@
 class LLButton;
 class LLTextBox;
 
-class LLInventoryLinkReplaceDropTarget : public LLLineEditor
+class LLInventoryLinkReplaceDropTarget final : public LLLineEditor
 {
 public:
+    AL_VIEW_TYPE(LLInventoryLinkReplaceDropTarget, LLLineEditor);
+
     struct Params : public LLInitParam::Block<Params, LLLineEditor::Params>
     {
         Params()
@@ -56,7 +58,7 @@ public:
         return mDADSignal.connect(cb);
     }
 
-    virtual bool postBuild()
+    virtual bool postBuild() override
     {
         setEnabled(false);
         return LLLineEditor::postBuild();
@@ -66,7 +68,7 @@ public:
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
-                                   std::string& tooltip_msg);
+                                   std::string& tooltip_msg) override;
 
     LLUUID getItemID() const { return mItemID; }
     void setItem(LLInventoryItem* item);
@@ -78,18 +80,20 @@ private:
 };
 
 
-class LLFloaterLinkReplace : public LLFloater, LLEventTimer
+class LLFloaterLinkReplace final : public LLFloater, LLEventTimer
 {
     LOG_CLASS(LLFloaterLinkReplace);
 
 public:
+    AL_VIEW_TYPE(LLFloaterLinkReplace, LLFloater);
+
     LLFloaterLinkReplace(const LLSD& key);
     virtual ~LLFloaterLinkReplace();
 
-    bool postBuild();
-    virtual void onOpen(const LLSD& key);
+    bool postBuild() override;
+    virtual void onOpen(const LLSD& key) override;
 
-    virtual bool tick();
+    virtual bool tick() override;
 
 private:
     void checkEnableStart();

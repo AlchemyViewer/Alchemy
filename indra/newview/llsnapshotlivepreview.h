@@ -27,22 +27,29 @@
 #ifndef LL_LLSNAPSHOTLIVEPREVIEW_H
 #define LL_LLSNAPSHOTLIVEPREVIEW_H
 
+#include "alsnapshotcutout.h"
 #include "llsnapshotmodel.h"
 #include "llviewertexture.h"
 #include "llviewerwindow.h"
+
+#include <optional>
 
 class LLImageJPEG;
 
 ///----------------------------------------------------------------------------
 /// Class LLSnapshotLivePreview
 ///----------------------------------------------------------------------------
-class LLSnapshotLivePreview : public LLView
+class LLSnapshotLivePreview final : public LLView
 {
     LOG_CLASS(LLSnapshotLivePreview);
 public:
+    AL_VIEW_TYPE(LLSnapshotLivePreview, LLView);
+
     typedef boost::signals2::signal<void(void)> snapshot_saved_signal_t;
 
     static void saveLocal(LLPointer<LLImageFormatted> image, const snapshot_saved_signal_t::slot_type& success_cb = snapshot_saved_signal_t(), const snapshot_saved_signal_t::slot_type& failure_cb = snapshot_saved_signal_t());
+    /// An empty image of @a format, at @a quality where the format has one.
+    static LLPointer<LLImageFormatted> createFormattedImage(LLSnapshotModel::ESnapshotFormat format, S32 quality);
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Params()
@@ -58,8 +65,8 @@ public:
 
     void setContainer(LLView* container) { mViewContainer = container; }
 
-    /*virtual*/ void draw();
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent);
+    /*virtual*/ void draw() override;
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent) override;
 
     void setSize(S32 w, S32 h);
     void setWidth(S32 w) { mWidth[mCurImageIndex] = w; }
@@ -100,6 +107,13 @@ public:
     void setAllowFullScreenPreview(bool allow) { mAllowFullScreenPreview = allow; }
     void setFilter(std::string filter_name) { mFilterName = filter_name; }
     std::string  getFilter() const { return mFilterName; }
+    /// The cutout this preview takes, or none. Set by whoever owns the preview
+    /// (ALSnapshotCutout::fromSettings), never read from settings here: previews of
+    /// other floaters share the list and the settings.
+    void setCutout(const std::optional<ALSnapshotCutout>& cutout);
+    bool hasCutout() const { return mCutout.has_value(); }
+    /// The last cutout drawn was its fill alone: the subject nowhere in view.
+    bool cutoutDrewNothing() const { return mCutout.has_value() && !mCutoutDrawn; }
     void updateSnapshot(bool new_snapshot, bool new_thumbnail = false, F32 delay = 0.f);
     void saveTexture(bool outfit_snapshot = false, std::string name = "");
     void saveLocal(const snapshot_saved_signal_t::slot_type& success_cb, const snapshot_saved_signal_t::slot_type& failure_cb);
@@ -111,6 +125,9 @@ public:
     /// Sets size of preview thumbnail image and the surrounding rect.
     void setThumbnailPlaceholderRect(const LLRect& rect) {mThumbnailPlaceholderRect = rect; }
     bool setThumbnailImageSize() ;
+    /// True if the thumbnail is the preview made smaller, rather than a
+    /// screen grab of its own -- and so sized from the preview too.
+    bool thumbnailScaledFromPreview() const;
     void generateThumbnailImage(bool force_update = false) ;
     void resetThumbnailImage() { mThumbnailImage = NULL ; }
     void drawPreviewRect(S32 offset_x, S32 offset_y, LLColor4 alpha_color = LLColor4(0.5f, 0.5f, 0.5f, 0.8f));
@@ -173,6 +190,16 @@ private:
     bool                        mSnapshotActive;
     LLSnapshotModel::ESnapshotLayerType mSnapshotBufferType;
     std::string                 mFilterName;
+    std::optional<ALSnapshotCutout> mCutout;
+    bool                        mCutoutDrawn = true;
+    // The last cutout drawn, resolved and not yet over its fill: a change of
+    // fill or format lays it down again (mCutoutRelayOnly) instead of drawing
+    // the scene again.
+    LLPointer<LLImageRaw>       mCutoutResolved;
+    bool                        mCutoutRelayOnly = false;
+
+    // mPreviewImage from mCutoutResolved over the current cutout's fill.
+    bool layCutoutOverFill();
 
     static LLPointer<LLImageFormatted> sSaveLocalImage;
 

@@ -37,11 +37,14 @@ class LLSpinCtrl;
 class ALPanelQuickSettings final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALPanelQuickSettings, LLPanel);
+
     ALPanelQuickSettings();
     ~ALPanelQuickSettings();
 
     bool postBuild() override;
     void refresh() override;
+    void onVisibilityChange(bool new_visibility) override;
 
 private:
     void onHoverSliderMoved(const LLSD& val);

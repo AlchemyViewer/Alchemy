@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="SUBIR MODELO">
-	<string name="status_idle"/>
 	<string name="status_parse_error">
 		Error: Problema de análisis de DAE - consulta los datos en el registro.
 	</string>
@@ -78,19 +77,6 @@
 			<text name="name_label">
 				Nombre del modelo:
 			</text>
-			<text name="model_category_label">
-				Este modelo representa...
-			</text>
-			<combo_box name="model_category_combo">
-				<combo_item label="Elegir uno..." name="Choose one"/>
-				<combo_item label="Forma del avatar" name="Avatar shape"/>
-				<combo_item label="Anexo del avatar" name="Avatar attachment"/>
-				<combo_item label="Objeto en movimiento (vehículo, animal)" name="Moving object (vehicle, animal)"/>
-				<combo_item label="Componente de construcción" name="Building Component"/>
-				<combo_item label="Grande, sin movimiento, etc." name="Large, non moving etc"/>
-				<combo_item label="Más pequeño, sin movimiento, etc." name="Smaller, non-moving etc"/>
-				<combo_item label="No es exactamente ninguno de estos" name="Not really any of these"/>
-			</combo_box>
 		</panel>
 		<tab_container name="import_tab">
 			<panel label="Nivel de detalle" name="lod_panel" title="Nivel de detalle">
@@ -100,7 +86,6 @@
 				<text initial_value="Alto" name="high_label" value="Alto"/>
 				<combo_box name="lod_source_high">
 					<item label="Cargar desde archivo" name="Load from file" value="Cargar desde archivo"/>
-					<item label="Generar" name="Generate" value="Generar"/>
 				</combo_box>
 				<button label="Buscar..." name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
@@ -112,7 +97,6 @@
 				<text initial_value="Medio" name="medium_label" value="Medio"/>
 				<combo_box name="lod_source_medium">
 					<item label="Cargar desde archivo" name="Load from file" value="Cargar desde archivo"/>
-					<item label="Generar" name="Generate" value="Generar"/>
 					<item label="Usar nivel de detalle superior" name="Use LoD above" value="Usar nivel de detalle superior"/>
 				</combo_box>
 				<button label="Buscar..." name="lod_browse_medium"/>
@@ -125,7 +109,6 @@
 				<text initial_value="Bajo" name="low_label" value="Bajo"/>
 				<combo_box name="lod_source_low">
 					<item label="Cargar desde archivo" name="Load from file" value="Cargar desde archivo"/>
-					<item label="Generar" name="Generate" value="Generar"/>
 					<item label="Usar nivel de detalle superior" name="Use LoD above" value="Usar nivel de detalle superior"/>
 				</combo_box>
 				<button label="Buscar..." name="lod_browse_low"/>
@@ -138,7 +121,6 @@
 				<text initial_value="Mínimo" name="lowest_label" value="Mínimo"/>
 				<combo_box name="lod_source_lowest">
 					<item label="Cargar desde archivo" name="Load from file" value="Cargar desde archivo"/>
-					<item label="Generar" name="Generate" value="Generar"/>
 					<item label="Usar nivel de detalle superior" name="Use LoD above" value="Usar nivel de detalle superior"/>
 				</combo_box>
 				<button label="Buscar..." name="lod_browse_lowest"/>
@@ -158,43 +140,14 @@
 						Paso 1: Nivel de detalle
 					</text>
 					<combo_box name="physics_lod_combo" tool_tip="Niveles de detalle para utilizar con la forma física">
-						<combo_item name="choose_one">
-							Elegir uno...
-						</combo_item>
-						<combo_item name="physics_high">
-							Alto
-						</combo_item>
-						<combo_item name="physics_medium">
-							Medio
-						</combo_item>
-						<combo_item name="physics_low">
-							Bajo
-						</combo_item>
-						<combo_item name="physics_lowest">
-							Mínimo
-						</combo_item>
-						<combo_item name="load_from_file">
-							De archivo
-						</combo_item>
+						<combo_item name="choose_one" label="Elegir uno..."/>
+						<combo_item name="physics_high" label="Alto"/>
+						<combo_item name="physics_medium" label="Medio"/>
+						<combo_item name="physics_low" label="Bajo"/>
+						<combo_item name="physics_lowest" label="Mínimo"/>
+						<combo_item name="load_from_file" label="De archivo"/>
 					</combo_box>
 					<button label="Buscar..." name="physics_browse"/>
-				</panel>
-				<panel name="physics analysis">
-					<text name="method_label">
-						Paso 2: Analizar
-					</text>
-					<text name="analysis_method_label">
-						Método:
-					</text>
-					<text name="quality_label">
-						Calidad:
-					</text>
-					<text name="smooth_method_label">
-						Leve:
-					</text>
-					<check_box label="Cerrar agujeros" name="Close Holes (Slow)"/>
-					<button label="Analizar" name="Decompose"/>
-					<button label="Cancelar" name="decompose_cancel"/>
 				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
@@ -230,6 +183,25 @@
 						Apariencias: [HULLS]
 					</text>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="smooth_method_label">
+						Leve:
+					</text>
+					<text name="quality_label">
+						Calidad:
+					</text>
+					<text name="analysis_method_label">
+						Método:
+					</text>
+					<text name="method_label">
+						Paso 2: Analizar
+					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="Cancelar" name="decompose_cancel"/>
+					<button label="Analizar" name="Decompose"/>
+					<check_box label="Cerrar agujeros" name="Close Holes (Slow)"/>
+				</panel>
 			</panel>
 			<panel label="Opciones de subida" name="modifiers_panel">
 				<text name="scale_label">
@@ -243,16 +215,15 @@
 					[X] X [Y] X [Z]
 				</text>
 				<check_box label="Incluir texturas" name="upload_textures"/>
-				<text name="include_label">
-					Solo para modelos de avatar:
-				</text>
-				<check_box label="Incluir el peso de la piel" name="upload_skin"/>
-				<check_box label="Incluir posturas de las articulaciones" name="upload_joints"/>
-				<check_box label="Bloquear la escala si está definida la posición de la articulación" name="lock_scale_if_joint_position"/>
+			</panel>
+			<panel name="rigging_panel">
+				<spinner name="pelvis_offset" value="0.0"/>
 				<text name="pelvis_offset_label">
 					Desplazamiento Z (subir o bajar el avatar):
 				</text>
-				<spinner name="pelvis_offset" value="0.0"/>
+				<check_box label="Bloquear la escala si está definida la posición de la articulación" name="lock_scale_if_joint_position"/>
+				<check_box label="Incluir posturas de las articulaciones" name="upload_joints"/>
+				<check_box label="Incluir el peso de la piel" name="upload_skin"/>
 			</panel>
 		</tab_container>
 		<panel name="weights_and_warning_panel">

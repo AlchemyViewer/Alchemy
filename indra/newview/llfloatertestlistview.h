@@ -30,8 +30,11 @@
 
 class LLSD;
 
-class LLFloaterTestListView : public LLFloater
+class LLFloaterTestListView final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterTestListView, LLFloater);
+private:
     friend class LLFloaterReg;
 
 private:

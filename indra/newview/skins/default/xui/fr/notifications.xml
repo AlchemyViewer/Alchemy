@@ -557,21 +557,11 @@ L'objet est peut-être inaccessible ou a peut-être été supprimé.</notificati
 	<notification name="SaveNotecardFailObjectNotFound">La note n'a pas pu être enregistrée car l'objet ou l'inventaire de l'objet associé n'a pas été trouvé.
 L'objet est peut-être inaccessible ou a peut-être été supprimé.</notification>
 	<notification name="SaveNotecardFailReason">Une erreur est survenue lors de l'enregistrement de la note, suite au problème suivant : [REASON]. Essayez d'enregistrer votre note ultérieurement.</notification>
-	<notification name="ScriptCannotUndo">
-		Impossible d'annuler tous les changements dans votre version du script.
-Souhaitez-vous charger la dernière version enregistrée sur le serveur ?
-(**Attention** Cette opération est irréversible.)
-		<usetemplate name="okcancelbuttons" notext="Annuler" yestext="OK"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">Impossible d'enregistrer le script car l'objet qui le contient est introuvable.
-L'objet est peut-être inaccessible ou a peut-être été supprimé.</notification>
 	<notification name="StartRegionEmpty">
 		Vous n'avez pas défini de région de départ.
 Saisissez le nom de la région voulue dans la case Lieu de départ ou choisissez Dernier emplacement ou Domicile comme lieu de départ.
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
-	<notification name="CouldNotStartStopScript">Impossible de lancer ou d'arrêter le script car l'objet qui le contient est introuvable.
-L'objet est peut-être inaccessible ou a peut-être été supprimé.</notification>
 	<notification name="CannotDownloadFile">Impossible de télécharger le fichier</notification>
 	<notification label="" name="MediaFileDownloadUnsupported">
 		Vous avez demandé un téléchargement de fichier, qui n’est pas pris en charge dans [SECOND_LIFE].
@@ -852,10 +842,6 @@ Sélectionnez le terrain sur les deux parcelles.</notification>
 Vous devrez réinitialiser le nom et les options de la nouvelle parcelle.
 
 Fusionner le terrain ?
-		<usetemplate name="okcancelbuttons" notext="Annuler" yestext="OK"/>
-	</notification>
-	<notification name="ConfirmNotecardSave">
-		Cette note doit être sauvegardée avant que l'objet ne puisse être copié ou visualisé. Enregistrer la note ?
 		<usetemplate name="okcancelbuttons" notext="Annuler" yestext="OK"/>
 	</notification>
 	<notification name="ConfirmItemCopy">
@@ -1448,7 +1434,6 @@ or ce nombre dépasse la limite autorisée fixée à [LIMIT].
 	<notification label="Envoyer un message à tout le monde dans votre domaine" name="MessageEstate">
 		Saisissez un message court qui sera envoyé à tous les résidents se trouvant actuellement sur votre domaine.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Annuler"/>
 		</form>
@@ -1694,7 +1679,6 @@ Publier cette petite annonce maintenant pour [AMOUNT] L$ ?
 	<notification label="Envoyer un message à la région" name="MessageRegion">
 		Saisissez un message qui sera envoyé à tous les résidents présents dans cette région.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Annuler"/>
 		</form>
@@ -2043,9 +2027,6 @@ Cela risque d'impacter votre mot de passe.</notification>
 	<notification name="IMAcrossParentEstates">Impossible d'envoyer d'IM entre domaines parents.</notification>
 	<notification name="TransferInventoryAcrossParentEstates">Impossible de transférer l'inventaire entre domaines parents.</notification>
 	<notification name="UnableToLoadNotecard">Impossible de lire les données de la note actuellement.</notification>
-	<notification name="ScriptMissing">Script absent de la base de données.</notification>
-	<notification name="ScriptNoPermissions">Droits insuffisants pour voir le script.</notification>
-	<notification name="UnableToLoadScript">Impossible de charger le script. Merci de réessayer.</notification>
 	<notification name="IncompleteInventory">Tous les éléments que vous souhaitez transférer ne sont pas encore disponibles sur le serveur.
 Merci d'essayer à nouveau dans une minute.</notification>
 	<notification name="CannotModifyProtectedCategories">Vous ne pouvez pas modifier de catégories protégées.</notification>
@@ -2538,7 +2519,6 @@ Voir Alchemy.log pour plus de détails.</notification>
 avec les résidents suivants :
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="Annuler" yestext="OK"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		Vous ne pouvez partager qu'un dossier à la fois.
@@ -2808,9 +2788,6 @@ Voulez-vous continuer ?
 		L'objet sélectionné affecte le maillage de navigation. Si vous le modifiez en Flexibilité, il sera supprimé de ce maillage.
 		<usetemplate ignoretext="L'objet sélectionné affecte le maillage de navigation. Si vous le modifiez en Flexibilité, il sera supprimé de ce maillage." name="okcancelignore" notext="Annuler" yestext="OK"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">Vous semblez ne pas avoir le matériel requis pour utiliser [APP_NAME]. [APP_NAME] requiert une carte graphique OpenGL avec une prise en charge du multitexturing. Si vous avez une telle carte, assurez-vous que vous avez aussi les pilotes les plus récents pour la carte, ainsi que les service packs et les patchs pour votre système d'exploitation.
-
-Si vous avez toujours des problèmes, veuillez consulter la page [SUPPORT_SITE].</global>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
 	<global name="UnsupportedGPU">- Votre carte graphique ne remplit pas les conditions minimum requises.</global>

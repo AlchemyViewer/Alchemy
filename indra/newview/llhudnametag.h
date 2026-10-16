@@ -37,11 +37,12 @@
 #include "llrect.h"
 //#include "llframetimer.h"
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include <set>
 #include <vector>
 
 class LLHUDNameTag;
+class LLHUDTextScope;
 class LLUIImage;
 
 struct llhudnametag_further_away
@@ -55,22 +56,37 @@ protected:
     class LLHUDTextSegment
     {
     public:
-        LLHUDTextSegment(const LLWString& text, const LLFontGL::StyleFlags style, const LLColor4& color, const LLFontGL* font)
+        LLHUDTextSegment(std::string text, const LLFontGL::StyleFlags style, const LLColor4& color, const LLFontGL* font)
         :   mColor(color),
             mStyle(style),
-            mText(text),
+            mText(std::move(text)),
             mFont(font)
         {}
         F32 getWidth(const LLFontGL* font);
-        const LLWString& getText() const { return mText; }
-        void clearFontWidthMap() { mFontWidthMap.clear(); }
+        const std::string& getText() const { return mText; }
+
+        // Draws this line through the scope, from the same cache the width
+        // came out of -- one piece of text, one place its work is kept.
+        void draw(LLHUDTextScope& scope, const LLFontGL& font, U8 style,
+                  LLFontGL::ShadowType shadow, F32 x_offset, F32 y_offset,
+                  const LLColor4& color) const;
+
+        // Let go of the shaped glyphs, keeping the segment. For text that has
+        // gone off screen and may come back.
+        void releaseGeometry() const { mFontCache.reset(); }
 
         LLColor4                mColor;
         LLFontGL::StyleFlags    mStyle;
         const LLFontGL*         mFont;
     private:
-        LLWString               mText;
-        std::map<const LLFontGL*, F32> mFontWidthMap;
+        std::string             mText;
+
+        // What this segment's text costs to measure and to draw, kept between
+        // frames. A segment is measured once per frame per font to place it
+        // and then drawn, and its text never changes -- segments are rebuilt
+        // wholesale, not edited. The cache notices a font or scale change for
+        // itself, which is what the manual sweep on reshape used to be for.
+        mutable LLFontTextCache mFontCache;
     };
 
 public:
@@ -90,6 +106,15 @@ public:
     static const F32 HUD_TEXT_MAX_WIDTH; // 190px
 
 public:
+    // How many lines have been added since the text was last cleared, and a
+    // way to recolour one of them without disturbing what it has shaped. A
+    // line that wraps becomes several segments, so a caller that added it has
+    // no other way to find them again. Chat bubbles fade continuously while
+    // their text stands still, and rebuilding for a colour reshaped every
+    // line of every chatting avatar on screen, every frame.
+    S32 getNumLines() const { return (S32)mLineSegmentCounts.size(); }
+    void setLineColor(S32 line_index, const LLColor4& color);
+
     // Set entire string, eliminating existing lines
     void setString(const std::string& text_utf8);
 
@@ -132,6 +157,11 @@ public:
     bool getVisible() const { return mVisible; }
     bool getHidden() const { return mHidden; }
     void setHidden( bool hide ) { mHidden = hide; }
+
+    // Drop what every line of this tag has shaped, keeping the lines. Called
+    // when the tag leaves the screen, so only what is on it holds geometry.
+    void releaseTextGeometry();
+
     void shift(const LLVector3& offset);
     F32 getWorldHeight() const;
 
@@ -141,6 +171,14 @@ public:
     static void addPickable(std::set<LLViewerObject*> &pick_list);
     static void reshape();
     static void setDisplayText(bool flag) { sDisplayText = flag ; }
+
+    // Let go of the lists the per-frame passes keep. They hold references, so
+    // a tag they still name outlives the sweep that marked it dead and is
+    // destroyed at static-destruction time instead -- after the GL context,
+    // while its lines still hold the vertex buffers they shaped. Called from
+    // LLHUDObject::cleanupHUDObjects, which is where every tag is marked dead
+    // and where the last reference should be dropped.
+    static void releaseTextObjects();
 
 protected:
     LLHUDNameTag(const U8 type);
@@ -169,6 +207,14 @@ private:
     const LLFontGL* mBoldFontp;
     LLRectf         mSoftScreenRect;
     LLVector3       mPositionAgent;
+    // How far a screen pixel reaches in the world at this tag's position,
+    // taken once per frame alongside the position it is derived from.
+    // Deriving it costs a tangent and three window lookups, and the overlap
+    // pass below asks for a tag's screen rectangle once per overlapping
+    // neighbour per iteration -- thousands of times over, for an answer that
+    // cannot change while the frame is being built.
+    LLVector3       mPixelUpVec;
+    LLVector3       mPixelRightVec;
     LLVector2       mPositionOffset;
     LLVector2       mTargetPositionOffset;
     F32             mMass;
@@ -177,6 +223,9 @@ private:
     F32             mRadius;
     std::vector<LLHUDTextSegment> mTextSegments;
     std::vector<LLHUDTextSegment> mLabelSegments;
+    // Segments produced by each addLine, in call order. One line wraps into
+    // as many as it needs, and this is what maps a line back to them.
+    std::vector<S32>              mLineSegmentCounts;
 //  LLFrameTimer    mResizeTimer;
     ETextAlignment  mTextAlignment;
     EVertAlignment  mVertAlignment;
@@ -187,6 +236,15 @@ private:
 
     static bool    sDisplayText ;
     static std::set<LLPointer<LLHUDNameTag> > sTextObjects;
+    // The same tags in one run of memory, for the passes that visit all of
+    // them every frame. The set stays the authority on what exists -- it is
+    // what insertion and removal work against, and removal can happen while a
+    // pass is running -- so this is rebuilt from it only when it changes, and
+    // holds its own references so a removal mid-pass cannot pull a tag out
+    // from under one.
+    static std::vector<LLPointer<LLHUDNameTag> > sAllTextObjects;
+    static bool sAllTextObjectsDirty;
+    static const std::vector<LLPointer<LLHUDNameTag> >& getAllTextObjects();
     static std::vector<LLPointer<LLHUDNameTag> > sVisibleTextObjects;
 //  static std::vector<LLPointer<LLHUDNameTag> > sVisibleHUDTextObjects;
     typedef std::set<LLPointer<LLHUDNameTag> >::iterator TextObjectIterator;

@@ -31,6 +31,7 @@
 #include "llerror.h"
 
 #include <iomanip>
+#include <set>
 //#include <memory>
 
 #if LL_WINDOWS
@@ -89,7 +90,10 @@ namespace
         eL2Associativity,
         eCacheSizeK,
         eFeatureBits,
-        eExtFeatureBits
+        eExtFeatureBits,
+        eMicrocode,
+        ePhysicalCores,
+        eLogicalProcessors
     };
 
     const char* cpu_config_names[] =
@@ -102,7 +106,10 @@ namespace
         "L2 Associativity",
         "Cache Size",
         "Feature Bits",
-        "Ext. Feature Bits"
+        "Ext. Feature Bits",
+        "Microcode",
+        "Physical Cores",
+        "Logical Processors"
     };
 
 
@@ -126,6 +133,10 @@ namespace
         eAVX_Features = 41,
         eAVX2_Features = 42,
         eAVX512F_Features = 43,
+        eNEON_Features = 44,
+        eNEON_DotProd_Features = 45,
+        eNEON_FP16_Features = 46,
+        eSVE_Features = 47,
     };
 
     const char* cpu_feature_names[] =
@@ -176,8 +187,13 @@ namespace
         "AVX Instructions",   // 41
         "AVX2 Instructions",  // 42
         "AVX-512F Instructions", // 43
+        "NEON Instructions", // 44
+        "NEON Dot Product", // 45
+        "NEON FP16", // 46
+        "SVE Instructions", // 47
     };
 
+#ifndef LL_ARM64
     std::string intel_CPUFamilyName(int composed_family)
     {
         switch(composed_family)
@@ -233,7 +249,7 @@ namespace
         }
         return STRINGIZE("Unrecognized CPU vendor <" << cpu_vendor << ">");
     }
-
+#endif
 } // end unnamed namespace
 
 // The base class for implementations.
@@ -304,6 +320,26 @@ public:
         return hasExtension(cpu_feature_names[eAVX512F_Features]);
     }
 
+    bool hasNEON() const
+    {
+        return hasExtension(cpu_feature_names[eNEON_Features]);
+    }
+
+    bool hasNEONDotProd() const
+    {
+        return hasExtension(cpu_feature_names[eNEON_DotProd_Features]);
+    }
+
+    bool hasNEONFP16() const
+    {
+        return hasExtension(cpu_feature_names[eNEON_FP16_Features]);
+    }
+
+    bool hasSVE() const
+    {
+        return hasExtension(cpu_feature_names[eSVE_Features]);
+    }
+
     bool hasAltivec() const
     {
         return hasExtension("Altivec");
@@ -327,6 +363,7 @@ public:
         out << "Extended family:  " << getInfo(eExtendedFamily, 0) << std::endl;
         out << "Model:            " << getInfo(eModel, 0) << std::endl;
         out << "Extended model:   " << getInfo(eExtendedModel, 0) << std::endl;
+        out << "Stepping:         " << getInfo(eStepping, 0) << std::endl;
         out << "Type:             " << getInfo(eType, 0) << std::endl;
         out << "Brand ID:         " << getInfo(eBrandID, 0) << std::endl;
         out << std::endl;
@@ -403,6 +440,7 @@ private:
 // LL_MSVC and not LLWINDOWS because some of the following code
 // uses the MSVC compiler intrinsics __cpuid() and __rdtsc().
 
+#ifndef LL_ARM64
 // Delays for the specified amount of milliseconds
 static void _Delay(unsigned int ms)
 {
@@ -495,6 +533,16 @@ static F64 calculate_cpu_frequency(U32 measure_msecs)
     // member var uqwFrequency - converted to MHz
     return frequency  / (F64)1000000;
 }
+#else
+// Feature numbers newer than some of the SDKs this builds with. A Windows
+// older than the feature reports FALSE for it.
+#ifndef PF_ARM_SVE_INSTRUCTIONS_AVAILABLE
+#define PF_ARM_SVE_INSTRUCTIONS_AVAILABLE 46
+#endif
+#ifndef PF_ARM_V82_FP16_INSTRUCTIONS_AVAILABLE
+#define PF_ARM_V82_FP16_INSTRUCTIONS_AVAILABLE 67
+#endif
+#endif // !LL_ARM64
 
 // Windows implementation
 class LLProcessorInfoWindowsImpl : public LLProcessorInfoImpl
@@ -503,10 +551,99 @@ public:
     LLProcessorInfoWindowsImpl()
     {
         getCPUIDInfo();
+#ifndef LL_ARM64
         setInfo(eFrequency, calculate_cpu_frequency(50));
+#endif
     }
 
 private:
+#if LL_ARM64
+    // Windows on Arm has no CPUID. Windows describes each processor under
+    // this registry key, and reports the instruction set extensions through
+    // IsProcessorFeaturePresent.
+    void getCPUIDInfo()
+    {
+        const wchar_t* cpu_key = L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0";
+
+        std::string vendor = getRegistryString(cpu_key, L"VendorIdentifier");
+        if (vendor.empty())
+        {
+            vendor = "ARM64";
+        }
+        const std::string brand = getRegistryString(cpu_key, L"ProcessorNameString");
+        setInfo(eVendor, vendor);
+        setInfo(eBrandName, brand.empty() ? vendor + " ARM64" : brand);
+        setInfo(eFamilyName, vendor + " ARMv8");
+        setInfo(eType, 0);
+
+        // The rated clock Windows records for the part, where x86 times its TSC
+        DWORD mhz = 0;
+        DWORD size = sizeof(mhz);
+        if (RegGetValueW(HKEY_LOCAL_MACHINE, cpu_key, L"~MHz", RRF_RT_REG_DWORD, nullptr, &mhz, &size) == ERROR_SUCCESS
+            && mhz != 0)
+        {
+            setInfo(eFrequency, (F64)mhz);
+        }
+
+        // The Windows ARM64 ABI presumes AdvSIMD, so every machine it runs on
+        // has it.
+        setExtension(cpu_feature_names[eNEON_Features]);
+        if (IsProcessorFeaturePresent(PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE))
+        {
+            setExtension(cpu_feature_names[eNEON_DotProd_Features]);
+        }
+        if (IsProcessorFeaturePresent(PF_ARM_V82_FP16_INSTRUCTIONS_AVAILABLE))
+        {
+            setExtension(cpu_feature_names[eNEON_FP16_Features]);
+        }
+        if (IsProcessorFeaturePresent(PF_ARM_SVE_INSTRUCTIONS_AVAILABLE))
+        {
+            setExtension(cpu_feature_names[eSVE_Features]);
+        }
+
+        // Level 1 data cache line, and the largest level 2: big and little
+        // cores' level 2 caches differ.
+        DWORD bytes = 0;
+        GetLogicalProcessorInformation(nullptr, &bytes);
+        std::vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> infos(bytes / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION));
+        if (!infos.empty() && GetLogicalProcessorInformation(infos.data(), &bytes))
+        {
+            DWORD l2_size = 0;
+            for (const SYSTEM_LOGICAL_PROCESSOR_INFORMATION& info : infos)
+            {
+                if (info.Relationship != RelationCache)
+                {
+                    continue;
+                }
+                if (info.Cache.Level == 1 && info.Cache.Type == CacheData)
+                {
+                    setConfig(eCacheLineSize, (S32)info.Cache.LineSize);
+                }
+                else if (info.Cache.Level == 2)
+                {
+                    l2_size = llmax(l2_size, info.Cache.Size);
+                }
+            }
+            if (l2_size != 0)
+            {
+                setConfig(eCacheSizeK, (S32)(l2_size / 1024));
+            }
+        }
+    }
+
+    static std::string getRegistryString(const wchar_t* key, const wchar_t* value)
+    {
+        wchar_t buffer[256] = {};
+        DWORD size = sizeof(buffer);
+        if (RegGetValueW(HKEY_LOCAL_MACHINE, key, value, RRF_RT_REG_SZ, nullptr, buffer, &size) != ERROR_SUCCESS)
+        {
+            return std::string();
+        }
+        std::string result = ll_convert_wide_to_string(buffer);
+        LLStringUtil::trim(result);
+        return result;
+    }
+#else
     void getCPUIDInfo()
     {
         // http://msdn.microsoft.com/en-us/library/hskdteyh(VS.80).aspx
@@ -672,6 +809,7 @@ private:
             }
         }
     }
+#endif // LL_ARM64
 };
 
 #elif LL_DARWIN
@@ -749,13 +887,39 @@ private:
         cpu_brand_string[0x3f] = 0;
         setInfo(eBrandName, cpu_brand_string);
 
+#if LL_ARM64
+        // Apple silicon: the brand string is the part's name, and the
+        // instruction set is reported as hw.optional keys, each one when
+        // present and nonzero. AdvSIMD is every ARMv8-A machine's; the rest
+        // are the extensions the ops layer may one day take a path for.
+        setInfo(eVendor, "Apple");
+        setInfo(eFamilyName, cpu_brand_string[0] != '\0' ? cpu_brand_string : "Apple silicon");
+        setInfo(eType, 0);
+        setConfig(eCacheLineSize, (S32)getSysctlInt64("hw.cachelinesize"));
+        setConfig(eCacheSizeK, (S32)(getSysctlInt64("hw.l2cachesize") / 1024));
+        if (getSysctlInt("hw.optional.AdvSIMD"))
+        {
+            setExtension(cpu_feature_names[eNEON_Features]);
+        }
+        if (getSysctlInt("hw.optional.arm.FEAT_DotProd"))
+        {
+            setExtension(cpu_feature_names[eNEON_DotProd_Features]);
+        }
+        if (getSysctlInt("hw.optional.arm.FEAT_FP16"))
+        {
+            setExtension(cpu_feature_names[eNEON_FP16_Features]);
+        }
+        if (getSysctlInt("hw.optional.arm.FEAT_SVE"))
+        {
+            setExtension(cpu_feature_names[eSVE_Features]);
+        }
+#else
         char cpu_vendor[0x20];
         len = sizeof(cpu_vendor);
         memset(cpu_vendor, 0, len);
         sysctlbyname("machdep.cpu.vendor", (void*)cpu_vendor, &len, NULL, 0);
         cpu_vendor[0x1f] = 0;
-        // M series CPUs don't provide this field so if empty, just fall back to Apple.
-        setInfo(eVendor, (cpu_vendor[0] != '\0') ? cpu_vendor : "Apple");
+        setInfo(eVendor, cpu_vendor);
 
         setInfo(eStepping, getSysctlInt("machdep.cpu.stepping"));
         setInfo(eModel, getSysctlInt("machdep.cpu.model"));
@@ -850,6 +1014,7 @@ private:
         {
             setExtension(cpu_feature_names[eAVX512F_Features]);
         }
+#endif // LL_ARM64
     }
 };
 
@@ -905,37 +1070,130 @@ private:
         return mhz;
     }
 
+#if LL_ARM64
+    // A virtual machine, and a kernel without a cpufreq driver for its
+    // board, leave sysfs with no clock at all, and an arm64 cpuinfo has no
+    // MHz line to fall back on. Every ARMv8 core retires one dependent
+    // integer add a cycle, so a timed chain of them reads the clock the core
+    // runs at. The fastest of ten short passes is kept, which is the core
+    // after it has woken up and without a pass the scheduler interrupted.
+    // Timed on the generic timer, read directly: a 2.6 GHz Neoverse V1
+    // under a hypervisor measured 2592 MHz this way.
+    static F64 measureCPUMHz()
+    {
+        constexpr U64 ADDS_PER_PASS = 1u << 22;
+        U64 frequency = 0;
+        asm volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+        if (frequency == 0)
+        {
+            return 0.0;
+        }
+
+        U64 fastest = 0;
+        for (int pass = 0; pass < 10; ++pass)
+        {
+            U64 count = ADDS_PER_PASS / 8;
+            U64 chain = 0;
+            U64 start = 0;
+            U64 end = 0;
+            asm volatile("isb\n\tmrs %0, cntvct_el0" : "=r"(start));
+            asm volatile(
+                "1:\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "subs %[count], %[count], #1\n\t"
+                "b.ne 1b"
+                : [chain] "+r"(chain), [count] "+r"(count)
+                :
+                : "cc");
+            asm volatile("isb\n\tmrs %0, cntvct_el0" : "=r"(end));
+            if (end > start && (fastest == 0 || end - start < fastest))
+            {
+                fastest = end - start;
+            }
+        }
+        return fastest ? (F64)ADDS_PER_PASS * (F64)frequency / (F64)fastest / 1e6 : 0.0;
+    }
+#endif
+
     void get_proc_cpuinfo()
     {
+        // Lines are read whole. A fixed buffer kept the first 254 bytes of
+        // an x86 flags line, which on a current part ends before pni, the
+        // SSE4s and AVX, and the rest of it went as lines of no name.
         std::map< std::string, std::string > cpuinfo;
-        LLFILE* cpuinfo_fp = LLFile::fopen(CPUINFO_FILE, LLFILE_MODE("rb"));
-        if(cpuinfo_fp)
+        std::vector<std::string> processors;
+        bool first_block = true;
+        llifstream cpuinfo_file{ CPUINFO_FILE };
+        std::string line;
+        while (std::getline(cpuinfo_file, line))
         {
-            char line[MAX_STRING];
-            memset(line, 0, MAX_STRING);
-            while(fgets(line, MAX_STRING, cpuinfo_fp))
+            // The first logical processor's block, up to the blank line
+            // that ends it
+            if (first_block)
             {
-                // /proc/cpuinfo on Linux looks like:
-                // name\t*: value\n
-                char* tabspot = strchr( line, '\t' );
-                if (tabspot == NULL)
-                    continue;
-                char* colspot = strchr( tabspot, ':' );
-                if (colspot == NULL)
-                    continue;
-                char* spacespot = strchr( colspot, ' ' );
-                if (spacespot == NULL)
-                    continue;
-                char* nlspot = strchr( line, '\n' );
-                if (nlspot == NULL)
-                    nlspot = line + strlen( line ); // Fallback to terminating NUL
-                std::string linename( line, tabspot );
-                std::string llinename(linename);
-                LLStringUtil::toLower(llinename);
-                std::string lineval( spacespot + 1, nlspot );
-                cpuinfo[ llinename ] = lineval;
+                if (line.empty())
+                {
+                    first_block = mFirstProcessor.empty();
+                }
+                else
+                {
+                    mFirstProcessor += line + "\n";
+                }
             }
-            fclose(cpuinfo_fp);
+
+            // /proc/cpuinfo on Linux looks like:
+            // name\t*: value
+            // though arm64 writes "CPU architecture: 8" with no tab, so the
+            // name is what comes before the colon, less the space after it.
+            const size_t colon = line.find(':');
+            if (colon == std::string::npos || colon == 0)
+            {
+                continue;
+            }
+            const size_t name_end = line.find_last_not_of(" \t", colon - 1);
+            if (name_end == std::string::npos)
+            {
+                continue;
+            }
+            std::string name = line.substr(0, name_end + 1);
+            LLStringUtil::toLower(name);
+            const size_t value = line.find_first_not_of(' ', colon + 1);
+            cpuinfo[name] = value == std::string::npos ? std::string() : line.substr(value);
+            if (name == "processor")
+            {
+                processors.push_back(cpuinfo[name]);
+            }
+        }
+
+        // Every logical processor has a block. The kernel gives each of a
+        // core's hardware threads the same list of them, so the distinct
+        // lists count the cores, a hybrid or arm64 part's as well.
+        if (!processors.empty())
+        {
+            setConfig(eLogicalProcessors, (S32)processors.size());
+            std::set<std::string> cores;
+            for (const std::string& processor : processors)
+            {
+                llifstream siblings{ "/sys/devices/system/cpu/cpu" + processor + "/topology/thread_siblings_list" };
+                std::string list;
+                if (!(siblings >> list))
+                {
+                    cores.clear();
+                    break;
+                }
+                cores.insert(list);
+            }
+            if (!cores.empty())
+            {
+                setConfig(ePhysicalCores, (S32)cores.size());
+            }
         }
 # if LL_X86
 
@@ -967,6 +1225,13 @@ private:
         }
 
         setInfo(eFamilyName, compute_CPUFamilyName(cpuinfo["vendor_id"].c_str(), family, 0));
+
+        // The microcode revision, which some crashes turn on, as Raptor
+        // Lake's instability did
+        if (!cpuinfo["microcode"].empty())
+        {
+            setConfig(eMicrocode, cpuinfo["microcode"]);
+        }
 
         // setInfo(eExtendedModel, getSysctlInt("machdep.cpu.extmodel"));
         // setInfo(eBrandID, getSysctlInt("machdep.cpu.brand"));
@@ -1032,35 +1297,76 @@ private:
             setExtension(cpu_feature_names[eAVX512F_Features]);
         }
 
-# endif // LL_X86
-    }
+# elif LL_ARM64
 
-    std::string getCPUFeatureDescription() const
-    {
-        std::ostringstream s;
-
-        // *NOTE:Mani - This is for linux only.
-        LLFILE* cpuinfo = LLFile::fopen(CPUINFO_FILE, LLFILE_MODE("rb"));
-        if(cpuinfo)
+        F64 mhz = getCPUMaxMHZ();
+        if (mhz <= 1.0)
         {
-            char line[MAX_STRING];
-            memset(line, 0, MAX_STRING);
-            while(fgets(line, MAX_STRING, cpuinfo))
-            {
-                line[strlen(line)-1] = ' ';
-                s << line;
-                s << std::endl;
-            }
-            fclose(cpuinfo);
-            s << std::endl;
+            mhz = measureCPUMHz();
+        }
+        if (mhz > 1.0)
+        {
+            setInfo(eFrequency, mhz);
+        }
+
+        // An arm64 cpuinfo names the part by implementer and part number,
+        // and a few kernels add a model name; the features line lists the
+        // instruction set the way an x86 flags line does.
+        if (!cpuinfo["model name"].empty())
+        {
+            setInfo(eBrandName, cpuinfo["model name"]);
         }
         else
         {
-            s << "Unable to collect processor information" << std::endl;
+            setInfo(eBrandName, "implementer " + cpuinfo["cpu implementer"] + " part " + cpuinfo["cpu part"]);
         }
-        return s.str();
+        const std::string& implementer = cpuinfo["cpu implementer"];
+        const char* vendor = implementer == "0x41" ? "Arm"
+                           : implementer == "0x51" ? "Qualcomm"
+                           : implementer == "0x61" ? "Apple"
+                           : implementer == "0x4e" ? "NVIDIA"
+                           : implementer == "0xc0" ? "Ampere"
+                           : implementer == "0x48" ? "HiSilicon"
+                           : "ARM64";
+        setInfo(eVendor, vendor);
+        setInfo(eFamilyName, std::string(vendor) + " ARMv" + cpuinfo["cpu architecture"]);
+
+        std::string features = " " + cpuinfo["features"] + " ";
+        LLStringUtil::toLower(features);
+        if (features.find(" asimd ") != std::string::npos)
+        {
+            setExtension(cpu_feature_names[eNEON_Features]);
+        }
+        if (features.find(" asimddp ") != std::string::npos)
+        {
+            setExtension(cpu_feature_names[eNEON_DotProd_Features]);
+        }
+        if (features.find(" asimdhp ") != std::string::npos)
+        {
+            setExtension(cpu_feature_names[eNEON_FP16_Features]);
+        }
+        if (features.find(" sve ") != std::string::npos)
+        {
+            setExtension(cpu_feature_names[eSVE_Features]);
+        }
+
+# endif // LL_X86
     }
 
+public:
+    // The summary the other platforms give. The whole of /proc/cpuinfo was
+    // here, a block for each logical processor, which on 28 threads was
+    // over half the log; the blocks repeat but for their IDs and momentary
+    // clock. The first one goes to the debug log, for the full flag and bug
+    // lists, cache and address widths.
+    std::string getCPUFeatureDescription() const override
+    {
+        LL_DEBUGS("SystemInfo") << "First processor in " << CPUINFO_FILE << ":\n" << mFirstProcessor << LL_ENDL;
+        return LLProcessorInfoImpl::getCPUFeatureDescription();
+    }
+
+private:
+    std::string mFirstProcessor;
 };
 
 
@@ -1099,6 +1405,10 @@ bool LLProcessorInfo::hasSSE4a() const { return mImpl->hasSSE4a(); }
 bool LLProcessorInfo::hasAVX() const { return mImpl->hasAVX(); }
 bool LLProcessorInfo::hasAVX2() const { return mImpl->hasAVX2(); }
 bool LLProcessorInfo::hasAVX512F() const { return mImpl->hasAVX512F(); }
+bool LLProcessorInfo::hasNEON() const { return mImpl->hasNEON(); }
+bool LLProcessorInfo::hasNEONDotProd() const { return mImpl->hasNEONDotProd(); }
+bool LLProcessorInfo::hasNEONFP16() const { return mImpl->hasNEONFP16(); }
+bool LLProcessorInfo::hasSVE() const { return mImpl->hasSVE(); }
 bool LLProcessorInfo::hasAltivec() const { return mImpl->hasAltivec(); }
 std::string LLProcessorInfo::getCPUFamilyName() const { return mImpl->getCPUFamilyName(); }
 std::string LLProcessorInfo::getCPUBrandName() const { return mImpl->getCPUBrandName(); }

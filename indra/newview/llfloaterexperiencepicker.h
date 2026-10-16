@@ -34,9 +34,10 @@ class LLLineEditor;
 class LLPanelExperiencePicker;
 
 
-class LLFloaterExperiencePicker : public LLFloater
+class LLFloaterExperiencePicker final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterExperiencePicker, LLFloater);
 
     typedef std::function<void(const uuid_vec_t&)> select_callback_t;
     // filter function for experiences, return true if the experience should be hidden.

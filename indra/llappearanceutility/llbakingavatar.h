@@ -38,7 +38,6 @@ class LLBakingAvatar : public LLAvatarAppearance
  **                    INITIALIZATION
  **/
 public:
-    LL_ALIGN_NEW
 
     LLBakingAvatar(LLWearableData* wearable_data, S32 bakeTextureSize = 512);
     virtual ~LLBakingAvatar();

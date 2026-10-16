@@ -49,15 +49,17 @@ class LLTabContainer;
 class LLTextBase;
 class LLToolset;
 
-class LLFloaterPathfindingConsole
+class LLFloaterPathfindingConsole final
 :   public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
-    virtual bool postBuild();
-    virtual void onOpen(const LLSD& pKey);
-    virtual void onClose(bool pIsAppQuitting);
+    AL_VIEW_TYPE(LLFloaterPathfindingConsole, LLFloater);
+
+    virtual bool postBuild() override;
+    virtual void onOpen(const LLSD& pKey) override;
+    virtual void onClose(bool pIsAppQuitting) override;
 
     static LLHandle<LLFloaterPathfindingConsole> getInstanceHandle();
 

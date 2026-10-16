@@ -22,7 +22,7 @@
      name="rule_list"
      search_column="0">
 		<column name="icon_enabled" label="Enabled" width="24" />
-		<column dynamicwidth="true" name="RuleName" label="Rule Name" />
+		<column dynamic_width="true" name="RuleName" label="Rule Name" />
 		<column name="direction" label="In / Out" width="64" />
 	</scroll_list>
 	<text

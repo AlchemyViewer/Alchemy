@@ -47,7 +47,6 @@
 #include "llfocusmgr.h"
 #include "llmanipscale.h"
 #include "llmenubutton.h"
-#include "llpreviewscript.h"
 #include "llresmgr.h"
 #include "llselectmgr.h"
 #include "llspinctrl.h"
@@ -2419,7 +2418,7 @@ void LLPanelObject::onCopyPos()
     mClipboardPos = LLVector3(mCtrlPosX->get(), mCtrlPosY->get(), mCtrlPosZ->get());
 
     std::string stringVec = llformat("<%g, %g, %g>", mClipboardPos.mV[VX], mClipboardPos.mV[VY], mClipboardPos.mV[VZ]);
-    LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(stringVec));
+    LLView::getWindow()->copyTextToClipboard(stringVec);
 
     LLStringUtil::format_map_t args;
     args["VALUE"] = stringVec;
@@ -2433,7 +2432,7 @@ void LLPanelObject::onCopySize()
     mClipboardSize = LLVector3(mCtrlScaleX->get(), mCtrlScaleY->get(), mCtrlScaleZ->get());
 
     std::string stringVec = llformat("<%g, %g, %g>", mClipboardSize.mV[VX], mClipboardSize.mV[VY], mClipboardSize.mV[VZ]);
-    LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(stringVec));
+    LLView::getWindow()->copyTextToClipboard(stringVec);
 
     LLStringUtil::format_map_t args;
     args["VALUE"] = stringVec;
@@ -2448,7 +2447,7 @@ void LLPanelObject::onCopyRot()
     mClipboardRot = LLVector3(mCtrlRotX->get(), mCtrlRotY->get(), mCtrlRotZ->get());
 
     std::string stringVec = llformat("<%g, %g, %g>", mClipboardRot.mV[VX], mClipboardRot.mV[VY], mClipboardRot.mV[VZ]);
-    LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(stringVec));
+    LLView::getWindow()->copyTextToClipboard(stringVec);
 
     LLStringUtil::format_map_t args;
     args["VALUE"] = stringVec;

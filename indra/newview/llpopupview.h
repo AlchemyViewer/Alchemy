@@ -29,23 +29,25 @@
 
 #include "llpanel.h"
 
-class LLPopupView : public LLPanel
+class LLPopupView final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPopupView, LLPanel);
+
     LLPopupView(const Params& p = LLPanel::Params());
     ~LLPopupView();
 
-    /*virtual*/ void draw();
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleMiddleMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleMiddleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleRightMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
-    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask);
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleMiddleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleRightMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask) override;
 
     void addPopup(LLView* popup);
     void removePopup(LLView* popup);

@@ -75,45 +75,7 @@ LL_COMMON_API void ll_assert_aligned_func(uintptr_t ptr,U32 alignment);
 #define ll_assert_aligned(ptr,alignment)
 #endif
 
-#if LL_ARM64
-#include "sse2neon/sse2neon.h"
-#else
-#include <xmmintrin.h>
-#endif
-
-template <typename T> T* LL_NEXT_ALIGNED_ADDRESS(T* address)
-{
-    return reinterpret_cast<T*>(
-        (uintptr_t(address) + 0xF) & ~0xF);
-}
-
-template <typename T> T* LL_NEXT_ALIGNED_ADDRESS_64(T* address)
-{
-    return reinterpret_cast<T*>(
-        (uintptr_t(address) + 0x3F) & ~0x3F);
-}
-
-#define LL_ALIGN_NEW                        \
-public:                                     \
-    void* operator new(size_t size)         \
-    {                                       \
-        return ll_aligned_malloc_16(size);  \
-    }                                       \
-                                            \
-    void operator delete(void* ptr)         \
-    {                                       \
-        ll_aligned_free_16(ptr);            \
-    }                                       \
-                                            \
-    void* operator new[](size_t size)       \
-    {                                       \
-        return ll_aligned_malloc_16(size);  \
-    }                                       \
-                                            \
-    void operator delete[](void* ptr)       \
-    {                                       \
-        ll_aligned_free_16(ptr);            \
-    }
+#include "alsimd.h"
 
 //------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------
@@ -336,75 +298,15 @@ LL_FORCE_INLINE void ll_aligned_free(void* ptr)
 inline void ll_memcpy_nonaliased_aligned_16(char* __restrict dst, const char* __restrict src, size_t bytes)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
-#if defined(LL_ARM64)
-    memcpy(dst, src, bytes);
-#else
     assert(src != NULL);
     assert(dst != NULL);
     assert(bytes > 0);
-    assert((bytes % sizeof(F32))== 0);
     ll_assert_aligned(src,16);
     ll_assert_aligned(dst,16);
-
     assert((src < dst) ? ((src + bytes) <= dst) : ((dst + bytes) <= src));
     assert(bytes%16==0);
 
-    char* end = dst + bytes;
-
-    if (bytes > 64)
-    {
-
-        // Find start of 64b aligned area within block
-        //
-        void* begin_64 = LL_NEXT_ALIGNED_ADDRESS_64(dst);
-
-        //at least 64 bytes before the end of the destination, switch to 16 byte copies
-        void* end_64 = end-64;
-
-        // Prefetch the head of the 64b area now
-        //
-        _mm_prefetch((char*)begin_64, _MM_HINT_NTA);
-        _mm_prefetch((char*)begin_64 + 64, _MM_HINT_NTA);
-        _mm_prefetch((char*)begin_64 + 128, _MM_HINT_NTA);
-        _mm_prefetch((char*)begin_64 + 192, _MM_HINT_NTA);
-
-        // Copy 16b chunks until we're 64b aligned
-        //
-        while (dst < begin_64)
-        {
-
-            _mm_store_ps((F32*)dst, _mm_load_ps((F32*)src));
-            dst += 16;
-            src += 16;
-        }
-
-        // Copy 64b chunks up to your tail
-        //
-        // might be good to shmoo the 512b prefetch offset
-        // (characterize performance for various values)
-        //
-        while (dst < end_64)
-        {
-            _mm_prefetch((char*)src + 512, _MM_HINT_NTA);
-            _mm_prefetch((char*)dst + 512, _MM_HINT_NTA);
-            _mm_store_ps((F32*)dst, _mm_load_ps((F32*)src));
-            _mm_store_ps((F32*)(dst + 16), _mm_load_ps((F32*)(src + 16)));
-            _mm_store_ps((F32*)(dst + 32), _mm_load_ps((F32*)(src + 32)));
-            _mm_store_ps((F32*)(dst + 48), _mm_load_ps((F32*)(src + 48)));
-            dst += 64;
-            src += 64;
-        }
-    }
-
-    // Copy remainder 16b tail chunks (or ALL 16b chunks for sub-64b copies)
-    //
-    while (dst < end)
-    {
-        _mm_store_ps((F32*)dst, _mm_load_ps((F32*)src));
-        dst += 16;
-        src += 16;
-    }
-#endif
+    alsimd::copy_aligned16(dst, src, bytes);
 }
 
 #ifndef __DEBUG_PRIVATE_MEM__
@@ -420,18 +322,33 @@ public:
     static void* tryToAlloc(void* address, U32 size);
     static void initMaxHeapSizeGB(F32Gigabytes max_heap_size);
     static void updateMemoryInfo() ;
+    // Refreshes the memory counters at most once per second. Every subsystem
+    // that polls free memory should call this rather than updateMemoryInfo(),
+    // so the whole viewer shares a single sample per second.
+    static void updateFreeSystemMemory();
     static void logMemoryInfo(bool update = false);
+
+    // Scales down draw distance as free system memory runs out. Returns 1 for
+    // no reduction, up to 2 for half range.
     static F32 getSystemMemoryBudgetFactor();
+    // Machines that will never exhaust system memory can opt out entirely,
+    // pinning the factor at 1 so draw distance is left alone.
+    static void setSystemMemoryBudgetEnabled(bool enabled);
 
 #if LL_WINDOWS
     // Commit charge is a Windows-only concept, combines page file and ram
     static U32Megabytes getAvailableCommitMemMB();
 #endif
     static U32Kilobytes getAvailableMemKB() ;
+    // The free memory that runs out first: physical, or on Windows the commit
+    // charge when that is the scarcer. Everything that acts on memory pressure
+    // reads this one figure, so the texture bias and the draw-distance factor
+    // escalate in the order they were designed to.
+    static S32Megabytes getScarcestFreeMemMB();
     static U32Kilobytes getMaxMemKB() ;
+    static U32Kilobytes getMaxHeapSizeKB() { return sMaxHeapSizeInKB; }
     static U32Kilobytes getAllocatedMemKB() ;
 private:
-    static void updateFreeSystemMemory();
     // LLMemoryInfo directly updates memory stats
     friend class LLMemoryInfo;
 
@@ -446,6 +363,7 @@ private:
     static LLFrameTimer sMemoryCheckTimer;
     static F32 sSysMemoryFactor;
     static U32 sFactorLastFrameCount;
+    static bool sSysMemoryBudgetEnabled;
 };
 
 // LLRefCount moved to llrefcount.h

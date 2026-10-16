@@ -34,14 +34,16 @@
 
 class LLComboBox;
 
-class LLPanelLandAudio
+class LLPanelLandAudio final
     :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandAudio, LLPanel);
+
     LLPanelLandAudio(LLSafeHandle<LLParcelSelection>& parcelp);
     /*virtual*/ ~LLPanelLandAudio();
-    /*virtual*/ bool postBuild();
-    void refresh();
+    /*virtual*/ bool postBuild() override;
+    void refresh() override;
 
 private:
     static void onCommitAny(LLUICtrl* ctrl, void *userdata);

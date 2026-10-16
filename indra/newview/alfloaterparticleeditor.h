@@ -40,6 +40,8 @@ class LLViewerTexture;
 class ALFloaterParticleEditor final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(ALFloaterParticleEditor, LLFloater);
+
     ALFloaterParticleEditor(const LLSD& key);
     ~ALFloaterParticleEditor();
 

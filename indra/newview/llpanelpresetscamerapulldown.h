@@ -31,9 +31,11 @@
 
 #include "llpanelpulldown.h"
 
-class LLPanelPresetsCameraPulldown : public LLPanelPulldown
+class LLPanelPresetsCameraPulldown final : public LLPanelPulldown
 {
  public:
+    AL_VIEW_TYPE(LLPanelPresetsCameraPulldown, LLPanelPulldown);
+
     LLPanelPresetsCameraPulldown();
     bool postBuild() override;
     void draw() override;

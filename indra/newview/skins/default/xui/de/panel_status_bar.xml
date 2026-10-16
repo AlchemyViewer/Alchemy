@@ -27,5 +27,4 @@
 		24:00 H PST
 	</text>
 	<button name="media_toggle_btn" tool_tip="Alle Medien starten/stoppen (Musik, Video, Webseiten)"/>
-	<button name="volume_btn" tool_tip="Steuerung der Gesamtlautstärke"/>
 </panel>

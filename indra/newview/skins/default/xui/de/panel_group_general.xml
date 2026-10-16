@@ -16,7 +16,6 @@ Bewegen Sie die Maus über die Optionen, um weitere Informationen anzuzeigen.
 		<text name="prepend_founded_by">
 			Gründer:
 		</text>
-		<name_box initial_value="(wird in Datenbank gesucht)" name="founder_name"/>
 		<text name="join_cost_text">
 			Kostenlos
 		</text>
@@ -26,9 +25,8 @@ Bewegen Sie die Maus über die Optionen, um weitere Informationen anzuzeigen.
 		Gruppencharta
 	</text_editor>
 	<name_list name="visible_members">
-		<name_list.columns label="Mitglied" name="name" relwidth="0.40"/>
-		<name_list.columns label="Titel" name="title" relwidth="0.25"/>
-		<name_list.columns label="Status" name="status"/>
+		<name_list.columns name="name" relwidth="0.40"/>
+		<name_list.columns name="title" relwidth="0.25"/>
 	</name_list>
 	<text name="my_group_settngs_label">
 		Ich

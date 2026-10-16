@@ -37,19 +37,22 @@ bool LLChatMentionHelper::isActive(const LLUICtrl* ctrl) const
     return mHostHandle.get() == ctrl;
 }
 
-bool LLChatMentionHelper::isCursorInNameMention(const LLWString& wtext, S32 cursor_pos, S32* mention_start_pos) const
+bool LLChatMentionHelper::isCursorInNameMention(std::string_view text, S32 cursor_pos, S32* mention_start_pos) const
 {
-    if (cursor_pos <= 0 || cursor_pos > static_cast<S32>(wtext.size()))
+    if (cursor_pos <= 0 || cursor_pos > static_cast<S32>(text.size()))
         return false;
 
-    // Find the beginning of the current word
+    // Find the beginning of the current word. Space and newline are ASCII, so
+    // no byte of a multi-byte character can be mistaken for either and this
+    // walk is safe a byte at a time. It lands on a character start for the
+    // same reason -- the byte after an ASCII one always is.
     S32 start = cursor_pos - 1;
-    while (start > 0 && wtext[start - 1] != U32(' ') && wtext[start - 1] != U32('\n'))
+    while (start > 0 && text[start - 1] != ' ' && text[start - 1] != '\n')
     {
         --start;
     }
 
-    if (wtext[start] != U32('@'))
+    if (text[start] != '@')
         return false;
 
     if (mention_start_pos)
@@ -63,7 +66,7 @@ bool LLChatMentionHelper::isCursorInNameMention(const LLWString& wtext, S32 curs
     }
 
     // Get the name after '@'
-    std::string name = wstring_to_utf8str(wtext.substr(start + 1, word_length - 1));
+    std::string name(text.substr(start + 1, word_length - 1));
     LLStringUtil::toLower(name);
     for (const auto& av_name : mAvatarNames)
     {

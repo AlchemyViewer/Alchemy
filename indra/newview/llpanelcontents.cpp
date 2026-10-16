@@ -45,10 +45,11 @@
 #include "material_codes.h"
 
 // project includes
+#include "alscriptstudio.h"
 #include "llagent.h"
 #include "llpanelobjectinventory.h"
-#include "llpreviewscript.h"
 #include "llresmgr.h"
+#include "llscripteditorws.h"
 #include "llselectmgr.h"
 #include "lltool.h"
 #include "lltoolcomp.h"
@@ -115,6 +116,7 @@ LLPanelContents::LLPanelContents()
 
 LLPanelContents::~LLPanelContents()
 {
+    mSimulatorFeaturesConnection.disconnect();
     // Children all cleaned up by default view destructor.
 }
 
@@ -134,6 +136,8 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 {
     if( !objectp )
     {
+        mSimulatorFeaturesConnection.disconnect();
+        mLastScriptObjectID.setNull();
         getChildView("button new script")->setEnabled(false);
         getChildView("button new notecard")->setEnabled(false);
         mPublishButton->setEnabled(false);
@@ -198,10 +202,27 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     // Edit script button - ok if object is editable and there's an unambiguous destination for the object.
     getChildView("button new script")->setEnabled(new_button_enabled);
 
-    // Enable the Lua script option only when the region supports it.
+    // Enable the Lua script option only when the region supports it, and
+    // default a freshly selected object's new script to the region's language.
     LLViewerRegion* region = objectp->getRegion();
     bool lua_enabled = isLuaEnabledForObjectRegion(objectp);
-    getChild<LLComboBox>("button new script")->setEnabledByValue("lua", lua_enabled);
+    // A region's features can come after its object is selected: asked
+    // again once they have, or the choice would stay LSL with SLua off.
+    mSimulatorFeaturesConnection.disconnect();
+    if (region && !region->simulatorFeaturesReceived())
+    {
+        mSimulatorFeaturesConnection = region->setSimulatorFeaturesReceivedCallback(
+            boost::bind(&LLPanelContents::onSimulatorFeaturesReceived, this, _1));
+    }
+    LLComboBox* new_script = getChild<LLComboBox>("button new script");
+    new_script->setEnabledByValue("lua", lua_enabled);
+    if (mLastScriptObjectID != objectp->getID() || mLastLuaRegion != lua_enabled)
+    {
+        mNewScriptIsLua = lua_enabled;
+        new_script->setValue(mNewScriptIsLua ? "lua" : "lsl");
+    }
+    mLastScriptObjectID = objectp->getID();
+    mLastLuaRegion = lua_enabled;
 
     getChildView("button permissions")->setEnabled(!objectp->isPermanentEnforced());
     mPanelInventoryObject->setEnabled(!objectp->isPermanentEnforced());
@@ -216,8 +237,13 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     bool has_create_cap = region && !region->getCapability("CreateTaskInventoryItem").empty();
     getChildView("button new notecard")->setEnabled(has_create_cap && new_button_enabled);
 
-    // Publish button - enabled only when WS server is configured, and a single editable root object is selected.
-    mPublishButton->setEnabled(LLScriptEditorWSServer::isEnabled() && new_button_enabled);
+    // Explore in IDE: to an external editor over the bridge when that is
+    // on, else to Script Studio, and named for which; either way a single
+    // editable root object.
+    const bool ide = LLScriptEditorWSServer::isEnabled();
+    mPublishButton->setLabel(getString(ide ? "ide_label" : "studio_label"));
+    mPublishButton->setToolTip(getString(ide ? "ide_tooltip" : "studio_tooltip"));
+    mPublishButton->setEnabled(new_button_enabled);
 
     // Sync toggle state to reflect whether the object is currently published.
     if (LLScriptEditorWSServer::isEnabled())
@@ -229,6 +255,11 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     {
         mPublishButton->setToggleState(false);
     }
+}
+
+void LLPanelContents::onSimulatorFeaturesReceived(const LLUUID&)
+{
+    refresh();
 }
 
 void LLPanelContents::onFilterEdit()
@@ -337,15 +368,18 @@ void LLPanelContents::onNewScriptFlyoutCommit(LLUICtrl* ctrl)
     }
 // [/RLVa:KB]
 
-    U8 script_language = isLuaEnabledForObjectRegion(object) ? SST_LUA : SST_LSL;
+    // The button itself says nothing, the list deselected as it is
+    // clicked: it makes what was last picked, or the region's language.
     if (value == "lua")
     {
-        script_language = SST_LUA;
+        mNewScriptIsLua = true;
     }
     else if (value == "lsl")
     {
-        script_language = SST_LSL;
+        mNewScriptIsLua = false;
     }
+    ctrl->setValue(mNewScriptIsLua ? "lua" : "lsl");
+    const U8 script_language = mNewScriptIsLua ? SST_LUA : SST_LSL;
 
     // template_id is an inventory item UUID of a script in the user's
     // inventory pulled from per account settings. The sim should fallback
@@ -457,6 +491,17 @@ void LLPanelContents::onClickPublish()
         return;
     }
 
+    const LLUUID object_id = object->getID();
+    if (!LLScriptEditorWSServer::isEnabled())
+    {
+        // No external editor listening: the studio's explorer, with the
+        // object kept in it.
+        ALScriptStudio::explore(object_id);
+        // Not a toggle this way: nothing to stop.
+        mPublishButton->setToggleState(false);
+        return;
+    }
+
     auto server = LLScriptEditorWSServer::ensureServerRunning();
     if (!server)
     {
@@ -464,7 +509,6 @@ void LLPanelContents::onClickPublish()
         return;
     }
 
-    const LLUUID object_id = object->getID();
     if (server->getConnectionCount())
     { // if we already have at least one connection, then we can toggle the publish state of the object
         if (server->isObjectPublished(object_id))

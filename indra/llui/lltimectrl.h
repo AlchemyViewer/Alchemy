@@ -34,11 +34,13 @@
 
 class LLLineEditor;
 
-class LLTimeCtrl
+class LLTimeCtrl final
 : public LLUICtrl
 {
     LOG_CLASS(LLTimeCtrl);
 public:
+    AL_VIEW_TYPE(LLTimeCtrl, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<S32> label_width;
@@ -92,8 +94,8 @@ private:
         NONE
     };
 
-    virtual void    onFocusLost();
-    virtual bool    handleKeyHere(KEY key, MASK mask);
+    virtual void    onFocusLost() override;
+    virtual bool    handleKeyHere(KEY key, MASK mask) override;
 
     void    onUpBtn();
     void    onDownBtn();

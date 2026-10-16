@@ -159,7 +159,7 @@ public:
     const joint_alias_map_t& getJointAliases();
     static joint_alias_map_t buildJointAliases();
     typedef std::map<std::string, std::string> joint_parent_map_t; // matrix plus parent
-    typedef std::map<std::string, glm::mat4> joint_rest_map_t;
+    typedef std::map<std::string, LLMatrix4a> joint_rest_map_t;
     void getJointMatricesAndHierarhy(std::vector<LLJointData> &data) const;
 
 protected:

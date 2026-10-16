@@ -218,7 +218,7 @@ private:
     id_map_t mHeaderIDMap;
 
     LLFile*      mFastCachep;
-    LLFrameTimer mFastCacheTimer;
+    LLTimer      mFastCacheTimer;   // the cache threads keep the file open by it, so not the frame clock
     U8*          mFastCachePadBuffer;
 
     // BODIES (TEXTURES minus headers)

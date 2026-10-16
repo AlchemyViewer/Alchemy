@@ -61,6 +61,8 @@ class LLInventoryPanel : public LLPanel
     // Data
     //--------------------------------------------------------------------
 public:
+    AL_VIEW_TYPE(LLInventoryPanel, LLPanel);
+
     struct Filter : public LLInitParam::Block<Filter>
     {
         Optional<U32>           sort_order;
@@ -300,6 +302,19 @@ protected:
     LLPointer<LLFolderViewGroupedItemBridge> mGroupedItemBridge;
     Params                      mParams;    // stored copy of parameter block
 
+    // Merge the type defaults into the item and folder templates, once. Every
+    // view this panel builds is a copy of one of these, so the merge is done
+    // here rather than per widget -- an inventory builds a view per item it
+    // holds, which reaches six figures.
+    //
+    // Asked for where the templates are read rather than where they are
+    // assigned: a subclass is free to take a different route through
+    // initFromParams, and one that skips this class's leaves every item it
+    // builds without an item_height, which has no value of its own outside the
+    // widget defaults.
+    void                        ensureViewTemplates();
+    bool                        mViewTemplatesMerged { false };
+
     boost::unordered_map<LLUUID, LLFolderViewItem*> mItemMap;
     /**
      * Pointer to LLInventoryFolderViewModelBuilder.
@@ -404,9 +419,11 @@ protected:
 };
 
 
-class LLInventorySingleFolderPanel : public LLInventoryPanel
+class LLInventorySingleFolderPanel final : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLInventorySingleFolderPanel, LLInventoryPanel);
+
     struct Params : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {};
 
@@ -463,6 +480,8 @@ protected:
 class LLAssetFilteredInventoryPanel : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLAssetFilteredInventoryPanel, LLInventoryPanel);
+
     struct Params
         : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {

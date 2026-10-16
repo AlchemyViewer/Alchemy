@@ -33,7 +33,7 @@
 #include "llmotion.h"
 #include "lltimer.h"
 
-#define MIN_REQUIRED_PIXEL_AREA_EMOTE 2000.f
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_EMOTE = 2000.f;
 
 #define EMOTE_MORPH_FADEIN_TIME 0.3f
 #define EMOTE_MORPH_IN_TIME 1.1f
@@ -101,7 +101,7 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();

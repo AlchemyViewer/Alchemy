@@ -49,6 +49,7 @@
 #include "llsdserialize.h"
 #include "llvector4a.h"
 #include "llmatrix4a.h"
+#include "alsimdkernels.h"
 #include "llmeshoptimizer.h"
 #include "lltimer.h"
 #include "llvolumeoctree.h"
@@ -57,10 +58,6 @@
 #include "mikktspace/mikktspace.hh"
 
 #include <meshoptimizer.h>
-
-#define DEBUG_SILHOUETTE_BINORMALS 0
-#define DEBUG_SILHOUETTE_NORMALS 0 // TomY: Use this to display normals using the silhouette
-#define DEBUG_SILHOUETTE_EDGE_MAP 0 // DaveP: Use this to display edge map using the silhouette
 
 constexpr F32 MIN_CUT_DELTA = 0.02f;
 
@@ -1312,7 +1309,7 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
 
     LLMatrix3 rot(twist * qang);
 
-    pt->mRot.loadu(rot);
+    pt->mRot.set(rot);
 
     t+=step;
 
@@ -1344,7 +1341,7 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
         // Rotate the point around the circle's center.
         qang.setQuat   (ang,path_axis);
         LLMatrix3 tmp(twist*qang);
-        pt->mRot.loadu(tmp);
+        pt->mRot.set(tmp);
 
         t+=step;
     }
@@ -1370,7 +1367,7 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
     // Rotate the point around the circle's center.
     qang.setQuat   (ang,path_axis);
     LLMatrix3 tmp(twist*qang);
-    pt->mRot.loadu(tmp);
+    pt->mRot.set(tmp);
 
     mTotal = mPath.size();
 }
@@ -1502,7 +1499,7 @@ bool LLPath::generate(const LLPathParams& params, F32 detail, S32 split,
                 LLQuaternion quat;
                 quat.setQuat(lerp(F_PI * params.getTwistBegin(),F_PI * params.getTwist(),t),0,0,1);
                 LLMatrix3 tmp(quat);
-                mPath[i].mRot.loadu(tmp);
+                mPath[i].mRot.set(tmp);
                 mPath[i].mScale.set(lerp(start_scale.mV[0],end_scale.mV[0],t),
                                     lerp(start_scale.mV[1],end_scale.mV[1],t),
                                     0,1);
@@ -1569,7 +1566,7 @@ bool LLPath::generate(const LLPathParams& params, F32 detail, S32 split,
             LLQuaternion quat;
             quat.setQuat(F_PI * params.getTwist() * t,1,0,0);
             LLMatrix3 tmp(quat);
-            mPath[i].mRot.loadu(tmp);
+            mPath[i].mRot.set(tmp);
         }
 
         break;
@@ -1600,7 +1597,7 @@ bool LLDynamicPath::generate(const LLPathParams& params, F32 detail, S32 split,
         for (U32 i = 0; i < 2; i++)
         {
             mPath[i].mPos.set(0, 0, 0);
-            mPath[i].mRot.loadu(tmp);
+            mPath[i].mRot.set(tmp);
             mPath[i].mScale.set(1, 1, 0, 1);
             mPath[i].mTexT = 0;
         }
@@ -1972,8 +1969,6 @@ LLVolume::LLVolume(const LLVolumeParams &params, const F32 detail, const bool ge
     mNumHullIndices = 0;
 
     // set defaults
-    mSculptValidationCache.fill(LLSculptValidationState::Unvalidated);
-
     if (mParams.getPathParams().getCurveType() == LL_PCODE_PATH_FLEXIBLE)
     {
         mPathp = new LLDynamicPath();
@@ -1999,13 +1994,6 @@ void LLVolume::resizePath(S32 length)
     mPathp->resizePath(length);
     mVolumeFaces.clear();
     setDirty();
-}
-
-void LLVolume::setDirty()
-{
-    mPathp->setDirty();
-    mProfilep->setDirty();
-    mSculptValidationCache.fill(LLSculptValidationState::Unvalidated);
 }
 
 void LLVolume::regen()
@@ -2117,7 +2105,7 @@ bool LLVolume::generate()
             scale_mat *= rot;
 
             LLMatrix4a rot_mat;
-            rot_mat.loadu(scale_mat);
+            rot_mat.set(scale_mat);
 
             LLVector4a* profile = mProfilep->mProfile.mArray;
             LLVector4a* end_profile = profile+sizeT;
@@ -2152,74 +2140,6 @@ bool LLVolume::generate()
     }
 
     return false;
-}
-
-void LLVolumeFace::VertexData::init()
-{
-    if (!mData)
-    {
-        mData = (LLVector4a*) ll_aligned_malloc_16(sizeof(LLVector4a)*2);
-    }
-}
-
-LLVolumeFace::VertexData::VertexData()
-{
-    mData = NULL;
-    init();
-}
-
-LLVolumeFace::VertexData::VertexData(const VertexData& rhs)
-{
-    mData = NULL;
-    *this = rhs;
-}
-
-const LLVolumeFace::VertexData& LLVolumeFace::VertexData::operator=(const LLVolumeFace::VertexData& rhs)
-{
-    if (this != &rhs)
-    {
-        init();
-        LLVector4a::memcpyNonAliased16((F32*) mData, (F32*) rhs.mData, 2*sizeof(LLVector4a));
-        mTexCoord = rhs.mTexCoord;
-    }
-    return *this;
-}
-
-LLVolumeFace::VertexData::~VertexData()
-{
-    ll_aligned_free_16(mData);
-    mData = NULL;
-}
-
-LLVector4a& LLVolumeFace::VertexData::getPosition()
-{
-    return mData[POSITION];
-}
-
-LLVector4a& LLVolumeFace::VertexData::getNormal()
-{
-    return mData[NORMAL];
-}
-
-const LLVector4a& LLVolumeFace::VertexData::getPosition() const
-{
-    return mData[POSITION];
-}
-
-const LLVector4a& LLVolumeFace::VertexData::getNormal() const
-{
-    return mData[NORMAL];
-}
-
-
-void LLVolumeFace::VertexData::setPosition(const LLVector4a& pos)
-{
-    mData[POSITION] = pos;
-}
-
-void LLVolumeFace::VertexData::setNormal(const LLVector4a& norm)
-{
-    mData[NORMAL] = norm;
 }
 
 bool LLVolumeFace::VertexData::operator<(const LLVolumeFace::VertexData& rhs)const
@@ -2270,8 +2190,8 @@ bool LLVolumeFace::VertexData::operator<(const LLVolumeFace::VertexData& rhs)con
 
 bool LLVolumeFace::VertexData::operator==(const LLVolumeFace::VertexData& rhs)const
 {
-    return mData[POSITION].equals3(rhs.getPosition()) &&
-            mData[NORMAL].equals3(rhs.getNormal()) &&
+    return mPosition.equals3(rhs.mPosition) &&
+            mNormal.equals3(rhs.mNormal) &&
             mTexCoord == rhs.mTexCoord;
 }
 
@@ -2281,17 +2201,17 @@ bool LLVolumeFace::VertexData::compareNormal(const LLVolumeFace::VertexData& rhs
 
     const F32 epsilon = 0.00001f;
 
-    if (rhs.mData[POSITION].equals3(mData[POSITION], epsilon) &&
+    if (rhs.mPosition.equals3(mPosition, epsilon) &&
         fabs(rhs.mTexCoord[0]-mTexCoord[0]) < epsilon &&
         fabs(rhs.mTexCoord[1]-mTexCoord[1]) < epsilon)
     {
         if (angle_cutoff > 1.f)
         {
-            retval = (mData[NORMAL].equals3(rhs.mData[NORMAL], epsilon));
+            retval = (mNormal.equals3(rhs.mNormal, epsilon));
         }
         else
         {
-            F32 cur_angle = rhs.mData[NORMAL].dot3(mData[NORMAL]).getF32();
+            F32 cur_angle = rhs.mNormal.dot3(mNormal).getF32();
             retval = cur_angle > angle_cutoff;
         }
     }
@@ -2450,6 +2370,7 @@ bool LLVolume::unpackVolumeFaces(U8* in_data, S32 size)
 
 bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
     {
         auto face_count = mdl.size();
 
@@ -2512,12 +2433,15 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             // dereferencing is strict-aliasing UB (you may not access a
             // char-typed object through a non-char pointer). std::memcpy is
             // defined and compiles down to a load on every supported target.
-            const U8* indices_bytes = idx.data();
-            for (U32 j = 0; j < num_indices; ++j)
             {
-                U16 idx_v;
-                std::memcpy(&idx_v, indices_bytes + j * sizeof(U16), sizeof(U16));
-                face.mIndices[j] = idx_v;
+                const U8* indices_bytes = idx.data();
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - indices");
+                for (U32 j = 0; j < num_indices; ++j)
+                {
+                    U16 idx_v;
+                    std::memcpy(&idx_v, indices_bytes + j * sizeof(U16), sizeof(U16));
+                    face.mIndices[j] = idx_v;
+                }
             }
 
             //copy out vertices
@@ -2583,51 +2507,36 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             tc_range.set(tc_range2[0], tc_range2[1], tc_range2[0], tc_range2[1]);
             LLVector4a min_tc4(min_tc[0], min_tc[1], min_tc[0], min_tc[1]);
 
-            LLVector4a* pos_out = face.mPositions;
-            LLVector4a* norm_out = face.mNormals;
-            // mTexCoords is LLVector2* into a 16-byte-aligned slab; write 4
-            // floats (= 2 UV pairs) per iteration via store4a through F32*,
-            // avoiding a cast to LLVector4a* of unrelated-class storage.
+            // mTexCoords is LLVector2* into a 16-byte-aligned slab holding
+            // two texture coordinates per vector
             F32* tc_out = (F32*) face.mTexCoords;
 
-            {
-                // Same aliasing issue as the index loop above: pos is a
-                // std::vector<U8> with three little-endian U16s per vertex.
-                const U8* v_bytes = pos.data();
-                for (U32 j = 0; j < num_verts; ++j)
-                {
-                    U16 v[3];
-                    std::memcpy(v, v_bytes + j * sizeof(v), sizeof(v));
-                    pos_out->set((F32) v[0], (F32) v[1], (F32) v[2]);
-                    pos_out->div(65535.f);
-                    pos_out->mul(pos_range);
-                    pos_out->add(min_pos);
-                    pos_out++;
-                }
+            // each quantized value is its sixteen bits over 65535, times
+            // the range, plus the minimum; the range over 65535 is one
+            // multiply per lane
+            const LLVector4a u16_step(1.f / 65535.f);
 
+            {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - positions");
+                LLVector4a pos_scale;
+                pos_scale.setMul(pos_range, u16_step);
+                alsimd::dequantize_u16x3(pos.data(), num_verts, pos_scale, min_pos, face.mPositions);
             }
 
             {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - normals");
                 if (!norm.empty())
                 {
-                    const U8* n_bytes = norm.data();
-                    for (U32 j = 0; j < num_verts; ++j)
-                    {
-                        U16 n[3];
-                        std::memcpy(n, n_bytes + j * sizeof(n), sizeof(n));
-                        norm_out->set((F32) n[0], (F32) n[1], (F32) n[2]);
-                        norm_out->div(65535.f);
-                        norm_out->mul(2.f);
-                        norm_out->sub(1.f);
-                        norm_out++;
-                    }
+                    // from sixteen bits to -1..1
+                    alsimd::dequantize_u16x3(norm.data(), num_verts, LLVector4a(2.f / 65535.f), LLVector4a(-1.f), face.mNormals);
                 }
                 else
                 {
+                    LLVector4a* norm_out = face.mNormals;
                     for (U32 j = 0; j < num_verts; ++j)
                     {
                         norm_out->clear();
-                        norm_out++; // or just norm_out[j].clear();
+                        norm_out++;
                     }
                 }
             }
@@ -2662,39 +2571,12 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 #endif
 
             {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - texcoords");
                 if (!tc.empty())
                 {
-                    // tc is std::vector<U8>; packs two vertices' UV pairs
-                    // into one LLVector4a, so we read four little-endian
-                    // U16s (8 bytes) per loop iteration. On odd num_verts the
-                    // final iteration only has one vertex left (4 bytes),
-                    // and copying 8 bytes would walk past the buffer end.
-                    const U8* t_bytes = tc.data();
-                    U32 t_offset = 0;
-                    for (U32 j = 0; j < num_verts; j+=2)
-                    {
-                        U16 t[4] = { 0, 0, 0, 0 };
-                        LLVector4a tc4;
-                        if (j < num_verts-1)
-                        {
-                            std::memcpy(t, t_bytes + t_offset, sizeof(t));
-                            tc4.set((F32) t[0], (F32) t[1], (F32) t[2], (F32) t[3]);
-                            t_offset += sizeof(t);
-                        }
-                        else
-                        {
-                            std::memcpy(t, t_bytes + t_offset, sizeof(U16) * 2);
-                            tc4.set((F32) t[0], (F32) t[1], 0.f, 0.f);
-                            t_offset += sizeof(U16) * 2;
-                        }
-
-                        tc4.div(65535.f);
-                        tc4.mul(tc_range);
-                        tc4.add(min_tc4);
-
-                        tc4.store4a(tc_out);
-                        tc_out += 4;
-                    }
+                    LLVector4a tc_scale;
+                    tc_scale.setMul(tc_range, u16_step);
+                    alsimd::dequantize_u16x2(tc.data(), num_verts, tc_scale, min_tc4, tc_out);
                 }
                 else
                 {
@@ -2720,6 +2602,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                 }
 
                 const LLSD::Binary& weights = mdl[i]["Weights"].asBinary();
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - weights");
 
                 U32 idx = 0;
 
@@ -2837,41 +2720,38 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 
             //calculate bounding box
             // VFExtents change
-            LLVector4a& min = face.mExtents[0];
-            LLVector4a& max = face.mExtents[1];
-
-            if (face.mNumVertices < 3)
-            { //empty face, use a dummy 1cm (at 1m scale) bounding box
-                min.splat(-0.005f);
-                max.splat(0.005f);
-            }
-            else
             {
-                min = max = face.mPositions[0];
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - extents");
+                LLVector4a& min = face.mExtents[0];
+                LLVector4a& max = face.mExtents[1];
 
-                for (S32 i = 1; i < face.mNumVertices; ++i)
-                {
-                    min.setMin(min, face.mPositions[i]);
-                    max.setMax(max, face.mPositions[i]);
-                }
-
-                if (face.mTexCoords)
-                {
-                    LLVector2& min_tc = face.mTexCoordExtents[0];
-                    LLVector2& max_tc = face.mTexCoordExtents[1];
-
-                    min_tc = face.mTexCoords[0];
-                    max_tc = face.mTexCoords[0];
-
-                    for (S32 j = 1; j < face.mNumVertices; ++j)
-                    {
-                        update_min_max(min_tc, max_tc, face.mTexCoords[j]);
-                    }
+                if (face.mNumVertices < 3)
+                { //empty face, use a dummy 1cm (at 1m scale) bounding box
+                    min.splat(-0.005f);
+                    max.splat(0.005f);
                 }
                 else
                 {
-                    face.mTexCoordExtents[0].set(0,0);
-                    face.mTexCoordExtents[1].set(1,1);
+                    alsimd::extents(face.mPositions, face.mNumVertices, min, max);
+
+                    if (face.mTexCoords)
+                    {
+                        LLVector2& min_tc = face.mTexCoordExtents[0];
+                        LLVector2& max_tc = face.mTexCoordExtents[1];
+
+                        min_tc = face.mTexCoords[0];
+                        max_tc = face.mTexCoords[0];
+
+                        for (S32 j = 1; j < face.mNumVertices; ++j)
+                        {
+                            update_min_max(min_tc, max_tc, face.mTexCoords[j]);
+                        }
+                    }
+                    else
+                    {
+                        face.mTexCoordExtents[0].set(0,0);
+                        face.mTexCoordExtents[1].set(1,1);
+                    }
                 }
             }
         }
@@ -3318,100 +3198,10 @@ S32 sculpt_sides(F32 detail)
     }
 }
 
-static bool validate_sculpt_geometry(const LLVolume* volume)
-{
-    if (!volume || volume->getNumVolumeFaces() == 0)
-    {
-        return true;
-    }
 
-    // Validate each face in the sculpt
-    for (S32 face_idx = 0; face_idx < volume->getNumVolumeFaces(); ++face_idx)
-    {
-        const LLVolumeFace& face = volume->getVolumeFace(face_idx);
-
-        // Skip validation for degenerate faces
-        if (face.mNumVertices < 3 || face.mNumIndices < 3)
-        {
-            continue;
-        }
-
-        // Calculate 'bounding' surface
-        LLVector4a extent_size;
-        extent_size.setSub(face.mExtents[1], face.mExtents[0]);
-
-        F32 width = extent_size[0];
-        F32 height = extent_size[1];
-        F32 depth = extent_size[2];
-
-        F32 bounding_surface = width * height + width * depth + height * depth;
-        bounding_surface *= 2;
-
-        if (!llfinite(bounding_surface) || bounding_surface <= FLT_EPSILON)
-        {
-            return false;
-        }
-
-        // Calculate total surface area of all triangles
-        F32 total_triangle_area = 0.0f;
-        S32 num_triangles = face.mNumIndices / 3;
-
-        for (S32 i = 0; i < num_triangles; ++i)
-        {
-            S32 idx_base = i * 3;
-            U16 idx0 = face.mIndices[idx_base];
-            U16 idx1 = face.mIndices[idx_base + 1];
-            U16 idx2 = face.mIndices[idx_base + 2];
-
-            // Validate indices
-            if (idx0 >= face.mNumVertices || idx1 >= face.mNumVertices || idx2 >= face.mNumVertices)
-            {
-                continue;
-            }
-
-            const LLVector4a& v0 = face.mPositions[idx0];
-            const LLVector4a& v1 = face.mPositions[idx1];
-            const LLVector4a& v2 = face.mPositions[idx2];
-
-            // Calculate triangle area
-            LLVector4a edge1, edge2, cross;
-            edge1.setSub(v1, v0);
-            edge2.setSub(v2, v0);
-            cross.setCross3(edge1, edge2);
-
-            F32 triangle_area = cross.getLength3().getF32() * 0.5f;
-            total_triangle_area += triangle_area;
-        }
-
-        if (!llfinite(total_triangle_area))
-        {
-            return false;
-        }
-
-        // The idea here is that the total area of a sculpt is normally comparable
-        // to the area of a bounding box. But a random overlapping collection of
-        // triangles has a significantly larger area than a sculpt normally has.
-        F32 area_ratio = total_triangle_area / bounding_surface;
-
-        constexpr F32 MAX_AREA_TO_AREA_RATIO = 16.0f;
-        if (area_ratio > MAX_AREA_TO_AREA_RATIO)
-        {
-            LL_DEBUGS("LLVOLUME") << "Sculpt rejected: excessive triangle area."
-                << "  Face index: " << face_idx
-                << "  Total triangle area: " << total_triangle_area << " sq m"
-                << "  Bounding surface area: " << bounding_surface << " sq m"
-                << "  Ratio: " << area_ratio
-                << "  Triangle count: " << num_triangles
-                << "  Bounds: [" << width << " x " << height << " x " << depth << "]" << LL_ENDL;
-            return false;
-        }
-    }
-
-    return true;
-}
 
 // determine the number of vertices in both s and t direction for this sculpt
-static void sculpt_calc_mesh_resolution(U16 width, U16 height, U8 type, F32 detail, S32& s, S32& t)
+void sculpt_calc_mesh_resolution(U16 width, U16 height, U8 type, F32 detail, S32& s, S32& t)
 {
     // this code has the following properties:
     // 1) the aspect ratio of the mesh is as close as possible to the ratio of the map
@@ -3521,62 +3311,10 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
 
     mSculptLevel = sculpt_level;
 
-    LLSculptValidationState cached_state = LLSculptValidationState::Valid;
-    if (!data_is_empty && (sculpt_level >= 0) && sculpt_level < SCULPT_CACHE_SIZE)
-    {
-        // validation might be expensive, so we do it only once per lod.
-        cached_state = mSculptValidationCache[sculpt_level];
-    }
+    // Delete any existing faces so that they get regenerated
+    mVolumeFaces.clear();
 
-    switch (cached_state)
-    {
-    case LLSculptValidationState::Valid:
-        {
-            // Delete any existing faces, then regenerate
-            mVolumeFaces.clear();
-            createVolumeFaces();
-            break;
-        }
-    case LLSculptValidationState::Invalid:
-        {
-            // Invalid geometry
-            // Regenerate mesh with an empty placeholder
-            mVolumeFaces.clear();
-            sculptGenerateEmptyPlaceholder();
-            createVolumeFaces();
-            break;
-        }
-    case LLSculptValidationState::Unvalidated:
-        {
-            // First time at this LOD
-            mVolumeFaces.clear();
-            createVolumeFaces();
-
-            bool valid_geometry = true;
-
-            // Todo: can this be backed into createVolumeFaces?
-            // Or calculated without having to call createVolumeFaces first?
-            // Todo 2: should the same be done for meshes?
-            valid_geometry = validate_sculpt_geometry(this);
-            mSculptValidationCache[sculpt_level] = valid_geometry ? LLSculptValidationState::Valid : LLSculptValidationState::Invalid;
-
-            if (!valid_geometry)
-            {
-                LL_WARNS("LLVOLUME") << "Sculpt failed geometry validation - either invalid image or malicious. "
-                    << "Replacing with placeholder. Image: " << mParams.getSculptID() << LL_ENDL;
-
-                // Clear the malicious faces
-                mVolumeFaces.clear();
-
-                // Regenerate mesh with empty placeholder
-                sculptGenerateEmptyPlaceholder();
-
-                // Recreate faces with placeholder geometry
-                createVolumeFaces();
-            }
-            break;
-        }
-    } //switch (cached_state)
+    createVolumeFaces();
 }
 
 
@@ -4053,490 +3791,6 @@ S32 LLVolume::getNumTriangles(S32* vcount) const
     }
 
     return triangle_count;
-}
-
-void LLVolumeFace::generateSilhouetteEdge(const LLVolume* volume, std::vector<S32>& edge) const
-{
-    llassert(edge.empty()); // edge is supposed to be a scratch array
-
-    if (volume->isMeshAssetLoaded()) { return; }
-
-    if (mTypeMask & CAP_MASK)
-    {
-        // Logic copied from LLVolumeFace::createCap - indicates a face created via
-        // createUnCutCubeCap.
-        if (!(mTypeMask & HOLLOW_MASK) &&
-            !(mTypeMask & OPEN_MASK) &&
-            ((volume->getParams().getPathParams().getBegin()==0.0f)&&
-            (volume->getParams().getPathParams().getEnd()==1.0f))&&
-            (volume->getParams().getProfileParams().getCurveType()==LL_PCODE_PROFILE_SQUARE &&
-             volume->getParams().getPathParams().getCurveType()==LL_PCODE_PATH_LINE)
-            )
-        {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("llvfgse - CAP_MASK");
-
-            const LLAlignedArray<LLVector4a,64>& profile = volume->getProfile().mProfile;
-            S32 grid_size = (profile.size()-1)/4;
-            edge.resize(mNumIndices);
-            llassert(edge.size() == 6*grid_size*grid_size);
-
-            S32 cur_edge = 0;
-            for(S32 gx = 0;gx<grid_size;gx++)
-            {
-                for(S32 gy = 0;gy<grid_size;gy++)
-                {
-                    if (mTypeMask & TOP_MASK)
-                    {
-
-                        S32 edge_value = grid_size * 2 * gy + gx * 2;
-
-                        if (gx > 0)
-                        {
-                            edge[cur_edge++] = edge_value;
-                        }
-                        else
-                        {
-                            edge[cur_edge++] = -1; // Mark face to higlight it
-                        }
-
-                        if (gy < grid_size - 1)
-                        {
-                            edge[cur_edge++] = edge_value;
-                        }
-                        else
-                        {
-                            edge[cur_edge++] = -1;
-                        }
-
-                        edge[cur_edge++] = edge_value;
-
-                        if (gx < grid_size - 1)
-                        {
-                            edge[cur_edge++] = edge_value;
-                        }
-                        else
-                        {
-                            edge[cur_edge++] = -1;
-                        }
-
-                        if (gy > 0)
-                        {
-                            edge[cur_edge++] = edge_value;
-                        }
-                        else
-                        {
-                            edge[cur_edge++] = -1;
-                        }
-
-                        edge[cur_edge++] = edge_value;
-                    }
-                    else
-                    {
-                        S32 edge_value = grid_size * 2 * gy + gx * 2;
-
-                        if (gy > 0)
-                        {
-                            edge[cur_edge++] = edge_value;
-                        }
-                        else
-                        {
-                            edge[cur_edge++] = -1;
-                        }
-
-                        if (gx < grid_size - 1)
-                        {
-                            edge[cur_edge++] = edge_value;
-                        }
-                        else
-                        {
-                            edge[cur_edge++] = -1;
-                        }
-
-                        edge[cur_edge++] = edge_value;
-
-                        if (gy < grid_size - 1)
-                        {
-                            edge[cur_edge++] = edge_value;
-                        }
-                        else
-                        {
-                            edge[cur_edge++] = -1;
-                        }
-
-                        if (gx > 0)
-                        {
-                            edge[cur_edge++] = edge_value;
-                        }
-                        else
-                        {
-                            edge[cur_edge++] = -1;
-                        }
-
-                        edge[cur_edge++] = edge_value;
-                    }
-                }
-            }
-        }
-    }
-    else if ((mTypeMask & END_MASK) || (mTypeMask & SIDE_MASK))
-    {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("llvfgse - END_MASK or SIDE_MASK");
-
-        edge.resize(mNumIndices);
-        llassert(edge.size() == 6*(mNumS-1)*(mNumT-1));
-
-        S32 cur_edge = 0;
-        const bool flat_face = mTypeMask & FLAT_MASK;
-        for (S32 t = 0; t < (mNumT-1); t++)
-        {
-            for (S32 s = 0; s < (mNumS-1); s++)
-            {
-                // bottom left/top right neighbor face
-                edge[cur_edge++] = (mNumS-1)*2*t+s*2+1;
-
-                if (t < mNumT-2)
-                {   // top right/top left neighbor face
-                    edge[cur_edge++] = (mNumS-1)*2*(t+1)+s*2+1;
-                }
-                else if (mNumT <= 3 || volume->getPath().isOpen())
-                {   // no neighbor
-                    edge[cur_edge++] = -1;
-                }
-                else
-                {   // wrap on T
-                    edge[cur_edge++] = s*2+1;
-                }
-
-                if (s > 0)
-                {   // top left/bottom left neighbor face
-                    edge[cur_edge++] = (mNumS-1)*2*t+s*2-1;
-                }
-                else if (flat_face || volume->getProfile().isOpen())
-                {   // no neighbor
-                    edge[cur_edge++] = -1;
-                }
-                else
-                {   // wrap on S
-                    edge[cur_edge++] = (mNumS-1)*2*t+(mNumS-2)*2+1;
-                }
-
-                if (t > 0)
-                {   // bottom left/bottom right neighbor face
-                    edge[cur_edge++] = (mNumS-1)*2*(t-1)+s*2;
-                }
-                else if (mNumT <= 3 || volume->getPath().isOpen())
-                {   // no neighbor
-                    edge[cur_edge++] = -1;
-                }
-                else
-                {   // wrap on T
-                    edge[cur_edge++] = (mNumS-1)*2*(mNumT-2)+s*2;
-                }
-
-                if (s < mNumS-2)
-                {   // bottom right/top right neighbor face
-                    edge[cur_edge++] = (mNumS-1)*2*t+(s+1)*2;
-                }
-                else if (flat_face || volume->getProfile().isOpen())
-                {   // no neighbor
-                    edge[cur_edge++] = -1;
-                }
-                else
-                {   // wrap on S
-                    edge[cur_edge++] = (mNumS-1)*2*t;
-                }
-
-                // top right/bottom left neighbor face
-                edge[cur_edge++] = (mNumS-1)*2*t+s*2;
-            }
-        }
-    }
-    else
-    {
-        LL_ERRS() << "Unknown/uninitialized face type!" << LL_ENDL;
-    }
-}
-
-//-----------------------------------------------------------------------------
-// generateSilhouetteVertices()
-//-----------------------------------------------------------------------------
-void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
-                                          std::vector<LLVector3> &normals,
-                                          const LLVector3& obj_cam_vec_in,
-                                          const LLMatrix4& mat_in,
-                                          const LLMatrix3& norm_mat_in,
-                                          S32 face_mask)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
-
-    LLMatrix4a mat;
-    mat.loadu(mat_in);
-
-    LLMatrix4a norm_mat;
-    norm_mat.loadu(norm_mat_in);
-
-    LLVector4a obj_cam_vec;
-    obj_cam_vec.load3(obj_cam_vec_in.mV);
-
-    vertices.clear();
-    normals.clear();
-
-    if ((mParams.getSculptType() & LL_SCULPT_TYPE_MASK) == LL_SCULPT_TYPE_MESH)
-    {
-        return;
-    }
-
-    S32 cur_index = 0;
-    // Scratch array for per-face silhouette edge information. This also has a
-    // lot of dev-only debug information that we might not care about anymore.
-    // (see DEBUG_SILHOUETTE_EDGE_MAP)
-    // *TODO: Consider removing the debug associated with
-    // DEBUG_SILHOUETTE_EDGE_MAP, and remove its associated computational
-    // overhead in generateSilhouetteEdge.
-    std::vector<S32> edge;
-    //for each face
-    for (face_list_t::iterator iter = mVolumeFaces.begin();
-         iter != mVolumeFaces.end(); ++iter)
-    {
-        LLVolumeFace& face = *iter;
-
-        if (!(face_mask & (0x1 << cur_index++)) ||
-             face.mNumIndices == 0)
-        {
-            continue;
-        }
-        // Attempt to generate "edge" info for this silhouette, which is used
-        // for some prims. If the edge array remains empty, then this
-        // silhouette generation method is not supported for this face.
-        edge.clear();
-        face.generateSilhouetteEdge(this, edge);
-        if (edge.empty())
-        {
-            continue;
-        }
-
-        if (face.mTypeMask & (LLVolumeFace::CAP_MASK))
-        {
-            LLVector4a* v = (LLVector4a*)face.mPositions;
-            LLVector4a* n = (LLVector4a*)face.mNormals;
-
-            for (S32 j = 0; j < face.mNumIndices / 3; j++)
-            {
-                for (S32 k = 0; k < 3; k++)
-                {
-                    S32 index = edge[j * 3 + k];
-
-                    if (index == -1)
-                    {
-                        // silhouette edge, currently only cubes, so no other conditions
-
-                        S32 v1 = face.mIndices[j * 3 + k];
-                        S32 v2 = face.mIndices[j * 3 + ((k + 1) % 3)];
-
-                        LLVector4a t;
-                        mat.affineTransform(v[v1], t);
-                        vertices.push_back(LLVector3(t[0], t[1], t[2]));
-
-                        norm_mat.rotate(n[v1], t);
-
-                        t.normalize3fast();
-                        normals.push_back(LLVector3(t[0], t[1], t[2]));
-
-                        mat.affineTransform(v[v2], t);
-                        vertices.push_back(LLVector3(t[0], t[1], t[2]));
-
-                        norm_mat.rotate(n[v2], t);
-                        t.normalize3fast();
-                        normals.push_back(LLVector3(t[0], t[1], t[2]));
-                    }
-                }
-            }
-
-        }
-        else
-        {
-            //==============================================
-            //DEBUG draw edge map instead of silhouette edge
-            //==============================================
-
-#if DEBUG_SILHOUETTE_EDGE_MAP
-
-            //for each triangle
-            U32 tri_count = face.mNumIndices / 3;
-            for (U32 j = 0; j < tri_count; j++) {
-                //get vertices
-                S32 v1 = face.mIndices[j*3+0];
-                S32 v2 = face.mIndices[j*3+1];
-                S32 v3 = face.mIndices[j*3+2];
-
-                //get current face center
-                LLVector3 cCenter = (face.mVertices[v1].getPosition() +
-                                    face.mVertices[v2].getPosition() +
-                                    face.mVertices[v3].getPosition()) / 3.0f;
-
-                //for each edge
-                for (S32 k = 0; k < 3; k++) {
-                    S32 nIndex = edge[j*3+k];
-                    if (nIndex <= -1) {
-                        continue;
-                    }
-
-                    if (nIndex >= (S32)tri_count) {
-                        continue;
-                    }
-                    //get neighbor vertices
-                    v1 = face.mIndices[nIndex*3+0];
-                    v2 = face.mIndices[nIndex*3+1];
-                    v3 = face.mIndices[nIndex*3+2];
-
-                    //get neighbor face center
-                    LLVector3 nCenter = (face.mVertices[v1].getPosition() +
-                                    face.mVertices[v2].getPosition() +
-                                    face.mVertices[v3].getPosition()) / 3.0f;
-
-                    //draw line
-                    vertices.push_back(cCenter);
-                    vertices.push_back(nCenter);
-                    normals.push_back(LLVector3(1,1,1));
-                    normals.push_back(LLVector3(1,1,1));
-                    segments.push_back(vertices.size());
-                }
-            }
-
-            continue;
-
-            //==============================================
-            //DEBUG
-            //==============================================
-
-            //==============================================
-            //DEBUG draw normals instead of silhouette edge
-            //==============================================
-#elif DEBUG_SILHOUETTE_NORMALS
-
-            //for each vertex
-            for (U32 j = 0; j < face.mNumVertices; j++) {
-                vertices.push_back(face.mVertices[j].getPosition());
-                vertices.push_back(face.mVertices[j].getPosition() + face.mVertices[j].getNormal()*0.1f);
-                normals.push_back(LLVector3(0,0,1));
-                normals.push_back(LLVector3(0,0,1));
-                segments.push_back(vertices.size());
-#if DEBUG_SILHOUETTE_BINORMALS
-                vertices.push_back(face.mVertices[j].getPosition());
-                vertices.push_back(face.mVertices[j].getPosition() + face.mVertices[j].mTangent*0.1f);
-                normals.push_back(LLVector3(0,0,1));
-                normals.push_back(LLVector3(0,0,1));
-                segments.push_back(vertices.size());
-#endif
-            }
-
-            continue;
-#else
-            //==============================================
-            //DEBUG
-            //==============================================
-
-            constexpr U8 AWAY = 0x01,
-                         TOWARDS = 0x02;
-
-            //for each triangle
-            std::vector<U8> fFacing;
-            vector_append(fFacing, face.mNumIndices/3);
-
-            LLVector4a* v = (LLVector4a*) face.mPositions;
-            LLVector4a* n = (LLVector4a*) face.mNormals;
-
-            for (S32 j = 0; j < face.mNumIndices/3; j++)
-            {
-                //approximate normal
-                S32 v1 = face.mIndices[j*3+0];
-                S32 v2 = face.mIndices[j*3+1];
-                S32 v3 = face.mIndices[j*3+2];
-
-                LLVector4a c1,c2;
-                c1.setSub(v[v1], v[v2]);
-                c2.setSub(v[v2], v[v3]);
-
-                LLVector4a norm;
-
-                norm.setCross3(c1, c2);
-
-                if (norm.dot3(norm) < 0.00000001f)
-                {
-                    fFacing[j] = AWAY | TOWARDS;
-                }
-                else
-                {
-                    //get view vector
-                    LLVector4a view;
-                    view.setSub(obj_cam_vec, v[v1]);
-                    bool away = view.dot3(norm) > 0.0f;
-                    if (away)
-                    {
-                        fFacing[j] = AWAY;
-                    }
-                    else
-                    {
-                        fFacing[j] = TOWARDS;
-                    }
-                }
-            }
-
-            //for each triangle
-            for (S32 j = 0; j < face.mNumIndices/3; j++)
-            {
-                if (fFacing[j] == (AWAY | TOWARDS))
-                { //this is a degenerate triangle
-                    //take neighbor facing (degenerate faces get facing of one of their neighbors)
-                    // *FIX IF NEEDED:  this does not deal with neighboring degenerate faces
-                    for (S32 k = 0; k < 3; k++)
-                    {
-                        S32 index = edge[j*3+k];
-                        if (index != -1)
-                        {
-                            fFacing[j] = fFacing[index];
-                            break;
-                        }
-                    }
-                    continue; //skip degenerate face
-                }
-
-                //for each edge
-                for (S32 k = 0; k < 3; k++) {
-                    S32 index = edge[j*3+k];
-                    if (index != -1 && fFacing[index] == (AWAY | TOWARDS)) {
-                        //our neighbor is degenerate, make him face our direction
-                        fFacing[edge[j*3+k]] = fFacing[j];
-                        continue;
-                    }
-
-                    if (index == -1 ||      //edge has no neighbor, MUST be a silhouette edge
-                        (fFacing[index] & fFacing[j]) == 0) {   //we found a silhouette edge
-
-                        S32 v1 = face.mIndices[j*3+k];
-                        S32 v2 = face.mIndices[j*3+((k+1)%3)];
-
-                        LLVector4a t;
-                        mat.affineTransform(v[v1], t);
-                        vertices.push_back(LLVector3(t[0], t[1], t[2]));
-
-                        norm_mat.rotate(n[v1], t);
-
-                        t.normalize3fast();
-                        normals.push_back(LLVector3(t[0], t[1], t[2]));
-
-                        mat.affineTransform(v[v2], t);
-                        vertices.push_back(LLVector3(t[0], t[1], t[2]));
-
-                        norm_mat.rotate(n[v2], t);
-                        t.normalize3fast();
-                        normals.push_back(LLVector3(t[0], t[1], t[2]));
-                    }
-                }
-            }
-#endif
-        }
-    }
 }
 
 S32 LLVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
@@ -6921,7 +6175,9 @@ void LLVolumeFace::resizeVertices(S32 num_verts)
 
     if (num_verts)
     {
-        //pad texture coordinate block end to allow for QWORD reads
+        // the texture coordinate block is a whole number of 16-byte vectors:
+        // the copies move it that way and the texcoord kernel reads it two
+        // coordinates at a time, the last vector included
         S32 tc_size = ((num_verts*sizeof(LLVector2)) + 0xF) & ~0xF;
 
         mPositions = (LLVector4a*) ll_aligned_malloc<64>(sizeof(LLVector4a)*2*num_verts+tc_size);
@@ -7042,7 +6298,8 @@ void LLVolumeFace::resizeIndices(S32 num_indices)
 
     if (num_indices)
     {
-        //pad index block end to allow for QWORD reads
+        // the index block is a whole number of 16-byte vectors, which is
+        // how the copies move it
         S32 size = ((num_indices*sizeof(U16)) + 0xF) & ~0xF;
 
         mIndices = (U16*) ll_aligned_malloc_16(size);
@@ -7350,28 +6607,7 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         a.setSub(b, v1);
         b.sub(v2);
 
-
-        LLQuad& vector1 = *((LLQuad*) &v1);
-        LLQuad& vector2 = *((LLQuad*) &v2);
-
-        LLQuad& amQ = *((LLQuad*) &a);
-        LLQuad& bmQ = *((LLQuad*) &b);
-
-        //v1.setCross3(t,v0);
-        //setCross3(const LLVector4a& a, const LLVector4a& b)
-        // Vectors are stored in memory in w, z, y, x order from high to low
-        // Set vector1 = { a[W], a[X], a[Z], a[Y] }
-        vector1 = _mm_shuffle_ps( amQ, amQ, _MM_SHUFFLE( 3, 0, 2, 1 ));
-        // Set vector2 = { b[W], b[Y], b[X], b[Z] }
-        vector2 = _mm_shuffle_ps( bmQ, bmQ, _MM_SHUFFLE( 3, 1, 0, 2 ));
-        // mQ = { a[W]*b[W], a[X]*b[Y], a[Z]*b[X], a[Y]*b[Z] }
-        vector2 = _mm_mul_ps( vector1, vector2 );
-        // vector3 = { a[W], a[Y], a[X], a[Z] }
-        amQ = _mm_shuffle_ps( amQ, amQ, _MM_SHUFFLE( 3, 1, 0, 2 ));
-        // vector4 = { b[W], b[X], b[Z], b[Y] }
-        bmQ = _mm_shuffle_ps( bmQ, bmQ, _MM_SHUFFLE( 3, 0, 2, 1 ));
-        // mQ = { 0, a[X]*b[Y] - a[Y]*b[X], a[Z]*b[X] - a[X]*b[Z], a[Y]*b[Z] - a[Z]*b[Y] }
-        vector1 = _mm_sub_ps( vector2, _mm_mul_ps( amQ, bmQ ));
+        v1.setCross3(a, b);
 
         llassert(v1.isFinite3());
 

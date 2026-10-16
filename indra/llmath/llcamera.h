@@ -31,7 +31,9 @@
 #include "llmath.h"
 #include "llcoordframe.h"
 #include "llplane.h"
+#include "alplaneset.h"
 #include "llvector4a.h"
+#include "llmatrix4a.h"
 
 constexpr F32 DEFAULT_FIELD_OF_VIEW = 60.f * DEG_TO_RAD;
 constexpr F32 DEFAULT_ASPECT_RATIO  = 640.f / 480.f;
@@ -41,7 +43,14 @@ constexpr F32 DEFAULT_FAR_PLANE     = 64.f; // far reaches across two horizontal
 constexpr F32 MAX_ASPECT_RATIO  = 50.0f;
 constexpr F32 MAX_NEAR_PLANE    = 1023.9f;   // Clamp the near plane just before the skybox ends
 constexpr F32 MAX_FAR_PLANE     = 100000.0f; //1000000.0f; // Max allowed. Not good Z precision though.
-constexpr F32 MAX_FAR_CLIP      = 512.0f;
+constexpr F32 MAX_FAR_CLIP      = 2048.0f;   // Draw distance ceiling under reverse-Z, whose float depth keeps its precision there
+constexpr F32 FORWARD_Z_MAX_FAR_CLIP = 512.0f; // Draw distance ceiling under forward 24-bit depth
+// The far plane of every finite projection: forward-Z's main view, probe captures and previews. An infinite
+// request under forward-Z falls back to it.
+constexpr F32 FINITE_PROJECTION_FAR = 1024.0f;
+// Depth reconstruction places no point farther than this; the cleared far depth of an infinite projection
+// would otherwise unproject to infinity. The shaders carry it as deferredUtil.glsl's RECONSTRUCT_W_FLOOR, 1 / this.
+constexpr F32 MAX_RECONSTRUCT_DISTANCE = 1000000.0f;
 
 constexpr F32 MIN_ASPECT_RATIO  = 0.02f;
 constexpr F32 MIN_NEAR_PLANE    = 0.1f;
@@ -63,7 +72,6 @@ constexpr F32 MAX_FIELD_OF_VIEW = 175.f * DEG_TO_RAD;
 class alignas(16) LLCamera
 :   public LLCoordFrame
 {
-    LL_ALIGN_NEW
 public:
     LLCamera(const LLCamera& rhs)
     {
@@ -125,6 +133,11 @@ private:
     LLPlane mLastAgentPlanes[AGENT_PLANE_USER_CLIP_NUM];
     U8 mPlaneMask[PLANE_MASK_NUM];         // 8 for alignment
 
+    // The planes in use, one per lane, for the box tests; rebuilt whenever
+    // a plane, its mask or the count changes.
+    ALPlaneSet mAgentPlaneSet;
+    ALPlaneSet mRegionPlaneSet;
+
     F32 mView;                  // angle between top and bottom frustum planes in radians.
     F32 mAspect;                // width/height
     S32 mViewHeightInPixels;    // for ViewHeightInPixels() only
@@ -137,10 +150,18 @@ private:
     U32 mPlaneCount;  //defaults to 6, if setUserClipPlane is called, uses user supplied clip plane in
 
     LLVector3 mWorldPlanePos;       // Position of World Planes (may be offset from camera)
+
+protected:
+    // The modelview and projection this camera renders with, set by whoever
+    // aims it; the frustum is derived from them.
+    LLMatrix4a mModelview;
+    LLMatrix4a mProjection;
 public:
     LLVector3 mAgentFrustum[AGENT_FRUSTRUM_NUM];  //8 corners of 6-plane frustum
     F32 mFrustumCornerDist;     //distance to corner of frustum against far clip plane
-    LLPlane& getAgentPlane(U32 idx) { return mAgentPlanes[idx]; }
+    const LLPlane& getAgentPlane(U32 idx) const { return mAgentPlanes[idx]; }
+    // Replaces one plane; its octant and the plane set follow
+    void setAgentPlane(U32 idx, const LLPlane& plane);
 
 public:
     LLCamera();
@@ -181,6 +202,15 @@ public:
 
     const LLVector3& getWorldPlanePos() const       { return mWorldPlanePos; }
 
+    const LLMatrix4a& getModelview() const          { return mModelview; }
+    const LLMatrix4a& getProjection() const         { return mProjection; }
+    void setModelview(const LLMatrix4a& modelview)   { mModelview = modelview; }
+    void setProjection(const LLMatrix4a& projection) { mProjection = projection; }
+
+    // The modelview this coordinate frame gives: into the frame, then its
+    // axes onto GL's (-Z at, Y up)
+    LLMatrix4a frameModelview() const;
+
     // Copy mView, mAspect, mNearPlane, and mFarPlane to buffer.
     // Return number of bytes copied.
     size_t writeFrustumToBuffer(char *buffer) const;
@@ -218,6 +248,7 @@ protected:
     void calculateFrustumPlanes();
     void calculateFrustumPlanes(F32 left, F32 right, F32 top, F32 bottom);
     void calculateFrustumPlanesFromWindow(F32 x1, F32 y1, F32 x2, F32 y2);
+    void rebuildPlaneSets();
 };
 
 

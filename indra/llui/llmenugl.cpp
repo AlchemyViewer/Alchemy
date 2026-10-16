@@ -147,8 +147,25 @@ LLMenuItemGL::Params::Params()
 }
 
 // Default constructor
+U32 LLMenuItemGL::sContextBuild = 1;
+
+void LLMenuItemGL::claimContextEntry(LLView* view)
+{
+    if (LLMenuItemGL* item = view->as<LLMenuItemGL>())
+    {
+        item->mContextBuild = sContextBuild;
+    }
+}
+
+bool LLMenuItemGL::contextEntryClaimed(const LLView* view)
+{
+    const LLMenuItemGL* item = view->as<LLMenuItemGL>();
+    return item && item->mContextBuild == sContextBuild;
+}
+
 LLMenuItemGL::LLMenuItemGL(const LLMenuItemGL::Params& p)
 :   LLUICtrl(p),
+    mContextBuild(0),
     mJumpKey(p.jump_key),
     mAllowKeyRepeat(p.allow_key_repeat),
     mHighlight( false ),
@@ -173,12 +190,12 @@ LLMenuItemGL::LLMenuItemGL(const LLMenuItemGL::Params& p)
     if (shortcut.find("control") != shortcut.npos)
     {
 #ifdef LL_DARWIN
-        if ( useMacCtrl )
-        {
-            mAcceleratorMask |= MASK_MAC_CONTROL;
-        }
-#endif // LL_DARWIN
+        // The Mac's Control key itself rather than Command, which is what
+        // "control" means there otherwise.
+        mAcceleratorMask |= useMacCtrl ? MASK_MAC_CONTROL : MASK_CONTROL;
+#else
         mAcceleratorMask |= MASK_CONTROL;
+#endif // LL_DARWIN
     }
     if (shortcut.find("alt") != shortcut.npos)
     {
@@ -221,7 +238,7 @@ bool LLMenuItemGL::hasAccelerator(const KEY &key, const MASK &mask) const
 //virtual
 bool LLMenuItemGL::handleAcceleratorKey(KEY key, MASK mask)
 {
-    if( getEnabled() && (!gKeyboard->getKeyRepeated(key) || mAllowKeyRepeat) && (key == mAcceleratorKey) && (mask == (mAcceleratorMask & MASK_NORMALKEYS)) )
+    if( getEnabled() && (!gKeyboard->getKeyRepeated(key) || mAllowKeyRepeat) && (key == mAcceleratorKey) && (mask == (mAcceleratorMask & MASK_MODIFIERS)) )
     {
         onCommit();
         return true;
@@ -279,7 +296,7 @@ bool LLMenuItemGL::addToAcceleratorList(std::list <LLMenuKeyboardBinding*> *list
         for (list_it = listp->begin(); list_it != listp->end(); ++list_it)
         {
             accelerator = *list_it;
-            if ((accelerator->mKey == mAcceleratorKey) && (accelerator->mMask == (mAcceleratorMask & MASK_NORMALKEYS)))
+            if ((accelerator->mKey == mAcceleratorKey) && (accelerator->mMask == (mAcceleratorMask & MASK_MODIFIERS)))
             {
 
             // *NOTE: get calling code to throw up warning or route
@@ -303,7 +320,7 @@ bool LLMenuItemGL::addToAcceleratorList(std::list <LLMenuKeyboardBinding*> *list
             if (accelerator)
             {
                 accelerator->mKey = mAcceleratorKey;
-                accelerator->mMask = (mAcceleratorMask & MASK_NORMALKEYS);
+                accelerator->mMask = (mAcceleratorMask & MASK_MODIFIERS);
 //              accelerator->mName = mLabel;
             }
             listp->push_back(accelerator);//addData(accelerator);
@@ -314,9 +331,14 @@ bool LLMenuItemGL::addToAcceleratorList(std::list <LLMenuKeyboardBinding*> *list
 
 // This function appends the character string representation of
 // the current accelerator key and mask to the provided string.
+std::string LLMenuItemGL::getAcceleratorString() const
+{
+    return mAcceleratorKey == KEY_NONE ? mShownKeys : LLKeyboard::stringFromAccelerator(mAcceleratorMask, mAcceleratorKey);
+}
+
 void LLMenuItemGL::appendAcceleratorString( std::string& st ) const
 {
-    st = LLKeyboard::stringFromAccelerator( mAcceleratorMask, mAcceleratorKey );
+    st = mAcceleratorKey == KEY_NONE && !mShownKeys.empty() ? mShownKeys : LLKeyboard::stringFromAccelerator( mAcceleratorMask, mAcceleratorKey );
     LL_DEBUGS("HotKeys") << "appendAcceleratorString: " << st << LL_ENDL;
 }
 
@@ -354,6 +376,13 @@ LLMenuGL* LLMenuItemGL::getMenu() const
 // getNominalWidth() - returns the normal width of this control in
 // pixels - this is used for calculating the widest item, as well as
 // for horizontal arrangement.
+S32 LLMenuItemGL::labelWidth(S32 offset, S32 max_bytes) const
+{
+    const std::string& label = mLabel.getString();
+    mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+    return llceil(mLabelBuffer.getWidthBytes(getFont(), label, offset, max_bytes, false));
+}
+
 U32 LLMenuItemGL::getNominalWidth( void ) const
 {
     U32 width;
@@ -367,14 +396,14 @@ U32 LLMenuItemGL::getNominalWidth( void ) const
         width = PLAIN_PAD_PIXELS;
     }
 
-    if( KEY_NONE != mAcceleratorKey )
+    if( KEY_NONE != mAcceleratorKey || !mShownKeys.empty() )
     {
         width += getMenu()->getShortcutPad();
         std::string temp;
         appendAcceleratorString( temp );
         width += mFont->getWidth( temp );
     }
-    width += mFont->getWidth( mLabel.getWString() );
+    width += labelWidth();
     return width;
 }
 
@@ -514,7 +543,9 @@ void LLMenuItemGL::draw( void )
     // Draw the text on top.
     if (mBriefItem)
     {
-        mFont->render( mLabel, 0, BRIEF_PAD_PIXELS / 2, 0, color,
+        const std::string& label = mLabel.getString();
+        mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+        mLabelBuffer.renderBytes( mFont, label, 0, BRIEF_PAD_PIXELS / 2.f, 0.f, color,
                        LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
     }
     else
@@ -525,19 +556,27 @@ void LLMenuItemGL::draw( void )
         F32 y = (F32)MENU_ITEM_PADDING / 2.f;
         if( !mDrawBoolLabel.empty() )
         {
-            mFont->render( mDrawBoolLabel.getWString(), 0, (F32)LEFT_PAD_PIXELS, y, color,
+            const std::string& bool_label = mDrawBoolLabel.getString();
+            mBoolLabelBuffer.setSource(&mDrawBoolLabel, mDrawBoolLabel.getGeneration());
+        mBoolLabelBuffer.renderBytes( mFont, bool_label, 0, (F32)LEFT_PAD_PIXELS, y, color,
                            LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
-        mFont->render( mLabel.getWString(), 0, (F32)LEFT_PLAIN_PIXELS, y, color,
+        const std::string& label = mLabel.getString();
+        mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+        mLabelBuffer.renderBytes( mFont, label, 0, (F32)LEFT_PLAIN_PIXELS, y, color,
                        LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         if( !mDrawAccelLabel.empty() )
         {
-            mFont->render( mDrawAccelLabel.getWString(), 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
+            const std::string& accel_label = mDrawAccelLabel.getString();
+            mAccelLabelBuffer.setSource(&mDrawAccelLabel, mDrawAccelLabel.getGeneration());
+        mAccelLabelBuffer.renderBytes( mFont, accel_label, 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
                            LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
         if( !mDrawBranchLabel.empty() )
         {
-            mFont->render( mDrawBranchLabel.getWString(), 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
+            const std::string& branch_label = mDrawBranchLabel.getString();
+            mBranchLabelBuffer.setSource(&mDrawBranchLabel, mDrawBranchLabel.getGeneration());
+        mBranchLabelBuffer.renderBytes( mFont, branch_label, 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
                            LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
     }
@@ -545,13 +584,19 @@ void LLMenuItemGL::draw( void )
     // underline "jump" key only when keyboard navigation has been initiated
     if (getMenu()->jumpKeysActive() && LLMenuGL::getKeyboardMode())
     {
-        std::string upper_case_label = mLabel.getString();
+        const std::string& label = mLabel.getString();
+        std::string upper_case_label = label;
         LLStringUtil::toUpper(upper_case_label);
         std::string::size_type offset = upper_case_label.find(mJumpKey);
         if (offset != std::string::npos)
         {
-            S32 x_begin = LEFT_PLAIN_PIXELS + mFont->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset));
-            S32 x_end = LEFT_PLAIN_PIXELS + mFont->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset) + 1);
+            // The offset indexes the uppercased copy, and uppercasing UTF-8
+            // does not preserve length, so it has to be carried back onto the
+            // label before it can measure any of it.
+            const S32 key_begin = (S32)utf8str_bytes_from_cased_bytes(label, offset, true);
+            const S32 key_end   = (S32)utf8str_decode_at(label, (size_t)key_begin).next;
+            S32 x_begin = LEFT_PLAIN_PIXELS + labelWidth(0, key_begin);
+            S32 x_end = LEFT_PLAIN_PIXELS + labelWidth(0, key_end);
             gl_line_2d(x_begin, (MENU_ITEM_PADDING / 2) + 1, x_end, (MENU_ITEM_PADDING / 2) + 1);
         }
     }
@@ -569,6 +614,10 @@ void LLMenuItemGL::onVisibilityChange(bool new_visibility)
     {
         getMenu()->needsArrange();
     }
+    mLabelBuffer.reset();
+    mBoolLabelBuffer.reset();
+    mAccelLabelBuffer.reset();
+    mBranchLabelBuffer.reset();
     LLView::onVisibilityChange(new_visibility);
 }
 
@@ -695,17 +744,16 @@ LLFloater* LLMenuItemTearOffGL::getParentFloater()
 
     while (parent_view)
     {
-        if (dynamic_cast<LLFloater*>(parent_view))
+        if (LLFloater* floaterp = parent_view->as<LLFloater>())
         {
-            return dynamic_cast<LLFloater*>(parent_view);
+            return floaterp;
         }
 
-        bool parent_is_menu = dynamic_cast<LLMenuGL*>(parent_view) && !dynamic_cast<LLMenuBarGL*>(parent_view);
-
-        if (parent_is_menu)
+        LLMenuGL* menup = parent_view->as<LLMenuGL>();
+        if (menup && !parent_view->as<LLMenuBarGL>())
         {
             // use menu parent
-            parent_view =  dynamic_cast<LLMenuGL*>(parent_view)->getParentMenuItem();
+            parent_view = menup->getParentMenuItem();
         }
         else
         {
@@ -721,7 +769,7 @@ void LLMenuItemTearOffGL::onCommit()
 {
     if (getMenu()->getTornOff())
     {
-        LLTearOffMenu * torn_off_menu = dynamic_cast<LLTearOffMenu*>(getMenu()->getParent());
+        LLTearOffMenu * torn_off_menu = getMenu()->getParentAs<LLTearOffMenu>();
         if (torn_off_menu)
         {
             torn_off_menu->closeFloater();
@@ -876,7 +924,7 @@ bool LLMenuItemCallGL::handleKeyHere( KEY key, MASK mask )
 
 bool LLMenuItemCallGL::handleAcceleratorKey( KEY key, MASK mask )
 {
-    if( (!gKeyboard->getKeyRepeated(key) || getAllowKeyRepeat()) && (key == mAcceleratorKey) && (mask == (mAcceleratorMask & MASK_NORMALKEYS)) )
+    if( (!gKeyboard->getKeyRepeated(key) || getAllowKeyRepeat()) && (key == mAcceleratorKey) && (mask == (mAcceleratorMask & MASK_MODIFIERS)) )
     {
         updateEnabled();
         if (getEnabled())
@@ -1139,7 +1187,7 @@ void LLMenuItemBranchGL::setHighlight( bool highlight )
 
     bool auto_open = getEnabled() && (!branch->getVisible() || branch->getTornOff());
     // torn off menus don't open sub menus on hover unless they have focus
-    LLFloater * menu_parent = dynamic_cast<LLFloater *>(getMenu()->getParent());
+    LLFloater * menu_parent = getMenu()->getParentAs<LLFloater>();
     if (getMenu()->getTornOff() && menu_parent && !menu_parent->hasFocus())
     {
         auto_open = false;
@@ -1161,7 +1209,7 @@ void LLMenuItemBranchGL::setHighlight( bool highlight )
     {
         if (branch->getTornOff())
         {
-            LLFloater * branch_parent = dynamic_cast<LLFloater *>(branch->getParent());
+            LLFloater * branch_parent = branch->getParentAs<LLFloater>();
             if (branch_parent)
             {
                 branch_parent->setFocus(false);
@@ -1222,7 +1270,7 @@ bool LLMenuItemBranchGL::handleKeyHere(KEY key, MASK mask)
             bool handled = branch->clearHoverItem();
             if (branch->getTornOff())
             {
-                LLFloater * branch_parent = dynamic_cast<LLFloater *>(branch->getParent());
+                LLFloater * branch_parent = branch->getParentAs<LLFloater>();
                 if (branch_parent)
                 {
                     branch_parent->setFocus(false);
@@ -1230,7 +1278,7 @@ bool LLMenuItemBranchGL::handleKeyHere(KEY key, MASK mask)
             }
             if (handled && getMenu()->getTornOff())
             {
-                LLFloater * menu_parent = dynamic_cast<LLFloater *>(getMenu()->getParent());
+                LLFloater * menu_parent = getMenu()->getParentAs<LLFloater>();
                 if (menu_parent)
                 {
                     menu_parent->setFocus(true);
@@ -1274,7 +1322,7 @@ void LLMenuItemBranchGL::openMenu()
 
     if (branch->getTornOff())
     {
-        LLFloater * branch_parent = dynamic_cast<LLFloater *>(branch->getParent());
+        LLFloater * branch_parent = branch->getParentAs<LLFloater>();
         if (branch_parent)
         {
             gFloaterView->bringToFront(branch_parent);
@@ -1394,7 +1442,7 @@ LLMenuItemBranchDownGL::LLMenuItemBranchDownGL( const Params& p) :
 U32 LLMenuItemBranchDownGL::getNominalWidth( void ) const
 {
     U32 width = LEFT_PAD_PIXELS + LEFT_WIDTH_PIXELS + RIGHT_PAD_PIXELS;
-    width += getFont()->getWidth( mLabel.getWString() );
+    width += labelWidth();
     return width;
 }
 
@@ -1419,7 +1467,7 @@ void LLMenuItemBranchDownGL::openMenu( void )
         LLEmojiHelper::instance().hideHelper(nullptr, true);
         if (branch->getTornOff())
         {
-            LLFloater * branch_parent = dynamic_cast<LLFloater *>(branch->getParent());
+            LLFloater * branch_parent = branch->getParentAs<LLFloater>();
             if (branch_parent)
             {
                 gFloaterView->bringToFront(branch_parent);
@@ -1478,7 +1526,7 @@ void LLMenuItemBranchDownGL::setHighlight( bool highlight )
     {
         if (branch->getTornOff())
         {
-            LLFloater * branch_parent = dynamic_cast<LLFloater *>(branch->getParent());
+            LLFloater * branch_parent = branch->getParentAs<LLFloater>();
             if (branch_parent)
             {
                 branch_parent->setFocus(false);
@@ -1645,21 +1693,33 @@ void LLMenuItemBranchDownGL::draw( void )
     // Munus are all of the same size, so fixed offset works here,
     // but it won't work if somebody decides to use different font
     // todo: adjust logic to work of rect and font height
-    getFont()->render( mLabel.getWString(), 0, (F32)getRect().getWidth() / 2.f, (F32)LABEL_BOTTOM_PAD_PIXELS, color,
+    //
+    // Through the cache, as the items inside a menu are. These are the names
+    // along the top of the window, drawn on every frame the viewer runs, and
+    // going to the font direct meant shaping every one of them on every one of
+    // those frames. A colour that changes on hover is rewritten over the
+    // glyphs rather than reshaping them.
+    mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+    mLabelBuffer.renderBytes( getFont(), mLabel.getString(), 0, (F32)getRect().getWidth() / 2.f, (F32)LABEL_BOTTOM_PAD_PIXELS, color,
                    LLFontGL::HCENTER, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false);
 
 
     // underline navigation key only when keyboard navigation has been initiated
     if (getMenu()->jumpKeysActive() && LLMenuGL::getKeyboardMode())
     {
-        std::string upper_case_label = mLabel.getString();
+        const std::string& label = mLabel.getString();
+        std::string upper_case_label = label;
         LLStringUtil::toUpper(upper_case_label);
         std::string::size_type offset = upper_case_label.find(getJumpKey());
         if (offset != std::string::npos)
         {
-            S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - getFont()->getWidthF32(mLabel.getWString(), 0, S32_MAX) / 2.f);
-            S32 x_begin = x_offset + getFont()->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset));
-            S32 x_end = x_offset + getFont()->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset) + 1);
+            // See LLMenuItemGL::draw: the offset indexes the uppercased copy,
+            // which is not the same length as the label it came from.
+            const S32 key_begin = (S32)utf8str_bytes_from_cased_bytes(label, offset, true);
+            const S32 key_end   = (S32)utf8str_decode_at(label, (size_t)key_begin).next;
+            S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - (F32)labelWidth() / 2.f);
+            S32 x_begin = x_offset + labelWidth(0, key_begin);
+            S32 x_end = x_offset + labelWidth(0, key_end);
             gl_line_2d(x_begin, LABEL_BOTTOM_PAD_PIXELS, x_end, LABEL_BOTTOM_PAD_PIXELS);
         }
     }
@@ -1855,14 +1915,17 @@ void LLMenuGL::setCanTearOff(bool tear_off)
 
 bool LLMenuGL::addChild(LLView* view, S32 tab_group)
 {
-    LLMenuGL* menup = dynamic_cast<LLMenuGL*>(view);
-    if (menup)
+    if (!view)
+    {
+        return false;
+    }
+
+    if (LLMenuGL* menup = view->as<LLMenuGL>())
     {
         return appendMenu(menup);
     }
 
-    LLMenuItemGL* itemp = dynamic_cast<LLMenuItemGL*>(view);
-    if (itemp)
+    if (LLMenuItemGL* itemp = view->as<LLMenuItemGL>())
     {
         return append(itemp);
     }
@@ -1875,26 +1938,27 @@ bool LLMenuGL::addChild(LLView* view, S32 tab_group)
 // Add an item to the context menu branch
 bool LLMenuGL::addContextChild(LLView* view, S32 tab_group)
 {
-    LLContextMenu* context = dynamic_cast<LLContextMenu*>(view);
-    if (context)
+    if (!view)
+    {
+        return false;
+    }
+
+    if (LLContextMenu* context = view->as<LLContextMenu>())
     {
         return appendContextSubMenu(context);
     }
 
-    LLMenuItemSeparatorGL* separator = dynamic_cast<LLMenuItemSeparatorGL*>(view);
-    if (separator)
+    if (LLMenuItemSeparatorGL* separator = view->as<LLMenuItemSeparatorGL>())
     {
         return append(separator);
     }
 
-    LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(view);
-    if (item)
+    if (LLMenuItemGL* item = view->as<LLMenuItemGL>())
     {
         return append(item);
     }
 
-    LLMenuGL* menup = dynamic_cast<LLMenuGL*>(view);
-    if (menup)
+    if (LLMenuGL* menup = view->as<LLMenuGL>())
     {
         return appendMenu(menup);
     }
@@ -1943,7 +2007,7 @@ bool LLMenuGL::jumpKeysActive()
         if (getTornOff())
         {
             // activation of jump keys on torn off menus controlled by keyboard focus
-            LLFloater * parent = dynamic_cast<LLFloater *>(getParent());
+            LLFloater * parent = getParentAs<LLFloater>();
             if (parent)
             {
                 active = parent->hasFocus();
@@ -1974,7 +2038,7 @@ bool LLMenuGL::isOpen()
             return true;
         }
         // otherwise we are only active if we have keyboard focus
-        LLFloater * parent = dynamic_cast<LLFloater *>(getParent());
+        LLFloater * parent = getParentAs<LLFloater>();
         if (parent)
         {
             return parent->hasFocus();
@@ -2115,7 +2179,7 @@ void LLMenuGL::arrange( void )
         U32 max_height = getTornOff() ? U32_MAX: menu_region_rect.getHeight();
 
         // *FIX: create the item first and then ask for its dimensions?
-        S32 spillover_item_width = PLAIN_PAD_PIXELS + LLFontGL::getFontSansSerif()->getWidth( std::string("More") ); // *TODO: Translate
+        S32 spillover_item_width = PLAIN_PAD_PIXELS + LLFontGL::getFontSansSerif()->getWidth("More"); // *TODO: Translate
         S32 spillover_item_height = LLFontGL::getFontSansSerif()->getLineHeight() + MENU_ITEM_PADDING;
 
         // Scrolling support
@@ -2411,7 +2475,7 @@ void LLMenuGL::arrange( void )
 
         if (getTornOff())
         {
-            LLTearOffMenu * torn_off_menu = dynamic_cast<LLTearOffMenu*>(getParent());
+            LLTearOffMenu * torn_off_menu = getParentAs<LLTearOffMenu>();
             if (torn_off_menu)
             {
                 torn_off_menu->updateSize();
@@ -2632,7 +2696,7 @@ void LLMenuGL::erase( S32 begin, S32 end, bool arrange/* = true*/)
 // add new item at position
 void LLMenuGL::insert( S32 position, LLView * ctrl, bool arrange /*= true*/ )
 {
-    LLMenuItemGL * item = dynamic_cast<LLMenuItemGL *>(ctrl);
+    LLMenuItemGL * item = ctrl ? ctrl->as<LLMenuItemGL>() : nullptr;
 
     if (NULL == item || position < 0 || position >= mItems.size())
     {
@@ -2875,7 +2939,7 @@ LLMenuItemGL* LLMenuGL::highlightNextItem(LLMenuItemGL* cur_item, bool skip_disa
     // same as giving focus to it
     if (!cur_item && getTornOff())
     {
-        LLFloater * parent = dynamic_cast<LLFloater *>(getParent());
+        LLFloater * parent = getParentAs<LLFloater>();
         if (parent)
         {
             parent->setFocus(true);
@@ -2943,7 +3007,7 @@ LLMenuItemGL* LLMenuGL::highlightNextItem(LLMenuItemGL* cur_item, bool skip_disa
     while(1)
     {
         // skip separators and disabled/invisible items
-        if ((*next_item_iter)->getEnabled() && (*next_item_iter)->getVisible() && !dynamic_cast<LLMenuItemSeparatorGL*>(*next_item_iter))
+        if ((*next_item_iter)->getEnabled() && (*next_item_iter)->getVisible() && !(*next_item_iter)->as<LLMenuItemSeparatorGL>())
         {
             if (cur_item)
             {
@@ -2981,7 +3045,7 @@ LLMenuItemGL* LLMenuGL::highlightPrevItem(LLMenuItemGL* cur_item, bool skip_disa
     // same as giving focus to it
     if (!cur_item && getTornOff())
     {
-        LLFloater * parent = dynamic_cast<LLFloater *>(getParent());
+        LLFloater * parent = getParentAs<LLFloater>();
         if (parent)
         {
             parent->setFocus(true);
@@ -3292,14 +3356,12 @@ LLMenuGL* LLMenuGL::findChildMenuByName(std::string_view name, bool recurse) con
     LLView* view = findChildView(name, recurse);
     if (view)
     {
-        LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(view);
-        if (branch)
+        if (LLMenuItemBranchGL* branch = view->as<LLMenuItemBranchGL>())
         {
             return branch->getBranch();
         }
 
-        LLMenuGL* menup = dynamic_cast<LLMenuGL*>(view);
-        if (menup)
+        if (LLMenuGL* menup = view->as<LLMenuGL>())
         {
             return menup;
         }
@@ -3779,7 +3841,7 @@ bool LLMenuHolderGL::handleMouseDown( S32 x, S32 y, MASK mask )
     bool handled = LLView::childrenHandleMouseDown(x, y, mask) != NULL;
     if (!handled)
     {
-        LLMenuGL* visible_menu = (LLMenuGL*)getVisibleMenu();
+        LLMenuGL* visible_menu = getVisibleMenu();
         LLMenuItemGL* parent_menu = visible_menu ? visible_menu->getParentMenuItem() : NULL;
         if (parent_menu && parent_menu->getVisible())
         {
@@ -3841,7 +3903,7 @@ bool LLMenuHolderGL::handleRightMouseUp( S32 x, S32 y, MASK mask )
 bool LLMenuHolderGL::handleKey(KEY key, MASK mask, bool called_from_parent)
 {
     bool handled =  false;
-    LLMenuGL* const  pMenu  = dynamic_cast<LLMenuGL*>(getVisibleMenu());
+    LLMenuGL* const  pMenu  = getVisibleMenu();
 
     if (pMenu)
     {
@@ -3883,14 +3945,17 @@ void LLMenuHolderGL::reshape(S32 width, S32 height, bool called_from_parent)
     LLView::reshape(width, height, called_from_parent);
 }
 
-LLView* const LLMenuHolderGL::getVisibleMenu() const
+LLMenuGL* LLMenuHolderGL::getVisibleMenu() const
 {
     for ( child_list_const_iter_t child_it = getChildList()->begin(); child_it != getChildList()->end(); ++child_it)
     {
         LLView* viewp = *child_it;
-        if (viewp->getVisible() && dynamic_cast<LLMenuGL*>(viewp) != NULL)
+        if (viewp->getVisible())
         {
-            return viewp;
+            if (LLMenuGL* menup = viewp->as<LLMenuGL>())
+            {
+                return menup;
+            }
         }
     }
     return NULL;
@@ -3911,7 +3976,7 @@ bool LLMenuHolderGL::hideMenus()
         for ( child_list_const_iter_t child_it = getChildList()->begin(); child_it != getChildList()->end(); ++child_it)
         {
             LLView* viewp = *child_it;
-            if (dynamic_cast<LLMenuGL*>(viewp) != NULL && viewp->getVisible())
+            if (viewp->getVisible() && viewp->as<LLMenuGL>())
             {
                 viewp->setVisible(false);
             }

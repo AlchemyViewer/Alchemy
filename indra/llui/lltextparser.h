@@ -29,6 +29,7 @@
 #ifndef LL_LLTEXTPARSER_H
 #define LL_LLTEXTPARSER_H
 
+#include "alregex.h"
 #include "llsd.h"
 #include "llsingleton.h"
 #include "lluicolor.h"
@@ -92,9 +93,27 @@ public:
 protected:
     std::string getFileName() const;
 
+    // Which entries' keywords a text holds, each as its condition reads it,
+    // asked of all of them in one pass: may[i] for entry i, where the sets
+    // can say, and false where they cannot, when any entry may
+    bool mayHold(const std::string& text, std::vector<bool>& may) const;
+    void buildSets() const;
+
 protected:
     bool             mLoaded;
     highlight_list_t mHighlightEntries;
+
+    // The keywords as one set of each case, made again the first time a text
+    // is parsed after the entries may have changed: added, removed, loaded,
+    // or handed out to be changed where they are
+    mutable bool                mSetsDirty = true;
+    mutable ALRegexSet          mCaseSet;
+    mutable ALRegexSet          mAnyCaseSet;
+    // For each set, the entry each of its keywords is; and the entries in
+    // neither, tried whatever the sets say
+    mutable std::vector<size_t> mCaseEntries;
+    mutable std::vector<size_t> mAnyCaseEntries;
+    mutable std::vector<bool>   mAlwaysTried;
 };
 
 #endif

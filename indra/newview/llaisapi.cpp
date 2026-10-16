@@ -1074,14 +1074,14 @@ AISUpdate::AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& 
         && type != AISAPI::UPDATEITEM
         && type != AISAPI::FETCHCOF
         && type != AISAPI::FETCHCATEGORYLINKS;
-    mTaskTimer.setTimerExpirySec(AIS_TASK_EXPIRY_SECONDS);
     mTaskTimer.start();
+    mTaskTimer.setTimerExpirySec(AIS_TASK_EXPIRY_SECONDS);
 
     U32 current_frame = LLFrameTimer::getFrameCount();
     if (sBatchFrameCount != current_frame)
     {
-        sBatchTimer.setTimerExpirySec(AIS_BATCH_EXPIRY_SECONDS);
         sBatchTimer.start();
+        sBatchTimer.setTimerExpirySec(AIS_BATCH_EXPIRY_SECONDS);
         sBatchFrameCount = current_frame;
     }
     parseUpdate(update);

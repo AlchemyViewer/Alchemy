@@ -1099,7 +1099,9 @@ void LLPanelDirBrowser::sendDirFindQuery(
 void LLPanelDirBrowser::onKeystrokeName(LLLineEditor* line, void* data)
 {
     LLPanelDirBrowser *self = (LLPanelDirBrowser*)data;
-    if (line->getLength() >= (S32)self->mMinSearchChars)
+    // The minimum is expressed in characters, so the query is counted in them
+    // rather than in the bytes the editor stores.
+    if (utf8str_codepoint_count(line->getText()) >= self->mMinSearchChars)
     {
         self->setDefaultBtn( "Search" );
         self->childEnable("Search");

@@ -22,7 +22,6 @@
 	<text name="title" value="Профиль места"/>
 	<scroll_container name="place_scroll">
 		<panel name="scrolling_panel">
-			<text name="region_title" value="Образец_региона"/>
 			<text name="parcel_title" value="Пример участка, длина имени (145, 228, 26)"/>
 			<expandable_text name="description" value="Du waltz die spritz"/>
 			<text name="maturity_value" value="неизвестно"/>

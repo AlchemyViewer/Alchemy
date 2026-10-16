@@ -42,18 +42,20 @@ class LLConversation;
  * Also LLConversationLogListItem holds pointer to its LLConversationLog.
  */
 
-class LLConversationLogListItem : public LLPanel
+class LLConversationLogListItem final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLConversationLogListItem, LLPanel);
+
     LLConversationLogListItem(const LLConversation* conversation);
     virtual ~LLConversationLogListItem();
 
-    void onMouseEnter(S32 x, S32 y, MASK mask);
-    void onMouseLeave(S32 x, S32 y, MASK mask);
+    void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
-    virtual void setValue(const LLSD& value);
+    virtual void setValue(const LLSD& value) override;
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void onIMFloaterShown(const LLUUID& session_id);
     void onRemoveBtnClicked();

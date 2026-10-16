@@ -166,7 +166,7 @@ void LLToolBrushLand::modifyLandAtPointGlobal(const LLVector3d &pos_global,
         regionp->forceUpdate();
 
         // tell the simulator what we've done
-        F32 seconds = (1.0f / gFPSClamped) * gSavedSettings.getF32("LandBrushForce");
+        F32 seconds = gFrameDTClamped * gSavedSettings.getF32("LandBrushForce");
         F32 x_pos = (F32)pos_region.mV[VX];
         F32 y_pos = (F32)pos_region.mV[VY];
         LLMessageSystem* msg = gMessageSystem;

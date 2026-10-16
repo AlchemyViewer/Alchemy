@@ -40,20 +40,22 @@ class LLCheckBoxCtrl;
 
 //////////////////////////////////////////////////////////////////////////////
 // floater class
-class LLFloaterColorPicker
+class LLFloaterColorPicker final
     : public LLFloater
 {
     public:
+    AL_VIEW_TYPE(LLFloaterColorPicker, LLFloater);
+
         LLFloaterColorPicker (LLColorSwatchCtrl* swatch, bool show_apply_immediate = false);
         virtual ~LLFloaterColorPicker ();
 
         // overrides
-        virtual bool postBuild ();
-        virtual void draw ();
-        virtual bool handleMouseDown ( S32 x, S32 y, MASK mask );
-        virtual bool handleMouseUp ( S32 x, S32 y, MASK mask );
-        virtual bool handleHover ( S32 x, S32 y, MASK mask );
-        virtual void onMouseCaptureLost();
+        virtual bool postBuild () override;
+        virtual void draw () override;
+        virtual bool handleMouseDown ( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleMouseUp ( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleHover ( S32 x, S32 y, MASK mask ) override;
+        virtual void onMouseCaptureLost() override;
         virtual F32  getSwatchTransparency();
 
         // implicit methods

@@ -9,9 +9,6 @@
 	<floater.string name="scripts_score_label">
 		Tid
 	</floater.string>
-	<floater.string name="scripts_mono_time_label">
-		Mono tid
-	</floater.string>
 	<floater.string name="top_colliders_title">
 		Mest kolliderende
 	</floater.string>
@@ -33,7 +30,6 @@
 		<scroll_list.columns label="Ejer" name="owner"/>
 		<scroll_list.columns label="Lokation" name="location"/>
 		<scroll_list.columns label="Tid" name="time"/>
-		<scroll_list.columns label="Mono tid" name="mono_time"/>
 		<scroll_list.columns label="URL&apos;er" name="URLs"/>
 	</scroll_list>
 	<text name="id_text">
@@ -51,6 +47,4 @@
 	<button label="Genopfrisk" name="refresh_btn"/>
 	<button label="Returnér valgte" name="return_selected_btn"/>
 	<button label="Returnér alle" name="return_all_btn"/>
-	<button label="Afbryd valgte" name="disable_selected_btn"/>
-	<button label="Afbryd alle" name="disable_all_btn"/>
 </floater>

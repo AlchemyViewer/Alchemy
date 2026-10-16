@@ -38,11 +38,13 @@ class LLRadioGroup;
 class LLTextEditor;
 class LLUUID;
 
-class LLFloaterTOS :
+class LLFloaterTOS final :
     public LLModalDialog,
     public LLViewerMediaObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterTOS, LLModalDialog);
+
     LLFloaterTOS(const LLSD& data);
     virtual ~LLFloaterTOS();
 

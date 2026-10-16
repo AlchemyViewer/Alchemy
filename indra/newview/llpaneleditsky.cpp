@@ -866,7 +866,7 @@ void LLPanelSettingsSkyDensityTab::refresh()
     F32 absorption_exponential_term  = (F32)absorption_config[LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_TERM].asReal();
     F32 absorption_exponential_scale = (F32)absorption_config[LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_SCALE_FACTOR].asReal();
     F32 absorption_linear_term       = (F32)absorption_config[LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM].asReal();
-    F32 absorption_constant_term     = (F32)absorption_config[LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_TERM].asReal();
+    F32 absorption_constant_term     = (F32)absorption_config[LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM].asReal();
     F32 absorption_max_alt           = (F32)absorption_config[LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH].asReal();
 
     getChild<LLUICtrl>(FIELD_SKY_DENSITY_RAYLEIGH_EXPONENTIAL)->setValue(rayleigh_exponential_term);
@@ -910,15 +910,26 @@ void LLPanelSettingsSkyDensityTab::updateProfile()
     F32 absorption_constant_term     = getChild<LLSliderCtrl>(FIELD_SKY_DENSITY_ABSORPTION_CONSTANT)->getValueF32();
     F32 absorption_max_alt           = getChild<LLSliderCtrl>(FIELD_SKY_DENSITY_ABSORPTION_MAX_ALTITUDE)->getValueF32();
 
-    LLSD rayleigh_config    = LLSettingsSky::createSingleLayerDensityProfile(rayleigh_max_alt, rayleigh_exponential_term, rayleigh_exponential_scale, rayleigh_linear_term, rayleigh_constant_term);
-    LLSD mie_config         = LLSettingsSky::createSingleLayerDensityProfile(mie_max_alt, mie_exponential_term, mie_exponential_scale, mie_linear_term, mie_constant_term, mie_aniso_factor);
-    LLSD absorption_layer   = LLSettingsSky::createSingleLayerDensityProfile(absorption_max_alt, absorption_exponential_term, absorption_exponential_scale, absorption_linear_term, absorption_constant_term);
+    // The tab edits the first layer of each profile and keeps the layers above it as they are.
+    auto set_first_layer = [](LLSD& profile, const LLSD& layer)
+    {
+        if (profile.size() == 0)
+        {
+            profile.append(layer);
+        }
+        else
+        {
+            profile[0] = layer;
+        }
+    };
 
-    static LLSD absorption_layer_ozone = LLSettingsSky::createDensityProfileLayer(0.0f, 0.0f, 0.0f, -1.0f / 15000.0f, 8.0f / 3.0f);
+    LLSD rayleigh_config    = LLSettingsSky::flattenDensityProfile(mSkySettings->getRayleighConfigs());
+    LLSD mie_config         = LLSettingsSky::flattenDensityProfile(mSkySettings->getMieConfigs());
+    LLSD absorption_config  = LLSettingsSky::flattenDensityProfile(mSkySettings->getAbsorptionConfigs());
 
-    LLSD absorption_config;
-    absorption_config.append(absorption_layer);
-    absorption_config.append(absorption_layer_ozone);
+    set_first_layer(rayleigh_config, LLSettingsSky::createDensityProfileLayer(rayleigh_max_alt, rayleigh_exponential_term, rayleigh_exponential_scale, rayleigh_linear_term, rayleigh_constant_term));
+    set_first_layer(mie_config, LLSettingsSky::createDensityProfileLayer(mie_max_alt, mie_exponential_term, mie_exponential_scale, mie_linear_term, mie_constant_term, mie_aniso_factor));
+    set_first_layer(absorption_config, LLSettingsSky::createDensityProfileLayer(absorption_max_alt, absorption_exponential_term, absorption_exponential_scale, absorption_linear_term, absorption_constant_term));
 
     mSkySettings->setRayleighConfigs(rayleigh_config);
     mSkySettings->setMieConfigs(mie_config);

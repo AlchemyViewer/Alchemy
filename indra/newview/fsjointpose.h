@@ -487,7 +487,7 @@ class FSJointPose
 
     std::deque<FSJointState>              mLastSetJointStates;
     size_t                                mUndoneJointStatesIndex      = 0;
-    std::chrono::system_clock::time_point mTimeLastUpdatedCurrentState = std::chrono::system_clock::now();
+    std::chrono::steady_clock::time_point mTimeLastUpdatedCurrentState = std::chrono::steady_clock::now();
 
     FSJointState mCurrentState;
 

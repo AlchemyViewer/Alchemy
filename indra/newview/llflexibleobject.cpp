@@ -94,7 +94,9 @@ void LLVolumeImplFlexible::updateClass()
 {
     LL_PROFILE_ZONE_SCOPED;
 
-    U64 virtual_frame_num = (U64)(LLTimer::getElapsedSeconds() / SEC_PER_FLEXI_FRAME);
+    // On the frame clock, as doIdleUpdate() reads it: every flexi this frame, here and there,
+    // agrees on the virtual frame.
+    U64 virtual_frame_num = (U64)(LLFrameTimer::getUptimeSeconds() / SEC_PER_FLEXI_FRAME);
     for (std::vector<LLVolumeImplFlexible*>::iterator iter = sInstanceList.begin();
             iter != sInstanceList.end();
             ++iter)
@@ -362,7 +364,7 @@ void LLVolumeImplFlexible::doIdleUpdate()
                 update_period = llclamp(update_period, 1U, 32U);
 
                 // We control how fast flexies update, buy splitting updates among frames
-                U64 virtual_frame_num = (U64)(LLTimer::getElapsedSeconds() / SEC_PER_FLEXI_FRAME);
+                U64 virtual_frame_num = (U64)(LLFrameTimer::getUptimeSeconds() / SEC_PER_FLEXI_FRAME);
 
                 if  (visible)
                 {
@@ -402,6 +404,18 @@ void LLVolumeImplFlexible::doIdleUpdate()
                             mVO->shrinkWrap();
                             gPipeline.markRebuild(drawablep, LLDrawable::REBUILD_POSITION);
                         }
+                    }
+                    else if (pixel_area <= 256.f)
+                    {
+                        // Too small on screen to simulate. Come back on the same schedule as an
+                        // invisible flexi rather than next frame: this case wrote neither field, so
+                        // updateClass's test stayed true and a small visible flexi re-ran this every
+                        // frame for as long as it stayed small, never simulating. update_period comes
+                        // from its size, so this is about as often as it would be simulated if it were
+                        // just over the line. A flexi waiting on a rebuild still comes back every
+                        // frame, to be simulated as soon as the rebuild lands.
+                        mLastFrameNum = virtual_frame_num;
+                        mLastUpdatePeriod = update_period;
                     }
                 }
                 else
@@ -710,7 +724,7 @@ void LLVolumeImplFlexible::doFlexibleUpdate()
             mUpdated = false;
         }
 
-        new_point->mRot.loadu(LLMatrix3(rot));
+        new_point->mRot.set(LLMatrix3(rot));
         new_point->mScale.set(newSection[i].mScale.mV[0], newSection[i].mScale.mV[1], 0,1);
         new_point->mTexT = ((F32)i)/(num_render_sections);
     }
@@ -932,7 +946,7 @@ void LLVolumeImplFlexible::updateRelativeXform(bool force_identity)
     vo->mRelativeXformInvTrans.setRows(x_axis, y_axis, z_axis);
 }
 
-const LLMatrix4& LLVolumeImplFlexible::getWorldMatrix(LLXformMatrix* xform) const
+const LLMatrix4a& LLVolumeImplFlexible::getWorldMatrix(LLXformMatrix* xform) const
 {
     return xform->getWorldMatrix();
 }

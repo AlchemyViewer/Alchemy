@@ -29,6 +29,7 @@
 
 #include "llerror.h"
 #include "stdtypes.h"
+#include "lldefs.h"
 
 class LLVector4;
 class LLVector3;
@@ -75,9 +76,9 @@ class LLMatrix3
         //
 
         // various useful matrix functions
-        const LLMatrix3& setIdentity();             // Load identity matrix
-        const LLMatrix3& clear();                   // Clears Matrix to zero
-        const LLMatrix3& setZero();                 // Clears Matrix to zero
+        constexpr const LLMatrix3& setIdentity() noexcept;  // Load identity matrix
+        constexpr const LLMatrix3& clear() noexcept;        // Clears Matrix to zero
+        constexpr const LLMatrix3& setZero() noexcept;      // Clears Matrix to zero
 
         ///////////////////////////
         //
@@ -105,17 +106,17 @@ class LLMatrix3
         LLVector3 getFwdRow() const;
         LLVector3 getLeftRow() const;
         LLVector3 getUpRow() const;
-        F32  determinant() const;           // Return determinant
+        constexpr F32 determinant() const noexcept; // Return determinant
 
 
         ///////////////////////////
         //
         // Operations on an existing matrix
         //
-        const LLMatrix3& transpose();       // Transpose MAT4
+        constexpr const LLMatrix3& transpose() noexcept;        // Transpose MAT4
         const LLMatrix3& orthogonalize();   // Orthogonalizes X, then Y, then Z
         void invert();          // Invert MAT4
-        const LLMatrix3& adjointTranspose();// returns transpose of matrix adjoint, for multiplying normals
+        constexpr const LLMatrix3& adjointTranspose() noexcept; // returns transpose of matrix adjoint, for multiplying normals
 
 
         // Rotate existing matrix
@@ -128,20 +129,20 @@ class LLMatrix3
         const LLMatrix3& rotate(const F32 roll, const F32 pitch, const F32 yaw);            // Rotate matrix by roll (about x), pitch (about y), and yaw (about z)
         const LLMatrix3& rotate(const LLQuaternion &q);         // Transform matrix by Euler angles and translating by pos
 
-        void add(const LLMatrix3& other_matrix);    // add other_matrix to this one
+        constexpr void add(const LLMatrix3& other_matrix) noexcept;    // add other_matrix to this one
 
 // This operator is misleading as to operation direction
 //      friend LLVector3 operator*(const LLMatrix3 &a, const LLVector3 &b);         // Apply rotation a to vector b
 
         friend LLVector3 operator*(const LLVector3 &a, const LLMatrix3 &b);         // Apply rotation b to vector a
         friend LLVector3d operator*(const LLVector3d &a, const LLMatrix3 &b);           // Apply rotation b to vector a
-        friend LLMatrix3 operator*(const LLMatrix3 &a, const LLMatrix3 &b);         // Return a * b
+        friend constexpr LLMatrix3 operator*(const LLMatrix3 &a, const LLMatrix3 &b) noexcept;  // Return a * b
 
-        friend bool operator==(const LLMatrix3 &a, const LLMatrix3 &b);             // Return a == b
-        friend bool operator!=(const LLMatrix3 &a, const LLMatrix3 &b);             // Return a != b
+        friend constexpr bool operator==(const LLMatrix3 &a, const LLMatrix3 &b) noexcept;      // Return a == b
+        friend constexpr bool operator!=(const LLMatrix3 &a, const LLMatrix3 &b) noexcept;      // Return a != b
 
-        friend const LLMatrix3& operator*=(LLMatrix3 &a, const LLMatrix3 &b);               // Return a * b
-        friend const LLMatrix3& operator*=(LLMatrix3 &a, F32 scalar );                      // Return a * scalar
+        friend constexpr const LLMatrix3& operator*=(LLMatrix3 &a, const LLMatrix3 &b) noexcept;    // Return a * b
+        friend constexpr const LLMatrix3& operator*=(LLMatrix3 &a, F32 scalar ) noexcept;           // Return a * scalar
 
         friend std::ostream&     operator<<(std::ostream& s, const LLMatrix3 &a);   // Stream a
 };
@@ -165,6 +166,175 @@ constexpr LLMatrix3::LLMatrix3(const F32 *mat) noexcept
     mMatrix[2][2] = mat[8];
 }
 
+constexpr const LLMatrix3& LLMatrix3::setIdentity() noexcept
+{
+    mMatrix[0][0] = 1.f;
+    mMatrix[0][1] = 0.f;
+    mMatrix[0][2] = 0.f;
+
+    mMatrix[1][0] = 0.f;
+    mMatrix[1][1] = 1.f;
+    mMatrix[1][2] = 0.f;
+
+    mMatrix[2][0] = 0.f;
+    mMatrix[2][1] = 0.f;
+    mMatrix[2][2] = 1.f;
+    return (*this);
+}
+
+constexpr const LLMatrix3& LLMatrix3::clear() noexcept
+{
+    mMatrix[0][0] = 0.f;
+    mMatrix[0][1] = 0.f;
+    mMatrix[0][2] = 0.f;
+
+    mMatrix[1][0] = 0.f;
+    mMatrix[1][1] = 0.f;
+    mMatrix[1][2] = 0.f;
+
+    mMatrix[2][0] = 0.f;
+    mMatrix[2][1] = 0.f;
+    mMatrix[2][2] = 0.f;
+    return (*this);
+}
+
+constexpr const LLMatrix3& LLMatrix3::setZero() noexcept
+{
+    mMatrix[0][0] = 0.f;
+    mMatrix[0][1] = 0.f;
+    mMatrix[0][2] = 0.f;
+
+    mMatrix[1][0] = 0.f;
+    mMatrix[1][1] = 0.f;
+    mMatrix[1][2] = 0.f;
+
+    mMatrix[2][0] = 0.f;
+    mMatrix[2][1] = 0.f;
+    mMatrix[2][2] = 0.f;
+    return (*this);
+}
+
+constexpr const LLMatrix3& LLMatrix3::transpose() noexcept
+{
+    // transpose the matrix
+    F32 temp;
+    temp = mMatrix[VX][VY]; mMatrix[VX][VY] = mMatrix[VY][VX]; mMatrix[VY][VX] = temp;
+    temp = mMatrix[VX][VZ]; mMatrix[VX][VZ] = mMatrix[VZ][VX]; mMatrix[VZ][VX] = temp;
+    temp = mMatrix[VY][VZ]; mMatrix[VY][VZ] = mMatrix[VZ][VY]; mMatrix[VZ][VY] = temp;
+    return *this;
+}
+
+constexpr F32 LLMatrix3::determinant() const noexcept
+{
+    // Is this a useful method when we assume the matrices are valid rotation
+    // matrices throughout this implementation?
+    return  mMatrix[0][0] * (mMatrix[1][1] * mMatrix[2][2] - mMatrix[1][2] * mMatrix[2][1]) +
+            mMatrix[0][1] * (mMatrix[1][2] * mMatrix[2][0] - mMatrix[1][0] * mMatrix[2][2]) +
+            mMatrix[0][2] * (mMatrix[1][0] * mMatrix[2][1] - mMatrix[1][1] * mMatrix[2][0]);
+}
+
+// does not assume a rotation matrix, and does not divide by determinant, assuming results will be renormalized
+constexpr const LLMatrix3& LLMatrix3::adjointTranspose() noexcept
+{
+    LLMatrix3 adjoint_transpose;
+    adjoint_transpose.mMatrix[VX][VX] = mMatrix[VY][VY] * mMatrix[VZ][VZ] - mMatrix[VY][VZ] * mMatrix[VZ][VY] ;
+    adjoint_transpose.mMatrix[VY][VX] = mMatrix[VY][VZ] * mMatrix[VZ][VX] - mMatrix[VY][VX] * mMatrix[VZ][VZ] ;
+    adjoint_transpose.mMatrix[VZ][VX] = mMatrix[VY][VX] * mMatrix[VZ][VY] - mMatrix[VY][VY] * mMatrix[VZ][VX] ;
+    adjoint_transpose.mMatrix[VX][VY] = mMatrix[VZ][VY] * mMatrix[VX][VZ] - mMatrix[VZ][VZ] * mMatrix[VX][VY] ;
+    adjoint_transpose.mMatrix[VY][VY] = mMatrix[VZ][VZ] * mMatrix[VX][VX] - mMatrix[VZ][VX] * mMatrix[VX][VZ] ;
+    adjoint_transpose.mMatrix[VZ][VY] = mMatrix[VZ][VX] * mMatrix[VX][VY] - mMatrix[VZ][VY] * mMatrix[VX][VX] ;
+    adjoint_transpose.mMatrix[VX][VZ] = mMatrix[VX][VY] * mMatrix[VY][VZ] - mMatrix[VX][VZ] * mMatrix[VY][VY] ;
+    adjoint_transpose.mMatrix[VY][VZ] = mMatrix[VX][VZ] * mMatrix[VY][VX] - mMatrix[VX][VX] * mMatrix[VY][VZ] ;
+    adjoint_transpose.mMatrix[VZ][VZ] = mMatrix[VX][VX] * mMatrix[VY][VY] - mMatrix[VX][VY] * mMatrix[VY][VX] ;
+
+    *this = adjoint_transpose;
+    return *this;
+}
+
+constexpr void LLMatrix3::add(const LLMatrix3& other_matrix) noexcept
+{
+    for (S32 i = 0; i < 3; ++i)
+    {
+        for (S32 j = 0; j < 3; ++j)
+        {
+            mMatrix[i][j] += other_matrix.mMatrix[i][j];
+        }
+    }
+}
+
+inline constexpr LLMatrix3 operator*(const LLMatrix3 &a, const LLMatrix3 &b) noexcept
+{
+    U32     i, j;
+    LLMatrix3   mat;
+    for (i = 0; i < NUM_VALUES_IN_MAT3; i++)
+    {
+        for (j = 0; j < NUM_VALUES_IN_MAT3; j++)
+        {
+            mat.mMatrix[j][i] = a.mMatrix[j][0] * b.mMatrix[0][i] +
+                                a.mMatrix[j][1] * b.mMatrix[1][i] +
+                                a.mMatrix[j][2] * b.mMatrix[2][i];
+        }
+    }
+    return mat;
+}
+
+inline constexpr bool operator==(const LLMatrix3 &a, const LLMatrix3 &b) noexcept
+{
+    U32     i, j;
+    for (i = 0; i < NUM_VALUES_IN_MAT3; i++)
+    {
+        for (j = 0; j < NUM_VALUES_IN_MAT3; j++)
+        {
+            if (a.mMatrix[j][i] != b.mMatrix[j][i])
+                return false;
+        }
+    }
+    return true;
+}
+
+inline constexpr bool operator!=(const LLMatrix3 &a, const LLMatrix3 &b) noexcept
+{
+    U32     i, j;
+    for (i = 0; i < NUM_VALUES_IN_MAT3; i++)
+    {
+        for (j = 0; j < NUM_VALUES_IN_MAT3; j++)
+        {
+            if (a.mMatrix[j][i] != b.mMatrix[j][i])
+                return true;
+        }
+    }
+    return false;
+}
+
+inline constexpr const LLMatrix3& operator*=(LLMatrix3 &a, const LLMatrix3 &b) noexcept
+{
+    U32     i, j;
+    LLMatrix3   mat;
+    for (i = 0; i < NUM_VALUES_IN_MAT3; i++)
+    {
+        for (j = 0; j < NUM_VALUES_IN_MAT3; j++)
+        {
+            mat.mMatrix[j][i] = a.mMatrix[j][0] * b.mMatrix[0][i] +
+                                a.mMatrix[j][1] * b.mMatrix[1][i] +
+                                a.mMatrix[j][2] * b.mMatrix[2][i];
+        }
+    }
+    a = mat;
+    return a;
+}
+
+inline constexpr const LLMatrix3& operator*=(LLMatrix3 &a, F32 scalar) noexcept
+{
+    for( U32 i = 0; i < NUM_VALUES_IN_MAT3; ++i )
+    {
+        for( U32 j = 0; j < NUM_VALUES_IN_MAT3; ++j )
+        {
+            a.mMatrix[i][j] *= scalar;
+        }
+    }
+
+    return a;
+}
 
 #endif
 

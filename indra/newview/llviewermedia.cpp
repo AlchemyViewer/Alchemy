@@ -660,7 +660,7 @@ void LLViewerMedia::onIdle(void *dummy_arg)
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMedia::updateMedia(void *dummy_arg)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
 
     llassert(!gCubeSnapshot);
     static LLCachedControl<bool> use_read_thread(gSavedSettings, "PluginUseReadThread", true);
@@ -687,7 +687,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     impl_list::iterator end = sViewerMediaImplList.end();
 
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media update interest"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE_INTEREST);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media update interest");
         for(; iter != end;)
         {
             LLViewerMediaImpl* pimpl = *iter++;
@@ -699,12 +699,12 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     // Let the spare media source actually launch
     if(mSpareBrowserMediaSource)
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media spare idle"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_SPARE_IDLE);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media spare idle");
         mSpareBrowserMediaSource->idle();
     }
 
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_SORT);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort");
         // Sort the static instance list using our interest criteria
         sViewerMediaImplList.sort(priorityComparitor);
     }
@@ -735,7 +735,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     // If max_normal + max_low is less than max_instances, things will tend to get unloaded instead of being set to slideshow.
 
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media misc"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_MISC);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media misc");
         for(; iter != end; iter++)
         {
             LLViewerMediaImpl* pimpl = *iter;
@@ -922,7 +922,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     }
     else
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort2"); // LL_RECORD_BLOCK_TIME(FTM_MEDIA_SORT2);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort2");
         // Use a distance-based sort for proximity values.
         std::stable_sort(proximity_order.begin(), proximity_order.end(), proximity_comparitor);
     }
@@ -1300,7 +1300,8 @@ void LLViewerMedia::getOpenIDCookieCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getOpenIDCookieCoro", httpPolicy);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getOpenIDCookieCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
@@ -1442,7 +1443,8 @@ void LLViewerMedia::openIDSetupCoro(std::string openidUrl, std::string openidTok
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("openIDSetupCoro", httpPolicy);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("openIDSetupCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
@@ -1582,7 +1584,12 @@ bool LLViewerMedia::hasParcelMedia()
 //////////////////////////////////////////////////////////////////////////////////////////
 bool LLViewerMedia::hasParcelAudio()
 {
-    return !LLViewerMedia::getParcelAudioURL().empty();
+    // Asked, not fetched. getParcelAudioURL returns the URL by value, and the
+    // status bar asks this twice a frame -- once for whether the media button
+    // is enabled and once, through isParcelAudioPlaying, for what it shows --
+    // so a question about whether a string is empty was copying it, twice,
+    // every frame the viewer ran.
+    return !LLViewerParcelMgr::getInstance()->getAgentParcel()->getMusicURL().empty();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -1840,9 +1847,18 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
     else
     {
 #if LL_LINUX
+        // GStreamer plays media on Linux; VLC, where it was built, only when
+        // asked for.
         if(plugin_basename == "media_plugin_gstreamer10" && gSavedSettings.getBOOL("MediaPluginForceVLC"))
         {
-            plugin_basename = "media_plugin_libvlc";
+            if (LLFile::isfile(gDirUtilp->getLLPluginFilename("media_plugin_libvlc")))
+            {
+                plugin_basename = "media_plugin_libvlc";
+            }
+            else
+            {
+                LL_WARNS_ONCE("Media") << "MediaPluginForceVLC is set, but this viewer has no VLC plugin; using GStreamer" << LL_ENDL;
+            }
         }
 #endif
 
@@ -2796,7 +2812,8 @@ void LLViewerMediaImpl::mimeDiscoveryCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("mimeDiscoveryCoro", httpPolicy);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("mimeDiscoveryCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
@@ -2943,7 +2960,7 @@ bool LLViewerMediaImpl::handleUnicodeCharHere(llwchar uni_char)
         {
             LLSD native_key_data = gViewerWindow->getWindow()->getNativeKeyData();
 
-            mMediaSource->textInput(wstring_to_utf8str(LLWString(1, uni_char)), gKeyboard->currentMask(false), native_key_data);
+            mMediaSource->textInput(utf8str_from_cp(uni_char), gKeyboard->currentMask(false), native_key_data);
         }
     }
 
@@ -2975,7 +2992,7 @@ bool LLViewerMediaImpl::canNavigateBack()
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMediaImpl::update()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_DO_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
 
     // Shared CEF daemon crash recovery: once the backoff has elapsed, clear the
     // failure latch so the normal load path below recreates the source (which
@@ -3102,6 +3119,11 @@ void LLViewerMediaImpl::update()
             mTextureUpdatePending = true;
             ref();  // protect texture from deletion while active on bg queue
             media_tex->ref();
+            // The texture reports the frame it shows until the worker's publishes: see
+            // LLImageGL::beginUpload, taken here on the main thread before the post and
+            // released in the callback.
+            LLPointer<LLImageGL> gl_image = media_tex->getGLTexture();
+            gl_image->beginUpload();
             main_queue->postTo(
                 mTexUpdateQueue, // Worker thread queue
                 [=, this]() // work done on update worker thread
@@ -3116,9 +3138,16 @@ void LLViewerMediaImpl::update()
 #if LL_IMAGEGL_THREAD_CHECK
                     media_tex->getGLTexture()->mActiveThread = LLThread::currentID();
 #endif
-                    mTextureUpdatePending = false;
-                    media_tex->unref();
-                    unref();
+                    // The frame publishes once the GPU has finished with it; the next
+                    // update must not start before then.
+                    gl_image->afterPublish([=, this]()
+                    {
+                        // A no-op when syncTexName published the frame.
+                        gl_image->endUpload();
+                        mTextureUpdatePending = false;
+                        media_tex->unref();
+                        unref();
+                    });
                 });
         }
         else
@@ -3202,18 +3231,26 @@ void LLViewerMediaImpl::doMediaTexUpdate(LLViewerMediaTexture* media_tex, U8* da
         {
             LL_WARNS("Media") << "Failed to create media texture" << LL_ENDL;
         }
-
-        // copy just the subimage covered by the image raw to GL
-        media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+        else
+        {
+            // copy just the subimage covered by the image raw to GL
+            media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+        }
     }
 
-    if (sync)
+    // With no new texture there is nothing to upload into or publish. Given a tex_name of
+    // 0, setSubImage writes the texture on screen instead -- from the worker, while the
+    // main thread may be sampling it.
+    if (tex_name != 0)
     {
-        media_tex->getGLTexture()->syncToMainThread(tex_name);
-    }
-    else
-    {
-        media_tex->getGLTexture()->syncTexName(tex_name);
+        if (sync)
+        {
+            media_tex->getGLTexture()->syncToMainThread(tex_name);
+        }
+        else
+        {
+            media_tex->getGLTexture()->syncTexName(tex_name);
+        }
     }
 
     // release the data pointer before freeing raw so LLImageRaw destructor doesn't
@@ -4007,7 +4044,7 @@ bool LLViewerMediaImpl::isUpdated()
 
 void LLViewerMediaImpl::calculateInterest()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_CALCULATE_INTEREST);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     LLViewerMediaTexture* texture = LLViewerTextureManager::findMediaTexture( mTextureId );
 
     llassert(!gCubeSnapshot);

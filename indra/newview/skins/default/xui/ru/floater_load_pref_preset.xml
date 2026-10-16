@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<floater name="Load Pref Preset" title="ЗАГРУЗИТЬ ПРЕСЕТ">
+<floater name="load_pref_preset" title="ЗАГРУЗИТЬ ПРЕСЕТ">
 	<string name="title_graphic">
 		Загрузить пресет графики
 	</string>

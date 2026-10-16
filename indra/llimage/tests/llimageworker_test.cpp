@@ -33,8 +33,11 @@
 #include "../llcommon/lltimer.h"
 // for lltrace class
 #include "../llcommon/lltrace.h"
-// Tut header
-#include "../test/lltut.h"
+// Catch2 header
+#include <catch2/catch_test_macros.hpp>
+
+#include <atomic>
+#include <memory>
 
 // -------------------------------------------------------------------------------------------
 // Stubbing: Declarations required to link and run the class being tested
@@ -95,10 +98,10 @@ const std::string& LLImage::getLastThreadError() { static std::string msg; retur
 // -------------------------------------------------------------------------------------------
 
 // -------------------------------------------------------------------------------------------
-// TUT
+// Tests
 // -------------------------------------------------------------------------------------------
 
-namespace tut
+namespace
 {
     // Test wrapper declarations
 
@@ -115,20 +118,23 @@ namespace tut
     class responder_test : public LLImageDecodeThread::Responder
     {
         public:
-            responder_test(bool* res)
+            responder_test(std::shared_ptr<std::atomic<bool>> res)
+                : done(std::move(res))
             {
-                done = res;
-                *done = false;
             }
             virtual void completed(bool success, const std::string& error_message, LLImageRaw* raw, LLImageRaw* aux, U32 request_id)
             {
-                *done = true;
+                done->store(true);
             }
         private:
             // This is what can be thought of as the minimal implementation of a responder
             // Done will be switched to true when completed() is called and can be tested
             // outside the responder. A better way of doing this is to store a callback here.
-            bool* done;
+            // completed() runs on a decode worker thread while the test polls the flag, so
+            // the flag is atomic; and the responder shares ownership of it, so a responder
+            // that completes after the test has given up waiting writes to a live flag
+            // rather than into a stack frame that is gone.
+            std::shared_ptr<std::atomic<bool>> done;
     };
 
     // Test wrapper declaration : decode thread
@@ -147,44 +153,37 @@ namespace tut
         }
     };
 
-    // Tut templating thingamagic: test group, object and test instance
-    typedef test_group<imagedecodethread_test> imagedecodethread_t;
-    typedef imagedecodethread_t::object imagedecodethread_object_t;
-    tut::imagedecodethread_t tut_imagedecodethread("LLImageDecodeThread");
 
     // ---------------------------------------------------------------------------------------
     // Test functions
     // Notes:
     // * Test as many as you possibly can without requiring a full blown simulation of everything
-    // * The tests are executed in sequence so the test instance state may change between calls
-    // * Remember that you cannot test private methods with tut
     // ---------------------------------------------------------------------------------------
 
     // ---------------------------------------------------------------------------------------
     // Test the LLImageDecodeThread interface
     // ---------------------------------------------------------------------------------------
 
-    template<> template<>
-    void imagedecodethread_object_t::test<1>()
+    TEST_CASE_METHOD(imagedecodethread_test, "LLImageDecodeThread: a threaded decodeImage calls the responder", "[LLImageDecodeThread]")
     {
         // Test a *threaded* instance of the class
         mThread = new LLImageDecodeThread(true);
-        ensure("LLImageDecodeThread: threaded constructor failed", mThread != NULL);
+        REQUIRE(mThread != NULL);
         // Insert something in the queue
-        bool done = false;
-        LLImageDecodeThread::handle_t decodeHandle = mThread->decodeImage(NULL, 0, false, new responder_test(&done));
+        const auto done = std::make_shared<std::atomic<bool>>(false);
+        LLImageDecodeThread::handle_t decodeHandle = mThread->decodeImage(NULL, 0, false, new responder_test(done));
         // Verifies we get back a valid handle
-        ensure("LLImageDecodeThread:  threaded decodeImage(), returned handle is null", decodeHandle != 0);
+        CHECK(decodeHandle != 0);
         // Wait till the thread has time to handle the work order (though it doesn't do much per work order...)
         const U32 INCREMENT_TIME = 500;             // 500 milliseconds
         const U32 MAX_TIME = 20 * INCREMENT_TIME;   // Do the loop 20 times max, i.e. wait 10 seconds but no more
         U32 total_time = 0;
-        while ((done == false) && (total_time < MAX_TIME))
+        while (!done->load() && (total_time < MAX_TIME))
         {
             ms_sleep(INCREMENT_TIME);
             total_time += INCREMENT_TIME;
         }
         // Verifies that the responder has now been called
-        ensure("LLImageDecodeThread: threaded work unit not processed", done == true);
+        CHECK(done->load());
     }
 }

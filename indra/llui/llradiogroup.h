@@ -36,10 +36,11 @@
  * buttons (usually radio buttons).  Automatically handles the mutex
  * condition by highlighting only one button at a time.
  */
-class LLRadioGroup
+class LLRadioGroup final
 :   public LLUICtrl, public LLCtrlSelectionInterface
 {
 public:
+    AL_VIEW_TYPE(LLRadioGroup, LLUICtrl);
 
     struct ItemParams : public LLInitParam::Block<ItemParams, LLCheckBoxCtrl::Params>
     {
@@ -50,6 +51,9 @@ public:
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<bool>                      allow_deselect;
+        // A line around the group, drawn by a border the group holds and
+        // which follows every edge of it.
+        Optional<bool>                      draw_border;
         Multiple<ItemParams, AtLeast<1> >   items;
         Params();
     };
@@ -64,42 +68,51 @@ public:
 
     virtual ~LLRadioGroup();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
-    virtual bool handleKeyHere(KEY key, MASK mask);
+    virtual bool handleKeyHere(KEY key, MASK mask) override;
 
     void setIndexEnabled(S32 index, bool enabled);
     // return the index value of the selected item
     S32 getSelectedIndex() const { return mSelectedIndex; }
+    // The item a yes or no picks out: the one whose value reads as it, and
+    // failing any that reads as either, the second for yes and the first
+    // for no. This is what lets a choice of two answer for a boolean
+    // setting. -1 when no item is that.
+    S32 getIndexForBool(bool which) const;
     // set the index value programatically
     bool setSelectedIndex(S32 index, bool from_event = false);
     // foxus child by index if it can get focus
     void focusSelectedRadioBtn();
 
     // Accept and retrieve strings of the radio group control names
-    virtual void    setValue(const LLSD& value );
-    virtual LLSD    getValue() const;
+    virtual void    setValue(const LLSD& value ) override;
+    virtual LLSD    getValue() const override;
+    // What the selection writes to the setting it is bound to: the item's
+    // value, or, for a setting that is a boolean, the yes or no the item
+    // stands for.
+    LLSD            getControlValue();
 
     // Update the control as needed.  Userdata must be a pointer to the button.
     void onClickButton(LLUICtrl* clicked_radio);
 
     //========================================================================
-    LLCtrlSelectionInterface* getSelectionInterface()   { return (LLCtrlSelectionInterface*)this; };
+    LLCtrlSelectionInterface* getSelectionInterface() override   { return (LLCtrlSelectionInterface*)this; };
 
     // LLCtrlSelectionInterface functions
-    /*virtual*/ S32     getItemCount() const                { return static_cast<S32>(mRadioButtons.size()); }
-    /*virtual*/ bool    getCanSelect() const                { return true; }
-    /*virtual*/ bool    selectFirstItem()                   { return setSelectedIndex(0); }
-    /*virtual*/ bool    selectNthItem( S32 index )          { return setSelectedIndex(index); }
-    /*virtual*/ bool    selectItemRange( S32 first, S32 last ) { return setSelectedIndex(first); }
-    /*virtual*/ S32     getFirstSelectedIndex() const       { return getSelectedIndex(); }
-    /*virtual*/ bool    setCurrentByID( const LLUUID& id );
-    /*virtual*/ LLUUID  getCurrentID() const;               // LLUUID::null if no items in menu
-    /*virtual*/ bool    setSelectedByValue(const LLSD& value, bool selected);
-    /*virtual*/ LLSD    getSelectedValue();
-    /*virtual*/ bool    isSelected(const LLSD& value) const;
-    /*virtual*/ bool    operateOnSelection(EOperation op);
-    /*virtual*/ bool    operateOnAll(EOperation op);
+    /*virtual*/ S32     getItemCount() const override                { return static_cast<S32>(mRadioButtons.size()); }
+    /*virtual*/ bool    getCanSelect() const override                { return true; }
+    /*virtual*/ bool    selectFirstItem() override                   { return setSelectedIndex(0); }
+    /*virtual*/ bool    selectNthItem( S32 index ) override          { return setSelectedIndex(index); }
+    /*virtual*/ bool    selectItemRange( S32 first, S32 last ) override { return setSelectedIndex(first); }
+    /*virtual*/ S32     getFirstSelectedIndex() const override       { return getSelectedIndex(); }
+    /*virtual*/ bool    setCurrentByID( const LLUUID& id ) override;
+    /*virtual*/ LLUUID  getCurrentID() const override;               // LLUUID::null if no items in menu
+    /*virtual*/ bool    setSelectedByValue(const LLSD& value, bool selected) override;
+    /*virtual*/ LLSD    getSelectedValue() override;
+    /*virtual*/ bool    isSelected(const LLSD& value) const override;
+    /*virtual*/ bool    operateOnSelection(EOperation op) override;
+    /*virtual*/ bool    operateOnAll(EOperation op) override;
 
 private:
     const LLFontGL*     mFont;

@@ -177,12 +177,12 @@ public:
     /*virtual*/ bool        packUUID(const LLUUID &value, const char *name);
     /*virtual*/ bool        unpackUUID(LLUUID &value, const char *name);
 
-                S32         getCurrentSize() const  { return (S32)(mCurBufferp - mBufferp); }
+                S32         getCurrentSize() const  { return mBufferp ? (S32)(mCurBufferp - mBufferp) : mCountedSize; }
                 S32         getBufferSize() const   { return mBufferSize; }
                 const U8*   getBuffer() const   { return mBufferp; }
-                void        reset()             { mCurBufferp = mBufferp; mWriteEnabled = (mCurBufferp != NULL); }
-                void        shift(S32 offset)   { reset(); mCurBufferp += offset;}
-                void        freeBuffer()        { delete [] mBufferp; mBufferp = mCurBufferp = NULL; mBufferSize = 0; mWriteEnabled = false; }
+                void        reset()             { mCurBufferp = mBufferp; mCountedSize = 0; mWriteEnabled = (mCurBufferp != NULL); }
+                void        shift(S32 offset)   { reset(); advance(offset); }
+                void        freeBuffer()        { delete [] mBufferp; mBufferp = mCurBufferp = NULL; mCountedSize = 0; mBufferSize = 0; mWriteEnabled = false; }
                 void        assignBuffer(U8 *bufferp, S32 size)
                 {
                     if(mBufferp && mBufferp != bufferp)
@@ -191,6 +191,7 @@ public:
                     }
                     mBufferp = bufferp;
                     mCurBufferp = bufferp;
+                    mCountedSize = 0;
                     mBufferSize = size;
                     mWriteEnabled = true;
                 }
@@ -201,9 +202,24 @@ public:
     /*virtual*/ void dumpBufferToLog();
 protected:
     inline bool verifyLength(const S32 data_size, const char *name);
+    // The cursor moved on past what was packed. A packer with no buffer,
+    // made to count the size something packs to, counts it instead: an
+    // offset added to its null cursor would be undefined.
+    void advance(S32 bytes)
+    {
+        if (mBufferp)
+        {
+            mCurBufferp += bytes;
+        }
+        else
+        {
+            mCountedSize += bytes;
+        }
+    }
 
     U8 *mBufferp;
     U8 *mCurBufferp;
+    S32 mCountedSize = 0;
     S32 mBufferSize;
 };
 

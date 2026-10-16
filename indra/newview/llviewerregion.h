@@ -88,8 +88,6 @@ public:
     {
         PARTITION_HUD=0,
         PARTITION_TERRAIN,
-        PARTITION_VOIDWATER,
-        PARTITION_WATER,
         PARTITION_TREE,
         PARTITION_PARTICLE,
         PARTITION_GRASS,
@@ -211,7 +209,7 @@ public:
 
     void setSimAccess(U8 sim_access)            { mSimAccess = sim_access; }
     U8 getSimAccess() const                     { return mSimAccess; }
-    const std::string getSimAccessString() const;
+    const std::string& getSimAccessString() const;
 
     // Homestead-related getters; there are no setters as nobody should be
     // setting them other than the individual message handler which is a member
@@ -291,6 +289,19 @@ public:
     void setCapabilitiesError();
     boost::signals2::connection setCapabilitiesReceivedCallback(const caps_received_signal_t::slot_type& cb);
 
+    // Fired when a region's own description changes underneath it: its name or
+    // its maturity rating, which arrive on a handshake long after the region
+    // was created and which nothing else announced. An estate manager changing
+    // the rating, or renaming the region, reaches the UI through this and
+    // through nothing else.
+    //
+    // Static, and carrying the region, because what listens to this is
+    // displaying the *agent's* region -- a per-instance signal would have to be
+    // reconnected on every crossing, and the crossing is the case that gets
+    // forgotten. Listeners that care about one region compare the argument.
+    typedef boost::signals2::signal<void(LLViewerRegion*)> region_info_signal_t;
+    static boost::signals2::connection setRegionInfoChangedCallback(const region_info_signal_t::slot_type& cb);
+
     static bool isSpecialCapabilityName(std::string_view name);
     void logActiveCapabilities() const;
 
@@ -343,6 +354,9 @@ public:
 
     // has region received its simulator features list? Requires an additional query after caps received.
     void requestSimulatorFeatures();
+    // Fetch the region's PBR terrain composition through the ModifyRegion cap
+    // and apply it; refreshes the region floater when the cap is absent.
+    void queryPBRTerrainFeatures();
     void setSimulatorFeaturesReceived(bool);
     bool simulatorFeaturesReceived() const;
     boost::signals2::connection setSimulatorFeaturesReceivedCallback(const caps_received_signal_t::slot_type& cb);
@@ -374,19 +388,18 @@ public:
     eCacheUpdateResult cacheFullUpdate(LLDataPackerBinaryBuffer &dp, U32 flags);
     eCacheUpdateResult cacheFullUpdate(LLViewerObject* objectp, LLDataPackerBinaryBuffer &dp, U32 flags);
 
-    void cacheFullUpdateGLTFOverride(const LLGLTFOverrideCacheEntry &override_data);
+    void cacheFullUpdateGLTFOverride(LLGLTFOverrideCacheEntry override_data);
 
     LLVOCacheEntry* getCacheEntryForOctree(U32 local_id);
     LLVOCacheEntry* getCacheEntry(U32 local_id, bool valid = true);
     bool probeCache(U32 local_id, U32 crc, U32 flags, U8 &cache_miss_type);
-    U64 getRegionCacheHitCount() { return mRegionCacheHitCount; }
-    U64 getRegionCacheMissCount() { return mRegionCacheMissCount; }
+    U64 getRegionCacheHitCount() const { return mRegionCacheHitCount; }
+    U64 getRegionCacheMissCount() const { return mRegionCacheMissCount; }
     void requestCacheMisses();
     void addCacheMissFull(const U32 local_id);
     //update object cache if the object receives a full-update or terse update
     LLViewerObject* updateCacheEntry(U32 local_id, LLViewerObject* objectp);
     void findOrphans(U32 parent_id);
-    void clearCachedVisibleObjects();
     void dumpCache  ();
     void clearVOCacheFromMemory();
 
@@ -402,6 +415,13 @@ public:
 
     U32 getNumOfVisibleGroups() const;
     U32 getNumOfActiveCachedObjects() const;
+    // Entry counts and packed-data footprint of this region's object cache, plus
+    // the running totals of objects the eviction walk dropped and objects rebuilt
+    // from a cache entry. The totals are cumulative for the region's life; a
+    // reader wanting a rate diffs successive samples.
+    // Walks mCacheMap, so call it at logging frequency, not per frame.
+    void getObjectCacheFootprint(U32& cached, U32& active, U32& waiting, U64& bytes,
+                                 U64& evicted, U64& built) const;
     LLSpatialPartition* getSpatialPartition(U32 type);
     LLVOCachePartition* getVOCachePartition();
 
@@ -479,7 +499,7 @@ public:
     F32Bits mBitsReceived;
     F32     mPacketsReceived;
 
-    LLMatrix4 mRenderMatrix;
+    LLMatrix4a mRenderMatrix;
 
     // These arrays are maintained in parallel. Ideally they'd be combined into a
     // single array of an aggrigate data type but for compatibility with the old
@@ -577,6 +597,7 @@ public:
     // a structure of size 2^14 = 16,000
     bool                                    mCacheLoaded;
     bool                                    mCacheDirty;
+    bool                                    mGLTFOverridesDirty;
     bool    mAlive;                 // can become false if circuit disconnects
     bool    mSimulatorFeaturesReceived;
     bool    mReleaseNotesRequested;
@@ -591,6 +612,7 @@ public:
     } eCababilitiesState;
 
     eCababilitiesState  mCapabilitiesState;
+    bool                mTerrainQueryOnCaps = false; // terrain query deferred until caps arrive
 
     typedef std::map<U32, std::vector<U32> > orphan_list_t;
     orphan_list_t mOrphanMap;
@@ -608,17 +630,23 @@ public:
     CacheMissItem::cache_miss_list_t   mCacheMissList;
     U64 mRegionCacheHitCount;
     U64 mRegionCacheMissCount;
+    U64 mObjectsEvicted;   //objects dropped by killInvisibleObjects
+    U64 mObjectsBuiltFromCache; //objects created from a cache entry
 
     caps_received_signal_t mCapabilitiesReceivedSignal;
     caps_received_signal_t mSimulatorFeaturesReceivedSignal;
+
+    static region_info_signal_t sRegionInfoChangedSignal;
 
     LLSD mSimulatorFeatures;
     U32  mWhisperRange = 10;
     U32  mSayRange = 20;
     U32  mShoutRange = 100;
 
-    typedef std::map<U32, LLPointer<LLVOCacheEntry> >      vocache_entry_map_t;
-    static vocache_entry_map_t sRegionCacheCleanup;
+    // Entries of a region that has gone, released a batch at a time from idle
+    // so that a large cache does not free tens of thousands of objects in one
+    // frame. Only the pointers move here; nothing is copied or re-counted.
+    static std::vector<LLPointer<LLVOCacheEntry>> sRegionCacheCleanup;
 
     // the materials capability throttle
     LLFrameTimer mMaterialsCapThrottleTimer;

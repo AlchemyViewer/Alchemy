@@ -23,9 +23,17 @@
 				<name_list.columns label="Статус" name="online"/>
 				<name_list.columns label="Роль" name="title"/>
 			</name_list>
-			<button label="Пригласить" name="member_invite"/>
-			<button label="Выкинуть" name="member_eject"/>
-			<button label="Заблокировать участников" name="member_ban"/>
+			<layout_stack name="button_row_ls">
+				<layout_panel name="ban_btn_lp">
+					<button label="Заблокировать участников" name="member_ban"/>
+				</layout_panel>
+				<layout_panel name="eject_btn_lp">
+					<button label="Выкинуть" name="member_eject"/>
+				</layout_panel>
+				<layout_panel name="btn_invite_lp">
+					<button label="Пригласить" name="member_invite"/>
+				</layout_panel>
+			</layout_stack>
 		</panel>
 		<panel label="РОЛИ" name="roles_sub_tab">
 			<panel.string name="help_text">

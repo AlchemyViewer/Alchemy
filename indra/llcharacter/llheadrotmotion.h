@@ -33,8 +33,10 @@
 #include "llmotion.h"
 #include "llframetimer.h"
 
-#define MIN_REQUIRED_PIXEL_AREA_HEAD_ROT 500.f;
-#define MIN_REQUIRED_PIXEL_AREA_EYE 25000.f;
+class LLVisualParam;
+
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_HEAD_ROT = 500.f;
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_EYE = 25000.f;
 
 //-----------------------------------------------------------------------------
 // class LLHeadRotMotion
@@ -96,7 +98,7 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();
@@ -178,10 +180,12 @@ public:
 
     void adjustEyeTarget(LLVector3* targetPos, LLJointState& left_eye_state, LLJointState& right_eye_state);
 
+    void setBlinkWeights(F32 left, F32 right);
+
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();
@@ -210,6 +214,10 @@ public:
     LLFrameTimer        mEyeBlinkTimer;
     F32                 mEyeBlinkTime;
     bool                mEyesClosed;
+
+    // resolved once, since the parameters are added when the avatar loads
+    LLVisualParam*      mBlinkLeftParam = nullptr;
+    LLVisualParam*      mBlinkRightParam = nullptr;
 };
 
 #endif // LL_LLHEADROTMOTION_H

@@ -57,5 +57,5 @@ void ALFloaterGenericText::onClickClose()
 
 void ALFloaterGenericText::onClickCopy()
 {
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(mContents, mContents.length()), 0, narrow(mContents.length()));
+    LLClipboard::instance().copyToClipboard(mContents, 0, narrow(mContents.length()));
 }

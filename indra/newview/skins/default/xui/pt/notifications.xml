@@ -553,21 +553,11 @@ O objeto pode estar fora de alcance ou foi deletado.</notification>
 	<notification name="SaveNotecardFailObjectNotFound">Não foi possível salvar uma nota pois o objeto ou o inventário associado ao objeto não foi encontrado.
 O objeto pode estar fora de alcance ou foi deletado.</notification>
 	<notification name="SaveNotecardFailReason">Houve um problema em salvar uma nota devido a seguinte razão: [REASON]. Tente salvar a nota novamente mais tarde.</notification>
-	<notification name="ScriptCannotUndo">
-		Não foi possível desfazer todas as mudanças na sua versão de script.
-Gostaria de carregar a última versão salva?
-(**Aviso** Esta operação não pode ser desfeita).
-		<usetemplate name="okcancelbuttons" notext="Não" yestext="Sim"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">Não foi possível salvar o script pois o objeto em que ele está não pôde ser encontrado.
-O objeto pode estar fora de alcance ou ter sido deletado.</notification>
 	<notification name="StartRegionEmpty">
 		Sua região de partida não está definida.
 Digite o nome da região na caixa 'Ponto de partida' ou selecione 'Meu último local' ou 'Minha casa' como ponto de partida.
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
-	<notification name="CouldNotStartStopScript">Não foi possível iniciar ou parar o script pois o objeto em que ele está não pôde ser encontrado.
-O objeto pode estar fora de alcance ou ter sido deletado.</notification>
 	<notification name="CannotDownloadFile">Não foi possível baixar o arquivo.</notification>
 	<notification label="" name="MediaFileDownloadUnsupported">
 		Você solicitou o download de um arquivo que não tem suporte no [SECOND_LIFE].
@@ -847,10 +837,6 @@ Você vai ter que redefinir nome e as opções do novo lote.
 
 Unir os terrenos?
 		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="Unir"/>
-	</notification>
-	<notification name="ConfirmNotecardSave">
-		Esta anotação precisa ser salva antes de o item ser copiado ou visualizado. Salvar anotação?
-		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="Salvar"/>
 	</notification>
 	<notification name="ConfirmItemCopy">
 		Copiar este item para o seu inventário?
@@ -1442,7 +1428,6 @@ Por favor volte mais tarde.</notification>
 	<notification label="Mensagem para todos na sua Propriedade" name="MessageEstate">
 		Digite um breve anúncio que será enviado para todos que estejam atualmente na sua propriedade.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -1688,7 +1673,6 @@ Publicar este classificado agora por L$ [AMOUNT]?
 	<notification label="Mensagem para todos desta Região" name="MessageRegion">
 		Digite um breve aviso que será enviado para todos nesta região.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -1765,7 +1749,6 @@ Você tem certeza de que deseja prosseguir com esta compra?
 Você tem certeza de que deseja prosseguir com esta compra?
 Por favor, re-insira sua senha e clique 'Confirmar Compra'.
 		<form name="form">
-			<input name="message"/>
 			<button name="ConfirmPurchase" text="Confirmar Compra"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -2037,9 +2020,6 @@ Ela pode afetar a digitação da senha.</notification>
 	<notification name="IMAcrossParentEstates">Não é possível enviar MIs entre propriedades-pai.</notification>
 	<notification name="TransferInventoryAcrossParentEstates">Não é possível transferir o inventário para propriedades-pai.</notification>
 	<notification name="UnableToLoadNotecard">Não é possível carregar notas neste momento.</notification>
-	<notification name="ScriptMissing">O script foi perdido no banco de dados.</notification>
-	<notification name="ScriptNoPermissions">Permissões insuficientes para visualizar o script.</notification>
-	<notification name="UnableToLoadScript">Impossível carregar o script. Por favor, tente novamente.</notification>
 	<notification name="IncompleteInventory">Os conteúdos completos que vocë está oferecendo, não estão ainda disponíveis localmente. Por favor, tente oferecê-los novamente em um minuto.</notification>
 	<notification name="CannotModifyProtectedCategories">Você não pode modificar categorias protegidas.</notification>
 	<notification name="CannotRemoveProtectedCategories">Você não pode remover categorias protegidas.</notification>
@@ -2528,7 +2508,6 @@ Acesse Alchemy.log para detalhes</notification>
 Com os seguintes residentes:
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="OK"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		É possível compartilhar apenas uma pasta de cada vez.
@@ -2796,9 +2775,6 @@ Deseja continuar?
 		O objeto selecionado afeta o navmesh.  Alterá-lo para um Caminho Flexível irá removê-lo do navmesh.
 		<usetemplate ignoretext="O objeto selecionado afeta o navmesh.  Alterá-lo para um Caminho Flexível irá removê-lo do navmesh." name="okcancelignore" notext="Cancelar" yestext="OK"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">Aparentemente a sua máquina não atende os requisitos de hardware do [APP_NAME].  [APP_NAME] requer placas de vídeo OpenGL com suporte a multitexturas.  Se sua place de vídeo tiver este perfil, atualize o driver da placa de vídeo, assim como patches e service packs do sistema operacional. 
-
-Se você continuar a receber esta mensagem, consulte o [SUPPORT_SITE].</global>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
 	<global name="UnsupportedGPU">- A sua placa de vídeo não atende os requisitos mínimos exigidos.</global>

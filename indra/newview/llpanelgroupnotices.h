@@ -38,20 +38,22 @@ class LLIconCtrl;
 class LLCheckBoxCtrl;
 class LLScrollListCtrl;
 
-class LLPanelGroupNotices : public LLPanelGroupTab
+class LLPanelGroupNotices final : public LLPanelGroupTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupNotices, LLPanelGroupTab);
+
     LLPanelGroupNotices();
     virtual ~LLPanelGroupNotices();
 
     // LLPanelGroupTab
-    virtual void activate();
+    virtual void activate() override;
     //virtual bool needsApply(std::string& mesg);
     //virtual bool apply(std::string& mesg);
     //virtual void update();
 
-    virtual bool postBuild();
-    virtual bool isVisibleByAgent(LLAgent* agentp);
+    virtual bool postBuild() override;
+    virtual bool isVisibleByAgent(LLAgent* agentp) override;
 
     void setItem(LLPointer<LLInventoryItem> inv_item);
 
@@ -67,7 +69,7 @@ public:
 
     void clearNoticeList();
 
-    virtual void setGroupID(const LLUUID& id);
+    virtual void setGroupID(const LLUUID& id) override;
 
 private:
     static void onClickRemoveAttachment(void* data);

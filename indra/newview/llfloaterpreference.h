@@ -76,20 +76,22 @@ typedef enum
     } EGraphicsSettings;
 
 // Floater to control preferences (display, audio, bandwidth, general.
-class LLFloaterPreference : public LLFloater, public LLAvatarPropertiesObserver, public LLConversationLogObserver
+class LLFloaterPreference final : public LLFloater, public LLAvatarPropertiesObserver, public LLConversationLogObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPreference, LLFloater);
+
     LLFloaterPreference(const LLSD& key);
     ~LLFloaterPreference();
 
     void apply();
     void cancel(const std::vector<std::string> settings_to_skip = {});
-    /*virtual*/ void draw();
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void onClose(bool app_quitting);
-    /*virtual*/ void changed();
-    /*virtual*/ void changed(const LLUUID& session_id, U32 mask) {};
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ void onClose(bool app_quitting) override;
+    /*virtual*/ void changed() override;
+    /*virtual*/ void changed(const LLUUID& session_id, U32 mask) override {};
 
     // static data update, called from message handler
     static void updateUserInfo(const std::string& visibility);
@@ -106,7 +108,7 @@ public:
     // update Show Favorites checkbox
     static void updateShowFavoritesCheckbox(bool val);
 
-    void processProperties( void* pData, EAvatarProcessorType type );
+    void processProperties( void* pData, EAvatarProcessorType type ) override;
     void saveAvatarProperties( void );
     static void saveAvatarPropertiesCoro(const std::string url, bool allow_publish);
     void selectPrivacyPanel();
@@ -179,7 +181,7 @@ public:
     void setPersonalInfo(const std::string& visibility);
     void refreshEnabledState();
     void onCommitWindowedMode();
-    void refresh(); // Refresh enable/disable
+    void refresh() override; // Refresh enable/disable
     // if the quality radio buttons are changed
     void onChangeQuality(const LLSD& data);
 
@@ -299,8 +301,10 @@ private:
 class LLPanelPreference : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelPreference, LLPanel);
+
     LLPanelPreference();
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     virtual ~LLPanelPreference();
 
@@ -343,15 +347,17 @@ private:
     LOG_CLASS(LLPanelPreference);
 };
 
-class LLPanelPreferenceGraphics : public LLPanelPreference
+class LLPanelPreferenceGraphics final : public LLPanelPreference
 {
 public:
-    bool postBuild();
-    void draw();
-    void cancel(const std::vector<std::string> settings_to_skip = {});
-    void saveSettings();
+    AL_VIEW_TYPE(LLPanelPreferenceGraphics, LLPanelPreference);
+
+    bool postBuild() override;
+    void draw() override;
+    void cancel(const std::vector<std::string> settings_to_skip = {}) override;
+    void saveSettings() override;
     void resetDirtyChilds();
-    void setHardwareDefaults();
+    void setHardwareDefaults() override;
     void setPresetText();
 
 protected:
@@ -366,10 +372,12 @@ private:
 // populated at panel-open time from the active FAudio engine's device
 // enumeration. The control_name binding writes the user's pick to
 // AudioFAudioOutputDevice; the engine reads it at next launch.
-class LLPanelPreferenceSound : public LLPanelPreference
+class LLPanelPreferenceSound final : public LLPanelPreference
 {
     LOG_CLASS(LLPanelPreferenceSound);
 public:
+    AL_VIEW_TYPE(LLPanelPreferenceSound, LLPanelPreference);
+
     bool postBuild() override;
 
 private:
@@ -392,10 +400,12 @@ private:
 // Colors > Chat preferences panel. Renders a live mock-chat preview that
 // re-colors whenever a chat-color swatch or any AlchemyChatIRC* setting
 // changes, using the real chat-color path so it matches in-world local chat.
-class LLPanelPreferenceColors : public LLPanelPreference
+class LLPanelPreferenceColors final : public LLPanelPreference
 {
     LOG_CLASS(LLPanelPreferenceColors);
 public:
+    AL_VIEW_TYPE(LLPanelPreferenceColors, LLPanelPreference);
+
     bool postBuild() override;
     void draw() override;
 
@@ -410,18 +420,20 @@ private:
     std::string mPreviewSignature;
 };
 
-class LLPanelPreferenceControls : public LLPanelPreference, public LLKeyBindResponderInterface
+class LLPanelPreferenceControls final : public LLPanelPreference, public LLKeyBindResponderInterface
 {
     LOG_CLASS(LLPanelPreferenceControls);
 public:
+    AL_VIEW_TYPE(LLPanelPreferenceControls, LLPanelPreference);
+
     LLPanelPreferenceControls();
     virtual ~LLPanelPreferenceControls();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    void apply();
-    void cancel(const std::vector<std::string> settings_to_skip = {});
-    void saveSettings();
+    void apply() override;
+    void cancel(const std::vector<std::string> settings_to_skip = {}) override;
+    void saveSettings() override;
     void resetDirtyChilds();
 
     void onListCommit();
@@ -437,9 +449,9 @@ public:
     void updateAndApply();
 
     // from interface
-    /*virtual*/ bool onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes);
-    /*virtual*/ void onDefaultKeyBind(bool all_modes);
-    /*virtual*/ void onCancelKeyBind();
+    /*virtual*/ bool onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes) override;
+    /*virtual*/ void onDefaultKeyBind(bool all_modes) override;
+    /*virtual*/ void onCancelKeyBind() override;
 
 private:
     // reloads settings, discards current changes, updates table
@@ -477,9 +489,11 @@ class LLAvatarComplexityControls
     LOG_CLASS(LLAvatarComplexityControls);
 };
 
-class LLFloaterPreferenceProxy : public LLFloater
+class LLFloaterPreferenceProxy final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPreferenceProxy, LLFloater);
+
     LLFloaterPreferenceProxy(const LLSD& key);
     ~LLFloaterPreferenceProxy();
 
@@ -488,13 +502,13 @@ public:
     void cancel();
 
 protected:
-    bool postBuild();
-    void onOpen(const LLSD& key);
-    void onClose(bool app_quitting);
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void onClose(bool app_quitting) override;
     void saveSettings();
     void onBtnOk();
     void onBtnCancel();
-    void onClickCloseBtn(bool app_quitting = false);
+    void onClickCloseBtn(bool app_quitting = false) override;
 
     void onChangeSocksSettings();
 

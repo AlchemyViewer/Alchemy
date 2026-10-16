@@ -410,7 +410,7 @@ void* LLFloaterWorldMap::createWorldMapView(void* data)
 
 bool LLFloaterWorldMap::postBuild()
 {
-    mMapView = dynamic_cast<LLWorldMapView*>(getChild<LLPanel>("objects_mapview"));
+    mMapView = getChild<LLPanel>("objects_mapview")->as<LLWorldMapView>();
     mMapView->setPan(0, 0, true);
 
     mTeleportButton = getChild<LLButton>("Teleport");
@@ -641,7 +641,7 @@ void LLFloaterWorldMap::draw()
     {
         if (mCompletingRegionName != "")
         {
-            F64 seconds = LLTimer::getElapsedSeconds();
+            F64 seconds = LLTimer::getUptimeSeconds();
             double value = fmod(seconds, 2);
             value = 0.5 + 0.5*cos(value * F_PI);
             LLColor4 loading_color(0.0, F32(value/2), F32(value), 1.0);
@@ -1531,7 +1531,7 @@ void LLFloaterWorldMap::onClickTeleportBtn()
 
 void LLFloaterWorldMap::onCopySLURL()
 {
-    getWindow()->copyTextToClipboard(utf8str_to_wstring(mSLURL.getSLURLString()));
+    getWindow()->copyTextToClipboard(mSLURL.getSLURLString());
 
     LLSD args;
     args["SLURL"] = mSLURL.getSLURLString();

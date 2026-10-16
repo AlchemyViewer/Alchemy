@@ -27,12 +27,15 @@
 #ifndef LL_LLFLOATERSNAPSHOT_H
 #define LL_LLFLOATERSNAPSHOT_H
 
+#include "alpopover.h"
 #include "llagent.h"
 #include "llfloater.h"
 #include "llpanelsnapshot.h"
 #include "llsnapshotmodel.h"
 
+class LLColorSwatchCtrl;
 class LLSpinCtrl;
+class LLViewerObject;
 class LLSnapshotLivePreview;
 class LLToolset;
 
@@ -41,13 +44,14 @@ class LLFloaterSnapshotBase : public LLFloater
     LOG_CLASS(LLFloaterSnapshotBase);
 
 public:
+    AL_VIEW_TYPE(LLFloaterSnapshotBase, LLFloater);
 
     LLFloaterSnapshotBase(const LLSD& key);
     virtual ~LLFloaterSnapshotBase();
 
-    /*virtual*/ void draw();
-    /*virtual*/ void onClose(bool app_quitting);
-    virtual S32 notify(const LLSD& info);
+    /*virtual*/ void draw() override;
+    /*virtual*/ void onClose(bool app_quitting) override;
+    virtual S32 notify(const LLSD& info) override;
 
     // TODO: create a snapshot model instead
     virtual void saveTexture() = 0;
@@ -114,6 +118,10 @@ public:
     LLSnapshotLivePreview* getPreviewView();
     virtual void updateControls(LLFloaterSnapshotBase* floater) = 0;
     virtual void updateLayout(LLFloaterSnapshotBase* floater);
+    // Puts back the toolset freeze frame replaced, once. updateLayout runs every
+    // draw, and LLToolMgr::setCurrentTool drops any transient tool, so restoring
+    // on every frame would cancel a picker the moment it was armed.
+    void restoreToolset();
     virtual void updateLivePreview();
     virtual void setStatus(EStatus status, bool ok = true, const std::string& msg = LLStringUtil::null);
     virtual EStatus getStatus() const { return mStatus; }
@@ -142,17 +150,20 @@ public:
     EStatus mStatus;
 };
 
-class LLFloaterSnapshot : public LLFloaterSnapshotBase
+class LLFloaterSnapshot final : public LLFloaterSnapshotBase
 {
     LOG_CLASS(LLFloaterSnapshot);
 
 public:
+    AL_VIEW_TYPE(LLFloaterSnapshot, LLFloaterSnapshotBase);
+
     LLFloaterSnapshot(const LLSD& key);
     /*virtual*/ ~LLFloaterSnapshot();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ S32 notify(const LLSD& info);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ void onClose(bool app_quitting) override;
+    /*virtual*/ S32 notify(const LLSD& info) override;
 
     static void update();
 
@@ -161,7 +172,7 @@ public:
 
     static LLFloaterSnapshot* getInstance();
     static LLFloaterSnapshot* findInstance();
-    /*virtual*/ void saveTexture();
+    /*virtual*/ void saveTexture() override;
 
     typedef boost::signals2::signal<void(void)> snapshot_saved_signal_t;
     void saveLocal(const snapshot_saved_signal_t::slot_type& success_cb, const snapshot_saved_signal_t::slot_type& failure_cb);
@@ -184,8 +195,7 @@ public:
     Impl(LLFloaterSnapshotBase* floater)
         : LLFloaterSnapshotBase::ImplBase(floater)
     {}
-    ~Impl()
-    {}
+    ~Impl();
 
     void applyKeepAspectCheck(LLFloaterSnapshotBase* view, bool checked);
     void updateResolution(LLUICtrl* ctrl, void* data, bool do_update = true);
@@ -210,16 +220,42 @@ public:
     void setResolution(LLFloaterSnapshotBase* floater, const std::string& comboname);
     /*virtual*/ void updateControls(LLFloaterSnapshotBase* floater);
 
+    // Cutout. The subject is session state (ALRenderIsolation), kept when the
+    // floater closes so Take Snapshot to Disk can cut it out; this is the
+    // floater's view of it and the eyedropper that picks it.
+    void setupCutout(LLFloaterSnapshot* floater);
+    static void onCommitCutout(LLUICtrl* ctrl, void* data);
+    static void onClickCutoutPick(LLUICtrl* ctrl, void* data);
+    static void onCutoutPickExit(void* data);
+    void startCutoutPick(LLFloaterSnapshotBase* floater);
+    void cancelCutoutPick();
+    bool openCutoutFillPopover(LLFloaterSnapshotBase* floater, LLColorSwatchCtrl* swatch);
+    void updateCutoutControls(LLFloaterSnapshotBase* floater);
+    std::string cutoutSubjectName(LLFloaterSnapshotBase* floater, LLViewerObject* subject);
+
 private:
     /*virtual*/ LLSnapshotModel::ESnapshotLayerType getLayerType(LLFloaterSnapshotBase* floater);
     void comboSetCustom(LLFloaterSnapshotBase *floater, const std::string& comboname);
     void checkAspectRatio(LLFloaterSnapshotBase *view, S32 index);
     void setFinished(bool finished, bool ok = true, const std::string& msg = LLStringUtil::null);
+
+public:
+    bool        mCutoutPicking = false;
+    // When a press on the eyedropper cancelled it: that press's commit is on
+    // its way, and must not arm the eyedropper again.
+    F64         mCutoutPickCancelledAt = 0.0;
+    LLUUID      mCutoutNameAsked;       // whose name has been asked for
+    boost::signals2::connection mCutoutAvatarName;
+    boost::signals2::connection mCutoutObjectName;
+    std::vector<boost::signals2::scoped_connection> mCutoutSettings;
+    ALPopoverSlot mCutoutFillPopover;
 };
 
-class LLSnapshotFloaterView : public LLFloaterView
+class LLSnapshotFloaterView final : public LLFloaterView
 {
 public:
+    AL_VIEW_TYPE(LLSnapshotFloaterView, LLFloaterView);
+
     struct Params
     :   public LLInitParam::Block<Params, LLFloaterView::Params>
     {
@@ -232,10 +268,10 @@ protected:
 public:
     virtual ~LLSnapshotFloaterView();
 
-    /*virtual*/ bool handleKey(KEY key, MASK mask, bool called_from_parent);
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleKey(KEY key, MASK mask, bool called_from_parent) override;
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask) override;
 };
 
 extern LLSnapshotFloaterView* gSnapshotFloaterView;

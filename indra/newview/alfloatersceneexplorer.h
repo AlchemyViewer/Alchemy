@@ -39,6 +39,8 @@ class ALFloaterSceneExplorer final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(ALFloaterSceneExplorer, LLFloater);
+
     bool postBuild() override;
     void onOpen(const LLSD& key) override;
     void onClose(bool app_quitting) override;

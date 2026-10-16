@@ -31,10 +31,12 @@
 
 class LLLineEditor;
 
-class LLFloaterWhiteListEntry :
+class LLFloaterWhiteListEntry final :
     public LLFloater
 {
     public:
+    AL_VIEW_TYPE(LLFloaterWhiteListEntry, LLFloater);
+
         LLFloaterWhiteListEntry(const LLSD& key);
         ~LLFloaterWhiteListEntry();
 

@@ -48,16 +48,18 @@ class LLFloaterGestureInventoryObserver;
 class LLMultiGesture;
 class LLMenuGL;
 
-class LLFloaterGesture
+class LLFloaterGesture final
 :   public LLFloater, LLInventoryFetchDescendentsObserver
 {
     LOG_CLASS(LLFloaterGesture);
 public:
+    AL_VIEW_TYPE(LLFloaterGesture, LLFloater);
+
     LLFloaterGesture(const LLSD& key);
     virtual ~LLFloaterGesture();
 
-    virtual bool postBuild();
-    virtual void done ();
+    virtual bool postBuild() override;
+    virtual void done () override;
     void refreshAll();
     /**
      * @brief Add new scrolllistitem into gesture_list.

@@ -38,9 +38,11 @@ struct StatViewRegistry : public LLChildRegistry<StatViewRegistry>
     LLSINGLETON_EMPTY_CTOR(StatViewRegistry);
 };
 
-class LLStatView : public LLContainerView
+class LLStatView final : public LLContainerView
 {
 public:
+    AL_VIEW_TYPE(LLStatView, LLContainerView);
+
     struct Params : public LLInitParam::Block<Params, LLContainerView::Params>
     {
         Optional<std::string> setting;

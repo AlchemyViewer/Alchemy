@@ -26,6 +26,8 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llgltfmateriallist.h"
+#include "llappviewer.h"
+#include "pipeline.h"
 
 #include "llagent.h"
 #include "llassetstorage.h"
@@ -212,10 +214,16 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
             auto count = llmin(tes.size(), MAX_TES);
             for (size_t i = 0; i < count; ++i)
             {
+                S32 te = tes[i].asInteger();
+                if (te < 0 || te >= (S32)MAX_TES)
+                {
+                    // the face index comes off the wire and indexes arrays here
+                    LL_WARNS("GLTF") << "Override for face " << te << " of " << id << " is out of range, ignored" << LL_ENDL;
+                    continue;
+                }
+
                 LLGLTFMaterial* mat = new LLGLTFMaterial(); // setTEGLTFMaterialOverride and cache will take ownership
                 mat->applyOverrideLLSD(od[i]);
-
-                S32 te = tes[i].asInteger();
 
                 has_te[te] = true;
                 cache.mSides[te] = od[i];
@@ -245,8 +253,8 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
                 }
             }
 
-            region->cacheFullUpdateGLTFOverride(cache);
             LL_DEBUGS("GLTF") << "GLTF Material Override: " << cache.mObjectId << " " << cache.mLocalId << " " << cache.mRegionHandle << " (sides:" << (cache.mSides.size()) << ")" << LL_ENDL;
+            region->cacheFullUpdateGLTFOverride(std::move(cache));
         }
 
     }

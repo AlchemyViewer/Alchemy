@@ -44,7 +44,6 @@ extern const F32 DEFAULT_AVATAR_JOINT_LOD;
 class alignas(16) LLAvatarJoint :
     public LLJoint
 {
-    LL_ALIGN_NEW
 public:
     LLAvatarJoint();
     LLAvatarJoint(S32 joint_num);
@@ -124,7 +123,6 @@ protected:
 
 class alignas(16) LLAvatarJointCollisionVolume : public LLAvatarJoint
 {
-    LL_ALIGN_NEW
 public:
     LLAvatarJointCollisionVolume();
     virtual ~LLAvatarJointCollisionVolume() {};

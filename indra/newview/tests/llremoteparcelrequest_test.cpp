@@ -26,47 +26,33 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../llremoteparcelrequest.h"
 
 #include "../llagent.h"
-#include "message.h"
-#include "llurlentry.h"
-#include "llpounceable.h"
 
 namespace {
     const LLUUID TEST_PARCEL_ID("11111111-1111-1111-1111-111111111111");
+
+    // A reply for the test parcel, as processParcelInfoReply() reads one
+    // off the wire.
+    LLParcelData testParcelData()
+    {
+        LLParcelData parcel_data;
+        parcel_data.parcel_id = TEST_PARCEL_ID;
+        return parcel_data;
+    }
 }
 
-void LLMessageSystem::getF32(char const *,char const *,F32 &,S32) { }
-void LLMessageSystem::getU8(char const *,char const *,U8 &,S32) { }
-void LLMessageSystem::getS32(char const *,char const *,S32 &,S32) { }
-void LLMessageSystem::getString(char const *,char const *, std::string &,S32) { }
-void LLMessageSystem::getUUID(char const *,char const *, LLUUID & out_id,S32)
-{
-    out_id = TEST_PARCEL_ID;
-}
-void LLMessageSystem::nextBlock(char const *) { }
-void LLMessageSystem::addUUID(char const *,LLUUID const &) { }
-void LLMessageSystem::addUUIDFast(char const *,LLUUID const &) { }
-void LLMessageSystem::nextBlockFast(char const *) { }
-void LLMessageSystem::newMessage(char const *) { }
-LLPounceable<LLMessageSystem*, LLPounceableStatic> gMessageSystem;
-char const* const _PREHASH_AgentID = 0;   // never dereferenced during this test
-char const* const _PREHASH_AgentData = 0; // never dereferenced during this test
 LLAgent gAgent;
 LLAgent::LLAgent() : mAgentAccess(NULL) { }
 LLAgent::~LLAgent() { }
 void LLAgent::sendReliableMessage(void) { }
 LLUUID gAgentSessionID;
 LLUUID gAgentID;
-LLUIColor::LLUIColor(void) { }
-LLControlGroup::LLControlGroup(std::string const & name) : LLInstanceTracker<LLControlGroup, std::string>(name) { }
-LLControlGroup::~LLControlGroup(void) { }
-void LLUrlEntryParcel::processParcelInfo(const LLUrlEntryParcel::LLParcelData& parcel_data) { }
 
-namespace tut
+namespace
 {
     struct TestObserver : public LLRemoteParcelInfoObserver {
         TestObserver() : mProcessed(false) { }
@@ -90,38 +76,35 @@ namespace tut
         }
     };
 
-    typedef test_group<RemoteParcelRequestData> remoteparcelrequest_t;
-    typedef remoteparcelrequest_t::object remoteparcelrequest_object_t;
-    tut::remoteparcelrequest_t tut_remoteparcelrequest("LLRemoteParcelRequest");
-
-    template<> template<>
-    void remoteparcelrequest_object_t::test<1>()
+    TEST_CASE_METHOD(RemoteParcelRequestData, "LLRemoteParcelRequest: an observer is told of the reply for its parcel", "[LLRemoteParcelRequest]")
     {
-        set_test_name("observer pointer");
-
         std::unique_ptr<TestObserver> observer(new TestObserver());
 
         LLRemoteParcelInfoProcessor & processor = LLRemoteParcelInfoProcessor::instance();
         processor.addObserver(LLUUID(TEST_PARCEL_ID), observer.get());
 
-        processor.processParcelInfoReply(gMessageSystem, NULL);
+        processor.processParcelData(testParcelData());
 
-        ensure(observer->mProcessed);
+        CHECK(observer->mProcessed);
     }
 
-    template<> template<>
-    void remoteparcelrequest_object_t::test<2>()
+    // CHOP-220: a dangling observer pointer. The deleted observer comes
+    // before a live one for the same parcel: the reply passes it over, does
+    // not crash on it, and still reaches the live one.
+    TEST_CASE_METHOD(RemoteParcelRequestData, "LLRemoteParcelRequest: a reply after an observer is deleted passes it over and reaches the rest", "[LLRemoteParcelRequest]")
     {
-        set_test_name("CHOP-220: dangling observer pointer");
-
         LLRemoteParcelInfoObserver * observer = new TestObserver();
+        TestObserver live;
 
         LLRemoteParcelInfoProcessor & processor = LLRemoteParcelInfoProcessor::instance();
         processor.addObserver(LLUUID(TEST_PARCEL_ID), observer);
+        processor.addObserver(LLUUID(TEST_PARCEL_ID), &live);
 
         delete observer;
         observer = NULL;
 
-        processor.processParcelInfoReply(gMessageSystem, NULL);
+        processor.processParcelData(testParcelData());
+        CHECK(live.mProcessed);
+        processor.removeObserver(LLUUID(TEST_PARCEL_ID), &live);
     }
 }

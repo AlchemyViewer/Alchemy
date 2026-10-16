@@ -88,7 +88,6 @@ inline bool operator!=(const LLVector3OverrideMap& a, const LLVector3OverrideMap
 //-----------------------------------------------------------------------------
 class alignas(16) LLJoint
 {
-    LL_ALIGN_NEW
 public:
     // priority levels, from highest to lowest
     enum JointPriority
@@ -107,7 +106,11 @@ public:
         MATRIX_DIRTY = 0x1 << 0,
         ROTATION_DIRTY = 0x1 << 1,
         POSITION_DIRTY = 0x1 << 2,
-        ALL_DIRTY = 0x7
+        ALL_DIRTY = 0x7,
+        // Carried by every joint above one whose matrix is dirty, so that the
+        // sweep can leave a subtree with nothing to do in it alone. Not part
+        // of ALL_DIRTY: it says something about the joints below, not this one.
+        SUBTREE_DIRTY = 0x1 << 3
     };
 public:
     enum SupportCategory
@@ -117,7 +120,6 @@ public:
     };
 protected:
     // explicit transformation members
-    LLMatrix4a          mWorldMatrix;
     LLXformMatrix       mXform;
 
     std::string mName;
@@ -130,9 +132,10 @@ protected:
     LLVector3       mDefaultPosition;
     LLVector3       mDefaultScale;
 
+    bool            mUpdateXform;
+
 public:
     U32             mDirtyFlags;
-    bool            mUpdateXform;
 
     // describes the skin binding pose
     LLVector3       mSkinOffset;
@@ -147,9 +150,6 @@ public:
     typedef std::vector<LLJoint*> joints_t;
     joints_t mChildren;
 
-    // debug statics
-    static S32      sNumTouches;
-    static S32      sNumUpdates;
     typedef std::set<std::string> debug_joint_name_t;
     static debug_joint_name_t s_debugJointNames;
     static void setDebugJointNames(const debug_joint_name_t& names);
@@ -190,6 +190,7 @@ public:
 
 private:
     void init();
+    void dirtySubtree(U32 flags);
 
 public:
     // set name and parent
@@ -254,22 +255,34 @@ public:
     LLQuaternion getLastWorldRotation();
     void setWorldRotation( const LLQuaternion& rot );
 
+    // writes the world rotation only when it differs by more than a tolerance,
+    // for callers whose value is recomputed every frame and does not come back
+    // bit identical
+    void setWorldRotationIfMoved( const LLQuaternion& rot );
+
     // get/set local scale
     const LLVector3& getScale();
     void setScale( const LLVector3& scale, bool apply_attachment_overrides = false );
 
     // get/set world matrix
-    const LLMatrix4 &getWorldMatrix();
+    const LLMatrix4a& getWorldMatrix();
     void setWorldMatrix( const LLMatrix4& mat );
 
-    const LLMatrix4a& getWorldMatrix4a();
+    // whether this joint and everything below it take part in the sweep
+    bool getUpdateXform() const { return mUpdateXform; }
+    void setUpdateXform( bool update );
 
-    void updateWorldMatrixChildren();
+    // recomputes every dirty world matrix in this subtree; returns how many
+    S32 updateWorldMatrixChildren();
     void updateWorldMatrixParent();
 
     void updateWorldPRSParent();
 
     void updateWorldMatrix();
+
+    // dirties this subtree when the xform this joint hangs off, which need
+    // not be a joint, has moved since the last world matrix was built
+    void touchIfXformParentMoved();
 
     // get/set skin offset
     const LLVector3 &getSkinOffset();

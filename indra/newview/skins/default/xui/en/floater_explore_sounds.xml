@@ -41,10 +41,10 @@
 	<check_box follows="top|left" bottom_delta="0" left_delta="160" width="110" name="repeated_asset_chk" label="Repeated Asset" />
 	<check_box follows="top|left" bottom_delta="0" left_delta="110" width="80" name="pause_chk" label="Pause Log" initial_value="false"/>
 	<scroll_list column_padding="0" draw_heading="true" follows="all" left="10" multi_select="true" name="sound_list" search_column="0" top="40" right="-10" bottom="-60">
-		<columns dynamicwidth="false" width="80" label="Playing" name="playing" />
-		<columns dynamicwidth="false" width="100" label="Type" name="type" />
-		<columns dynamicwidth="true" label="Owner" name="owner" />
-		<columns dynamicwidth="false" width="0" label="Sound" name="sound" />
+		<columns dynamic_width="false" width="80" label="Playing" name="playing" />
+		<columns dynamic_width="false" width="100" label="Type" name="type" />
+		<columns dynamic_width="true" label="Owner" name="owner" />
+		<columns dynamic_width="false" width="0" label="Sound" name="sound" />
 	</scroll_list>
 	<button bottom_delta="25" follows="left|bottom" height="20" label="Play Locally" name="play_locally_btn" left="10" width="95" enabled="false"/>
 	<button bottom_delta="0" follows="left|bottom" height="20" label="Stop Locally" name="stop_locally_btn" left_delta="100" width="95" enabled="false"/>

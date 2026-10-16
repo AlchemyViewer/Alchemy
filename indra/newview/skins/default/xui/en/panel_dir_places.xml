@@ -165,7 +165,7 @@
      search_column="2"
      width="336">
         <column label="" name="icon" width="24" />
-        <column dynamicwidth="true" label="Name" name="name" />
+        <column dynamic_width="true" label="Name" name="name" />
         <column label="Traffic" name="dwell" width="75" />
     </scroll_list>
     <text

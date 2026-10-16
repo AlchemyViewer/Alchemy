@@ -29,6 +29,9 @@
 #define LLUICTRLFACTORY_CPP
 #include "lluictrlfactory.h"
 
+#include "alxmllayermerge.h"
+#include "alxuidiagnostics.h"
+
 #include "llxmlnode.h"
 
 #include <fstream>
@@ -103,7 +106,7 @@ void LLUICtrlFactory::loadWidgetTemplate(const std::string& widget_tag, LLInitPa
         LLUICtrlFactory *factory = LLUICtrlFactory::getInstance();
         factory->mFileNames.push_back(base_filename);
 
-        if (LLXMLNode::getLayeredXMLNode(root_node, search_paths))
+        if (ALXmlLayerMerge::load(search_paths, root_node))
         {
             LLXUIParser parser;
             parser.readXUI(root_node, block, base_filename);
@@ -128,7 +131,13 @@ void LLUICtrlFactory::createChildren(LLView* viewp, LLXMLNodePtr node, const wid
         {
             // child_node is not a valid child for the current parent
             std::string child_name = std::string(child_node->getName()->mString);
-            if (LLDefaultChildRegistry::instance().getValue(child_name))
+            const bool known_elsewhere = LLDefaultChildRegistry::instance().getValue(child_name) != nullptr;
+            if (ALXUIDiagnostics* sink = ALXUIDiagnostics::active())
+            {
+                sink->report(known_elsewhere ? ALXUIDiagnostics::Kind::InvalidChild : ALXUIDiagnostics::Kind::CreateFailed,
+                             0, instance().getCurFileName(), child_node->getLineNumber(), child_name, node->getName()->mString);
+            }
+            else if (known_elsewhere)
             {
                 // This means that the registry assocaited with the parent widget does not have an entry
                 // for the child widget
@@ -161,7 +170,7 @@ bool LLUICtrlFactory::getLayeredXMLNode(const std::string &xui_filename, LLXMLNo
         paths.push_back(xui_filename);
     }
 
-    return LLXMLNode::getLayeredXMLNode(root, paths);
+    return ALXmlLayerMerge::load(paths, root);
 }
 
 
@@ -227,13 +236,6 @@ void LLUICtrlFactory::setCtrlParent(LLView* view, LLView* parent, S32 tab_group)
     parent->addChild(view, tab_group);
 }
 
-template<typename T>
-const LLInitParam::BaseBlock& get_empty_param_block()
-{
-    static typename T::Params params;
-    return params;
-}
-
 // adds a widget and its param block to various registries
 //static
 void LLUICtrlFactory::registerWidget(std::type_index widget_type, std::type_index param_block_type, const std::string& name)
@@ -257,9 +259,36 @@ void LLUICtrlFactory::registerWidget(std::type_index widget_type, std::type_inde
     }
 
     LLWidgetNameRegistry::instance().defaultRegistrar().add(param_block_type, name);
-    //FIXME: comment this in when working on schema generation
-    //LLWidgetTypeRegistry::instance().defaultRegistrar().add(tag, widget_type);
-    //LLDefaultParamBlockRegistry::instance().defaultRegistrar().add(widget_type, &get_empty_param_block<T>);
+    LLWidgetTypeRegistry::instance().defaultRegistrar().add(name, widget_type);
+}
+
+//static
+void LLUICtrlFactory::registerWidgetTag(const ALViewType* type, const std::string& tag)
+{
+    // A widget registered with more than one child registry keeps the tag
+    // it was registered with first.
+    if (!LLWidgetTagRegistry::instance().exists(type))
+    {
+        LLWidgetTagRegistry::instance().defaultRegistrar().add(type, tag);
+    }
+}
+
+//static
+const std::string* LLUICtrlFactory::widgetTag(const ALViewType* type)
+{
+    for (const ALViewType* cur = type; cur; cur = cur->mDepth > 0 ? cur->mAncestors[cur->mDepth - 1] : nullptr)
+    {
+        if (const std::string* tag = LLWidgetTagRegistry::instance().getValue(cur))
+        {
+            return tag;
+        }
+    }
+    return nullptr;
+}
+
+void LLUICtrlFactory::flushDefaults()
+{
+    mParamDefaultsMap.clear();
 }
 
 

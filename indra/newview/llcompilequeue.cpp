@@ -36,6 +36,11 @@
 
 #include "llcompilequeue.h"
 
+#include "alscriptstudio.h"
+
+#include "alscriptenvelope.h"
+#include "alscriptpreprocessor.h"
+#include "alscriptworkspace.h"
 #include "llagent.h"
 #include "llchat.h"
 #include "llfloaterreg.h"
@@ -115,50 +120,6 @@ namespace
 
 
 }
-
-// *NOTE$: A minor specialization of LLScriptAssetUpload, it does not require a buffer
-// (and does not save a buffer to the cache) and it finds the compile queue window and
-// displays a compiling message.
-class LLQueuedScriptAssetUpload : public LLScriptAssetUpload
-{
-public:
-    LLQueuedScriptAssetUpload(LLUUID taskId, LLUUID itemId, LLUUID assetId, std::string compileTarget,
-            bool isRunning, std::string scriptName, LLUUID queueId, LLUUID exerienceId, taskUploadFinish_f finish) :
-        LLScriptAssetUpload(taskId, itemId, compileTarget, isRunning,
-            exerienceId, std::string(), finish, nullptr),
-        mScriptName(scriptName),
-        mQueueId(queueId)
-    {
-        setAssetId(assetId);
-    }
-
-    virtual LLSD prepareUpload()
-    {
-        /* *NOTE$: The parent class (LLScriptAssetUpload will attempt to save
-         * the script buffer into to the cache.  Since the resource is already in
-         * the cache we don't want to do that.  Just put a compiling message in
-         * the window and move on
-         */
-        LLFloaterCompileQueue* queue = LLFloaterReg::findTypedInstance<LLFloaterCompileQueue>("compile_queue", LLSD(mQueueId));
-        if (queue)
-        {
-            std::string message = std::string("Compiling \"") + getScriptName() + std::string("\"...");
-
-            queue->getChild<LLScrollListCtrl>("queue output")->addSimpleElement(message, ADD_BOTTOM);
-        }
-
-        return LLSDMap("success", LLSD::Boolean(true));
-    }
-
-
-    std::string getScriptName() const { return mScriptName; }
-
-private:
-    void setScriptName(const std::string &scriptName) { mScriptName = scriptName; }
-
-    LLUUID mQueueId;
-    std::string mScriptName;
-};
 
 ///----------------------------------------------------------------------------
 /// Local function declarations, constants, enums, and typedefs
@@ -357,7 +318,8 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     LLCheckedHandle<LLFloaterCompileQueue> floater(hfloater);
     // Dereferencing floater may fail. If they do they throw LLExeceptionStaleHandle.
     // which is caught in objectScriptProcessingQueueCoro
-    std::string compile_target = floater->mCompileTarget;
+    const std::string requested_target = floater->mCompileTarget;
+    std::string compile_target = requested_target;
 
     // Initial test to see if we can (or should) attempt to compile the script.
     LLInventoryItem *item = dynamic_cast<LLInventoryItem *>(inventory);
@@ -366,6 +328,22 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     {
         LL_WARNS("SCRIPTQ") << "item retrieved is not an LLInventoryItem." << LL_ENDL;
         return true;
+    }
+
+    if (requested_target == "auto-luau")
+    {
+        compile_target =
+            item->getInventorySubType() == SST_LUA ? "luau" : "lsl-luau";
+    }
+    else if (requested_target == "auto")
+    {
+        compile_target = item->getRuntime();
+        if (compile_target.empty())
+        {
+            floater->addStringMessage(
+                "Skipping: " + item->getName() + " (no registered VM)");
+            return true;
+        }
     }
 
     if (!item->getPermissions().allowModifyBy(gAgent.getID(), gAgent.getGroupID()) ||
@@ -487,23 +465,97 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
         return true;
     }
 
-    std::string url = object->getRegion()->getCapability("UpdateScriptTask");
-
+    // Every recompile goes through the workspace, which every save goes
+    // through, so that every editor hears what the compiler said. A script
+    // the preprocessor wrapped, or any script while the preprocessor is on,
+    // is expanded again from its source, so that its includes are fresh;
+    // one whose text is not at hand is fetched by the workspace itself.
     {
-        LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLQueuedScriptAssetUpload>(object->getID(),
-            inventory->getUUID(),
-            assetId,
-            compile_target,
-            true,
-            inventory->getName(),
-            LLUUID(),
-            experienceId,
-            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _4));
-
-        LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
+        const ALScriptRef ref(object->getID(), inventory->getUUID());
+        // A save of it on its way would have the server's text land over
+        // it: left alone. Changes not saved in the studio are not what
+        // compiles: said so.
+        LLStringUtil::format_map_t named;
+        named["[SCRIPT_NAME]"] = inventory->getName();
+        if (ALScriptWorkspace::instance().saving(ref))
+        {
+            floater->addStringMessage(LLTrans::getString("CompileQueueSkippedSaving", named));
+            return true;
+        }
+        if (ALScriptStudio::unsavedIn(ref))
+        {
+            floater->addStringMessage(LLTrans::getString("CompileQueueUnsavedInStudio", named));
+        }
+        const std::string pumpName = pump.getName();
+        // Whether it runs after as it runs now, which the save asks the
+        // region.
+        const std::optional<bool> running;
+        const auto        heard    = [pumpName](const ALScriptCompileResult& compiled) {
+            LLSD out;
+            out["compiled"] = compiled.success;
+            LLSD errors     = LLSD::emptyArray();
+            if (!compiled.error.empty())
+            {
+                errors.append(compiled.error);
+            }
+            for (const std::string& message : compiled.messages)
+            {
+                errors.append(message);
+            }
+            out["errors"] = errors;
+            LLEventPumps::instance().post(pumpName, out);
+        };
+        std::string text;
+        if (!ALScriptWorkspace::readAsset(assetId, item->getType(), text))
+        {
+            ALScriptWorkspace::instance().recompile(ref, compile_target, heard, running,
+                                                    ALScriptSender(ALScriptOrigin::Queue));
+        }
+        else
+        {
+            if (ALPreprocessor::wanted(text, script_is_lua, ALScriptPreprocessor::enabled()) !=
+                ALPreprocessor::Wanted::No)
+            {
+                auto prepared = std::make_shared<ALScriptPrepared>();
+                ALScriptWorkspace::instance().prepare(ref, inventory->getName(), assetId, text, script_is_lua, compile_target,
+                                                      [pumpName, prepared](const ALScriptPrepared& p) {
+                                                          *prepared = p;
+                                                          LLEventPumps::instance().post(pumpName, LLSDMap("prepared", LLSD::Boolean(true)));
+                                                      });
+                result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
+                floater.check();
+                if (result.has("timeout"))
+                {
+                    LLStringUtil::format_map_t args;
+                    args["[OBJECT_NAME]"] = inventory->getName();
+                    floater->addStringMessage(floater->getString("Timeout", args));
+                    return true;
+                }
+                if (!prepared->errors.empty())
+                {
+                    floater->addStringMessage(std::string("Preprocessing of \"") + inventory->getName() + std::string("\" failed:"));
+                    for (const ALScriptDiagnostic& problem : prepared->errors)
+                    {
+                        floater->addStringMessage(std::to_string(problem.line + 1) + ": " + problem.message);
+                    }
+                    return true;
+                }
+                text = prepared->text;
+            }
+            ALScriptSaveOptions options;
+            options.compileTarget = compile_target;
+            options.running       = running;
+            options.experience    = experienceId;
+            options.sender        = ALScriptSender(ALScriptOrigin::Queue);
+            std::string error;
+            if (!ALScriptWorkspace::instance().save(ref, text, options, heard, error))
+            {
+                floater->addStringMessage(std::string("Upload of \"") + inventory->getName() + std::string("\" failed: ") + error);
+                return true;
+            }
+        }
+        result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
     }
-
-    result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
 
     floater.check();
 
@@ -789,8 +841,13 @@ bool LLFloaterDeleteQueue::startQueue()
 void ObjectInventoryFetcher::inventoryChanged(LLViewerObject* object,
         LLInventoryObject::object_list_t* inventory, S32 serial_num, void* user_data)
 {
+    // Nothing, where the request for it failed: an object with no scripts
+    // to the queue, rather than one it waits on.
     mInventoryList.clear();
-    mInventoryList.assign(inventory->begin(), inventory->end());
+    if (inventory)
+    {
+        mInventoryList.assign(inventory->begin(), inventory->end());
+    }
 
     mPump.post(LLSDMap("changed", LLSD::Boolean(true)));
 

@@ -191,7 +191,7 @@ namespace LL
         template<>
         inline void copyVec3<F32, vec3>(F32* src, vec3& dst)
         {
-            dst = vec3(src[0], src[1], src[2]);
+            dst.set(src);
         }
 
         template<>
@@ -277,16 +277,13 @@ namespace LL
         template<>
         inline void copyVec4<F32, quat>(F32* src, quat& dst)
         {
-            dst.x = src[0];
-            dst.y = src[1];
-            dst.z = src[2];
-            dst.w = src[3];
+            dst.getVector4aRw().loadua(src);
         }
 
         template<>
         inline void copyMat4<F32, mat4>(F32* src, mat4& dst)
         {
-            dst = glm::make_mat4(src);
+            dst.loadu(src);
         }
 
         //=========================================================================================================
@@ -774,22 +771,51 @@ namespace LL
             return true;
         }
 
+        // count floats from a JSON array into dst, or false leaving dst alone
+        template<U32 count>
+        inline bool copy_floats(const Value& src, F32* dst)
+        {
+            simdjson::dom::array arr;
+            if (src.get_array().get(arr) == simdjson::SUCCESS && arr.size() == count)
+            {
+                // populate a temporary local in case we hit an error in the
+                // middle of the array (don't partially write the destination)
+                F32 t[count];
+                for (U32 i = 0; i < count; ++i)
+                {
+                    if (!to_float(arr.at(i).value_unsafe(), t[i]))
+                    {
+                        return false;
+                    }
+                }
+                for (U32 i = 0; i < count; ++i)
+                {
+                    dst[i] = t[i];
+                }
+                return true;
+            }
+            return false;
+        }
+
+        inline void write_floats(const F32* src, U32 count, JsonWriter& dst)
+        {
+            dst.startArray();
+            for (U32 i = 0; i < count; ++i)
+            {
+                dst.value(src[i]);
+            }
+            dst.endArray();
+        }
+
         // vec4
         template<>
         inline bool copy(const Value& src, vec4& dst)
         {
-            simdjson::dom::array arr;
-            if (src.get_array().get(arr) == simdjson::SUCCESS && arr.size() == 4)
+            F32 v[4];
+            if (copy_floats<4>(src, v))
             {
-                vec4 v;
-                if (to_float(arr.at(0).value_unsafe(), v.x) &&
-                    to_float(arr.at(1).value_unsafe(), v.y) &&
-                    to_float(arr.at(2).value_unsafe(), v.z) &&
-                    to_float(arr.at(3).value_unsafe(), v.w))
-                {
-                    dst = v;
-                    return true;
-                }
+                dst.loadua(v);
+                return true;
             }
             return false;
         }
@@ -797,12 +823,7 @@ namespace LL
         template<>
         inline bool write(const vec4& src, JsonWriter& dst)
         {
-            dst.startArray();
-            dst.value(src.x);
-            dst.value(src.y);
-            dst.value(src.z);
-            dst.value(src.w);
-            dst.endArray();
+            write_floats(src.getF32ptr(), 4, dst);
             return true;
         }
 
@@ -810,18 +831,11 @@ namespace LL
         template<>
         inline bool copy(const Value& src, quat& dst)
         {
-            simdjson::dom::array arr;
-            if (src.get_array().get(arr) == simdjson::SUCCESS && arr.size() == 4)
+            F32 q[4];
+            if (copy_floats<4>(src, q))
             {
-                quat q;
-                if (to_float(arr.at(0).value_unsafe(), q.x) &&
-                    to_float(arr.at(1).value_unsafe(), q.y) &&
-                    to_float(arr.at(2).value_unsafe(), q.z) &&
-                    to_float(arr.at(3).value_unsafe(), q.w))
-                {
-                    dst = q;
-                    return true;
-                }
+                dst.getVector4aRw().loadua(q);
+                return true;
             }
             return false;
         }
@@ -829,12 +843,7 @@ namespace LL
         template<>
         inline bool write(const quat& src, JsonWriter& dst)
         {
-            dst.startArray();
-            dst.value(src.x);
-            dst.value(src.y);
-            dst.value(src.z);
-            dst.value(src.w);
-            dst.endArray();
+            write_floats(src.getVector4a().getF32ptr(), 4, dst);
             return true;
         }
 
@@ -843,29 +852,13 @@ namespace LL
         template<>
         inline bool copy(const Value& src, vec3& dst)
         {
-            simdjson::dom::array arr;
-            if (src.get_array().get(arr) == simdjson::SUCCESS && arr.size() == 3)
-            {
-                vec3 t;
-                if (to_float(arr.at(0).value_unsafe(), t.x) &&
-                    to_float(arr.at(1).value_unsafe(), t.y) &&
-                    to_float(arr.at(2).value_unsafe(), t.z))
-                {
-                    dst = t;
-                    return true;
-                }
-            }
-            return false;
+            return copy_floats<3>(src, dst.mV);
         }
 
         template<>
         inline bool write(const vec3& src, JsonWriter& dst)
         {
-            dst.startArray();
-            dst.value(src.x);
-            dst.value(src.y);
-            dst.value(src.z);
-            dst.endArray();
+            write_floats(src.mV, 3, dst);
             return true;
         }
 
@@ -873,28 +866,13 @@ namespace LL
         template<>
         inline bool copy(const Value& src, vec2& dst)
         {
-            simdjson::dom::array arr;
-            if (src.get_array().get(arr) == simdjson::SUCCESS && arr.size() == 2)
-            {
-                vec2 t;
-                if (to_float(arr.at(0).value_unsafe(), t.x) &&
-                    to_float(arr.at(1).value_unsafe(), t.y))
-                {
-                    dst = t;
-                    return true;
-                }
-            }
-            return false;
+            return copy_floats<2>(src, dst.mV);
         }
 
         template<>
         inline bool write(const vec2& src, JsonWriter& dst)
         {
-            dst.startArray();
-            dst.value(src.x);
-            dst.value(src.y);
-            dst.endArray();
-
+            write_floats(src.mV, 2, dst);
             return true;
         }
 
@@ -1038,41 +1016,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, mat4& dst)
         {
-            simdjson::dom::array arr;
-            if (src.get_array().get(arr) == simdjson::SUCCESS && arr.size() == 16)
+            F32 m[16];
+            if (copy_floats<16>(src, m))
             {
-                // populate a temporary local in case
-                // we hit an error in the middle of the array
-                // (don't partially write a matrix)
-                mat4 t;
-                F32* p = glm::value_ptr(t);
-
-                U32 i = 0;
-                for (const Value& v : arr)
-                {
-                    if (!to_float(v, p[i++]))
-                    {
-                        return false;
-                    }
-                }
-
-                dst = t;
+                dst.loadu(m);
                 return true;
             }
-
             return false;
         }
 
         template<>
         inline bool write(const mat4& src, JsonWriter& dst)
         {
-            dst.startArray();
-            const F32* p = glm::value_ptr(src);
-            for (U32 i = 0; i < 16; ++i)
-            {
-                dst.value(p[i]);
-            }
-            dst.endArray();
+            write_floats(src.getF32ptr(), 16, dst);
             return true;
         }
 

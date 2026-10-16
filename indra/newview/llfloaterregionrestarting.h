@@ -31,21 +31,23 @@
 #include "lltextbox.h"
 #include "lleventtimer.h"
 
-class LLFloaterRegionRestarting : public LLFloater,  public LLEventTimer
+class LLFloaterRegionRestarting final : public LLFloater,  public LLEventTimer
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterRegionRestarting, LLFloater);
+
     static void close();
     static void updateTime(S32 time);
 
 private:
     LLFloaterRegionRestarting(const LLSD& key);
     virtual ~LLFloaterRegionRestarting();
-    virtual bool postBuild();
-    virtual bool tick();
-    virtual void refresh();
-    virtual void draw();
+    virtual bool postBuild() override;
+    virtual bool tick() override;
+    virtual void refresh() override;
+    virtual void draw() override;
     virtual void regionChange();
 
     std::string mName;

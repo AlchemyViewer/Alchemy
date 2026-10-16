@@ -40,6 +40,8 @@ class ALFloaterWebProfile final
 {
     LOG_CLASS(ALFloaterWebProfile);
 public:
+    AL_VIEW_TYPE(ALFloaterWebProfile, LLFloaterWebContent);
+
     typedef LLFloaterWebContent::Params Params;
 
     ALFloaterWebProfile(const Params& key);

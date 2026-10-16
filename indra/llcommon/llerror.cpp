@@ -329,7 +329,9 @@ namespace {
 
         virtual bool enabled() override
         {
-            return LLError::getEnabledLogTypesMask() & 0x10;
+            // debugger_print() is a no-op without a debugger, but every enabled
+            // recorder is handed a freshly formatted copy of each line first.
+            return (LLError::getEnabledLogTypesMask() & 0x10) && IsDebuggerPresent();
         }
 
         virtual void recordMessage(LLError::ELevel level,
@@ -521,7 +523,9 @@ namespace
     typedef std::vector<LLError::RecorderPtr> Recorders;
     typedef std::vector<LLError::CallSite*> CallSiteVector;
 
-    class SettingsConfig : public LLRefCount
+    // Held by every thread that logs, some of them without the log's lock,
+    // so counted atomically.
+    class SettingsConfig : public LLThreadSafeRefCount
     {
         friend class Globals;
 
@@ -555,7 +559,7 @@ namespace
     typedef LLPointer<SettingsConfig> SettingsConfigPtr;
 
     SettingsConfig::SettingsConfig()
-        : LLRefCount(),
+        : LLThreadSafeRefCount(),
         mDefaultLevel(LLError::LEVEL_DEBUG),
         mLogAlwaysFlush(true),
         mEnabledLogTypesMask(255),
@@ -672,8 +676,7 @@ namespace LLError
         mLine(line),
         mClassInfo(class_info),
         mFunction(function),
-        mCached(false),
-        mShouldLog(false),
+        mCached(UNDECIDED),
         mPrintOnce(printOnce),
         mTags(new const char* [tag_count]),
         mTagCount(tag_count)
@@ -728,7 +731,7 @@ namespace LLError
 
     void CallSite::invalidate()
     {
-        mCached = false;
+        mCached.store(UNDECIDED, std::memory_order_relaxed);
     }
 }
 
@@ -1332,12 +1335,6 @@ namespace {
         static LL_PROFILE_MUTEX_NAMED(std::recursive_mutex, sLogMutex, "Log Mutex");
         return &sLogMutex;
     }
-    auto getStacksMutex()
-    {
-        // guaranteed to be initialized the first time control reaches here
-        static LL_PROFILE_MUTEX_NAMED(std::recursive_mutex, sStacksMutex, "Stacks Mutex");
-        return &sStacksMutex;
-    }
 
     bool checkLevelMap(const LevelMap& map, const std::string& key,
                         LLError::ELevel& level)
@@ -1422,9 +1419,10 @@ namespace LLError
             ? checkLevelMap(s->mTagLevelMap, site.mTags, site.mTagCount, compareLevel)
             : false);
 
-        site.mCached = true;
+        const bool should_log = site.mLevel >= compareLevel;
+        site.mCached.store(should_log ? CallSite::LOGS : CallSite::SILENT, std::memory_order_relaxed);
         g->addCallSite(site);
-        return site.mShouldLog = site.mLevel >= compareLevel;
+        return should_log;
     }
 
 
@@ -1557,90 +1555,6 @@ namespace LLError
 
 namespace LLError
 {
-    LLCallStacks::StringVector LLCallStacks::sBuffer ;
-
-    //static
-    void LLCallStacks::push(const char* function, const int line)
-    {
-        std::unique_lock lock(*getStacksMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getStacksMutex());
-        if (!lock)
-        {
-            return;
-        }
-
-        if(sBuffer.size() > 511)
-        {
-            clear() ;
-        }
-
-        std::ostringstream out;
-        insert(out, function, line);
-        sBuffer.push_back(out.str());
-    }
-
-    //static
-    void LLCallStacks::insert(std::ostream& out, const char* function, const int line)
-    {
-        out << function << " line " << line << " " ;
-    }
-
-    //static
-    void LLCallStacks::end(const std::ostringstream& out)
-    {
-        std::unique_lock lock(*getStacksMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getStacksMutex());
-        if (!lock)
-        {
-            return;
-        }
-
-        if(sBuffer.size() > 511)
-        {
-            clear() ;
-        }
-
-        sBuffer.push_back(out.str());
-    }
-
-    //static
-    void LLCallStacks::print()
-    {
-        std::unique_lock lock(*getStacksMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getStacksMutex());
-        if (!lock)
-        {
-            return;
-        }
-
-        if(! sBuffer.empty())
-        {
-            LL_INFOS() << " ************* PRINT OUT LL CALL STACKS ************* " << LL_ENDL;
-            for (StringVector::const_reverse_iterator ri(sBuffer.rbegin()), re(sBuffer.rend());
-                 ri != re; ++ri)
-            {
-                LL_INFOS() << (*ri) << LL_ENDL;
-            }
-            LL_INFOS() << " *************** END OF LL CALL STACKS *************** " << LL_ENDL;
-        }
-
-        cleanup();
-    }
-
-    //static
-    void LLCallStacks::clear()
-    {
-        sBuffer.clear();
-    }
-
-    //static
-    void LLCallStacks::cleanup()
-    {
-        clear();
-    }
-
-    std::ostream& operator<<(std::ostream& out, const LLStacktrace&)
-    {
-        return out << boost::stacktrace::stacktrace();
-    }
-
     // LLOutOfMemoryWarning
     std::string LLUserWarningMsg::sLocalizedOutOfMemoryTitle;
     std::string LLUserWarningMsg::sLocalizedOutOfMemoryWarning;

@@ -135,7 +135,7 @@ void ALFloaterRegionTracker::refresh()
             {
                 maturity.value(info->getAccessIcon());
 
-                info->updateAgentCount(LLTimer::getElapsedSeconds());
+                info->updateAgentCount(LLTimer::getUptimeSeconds());
                 S32 agent_count = info->getAgentCount();
                 if (info->isDown())
                 {
@@ -190,7 +190,7 @@ void ALFloaterRegionTracker::requestRegionData()
         const auto& name = it->first;
         if (LLSimInfo* info = LLWorldMap::getInstance()->simInfoFromName(name))
         {
-            info->updateAgentCount(LLTimer::getElapsedSeconds());
+            info->updateAgentCount(LLTimer::getUptimeSeconds());
         }
         else
         {

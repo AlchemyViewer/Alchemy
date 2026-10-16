@@ -71,6 +71,10 @@ void HttpRequestQueue::term()
 
 HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op, bool loggable /* = true */)
 {
+    // The op's handle is made before the worker can see the op. Made as the
+    // caller asks for it afterwards, the worker could be making it too.
+    op->getHandle();
+
     bool wake(false);
     {
         HttpScopedLock lock(mQueueMutex);

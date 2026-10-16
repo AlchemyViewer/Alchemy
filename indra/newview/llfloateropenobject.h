@@ -37,11 +37,12 @@
 class LLObjectSelection;
 class LLPanelObjectInventory;
 
-class LLFloaterOpenObject
+class LLFloaterOpenObject final
 : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterOpenObject, LLFloater);
 
     void dirty();
 
@@ -55,10 +56,10 @@ public:
 
 protected:
 
-    /*virtual*/ bool    postBuild();
-    void refresh();
-    void draw();
-    virtual void onOpen(const LLSD& key);
+    /*virtual*/ bool    postBuild() override;
+    void refresh() override;
+    void draw() override;
+    virtual void onOpen(const LLSD& key) override;
 
     void moveToInventory(bool wear, bool replace = false);
 

@@ -258,7 +258,7 @@ void LLPanelProfileClassifieds::selectClassified(const LLUUID& classified_id, bo
     {
         for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
         {
-            LLPanelProfileClassified* classified_panel = dynamic_cast<LLPanelProfileClassified*>(mTabContainer->getPanelByIndex(tab_idx));
+            LLPanelProfileClassified* classified_panel = ALViewType::as<LLPanelProfileClassified>(mTabContainer->getPanelByIndex(tab_idx));
             if (classified_panel)
             {
                 if (classified_panel->getClassifiedId() == classified_id)
@@ -328,7 +328,7 @@ void LLPanelProfileClassifieds::onClickNewBtn()
 
 void LLPanelProfileClassifieds::onClickDelete()
 {
-    LLPanelProfileClassified* classified_panel = dynamic_cast<LLPanelProfileClassified*>(mTabContainer->getCurrentPanel());
+    LLPanelProfileClassified* classified_panel = ALViewType::as<LLPanelProfileClassified>(mTabContainer->getCurrentPanel());
     if (classified_panel)
     {
         LLUUID classified_id = classified_panel->getClassifiedId();
@@ -351,10 +351,12 @@ void LLPanelProfileClassifieds::callbackDeleteClassified(const LLSD& notificatio
         LLUUID classified_id = notification["payload"]["classified_id"].asUUID();
         S32 tab_idx = notification["payload"]["tab_idx"].asInteger();
 
-        LLPanelProfileClassified* classified_panel = dynamic_cast<LLPanelProfileClassified*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfileClassified* classified_panel = ALViewType::as<LLPanelProfileClassified>(mTabContainer->getPanelByIndex(tab_idx));
         if (classified_panel && classified_panel->getClassifiedId() == classified_id)
         {
+            // Let go by its tab, and kept by nothing else.
             mTabContainer->removeTabPanel(classified_panel);
+            classified_panel->die();
         }
 
         if (classified_id.notNull())
@@ -454,7 +456,7 @@ void LLPanelProfileClassifieds::processProperties(void* data, EAvatarProcessorTy
 void LLPanelProfileClassifieds::resetData()
 {
     resetLoading();
-    mTabContainer->deleteAllTabs();
+    mTabContainer->deleteAllTabs(true);
 }
 
 void LLPanelProfileClassifieds::updateButtons()
@@ -484,7 +486,7 @@ bool LLPanelProfileClassifieds::hasNewClassifieds()
 {
     for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
     {
-        LLPanelProfileClassified* classified_panel = dynamic_cast<LLPanelProfileClassified*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfileClassified* classified_panel = ALViewType::as<LLPanelProfileClassified>(mTabContainer->getPanelByIndex(tab_idx));
         if (classified_panel && classified_panel->isNew())
         {
             return true;
@@ -497,7 +499,7 @@ bool LLPanelProfileClassifieds::hasUnsavedChanges()
 {
     for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
     {
-        LLPanelProfileClassified* classified_panel = dynamic_cast<LLPanelProfileClassified*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfileClassified* classified_panel = ALViewType::as<LLPanelProfileClassified>(mTabContainer->getPanelByIndex(tab_idx));
         if (classified_panel && classified_panel->isDirty()) // includes 'new'
         {
             return true;
@@ -522,7 +524,7 @@ void LLPanelProfileClassifieds::commitUnsavedChanges()
     {
         for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
         {
-            LLPanelProfileClassified* classified_panel = dynamic_cast<LLPanelProfileClassified*>(mTabContainer->getPanelByIndex(tab_idx));
+            LLPanelProfileClassified* classified_panel = ALViewType::as<LLPanelProfileClassified>(mTabContainer->getPanelByIndex(tab_idx));
             if (classified_panel && classified_panel->isDirty() && !classified_panel->isNew())
             {
                 classified_panel->doSave();
@@ -1504,7 +1506,7 @@ void LLPanelProfileClassified::onTextureSelected()
 void LLPanelProfileClassified::updateTabLabel(const std::string& title)
 {
     setLabel(title);
-    LLTabContainer* parent = dynamic_cast<LLTabContainer*>(getParent());
+    LLTabContainer* parent = getParentAs<LLTabContainer>();
     if (parent)
     {
         parent->setCurrentTabName(title);

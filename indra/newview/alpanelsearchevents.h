@@ -36,9 +36,11 @@
 class LLComboBox;
 class LLSearchEditor;
 
-class ALPanelSearchEvents : public ALPanelSearch
+class ALPanelSearchEvents final : public ALPanelSearch
 {
 public:
+    AL_VIEW_TYPE(ALPanelSearchEvents, ALPanelSearch);
+
     ALPanelSearchEvents();
     bool postBuild() override;
 

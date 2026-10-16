@@ -56,6 +56,8 @@ class LLFloaterIMSessionTab
 // [/RLVa:KB]
 
 public:
+    AL_VIEW_TYPE(LLFloaterIMSessionTab, LLTransientDockableFloater);
+
     LOG_CLASS(LLFloaterIMSessionTab);
 
     LLFloaterIMSessionTab(const LLSD& session_id);
@@ -170,7 +172,7 @@ public:
     static void applyMUPose(std::string& text);
     static void applyOOCClose(std::string& text);
 
-    void updateUsedEmojis(LLWStringView text);
+    void updateUsedEmojis(std::string_view text);
 
 protected:
     S32  mFloaterExtraWidth;

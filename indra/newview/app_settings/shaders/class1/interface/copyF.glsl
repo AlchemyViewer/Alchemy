@@ -29,13 +29,20 @@ in vec2 tc;
 uniform sampler2D depthMap;
 #endif
 
+// DEPTH_ONLY copies depth alone, drawn with colour writes off: no colour is read.
+#if !defined(DEPTH_ONLY)
 uniform sampler2D diffuseMap;
+#endif
 
 out vec4 frag_color;
 
 void main()
 {
+#if defined(DEPTH_ONLY)
+    frag_color = vec4(0.0);
+#else
     frag_color = texture(diffuseMap, tc);
+#endif
 #if defined(COPY_DEPTH)
     // Reverse-Z neutral: copies the raw stored depth value verbatim, no convention math.
     gl_FragDepth = texture(depthMap, tc).r;

@@ -23,7 +23,6 @@
 	<text name="maturity_desired_prompt">
 		Je veux accéder au contenu classé :
 	</text>
-	<text name="maturity_desired_textbox"/>
 	<combo_box name="maturity_desired_combobox">
 		<combo_box.item label="Général, Modéré, Adulte" name="Desired_Adult"/>
 		<combo_box.item label="Général et Modéré" name="Desired_Mature"/>
@@ -43,7 +42,6 @@
 	</radio_group>
 	<check_box label="Mon nom" name="show_my_name_checkbox1"/>
 	<check_box label="Noms d&apos;utilisateur" name="show_slids" tool_tip="Afficher le nom d&apos;utilisateur, comme bobsmith123."/>
-	<check_box label="Titres de groupe" name="show_all_title_checkbox1" tool_tip="Afficher les titres de groupe, comme Officier ou Membre."/>
 	<check_box label="Mettre mes amis en surbrillance" name="show_friends" tool_tip="Mettre en surbrillance l&apos;affichage des noms de vos amis."/>
 	<check_box label="Voir les noms d&apos;affichage" name="display_names_check" tool_tip="Cocher pour utiliser les noms d&apos;affichage dans les chats, les IM, l&apos;affichage des noms, etc."/>
 	<text name="inworld_typing_rg_label">

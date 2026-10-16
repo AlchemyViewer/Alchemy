@@ -28,8 +28,10 @@
 
 #define LLVIEWERCAMERA_CPP
 #include "llviewercamera.h"
+#include "pipeline.h"
 
 // Viewer includes
+#include "alfarplane.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llmatrix4a.h"
@@ -63,9 +65,32 @@ LLTrace::CountStatHandle<> LLViewerCamera::sAngularVelocityStat("camera_angular_
 
 LLViewerCamera::eCameraID LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
 
+namespace
+{
+    LLCamera& current_camera()
+    {
+        static LLCamera camera;
+        return camera;
+    }
+}
+
+//static
+const LLCamera& LLViewerCamera::getCurrent()
+{
+    return current_camera();
+}
+
+//static
+void LLViewerCamera::setCurrent(const LLCamera& camera)
+{
+    current_camera() = camera;
+}
+
 LLViewerCamera::LLViewerCamera() : LLCamera()
 {
-    calcProjection(getFar());
+    mLastModelview.setIdentity();
+    mDeltaModelview.setIdentity();
+    mInverseDeltaModelview.setIdentity();
     mCameraFOVDefault = DEFAULT_FIELD_OF_VIEW;
     mPrevCameraFOVDefault = DEFAULT_FIELD_OF_VIEW;
     mSavedFOVDefault = DEFAULT_FIELD_OF_VIEW;
@@ -166,40 +191,25 @@ bool LLViewerCamera::updateCameraLocation(const LLVector3 &center, const LLVecto
     return true;
 }
 
-const LLMatrix4 &LLViewerCamera::getProjection() const
+// Deliberately not reverse-Z, and every consumer must keep it that way: the
+// manipulators sort what they project with it nearest first, and a reversed
+// z would sort them the other way round.
+LLMatrix4a LLViewerCamera::getForwardZProjection() const
 {
-    calcProjection(getFar());
-    return mProjectionMatrix;
+    return LLMatrix4a::perspective(getView(), getAspect(), getNear(), getFar());
 }
 
-const LLMatrix4 &LLViewerCamera::getModelview() const
+void LLViewerCamera::calcDeltaModelview()
 {
-    LLMatrix4 cfr(OGL_TO_CFR_ROTATION);
-    getMatrixToLocal(mModelviewMatrix);
-    mModelviewMatrix *= cfr;
-    return mModelviewMatrix;
+    // from the last frame's eye space back to world, then into this frame's
+    mDeltaModelview.setInverse(mLastModelview);
+    mDeltaModelview.setMul(mDeltaModelview, mModelview);
+    mInverseDeltaModelview.setInverse(mDeltaModelview);
 }
 
-// CPU-side [-1,1] projection cache used by getProjection(). Deliberately NOT reverse-Z, and
-// every consumer must keep it that way: this matrix is only ever used for screen-xy
-// hit-testing and self-relative nearest-first z sorting among points it projected itself.
-// Nothing may compare its z against a GL depth-buffer sample -- that is what the reverse-Z
-// aware al_project / al_unproject are for. Leaving it forward keeps that math byte-identical.
-void LLViewerCamera::calcProjection(const F32 far_distance) const
+void LLViewerCamera::rememberModelview()
 {
-    F32 fov_y = getView();
-    F32 z_far = far_distance;
-    F32 z_near = getNear();
-    F32 aspect = getAspect();
-
-    F32 f = 1 / tan(fov_y * 0.5f);
-
-    mProjectionMatrix.setZero();
-    mProjectionMatrix.mMatrix[0][0] = f/aspect;
-    mProjectionMatrix.mMatrix[1][1] = f;
-    mProjectionMatrix.mMatrix[2][2] = (z_far + z_near)/(z_near - z_far);
-    mProjectionMatrix.mMatrix[3][2] = (2*z_far*z_near)/(z_near - z_far);
-    mProjectionMatrix.mMatrix[2][3] = -1;
+    mLastModelview = mModelview;
 }
 
 // Sets up opengl state for 3D drawing.  If for selection, also
@@ -210,59 +220,52 @@ void LLViewerCamera::calcProjection(const F32 far_distance) const
 //static
 void LLViewerCamera::updateFrustumPlanes(LLCamera& camera, bool ortho, bool zflip, bool no_hacks)
 {
-    glm::ivec4 viewport = glm::make_vec4((GLint*) gGLViewport);
-    glm::mat4 model = get_current_modelview();
-    glm::mat4 proj = get_current_projection();
+    const S32* viewport = gGLViewport;
 
-    LLVector3 frust[8];
+    // the camera inverted once for the eight corners
+    LLMatrix4a inverse;
+    inverse.setMul(camera.getModelview(), camera.getProjection());
+    inverse.invert();
 
     // Near-plane corners unproject at al_window_near() (0 forward, 1 reverse-Z), far at
     // al_window_far(); al_unproject uses the ZO variant under reverse-Z. frust[0..3]=near,
-    // frust[4..7]=far in every branch below, unchanged.
+    // frust[4..7]=far in every branch below.
     const F32 win_near = al_window_near();
-    const F32 win_far  = al_window_far();
+    // An infinite projection has no far plane to unproject, so its far corners are taken at
+    // MAX_RECONSTRUCT_DISTANCE; the callers that use them (shadow cascades) only need their direction.
+    const F32 win_far  = ALFarPlane::frustumFarWindowDepth(al_projection_is_infinite(camera.getProjection()), camera.getNear(), al_window_far());
 
-    glm::vec3 obj;
-    if (no_hacks)
+    const F32 x0 = F32(viewport[0]);
+    const F32 x1 = F32(viewport[0] + viewport[2]);
+    const F32 y0 = F32(viewport[1]);
+    const F32 y1 = F32(viewport[1] + viewport[3]);
+    // the window's corners round from the bottom left, or from the top left
+    // when the view is flipped
+    const F32 corners[2][4][2] = {
+        { { x0, y0 }, { x1, y0 }, { x1, y1 }, { x0, y1 } },
+        { { x0, y1 }, { x1, y1 }, { x1, y0 }, { x0, y0 } },
+    };
+    const bool flipped = zflip && !no_hacks;
+    const F32 (*at)[2] = corners[flipped ? 1 : 0];
+
+    LLVector3 frust[8];
+    for (U32 i = 0; i < 4; i++)
     {
-        obj = al_unproject(glm::vec3(viewport[0], viewport[1], win_near), model, proj, viewport);
-        frust[0].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0]+viewport[2],viewport[1], win_near),model,proj,viewport);
-        frust[1].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0]+viewport[2],viewport[1]+viewport[3], win_near),model,proj,viewport);
-        frust[2].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0],viewport[1]+viewport[3], win_near),model,proj,viewport);
-        frust[3].setVec(glm::value_ptr(obj));
-
-        obj = al_unproject(glm::vec3(viewport[0],viewport[1], win_far),model,proj,viewport);
-        frust[4].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0]+viewport[2],viewport[1], win_far),model,proj,viewport);
-        frust[5].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0]+viewport[2],viewport[1]+viewport[3], win_far),model,proj,viewport);
-        frust[6].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0],viewport[1]+viewport[3], win_far),model,proj,viewport);
-        frust[7].setVec(glm::value_ptr(obj));
+        const LLVector4a obj = al_unproject(LLVector4a(at[i][0], at[i][1], win_near, 1.f), inverse, viewport);
+        frust[i].set(obj.getF32ptr());
     }
-    else if (zflip)
+
+    if (no_hacks || flipped)
     {
-        obj = al_unproject(glm::vec3(viewport[0],viewport[1]+viewport[3], win_near),model,proj,viewport);
-        frust[0].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0]+viewport[2],viewport[1]+viewport[3], win_near),model,proj,viewport);
-        frust[1].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0]+viewport[2],viewport[1], win_near),model,proj,viewport);
-        frust[2].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0],viewport[1], win_near),model,proj,viewport);
-        frust[3].setVec(glm::value_ptr(obj));
+        for (U32 i = 0; i < 4; i++)
+        {
+            const LLVector4a obj = al_unproject(LLVector4a(at[i][0], at[i][1], win_far, 1.f), inverse, viewport);
+            frust[i+4].set(obj.getF32ptr());
+        }
+    }
 
-        obj = al_unproject(glm::vec3(viewport[0],viewport[1]+viewport[3], win_far),model,proj,viewport);
-        frust[4].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0]+viewport[2],viewport[1]+viewport[3], win_far),model,proj,viewport);
-        frust[5].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0]+viewport[2],viewport[1], win_far),model,proj,viewport);
-        frust[6].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0],viewport[1], win_far),model,proj,viewport);
-        frust[7].setVec(glm::value_ptr(obj));
-
+    if (flipped)
+    {
         for (U32 i = 0; i < 4; i++)
         {
             frust[i+4] = frust[i+4]-frust[i];
@@ -270,17 +273,8 @@ void LLViewerCamera::updateFrustumPlanes(LLCamera& camera, bool ortho, bool zfli
             frust[i+4] = frust[i] + frust[i+4]*camera.getFar();
         }
     }
-    else
+    else if (!no_hacks)
     {
-        obj = al_unproject(glm::vec3(viewport[0],viewport[1], win_near),model,proj,viewport);
-        frust[0].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0]+viewport[2],viewport[1], win_near),model,proj,viewport);
-        frust[1].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0]+viewport[2],viewport[1]+viewport[3], win_near),model,proj,viewport);
-        frust[2].setVec(glm::value_ptr(obj));
-        obj = al_unproject(glm::vec3(viewport[0],viewport[1]+viewport[3], win_near),model,proj,viewport);
-        frust[3].setVec(glm::value_ptr(obj));
-
         if (ortho)
         {
             LLVector3 far_shift = camera.getAtAxis()*camera.getFar()*2.f;
@@ -326,19 +320,19 @@ void LLViewerCamera::setPerspective(bool for_selection,
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.loadIdentity();
 
-    glm::mat4 proj_mat = glm::identity<glm::mat4>();
+    LLMatrix4a proj_mat = LLMatrix4a::identity();
 
     if (for_selection)
     {
         // make a tiny little viewport
         // anything drawn into this viewport will be "selected"
 
-        glm::ivec4 viewport(gViewerWindow->getWorldViewRectRaw().mLeft,
+        const S32 viewport[4] = { gViewerWindow->getWorldViewRectRaw().mLeft,
             gViewerWindow->getWorldViewRectRaw().mBottom,
             gViewerWindow->getWorldViewRectRaw().getWidth(),
-            gViewerWindow->getWorldViewRectRaw().getHeight());
+            gViewerWindow->getWorldViewRectRaw().getHeight() };
 
-        proj_mat = glm::pickMatrix(glm::vec2(x + width / 2.f, y_from_bot + height / 2.f), glm::vec2((GLfloat)width, (GLfloat)height), viewport);
+        proj_mat = LLMatrix4a::pick(x + width / 2.f, y_from_bot + height / 2.f, (F32)width, (F32)height, viewport);
 
         if (limit_select_distance)
         {
@@ -357,10 +351,12 @@ void LLViewerCamera::setPerspective(bool for_selection,
     }
     else
     {
-        // Only override the far clip if it's not passed in explicitly.
+        // Only override the far clip if it's not passed in explicitly; the previews that name none get
+        // a finite plane well past anything they show.
         if (z_default_far)
         {
-            z_far = MAX_FAR_CLIP;
+            constexpr F32 PREVIEW_FAR = 512.f;
+            z_far = PREVIEW_FAR;
         }
         glViewport(x, y_from_bot, width, height);
         gGLViewport[0] = x;
@@ -375,36 +371,25 @@ void LLViewerCamera::setPerspective(bool for_selection,
         int pos_y = mZoomSubregion / llceil(mZoomFactor);
         int pos_x = mZoomSubregion - (pos_y * llceil(mZoomFactor));
 
-        glm::mat4 translate;
-        translate = glm::translate(glm::vec3(offset - (F32)pos_x * 2.f, offset - (F32)pos_y * 2.f, 0.f));
-        glm::mat4 scale;
-        scale = glm::scale(glm::vec3(mZoomFactor, mZoomFactor, 1.f));
-
-        proj_mat = scale * proj_mat;
-        proj_mat = translate * proj_mat;
+        // the subregion scaled up, then moved into place: after the pick, before the
+        // perspective
+        proj_mat.setMul(proj_mat, LLMatrix4a::scaling(mZoomFactor, mZoomFactor, 1.f));
+        proj_mat.setMul(proj_mat, LLMatrix4a::translation(offset - (F32)pos_x * 2.f, offset - (F32)pos_y * 2.f, 0.f));
     }
 
-    calcProjection(z_far); // Update the projection matrix cache
-
     // al_perspective emits reversed-ZO under reverse-Z; pick/zoom above touch xy only, so
-    // composing them ahead of the reversed z-row is correct. Forward branch == glm::perspective.
-    proj_mat *= al_perspective(fov_y, aspect, z_near, z_far);
+    // composing them ahead of the reversed z-row is correct. The perspective applies first.
+    proj_mat.setMul(al_perspective(fov_y, aspect, z_near, z_far), proj_mat);
 
-    gGL.loadMatrix(glm::value_ptr(proj_mat));
+    gGL.loadMatrix(proj_mat);
 
-    set_current_projection(proj_mat);
+    mProjection = proj_mat;
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
 
-    glm::mat4 modelview(glm::make_mat4((GLfloat*)OGL_TO_CFR_ROTATION));
+    const LLMatrix4a modelview = frameModelview();
 
-    GLfloat         ogl_matrix[16];
-
-    getOpenGLTransform(ogl_matrix);
-
-    modelview *= glm::make_mat4(ogl_matrix);
-
-    gGL.loadMatrix(glm::value_ptr(modelview));
+    gGL.loadMatrix(modelview);
 
     if (for_selection && (width > 1 || height > 1))
     {
@@ -418,22 +403,23 @@ void LLViewerCamera::setPerspective(bool for_selection,
 
     }
 
-    // if not picking and not doing a snapshot, cache various GL matrices
+    // if not picking and not doing a snapshot, keep the modelview; the
+    // projection is kept either way, so the frustum below is the pick's
     if (!for_selection && mZoomFactor == 1.f)
     {
-        // Save GL matrices for access elsewhere in code, especially project_world_to_screen
-        set_current_modelview(modelview);
+        mModelview = modelview;
     }
 
     updateFrustumPlanes(*this);
+    setCurrent(*this);
 }
 
-// Uses the last GL matrices set in set_perspective to project a point from
-// screen coordinates to the agent's region.
+// Uses the current camera's matrices to project a point from screen
+// coordinates to the agent's region.
 void LLViewerCamera::projectScreenToPosAgent(const S32 screen_x, const S32 screen_y, LLVector3* pos_agent) const
 {
-    glm::vec3 agent_coord = al_unproject(glm::vec3(screen_x, screen_y, al_window_near()), get_current_modelview(), get_current_projection(), glm::make_vec4(gGLViewport));
-    pos_agent->setVec( (F32)agent_coord.x, (F32)agent_coord.y, (F32)agent_coord.z );
+    const LLVector4a agent_coord = al_unproject(LLVector4a((F32)screen_x, (F32)screen_y, al_window_near(), 1.f), getCurrent().getModelview(), getCurrent().getProjection(), gGLViewport);
+    pos_agent->set(agent_coord.getF32ptr());
 }
 
 // Uses the last GL matrices set in set_perspective to project a point from
@@ -459,20 +445,20 @@ bool LLViewerCamera::projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoord
     }
 
     LLRect world_view_rect = gViewerWindow->getWorldViewRectRaw();
-    glm::ivec4 viewport(world_view_rect.mLeft, world_view_rect.mBottom, world_view_rect.getWidth(), world_view_rect.getHeight());
-    glm::vec3 win_coord = al_project(glm::vec3(pos_agent), get_current_modelview(), get_current_projection(), viewport);
+    const S32 viewport[4] = { world_view_rect.mLeft, world_view_rect.mBottom, world_view_rect.getWidth(), world_view_rect.getHeight() };
+    LLVector3 win_coord(al_project(LLVector4a(pos_agent.mV[0], pos_agent.mV[1], pos_agent.mV[2], 1.f), getCurrent().getModelview(), getCurrent().getProjection(), viewport).getF32ptr());
 
     {
         // convert screen coordinates to virtual UI coordinates
-        win_coord.x /= gViewerWindow->getDisplayScale().mV[VX];
-        win_coord.y /= gViewerWindow->getDisplayScale().mV[VY];
+        win_coord.mV[VX] /= gViewerWindow->getDisplayScale().mV[VX];
+        win_coord.mV[VY] /= gViewerWindow->getDisplayScale().mV[VY];
 
         // should now have the x,y coords of grab_point in screen space
         LLRect world_rect = gViewerWindow->getWorldViewRectScaled();
 
         // convert to pixel coordinates
-        S32 int_x = lltrunc(win_coord.x);
-        S32 int_y = lltrunc(win_coord.y);
+        S32 int_x = lltrunc(win_coord.mV[VX]);
+        S32 int_y = lltrunc(win_coord.mV[VY]);
 
         bool valid = true;
 
@@ -553,32 +539,32 @@ bool LLViewerCamera::projectPosAgentToScreenEdge(const LLVector3 &pos_agent,
 
     LLRect world_view_rect = gViewerWindow->getWorldViewRectRaw();
 
-    glm::ivec4 viewport(world_view_rect.mLeft, world_view_rect.mBottom, world_view_rect.getWidth(), world_view_rect.getHeight());
-    glm::vec3 win_coord = al_project(glm::vec3(pos_agent), get_current_modelview(), get_current_projection(), viewport);
+    const S32 viewport[4] = { world_view_rect.mLeft, world_view_rect.mBottom, world_view_rect.getWidth(), world_view_rect.getHeight() };
+    LLVector3 win_coord(al_project(LLVector4a(pos_agent.mV[0], pos_agent.mV[1], pos_agent.mV[2], 1.f), getCurrent().getModelview(), getCurrent().getProjection(), viewport).getF32ptr());
 
     {
-        win_coord.x /= gViewerWindow->getDisplayScale().mV[VX];
-        win_coord.y /= gViewerWindow->getDisplayScale().mV[VY];
+        win_coord.mV[VX] /= gViewerWindow->getDisplayScale().mV[VX];
+        win_coord.mV[VY] /= gViewerWindow->getDisplayScale().mV[VY];
         // should now have the x,y coords of grab_point in screen space
         const LLRect& world_rect = gViewerWindow->getWorldViewRectScaled();
 
         // ...sanity check
-        S32 int_x = lltrunc(win_coord.x);
-        S32 int_y = lltrunc(win_coord.y);
+        S32 int_x = lltrunc(win_coord.mV[VX]);
+        S32 int_y = lltrunc(win_coord.mV[VY]);
 
         // find the center
         F32 center_x = (F32)world_rect.getCenterX();
         F32 center_y = (F32)world_rect.getCenterY();
 
-        if (win_coord.x == center_x  && win_coord.y == center_y)
+        if (win_coord.mV[VX] == center_x  && win_coord.mV[VY] == center_y)
         {
             // can't project to edge from exact center
             return false;
         }
 
         // find the line from center to local
-        F32 line_x = win_coord.x - center_x;
-        F32 line_y = win_coord.y - center_y;
+        F32 line_x = win_coord.mV[VX] - center_x;
+        F32 line_y = win_coord.mV[VY] - center_y;
 
         int_x = lltrunc(center_x);
         int_y = lltrunc(center_y);
@@ -599,11 +585,11 @@ bool LLViewerCamera::projectPosAgentToScreenEdge(const LLVector3 &pos_agent,
         else if (0 == world_rect.getWidth())
         {
             // the diagonal slope of the view is undefined
-            if (win_coord.y < world_rect.mBottom)
+            if (win_coord.mV[VY] < world_rect.mBottom)
             {
                 int_y = world_rect.mBottom;
             }
-            else if (win_coord.y > world_rect.mTop)
+            else if (win_coord.mV[VY] > world_rect.mTop)
             {
                 int_y = world_rect.mTop;
             }
@@ -766,9 +752,9 @@ bool LLViewerCamera::areVertsVisible(LLViewerObject* volumep, bool all_verts)
     LLMatrix4 render_mat(vo_volume->getRenderRotation(), LLVector4(vo_volume->getRenderPosition()));
 
     LLMatrix4a render_mata;
-    render_mata.loadu(render_mat);
+    render_mata.set(render_mat);
     LLMatrix4a mata;
-    mata.loadu(mat);
+    mata.set(mat);
 
     num_faces = volume->getNumVolumeFaces();
     for (i = 0; i < num_faces; i++)

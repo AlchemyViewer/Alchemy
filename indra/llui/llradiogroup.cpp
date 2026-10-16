@@ -46,17 +46,19 @@ static LLDefaultChildRegistry::Register<LLRadioGroup> r1("radio_group");
  * buttons (usually radio buttons).  Automatically handles the mutex
  * condition by highlighting only one button at a time.
  */
-class LLRadioCtrl : public LLCheckBoxCtrl
+class LLRadioCtrl final : public LLCheckBoxCtrl
 {
 public:
+    AL_VIEW_TYPE(LLRadioCtrl, LLCheckBoxCtrl);
+
     typedef LLRadioGroup::ItemParams Params;
     /*virtual*/ ~LLRadioCtrl();
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
-    LLSD getPayload() { return mPayload; }
+    const LLSD& getPayload() const { return mPayload; }
 
     // Ensure label is in an attribute, not the contents
 
@@ -70,6 +72,7 @@ static LLWidgetNameRegistry::StaticRegistrar register_radio_item(typeid(LLRadioG
 
 LLRadioGroup::Params::Params()
 :   allow_deselect("allow_deselect"),
+    draw_border("draw_border", false),
     items("item")
 {
     addSynonym(items, "radio_item");
@@ -83,7 +86,17 @@ LLRadioGroup::LLRadioGroup(const LLRadioGroup::Params& p)
     mFont(p.font.isProvided() ? p.font() : LLFontGL::getFontSansSerifSmall()),
     mSelectedIndex(-1),
     mAllowDeselect(p.allow_deselect)
-{}
+{
+    if (p.draw_border)
+    {
+        LLViewBorder::Params bp;
+        bp.name = "radio group border";
+        bp.rect = getLocalRect();
+        bp.bevel_style = LLViewBorder::BEVEL_NONE;
+        bp.follows.flags = FOLLOWS_ALL;
+        addChild(LLUICtrlFactory::create<LLViewBorder>(bp));
+    }
+}
 
 void LLRadioGroup::initFromParams(const Params& p)
 {
@@ -218,10 +231,68 @@ bool LLRadioGroup::setSelectedIndex(S32 index, bool from_event)
 
     if (!from_event)
     {
-        setControlValue(getValue());
+        setControlValue(getControlValue());
     }
 
     return true;
+}
+
+// Whether an item's value says yes or no: by being one, by being a number,
+// or by being a word for one.
+static bool reads_as_bool(const LLSD& value, bool& said)
+{
+    switch (value.type())
+    {
+    case LLSD::TypeBoolean:
+        said = value.asBoolean();
+        return true;
+    case LLSD::TypeInteger:
+        said = value.asInteger() != 0;
+        return true;
+    case LLSD::TypeString:
+        return LLStringUtil::convertToBOOL(value.asStringRef(), said);
+    default:
+        return false;
+    }
+}
+
+S32 LLRadioGroup::getIndexForBool(bool which) const
+{
+    bool any_said = false;
+    S32 idx = 0;
+    for (const LLRadioCtrl* radio : mRadioButtons)
+    {
+        bool said = false;
+        if (reads_as_bool(radio->getPayload(), said))
+        {
+            any_said = true;
+            if (said == which)
+            {
+                return idx;
+            }
+        }
+        ++idx;
+    }
+    if (!any_said && mRadioButtons.size() == 2)
+    {
+        return which ? 1 : 0;
+    }
+    return -1;
+}
+
+LLSD LLRadioGroup::getControlValue()
+{
+    LLControlVariable* control = getControlVariable();
+    if (control && control->type() == TYPE_BOOLEAN && mSelectedIndex >= 0)
+    {
+        bool said = false;
+        if (reads_as_bool(mRadioButtons[mSelectedIndex]->getPayload(), said))
+        {
+            return said;
+        }
+        return mSelectedIndex > 0;
+    }
+    return getValue();
 }
 
 void LLRadioGroup::focusSelectedRadioBtn()
@@ -305,7 +376,7 @@ bool LLRadioGroup::handleKeyHere(KEY key, MASK mask)
 void LLRadioGroup::onClickButton(LLUICtrl* ctrl)
 {
     // LL_INFOS() << "LLRadioGroup::onClickButton" << LL_ENDL;
-    LLRadioCtrl* clicked_radio = dynamic_cast<LLRadioCtrl*>(ctrl);
+    LLRadioCtrl* clicked_radio = ALViewType::as<LLRadioCtrl>(ctrl);
     if (!clicked_radio)
         return;
     S32 index = 0;
@@ -354,8 +425,13 @@ void LLRadioGroup::setValue( const LLSD& value )
     }
     if (idx != -1)
     {
-        // string not found, try integer
-        if (value.isInteger())
+        // string not found: a yes or no picks the item that stands for
+        // it, a number picks by position
+        if (value.isBoolean())
+        {
+            setSelectedIndex(getIndexForBool(value.asBoolean()), true);
+        }
+        else if (value.isInteger())
         {
             setSelectedIndex((S32) value.asInteger(), true);
         }

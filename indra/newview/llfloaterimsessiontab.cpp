@@ -48,6 +48,7 @@
 #include "llfloaterimnearbychat.h"
 #include "llgroupiconctrl.h"
 #include "lllayoutstack.h"
+#include "lllogchat.h"
 #include "llnotificationsutil.h"
 #include "llpanelemojicomplete.h"
 #include "lltoolbarview.h"
@@ -561,7 +562,7 @@ void LLFloaterIMSessionTab::onEmojiPickerClosed()
 
 void LLFloaterIMSessionTab::initEmojiRecentPanel()
 {
-    std::list<LLWString>& recentlyUsed = LLFloaterEmojiPicker::getRecentlyUsed();
+    std::list<std::string>& recentlyUsed = LLFloaterEmojiPicker::getRecentlyUsed();
     if (recentlyUsed.empty())
     {
         mEmojiRecentEmptyText->setVisible(true);
@@ -570,9 +571,9 @@ void LLFloaterIMSessionTab::initEmojiRecentPanel()
     else
     {
         // Pass as a list-of-clusters so setEmojis can keep ZWJ sequences
-        // intact. A single concatenated LLWString would collapse the groups
+        // intact. A single concatenated string would collapse the groups
         // back into ambiguous codepoints.
-        std::vector<LLWString> emojis(recentlyUsed.begin(), recentlyUsed.end());
+        std::vector<std::string> emojis(recentlyUsed.begin(), recentlyUsed.end());
         mEmojiRecentIconsCtrl->setEmojis(emojis);
         mEmojiRecentEmptyText->setVisible(false);
         mEmojiRecentContainer->setVisible(true);
@@ -596,11 +597,10 @@ void LLFloaterIMSessionTab::onRecentEmojiPicked(const LLSD& value)
     LLSD::String str = value.asString();
     if (str.size())
     {
-        LLWString wstr = utf8string_to_wstring(str);
-        if (wstr.size())
+        if (!str.empty())
         {
-            // Whole wstr so ZWJ / flag / keycap / tag clusters stay together.
-            mInputEditor->insertEmoji(wstr);
+            // The whole string, so ZWJ / flag / keycap / tag clusters stay together.
+            mInputEditor->insertEmoji(str);
         }
     }
 }
@@ -619,25 +619,8 @@ void LLFloaterIMSessionTab::deleteAllChildren()
 
 std::string LLFloaterIMSessionTab::appendTime()
 {
-    std::string timeStr;
-    static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
-    if (use_24h)
-    {
-        timeStr = "[" + LLTrans::getString("TimeHour") + "]:"
-            "[" + LLTrans::getString("TimeMin") + "]";
-    }
-    else
-    {
-        timeStr = "[" + LLTrans::getString("TimeHour12") + "]:"
-            "[" + LLTrans::getString("TimeMin") + "] ["
-            + LLTrans::getString("TimeAMPM") + "]";
-    }
-
-    LLSD substitution;
-    substitution["datetime"] = (S32)time_corrected();
-    LLStringUtil::format(timeStr, substitution);
-
-    return timeStr;
+    // Keep the original precision so the display preference can change later.
+    return LLLogChat::timestamp2LogString(0, false, true);
 }
 
 void LLFloaterIMSessionTab::appendMessage(const LLChat& chat, const LLSD& args)
@@ -669,7 +652,7 @@ void LLFloaterIMSessionTab::appendMessage(const LLChat& chat, const LLSD& args)
     mChatHistory->appendMessage(chat, chat_args, input_append_params);
 }
 
-void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
+void LLFloaterIMSessionTab::updateUsedEmojis(std::string_view text)
 {
     LLEmojiDictionary* dictionary = LLEmojiDictionary::getInstance();
     llassert_always(dictionary);
@@ -680,26 +663,27 @@ void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
     // (ZWJ family, flag pair, keycap, tag subdivision) that must be
     // recorded as a single emoji. Codepoints outside any cluster are
     // handled with the single-codepoint path below.
-    const auto clusters = wstring_find_emoji_clusters(text);
+    const auto clusters = utf8str_find_emoji_clusters(text);
     auto next_run = clusters.begin();
     for (size_t i = 0; i < text.size(); )
     {
         if (next_run != clusters.end() && next_run->first == i)
         {
-            LLFloaterEmojiPicker::onEmojiUsed(LLWString(text.data() + next_run->first,
-                                                        next_run->second - next_run->first));
+            LLFloaterEmojiPicker::onEmojiUsed(
+                std::string(text.substr(next_run->first, next_run->second - next_run->first)));
             emojiSent = true;
             i = next_run->second;
             ++next_run;
             continue;
         }
 
-        if (dictionary->isEmoji(text[i]))
+        const LLCodepointAt at = utf8str_decode_at(text, i);
+        if (dictionary->isEmoji(at.cp))
         {
-            LLFloaterEmojiPicker::onEmojiUsed(LLWString(1, text[i]));
+            LLFloaterEmojiPicker::onEmojiUsed(utf8str_from_cp(at.cp));
             emojiSent = true;
         }
-        ++i;
+        i = at.next;
     }
 
     if (!emojiSent)
@@ -944,6 +928,11 @@ bool LLFloaterIMSessionTab::onIMShowModesMenuItemEnable(const LLSD& userdata)
 {
     std::string item = userdata.asString();
     bool plain_text = gSavedSettings.getS32("AlchemyChatHistoryStyle") >= 1;
+    if (item == "AlchemyIMShowSeconds")
+    {
+        // Expanded headers always show the time; plain text only when asked.
+        return !plain_text || gSavedSettings.getBOOL("IMShowTime");
+    }
     bool is_not_names = (item != "IMShowNamesForP2PConv");
     return (plain_text && (is_not_names || mIsP2PChat));
 }
@@ -1085,7 +1074,7 @@ void LLFloaterIMSessionTab::processChatHistoryStyleUpdate(bool clean_messages/* 
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin();
             iter != inst_list.end(); ++iter)
     {
-        LLFloaterIMSession* floater = dynamic_cast<LLFloaterIMSession*>(*iter);
+        LLFloaterIMSession* floater = (*iter)->as<LLFloaterIMSession>();
         if (floater)
         {
             floater->reloadMessages(clean_messages);
@@ -1106,7 +1095,7 @@ void LLFloaterIMSessionTab::reloadEmptyFloaters()
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin();
         iter != inst_list.end(); ++iter)
     {
-        LLFloaterIMSession* floater = dynamic_cast<LLFloaterIMSession*>(*iter);
+        LLFloaterIMSession* floater = (*iter)->as<LLFloaterIMSession>();
         if (floater && floater->getLastChatMessageIndex() == -1)
         {
             floater->reloadMessages(true);
@@ -1131,7 +1120,7 @@ void LLFloaterIMSessionTab::updateCallBtnState(bool callIsActive)
 
 void LLFloaterIMSessionTab::onSlide(LLFloaterIMSessionTab* self)
 {
-    LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(self->getHost());
+    LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(self->getHost());
     bool should_be_expanded = false;
     if (host_floater)
     {
@@ -1163,7 +1152,7 @@ void LLFloaterIMSessionTab::onSlide(LLFloaterIMSessionTab* self)
 
 void LLFloaterIMSessionTab::onCollapseToLine(LLFloaterIMSessionTab* self)
 {
-    LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(self->getHost());
+    LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(self->getHost());
     if (!host_floater)
     {
         bool expand = self->isMessagePaneExpanded();
@@ -1230,7 +1219,7 @@ void LLFloaterIMSessionTab::onOpen(const LLSD& key)
 {
     if (!checkIfTornOff())
     {
-        if(LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(getHost()))
+        if(LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(getHost()))
         {
             // Show the messages pane when opening a floater hosted in the Conversations
             host_floater->collapseMessagesPane(false);
@@ -1459,9 +1448,13 @@ void LLFloaterIMSessionTab::applyMUPose(std::string& text)
             text.replace(0, 1, "/me");
         }
         // Account for emotes and smilies
-        else if (!isdigit(text.at(1))
-                 && !ispunct(text.at(1))
-                 && !isspace(text.at(1)))
+        // Through LLStringOps rather than <cctype> directly: char is signed,
+        // so the lead byte of anything above ASCII arrives negative and lands
+        // outside the domain those take, which is undefined and asserts in a
+        // debug CRT. Typing a colon in front of an accented word is enough.
+        else if (!LLStringOps::isDigit(text.at(1))
+                 && !LLStringOps::isPunct(text.at(1))
+                 && !LLStringOps::isSpace(text.at(1)))
         {
             text.replace(0, 1, "/me ");
         }

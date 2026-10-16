@@ -61,6 +61,7 @@ class LLVelocityBar;
 class LLPanel;
 class LLImageRaw;
 class LLImageFormatted;
+struct ALSnapshotCutout;
 class LLHUDIcon;
 class LLWindow;
 class LLRootView;
@@ -146,8 +147,9 @@ private:
 
 };
 
-struct MainPanel : public LLPanel
+struct MainPanel final : public LLPanel
 {
+    AL_VIEW_TYPE(MainPanel, LLPanel);
 };
 
 static const U32 MAX_SNAPSHOT_IMAGE_SIZE = 7680; // max snapshot image size 7680 * 7680 UHDTV2
@@ -229,12 +231,12 @@ public:
                 void handleMouseDragged(LLWindow *window,  LLCoordGL pos, MASK mask);
     /*virtual*/ void handleMouseLeave(LLWindow *window);
     /*virtual*/ void handleResize(LLWindow *window,  S32 x,  S32 y);
+    /*virtual*/ void handleRequestResolutionUpdate(LLWindow* window);
     /*virtual*/ void handleFocus(LLWindow *window);
     /*virtual*/ void handleFocusLost(LLWindow *window);
     /*virtual*/ bool handleActivate(LLWindow *window, bool activated);
     /*virtual*/ bool handleActivateApp(LLWindow *window, bool activating);
     /*virtual*/ void handleMenuSelect(LLWindow *window,  S32 menu_item);
-    /*virtual*/ bool handlePaint(LLWindow *window,  S32 x,  S32 y,  S32 width,  S32 height);
     /*virtual*/ void handleScrollWheel(LLWindow *window,  LLScrollDelta delta);
     /*virtual*/ void handleScrollHWheel(LLWindow *window,  LLScrollDelta delta);
     /*virtual*/ bool handleDoubleClick(LLWindow *window,  LLCoordGL pos, MASK mask);
@@ -384,9 +386,15 @@ public:
 
     bool saveSnapshot(const std::string&  filename, S32 image_width, S32 image_height, bool show_ui = true, bool show_hud = true, bool do_rebuild = false, bool show_balance = true,
                      LLSnapshotModel::ESnapshotLayerType type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR, LLSnapshotModel::ESnapshotFormat format = LLSnapshotModel::SNAPSHOT_FORMAT_BMP);
+    // With a cutout, only its subject is drawn, and raw comes back as the
+    // subject premultiplied by its coverage, RGBA at the size asked for: the
+    // caller lays it over the fill (ALCutoutImage::layOverFill), which takes no
+    // render. The interface, the HUD and the depth layers do not apply to a
+    // cutout. cutout_drawn, if given, is told whether any of the subject was drawn.
     bool rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_height, bool keep_window_aspect = true, bool is_texture = false,
                      bool show_ui = true, bool show_hud = true, bool do_rebuild = false, bool no_post = false, bool show_balance = true,
-                     LLSnapshotModel::ESnapshotLayerType type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR, S32 max_size = MAX_SNAPSHOT_IMAGE_SIZE);
+                     LLSnapshotModel::ESnapshotLayerType type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR, S32 max_size = MAX_SNAPSHOT_IMAGE_SIZE,
+                     const ALSnapshotCutout* cutout = nullptr, bool* cutout_drawn = nullptr);
 
     bool            simpleSnapshot(LLImageRaw *raw, S32 image_width, S32 image_height, const int num_render_passes);
 

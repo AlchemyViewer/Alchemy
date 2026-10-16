@@ -30,14 +30,16 @@
 #include "llcontrol.h"
 #include "llfloater.h"
 
-class LLFloaterPreferenceViewAdvanced
+class LLFloaterPreferenceViewAdvanced final
 :   public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterPreferenceViewAdvanced, LLFloater);
+
     LLFloaterPreferenceViewAdvanced(const LLSD& key);
-    virtual void draw();
+    virtual void draw() override;
 
     void onCommitSettings();
     void updateCameraControl(const LLVector3& vector);

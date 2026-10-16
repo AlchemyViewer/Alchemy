@@ -31,9 +31,9 @@
 #include "llview.h"
 
 #include <sstream>
-#include <boost/tokenizer.hpp>
 #include <boost/bind.hpp>
 
+#include "llfontgl.h"
 #include "llrender.h"
 #include "llevent.h"
 #include "llfocusmgr.h"
@@ -47,7 +47,6 @@
 #include "lltooltip.h"
 #include "llsdutil.h"
 #include "llsdserialize.h"
-#include "llviewereventrecorder.h"
 #include "llkeyboard.h"
 // for ui edit hack
 #include "llbutton.h"
@@ -68,20 +67,14 @@ bool    LLView::sDebugKeys = false;
 bool    LLView::sDebugMouseHandling = false;
 std::string LLView::sMouseHandlerMessage;
 bool    LLView::sForceReshape = false;
-std::set<LLView*> LLView::sPreviewHighlightedElements;
-bool LLView::sHighlightingDiffs = false;
-LLView* LLView::sPreviewClickedElement = NULL;
-bool    LLView::sDrawPreviewHighlights = false;
-S32     LLView::sLastLeftXML = S32_MIN;
-S32     LLView::sLastBottomXML = S32_MIN;
 std::vector<LLViewDrawContext*> LLViewDrawContext::sDrawContextStack;
 
-LLView::DrilldownFunc LLView::sDrilldown =
-    boost::bind(&LLView::pointInView, _1, _2, _3, HIT_TEST_USE_BOUNDING_RECT);
+// Empty until a test installs one; see LLView::TemporaryDrilldownFunc. The
+// answer it used to hold as a default is pointInView, which visibleAndContains
+// now calls directly.
+LLView::DrilldownFunc LLView::sDrilldown;
 
-//#if LL_DEBUG
 bool LLView::sIsDrawing = false;
-//#endif
 
 // Compiler optimization, generate extern template
 template class LLView* LLView::getChild<class LLView>(
@@ -140,19 +133,18 @@ LLView::LLView(const LLView::Params& p)
 :   mVisible(p.visible),
     mInDraw(false),
     mName(p.name),
-    mParentView(NULL),
+    mParentView(nullptr),
     mReshapeFlags(FOLLOWS_NONE),
     mFromXUI(p.from_xui),
     mIsFocusRoot(p.focus_root),
-    mLastVisible(false),
-    mHoverCursor(getCursorFromString(p.hover_cursor)),
+    mHoverCursor(getCursorFromString(p.hover_cursor())),
     mEnabled(p.enabled),
     mMouseOpaque(p.mouse_opaque),
     mSoundFlags(p.sound_flags),
     mUseBoundingRect(p.use_bounding_rect),
     mDefaultTabGroup(p.default_tab_group),
     mLastTabGroup(0),
-    mDefaultWidgets(NULL)
+    mDefaultWidgets(nullptr)
 {
     // create rect first, as this will supply initial follows flags
     setShape(p.rect);
@@ -167,7 +159,14 @@ LLView::LLView(const LLView::Params& p)
 
 LLView::~LLView()
 {
-    dirtyRect();
+    // Nothing off screen has a region to repaint, and a view already inside a
+    // subtree teardown has had its region claimed at the top of it. The parent
+    // link is cut before a child is deleted, so what dirtyRect could work out
+    // for one of those is its own rect read as if it were the screen's.
+    if (getVisible() && sDeleteDepth == 0)
+    {
+        dirtyRect();
+    }
     //LL_INFOS() << "Deleting view " << mName << ":" << (void*) this << LL_ENDL;
     if (LLView::sIsDrawing)
     {
@@ -183,9 +182,14 @@ LLView::~LLView()
         gFocusMgr.removeMouseCaptureWithoutCallback( this );
     }
 
+    // Counted as a teardown, because the region this view's children are about
+    // to vacate sits inside the one already claimed above, and deleteAllChildren
+    // would otherwise claim it a second time.
+    ++sDeleteDepth;
     deleteAllChildren();
+    --sDeleteDepth;
 
-    if (mParentView != NULL)
+    if (mParentView != nullptr)
     {
         mParentView->removeChild(this);
     }
@@ -193,9 +197,11 @@ LLView::~LLView()
     if (mDefaultWidgets)
     {
         delete mDefaultWidgets;
-        mDefaultWidgets = NULL;
+        mDefaultWidgets = nullptr;
     }
 
+    delete mChildList;
+    delete mTabOrder;
     delete mToolTipMsg;
 }
 
@@ -250,6 +256,44 @@ void LLView::setRect(const LLRect& rect)
     updateBoundingRect();
 }
 
+S32 LLView::sTransparencyViewsWalked = 0;
+S32 LLView::sReshapeCount = 0;
+S32 LLView::sReshapeDepth = 0;
+S32 LLView::sDeleteDepth = 0;
+U32 LLView::sTreeGeneration = 0;
+
+void LLView::applyTransparencyType(U8 transparency_type)
+{
+    if (!getVisible())
+    {
+        // Stop here and keep the value. Nothing beneath a hidden view is drawn,
+        // so nothing beneath it is reading a transparency, and an inventory
+        // holds two hundred thousand such views to show a few dozen.
+        //
+        // Safe to leave stale where a deferred layout was not: a transparency
+        // is read by the control that holds it and by nothing else, so no view
+        // sizes itself from another view's.
+        mPendingTransparency = transparency_type;
+        mHasPendingTransparency = true;
+        return;
+    }
+    mHasPendingTransparency = false;
+    ++sTransparencyViewsWalked;
+
+    // isCtrl is a virtual returning a constant where dynamic_cast walks the
+    // RTTI graph, and this is asked once per view. The pairing with static_cast
+    // is how the rest of llui asks it.
+    if (isCtrl())
+    {
+        static_cast<LLUICtrl*>(this)->setTransparencyType((LLUICtrl::ETypeTransparency)transparency_type);
+    }
+
+    for (LLView* child : children())
+    {
+        child->applyTransparencyType(transparency_type);
+    }
+}
+
 void LLView::setUseBoundingRect( bool use_bounding_rect )
 {
     if (mUseBoundingRect != use_bounding_rect)
@@ -279,10 +323,10 @@ void LLView::sendChildToFront(LLView* child)
     {
         // minor optimization, but more importantly,
         //  won't temporarily create an empty list
-        if (child != mChildList.front())
+        if (child != mChildList->front())
         {
-            mChildList.remove( child );
-            mChildList.push_front(child);
+            mChildList->remove( child );
+            mChildList->push_front(child);
         }
     }
 }
@@ -294,10 +338,10 @@ void LLView::sendChildToBack(LLView* child)
     {
         // minor optimization, but more importantly,
         //  won't temporarily create an empty list
-        if (child != mChildList.back())
+        if (child != mChildList->back())
         {
-            mChildList.remove( child );
-            mChildList.push_back(child);
+            mChildList->remove( child );
+            mChildList->push_back(child);
         }
     }
 }
@@ -322,12 +366,15 @@ bool LLView::addChild(LLView* child, S32 tab_group)
     }
 
     // add to front of child list, as normal
-    mChildList.push_front(child);
+    childList().push_front(child);
+    // Said before the subtree is walked for anything else, so a pass that
+    // skipped its work last time knows the tree has moved under it.
+    ++sTreeGeneration;
 
     // add to tab order list
     if (tab_group != 0)
     {
-        mTabOrder.insert(tab_order_pair_t(child, tab_group));
+        tabOrder().insert(tab_order_pair_t(child, tab_group));
     }
 
     child->mParentView = this;
@@ -362,17 +409,18 @@ void LLView::removeChild(LLView* child)
     {
         // if we are removing an item we are currently iterating over, that would be bad
         llassert(!child->mInDraw);
-        mChildList.remove( child );
-        child->mParentView = NULL;
-        child_tab_order_t::iterator found = mTabOrder.find(child);
-        if (found != mTabOrder.end())
+        mChildList->remove( child );
+        child->mParentView = nullptr;
+        if (mTabOrder)
         {
-            mTabOrder.erase(found);
+            mTabOrder->erase(child);
         }
     }
     else
     {
+        // Nothing left this view, so nothing about it has changed shape.
         LL_WARNS() << "\"" << child->getName() << "\" is not a child of " << getName() << LL_ENDL;
+        return;
     }
     updateBoundingRect();
 }
@@ -507,21 +555,21 @@ LLRect LLView::getRequiredRect()
 
 bool LLView::focusNextRoot()
 {
-    LLView::child_list_t result = LLView::getFocusRootsQuery().run(this);
+    viewList_t result = LLView::getFocusRootsQuery().run(this);
     return LLView::focusNext(result);
 }
 
 bool LLView::focusPrevRoot()
 {
-    LLView::child_list_t result = LLView::getFocusRootsQuery().run(this);
+    viewList_t result = LLView::getFocusRootsQuery().run(this);
     return LLView::focusPrev(result);
 }
 
 // static
-bool LLView::focusNext(LLView::child_list_t & result)
+bool LLView::focusNext(viewList_t & result)
 {
-    LLView::child_list_reverse_iter_t focused = result.rend();
-    for(LLView::child_list_reverse_iter_t iter = result.rbegin();
+    viewList_t::reverse_iterator focused = result.rend();
+    for(viewList_t::reverse_iterator iter = result.rbegin();
         iter != result.rend();
         ++iter)
     {
@@ -531,7 +579,7 @@ bool LLView::focusNext(LLView::child_list_t & result)
             break;
         }
     }
-    LLView::child_list_reverse_iter_t next = focused;
+    viewList_t::reverse_iterator next = focused;
     next = (next == result.rend()) ? result.rbegin() : ++next;
     while(next != focused)
     {
@@ -540,7 +588,7 @@ bool LLView::focusNext(LLView::child_list_t & result)
         {
             next = result.rbegin();
         }
-        if ((*next)->isCtrl() && ((LLUICtrl*)*next)->hasTabStop())
+        if ((*next)->isCtrl() && static_cast<LLUICtrl*>(*next)->hasTabStop())
         {
             LLUICtrl * ctrl = static_cast<LLUICtrl*>(*next);
             ctrl->setFocus(true);
@@ -554,10 +602,10 @@ bool LLView::focusNext(LLView::child_list_t & result)
 }
 
 // static
-bool LLView::focusPrev(LLView::child_list_t & result)
+bool LLView::focusPrev(viewList_t & result)
 {
-    LLView::child_list_iter_t focused = result.end();
-    for(LLView::child_list_iter_t iter = result.begin();
+    viewList_t::iterator focused = result.end();
+    for(viewList_t::iterator iter = result.begin();
         iter != result.end();
         ++iter)
     {
@@ -567,7 +615,7 @@ bool LLView::focusPrev(LLView::child_list_t & result)
             break;
         }
     }
-    LLView::child_list_iter_t next = focused;
+    viewList_t::iterator next = focused;
     next = (next == result.end()) ? result.begin() : ++next;
     while(next != focused)
     {
@@ -576,7 +624,11 @@ bool LLView::focusPrev(LLView::child_list_t & result)
         {
             next = result.begin();
         }
-        if((*next)->isCtrl())
+        // The tab stop test is what focusNext asks. The tab order query
+        // prefilters on it, so the two agree there whichever way it is asked;
+        // the focus roots query does not, and that is the path Ctrl-Shift-Tab
+        // takes.
+        if ((*next)->isCtrl() && static_cast<LLUICtrl*>(*next)->hasTabStop())
         {
             LLUICtrl * ctrl = static_cast<LLUICtrl*>(*next);
             if (!ctrl->hasFocus())
@@ -598,28 +650,60 @@ bool LLView::focusPrev(LLView::child_list_t & result)
 void LLView::deleteAllChildren()
 {
     // clear out the control ordering
-    mTabOrder.clear();
-
-    while (!mChildList.empty())
+    if (mTabOrder)
     {
-        LLView* viewp = mChildList.front();
-        viewp->mParentView = NULL;
-        delete viewp;
-        mChildList.pop_front();
+        mTabOrder->clear();
     }
+
+    const bool had_children = mChildList && !mChildList->empty();
+
+    ++sDeleteDepth;
+    if (mChildList)
+    {
+        while (!mChildList->empty())
+        {
+            LLView* viewp = mChildList->front();
+            // Pop before deleting. The child's destructor (and its children's
+            // destructors, e.g. LLFloater::~LLFloater deleting mDragHandle and
+            // mResizeBar/mResizeHandle explicitly) call ~LLView(), which calls
+            // mParentView->removeChild(this). If viewp is still at the front of
+            // the list at that point, removeChild() erases it -- but pop_front()
+            // below then removes whatever is now at the front instead, leaving the
+            // originally-next entry as a dangling pointer in mChildList.
+            // Popping first means removeChild() finds mParentView == NULL and
+            // takes the no-op warning branch, keeping the list consistent.
+            mChildList->pop_front();
+            viewp->mParentView = nullptr;
+            delete viewp;
+        }
+    }
+    --sDeleteDepth;
+
+    // Outside the count, so a view that does use a bounding rect shrinks to
+    // what is left of it and tells its parent.
     updateBoundingRect();
+
+    // The region the children vacated. The call above cannot claim it: a view
+    // that does not use a bounding rect reports its own rect, which losing its
+    // children does not move, so it finds nothing there to compare. Nor do the
+    // children claim it -- a view deleted inside the count leaves the region to
+    // whatever is taking the subtree down.
+    if (had_children && getVisible() && sDeleteDepth == 0)
+    {
+        dirtyRect();
+    }
 }
 
 void LLView::setAllChildrenEnabled(bool b, bool recursive /*= false*/)
 {
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         viewp->setEnabled(b);
     }
 
     if (recursive)
     {
-        for (LLView* viewp : mChildList)
+        for (LLView* viewp : children())
         {
             viewp->setAllChildrenEnabled(b, recursive);
         }
@@ -631,7 +715,17 @@ void LLView::setVisible(bool visible)
 {
     if ( mVisible != visible )
     {
+        // Only a real change is named: this is asked constantly and answers
+        // "no" almost every time.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("set visible");
+
         mVisible = visible;
+
+        // Spend the transparency a floater left here while this was hidden.
+        if (visible && mHasPendingTransparency)
+        {
+            applyTransparencyType(mPendingTransparency);
+        }
 
         // notify children of visibility change if root, or part of visible hierarchy
         if (!getParent() || getParent()->isInVisibleChain())
@@ -647,9 +741,14 @@ void LLView::setVisible(bool visible)
 // virtual
 void LLView::onVisibilityChange ( bool new_visibility )
 {
+    // Recurses into every visible descendant, so a floater opening or closing
+    // walks the whole of itself. Reports how wide this level is; the depth
+    // shows as nesting.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("visibility change");
+    LL_PROFILE_ZONE_NUM(getChildCount());
+
     bool old_visibility;
-    bool log_visibility_change = LLViewerEventRecorder::instance().getLoggingStatus();
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         if (!viewp)
         {
@@ -659,26 +758,9 @@ void LLView::onVisibilityChange ( bool new_visibility )
         // only views that are themselves visible will have their overall visibility affected by their ancestors
         old_visibility=viewp->getVisible();
 
-        if(log_visibility_change)
-        {
-        if (old_visibility!=new_visibility)
-        {
-            LLViewerEventRecorder::instance().logVisibilityChange( viewp->getPathname(), viewp->getName(), new_visibility,"widget");
-        }
-        }
-
         if (old_visibility)
         {
             viewp->onVisibilityChange ( new_visibility );
-        }
-
-        if(log_visibility_change)
-        {
-            // Consider changing returns to confirm success and know which widget grabbed it
-            // For now assume success and log at highest xui possible
-            // NOTE we log actual state - which may differ if it somehow failed to set visibility
-            LL_DEBUGS() << "LLView::handleVisibilityChange   - now: " << getVisible()  << " xui: " << viewp->getPathname() << " name: " << viewp->getName() << LL_ENDL;
-
         }
     }
 }
@@ -713,7 +795,7 @@ void LLView::setSnappedTo(const LLView* snap_view)
 
 bool LLView::handleHover(S32 x, S32 y, MASK mask)
 {
-    return childrenHandleHover( x, y, mask ) != NULL;
+    return childrenHandleHover( x, y, mask ) != nullptr;
 }
 
 void LLView::onMouseEnter(S32 x, S32 y, MASK mask)
@@ -728,8 +810,13 @@ void LLView::onMouseLeave(S32 x, S32 y, MASK mask)
 
 bool LLView::visibleAndContains(S32 local_x, S32 local_y)
 {
-    return sDrilldown(this, local_x, local_y)
-        && getVisible();
+    // Visibility first. It is a bool read where the other is a rect test, and
+    // most of the children of a large tree are hidden -- an open inventory
+    // keeps the items of its closed folders that way. Both tests are pure, so
+    // asking them in either order reaches the same answer.
+    return getVisible()
+        && (sDrilldown ? sDrilldown(this, local_x, local_y)
+                       : pointInView(local_x, local_y, HIT_TEST_USE_BOUNDING_RECT));
 }
 
 bool LLView::visibleEnabledAndContains(S32 local_x, S32 local_y)
@@ -753,7 +840,7 @@ LLView* LLView::childrenHandleCharEvent(std::string_view desc, const METHOD& met
 {
     if ( getVisible() && getEnabled() )
     {
-        for (LLView* viewp : mChildList)
+        for (LLView* viewp : children())
         {
             if ((viewp->*method)(c, mask, true))
             {
@@ -765,14 +852,14 @@ LLView* LLView::childrenHandleCharEvent(std::string_view desc, const METHOD& met
             }
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 // XDATA might be MASK, or S32 clicks
 template <typename METHOD, typename XDATA>
 LLView* LLView::childrenHandleMouseEvent(const METHOD& method, S32 x, S32 y, XDATA extra, bool allow_mouse_block)
 {
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         S32 local_x = x - viewp->getRect().mLeft;
         S32 local_y = y - viewp->getRect().mBottom;
@@ -785,23 +872,18 @@ LLView* LLView::childrenHandleMouseEvent(const METHOD& method, S32 x, S32 y, XDA
         if ((viewp->*method)( local_x, local_y, extra )
             || (allow_mouse_block && viewp->blockMouseEvent( local_x, local_y )))
         {
-            LL_DEBUGS() << "LLView::childrenHandleMouseEvent calling updatemouseeventinfo - local_x|global x  "<< local_x << " " << x   << "local/global y " << local_y << " " << y << LL_ENDL;
-            LL_DEBUGS() << "LLView::childrenHandleMouseEvent  getPathname for viewp result: " << viewp->getPathname() << "for this view: " << getPathname() << LL_ENDL;
-
-            LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
-
             // This is NOT event recording related
             viewp->logMouseEvent();
 
             return viewp;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 LLView* LLView::childrenHandleToolTip(S32 x, S32 y, MASK mask)
 {
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         S32 local_x = x - viewp->getRect().mLeft;
         S32 local_y = y - viewp->getRect().mBottom;
@@ -820,7 +902,7 @@ LLView* LLView::childrenHandleToolTip(S32 x, S32 y, MASK mask)
             return viewp;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 LLView* LLView::childrenHandleDragAndDrop(S32 x, S32 y, MASK mask,
@@ -833,7 +915,7 @@ LLView* LLView::childrenHandleDragAndDrop(S32 x, S32 y, MASK mask,
     // default to not accepting drag and drop, will be overridden by handler
     *accept = ACCEPT_NO;
 
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         S32 local_x = x - viewp->getRect().mLeft;
         S32 local_y = y - viewp->getRect().mBottom;
@@ -854,12 +936,12 @@ LLView* LLView::childrenHandleDragAndDrop(S32 x, S32 y, MASK mask,
             return viewp;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 LLView* LLView::childrenHandleHover(S32 x, S32 y, MASK mask)
 {
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         S32 local_x = x - viewp->getRect().mLeft;
         S32 local_y = y - viewp->getRect().mBottom;
@@ -869,7 +951,10 @@ LLView* LLView::childrenHandleHover(S32 x, S32 y, MASK mask)
         }
 
         // This call differentiates this method from childrenHandleMouseEvent().
-        LLUI::getInstance()->mWindow->setCursor(viewp->getHoverCursor());
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(viewp->getHoverCursor());
+        }
 
         if (viewp->handleHover(local_x, local_y, mask)
             || viewp->blockMouseEvent(local_x, local_y))
@@ -879,15 +964,15 @@ LLView* LLView::childrenHandleHover(S32 x, S32 y, MASK mask)
             return viewp;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 LLView* LLView::childFromPoint(S32 x, S32 y, bool recur)
 {
     if (!getVisible())
-        return NULL;
+        return nullptr;
 
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         S32 local_x = x - viewp->getRect().mLeft;
         S32 local_y = y - viewp->getRect().mBottom;
@@ -911,13 +996,13 @@ LLView* LLView::childFromPoint(S32 x, S32 y, bool recur)
         return viewp;
 
     }
-    return 0;
+    return nullptr;
 }
 
 F32 LLView::getTooltipTimeout()
 {
-    static LLCachedControl<F32> tooltip_fast_delay(*LLUI::getInstance()->mSettingGroups["config"], "ToolTipFastDelay", 0.1f);
-    static LLCachedControl<F32> tooltip_delay(*LLUI::getInstance()->mSettingGroups["config"], "ToolTipDelay", 0.7f);
+    static LLCachedControl<F32> tooltip_fast_delay(LLUI::getInstance()->getControlControlGroup("ToolTipFastDelay"), "ToolTipFastDelay", 0.1f);
+    static LLCachedControl<F32> tooltip_delay(LLUI::getInstance()->getControlControlGroup("ToolTipDelay"), "ToolTipDelay", 0.7f);
     // allow "scrubbing" over ui by showing next tooltip immediately
     // if previous one was still visible
     return (F32)(LLToolTipMgr::instance().toolTipVisible()
@@ -926,7 +1011,7 @@ F32 LLView::getTooltipTimeout()
 }
 
 // virtual
-const std::string LLView::getToolTip() const
+std::string LLView::getToolTip() const
 {
     if (sDebugUnicode)
     {
@@ -962,7 +1047,7 @@ bool LLView::handleToolTip(S32 x, S32 y, MASK mask)
     std::string tooltip = getToolTip();
     if (!tooltip.empty())
     {
-        static LLCachedControl<bool> allow_ui_tooltips(*LLUI::getInstance()->mSettingGroups["config"], "BasicUITooltips", true);
+        static LLCachedControl<bool> allow_ui_tooltips(LLUI::getInstance()->getControlControlGroup("BasicUITooltips"), "BasicUITooltips", true);
 
         // Even if we don't show tooltips, consume the event, nothing below should show tooltip
         if (allow_ui_tooltips)
@@ -994,7 +1079,7 @@ bool LLView::handleKey(KEY key, MASK mask, bool called_from_parent)
         if( called_from_parent )
         {
             // Downward traversal
-            handled = childrenHandleKey( key, mask ) != NULL;
+            handled = childrenHandleKey( key, mask ) != nullptr;
         }
 
         if (!handled)
@@ -1026,7 +1111,7 @@ bool LLView::handleKeyUp(KEY key, MASK mask, bool called_from_parent)
         if (called_from_parent)
         {
             // Downward traversal
-            handled = childrenHandleKeyUp(key, mask) != NULL;
+            handled = childrenHandleKeyUp(key, mask) != nullptr;
         }
 
         if (!handled)
@@ -1072,7 +1157,7 @@ bool LLView::handleUnicodeChar(llwchar uni_char, bool called_from_parent)
         if( called_from_parent )
         {
             // Downward traversal
-            handled = childrenHandleUnicodeChar( uni_char ) != NULL;
+            handled = childrenHandleUnicodeChar( uni_char ) != nullptr;
         }
 
         if (!handled)
@@ -1091,11 +1176,6 @@ bool LLView::handleUnicodeChar(llwchar uni_char, bool called_from_parent)
         handled = mParentView->handleUnicodeChar(uni_char, false);
     }
 
-    if (handled)
-    {
-        LLViewerEventRecorder::instance().logKeyUnicodeEvent(uni_char);
-    }
-
     return handled;
 }
 
@@ -1111,7 +1191,7 @@ bool LLView::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                EAcceptance* accept,
                                std::string& tooltip_msg)
 {
-    return childrenHandleDragAndDrop( x, y, mask, drop, cargo_type, cargo_data, accept, tooltip_msg) != NULL;
+    return childrenHandleDragAndDrop( x, y, mask, drop, cargo_type, cargo_data, accept, tooltip_msg) != nullptr;
 }
 
 void LLView::onMouseCaptureLost()
@@ -1127,49 +1207,49 @@ bool LLView::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     LLView* r = childrenHandleMouseUp( x, y, mask );
 
-    return (r!=NULL);
+    return (r!=nullptr);
 }
 
 bool LLView::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     LLView* r= childrenHandleMouseDown(x, y, mask );
 
-    return (r!=NULL);
+    return (r!=nullptr);
 }
 
 bool LLView::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
-    return childrenHandleDoubleClick( x, y, mask ) != NULL;
+    return childrenHandleDoubleClick( x, y, mask ) != nullptr;
 }
 
 bool LLView::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    return childrenHandleScrollWheel( x, y, delta ) != NULL;
+    return childrenHandleScrollWheel( x, y, delta ) != nullptr;
 }
 
 bool LLView::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    return childrenHandleScrollHWheel( x, y, delta ) != NULL;
+    return childrenHandleScrollHWheel( x, y, delta ) != nullptr;
 }
 
 bool LLView::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
-    return childrenHandleRightMouseDown( x, y, mask ) != NULL;
+    return childrenHandleRightMouseDown( x, y, mask ) != nullptr;
 }
 
 bool LLView::handleRightMouseUp(S32 x, S32 y, MASK mask)
 {
-    return childrenHandleRightMouseUp( x, y, mask ) != NULL;
+    return childrenHandleRightMouseUp( x, y, mask ) != nullptr;
 }
 
 bool LLView::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
 {
-    return childrenHandleMiddleMouseDown( x, y, mask ) != NULL;
+    return childrenHandleMiddleMouseDown( x, y, mask ) != nullptr;
 }
 
 bool LLView::handleMiddleMouseUp(S32 x, S32 y, MASK mask)
 {
-    return childrenHandleMiddleMouseUp( x, y, mask ) != NULL;
+    return childrenHandleMiddleMouseUp( x, y, mask ) != nullptr;
 }
 
 LLView* LLView::childrenHandleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
@@ -1243,25 +1323,68 @@ void LLView::draw()
 
 void LLView::drawChildren()
 {
-    if (!mChildList.empty())
+    if (mChildList && !mChildList->empty())
     {
         LLView* rootp = LLUI::getInstance()->getRootView();
+
+        // Where this view sits on screen. Every child's screen rect is its own
+        // rect offset by exactly this, so asking each child for its own -- one
+        // walk of the parent chain to the root per child -- recomputes a
+        // prefix all of them share. This is the whole of the UI's per-frame
+        // cull, so it is once per parent rather than once per child.
+        S32 origin_x, origin_y;
+        localPointToScreen(0, 0, &origin_x, &origin_y);
+
+        // Under a scale the view tree's answer is where a child would have
+        // been drawn at a hundred per cent, which is not where it is: the
+        // transform being drawn through says where that is. Nothing pushes a
+        // scale but a zoomed canvas, so everything else keeps the arithmetic
+        // it had.
+        const F32 scale_x = LLFontGL::sCurScaleX;
+        const F32 scale_y = LLFontGL::sCurScaleY;
+        const bool scaled = scale_x != 1.f || scale_y != 1.f;
+        if (scaled)
+        {
+            origin_x = ll_round(LLFontGL::sCurOrigin.mX * scale_x);
+            origin_y = ll_round(LLFontGL::sCurOrigin.mY * scale_y);
+        }
+
+        // Whatever this view knows about its children that the two tests below
+        // do not. Null for all but the few views that override it.
+        const LLRect cull_rect = getChildCullRectScreen();
+        const bool   has_cull  = cull_rect.notEmpty();
+
         ++sDepth;
 
-        for (child_list_reverse_iter_t child_iter = mChildList.rbegin(); child_iter != mChildList.rend();)  // ++child_iter)
+        for (child_list_const_reverse_iter_t child_iter = mChildList->rbegin(); child_iter != mChildList->rend();)  // ++child_iter)
         {
-            child_list_reverse_iter_t child = child_iter++;
+            child_list_const_reverse_iter_t child = child_iter++;
             LLView *viewp = *child;
 
-            if (viewp == NULL)
+            if (viewp == nullptr)
             {
                 continue;
             }
 
             if (viewp->getVisible() && viewp->getRect().isValid())
             {
-                LLRect screen_rect = viewp->calcScreenRect();
-                if ( rootp->getLocalRect().overlaps(screen_rect)  && sDirtyRect.overlaps(screen_rect))
+                // Same answer as viewp->calcScreenRect(), reached without the
+                // walk: this view's own rect already contributed to origin_*
+                // above, and the child's is the only term left.
+                llassert(viewp->mParentView == this);
+                LLRect screen_rect = viewp->getRect();
+                if (scaled)
+                {
+                    screen_rect.set(ll_round((F32)screen_rect.mLeft * scale_x),
+                                    ll_round((F32)screen_rect.mTop * scale_y),
+                                    ll_round((F32)screen_rect.mRight * scale_x),
+                                    ll_round((F32)screen_rect.mBottom * scale_y));
+                }
+                screen_rect.translate(origin_x, origin_y);
+
+                if ( rootp->getLocalRect().overlaps(screen_rect)
+                  && sDirtyRect.overlaps(screen_rect)
+                  && (!has_cull || cull_rect.overlaps(screen_rect)))
                 {
                     LLUI::pushMatrix();
                     {
@@ -1294,7 +1417,7 @@ void LLView::drawChildren()
 void LLView::dirtyRect()
 {
     LLView* child = getParent();
-    LLView* parent = child ? child->getParent() : NULL;
+    LLView* parent = child ? child->getParent() : nullptr;
     LLView* cur = this;
     while (child && parent && parent->getParent())
     { //find third to top-most view
@@ -1317,8 +1440,6 @@ void LLView::dirtyRect()
 //Draw a box for debugging.
 void LLView::drawDebugRect()
 {
-    std::set<LLView*>::iterator preview_iter = std::find(sPreviewHighlightedElements.begin(), sPreviewHighlightedElements.end(), this); // figure out if it's a previewed element
-
     LLUI::pushMatrix();
     {
         // drawing solids requires texturing be disabled
@@ -1333,22 +1454,7 @@ void LLView::drawDebugRect()
 
         // draw red rectangle for the border
         LLColor4 border_color(0.25f, 0.25f, 0.25f, 1.f);
-        if(preview_iter != sPreviewHighlightedElements.end())
-        {
-            if(LLView::sPreviewClickedElement && this == sPreviewClickedElement)
-            {
-                border_color = LLColor4::red;
-            }
-            else
-            {
-                static LLUIColor scroll_highlighted_color = LLUIColorTable::instance().getColor("ScrollHighlightedColor");
-                border_color = scroll_highlighted_color;
-            }
-        }
-        else
-        {
-            border_color.mV[sDepth%3] = 1.f;
-        }
+        border_color.mV[sDepth%3] = 1.f;
 
         gGL.color4fv( border_color.mV );
 
@@ -1366,9 +1472,8 @@ void LLView::drawDebugRect()
             gGL.vertex2i(0, debug_rect.getHeight() - 1);
         gGL.end();
 
-        // Draw the name if it's not a leaf node or not in editing or preview mode
-        if (mChildList.size()
-            && preview_iter == sPreviewHighlightedElements.end()
+        // Draw the name if it's not a leaf node
+        if (getChildCount()
             && sDebugRectsShowNames)
         {
             S32 x, y;
@@ -1381,7 +1486,7 @@ void LLView::drawDebugRect()
 
             S32 depth = 0;
             LLView * viewp = this;
-            while (NULL != viewp)
+            while (nullptr != viewp)
             {
                 viewp = viewp->getParent();
                 depth++;
@@ -1411,7 +1516,12 @@ void LLView::drawChild(LLView* childp, S32 x_offset, S32 y_offset, bool force_dr
             LLUI::pushMatrix();
             {
                 LLUI::translate((F32)childp->getRect().mLeft + x_offset, (F32)childp->getRect().mBottom + y_offset);
+                // Said the same way drawChildren says it, so that a widget
+                // taken out of its parent from inside draw is caught wherever
+                // the parent draws it from.
+                childp->mInDraw = true;
                 childp->draw();
+                childp->mInDraw = false;
             }
             LLUI::popMatrix();
         }
@@ -1427,16 +1537,26 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
     S32 delta_width = width - getRect().getWidth();
     S32 delta_height = height - getRect().getHeight();
 
+    // Every view a cascade touches resolves to the same near-root ancestor and
+    // so asks for the same screen region; the walk that finds it is the cost,
+    // and in an inventory it is a pointer chase through twenty scattered views,
+    // fifteen hundred times. So the region is claimed once, here at the top,
+    // and updateBoundingRect stays quiet while this is running.
+    const bool outermost_reshape = (sReshapeDepth == 0);
+    ++sReshapeDepth;
+
     if (delta_width || delta_height || sForceReshape)
     {
+        ++sReshapeCount;
+
         // adjust our rectangle
         mRect.mRight = getRect().mLeft + width;
         mRect.mTop = getRect().mBottom + height;
 
         // move child views according to reshape flags
-        for (LLView* viewp : mChildList)
+        for (LLView* viewp : children())
         {
-            if (viewp != NULL)
+            if (viewp != nullptr)
             {
             LLRect child_rect( viewp->mRect );
 
@@ -1480,7 +1600,14 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
 
             S32 delta_x = child_rect.mLeft - viewp->getRect().mLeft;
             S32 delta_y = child_rect.mBottom - viewp->getRect().mBottom;
-            viewp->translate( delta_x, delta_y );
+            if (delta_x || delta_y)
+            {
+                // translate() recomputes a bounding rect and can dirty the
+                // screen. A child that did not move wants none of that, and on
+                // a width change none of them move -- a view that follows both
+                // edges keeps its left where it was.
+                viewp->translate( delta_x, delta_y );
+            }
             if (child_rect.getWidth() != viewp->getRect().getWidth()
                 || child_rect.getHeight() != viewp->getRect().getHeight()
                 || sForceReshape)
@@ -1500,13 +1627,19 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
     }
 
     updateBoundingRect();
+
+    --sReshapeDepth;
+    if (outermost_reshape && (delta_width || delta_height || sForceReshape))
+    {
+        dirtyRect();
+    }
 }
 
 LLRect LLView::calcBoundingRect()
 {
     LLRect local_bounding_rect = LLRect::null;
 
-    for (LLView* childp : mChildList)
+    for (LLView* childp : children())
     {
         // ignore invisible and "top" children when calculating bounding rect
         // such as combobox popups
@@ -1559,7 +1692,13 @@ void LLView::updateBoundingRect()
         getParent()->updateBoundingRect();
     }
 
-    if (mBoundingRect != cur_rect)
+    // A view that is not on screen has no screen region to repaint, and this is
+    // where a resize spends most of itself: dirtyRect walks to a near-root
+    // ancestor and takes its screen rect, and dragging an inventory floater's
+    // edge resizes two hundred thousand items, nearly all of them inside closed
+    // folders. Being shown marks the region itself -- see setVisible -- so the
+    // repaint is asked for at the moment there is something to repaint.
+    if (mBoundingRect != cur_rect && getVisible() && sReshapeDepth == 0 && sDeleteDepth == 0)
     {
         dirtyRect();
     }
@@ -1568,9 +1707,16 @@ void LLView::updateBoundingRect()
 
 LLRect LLView::calcScreenRect() const
 {
-    LLRect screen_rect;
-    localPointToScreen(0, 0, &screen_rect.mLeft, &screen_rect.mBottom);
-    localPointToScreen(getRect().getWidth(), getRect().getHeight(), &screen_rect.mRight, &screen_rect.mTop);
+    // One walk of the parent chain, not two. Both corners are offset from the
+    // screen by the same amount -- the second localPointToScreen was walking
+    // to the root again to add the width and height to an answer it already
+    // had -- and this is asked once per visible child per frame by
+    // drawChildren.
+    S32 origin_x, origin_y;
+    localPointToScreen(0, 0, &origin_x, &origin_y);
+
+    LLRect screen_rect = getRect();
+    screen_rect.translate(origin_x - screen_rect.mLeft, origin_y - screen_rect.mBottom);
     return screen_rect;
 }
 
@@ -1634,16 +1780,22 @@ bool LLView::hasAncestor(const LLView* parentp) const
 
 bool LLView::childHasKeyboardFocus(std::string_view childname) const
 {
-    LLView *focus = dynamic_cast<LLView *>(gFocusMgr.getKeyboardFocus());
+    // A child of this view by that name, which is what the name says. The walk
+    // up from the focused view passes every name between it and the root, so
+    // without knowing where this view sits on that walk it answered for any
+    // view of that name anywhere -- another floater's, or an ancestor's.
+    LLView* focus = gFocusMgr.getKeyboardFocusView();
+    if (!focus || !focus->hasAncestor(this))
+    {
+        return false;
+    }
 
-    while (focus != NULL)
+    for (; focus && focus != this; focus = focus->getParent())
     {
         if (focus->getName() == childname)
         {
             return true;
         }
-
-        focus = focus->getParent();
     }
 
     return false;
@@ -1653,7 +1805,7 @@ bool LLView::childHasKeyboardFocus(std::string_view childname) const
 
 bool LLView::hasChild(std::string_view childname, bool recurse) const
 {
-    return findChildView(childname, recurse) != NULL;
+    return findChildView(childname, recurse) != nullptr;
 }
 
 //-----------------------------------------------------------------------------
@@ -1669,7 +1821,7 @@ LLView* LLView::findChildView(std::string_view name, bool recurse) const
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     // Look for direct children *first*
-    for (LLView* childp : mChildList)
+    for (LLView* childp : children())
     {
         llassert(childp);
         if (childp->getName() == name)
@@ -1680,7 +1832,7 @@ LLView* LLView::findChildView(std::string_view name, bool recurse) const
     if (recurse)
     {
         // Look inside each child as well.
-        for (LLView* childp : mChildList)
+        for (LLView* childp : children())
         {
             llassert(childp);
             LLView* viewp = childp->findChildView(name, recurse);
@@ -1690,7 +1842,7 @@ LLView* LLView::findChildView(std::string_view name, bool recurse) const
             }
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 bool LLView::parentPointInView(S32 x, S32 y, EHitTestType type) const
@@ -1732,15 +1884,14 @@ void LLView::localPointToScreen(S32 local_x, S32 local_y, S32* screen_x, S32* sc
     *screen_x = local_x;
     *screen_y = local_y;
 
-    const LLView* cur = this;
-    do
+    // By reference: two of this rect's four fields are wanted and getRect
+    // hands back the whole thing, once per level of the tree.
+    for (const LLView* cur = this; cur; cur = cur->mParentView)
     {
-        LLRect cur_rect = cur->getRect();
+        const LLRect& cur_rect = cur->getRect();
         *screen_x += cur_rect.mLeft;
         *screen_y += cur_rect.mBottom;
-        cur = cur->mParentView;
     }
-    while( cur );
 }
 
 void LLView::screenRectToLocal(const LLRect& screen, LLRect* local) const
@@ -1781,23 +1932,25 @@ LLView* LLView::getRootView()
 
 LLView* LLView::findPrevSibling(LLView* child)
 {
-    child_list_t::iterator prev_it = std::find(mChildList.begin(), mChildList.end(), child);
-    if (prev_it != mChildList.end() && prev_it != mChildList.begin())
+    const child_list_t& list = children();
+    child_list_const_iter_t prev_it = std::find(list.begin(), list.end(), child);
+    if (prev_it != list.end() && prev_it != list.begin())
     {
         return *(--prev_it);
     }
-    return NULL;
+    return nullptr;
 }
 
 LLView* LLView::findNextSibling(LLView* child)
 {
-    child_list_t::iterator next_it = std::find(mChildList.begin(), mChildList.end(), child);
-    if (next_it != mChildList.end())
+    const child_list_t& list = children();
+    child_list_const_iter_t next_it = std::find(list.begin(), list.end(), child);
+    if (next_it != list.end())
     {
         next_it++;
     }
 
-    return (next_it != mChildList.end()) ? *next_it : NULL;
+    return (next_it != list.end()) ? *next_it : nullptr;
 }
 
 
@@ -1909,7 +2062,7 @@ void LLView::centerWithin(const LLRect& bounds)
 bool LLView::localPointToOtherView( S32 x, S32 y, S32 *other_x, S32 *other_y, const LLView* other_view) const
 {
     const LLView* cur_view = this;
-    const LLView* root_view = NULL;
+    const LLView* root_view = nullptr;
 
     while (cur_view)
     {
@@ -1923,8 +2076,10 @@ bool LLView::localPointToOtherView( S32 x, S32 y, S32 *other_x, S32 *other_y, co
         x += cur_view->getRect().mLeft;
         y += cur_view->getRect().mBottom;
 
-        cur_view = cur_view->getParent();
+        // The view, not its parent: taken after the walk this would be the
+        // null that ended it, and every tree's walk ends in the same null.
         root_view = cur_view;
+        cur_view = cur_view->getParent();
     }
 
     // assuming common root between two views, chase other_view's parents up to root
@@ -1934,14 +2089,14 @@ bool LLView::localPointToOtherView( S32 x, S32 y, S32 *other_x, S32 *other_y, co
         x -= cur_view->getRect().mLeft;
         y -= cur_view->getRect().mBottom;
 
-        cur_view = cur_view->getParent();
-
         if (cur_view == root_view)
         {
             *other_x = x;
             *other_y = y;
             return true;
         }
+
+        cur_view = cur_view->getParent();
     }
 
     *other_x = x;
@@ -1953,7 +2108,7 @@ bool LLView::localRectToOtherView( const LLRect& local, LLRect* other, const LLV
 {
     LLRect cur_rect = local;
     const LLView* cur_view = this;
-    const LLView* root_view = NULL;
+    const LLView* root_view = nullptr;
 
     while (cur_view)
     {
@@ -1965,8 +2120,9 @@ bool LLView::localRectToOtherView( const LLRect& local, LLRect* other, const LLV
 
         cur_rect.translate(cur_view->getRect().mLeft, cur_view->getRect().mBottom);
 
-        cur_view = cur_view->getParent();
+        // The view, not its parent -- see localPointToOtherView.
         root_view = cur_view;
+        cur_view = cur_view->getParent();
     }
 
     // assuming common root between two views, chase other_view's parents up to root
@@ -1975,13 +2131,13 @@ bool LLView::localRectToOtherView( const LLRect& local, LLRect* other, const LLV
     {
         cur_rect.translate(-cur_view->getRect().mLeft, -cur_view->getRect().mBottom);
 
-        cur_view = cur_view->getParent();
-
         if (cur_view == root_view)
         {
             *other = cur_rect;
             return true;
         }
+
+        cur_view = cur_view->getParent();
     }
 
     *other = cur_rect;
@@ -2019,7 +2175,7 @@ public:
 
         if(a_group < mDefaultTabGroup && b_group >= mDefaultTabGroup) return true;
         if(b_group < mDefaultTabGroup && a_group >= mDefaultTabGroup) return false;
-        return a_group > b_group;  // sort correctly if they're both on the same side of the default tab groupreturn a > b;
+        return a_group > b_group;  // sort correctly if they're both on the same side of the default tab group
     }
 private:
     // ok to store a reference, as this should only be allocated on stack during view query operations
@@ -2030,9 +2186,13 @@ private:
 class SortByTabOrder : public LLQuerySorter, public LLSingleton<SortByTabOrder>
 {
     LLSINGLETON_EMPTY_CTOR(SortByTabOrder);
-    /*virtual*/ void sort(LLView * parent, LLView::child_list_t &children) const override
+    /*virtual*/ void sort(LLView * parent, viewList_t &children) const override
     {
-        children.sort(CompareByTabOrder(parent->getTabOrder(), parent->getDefaultTabGroup()));
+        // Stable: the comparator answers equal for two views in the same tab
+        // group, and what orders those is the order they were added in, which
+        // is what the caller handed over. std::sort would shuffle them.
+        std::stable_sort(children.begin(), children.end(),
+                         CompareByTabOrder(parent->getTabOrder(), parent->getDefaultTabGroup()));
     }
 };
 
@@ -2054,7 +2214,7 @@ const LLViewQuery & LLView::getTabOrderQuery()
 class LLFocusRootsFilter : public LLQueryFilter, public LLSingleton<LLFocusRootsFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLFocusRootsFilter);
-    /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override
+    /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const override
     {
         return filterResult_t(view->isCtrl() && view->isFocusRoot(), !view->isFocusRoot());
     }
@@ -2092,11 +2252,11 @@ LLView* LLView::findSnapRect(LLRect& new_rect, const LLCoordGL& mouse_dir,
                              LLView::ESnapType snap_type, S32 threshold, S32 padding)
 {
     new_rect = mRect;
-    LLView* snap_view = NULL;
+    LLView* snap_view = nullptr;
 
     if (!mParentView)
     {
-        return NULL;
+        return nullptr;
     }
 
     S32 delta_x = 0;
@@ -2160,10 +2320,10 @@ LLView* LLView::findSnapEdge(S32& new_edge_val, const LLCoordGL& mouse_dir, ESna
     if (!mParentView)
     {
         new_edge_val = snap_pos;
-        return NULL;
+        return nullptr;
     }
 
-    LLView* snap_view = NULL;
+    LLView* snap_view = nullptr;
 
     // If the view is near the edge of its parent, snap it to
     // the edge.
@@ -2242,7 +2402,7 @@ LLView* LLView::findSnapEdge(S32& new_edge_val, const LLCoordGL& mouse_dir, ESna
                 }
                 // if snapped with sibling along other axis, check for shared edge
                 else if (llabs(sibling_rect.mTop - (test_rect.mBottom - padding)) <= y_threshold
-                    || llabs(sibling_rect.mBottom - (test_rect.mTop + padding)) <= x_threshold)
+                    || llabs(sibling_rect.mBottom - (test_rect.mTop + padding)) <= y_threshold)
                 {
                     if (llabs(test_rect.mRight - sibling_rect.mRight) <= x_threshold
                         && (test_rect.mRight - sibling_rect.mRight) * mouse_dir.mX <= 0)
@@ -2375,7 +2535,7 @@ void LLView::initFromParams(const LLView::Params& params)
         setName(params.name());
     }
 
-    mLayout = params.layout();
+    mLayoutTopLeft = (params.layout() == "topleft");
 }
 
 void LLView::parseFollowsFlags(const LLView::Params& params)
@@ -2391,38 +2551,40 @@ void LLView::parseFollowsFlags(const LLView::Params& params)
     {
         setFollows(FOLLOWS_NONE);
 
-        std::string follows = params.follows.string;
+        // Split in place. This runs for every widget a floater builds, and a
+        // boost::tokenizer here copied the whole attribute and then allocated
+        // a std::string for each of the two or three names inside it, to
+        // compare each against five short literals and throw it away.
+        // Bound through a reference: if the accessor ever returns by value, a
+        // view taken straight off it would outlive what it points at.
+        const std::string& follows_str = params.follows.string;
+        const std::string_view follows = follows_str;
 
-        typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-        boost::char_separator<char> sep("|");
-        tokenizer tokens(follows, sep);
-        tokenizer::iterator token_iter = tokens.begin();
-
-        while(token_iter != tokens.end())
+        U32 flags = FOLLOWS_NONE;
+        for (size_t start = 0; start <= follows.size(); )
         {
-            const std::string& token_str = *token_iter;
-            if (token_str == "left")
+            const size_t bar = follows.find('|', start);
+            const std::string_view token =
+                follows.substr(start, bar == std::string_view::npos ? std::string_view::npos : bar - start);
+
+            if      (token == "left")   { flags |= FOLLOWS_LEFT; }
+            else if (token == "right")  { flags |= FOLLOWS_RIGHT; }
+            else if (token == "top")    { flags |= FOLLOWS_TOP; }
+            else if (token == "bottom") { flags |= FOLLOWS_BOTTOM; }
+            else if (token == "all")    { flags |= FOLLOWS_ALL; }
+            // The word for no edges at all. It was always the effect of
+            // writing anything the four names do not cover; naming it makes
+            // "this element follows nothing" something a file can say on
+            // purpose rather than by writing a token that is ignored.
+            else if (token == "none")   { flags |= FOLLOWS_NONE; }
+
+            if (bar == std::string_view::npos)
             {
-                setFollowsLeft();
+                break;
             }
-            else if (token_str == "right")
-            {
-                setFollowsRight();
-            }
-            else if (token_str == "top")
-            {
-                setFollowsTop();
-            }
-            else if (token_str == "bottom")
-            {
-                setFollowsBottom();
-            }
-            else if (token_str == "all")
-            {
-                setFollowsAll();
-            }
-            ++token_iter;
+            start = bar + 1;
         }
+        setFollows(flags);
     }
     else if (params.follows.flags.isChosen())
     {
@@ -2430,20 +2592,6 @@ void LLView::parseFollowsFlags(const LLView::Params& params)
     }
 }
 
-
-// static
-//LLFontGL::HAlign LLView::selectFontHAlign(LLXMLNodePtr node)
-//{
-//  LLFontGL::HAlign gl_hfont_align = LLFontGL::LEFT;
-//
-//  if (node->hasAttribute("halign"))
-//  {
-//      std::string horizontal_align_name;
-//      node->getAttributeString("halign", horizontal_align_name);
-//      gl_hfont_align = LLFontGL::hAlignFromName(horizontal_align_name);
-//  }
-//  return gl_hfont_align;
-//}
 
 // Return the rectangle of the last-constructed child,
 // if present and a first-class widget (eg, not a close box or drag handle)
@@ -2467,7 +2615,7 @@ static bool get_last_child_rect(LLView* parent, LLRect *rect)
 }
 
 //static
-void LLView::applyXUILayout(LLView::Params& p, LLView* parent, LLRect layout_rect)
+void LLView::applyXUILayout(LLView::Params& p, LLView* parent, LLRect layout_rect, const LLRect* after)
 {
     if (!parent) return;
 
@@ -2478,7 +2626,7 @@ void LLView::applyXUILayout(LLView::Params& p, LLView* parent, LLRect layout_rec
     // the default is also "topleft".  JC
     if (p.layout().empty())
     {
-        p.layout = parent->getLayout();
+        p.layout = parent->isLayoutTopLeft() ? "topleft" : "bottomleft";
     }
 
     if (layout_rect.isEmpty())
@@ -2528,8 +2676,20 @@ void LLView::applyXUILayout(LLView::Params& p, LLView* parent, LLRect layout_rec
 
     default_rect.translate(0, default_rect.getHeight());
 
-    // If there was a recently constructed child, use its rectangle
-    get_last_child_rect(parent, &default_rect);
+    if (after)
+    {
+        // What a pad or a delta is measured from, said outright. The list of
+        // children answers that during a build, because the child being
+        // placed is the last one on it -- afterwards every child is on it and
+        // the list cannot say which one came before which. A caller placing a
+        // child again knows, and this is where it says so.
+        default_rect = *after;
+    }
+    else
+    {
+        // If there was a recently constructed child, use its rectangle
+        get_last_child_rect(parent, &default_rect);
+    }
 
     if (layout_topleft)
     {
@@ -2678,6 +2838,38 @@ LLView::root_to_view_iterator_t LLView::endRootToView()
 }
 
 
+LLView::child_list_t& LLView::childList()
+{
+    if (!mChildList)
+    {
+        mChildList = new child_list_t();
+    }
+    return *mChildList;
+}
+
+LLView::child_tab_order_t& LLView::tabOrder()
+{
+    if (!mTabOrder)
+    {
+        mTabOrder = new child_tab_order_t();
+    }
+    return *mTabOrder;
+}
+
+const LLView::child_list_t& LLView::children() const
+{
+    // Shared, and const: a view with no children has nothing of its own to
+    // walk, and allocating a list to say so is what this avoids.
+    static const child_list_t no_children;
+    return mChildList ? *mChildList : no_children;
+}
+
+const LLView::child_tab_order_t& LLView::getTabOrder() const
+{
+    static const child_tab_order_t no_tab_order;
+    return mTabOrder ? *mTabOrder : no_tab_order;
+}
+
 // only create maps on demand, as they incur heap allocation/deallocation cost
 // when a view is constructed/deconstructed
 LLView& LLView::getDefaultWidgetContainer() const
@@ -2701,10 +2893,14 @@ S32 LLView::notifyParent(const LLSD& info)
 }
 bool    LLView::notifyChildren(const LLSD& info)
 {
+    // Every child, not every child up to the first one that says yes. The
+    // answer is whether anybody handled it, and a message sent to a panel to
+    // have each of its accordions store its state is one every accordion has
+    // to see.
     bool ret = false;
-    for (LLView* childp : mChildList)
+    for (LLView* childp : children())
     {
-        ret = ret || childp->notifyChildren(info);
+        ret |= childp->notifyChildren(info);
     }
     return ret;
 }

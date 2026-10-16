@@ -1,0 +1,7 @@
+self-hosted-runner:
+  # Runner images newer than actionlint's list of GitHub-hosted labels.
+  labels:
+    - ubuntu-26.04
+    - ubuntu-26.04-arm
+    - windows-11-vs2026-arm
+    - xcode-27

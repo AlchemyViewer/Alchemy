@@ -283,7 +283,7 @@ void LLFloaterRegionRestartSchedule::requestRegionShcheduleCoro(std::string url,
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
-    LLFloaterRegionRestartSchedule* floater = dynamic_cast<LLFloaterRegionRestartSchedule*>(handle.get());
+    LLFloaterRegionRestartSchedule* floater = ALViewType::as<LLFloaterRegionRestartSchedule>(handle.get());
     if (!floater)
     {
         LL_DEBUGS("Region") << "Region Restart Schedule floater is already dead" << LL_ENDL;
@@ -378,7 +378,7 @@ void LLFloaterRegionRestartSchedule::setRegionShcheduleCoro(std::string url, LLS
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
-    LLFloaterRegionRestartSchedule* floater = dynamic_cast<LLFloaterRegionRestartSchedule*>(handle.get());
+    LLFloaterRegionRestartSchedule* floater = ALViewType::as<LLFloaterRegionRestartSchedule>(handle.get());
     if (floater)
     {
         floater->closeFloater();

@@ -50,8 +50,7 @@ public:
     void                setEmptyLookupMessage(const std::string& message) { }
     std::string         getEmptyLookupMessage(bool is_empty_folder = false) const { return mEmpty; }
     bool                showAllResults() const { return true; }
-    std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const { return std::string::npos; }
-    std::string::size_type getFilterStringSize() const { return 0; }
+    Match getFilterMatch(LLFolderViewModelItem*) const { return Match(); }
 
     bool                isActive() const { return false; }
     bool                isModified() const { return false; }

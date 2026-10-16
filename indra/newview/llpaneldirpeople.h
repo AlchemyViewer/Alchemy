@@ -31,15 +31,17 @@
 class LLLineEditor;
 class LLFloaterDirectory;
 
-class LLPanelDirPeople : public LLPanelDirBrowser
+class LLPanelDirPeople final : public LLPanelDirBrowser
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirPeople, LLPanelDirBrowser);
+
     LLPanelDirPeople();
     virtual ~LLPanelDirPeople();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    /*virtual*/ void performQuery();
+    /*virtual*/ void performQuery() override;
 
     static void onClickSearch(void *userdata);
     static void onKeystrokeName(LLLineEditor* line, void* data);

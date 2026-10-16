@@ -71,7 +71,7 @@ LLSlider::LLSlider(const LLSlider::Params& p)
     mMouseDownSignal(NULL),
     mMouseUpSignal(NULL)
 {
-    mViewModel->setValue(p.initial_value);
+    viewModel()->setValue(p.initial_value);
     updateThumbRect();
     mDragStartThumbRect = mThumbRect;
     setControlName(p.control_name, NULL);

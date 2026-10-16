@@ -706,7 +706,7 @@ bool start_chat( EKeystate s )
 
 bool start_gesture( EKeystate s )
 {
-    LLUICtrl* focus_ctrlp = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl* focus_ctrlp = gFocusMgr.getKeyboardFocusCtrl();
     if (KEYSTATE_UP == s &&
         ! (focus_ctrlp && focus_ctrlp->acceptsTextInput()))
     {
@@ -1699,6 +1699,9 @@ bool LLViewerInput::scanKey(const std::vector<LLKeyboardBinding> &binding,
                                bool key_level,
                                bool repeat) const
 {
+    // In world either Control is Control on the Mac, as it always was: the
+    // Mac's own key is told apart from Command for the UI's sake alone.
+    mask = LLKeyboard::foldMacControl(mask);
     for (S32 i = 0; i < binding_count; i++)
     {
         if (binding[i].mKey == key)

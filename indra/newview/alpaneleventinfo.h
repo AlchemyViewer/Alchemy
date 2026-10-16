@@ -34,9 +34,11 @@
 #include "llpanel.h"
 #include "lleventnotifier.h"
 
-class ALPanelEventInfo : public LLPanel
+class ALPanelEventInfo final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALPanelEventInfo, LLPanel);
+
     ALPanelEventInfo();
     /*virtual*/ bool postBuild() override;
     /*virtual*/ void onOpen(const LLSD& key) override;

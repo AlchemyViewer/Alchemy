@@ -70,7 +70,7 @@ LLVOGrass::LLVOGrass(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regi
 :   LLAlphaObject(id, pcode, regionp)
 {
     mPatch               = NULL;
-    mLastPatchUpdateTime = 0;
+    mLastPatchUpdateCount = 0;
     mGrassVel.clearVec();
     mGrassBend.clearVec();
     mbCanSelect          = true;
@@ -213,7 +213,8 @@ void LLVOGrass::initClass()
     {
         if (1)   //(i%2 == 0)           Uncomment for X blading
         {
-            F32 u = sqrt(-2.0f * log(ll_frand()));
+            // Box-Muller, over (0, 1]: log(0) would put the blade at infinity.
+            F32 u = sqrt(-2.0f * log(1.f - ll_frand()));
             F32 v = 2.0f * F_PI * ll_frand();
 
             x = u * sin(v) * GRASS_DISTRIBUTION_SD;
@@ -295,7 +296,7 @@ void LLVOGrass::idleUpdate(LLAgent &agent, const F64 &time)
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
         return;
     }
-    if (mPatch && (mLastPatchUpdateTime != mPatch->getLastUpdateTime()))
+    if (mPatch && (mLastPatchUpdateCount != mPatch->getUpdateCount()))
     {
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
     }
@@ -477,7 +478,7 @@ void LLVOGrass::getGeometry(S32 idx,
 
     mPatch = mRegionp->getLand().resolvePatchRegion(getPositionRegion());
     if (mPatch)
-        mLastPatchUpdateTime = mPatch->getLastUpdateTime();
+        mLastPatchUpdateCount = mPatch->getUpdateCount();
 
     LLVector3 position;
     // Create random blades of grass with gaussian distribution

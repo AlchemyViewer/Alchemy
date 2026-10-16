@@ -217,7 +217,7 @@ struct CompareProbeDistance
 
 static F32 update_score(LLReflectionMap* p)
 {
-    return gFrameTimeSeconds - p->mLastUpdateTime  - p->mDistance*0.1f;
+    return (F32)(gFrameTimeSeconds - p->mLastUpdateTime) - p->mDistance*0.1f;
 }
 
 // return true if a is higher priority for an update than b
@@ -327,7 +327,7 @@ void LLReflectionMapManager::update()
     if (!mRenderTarget.isComplete())
     {
         U32 color_fmt = render_hdr ? GL_R11F_G11F_B10F : GL_RGB8;
-        U32 targetRes = mProbeResolution * 4; // super sample
+        U32 targetRes = mProbeResolution * mSuperSample; // super sample
         mRenderTarget.allocate(targetRes, targetRes, color_fmt, true);
     }
 
@@ -341,6 +341,23 @@ void LLReflectionMapManager::update()
         {
             mMipChain[i].allocate(res, res, render_hdr ? GL_R11F_G11F_B10F : GL_RGB8);
             res /= 2;
+        }
+    }
+
+    {
+        // Scratch for the row-parallel SH projection in updateProbeFace: nine coefficients wide,
+        // one row per face row of the mip it integrates. Sized here, outside the reset guard in
+        // initReflectionMaps, so a change of ALProbeSHProjectionRes resizes this and nothing else.
+        static LLCachedControl<bool> two_pass(gSavedSettings, "ALProbeSHProjectionTwoPass", true);
+        S32 sh_mip = 0;
+        const U32 sh_rows = two_pass ? 6 * shProjectionRes(sh_mip) : 0;
+        if (mSHPartial.isComplete() && mSHPartial.getHeight() != sh_rows)
+        {
+            mSHPartial.release();
+        }
+        if (sh_rows > 0 && !mSHPartial.isComplete())
+        {
+            mSHPartial.allocate(LL_SH_COEFF_COUNT, sh_rows, GL_RGBA16F);
         }
     }
 
@@ -384,12 +401,6 @@ void LLReflectionMapManager::update()
     LLReflectionMap* oldestProbe = nullptr;
     LLReflectionMap* oldestOccluded = nullptr;
 
-    if (mUpdatingProbe != nullptr)
-    {
-        did_update = true;
-        doProbeUpdate();
-    }
-
     // Occlusion state only means anything for as long as the queries that produce it keep
     // running, and they stop whenever LLPipeline::sUseOcclusion drops out of its "query"
     // level -- the UseOcclusion setting, a feature-table veto, or simply turning on wireframe.
@@ -402,7 +413,7 @@ void LLReflectionMapManager::update()
     {
         for (auto& probe : mProbes)
         {
-            probe->mOccluded = false;
+            probe->clearOcclusion();
         }
     }
 
@@ -457,6 +468,24 @@ void LLReflectionMapManager::update()
 
             probe->mInsideManualProbe = eclipsed;
         }
+    }
+
+    // A probe that stopped being relevant partway through its twelve passes is dropped rather than
+    // finished, by the same rule the scheduling loop below uses to skip one. Every remaining pass
+    // renders the whole scene for a probe that is about to lose its cube slot in the release pass,
+    // or, when whatever registered it is gone, to be deleted outright. It comes after the eclipse
+    // pass above so that it judges on this frame's mInsideManualProbe, as the scheduling loop does:
+    // judged on last frame's, a probe whose eclipser had just gone would be abandoned here, found
+    // relevant again a few lines later, and start its twelve passes over.
+    if (mUpdatingProbe != nullptr && mUpdatingProbe != mDefaultProbe && !mUpdatingProbe->isRelevant())
+    {
+        abandonProbeUpdate();
+    }
+
+    if (mUpdatingProbe != nullptr)
+    {
+        did_update = true;
+        doProbeUpdate();
     }
 
     // Update distance to camera for all probes.
@@ -520,7 +549,7 @@ void LLReflectionMapManager::update()
             // would otherwise start out culled by a query taken back when it still had
             // something to show, and need two more occlusion passes to say so -- on top of the
             // twelve it needs to regenerate.
-            probe->mOccluded = false;
+            probe->clearOcclusion();
         }
     }
 
@@ -680,7 +709,6 @@ void LLReflectionMapManager::refreshSettings()
     mRenderReflectionProbeLevel = gSavedSettings.getS32("RenderReflectionProbeLevel");
     mRenderReflectionProbeCount = gSavedSettings.getU32("RenderReflectionProbeCount");
     mRenderReflectionProbeDynamicAllocation = gSavedSettings.getS32("RenderReflectionProbeDynamicAllocation");
-    cleanupQueryPool();
 }
 
 LLReflectionMap* LLReflectionMapManager::addProbe(LLSpatialGroup* group)
@@ -730,25 +758,6 @@ U32 LLReflectionMapManager::probeMemory()
     return (mDynamicProbeCount * 6 * (mProbeResolution * mProbeResolution) * 4) / 1024 / 1024;
 }
 
-GLuint LLReflectionMapManager::allocateQuery()
-{
-    if (mQueryPool.empty())
-    {
-        GLuint query;
-        glGenQueries(1, &query);
-        return query;
-    }
-
-    GLuint query = mQueryPool.front();
-    mQueryPool.pop_front();
-    return query;
-}
-
-void LLReflectionMapManager::recycleQuery(GLuint query)
-{
-    mQueryPool.push_back(query);
-}
-
 struct CompareProbeDepth
 {
     bool operator()(const LLReflectionMap* lhs, const LLReflectionMap* rhs)
@@ -761,8 +770,7 @@ void LLReflectionMapManager::getReflectionMaps(std::vector<LLReflectionMap*>& ma
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
 
-    LLMatrix4a modelview;
-    modelview.loadu(gGLModelView);
+    const LLMatrix4a& modelview = LLViewerCamera::getCurrent().getModelview();
     LLVector4a oa; // scratch space for transformed origin
 
     // Occlusion is measured from the main camera, so it says nothing about what a probe capture
@@ -895,8 +903,7 @@ void LLReflectionMapManager::deleteProbe(U32 i)
     }
     if (mUpdatingProbe == probe)
     {
-        mUpdatingProbe = nullptr;
-        mUpdatingFace = 0;
+        abandonProbeUpdate();
     }
 
     // remove from any Neighbors lists
@@ -909,6 +916,18 @@ void LLReflectionMapManager::deleteProbe(U32 i)
 
     // Probes are distance sorted, order matters.
     mProbes.erase(mProbes.begin() + i);
+}
+
+void LLReflectionMapManager::abandonProbeUpdate()
+{
+    mUpdatingProbe = nullptr;
+    mUpdatingFace = 0;
+
+    // The irradiance half runs first and the radiance half is what marks a probe complete. Left
+    // set, this would start the next probe on its radiance half: it would skip the irradiance
+    // projection altogether and be marked complete on whatever SH coefficients its slot's
+    // previous owner left behind.
+    mRadiancePass = false;
 }
 
 
@@ -1150,38 +1169,102 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
             // The old pass re-integrated the environment once per output texel; this integrates
             // it once, into the only nine numbers irradiance actually has.
             //
-            // Integrate a mip whose faces are mSHProjectionRes, not mip 0. Averaging texels
+            // Integrate the mip ALProbeSHProjectionRes asks for, not mip 0. Averaging texels
             // before an integral does not change the integral, and the target basis cannot
             // represent anything the finer mip would add.
             S32 sh_mip = 0;
-            U32 sh_res = mProbeResolution;
-            while (sh_res > mSHProjectionRes && (size_t)(sh_mip + 1) < mMipChain.size())
+            const U32 sh_res = shProjectionRes(sh_mip);
+
+            // The last draw is the same for both forms below: nine fragments write this probe's
+            // row of mSHCoeffs. This probe owns one row and must not disturb any other, so the
+            // viewport is the write mask -- the target is never cleared.
+            auto draw_coefficients = [&](LLGLSLShader& program)
             {
-                sh_res >>= 1;
-                ++sh_mip;
+                program.uniform1i(LLShaderMgr::U_WIDTH, (S32)sh_res);
+
+                mSHCoeffs.bindTarget();
+                glViewport(0, probe->mCubeIndex, LL_SH_COEFF_COUNT, 1);
+
+                mVertexBuffer->setBuffer();
+                mVertexBuffer->drawArrays(gGL.TRIANGLE_STRIP, 0, 4);
+
+                mSHCoeffs.flush();
+                program.unbind();
+            };
+
+            static LLCachedControl<bool> two_pass(gSavedSettings, "ALProbeSHProjectionTwoPass", true);
+            const U32 sh_rows = 6 * sh_res;
+            if (two_pass && mSHPartial.isComplete() && mSHPartial.getHeight() == sh_rows)
+            {
+                // Row-parallel form: 9 x 6R fragments each integrate one face row into
+                // mSHPartial, then nine fragments add the rows. The single-pass form below
+                // serialises the whole cube inside each of nine fragments, which is what made
+                // it a multi-millisecond stall however few texels it read.
+                {
+                    LL_PROFILE_GPU_ZONE("probe sh rows");
+                    gSHProjectionRowsProgram.bind();
+                    S32 channel = gSHProjectionRowsProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
+                    mTexture->bind(channel);
+
+                    gSHProjectionRowsProgram.uniform1i(LLShaderMgr::SOURCE_IDX, sourceIdx);
+                    gSHProjectionRowsProgram.uniform1f(LLShaderMgr::MIP_LEVEL, (GLfloat)sh_mip);
+                    gSHProjectionRowsProgram.uniform1i(LLShaderMgr::U_WIDTH, (S32)sh_res);
+
+                    mSHPartial.bindTarget();
+                    // bindTarget sets the viewport to the whole target, which is exactly this
+                    // strip; restated because the draw depends on it.
+                    glViewport(0, 0, LL_SH_COEFF_COUNT, sh_rows);
+
+                    mVertexBuffer->setBuffer();
+                    mVertexBuffer->drawArrays(gGL.TRIANGLE_STRIP, 0, 4);
+
+                    mSHPartial.flush();
+                    gSHProjectionRowsProgram.unbind();
+                }
+                {
+                    LL_PROFILE_GPU_ZONE("probe sh reduce");
+                    gSHProjectionReduceProgram.bind();
+                    // texelFetch source: point sampled, so nothing is filtered across rows
+                    gSHProjectionReduceProgram.bindTexture(LLShaderMgr::SH_PARTIAL, &mSHPartial, ALSamplers::PointClamp);
+                    draw_coefficients(gSHProjectionReduceProgram);
+                }
             }
+            else
+            {
+                // Single pass: nine fragments each walk the whole cube. Kept for A/B captures
+                // and as the fallback when the partial target is not there.
+                gSHProjectionProgram.bind();
+                S32 channel = gSHProjectionProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
+                mTexture->bind(channel);
 
-            gSHProjectionProgram.bind();
-            S32 channel = gSHProjectionProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
-            mTexture->bind(channel);
-
-            gSHProjectionProgram.uniform1i(LLShaderMgr::SOURCE_IDX, sourceIdx);
-            gSHProjectionProgram.uniform1f(LLShaderMgr::MIP_LEVEL, (GLfloat)sh_mip);
-            gSHProjectionProgram.uniform1i(LLShaderMgr::U_WIDTH, (S32)sh_res);
-
-            mSHCoeffs.bindTarget();
-            // This probe owns one row and must not disturb any other, so the viewport is the
-            // write mask -- the target is never cleared.
-            glViewport(0, probe->mCubeIndex, LL_SH_COEFF_COUNT, 1);
-
-            mVertexBuffer->setBuffer();
-            mVertexBuffer->drawArrays(gGL.TRIANGLE_STRIP, 0, 4);
-
-            mSHCoeffs.flush();
-
-            gSHProjectionProgram.unbind();
+                gSHProjectionProgram.uniform1i(LLShaderMgr::SOURCE_IDX, sourceIdx);
+                gSHProjectionProgram.uniform1f(LLShaderMgr::MIP_LEVEL, (GLfloat)sh_mip);
+                draw_coefficients(gSHProjectionProgram);
+            }
         }
     }
+}
+
+U32 LLReflectionMapManager::shProjectionRes(S32& mip) const
+{
+    // Face edge length the SH projection integrates over. Irradiance is band-limited to nine
+    // coefficients, so this only has to be fine enough not to alias the source before the
+    // integral -- it is not an output resolution and does not bound reconstruction quality.
+    // scripts/content_tools/check_sh_projection.py puts the 8x8 default within half a percent
+    // of a 128x128 integration; 4x4 is the floor, where that error passes one percent. The
+    // cost scales with the texel count, so 32 (the old fixed value) is sixteen times 8.
+    static LLCachedControl<S32> projection_res(gSavedSettings, "ALProbeSHProjectionRes", 8);
+    const U32 target = llmin((U32)llmax((S32)projection_res, 4), mProbeResolution);
+
+    // Every probe resolution writes mips down to 2x2, so the walk always reaches the target.
+    mip = 0;
+    U32 res = mProbeResolution;
+    while (res > target && (size_t)(mip + 1) < mMipChain.size())
+    {
+        res >>= 1;
+        ++mip;
+    }
+    return res;
 }
 
 void LLReflectionMapManager::reset()
@@ -1302,8 +1385,7 @@ void LLReflectionMapManager::updateUniforms()
     }
 
     // load modelview matrix into matrix 4a
-    LLMatrix4a modelview;
-    modelview.loadu(gGLModelView);
+    const LLMatrix4a& modelview = LLViewerCamera::getCurrent().getModelview();
     LLVector4a oa; // scratch space for transformed origin
 
     S32 count = 0;
@@ -1497,7 +1579,7 @@ void LLReflectionMapManager::updateUniforms()
             LLViewerObject* vobj = probe->mViewerObject;
             if (vobj)
             {
-                F32 time = (F32)gFrameTimeSeconds - probe->mLastUpdateTime;
+                F32 time = (F32)(gFrameTimeSeconds - probe->mLastUpdateTime);
                 vobj->setDebugText(llformat("%d/%d/%d/%.1f - %.1f/%.1f", probe->mCubeIndex, probe->mProbeIndex, (U32) probe->mNeighbors.size(), probe->mMinDepth, probe->mMaxDepth, time), time > 1.f ? LLColor4::white : LLColor4::green);
             }
         }
@@ -1621,6 +1703,18 @@ void LLReflectionMapManager::initReflectionMaps()
 {
     static LLCachedControl<U32> ref_probe_res(gSavedSettings, "RenderReflectionProbeResolution", 128U);
     U32 probe_resolution = nhpo2(llclamp(ref_probe_res(), (U32)64, (U32)512));
+
+    // The supersample factor sizes the scratch target and, through LLPipeline, the aux pack a
+    // face renders into; a change is applied like a resolution change, by the listener that
+    // rebuilds the GL buffers (handleReflectionProbeDetailChanged), so here it only has to be
+    // read. 1, 2 or 4: the blur and downsample below assume a power of two.
+    static LLCachedControl<S32> super_sample(gSavedSettings, "ALProbeSuperSample", 4);
+    const U32 supersample = super_sample >= 4 ? 4u : (super_sample >= 2 ? 2u : 1u);
+    if (supersample != mSuperSample)
+    {
+        mSuperSample = supersample;
+        mRenderTarget.release();
+    }
     // No irradiance resolution to size any more: irradiance is nine SH coefficients whatever
     // the environment looks like, so the setting that used to pick a cubemap edge length is gone.
     if (mTexture.isNull() || mReflectionProbeCount != mDynamicProbeCount || mProbeResolution != probe_resolution ||
@@ -1688,7 +1782,7 @@ void LLReflectionMapManager::initReflectionMaps()
             // them standing could not clear a probe that was stuck on either -- and this is the
             // path a teleport, a sky change or a probe-count change goes through, which is
             // exactly where someone would expect to get their probes back.
-            probe->mOccluded = false;
+            probe->clearOcclusion();
             probe->mInsideManualProbe = false;
         }
 
@@ -1749,34 +1843,21 @@ void LLReflectionMapManager::cleanup()
 
     mTexture = nullptr;
     mSHCoeffs.release();
+    mSHPartial.release();
 
     mProbes.clear();
     mKillList.clear();
     mCreateList.clear();
 
     mReflectionMaps.clear();
-    mUpdatingFace = 0;
+    abandonProbeUpdate();
 
     mDefaultProbe = nullptr;
-    mUpdatingProbe = nullptr;
 
     mUBO.release();
 
-    cleanupQueryPool();
-
     // note: also called on teleport (not just shutdown), so make sure we're in a good "starting" state
     initCubeFree();
-}
-
-void LLReflectionMapManager::cleanupQueryPool()
-{
-    if (!mQueryPool.empty())
-    {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("cleanup query pool");
-        std::vector<GLuint> queries(mQueryPool.begin(), mQueryPool.end());
-        glDeleteQueries(static_cast<GLsizei>(queries.size()), queries.data());
-        mQueryPool.clear();
-    }
 }
 
 void LLReflectionMapManager::doOcclusion()
@@ -1798,7 +1879,7 @@ void LLReflectionMapManager::doOcclusion()
         // culled by a query taken while it had something to show, not by one taken before.
         if (probe->mCubeIndex == -1 || !probe->isRelevant())
         {
-            probe->mOccluded = false;
+            probe->clearOcclusion();
             continue;
         }
 

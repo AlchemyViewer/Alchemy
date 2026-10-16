@@ -48,6 +48,9 @@ class ALPanelBlockBase
 public:
     virtual const std::string& getFilterString() const = 0;
     virtual void               setFilterString(const std::string& strFilter) = 0;
+
+    // The interface behind a view, for the two panels that implement it.
+    static ALPanelBlockBase* fromView(LLView* view);
 };
 
 // ============================================================================
@@ -57,6 +60,8 @@ public:
 class ALPanelBlockList final : public LLPanel, public LLMuteListObserver, public ALPanelBlockBase
 {
 public:
+    AL_VIEW_TYPE(ALPanelBlockList, LLPanel);
+
     ALPanelBlockList();
     ~ALPanelBlockList();
 
@@ -114,6 +119,8 @@ protected:
 class ALPanelDerenderList final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALPanelDerenderList, LLPanel);
+
     ALPanelDerenderList();
     ~ALPanelDerenderList();
 
@@ -153,6 +160,8 @@ protected:
 class ALPanelAssetBlocklist final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALPanelAssetBlocklist, LLPanel);
+
     ALPanelAssetBlocklist();
     ~ALPanelAssetBlocklist();
 
@@ -193,6 +202,8 @@ class ALPanelAvatarRendering final : public LLPanel, public LLMuteListObserver, 
 {
     friend class ALPanelAvatarRenderingContextMenu;
 public:
+    AL_VIEW_TYPE(ALPanelAvatarRendering, LLPanel);
+
     ALPanelAvatarRendering();
     ~ALPanelAvatarRendering();
 
@@ -249,6 +260,8 @@ protected:
 class ALFloaterBlocked final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(ALFloaterBlocked, LLFloater);
+
     ALFloaterBlocked(const LLSD& sdKey);
     ~ALFloaterBlocked();
 
@@ -282,5 +295,18 @@ protected:
     LLFilterEditor* m_pFilterEditor = nullptr;
     LLTabContainer* m_pBlockedTabs = nullptr;
 };
+
+inline ALPanelBlockBase* ALPanelBlockBase::fromView(LLView* view)
+{
+    if (ALPanelBlockList* list = ALViewType::as<ALPanelBlockList>(view))
+    {
+        return list;
+    }
+    if (ALPanelAvatarRendering* rendering = ALViewType::as<ALPanelAvatarRendering>(view))
+    {
+        return rendering;
+    }
+    return nullptr;
+}
 
 // ============================================================================

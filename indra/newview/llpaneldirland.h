@@ -32,15 +32,17 @@
 class LLUICtrl;
 class LLPanelDirBrowser;
 
-class LLPanelDirLand : public LLPanelDirBrowser
+class LLPanelDirLand final : public LLPanelDirBrowser
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirLand, LLPanelDirBrowser);
+
     LLPanelDirLand();
     /*virtual*/ ~LLPanelDirLand();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    void performQuery();
+    void performQuery() override;
 
 protected:
     void onClickSort();

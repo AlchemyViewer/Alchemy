@@ -46,6 +46,8 @@ class ALChatBar final
 :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(ALChatBar, LLFloater);
+
     // constructor for inline chat-bars (e.g. hosted in chat history window)
     ALChatBar(const LLSD& key);
 

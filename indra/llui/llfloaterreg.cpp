@@ -67,6 +67,26 @@ bool LLFloaterReg::isRegistered(std::string_view name)
 }
 
 //static
+std::string LLFloaterReg::findNameForFile(std::string_view file)
+{
+    for (const auto& [name, data] : sBuildMap)
+    {
+        if (data.mFile == file)
+        {
+            return name;
+        }
+    }
+    return LLStringUtil::null;
+}
+
+//static
+const LLFloaterReg::BuildData* LLFloaterReg::getBuildData(std::string_view name)
+{
+    const build_map_t::const_iterator found = sBuildMap.find(name);
+    return found == sBuildMap.end() ? nullptr : &found->second;
+}
+
+//static
 LLFloater* LLFloaterReg::getLastFloaterInGroup(std::string_view name)
 {
     auto it = sGroupMap.find(name);

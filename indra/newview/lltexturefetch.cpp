@@ -32,6 +32,7 @@
 #include <atomic>
 
 #include "lltexturefetch.h"
+#include "llappviewer.h"
 
 #include "lldir.h"
 #include "llhttpconstants.h"
@@ -285,7 +286,7 @@ class LLTextureFetchWorker : public LLWorkerClass, public LLCore::HttpHandler
     friend class LLTextureFetch;
 
 private:
-    class CacheReadResponder : public LLTextureCache::ReadResponder
+    class CacheReadResponder final : public LLTextureCache::ReadResponder
     {
     public:
 
@@ -297,7 +298,7 @@ private:
         }
 
         // Threads:  Ttc
-        virtual void completed(bool success)
+        void completed(bool success) override
         {
             LL_PROFILE_ZONE_SCOPED;
             LLTextureFetchWorker* worker = mFetcher->getWorker(mID);
@@ -311,7 +312,7 @@ private:
         LLUUID mID;
     };
 
-    class CacheWriteResponder : public LLTextureCache::WriteResponder
+    class CacheWriteResponder final : public LLTextureCache::WriteResponder
     {
     public:
 
@@ -322,7 +323,7 @@ private:
         }
 
         // Threads:  Ttc
-        virtual void completed(bool success)
+        void completed(bool success) override
         {
             LL_PROFILE_ZONE_SCOPED;
             LLTextureFetchWorker* worker = mFetcher->getWorker(mID);
@@ -336,29 +337,42 @@ private:
         LLUUID mID;
     };
 
-    class DecodeResponder : public LLImageDecodeThread::Responder
+    class DecodeResponder final : public LLImageDecodeThread::Responder
     {
     public:
 
         // Threads:  Ttf
         DecodeResponder(LLTextureFetch* fetcher, const LLUUID& id, LLTextureFetchWorker* worker)
-            : mFetcher(fetcher), mID(id)
+            : mFetcher(fetcher), mID(id), mWorker(worker)
         {
+            ++mWorker->mDecodesInFlight;
+        }
+
+        // Threads:  Tid once the decode has run, or the posting thread if it could not be queued
+        ~DecodeResponder() override
+        {
+            // The last thing this responder does with the worker. deleteOK holds the worker's
+            // deletion until every responder carrying a pointer to it has got this far.
+            --mWorker->mDecodesInFlight;
         }
 
         // Threads:  Tid
-        virtual void completed(bool success, const std::string& error_message, LLImageRaw* raw, LLImageRaw* aux, U32 request_id)
+        void completed(bool success, const std::string& error_message, LLImageRaw* raw, LLImageRaw* aux, U32 request_id) override
         {
             LL_PROFILE_ZONE_SCOPED;
-            LLTextureFetchWorker* worker = mFetcher->getWorker(mID);
-            if (worker)
+            // A worker taken out of the fetcher is on its way to deletion and takes no result.
+            // The lookup's answer is only compared, never called through: this responder keeps
+            // mWorker alive, while a newer worker filed under the same id did not ask for this
+            // decode and could be freed between the lookup and the call.
+            if (mFetcher->getWorker(mID) == mWorker)
             {
-                worker->callbackDecoded(success, error_message, raw, aux, request_id);
+                mWorker->callbackDecoded(success, error_message, raw, aux, request_id);
             }
         }
     private:
         LLTextureFetch* mFetcher;
         LLUUID mID;
+        LLTextureFetchWorker* mWorker;
     };
 
     struct Compare
@@ -410,6 +424,9 @@ public:
 
     void setCanUseHTTP(bool can_use_http) { mCanUseHTTP = can_use_http; }
     bool getCanUseHTTP() const { return mCanUseHTTP; }
+
+    // Locks:  Mw (held by the caller)
+    void getStatus(LLTextureFetch::FetchStatus& status) const;
 
     void setUrl(const std::string& url) { mUrl = url; }
 
@@ -539,8 +556,10 @@ private:
     S32 mRequestedDiscard;
     S32 mLoadedDiscard;
     S32 mDecodedDiscard;
-    LLFrameTimer mRequestedDeltaTimer;
-    LLFrameTimer mFetchDeltaTimer;
+    // LLTimer, not LLFrameTimer: the fetch thread resets them, and the frame clock is the
+    // main thread's.
+    LLTimer mRequestedDeltaTimer;
+    LLTimer mFetchDeltaTimer;
     LLTimer mCacheReadTimer;
     LLTimer mDecodeTimer;
     LLTimer mCacheWriteTimer;
@@ -561,6 +580,10 @@ private:
                                 mCachedSize;
     e_request_state mSentRequest;
     handle_t mDecodeHandle;
+    // DecodeResponders alive that point at this worker. A responder lives on past completed()
+    // and past the worker's interest in its decode, so neither mDecodeHandle nor mDecoded can
+    // say when the last one is gone; this can.
+    std::atomic<S32> mDecodesInFlight;
     bool mLoaded;
     bool mDecoded;
     bool mWritten;
@@ -888,6 +911,7 @@ LLTextureFetchWorker::LLTextureFetchWorker(LLTextureFetch* fetcher,
       mLoaded(false),
       mSentRequest(UNSENT),
       mDecodeHandle(0),
+      mDecodesInFlight(0),
       mDecoded(false),
       mWritten(false),
       mNeedsAux(false),
@@ -1024,6 +1048,29 @@ F32 LLTextureFetchWorker::getImagePriority() const
     return mImagePriority;
 }
 
+// Locks:  Mw (held by the caller)
+void LLTextureFetchWorker::getStatus(LLTextureFetch::FetchStatus& status) const
+{
+    status.mState = mState;
+    status.mFetchDeltaTime = mFetchDeltaTimer.getElapsedTimeF32();
+    status.mRequestDeltaTime = mRequestedDeltaTimer.getElapsedTimeF32();
+    status.mDataProgress = 0.f;
+    if (mFileSize > 0 && mFormattedImage.notNull())
+    {
+        status.mDataProgress = (F32)mFormattedImage->getDataSize() / (F32)mFileSize;
+    }
+    if (mState >= LOAD_FROM_NETWORK && mState <= WAIT_HTTP_REQ)
+    {
+        status.mRequestedPriority = mRequestedPriority;
+    }
+    else
+    {
+        status.mRequestedPriority = mImagePriority;
+    }
+    status.mFetchPriority = (U32)getImagePriority();
+    status.mCanUseHTTP = getCanUseHTTP();
+}
+
 // Threads:  Tmain
 void LLTextureFetchWorker::startWork(S32 param)
 {
@@ -1041,6 +1088,7 @@ bool LLTextureFetchWorker::doWork(S32 param)
     static const LLCore::HttpStatus http_not_found(HTTP_NOT_FOUND);                     // 404
     static const LLCore::HttpStatus http_service_unavail(HTTP_SERVICE_UNAVAILABLE);     // 503
     static const LLCore::HttpStatus http_not_sat(HTTP_REQUESTED_RANGE_NOT_SATISFIABLE); // 416;
+    static const LLCore::HttpStatus http_forbidden(HTTP_FORBIDDEN);                     // 403
 
     LLMutexLock lock(&mWorkMutex);                                      // +Mw
 
@@ -1575,8 +1623,11 @@ bool LLTextureFetchWorker::doWork(S32 param)
                     // Allowed, we'll accept whatever data we have as complete.
                     mHaveAllData = true;
                 }
-                else
+                else if (mFTType != FTT_MAP_TILE || http_forbidden != mGetStatus)
                 {
+                    // Map tiles that do not exist come back 403 from the CDN;
+                    // that is the expected answer for open water, not a failure.
+                    // Anything else a tile fetch gets back is still news.
                     LL_INFOS(LOG_TXT) << "HTTP GET failed for: " << mUrl
                                       << " Status: " << mGetStatus.toTerseString()
                                       << " Reason: '" << mGetReason << "'"
@@ -1606,7 +1657,10 @@ bool LLTextureFetchWorker::doWork(S32 param)
                 resetFormattedData();
                 setState(DONE);
                 releaseHttpSemaphore();
-                LL_WARNS(LOG_TXT) << mID << " abort: fail harder" << LL_ENDL;
+                if (mFTType != FTT_MAP_TILE)
+                {
+                    LL_WARNS(LOG_TXT) << mID << " abort: fail harder" << LL_ENDL;
+                }
                 return true; // failed
             }
 
@@ -2152,6 +2206,14 @@ bool LLTextureFetchWorker::deleteOK()
         delete_ok = false;
     }
 
+    // A decode responder dereferences this worker until it is destroyed, whether or not its
+    // decode still matters. Once a worker is out of mRequestMap its decode's result is
+    // dropped, so neither mDecodeHandle nor mDecoded ever settles for it; the count does.
+    if (mDecodesInFlight > 0)
+    {
+        delete_ok = false;
+    }
+
     return delete_ok;
 }
 
@@ -2462,6 +2524,7 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, bool threaded, bool qa_mod
       mOriginFetchSource(LLTextureFetch::FROM_ALL),
       mTextureInfoMainThread(false)
 {
+    mRequestMap.reserve(4096);
     mMaxBandwidth = LLViewerThrottle::getMaxBandwidthKbps();
     mTextureInfo.setLogging(true);
 
@@ -2501,7 +2564,7 @@ LLTextureFetch::~LLTextureFetch()
 }
 
 S32 LLTextureFetch::createRequest(FTType f_type, const std::string& url, const LLUUID& id, const LLHost& host, F32 priority,
-    S32 w, S32 h, S32 c, S32 desired_discard, bool needs_aux, bool can_use_http)
+    S32 w, S32 h, S32 c, S32 desired_discard, bool needs_aux, bool can_use_http, FetchStatus& status)
 {
     LL_PROFILE_ZONE_SCOPED;
     if (mDebugPause)
@@ -2599,16 +2662,17 @@ S32 LLTextureFetch::createRequest(FTType f_type, const std::string& url, const L
 
         //MAINT-4184 url is always empty.  Do not set with it.
 
-        if (!worker->haveWork())
+        const bool start_work = !worker->haveWork();
+        if (start_work)
         {
             worker->setState(LLTextureFetchWorker::INIT);
-            worker->unlockWorkMutex();                                  // -Mw
-
-            worker->addWork(0);
         }
-        else
+        worker->getStatus(status);
+        worker->unlockWorkMutex();                                      // -Mw
+
+        if (start_work)
         {
-            worker->unlockWorkMutex();                                  // -Mw
+            worker->addWork(0);
         }
     }
     else
@@ -2622,6 +2686,7 @@ S32 LLTextureFetch::createRequest(FTType f_type, const std::string& url, const L
         worker->mActiveCount++;
         worker->mNeedsAux = needs_aux;
         worker->setCanUseHTTP(can_use_http);
+        worker->getStatus(status);
         worker->unlockWorkMutex();                                      // -Mw
     }
 
@@ -2754,7 +2819,6 @@ U32 LLTextureFetch::getTotalNumHTTPRequests()
 // Locks:  Mfq
 LLTextureFetchWorker* LLTextureFetch::getWorkerAfterLock(const LLUUID& id)
 {
-    LL_PROFILE_ZONE_SCOPED;
     LLTextureFetchWorker* res = NULL;
     map_t::iterator iter = mRequestMap.find(id);
     if (iter != mRequestMap.end())
@@ -2776,7 +2840,7 @@ LLTextureFetchWorker* LLTextureFetch::getWorker(const LLUUID& id)
 // Threads:  T*
 bool LLTextureFetch::getRequestFinished(const LLUUID& id, S32& discard_level, S32& worker_state,
                                         LLPointer<LLImageRaw>& raw, LLPointer<LLImageRaw>& aux,
-                                        LLCore::HttpStatus& last_http_get_status)
+                                        LLCore::HttpStatus& last_http_get_status, FetchStatus& status)
 {
     LL_PROFILE_ZONE_SCOPED;
     bool res = false;
@@ -2796,6 +2860,12 @@ bool LLTextureFetch::getRequestFinished(const LLUUID& id, S32& discard_level, S3
 //              LL_WARNS(LOG_TXT) << "Adding work for inactive worker: " << id << LL_ENDL;
                 worker->addWork(0);
             }
+            if (worker->haveWork())
+            {
+                worker->lockWorkMutex();                                // +Mw
+                worker->getStatus(status);
+                worker->unlockWorkMutex();                              // -Mw
+            }
         }
         else if (worker->checkWork())
         {
@@ -2804,8 +2874,6 @@ bool LLTextureFetch::getRequestFinished(const LLUUID& id, S32& discard_level, S3
             F32 cache_read_time;
             F32 cache_write_time;
             S32 file_size;
-            std::map<S32, F32> logged_state_timers;
-            F32 skipped_states_time;
             worker->lockWorkMutex();                                    // +Mw
             last_http_get_status = worker->mGetStatus;
             discard_level = worker->mDecodedDiscard;
@@ -2821,8 +2889,6 @@ bool LLTextureFetch::getRequestFinished(const LLUUID& id, S32& discard_level, S3
             worker->mDecodeTimer.reset();
             worker->mCacheWriteTimer.reset();
             worker->mFetchTimer.reset();
-            logged_state_timers = worker->mStateTimersMap;
-            skipped_states_time = worker->mSkippedStatesTime;
             worker->mStateTimer.reset();
             res = true;
             LL_DEBUGS(LOG_TXT) << id << ": Request Finished. State: " << worker->mState << " Discard: " << discard_level << LL_ENDL;
@@ -2851,6 +2917,7 @@ bool LLTextureFetch::getRequestFinished(const LLUUID& id, S32& discard_level, S3
                 raw = worker->mRawImage;
                 aux = worker->mAuxImage;
             }
+            worker->getStatus(status);
             worker->unlockWorkMutex();                                  // -Mw
         }
     }
@@ -3118,64 +3185,6 @@ bool LLTextureFetch::isFromLocalCache(const LLUUID& id)
     }
 
     return from_cache ;
-}
-
-S32 LLTextureFetch::getFetchState(const LLUUID& id)
-{
-    S32 state = LLTextureFetchWorker::INVALID;
-    LLTextureFetchWorker* worker = getWorker(id);
-    if (worker && worker->haveWork())
-    {
-        state = worker->mState;
-    }
-
-    return state;
-}
-
-// Threads:  T*
-S32 LLTextureFetch::getFetchState(const LLUUID& id, F32& data_progress_p, F32& requested_priority_p,
-                                  U32& fetch_priority_p, F32& fetch_dtime_p, F32& request_dtime_p, bool& can_use_http)
-{
-    LL_PROFILE_ZONE_SCOPED;
-    S32 state = LLTextureFetchWorker::INVALID;
-    F32 data_progress = 0.0f;
-    F32 requested_priority = 0.0f;
-    F32 fetch_dtime = 999999.f;
-    F32 request_dtime = 999999.f;
-    U32 fetch_priority = 0;
-
-    LLTextureFetchWorker* worker = getWorker(id);
-    if (worker && worker->haveWork())
-    {
-        worker->lockWorkMutex();                                        // +Mw
-        state = worker->mState;
-        fetch_dtime = worker->mFetchDeltaTimer.getElapsedTimeF32();
-        request_dtime = worker->mRequestedDeltaTimer.getElapsedTimeF32();
-        if (worker->mFileSize > 0)
-        {
-            if (worker->mFormattedImage.notNull())
-            {
-                data_progress = (F32)worker->mFormattedImage->getDataSize() / (F32)worker->mFileSize;
-            }
-        }
-        if (state >= LLTextureFetchWorker::LOAD_FROM_NETWORK && state <= LLTextureFetchWorker::WAIT_HTTP_REQ)
-        {
-            requested_priority = worker->mRequestedPriority;
-        }
-        else
-        {
-            requested_priority = worker->mImagePriority;
-        }
-        fetch_priority = (U32)worker->getImagePriority();
-        can_use_http = worker->getCanUseHTTP() ;
-        worker->unlockWorkMutex();                                      // -Mw
-    }
-    data_progress_p = data_progress;
-    requested_priority_p = requested_priority;
-    fetch_priority_p = fetch_priority;
-    fetch_dtime_p = fetch_dtime;
-    request_dtime_p = request_dtime;
-    return state;
 }
 
 // Threads:  T*

@@ -41,6 +41,7 @@ public:
     virtual bool        handleMouseDown(S32 x, S32 y, MASK mask) override;
     virtual bool        handleMouseUp(S32 x, S32 y, MASK mask) override;
     virtual bool        handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool        handleKey(KEY key, MASK mask) override;
 
     virtual void        handleSelect() override;
     virtual void        handleDeselect() override;

@@ -33,6 +33,8 @@
 class LLFloaterPublishClassified final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPublishClassified, LLFloater);
+
     LLFloaterPublishClassified(const LLSD& key);
     ~LLFloaterPublishClassified() override = default;
 

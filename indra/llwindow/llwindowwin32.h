@@ -62,7 +62,11 @@ public:
     void restore() override;
     bool getFullscreen();
     bool getPosition(LLCoordScreen *position) override;
+
+    // Outer window frame size in pixels (includes title bar and borders).
+    // Note OS Specific behavior: On macOS excludes title bar.
     bool getSize(LLCoordScreen *size) override;
+
     bool getSize(LLCoordWindow *size) override;
     bool setPosition(LLCoordScreen position) override;
     bool setSizeImpl(LLCoordScreen size) override;
@@ -88,8 +92,8 @@ public:
     void releaseMouse() override;
     void setMouseClipping( bool b ) override;
     bool isClipboardTextAvailable() override;
-    bool pasteTextFromClipboard(LLWString &dst) override;
-    bool copyTextToClipboard(const LLWString &src) override;
+    bool pasteTextFromClipboard(std::string &dst) override;
+    bool copyTextToClipboard(const std::string &src) override;
     void flashIcon(F32 seconds) override;
     F32 getGamma() override;
     bool setGamma(const F32 gamma) override; // Set the gamma
@@ -178,7 +182,7 @@ protected:
     void    fillCandidateForm(const LLCoordGL& caret, const LLRect& bounds, CANDIDATEFORM *form);
     void    fillCharPosition(const LLCoordGL& caret, const LLRect& bounds, const LLRect& control, IMECHARPOSITION *char_position);
     void    fillCompositionLogfont(LOGFONT *logfont);
-    U32     fillReconvertString(const LLWString &text, S32 focus, S32 focus_length, RECONVERTSTRING *reconvert_string);
+    U32     fillReconvertString(const std::string &text, S32 focus, S32 focus_length, RECONVERTSTRING *reconvert_string);
     void    handleStartCompositionMessage();
     void    handleCompositionMessage(U32 indexes);
     bool    handleImeRequests(WPARAM request, LPARAM param, LRESULT *result);

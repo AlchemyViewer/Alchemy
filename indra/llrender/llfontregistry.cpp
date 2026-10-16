@@ -30,6 +30,7 @@
 
 #include "linden_common.h"
 #include "llgl.h"
+#include "llfontbitmapcache.h"
 #include "llfontfreetype.h"
 #include "llfontgl.h"
 #include "llfontregistry.h"
@@ -299,6 +300,9 @@ void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hi
 LLFontRegistry::LLFontRegistry(bool create_gl_textures)
 :   mCreateGLTextures(create_gl_textures)
 {
+    // The atlas is what needs a GL context, so the atlas is what is told.
+    LLFontBitmapCache::setUsesGL(create_gl_textures);
+
     // This is potentially a slow directory traversal, so we want to
     // cache the result.
     mUltimateFallbackList = LLWindow::getDynamicFallbackFontList();
@@ -1709,9 +1713,15 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     {
         LLFontGL *fontp = NULL;
 
-        // *HACK: Fallback fonts don't render, so we can use that to suppress
-        // creation of OpenGL textures for test apps. JC
-        bool is_fallback = !is_first_found || !mCreateGLTextures;
+        // Whether this face is a fallback says one thing only: that it is
+        // not the head of this family's chain. It used to also mean "this
+        // process has no GL", because a fallback never rasterizes and that
+        // was a cheap way to keep a test app off the atlas -- at the cost of
+        // flagging the head too, which made measuring text an assertion
+        // failure. The atlas is now what knows about GL
+        // (LLFontBitmapCache::usesGL), so a headless registry has real heads
+        // that measure, and uploads nothing.
+        bool is_fallback = !is_first_found;
         F32 extra_scale = (is_fallback) ? fallback_scale : 1.0f;
         // Per-family absolute pin: if this file's source family declares
         // a <size> for the requested size_name, that point size pins THIS
@@ -2054,11 +2064,49 @@ bool LLFontRegistry::reload(const LLSD& font_overrides)
         }
     }
 
+    // Which face draws a style asked for at render time was decided over
+    // the old wiring; the new fonts.xml may have a face for it now, or
+    // have lost the one it had.
+    for (auto& [desc, head] : heads)
+    {
+        head->forgetFaces();
+    }
+
     // pinned_old_fallbacks goes out of scope here. Any shared fallback
     // instance no longer referenced by a (rebuilt) head's mFontFreetype
     // chain hits refcount 0; ~ALFontFace fires on its ALFontFace and
     // releases the FT_Face + atlas LLImageGL.
     return true;
+}
+
+// Every family declared, whether or not a person may pick it: a XUI file
+// names the internal ones too, and this is the list a tool offers an author
+// rather than the list a preference offers a user. "default" is the
+// OS-fallback plumbing and is not a name anything writes.
+std::vector<std::string> LLFontRegistry::getDeclaredFontNames() const
+{
+    std::set<std::string> uniq;
+    for (const auto& kv : mFontMap)
+    {
+        if (kv.first.isTemplate() && kv.first.getName() != "default")
+        {
+            uniq.insert(kv.first.getName());
+        }
+    }
+    return std::vector<std::string>(uniq.begin(), uniq.end());
+}
+
+std::vector<std::string> LLFontRegistry::getDeclaredSizeNames() const
+{
+    std::set<std::string> uniq;
+    for (const auto& kv : mFontSizes)
+    {
+        if (!mDeclaredLater.count(kv.first))
+        {
+            uniq.insert(kv.first);
+        }
+    }
+    return std::vector<std::string>(uniq.begin(), uniq.end());
 }
 
 std::vector<LLFontRegistry::FamilyInfo> LLFontRegistry::getAvailableFamilies(FamilyFilter filter) const
@@ -2161,10 +2209,9 @@ LLFontGL *LLFontRegistry::getFont(const LLFontDescriptor& desc)
         else if (mCreateGLTextures)
         {
             // Generate glyphs for ASCII chars to avoid stalls later. Only
-            // worth doing when there is an atlas to warm -- and only safe
-            // then: createFont marks every face a fallback when
-            // mCreateGLTextures is off, including the head, and asking a
-            // fallback for glyph info directly is an error.
+            // worth doing where there is an atlas to warm; without one the
+            // sheets are CPU-side and a glyph costs what it costs whenever
+            // it is first measured.
             fontp->generateASCIIglyphs();
         }
         return fontp;

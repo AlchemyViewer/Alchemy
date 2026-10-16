@@ -21,8 +21,8 @@ Maximal 200 pro Gruppe täglich
 	<text name="notice_list_none_found">
 		Nicht gefunden.
 	</text>
-	<button label="Neue Mitteilung" label_selected="Neue Mitteilung" name="create_new_notice" tool_tip="Neue Mitteilung erstellen"/>
-	<button label="Aktualisieren" label_selected="Liste aktualisieren" name="refresh_notices" tool_tip="Mitteilungsliste aktualisieren"/>
+	<button label="Neue Mitteilung" name="create_new_notice" tool_tip="Neue Mitteilung erstellen"/>
+	<button name="refresh_notices" tool_tip="Mitteilungsliste aktualisieren"/>
 	<panel label="Neue Mitteilung" name="panel_create_new_notice">
 		<text name="lbl">
 			Mitteilung schreiben
@@ -40,7 +40,7 @@ Maximal 200 pro Gruppe täglich
 			Das Objekt hierhin ziehen und ablegen, um es anzuhängen:
 		</text>
 		<button label="Inventar" name="open_inventory" tool_tip="Inventar öffnen"/>
-		<button label="Entfernen" label_selected="Anhang entfernen" name="remove_attachment" tool_tip="Anhang von Ihrer Benachrichtigung entfernen"/>
+		<button name="remove_attachment" tool_tip="Anhang von Ihrer Benachrichtigung entfernen"/>
 		<button label="Senden" label_selected="Senden" name="send_notice"/>
 		<group_drop_target name="drop_target" tool_tip="Ziehen Sie ein Objekt aus Ihrem Inventar auf dieses Feld, um es mit dieser Mitteilung zu versenden. Um das Objekt anhängen zu können, müssen Sie die Erlaubnis zum Kopieren und Übertragen besitzen."/>
 	</panel>
@@ -57,6 +57,6 @@ Maximal 200 pro Gruppe täglich
 		<text name="lbl4">
 			Nachricht:
 		</text>
-		<button label="Anhang öffnen" label_selected="Anlage öffnen" name="open_attachment"/>
+		<button label="Anhang öffnen" name="open_attachment"/>
 	</panel>
 </panel>

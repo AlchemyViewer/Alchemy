@@ -29,7 +29,6 @@
 //-----------------------------------------------------------------------------
 #include "llviewerprecompiledheaders.h"
 
-#include "llfasttimer.h"
 #include "llrender.h"
 
 #include "llbox.h"
@@ -101,14 +100,16 @@ void LLViewerJointMesh::uploadJointMatrices()
     LLPolyMesh *reference_mesh = mMesh->getReferenceMesh();
 
     //calculate joint matrices
+    LLMatrix4a model_view;
+    model_view.loadu(&LLDrawPoolAvatar::getModelView().mMatrix[0][0]);
     size_t num_joints = llmin(reference_mesh->mJointRenderData.size(), LL_CHARACTER_MAX_JOINTS_PER_MESH);
     for (joint_num = 0; joint_num < num_joints; joint_num++)
     {
-        LLMatrix4 joint_mat = *reference_mesh->mJointRenderData[joint_num]->mWorldMatrix;
-
-        joint_mat *= LLDrawPoolAvatar::getModelView();
-        gJointMatUnaligned[joint_num] = joint_mat;
-        gJointRotUnaligned[joint_num] = joint_mat.getMat3();
+        // joint to world to eye, in registers; only the result is stored
+        LLMatrix4a joint_mat;
+        joint_mat.setMulNoAlias(reference_mesh->mJointRenderData[joint_num]->mJoint->getWorldMatrix(), model_view);
+        gJointMatUnaligned[joint_num] = joint_mat.toMatrix4();
+        gJointRotUnaligned[joint_num] = gJointMatUnaligned[joint_num].getMat3();
     }
 
     bool last_pivot_uploaded{ false };
@@ -298,7 +299,7 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     else
     {
         gGL.pushMatrix();
-        LLMatrix4 jointToWorld = getWorldMatrix();
+        LLMatrix4 jointToWorld = getWorldMatrix().toMatrix4();
         gGL.multMatrix((GLfloat*)jointToWorld.mMatrix);
         buff->setBuffer();
         buff->drawRange(LLRender::TRIANGLES, start, end, count, offset);

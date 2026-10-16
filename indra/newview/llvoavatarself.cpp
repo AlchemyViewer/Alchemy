@@ -352,7 +352,7 @@ bool LLVOAvatarSelf::buildSkeletonSelf(const LLAvatarSkeletonInfo *info)
     // SL-315
     mScreenp->setWorldPosition(LLVector3::zero);
     // need to update screen agressively when sidebar opens/closes, for example
-    mScreenp->mUpdateXform = true;
+    mScreenp->setUpdateXform(true);
     return true;
 }
 
@@ -798,7 +798,7 @@ bool LLVOAvatarSelf::setVisualParamWeight(S32 index, S32 type, F32 weight)
     return false;
 }
 
-bool LLVOAvatarSelf::setParamWeight(const LLViewerVisualParam *param, F32 weight)
+bool LLVOAvatarSelf::setParamWeight(LLViewerVisualParam *param, F32 weight)
 {
     if (!param)
     {
@@ -819,18 +819,32 @@ bool LLVOAvatarSelf::setParamWeight(const LLViewerVisualParam *param, F32 weight
         }
     }
 
-    return LLCharacter::setVisualParamWeight(param,weight);
+    // How much of the wearable push is a push at all, for a capture to answer
+    // before anything is gated on it.
+    if (param->getWeight() != weight)
+    {
+        ++sParamWeightsChanged;
+    }
+
+    // Every caller of this found the parameter in this character's own map, so
+    // it is this character's parameter, and asking the map for it again by the
+    // id it was found under gives back the one already in hand.
+    param->setWeight(weight);
+    return true;
 }
 
 /*virtual*/
-void LLVOAvatarSelf::updateVisualParams()
+bool LLVOAvatarSelf::updateVisualParams()
 {
-    LLVOAvatar::updateVisualParams();
+    return LLVOAvatar::updateVisualParams();
 }
+
+S32 LLVOAvatarSelf::sParamWeightsChanged = 0;
 
 void LLVOAvatarSelf::writeWearablesToAvatar()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    sParamWeightsChanged = 0;
     for (U32 type = 0; type < LLWearableType::WT_COUNT; type++)
     {
         LLWearable *wearable = gAgentWearables.getTopWearable((LLWearableType::EType)type);
@@ -840,20 +854,32 @@ void LLVOAvatarSelf::writeWearablesToAvatar()
         }
     }
 
+    LL_PROFILE_ZONE_NUM(sParamWeightsChanged);
 }
 
 /*virtual*/
 void LLVOAvatarSelf::idleUpdateAppearanceAnimation()
 {
-    // Animate all top-level wearable visual parameters
-    gAgentWearables.animateAllWearableParams(calcMorphAmount());
+    // Only a morph gives either of these anything to do. animateAllWearableParams
+    // moves nothing unless a parameter is animating, and the push after it was
+    // writing weights the avatar already had -- measured at none changed, every
+    // frame, once an appearance had settled.
+    //
+    // Everything that changes a worn wearable outside a morph pushes it itself:
+    // the sliders and the shape importer in the appearance editor, reverting an
+    // edit, a clothing colour, the morph tool, an outfit change, and wearing or
+    // changing a single wearable, which all arrive at LLAgentWearables::wearableUpdated.
+    if (mAppearanceAnimating)
+    {
+        // Animate all top-level wearable visual parameters
+        gAgentWearables.animateAllWearableParams(calcMorphAmount());
 
-    // Apply wearable visual params to avatar
-    writeWearablesToAvatar();
+        // Apply wearable visual params to avatar
+        writeWearablesToAvatar();
+    }
 
     //allow avatar to process updates
     LLVOAvatar::idleUpdateAppearanceAnimation();
-
 }
 
 // virtual

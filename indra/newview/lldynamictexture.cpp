@@ -189,7 +189,7 @@ bool LLViewerDynamicTexture::updateAllInstances()
         return true;
     }
 
-    LLRenderTarget& preview_target = gPipeline.mAuxillaryRT.deferredScreen;
+    LLRenderTarget& preview_target = gPipeline.mPreviewMap;
     LLRenderTarget& bake_target = gPipeline.mBakeMap;
     if (!preview_target.isComplete() || !bake_target.isComplete())
     {
@@ -240,7 +240,7 @@ bool LLViewerDynamicTexture::updateAllInstances()
     {
         for (LLViewerDynamicTexture* dynamicTexture : LLViewerDynamicTexture::sInstances[order])
         {
-            update_func(dynamicTexture, preview_target, LLPipeline::MAX_PREVIEW_WIDTH, LLPipeline::MAX_PREVIEW_WIDTH);
+            update_func(dynamicTexture, preview_target, preview_target.getWidth(), preview_target.getHeight());
         }
     }
     preview_target.flush();

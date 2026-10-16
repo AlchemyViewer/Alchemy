@@ -442,8 +442,8 @@ public:
             LLProcess::WritePipe& childin(mChild->getWritePipe(LLProcess::STDIN));
             LLEventPump& mainloop(LLEventPumps::instance().obtain("mainloop"));
             LLSD nop;
-            F64 until = (LLTimer::getElapsedSeconds() + 2).value();
-            while (childin.size() && LLTimer::getElapsedSeconds() < until)
+            LLTimer waited;
+            while (childin.size() && waited.getElapsedTimeF64() < 2.0)
             {
                 mainloop.post(nop);
             }

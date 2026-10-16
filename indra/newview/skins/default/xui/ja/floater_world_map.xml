@@ -51,7 +51,6 @@
 				<text name="events_adult_label">
 					Adult
 				</text>
-				<check_box name="AlchemyMapShowAgentCount" label="エージェント数"/>
 			</panel>
 			<panel name="layout_panel_3">
 				<text name="find_on_map_label">

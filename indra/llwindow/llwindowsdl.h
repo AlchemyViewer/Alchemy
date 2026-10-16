@@ -42,15 +42,6 @@
 #include "llwin32headers.h" // HWND / WNDPROC for the WM_COPYDATA subclass
 #endif
 
-#ifdef LL_WAYLAND
-#include <wayland-client-protocol.h>
-#endif
-
-#if LL_X11
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#endif
-
 class LLPreeditor;
 
 class LLWindowSDL final : public LLWindow
@@ -98,18 +89,24 @@ public:
     // touch/pen branch still needs to disable warp.
     bool isWrapMouse() const override { return !mAbsoluteCursorPosition; }
 
-    // On Linux/X11 and Wayland AltGr is delivered as Right-Alt alone (no
-    // Ctrl prefix). LLKeyboardSDL folds RALT into MASK_ALT, so a chat-bar
-    // user typing AltGr+E (€ on German layout) would otherwise see the
-    // in-world "Alt+E" binding fire alongside the € insert. We detect the
-    // RAlt-without-LAlt-and-without-Ctrl signature here so handleKey can
-    // short-circuit before the binding dispatch — mirrors the AltGr block
-    // in LLWindowWin32 / LLViewerWindow::handleKey.
+    // Asked by LLViewerWindow::handleKey so an AltGr-composed character
+    // (AltGr+E for € on a German layout) doesn't also fire the in-world
+    // "Alt+E" binding — mirrors the AltGr block for LLWindowWin32 there.
+    // On X11 and Wayland AltGr is xkb's ISO_Level3_Shift, which SDL reports
+    // as SDL_KMOD_MODE and never as an Alt, and Level5_Shift (Neo and the
+    // like) as SDL_KMOD_LEVEL5; a Right-Alt there is a plain Alt, as on US
+    // layouts. Cocoa reports Option, the Mac's composing key, as an Alt, and
+    // SDL's Windows backend reports AltGr as Right-Alt with Windows' extra
+    // Ctrl dropped, so there Right-Alt alone is the signature.
     bool isAltGrPressed() const override
     {
+#if LL_LINUX
+        return (mKeyModifiers & (SDL_KMOD_MODE | SDL_KMOD_LEVEL5)) != 0;
+#else
         return (mKeyModifiers & SDL_KMOD_RALT)
             && !(mKeyModifiers & SDL_KMOD_LALT)
             && !(mKeyModifiers & SDL_KMOD_CTRL);
+#endif
     }
 
     // Pen / stylus and touchscreen metadata sourced from SDL_EVENT_PEN_AXIS
@@ -139,12 +136,12 @@ public:
     void setMinSize(U32 min_width, U32 min_height, bool enforce_immediately = true) override;
 
     bool isClipboardTextAvailable() override;
-    bool pasteTextFromClipboard(LLWString &dst) override;
-    bool copyTextToClipboard(const LLWString &src) override;
+    bool pasteTextFromClipboard(std::string &dst) override;
+    bool copyTextToClipboard(const std::string &src) override;
 
     bool isPrimaryTextAvailable() override;
-    bool pasteTextFromPrimary(LLWString &dst) override;
-    bool copyTextToPrimary(const LLWString &src) override;
+    bool pasteTextFromPrimary(std::string &dst) override;
+    bool copyTextToPrimary(const std::string &src) override;
 
     void flashIcon(F32 seconds) override;
     void maybeStopFlashIcon();
@@ -192,8 +189,13 @@ public:
     std::string getDisplayServer() const override;
 
     void bringToFront() override;
+    // bringToFront() with the xdg-activation token another process was
+    // launched with and handed over, which on Wayland is what lets a window
+    // out of focus take it. Without a token, or on X11, it is bringToFront().
+    void bringToFront(const std::string& activation_token);
 
     void setLanguageTextInput(const LLCoordGL& pos) override;
+    void updateLanguageTextInputArea() override;
     void allowLanguageTextInput(LLPreeditor* preeditor, bool b) override;
 
     void spawnWebBrowser(const std::string &escaped_url, bool async) override;
@@ -295,6 +297,16 @@ protected:
     // or density can change (resize / DPI / monitor).
     void refreshPixelMetrics();
 
+#if LL_LINUX
+    // GPU reset detection, on NVIDIA's EGL: armGraphicsResetCheck once GL is
+    // loaded, to poll when createContext got a context that reports a reset,
+    // then checkGraphicsReset each frame from swapBuffers. A reset found is
+    // said once and the viewer quits, as nothing the GPU held survives it.
+    void armGraphicsResetCheck();
+    void checkGraphicsReset();
+    bool mGraphicsResetSeen = false;
+#endif
+
     //
     // Platform specific variables
     //
@@ -323,8 +335,9 @@ private:
     U32 mKeyRawScanCode = 0;
 
     // Per-frame mouse-motion accumulator. SDL_EVENT_MOUSE_MOTION delivers
-    // event.motion.xrel/yrel (relative motion since the last event in
-    // screen-coord units); we scale by pixel density and sum into this
+    // event.motion.xrel/yrel (relative motion since the last event, in
+    // screen-coord units unless relative mode gives device counts); we
+    // scale the screen-coord kind by pixel density and sum into this
     // member so getCursorDelta() — queried once per frame from
     // LLViewerWindow::updateMouseDelta — sees every motion event, not
     // just the last-position-minus-first-position which truncates to zero
@@ -372,6 +385,13 @@ private:
     // truncation the legacy code used.
     F32 mScrollWheelAccumX = 0.f;
     F32 mScrollWheelAccumY = 0.f;
+
+    // A touchpad pinch, given to the viewer as Control+wheel clicks (see
+    // SDL_EVENT_PINCH_UPDATE): the scale the gesture last reported, where a
+    // backend reports it from the gesture's start, and the clicks it has not
+    // yet made whole. Both reset with each gesture.
+    F32 mPinchLastScale = 1.f;
+    F32 mPinchClickAccum = 0.f;
 
     // Mirrors LLWindowWin32::mAbsoluteCursorPosition. Set true while the
     // most recent mouse motion/button event was synthesised from a touch
@@ -426,30 +446,18 @@ private:
     LLCoordWindow mDeferredCursorWarp;
     bool mHasDeferredCursorWarp = false;
 
-    // Shared GL contexts for worker threads (texture upload, VBO streaming).
-    //
-    // Worker threads ask for a shared GL context via createSharedContext() (on
-    // the main thread), bind it via makeContextCurrent() and release it with
-    // destroySharedContext() (both on the worker thread) so they can stream GL
-    // objects without interrupting the main render thread.
-    //
-    // Rather than SDL3's "one hidden carrier SDL_Window per context" pattern
-    // (which forces a main-thread-only deferred-window-destruction dance), we
-    // create the contexts with the platform-native GL API behind SDL:
-    //   * Windows  — WGL sibling context on the main window's HDC
-    //   * macOS    — CGL context sharing the current CGLContextObj (drawable-less)
-    //   * X11      — GLX context bound to a 1x1 GLXPbuffer (offscreen, no WM)
-    //   * Wayland  — EGL context made current surfaceless (EGL_NO_SURFACE)
-    // Each returns an opaque heap handle (LLSDLSharedContext, defined in the
-    // .cpp). mSharedContexts tracks the live handles ONLY so destroyContext can
-    // warn about and reclaim any a worker failed to release; it is touched only
-    // under mSharedCtxMutex.
+    // Shared GL contexts for worker threads, made and bound by the
+    // sdl_*_shared_context functions in llsdl.h. mSharedContexts tracks the
+    // live handles ONLY so destroyContext can warn about and reclaim any a
+    // worker failed to release; it is touched only under mSharedCtxMutex.
     LLMutex mSharedCtxMutex;
     std::set<void*> mSharedContexts;
 
-    // Files accumulated between SDL_EVENT_DROP_BEGIN and SDL_EVENT_DROP_COMPLETE.
-    // Each SDL_EVENT_DROP_FILE only carries one path, so we batch them and
-    // dispatch a single handleDragNDrop on COMPLETE.
+    // Files and text accumulated between SDL_EVENT_DROP_BEGIN and
+    // SDL_EVENT_DROP_COMPLETE. Each SDL_EVENT_DROP_FILE only carries one path
+    // and each SDL_EVENT_DROP_TEXT one line, so we batch them and dispatch a
+    // single handleDragNDrop on COMPLETE.
+    std::string mPendingDropText;
     std::vector<std::string> mPendingDropFiles;
 
     // Currently-focused preeditor receiving SDL_EVENT_TEXT_EDITING composition
@@ -467,10 +475,20 @@ private:
     // just-the-commits from SDL3.
     LLPreeditor* mPreeditor = nullptr;
 
-    void tryFindFullscreenSize(int &aWidth, int &aHeight);
+    // Hand the platform IME the text input area of mPreeditor, the caret
+    // and the preedit around it, as the preeditor places them, so the IME's
+    // candidate window opens under the caret. False when there is no
+    // preeditor or it cannot place its caret (scrolled out of sight).
+    bool placeLanguageTextInputArea();
 
     enum EServerProtocol{ X11, Wayland, Unknown };
     EServerProtocol mServerProtocol = Unknown;
+
+    // Wayland only: set from SDL_EVENT_WINDOW_OCCLUDED until the EXPOSED that
+    // follows the window's return. xdg-shell never tells a client it was
+    // minimised; the toplevel's "suspended" state, which SDL reports as
+    // occlusion, is what arrives instead. getMinimized() counts it.
+    bool mOccluded = false;
 
 #if LL_WINDOWS
     // Install/remove a WndProc subclass on the SDL window's HWND so we can
@@ -483,27 +501,6 @@ private:
 
     HWND mWin32Hwnd = nullptr;
     WNDPROC mPrevWndProc = nullptr;
-#endif
-public:
-#if LL_X11
-    // X11
-    struct X11_DATA
-    {
-        Display* xdisplay = nullptr;
-        Window xwindow = 0;
-        int xscreen = -1;
-    };
-    static X11_DATA sX11Data;
-#endif
-
-#if LL_WAYLAND
-    // Wayland
-    struct WAYLAND_DATA
-    {
-        struct wl_display* display = nullptr;
-        struct wl_surface* surface = nullptr;
-    };
-    static WAYLAND_DATA sWaylandData;
 #endif
 };
 

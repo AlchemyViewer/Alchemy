@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Script Studio's SLua aliases, on the Build tab of its preferences:
+     each a name a require says after the @, and a folder on disk it
+     stands for, which naming it lets a require read. -->
+<panel
+ follows="left|top"
+ height="130"
+ layout="topleft"
+ name="aliases_panel"
+ width="370">
+    <panel.string name="NoAlias">No aliases. Use Add... to name a folder, or drop one from your inventory.</panel.string>
+    <panel.string name="NoAliasWorldOff">No aliases. Use Add... to name a folder.</panel.string>
+    <panel.string name="AliasTip">@[NAME]: [FOLDER]</panel.string>
+    <panel.string name="InventoryFolder">Inventory: [NAME]</panel.string>
+    <panel.string name="InventoryFolderGone">Inventory folder not found</panel.string>
+    <panel.string name="InventoryFolderTip">An inventory folder, which a require reads from while world includes are on.</panel.string>
+    <panel.string name="InventoryFolderOffTip">An inventory folder, which a require reads from only while world includes are on, which they are not.</panel.string>
+    <panel.string name="DiskFolderGone">Not found: [FOLDER]</panel.string>
+    <panel.string name="DiskFolderGoneTip">[FOLDER] is not there: a require through this alias finds nothing until it is.</panel.string>
+    <panel.string name="DiskFolderOffTip">[FOLDER], which a require reads from only while files on disk may be read, which they may not.</panel.string>
+    <panel.string name="DropFolder">Name this inventory folder an alias</panel.string>
+    <panel.string name="DropFolderWorldOff">An inventory folder is read as an alias only while world includes are on, which they are not.</panel.string>
+    <panel.string name="NameTaken">'[NAME]' is already an alias.</panel.string>
+    <panel.string name="NameBad">An alias's name is letters, digits, - _ and . -- not self, and not starting sl-.</panel.string>
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="20"
+     name="aliases_label"
+     tool_tip="A SLua script reaches a library on disk through an alias: require(&quot;@name/module&quot;) reads module from the alias's folder, where no .luaurc names the alias. A script in an object reaches a library on disk only this way."
+     top="0"
+     width="350">
+        SLua aliases: require("@name/x") reads x from the folder
+    </text>
+    <pane_list
+     column_padding="0"
+     draw_heading="false"
+     follows="left|top"
+     height="54"
+     layout="topleft"
+     left="20"
+     multi_select="false"
+     name="aliases"
+     tool_tip="Each alias's name and its folder: one on disk, or one of your inventory's dropped here"
+     top_pad="4"
+     width="260">
+        <pane_list.columns name="alias" width="70" />
+        <pane_list.columns dynamic_width="true" name="folder" />
+    </pane_list>
+    <button
+     follows="left|top"
+     height="22"
+     label="Add..."
+     layout="topleft"
+     left_pad="6"
+     name="add_alias"
+     tool_tip="Name a folder as an alias, after the folder's own name"
+     top_delta="0"
+     width="70" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Remove"
+     layout="topleft"
+     left_delta="0"
+     name="remove_alias"
+     tool_tip="Stop naming the selected folder"
+     top_pad="4"
+     width="70" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="20"
+     name="name_label"
+     top="80"
+     width="44">
+        Name:
+    </text>
+    <line_editor
+     follows="left|top"
+     height="20"
+     layout="topleft"
+     left_pad="4"
+     max_length_bytes="64"
+     name="alias_name"
+     tool_tip="The selected alias's name: type another and press Return"
+     top_delta="-2"
+     width="120" />
+    <!-- Why a name typed was not taken, on a line of its own to wrap. -->
+    <text
+     follows="left|top"
+     height="28"
+     layout="topleft"
+     left="20"
+     name="said"
+     top_pad="4"
+     width="350"
+     wrap="true" />
+</panel>

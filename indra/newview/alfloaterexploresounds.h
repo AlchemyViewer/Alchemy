@@ -17,10 +17,12 @@ class ALFloaterExploreSounds final
 : public LLFloater, public LLEventTimer
 {
 public:
-    ALFloaterExploreSounds(const LLSD& key);
-    bool postBuild();
+    AL_VIEW_TYPE(ALFloaterExploreSounds, LLFloater);
 
-    bool tick();
+    ALFloaterExploreSounds(const LLSD& key);
+    bool postBuild() override;
+
+    bool tick() override;
 
     LLSoundHistoryItem getItem(const LLUUID& itemID);
 

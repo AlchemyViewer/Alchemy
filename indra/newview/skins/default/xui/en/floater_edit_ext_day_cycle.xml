@@ -285,7 +285,7 @@
                                     user_resize="false"
                                     height="150"
                                     width="200"
-                                    min_height="0"
+                                    min_width="0"
                                     visible="true">
                                 <button
                                         follows="top|left"
@@ -321,7 +321,7 @@
                                     user_resize="false"
                                     height="150"
                                     width="200"
-                                    min_height="0"
+                                    min_width="0"
                                     visible="true">
                                 <layout_stack
                                         name="progress_control"
@@ -467,7 +467,7 @@
                                     user_resize="false"
                                     width="190"
                                     height="150"
-                                    min_height="0"
+                                    min_width="0"
                                     visible="true">
                                 <button
 

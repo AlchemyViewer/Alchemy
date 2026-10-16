@@ -31,9 +31,12 @@
 ///----------------------------------------------------------------------------
 /// Class LLFloaterWindowSize
 ///----------------------------------------------------------------------------
-class LLFloaterWindowSize
+class LLFloaterWindowSize final
     :   public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterWindowSize, LLFloater);
+private:
     friend class LLFloaterReg;
 private:
     LLFloaterWindowSize(const LLSD& key);

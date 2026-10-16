@@ -78,7 +78,12 @@ public:
     virtual void restore() = 0;
     bool getFullscreen()    { return mFullscreen; };
     virtual bool getPosition(LLCoordScreen *position) = 0;
+
+    // Returns the platform-defined window size in physical (backing) pixels.
+    // On macOS: backing content view size (excludes title bar).
+    // On Windows: outer window frame size (includes title bar and borders).
     virtual bool getSize(LLCoordScreen *size) = 0;
+
     virtual bool getSize(LLCoordWindow *size) = 0;
     virtual bool setPosition(LLCoordScreen position) = 0;
     bool setSize(LLCoordScreen size);
@@ -99,7 +104,7 @@ public:
 
     virtual bool setCursorPosition(LLCoordWindow position) = 0;
     virtual bool getCursorPosition(LLCoordWindow *position) = 0;
-#if (LL_WINDOWS || LL_SDL_WINDOW) && !LL_MESA_HEADLESS
+#if LL_WINDOWS || LL_SDL_WINDOW
     // Return the cumulative mouse motion delta in PIXELS since the previous
     // call, then reset the accumulator to zero. Backends should accumulate
     // event-level relative motion (Win32 raw input, SDL3 event.motion.xrel/yrel)
@@ -168,12 +173,12 @@ public:
     virtual void setMouseClipping( bool b ) = 0;
 
     virtual bool isClipboardTextAvailable() = 0;
-    virtual bool pasteTextFromClipboard(LLWString &dst) = 0;
-    virtual bool copyTextToClipboard(const LLWString &src) = 0;
+    virtual bool pasteTextFromClipboard(std::string &dst) = 0;
+    virtual bool copyTextToClipboard(const std::string &src) = 0;
 
     virtual bool isPrimaryTextAvailable();
-    virtual bool pasteTextFromPrimary(LLWString &dst);
-    virtual bool copyTextToPrimary(const LLWString &src);
+    virtual bool pasteTextFromPrimary(std::string &dst);
+    virtual bool copyTextToPrimary(const std::string &src);
 
     virtual void flashIcon(F32 seconds) = 0;
     virtual F32 getGamma() = 0;
@@ -340,6 +345,14 @@ constexpr S32 OSBTN_NO = 1;
 constexpr S32 OSBTN_OK = 2;
 constexpr S32 OSBTN_CANCEL = 3;
 
+// Which window LLWindowManager makes.
+enum class ALWindowBackend
+{
+    Native,     // the platform's window: LLWindowWin32 or LLWindowSDL
+    Hidden,     // ALWindowSDLHeadless: an SDL window never shown, with a GL context on it
+    None,       // LLWindowHeadless: no window and no GL
+};
+
 //
 // LLWindowManager
 // Manages window creation and error checking
@@ -354,13 +367,22 @@ public:
         bool fullscreen = false,
         bool clearBg = false,
         bool enable_vsync = false,
-        bool use_gl = true,
+        ALWindowBackend backend = ALWindowBackend::Native,
         bool ignore_pixel_depth = false,
         U32 fsaa_samples = 0,
         U32 max_cores = 0,
         F32 max_gl_version = 4.6f);
     static bool destroyWindow(LLWindow* window);
     static bool isWindowValid(LLWindow *window);
+
+    // The backend of the window most recently asked for, Native until one is.
+    // Set before that window is constructed, so what fails on the way up is
+    // already reported the way the backend wants: a hidden window gets no
+    // message box and no splash.
+    static ALWindowBackend getBackend() { return sBackend; }
+
+private:
+    static ALWindowBackend sBackend;
 };
 
 //

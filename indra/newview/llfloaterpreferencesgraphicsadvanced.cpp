@@ -36,6 +36,7 @@
 #include "llsliderctrl.h"
 #include "lltextbox.h"
 #include "lltrans.h"
+#include "llviewercontrol.h"
 #include "llviewershadermgr.h"
 #include "llviewertexturelist.h"
 #include "llvoavatar.h"
@@ -138,19 +139,11 @@ void LLFloaterPreferenceGraphicsAdvanced::onRenderOptionEnable()
     refreshEnabledGraphics();
 }
 
-void LLFloaterPreferenceGraphicsAdvanced::onAdvancedAtmosphericsEnable()
-{
-    LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
-    if (instance)
-    {
-        instance->refresh();
-    }
-
-    refreshEnabledGraphics();
-}
-
 void LLFloaterPreferenceGraphicsAdvanced::refresh()
 {
+    LLSliderCtrl* draw_distance = getChild<LLSliderCtrl>("DrawDistance");
+    cap_draw_distance_control(draw_distance, draw_distance);
+
     // sliders and their text boxes
     //  mPostProcess = gSavedSettings.getS32("RenderGlowResolutionPow");
     // slider text boxes

@@ -808,7 +808,7 @@ U8* LLImageBase::allocateDataSize(S32 width, S32 height, S32 ncomponents, S32 si
 // LLImageRaw
 //---------------------------------------------------------------------------
 
-S32 LLImageRaw::sRawImageCount = 0;
+std::atomic<S32> LLImageRaw::sRawImageCount = 0;
 
 LLImageRaw::LLImageRaw()
     : LLImageBase()
@@ -1193,8 +1193,7 @@ void LLImageRaw::composite( const LLImageRaw* src )
 {
     LLImageRaw* dst = this;  // Just for clarity.
 
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(src, this);
 
     if (!validateSrcAndDst("LLImageRaw::composite", src, dst))
     {
@@ -1306,8 +1305,7 @@ void LLImageRaw::copyUnscaledAlphaMask( const LLImageRaw* src, const LLColor4U& 
 {
     LLImageRaw* dst = this;  // Just for clarity.
 
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(src, this);
 
     if (!validateSrcAndDst("LLImageRaw::copyUnscaledAlphaMask", src, dst))
     {
@@ -1412,8 +1410,7 @@ void LLImageRaw::copy(const LLImageRaw* src)
 {
     LLImageRaw* dst = this;  // Just for clarity.
 
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(src, this);
 
     if (!validateSrcAndDst("LLImageRaw::copy", src, dst))
     {
@@ -1553,8 +1550,7 @@ void LLImageRaw::copyScaled( const LLImageRaw* src )
 {
     LLImageRaw* dst = this;  // Just for clarity.
 
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(src, this);
 
     if (!validateSrcAndDst("LLImageRaw::copyScaled", src, dst))
     {
@@ -1947,6 +1943,8 @@ void LLImageRaw::addEmissive(LLImageRaw* src)
 {
     LLImageRaw* dst = this;  // Just for clarity.
 
+    LLImageDataCopyLock lock(src, dst);
+
     if (!validateSrcAndDst(__FUNCTION__, src, dst))
     {
         return;
@@ -2010,8 +2008,7 @@ void LLImageRaw::addEmissiveScaled(LLImageRaw* src)
 
 bool LLImageRaw::validateSrcAndDst(std::string func, const LLImageRaw* src, const LLImageRaw* dst)
 {
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(dst);
+    LLImageDataCopyLock lock(src, dst);
 
     if (!src || !dst || src->isBufferInvalid() || dst->isBufferInvalid())
     {
@@ -2213,7 +2210,7 @@ bool LLImageRaw::createFromFile(const std::string &filename, bool j2c_lowest_mip
 //---------------------------------------------------------------------------
 
 //static
-S32 LLImageFormatted::sGlobalFormattedMemory = 0;
+std::atomic<S32> LLImageFormatted::sGlobalFormattedMemory = 0;
 
 LLImageFormatted::LLImageFormatted(S8 codec)
     : LLImageBase(),

@@ -129,7 +129,7 @@ bool LLTipHandler::processNotification(const LLNotificationPtr& notification, bo
         p.lifetime_secs = (F32)gSavedSettings.getS32("NotificationTipToastLifeTime");
     }
 
-    LLScreenChannel* channel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+    LLScreenChannel* channel = ALViewType::as<LLScreenChannel>(mChannel.get());
     if(channel)
         channel->addToast(p);
     return false;

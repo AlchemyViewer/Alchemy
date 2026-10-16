@@ -37,14 +37,16 @@
 
 #include <boost/unordered_map.hpp>
 
+#include <set>
+
 class LLFontGL;
 class LLFontFreetype;
 
 // Forward-declare the test fixtures so LLFontRegistry's friend declarations
-// can reference them. Defined inside namespace tut by
-// indra/llrender/tests/llfontregistry_test.cpp.
-namespace tut { struct llfontregistry_data; }
-namespace tut { struct llfontregistry_gl_data; }
+// can reference them. Defined in namespace ll_test by
+// indra/llrender/tests/llfontregistry_test.cpp and llfontregistry_gl_test.cpp.
+namespace ll_test { struct llfontregistry_data; }
+namespace ll_test { struct llfontregistry_gl_data; }
 
 typedef std::vector<std::string> string_vec_t;
 
@@ -181,13 +183,12 @@ public:
     // Test fixture in indra/llrender/tests/llfontregistry_test.cpp drives
     // resolveFontReferences / applyFamilyOverrides directly so the resolver
     // unit tests don't have to set up gDirUtilp + a temp skin tree just to
-    // reach parseFontInfo. Lives in `namespace tut`, where TUT requires
-    // the fixture struct.
-    friend struct ::tut::llfontregistry_data;
+    // reach parseFontInfo.
+    friend struct ::ll_test::llfontregistry_data;
     // GL-fixture sibling: needs the same private-member access to drive
     // simulateReload-style state wipes in tests that exercise actual
     // freetype loading + size-change reloads.
-    friend struct ::tut::llfontregistry_gl_data;
+    friend struct ::ll_test::llfontregistry_gl_data;
     // create_gl_textures - set to false for test apps with no OpenGL window,
     // such as llui_libtest
     LLFontRegistry(bool create_gl_textures);
@@ -278,11 +279,29 @@ public:
     // font-override dropdowns.
     std::vector<FamilyInfo> getAvailableFamilies(FamilyFilter filter = FamilyFilter::ANY) const;
 
+    // The names a XUI file may write. `font="SansSerifSmall"` names a
+    // declared font and not a family: SansSerifSmall is a name, DejaVu is
+    // a family, and the two lists overlap without being the same one.
+    // `font.size="Large"` names a size out of the same file. Both sorted,
+    // for a tool offering an author the vocabulary rather than asking them
+    // to remember it.
+    std::vector<std::string> getDeclaredFontNames() const;
+    std::vector<std::string> getDeclaredSizeNames() const;
+
     // Look up the point size for a size name, optionally honoring per-family
     // overrides (<size> children of <font> in fonts.xml). Pass an empty family
     // to skip the per-family lookup and consult only the global table.
     bool nameToSize(const std::string& family, const std::string& size_name, F32& size);
     bool nameToSize(const std::string& size_name, F32& size);
+    // A size fonts.xml did not name -- a text zoomed to a size of its own
+    // -- named from now on, until the registry reads fonts.xml again.
+    // Not among the names a file may write (getDeclaredSizeNames): the
+    // next session has not got it.
+    void declareSize(const std::string& size_name, F32 size)
+    {
+        mFontSizes[size_name] = size;
+        mDeclaredLater.insert(size_name);
+    }
 
     void dump();
     void dumpTextures();
@@ -378,6 +397,8 @@ private:
     font_reg_map_t mFontMap;
     // Given a size name, look up the point size.
     font_size_map_t mFontSizes;
+    // The size names declareSize gave, which fonts.xml does not.
+    std::set<std::string> mDeclaredLater;
     // Per-family size overrides: mFamilySizes[family][size_name] = pt size.
     // Consulted before mFontSizes when a family declares its own <size>.
     family_size_map_t mFamilySizes;

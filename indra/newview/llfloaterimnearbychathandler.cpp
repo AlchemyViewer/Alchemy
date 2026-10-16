@@ -49,7 +49,7 @@
 #include "llfloaterimcontainer.h"
 #include "llrootview.h"
 #include "lllayoutstack.h"
-#include "llscripteditorws.h"
+#include "alscriptworkspace.h"
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvactions.h"
@@ -71,10 +71,11 @@ static LLFloaterIMNearbyChatToastPanel* createToastPanel()
 //LLFloaterIMNearbyChatScreenChannel
 //-----------------------------------------------------------------------------------------------
 
-class LLFloaterIMNearbyChatScreenChannel: public LLScreenChannelBase
+class LLFloaterIMNearbyChatScreenChannel final: public LLScreenChannelBase
 {
     LOG_CLASS(LLFloaterIMNearbyChatScreenChannel);
 public:
+    AL_VIEW_TYPE(LLFloaterIMNearbyChatScreenChannel, LLScreenChannelBase);
     typedef std::vector<LLHandle<LLToast> > toast_vec_t;
     typedef std::list<LLHandle<LLToast> > toast_list_t;
 
@@ -137,14 +138,14 @@ public:
         mChatBarReshapeConnection.disconnect();
     }
 
-    void redrawToasts()
+    void redrawToasts() override
     {
         arrangeToasts();
     }
 
     // hide all toasts from screen, but not remove them from a channel
     // removes all toasts from a channel
-    virtual void        removeToastsFromChannel()
+    virtual void        removeToastsFromChannel() override
     {
         for(toast_vec_t::iterator it = m_active_toasts.begin(); it != m_active_toasts.end(); ++it)
         {
@@ -153,7 +154,7 @@ public:
         m_active_toasts.clear();
     };
 
-    virtual void deleteAllChildren()
+    virtual void deleteAllChildren() override
     {
         LL_DEBUGS("NearbyChat") << "Clearing toast pool" << LL_ENDL;
         m_toast_pool.clear();
@@ -212,17 +213,18 @@ protected:
 
 // We're deriving from LLToast to be able to override onClose()
 // in order to handle closing nearby chat toasts properly.
-class LLFloaterIMNearbyChatToast : public LLToast
+class LLFloaterIMNearbyChatToast final : public LLToast
 {
     LOG_CLASS(LLFloaterIMNearbyChatToast);
 public:
+    AL_VIEW_TYPE(LLFloaterIMNearbyChatToast, LLToast);
     LLFloaterIMNearbyChatToast(const LLToast::Params& p, LLFloaterIMNearbyChatScreenChannel* nc_channelp)
     :   LLToast(p),
         mNearbyChatScreenChannelp(nc_channelp)
     {
     }
 
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onClose(bool app_quitting) override;
 
 private:
     LLFloaterIMNearbyChatScreenChannel* mNearbyChatScreenChannelp;
@@ -395,7 +397,7 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
         LLToast* toast = m_active_toasts[0].get();
         if (toast)
         {
-            LLFloaterIMNearbyChatToastPanel* panel = dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(toast->getPanel());
+            LLFloaterIMNearbyChatToastPanel* panel = ALViewType::as<LLFloaterIMNearbyChatToastPanel>(toast->getPanel());
 
             if (panel && panel->messageID() == fromID && panel->getFromName() == from && panel->canAddText())
             {
@@ -449,7 +451,7 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
     }
 
 
-    LLFloaterIMNearbyChatToastPanel* panel = dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(toast->getPanel());
+    LLFloaterIMNearbyChatToastPanel* panel = ALViewType::as<LLFloaterIMNearbyChatToastPanel>(toast->getPanel());
     if (!panel)
         return;
     panel->init(chat);
@@ -634,7 +636,7 @@ void LLFloaterIMNearbyChatScreenChannel::updateToastWidth()
     for(toast_vec_t::iterator itActive = m_active_toasts.begin(); itActive != m_active_toasts.end(); ++itActive)
     {
         LLToast* pToast = (*itActive).get();
-        LLFloaterIMNearbyChatToastPanel* pToastPanel = (pToast) ? dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(pToast->getPanel()) : NULL;
+        LLFloaterIMNearbyChatToastPanel* pToastPanel = (pToast) ? ALViewType::as<LLFloaterIMNearbyChatToastPanel>(pToast->getPanel()) : NULL;
         if (!pToastPanel)
             continue;
 
@@ -653,7 +655,7 @@ void LLFloaterIMNearbyChatScreenChannel::updateToastWidth()
     for(toast_list_t::iterator itPool = m_toast_pool.begin(); itPool != m_toast_pool.end(); ++itPool)
     {
         LLToast* pToast = (*itPool).get();
-        LLFloaterIMNearbyChatToastPanel* pToastPanel = (pToast) ? dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(pToast->getPanel()) : NULL;
+        LLFloaterIMNearbyChatToastPanel* pToastPanel = (pToast) ? ALViewType::as<LLFloaterIMNearbyChatToastPanel>(pToast->getPanel()) : NULL;
         if (!pToastPanel)
             continue;
 
@@ -754,21 +756,19 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
         return;
     }
 
-    if (LLScriptEditorWSServer::isEnabled() &&
-        gSavedSettings.getBOOL("ExternalWebsocketForwardDebug") &&
-        (chat_msg.mChatType == CHAT_TYPE_DEBUG_MSG ||
-         chat_msg.mChatType == CHAT_TYPE_OWNER))
+    // What scripts say, for Script Studio's output and the external
+    // editor bridge, both of which listen to the workspace.
+    if (chat_msg.mChatType == CHAT_TYPE_DEBUG_MSG || chat_msg.mChatType == CHAT_TYPE_OWNER)
     {
-        LLScriptEditorWSServer::ptr_t server =
-            LLScriptEditorWSServer::getServer();
-        if (server)
-        {
-            const auto channel =
-                chat_msg.mChatType == CHAT_TYPE_OWNER
-                    ? LLPublishedObjectMgr::RuntimeEventAggregator::Channel::OWNER_SAY
-                    : LLPublishedObjectMgr::RuntimeEventAggregator::Channel::DEBUG;
-            server->forwardChatToIDE(chat_msg, channel);
-        }
+        ALScriptWorkspace::instance().ingestChat(chat_msg);
+    }
+    // And what the agent's own objects say aloud, to the agent alone, or
+    // in an IM -- which comes here as chat, with the object's place.
+    else if (chat_msg.mSourceType == CHAT_SOURCE_OBJECT && chat_msg.mOwnerID == gAgentID &&
+             (chat_msg.mChatType == CHAT_TYPE_WHISPER || chat_msg.mChatType == CHAT_TYPE_NORMAL || chat_msg.mChatType == CHAT_TYPE_SHOUT ||
+              chat_msg.mChatType == CHAT_TYPE_DIRECT))
+    {
+        ALScriptWorkspace::instance().ingestChat(chat_msg, args.has("slurl"));
     }
 
     // don't show toast and add message to chat history on receive debug message
@@ -851,7 +851,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
     }
     */
 
-    LLFloaterIMNearbyChatScreenChannel* channel = dynamic_cast<LLFloaterIMNearbyChatScreenChannel*>(mChannel.get());
+    LLFloaterIMNearbyChatScreenChannel* channel = ALViewType::as<LLFloaterIMNearbyChatScreenChannel>(mChannel.get());
 
     if(channel)
     {

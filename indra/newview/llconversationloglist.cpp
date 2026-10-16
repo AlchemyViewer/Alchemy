@@ -520,7 +520,7 @@ LLIMModel::LLIMSession::SType LLConversationLogList::getSelectedSessionType()
 const LLConversationLogListItem* LLConversationLogList::getSelectedConversationPanel()
 {
     LLPanel* panel = LLFlatListViewEx::getSelectedItem();
-    LLConversationLogListItem* conv_panel = dynamic_cast<LLConversationLogListItem*>(panel);
+    LLConversationLogListItem* conv_panel = ALViewType::as<LLConversationLogListItem>(panel);
 
     return conv_panel;
 }
@@ -545,7 +545,7 @@ LLConversationLogListItem* LLConversationLogList::getConversationLogListItem(con
 
     for (; iter != panels.end(); ++iter)
     {
-        LLConversationLogListItem* item = dynamic_cast<LLConversationLogListItem*>(*iter);
+        LLConversationLogListItem* item = (*iter)->as<LLConversationLogListItem>();
         if (item && session_id == item->getConversation()->getSessionID())
         {
             return item;
@@ -562,8 +562,8 @@ LLConversationLogList::ESortOrder LLConversationLogList::getSortOrder()
 
 bool LLConversationLogListItemComparator::compare(const LLPanel* item1, const LLPanel* item2) const
 {
-    const LLConversationLogListItem* conversation_item1 = dynamic_cast<const LLConversationLogListItem*>(item1);
-    const LLConversationLogListItem* conversation_item2 = dynamic_cast<const LLConversationLogListItem*>(item2);
+    const LLConversationLogListItem* conversation_item1 = ALViewType::as<LLConversationLogListItem>(item1);
+    const LLConversationLogListItem* conversation_item2 = ALViewType::as<LLConversationLogListItem>(item2);
 
     if (!conversation_item1 || !conversation_item2)
     {

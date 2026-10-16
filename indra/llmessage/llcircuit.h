@@ -123,7 +123,7 @@ public:
     U32         getPacketsLost() const;
     TPACKETID   getPacketOutID() const;
     bool        getTrusted() const;
-    F32         getAgeInSeconds() const;
+    F64         getAgeInSeconds() const;
     S32         getUnackedPacketCount() const   { return mUnackedPacketCount; }
     S32         getUnackedPacketBytes() const   { return mUnackedPacketBytes; }
     F64Seconds  getNextPingSendTime() const { return mNextPingSendTime; }
@@ -238,7 +238,7 @@ protected:
     packet_time_map                         mPotentialLostPackets;
     packet_time_map                         mRecentlyReceivedReliablePackets;
     std::vector<TPACKETID> mAcks;
-    F32 mAckCreationTime; // first ack creation time
+    F64 mAckCreationTime; // first ack creation time, as getAgeInSeconds(): a circuit can live all session
 
     typedef std::map<TPACKETID, LLReliablePacket *> reliable_map;
     typedef reliable_map::iterator                  reliable_iter;

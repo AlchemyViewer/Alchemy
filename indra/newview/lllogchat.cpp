@@ -30,7 +30,8 @@
 #include "llagentui.h"
 #include "llavatarnamecache.h"
 #include "lllogchat.h"
-#include "llregex.h"
+#include "alchattimestamp.h"
+#include "alregex.h"
 #include "lltrans.h"
 #include "llurlaction.h"
 #include "llurlentry.h"
@@ -43,7 +44,6 @@
 
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/regex.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/local_time_adjustor.hpp>
@@ -79,15 +79,18 @@ const static std::string MULTI_LINE_PREFIX(" ");
  *  [2009/11/20 3:01]  Corba ProductEngine is Offline
  *
  * Note: "You" was used as an avatar names in viewers of previous versions
+ *
+ * ALChatTimestamp recognizes these timestamps with or without seconds.
  */
-const static boost::regex TIMESTAMP_AND_STUFF("^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\s[AaPp][Mm]\\]\\s+|\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\]\\s+|\\[\\d{1,2}:\\d{2}\\s[AaPp][Mm]\\]\\s+|\\[\\d{1,2}:\\d{2}\\]\\s+)?(.*)$");
-const static boost::regex TIMESTAMP("^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}(\\s[AaPp][Mm])?\\]|\\[\\d{1,2}:\\d{2}(\\s[AaPp][Mm])?\\]).*");
 
 /**
  *  Regular expression suitable to match names like
- *  "You", "Second Life", "Igor ProductEngine", "Object", "Mega House"
+ *  "You", "Second Life", "Igor ProductEngine", "Object", "Mega House",
+ *  with the colon after them, at the head of what follows a timestamp; the
+ *  text is what follows the blanks after that.
  */
-const static boost::regex NAME_AND_TEXT("([^:]+[:]{1})?(\\s*)(.*)");
+const static ALRegex NAME_PREFIX("[^:]+:");
+const static ALRegex BLANKS("\\s*");
 
 /**
  * These are recognizers for matching the names of ad-hoc conferences when generating the log file name
@@ -96,8 +99,8 @@ const static boost::regex NAME_AND_TEXT("([^:]+[:]{1})?(\\s*)(.*)");
  * If the naming system for ad-hoc conferences are change in LLIMModel::LLIMSession::buildHistoryFileName()
  * then these definition need to be adjusted as well.
  */
-const static boost::regex INBOUND_CONFERENCE("^[a-zA-Z]{1,31} [a-zA-Z]{1,31} Conference [0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2} [0-9a-f]{4}");
-const static boost::regex OUTBOUND_CONFERENCE("^Ad-hoc Conference hash[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}");
+const static ALRegex INBOUND_CONFERENCE("^[a-zA-Z]{1,31} [a-zA-Z]{1,31} Conference [0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2} [0-9a-f]{4}");
+const static ALRegex OUTBOUND_CONFERENCE("^Ad-hoc Conference hash[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}");
 
 //is used to parse complex object names like "Xstreet SL Terminal v2.2.5 st"
 const static std::string NAME_TEXT_DIVIDER(": ");
@@ -105,11 +108,6 @@ const static std::string NAME_TEXT_DIVIDER(": ");
 // is used for timestamps adjusting
 const static char* DATE_FORMAT("%Y/%m/%d %H:%M");
 const static char* TIME_FORMAT("%H:%M");
-
-const static int IDX_TIMESTAMP = 1;
-const static int IDX_STUFF = 2;
-const static int IDX_NAME = 1;
-const static int IDX_TEXT = 3;
 
 using namespace boost::posix_time;
 using namespace boost::gregorian;
@@ -142,7 +140,7 @@ public:
     {
         typedef boost::date_time::local_adjustor<ptime, -8, no_dst> pst;
         typedef boost::date_time::local_adjustor<ptime, -7, no_dst> pdt;
-        time_t t_time = time(NULL);
+        time_t t_time = time_corrected();
         ptime p_time = LLStringOps::getPacificDaylightTime()
             ? pdt::utc_to_local(from_time_t(t_time))
             : pst::utc_to_local(from_time_t(t_time));
@@ -152,7 +150,7 @@ public:
 
     void checkAndCutOffDate(std::string& time_str)
     {
-        if (time_str.size() < 10) // not enough space for a date
+        if (time_str.find('/') == std::string::npos)
         {
             return;
         }
@@ -235,9 +233,8 @@ std::string LLLogChat::makeLogFileName(std::string filename)
      * if it is then skip date stamping.
      **/
 
-    boost::match_results<std::string::const_iterator> matches;
-    bool inboundConf = ll_regex_match(filename, matches, INBOUND_CONFERENCE);
-    bool outboundConf = ll_regex_match(filename, matches, OUTBOUND_CONFERENCE);
+    bool inboundConf = INBOUND_CONFERENCE.match(filename);
+    bool outboundConf = OUTBOUND_CONFERENCE.match(filename);
     if (!(inboundConf || outboundConf))
     {
         if( gSavedPerAccountSettings.getBOOL("LogFileNamewithDate") )
@@ -301,7 +298,7 @@ std::string LLLogChat::cleanFileName(std::string filename)
     return filename;
 }
 
-std::string LLLogChat::timestamp2LogString(U32 timestamp, bool withdate)
+std::string LLLogChat::timestamp2LogString(U32 timestamp, bool withdate, bool withseconds)
 {
     std::string timeStr;
     if (withdate)
@@ -311,17 +308,16 @@ std::string LLLogChat::timestamp2LogString(U32 timestamp, bool withdate)
             + LLTrans::getString("TimeDay") + "] ";
     }
 
-    static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
-    if (use_24h)
+    const bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+    timeStr += "[" + LLTrans::getString(use_24h ? "TimeHour" : "TimeHour12") + "]:["
+        + LLTrans::getString("TimeMin") + "]";
+    if (withseconds)
     {
-        timeStr += "[" + LLTrans::getString("TimeHour") + "]:["
-            + LLTrans::getString("TimeMin") + "]";
+        timeStr += ":[" + LLTrans::getString("TimeSec") + "]";
     }
-    else
+    if (!use_24h)
     {
-        timeStr += "[" + LLTrans::getString("TimeHour12") + "]:["
-            + LLTrans::getString("TimeMin") + "] ["
-            + LLTrans::getString("TimeAMPM") + "]";
+        timeStr += " [" + LLTrans::getString("TimeAMPM") + "]";
     }
 
     LLSD substitution;
@@ -367,12 +363,12 @@ void LLLogChat::saveHistory(const std::string& filename,
     // avoid costly regex calls
     if (line.find("/mention") != std::string::npos)
     {
-        static const boost::regex mention_regex(APP_HEADER_REGEX "/agent/[\\da-f-]+/mention", boost::regex::perl | boost::regex::icase);
+        static const ALRegex mention_regex(APP_HEADER_REGEX "/agent/[\\da-f-]+/mention", ALRegex::ICASE);
 
         // replace mention URL with [@username](URL)
-        altered_line = boost::regex_replace(line, mention_regex, [](const boost::smatch& match) -> std::string
+        mention_regex.replaceEach(altered_line, [](const ALRegexMatch& match) -> std::string
         {
-            std::string url = match[0].str();
+            std::string url = match.str();
             std::string username = LLUrlAction::getURLLabel(url);
             return "[" + username + "](" + url + ")";
         });
@@ -381,7 +377,8 @@ void LLLogChat::saveHistory(const std::string& filename,
     LLSD item;
 
     if (gSavedPerAccountSettings.getBOOL("LogTimestamp"))
-         item["time"] = LLLogChat::timestamp2LogString(0, gSavedPerAccountSettings.getBOOL("LogTimestampDate"));
+         item["time"] = LLLogChat::timestamp2LogString(0, gSavedPerAccountSettings.getBOOL("LogTimestampDate"),
+                                                     gSavedSettings.getBOOL("AlchemyIMShowSeconds"));
 
     item["from_id"] = from_id;
     item["message"] = altered_line;
@@ -496,11 +493,11 @@ void LLLogChat::loadChatHistory(const std::string& file_name, std::list<LLSD>& m
         if (line.find("/mention)") != std::string::npos)
         {
             // restore original mention URL from [@username](URL) format
-            static const boost::regex altered_mention_regex("\\[@([^\\]]+)\\]\\((" APP_HEADER_REGEX "/agent/[\\da-f-]+/mention)\\)",
-                                                            boost::regex::perl | boost::regex::icase);
+            static const ALRegex altered_mention_regex("\\[@([^\\]]+)\\]\\((" APP_HEADER_REGEX "/agent/[\\da-f-]+/mention)\\)",
+                                                       ALRegex::ICASE);
 
-            // $2 captures the URL part
-            line = boost::regex_replace(line, altered_mention_regex, "$2");
+            // group 2 captures the URL part
+            altered_mention_regex.replaceEach(line, [](const ALRegexMatch& match) { return match.str(2); });
         }
 
         //updated 1.23 plain text log format requires a space added before subsequent lines in a multilined message
@@ -913,9 +910,8 @@ bool LLLogChat::isTranscriptFileFound(std::string fullname)
         if (bytes_to_read > 0 && NULL != fgets(buffer, bytes_to_read, filep))
         {
             //matching a timestamp
-            boost::match_results<std::string::const_iterator> matches;
             std::string line(remove_utf8_bom(buffer));
-            if (ll_regex_match(line, matches, TIMESTAMP))
+            if (ALChatTimestamp::prefixLength(line) != 0)
             {
                 result = true;
             }
@@ -999,14 +995,11 @@ bool LLChatLogParser::parse(std::string& raw, LLSD& im, const LLSD& parse_params
     im = LLSD::emptyMap();
 
     //matching a timestamp
-    boost::match_results<std::string::const_iterator> matches;
-    if (!ll_regex_match(raw, matches, TIMESTAMP_AND_STUFF)) return false;
-
-    bool has_timestamp = matches[IDX_TIMESTAMP].matched;
-    if (has_timestamp)
+    const size_t timestamp_length = ALChatTimestamp::prefixLength(raw);
+    if (timestamp_length != 0)
     {
         //timestamp was successfully parsed
-        std::string timestamp = matches[IDX_TIMESTAMP];
+        std::string timestamp = raw.substr(0, timestamp_length);
         boost::trim(timestamp);
         timestamp.erase(0, 1);
         timestamp.erase(timestamp.length()-1, 1);
@@ -1026,19 +1019,13 @@ bool LLChatLogParser::parse(std::string& raw, LLSD& im, const LLSD& parse_params
         im[LL_IM_TIME] = "";
     }
 
-    bool has_stuff = matches[IDX_STUFF].matched;
-    if (!has_stuff)
-    {
-        return false;  //*TODO should return false or not?
-    }
+    // the rest of the line, after any timestamp
+    std::string stuff = raw.substr(timestamp_length);
 
     //matching a name and a text
-    std::string stuff = matches[IDX_STUFF];
-    boost::match_results<std::string::const_iterator> name_and_text;
-    if (!ll_regex_match(stuff, name_and_text, NAME_AND_TEXT)) return false;
-
-    bool has_name = name_and_text[IDX_NAME].matched;
-    std::string name = LLURI::unescape(name_and_text[IDX_NAME]);
+    ALRegexMatch named;
+    bool has_name = NAME_PREFIX.search(stuff, &named, 0, true, 0);
+    std::string name = has_name ? LLURI::unescape(named.str()) : std::string();
 
     //we don't need a name/text separator
     if (has_name && name.length() && name[name.length()-1] == ':')
@@ -1072,9 +1059,6 @@ bool LLChatLogParser::parse(std::string& raw, LLSD& im, const LLSD& parse_params
         return true; //parse as a message from Second Life
     }
 
-    bool has_text = name_and_text[IDX_TEXT].matched;
-    if (!has_text) return false;
-
     //for parsing logs created in very old versions of a viewer
     if (name == "You")
     {
@@ -1088,7 +1072,9 @@ bool LLChatLogParser::parse(std::string& raw, LLSD& im, const LLSD& parse_params
         im[LL_IM_FROM] = name;
     }
 
-    im[LL_IM_TEXT] = name_and_text[IDX_TEXT];
+    // the text is what follows the name and the blanks after it
+    ALRegexMatch blanks;
+    im[LL_IM_TEXT] = BLANKS.search(stuff, &blanks, named.end(), true, 0) ? stuff.substr(blanks.end()) : stuff.substr(named.end());
     return true;  //parsed name and message text, maybe have a timestamp too
 }
 
@@ -1116,37 +1102,25 @@ void LLDeleteHistoryThread::run()
 }
 
 LLActionThread::LLActionThread(const std::string& name)
-    : LLThread(name),
-    mMutex(),
-    mRunCondition(),
-    mFinished(false)
+    : LLThread(name)
 {
 }
 
 LLActionThread::~LLActionThread()
 {
+    // Stopped before mFinished goes: a thread seen finished may still be notifying
+    // its waiters through it.
+    shutdown();
 }
 
 void LLActionThread::waitFinished()
 {
-    mMutex.lock();
-    if (!mFinished)
-    {
-        mMutex.unlock();
-        mRunCondition.wait();
-    }
-    else
-    {
-        mMutex.unlock();
-    }
+    mFinished.wait();
 }
 
 void LLActionThread::setFinished()
 {
-    mMutex.lock();
-    mFinished = true;
-    mMutex.unlock();
-    mRunCondition.signal();
+    mFinished.set_all();
 }
 
 LLLoadHistoryThread::LLLoadHistoryThread(const std::string& file_name, std::list<LLSD>* messages, const LLSD& load_params)

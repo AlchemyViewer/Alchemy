@@ -103,15 +103,18 @@ void LLRemoteParcelInfoProcessor::processParcelInfoReply(LLMessageSystem* msg, v
     msg->getS32Fast(_PREHASH_Data, _PREHASH_SalePrice, parcel_data.sale_price);
     msg->getS32Fast(_PREHASH_Data, _PREHASH_AuctionID, parcel_data.auction_id);
 
-    LLRemoteParcelInfoProcessor* inst = LLRemoteParcelInfoProcessor::getInstance();
+    LLRemoteParcelInfoProcessor::getInstance()->processParcelData(parcel_data);
+}
 
-    requests_map_t::const_iterator found = inst->mPendingParcelRequests.find(parcel_data.parcel_id);
-    if (found != inst->mPendingParcelRequests.end())
+void LLRemoteParcelInfoProcessor::processParcelData(const LLParcelData& parcel_data)
+{
+    requests_map_t::const_iterator found = mPendingParcelRequests.find(parcel_data.parcel_id);
+    if (found != mPendingParcelRequests.end())
     {
-        inst->mPendingParcelRequests.erase(found);
+        mPendingParcelRequests.erase(found);
     }
 
-    LLRemoteParcelInfoProcessor::observer_multimap_t & observers = inst->mObservers;
+    observer_multimap_t & observers = mObservers;
 
     typedef std::vector<observer_multimap_t::iterator> deadlist_t;
     deadlist_t dead_iters;

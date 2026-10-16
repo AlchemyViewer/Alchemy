@@ -68,7 +68,6 @@
 #include "bufferarray.h"
 #include "bufferstream.h"
 #include "workqueue.h"
-#include "llfasttimer.h"
 #include "llcorehttputil.h"
 #include "lltrans.h"
 #include "llstatusbar.h"
@@ -304,9 +303,6 @@
 //                   locally-generated 500 status.
 //   0x08            As with 0x04 but for the upload operation.
 //
-//   For major changes, see the LL_MESH_FASTTIMER_ENABLE below and
-//   instructions for looking for frame stalls using fast timers.
-//
 // *TODO:  Work list for followup actions:
 //   * Review anything marked as unsafe above, verify if there are real issues.
 //   * See if we can put ::run() into a hard sleep.  May not actually perform better
@@ -327,19 +323,6 @@
 // --------------------------------------------------------------------------
 //                    Development/Debug/QA Tools
 //
-// Enable here or in build environment to get fasttimer data on mesh fetches.
-//
-// Typically, this is used to perform A/B testing using the
-// fasttimer console (shift-ctrl-9).  This is done by looking
-// for stalls due to lock contention between the main thread
-// and the repository and HTTP code.  In a release viewer,
-// these appear as ping-time or worse spikes in frame time.
-// With this instrumentation enabled, a stall will appear
-// under the 'Mesh Fetch' timer which will be either top-level
-// or under 'Render' time.
-
-static LLFastTimer::DeclareTimer FTM_MESH_FETCH("Mesh Fetch");
-
 // Random failure testing for development/QA.
 //
 // Set the MESH_*_FAILED macros to either 'false' or to
@@ -4558,6 +4541,9 @@ void LLMeshRepository::unregisterMesh(LLVOVolume* vobj, const LLVolumeParams& me
         llassert(!param_iter->second.mVolumes.contains(vobj));
         if (param_iter->second.mVolumes.empty())
         {
+            // Erasing the entry untracks any request still queued in mPendingRequests;
+            // the submit loop in notifyLoadedMeshes() discards it there rather than
+            // paying an O(queue) scan for every dying object here.
             lod.erase(param_iter);
         }
     }
@@ -4576,6 +4562,7 @@ void LLMeshRepository::unregisterSkinInfo(const LLUUID& mesh_id, LLVOVolume* vob
         llassert(!skin_pair_iter->second.mVolumes.contains(vobj));
         if (skin_pair_iter->second.mVolumes.empty())
         {
+            // As in unregisterMesh(): a request still queued is dropped at submit.
             mLoadingSkins.erase(skin_pair_iter);
         }
     }
@@ -4602,11 +4589,25 @@ void LLMeshRepository::unregisterAllMeshes()
         lod.clear();
     }
     mLoadingSkins.clear();
+    // mPendingRequests holds shared_ptrs to the same PendingRequestBase objects
+    // that were tracked by the maps above. Now that every tracking entry is gone
+    // any queued request has no volumes to notify, so discard them here to keep
+    // ownership consistent and avoid submitting requests against freed data.
+    // Decrement sLODPending for any LOD requests being discarded to keep the
+    // counter balanced with the increments in loadMesh().
+    for (const std::shared_ptr<PendingRequestBase>& req : mPendingRequests)
+    {
+        if (req && req->getRequestType() == MESH_REQUEST_LOD)
+        {
+            LLMeshRepository::sLODPending--;
+        }
+    }
+    mPendingRequests.clear();
 }
 
 S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_params, S32 new_lod, S32 last_lod)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     // Manage time-to-load metrics for mesh download operations.
     metricsProgress(1);
@@ -4724,7 +4725,7 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 
 void LLMeshRepository::notifyLoadedMeshes()
 { //called from main thread
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     // GetMesh2 operation with keepalives, etc.  With pipelining,
     // we'll increase this.  See llappcorehttp and llcorehttp for
@@ -5024,8 +5025,18 @@ void LLMeshRepository::notifyLoadedMeshes()
     // submission run. Any submission entry point added here must take mMutex itself.
     for (const std::shared_ptr<PendingRequestBase>& req_p : submit_batch)
     {
-        // todo: check hasTrackedData here and erase request if none
-        // since this is supposed to mean that request was removed
+        // A request whose last waiting volume unregistered while it sat in the queue
+        // has no tracked data left. This is the one place such requests are dropped;
+        // unregisterMesh()/unregisterSkinInfo() leave them queued on purpose.
+        if (!req_p || !req_p->hasTrackedData())
+        {
+            // Keep sLODPending balanced with the increment in loadMesh().
+            if (req_p && req_p->getRequestType() == MESH_REQUEST_LOD)
+            {
+                LLMeshRepository::sLODPending--;
+            }
+            continue;
+        }
         switch (req_p->getRequestType())
         {
         case MESH_REQUEST_LOD:
@@ -5364,7 +5375,7 @@ EMeshSkinInfoResult LLMeshRepository::fetchSkinInfo(const LLUUID& mesh_id, LLVOV
 
 void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     // Local mesh previews have no server-side decomposition; don't queue a repo
     // request that can never resolve (the id would sit in mLoadingPhysicsShapes
@@ -5399,7 +5410,7 @@ void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
 
 LLModel::Decomposition* LLMeshRepository::getDecomposition(const LLUUID& mesh_id)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     LLModel::Decomposition* ret = NULL;
 

@@ -105,7 +105,7 @@ void LLFloaterURLEntry::buildURLHistory()
 
 void LLFloaterURLEntry::headerFetchComplete(S32 status, const std::string& mime_type)
 {
-    LLPanelLandMedia* panel_media = dynamic_cast<LLPanelLandMedia*>(mPanelLandMediaHandle.get());
+    LLPanelLandMedia* panel_media = ALViewType::as<LLPanelLandMedia>(mPanelLandMediaHandle.get());
     if (panel_media)
     {
         // status is ignored for now -- error = "none/none"
@@ -201,7 +201,8 @@ void LLFloaterURLEntry::getMediaTypeCoro(std::string url, LLHandle<LLFloater> pa
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMediaTypeCoro", httpPolicy);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMediaTypeCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
     LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();

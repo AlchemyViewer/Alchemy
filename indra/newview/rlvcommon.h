@@ -32,6 +32,7 @@
 //
 // General viewer source
 //
+class ALRegex;
 class LLInventoryItem;
 class LLUICtrl;
 class LLViewerInventoryCategory;
@@ -123,7 +124,7 @@ protected:
     static bool s_fTempAttach;
     static std::list<std::string> s_BlockedExperiences;
     static std::list<LLUUID>      s_CompatItemCreators;
-    static std::list<std::string> s_CompatItemNames;
+    static std::list<ALRegex>     s_CompatItemNames;
 };
 
 // ============================================================================

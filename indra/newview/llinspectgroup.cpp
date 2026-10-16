@@ -48,11 +48,12 @@
 
 /// Group Inspector, a small information window used when clicking
 /// on group names in the 2D UI
-class LLInspectGroup : public LLInspect, public LLGroupMgrObserver
+class LLInspectGroup final : public LLInspect, public LLGroupMgrObserver
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLInspectGroup, LLInspect);
     // key["group_id"] - Group ID for which to show information
     // Inspector will be positioned relative to current mouse position
     LLInspectGroup(const LLSD& key);
@@ -60,17 +61,17 @@ public:
 
     // Because floater is single instance, need to re-parse data on each spawn
     // (for example, inspector about same group but in different position)
-    /*virtual*/ void onOpen(const LLSD& group_id);
+    /*virtual*/ void onOpen(const LLSD& group_id) override;
 
     void setGroupID(const LLUUID& group_id);
 
     // When closing they should close their gear menu
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onClose(bool app_quitting) override;
 
     // Update view based on information from group manager
     void processGroupData();
 
-    virtual void changed(LLGroupChange gc);
+    virtual void changed(LLGroupChange gc) override;
 
     // Make network requests for all the data to display in this view.
     // Used on construction and if avatar id changes.

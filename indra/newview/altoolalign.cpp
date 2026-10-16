@@ -148,8 +148,8 @@ bool ALToolAlign::findSelectedManipulator(S32 x, S32 y)
     {
         transform.initAll(LLVector3(1.f, 1.f, 1.f), mBBox.getRotation(), mBBox.getCenterAgent());
 
-        LLMatrix4 projection_matrix(camera->getProjection());
-        LLMatrix4 model_matrix(camera->getModelview());
+        LLMatrix4 projection_matrix = camera->getForwardZProjection().toMatrix4();
+        LLMatrix4 model_matrix = camera->frameModelview().toMatrix4();
 
         transform *= model_matrix;
         transform *= projection_matrix;

@@ -1,39 +1,20 @@
 # -*- cmake -*-
 
 # Integration tests of the llimage library (JPEG2000, PNG, jpeg, etc... images reading and writing)
-if (BUILD_TESTING)
+if(AL_BUILD_TESTS)
+  add_executable(llimage_libtest)
 
-set(llimage_libtest_SOURCE_FILES
-    llimage_libtest.cpp
-    )
+  target_sources(llimage_libtest PRIVATE llimage_libtest.cpp llimage_libtest.h)
 
-set(llimage_libtest_HEADER_FILES
-    llimage_libtest.h
-    )
+  set_target_properties(llimage_libtest PROPERTIES FOLDER "Tests")
 
-list(APPEND llimage_libtest_SOURCE_FILES ${llimage_libtest_HEADER_FILES})
+  target_link_libraries(
+    llimage_libtest
+    PRIVATE al::flags llcommon llfilesystem llmath llimage
+  )
 
-add_executable(llimage_libtest
-    ${llimage_libtest_SOURCE_FILES}
-    )
-
-set_target_properties(llimage_libtest
-                    PROPERTIES
-                    FOLDER "Tests"
-                    )
-
-# Libraries on which this application depends on
-# Sort by high-level to low-level
-target_link_libraries(llimage_libtest
-        llcommon
-        llfilesystem
-        llmath
-        llimage
-        )
-
-if (BUILD_VIEWER)
+  if(AL_BUILD_VIEWER)
     # Ensure people working on the viewer don't break this library
-    add_dependencies(viewer llimage_libtest)
-endif (BUILD_VIEWER)
-
+    add_dependencies(${AL_VIEWER_BINARY_NAME} llimage_libtest)
+  endif()
 endif()

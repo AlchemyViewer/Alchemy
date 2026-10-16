@@ -34,14 +34,16 @@ class LLScrollListCtrl;
 class LLTextBox;
 class LLFloaterMediaSettings;
 
-class LLPanelMediaSettingsSecurity : public LLPanel
+class LLPanelMediaSettingsSecurity final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelMediaSettingsSecurity, LLPanel);
+
     LLPanelMediaSettingsSecurity();
     ~LLPanelMediaSettingsSecurity();
 
-    bool postBuild();
-    virtual void draw();
+    bool postBuild() override;
+    virtual void draw() override;
 
     // XXX TODO: put these into a common parent class?
     // Hook that the floater calls before applying changes from the panel

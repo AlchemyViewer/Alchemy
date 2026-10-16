@@ -35,7 +35,6 @@
 #include "llflexibleobject.h"
 #include "llviewercontrol.h"
 #include "lldatapacker.h"
-#include "llfasttimer.h"
 #include "llfloaterreg.h"
 #include "llfontgl.h"
 #include "llframetimer.h"
@@ -93,7 +92,6 @@
 #include "llvosurfacepatch.h"
 #include "llvotree.h"
 #include "llvovolume.h"
-#include "llvowater.h"
 #include "llworld.h"
 #include "llui.h"
 #include "pipeline.h"
@@ -132,9 +130,9 @@ S32         LLViewerObject::sAxisArrowLength(50);
 bool        LLViewerObject::sPulseEnabled(false);
 bool        LLViewerObject::sUseSharedDrawables(false); // true
 
-// sMaxUpdateInterpolationTime must be greater than sPhaseOutUpdateInterpolationTime
-F64Seconds  LLViewerObject::sMaxUpdateInterpolationTime(3.0);       // For motion interpolation: after X seconds with no updates, don't predict object motion
-F64Seconds  LLViewerObject::sPhaseOutUpdateInterpolationTime(2.0);  // For motion interpolation: after Y seconds with no updates, taper off motion prediction
+// Defaults only: LLViewerObjectList::update overwrites these from settings. mMaxTime must stay
+// greater than mPhaseOutTime, or there is no room for the taper between them.
+ALMotionPredictor::Tuning LLViewerObject::sPredictionTuning;
 F64Seconds  LLViewerObject::sMaxRegionCrossingInterpolationTime(1.0);// For motion interpolation: don't interpolate over this time on region crossing
 
 std::map<std::string, U32> LLViewerObject::sObjectDataMap;
@@ -147,7 +145,6 @@ boost::unordered_map<LLUUID, std::vector<LLViewerObject*>> LLViewerObject::sPend
 // to settle down at a reasonable rate.
 // JC 3/18/2003
 
-const F32 PHYSICS_TIMESTEP = 1.f / 45.f;
 const U32 MAX_INV_FILE_READ_FAILS = 25;
 const S32 MAX_OBJECT_BINARY_DATA_SIZE = 60 + 16;
 
@@ -165,8 +162,6 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
     if (gNonInteractive
         && pcode != LL_PCODE_LEGACY_AVATAR
         && pcode != LL_VO_SURFACE_PATCH
-        && pcode != LL_VO_WATER
-        && pcode != LL_VO_VOID_WATER
         && pcode != LL_VO_WL_SKY
         && pcode != LL_VO_SKY
         && pcode != LL_VO_PART_GROUP
@@ -236,10 +231,6 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
       res = new LLVOSurfacePatch(id, pcode, regionp); break;
     case LL_VO_SKY:
       res = new LLVOSky(id, pcode, regionp); break;
-    case LL_VO_VOID_WATER:
-        res = new LLVOVoidWater(id, pcode, regionp); break;
-    case LL_VO_WATER:
-        res = new LLVOWater(id, pcode, regionp); break;
     case LL_VO_PART_GROUP:
       res = new LLVOPartGroup(id, pcode, regionp); break;
     case LL_VO_HUD_PART_GROUP:
@@ -333,7 +324,11 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
     LLPrimitive::init_primitive(pcode);
 
     // CP: added 12/2/2005 - this was being initialised to 0, not the current frame time
-    mLastInterpUpdateSecs = LLFrameTimer::getElapsedSeconds();
+    // Both clocks need it: an object whose first update is rejected before the timestamps are
+    // stamped otherwise measures its update age from the start of the session, which is instantly
+    // past every phase-out threshold.
+    mLastInterpUpdateSecs = LLFrameTimer::getUptimeSeconds();
+    mLastMessageUpdateSecs = mLastInterpUpdateSecs;
 
     mPositionRegion = LLVector3(0.f, 0.f, 0.f);
 
@@ -353,7 +348,7 @@ LLViewerObject::~LLViewerObject()
     // unhook from reflection probe manager
     if (mReflectionProbe.notNull())
     {
-        mReflectionProbe->mViewerObject = nullptr;
+        mReflectionProbe->orphan();
         mReflectionProbe = nullptr;
     }
 
@@ -534,7 +529,7 @@ void LLViewerObject::markDead()
 
         if (mReflectionProbe.notNull())
         {
-            mReflectionProbe->mViewerObject = nullptr;
+            mReflectionProbe->orphan();
             mReflectionProbe = nullptr;
         }
 
@@ -565,7 +560,7 @@ void LLViewerObject::dump() const
 {
     LL_INFOS() << "Type: " << pCodeToString(mPrimitiveCode) << LL_ENDL;
     LL_INFOS() << "Drawable: " << (LLDrawable *)mDrawable << LL_ENDL;
-    LL_INFOS() << "Update Age: " << LLFrameTimer::getElapsedSeconds() - mLastMessageUpdateSecs << LL_ENDL;
+    LL_INFOS() << "Update Age: " << LLFrameTimer::getUptimeSeconds() - mLastMessageUpdateSecs << LL_ENDL;
 
     LL_INFOS() << "Parent: " << getParent() << LL_ENDL;
     LL_INFOS() << "ID: " << mID << LL_ENDL;
@@ -627,7 +622,6 @@ void LLViewerObject::initVOClasses()
     LLVOTree::initClass();
     LL_INFOS() << "Viewer Object size: " << sizeof(LLViewerObject) << LL_ENDL;
     LLVOGrass::initClass();
-    LLVOWater::initClass();
     LLVOVolume::initClass();
 
     initObjectDataMap();
@@ -636,7 +630,6 @@ void LLViewerObject::initVOClasses()
 void LLViewerObject::cleanupVOClasses()
 {
     SUBSYSTEM_CLEANUP(LLVOGrass);
-    SUBSYSTEM_CLEANUP(LLVOWater);
     SUBSYSTEM_CLEANUP(LLVOTree);
     SUBSYSTEM_CLEANUP(LLVOAvatar);
     SUBSYSTEM_CLEANUP(LLVOVolume);
@@ -1266,6 +1259,43 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
         return retval;
     }
 
+    // Has this message been overtaken by one already applied? Decided here, before the decode can
+    // run setRegion() and zero the counter, and against the sender rather than the counter alone:
+    // packet ids are per circuit, so they only order messages from the sim that issued them, and
+    // the first message after a handoff must not be measured against the old sim's sequence.
+    //
+    // What a stale message loses depends on what it carries. A terse update is nothing but motion,
+    // and a newer packet has already said where this object is and how it moves, so the whole
+    // thing is dropped -- and dropped now, before any of it is read. A full update also carries the
+    // state the simulator only sends on change (parenting, textures, scale, flags, extra params),
+    // which no later packet repeats; that part is still applied below, and only the motion and the
+    // position are withheld. The full decode also has to run to the end for a subclass's sake:
+    // LLVOVolume reads its volume parameters and texture entries from the same data packer,
+    // starting wherever this function leaves it.
+    bool stale_update = false;
+    if (mesgsys != NULL)
+    {
+        U32 packet_id = mesgsys->getCurrentRecvPacketID();
+        if (mesgsys->getSender() != mRegionp->getHost())
+        {
+            mLatestRecvPacketID = packet_id;
+        }
+        else if (packet_id < mLatestRecvPacketID &&
+                 mLatestRecvPacketID - packet_id < 65536)
+        {
+            stale_update = true;
+        }
+        else
+        {
+            mLatestRecvPacketID = packet_id;
+        }
+
+        if (stale_update && update_type == OUT_TERSE_IMPROVED)
+        {
+            return retval;
+        }
+    }
+
     // Coordinates of objects on simulators are region-local.
     U64 region_handle = 0;
 
@@ -1321,6 +1351,11 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     // Use getPosition, not getPositionRegion, since this is what we're comparing directly against.
     LLVector3 test_pos_parent = getPosition();
 
+    // Where prediction had got to. test_pos_parent is the same value but gets quantized in the
+    // terse path to make the "did it move" comparison fair, so keep an unrounded copy for the
+    // prediction residual logged at the end of this function.
+    const LLVector3 predicted_pos_parent = test_pos_parent;
+
     // This needs to match the largest size below. See switch(length)
     U8  data[MAX_OBJECT_BINARY_DATA_SIZE];
 
@@ -1341,6 +1376,11 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     LLVector3 old_angv = getAngularVelocity();
     LLQuaternion new_rot;
     LLVector3 new_scale = getScale();
+
+    // The decode writes velocity and acceleration straight into the object. These are what a stale
+    // full update hands back once it has been decoded for everything else.
+    const LLVector3 old_vel = getVelocity();
+    const LLVector3 old_acc = getAcceleration();
 
     U32 parent_id = 0;
     U8  material = 0;
@@ -1562,7 +1602,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     mHudText = temp_string;
                     mHudTextColor = LLColor4(coloru);
 
-                    setChanged(MOVED | SILHOUETTE);
+                    setChanged(MOVED);
                 }
                 else
                 {
@@ -2106,7 +2146,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     // Show particles, icon and HUD
                     hideExtraDisplayItems( false );
 
-                    setChanged(MOVED | SILHOUETTE);
+                    setChanged(MOVED);
                 }
                 else
                 {
@@ -2245,8 +2285,8 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     }
                     cur_parentp->removeChild(this);
                     sent_parentp->addChild(this);
-                    setChanged(MOVED | SILHOUETTE);
-                    sent_parentp->setChanged(MOVED | SILHOUETTE);
+                    setChanged(MOVED);
+                    sent_parentp->setChanged(MOVED);
                     if (sent_parentp->mDrawable.notNull())
                     {
                         gPipeline.markMoved(sent_parentp->mDrawable, false); // undamped
@@ -2280,7 +2320,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
                         cur_parentp->removeChild(this);
 
-                        setChanged(MOVED | SILHOUETTE);
+                        setChanged(MOVED);
 
                         if (mDrawable.notNull())
                         {
@@ -2318,24 +2358,22 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     //
     //
 
-    // If we're going to skip this message, why are we
-    // doing all the parenting, etc above?
-    if(mesgsys != NULL)
+    // A stale full update stops here, with its parenting, textures, flags and extra params applied
+    // and its motion handed back. A newer packet has already reported this object's velocity, and
+    // that is what prediction continues from; the scale, position and rotation below are likewise
+    // older than what the object already holds.
+    if (stale_update)
     {
-    U32 packet_id = mesgsys->getCurrentRecvPacketID();
-    if (packet_id < mLatestRecvPacketID &&
-        mLatestRecvPacketID - packet_id < 65536)
-    {
-        //skip application of this message, it's old
+        setVelocity(old_vel);
+        setAcceleration(old_acc);
+        setAngularVelocity(old_angv);
         return retval;
-    }
-    mLatestRecvPacketID = packet_id;
     }
 
     // Set the change flags for scale
     if (new_scale != getScale())
     {
-        setChanged(SCALED | SILHOUETTE);
+        setChanged(SCALED);
         setScale(new_scale);  // Must follow setting permYouOwner()
     }
 
@@ -2412,7 +2450,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
             gAgent.rotate(new_rot);
             gAgentCamera.resetView();
         }
-        setChanged(ROTATED | SILHOUETTE);
+        setChanged(ROTATED);
     }
 
     if ( gShowObjectUpdates )
@@ -2487,7 +2525,29 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     // much jumping and hopping around...
 
 //  U32 ping_delay = mesgsys->mCircuitInfo.getPingDelay();
-    mLastInterpUpdateSecs = LLFrameTimer::getElapsedSeconds();
+    const F64 update_time = LLFrameTimer::getUptimeSeconds();
+
+    // Before the clocks move: how far the prediction had drifted by the time the real answer
+    // arrived. This is the reading that settles the direction of the timestep correction in
+    // ALMotionPredictor::finalVelocity -- under gravity the two candidate signs are about 44 mm
+    // apart over a 0.2 s update interval, which is far larger than the noise here.
+    if (mMotionPredictor.hasCadence() && !getAcceleration().isExactlyZero())
+    {
+        LL_DEBUGS("Interpolate") << "Prediction residual for " << getID()
+                                 << ": " << (predicted_pos_parent - getPosition())
+                                 << " after " << (update_time - mLastMessageUpdateSecs.value())
+                                 << "s, accel " << getAcceleration() << LL_ENDL;
+    }
+
+    // Record the arrival before the velocity is converted, so the observed rate is a property of
+    // the stream and not of what we then do with it.
+    mMotionPredictor.noteUpdate(update_time);
+
+    // The simulator reports velocity averaged over its own timestep. Convert once, here, rather
+    // than inside the per-frame integration where the correction picks up the viewer's frame rate.
+    setVelocity(ALMotionPredictor::finalVelocity(getVelocity(), getAcceleration()));
+
+    mLastInterpUpdateSecs = (F64Seconds)update_time;
     mLastMessageUpdateSecs = mLastInterpUpdateSecs;
     if (mDrawable.notNull())
     {
@@ -2546,9 +2606,11 @@ void LLViewerObject::idleUpdate(LLAgent &agent, const F64 &frame_time)
             applyAngularVelocity(dt);
 
             if (isAttachment())
-            {
+            {   // An attachment rides its joint, so there is no linear motion to predict -- but it
+                // still needs the drawable pass below. Returning here skipped clearChanged(SHIFTED),
+                // and a still attachment present at a region shift has no other route back into
+                // updateDrawable, so the flag latched and forced undamped motion from then on.
                 mLastInterpUpdateSecs = (F64Seconds)frame_time;
-                return;
             }
             else
             {   // Move object based on it's velocity and rotation
@@ -2565,92 +2627,122 @@ void LLViewerObject::idleUpdate(LLAgent &agent, const F64 &frame_time)
 void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_time, const F32SecondsImplicit& dt_seconds)
 {
     // linear motion
-    // PHYSICS_TIMESTEP is used below to correct for the fact that the velocity in object
-    // updates represents the average velocity of the last timestep, rather than the final velocity.
-    // the time dilation above should guarantee that dt is never less than PHYSICS_TIMESTEP, theoretically
+    //
+    // The correction for update velocities being the average over the simulator's timestep rather
+    // than the velocity at its end is applied once, when the update lands -- see
+    // ALMotionPredictor::finalVelocity. It used to be folded into every frame here, on the stated
+    // assumption that time dilation keeps dt at or above the simulator timestep. Dilation only ever
+    // makes dt smaller, and any viewer running faster than the simulator's 45 Hz is already below
+    // it, so the correction term went negative and on the first frame of a fall -- where velocity
+    // is still near zero -- it was larger than the step it was correcting. Dropped objects moved
+    // upward before they moved down, at 60 fps and above and never at 45.
     //
     // *TODO: should also wrap linear accel/velocity in check
     // to see if object is selected, instead of explicitly
     // zeroing it out
 
-    F32 dt = dt_seconds;
+    // An update carrying a region handle the viewer does not know yet leaves mRegionp null without
+    // killing the object, and the clamps below read the region for every predicted position. The
+    // caller already guards this for the time dilation; do the same before predicting anything.
+    if (!mRegionp)
+    {
+        mLastInterpUpdateSecs = frame_time;
+        return;
+    }
+
+    const ALMotionPredictor::Tuning& tuning = sPredictionTuning;
+
+    // A frame that spans a stall -- a paused viewer, a snapshot floater holding FreezeTime, a long
+    // hitch -- would otherwise carry every moving object forward by the whole of it in one step.
+    F32 dt = ALMotionPredictor::clampFrameStep(dt_seconds, tuning);
     F64Seconds time_since_last_update = frame_time - mLastMessageUpdateSecs;
     if (time_since_last_update <= (F64Seconds)0.0 || dt <= 0.f)
     {
+        // Nothing to integrate this frame, but the clock still has to move: leaving it behind
+        // stores up the whole idle span as one huge dt the moment motion resumes.
+        mLastInterpUpdateSecs = frame_time;
         return;
     }
 
     LLVector3 accel = getAcceleration();
     LLVector3 vel   = getVelocity();
 
-    if (sMaxUpdateInterpolationTime <= (F64Seconds)0.0)
+    if (tuning.mMaxTime <= 0.f)
     {   // Old code path ... unbounded, simple interpolation
         if (!(accel.isExactlyZero() && vel.isExactlyZero()))
         {
-            LLVector3 pos   = (vel + (0.5f * (dt-PHYSICS_TIMESTEP)) * accel) * dt;
-
             // region local
-            setPositionRegion(pos + getPositionRegion());
+            setPositionRegion(ALMotionPredictor::positionDelta(vel, accel, dt) + getPositionRegion());
             setVelocity(vel + accel*dt);
 
             // for objects that are spinning but not translating, make sure to flag them as having moved
-            setChanged(MOVED | SILHOUETTE);
+            setChanged(MOVED);
         }
     }
     else if (!accel.isExactlyZero() || !vel.isExactlyZero())        // object is moving
     {   // Object is moving, and hasn't been too long since we got an update from the server
 
         // Calculate predicted position and velocity
-        LLVector3 new_pos = (vel + (0.5f * (dt-PHYSICS_TIMESTEP)) * accel) * dt;
+        LLVector3 new_pos = ALMotionPredictor::positionDelta(vel, accel, dt);
         LLVector3 new_v = accel * dt;
 
-        if (time_since_last_update > sPhaseOutUpdateInterpolationTime &&
-            sPhaseOutUpdateInterpolationTime > (F64Seconds)0.0)
-        {   // Haven't seen a viewer update in a while, check to see if the circuit is still active
-            if (mRegionp)
-            {   // The simulator will NOT send updates if the object continues normally on the path
-                // predicted by the velocity and the acceleration (often gravity) sent to the viewer
-                // So check to see if the circuit is blocked, which means the sim is likely in a long lag
-                LLCircuitData *cdp = gMessageSystem->mCircuitInfo.findCircuit( mRegionp->getHost() );
-                if (cdp)
+        // How much of that step to keep. No window can open before the configured phase-out time,
+        // so until then the answer is always "all of it" -- which also keeps the circuit lookup
+        // off the common path.
+        const F32 age = (F32)time_since_last_update.value();
+        if (tuning.mPhaseOutTime > 0.f && age > tuning.mPhaseOutTime)
+        {
+            // The simulator will NOT send updates if the object continues normally on the path
+            // predicted by the velocity and the acceleration (often gravity) sent to the viewer,
+            // so silence on its own is not a fault. What distinguishes the two is this object's
+            // own history: one that had been updating steadily and has now stopped is in trouble,
+            // one that has never established a rate is not evidence of anything.
+            ALMotionPredictor::Window window = mMotionPredictor.phaseOutWindow(tuning);
+
+            // The circuit is a second, independent signal -- if it is dead or blocked then nothing
+            // is arriving for any object on it, whatever this one's history says.
+            bool circuit_lost = true;
+            F64Seconds time_since_last_packet(0.0);
+            if (LLCircuitData* cdp = gMessageSystem->mCircuitInfo.findCircuit(mRegionp->getHost()))
+            {
+                time_since_last_packet = LLMessageSystem::getMessageTimeSeconds() - cdp->getLastPacketInTime();
+                circuit_lost = !cdp->isAlive() || cdp->isBlocked();
+            }
+
+            if (!tuning.mCadenceAware)
+            {   // The default: the taper engages only when the whole circuit looks broken. Any
+                // packet at all -- terrain, a ping, someone's chat -- refreshes that clock, so on
+                // a healthy connection prediction runs unbounded, which is what the simulator
+                // expects of an object it has stopped correcting. (ALInterpolationCadenceAware
+                // trades that for the object's own history, above.)
+                if (!circuit_lost && time_since_last_packet <= (F64Seconds)tuning.mPhaseOutTime)
                 {
-                    // Find out how many seconds since last packet arrived on the circuit
-                    F64Seconds time_since_last_packet = LLMessageSystem::getMessageTimeSeconds() - cdp->getLastPacketInTime();
-
-                    if (!cdp->isAlive() ||      // Circuit is dead or blocked
-                         cdp->isBlocked() ||    // or doesn't seem to be getting any packets
-                         (time_since_last_packet > sPhaseOutUpdateInterpolationTime))
-                    {
-                        // Start to reduce motion interpolation since we haven't seen a server update in a while
-                        F64Seconds time_since_last_interpolation = frame_time - mLastInterpUpdateSecs;
-                        F64 phase_out = 1.0;
-                        if (time_since_last_update > sMaxUpdateInterpolationTime)
-                        {   // Past the time limit, so stop the object
-                            phase_out = 0.0;
-                            //LL_INFOS() << "Motion phase out to zero" << LL_ENDL;
-
-                            // Kill angular motion as well.  Note - not adding this due to paranoia
-                            // about stopping rotation for llTargetOmega objects and not having it restart
-                            // setAngularVelocity(LLVector3::zero);
-                        }
-                        else if (mLastInterpUpdateSecs - mLastMessageUpdateSecs > sPhaseOutUpdateInterpolationTime)
-                        {   // Last update was already phased out a bit
-                            phase_out = (sMaxUpdateInterpolationTime - time_since_last_update) /
-                                        (sMaxUpdateInterpolationTime - time_since_last_interpolation);
-                            //LL_INFOS() << "Continuing motion phase out of " << (F32) phase_out << LL_ENDL;
-                        }
-                        else
-                        {   // Phase out from full value
-                            phase_out = (sMaxUpdateInterpolationTime - time_since_last_update) /
-                                        (sMaxUpdateInterpolationTime - sPhaseOutUpdateInterpolationTime);
-                            //LL_INFOS() << "Starting motion phase out of " << (F32) phase_out << LL_ENDL;
-                        }
-                        phase_out = llclamp(phase_out, 0.0, 1.0);
-
-                        new_pos = new_pos * ((F32) phase_out);
-                        new_v = new_v * ((F32) phase_out);
-                    }
+                    window = ALMotionPredictor::Window();
                 }
+            }
+            else if (circuit_lost && !window.isTapering())
+            {   // No rate established for this object, but its simulator has stopped talking
+                // altogether. Fall back to the configured window rather than coasting forever.
+                window.mStart = tuning.mPhaseOutTime;
+                window.mEnd   = llmax(tuning.mMaxTime, tuning.mPhaseOutTime);
+            }
+
+            // Note - not killing angular motion here, out of paranoia about stopping rotation for
+            // llTargetOmega objects and not having it restart.
+            const F32 phase_out = ALMotionPredictor::phaseOutFactor(age, window);
+            if (phase_out <= 0.f)
+            {
+                // Prediction has been given up on entirely, so hold where we are. Falling through
+                // would spend the terrain and region-edge clamps below on a zero-length step, and
+                // could still shift the object -- which is not what "stop predicting" should mean.
+                mLastInterpUpdateSecs = frame_time;
+                return;
+            }
+
+            if (phase_out < 1.f)
+            {
+                new_pos = new_pos * phase_out;
+                new_v = new_v * phase_out;
             }
         }
 
@@ -2663,7 +2755,7 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
         F32 min_height;
         if (isAvatar())
         {   // Make a better guess about AVs not going underground
-            min_height = LLWorld::getInstance()->resolveLandHeightGlobal(new_pos_global);
+            min_height = LLWorld::getInstance()->resolveLandHeightGlobal(new_pos_global, mRegionp);
             min_height += (0.5f * getScale().mV[VZ]);
         }
         else
@@ -2708,7 +2800,7 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
                 {
                     // Workaround: we can't accurately figure out time when we cross border
                     // so just write down time 'after the fact', it is far from optimal in
-                    // case of lags, but for lags sMaxUpdateInterpolationTime will kick in first
+                    // case of lags, but for lags the prediction phase-out kicks in first
                     LL_DEBUGS("Interpolate") << "Predicted region crossing, new position " << new_pos << LL_ENDL;
                     mRegionCrossExpire = frame_time + sMaxRegionCrossingInterpolationTime;
                 }
@@ -2728,12 +2820,37 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
             mRegionCrossExpire = 0;
         }
 
-        // Set new position and velocity
+        // Set new position and velocity. The message path already refuses a non-finite position;
+        // the predicted one can pick one up from the region clipping above, and a NaN here reaches
+        // the drawable and the octree, where it is far harder to trace back.
+        if (!new_pos.isFinite() || !new_v.isFinite())
+        {
+            LL_WARNS_ONCE("Interpolate") << "Non-finite predicted motion for " << getID()
+                                         << ", pos " << new_pos << " vel " << new_v
+                                         << " -- holding position" << LL_ENDL;
+            mLastInterpUpdateSecs = frame_time;
+            return;
+        }
+
         setPositionRegion(new_pos);
         setVelocity(new_v);
 
+        // Prediction can bring an object to rest on its own -- the region-edge clamps above clear
+        // velocity and acceleration outright. mStatic is otherwise only recomputed when a message
+        // arrives, and if the simulator believes this object already crossed, none ever does: it
+        // stays on the active list and in the more expensive active partition for the rest of the
+        // session, walked every frame to do nothing. Retire it here instead.
+        if (!mStatic
+            && new_v.isExactlyZero()
+            && getAcceleration().isExactlyZero()
+            && getAngularVelocity().isExactlyZero())
+        {
+            mStatic = true;
+            gObjectList.updateActive(this);
+        }
+
         // for objects that are spinning but not translating, make sure to flag them as having moved
-        setChanged(MOVED | SILHOUETTE);
+        setChanged(MOVED);
     }
 
     // Update the last time we did anything
@@ -3121,6 +3238,7 @@ void LLViewerObject::fetchInventoryFromServer()
 
         // This will get reset by doInventoryCallback or processTaskInv
         mInvRequestState = INVENTORY_REQUEST_PENDING;
+        mInvRequestFailed = false;
 
         if (mRegionp && !mRegionp->getCapability("RequestTaskInventory").empty())
         {
@@ -3227,18 +3345,26 @@ void LLViewerObject::fetchInventoryFromCapCoro(const LLUUID task_inv)
         else if (status.getType() == 304)
         {
             LL_INFOS() << "Inventory wasn't changed on server!" << LL_ENDL;
-            obj->mInvRequestState = INVENTORY_REQUEST_STOPPED;
             // Even though it wasn't necessary to send a response, we still may have mutated
             // the inventory since we kicked off the request, check for that case.
             potentially_stale = obj->mInventorySerialNum < obj->mExpectedInventorySerialNum;
             // Set this to what we already have so that we don't re-request a second time.
             obj->mExpectedInventorySerialNum = obj->mInventorySerialNum;
+            // What we already have is the answer, and whoever asked is
+            // waiting for one. Also stops the request.
+            obj->doInventoryCallback();
         }
         else
         {
             // Not sure that there's anything sensible we can do to recover here, retrying in a loop would be bad.
             LL_WARNS() << "Error status while requesting task inventory: " << status.toString() << LL_ENDL;
-            obj->mInvRequestState = INVENTORY_REQUEST_STOPPED;
+            // But whoever asked is told that nothing came, rather than
+            // nothing at all: a listener waiting on the answer -- the
+            // build floater's contents, a script's includes looked up in
+            // its object -- would otherwise wait for the rest of the
+            // session. Also stops the request.
+            obj->mInvRequestFailed = true;
+            obj->doInventoryCallback();
         }
 
         if (potentially_stale)
@@ -4726,18 +4852,18 @@ const LLQuaternion LLViewerObject::getRenderRotation() const
         LLDrawable* parent = mDrawable->getParent();
         if (!mDrawable->isRoot() && parent)
         {
-            ret = getRotation() * LLQuaternion(parent->getWorldMatrix());
+            ret = getRotation() * LLQuaternion(parent->getWorldMatrix().toMatrix4());
         }
         else
         {
-            ret = LLQuaternion(mDrawable->getWorldMatrix());
+            ret = LLQuaternion(mDrawable->getWorldMatrix().toMatrix4());
         }
     }
 
     return ret;
 }
 
-const LLMatrix4 LLViewerObject::getRenderMatrix() const
+const LLMatrix4a& LLViewerObject::getRenderMatrix() const
 {
     return mDrawable->getWorldMatrix();
 }
@@ -4815,7 +4941,7 @@ void LLViewerObject::setPosition(const LLVector3 &pos, bool damped)
 {
     if (getPosition() != pos)
     {
-        setChanged(TRANSLATED | SILHOUETTE);
+        setChanged(TRANSLATED);
     }
 
     LLXform::setPosition(pos);
@@ -4858,7 +4984,7 @@ void LLViewerObject::setPositionGlobal(const LLVector3d &pos_global, bool damped
             // LLViewerObject version of setPosition?
             LLVector3 old_pos = mDrawable->mXform.getParent()->getPosition();
             mDrawable->mXform.getParent()->setPosition(old_pos + delta_pos);
-            setChanged(TRANSLATED | SILHOUETTE);
+            setChanged(TRANSLATED);
         }
         if (mParent && ((LLViewerObject*)mParent)->isAvatar())
         {
@@ -5928,18 +6054,22 @@ LLViewerTexture *LLViewerObject::getTEImage(const U8 face) const
 bool LLViewerObject::isImageAlphaBlended(const U8 te) const
 {
     LLViewerTexture* image = getTEImage(te);
+    if (image && image->isAlphaOnly())
+    {
+        return true;
+    }
     LLGLenum format = image ? image->getPrimaryFormat() : GL_RGB;
     switch (format)
     {
         case GL_RGBA:
-        case GL_ALPHA:
-        case GL_RED:
         {
             return true;
         }
         break;
 
-        case GL_RGB: break;
+        // a luminance source is R8 too, and has no alpha
+        case GL_RGB:
+        case GL_RED: break;
         default:
         {
             LL_WARNS() << "Unexpected tex format in LLViewerObject::isImageAlphaBlended...returning no alpha." << LL_ENDL;
@@ -6423,8 +6553,7 @@ void LLViewerObject::updateDrawable(bool force_damped)
     if (!isChanged(MOVED))
     { //most common case, having an empty if case here makes for better branch prediction
     }
-    else if (mDrawable.notNull() &&
-        !mDrawable->isState(LLDrawable::ON_MOVE_LIST))
+    else if (mDrawable.notNull())
     {
         bool damped_motion =
             !isChanged(SHIFTED) &&                                      // not shifted between regions this frame and...
@@ -6438,7 +6567,27 @@ void LLViewerObject::updateDrawable(bool force_damped)
                     mDrawable->getGeneration() != -1                    // ...was not created this frame.
                 )
             );
-        gPipeline.markMoved(mDrawable, damped_motion);
+
+        if (!mDrawable->isState(LLDrawable::ON_MOVE_LIST))
+        {
+            gPipeline.markMoved(mDrawable, damped_motion);
+        }
+        else if (!damped_motion && !isSelected() && !getVelocity().isExactlyZero())
+        {
+            // Already queued, but the object is now moving under physics, which is never damped.
+            // A drawable that was mid-lerp when that motion began used to keep easing, because a
+            // queued drawable was never re-marked: extrapolated forward, then lagged back behind
+            // that by the damping, for as long as it moved. Upgrade it to a snap, never the
+            // reverse -- a snap asked for earlier this frame (a parent change, a region cross) must
+            // not be turned back into a lerp by a later, ordinary update.
+            //
+            // Only for that case. Any other move that comes out undamped here still leaves a
+            // queued lerp alone, as it always has: a selected object is undamped by the formula
+            // above, and while a joystick edit is easing it (LLSelectMgr::selectionMove) the
+            // simulator's echo of the edit arrives through here -- snapping to each echo would
+            // put back the jitter the damping is there to hide.
+            gPipeline.markMoved(mDrawable, false);
+        }
     }
     clearChanged(SHIFTED);
 }
@@ -7072,6 +7221,10 @@ void LLViewerObject::setRegion(LLViewerRegion *regionp)
     mLatestRecvPacketID = 0;
     mRegionp = regionp;
 
+    // A different simulator is sending this object now, at whatever rate it chooses. The rate the
+    // old one used says nothing about when the new one is late.
+    mMotionPredictor.forgetCadence();
+
     for (child_list_t::iterator i = mChildList.begin(); i != mChildList.end(); ++i)
     {
         LLViewerObject* child = *i;
@@ -7083,7 +7236,7 @@ void LLViewerObject::setRegion(LLViewerRegion *regionp)
         mControlAvatar->setRegion(regionp);
     }
 
-    setChanged(MOVED | SILHOUETTE);
+    setChanged(MOVED);
     updateDrawable(false);
 }
 
@@ -7092,7 +7245,7 @@ void    LLViewerObject::updateRegion(LLViewerRegion *regionp)
 {
 //  if (regionp)
 //  {
-//      F64 now = LLFrameTimer::getElapsedSeconds();
+//      F64 now = LLFrameTimer::getUptimeSeconds();
 //      LL_INFOS() << "Updating to region " << regionp->getName()
 //          << ", ms since last update message: " << (F32)((now - mLastMessageUpdateSecs) * 1000.0)
 //          << ", ms since last interpolation: " << (F32)((now - mLastInterpUpdateSecs) * 1000.0)
@@ -7232,12 +7385,22 @@ void LLViewerObject::applyAngularVelocity(F32 dt)
         // calculate the delta increment based on the object's angular velocity
         dQ.setQuat(angle, ang_vel);
 
+        // Quaternion multiplication does not renormalise, and both of these accumulate one product
+        // per frame for as long as the object spins. An llTargetOmega object that never receives a
+        // rotation update -- the common case, since the simulator has nothing to correct -- drifts
+        // off the unit sphere, and a rotation built from a quaternion of magnitude m scales the
+        // object by m*m. Measured at 8 h and 300 fps that is a fifth of the object's size.
+
         // accumulate the angular velocity rotations to re-apply in the case of an object update
         mAngularVelocityRot *= dQ;
+        mAngularVelocityRot.normalize();
 
         // Just apply the delta increment to the current rotation
-        setRotation(getRotation()*dQ);
-        setChanged(MOVED | SILHOUETTE);
+        LLQuaternion new_rot = getRotation() * dQ;
+        new_rot.normalize();
+        setRotation(new_rot);
+
+        setChanged(MOVED);
     }
 }
 

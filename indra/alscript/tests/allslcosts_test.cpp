@@ -1,0 +1,649 @@
+/**
+ * @file tests/allslcosts_test.cpp
+ * @brief What LSL forms cost on each target: every answer ALLSLCosts gives, measured.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+// Each answer ALLSLCosts gives, compiled for each target with the grid's
+// builtins loaded: a pair of snippets in a handler with a local of every
+// type to work on, weighed once and twice over, so that what a second use
+// adds is told from what the first did. A failure here is a compiler that
+// changed, and the answer to change with it -- or a form that is no longer
+// what the optimizer takes it to be.
+//
+// Set AL_COSTS_PRINT to have every pair's numbers printed.
+
+#include "linden_common.h"
+
+#include "../lsl/optimizer/allslcosts.h"
+
+#include "../lsl/allslservice.h"
+#include "../core/alscriptweight.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+
+namespace
+{
+    struct allslcosts_data
+    {
+        using Target = ALLSLOptimizer::Target;
+
+        ALLSLService lsl;
+        std::string  error;
+        bool         lslLoaded = false;
+        const bool   print     = getenv("AL_COSTS_PRINT") != nullptr;
+
+        allslcosts_data() { lslLoaded = lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error); }
+
+        static constexpr Target TARGETS[] = { Target::LSO, Target::Mono, Target::Luau };
+
+        static const char* nameOf(Target t) { return t == Target::LSO ? "LSO" : t == Target::Mono ? "Mono" : "Luau"; }
+
+        // Globals the snippet needs, and its statements.
+        struct Snippet
+        {
+            std::string globals;
+            std::string body;
+        };
+
+        // The body `copies` times, each in braces of its own, so that its
+        // locals can be declared again.
+        static std::string script(const Snippet& s, int copies)
+        {
+            std::string body;
+            for (int i = 0; i < copies; ++i)
+            {
+                body += "{ " + s.body + " }\n";
+            }
+            return "integer gi = 3; float gf = 2.5; string gs = \"a\"; key gk; vector gv = <1, 2, 3>; list gl = [1];\n" + s.globals +
+                   "\ndefault { state_entry() {\n"
+                   "integer i = gi; integer j = gi; float f = gf; string s = gs; key k = gk; list l = gl; vector v = gv;\n" +
+                   body + "llOwnerSay((string)[i, j, f, s, k, v] + (string)l);\n} }\n";
+        }
+
+        S32 require_compiled_size(Target t, const Snippet& s, int copies)
+        {
+            const std::string    text   = script(s, copies);
+            const ALScriptWeight weight = t == Target::LSO    ? ALScriptWeigh::lso(text)
+                                          : t == Target::Mono ? ALScriptWeigh::mono(text)
+                                                              : ALScriptWeigh::lslLuau(text);
+            INFO("compiles for " << nameOf(t) << ": " << weight.error << "\n" << text);
+            REQUIRE(weight.compiled);
+            return S32(weight.total);
+        }
+
+        // What `b` costs against `a`: where each is once, and what a second
+        // of it adds against a second of the other. Where one of them is
+        // only globals, the first alone.
+        struct Delta
+        {
+            S32 first = 0;
+            S32 each  = 0;
+        };
+        Delta delta(Target t, const Snippet& a, const Snippet& b)
+        {
+            const S32 a1 = require_compiled_size(t, a, 1);
+            const S32 b1 = require_compiled_size(t, b, 1);
+            Delta     d;
+            d.first = b1 - a1;
+            d.each  = !a.body.empty() && !b.body.empty() ? (require_compiled_size(t, b, 2) - b1) - (require_compiled_size(t, a, 2) - a1) : d.first;
+            return d;
+        }
+
+        // Smaller where a use is smaller, or no larger and the first is.
+        static char verdict(const Delta& d)
+        {
+            if (d.each < 0 || (d.each == 0 && d.first < 0))
+            {
+                return '<';
+            }
+            if (d.each > 0 || (d.each == 0 && d.first > 0))
+            {
+                return '>';
+            }
+            return '=';
+        }
+
+        // A float as the optimizer writes it for a target: a whole value as
+        // an integer where that is smaller.
+        static std::string number(Target t, double v)
+        {
+            char buffer[32];
+            if (ALLSLCosts::of(t).integerForFloat && v == double(S32(v)))
+            {
+                snprintf(buffer, sizeof(buffer), "%d", S32(v));
+            }
+            else
+            {
+                snprintf(buffer, sizeof(buffer), "%g", v);
+                if (!strchr(buffer, '.'))
+                {
+                    strcat(buffer, ".0");
+                }
+            }
+            return buffer;
+        }
+
+        void said(const std::string& what, Target t, const Delta& d, S32 expected) const
+        {
+            if (print)
+            {
+                fprintf(stderr, "%-44s %-5s first %+5d each %+5d  (taken as %+d)\n", what.c_str(), nameOf(t), d.first, d.each, expected);
+            }
+        }
+    };
+
+    // The rewrites: each pair's verdict on LSO, Mono and Luau in turn --
+    // '<' where the second form is smaller -- and the flag that stands for
+    // it where the optimizer has one. The rest are what rewrites still to
+    // come will read: here so that what was measured stays measured.
+    TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: the rewrites: each pair's verdict on each target and the flag for it", "[ALLSLCosts]")
+    {
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
+        using Flag = bool ALLSLCosts::*;
+        struct Fact
+        {
+            const char* what;
+            Snippet     a;
+            Snippet     b;
+            const char* verdicts;
+            Flag        flag;
+            // Told by one use alone: where the first carries what a script
+            // pays once -- Luau's import of its bit library for ~ -- more
+            // than a few uses after it save.
+            bool        once = false;
+        };
+        const Fact facts[] = {
+            // optfloats
+            { "2.0 as 2", { "", "f = 2.0;" }, { "", "f = 2;" }, "><=", &ALLSLCosts::integerForFloat },
+            { "200.0 as 200", { "", "f = 200.0;" }, { "", "f = 200;" }, "><=", &ALLSLCosts::integerForFloat },
+            { "an argument 1.0 as 1", { "", "llSetText(s, v, 1.0);" }, { "", "llSetText(s, v, 1);" }, "><=", &ALLSLCosts::integerForFloat },
+            { "a vector's parts", { "", "v = <1.0, 2.0, 3.0>;" }, { "", "v = <1, 2, 3>;" }, "><=", &ALLSLCosts::integerForFloat },
+            { "some of a vector's parts", { "", "v = <1.5, 2.0, 3.0>;" }, { "", "v = <1.5, 2, 3>;" }, "><=", &ALLSLCosts::integerForFloat },
+            // listlength
+            { "llGetListLength(l) as l != []", { "", "i = llGetListLength(l);" }, { "", "i = l != [];" }, "<>>", &ALLSLCosts::lengthAsNotEqual },
+            // listadd
+            { "[a] as (list)a", { "", "l = [i];" }, { "", "l = (list)i;" }, "<<>", &ALLSLCosts::listAsSum },
+            { "[a, b] as (list)a + b", { "", "l = [i, j];" }, { "", "l = (list)i + j;" }, "<<>", &ALLSLCosts::listAsSum },
+            { "[a, b, c] as (list)a + b + c", { "", "l = [i, j, f];" }, { "", "l = (list)i + j + f;" }, "<<>", &ALLSLCosts::listAsSum },
+            // The -1 idioms, where only truth counts, and of what is never below -1.
+            { "x != -1 as ~x", { "", "if (j != -1) i = 2;" }, { "", "if (~j) i = 2;" }, "<<>", &ALLSLCosts::complementForNotMinusOne, true },
+            { "a find != -1 as ~find", { "", "if (llListFindList(l, [i]) != -1) i = 2;" }, { "", "if (~llListFindList(l, [i])) i = 2;" }, "<<>",
+              &ALLSLCosts::complementForNotMinusOne, true },
+            { "a find >= 0 as ~find", { "", "if (llSubStringIndex(s, \"a\") >= 0) i = 2;" }, { "", "if (~llSubStringIndex(s, \"a\")) i = 2;" }, "<<>",
+              &ALLSLCosts::complementForNotMinusOne, true },
+            { "a find > -1 as ~find", { "", "if (llSubStringIndex(s, \"a\") > -1) i = 2;" }, { "", "if (~llSubStringIndex(s, \"a\")) i = 2;" }, "<<>",
+              &ALLSLCosts::complementForNotMinusOne, true },
+            { "x == -1 as !~x", { "", "i = j == -1;" }, { "", "i = !~j;" }, "<<>", &ALLSLCosts::notComplementForMinusOne },
+            { "x == -1 as !~x, as a condition", { "", "if (j == -1) i = 2;" }, { "", "if (!~j) i = 2;" }, "<<>", &ALLSLCosts::notComplementForMinusOne },
+            // Luau's answer turns on the operand -- a call here, a local above
+            // -- and the flag keeps to the local's.
+            { "a find < 0 as !~find", { "", "if (llSubStringIndex(s, \"a\") < 0) i = 2;" }, { "", "if (!~llSubStringIndex(s, \"a\")) i = 2;" }, "<<<",
+              nullptr },
+            // One and two either way.
+            { "x + 1 as -~x", { "", "i = j + 1;" }, { "", "i = -~j;" }, "<<>", &ALLSLCosts::negateComplementForIncrement },
+            { "x + 2 as -~-~x", { "", "i = j + 2;" }, { "", "i = -~-~j;" }, "<<>", &ALLSLCosts::negateComplementForIncrement },
+            { "x - 1 as ~-x", { "", "i = j - 1;" }, { "", "i = ~-j;" }, "<<>", &ALLSLCosts::complementNegateForDecrement },
+            { "x - 2 as ~-~-x", { "", "i = j - 2;" }, { "", "i = ~-~-j;" }, "<<>", &ALLSLCosts::complementNegateForDecrement },
+            // An increment whose value goes unused.
+            { "x++ as ++x", { "", "i++;" }, { "", "++i;" }, "<<=", &ALLSLCosts::preForPost },
+            { "x-- as --x", { "", "i--;" }, { "", "--i;" }, "<<=", &ALLSLCosts::preForPost },
+            { "a for's x++ as ++x", { "", "for (i = 0; i < 3; i++) j = i;" }, { "", "for (i = 0; i < 3; ++i) j = i;" }, "<<=", &ALLSLCosts::preForPost },
+            // A list's element bare.
+            { "l + [a] as l + a", { "", "l = l + [i];" }, { "", "l = l + i;" }, "<<<", &ALLSLCosts::elementForList },
+            { "l + [a, b] as l + a + b", { "", "l = l + [i, j];" }, { "", "l = l + i + j;" }, "<<<", &ALLSLCosts::elementForList },
+            { "[a] + l as a + l", { "", "l = [s] + l;" }, { "", "l = s + l;" }, "<<<", &ALLSLCosts::elementForList },
+            { "l + (list)x as l + x", { "", "l = l + (list)s;" }, { "", "l = l + s;" }, "<<<", &ALLSLCosts::elementForList },
+            { "l += [a] as l += a", { "", "l += [i];" }, { "", "l += i;" }, "<<<", &ALLSLCosts::elementForList },
+            // To come.
+            // Comparisons.
+            { "!(a <= b) as a > b", { "", "if (!(j <= i)) i = 2;" }, { "", "if (j > i) i = 2;" }, "<<<", &ALLSLCosts::comparisonForNot },
+            { "!(a >= b) as a < b", { "", "if (!(j >= i)) i = 2;" }, { "", "if (j < i) i = 2;" }, "<<<", &ALLSLCosts::comparisonForNot },
+            { "!(a != b) as a == b", { "", "if (!(j != i)) i = 2;" }, { "", "if (j == i) i = 2;" }, "<<<", &ALLSLCosts::comparisonForNot },
+            // Never larger, where the flag is not for these alone.
+            { "!(a > b) as a <= b", { "", "if (!(j > i)) i = 2;" }, { "", "if (j <= i) i = 2;" }, "<=<", nullptr },
+            { "!(a == b) as a != b", { "", "if (!(j == i)) i = 2;" }, { "", "if (j != i) i = 2;" }, "<=<", nullptr },
+            { "!(a < b) as a >= b, as a value", { "", "i = !(j < i);" }, { "", "i = j >= i;" }, "<==", nullptr },
+            { "a != b as a ^ b, a loop's", { "", "while (j != i) i++;" }, { "", "while (j ^ i) i++;" }, "<<>", &ALLSLCosts::xorForNotEqual },
+            { "if (a == b) A else B as if (a ^ b) B else A", { "", "if (j == i) i = 2; else i = 3;" }, { "", "if (j ^ i) i = 3; else i = 2;" }, "<<>",
+              &ALLSLCosts::xorForNotEqual },
+            { "a >= 5 as a > 4", { "", "if (j >= 5) i = 2;" }, { "", "if (j > 4) i = 2;" }, "=<=", &ALLSLCosts::strictForInclusive },
+            { "a <= 5 as a < 6", { "", "if (j <= 5) i = 2;" }, { "", "if (j < 6) i = 2;" }, "=<=", &ALLSLCosts::strictForInclusive },
+            { "a || b as a | b", { "", "while (i || j) i--;" }, { "", "while (i | j) i--;" }, "=<>", &ALLSLCosts::bitOrForOr },
+            { "a <= b as a < b + 1, of a variable", { "", "i = j <= i;" }, { "", "i = j < i + 1;" }, ">>=", nullptr },
+            // The library as casts.
+            { "llDumpList2String(l, \"\") as (string)l", { "", "s = llDumpList2String(l, \"\");" }, { "", "s = (string)l;" }, "<<<",
+              &ALLSLCosts::castForDump },
+            { "llList2String(llGetObjectDetails(k, [X]), 0) as (string)", { "", "s = llList2String(llGetObjectDetails(k, [OBJECT_NAME]), 0);" },
+              { "", "s = (string)llGetObjectDetails(k, [OBJECT_NAME]);" }, "<<<", &ALLSLCosts::castForDetail },
+            // Not taken: a key's is NULL_KEY from an empty list, an integer's no 0 of a key.
+            { "llList2Key(llGetObjectDetails(k, [X]), 0) as (key)(string)", { "", "k = llList2Key(llGetObjectDetails(k, [OBJECT_OWNER]), 0);" },
+              { "", "k = (key)((string)llGetObjectDetails(k, [OBJECT_OWNER]));" }, "<<>", nullptr },
+            { "a whole float in a list as ((float)2)", { "", "l = [2.0];" }, { "", "l = [(float)2];" }, "><=", &ALLSLCosts::castForWholeFloat },
+            { "a whole float cast as ((float)2)", { "", "s = (string)2.0;" }, { "", "s = (string)((float)2);" }, "><=", &ALLSLCosts::castForWholeFloat },
+            // To come.
+            // Bit tests of one value as one.
+            { "(a & 4) && (a & 8) as !~(a | -13)", { "", "if ((j & 4) && (j & 8)) i = 2;" }, { "", "if (!~(j | -13)) i = 2;" }, "<<<",
+              &ALLSLCosts::bitTestsMerged },
+            { "the same, a value", { "", "i = (j & 4) && (j & 8);" }, { "", "i = !~(j | -13);" }, "<<<", &ALLSLCosts::bitTestsMerged },
+            { "three bits", { "", "if ((j & 4) && (j & 8) && (j & 1)) i = 2;" }, { "", "if (!~(j | -14)) i = 2;" }, "<<<", &ALLSLCosts::bitTestsMerged },
+            { "!(a & 4) && !(a & 8) as !(a & 12)", { "", "if (!(j & 4) && !(j & 8)) i = 2;" }, { "", "if (!(j & 12)) i = 2;" }, "<<<",
+              &ALLSLCosts::bitTestsMerged },
+            { "(a & 4) || (a & 8) as a & 12, only truth asked", { "", "if ((j & 4) || (j & 8)) i = 2;" }, { "", "if (j & 12) i = 2;" }, "<<<",
+              &ALLSLCosts::bitTestsMerged },
+            { "(a & 4) | (a & 8) as a & 12", { "", "i = (j & 4) | (j & 8);" }, { "", "i = j & 12;" }, "<<<", &ALLSLCosts::bitTestsMerged },
+            { "i = i + 1 as ++i", { "", "i = i + 1;" }, { "", "++i;" }, "=<=", &ALLSLCosts::incrementForAssign },
+            { "i = 1 + i as ++i", { "", "i = 1 + i;" }, { "", "++i;" }, "=<<", &ALLSLCosts::incrementForAssign },
+            { "i = i - 1 as --i", { "", "i = i - 1;" }, { "", "--i;" }, "=<=", &ALLSLCosts::incrementForAssign },
+            { "i += 1 as ++i", { "", "i += 1;" }, { "", "++i;" }, "=<=", &ALLSLCosts::incrementForAssign },
+            { "i -= 1 as --i", { "", "i -= 1;" }, { "", "--i;" }, "=<=", &ALLSLCosts::incrementForAssign },
+            { "j = i = i + 1 as j = ++i", { "", "j = i = i + 1;" }, { "", "j = ++i;" }, "=<=", &ALLSLCosts::incrementForAssign },
+            { "a global's gi = gi + 1 as ++gi", { "", "gi = gi + 1;" }, { "", "++gi;" }, "=<=", &ALLSLCosts::incrementForAssign },
+            { "a for's i = i + 1 as ++i", { "", "for (i = 0; i < 3; i = i + 1) j = i;" }, { "", "for (i = 0; i < 3; ++i) j = i;" }, "=<=",
+              &ALLSLCosts::incrementForAssign },
+            // Not taken: a float's, and against -~x, which Mono writes x + 1 as.
+            { "f = f + 1 as ++f", { "", "f = f + 1;" }, { "", "++f;" }, "=>=", nullptr },
+            { "i = -~i as ++i", { "", "i = -~i;" }, { "", "++i;" }, ">=<", nullptr },
+            { "-5 as ((integer)-5)", { "", "i = -5;" }, { "", "i = ((integer)-5);" }, "=<=", &ALLSLCosts::castForNegative },
+            { "-5 as an argument", { "", "i = llAbs(-5);" }, { "", "i = llAbs(((integer)-5));" }, "=<=", &ALLSLCosts::castForNegative },
+            { "x * -2", { "", "i = j * -2;" }, { "", "i = j * ((integer)-2);" }, "=<>", &ALLSLCosts::castForNegative },
+            { "-3 in a comparison", { "", "if (j == -3) i = 2;" }, { "", "if (j == ((integer)-3)) i = 2;" }, "=<=", &ALLSLCosts::castForNegative },
+            { "-5 in a list", { "", "l = [-5];" }, { "", "l = [((integer)-5)];" }, "=<=", &ALLSLCosts::castForNegative },
+            { "-2147483648", { "", "i = -2147483648;" }, { "", "i = ((integer)-2147483648);" }, "=<=", &ALLSLCosts::castForNegative },
+            { "-0x10", { "", "i = -0x10;" }, { "", "i = ((integer)-0x10);" }, "=<=", &ALLSLCosts::castForNegative },
+            { "-5.5 as ((float)-5.5)", { "", "f = -5.5;" }, { "", "f = ((float)-5.5);" }, "=<>", &ALLSLCosts::castForNegative },
+            { "-5.5 as an argument", { "", "f = llFabs(-5.5);" }, { "", "f = llFabs(((float)-5.5));" }, "=<>", &ALLSLCosts::castForNegative },
+            { "a vector's negative part", { "", "v = <-1.5, 0, 0>;" }, { "", "v = <((float)-1.5), 0, 0>;" }, "=<>", &ALLSLCosts::castForNegative },
+            { "integer x = 0 as integer x", { "", "integer z = 0; i = z;" }, { "", "integer z; i = z;" }, "=<=", &ALLSLCosts::dropIntegerDefault },
+            { "float x = 0 as float x", { "", "float z = 0; f = z;" }, { "", "float z; f = z;" }, "<>=", &ALLSLCosts::dropFloatDefault },
+            { "key x = \"\" as key x", { "", "key z = \"\"; k = z;" }, { "", "key z; k = z;" }, "<=<", &ALLSLCosts::dropKeyDefault },
+            { "key x = (key)\"\" as key x", { "", "key z = (key)\"\"; k = z;" }, { "", "key z; k = z;" }, "<=<", &ALLSLCosts::dropKeyDefault },
+            { "vector x = ZERO_VECTOR as vector x", { "", "vector z = ZERO_VECTOR; v = z;" }, { "", "vector z; v = z;" }, "<==",
+              &ALLSLCosts::dropVectorDefault },
+            { "vector x = <0, 0, 0> as vector x", { "", "vector z = <0, 0, 0>; v = z;" }, { "", "vector z; v = z;" }, "<>=", &ALLSLCosts::dropVectorDefault },
+            { "rotation x = ZERO_ROTATION as rotation x", { "", "rotation z = ZERO_ROTATION; v = llRot2Euler(z);" },
+              { "", "rotation z; v = llRot2Euler(z);" }, "<==", &ALLSLCosts::dropRotationDefault },
+            { "rotation x = <0, 0, 0, 1> as rotation x", { "", "rotation z = <0, 0, 0, 1>; v = llRot2Euler(z);" },
+              { "", "rotation z; v = llRot2Euler(z);" }, "<>=", &ALLSLCosts::dropRotationDefault },
+            { "integer global = 0 as integer global", { "integer z0 = 0;", "i = z0;" }, { "integer z0;", "i = z0;" }, "=<=",
+              &ALLSLCosts::dropIntegerGlobalDefault },
+            // Never smaller: a float written 0.0, a string's, a list's; and of
+            // globals but an integer, none.
+            { "float x = 0.0 as float x", { "", "float z = 0.0; f = z;" }, { "", "float z; f = z;" }, "===", nullptr },
+            { "string x = \"\" as string x", { "", "string z = \"\"; s = z;" }, { "", "string z; s = z;" }, "===", nullptr },
+            { "list x = [] as list x", { "", "list z = []; l = z;" }, { "", "list z; l = z;" }, "===", nullptr },
+            { "float global = 0 as float global", { "float z0 = 0;", "f = z0;" }, { "float z0;", "f = z0;" }, "=>=", nullptr },
+            { "string global = \"\" as string global", { "string z0 = \"\";", "s = z0;" }, { "string z0;", "s = z0;" }, "===", nullptr },
+            { "list global = [] as list global", { "list z0 = [];", "l = z0;" }, { "list z0;", "l = z0;" }, "===", nullptr },
+            { "a && b as !(!a | !b)", { "", "if (i && j) i = 2;" }, { "", "if (!(!i | !j)) i = 2;" }, ">=>", nullptr },
+            { "NULL_KEY as \"\"", { "", "k = llGetOwnerKey(NULL_KEY);" }, { "", "k = llGetOwnerKey(\"\");" }, "<<<", &ALLSLCosts::emptyForNullKey },
+            { "llStringLength(s) as s != \"\"", { "", "if (llStringLength(s)) i = 2;" }, { "", "if (s != \"\") i = 2;" }, "<>>", &ALLSLCosts::emptyForLength },
+            { "llDumpList2String(l, \"\") as (string)l", { "", "s = llDumpList2String(l, \"\");" }, { "", "s = (string)l;" }, "<<<", nullptr },
+            { "if (!a) A else B as if (a) B else A", { "", "if (!j) i = 2; else i = 3;" }, { "", "if (j) i = 3; else i = 2;" }, "<<<", nullptr },
+            { "a trailing return;", { "integer i0; f1() { i0 = 1; return; }", "f1();" }, { "integer i0; f1() { i0 = 1; }", "f1();" }, "===", nullptr },
+            // Operators another way.
+            { "a && b of truths as a & b", { "", "if (j < i && i > 2) i = 2;" }, { "", "if (j < i & i > 2) i = 2;" }, "=<>", &ALLSLCosts::bitAndForAnd },
+            { "the same, a value", { "", "i = j < i && i > 2;" }, { "", "i = j < i & i > 2;" }, "=<>", &ALLSLCosts::bitAndForAnd },
+            { "a - b as a + -b", { "", "i = j - i;" }, { "", "i = j + -i;" }, "><>", &ALLSLCosts::plusForMinus },
+            { "a - 5 as a + -5", { "", "i = j - 5;" }, { "", "i = j + -5;" }, "><=", &ALLSLCosts::plusForMinus },
+            { "f - g as f + -g", { "", "f = f - gf;" }, { "", "f = f + -gf;" }, "><>", &ALLSLCosts::plusForMinus },
+            { "x -= y as x += -y", { "", "i -= j;" }, { "", "i += -j;" }, "><>", &ALLSLCosts::plusForMinus },
+            { "x << 3 as x * 8", { "", "i = j << 3;" }, { "", "i = j * 8;" }, "><<", &ALLSLCosts::productForShift },
+            { "-1 - x as ~x", { "", "i = -1 - j;" }, { "", "i = ~j;" }, "<<>", &ALLSLCosts::complementForMinusOneLess },
+            { "x * 2 as x + x", { "", "i = j * 2;" }, { "", "i = j + j;" }, "=<<", &ALLSLCosts::sumForDouble },
+            { "f * 2 as f + f", { "", "f = f * 2;" }, { "", "f = f + f;" }, "=<<", &ALLSLCosts::sumForDouble },
+            { "f / 4 as f * 0.25", { "", "f = f / 4;" }, { "", "f = f * 0.25;" }, "=<=", &ALLSLCosts::productForQuotient },
+            { "f / 2.0 as f * 0.5", { "", "f = f / 2.0;" }, { "", "f = f * 0.5;" }, "=<=", &ALLSLCosts::productForQuotient },
+            { "x & 1 as x % 2, only truth asked", { "", "if (j & 1) i = 2;" }, { "", "if (j % 2) i = 2;" }, ">><", &ALLSLCosts::remainderForOddTest },
+            { "a != b as a - b, only truth asked", { "", "if (j != i) i = 2;" }, { "", "if (j - i) i = 2;" }, "=><", &ALLSLCosts::differenceForNotEqual },
+            { "a == b as !(a - b)", { "", "i = j == i;" }, { "", "i = !(j - i);" }, ">><", &ALLSLCosts::differenceForNotEqual },
+            // Mono's first is the helper to shift, not each place.
+            { "x >> 2 as x / 4, x never below nought", { "", "i = j >> 2;" }, { "", "i = j / 4;" }, "><<", &ALLSLCosts::quotientForShift },
+            { "x & 7 as x % 8, x never below nought", { "", "i = j & 7;" }, { "", "i = j % 8;" }, ">><", &ALLSLCosts::quotientForShift },
+            { "x * -1 as -x", { "", "i = j * -1;" }, { "", "i = -j;" }, "<<<", nullptr },
+            // Branches.
+            { "if (a) if (b) as if (a && b)", { "", "if (j) if (i) i = 2;" }, { "", "if (j && i) i = 2;" }, "<>=", &ALLSLCosts::andForNestedIf },
+            { "if (a > 2) if (b < 5) as if (a > 2 & b < 5)", { "", "if (j > 2) if (i < 5) i = 2;" }, { "", "if (j > 2 & i < 5) i = 2;" }, "<<>",
+              &ALLSLCosts::bitAndForNestedTruths },
+            { "if (c) x = 5; else x = 7; as x = (c) * -2 + 7, of a truth", { "", "if (j > 2) i = 5; else i = 7;" }, { "", "i = (j > 2) * -2 + 7;" }, "<<<",
+              nullptr },
+            { "the same of anything else, as !!c", { "", "if (j) i = 5; else i = 7;" }, { "", "i = !!j * -2 + 7;" }, "<<=", &ALLSLCosts::arithmeticForSelect },
+            { "if (c) x = a; else x = B; as x = B; if (c) x = a;", { "", "if (j > 2) s = gs; else s = \"no\";" }, { "", "s = \"no\"; if (j > 2) s = gs;" },
+              "<<<", nullptr },
+            { "if (c) return 1; return 0; as return c;", { "integer f1(integer a) { if (a > 3) return 1; return 0; }", "i = f1(i);" },
+              { "integer f1(integer a) { return a > 3; }", "i = f1(i);" }, "<<<", nullptr },
+            { "if (c) x = 1; else x = 0; as x = c;", { "", "if (j > 2) i = 1; else i = 0;" }, { "", "i = j > 2;" }, "<<<", nullptr },
+            { "an else after a return", { "integer f1(integer a) { if (a) return 5; else return 6; }", "i = f1(i);" },
+              { "integer f1(integer a) { if (a) return 5; return 6; }", "i = f1(i);" }, "<<<", nullptr },
+            { "a jump over statements as an else", { "", "if (j) { i = 1; jump L; } i = 2; @L;" }, { "", "if (j) i = 1; else i = 2;" }, "==<", nullptr, true },
+            { "an if with nothing to do", { "", "if (j > 2) {} i = 3;" }, { "", "i = 3;" }, "<<<", nullptr },
+            // Loops.
+            { "a for whose first check passes as a do", { "", "for (i = 0; i < 3; ++i) j = i;" }, { "", "i = 0; do j = i; while (++i < 3);" }, "<<>",
+              &ALLSLCosts::doForKnownFirst },
+            { "a while so", { "", "i = 0; while (i < 3) { j += i; ++i; }" }, { "", "i = 0; do { j += i; ++i; } while (i < 3);" }, "<<=",
+              &ALLSLCosts::doForKnownFirst },
+            { "a counter read nowhere else, counted down", { "", "for (i = 0; i < 3; ++i) j += 2;" }, { "", "i = 3; do j += 2; while (--i);" }, "<<<",
+              nullptr },
+            { "the same to a bound not known", { "", "for (i = 0; i < j; ++i) f += 2;" }, { "", "i = j; while (i--) f += 2;" }, "<<<", nullptr },
+            // A key found or NULL_KEY.
+            { "k != NULL_KEY as k", { "", "k = llGetOwner(); if (k != NULL_KEY) i = 2;" }, { "", "k = llGetOwner(); if (k) i = 2;" }, "<<<", nullptr },
+            { "if (k == NULL_KEY) A else B as if (k) B else A", { "", "k = llGetOwner(); if (k == NULL_KEY) i = 2; else i = 3;" },
+              { "", "k = llGetOwner(); if (k) i = 3; else i = 2;" }, "<<<", nullptr },
+            { "if (k == NULL_KEY) A as if (k) ; else A", { "", "k = llGetOwner(); if (k == NULL_KEY) i = 2;" }, { "", "k = llGetOwner(); if (k) ; else i = 2;" },
+              "<<<", nullptr },
+            // Functions and variables.
+            { "a parameter never read taken away", { "f1(integer a, integer b) { llOwnerSay((string)a); }", "f1(i, j); f1(j, i);" },
+              { "f1(integer a) { llOwnerSay((string)a); }", "f1(i); f1(j);" }, "<<<", nullptr },
+            { "a parameter every call gives 2 made a local", { "f1(integer a, integer b) { llOwnerSay((string)(a + b)); }", "f1(i, 2); f1(j, 2);" },
+              { "f1(integer a) { llOwnerSay((string)(a + 2)); }", "f1(i); f1(j);" }, "<<<", nullptr },
+            { "a string no call reads not returned", { "string f1(integer a) { llOwnerSay((string)a); return \"x\"; }", "f1(i); f1(j);" },
+              { "f1(integer a) { llOwnerSay((string)a); }", "f1(i); f1(j);" }, "<<<", nullptr },
+            { "a global set before it is read made a local", { "integer z0;", "z0 = llGetUnixTime(); i = z0;" }, { "", "integer z0 = llGetUnixTime(); i = z0;" },
+              "<<<", nullptr },
+            { "a value set again before it is read not set", { "", "integer z = i; z = j; i = z;" }, { "", "integer z = j; i = z;" }, "<<<", nullptr },
+            { "a || 1 settled", { "", "if ((integer)s || 1) i = 2;" }, { "", "i = 2;" }, "<<<", nullptr },
+            // What is kept in a local, as the weigher has it (Mono's frame not in it).
+            { "a global read three times read once", { "", "i = gi + j; j = gi + i; i = gi + j;" }, { "", "integer z = gi; i = z + j; j = z + i; i = z + j;" },
+              "><<", nullptr },
+            { "a vector written twice kept in a local", { "", "v = v + <1.5, 2.5, 3.5>; v = v - <1.5, 2.5, 3.5>;" },
+              { "", "vector z = <1.5, 2.5, 3.5>; v = v + z; v = v - z;" }, "><<", nullptr },
+            { "a loop that never ends by a jump back", { "", "do { i = i + j; if (i) jump L; } while (TRUE); @L;" },
+              { "", "@M; { i = i + j; if (i) jump L; } jump M; @L;" }, "<<>", &ALLSLCosts::jumpForForever, true },
+            // Smaller everywhere where the two are held nowhere else; LSO,
+            // which holds none, joins them whatever the option.
+            { "two string literals joined", { "", "s = \"abc\" + \"def\";" }, { "", "s = \"abcdef\";" }, "<<<", nullptr },
+        };
+        for (const Fact& fact : facts)
+        {
+            for (size_t n = 0; n < 3; ++n)
+            {
+                const Target t = TARGETS[n];
+                const Delta  d = delta(t, fact.a, fact.b);
+                said(fact.what, t, d, 0);
+                const char v = fact.once ? verdict({ d.first, d.first }) : verdict(d);
+                INFO(fact.what << " on " << nameOf(t));
+                REQUIRE(v == fact.verdicts[n]);
+                // A flag on is a form smaller there; one off may be for what
+                // a first use costs a script that the pair does not show
+                // (allslcosts.cpp says where).
+                if (fact.flag && ALLSLCosts::of(t).*fact.flag)
+                {
+                    UNSCOPED_INFO("the flag is on and the form not smaller");
+                    REQUIRE(v == '<');
+                }
+            }
+        }
+    }
+
+    TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: what a function costs and a call of it and a local and a jump", "[ALLSLCosts]")
+    {
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
+        const Snippet none{ "", "" };
+        const Snippet two{ "f1() { }", "" };
+        const Snippet eighteen{ "a_much_longer_name() { }", "" };
+        const Snippet param{ "f1(integer a) { }", "" };
+        for (const Target t : TARGETS)
+        {
+            const ALLSLCosts& c = ALLSLCosts::of(t);
+            INFO("on " << nameOf(t));
+
+            const Delta local = delta(t, { "", "integer z = i; j = z;" }, { "", "j = i;" });
+            said("a local", t, local, -c.local);
+            REQUIRE(-local.each == c.local);
+
+            const Delta jump = delta(t, { "", "jump L; @L;" }, { "", "" });
+            said("a jump", t, jump, -c.jump);
+            REQUIRE(-jump.first == c.jump);
+
+            const Delta f2  = delta(t, none, two);
+            const Delta f18 = delta(t, none, eighteen);
+            said("a function", t, f2, c.function + 2 * c.functionChar);
+            REQUIRE((f18.first - f2.first) / 16 == c.functionChar);
+            REQUIRE(f2.first - 2 * c.functionChar == c.function);
+
+            const Delta p = delta(t, two, param);
+            said("a parameter", t, p, c.parameter);
+            REQUIRE(p.first == c.parameter);
+
+            const Delta call = delta(t, { "f1() { }", "f1();" }, { "f1() { }", "f1(); f1();" });
+            said("a call", t, call, c.call);
+            REQUIRE(call.each == c.call);
+
+            const Delta argued = delta(t, { "f1(integer a) { }", "f1(i);" }, { "f1(integer a) { }", "f1(i); f1(i);" });
+            said("a call with an argument", t, argued, c.call + c.argument);
+            REQUIRE(argued.each - c.call == c.argument);
+
+            for (const char* text : { "hello", "hello world, hello" })
+            {
+                const S32   length = S32(strlen(text));
+                const Delta string = delta(t, { "", "s = s;" }, { "", "s = \"" + std::string(text) + "\";" });
+                said("a string of " + std::to_string(length) + ", held once", t, string, c.stringHeld + length * c.stringHeldChar);
+                CAPTURE(length);
+                REQUIRE(string.first - string.each ==
+                              c.stringHeld + length * c.stringHeldChar);
+            }
+
+            const Delta first2  = delta(t, two, { "f1() { }", "f1();" });
+            const Delta first18 = delta(t, eighteen, { "a_much_longer_name() { }", "a_much_longer_name();" });
+            said("a first call", t, first2, c.call + c.reference + 2 * c.referenceChar);
+            REQUIRE((first18.first - first2.first) / 16 == c.referenceChar);
+            REQUIRE(first2.first - c.call - 2 * c.referenceChar == c.reference);
+
+            // The most elements of a literal added to a list bare: at it
+            // smaller, one past it larger; with none, eight smaller.
+            const auto bare = [&](S32 n) {
+                std::string literal, sum;
+                for (S32 k = 0; k < n; ++k)
+                {
+                    const char* one = k % 2 ? "j" : "s";
+                    literal += (k ? ", " : "") + std::string(one);
+                    sum += std::string(" + ") + one;
+                }
+                return delta(t, { "", "l = l + [" + literal + "];" }, { "", "l = l" + sum + ";" });
+            };
+            if (c.elementsForListMost > 0)
+            {
+                UNSCOPED_INFO("the most added bare, smaller");
+                REQUIRE(verdict(bare(c.elementsForListMost)) == '<');
+                UNSCOPED_INFO("one more, larger");
+                REQUIRE(verdict(bare(c.elementsForListMost + 1)) == '>');
+            }
+            else
+            {
+                UNSCOPED_INFO("eight added bare, smaller");
+                REQUIRE(verdict(bare(8)) == '<');
+            }
+        }
+    }
+
+    TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: a global never assigned against its value written where it is read", "[ALLSLCosts]")
+    {
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
+        struct Kind
+        {
+            const char*                  what;
+            ALLSLCosts::Held ALLSLCosts::*held;
+            const char*                  type;
+            std::vector<double>          parts;
+            const char*                  read;
+        };
+        const Kind kinds[] = {
+            { "an integer", &ALLSLCosts::integer, "integer", {}, "i = @;" },
+            { "a float", &ALLSLCosts::floating, "float", { 2.5 }, "f = @;" },
+            { "a whole float", &ALLSLCosts::wholeFloating, "float", { 2.0 }, "f = @;" },
+            { "a vector", &ALLSLCosts::vector, "vector", { 1.5, 2.5, 3.5 }, "v = @;" },
+            { "a whole vector", &ALLSLCosts::wholeVector, "vector", { 1, 2, 3 }, "v = @;" },
+            { "a rotation", &ALLSLCosts::rotation, "rotation", { .5, .5, .5, .5 }, "v = v * @;" },
+            { "a whole rotation", &ALLSLCosts::wholeRotation, "rotation", { 1, 2, 3, 4 }, "v = v * @;" },
+        };
+        const auto put = [](std::string text, const std::string& what) { return text.replace(text.find('@'), 1, what); };
+        for (const Target t : TARGETS)
+        {
+            const ALLSLCosts& c = ALLSLCosts::of(t);
+            INFO("on " << nameOf(t));
+            for (const Kind& kind : kinds)
+            {
+                std::string value;
+                for (double part : kind.parts)
+                {
+                    value += (value.empty() ? "" : ", ") + number(t, part);
+                }
+                value = kind.parts.empty() ? std::string("1234567") : kind.parts.size() > 1 ? "<" + value + ">" : value;
+                const std::string       global = std::string(kind.type) + " gw = " + value + ";";
+                const Delta             own    = delta(t, { "", "" }, { global, "" });
+                const Delta             out    = delta(t, { global, put(kind.read, "gw") }, { global, put(kind.read, value) });
+                const ALLSLCosts::Held& held   = c.*kind.held;
+                said(std::string(kind.what) + " global", t, own, held.global);
+                said(std::string(kind.what) + " written out", t, out, held.first);
+                CAPTURE(kind.what);
+                REQUIRE(own.first == held.global);
+                REQUIRE(out.first == held.first);
+                REQUIRE(out.each == held.each);
+            }
+            // A string at two lengths, what a character adds the same.
+            for (const char* text : { "hello", "hello world, hello" })
+            {
+                const S32              length = S32(strlen(text));
+                const std::string      quoted = std::string("\"") + text + "\"";
+                const std::string      global = "string gw = " + quoted + ";";
+                const Delta            own    = delta(t, { "", "" }, { global, "" });
+                const Delta            out    = delta(t, { global, "s = gw;" }, { global, "s = " + quoted + ";" });
+                const ALLSLCosts::Held held   = c.stringOf(length);
+                const std::string      what   = "a string of " + std::to_string(length);
+                said(what + " global", t, own, held.global);
+                said(what + " written out", t, out, held.first);
+                CAPTURE(length);
+                REQUIRE(own.first == held.global);
+                REQUIRE(out.first == held.first);
+                REQUIRE(out.each == held.each);
+            }
+        }
+    }
+
+    // What putting a function in place is estimated to come to, against the
+    // script written both ways and weighed: the same side of nothing, and
+    // near it.
+    TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: what putting a function in place is estimated to come to", "[ALLSLCosts]")
+    {
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
+        struct Case
+        {
+            const char* what;
+            Snippet     called;
+            Snippet     inlined;
+            const char* name;
+            ALLSLCosts::Inlining f;
+        };
+        const Case cases[] = {
+            { "an expression, three times", { "integer sq(integer x) { return x * x; }", "i = sq(j); j = sq(i); i = sq(j);" },
+              { "", "i = j * j; j = i * i; i = j * j;" }, "sq", { 0, 3, 1, 0, 0, 0, 0, 2 } },
+            { "a statement, twice", { "say(string m) { llOwnerSay(\"[\" + m + \"]\"); }", "say(s); say(gs);" },
+              { "", "{ string m = s; llOwnerSay(\"[\" + m + \"]\"); } { string m = gs; llOwnerSay(\"[\" + m + \"]\"); }" }, "say", { 0, 2, 1, 1, 0, 2, 2, 3 } },
+            { "a longer body, five times",
+              { "tell(integer n) { if (n > 2) llOwnerSay(\"many \" + (string)n); else llOwnerSay(\"few\"); llSetText((string)n, gv, 1.0); }",
+                "tell(i); tell(j); tell(i + j); tell(2); tell(i * 2);" },
+              { "", "{ integer n = i; if (n > 2) llOwnerSay(\"many \" + (string)n); else llOwnerSay(\"few\"); llSetText((string)n, gv, 1.0); }"
+                    "{ integer n = j; if (n > 2) llOwnerSay(\"many \" + (string)n); else llOwnerSay(\"few\"); llSetText((string)n, gv, 1.0); }"
+                    "{ integer n = i + j; if (n > 2) llOwnerSay(\"many \" + (string)n); else llOwnerSay(\"few\"); llSetText((string)n, gv, 1.0); }"
+                    "{ integer n = 2; if (n > 2) llOwnerSay(\"many \" + (string)n); else llOwnerSay(\"few\"); llSetText((string)n, gv, 1.0); }"
+                    "{ integer n = i * 2; if (n > 2) llOwnerSay(\"many \" + (string)n); else llOwnerSay(\"few\"); llSetText((string)n, gv, 1.0); }" },
+              "tell", { 0, 5, 1, 1, 0, 2, 8, 4 } },
+        };
+        for (const Case& one : cases)
+        {
+            for (const Target t : TARGETS)
+            {
+                const std::string    text  = script(one.called, 1);
+                const ALScriptWeight whole = t == Target::LSO ? ALScriptWeigh::lso(text) : t == Target::Mono ? ALScriptWeigh::mono(text) : ALScriptWeigh::lslLuau(text);
+                S32                  bytes = -1;
+                for (const ALScriptWeight::Part& part : whole.parts)
+                {
+                    bytes = part.name == one.name ? S32(part.bytes) : bytes;
+                }
+                INFO(one.what << " on " << nameOf(t));
+                UNSCOPED_INFO("the function weighed: " << whole.error);
+                REQUIRE(bytes > 0);
+                const S32 measured = require_compiled_size(t, one.inlined, 1) - require_compiled_size(t, one.called, 1);
+                ALLSLCosts::Inlining f = one.f;
+                f.bytes                = bytes;
+                const S32 estimate     = ALLSLCosts::of(t).inlined(f);
+                said(std::string(one.what) + " (estimated)", t, { measured, measured }, estimate);
+                CAPTURE(estimate, measured);
+                REQUIRE((estimate < 0) == (measured < 0));
+                REQUIRE(std::abs(estimate - measured) <= std::max(12, std::abs(measured) / 4));
+            }
+        }
+    }
+
+    // Where a list's helpers are held once for the script: the least a
+    // list's shape saves at a place, and the most a helper new to the
+    // script costs.
+    TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: where a list's helpers are held once for the script", "[ALLSLCosts]")
+    {
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
+        for (const Target t : TARGETS)
+        {
+            const ALLSLCosts& c = ALLSLCosts::of(t);
+            INFO("on " << nameOf(t));
+            if (c.listShapeLeast == 0)
+            {
+                continue;
+            }
+            const std::pair<Snippet, Snippet> shapes[] = {
+                { { "", "l = [i];" }, { "", "l = (list)i;" } },
+                { { "", "l = [i, j];" }, { "", "l = (list)i + j;" } },
+                { { "", "l = l + [i];" }, { "", "l = l + i;" } },
+                { { "", "l = l + [i, j];" }, { "", "l = l + i + j;" } },
+                { { "", "l = [s] + l;" }, { "", "l = s + l;" } },
+                { { "", "l = l + (list)s;" }, { "", "l = l + s;" } },
+                { { "", "l += [i];" }, { "", "l += i;" } },
+            };
+            S32 least = std::numeric_limits<S32>::max();
+            for (const auto& [a, b] : shapes)
+            {
+                least = std::min(least, -delta(t, a, b).each);
+            }
+            said("the least a list's shape saves", t, { least, least }, c.listShapeLeast);
+            REQUIRE(least == c.listShapeLeast);
+            // A helper each: a cast to a list, something added after one,
+            // something added before one.
+            const Snippet had{ "", "l = l + [i];" };
+            S32           most = 0;
+            for (const char* more : { "l = (list)s;", "l = l + v;", "l = v + l;" })
+            {
+                const Delta d = delta(t, had, { "", std::string("l = l + [i]; ") + more });
+                most          = std::max(most, d.first - d.each);
+            }
+            said("the most a helper costs", t, { most, most }, c.listHelperMost);
+            REQUIRE(most == c.listHelperMost);
+        }
+    }
+}

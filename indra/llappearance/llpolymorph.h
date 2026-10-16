@@ -43,7 +43,6 @@ class LLWearable;
 //-----------------------------------------------------------------------------
 class alignas(16) LLPolyMorphData
 {
-    LL_ALIGN_NEW
 public:
     LLPolyMorphData(const std::string& morph_name);
     ~LLPolyMorphData();
@@ -146,7 +145,6 @@ protected:
 //-----------------------------------------------------------------------------
 class alignas(16) LLPolyMorphTarget : public LLViewerVisualParam
 {
-    LL_ALIGN_NEW
 public:
     LLPolyMorphTarget(LLPolyMesh *poly_mesh);
     ~LLPolyMorphTarget();

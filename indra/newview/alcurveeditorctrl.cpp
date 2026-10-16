@@ -25,11 +25,13 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alcurveeditorctrl.h"
+#include "alsurface.h"
 
 #include "llfocusmgr.h"
 #include "lllocalcliprect.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
+#include "llstring.h"
 #include "lluicolortable.h"
 #include "llwindow.h"
 
@@ -45,7 +47,7 @@ constexpr S32 GRAB_SLOP = 4;
 
 ALCurveEditorCtrl::Params::Params()
 :   background_color("background_color", LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor")),
-    border_color("border_color", LLUIColorTable::instance().getColor("DefaultShadowLight")),
+    border_color("border_color", ALSurface::well()),
     grid_color("grid_color", LLUIColorTable::instance().getColor("DefaultShadowDark")),
     curve_color("curve_color", LLUIColorTable::instance().getColor("White")),
     handle_color("handle_color", LLUIColorTable::instance().getColor("White")),
@@ -53,7 +55,9 @@ ALCurveEditorCtrl::Params::Params()
     curve_samples("curve_samples", 96),
     handle_radius("handle_radius", 4),
     curve_width("curve_width", 1.6f),
-    draw_diagonal("draw_diagonal", true)
+    draw_diagonal("draw_diagonal", true),
+    points_editable("points_editable", false),
+    edited_settings("edited_settings")
 {
     changeDefault(mouse_opaque, true);
 }
@@ -69,8 +73,12 @@ ALCurveEditorCtrl::ALCurveEditorCtrl(const ALCurveEditorCtrl::Params& p)
     mCurveSamples(llmax(2, p.curve_samples())),
     mHandleRadius(llmax(2, p.handle_radius())),
     mCurveWidth(llmax(0.5f, p.curve_width())),
-    mDrawDiagonal(p.draw_diagonal)
+    mDrawDiagonal(p.draw_diagonal),
+    mPointsEditable(p.points_editable)
 {
+    // "A,B, C" -> {A, B, C}: runs of separators collapse, so a space after a
+    // comma in the XUI is harmless.
+    LLStringUtil::getTokens(p.edited_settings(), mSettingNames, ", ");
 }
 
 void ALCurveEditorCtrl::addGhostCurve(curve_fn_t fn, const LLColor4& color)
@@ -81,18 +89,6 @@ void ALCurveEditorCtrl::addGhostCurve(curve_fn_t fn, const LLColor4& color)
 void ALCurveEditorCtrl::addFillCurve(curve_fn_t fn, const LLColor4& color)
 {
     mFills.emplace_back(std::move(fn), color);
-}
-
-std::string ALCurveEditorCtrl::getActiveHandleName() const
-{
-    if (mDragIndex < 0 || mDragIndex >= (S32)mHandles.size())
-    {
-        return std::string();
-    }
-    // By value on purpose: a consumer typically reacts to the commit by
-    // writing a setting and calling setHandles(), which would leave a
-    // reference into the old vector dangling.
-    return mHandles[mDragIndex].mName;
 }
 
 LLRect ALCurveEditorCtrl::plotRect() const
@@ -173,6 +169,7 @@ bool ALCurveEditorCtrl::handleMouseDown(S32 x, S32 y, MASK mask)
     graphToPixel(mHandles[index].mX, mHandles[index].mY, hx, hy);
     mGrabOffsetX = x - hx;
     mGrabOffsetY = y - hy;
+    mDrag.press(x, y);
 
     gFocusMgr.setMouseCapture(this);
     setFocus(true);
@@ -185,7 +182,21 @@ bool ALCurveEditorCtrl::handleHover(S32 x, S32 y, MASK mask)
     // control to the consumer, which is free to replace the handle list.
     if (gFocusMgr.getMouseCapture() != this || mDragIndex < 0 || mDragIndex >= (S32)mHandles.size())
     {
-        getWindow()->setCursor(UI_CURSOR_ARROW);
+        // Not dragging: remember the handle under the pointer, so the target
+        // of a double-click is visible before it is clicked.
+        mHoverIndex = getEnabled() ? hitTest(x, y) : -1;
+        getWindow()->setCursor(mHoverIndex >= 0 ? UI_CURSOR_HAND : UI_CURSOR_ARROW);
+        return true;
+    }
+
+    // The viewer calls the captor's handleHover every frame (updateUI in
+    // llviewerwindow.cpp), not only on motion. A press that never moves must
+    // not commit: it would rewrite the value at pixel resolution, dirty the
+    // Look and put a step on the undo stack for a click -- and the first
+    // half of a double-click is exactly such a press. The gesture says a
+    // move only where the pointer went somewhere.
+    if (!mDrag.moved(x, y))
+    {
         return true;
     }
 
@@ -205,7 +216,9 @@ bool ALCurveEditorCtrl::handleHover(S32 x, S32 y, MASK mask)
     // up next frame, and the drag previews live. The handle list is the
     // widget's own state, so a consumer that clamps differently is free to
     // write back a corrected position via setHandles().
+    mAction = ACTION_DRAG;
     onCommit();
+    mAction = ACTION_NONE;
 
     getWindow()->setCursor(UI_CURSOR_ARROW);
     return true;
@@ -218,9 +231,76 @@ bool ALCurveEditorCtrl::handleMouseUp(S32 x, S32 y, MASK mask)
         return LLUICtrl::handleMouseUp(x, y, mask);
     }
 
+    mDrag.release();
     gFocusMgr.setMouseCapture(nullptr);
     mDragIndex = -1;
     return true;
+}
+
+// Taken away mid-drag -- a menu, another window -- the drag is over: the
+// handle is no longer the one being dragged, and is not drawn as it.
+// What the drag committed as it went stands, as a release would leave it.
+void ALCurveEditorCtrl::onMouseCaptureLost()
+{
+    mDrag.cancel();
+    mDragIndex = -1;
+    LLUICtrl::onMouseCaptureLost();
+}
+
+bool ALCurveEditorCtrl::handleDoubleClick(S32 x, S32 y, MASK mask)
+{
+    // Without point editing the second press stays inert, as it is today: the
+    // widget is mouse_opaque, so the parent chain reports the event handled
+    // and the single-click fallback in LLViewerWindow never runs.
+    if (!mPointsEditable || !getEnabled())
+    {
+        return LLUICtrl::handleDoubleClick(x, y, mask);
+    }
+
+    // The first press and its release were delivered before this (DOWN, UP,
+    // DBLCLK, UP on Win32 and SDL alike), so no drag is live. Drop capture
+    // anyway: a REMOVE must not leave a drag pointing at a handle that is
+    // about to go.
+    if (gFocusMgr.getMouseCapture() == this)
+    {
+        gFocusMgr.setMouseCapture(nullptr);
+    }
+    mDrag.cancel();
+    mDragIndex = -1;
+
+    const S32 index = hitTest(x, y);
+    if (index >= 0)
+    {
+        // Name the target through the same API a drag uses, for the duration
+        // of the callback only.
+        mDragIndex = index;
+        mAction = ACTION_REMOVE;
+        onCommit();
+        mAction = ACTION_NONE;
+        mDragIndex = -1;
+        mHoverIndex = -1;   // the list may be one shorter; the next hover re-finds it
+    }
+    else if (plotRect().pointInRect(x, y))
+    {
+        pixelToGraph(x, y, mActionX, mActionY);
+        mAction = ACTION_ADD;
+        onCommit();
+        mAction = ACTION_NONE;
+        mHoverIndex = -1;   // the list may be one longer; the next hover re-finds it
+    }
+    // A double-click on the frame outside the plot asks for nothing. The plot
+    // is inset by the handle radius, and pixelToGraph clamps, so a click out
+    // there would resolve to an exact axis extreme and plant a point on the
+    // edge -- a click that missed the graph, not a request for a point.
+
+    setFocus(true);
+    return true;
+}
+
+void ALCurveEditorCtrl::onMouseLeave(S32 x, S32 y, MASK mask)
+{
+    mHoverIndex = -1;
+    LLUICtrl::onMouseLeave(x, y, mask);
 }
 
 std::vector<LLVector2> ALCurveEditorCtrl::sampleCurve(const curve_fn_t& fn) const
@@ -321,7 +401,8 @@ void ALCurveEditorCtrl::draw()
         // Filled disc first, then an anti-aliased ring over its edge. The
         // fan's own outline is aliased and there is no cheap way to feather a
         // fan, but the ring sits exactly on that edge and covers it.
-        const bool active = (i == mDragIndex);
+        const bool active  = (i == mDragIndex);
+        const bool hovered = !active && (i == mHoverIndex);
         gGL.color4fv(handle.mColor.mV);
         gl_circle_2d(c.mV[VX], c.mV[VY], (F32)mHandleRadius, 16, true);
 
@@ -334,7 +415,13 @@ void ALCurveEditorCtrl::draw()
             ring.emplace_back(c.mV[VX] + cosf(a) * (F32)mHandleRadius,
                               c.mV[VY] + sinf(a) * (F32)mHandleRadius);
         }
-        gl_polyline_2d(ring, active ? LLColor4::white : mHandleColor.get(), 1.5f, true);
+        // The ring, not the disc, carries the highlight: the disc is the
+        // handle's own colour, which a channel or a band may be using to say
+        // what it is.
+        gl_polyline_2d(ring,
+                       active ? LLColor4::white
+                              : hovered ? LLColor4(1.f, 1.f, 1.f, 0.8f) : mHandleColor.get(),
+                       hovered ? 2.5f : 1.5f, true);
     }
 
     gl_rect_2d(bounds, mBorderColor.get(), false);

@@ -92,6 +92,8 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "alcrashreporter.h"
+#include "alfeedback.h"
 #include "llappviewer.h"
 #include "llstartup.h"
 
@@ -140,7 +142,7 @@
 #include "lllocationhistory.h"
 #include "llgltfmateriallist.h"
 #include "llimageworker.h"
-#include "llregex.h"
+#include "alregex.h"
 
 #include "llloginflags.h"
 #include "llmd5.h"
@@ -212,7 +214,10 @@
 #include "llpanelgroupnotices.h"
 #include "llparcel.h"
 #include "llpreview.h"
-#include "llpreviewscript.h"
+#include "alscriptdiskmasters.h"
+#include "alscriptstudio.h"
+#include "alscripttempfiles.h"
+#include "alscriptworkspace.h"
 #include "llproxy.h"
 #include "llproductinforequest.h"
 #include "llqueryflags.h"
@@ -222,6 +227,7 @@
 #include "llsky.h"
 #include "llstatview.h"
 #include "llstatusbar.h"        // sendMoneyBalanceRequest(), owns L$ balance
+#include "llbuycurrencyhtml.h"
 #include "llsurface.h"
 #include "lltexturecache.h"
 #include "lltexturefetch.h"
@@ -289,8 +295,6 @@
 
 #include "llenvironment.h"
 
-#include "llstacktrace.h"
-
 #include "threadpool.h"
 #include "llperfstats.h"
 
@@ -357,6 +361,7 @@ void uninstall_nsis_if_required();
 void show_release_notes_if_required();
 void show_first_run_dialog();
 bool first_run_dialog_callback(const LLSD& notification, const LLSD& response);
+bool crash_report_consent_callback(const LLSD& notification, const LLSD& response);
 void set_startup_status(const F32 frac, const std::string& string, const std::string& msg);
 bool login_alert_status(const LLSD& notification, const LLSD& response);
 void register_viewer_callbacks(LLMessageSystem* msg);
@@ -520,14 +525,20 @@ bool idle_startup()
 
     LLMortician::updateClass();
 
-    const std::string delims (" ");
     std::string system;
+#if LL_LINUX
+    // The simple OS string names the distribution, whose first word is no
+    // key of language_settings.xml
+    system = "Linux";
+#else
+    const std::string delims (" ");
     size_t begIdx, endIdx;
     std::string osString = LLOSInfo::instance().getOSStringSimple();
 
     begIdx = osString.find_first_not_of (delims);
     endIdx = osString.find_first_of (delims, begIdx);
     system = osString.substr (begIdx, endIdx - begIdx);
+#endif
     system += "Locale";
 
     std::string locale = LLTrans::getString(system);
@@ -550,8 +561,7 @@ bool idle_startup()
             }
             else
             {
-                LLWString utf32str = ll_convert<LLWString>(val);
-                if (utf32str.size() > 4)
+                if (utf8str_codepoint_count(val) > 4)
                 {
                     LL_DEBUGS("InitInfo") << "Current locale \"" << locale << "\" "
                         << "has impracitcally long AM/PM time format" << LL_ENDL;
@@ -565,13 +575,11 @@ bool idle_startup()
         // Some locales (as well some of our own dateTimeAM/PM) return long
         // strings for AM/PM which aren't practical to display in the UI.
         // Hardcode to "AM"/"PM" in those cases.
-        LLWString utf32str = ll_convert<LLWString>(LLStringOps::sAM);
-        if (utf32str.size() > 4)
+        if (utf8str_codepoint_count(LLStringOps::sAM) > 4)
         {
             LLStringOps::sAM = "AM";
         }
-        utf32str = ll_convert<LLWString>(LLStringOps::sPM);
-        if (utf32str.size() > 4)
+        if (utf8str_codepoint_count(LLStringOps::sPM) > 4)
         {
             LLStringOps::sPM = "PM";
         }
@@ -644,7 +652,7 @@ bool idle_startup()
                 std::string value = root->getValue();
                 F32 version = 0.0f;
                 LLStringUtil::convertToF32(value, version);
-                if (version >= 1.0f)
+                if (version >= 2.0f)
                 {
                     xml_ok = true;
                 }
@@ -828,6 +836,7 @@ bool idle_startup()
             {
                 gAudiop = (LLAudioEngine *) new LLAudioEngine_FMODSTUDIO(
                     gSavedSettings.getBOOL("FMODExProfilerEnable"),
+                    gSavedSettings.getU32("FMODResampleMethod"),
                     gSavedSettings.getString("AudioFMODOutputDevice"));
             }
 #endif
@@ -947,10 +956,6 @@ bool idle_startup()
             LL_WARNS("AppInit") << "Unreliable timers detected (may be bad PCI chipset)!!" << LL_ENDL;
         }
 
-#ifdef LL_DISCORD
-        LLAppViewer::initDiscordSocial();
-#endif
-
         //
         // Log on to system
         //
@@ -1061,6 +1066,19 @@ bool idle_startup()
             LLPanelLogin::populateFields( gUserCredential, gRememberUser, gRememberPassword);
             LLPanelLogin::giveFocus();
 
+            // The first launch asks before any crash report is sent. After a
+            // crash or a freeze the user is asked what happened: once that
+            // question is answered, when it is asked, so the two never stack.
+            if (ALCrashReporter::available() && gSavedSettings.getS32("AlchemyCrashReportConsent") == 0)
+            {
+                LLNotificationsUtil::add("AlchemyCrashReportConsent", LLSD(), LLSD().with("ask_about_last_run", true),
+                                         crash_report_consent_callback);
+            }
+            else
+            {
+                ALFeedback::askAboutLastRun();
+            }
+
             // MAINT-3231 Show first run dialog only for Desura viewer
             if (gSavedSettings.getString("sourceid") == "1208_desura")
             {
@@ -1083,6 +1101,9 @@ bool idle_startup()
             // skip directly to message template verification
             LLStartUp::setStartupState( STATE_LOGIN_CLEANUP );
         }
+        // Feedback that could not be sent before goes now, and then whenever
+        // it is due, however the login goes.
+        ALFeedback::startQueue();
 
         gViewerWindow->setNormalControlsVisible( false );
         gLoginMenuBarView->setVisible( true );
@@ -1243,7 +1264,15 @@ bool idle_startup()
         }
         else
         {
-            gDirUtilp->setChatLogsDir(gSavedPerAccountSettings.getString("InstantMessageLogPath"));
+            // A path saved before the user dir moved follows it.
+            const std::string saved_path = gSavedPerAccountSettings.getString("InstantMessageLogPath");
+            const std::string log_path = gDirUtilp->relocateLegacyPath(saved_path);
+            if (log_path != saved_path)
+            {
+                LL_INFOS("AppInit") << "Chat logs moved from " << saved_path << " to " << log_path << LL_ENDL;
+                gSavedPerAccountSettings.setString("InstantMessageLogPath", log_path);
+            }
+            gDirUtilp->setChatLogsDir(log_path);
         }
         gDirUtilp->setPerAccountChatLogsDir(userid);
 
@@ -1854,15 +1883,6 @@ bool idle_startup()
         // Sets up the parameters for the first simulator
 
         LL_DEBUGS("AppInit") << "Initializing camera..." << LL_ENDL;
-        gFrameTime    = totalTime();
-        F32Seconds last_time = gFrameTimeSeconds;
-        gFrameTimeSeconds = (gFrameTime - gStartTime);
-
-        gFrameIntervalSeconds = gFrameTimeSeconds - last_time;
-        if (gFrameIntervalSeconds < 0.f)
-        {
-            gFrameIntervalSeconds = 0.f;
-        }
 
         // Make sure agent knows correct aspect ratio
         // FOV limits depend upon aspect ratio so this needs to happen before initializing the FOV below
@@ -2108,6 +2128,7 @@ bool idle_startup()
         // Get L$ and ownership credit information
         LL_INFOS() << "Requesting Money Balance" << LL_ENDL;
         LLStatusBar::sendMoneyBalanceRequest();
+        LLBuyCurrencyHTML::checkFeatureFlag();
 
         do_startup_frame();
 
@@ -2483,7 +2504,10 @@ bool idle_startup()
 
         LL_DEBUGS("SceneLoadTiming", "Start") << "Scene Load Started " << LL_ENDL;
         gRenderStartTime.reset();
+        gSimLastTime = 0.f;
+        gSimFrames = (F32)gFrameCount;
         gForegroundTime.reset();
+        gForegroundFrameCount = 0;
 
         // HACK: Inform simulator of window size.
         // Do this here so it's less likely to race with RegisterNewAgent.
@@ -2736,6 +2760,9 @@ bool idle_startup()
         LLStartUp::setStartupState( STATE_STARTED );
         do_startup_frame();
 
+        // A login that skipped the login screen asks about the last run here.
+        ALFeedback::askAboutLastRun();
+
         // Unmute audio if desired and setup volumes.
         // This is a not-uncommon crash site, so surround it with
         // LL_INFOS() output to aid diagnosis.
@@ -2747,6 +2774,16 @@ bool idle_startup()
         gFocusMgr.setKeyboardFocus(NULL);
 
         LLAppViewer::instance()->handleLoginComplete();
+
+        // What Script Studio kept of a session that ended before its scripts
+        // were saved, offered back now the world is in; and the copies such
+        // a session gave an editor outside, taken out of the temp folder.
+        ALScriptStudio::offerRecovery();
+        ALScriptWorkspace::instance().tempFiles().sweep();
+        // Scripts whose master is a file on disk: live while logged in, a
+        // save of the file made outside the studio sending them, whether or
+        // not a studio window is open.
+        ALScriptDiskMasters::instance().start();
 
         LLAgentPicksInfo::getInstance()->requestNumberOfPicks();
 
@@ -2855,7 +2892,8 @@ void release_notes_coro(const std::string url)
 
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("releaseNotesCoro", httpPolicy);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("releaseNotesCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
@@ -2939,10 +2977,10 @@ void uninstall_nsis_if_required()
 void validate_release_notes_coro(const std::string url)
 {
     LLVersionInfo& versionInfo(LLVersionInfo::instance());
-    const boost::regex version_regex(R"(\b\d+\.\d+\.\d+\.\d+\b)");
+    static const ALRegex version_regex(R"(\b\d+\.\d+\.\d+\.\d+\b)");
 
     if (url.find(versionInfo.getVersion()) == std::string::npos // has no our build version
-        && ll_regex_search(url, version_regex)) // has any version
+        && version_regex.search(url)) // has any version
     {
         LL_INFOS() << "Received release notes url \"" << url << "\" wwith mismatching build, falling back to locally generated url" << LL_ENDL;
         // Updater only provides notes for a most recent version, if it is not
@@ -3013,6 +3051,17 @@ void show_release_notes_if_required()
         }
         release_notes_shown = true;
     }
+}
+
+bool crash_report_consent_callback(const LLSD& notification, const LLSD& response)
+{
+    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    gSavedSettings.setS32("AlchemyCrashReportConsent", option == 0 ? 1 : 2);
+    if (notification["payload"]["ask_about_last_run"].asBoolean())
+    {
+        ALFeedback::askAboutLastRun();
+    }
+    return false;
 }
 
 void show_first_run_dialog()
@@ -3117,7 +3166,7 @@ void register_viewer_callbacks(LLMessageSystem* msg)
     msg->setHandlerFuncFast(_PREHASH_CoarseLocationUpdate,      LLWorld::processCoarseUpdate);
     msg->setHandlerFuncFast(_PREHASH_ReplyTaskInventory,        LLViewerObject::processTaskInv);
     msg->setHandlerFuncFast(_PREHASH_DerezContainer,            process_derez_container);
-    msg->setHandlerFuncFast(_PREHASH_ScriptRunningReply,        LLLiveLSLEditor::processScriptRunningReply);
+    msg->setHandlerFuncFast(_PREHASH_ScriptRunningReply,        ALScriptWorkspace::processScriptRunningReply);
 
     msg->setHandlerFuncFast(_PREHASH_DeRezAck,                  process_derez_ack);
 
@@ -3217,7 +3266,7 @@ void register_viewer_callbacks(LLMessageSystem* msg)
     msg->setHandlerFuncFast(_PREHASH_ParcelObjectOwnersReply,       LLPanelLandObjects::processParcelObjectOwnersReply);
 
     msg->setHandlerFuncFast(_PREHASH_InitiateDownload,              process_initiate_download);
-    msg->setHandlerFuncFast(_PREHASH_LandStatReply,                 LLFloaterTopObjects::handle_land_reply);
+    msg->setHandlerFuncFast(_PREHASH_LandStatReply,                 ALScriptWorkspace::processLandStatReply);
     msg->setHandlerFuncFast(_PREHASH_GenericMessage,                process_generic_message);
     msg->setHandlerFuncFast(_PREHASH_GenericStreamingMessage,       process_generic_streaming_message);
     msg->setHandlerFuncFast(_PREHASH_LargeGenericMessage,           process_large_generic_message);
@@ -3430,6 +3479,7 @@ void LLStartUp::setStartupState( EStartupState state )
     getPhases().stopPhase(getStartupStateString());
     gStartupState = state;
     getPhases().startPhase(getStartupStateString());
+    ALCrashReporter::setTag("app_state", startupStateToString(state));
 
     postStartupState();
 }

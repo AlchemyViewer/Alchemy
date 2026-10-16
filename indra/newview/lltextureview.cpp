@@ -29,12 +29,14 @@
 #include <set>
 
 #include "lltextureview.h"
+#include "pipeline.h"
 
 #include "llrect.h"
 #include "llerror.h"
 #include "lllfsthread.h"
 #include "llui.h"
 #include "llimageworker.h"
+#include "algpubuffer.h"
 #include "llrender.h"
 
 #include "lltooltip.h"
@@ -94,7 +96,7 @@ static S32 max_status_w = 0;
 static void update_layout()
 {
     const LLFontGL* font = LLFontGL::getFontMonospace();
-    char_w = llmax(1, font->getWidth(std::string("M")));
+    char_w = llmax(1, font->getWidth("M"));
 
     // Align the progress bar with "[download]" in the column-1 header so the
     // bar sits where its label says.
@@ -136,9 +138,10 @@ static S32 required_view_width()
 
 ////////////////////////////////////////////////////////////////////////////
 
-class LLTextureBar : public LLView
+class LLTextureBar final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLTextureBar, LLView);
     LLPointer<LLViewerFetchedTexture> mImagep;
     S32 mHilite;
 
@@ -158,9 +161,9 @@ public:
         mTextureView(p.texture_view)
     {}
 
-    virtual void draw();
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual LLRect getRequiredRect();   // Return the height of this object, given the set options.
+    virtual void draw() override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual LLRect getRequiredRect() override;   // Return the height of this object, given the set options.
 
 // Used for sorting
     struct sort
@@ -409,9 +412,10 @@ LLRect LLTextureBar::getRequiredRect()
 
 ////////////////////////////////////////////////////////////////////////////
 
-class LLAvatarTexBar : public LLView
+class LLAvatarTexBar final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLAvatarTexBar, LLView);
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Mandatory<LLTextureView*>   texture_view;
@@ -428,9 +432,9 @@ public:
         mTextureView(p.texture_view)
     {}
 
-    virtual void draw();
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual LLRect getRequiredRect();   // Return the height of this object, given the set options.
+    virtual void draw() override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual LLRect getRequiredRect() override;   // Return the height of this object, given the set options.
 
 private:
     LLTextureView* mTextureView;
@@ -518,9 +522,10 @@ LLRect LLAvatarTexBar::getRequiredRect()
 
 ////////////////////////////////////////////////////////////////////////////
 
-class LLGLTexMemBar : public LLView
+class LLGLTexMemBar final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLGLTexMemBar, LLView);
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Mandatory<LLTextureView*>   texture_view;
@@ -537,9 +542,9 @@ public:
         mTextureView(p.texture_view)
     {}
 
-    virtual void draw();
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual LLRect getRequiredRect();   // Return the height of this object, given the set options.
+    virtual void draw() override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual LLRect getRequiredRect() override;   // Return the height of this object, given the set options.
 
 private:
     LLTextureView* mTextureView;
@@ -633,10 +638,11 @@ void LLGLTexMemBar::draw()
 
     // Parent LLContainerView already paints the full-rect background; this bar's
     // required height (see getRequiredRect) covers all eight lines of text below.
-    text = llformat("Est. Free: %d MB Sys Free: %d MB FBO: %d MB Probe#: %d Probe Mem: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
+    text = llformat("Est. Free: %d MB Sys Free: %d MB FBO: %d MB Buffers: %d MB Probe#: %d Probe Mem: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
                     (S32)LLViewerTexture::sFreeVRAMMegabytes,
                     LLMemory::getAvailableMemKB()/1024,
                     LLRenderTarget::sBytesAllocated/(1024*1024),
+                    (S32)(ALGPUBuffer::sBytesAllocated/(1024*1024)),
                     gPipeline.mReflectionMapManager.probeCount(),
                     gPipeline.mReflectionMapManager.probeMemory(),
                     discard_bias,
@@ -701,7 +707,7 @@ void LLGLTexMemBar::draw()
                     LLAppViewer::getTextureFetch()->getNumRequests(), LLAppViewer::getTextureFetch()->getNumDeletes(),
                     LLAppViewer::getTextureCache()->getNumReads(), LLAppViewer::getTextureCache()->getNumWrites(),
                     LLLFSThread::sLocal->getPending(),
-                    LLImageRaw::sRawImageCount,
+                    LLImageRaw::sRawImageCount.load(std::memory_order_relaxed),
                     LLAppViewer::getTextureFetch()->getNumHTTPRequests(),
                     LLAppViewer::getImageDecodeThread()->getPending(),
                     gTextureList.mCreateTextureList.size());
@@ -925,8 +931,8 @@ void LLTextureView::draw()
             LL_INFOS() << "ID\tMEM\tBOOST\tPRI\tWIDTH\tHEIGHT\tDISCARD" << LL_ENDL;
         }
 
-        for (LLViewerTextureList::image_list_t::iterator iter = gTextureList.mImageList.begin();
-             iter != gTextureList.mImageList.end(); )
+        for (LLViewerTextureList::image_table_t::const_iterator iter = gTextureList.begin();
+             iter != gTextureList.end(); )
         {
             LLViewerFetchedTexture* imagep = *iter++;
             if(!imagep->hasFetcher())

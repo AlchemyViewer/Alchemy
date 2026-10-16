@@ -18,9 +18,12 @@
 #include <functional>
 // external library headers
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+#include "altestname.h"
 #include "../test/namedtempfile.h"
 #include "../test/catch_and_store_what_in.h"
+#include "altestfailure.h"
 #include "wrapllerrs.h"             // CaptureLog
 #include "llevents.h"
 #include "llprocess.h"
@@ -45,7 +48,7 @@ const size_t BUFFERED_LENGTH = 1023*1024; // try wrangling just under a megabyte
 // capture std::weak_ptrs to LLLeap instances so we can tell when they expire
 typedef std::vector<std::weak_ptr<LLLeap>> LLLeapVector;
 
-void waitfor(const LLLeapVector& instances, int timeout=60)
+static void waitfor(const LLLeapVector& instances, int timeout=60)
 {
     int i;
     for (i = 0; i < timeout; ++i)
@@ -75,13 +78,12 @@ void waitfor(const LLLeapVector& instances, int timeout=60)
         sleep(1);
         LLEventPumps::instance().obtain("mainloop").post(LLSD());
     }
-    tut::ensure(STRINGIZE("at least 1 of " << instances.size()
-                          << " LLLeap instances timed out ("
-                          << timeout << " seconds) without terminating"),
-                i < timeout);
+    INFO("at least 1 of " << instances.size()
+         << " LLLeap instances timed out (" << timeout << " seconds) without terminating");
+    REQUIRE(i < timeout);
 }
 
-void waitfor(LLLeap* instance, int timeout=60)
+static void waitfor(LLLeap* instance, int timeout=60)
 {
     LLLeapVector instances;
     instances.push_back(instance->getWeak());
@@ -89,9 +91,9 @@ void waitfor(LLLeap* instance, int timeout=60)
 }
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
     struct llleap_data
     {
@@ -117,7 +119,7 @@ namespace tut
                    "    hdr = []\n"
                    "    while b':' not in hdr and len(hdr) < 20:\n"
                    "        hdr.append(sys.stdin.buffer.read(1))\n"
-                   "        if not hdr:\n"
+                   "        if not hdr[-1]:\n"
                    "            sys.exit(0)\n"
                    "    if not hdr[-1] == b':':\n"
                    "        raise ProtocolError('Expected len:data, got %r' % hdr, hdr)\n"
@@ -193,27 +195,23 @@ namespace tut
                               reader.getPath().string().substr(0, reader.getPath().string().length()-3))),
             PYTHON(LLStringUtil::getenv("PYTHON"))
         {
-            ensure("Set PYTHON to interpreter pathname", !PYTHON.empty());
+            UNSCOPED_INFO("Set PYTHON to interpreter pathname");
+            REQUIRE_FALSE(PYTHON.empty());
         }
         NamedExtTempFile reader;
         const std::string reader_module;
         const std::string PYTHON;
     };
-    typedef test_group<llleap_data> llleap_group;
-    typedef llleap_group::object object;
-    llleap_group llleapgrp("llleap");
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(llleap_data, "llleap: two LLLeap instances coexist and both terminate", "[llleap]")
     {
-        set_test_name("multiple LLLeap instances");
         NamedExtTempFile script("py",
                                 "import time\n"
                                 "time.sleep(1)\n");
         LLLeapVector instances;
-        instances.push_back(LLLeap::create(get_test_name(),
+        instances.push_back(LLLeap::create(ll_test::currentTestName(),
                                            StringVec{PYTHON, script.getPath().string()})->getWeak());
-        instances.push_back(LLLeap::create(get_test_name(),
+        instances.push_back(LLLeap::create(ll_test::currentTestName(),
                                            StringVec{PYTHON, script.getPath().string()})->getWeak());
         // In this case we're simply establishing that two LLLeap instances
         // can coexist without throwing exceptions or bombing in any other
@@ -221,158 +219,147 @@ namespace tut
         waitfor(instances);
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(llleap_data, "llleap: a plugin's stderr lines go to the log", "[llleap]")
     {
-        set_test_name("stderr to log");
         NamedExtTempFile script("py",
                                 "import sys\n"
                                 "sys.stderr.write('''Hello from Python!\n"
                                 "note partial line''')\n");
         StringVec vcommand{ PYTHON, script.getPath().string() };
         CaptureLog log(LLError::LEVEL_INFO);
-        waitfor(LLLeap::create(get_test_name(), vcommand));
+        waitfor(LLLeap::create(ll_test::currentTestName(), vcommand));
         log.messageWith("Hello from Python!");
         log.messageWith("note partial line");
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(llleap_data, "llleap: stdout without a length prefix is logged as bad protocol", "[llleap]")
     {
-        set_test_name("bad stdout protocol");
         NamedExtTempFile script("py",
                                 "print('Hello from Python!')\n");
         CaptureLog log(LLError::LEVEL_WARN);
-        waitfor(LLLeap::create(get_test_name(),
+        waitfor(LLLeap::create(ll_test::currentTestName(),
                                StringVec{PYTHON, script.getPath().string()}));
-        ensure_contains("error log line",
-                        log.messageWith("invalid protocol"), "Hello from Python!");
+        CHECK_THAT(log.messageWith("invalid protocol"), Catch::Matchers::ContainsSubstring("Hello from Python!"));
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(llleap_data, "llleap: partial stdout left at exit is logged", "[llleap]")
     {
-        set_test_name("leftover stdout");
         NamedExtTempFile script("py",
                                 "import sys\n"
                                 // note lack of newline
                                 "sys.stdout.write('Hello from Python!')\n");
         CaptureLog log(LLError::LEVEL_WARN);
-        waitfor(LLLeap::create(get_test_name(),
+        waitfor(LLLeap::create(ll_test::currentTestName(),
                                StringVec{PYTHON, script.getPath().string()}));
-        ensure_contains("error log line",
-                        log.messageWith("Discarding"), "Hello from Python!");
+        CHECK_THAT(log.messageWith("Discarding"), Catch::Matchers::ContainsSubstring("Hello from Python!"));
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE_METHOD(llleap_data, "llleap: a non-numeric length prefix is logged", "[llleap]")
     {
-        set_test_name("bad stdout len prefix");
         NamedExtTempFile script("py",
                                 "import sys\n"
                                 "sys.stdout.write('5a2:something')\n");
         CaptureLog log(LLError::LEVEL_WARN);
-        waitfor(LLLeap::create(get_test_name(),
+        waitfor(LLLeap::create(ll_test::currentTestName(),
                                StringVec{PYTHON, script.getPath().string()}));
-        ensure_contains("error log line",
-                        log.messageWith("invalid protocol"), "5a2:");
+        CHECK_THAT(log.messageWith("invalid protocol"), Catch::Matchers::ContainsSubstring("5a2:"));
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE_METHOD(llleap_data, "llleap: create with an empty command throws or returns null", "[llleap]")
     {
-        set_test_name("empty plugin vector");
         std::string threw = catch_what<LLLeap::Error>([](){
                 LLLeap::create("empty", StringVec());
             });
-        ensure_contains("LLLeap::Error", threw, "no plugin");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("no plugin"));
         // try the suppress-exception variant
-        ensure("bad launch returned non-NULL", ! LLLeap::create("empty", StringVec(), false));
+        CHECK_FALSE(LLLeap::create("empty", StringVec(), false));
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE_METHOD(llleap_data, "llleap: create with a missing executable throws or returns null", "[llleap]")
     {
-        set_test_name("bad launch");
         // Synthesize bogus executable name
         std::string BADPYTHON(PYTHON.substr(0, PYTHON.length()-1) + "x");
         CaptureLog log;
         std::string threw = catch_what<LLLeap::Error>([&BADPYTHON](){
                 LLLeap::create("bad exe", BADPYTHON);
             });
-        ensure_contains("LLLeap::create() didn't throw", threw, "failed");
+        UNSCOPED_INFO("LLLeap::create() didn't throw");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("failed"));
         log.messageWith("failed");
         log.messageWith(BADPYTHON);
         // try the suppress-exception variant
-        ensure("bad launch returned non-NULL", ! LLLeap::create("bad exe", BADPYTHON, false));
+        CHECK_FALSE(LLLeap::create("bad exe", BADPYTHON, false));
     }
 
-    // Generic self-contained listener: derive from this and override its
-    // call() method, then tell somebody to post on the pump named getName().
-    // Control will reach your call() override.
-    struct ListenerBase
+    namespace
     {
-        // Pass the pump name you want; will tweak for uniqueness.
-        ListenerBase(const std::string& name):
-            mPump(name, true)
+        // Generic self-contained listener: derive from this and override its
+        // call() method, then tell somebody to post on the pump named getName().
+        // Control will reach your call() override.
+        struct ListenerBase
         {
-            mPump.listen(name, boost::bind(&ListenerBase::call, this, _1));
-        }
+            // Pass the pump name you want; will tweak for uniqueness.
+            ListenerBase(const std::string& name):
+                mPump(name, true)
+            {
+                mPump.listen(name, boost::bind(&ListenerBase::call, this, _1));
+            }
 
-        virtual ~ListenerBase() {}  // pacify MSVC
+            virtual ~ListenerBase() {}  // pacify MSVC
 
-        virtual bool call(const LLSD& request)
+            virtual bool call(const LLSD& request)
+            {
+                return false;
+            }
+
+            LLEventPump& getPump() { return mPump; }
+            const LLEventPump& getPump() const { return mPump; }
+
+            std::string getName() const { return mPump.getName(); }
+            void post(const LLSD& data) { mPump.post(data); }
+
+            LLEventStream mPump;
+        };
+
+        // Mimic a dummy little LLEventAPI that merely sends a reply back to its
+        // requester on the "reply" pump.
+        struct AckAPI: public ListenerBase
         {
-            return false;
-        }
+            AckAPI(): ListenerBase("AckAPI") {}
 
-        LLEventPump& getPump() { return mPump; }
-        const LLEventPump& getPump() const { return mPump; }
+            virtual bool call(const LLSD& request)
+            {
+                LLEventPumps::instance().obtain(request["reply"]).post("ack");
+                return false;
+            }
+        };
 
-        std::string getName() const { return mPump.getName(); }
-        void post(const LLSD& data) { mPump.post(data); }
+        // Give LLLeap script a way to post success/failure.
+        struct Result: public ListenerBase
+        {
+            Result(): ListenerBase("Result") {}
 
-        LLEventStream mPump;
-    };
+            virtual bool call(const LLSD& request)
+            {
+                mData = request;
+                return false;
+            }
 
-    // Mimic a dummy little LLEventAPI that merely sends a reply back to its
-    // requester on the "reply" pump.
-    struct AckAPI: public ListenerBase
+            void require_success() const
+            {
+                UNSCOPED_INFO("never posted to " << getName());
+                REQUIRE(mData.isDefined());
+                // Post an empty string for success, non-empty string is failure message.
+                UNSCOPED_INFO(mData);
+                REQUIRE(mData.asString().empty());
+            }
+
+            LLSD mData;
+        };
+    } // anonymous namespace
+
+    TEST_CASE_METHOD(llleap_data, "llleap: a plugin's request gets the API's reply", "[llleap]")
     {
-        AckAPI(): ListenerBase("AckAPI") {}
-
-        virtual bool call(const LLSD& request)
-        {
-            LLEventPumps::instance().obtain(request["reply"]).post("ack");
-            return false;
-        }
-    };
-
-    // Give LLLeap script a way to post success/failure.
-    struct Result: public ListenerBase
-    {
-        Result(): ListenerBase("Result") {}
-
-        virtual bool call(const LLSD& request)
-        {
-            mData = request;
-            return false;
-        }
-
-        void ensure() const
-        {
-            tut::ensure(std::string("never posted to ") + getName(), mData.isDefined());
-            // Post an empty string for success, non-empty string is failure message.
-            tut::ensure(mData, mData.asString().empty());
-        }
-
-        LLSD mData;
-    };
-
-    template<> template<>
-    void object::test<8>()
-    {
-        set_test_name("round trip");
         AckAPI api;
         Result result;
         NamedExtTempFile script("py",
@@ -385,27 +372,28 @@ namespace tut
                                 "result = '' if resp == dict(pump=replypump(), data='ack')\\\n"
                                 "            else 'bad: ' + str(resp)\n"
                                 "send(pump='" << result.getName() << "', data=result)\n";});
-        waitfor(LLLeap::create(get_test_name(),
+        waitfor(LLLeap::create(ll_test::currentTestName(),
                                StringVec{PYTHON, script.getPath().string()}));
-        result.ensure();
+        result.require_success();
     }
 
-    struct ReqIDAPI: public ListenerBase
+    namespace
     {
-        ReqIDAPI(): ListenerBase("ReqIDAPI") {}
-
-        virtual bool call(const LLSD& request)
+        struct ReqIDAPI: public ListenerBase
         {
-            // free function from llevents.h
-            sendReply(LLSD(), request);
-            return false;
-        }
-    };
+            ReqIDAPI(): ListenerBase("ReqIDAPI") {}
 
-    template<> template<>
-    void object::test<9>()
+            virtual bool call(const LLSD& request)
+            {
+                // free function from llevents.h
+                sendReply(LLSD(), request);
+                return false;
+            }
+        };
+    } // anonymous namespace
+
+    TEST_CASE_METHOD(llleap_data, "llleap: many small requests get their replies in order", "[llleap]")
     {
-        set_test_name("many small messages");
         // It's not clear to me whether there's value in iterating many times
         // over a send/receive loop -- I don't think that will exercise any
         // interesting corner cases. This test first sends a large number of
@@ -445,16 +433,18 @@ namespace tut
                                 "        result = 'expected reqid=%s in %s' % (i, resp)\n"
                                 "        break\n"
                                 "send(pump='" << result.getName() << "', data=result)\n";});
-        waitfor(LLLeap::create(get_test_name(), StringVec{PYTHON, script.getPath().string()}),
+        waitfor(LLLeap::create(ll_test::currentTestName(), StringVec{PYTHON, script.getPath().string()}),
                 300);               // needs more realtime than most tests
-        result.ensure();
+        result.require_success();
     }
 
-    // This is the body of test<10>, extracted so we can run it over a number
-    // of large-message sizes.
-    void test_large_message(const std::string& PYTHON, const std::string& reader_module,
-                            const std::string& test_name, size_t size)
+    // This is the body of the very large message test, extracted so we can
+    // run it over a number of large-message sizes.
+    static void test_large_message(const std::string& PYTHON, const std::string& reader_module,
+                                   const std::string& test_name, size_t size)
     {
+        // test_or_split() runs this at several sizes: say which one failed
+        CAPTURE(size);
         ReqIDAPI api;
         Result result;
         NamedExtTempFile script("py",
@@ -510,88 +500,94 @@ namespace tut
                                 "        send('" << result.getName() << "',\n"
                                 "             'at offset %s, expected %r but got %r' %\n"
                                 "             (start, large[start:end], echoed[start:end]))\n"
+                                "        break\n"
                                 "sys.exit(1)\n";});
         waitfor(LLLeap::create(test_name,
                                StringVec{PYTHON, script.getPath().string(), stringize(size)}),
                 180);               // try a longer timeout
-        result.ensure();
+        result.require_success();
     }
 
-    struct TestLargeMessage
+    namespace
     {
-        TestLargeMessage(const std::string& PYTHON_, const std::string& reader_module_,
-                         const std::string& test_name_):
-            PYTHON(PYTHON_),
-            reader_module(reader_module_),
-            test_name(test_name_)
-        {}
-
-        bool operator()(size_t left, size_t right) const
+        struct TestLargeMessage
         {
-            // We don't know whether upper_bound is going to pass the "sought
-            // value" as the left or the right operand. We pass 0 as the
-            // "sought value" so we can distinguish it. Of course that means
-            // the sequence we're searching must not itself contain 0!
-            size_t size;
-            bool success;
-            if (left)
+            TestLargeMessage(const std::string& PYTHON_, const std::string& reader_module_,
+                             const std::string& test_name_):
+                PYTHON(PYTHON_),
+                reader_module(reader_module_),
+                test_name(test_name_)
+            {}
+
+            bool operator()(size_t left, size_t right) const
             {
-                size = left;
-                // Consider our return value carefully. Normal binary_search
-                // (or, in our case, upper_bound) expects a container sorted
-                // in ascending order, and defaults to the std::less
-                // comparator. Our container is in fact in ascending order, so
-                // return consistently with std::less. Here we were called as
-                // compare(item, sought). If std::less were called that way,
-                // 'true' would mean to move right (to higher numbers) within
-                // the sequence: the item being considered is less than the
-                // sought value. For us, that means that test_large_message()
-                // success should return 'true'.
-                success = true;
-            }
-            else
-            {
-                size = right;
-                // Here we were called as compare(sought, item). If std::less
-                // were called that way, 'true' would mean to move left (to
-                // lower numbers) within the sequence: the sought value is
-                // less than the item being considered. For us, that means
-                // test_large_message() FAILURE should return 'true', hence
-                // test_large_message() success should return 'false'.
-                success = false;
+                // We don't know whether upper_bound is going to pass the "sought
+                // value" as the left or the right operand. We pass 0 as the
+                // "sought value" so we can distinguish it. Of course that means
+                // the sequence we're searching must not itself contain 0!
+                size_t size;
+                bool success;
+                if (left)
+                {
+                    size = left;
+                    // Consider our return value carefully. Normal binary_search
+                    // (or, in our case, upper_bound) expects a container sorted
+                    // in ascending order, and defaults to the std::less
+                    // comparator. Our container is in fact in ascending order, so
+                    // return consistently with std::less. Here we were called as
+                    // compare(item, sought). If std::less were called that way,
+                    // 'true' would mean to move right (to higher numbers) within
+                    // the sequence: the item being considered is less than the
+                    // sought value. For us, that means that test_large_message()
+                    // success should return 'true'.
+                    success = true;
+                }
+                else
+                {
+                    size = right;
+                    // Here we were called as compare(sought, item). If std::less
+                    // were called that way, 'true' would mean to move left (to
+                    // lower numbers) within the sequence: the sought value is
+                    // less than the item being considered. For us, that means
+                    // test_large_message() FAILURE should return 'true', hence
+                    // test_large_message() success should return 'false'.
+                    success = false;
+                }
+
+                try
+                {
+                    test_large_message(PYTHON, reader_module, test_name, size);
+                    std::cout << "test_large_message(" << size << ") succeeded" << std::endl;
+                    return success;
+                }
+                catch (const ll_test::Failure&)
+                {
+                    std::cout << "test_large_message(" << size << ") failed" << std::endl;
+                    return ! success;
+                }
             }
 
-            try
-            {
-                test_large_message(PYTHON, reader_module, test_name, size);
-                std::cout << "test_large_message(" << size << ") succeeded" << std::endl;
-                return success;
-            }
-            catch (const failure& e)
-            {
-                std::cout << "test_large_message(" << size << ") failed: " << e.what() << std::endl;
-                return ! success;
-            }
-        }
-
-        const std::string PYTHON, reader_module, test_name;
-    };
+            const std::string PYTHON, reader_module, test_name;
+        };
+    } // anonymous namespace
 
     // The point of this function is to try to find a size at which
     // test_large_message() can succeed. We still want the overall test to
     // fail; otherwise we won't get the coder's attention -- but if
     // test_large_message() fails, try to find a plausible size at which it
-    // DOES work.
-    void test_or_split(const std::string& PYTHON, const std::string& reader_module,
-                       const std::string& test_name, size_t size)
+    // DOES work. Catch2 records a failed REQUIRE before it throws, so every
+    // size the search tries and fails is reported as a failure of its own,
+    // naming that size; the exception rethrown below only ends the case.
+    static void test_or_split(const std::string& PYTHON, const std::string& reader_module,
+                              const std::string& test_name, size_t size)
     {
         try
         {
             test_large_message(PYTHON, reader_module, test_name, size);
         }
-        catch (const failure& e)
+        catch (const ll_test::Failure&)
         {
-            std::cout << "test_large_message(" << size << ") failed: " << e.what() << std::endl;
+            std::cout << "test_large_message(" << size << ") failed" << std::endl;
             // If it still fails below 4K, give up: subdividing any further is
             // pointless.
             if (size >= 4096)
@@ -637,7 +633,7 @@ namespace tut
                                   << "that succeeds" << std::endl;
                     }
                 }
-                catch (const failure&)
+                catch (const ll_test::Failure&)
                 {
                     // The recursive test_or_split() call above has already
                     // handled the exception. We don't want our caller to see
@@ -647,14 +643,12 @@ namespace tut
             // In any case, because we reached here through failure of
             // our original test_large_message(size) call, ensure failure
             // propagates.
-            throw e;
+            throw;
         }
     }
 
-    template<> template<>
-    void object::test<10>()
+    TEST_CASE_METHOD(llleap_data, "llleap: a very large message echoes back intact", "[llleap]")
     {
-        set_test_name("very large message");
-        test_or_split(PYTHON, reader_module, get_test_name(), BUFFERED_LENGTH);
+        test_or_split(PYTHON, reader_module, ll_test::currentTestName(), BUFFERED_LENGTH);
     }
-} // namespace tut
+} // anonymous namespace

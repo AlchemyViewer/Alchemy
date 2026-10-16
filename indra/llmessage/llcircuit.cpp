@@ -1098,7 +1098,7 @@ void LLCircuit::sendAcks(F32 collect_time)
         circuit_data_map::iterator cur_it = it++;
         cd = (*cur_it).second;
         S32 count = (S32)cd->mAcks.size();
-        F32 age = cd->getAgeInSeconds() - cd->mAckCreationTime;
+        F32 age = (F32)(cd->getAgeInSeconds() - cd->mAckCreationTime);
         if (age > collect_time || count == 0)
         {
             if (count>0)
@@ -1276,6 +1276,7 @@ void LLCircuitData::pingTimerStop(const U8 ping_id)
         // Ack, we got our ping response on the same frame! Sigh, let's get a real time otherwise
         // all of our ping calculations will be skewed.
         mt_secs = LLMessageSystem::getMessageTimeSeconds(true);
+        time = mt_secs - mPingTime;
     }
     mLastPingReceivedTime = mt_secs;
 
@@ -1415,9 +1416,9 @@ void LLCircuitData::setTrusted(bool t)
     mTrusted = t;
 }
 
-F32 LLCircuitData::getAgeInSeconds() const
+F64 LLCircuitData::getAgeInSeconds() const
 {
-    return mExistenceTimer.getElapsedTimeF32();
+    return mExistenceTimer.getElapsedTimeF64();
 }
 
 std::vector<LLCircuitData*> LLCircuit::getCircuitDataList() const

@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <context_menu name="Self Pie">
-	<menu_item_call label="Sentar" name="Sit Down Here"/>
-	<menu_item_call label="Ficar de pé" name="Stand Up"/>
 	<context_menu label="Tirar" name="Take Off &gt;">
 		<context_menu label="Roupa" name="Clothes &gt;">
 			<menu_item_call label="Camisa" name="Shirt"/>
@@ -24,7 +22,6 @@
 	</context_menu>
 	<menu_item_call label="Minha aparência" name="Chenge Outfit"/>
 	<menu_item_call label="Editar meu look" name="Edit Outfit"/>
-	<menu_item_call label="Editar meu corpo" name="Edit My Shape"/>
 	<menu_item_call label="Altura de foco" name="Hover Height"/>
 	<menu_item_call label="Redefinir esqueleto" name="Reset Skeleton"/>
 	<menu_item_call label="Redefinir esqueleto e animações" name="Reset Skeleton And Animations"/>

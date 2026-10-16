@@ -1,11 +1,12 @@
 {
-  "builtin-baseline": "7e43e0768a5af180a9cf75d87d692dce1b9da34f",
+  "builtin-baseline": "da2be01c400dd3ed102c1198752ef44c76aabe37",
   "dependencies": [
     "alchemy-branding",
     "alchemy-dictionaries",
     "alchemy-fonts",
     "apr",
     "boost-asio",
+    "boost-beast",
     "boost-circular-buffer",
     "boost-dll",
     "boost-fiber",
@@ -13,8 +14,12 @@
     "boost-iostreams",
     "boost-process",
     "boost-program-options",
-    "boost-random",
-    "boost-regex",
+    {
+      "name": "boost-regex",
+      "features": [
+        "icu"
+      ]
+    },
     "boost-signals2",
     "boost-spirit",
     "boost-stacktrace",
@@ -48,8 +53,8 @@
         "zlib"
       ]
     },
-    "glm",
     "harfbuzz",
+    "icu",
     {
       "name": "libavif",
       "features": [
@@ -75,7 +80,7 @@
     "minizip",
     {
       "name": "nvapi",
-      "platform": "windows & x64"
+      "platform": "windows"
     },
     {
       "name": "open-libndofdev",
@@ -99,7 +104,9 @@
         "freetype"
       ]
     },
+    "pocketfft",
     "pugixml",
+    "re2",
     {
       "name": "sdl3",
       "features": [
@@ -139,10 +146,7 @@
     "secondlife-emoji-shortcodes",
     "simdjson",
     "simdutf",
-    {
-      "name": "sse2neon",
-      "platform": "osx"
-    },
+    "slua",
     "tinyexr",
     "tinygltf",
     "v-hacd",
@@ -150,35 +154,21 @@
       "name": "vlc-bin",
       "platform": "windows | osx"
     },
-    {
-      "name": "webrtc",
-      "features": [
-        {
-          "name": "alsa",
-          "platform": "linux"
-        },
-        {
-          "name": "pulseaudio",
-          "platform": "linux"
-        }
-      ]
-    },
-    "websocketpp",
     "xxhash",
     "zlib"
   ],
+  "overrides": [
+    {
+      "$comment": "HarfBuzz 14.5 is Unicode 18 and ICU 78 is Unicode 17; alfontshaping test 35 holds the two to one Unicode. Lift this with ICU's move to Unicode 18.",
+      "name": "harfbuzz",
+      "version": "14.4.0"
+    }
+  ],
   "features": {
-    "bugsplat": {
-      "description": "Build with support for Bugsplat crash reporting",
+    "discord": {
+      "description": "Enable Discord rich presence through the Discord Social SDK",
       "dependencies": [
-        {
-          "name": "bugsplat",
-          "platform": "windows & x64"
-        },
-        {
-          "name": "bugsplat-apple",
-          "platform": "osx"
-        }
+        "discord-social-sdk"
       ]
     },
     "dullahan-example": {
@@ -186,11 +176,11 @@
       "dependencies": [
         {
           "name": "glad",
-          "platform": "windows | linux",
           "features": [
             "gl-api-41",
             "loader"
-          ]
+          ],
+          "platform": "windows | linux"
         },
         {
           "name": "imgui",
@@ -209,6 +199,12 @@
         "faudio"
       ]
     },
+    "fmodstudio": {
+      "description": "Build with support for the FMOD Studio audio engine",
+      "dependencies": [
+        "fmodstudio"
+      ]
+    },
     "hunspell": {
       "description": "Build with support for Hunspell spell-check engine",
       "dependencies": [
@@ -219,18 +215,6 @@
       "description": "Build with support for Kakadu JPEG2000",
       "dependencies": [
         "kdu"
-      ]
-    },
-    "offscreen": {
-      "description": "Build with support for Mesa3D Software OSR backend",
-      "dependencies": [
-        {
-          "name": "mesa",
-          "features": [
-            "offscreen"
-          ],
-          "platform": "windows"
-        }
       ]
     },
     "openal": {
@@ -266,7 +250,33 @@
         },
         {
           "name": "sentry-native",
-          "platform": "windows | linux"
+          "features": [
+            "backend",
+            "compression",
+            "transport"
+          ],
+          "platform": "linux"
+        },
+        {
+          "name": "sentry-native",
+          "features": [
+            "backend",
+            "compression",
+            "transport",
+            "wer"
+          ],
+          "platform": "windows"
+        }
+      ]
+    },
+    "tests": {
+      "description": "Build the unit tests, on Catch2",
+      "dependencies": [
+        {
+          "name": "catch2",
+          "features": [
+            "thread-safe-assertions"
+          ]
         }
       ]
     },
@@ -312,7 +322,25 @@
     "velopack": {
       "description": "Build with support for the Velopack install and update framework",
       "dependencies": [
-        "velopack"
+        "corrosion"
+      ]
+    },
+    "webrtc": {
+      "description": "Build with WebRTC voice",
+      "dependencies": [
+        {
+          "name": "webrtc",
+          "features": [
+            {
+              "name": "alsa",
+              "platform": "linux"
+            },
+            {
+              "name": "pulseaudio",
+              "platform": "linux"
+            }
+          ]
+        }
       ]
     }
   }

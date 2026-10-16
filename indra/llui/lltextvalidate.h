@@ -39,8 +39,7 @@ namespace LLTextValidate
         ValidatorImpl() {}
         virtual ~ValidatorImpl() {}
 
-        virtual bool validate(const std::string& str) = 0;
-        virtual bool validate(const LLWString& str) = 0;
+        virtual bool validate(std::string_view str) = 0;
 
         bool setError(std::string name, LLSD values = LLSD()) { return mLastErrorName = name, mLastErrorValues = values, false; }
         bool resetError() { return mLastErrorName.clear(), mLastErrorValues.clear(), true; }
@@ -64,8 +63,7 @@ namespace LLTextValidate
         Validator(const Validator& validator) : mImpl(validator.mImpl) {}
         Validator(const Validator* validator) : mImpl(validator->mImpl) {}
 
-        bool validate(const std::string& str) const { return !mImpl || mImpl->validate(str); }
-        bool validate(const LLWString& str) const { return !mImpl || mImpl->validate(str); }
+        bool validate(std::string_view str) const { return !mImpl || mImpl->validate(str); }
 
         operator bool() const { return mImpl; }
 

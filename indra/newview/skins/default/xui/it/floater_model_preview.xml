@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="CARICAMENTO MODELLO">
-	<string name="status_idle"/>
 	<string name="status_parse_error">
 		Errore: Errore elaborazione Dae - vedere il registro per informazioni dettagliate.
 	</string>
@@ -78,19 +77,6 @@
 			<text name="name_label">
 				Nome modello:
 			</text>
-			<text name="model_category_label">
-				Questo modello rappresenta...
-			</text>
-			<combo_box name="model_category_combo">
-				<combo_item label="Seleziona uno..." name="Choose one"/>
-				<combo_item label="Forma avatar" name="Avatar shape"/>
-				<combo_item label="Elemento collegato all&apos;avatar" name="Avatar attachment"/>
-				<combo_item label="Oggetto mobile (veicolo, animale)" name="Moving object (vehicle, animal)"/>
-				<combo_item label="Componente edificio" name="Building Component"/>
-				<combo_item label="Grande, immobile, ecc." name="Large, non moving etc"/>
-				<combo_item label="Piccolo, immobile, ecc." name="Smaller, non-moving etc"/>
-				<combo_item label="Nessuno di questi" name="Not really any of these"/>
-			</combo_box>
 		</panel>
 		<tab_container name="import_tab">
 			<panel label="Livello di dettaglio" name="lod_panel" title="Livello di dettaglio">
@@ -100,7 +86,6 @@
 				<text initial_value="Alto" name="high_label" value="Alto"/>
 				<combo_box name="lod_source_high">
 					<item label="Carica da file" name="Load from file" value="Carica da file"/>
-					<item label="Genera" name="Generate" value="Genera"/>
 				</combo_box>
 				<button label="Sfoglia..." name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
@@ -112,7 +97,6 @@
 				<text initial_value="Medio" name="medium_label" value="Medio"/>
 				<combo_box name="lod_source_medium">
 					<item label="Carica da file" name="Load from file" value="Carica da file"/>
-					<item label="Genera" name="Generate" value="Genera"/>
 					<item label="Usa livello di dettaglio indicato in precedenza" name="Use LoD above" value="Usa livello di dettaglio indicato in precedenza"/>
 				</combo_box>
 				<button label="Sfoglia..." name="lod_browse_medium"/>
@@ -125,7 +109,6 @@
 				<text initial_value="Basso" name="low_label" value="Basso"/>
 				<combo_box name="lod_source_low">
 					<item label="Carica da file" name="Load from file" value="Carica da file"/>
-					<item label="Genera" name="Generate" value="Genera"/>
 					<item label="Usa livello di dettaglio indicato in precedenza" name="Use LoD above" value="Usa livello di dettaglio indicato in precedenza"/>
 				</combo_box>
 				<button label="Sfoglia..." name="lod_browse_low"/>
@@ -138,7 +121,6 @@
 				<text initial_value="Bassissimo" name="lowest_label" value="Bassissimo"/>
 				<combo_box name="lod_source_lowest">
 					<item label="Carica da file" name="Load from file" value="Carica da file"/>
-					<item label="Genera" name="Generate" value="Genera"/>
 					<item label="Usa livello di dettaglio indicato in precedenza" name="Use LoD above" value="Usa livello di dettaglio indicato in precedenza"/>
 				</combo_box>
 				<button label="Sfoglia..." name="lod_browse_lowest"/>
@@ -158,43 +140,14 @@
 						Passaggio 1: Livello di dettaglio
 					</text>
 					<combo_box name="physics_lod_combo" tool_tip="Livello di dettaglio per forma fisica">
-						<combo_item name="choose_one">
-							Seleziona uno...
-						</combo_item>
-						<combo_item name="physics_high">
-							Alto
-						</combo_item>
-						<combo_item name="physics_medium">
-							Medio
-						</combo_item>
-						<combo_item name="physics_low">
-							Basso
-						</combo_item>
-						<combo_item name="physics_lowest">
-							Bassissimo
-						</combo_item>
-						<combo_item name="load_from_file">
-							Da file
-						</combo_item>
+						<combo_item name="choose_one" label="Seleziona uno..."/>
+						<combo_item name="physics_high" label="Alto"/>
+						<combo_item name="physics_medium" label="Medio"/>
+						<combo_item name="physics_low" label="Basso"/>
+						<combo_item name="physics_lowest" label="Bassissimo"/>
+						<combo_item name="load_from_file" label="Da file"/>
 					</combo_box>
 					<button label="Sfoglia..." name="physics_browse"/>
-				</panel>
-				<panel name="physics analysis">
-					<text name="method_label">
-						Passaggio 2: Analizza
-					</text>
-					<text name="analysis_method_label">
-						Metodo:
-					</text>
-					<text name="quality_label">
-						Qualità:
-					</text>
-					<text name="smooth_method_label">
-						Liscia:
-					</text>
-					<check_box label="Chiudi fori" name="Close Holes (Slow)"/>
-					<button label="Analizza" name="Decompose"/>
-					<button label="Annulla" name="decompose_cancel"/>
 				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
@@ -230,6 +183,25 @@
 						Scafi: [HULLS]
 					</text>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="smooth_method_label">
+						Liscia:
+					</text>
+					<text name="quality_label">
+						Qualità:
+					</text>
+					<text name="analysis_method_label">
+						Metodo:
+					</text>
+					<text name="method_label">
+						Passaggio 2: Analizza
+					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="Annulla" name="decompose_cancel"/>
+					<button label="Analizza" name="Decompose"/>
+					<check_box label="Chiudi fori" name="Close Holes (Slow)"/>
+				</panel>
 			</panel>
 			<panel label="Carica opzioni" name="modifiers_panel">
 				<text name="scale_label">
@@ -243,16 +215,15 @@
 					[X] X [Y] X [Z]
 				</text>
 				<check_box label="Includi texture" name="upload_textures"/>
-				<text name="include_label">
-					Solo per modelli avatar:
-				</text>
-				<check_box label="Includi peso pelle" name="upload_skin"/>
-				<check_box label="Includi posizioni giunti" name="upload_joints"/>
-				<check_box label="Blocca scala se è definita la posizione dei giunti" name="lock_scale_if_joint_position"/>
-				<text name="pelvis_offset_label">
-					Spostamento Z (sposta l&apos;avatar in alto o in basso):
-				</text>
+			</panel>
+			<panel name="rigging_panel">
 				<spinner name="pelvis_offset" value="0.0"/>
+				<text name="pelvis_offset_label">
+					Spostamento Z (sposta l'avatar in alto o in basso):
+				</text>
+				<check_box label="Blocca scala se è definita la posizione dei giunti" name="lock_scale_if_joint_position"/>
+				<check_box label="Includi posizioni giunti" name="upload_joints"/>
+				<check_box label="Includi peso pelle" name="upload_skin"/>
 			</panel>
 		</tab_container>
 		<panel name="weights_and_warning_panel">

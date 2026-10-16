@@ -252,7 +252,7 @@
         top_pad="5"
         follows="left|top"
         height="18"
-        name="calc_txt"
+        name="resync_txt"
         width="240">
         Resync Animations
     </text>
@@ -271,7 +271,7 @@
         top_pad="5"
         follows="left|top"
         height="18"
-        name="calc_txt"
+        name="channel_txt"
         width="240">
         Set Nearby Chat Channel
     </text>

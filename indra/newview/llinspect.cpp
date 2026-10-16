@@ -122,7 +122,12 @@ bool LLInspect::handleToolTip(S32 x, S32 y, MASK mask)
 // virtual
 void LLInspect::onMouseLeave(S32 x, S32 y, MASK mask)
 {
-    mOpenTimer.unpause();
+    // Once focus is lost the open timer is stopped, not paused, and the
+    // fade has begun; unpausing it would restart the fade.
+    if (!mCloseTimer.getStarted())
+    {
+        mOpenTimer.unpause();
+    }
 }
 
 bool LLInspect::childHasVisiblePopupMenu()

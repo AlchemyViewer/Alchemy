@@ -34,9 +34,10 @@
 
 class LLSD;
 
-class LLConsole : public LLFixedBuffer, public LLUICtrl, public LLInstanceTracker<LLConsole>
+class LLConsole final : public LLFixedBuffer, public LLUICtrl, public LLInstanceTracker<LLConsole>
 {
 public:
+    AL_VIEW_TYPE(LLConsole, LLUICtrl);
 
     typedef enum e_font_size
     {
@@ -73,7 +74,7 @@ public:
     //color.
     struct ParagraphColorSegment
     {
-        S32     mNumChars;
+        S32     mNumBytes;
         LLColor4 mColor;
     };
 
@@ -84,9 +85,9 @@ public:
     class LineColorSegment
     {
         public:
-            LineColorSegment(LLWString text, LLColor4 color, F32 xpos) : mText(text), mColor(color), mXPosition(xpos) {}
+            LineColorSegment(std::string text, LLColor4 color, F32 xpos) : mText(std::move(text)), mColor(color), mXPosition(xpos) {}
         public:
-            LLWString mText;
+            std::string mText;
             LLColor4  mColor;
             F32       mXPosition;
     };
@@ -111,13 +112,13 @@ public:
     class Paragraph
     {
         public:
-            Paragraph (LLWString str, const LLColor4 &color, F32 add_time, const LLFontGL* font, F32 screen_width);
+            Paragraph (std::string str, const LLColor4 &color, F64 add_time, const LLFontGL* font, F32 screen_width);
             void makeParagraphColorSegments ( const LLColor4 &color);
             void updateLines ( F32 screen_width,  const LLFontGL* font, bool force_resize=false );
         public:
-            LLWString mParagraphText;   //The entire text of the paragraph
+            std::string mParagraphText; //The entire text of the paragraph
             paragraph_color_segments_t  mParagraphColorSegments;
-            F32 mAddTime;               //Time this paragraph was added to the display.
+            F64 mAddTime;               //Time this paragraph was added to the display, on the console's mTimer.
             F32 mMaxWidth;              //Width of the widest line of text in this paragraph.
             lines_t mLines;
 
@@ -132,14 +133,14 @@ public:
     // each line lasts this long after being added
     void            setLinePersistTime(F32 seconds);
 
-    void            reshape(S32 width, S32 height, bool called_from_parent = true);
+    void            reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     // -1 = monospace, 0 means small, font size = 1 means big
     void            setFontSize(S32 size_index);
 
 
     // Overrides
-    /*virtual*/ void    draw();
+    /*virtual*/ void    draw() override;
 private:
     void        update();
 

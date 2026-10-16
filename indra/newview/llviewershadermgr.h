@@ -102,6 +102,8 @@ extern LLGLSLShader         gGaussianProgram;
 extern LLGLSLShader         gRadianceGenProgram;
 extern LLGLSLShader         gHeroRadianceGenProgram;
 extern LLGLSLShader         gSHProjectionProgram;
+extern LLGLSLShader         gSHProjectionRowsProgram;
+extern LLGLSLShader         gSHProjectionReduceProgram;
 extern LLGLSLShader         gGlowCombineFXAAProgram;
 extern LLGLSLShader         gDebugProgram;
 enum NormalDebugShaderVariant : S32
@@ -115,6 +117,7 @@ extern LLGLSLShader         gClipProgram;
 extern LLGLSLShader         gBenchmarkProgram;
 extern LLGLSLShader         gReflectionProbeDisplayProgram;
 extern LLGLSLShader         gCopyProgram;
+extern LLGLSLShader         gCopyDepthProgram;
 extern LLGLSLShader         gPBRTerrainBakeProgram;
 extern LLGLSLShader         gDrawColorProgram;
 
@@ -133,6 +136,13 @@ extern LLGLSLShader     gObjectAlphaMaskNoColorProgram;
 //environment shaders
 extern LLGLSLShader         gWaterProgram;
 extern LLGLSLShader         gUnderWaterProgram;
+// The patches within the tessellation reach, displaced by the waves; built where tessellation is (water_waves_supported).
+extern LLGLSLShader         gWaterWavesProgram;
+extern LLGLSLShader         gUnderWaterWavesProgram;
+extern LLGLSLShader         gWaterExclusionProgram;
+extern LLGLSLShader         gWaterFieldProgram;
+// One level of ALDepthPyramid; built where the session computes.
+extern LLGLSLShader         gDepthPyramidProgram;
 extern LLGLSLShader         gGlowProgram;
 extern LLGLSLShader         gGlowExtractProgram;
 extern LLGLSLShader         gBloomExtractProgram;
@@ -140,11 +150,37 @@ extern LLGLSLShader         gBloomDownsampleProgram;
 extern LLGLSLShader         gBloomDownsampleFirstProgram;
 extern LLGLSLShader         gBloomUpsampleProgram;
 extern LLGLSLShader         gBloomCompositeProgram;
+// Taps per cross-filter pass. Injected into crossFilterF.glsl as CROSS_TAPS
+// and used by pipeline.cpp for the pass strides and the falloff remap, so the
+// chain's exact base-N tiling has one source of truth instead of three sites
+// that each hard-coded 4 or 63.
+constexpr S32               CROSS_FILTER_TAPS = 4;
+// Shared by the generation gate and the composite, which read the same setting
+// in two different files and must agree, or the effect changes brightness
+// between "is it on" and "how bright".
+constexpr F32               CROSS_FILTER_MAX_STRENGTH = 32.f;
+extern LLGLSLShader         gCrossFilterProgram;
+// Upper bound on the generator's segment loops. Injected into lensDirtGenF as
+// DIRT_MAX_LINES and used by pipeline.cpp to clamp the scratch count, so the
+// loop bound and the CPU clamp cannot drift apart.
+constexpr S32               LENS_DIRT_MAX_LINES = 32;
+extern LLGLSLShader         gLensDirtGenProgram;
 
 //interface shaders
 extern LLGLSLShader         gHighlightProgram;
 extern LLGLSLShader         gHighlightNormalProgram;
 extern LLGLSLShader         gHighlightSpecularProgram;
+// Selection outlines (ALSelectionOutline): the id pass and the wireframe, with rigged variants and linked with
+// interface/selectionAlphaF.glsl, the jump pass, the tile pass and the edge pass, each linked with
+// interface/selectionUtilF.glsl.
+extern LLGLSLShader         gSelectionIdProgram;
+extern LLGLSLShader         gSelectionWireframeProgram;
+extern LLGLSLShader         gSelectionJumpProgram;
+extern LLGLSLShader         gSelectionTileProgram;
+extern LLGLSLShader         gSelectionOutlineProgram;
+extern LLGLSLShader         gSelectionGlowReachProgram;
+extern LLGLSLShader         gSelectionGlowRowProgram;
+extern LLGLSLShader         gSelectionBackdropMaskProgram;
 
 extern LLGLSLShader         gDeferredHighlightProgram;
 
@@ -162,6 +198,7 @@ extern LLGLSLShader         gDeferredDiffuseAlphaMaskProgram;
 extern LLGLSLShader         gDeferredNonIndexedDiffuseAlphaMaskProgram;
 extern LLGLSLShader         gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram;
 extern LLGLSLShader         gDeferredBumpProgram;
+extern LLGLSLShader         gDeferredBumpAlphaMaskProgram; // the bump faces that can discard
 extern LLGLSLShader         gDeferredTerrainProgram;
 extern LLGLSLShader         gDeferredTreeProgram;
 extern LLGLSLShader         gDeferredTreeShadowProgram;
@@ -172,11 +209,14 @@ extern LLGLSLShader         gDeferredMultiSpotLightProgram;
 extern LLGLSLShader         gDeferredSunProgram;
 extern LLGLSLShader         gDeferredSunProbeProgram;
 extern LLGLSLShader         gHazeProgram;
+extern LLGLSLShader         gHazeOnWaterProgram;
 extern LLGLSLShader         gHazeWaterProgram;
 extern LLGLSLShader         gDeferredBlurLightProgram;
 extern LLGLSLShader         gDeferredAvatarProgram;
 extern LLGLSLShader         gDeferredSoftenProgram;
+extern LLGLSLShader         gDeferredSoftenSkyProgram;
 extern LLGLSLShader         gDeferredShadowProgram;
+extern LLGLSLShader         gDeferredTerrainShadowProgram;
 extern LLGLSLShader         gDeferredShadowCubeProgram;
 extern LLGLSLShader         gDeferredShadowAlphaMaskProgram;
 extern LLGLSLShader         gDeferredShadowGLTFAlphaMaskProgram;
@@ -184,10 +224,17 @@ extern LLGLSLShader         gDeferredShadowGLTFAlphaMaskIndexedProgram; // multi
 extern LLGLSLShader         gDeferredShadowMaterialIndexedProgram; // multi-material indexed legacy mask shadow
 extern LLGLSLShader         gDeferredShadowGLTFAlphaBlendProgram;
 extern LLGLSLShader         gDeferredShadowFullbrightAlphaMaskProgram;
+// DoF gather blur, four variants over two orthogonal compile-time axes:
+// FRONT_BLUR (RenderDepthOfFieldNearBlur) and DOF_SHAPED (any of the shaped
+// aperture, cat's-eye or defocus fringe being active). The shaped code sits in
+// the innermost sample loop, so it is compiled out rather than branched over.
 extern LLGLSLShader         gDeferredPostProgram;
 extern LLGLSLShader         gDeferredPostProgramNoNear;
+extern LLGLSLShader         gDeferredPostProgramShaped;
+extern LLGLSLShader         gDeferredPostProgramNoNearShaped;
 extern LLGLSLShader         gDeferredCoFProgram;
 extern LLGLSLShader         gDeferredDoFCombineProgram;
+extern LLGLSLShader         gDeferredDoFCombineProgramNoNear;
 extern LLGLSLShader         gFXAAProgram[4];
 extern LLGLSLShader         gSMAAEdgeDetectProgram[4];
 extern LLGLSLShader         gSMAABlendWeightsProgram[4];
@@ -196,7 +243,9 @@ extern LLGLSLShader         gCASProgram;
 extern LLGLSLShader         gDeferredPostNoDoFProgram;
 extern LLGLSLShader         gExposureProgram;
 extern LLGLSLShader         gExposureProgramNoFade;
+extern LLGLSLShader         gExposureHistogramProgram;
 extern LLGLSLShader         gLuminanceProgram;
+extern LLGLSLShader         gLensFlareStateProgram;
 extern LLGLSLShader         gDeferredAvatarShadowProgram;
 extern LLGLSLShader         gDeferredAvatarAlphaShadowProgram;
 extern LLGLSLShader         gDeferredAvatarAlphaMaskShadowProgram;
@@ -246,7 +295,9 @@ extern LLGLSLShader         gHUDPBROpaqueProgram;
 extern LLGLSLShader         gPBRGlowProgram;
 extern LLGLSLShader         gPBRGlowIndexedProgram; // multi-material indexed PBR glow
 extern LLGLSLShader         gDeferredPBROpaqueProgram;
+extern LLGLSLShader         gDeferredPBRAlphaMaskProgram;
 extern LLGLSLShader         gDeferredPBROpaqueIndexedProgram; // multi-material indexed PBR opaque
+extern LLGLSLShader         gDeferredPBRAlphaMaskIndexedProgram; // multi-material indexed PBR alpha mask
 extern LLGLSLShader         gDeferredPBRAlphaProgram;
 extern LLGLSLShader         gDeferredPBRAlphaImpostorProgram;
 extern LLGLSLShader         gHUDPBRAlphaProgram;
@@ -270,6 +321,9 @@ enum TerrainPBRDetail : S32
 // needs 17 samplers; macOS GL 4.1 provides 16). Shader compilation and the
 // terrain draw pool must both use this so the maps bound match the samplers built.
 S32 clamp_terrain_detail(S32 detail);
+// Whether the water's waves can be drawn: tessellation, on the effective GL version. The shader manager builds the
+// waves' programs and the water draws them only then.
+bool water_waves_supported();
 enum TerrainPaintType : U32
 {
     // Use LLVLComposition::mDatap (heightmap) generated by generateHeights, plus noise from TERRAIN_ALPHARAMP
@@ -279,4 +333,5 @@ enum TerrainPaintType : U32
     TERRAIN_PAINT_TYPE_COUNT                = 2,
 };
 extern LLGLSLShader         gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
+extern LLGLSLShader         gDeferredPBRTerrainAlphaMaskProgram[TERRAIN_PAINT_TYPE_COUNT]; // a region with a masked material
 #endif

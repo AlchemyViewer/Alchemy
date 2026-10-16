@@ -40,16 +40,17 @@
 #include "llagent.h"
 
 
-class LLFloaterDisplayName : public LLFloater
+class LLFloaterDisplayName final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterDisplayName, LLFloater);
     LLFloaterDisplayName(const LLSD& key);
     virtual ~LLFloaterDisplayName() { }
-    /*virtual*/ bool    postBuild();
+    /*virtual*/ bool    postBuild() override;
     void onSave();
     void onReset();
     void onCancel();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
 private:
 
@@ -72,7 +73,7 @@ void LLFloaterDisplayName::onOpen(const LLSD& key)
     LLAvatarName av_name;
     LLAvatarNameCache::get(gAgent.getID(), &av_name);
 
-    F64 now_secs = LLDate::now().secondsSinceEpoch();
+    F64 now_secs = (F64)time_corrected();
     mIsLockedOut = now_secs < av_name.mNextUpdate;
     if (mIsLockedOut)
     {
@@ -212,8 +213,7 @@ void LLFloaterDisplayName::onSave()
     }
 
     const U32 DISPLAY_NAME_MAX_LENGTH = 31; // characters, not bytes
-    LLWString display_name_wstr = utf8string_to_wstring(display_name_utf8);
-    if (display_name_wstr.size() > DISPLAY_NAME_MAX_LENGTH)
+    if (utf8str_codepoint_count(display_name_utf8) > DISPLAY_NAME_MAX_LENGTH)
     {
         LLSD args;
         args["LENGTH"] = llformat("%d", DISPLAY_NAME_MAX_LENGTH);

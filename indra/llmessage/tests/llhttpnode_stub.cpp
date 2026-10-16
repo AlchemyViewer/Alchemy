@@ -61,7 +61,7 @@ LLHTTPNode* LLHTTPNode::getChild(const std::string& name, LLSD& context) const {
 bool LLHTTPNode::handles(const LLSD& remainder, LLSD& context) const { return false; }
 bool LLHTTPNode::validate(const std::string& name, LLSD& context) const { return false; }
 const LLHTTPNode* LLHTTPNode::traverse(const std::string& path, LLSD& context) const { return NULL; }
-void LLHTTPNode::addNode(const std::string& path, LLHTTPNode* nodeToAdd) { }
+bool LLHTTPNode::addNode(const std::string& path, LLHTTPNode* nodeToAdd) { return false; }
 LLSD LLHTTPNode::allNodePaths() const { return LLSD(); }
 const LLHTTPNode* LLHTTPNode::rootNode() const { return NULL; }
 const LLHTTPNode* LLHTTPNode::findNode(const std::string& name) const { return NULL; }

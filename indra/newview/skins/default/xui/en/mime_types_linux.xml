@@ -210,6 +210,17 @@
 			media_plugin_cef
 		</impl>
 	</mimetype>
+	<mimetype name="application/octet-stream">
+		<label name="application/octet-stream_label">
+			Stream
+		</label>
+		<widgettype>
+			movie
+		</widgettype>
+		<impl>
+			media_plugin_gstreamer10
+		</impl>
+	</mimetype>
 	<mimetype name="application/ogg">
 		<label name="application/ogg_label">
 			Ogg Audio/Video
@@ -455,6 +466,28 @@
 	<mimetype menu="1" name="video/quicktime">
 		<label name="video/quicktime_label">
 			Movie (QuickTime)
+		</label>
+		<widgettype>
+			movie
+		</widgettype>
+		<impl>
+			media_plugin_gstreamer10
+		</impl>
+	</mimetype>
+	<mimetype name="video/octet-stream">
+		<label name="video/octet-stream_label">
+			Movie
+		</label>
+		<widgettype>
+			movie
+		</widgettype>
+		<impl>
+			media_plugin_gstreamer10
+		</impl>
+	</mimetype>
+	<mimetype name="video/x-flv">
+		<label name="video/x-flv_label">
+			Movie (flv)
 		</label>
 		<widgettype>
 			movie

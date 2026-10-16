@@ -230,7 +230,8 @@ bool LLSetKeyBindDialog::recordAndHandleKey(KEY key, MASK mask, bool down)
         // Mask up event often generates things like 'shift key + shift mask', filter it out.
         if (key == KEY_CONTROL)
         {
-            mask &= ~MASK_CONTROL;
+            // On the Mac the key is its own Control, not Command.
+            mask &= ~(MASK_CONTROL | MASK_MAC_CONTROL);
         }
         if (key == KEY_SHIFT)
         {

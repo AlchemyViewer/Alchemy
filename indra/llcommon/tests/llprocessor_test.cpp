@@ -25,26 +25,15 @@
  */
 
 #include "linden_common.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../llprocessor.h"
 
 
-namespace tut
+namespace
 {
-    struct processor
+    TEST_CASE("LLProcessor: LLProcessorInfo names the CPU and gives a sane frequency", "[LLProcessor]")
     {
-    };
-
-    typedef test_group<processor> processor_t;
-    typedef processor_t::object processor_object_t;
-    tut::processor_t tut_processor("LLProcessor");
-
-    template<> template<>
-    void processor_object_t::test<1>()
-    {
-        set_test_name("LLProcessorInfo regression test");
-
         LLProcessorInfo pi;
         F64 freq =  pi.getCPUFrequency();
         //bool sse =  pi.hasSSE();
@@ -54,8 +43,9 @@ namespace tut
         std::string brand =  pi.getCPUBrandName();
         //std::string steam =  pi.getCPUFeatureDescription();
 
-        ensure_not_equals("Unknown Brand name", brand, "Unknown");
-        ensure_not_equals("Unknown Family name", family, "Unknown");
-        ensure("Reasonable CPU Frequency > 100 && < 10000", freq > 100 && freq < 10000);
+        CHECK(brand != "Unknown");
+        CHECK(family != "Unknown");
+        CHECK(freq > 100);
+        CHECK(freq < 10000);
     }
 }

@@ -33,7 +33,6 @@
 #include <iostream>
 #include <limits>
 #include <map>
-#include <ranges>
 #include <string_view>
 #include <vector>
 
@@ -50,6 +49,7 @@
 #include "llquaternion.h"
 #include "llsd.h"
 #include "llstring.h"
+#include "llrand.h"
 #include "lluuid.h"
 
 // static
@@ -162,8 +162,12 @@ bool LLXMLNode::removeChild(LLXMLNode *target_child)
     }
     else if (mChildren.notNull())
     {
-        LLXMLChildList::iterator children_itr = mChildren->map.find(target_child->mName);
-        while (children_itr != mChildren->map.end())
+        // Siblings share names, so the walk must begin at the first entry
+        // under this one, and multimap::find promises only some entry with
+        // the key: libc++ 22 returns whichever the tree descent reaches, so
+        // a walk from there can start past the target and miss it.
+        auto [children_itr, children_end] = mChildren->map.equal_range(target_child->mName);
+        for (; children_itr != children_end; ++children_itr)
         {
             if (target_child == children_itr->second)
             {
@@ -190,14 +194,6 @@ bool LLXMLNode::removeChild(LLXMLNode *target_child)
                     mChildren = nullptr;
                 }
                 return true;
-            }
-            else if (children_itr->first != target_child->mName)
-            {
-                break;
-            }
-            else
-            {
-                ++children_itr;
             }
         }
     }
@@ -530,85 +526,6 @@ void buildNodeTree(const ALXmlDocument& document, LLXMLNode* file_node)
 } // namespace
 
 // static
-bool LLXMLNode::updateNode(
-    LLXMLNodePtr& node,
-    LLXMLNodePtr& update_node)
-{
-
-    if (!node || !update_node)
-    {
-        LL_WARNS() << "Node invalid" << LL_ENDL;
-        return false;
-    }
-
-    //update the node value
-    node->mValue = update_node->mValue;
-
-    //update all attribute values
-    for (auto& [attribNameEntry, updateAttribNode] : update_node->mAttributes)
-    {
-        LLXMLNodePtr attribNode;
-
-        node->getAttribute(attribNameEntry, attribNode, 0);
-
-        if (attribNode)
-        {
-            attribNode->mValue = updateAttribNode->mValue;
-        }
-    }
-
-    //update all of node's children with updateNodes children that match name
-    LLXMLNodePtr child = node->getFirstChild();
-    LLXMLNodePtr last_child = child;
-    LLXMLNodePtr updateChild;
-
-    for (updateChild = update_node->getFirstChild(); updateChild.notNull();
-         updateChild = updateChild->getNextSibling())
-    {
-        while(child.notNull())
-        {
-            std::string nodeName;
-            std::string updateName;
-
-            updateChild->getAttributeString("name", updateName);
-            child->getAttributeString("name", nodeName);
-
-
-            //if it's a combobox there's no name, but there is a value
-            if (updateName.empty())
-            {
-                updateChild->getAttributeString("value", updateName);
-                child->getAttributeString("value", nodeName);
-            }
-
-            if ((nodeName != "") && (updateName == nodeName))
-            {
-                updateNode(child, updateChild);
-                last_child = child;
-                child = child->getNextSibling();
-                if (child.isNull())
-                {
-                    child = node->getFirstChild();
-                }
-                break;
-            }
-
-            child = child->getNextSibling();
-            if (child.isNull())
-            {
-                child = node->getFirstChild();
-            }
-            if (child == last_child)
-            {
-                break;
-            }
-        }
-    }
-
-    return true;
-}
-
-// static
 bool LLXMLNode::parseFile(const std::string& filename, LLXMLNodePtr& node, LLXMLNode* defaults_tree)
 {
     std::string xml = LLFile::getContents(filename);
@@ -740,56 +657,6 @@ bool LLXMLNode::isFullyDefault() const
     }
 
     return false;
-}
-
-// static
-bool LLXMLNode::getLayeredXMLNode(LLXMLNodePtr& root,
-                                  const std::vector<std::string>& paths)
-{
-    if (paths.empty()) return false;
-
-    std::string filename = paths.front();
-    if (filename.empty())
-    {
-        return false;
-    }
-
-    if (!LLXMLNode::parseFile(filename, root, nullptr))
-    {
-        LL_WARNS() << "Problem reading UI description file: " << filename << " " << errno << LL_ENDL;
-        return false;
-    }
-
-    LLXMLNodePtr updateRoot;
-
-    // We've already dealt with the first item, skip that one
-    for (const std::string& layer_filename : paths | std::views::drop(1))
-    {
-        if(layer_filename.empty() || layer_filename == filename)
-        {
-            // no localized version of this file, that's ok, keep looking
-            continue;
-        }
-
-        if (!LLXMLNode::parseFile(layer_filename, updateRoot, nullptr))
-        {
-            LL_WARNS() << "Problem reading localized UI description file: " << layer_filename << LL_ENDL;
-            return false;
-        }
-
-        std::string nodeName;
-        std::string updateName;
-
-        updateRoot->getAttributeString("name", updateName);
-        root->getAttributeString("name", nodeName);
-
-        if (updateName == nodeName)
-        {
-            LLXMLNode::updateNode(root, updateRoot);
-        }
-    }
-
-    return true;
 }
 
 // static
@@ -1067,8 +934,11 @@ bool LLXMLNode::getChild(const LLStringTableEntry* name, LLXMLNodePtr& node, boo
 {
     if (mChildren.notNull())
     {
-        LLXMLChildList::const_iterator child_itr = mChildren->map.find(name);
-        if (child_itr != mChildren->map.end())
+        // The first child of the name in document order: equal keys sit in
+        // insertion order, and lower_bound is the front of the run where
+        // find would land anywhere in it.
+        LLXMLChildList::const_iterator child_itr = mChildren->map.lower_bound(name);
+        if (child_itr != mChildren->map.end() && child_itr->first == name)
         {
             node = (*child_itr).second;
             return true;
@@ -1091,20 +961,11 @@ void LLXMLNode::getChildren(const LLStringTableEntry* name, LLXMLNodeList &child
 {
     if (mChildren.notNull())
     {
-        LLXMLChildList::const_iterator child_itr = mChildren->map.find(name);
-        if (child_itr != mChildren->map.end())
+        auto [child_itr, children_end] = mChildren->map.equal_range(name);
+        for (; child_itr != children_end; ++child_itr)
         {
-            LLXMLChildList::const_iterator children_end = mChildren->map.end();
-            while (child_itr != children_end)
-            {
-                LLXMLNodePtr child = (*child_itr).second;
-                if (name != child->mName)
-                {
-                    break;
-                }
-                children.emplace(child->mName->mString, child);
-                child_itr++;
-            }
+            const LLXMLNodePtr& child = child_itr->second;
+            children.emplace(child->mName->mString, child);
         }
     }
     if (children.size() == 0 && use_default_if_missing && !mDefault.isNull())
@@ -2635,8 +2496,7 @@ U32 LLXMLNode::getChildCount() const
 
 U32 get_rand(U32 max_value)
 {
-    U32 random_num = rand() + ((U32)rand() << 16);
-    return (random_num % max_value);
+    return ll_rand_u32() % max_value;
 }
 
 LLXMLNode *get_rand_node(LLXMLNode *node)

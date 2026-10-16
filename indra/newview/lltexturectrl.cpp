@@ -208,7 +208,7 @@ void LLFloaterTexturePicker::setImageID(const LLUUID& image_id, bool set_selecti
     if( ((mImageAssetID != image_id) || getTentative()) && mActive)
     {
         mNoCopyTextureSelected = false;
-        mViewModel->setDirty(); // *TODO: shouldn't we be using setValue() here?
+        viewModel()->setDirty(); // *TODO: shouldn't we be using setValue() here?
         mImageAssetID = image_id;
 
         if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(mImageAssetID))
@@ -822,7 +822,7 @@ void LLFloaterTexturePicker::draw()
         }
 
         // Draw Tentative Label over the image
-        if( getTentative() && !mViewModel->isDirty() )
+        if( getTentative() && !isDirty() )
         {
             mTentativeLabel->setVisible( true );
             drawChild(mTentativeLabel);
@@ -1087,7 +1087,7 @@ void LLFloaterTexturePicker::onBtnCancel(void* userdata)
     {
         self->mOnFloaterCommitCallback(LLTextureCtrl::TEXTURE_CANCEL, PICKER_UNKNOWN, self->mOriginalImageAssetID, LLUUID::null, LLUUID::null);
     }
-    self->mViewModel->resetDirty();
+    self->resetDirty();
     self->closeFloater();
 }
 
@@ -1150,7 +1150,7 @@ void LLFloaterTexturePicker::onSelectionChange(const std::deque<LLFolderViewItem
                 mNoCopyTextureSelected = true;
             }
             setImageIDFromItem(itemp, false);
-            mViewModel->setDirty(); // *TODO: shouldn't we be using setValue() here?
+            viewModel()->setDirty(); // *TODO: shouldn't we be using setValue() here?
 
             if(!mPreviewSettingChanged)
             {
@@ -1387,7 +1387,7 @@ void LLFloaterTexturePicker::onBakeTextureSelect(LLUICtrl* ctrl, void *user_data
 
     self->setImageID(imageID);
     self->setTentative(false);
-    self->mViewModel->setDirty(); // *TODO: shouldn't we be using setValue() here?
+    self->viewModel()->setDirty(); // *TODO: shouldn't we be using setValue() here?
 
     if (!self->mPreviewSettingChanged)
     {
@@ -1930,7 +1930,7 @@ void LLTextureCtrl::setCanApplyImmediately(bool b)
 
 void LLTextureCtrl::setCanApply(bool can_preview, bool can_apply)
 {
-    LLFloaterTexturePicker* floaterp = dynamic_cast<LLFloaterTexturePicker*>(mFloaterHandle.get());
+    LLFloaterTexturePicker* floaterp = ALViewType::as<LLFloaterTexturePicker>(mFloaterHandle.get());
     if( floaterp )
     {
         floaterp->setCanApply(can_preview, can_apply);
@@ -2069,7 +2069,7 @@ void LLTextureCtrl::showPicker(bool take_focus)
             mInventoryPickType);
         mFloaterHandle = floaterp->getHandle();
 
-        LLFloaterTexturePicker* texture_floaterp = dynamic_cast<LLFloaterTexturePicker*>(floaterp);
+        LLFloaterTexturePicker* texture_floaterp = floaterp->as<LLFloaterTexturePicker>();
         if (texture_floaterp && mOnTextureSelectedCallback)
         {
             texture_floaterp->setTextureSelectedCallback(mOnTextureSelectedCallback);
@@ -2202,12 +2202,12 @@ void LLTextureCtrl::onFloaterCommit(ETexturePickOp op, LLPickerSource source, co
     if( floaterp && getEnabled())
     {
         if (op == TEXTURE_CANCEL)
-            mViewModel->resetDirty();
+            resetDirty();
         // If the "no_commit_on_selection" parameter is set
         // we get dirty only when user presses OK in the picker
         // (i.e. op == TEXTURE_SELECT) or texture changes via DnD.
         else if (mCommitOnSelection || op == TEXTURE_SELECT)
-            mViewModel->setDirty(); // *TODO: shouldn't we be using setValue() here?
+            viewModel()->setDirty(); // *TODO: shouldn't we be using setValue() here?
 
         if(floaterp->isDirty() || asset_id.notNull()) // mModelView->setDirty does not work.
         {
@@ -2265,7 +2265,7 @@ void LLTextureCtrl::onFloaterCommit(ETexturePickOp op, LLPickerSource source, co
 void LLTextureCtrl::setOnTextureSelectedCallback(texture_selected_callback cb)
 {
     mOnTextureSelectedCallback = cb;
-    LLFloaterTexturePicker* floaterp = dynamic_cast<LLFloaterTexturePicker*>(mFloaterHandle.get());
+    LLFloaterTexturePicker* floaterp = ALViewType::as<LLFloaterTexturePicker>(mFloaterHandle.get());
     if (floaterp)
     {
         floaterp->setTextureSelectedCallback(cb);
@@ -2275,7 +2275,7 @@ void LLTextureCtrl::setOnTextureSelectedCallback(texture_selected_callback cb)
 void LLTextureCtrl::setAllowLocalTexture(bool b)
 {
     mAllowLocalTexture = b;
-    LLFloaterTexturePicker* picker_floater = dynamic_cast<LLFloaterTexturePicker*>(mFloaterHandle.get());
+    LLFloaterTexturePicker* picker_floater = ALViewType::as<LLFloaterTexturePicker>(mFloaterHandle.get());
     if (picker_floater)
     {
         picker_floater->setLocalTextureEnabled(mAllowLocalTexture);
@@ -2370,7 +2370,7 @@ bool LLTextureCtrl::handleDragAndDrop(S32 x, S32 y, MASK mask,
             if(doDrop(item))
             {
                 if (!mCommitOnSelection)
-                    mViewModel->setDirty();
+                    viewModel()->setDirty();
 
                 // This removes the 'Multiple' overlay, since
                 // there is now only one texture selected.

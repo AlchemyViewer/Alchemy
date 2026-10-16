@@ -71,15 +71,15 @@
 			<text_editor name="group_money_details_text">
 				Henter...
 			</text_editor>
-			<button label="&lt; Før" label_selected="&lt; Før" name="earlier_details_button" tool_tip="Tilbage"/>
-			<button label="Efter &gt;" label_selected="Efter &gt;" name="later_details_button" tool_tip="Næste"/>
+			<button name="earlier_details_button" tool_tip="Tilbage"/>
+			<button name="later_details_button" tool_tip="Næste"/>
 		</panel>
 		<panel label="SALG" name="group_money_sales_tab">
 			<text_editor name="group_money_sales_text">
 				Henter...
 			</text_editor>
-			<button label="&lt; Før" label_selected="&lt; Før" name="earlier_sales_button" tool_tip="Tilbage"/>
-			<button label="Efter &gt;" label_selected="Efter &gt;" name="later_sales_button" tool_tip="Næste"/>
+			<button name="earlier_sales_button" tool_tip="Tilbage"/>
+			<button name="later_sales_button" tool_tip="Næste"/>
 		</panel>
 	</tab_container>
 </panel>

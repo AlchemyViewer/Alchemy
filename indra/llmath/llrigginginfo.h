@@ -36,7 +36,6 @@
 // isRiggedTo is based on the state of all currently associated rigged meshes
 class alignas(16) LLJointRiggingInfo
 {
-    LL_ALIGN_NEW
 public:
     LLJointRiggingInfo();
     bool isRiggedTo() const;

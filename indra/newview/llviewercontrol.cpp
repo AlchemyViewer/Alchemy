@@ -33,6 +33,7 @@
 #include "llviewercontrol.h"
 
 // Library includes
+#include "alfarplane.h"
 #include "aluniformbuffer.h"
 #include "llwindow.h"   // getGamma()
 
@@ -44,6 +45,7 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llconsole.h"
+#include "llf32uictrl.h"
 #include "lldrawpoolbump.h"
 #include "llfontgl.h"
 #include "lldrawpoolterrain.h"
@@ -72,7 +74,7 @@
 #include "llkeyboard.h"
 #include "llerrorcontrol.h"
 #include "llappviewer.h"
-#include "llvosurfacepatch.h"
+#include "llmemory.h"
 #include "llvowlsky.h"
 #include "alsamplerstate.h"
 #include "llrender.h"
@@ -128,16 +130,65 @@ static bool handleRenderAvatarMouselookChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleMemoryDrawDistanceLimitChanged(const LLSD& newvalue)
+{
+    LLMemory::setSystemMemoryBudgetEnabled(newvalue.asBoolean());
+    return true;
+}
+
 static bool handleRenderFarClipChanged(const LLSD& newvalue)
 {
     if (LLStartUp::getStartupState() >= STATE_STARTED)
     {
-        F32 draw_distance = (F32)newvalue.asReal();
+        F32 draw_distance = ALFarPlane::clampDrawDistance((F32)newvalue.asReal(), LLRender::sReverseZ);
     gAgentCamera.mDrawDistance = draw_distance;
     LLWorld::getInstance()->setLandFarClip(draw_distance);
     return true;
     }
     return false;
+}
+
+namespace
+{
+    // Every draw distance control capped so far, so that a change of depth convention caps them again.
+    std::vector<std::pair<LLHandle<LLF32UICtrl>, LLHandle<LLUICtrl>>> sDrawDistanceControls;
+
+    void apply_draw_distance_cap(LLF32UICtrl* range, LLUICtrl* bound)
+    {
+        const F32 ceiling = ALFarPlane::drawDistanceCeiling(LLRender::sReverseZ);
+        range->setMaxValue(ceiling);
+        // A slider does not take a lower maximum back into the value it shows, and a spinner never
+        // clamps: given the setting held to the ceiling, both show what the draw distance is.
+        if (LLControlVariable* control = bound->getControlVariable())
+        {
+            bound->setValue(llmin((F32)control->getValue().asReal(), ceiling));
+        }
+    }
+
+    // Caps again every draw distance control still alive, for the depth convention now in force.
+    void recap_draw_distance_controls()
+    {
+        std::erase_if(sDrawDistanceControls, [](const auto& c) { return c.first.isDead() || c.second.isDead(); });
+        for (const auto& [range, bound] : sDrawDistanceControls)
+        {
+            apply_draw_distance_cap(range.get(), bound.get());
+        }
+    }
+}
+
+void cap_draw_distance_control(LLF32UICtrl* range, LLUICtrl* bound)
+{
+    apply_draw_distance_cap(range, bound);
+
+    std::erase_if(sDrawDistanceControls, [](const auto& c) { return c.first.isDead() || c.second.isDead(); });
+    for (const auto& [known_range, known_bound] : sDrawDistanceControls)
+    {
+        if (known_range.get() == range)
+        {
+            return;
+        }
+    }
+    sDrawDistanceControls.emplace_back(range->getDerivedHandle<LLF32UICtrl>(), bound->getHandle());
 }
 
 static bool handleTerrainScaleChanged(const LLSD& newvalue)
@@ -265,7 +316,6 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
         gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
     }
-    LLWorld::getInstance()->updateWaterObjects();
     return true;
 }
 
@@ -273,12 +323,6 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
 static bool handleShadowsResized(const LLSD& newvalue)
 {
     gPipeline.requestResizeShadowTexture();
-    return true;
-}
-
-static bool handleWindowResized(const LLSD& newvalue)
-{
-    gPipeline.requestResizeScreenTexture();
     return true;
 }
 
@@ -303,7 +347,10 @@ static bool handleReverseZChanged(const LLSD& newvalue)
     // releases + recreates the GL buffers at the new depth format itself, so -- unlike the
     // emissive case -- do NOT release buffers up front (that would rebuild them at the old
     // format only to have setShaders rebuild them again).
-    return handleSetShaderChanged(newvalue);
+    const bool handled = handleSetShaderChanged(newvalue);
+    // The draw distance ceiling follows the convention setShaders latched; controls already shown take it now.
+    recap_draw_distance_controls();
+    return handled;
 }
 
 static bool handleHalationChanged(const LLSD& newvalue)
@@ -391,11 +438,11 @@ static bool handleAvatarPhysicsLODChanged(const LLSD& newvalue)
 
 static bool handleTerrainLODChanged(const LLSD& newvalue)
 {
-    LLVOSurfacePatch::sLODFactor = (F32)newvalue.asReal();
+    LLDrawPoolTerrain::sLODFactor = (F32)newvalue.asReal();
     //sqaure lod factor to get exponential range of [0,4] and keep
     //a value of 1 in the middle of the detail slider for consistency
     //with other detail sliders (see panel_preferences_graphics1.xml)
-    LLVOSurfacePatch::sLODFactor *= LLVOSurfacePatch::sLODFactor;
+    LLDrawPoolTerrain::sLODFactor *= LLDrawPoolTerrain::sLODFactor;
     return true;
 }
 
@@ -990,19 +1037,25 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "FirstPersonAvatarVisible", handleRenderAvatarMouselookChanged);
     setting_setup_signal_listener(gSavedSettings, "NumpadControl", handleNumpadControlChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFarClip", handleRenderFarClipChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderMemoryDrawDistanceLimit", handleMemoryDrawDistanceLimitChanged);
+    // Listeners only fire on change, so hand LLMemory the starting value.
+    LLMemory::setSystemMemoryBudgetEnabled(gSavedSettings.getBOOL("AlchemyRenderMemoryDrawDistanceLimit"));
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainScale", handleTerrainScaleChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRScale", handlePBRTerrainScaleChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRPlanarSampleCount", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRNormalsEnabled", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderTerrainHexTiling", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterHextile", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterWaves", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderDisableCompute", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "OctreeStaticObjectSizeFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeMaxNodeCapacity", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAlphaDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAttachmentSizeFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "RenderMaxTextureIndex", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderUIBuffer", handleWindowResized);
     setting_setup_signal_listener(gSavedSettings, "RenderDepthOfField", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAUseStencil", handleReleaseGLBufferChanged);
@@ -1046,6 +1099,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeCount", handleReflectionProbeCountChanged);
+    setting_setup_signal_listener(gSavedSettings, "ALProbeSuperSample", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbeDetailChanged);
 #if LL_DARWIN
     setting_setup_signal_listener(gSavedSettings, "RenderAppleUseMultGL", handleAppleUseMultGLChanged);

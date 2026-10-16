@@ -2,8 +2,10 @@
 
 add_library(llmessage STATIC)
 
-target_sources(llmessage
-    PRIVATE
+target_sources(
+  llmessage
+  PRIVATE
+    alnetimpairment.cpp
     llassetstorage.cpp
     llavatarname.cpp
     llavatarnamecache.cpp
@@ -71,145 +73,149 @@ target_sources(llmessage
     patch_dct.cpp
     patch_idct.cpp
     sound_ids.cpp
-    )
-
-target_sources(llmessage
-    PUBLIC
-    FILE_SET HEADERS
-    FILES
-    llassetstorage.h
-    llavatarname.h
-    llavatarnamecache.h
-    llbuffer.h
-    llbufferstream.h
-    llcachename.h
-    llchainio.h
-    llcipher.h
-    llcircuit.h
-    llclassifiedflags.h
-    llcoproceduremanager.h
-    llcorehttputil.h
-    lldatapacker.h
-    lldbstrings.h
-    lldispatcher.h
-    lleventflags.h
-    llexperiencecache.h
-    llextendedstatus.h
-    llfollowcamparams.h
-    llgenericstreamingmessage.h
-    llhost.h
-    llhttpnode.h
-    llhttpnodeadapter.h
-    llhttpsdhandler.h
-    llinstantmessage.h
-    llinvite.h
-    lliobuffer.h
-    lliopipe.h
-    lliosocket.h
-    llioutil.h
-    llloginflags.h
-    llmessagebuilder.h
-    llmessageconfig.h
-    llmessagelog.h
-    llmessagereader.h
-    llmessagetemplate.h
-    llmessagetemplateparser.h
-    llmessagethrottle.h
-    llmsgvariabletype.h
-    llnamevalue.h
-    llpacketack.h
-    llpacketbuffer.h
-    llpacketring.h
-    llpartdata.h
-    llpumpio.h
-    llproxy.h
-    llqueryflags.h
-    llregionflags.h
-    llregionhandle.h
-    llsdappservices.h
-    llsdhttpserver.h
-    llsdmessagebuilder.h
-    llsdmessagereader.h
-    llstoredmessage.h
-    lltaskname.h
-    llteleportflags.h
-    lltemplatemessagebuilder.h
-    lltemplatemessagedispatcher.h
-    lltemplatemessagereader.h
-    llthrottle.h
-    lltransfermanager.h
-    lltransfersourceasset.h
-    lltransfersourcefile.h
-    lltransfertargetfile.h
-    lltransfertargetvfile.h
-    lltrustedmessageservice.h
-    llvehicleparams.h
-    llxfer.h
-    llxfermanager.h
-    llxfer_file.h
-    llxfer_mem.h
-    llxfer_vfile.h
-    llxorcipher.h
-    llzerocode.h
-    machine.h
-    mean_collision_data.h
-    message.h
-    message_prehash.h
-    net.h
-    patch_code.h
-    patch_dct.h
-    sound_ids.h
-    )
-
-target_link_libraries(
-        llmessage
-        PUBLIC
-        llcommon
-        llfilesystem
-        llmath
-        llcorehttp
 )
-target_include_directories( llmessage  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
+
+target_sources(
+  llmessage
+  PUBLIC
+    FILE_SET HEADERS
+      FILES
+        alnetimpairment.h
+        llassetstorage.h
+        llavatarname.h
+        llavatarnamecache.h
+        llbuffer.h
+        llbufferstream.h
+        llcachename.h
+        llchainio.h
+        llcipher.h
+        llcircuit.h
+        llclassifiedflags.h
+        llcoproceduremanager.h
+        llcorehttputil.h
+        lldatapacker.h
+        lldbstrings.h
+        lldispatcher.h
+        lleventflags.h
+        llexperiencecache.h
+        llextendedstatus.h
+        llfollowcamparams.h
+        llgenericstreamingmessage.h
+        llhost.h
+        llhttpnode.h
+        llhttpnodeadapter.h
+        llhttpsdhandler.h
+        llinstantmessage.h
+        llinvite.h
+        lliobuffer.h
+        lliopipe.h
+        lliosocket.h
+        llioutil.h
+        llloginflags.h
+        llmessagebuilder.h
+        llmessageconfig.h
+        llmessagelog.h
+        llmessagereader.h
+        llmessagetemplate.h
+        llmessagetemplateparser.h
+        llmessagethrottle.h
+        llmsgvariabletype.h
+        llnamevalue.h
+        llpacketack.h
+        llpacketbuffer.h
+        llpacketring.h
+        llpartdata.h
+        llpumpio.h
+        llproxy.h
+        llqueryflags.h
+        llregionflags.h
+        llregionhandle.h
+        llsdappservices.h
+        llsdhttpserver.h
+        llsdmessagebuilder.h
+        llsdmessagereader.h
+        llstoredmessage.h
+        lltaskname.h
+        llteleportflags.h
+        lltemplatemessagebuilder.h
+        lltemplatemessagedispatcher.h
+        lltemplatemessagereader.h
+        llthrottle.h
+        lltransfermanager.h
+        lltransfersourceasset.h
+        lltransfersourcefile.h
+        lltransfertargetfile.h
+        lltransfertargetvfile.h
+        lltrustedmessageservice.h
+        llvehicleparams.h
+        llxfer.h
+        llxfermanager.h
+        llxfer_file.h
+        llxfer_mem.h
+        llxfer_vfile.h
+        llxorcipher.h
+        llzerocode.h
+        machine.h
+        mean_collision_data.h
+        message.h
+        message_prehash.h
+        net.h
+        patch_code.h
+        patch_dct.h
+        sound_ids.h
+)
+
+target_link_libraries(llmessage PRIVATE al::flags PUBLIC llcommon llfilesystem llmath llcorehttp)
 target_precompile_headers(llmessage REUSE_FROM llprecompiled)
 
 # tests
-if (BUILD_TESTING)
-  SET(llmessage_TEST_SOURCE_FILES
-    llcoproceduremanager.cpp
-    llnamevalue.cpp
-    lltrustedmessageservice.cpp
-    lltemplatemessagedispatcher.cpp
+if(AL_BUILD_TESTS)
+  # These three stand in for parts of llmessage and llcorehttp with stubs of
+  # their own, so they build their one file and do not link llmessage.
+  foreach(test llcoproceduremanager lltrustedmessageservice lltemplatemessagedispatcher)
+    al_add_test_binary(
+      ${test}_test
+      PROJECT llmessage
+      SOURCES tests/${test}_test.cpp
+      UNIT ${test}.cpp
+      LIBRARIES llmath llcorehttp llcommon
     )
-  set_property( SOURCE ${llmessage_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_LIBRARIES llmath llcorehttp)
-  LL_ADD_PROJECT_UNIT_TESTS(llmessage "${llmessage_TEST_SOURCE_FILES}")
+  endforeach()
 
-  #    set(TEST_DEBUG on)
+  # The state guard's checks on what llmessage keeps for the process, for
+  # every test binary that links it.
+  add_library(llmessage_test_checks OBJECT tests/llmessage_test_checks.cpp)
+  target_link_libraries(llmessage_test_checks PRIVATE al::flags al_test_support llmessage)
+  set_target_properties(llmessage_test_checks PROPERTIES FOLDER "Tests/llmessage")
 
-  set(test_libs
-          llfilesystem
-          llmath
-          llcorehttp
-          llmessage
-          llcommon
-          )
+  # io_test's pipes, which are not tests of their own.
+  add_library(llmessage_test_pipes OBJECT tests/llpipeutil.cpp)
+  target_link_libraries(llmessage_test_pipes PRIVATE al::flags llmessage)
+  set_target_properties(llmessage_test_pipes PROPERTIES FOLDER "Tests/llmessage")
 
-  set(test_project llmessage)
-
-  LL_ADD_INTEGRATION_TEST(io "tests/llpipeutil.cpp" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llavatarnamecache "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llbuffer "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lldatapacker "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llhost "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llhttpnode "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsdmessagebuilder "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsdmessagereader "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llmessageconfig "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llmessagetemplateparser "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llpartdata "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lltemplatemessagebuilder "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llxfer_file "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llxorcipher "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llzerocode "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(message "" "${test_libs}" "${test_project}")
-endif ()
-
+  al_add_test_binary(
+    llmessage_tests
+    PROJECT llmessage
+    SOURCES
+      tests/alnetimpairment_test.cpp
+      tests/io_test.cpp
+      tests/llavatarnamecache_test.cpp
+      tests/llbuffer_test.cpp
+      tests/lldatapacker_test.cpp
+      tests/llhost_test.cpp
+      tests/llhttpnode_test.cpp
+      tests/llmessageconfig_test.cpp
+      tests/llmessagetemplateparser_test.cpp
+      tests/llnamevalue_test.cpp
+      tests/llpartdata_test.cpp
+      tests/llsdmessagebuilder_test.cpp
+      tests/llsdmessagereader_test.cpp
+      tests/lltemplatemessagebuilder_test.cpp
+      tests/llxfer_file_test.cpp
+      tests/llxorcipher_test.cpp
+      tests/llzerocode_test.cpp
+      tests/message_test.cpp
+    LIBRARIES llfilesystem llmath llcorehttp llmessage llcommon
+    SUPPORT llmessage_test_checks llmessage_test_pipes
+  )
+endif()

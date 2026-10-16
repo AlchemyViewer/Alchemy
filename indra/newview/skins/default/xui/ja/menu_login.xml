@@ -7,19 +7,16 @@
 		<menu_item_call label="[APP_NAME]を終了" name="Quit"/>
 	</menu>
 	<menu label="ヘルプ" name="Help">
-		<menu_item_call label="ハウツー…" name="How To"/>
 		<menu_item_call label="Second Lifeナレッジベース" name="Knowledge Base"/>
 		<menu_item_call label="Second Life Wiki" name="Wiki"/>
 		<menu_item_call label="Second Lifeコミュニティフォーラム" name="Community Forums"/>
 		<menu_item_call label="Second Lifeサポートポータル" name="Support portal"/>
 		<menu_item_call label="Second Lifeブログ" name="Second Life Blogs"/>
-		<menu_item_call label="Second Lifeのバグ報告" name="Report Bug"/>
 		<menu_item_call label="[APP_NAME]について" name="About Second Life"/>
 	</menu>
 	<menu_item_check label="デバッグメニューを表示する" name="Show Debug Menu"/>
 	<menu label="デバッグ" name="Debug">
 		<menu_item_call label="デバッグ設定を表示" name="Debug Settings"/>
-		<menu_item_call label="ＸＵＩプレビューツール" name="UI Preview Tool"/>
 		<menu_item_call label="色の設定" name="Color Settings"/>
 		<menu label="フォント" name="Fonts">
 			<menu_item_call label="フォントテストを表示" name="Show Font Test"/>

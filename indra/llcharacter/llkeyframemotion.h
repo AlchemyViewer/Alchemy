@@ -32,13 +32,18 @@
 //-----------------------------------------------------------------------------
 
 #include <string>
+#include <vector>
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include "llassetstorage.h"
 #include "llbboxlocal.h"
 #include "llhandmotion.h"
 #include "lljointstate.h"
 #include "llmotion.h"
+#include "llpointer.h"
 #include "llquaternion.h"
+#include "llrefcount.h"
 #include "v3dmath.h"
 #include "v3math.h"
 #include "llbvhconsts.h"
@@ -46,7 +51,17 @@
 class LLKeyframeDataCache;
 class LLDataPacker;
 
-#define MIN_REQUIRED_PIXEL_AREA_KEYFRAME (40.f)
+// Below this the controller fades the motion out and stops updating it, and
+// the joints keep the pose they were left in -- so this is the size at which
+// an avatar stops moving and stands still instead. Six pixels on a side is
+// small enough that there is nothing left to see standing still.
+//
+// It was briefly 500, the same as head turning, on the reasoning that the one
+// motion writing most of the skeleton should not outlast the cheap ones. That
+// is twenty-two pixels on a side, which is an avatar you can make out in a
+// crowd, and freezing it is the most visible thing this subsystem can do. The
+// cost belongs somewhere the eye cannot find it.
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_KEYFRAME = 40.f;
 #define MAX_CHAIN_LENGTH (4)
 
 const S32 KEYFRAME_MOTION_VERSION = 1;
@@ -142,12 +157,12 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();
 
-    virtual void setStopTime(F32 time);
+    virtual void setStopTime(F64 time);
 
     static void onLoadComplete(const LLUUID& asset_uuid,
                                LLAssetType::EType type,
@@ -157,7 +172,7 @@ public:
     U32     getFileSize();
     bool    serialize(LLDataPacker& dp) const;
     bool    deserialize(LLDataPacker& dp, const LLUUID& asset_id, bool allow_invalid_joints = true);
-    bool    isLoaded() { return mJointMotionList != NULL; }
+    bool    isLoaded() { return mJointMotionList.notNull(); }
     bool    dumpToFile(const std::string& name);
 
 
@@ -173,6 +188,8 @@ public:
     }
 
     void setLoopIn(F32 in_point);
+    // Recomputes every curve's loop tail from the current loop settings.
+    void setupLoopSeams();
 
     void setLoopOut(F32 out_point);
 
@@ -259,7 +276,7 @@ protected:
         F32                         mFixupDistanceRMS;
     };
 
-    void applyKeyframes(F32 time);
+    void applyKeyframes(F32 time, const U8* joint_mask);
 
     void applyConstraints(F32 time, U8* joint_mask);
 
@@ -279,99 +296,70 @@ public:
     enum InterpolationType { IT_STEP, IT_LINEAR, IT_SPLINE };
 
     //-------------------------------------------------------------------------
-    // ScaleKey
+    // KeyCurve
     //-------------------------------------------------------------------------
-    class ScaleKey
+    // One channel of one joint: its keys sorted by time and unique in it, the
+    // times in an array of their own so a search reads nothing else. A curve
+    // is shared by every avatar playing the animation, so the cursor that
+    // makes a run of nearby samples cheap belongs to the caller.
+    template <typename T>
+    class KeyCurve
     {
     public:
-        ScaleKey() { mTime = 0.0f; }
-        ScaleKey(F32 time, const LLVector3 &scale) { mTime = time; mScale = scale; }
+        // Adds a key, or replaces the one already at this time.
+        void setKey(F32 time, const T& value);
 
-        F32         mTime;
-        LLVector3   mScale;
+        U32 getNumKeys() const { return static_cast<U32>(mTimes.size()); }
+        F32 getKeyTime(U32 index) const { return mTimes[index]; }
+        const T& getKeyValue(U32 index) const { return mValues[index]; }
+
+        // The nearest key outside the keyed range, the key itself on one,
+        // otherwise the two neighbours blended.
+        T getValue(F32 time) const;
+        // The same, remembering where the sample landed so that the next one
+        // nearby is placed in a compare or two. Any cursor is safe to pass,
+        // including a stale one.
+        T getValue(F32 time, U32& cursor) const;
+
+        // Where a looping animation goes when its keys run out before its loop
+        // does: the stretch from the last key to the loop out point leads back
+        // to the pose the loop starts from, rather than holding still and then
+        // arriving there in one frame. Called with the loop off, or with a
+        // loop that ends on a key, it takes the tail away again.
+        void setLoopSeam(bool looping, F32 loop_in_time, F32 loop_out_time);
+
+        InterpolationType   mInterpolationType = IT_LINEAR;
+
+    private:
+        // The first key at or after the time, or the key count when none is.
+        U32 findKey(F32 time, U32 hint) const;
+
+        std::vector<F32>    mTimes;
+        std::vector<T>      mValues;
+
+        T                   mLoopInValue {};
+        F32                 mLoopOutTime = 0.f;
+        bool                mLoopSeam = false;
     };
 
+    // Held in the vector forms, which is what a joint state takes: a sample
+    // goes from the curve into a joint state once per channel per joint per
+    // playing motion per frame, and through the scalar types that was a store
+    // on the way out of the blend and a load on the way into the state.
+    typedef KeyCurve<LLVector4a>    ScaleCurve;
+    typedef KeyCurve<LLQuaternion2> RotationCurve;
+    typedef KeyCurve<LLVector4a>    PositionCurve;
+
     //-------------------------------------------------------------------------
-    // RotationKey
+    // KeyCursors
     //-------------------------------------------------------------------------
-    class RotationKey
+    // Where a joint's three channels were last sampled, kept by the motion
+    // instance playing them.
+    struct KeyCursors
     {
-    public:
-        RotationKey() { mTime = 0.0f; }
-        RotationKey(F32 time, const LLQuaternion &rotation) { mTime = time; mRotation = rotation; }
-
-        F32             mTime;
-        LLQuaternion    mRotation;
-    };
-
-    //-------------------------------------------------------------------------
-    // PositionKey
-    //-------------------------------------------------------------------------
-    class PositionKey
-    {
-    public:
-        PositionKey() { mTime = 0.0f; }
-        PositionKey(F32 time, const LLVector3 &position) { mTime = time; mPosition = position; }
-
-        F32         mTime;
-        LLVector3   mPosition;
-    };
-
-    //-------------------------------------------------------------------------
-    // ScaleCurve
-    //-------------------------------------------------------------------------
-    class ScaleCurve
-    {
-    public:
-        ScaleCurve();
-        ~ScaleCurve();
-        LLVector3 getValue(F32 time, F32 duration);
-        LLVector3 interp(F32 u, ScaleKey& before, ScaleKey& after);
-
-        InterpolationType   mInterpolationType;
-        S32                 mNumKeys;
-        typedef std::map<F32, ScaleKey> key_map_t;
-        key_map_t           mKeys;
-        ScaleKey            mLoopInKey;
-        ScaleKey            mLoopOutKey;
-    };
-
-    //-------------------------------------------------------------------------
-    // RotationCurve
-    //-------------------------------------------------------------------------
-    class RotationCurve
-    {
-    public:
-        RotationCurve();
-        ~RotationCurve();
-        LLQuaternion getValue(F32 time, F32 duration);
-        LLQuaternion interp(F32 u, RotationKey& before, RotationKey& after);
-
-        InterpolationType   mInterpolationType;
-        S32                 mNumKeys;
-        typedef std::map<F32, RotationKey> key_map_t;
-        key_map_t       mKeys;
-        RotationKey     mLoopInKey;
-        RotationKey     mLoopOutKey;
-    };
-
-    //-------------------------------------------------------------------------
-    // PositionCurve
-    //-------------------------------------------------------------------------
-    class PositionCurve
-    {
-    public:
-        PositionCurve();
-        ~PositionCurve();
-        LLVector3 getValue(F32 time, F32 duration);
-        LLVector3 interp(F32 u, PositionKey& before, PositionKey& after);
-
-        InterpolationType   mInterpolationType;
-        S32                 mNumKeys;
-        typedef std::map<F32, PositionKey> key_map_t;
-        key_map_t       mKeys;
-        PositionKey     mLoopInKey;
-        PositionKey     mLoopOutKey;
+        U32 mScale = 0;
+        U32 mRotation = 0;
+        U32 mPosition = 0;
     };
 
     //-------------------------------------------------------------------------
@@ -387,16 +375,21 @@ public:
         U32             mUsage;
         LLJoint::JointPriority  mPriority;
 
-        void update(LLJointState* joint_state, F32 time, F32 duration);
+        void update(LLJointState* joint_state, F32 time, KeyCursors& cursors);
     };
 
     //-------------------------------------------------------------------------
     // JointMotionList
     //-------------------------------------------------------------------------
-    class JointMotionList
+    // Held by the cache and by every motion playing it, so it goes when the
+    // last of them lets go rather than when the first of them does.
+    class JointMotionList : public LLRefCount
     {
     public:
-        std::vector<JointMotion*> mJointMotionArray;
+        // The joints an animation writes, in one block. Every playing
+        // instance walks all of them every frame, and one heap allocation
+        // each turned that walk into a chase across the heap.
+        std::vector<JointMotion> mJointMotionArray;
         F32                     mDuration;
         bool                    mLoop;
         F32                     mLoopInPoint;
@@ -410,8 +403,6 @@ public:
         constraint_list_t       mConstraints;
         LLBBoxLocal             mPelvisBBox;
         // mEmoteName is a facial motion, but it's necessary to appear here so that it's cached.
-        // TODO: LLKeyframeDataCache::getKeyframeData should probably return a class containing
-        // JointMotionList and mEmoteName, see LLKeyframeMotion::onInitialize.
         std::string             mEmoteName;
         LLUUID                  mEmoteID;
 
@@ -419,19 +410,20 @@ public:
         JointMotionList();
         ~JointMotionList();
         U32 dumpDiagInfo();
-        JointMotion* getJointMotion(U32 index) const { llassert(index < mJointMotionArray.size()); return mJointMotionArray[index]; }
+        JointMotion* getJointMotion(U32 index) { llassert(index < mJointMotionArray.size()); return &mJointMotionArray[index]; }
         U32 getNumJointMotions() const { return static_cast<U32>(mJointMotionArray.size()); }
     };
 
 protected:
-    JointMotionList*                mJointMotionList;
+    LLPointer<JointMotionList>      mJointMotionList;
     std::vector<LLPointer<LLJointState> > mJointStates;
+    std::vector<KeyCursors>         mKeyCursors;
     LLJoint*                        mPelvisp;
     LLCharacter*                    mCharacter;
     typedef std::list<JointConstraint*> constraint_list_t;
     constraint_list_t               mConstraints;
     U32                             mLastSkeletonSerialNum;
-    F32                             mLastUpdateTime;
+    F64                             mLastUpdateTime;    // onUpdate()'s time, since activation
     F32                             mLastLoopedTime;
     AssetStatus                     mAssetStatus;
 
@@ -439,20 +431,27 @@ public:
     void setCharacter(LLCharacter* character) { mCharacter = character; }
 };
 
+// Every animation any character has played is kept here so that playing it
+// again costs nothing. Nothing is owned outright: an entry goes when the cache
+// and every motion holding it have all let go.
 class LLKeyframeDataCache
 {
 public:
-    // *FIX: implement this as an actual singleton member of LLKeyframeMotion
-    LLKeyframeDataCache(){};
-    ~LLKeyframeDataCache();
+    LLKeyframeDataCache() = delete;
 
-    typedef std::map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t;
+    typedef boost::unordered_flat_map<LLUUID, LLPointer<LLKeyframeMotion::JointMotionList>> keyframe_data_map_t;
     static keyframe_data_map_t sKeyframeDataMap;
 
     static void addKeyframeData(const LLUUID& id, LLKeyframeMotion::JointMotionList*);
     static LLKeyframeMotion::JointMotionList* getKeyframeData(const LLUUID& id);
 
     static void removeKeyframeData(const LLUUID& id);
+
+    // Drops every entry no motion is still holding. What is left is what some
+    // character can still play without fetching it again.
+    static void purge();
+
+    static size_t size() { return sKeyframeDataMap.size(); }
 
     //print out diagnostic info
     static void dumpDiagInfo();

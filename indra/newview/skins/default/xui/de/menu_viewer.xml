@@ -2,27 +2,12 @@
 <menu_bar name="Main Menu">
 	<menu label="Ich" name="Me">
 		<menu_item_call label="Profil..." name="Profile"/>
-		<menu_item_call label="Aussehen..." name="ChangeOutfit"/>
-		<menu_item_call label="Avatar auswählen..." name="Avatar Picker"/>
 		<menu_item_check label="Inventar..." name="Inventory"/>
 		<menu_item_call label="Neues Inventarfenster" name="NewInventoryWindow"/>
 		<menu_item_call label="Orte..." name="Places"/>
 		<menu_item_call label="Auswahlen..." name="Picks"/>
 		<menu_item_call label="Erlebnisse..." name="Experiences"/>
-		<menu_item_call label="Meine Skripte..." name="MyScripts"/>
 		<menu_item_call label="Kamerasteuerungen..." name="Camera Controls"/>
-		<menu label="Bewegung" name="Movement">
-			<menu_item_call label="Hinsetzen" name="Sit Down Here"/>
-			<menu_item_call label="Aufstehen" name="Stand up"/>
-			<menu_item_check label="Fliegen" name="Fly"/>
-			<menu_item_check label="Immer rennen" name="Always Run"/>
-			<menu_item_call label="Animation meines Avatars stoppen" name="Stop Animating My Avatar"/>
-			<menu_item_call label="Gehen/Rennen/Fliegen..." name="WalkRunFly"/>
-		</menu>
-		<menu label="Status" name="Status">
-			<menu_item_check label="Abwesend" name="Away"/>
-			<menu_item_check label="Nicht stören" name="Do Not Disturb"/>
-		</menu>
 		<menu_item_call label="L$ kaufen..." name="Buy and Sell L$"/>
 		<menu_item_call label="Marktplatz-Auflistungen..." name="MarketplaceListings"/>
 		<menu_item_call label="Kontoübersicht..." name="Manage My Account">
@@ -33,6 +18,8 @@
 		<menu_item_call label="Alle Steuerelemente ausblenden" name="Hide UI"/>
 		<menu_item_check label="HUD-Anhänge anzeigen" name="Show HUD Attachments"/>
 		<menu_item_call label="[APP_NAME] schließen" name="Quit"/>
+		<menu_item_check label="Nicht stören" name="Do Not Disturb"/>
+		<menu_item_check label="Abwesend" name="Away"/>
 	</menu>
 	<menu label="Unterhalten" name="Communicate">
 		<menu_item_check label="Unterhaltungen..." name="Conversations"/>
@@ -40,9 +27,6 @@
 		<menu_item_check label="Sprechen" name="Speak"/>
 		<menu_item_check label="Unterhaltungsprotokoll..." name="Conversation Log..."/>
 		<menu_item_check label="Chat-Benachrichtigungen..." name="Chat Alerts"/>
-		<menu_item_call label="Facebook..." name="Facebook"/>
-		<menu_item_call label="Twitter..." name="Twitter"/>
-		<menu_item_call label="Flickr..." name="Flickr"/>
 		<menu_item_check label="Gesten..." name="Gestures"/>
 		<menu_item_check label="Freunde" name="My Friends"/>
 		<menu_item_check label="Gruppen" name="My Groups"/>
@@ -66,7 +50,6 @@
 		<menu_item_call label="Mein Landbesitz..." name="My Land"/>
 		<menu_item_call label="Dieses Land kaufen" name="Buy Land"/>
 		<menu label="Anzeigen" name="LandShow">
-			<menu_item_check label="Bannlinien" name="Ban Lines"/>
 			<menu_item_check label="Strahlen" name="beacons"/>
 			<menu_item_check label="Grundstücksgrenzen" name="Property Lines"/>
 			<menu_item_check label="Landeigentümer" name="Land Owners"/>
@@ -83,6 +66,11 @@
 			<menu_item_call label="Meine Umgebungen..." name="my_environs"/>
 			<menu_item_call label="Persönliche Beleuchtung..." name="adjustment_tool"/>
 			<menu_item_check label="Wolken pausieren" name="pause_clouds"/>
+		</menu>
+		<menu name="Zoom menu">
+			<menu_item_call label="Hineinzoomen" name="Zoom In"/>
+			<menu_item_call label="Zoom-Standard" name="Zoom Default"/>
+			<menu_item_call label="Wegzoomen" name="Zoom Out"/>
 		</menu>
 	</menu>
 	<menu label="Bauen" name="BuildTools">
@@ -142,6 +130,7 @@
 			<menu_item_call label="Auswahl für Raster verwenden" name="Use Selection for Grid"/>
 			<menu_item_call label="Rasteroptionen..." name="Grid Options"/>
 			<menu_item_call label="Standard-Berechtigungen einstellen..." name="Set default permissions"/>
+			<menu_item_check label="Durchsichtig hervorheben" name="Highlight Transparent"/>
 		</menu>
 		<menu label="Hochladen" name="Upload">
 			<menu_item_call label="Bild ([COST] L$)..." name="Upload Image"/>
@@ -154,16 +143,12 @@
 		<menu_item_call label="Wiederholen" name="Redo"/>
 	</menu>
 	<menu label="Hilfe" name="Help">
-		<menu_item_call label="Anweisungen..." name="How To"/>
-		<menu_item_call label="Kurzanleitung" name="Quickstart"/>
 		<menu_item_call label="Knowledge Base" name="Knowledge Base"/>
 		<menu_item_call label="Wiki" name="Wiki"/>
 		<menu_item_call label="Community-Foren" name="Community Forums"/>
 		<menu_item_call label="Support-Portal" name="Support portal"/>
-		<menu_item_call label="[SECOND_LIFE]-Neuigkeiten" name="Second Life News"/>
 		<menu_item_call label="[SECOND_LIFE]-Blogs" name="Second Life Blogs"/>
 		<menu_item_call label="Missbrauch melden" name="Report Abuse"/>
-		<menu_item_call label="Fehler melden" name="Report Bug"/>
 		<menu_item_call label="Rempler, Stöße &amp; Schläge" name="Bumps, Pushes &amp;amp; Hits"/>
 		<menu_item_call label="INFO ÜBER [APP_NAME]" name="About Second Life"/>
 	</menu>
@@ -185,7 +170,6 @@
       <menu_item_check label="OOC Chat erlauben" name="Allow OOC Chat" />
       <menu_item_check label="Senden an #RLV verbieten" name="Forbid Give to #RLV" />
       <menu_item_check label="Gefilterten Chat anzeigen" name="Show Filtered Chat" />
-      <menu_item_check label="Namensschilder anzeigen" name="Show Name Tags" />
       <menu_item_check label="Anziehen ersetzt unverschlossenes" name="Wear Replaces Unlocked" />
       <menu_item_check label="Einschränkungen..." name="Restrictions" />
       <menu_item_check label="Nachrichten..." name="Strings" />
@@ -209,7 +193,6 @@
 			<menu_item_check label="Pulsierender Strahl" name="Cheesy Beacon"/>
 			<menu_item_check label="Partikel ausblenden" name="Hide Particles"/>
 			<menu_item_check label="Auswahl ausblenden" name="Hide Selected"/>
-			<menu_item_check label="Durchsichtig hervorheben" name="Highlight Transparent"/>
 			<menu_item_check label="Fadenkreuz für Mouselook anzeigen" name="ShowCrosshairs"/>
 		</menu>
 		<menu label="Darstellungstypen" name="Rendering Types">
@@ -220,7 +203,6 @@
 			<menu_item_check label="Flächenpatch" name="Rendering Type Surface Patch"/>
 			<menu_item_check label="Himmel" name="Rendering Type Sky"/>
 			<menu_item_check label="Wasser" name="Rendering Type Water"/>
-			<menu_item_check label="Boden" name="Rendering Type Ground"/>
 			<menu_item_check label="Volumen" name="Rendering Type Volume"/>
 			<menu_item_check label="Gras" name="Rendering Type Grass"/>
 			<menu_item_check label="Wolken" name="Rendering Type Clouds"/>
@@ -242,7 +224,6 @@
 		<menu_item_check label="Weiche Mausbewegung" name="Mouse Smoothing"/>
 		<menu_item_call label="Tasten freigeben" name="Release Keys"/>
 		<menu label="Tastaturkürzel" name="Shortcuts">
-			<menu_item_check label="Erweitert-Menü anzeigen - veraltetet" name="Show Advanced Menu - legacy shortcut"/>
 			<menu_item_call label="Fenster schließen" name="Close Window"/>
 			<menu_item_call label="Alle Fenster schließen" name="Close All Windows"/>
 			<menu_item_call label="Foto auf Datenträger" name="Snapshot to Disk"/>
@@ -250,9 +231,6 @@
 			<menu_item_check label="Joystick-Flycam" name="Joystick Flycam"/>
 			<menu_item_call label="Ansicht zurücksetzen" name="Reset View"/>
 			<menu_item_call label="Letzten Chatter ansehen" name="Look at Last Chatter"/>
-			<menu_item_call label="Hineinzoomen" name="Zoom In"/>
-			<menu_item_call label="Zoom-Standard" name="Zoom Default"/>
-			<menu_item_call label="Wegzoomen" name="Zoom Out"/>
 		</menu>
 		<menu_item_call label="Debug-Einstellungen anzeigen" name="Debug Settings"/>
 		<menu_item_check label="Menü „Entwickler“ anzeigen" name="Debug Mode"/>
@@ -261,12 +239,9 @@
 		<menu label="Konsolen" name="Consoles">
 			<menu_item_check label="Textur" name="Texture Console"/>
 			<menu_item_check label="Fehler beseitigen" name="Debug Console"/>
-			<menu_item_call label="Meldungen" name="Notifications"/>
 			<menu_item_check label="Regions-Debug-Konsole" name="Region Debug Console"/>
-			<menu_item_check label="Speicher" name="Memory"/>
 			<menu_item_check label="Szenestatistiken" name="Scene Statistics"/>
 			<menu_item_check label="Monitor zum Laden von Szenen" name="Scene Loading Monitor"/>
-			<menu_item_call label="Debug-Konsole für Texturabruffehler" name="Texture Fetch Debug Console"/>
 			<menu_item_call label="Info zu Region in Fenster Fehler beseitigen" name="Region Info to Debug Console"/>
 			<menu_item_call label="Gruppeninfo in Fenster Fehler beseitigen" name="Group Info to Debug Console"/>
 			<menu_item_call label="Info zu Fähigkeiten in Fenster Fehler beseitigen" name="Capabilities Info to Debug Console"/>
@@ -284,6 +259,7 @@
 			<menu_item_check label="Farbe unter Cursor anzeigen" name="Show Color Under Cursor"/>
 			<menu_item_check label="Speicher anzeigen" name="Show Memory"/>
 			<menu_item_check label="Akutalisierungen an Objekten anzeigen" name="Show Updates"/>
+			<menu_item_check name="Show Avatar Render Info" label="Avatar-Renderinfo anzeigen"/>
 		</menu>
 		<menu label="Fehler erzwingen" name="Force Errors">
 			<menu_item_call label="Haltepunkt erzwingen" name="Force Breakpoint"/>
@@ -299,7 +275,6 @@
 			<menu_item_check label="Kamera-Versatz" name="Camera Offset"/>
 			<menu_item_check label="Framerate randomisieren" name="Randomize Framerate"/>
 			<menu_item_check label="Periodic Slow Frame" name="Periodic Slow Frame"/>
-			<menu_item_check label="Frame-Test" name="Frame Test"/>
 			<menu_item_call label="Rahmenprofil" name="Frame Profile"/>
 			<menu_item_call label="Benchmark" name="Benchmark"/>
 		</menu>
@@ -318,7 +293,6 @@
 			<menu_item_check label="Oberflächenbereich" name="Face Area"/>
 			<menu_item_check label="Detailstufeninfos" name="LOD Info"/>
 			<menu_item_check label="Dreieckszähler" name="Triangle Count"/>
-			<menu_item_check label="Konstruktionswarteschlange" name="Build Queue"/>
 			<menu_item_check label="Lichter" name="Lights"/>
 			<menu_item_check label="Partikel" name="Particles"/>
 			<menu_item_check label="Gelenkpunkte" name="Collision Skeleton"/>
@@ -340,7 +314,6 @@
 			<menu_item_call label="Ausgewählte Materialinfos" name="Selected Material Info"/>
 			<menu_item_check label="Wireframe" name="Wireframe"/>
 			<menu_item_check label="Objekt-Objekt Okklusion" name="Object-Object Occlusion"/>
-			<menu_item_check label="Erweitertes Beleuchtungsmodell" name="Advanced Lighting Model"/>
 			<menu_item_check label="Schatten von Sonne-/Mond-Projektoren" name="Shadows from Sun/Moon/Projectors"/>
 			<menu_item_check label="SSAO und Schattenglättung" name="SSAO and Shadow Smoothing"/>
 			<menu_item_check label="Fehler in GL beseitigen" name="Debug GL"/>
@@ -349,13 +322,9 @@
 			<menu_item_check label="Automatische Alpha-Masken (nicht aufgeschoben)" name="Automatic Alpha Masks (non-deferred)"/>
 			<menu_item_check label="Animationstexturen" name="Animation Textures"/>
 			<menu_item_check label="Texturen deaktivieren" name="Disable Textures"/>
-			<menu_item_check label="Umgebung deaktivieren" name="Disable Ambient"/>
-			<menu_item_check label="Sonnenlicht deaktivieren" name="Disable Sunlight"/>
-			<menu_item_check label="Lokale Lichtquellen deaktivieren" name="Disable Local Lights"/>
 			<menu_item_check label="Voll-Res-Texturen" name="Rull Res Textures"/>
 			<menu_item_check label="Angehängte Lichter rendern" name="Render Attached Lights"/>
 			<menu_item_check label="Angehängte Partikel rendern" name="Render Attached Particles"/>
-			<menu_item_check label="Leucht-Objekte schweben lassen" name="Hover Glow Objects"/>
 			<menu_item_call label="Cache sofort leeren" name="Cache Clear"/>
 		</menu>
 		<menu label="Netzwerk" name="Network">
@@ -383,7 +352,6 @@
 			<menu_item_call label="Medienbrowser" name="Media Browser"/>
 			<menu_item_call label="SelectMgr ausgeben" name="Dump SelectMgr"/>
 			<menu_item_call label="Inventarinfo ausgeben" name="Dump Inventory"/>
-			<menu_item_call label="Timer ausgeben" name="Dump Timers"/>
 			<menu_item_call label="Fokus ausgeben" name="Dump Focus Holder"/>
 			<menu_item_call label="Ausgewählte Objektinfo drucken" name="Print Selected Object Info"/>
 			<menu_item_call label="Agent-Info drucken" name="Print Agent Info"/>
@@ -394,6 +362,7 @@
 			<menu_item_check label="Fehler in Maus-Events beseitigen" name="Debug Mouse Events"/>
 			<menu_item_check label="Fehler in Keys beseitigen" name="Debug Keys"/>
 			<menu_item_check label="Fehler in WindowProc beseitigen" name="Debug WindowProc"/>
+			<menu_item_call name="FB Connect Test" label="FB-Verbindungsprüfung"/>
 		</menu>
 		<menu label="XUI" name="XUI">
 			<menu_item_call label="Farbeinstellungen neu laden" name="Reload Color Settings"/>
@@ -421,7 +390,6 @@
 			<menu_item_check label="Animations-Info" name="Animation Info"/>
 			<menu_item_check label="Kamerafokus anzeigen" name="Show Look At"/>
 			<menu_item_check label="Klickpunkt anzeigen??" name="Show Point At"/>
-			<menu_item_check label="Fehler in Landaktualisierung beseitigen" name="Debug Joint Updates"/>
 			<menu_item_check label="LOD deaktiveren" name="Disable LOD"/>
 			<menu_item_check label="Fehler für sichtbare Agenten beseitigen" name="Debug Character Vis"/>
 			<menu_item_check label="Gelenkpunkte anzeigen" name="Show Collision Skeleton"/>
@@ -431,10 +399,14 @@
 			<menu_item_call label="Anhänge ausgeben" name="Dump Attachments"/>
 			<menu_item_call label="Fehler in Avatar-Texturen beseitigen" name="Debug Avatar Textures"/>
 			<menu_item_call label="Lokale Texturen ausgeben" name="Dump Local Textures"/>
+			<menu name="Animation Speed" label="Animationsgeschwindigkeit">
+				<menu_item_check name="Slow Motion Animations" label="Zeitlupen-Animationen"/>
+				<menu_item_call name="Reset All Animation Speed" label="Alle Animationsgeschwindigkeiten zurücksetzen"/>
+				<menu_item_call name="All Animations 10 Slower" label="Alle Animationen 10% langsamer"/>
+				<menu_item_call name="All Animations 10 Faster" label="Alle Animationen 10 % schneller"/>
+			</menu>
 		</menu>
-		<menu_item_check label="HTTP-Texturen" name="HTTP Textures"/>
 		<menu_item_call label="Bilder komprimieren" name="Compress Images"/>
-		<menu_item_call label="Visual Leak Detector aktivieren" name="Enable Visual Leak Detector"/>
 		<menu_item_check label="Ausgabe Fehlerbeseitigung ausgeben" name="Output Debug Minidump"/>
 		<menu_item_check label="Bei nächster Ausführung Fenster öffnen" name="Console Window"/>
 		<menu label="Protokollierungsstufe festlegen" name="Set Logging Level">
@@ -447,15 +419,6 @@
 		<menu_item_call label="Admin-Status anfordern" name="Request Admin Options"/>
 		<menu_item_call label="Admin-Status verlassen" name="Leave Admin Options"/>
 		<menu_item_check label="Admin-Menü anzeigen" name="View Admin Options"/>
-		<menu_item_call name="All Animations 10 Slower" label="Alle Animationen 10% langsamer"/>
-		<menu_item_check name="Show Avatar Render Info" label="Avatar-Renderinfo anzeigen"/>
-		<menu_item_call name="All Animations 10 Faster" label="Alle Animationen 10 % schneller"/>
-		<menu_item_call name="Playback event recording" label="Eventaufzeichnung wiedergeben"/>
-		<menu_item_call name="FB Connect Test" label="FB-Verbindungsprüfung"/>
-		<menu_item_call name="Stop event recording" label="Eventaufzeichnung anhalten"/>
-		<menu_item_call name="Reset All Animation Speed" label="Alle Animationsgeschwindigkeiten zurücksetzen"/>
-		<menu_item_call name="Start event recording" label="Eventaufzeichnung starten"/>
-		<menu_item_check name="Slow Motion Animations" label="Zeitlupen-Animationen"/>
 	</menu>
 	<menu label="Admin" name="Admin">
 		<menu label="Objekt" name="AdminObject">
@@ -508,5 +471,11 @@
 			</menu>
 		</menu>
 	</menu>
-	<menu name="Animation Speed" label="Animationsgeschwindigkeit"/>
+	<menu name="Avatar">
+		<menu_item_call label="Meine Skripte..." name="MyScripts"/>
+		<menu_item_check label="Immer rennen" name="Always Run"/>
+		<menu_item_call label="Gehen/Rennen/Fliegen..." name="WalkRunFly"/>
+		<menu_item_call label="Animation meines Avatars stoppen" name="Stop Animating My Avatar"/>
+		<menu_item_call label="Aussehen..." name="ChangeOutfit"/>
+	</menu>
 </menu_bar>

@@ -23,9 +23,17 @@
 				<name_list.columns label="狀態" name="online"/>
 				<name_list.columns label="頭銜" name="title"/>
 			</name_list>
-			<button label="邀請" name="member_invite"/>
-			<button label="踢出" name="member_eject"/>
-			<button label="禁絕成員" name="member_ban"/>
+			<layout_stack name="button_row_ls">
+				<layout_panel name="ban_btn_lp">
+					<button label="禁絕成員" name="member_ban"/>
+				</layout_panel>
+				<layout_panel name="eject_btn_lp">
+					<button label="踢出" name="member_eject"/>
+				</layout_panel>
+				<layout_panel name="btn_invite_lp">
+					<button label="邀請" name="member_invite"/>
+				</layout_panel>
+			</layout_stack>
 		</panel>
 		<panel label="角色" name="roles_sub_tab">
 			<panel.string name="help_text">

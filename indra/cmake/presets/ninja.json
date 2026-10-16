@@ -1,0 +1,1470 @@
+{
+  "version": 10,
+  "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
+  "include": [
+    "base.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "ninja-os",
+      "displayName": "Ninja Multi-Config",
+      "inherits": [
+        "base"
+      ],
+      "generator": "Ninja Multi-Config",
+      "cacheVariables": {
+        "CMAKE_DEFAULT_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "ninja",
+      "displayName": "Ninja Multi-Config Proprietary",
+      "inherits": [
+        "ninja-os",
+        "proprietary"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64",
+      "displayName": "Ninja Multi-Config (arm64)",
+      "inherits": [
+        "ninja-os",
+        "macos",
+        "macos-arm64"
+      ]
+    },
+    {
+      "name": "ninja-os-x64",
+      "displayName": "Ninja Multi-Config (x86_64)",
+      "inherits": [
+        "ninja-os",
+        "macos",
+        "macos-x64"
+      ]
+    },
+    {
+      "name": "ninja-arm64",
+      "displayName": "Ninja Multi-Config Proprietary (arm64)",
+      "inherits": [
+        "ninja",
+        "macos",
+        "macos-arm64"
+      ]
+    },
+    {
+      "name": "ninja-x64",
+      "displayName": "Ninja Multi-Config Proprietary (x86_64)",
+      "inherits": [
+        "ninja",
+        "macos",
+        "macos-x64"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt",
+      "displayName": "Ninja Multi-Config (fully optimized)",
+      "description": "The optimizations of a shipped build on any channel: LTO on, Tracy and Release debug logging off",
+      "inherits": [
+        "ninja-os",
+        "fullopt"
+      ],
+      "cacheVariables": {
+        "CMAKE_DEFAULT_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ninja-os-fullopt-arm64",
+      "displayName": "Ninja Multi-Config (fully optimized, arm64)",
+      "inherits": [
+        "ninja-os-fullopt",
+        "macos",
+        "macos-arm64"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-x64",
+      "displayName": "Ninja Multi-Config (fully optimized, x86_64)",
+      "inherits": [
+        "ninja-os-fullopt",
+        "macos",
+        "macos-x64"
+      ]
+    },
+    {
+      "name": "ninja-fullopt",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized)",
+      "description": "The optimizations of a shipped build on any channel: LTO on, Tracy and Release debug logging off",
+      "inherits": [
+        "ninja",
+        "fullopt"
+      ],
+      "cacheVariables": {
+        "CMAKE_DEFAULT_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ninja-fullopt-arm64",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized, arm64)",
+      "inherits": [
+        "ninja-fullopt",
+        "macos",
+        "macos-arm64"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-x64",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized, x86_64)",
+      "inherits": [
+        "ninja-fullopt",
+        "macos",
+        "macos-x64"
+      ]
+    },
+    {
+      "name": "ninja-os-lld",
+      "displayName": "Ninja Multi-Config (lld)",
+      "inherits": [
+        "ninja-os",
+        "linux",
+        "lld"
+      ]
+    },
+    {
+      "name": "ninja-os-mold",
+      "displayName": "Ninja Multi-Config (mold)",
+      "inherits": [
+        "ninja-os",
+        "linux",
+        "mold"
+      ]
+    },
+    {
+      "name": "ninja-os-clang",
+      "displayName": "Ninja Multi-Config (clang)",
+      "inherits": [
+        "ninja-os",
+        "linux",
+        "clang"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-lld",
+      "displayName": "Ninja Multi-Config (clang, lld)",
+      "inherits": [
+        "ninja-os",
+        "linux",
+        "clang",
+        "lld"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-mold",
+      "displayName": "Ninja Multi-Config (clang, mold)",
+      "inherits": [
+        "ninja-os",
+        "linux",
+        "clang",
+        "mold"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-lld",
+      "displayName": "Ninja Multi-Config (fully optimized, lld)",
+      "inherits": [
+        "ninja-os-fullopt",
+        "linux",
+        "lld"
+      ],
+      "description": "LTO through lld needs Clang: lld cannot read GCC's LTO objects"
+    },
+    {
+      "name": "ninja-os-fullopt-mold",
+      "displayName": "Ninja Multi-Config (fully optimized, mold)",
+      "inherits": [
+        "ninja-os-fullopt",
+        "linux",
+        "mold"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang",
+      "displayName": "Ninja Multi-Config (fully optimized, clang)",
+      "inherits": [
+        "ninja-os-fullopt",
+        "linux",
+        "clang"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-lld",
+      "displayName": "Ninja Multi-Config (fully optimized, clang, lld)",
+      "inherits": [
+        "ninja-os-fullopt",
+        "linux",
+        "clang",
+        "lld"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-mold",
+      "displayName": "Ninja Multi-Config (fully optimized, clang, mold)",
+      "inherits": [
+        "ninja-os-fullopt",
+        "linux",
+        "clang",
+        "mold"
+      ]
+    },
+    {
+      "name": "ninja-lld",
+      "displayName": "Ninja Multi-Config Proprietary (lld)",
+      "inherits": [
+        "ninja",
+        "linux",
+        "lld"
+      ]
+    },
+    {
+      "name": "ninja-mold",
+      "displayName": "Ninja Multi-Config Proprietary (mold)",
+      "inherits": [
+        "ninja",
+        "linux",
+        "mold"
+      ]
+    },
+    {
+      "name": "ninja-clang",
+      "displayName": "Ninja Multi-Config Proprietary (clang)",
+      "inherits": [
+        "ninja",
+        "linux",
+        "clang"
+      ]
+    },
+    {
+      "name": "ninja-clang-lld",
+      "displayName": "Ninja Multi-Config Proprietary (clang, lld)",
+      "inherits": [
+        "ninja",
+        "linux",
+        "clang",
+        "lld"
+      ]
+    },
+    {
+      "name": "ninja-clang-mold",
+      "displayName": "Ninja Multi-Config Proprietary (clang, mold)",
+      "inherits": [
+        "ninja",
+        "linux",
+        "clang",
+        "mold"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-lld",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized, lld)",
+      "inherits": [
+        "ninja-fullopt",
+        "linux",
+        "lld"
+      ],
+      "description": "LTO through lld needs Clang: lld cannot read GCC's LTO objects"
+    },
+    {
+      "name": "ninja-fullopt-mold",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized, mold)",
+      "inherits": [
+        "ninja-fullopt",
+        "linux",
+        "mold"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized, clang)",
+      "inherits": [
+        "ninja-fullopt",
+        "linux",
+        "clang"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-lld",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized, clang, lld)",
+      "inherits": [
+        "ninja-fullopt",
+        "linux",
+        "clang",
+        "lld"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-mold",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized, clang, mold)",
+      "inherits": [
+        "ninja-fullopt",
+        "linux",
+        "clang",
+        "mold"
+      ]
+    },
+    {
+      "name": "ninja-os-asan",
+      "displayName": "Ninja Multi-Config (AddressSanitizer and UndefinedBehaviorSanitizer)",
+      "inherits": [
+        "ninja-os",
+        "linux",
+        "clang",
+        "lld"
+      ],
+      "cacheVariables": {
+        "AL_SANITIZERS": "address;undefined",
+        "AL_BUILD_TESTS": true
+      }
+    },
+    {
+      "name": "ninja-os-tsan",
+      "displayName": "Ninja Multi-Config (ThreadSanitizer)",
+      "inherits": [
+        "ninja-os",
+        "linux",
+        "clang",
+        "lld"
+      ],
+      "cacheVariables": {
+        "AL_SANITIZERS": "thread",
+        "AL_BUILD_TESTS": true
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "ninja-os-debug",
+      "configurePreset": "ninja-os",
+      "inherits": [
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-optdebug",
+      "configurePreset": "ninja-os",
+      "inherits": [
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-relwithdebinfo",
+      "configurePreset": "ninja-os",
+      "inherits": [
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-release",
+      "configurePreset": "ninja-os",
+      "inherits": [
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-debug",
+      "configurePreset": "ninja",
+      "inherits": [
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-optdebug",
+      "configurePreset": "ninja",
+      "inherits": [
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-relwithdebinfo",
+      "configurePreset": "ninja",
+      "inherits": [
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-release",
+      "configurePreset": "ninja",
+      "inherits": [
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-debug",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-optdebug",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-relwithdebinfo",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-release",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-debug",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-optdebug",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-relwithdebinfo",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-release",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-arm64-debug",
+      "configurePreset": "ninja-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-arm64-optdebug",
+      "configurePreset": "ninja-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-arm64-relwithdebinfo",
+      "configurePreset": "ninja-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-arm64-release",
+      "configurePreset": "ninja-arm64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-x64-debug",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-x64-optdebug",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-x64-relwithdebinfo",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-x64-release",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-debug",
+      "configurePreset": "ninja-os-fullopt",
+      "inherits": [
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-optdebug",
+      "configurePreset": "ninja-os-fullopt",
+      "inherits": [
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt",
+      "inherits": [
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-release",
+      "configurePreset": "ninja-os-fullopt",
+      "inherits": [
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-arm64-debug",
+      "configurePreset": "ninja-os-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-arm64-optdebug",
+      "configurePreset": "ninja-os-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-arm64-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-arm64-release",
+      "configurePreset": "ninja-os-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-x64-debug",
+      "configurePreset": "ninja-os-fullopt-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-x64-optdebug",
+      "configurePreset": "ninja-os-fullopt-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-x64-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-x64-release",
+      "configurePreset": "ninja-os-fullopt-x64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-debug",
+      "configurePreset": "ninja-fullopt",
+      "inherits": [
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-optdebug",
+      "configurePreset": "ninja-fullopt",
+      "inherits": [
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-relwithdebinfo",
+      "configurePreset": "ninja-fullopt",
+      "inherits": [
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-release",
+      "configurePreset": "ninja-fullopt",
+      "inherits": [
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-arm64-debug",
+      "configurePreset": "ninja-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-arm64-optdebug",
+      "configurePreset": "ninja-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-arm64-relwithdebinfo",
+      "configurePreset": "ninja-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-arm64-release",
+      "configurePreset": "ninja-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-x64-debug",
+      "configurePreset": "ninja-fullopt-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-x64-optdebug",
+      "configurePreset": "ninja-fullopt-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-x64-relwithdebinfo",
+      "configurePreset": "ninja-fullopt-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-x64-release",
+      "configurePreset": "ninja-fullopt-x64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-lld-debug",
+      "configurePreset": "ninja-os-lld",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-lld-optdebug",
+      "configurePreset": "ninja-os-lld",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-lld-relwithdebinfo",
+      "configurePreset": "ninja-os-lld",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-lld-release",
+      "configurePreset": "ninja-os-lld",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-mold-debug",
+      "configurePreset": "ninja-os-mold",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-mold-optdebug",
+      "configurePreset": "ninja-os-mold",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-mold-relwithdebinfo",
+      "configurePreset": "ninja-os-mold",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-mold-release",
+      "configurePreset": "ninja-os-mold",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-debug",
+      "configurePreset": "ninja-os-clang",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-optdebug",
+      "configurePreset": "ninja-os-clang",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-relwithdebinfo",
+      "configurePreset": "ninja-os-clang",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-release",
+      "configurePreset": "ninja-os-clang",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-lld-debug",
+      "configurePreset": "ninja-os-clang-lld",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-lld-optdebug",
+      "configurePreset": "ninja-os-clang-lld",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-lld-relwithdebinfo",
+      "configurePreset": "ninja-os-clang-lld",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-lld-release",
+      "configurePreset": "ninja-os-clang-lld",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-mold-debug",
+      "configurePreset": "ninja-os-clang-mold",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-mold-optdebug",
+      "configurePreset": "ninja-os-clang-mold",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-mold-relwithdebinfo",
+      "configurePreset": "ninja-os-clang-mold",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-clang-mold-release",
+      "configurePreset": "ninja-os-clang-mold",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-lld-debug",
+      "configurePreset": "ninja-os-fullopt-lld",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-lld-optdebug",
+      "configurePreset": "ninja-os-fullopt-lld",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-lld-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt-lld",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-lld-release",
+      "configurePreset": "ninja-os-fullopt-lld",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-mold-debug",
+      "configurePreset": "ninja-os-fullopt-mold",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-mold-optdebug",
+      "configurePreset": "ninja-os-fullopt-mold",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-mold-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt-mold",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-mold-release",
+      "configurePreset": "ninja-os-fullopt-mold",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-debug",
+      "configurePreset": "ninja-os-fullopt-clang",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-optdebug",
+      "configurePreset": "ninja-os-fullopt-clang",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt-clang",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-release",
+      "configurePreset": "ninja-os-fullopt-clang",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-lld-debug",
+      "configurePreset": "ninja-os-fullopt-clang-lld",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-lld-optdebug",
+      "configurePreset": "ninja-os-fullopt-clang-lld",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-lld-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt-clang-lld",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-lld-release",
+      "configurePreset": "ninja-os-fullopt-clang-lld",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-mold-debug",
+      "configurePreset": "ninja-os-fullopt-clang-mold",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-mold-optdebug",
+      "configurePreset": "ninja-os-fullopt-clang-mold",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-mold-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt-clang-mold",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-clang-mold-release",
+      "configurePreset": "ninja-os-fullopt-clang-mold",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-lld-debug",
+      "configurePreset": "ninja-lld",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-lld-optdebug",
+      "configurePreset": "ninja-lld",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-lld-relwithdebinfo",
+      "configurePreset": "ninja-lld",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-lld-release",
+      "configurePreset": "ninja-lld",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-mold-debug",
+      "configurePreset": "ninja-mold",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-mold-optdebug",
+      "configurePreset": "ninja-mold",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-mold-relwithdebinfo",
+      "configurePreset": "ninja-mold",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-mold-release",
+      "configurePreset": "ninja-mold",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-clang-debug",
+      "configurePreset": "ninja-clang",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-clang-optdebug",
+      "configurePreset": "ninja-clang",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-clang-relwithdebinfo",
+      "configurePreset": "ninja-clang",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-clang-release",
+      "configurePreset": "ninja-clang",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-clang-lld-debug",
+      "configurePreset": "ninja-clang-lld",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-clang-lld-optdebug",
+      "configurePreset": "ninja-clang-lld",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-clang-lld-relwithdebinfo",
+      "configurePreset": "ninja-clang-lld",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-clang-lld-release",
+      "configurePreset": "ninja-clang-lld",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-clang-mold-debug",
+      "configurePreset": "ninja-clang-mold",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-clang-mold-optdebug",
+      "configurePreset": "ninja-clang-mold",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-clang-mold-relwithdebinfo",
+      "configurePreset": "ninja-clang-mold",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-clang-mold-release",
+      "configurePreset": "ninja-clang-mold",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-lld-debug",
+      "configurePreset": "ninja-fullopt-lld",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-lld-optdebug",
+      "configurePreset": "ninja-fullopt-lld",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-lld-relwithdebinfo",
+      "configurePreset": "ninja-fullopt-lld",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-lld-release",
+      "configurePreset": "ninja-fullopt-lld",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-mold-debug",
+      "configurePreset": "ninja-fullopt-mold",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-mold-optdebug",
+      "configurePreset": "ninja-fullopt-mold",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-mold-relwithdebinfo",
+      "configurePreset": "ninja-fullopt-mold",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-mold-release",
+      "configurePreset": "ninja-fullopt-mold",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-debug",
+      "configurePreset": "ninja-fullopt-clang",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-optdebug",
+      "configurePreset": "ninja-fullopt-clang",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-relwithdebinfo",
+      "configurePreset": "ninja-fullopt-clang",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-release",
+      "configurePreset": "ninja-fullopt-clang",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-lld-debug",
+      "configurePreset": "ninja-fullopt-clang-lld",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-lld-optdebug",
+      "configurePreset": "ninja-fullopt-clang-lld",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-lld-relwithdebinfo",
+      "configurePreset": "ninja-fullopt-clang-lld",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-lld-release",
+      "configurePreset": "ninja-fullopt-clang-lld",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-mold-debug",
+      "configurePreset": "ninja-fullopt-clang-mold",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-mold-optdebug",
+      "configurePreset": "ninja-fullopt-clang-mold",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-mold-relwithdebinfo",
+      "configurePreset": "ninja-fullopt-clang-mold",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-clang-mold-release",
+      "configurePreset": "ninja-fullopt-clang-mold",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-asan-debug",
+      "configurePreset": "ninja-os-asan",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-asan-optdebug",
+      "configurePreset": "ninja-os-asan",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-asan-relwithdebinfo",
+      "configurePreset": "ninja-os-asan",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-asan-release",
+      "configurePreset": "ninja-os-asan",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-tsan-debug",
+      "configurePreset": "ninja-os-tsan",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-tsan-optdebug",
+      "configurePreset": "ninja-os-tsan",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-tsan-relwithdebinfo",
+      "configurePreset": "ninja-os-tsan",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-tsan-release",
+      "configurePreset": "ninja-os-tsan",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "ninja-os-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "ninja-os"
+        },
+        {
+          "type": "build",
+          "name": "ninja-os-release"
+        }
+      ]
+    },
+    {
+      "name": "ninja-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "ninja"
+        },
+        {
+          "type": "build",
+          "name": "ninja-release"
+        }
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "ninja-os-fullopt"
+        },
+        {
+          "type": "build",
+          "name": "ninja-os-fullopt-release"
+        }
+      ]
+    },
+    {
+      "name": "ninja-fullopt-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "ninja-fullopt"
+        },
+        {
+          "type": "build",
+          "name": "ninja-fullopt-release"
+        }
+      ]
+    }
+  ]
+}

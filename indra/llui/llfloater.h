@@ -126,6 +126,7 @@ class LLFloater : public LLPanel, public LLInstanceTracker<LLFloater>
     friend class LLMultiFloater;
 
 public:
+    AL_VIEW_TYPE(LLFloater, LLPanel);
 
     struct KeyCompare
     {
@@ -229,6 +230,10 @@ public:
     // Don't export top/left for rect, only height/width
     bool buildFromFile(const std::string &filename);
 
+    // The same, against a tree the caller already has rather than the file
+    // it would have been read from.
+    bool buildFromXML(LLXMLNodePtr root, const std::string& filename);
+
     boost::signals2::connection setMinimizeCallback( const commit_signal_t::slot_type& cb );
     boost::signals2::connection setOpenCallback( const commit_signal_t::slot_type& cb );
     boost::signals2::connection setCloseCallback( const commit_signal_t::slot_type& cb );
@@ -236,12 +241,12 @@ public:
     void initFromParams(const LLFloater::Params& p);
     bool initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::string& filename);
 
-    /*virtual*/ void handleReshape(const LLRect& new_rect, bool by_user = false);
-    /*virtual*/ bool canSnapTo(const LLView* other_view);
-    /*virtual*/ void setSnappedTo(const LLView* snap_view);
-    /*virtual*/ void setFocus( bool b );
-    /*virtual*/ void setIsChrome(bool is_chrome);
-    /*virtual*/ void setRect(const LLRect &rect);
+    /*virtual*/ void handleReshape(const LLRect& new_rect, bool by_user = false) override;
+    /*virtual*/ bool canSnapTo(const LLView* other_view) override;
+    /*virtual*/ void setSnappedTo(const LLView* snap_view) override;
+    /*virtual*/ void setFocus( bool b ) override;
+    /*virtual*/ void setIsChrome(bool is_chrome) override;
+    /*virtual*/ void setRect(const LLRect &rect) override;
                 void setIsSingleInstance(bool is_single_instance);
                 bool getIsSingleInstance() const { return mSingleInstance; }
 
@@ -255,8 +260,7 @@ public:
     // Close the floater or its host. Use when hidding or toggling a floater instance.
     virtual void    closeHostedFloater();
 
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
-    /*virtual*/ void translate(S32 x, S32 y);
+    /*virtual*/ void translate(S32 x, S32 y) override;
 
     // Release keyboard and mouse focus
     void            releaseFocus();
@@ -322,27 +326,27 @@ public:
     S32             getMinHeight() const{ return mMinHeight; }
     S32             getHeaderHeight() const { return mHeaderHeight; }
 
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleRightMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask);
-    virtual bool    handleMiddleMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
 
-    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
-    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
+    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
-    virtual void    draw();
+    virtual void    draw() override;
     virtual void    drawShadow(LLPanel* panel);
 
-    virtual void    onOpen(const LLSD& key) {}
+    virtual void    onOpen(const LLSD& key) override {}
     virtual void    onClose(bool app_quitting) {}
 
     // This cannot be "const" until all derived floater canClose()
     // methods are const as well.  JC
     virtual bool    canClose() { return true; }
 
-    /*virtual*/ void setVisible(bool visible); // do not override
-    /*virtual*/ void onVisibilityChange ( bool new_visibility ); // do not override
+    /*virtual*/ void setVisible(bool visible) override; // do not override
+    /*virtual*/ void onVisibilityChange ( bool new_visibility ) override; // do not override
 
     bool            canFocusStealFrontmost() const { return mFocusStealsFrontmost; }
     void            setFocusStealsFrontmost(bool wants_frontmost) { mFocusStealsFrontmost = wants_frontmost; }
@@ -555,11 +559,22 @@ private:
     typedef std::set<LLHandle<LLFloater> > handle_set_t;
     typedef std::set<LLHandle<LLFloater> >::iterator handle_set_iter_t;
     handle_set_t    mDependents;
+    // The dependents this floater hid when it was minimized, so that restoring
+    // shows back what it put away and not what the user had.
+    handle_set_t    mDependentsHiddenOnMinimize;
     bool            mTranslateWithDependents { false };
 
     bool            mButtonsEnabled[BUTTON_COUNT];
     F32             mButtonScale;
     bool            mAutoFocus;
+
+    // What was last pushed onto every control under this floater, and the
+    // shape the view tree was in when it was pushed. Starts as TT_DEFAULT
+    // because that is what a control is constructed holding, and building the
+    // floater moves the tree count, so the first push is never the one
+    // skipped.
+    ETypeTransparency mAppliedTransparency { TT_DEFAULT };
+    U32               mAppliedTreeGeneration { 0 };
     LLHandle<LLFloater> mSnappedTo;
 
     LLHandle<LLFloater> mHostHandle;
@@ -599,6 +614,8 @@ const S32 FLOATER_MIN_VISIBLE_PIXELS = 16;
 class LLFloaterView : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLFloaterView, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>{};
 
 protected:
@@ -607,9 +624,12 @@ protected:
 
 public:
 
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
-    /*virtual*/ void draw();
-    /*virtual*/ LLRect getSnapRect() const;
+    // Every child is a floater; anything else is refused.
+    bool addChild(LLView* child, S32 tab_group = 0) override;
+
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ LLRect getSnapRect() const override;
     /*virtual*/ void refresh();
 
     LLRect          findNeighboringPosition( LLFloater* reference_floater, LLFloater* neighbor );
@@ -634,7 +654,7 @@ public:
     // attempt to close all floaters
     void            closeAllChildren(bool app_quitting);
     bool            allChildrenClosed();
-    void            shiftFloaters(S32 x_offset, S32 y_offset);
+    void            shiftMinimizedFloaters(S32 x_offset, S32 y_offset);
 
     void            hideAllFloaters();
     void            showHiddenFloaters();

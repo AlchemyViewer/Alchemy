@@ -1702,16 +1702,14 @@ void MediaPluginCEF::unicodeInput(std::string text, LLSD native_key_data = LLSD:
     // keyEvent(). dullahan strips control/shift from CHAR internally so a
     // CHAR isn't mistaken for a shortcut.
     //
-    // Previously this read native_key_data["sdl_sym"], which the SDL window
-    // backend never sets (getNativeKeyData only provides virtual_key /
-    // virtual_key_win / modifiers), so the synthesised key code was always 0
-    // and every page keydown carried keyCode 0. Sending the real text avoids
-    // depending on the keysym at all and fixes IME / dead-key / multi-byte
-    // input that a single keysym can't represent.
-    LLWString wtext = utf8str_to_wstring(text);
-    for (llwchar cp : wtext)
+    // The text is sent rather than a keysym because the SDL backend never
+    // sets one, and because IME, dead-key and multi-byte input cannot be
+    // represented by a single keysym in any case.
+    for (size_t i = 0; i < text.size(); )
     {
-        mCEFLib->nativeKeyboardEventSDL2(dullahan::KE_KEY_CHAR, (uint32_t)cp, 0, false);
+        const LLCodepointAt at = utf8str_decode_at(text, i);
+        mCEFLib->nativeKeyboardEventSDL2(dullahan::KE_KEY_CHAR, (uint32_t)at.cp, 0, false);
+        i = at.next;
     }
 #elif LL_WINDOWS
     text = ""; // not needed here but prevents unused var warning as error

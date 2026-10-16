@@ -755,16 +755,25 @@ std::string LLEventDispatcher::getState() const
 
 bool LLEventDispatcher::setState(SetState&, const std::string& state) const
 {
+    // Pass us empty string (a la ~SetState()) to reset to nullptr: only the
+    // SetState that set the state does, and it must, so it is cleared before
+    // the ignoring below. Once that turned it away too, the first state set
+    // on a coroutine stayed for every call after it, and was never freed.
+    if (state.empty())
+    {
+        mState.reset(nullptr);
+        return true;
+    }
+
     // If SetState is instantiated at multiple levels of function call, ignore
     // the lower-level call because the outer call presumably provides more
     // context.
     if (mState.get())
         return false;
 
-    // Pass us empty string (a la ~SetState()) to reset to nullptr, else take
-    // a heap copy of the passed state string so we can delete it on
+    // Take a heap copy of the passed state string so we can delete it on
     // subsequent reset().
-    mState.reset(state.empty()? nullptr : new std::string(state));
+    mState.reset(new std::string(state));
     return true;
 }
 

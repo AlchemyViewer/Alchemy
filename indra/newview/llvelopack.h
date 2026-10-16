@@ -33,6 +33,7 @@
 #include <functional>
 
 bool velopack_initialize();
+bool velopack_is_installed();
 void velopack_check_for_updates(const std::string& required_version, const std::string& relnotes_url);
 std::string velopack_get_current_version();
 bool velopack_is_update_pending();

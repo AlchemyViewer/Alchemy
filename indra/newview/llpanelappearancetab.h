@@ -34,6 +34,8 @@ class LLToggleableMenu;
 class LLPanelAppearanceTab : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelAppearanceTab, LLPanel);
+
     LLPanelAppearanceTab() : LLPanel() {}
     virtual ~LLPanelAppearanceTab() {}
 

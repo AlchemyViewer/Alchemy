@@ -69,6 +69,20 @@ void (*LLViewerTextureList::sUUIDCallback)(void **, const LLUUID&) = NULL;
 
 S32 LLViewerTextureList::sNumImages = 0;
 
+// Per-frame traffic on the list, sampled and reset by updateImages.
+static U32 sFindCount = 0;
+static U32 sFindMissCount = 0;
+static U32 sCreateCount = 0;
+static U32 sDeleteCount = 0;
+
+// Per-frame shape of the update window's visits, sampled and reset the same way.
+static U32 sVisitCount = 0;
+static U32 sVisitBoostedCount = 0;   // skipped the face loop on boost level
+static U32 sVisitFacelessCount = 0;  // walked the channels and found no face
+static U32 sFaceWalkCount = 0;
+static U32 sFaceOffScreenCount = 0;
+static U32 sPixelAreaCalcCount = 0;
+
 LLViewerTextureList gTextureList;
 
 extern LLGLSLShader gCopyProgram;
@@ -86,7 +100,7 @@ textureType(TEX_LIST_STANDARD)
 {
 }
 
-LLTextureKey::LLTextureKey(LLUUID id, ETexListType tex_type)
+LLTextureKey::LLTextureKey(const LLUUID& id, ETexListType tex_type)
 : textureId(id), textureType(tex_type)
 {
 }
@@ -103,6 +117,10 @@ void LLViewerTextureList::init()
 {
     mInitialized = true ;
     sNumImages = 0;
+    // A busy region settles around 25k textures and a teleport overlaps two
+    // regions until the old one flushes; this covers that without a growth
+    // ladder at region entry. A peak above it costs one rehash.
+    mImages.reserve(32768);
     doPreloadImages();
 }
 
@@ -113,8 +131,7 @@ void LLViewerTextureList::doPreloadImages()
     LL_DEBUGS("ViewerImages") << "Preloading images..." << LL_ENDL;
 
     llassert_always(mInitialized) ;
-    llassert_always(mImageList.empty()) ;
-    llassert_always(mUUIDMap.empty()) ;
+    llassert_always(mImages.empty()) ;
 
     // Set the "missing asset" image
     LLViewerFetchedTexture::sMissingAssetImagep = LLViewerTextureManager::getFetchedTextureFromFile("missing_asset.tga", FTT_LOCAL_FILE, MIPMAP_NO, LLViewerFetchedTexture::BOOST_UI);
@@ -152,12 +169,7 @@ void LLViewerTextureList::doPreloadImages()
     //uv_test->setClamp(false, false);
     //uv_test->setMipFilterNearest(true, true);
 
-    LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTextureFromFile("silhouette.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
-    if (image)
-    {
-        mImagePreloads.insert(image);
-    }
-    image = LLViewerTextureManager::getFetchedTextureFromFile("world/NoEntryLines.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
+    LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTextureFromFile("world/NoEntryLines.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
     if (image)
     {
         mImagePreloads.insert(image);
@@ -293,8 +305,8 @@ void LLViewerTextureList::shutdown()
     // Write out list of currently loaded textures for precaching on startup
     typedef std::set<std::pair<S32,LLViewerFetchedTexture*> > image_area_list_t;
     image_area_list_t image_area_list;
-    for (image_list_t::iterator iter = mImageList.begin();
-         iter != mImageList.end(); ++iter)
+    for (image_table_t::const_iterator iter = mImages.begin();
+         iter != mImages.end(); ++iter)
     {
         LLViewerFetchedTexture* image = *iter;
         if (!image->hasGLTexture() ||
@@ -356,9 +368,7 @@ void LLViewerTextureList::shutdown()
     }
     mFastCacheList.clear();
 
-    mUUIDMap.clear();
-
-    mImageList.clear();
+    mImages.clear();
 
     mInitialized = false ; //prevent loading textures again.
 }
@@ -367,7 +377,7 @@ void LLViewerTextureList::dump()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     LL_INFOS() << "LLViewerTextureList::dump()" << LL_ENDL;
-    for (image_list_t::iterator it = mImageList.begin(); it != mImageList.end(); ++it)
+    for (image_table_t::const_iterator it = mImages.begin(); it != mImages.end(); ++it)
     {
         LLViewerFetchedTexture* image = *it;
 
@@ -450,9 +460,56 @@ LLViewerFetchedTexture* LLViewerTextureList::getImageFromUrl(const std::string& 
         new_id.generate(url);
     }
 
-    LLPointer<LLViewerFetchedTexture> imagep = findImage(new_id, get_element_type(boost_priority));
+    const ETexListType tex_type = get_element_type(boost_priority);
+    ++sFindCount;
 
-    if (!imagep.isNull())
+    // made keeps the new texture alive from construction until the table has
+    // taken its own reference
+    LLPointer<LLViewerFetchedTexture> made;
+    LLPointer<LLViewerFetchedTexture> imagep = mImages.findOrInsert(LLTextureKey(new_id, tex_type), [&]() -> LLViewerFetchedTexture*
+    {
+        ++sFindMissCount;
+        switch(texture_type)
+        {
+        case LLViewerTexture::FETCHED_TEXTURE:
+            made = new LLViewerFetchedTexture(url, f_type, new_id, usemipmaps);
+            break ;
+        case LLViewerTexture::LOD_TEXTURE:
+            made = new LLViewerLODTexture(url, f_type, new_id, usemipmaps);
+            break ;
+        default:
+            LL_ERRS() << "Invalid texture type " << texture_type << LL_ENDL ;
+        }
+
+        if (internal_format && primary_format)
+        {
+            made->setExplicitFormat(internal_format, primary_format);
+        }
+
+        made->setTextureListType(tex_type);
+        sNumImages++;
+
+        if (boost_priority != 0)
+        {
+            if (boost_priority == LLViewerFetchedTexture::BOOST_UI)
+            {
+                made->dontDiscard();
+            }
+            if (boost_priority == LLViewerFetchedTexture::BOOST_ICON
+                || boost_priority == LLViewerFetchedTexture::BOOST_THUMBNAIL)
+            {
+                // Agent and group Icons are downloadable content, nothing manages
+                // icon deletion yet, so they should not persist
+                made->dontDiscard();
+                made->forceActive();
+            }
+            made->setBoostLevel(boost_priority);
+        }
+        return made.get();
+    });
+    llassert(imagep.notNull());
+
+    if (made.isNull())
     {
         LLViewerFetchedTexture *texture = imagep.get();
         if (texture->getUrl().empty())
@@ -466,45 +523,6 @@ LLViewerFetchedTexture* LLViewerTextureList::getImageFromUrl(const std::string& 
             LL_DEBUGS("Avatar") << "Requested texture " << new_id
                                 << " already exists with a different url, requested: " << url
                                 << " current: " << texture->getUrl() << LL_ENDL;
-        }
-
-    }
-    if (imagep.isNull())
-    {
-        switch(texture_type)
-        {
-        case LLViewerTexture::FETCHED_TEXTURE:
-            imagep = new LLViewerFetchedTexture(url, f_type, new_id, usemipmaps);
-            break ;
-        case LLViewerTexture::LOD_TEXTURE:
-            imagep = new LLViewerLODTexture(url, f_type, new_id, usemipmaps);
-            break ;
-        default:
-            LL_ERRS() << "Invalid texture type " << texture_type << LL_ENDL ;
-        }
-
-        if (internal_format && primary_format)
-        {
-            imagep->setExplicitFormat(internal_format, primary_format);
-        }
-
-        addImage(imagep, get_element_type(boost_priority));
-
-        if (boost_priority != 0)
-        {
-            if (boost_priority == LLViewerFetchedTexture::BOOST_UI)
-            {
-                imagep->dontDiscard();
-            }
-            if (boost_priority == LLViewerFetchedTexture::BOOST_ICON
-                || boost_priority == LLViewerFetchedTexture::BOOST_THUMBNAIL)
-            {
-                // Agent and group Icons are downloadable content, nothing manages
-                // icon deletion yet, so they should not persist
-                imagep->dontDiscard();
-                imagep->forceActive();
-            }
-            imagep->setBoostLevel(boost_priority);
         }
     }
 
@@ -571,8 +589,20 @@ LLViewerFetchedTexture* LLViewerTextureList::getImage(const LLUUID &image_id,
         return (LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT, FTT_DEFAULT, true, LLGLTexture::BOOST_UI));
     }
 
-    LLPointer<LLViewerFetchedTexture> imagep = findImage(image_id, get_element_type(boost_priority));
-    if (!imagep.isNull())
+    ++sFindCount;
+
+    // made keeps the new texture alive from construction until the table has
+    // taken its own reference
+    LLPointer<LLViewerFetchedTexture> made;
+    LLPointer<LLViewerFetchedTexture> imagep = mImages.findOrInsert(LLTextureKey(image_id, get_element_type(boost_priority)), [&]() -> LLViewerFetchedTexture*
+    {
+        ++sFindMissCount;
+        made = createImage(image_id, f_type, usemipmaps, boost_priority, texture_type, internal_format, primary_format, request_from_host);
+        return made.get();
+    });
+    llassert(imagep.notNull());
+
+    if (made.isNull())
     {
         LLViewerFetchedTexture *texture = imagep.get();
         if (request_from_host.isOk() &&
@@ -591,11 +621,6 @@ LLViewerFetchedTexture* LLViewerTextureList::getImage(const LLUUID &image_id,
         {
             LL_WARNS() << "FTType mismatch: requested " << f_type << " image has " << imagep->getFTType() << LL_ENDL;
         }
-
-    }
-    if (imagep.isNull())
-    {
-        imagep = createImage(image_id, f_type, usemipmaps, boost_priority, texture_type, internal_format, primary_format, request_from_host) ;
     }
 
     imagep->setGLTextureCreated(true);
@@ -603,7 +628,8 @@ LLViewerFetchedTexture* LLViewerTextureList::getImage(const LLUUID &image_id,
     return imagep;
 }
 
-//when this function is called, there is no such texture in the gTextureList with image_id.
+// Builds a texture for getImage to insert; the caller owns the reference and
+// the table entry, so this touches neither.
 LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
                                                    FTType f_type,
                                                    bool usemipmaps,
@@ -614,6 +640,7 @@ LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
                                                    LLHost request_from_host)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    ++sCreateCount;
 
     LLPointer<LLViewerFetchedTexture> imagep ;
     switch(texture_type)
@@ -633,7 +660,8 @@ LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
         imagep->setExplicitFormat(internal_format, primary_format);
     }
 
-    addImage(imagep, get_element_type(boost_priority));
+    imagep->setTextureListType(get_element_type(boost_priority));
+    sNumImages++;
 
     if (boost_priority != 0)
     {
@@ -659,8 +687,8 @@ LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
         imagep->forceActive() ;
     }
 
-        mFastCacheList.insert(imagep);
-        imagep->setInFastCacheList(true);
+    mFastCacheList.push_back(imagep);
+    imagep->setInFastCacheList(true);
 
     return imagep ;
 }
@@ -668,22 +696,26 @@ LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
 void LLViewerTextureList::findTexturesByID(const LLUUID &image_id, std::vector<LLViewerFetchedTexture*> &output)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    LLTextureKey search_key(image_id, TEX_LIST_STANDARD);
-    uuid_map_t::iterator iter = mUUIDMap.lower_bound(search_key);
-    while (iter != mUUIDMap.end() && iter->first.textureId == image_id)
+    // One texture per list type at most, standard first.
+    if (LLViewerFetchedTexture* image = mImages.find(LLTextureKey(image_id, TEX_LIST_STANDARD)))
     {
-        output.push_back(iter->second);
-        iter++;
+        output.push_back(image);
+    }
+    if (LLViewerFetchedTexture* image = mImages.find(LLTextureKey(image_id, TEX_LIST_SCALE)))
+    {
+        output.push_back(image);
     }
 }
 
 LLViewerFetchedTexture *LLViewerTextureList::findImage(const LLTextureKey &search_key)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    uuid_map_t::iterator iter = mUUIDMap.find(search_key);
-    if (iter == mUUIDMap.end())
-        return NULL;
-    return iter->second;
+    ++sFindCount;
+    LLViewerFetchedTexture* image = mImages.find(search_key);
+    if (!image)
+    {
+        ++sFindMissCount;
+    }
+    return image;
 }
 
 LLViewerFetchedTexture *LLViewerTextureList::findImage(const LLUUID &image_id, ETexListType tex_type)
@@ -691,112 +723,49 @@ LLViewerFetchedTexture *LLViewerTextureList::findImage(const LLUUID &image_id, E
     return findImage(LLTextureKey(image_id, tex_type));
 }
 
-void LLViewerTextureList::addImageToList(LLViewerFetchedTexture *image)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    assert_main_thread();
-    llassert_always(mInitialized) ;
-    llassert(image);
-    if (image->isInImageList())
-    {   // Flag is already set?
-        LL_WARNS() << "LLViewerTextureList::addImageToList - image " << image->getID()  << " already in list" << LL_ENDL;
-    }
-    else
-    {
-        if (!(mImageList.insert(image)).second)
-        {
-            LL_WARNS() << "Error happens when insert image " << image->getID()  << " into mImageList!" << LL_ENDL ;
-        }
-        image->setInImageList(true);
-    }
-}
-
-void LLViewerTextureList::removeImageFromList(LLViewerFetchedTexture *image)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    assert_main_thread();
-    llassert_always(mInitialized) ;
-    llassert(image);
-
-    size_t count = 0;
-    if (image->isInImageList())
-    {
-        image->setInImageList(false);
-        count = mImageList.erase(image) ;
-        if(count != 1)
-        {
-            LL_INFOS() << "Image  " << image->getID()
-                << " had mInImageList set but mImageList.erase() returned " << count
-                << LL_ENDL;
-        }
-    }
-    else
-    {   // Something is wrong, image is expected in list or callers should check first
-        LL_INFOS() << "Calling removeImageFromList() for " << image->getID()
-            << " but doesn't have mInImageList set"
-            << " ref count is " << image->getNumRefs()
-            << LL_ENDL;
-        uuid_map_t::iterator iter = mUUIDMap.find(LLTextureKey(image->getID(), (ETexListType)image->getTextureListType()));
-        if(iter == mUUIDMap.end())
-        {
-            LL_INFOS() << "Image  " << image->getID() << " is also not in mUUIDMap!" << LL_ENDL ;
-        }
-        else if (iter->second != image)
-        {
-            LL_INFOS() << "Image  " << image->getID() << " was in mUUIDMap but with different pointer" << LL_ENDL ;
-    }
-        else
-    {
-            LL_INFOS() << "Image  " << image->getID() << " was in mUUIDMap with same pointer" << LL_ENDL ;
-        }
-        count = mImageList.erase(image) ;
-        llassert(count != 0);
-        if(count != 0)
-        {   // it was in the list already?
-            LL_WARNS() << "Image  " << image->getID()
-                << " had mInImageList false but mImageList.erase() returned " << count
-                << LL_ENDL;
-        }
-    }
-}
-
 void LLViewerTextureList::addImage(LLViewerFetchedTexture *new_image, ETexListType tex_type)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    assert_main_thread();
+    llassert_always(mInitialized) ;
     if (!new_image)
     {
         return;
     }
-    //llassert(new_image);
-    LLUUID image_id = new_image->getID();
-    LLTextureKey key(image_id, tex_type);
-
-    LLViewerFetchedTexture *image = findImage(key);
-    if (image)
+    LLTextureKey key(new_image->getID(), tex_type);
+    new_image->setTextureListType(tex_type);
+    if (!mImages.insert(key, new_image))
     {
-        LL_INFOS() << "Image with ID " << image_id << " already in list" << LL_ENDL;
+        LL_WARNS() << "Image with ID " << new_image->getID() << " already in list" << LL_ENDL;
+        return;
     }
     sNumImages++;
-
-    addImageToList(new_image);
-    mUUIDMap[key] = new_image;
-    new_image->setTextureListType(tex_type);
 }
 
 
 void LLViewerTextureList::deleteImage(LLViewerFetchedTexture *image)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    assert_main_thread();
     if( image)
     {
+        ++sDeleteCount;
         if (image->hasCallbacks())
         {
             mCallbackList.erase(image);
         }
         LLTextureKey key(image->getID(), (ETexListType)image->getTextureListType());
-        llverify(mUUIDMap.erase(key) == 1);
+        // The table's reference is the last one the list holds. Keep it until
+        // this function returns, so the destructor cannot run while a caller
+        // still has the raw pointer in hand.
+        LLPointer<LLViewerFetchedTexture> removed = mImages.erase(key);
+        if (removed.isNull())
+        {
+            LL_WARNS() << "Image " << image->getID() << " is not in the list" << LL_ENDL;
+            return;
+        }
+        llassert(removed == image);
         sNumImages--;
-        removeImageFromList(image);
     }
 }
 
@@ -806,6 +775,24 @@ void LLViewerTextureList::deleteImage(LLViewerFetchedTexture *image)
 void LLViewerTextureList::updateImages(F32 max_time)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    LL_PROFILE_PLOT("TextureList: textures", (int64_t)mImages.size());
+    LL_PROFILE_PLOT("TextureList: finds", (int64_t)sFindCount);
+    LL_PROFILE_PLOT("TextureList: find misses", (int64_t)sFindMissCount);
+    LL_PROFILE_PLOT("TextureList: creates", (int64_t)sCreateCount);
+    LL_PROFILE_PLOT("TextureList: deletes", (int64_t)sDeleteCount);
+    LL_PROFILE_PLOT("TextureList: callback textures", (int64_t)mCallbackList.size());
+    LL_PROFILE_PLOT("TextureList: fast cache pending", (int64_t)mFastCacheList.size());
+    LL_PROFILE_PLOT("TextureList: visits", (int64_t)sVisitCount);
+    LL_PROFILE_PLOT("TextureList: visits boosted", (int64_t)sVisitBoostedCount);
+    LL_PROFILE_PLOT("TextureList: visits faceless", (int64_t)sVisitFacelessCount);
+    LL_PROFILE_PLOT("TextureList: faces walked", (int64_t)sFaceWalkCount);
+    LL_PROFILE_PLOT("TextureList: faces off screen", (int64_t)sFaceOffScreenCount);
+    LL_PROFILE_PLOT("TextureList: pixel area calcs", (int64_t)sPixelAreaCalcCount);
+    LL_PROFILE_PLOT("TextureList: discard bias", (double)LLViewerTexture::sDesiredDiscardBias);
+    sFindCount = sFindMissCount = sCreateCount = sDeleteCount = 0;
+    sVisitCount = sVisitBoostedCount = sVisitFacelessCount = 0;
+    sFaceWalkCount = sFaceOffScreenCount = sPixelAreaCalcCount = 0;
+
     static bool cleared = false;
     if(gTeleportDisplay)
     {
@@ -833,8 +820,8 @@ void LLViewerTextureList::updateImages(F32 max_time)
     {
         using namespace LLStatViewer;
         sample(NUM_IMAGES, sNumImages);
-        sample(NUM_RAW_IMAGES, LLImageRaw::sRawImageCount);
-        sample(FORMATTED_MEM, F64Bytes(LLImageFormatted::sGlobalFormattedMemory));
+        sample(NUM_RAW_IMAGES, LLImageRaw::sRawImageCount.load(std::memory_order_relaxed));
+        sample(FORMATTED_MEM, F64Bytes(LLImageFormatted::sGlobalFormattedMemory.load(std::memory_order_relaxed)));
     }
 
     // make sure each call below gets at least its "fair share" of time
@@ -883,8 +870,8 @@ void LLViewerTextureList::clearFetchingRequests()
 
     LLAppViewer::getTextureFetch()->deleteAllRequests();
 
-    for (image_list_t::iterator iter = mImageList.begin();
-         iter != mImageList.end(); ++iter)
+    for (image_table_t::const_iterator iter = mImages.begin();
+         iter != mImages.end(); ++iter)
     {
         LLViewerFetchedTexture* imagep = *iter;
         imagep->forceToDeleteRequest() ;
@@ -895,10 +882,14 @@ extern bool gCubeSnapshot;
 
 void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imagep, bool flush_images)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(!gCubeSnapshot);
 
     constexpr F32 BIAS_TRS_OUT_OF_SCREEN = 1.5f;
     constexpr F32 BIAS_TRS_ON_SCREEN = 1.f;
+
+    ++sVisitCount;
+    U32 faces_walked = 0;
 
     if (imagep->getBoostLevel() < LLViewerFetchedTexture::BOOST_HIGH)  // don't bother checking face list for boosted textures
     {
@@ -908,31 +899,67 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
         F32 max_vsize = 0.f;
         bool on_screen = false;
 
+        constexpr U32 max_faces_to_check = 1024;
+        // Faces one visit walks. The stat this feeds is a running max, so a
+        // texture with more faces than this converges on its largest face over
+        // a few visits. Above BIAS_TRS_OUT_OF_SCREEN the max is reset every
+        // visit; the slice's max is carried across a rotation of the list so
+        // the reset still sees the whole list, one rotation late.
+        constexpr U32 faces_per_visit = 32;
+
+        U32 channel_faces[LLRender::NUM_TEXTURE_CHANNELS];
         U32 face_count = 0;
-        U32 max_faces_to_check = 1024;
-
-        // get adjusted bias based on image resolution
-        LLImageGL* img = imagep->getGLTexture();
-        F32 max_discard = F32(img ? img->getMaxDiscardLevel() : MAX_DISCARD_LEVEL);
-        F32 bias = llclamp(max_discard - 2.f, 1.f, LLViewerTexture::sDesiredDiscardBias);
-
-        // convert bias into a vsize scaler
-        bias = (F32) llroundf(powf(4, bias - 1.f));
-
-        LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
         for (U32 i = 0; i < LLRender::NUM_TEXTURE_CHANNELS; ++i)
         {
-            face_count += imagep->getNumFaces(i);
-            S32 faces_to_check = (face_count > max_faces_to_check) ? 0 : imagep->getNumFaces(i);
+            channel_faces[i] = imagep->getNumFaces(i);
+            face_count += channel_faces[i];
+        }
 
-            for (S32 fi = 0; fi < faces_to_check; ++fi)
+        if (face_count > 0 && face_count <= max_faces_to_check)
+        {
+            // get adjusted bias based on image resolution
+            LLImageGL* img = imagep->getGLTexture();
+            F32 max_discard = F32(img ? img->getMaxDiscardLevel() : MAX_DISCARD_LEVEL);
+            F32 bias = llclamp(max_discard - 2.f, 1.f, LLViewerTexture::sDesiredDiscardBias);
+
+            // convert bias into a vsize scaler
+            bias = (F32) llroundf(powf(4, bias - 1.f));
+
+            U32 to_walk = face_count;
+            U32 position = 0;
+            const bool sliced = face_count > faces_per_visit;
+            bool rotation_done = false;
+            if (sliced)
             {
-                LLFace* face = (*(imagep->getFaceList(i)))[fi];
+                to_walk = faces_per_visit;
+                position = imagep->mFaceWalkCursor % face_count;
+                imagep->mFaceWalkCursor = position + to_walk;
+                rotation_done = position + to_walk >= face_count;
+            }
+
+            // position counts across the channels' lists laid end to end
+            U32 channel = 0;
+            while (position >= channel_faces[channel])
+            {
+                position -= channel_faces[channel];
+                ++channel;
+            }
+
+            for (U32 walked = 0; walked < to_walk; ++walked)
+            {
+                while (position >= channel_faces[channel])
+                {
+                    position = 0;
+                    channel = (channel + 1) % LLRender::NUM_TEXTURE_CHANNELS;
+                }
+                LLFace* face = (*(imagep->getFaceList(channel)))[position];
+                ++position;
 
                 if (face && face->getViewerObject())
                 {
                     F32 radius;
                     F32 cos_angle_to_view_dir;
+                    ++faces_walked;
 
                     if ((gFrameCount - face->mLastTextureUpdate) > 10)
                     { // only call calcPixelArea at most once every 10 frames for a given face
@@ -940,11 +967,16 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
                         // assigned to them, such as is the case with GLTF materials or Blinn-Phong materials
                         face->mInFrustum = face->calcPixelArea(cos_angle_to_view_dir, radius);
                         face->mLastTextureUpdate = gFrameCount;
+                        ++sPixelAreaCalcCount;
                     }
 
                     F32 vsize = face->getPixelArea();
 
                     on_screen |= face->mInFrustum;
+                    if (!face->mInFrustum)
+                    {
+                        ++sFaceOffScreenCount;
+                    }
 
                     // Scale desired texture resolution higher or lower depending on texture scale
                     //
@@ -986,10 +1018,20 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
                 }
             }
 
-            if (max_vsize >= LLViewerFetchedTexture::sMaxVirtualSize
-                && (on_screen || LLViewerTexture::sDesiredDiscardBias <= BIAS_TRS_ON_SCREEN))
+            if (sliced)
             {
-                break;
+                imagep->mFaceWalkMax = llmax(imagep->mFaceWalkMax, max_vsize);
+                if (rotation_done)
+                {
+                    imagep->mFaceWalkRotationMax = imagep->mFaceWalkMax;
+                    imagep->mFaceWalkMax = 0.f;
+                }
+                max_vsize = llmax(max_vsize, llmax(imagep->mFaceWalkMax, imagep->mFaceWalkRotationMax));
+            }
+            else
+            {
+                imagep->mFaceWalkMax = 0.f;
+                imagep->mFaceWalkRotationMax = 0.f;
             }
         }
 
@@ -998,6 +1040,11 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
             // this is especially important because the above is not time sliced and can hit multiple ms for a single texture
             max_vsize = MAX_IMAGE_AREA;
         }
+        else if (face_count == 0)
+        {
+            ++sVisitFacelessCount;
+        }
+        sFaceWalkCount += faces_walked;
 
         if (imagep->getType() == LLViewerTexture::LOD_TEXTURE && imagep->getBoostLevel() == LLViewerTexture::BOOST_NONE)
         { // conditionally reset max virtual size for unboosted LOD_TEXTURES
@@ -1013,6 +1060,11 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
 
         imagep->addTextureStats(max_vsize);
     }
+    else
+    {
+        ++sVisitBoostedCount;
+    }
+    LL_PROFILE_ZONE_NUM(faces_walked);
 
 #if 0
     imagep->setDebugText(llformat("%d/%d - %d/%d -- %d/%d",
@@ -1032,7 +1084,7 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
     }
 
     F32 max_inactive_time = 20.f; // inactive time before deleting saved raw image
-    S32 min_refs = 3; // 1 for mImageList, 1 for mUUIDMap, and 1 for "entries" in updateImagesFetchTextures
+    S32 min_refs = 2; // 1 for the list's table, and 1 for "entries" in updateImagesFetchTextures
 
     F32 lazy_flush_timeout = 30.f; // delete unused images after 30 seconds
 
@@ -1196,7 +1248,7 @@ F32 LLViewerTextureList::updateImagesLoadingFastCache(F32 max_time)
     //
 
     LLTimer timer;
-    image_list_t::iterator enditer = mFastCacheList.begin();
+    size_t loaded = 0;
     {
         // Prelock fast cache mutex to avoid waiting multiple times.
         LLMutexTrylock fast_cache_lock(LLAppViewer::getTextureCache()->getFastCacheMutex());
@@ -1210,18 +1262,16 @@ F32 LLViewerTextureList::updateImagesLoadingFastCache(F32 max_time)
             // But some variant of a timed try lock for 0.1ms or less might be optimal.
             return 0.0f;
         }
-        for (image_list_t::iterator iter = mFastCacheList.begin();
-            iter != mFastCacheList.end();)
+        // oldest first; the ones not reached wait at the front for the next call
+        for (const LLPointer<LLViewerFetchedTexture>& imagep : mFastCacheList)
         {
-            image_list_t::iterator curiter = iter++;
-            enditer = iter;
-            LLViewerFetchedTexture* imagep = *curiter;
             imagep->loadFromFastCache();
+            ++loaded;
             if (timer.getElapsedTimeF32() > max_time)
                 break;
         }
     }
-    mFastCacheList.erase(mFastCacheList.begin(), enditer);
+    mFastCacheList.erase(mFastCacheList.begin(), mFastCacheList.begin() + loaded);
     return timer.getElapsedTimeF32();
 }
 
@@ -1244,9 +1294,11 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
 
     typedef std::vector<LLPointer<LLViewerFetchedTexture> > entries_list_t;
     static entries_list_t entries;
+    static std::vector<U32> entry_positions; // where each entry sat in the window, for the rewind
     entries.clear();
+    entry_positions.clear();
 
-    // update N textures at beginning of mImageList
+    // update N textures from the table's cursor onwards
     U32 update_count = 0;
     static const S32 MIN_UPDATE_COUNT = gSavedSettings.getS32("TextureFetchUpdateMinCount");       // default: 32
 
@@ -1254,9 +1306,9 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
     // Deletion rules check ref count, so be careful not to hold any LLPointer references to the textures here other than the one in entries.
 
     //update MIN_UPDATE_COUNT or 5% of other textures, whichever is greater
-    update_count = llmax((U32) MIN_UPDATE_COUNT, (U32) mUUIDMap.size()/20);
+    update_count = llmax((U32) MIN_UPDATE_COUNT, (U32) mImages.size()/20);
     if (LLViewerTexture::sDesiredDiscardBias > 1.f
-        && LLViewerTexture::sBiasTexturesUpdated < (U32)mUUIDMap.size())
+        && LLViewerTexture::sBiasTexturesUpdated < (U32)mImages.size())
     {
         // We are over memory target. Bias affects discard rates, so update
         // existing textures agresively to free memory faster.
@@ -1267,45 +1319,54 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
         // at bias = 4 with 4 times the rate permanently.
         LLViewerTexture::sBiasTexturesUpdated += update_count;
     }
-    update_count = llmin(update_count, (U32) mUUIDMap.size());
+    update_count = llmin(update_count, (U32) mImages.size());
 
-    { // copy entries out of UUID map to avoid iterator invalidation from deletion inside updateImageDecodeProiroty or updateFetch below
+    U32 visited = 0;
+    { // copy entries out of the table: deletion inside updateImageDecodePriority or updateFetch below moves items
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vtluift - copy");
+        LL_PROFILE_ZONE_NUM(update_count);
 
-        // copy entries out of UUID map for updating
         entries.reserve(update_count);
-        uuid_map_t::iterator iter = mUUIDMap.upper_bound(mLastUpdateKey);
-        while (update_count-- > 0)
+        entry_positions.reserve(update_count);
+        U32 position = 0;
+        visited = mImages.visitWindow(update_count, [&](LLViewerFetchedTexture* imagep)
         {
-            if (iter == mUUIDMap.end())
+            if (imagep->getGLTexture())
             {
-                iter = mUUIDMap.begin();
+                entries.push_back(imagep);
+                entry_positions.push_back(position);
             }
-
-            if (iter->second->getGLTexture())
-            {
-                entries.push_back(iter->second);
-            }
-            ++iter;
-        }
+            ++position;
+        });
     }
 
     LLTimer timer;
 
-    for (auto& imagep : entries)
     {
-        mLastUpdateKey = LLTextureKey(imagep->getID(), (ETexListType)imagep->getTextureListType());
-
-        if (imagep->getNumRefs() > 1) // make sure this image hasn't been deleted before attempting to update (may happen as a side effect of some other image updating)
+        LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vtluift - update");
+        U32 updated = 0;
+        for (auto& imagep : entries)
         {
-            updateImageDecodePriority(imagep);
-            imagep->updateFetch();
-        }
+            if (imagep->getNumRefs() > 1) // make sure this image hasn't been deleted before attempting to update (may happen as a side effect of some other image updating)
+            {
+                updateImageDecodePriority(imagep);
+                imagep->updateFetch();
+            }
+            ++updated;
 
-        if (timer.getElapsedTimeF32() > max_time)
-        {
-            break;
+            if (timer.getElapsedTimeF32() > max_time)
+            {
+                break;
+            }
         }
+        if (updated < entries.size())
+        {
+            // out of time: the next window starts right after the last entry processed
+            mImages.rewind(visited - (entry_positions[updated - 1] + 1));
+        }
+        LL_PROFILE_ZONE_NUM(updated);
+        LL_PROFILE_PLOT("TextureList: window", (int64_t)entries.size());
+        LL_PROFILE_PLOT("TextureList: updated", (int64_t)updated);
     }
 
     return timer.getElapsedTimeF32();
@@ -1316,8 +1377,8 @@ void LLViewerTextureList::updateImagesUpdateStats()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     if (mForceResetTextureStats)
     {
-        for (image_list_t::iterator iter = mImageList.begin();
-             iter != mImageList.end(); )
+        for (image_table_t::const_iterator iter = mImages.begin();
+             iter != mImages.end(); )
         {
             LLViewerFetchedTexture* imagep = *iter++;
             imagep->resetTextureStats();
@@ -1335,29 +1396,16 @@ void LLViewerTextureList::decodeAllImages(F32 max_time)
     max_time -= updateImagesLoadingFastCache(max_time);
 
     // Update texture stats and priorities
-    std::vector<LLPointer<LLViewerFetchedTexture> > image_list;
-    for (image_list_t::iterator iter = mImageList.begin();
-         iter != mImageList.end(); )
+    for (image_table_t::const_iterator iter = mImages.begin();
+         iter != mImages.end(); )
     {
         LLViewerFetchedTexture* imagep = *iter++;
-        image_list.push_back(imagep);
-        imagep->setInImageList(false) ;
-    }
-
-    llassert_always(image_list.size() == mImageList.size()) ;
-    mImageList.clear();
-    for (std::vector<LLPointer<LLViewerFetchedTexture> >::iterator iter = image_list.begin();
-         iter != image_list.end(); ++iter)
-    {
-        LLViewerFetchedTexture* imagep = *iter;
         imagep->processTextureStats();
-        addImageToList(imagep);
     }
-    image_list.clear();
 
     // Update fetch (decode)
-    for (image_list_t::iterator iter = mImageList.begin();
-         iter != mImageList.end(); )
+    for (image_table_t::const_iterator iter = mImages.begin();
+         iter != mImages.end(); )
     {
         LLViewerFetchedTexture* imagep = *iter++;
         imagep->updateFetch();
@@ -1375,6 +1423,8 @@ void LLViewerTextureList::decodeAllImages(F32 max_time)
         {
             main_queue->runFor(std::chrono::milliseconds(1));
             fetch_pending += main_queue->size();
+            // Uploads still waiting on the GPU are not done either.
+            fetch_pending += LLImageGL::publishUploads();
         }
 
         if (fetch_pending == 0 || timer.getElapsedTimeF32() > max_time)
@@ -1383,8 +1433,8 @@ void LLViewerTextureList::decodeAllImages(F32 max_time)
         }
     }
     // Update fetch again
-    for (image_list_t::iterator iter = mImageList.begin();
-         iter != mImageList.end(); )
+    for (image_table_t::const_iterator iter = mImages.begin();
+         iter != mImages.end(); )
     {
         LLViewerFetchedTexture* imagep = *iter++;
         imagep->updateFetch();

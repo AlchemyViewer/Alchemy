@@ -222,8 +222,8 @@ protected:
     virtual bool doCompare(const LLAvatarListItem* item1, const LLAvatarListItem* item2) const
     {
 
-        F32 arr_time1 = LLRecentPeople::instance().getArrivalTimeByID(item1->getAvatarId());
-        F32 arr_time2 = LLRecentPeople::instance().getArrivalTimeByID(item2->getAvatarId());
+        F64 arr_time1 = LLRecentPeople::instance().getArrivalTimeByID(item1->getAvatarId());
+        F64 arr_time2 = LLRecentPeople::instance().getArrivalTimeByID(item2->getAvatarId());
 
         if (arr_time1 == arr_time2)
         {
@@ -927,10 +927,6 @@ void LLPanelPeople::updateNearbyList()
     }
 // [/RLVa:KB]
     mNearbyList->setDirty();
-#ifdef LL_DISCORD
-    if (gSavedSettings.getBOOL("EnableDiscord"))
-        LLAppViewer::updateDiscordPartyMaxSize((S32)mNearbyList->getIDs().size());
-#endif
 
     DISTANCE_COMPARATOR.updateAvatarsPositions(positions, mNearbyList->getIDs());
     LLActiveSpeakerMgr::instance().update(true);
@@ -1212,7 +1208,7 @@ void LLPanelPeople::onTabSelected(const LLSD& param)
 
 void LLPanelPeople::onAvatarListDoubleClicked(LLUICtrl* ctrl)
 {
-    LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl);
+    LLAvatarListItem* item = ALViewType::as<LLAvatarListItem>(ctrl);
     if(!item)
     {
         return;
@@ -1262,7 +1258,7 @@ void LLPanelPeople::onAvatarListCommitted(LLAvatarList* list)
 
 void LLPanelPeople::onNearbyListDoubleClicked(LLUICtrl* ctrl)
 {
-    LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl);
+    LLAvatarListItem* item = ALViewType::as<LLAvatarListItem>(ctrl);
     if(!item)
     {
         return;
@@ -1643,7 +1639,7 @@ bool LLPanelPeople::notifyChildren(const LLSD& info)
 {
     if (info.has("task-panel-action") && info["task-panel-action"].asString() == "handle-tri-state")
     {
-        LLSideTrayPanelContainer* container = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+        LLSideTrayPanelContainer* container = getParentAs<LLSideTrayPanelContainer>();
         if (!container)
         {
             LL_WARNS() << "Cannot find People panel container" << LL_ENDL;

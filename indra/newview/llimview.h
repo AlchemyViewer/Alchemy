@@ -572,16 +572,18 @@ protected:
 class LLCallDialog : public LLDockableFloater
 {
 public:
+    AL_VIEW_TYPE(LLCallDialog, LLDockableFloater);
+
     LLCallDialog(const LLSD& payload);
     virtual ~LLCallDialog();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void dockToToolbarButton(const std::string& toolbarButtonName);
 
     // check timer state
-    /*virtual*/ void draw();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ void draw() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
 protected:
     // lifetime timer for a notification
@@ -608,9 +610,11 @@ private:
     LLDockControl::DocAt getDockControlPos(const std::string& toolbarButtonName);
 };
 
-class LLIncomingCallDialog : public LLCallDialog
+class LLIncomingCallDialog final : public LLCallDialog
 {
 public:
+    AL_VIEW_TYPE(LLIncomingCallDialog, LLCallDialog);
+
     LLIncomingCallDialog(const LLSD& payload);
     ~LLIncomingCallDialog()
     {
@@ -620,8 +624,8 @@ public:
         }
     }
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
     static void onAccept(void* user_data);
     static void onReject(void* user_data);
@@ -638,15 +642,17 @@ private:
 
     boost::signals2::connection mAvatarNameCacheConnection;
 
-    /*virtual*/ void onLifetimeExpired();
+    /*virtual*/ void onLifetimeExpired() override;
 };
 
-class LLOutgoingCallDialog : public LLCallDialog
+class LLOutgoingCallDialog final : public LLCallDialog
 {
 public:
+    AL_VIEW_TYPE(LLOutgoingCallDialog, LLCallDialog);
+
     LLOutgoingCallDialog(const LLSD& payload);
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
     void show(const LLSD& key);
 
     static void onCancel(void* user_data);

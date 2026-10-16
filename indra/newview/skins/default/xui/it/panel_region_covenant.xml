@@ -21,7 +21,6 @@
 	<text name="covenant_timestamp_text">
 		Ultima modifica Merc 31 Dic 1969 16:00:00
 	</text>
-	<button label="?" name="covenant_help"/>
 	<text_editor bottom="-247" height="162" name="covenant_editor">
 		Per questa proprietà non è stato emesso alcun regolamento.
 	</text_editor>

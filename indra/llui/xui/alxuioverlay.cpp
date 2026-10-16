@@ -1,0 +1,175 @@
+/**
+ * @file alxuioverlay.cpp
+ * @brief Which layer and line wrote each value of a merged XUI tree, and what applied to nothing.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "alxuioverlay.h"
+
+#include <algorithm>
+
+void ALXUIOverlay::clear()
+{
+    mLayers.clear();
+    mOrigins.clear();
+    mDrops.clear();
+    mRescues.clear();
+}
+
+const std::string& ALXUIOverlay::layerPath(S32 layer) const
+{
+    return layer >= 0 && layer < (S32)mLayers.size() ? mLayers[layer] : LLStringUtil::null;
+}
+
+const ALXUIOverlay::Origin* ALXUIOverlay::originOf(const LLXMLNode* node) const
+{
+    auto it = mOrigins.find(node);
+    return it == mOrigins.end() || it->second.empty() ? nullptr : &it->second.back();
+}
+
+const std::vector<ALXUIOverlay::Origin>& ALXUIOverlay::writersOf(const LLXMLNode* node) const
+{
+    static const std::vector<Origin> nobody;
+    auto it = mOrigins.find(node);
+    return it == mOrigins.end() ? nobody : it->second;
+}
+
+// static
+std::string ALXUIOverlay::namePath(const LLXMLNode* node)
+{
+    return ALXmlLayerMerge::namePath(node);
+}
+
+void ALXUIOverlay::drop(S32 layer, const LLXMLNode* overlay_node, std::string what, const char* key,
+                        LLStringUtil::format_map_t args)
+{
+    Drop& d = mDrops.emplace_back();
+    d.layer = layer;
+    d.line = overlay_node ? overlay_node->getLineNumber() : 0;
+    d.path = overlay_node ? namePath(overlay_node->mIsAttribute ? overlay_node->mParent : overlay_node) : std::string();
+    d.what = std::move(what);
+    d.key = key;
+    d.args = std::move(args);
+}
+
+void ALXUIOverlay::layerParsed(S32 layer, const std::string& path)
+{
+    if ((S32)mLayers.size() <= layer)
+    {
+        mLayers.resize(layer + 1);
+    }
+    mLayers[layer] = path;
+}
+
+void ALXUIOverlay::layerSkipped(S32 layer, const std::string& path, const std::string& reason, S32 line)
+{
+    layerParsed(layer, path);
+    Drop& d = mDrops.emplace_back();
+    d.layer = layer;
+    d.line = line;
+    d.key = "LintDropFileUnparsed";
+    d.args["[REASON]"] = reason;
+}
+
+void ALXUIOverlay::rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
+{
+    std::string base_name;
+    std::string overlay_name;
+    base->getAttributeString("name", base_name);
+    overlay->getAttributeString("name", overlay_name);
+    drop(layer, overlay, std::string(), "LintDropRootName",
+         { { "[OVERLAY]", overlay_name }, { "[BASE]", base_name } });
+}
+
+void ALXUIOverlay::rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
+{
+    drop(layer, overlay, std::string(), "LintDropRootTag",
+         { { "[OVERLAY]", overlay->getName()->mString }, { "[BASE]", base->getName()->mString } });
+}
+
+void ALXUIOverlay::childRescued(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
+{
+    Rescue& r = mRescues.emplace_back();
+    r.layer = layer;
+    r.line = overlay->getLineNumber();
+    r.from = namePath(overlay);
+    r.to = namePath(base);
+}
+
+void ALXUIOverlay::childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode* overlay, Miss why)
+{
+    const char* key = "LintDropNotBelow";
+    switch (why)
+    {
+    case Miss::Unnamed:     key = "LintDropUnnamed"; break;
+    case Miss::Duplicate:   key = "LintDropDuplicate"; break;
+    case Miss::Ambiguous:   key = "LintDropAmbiguous"; break;
+    case Miss::NotBelow:    break;
+    }
+    // The root has no path of its own, and the sentence needs a name for
+    // it all the same.
+    std::string parent = namePath(base_parent);
+    if (parent.empty() && (!base_parent->getAttributeString("name", parent) || parent.empty()))
+    {
+        parent = std::string("<") + base_parent->getName()->mString + ">";
+    }
+    drop(layer, overlay, std::string("<") + overlay->getName()->mString + ">", key,
+         { { "[PARENT]", parent } });
+}
+
+void ALXUIOverlay::textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
+{
+    mOrigins[base].push_back(Origin{ layer, overlay->getLineNumber(), std::string() });
+}
+
+// Only where the layer's element says nothing at all -- no text, no
+// children, nothing but the name it was matched by: an element written for
+// an attribute of its own says what it came to say.
+void ALXUIOverlay::textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
+{
+    if (overlay->getFirstChild().isNull() && overlay->mAttributes.size() <= 1)
+    {
+        drop(layer, overlay, std::string(), "LintDropTextEmpty");
+    }
+}
+
+void ALXUIOverlay::valueAppliedAsText(S32 layer, LLXMLNode* base, LLXMLNode* overlay_attribute)
+{
+    mOrigins[base].push_back(Origin{ layer, overlay_attribute->getLineNumber(),
+                                     overlay_attribute->getValue() });
+}
+
+// Every layer that writes it is kept, not only the one that won: which
+// skins and which languages disagree about a value is the question the
+// gutter beside the row is asking, and the answer was crossing here and
+// being dropped.
+void ALXUIOverlay::attributeApplied(S32 layer, LLXMLNode* base_attribute, LLXMLNode* overlay_attribute)
+{
+    mOrigins[base_attribute].push_back(Origin{ layer, overlay_attribute->getLineNumber(),
+                                               overlay_attribute->getValue() });
+}
+
+void ALXUIOverlay::attributeDropped(S32 layer, LLXMLNode* base, LLXMLNode* overlay_attribute)
+{
+    drop(layer, overlay_attribute, overlay_attribute->getName()->mString, "LintDropAttribute");
+}

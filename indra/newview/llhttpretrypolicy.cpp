@@ -189,7 +189,8 @@ bool LLAdaptiveRetryPolicy::getSecondsUntilRetryAfter(const std::string& retry_a
     time_t date = curl_getdate(retry_after.c_str(), NULL);
     if (-1 == date) return false;
 
-    seconds_to_wait = (F32)((F64)date - LLTimer::getTotalSeconds());
+    // The server's date, so against the clock corrected to the server's.
+    seconds_to_wait = (F32)((F64)date - (F64)time_corrected());
 
     return true;
 }

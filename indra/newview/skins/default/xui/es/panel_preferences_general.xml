@@ -23,7 +23,6 @@
 	<text name="maturity_desired_prompt">
 		Quiero acceder a contenido:
 	</text>
-	<text name="maturity_desired_textbox"/>
 	<combo_box name="maturity_desired_combobox">
 		<combo_box.item label="General, Moderado y Adulto" name="Desired_Adult"/>
 		<combo_box.item label="General y Moderado" name="Desired_Mature"/>
@@ -43,7 +42,6 @@
 	</radio_group>
 	<check_box label="Mi nombre" name="show_my_name_checkbox1"/>
 	<check_box label="Nombre de usuario" name="show_slids" tool_tip="Mostrar el nombre de usuario, como bobsmith123"/>
-	<check_box label="Títulos de grupos" name="show_all_title_checkbox1" tool_tip="Mostrar títulos de grupos, como Jefe o Miembro"/>
 	<check_box label="Realzar amigos" name="show_friends" tool_tip="Realzar las etiquetas de los nombres de tus amigos"/>
 	<check_box label="Ver nombres mostrados" name="display_names_check" tool_tip="Comprobar para utilizar nombres mostrados en chat, MI, etiquetas de nombres, etc."/>
 	<text name="inworld_typing_rg_label">

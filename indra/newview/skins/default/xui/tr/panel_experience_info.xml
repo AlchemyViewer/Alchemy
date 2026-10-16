@@ -4,8 +4,30 @@
 	<scroll_container name="xp_scroll">
 		<panel name="scrolling_panel">
 			<layout_stack>
-				<layout_panel>
-					<text name="experience_title" value="Kyle&apos;s Superhero RPG"/>
+				<layout_panel name="marketplace panel">
+					<text name="Location">
+						Pazar yeri mağazası:
+					</text>
+					<text name="LocationTextText">
+						bir yer
+					</text>
+				</layout_panel>
+			</layout_stack>
+			<layout_stack name="ls1">
+				<layout_panel name="details panel">
+					<button label="Düzenle" name="edit_btn"/>
+					<text name="OwnerText">
+						Kyle
+					</text>
+					<text name="Owner">
+						Sahibi:
+					</text>
+					<text name="ContentRatingText">
+						Yetişkin
+					</text>
+					<text name="ContentRating">
+						Seviye:
+					</text>
 				</layout_panel>
 				<layout_panel name="location panel">
 					<text name="Location">
@@ -17,28 +39,8 @@
 					<button label="Işınlama" name="teleport_btn"/>
 					<button label="Harita" name="map_btn"/>
 				</layout_panel>
-				<layout_panel name="marketplace panel">
-					<text name="Location">
-						Pazar yeri mağazası:
-					</text>
-					<text name="LocationTextText">
-						bir yer
-					</text>
-				</layout_panel>
-				<layout_panel>
-					<text name="ContentRating">
-						Seviye:
-					</text>
-					<text name="ContentRatingText">
-						Yetişkin
-					</text>
-					<text name="Owner">
-						Sahibi:
-					</text>
-					<text name="OwnerText">
-						Kyle
-					</text>
-					<button label="Düzenle" name="edit_btn"/>
+				<layout_panel name="title panel">
+					<text name="experience_title" value="Kyle's Superhero RPG"/>
 				</layout_panel>
 			</layout_stack>
 		</panel>

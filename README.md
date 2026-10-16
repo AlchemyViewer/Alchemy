@@ -22,9 +22,6 @@ Alchemy uses CMake with vcpkg for dependency management. Platform setup, presets
 ```
 git clone --recurse-submodules https://github.com/AlchemyViewer/Alchemy.git alchemy
 cd alchemy
-python3 -m venv .venv && source .venv/bin/activate   # Windows: .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-dotnet tool restore                                  # packaging only
 cmake -S indra --preset <preset>                     # see BUILD.md for presets
 cmake --build build-<OS>-<preset> --config Release
 ```

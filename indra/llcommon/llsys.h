@@ -94,6 +94,10 @@ public:
     bool hasAVX() const;
     bool hasAVX2() const;
     bool hasAVX512F() const;
+    bool hasNEON() const;
+    bool hasNEONDotProd() const;
+    bool hasNEONFP16() const;
+    bool hasSVE() const;
     F64 getMHz() const;
 
     // Family is "AMD Duron" or "Intel Pentium Pro"
@@ -110,6 +114,10 @@ private:
     bool mHasAVX;
     bool mHasAVX2;
     bool mHasAVX512F;
+    bool mHasNEON;
+    bool mHasNEONDotProd;
+    bool mHasNEONFP16;
+    bool mHasSVE;
     bool mHasAltivec;
     F64 mCPUMHz;
     std::string mFamily;
@@ -146,8 +154,7 @@ public:
     static void updateAvailableMemory();
 
     // Retrieve a map of memory statistics. The keys of the map are platform-
-    // dependent.
-    // On Windows updates LLMemory values.
+    // dependent. This allocates; it is for diagnostics, not for polling.
     LLSD getStatsMap() const;
 
     // Re-fetch memory data (as reported by stream() and getStatsMap()) from the

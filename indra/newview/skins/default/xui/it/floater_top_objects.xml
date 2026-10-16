@@ -62,6 +62,6 @@
 	<button label="Aggiorna" name="refresh_btn" width="150"/>
 	<button label="Restituisci selezionato" name="return_selected_btn" width="150"/>
 	<button label="Restituisci tutti" left="170" name="return_all_btn"/>
-	<button label="Disabilita selezionato" name="disable_selected_btn" width="150"/>
-	<button label="Disabilita per tutti" left="170" name="disable_all_btn"/>
+	<button name="disable_selected_btn" width="150"/>
+	<button left="170" name="disable_all_btn"/>
 </floater>

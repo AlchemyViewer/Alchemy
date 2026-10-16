@@ -45,6 +45,30 @@ with the same filename but different name
   <texture name="AddItem_Off" file_name="icons/AddItem_Off.png" preload="false" />
   <texture name="AddItem_Press" file_name="icons/AddItem_Press.png" preload="false" />
 
+  <texture name="AlignBottom_Disabled" file_name="icons/AlignBottom_Disabled.png" preload="false" />
+  <texture name="AlignBottom_Off" file_name="icons/AlignBottom_Off.png" preload="false" />
+  <texture name="AlignBottom_Press" file_name="icons/AlignBottom_Press.png" preload="false" />
+
+  <texture name="AlignCenter_Disabled" file_name="icons/AlignCenter_Disabled.png" preload="false" />
+  <texture name="AlignCenter_Off" file_name="icons/AlignCenter_Off.png" preload="false" />
+  <texture name="AlignCenter_Press" file_name="icons/AlignCenter_Press.png" preload="false" />
+
+  <texture name="AlignLeft_Disabled" file_name="icons/AlignLeft_Disabled.png" preload="false" />
+  <texture name="AlignLeft_Off" file_name="icons/AlignLeft_Off.png" preload="false" />
+  <texture name="AlignLeft_Press" file_name="icons/AlignLeft_Press.png" preload="false" />
+
+  <texture name="AlignMiddle_Disabled" file_name="icons/AlignMiddle_Disabled.png" preload="false" />
+  <texture name="AlignMiddle_Off" file_name="icons/AlignMiddle_Off.png" preload="false" />
+  <texture name="AlignMiddle_Press" file_name="icons/AlignMiddle_Press.png" preload="false" />
+
+  <texture name="AlignRight_Disabled" file_name="icons/AlignRight_Disabled.png" preload="false" />
+  <texture name="AlignRight_Off" file_name="icons/AlignRight_Off.png" preload="false" />
+  <texture name="AlignRight_Press" file_name="icons/AlignRight_Press.png" preload="false" />
+
+  <texture name="AlignTop_Disabled" file_name="icons/AlignTop_Disabled.png" preload="false" />
+  <texture name="AlignTop_Off" file_name="icons/AlignTop_Off.png" preload="false" />
+  <texture name="AlignTop_Press" file_name="icons/AlignTop_Press.png" preload="false" />
+
   <texture name="add_payment_image_center"  file_name="windows/add_payment_image_center.png" preload="true" />
   <texture name="add_payment_image_left"  file_name="windows/add_payment_image_left.png" preload="true" />
   <texture name="add_payment_image_right"  file_name="windows/add_payment_image_right.png" preload="true" />
@@ -146,6 +170,7 @@ with the same filename but different name
   <texture name="Command_Compass_Icon"      file_name="toolbar_icons/land.png"         preload="true" />
   <texture name="Command_Debug_Icon"        file_name="toolbar_icons/debug.png"        preload="true" />
   <texture name="Command_Destinations_Icon" file_name="toolbar_icons/destinations.png" preload="true" />
+  <texture name="Command_Feedback_Icon"     file_name="toolbar_icons/outbox.png"       preload="true" />
   <texture name="Command_Gestures_Icon"     file_name="toolbar_icons/gestures.png"     preload="true" />
   <texture name="Command_Grid_Status_Icon"  file_name="toolbar_icons/grid_status.png"  preload="true" />
   <texture name="Command_Inventory_Icon"    file_name="toolbar_icons/inventory.png"    preload="true" />
@@ -170,6 +195,7 @@ with the same filename but different name
   <texture name="Command_RegionTracker_Icon" file_name="toolbar_icons/regiontracker.png"       preload="true" />
   <texture name="Command_Report_Abuse_Icon" file_name="toolbar_icons/report_abuse.png" preload="true" />
   <texture name="Command_Scripts_Icon"      file_name="toolbar_icons/script.png"       preload="true" />
+  <texture name="Command_ScriptStudio_Icon" file_name="toolbar_icons/script_studio.png" preload="true" />
   <texture name="Command_Stats_Icon"        file_name="toolbar_icons/stats.png"        preload="true" />
   <texture name="Command_Search_Icon"       file_name="toolbar_icons/search.png"       preload="true" />
   <texture name="Command_Snapshot_Icon"     file_name="toolbar_icons/snapshot.png"     preload="true" />
@@ -668,6 +694,18 @@ with the same filename but different name
   <texture name="Sidebar_Icon_Undock_Foreground" file_name="taskpanel/Sidebar_Icon_Undock_Foreground.png" preload="false" />
   <texture name="Sidebar_Icon_Undock_Press" file_name="taskpanel/Sidebar_Icon_Undock_Press.png" preload="false" />
 
+  <texture name="SidebarBottom_Disabled" file_name="icons/SidebarBottom_Disabled.png" preload="false" />
+  <texture name="SidebarBottom_Off" file_name="icons/SidebarBottom_Off.png" preload="false" />
+  <texture name="SidebarBottom_Press" file_name="icons/SidebarBottom_Press.png" preload="false" />
+
+  <texture name="SidebarLeft_Disabled" file_name="icons/SidebarLeft_Disabled.png" preload="false" />
+  <texture name="SidebarLeft_Off" file_name="icons/SidebarLeft_Off.png" preload="false" />
+  <texture name="SidebarLeft_Press" file_name="icons/SidebarLeft_Press.png" preload="false" />
+
+  <texture name="SidebarRight_Disabled" file_name="icons/SidebarRight_Disabled.png" preload="false" />
+  <texture name="SidebarRight_Off" file_name="icons/SidebarRight_Off.png" preload="false" />
+  <texture name="SidebarRight_Press" file_name="icons/SidebarRight_Press.png" preload="false" />
+
   <texture name="Shop" file_name="icons/Shop.png" preload="false" />
 
   <texture name="SkipBackward_Off" file_name="icons/SkipBackward_Off.png" preload="false" />
@@ -1001,4 +1039,38 @@ with the same filename but different name
   <texture name="Script_Running" file_name="script_editor/green_square.png" preload="false" />
   <texture name="Script_NotRunning" file_name="script_editor/yellow_square.png" preload="false" />
   <texture name="Script_Error" file_name="script_editor/red_square.png" preload="false" />
+
+  <!-- The Script Studio's marks, drawn by scripts/content_tools/generate_studio_icons.py:
+       the kinds of symbol on the completion list and in the outline, the
+       toolbar, and the tabs and the explorer. -->
+  <texture name="Symbol_Function" file_name="studio/Symbol_Function.png" preload="false" />
+  <texture name="Symbol_Event" file_name="studio/Symbol_Event.png" preload="false" />
+  <texture name="Symbol_Constant" file_name="studio/Symbol_Constant.png" preload="false" />
+  <texture name="Symbol_Keyword" file_name="studio/Symbol_Keyword.png" preload="false" />
+  <texture name="Symbol_Type" file_name="studio/Symbol_Type.png" preload="false" />
+  <texture name="Symbol_Variable" file_name="studio/Symbol_Variable.png" preload="false" />
+  <texture name="Symbol_Parameter" file_name="studio/Symbol_Parameter.png" preload="false" />
+  <texture name="Symbol_Field" file_name="studio/Symbol_Field.png" preload="false" />
+  <texture name="Symbol_Label" file_name="studio/Symbol_Label.png" preload="false" />
+  <texture name="Symbol_Snippet" file_name="studio/Symbol_Snippet.png" preload="false" />
+  <texture name="Symbol_Word" file_name="studio/Symbol_Word.png" preload="false" />
+  <texture name="Symbol_Deprecated" file_name="studio/Symbol_Deprecated.png" preload="false" />
+  <texture name="Symbol_Module" file_name="studio/Symbol_Module.png" preload="false" />
+  <texture name="Studio_SaveAll" file_name="studio/Studio_SaveAll.png" preload="false" />
+  <texture name="Studio_Find" file_name="studio/Studio_Find.png" preload="false" />
+  <texture name="Studio_Format" file_name="studio/Studio_Format.png" preload="false" />
+  <texture name="Studio_Expanded" file_name="studio/Studio_Expanded.png" preload="false" />
+  <texture name="Studio_File" file_name="studio/Studio_File.png" preload="false" />
+  <texture name="Studio_Prim" file_name="studio/Studio_Prim.png" preload="false" />
+  <texture name="Studio_Config" file_name="studio/Studio_Config.png" preload="false" />
+  <texture name="Studio_Save" file_name="studio/Studio_Save.png" preload="false" />
+  <texture name="Studio_Undo" file_name="studio/Studio_Undo.png" preload="false" />
+  <texture name="Studio_Redo" file_name="studio/Studio_Redo.png" preload="false" />
+  <texture name="Studio_PaneLeft" file_name="studio/Studio_PaneLeft.png" preload="false" />
+  <texture name="Studio_PaneBottom" file_name="studio/Studio_PaneBottom.png" preload="false" />
+  <texture name="Studio_PaneRight" file_name="studio/Studio_PaneRight.png" preload="false" />
+  <texture name="Studio_Pinned" file_name="studio/Studio_Pinned.png" preload="false" />
+  <texture name="Problem_Error" file_name="studio/Problem_Error.png" preload="false" />
+  <texture name="Problem_Warning" file_name="studio/Problem_Warning.png" preload="false" />
+  <texture name="Problem_Note" file_name="studio/Problem_Note.png" preload="false" />
 </textures>

@@ -23,95 +23,20 @@
  * $/LicenseInfo$
  */
 
-// Shared matrix stack + derived matrices, spliced from
-// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
-//[ENGINE_BLOCK Matrices]
+// The water has no vertex buffer: each piece of the field is an instance placed from the cell map and the layout
+// (waterSurface.glsl's water_vertex). waterLayout picks the part (ALWaterField::Draw).
+uniform int waterLayout;
 
-in vec3 position;
-
-
-void calcAtmospherics(vec3 inPositionEye);
-
-uniform vec2 waveDir1;
-uniform vec2 waveDir2;
-uniform float time;
-uniform vec3 eyeVec;
-uniform float waterHeight;
-uniform vec3 lightDir;
-
-out vec4 refCoord;
-out vec4 littleWave;
-out vec4 view;
-out vec3 vary_position;
-out vec3 vary_light_dir;
-out vec3 vary_tangent;
-out vec3 vary_normal;
-out vec2 vary_fragcoord;
-
-float wave(vec2 v, float t, float f, vec2 d, float s)
-{
-   return (dot(d, v)*f + t*s)*f;
-}
+bool water_vertex(int part, int instance, int vertex, out vec3 pos);
+// The corners the cells and the fringe share with the waves' patches, drawn by another program, land where the
+// patches' do: the same position through the same water_varyings.
+invariant gl_Position;
+// waterVaryingsV.glsl: what the fragment stages take, written alike for the waves' evaluation stage.
+vec4 water_varyings(vec3 position);
 
 void main()
 {
-    //transform vertex
-    vec4 pos = vec4(position.xyz, 1.0);
-    mat4 modelViewProj = modelview_projection_matrix;
-
-    vary_position = (modelview_matrix * pos).xyz;
-    vary_light_dir = normal_matrix * lightDir;
-    vary_normal = normal_matrix * vec3(0, 0, 1);
-    vary_tangent = normal_matrix * vec3(1, 0, 0);
-
-    vec4 oPosition;
-
-    //get view vector
-    vec3 oEyeVec;
-    oEyeVec.xyz = pos.xyz-eyeVec;
-
-    float d = length(oEyeVec.xy);
-    float ld = min(d, 2560.0);
-
-    pos.xy = eyeVec.xy + oEyeVec.xy/d*ld;
-    view.xyz = oEyeVec;
-
-    d = clamp(ld/1536.0-0.5, 0.0, 1.0);
-    d *= d;
-
-    oPosition = vec4(position, 1.0);
-//  oPosition.z = mix(oPosition.z, max(eyeVec.z*0.75, 0.0), d); // SL-11589 remove "U" shaped horizon
-
-    oPosition = modelViewProj * oPosition;
-
-    // waterF/underWaterF derive the refraction/reflection UV as refCoord.xy / refCoord.z;
-    // the +0.2 z fudge approximates clip w for the legacy convention. Under reverse-Z carry
-    // true clip w instead (clip.z -> ~0 at far would blow the UV up). refCoord.w is reused
-    // for a wave param below, so only .xyz changes here.
-#ifdef REVERSE_Z
-    refCoord.xyz = vec3(oPosition.xy, oPosition.w);
-#else
-    refCoord.xyz = oPosition.xyz + vec3(0,0,0.2);
-#endif
-
-    //get wave position parameter (create sweeping horizontal waves)
-    vec3 v = pos.xyz;
-    v.x += (cos(v.x*0.08/*+time*0.01*/)+sin(v.y*0.02))*6.0;
-
-    //push position for further horizon effect.
-    pos.xyz = oEyeVec.xyz*(waterHeight/oEyeVec.z);
-    pos.w = 1.0;
-    pos = modelview_matrix*pos;
-
-    calcAtmospherics(pos.xyz);
-
-    //pass wave parameters to pixel shader
-    vec2 bigWave =  (v.xy) * vec2(0.04,0.04)  + waveDir1 * time * 0.055;
-    //get two normal map (detail map) texture coordinates
-    littleWave.xy = (v.xy) * vec2(0.45, 0.9)   + waveDir2 * time * 0.13;
-    littleWave.zw = (v.xy) * vec2(0.1, 0.2) + waveDir1 * time * 0.1;
-    view.w = bigWave.y;
-    refCoord.w = bigWave.x;
-
-    gl_Position = oPosition;
+    vec3 position;
+    water_vertex(waterLayout, gl_InstanceID, gl_VertexID, position);
+    gl_Position = water_varyings(position);
 }

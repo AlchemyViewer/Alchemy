@@ -112,7 +112,7 @@ static_assert((U32)ALSceneExplorerFilter::SCOPE_PARCEL == (U32)ALSceneExplorerPr
 static_assert((U32)ALSceneExplorerFilter::SCOPE_RADIUS == (U32)ALSceneExplorerPredicate::SCOPE_RADIUS);
 
 ALSceneExplorerFilter::ALSceneExplorerFilter()
-:   mName("scene_explorer")
+:   ALFolderFilter("scene_explorer")
 {
 }
 
@@ -306,22 +306,28 @@ void ALSceneExplorerFilter::setModified(EFilterModified behavior)
     }
 }
 
-std::string::size_type ALSceneExplorerFilter::getStringMatchOffset(LLFolderViewModelItem* item) const
+// Only a name match can be highlighted: the widget draws the highlight within
+// its displayed label, and the name is the only searched field the label shows
+// (description/UUID/owner matches return no match). The search copy is
+// lowercased, and lowercasing UTF-8 changes byte lengths, so the raw find
+// offset does not index the label.
+LLFolderViewFilter::Match ALSceneExplorerFilter::getFilterMatch(LLFolderViewModelItem* item) const
 {
+    Match match;
     if (mConstraints.mFilterSubString.empty())
-        return std::string::npos;
-    // Only a name match can be highlighted: the widget draws the highlight at
-    // this offset within its displayed label, and the name is the only
-    // searched field the label shows (description/UUID/owner matches return
-    // npos). The lowercased search copy is byte-length-identical to the
-    // display name, so the offset maps straight onto the label — matching
-    // LLInventoryFilter's behaviour, including its non-ASCII imprecision.
+        return match;
     if (mConstraints.mSearchType != (U32)SEARCH_NAME
         && mConstraints.mSearchType != (U32)SEARCH_ALL)
     {
-        return std::string::npos;
+        return match;
     }
-    return static_cast<ALSceneExplorerItem*>(item)->searchName().find(mConstraints.mFilterSubString);
+
+    const std::string::size_type at =
+        static_cast<ALSceneExplorerItem*>(item)->searchName().find(mConstraints.mFilterSubString);
+    if (at == std::string::npos)
+        return match;
+
+    return spanIn(item->getDisplayName(), at, mConstraints.mFilterSubString);
 }
 
 bool ALSceneExplorerFilter::check(const LLFolderViewModelItem* item)
@@ -357,7 +363,7 @@ bool ALSceneExplorerFilter::check(const LLFolderViewModelItem* item)
 // ============================================================================
 ALSceneExplorerItem::ALSceneExplorerItem(EItemType type, const LLUUID& id, const std::string& name,
         LLFolderViewModelInterface& root_view_model, ALFloaterSceneExplorer* floater)
-:   LLFolderViewModelItemCommon(root_view_model),
+:   ALFilteredItem(root_view_model),
     mItemType(type),
     mUUID(id),
     mName(name),
@@ -574,65 +580,6 @@ void ALSceneExplorerItem::setPassedFilter(bool passed, S32 filter_generation,
             parent_folder->requestArrange();
         }
     }
-}
-
-bool ALSceneExplorerItem::filter(LLFolderViewFilter& filter)
-{
-    const S32 filter_generation = filter.getCurrentGeneration();
-    const S32 must_pass_generation = filter.getFirstRequiredGeneration();
-
-    if (getLastFilterGeneration() >= must_pass_generation
-        && getLastFolderFilterGeneration() >= must_pass_generation
-        && !passedFilter(must_pass_generation))
-    {
-        // Already failed a filter at least as strict as this one.
-        setPassedFilter(false, filter_generation);
-        setPassedFolderFilter(false, filter_generation);
-        return true;
-    }
-
-    const bool passed_filter_folder = isFolderType() ? filter.checkFolder(this) : true;
-    setPassedFolderFilter(passed_filter_folder, filter_generation);
-
-    bool continue_filtering = true;
-    if (!mChildren.empty()
-        && (getLastFilterGeneration() < must_pass_generation
-            || descendantsPassedFilter(must_pass_generation)))
-    {
-        for (auto& childp : mChildren)
-        {
-            ALSceneExplorerItem* child = static_cast<ALSceneExplorerItem*>(childp.get());
-            if (child->getLastFilterGeneration() < filter_generation)
-            {
-                // Child returns false when the per-pass time budget is spent;
-                // stop here and resume from this child on the next idle.
-                continue_filtering = child->filter(filter);
-            }
-            if (child->passedFilter())
-            {
-                ALSceneExplorerItem* vm = this;
-                while (vm && vm->mMostFilteredDescendantGeneration < filter_generation)
-                {
-                    vm->mMostFilteredDescendantGeneration = filter_generation;
-                    vm = static_cast<ALSceneExplorerItem*>(vm->mParent);
-                }
-            }
-            if (!continue_filtering)
-                break;
-        }
-    }
-
-    if (continue_filtering)
-    {
-        const bool passed = filter.check(this);
-        // The match offset/size make the folder view draw the standard
-        // inventory-style highlight over the matched substring.
-        setPassedFilter(passed, filter_generation,
-                        filter.getStringMatchOffset(this), filter.getFilterStringSize());
-        continue_filtering = !filter.isTimedOut();
-    }
-
-    return continue_filtering;
 }
 
 // ============================================================================

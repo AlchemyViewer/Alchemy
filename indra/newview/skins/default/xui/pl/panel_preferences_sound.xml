@@ -6,9 +6,6 @@
     <tab_container name="sound_prefs_tab_container">
     <panel name="general_sound_panel">
 	<slider label="Głośność ogólna" name="System Volume" />
-	<text name="mute_chb_label">
-		Wycisz gdy zminimalizowane
-	</text>
 	<slider label="Interfejs" name="UI Volume" />
 	<slider label="Otoczenie" name="Wind Volume" />
 	<slider label="Efekty dźwiękowe" name="SFX Volume" />
@@ -17,15 +14,8 @@
 	<check_box label="Włączone" name="enable_media" />
 	<slider label="Rozmowy głosowe" name="Voice Volume" />
 	<check_box label="Włączone" name="enable_voice_check" />
-	<check_box name="media_auto_play_btn" tool_tip="Zaznacz tę funkcję, aby automatycznie uruchamiać media" label="Automatycznie odtwarzaj media" />
 	<check_box name="media_show_on_others_btn" tool_tip="Odznacz tę funkcję by ukryć media załączone do awatarów w pobliżu" label="Uruchamiaj media dołączone do innych awatarów" />
 	<check_box name="gesture_audio_play_btn" tool_tip="Zaznacz, aby słyszeć dźwięki gestów" label="Odtwarzaj dźwięki gestów" />
-	<text name="voice_chat_settings">
-		Rozmowy głosowe
-	</text>
-	<line_editor name="modifier_combo" label="Przełącznik naciśnij-by-mówić" />
-	<button label="Ustaw klawisz" name="set_voice_hotkey_button" />
-	<button tool_tip="Zresetuj do środkowego przycisku myszy" name="set_voice_middlemouse_button" />
 	</panel>
 	<panel name="voice_sound_panel">
 	<text name="Listen from">

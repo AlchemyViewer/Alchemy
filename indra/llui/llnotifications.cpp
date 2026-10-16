@@ -33,6 +33,7 @@
 #include "llavatarnamecache.h"
 #include "llinstantmessage.h"
 #include "llcachename.h"
+#include "alxmllayermerge.h"
 #include "llxmlnode.h"
 #include "lluictrl.h"
 #include "lluictrlfactory.h"
@@ -44,7 +45,6 @@
 #include "llsdutil.h"
 
 #include <algorithm>
-#include <boost/regex.hpp>
 
 
 const std::string NOTIFICATION_PERSIST_VERSION = "0.93";
@@ -355,7 +355,7 @@ void LLNotificationForm::append(const LLSD& sub_form)
     }
 }
 
-void LLNotificationForm::formatElements(const LLSD& substitutions)
+void LLNotificationForm::formatElements(const LLStringUtil::format_map_t& defaults, const LLSD& substitutions)
 {
     for (LLSD::array_iterator it = mFormData.beginArray();
         it != mFormData.endArray();
@@ -365,13 +365,13 @@ void LLNotificationForm::formatElements(const LLSD& substitutions)
         if ((*it).has("text"))
         {
             std::string text = (*it)["text"].asString();
-            LLStringUtil::format(text, substitutions);
+            LLStringUtil::format(text, defaults, substitutions);
             (*it)["text"] = text;
         }
         if ((*it)["type"].asString() == "text" && (*it).has("value"))
         {
             std::string value = (*it)["value"].asString();
-            LLStringUtil::format(value, substitutions);
+            LLStringUtil::format(value, defaults, substitutions);
             (*it)["value"] = value;
         }
     }
@@ -862,13 +862,9 @@ void LLNotification::init(const std::string& template_name, const LLSD& form_ele
     mTemplatep = LLNotifications::instance().getTemplate(template_name);
     if (!mTemplatep) return;
 
-    // add default substitutions
-    const LLStringUtil::format_map_t& default_args = LLTrans::getDefaultArgs();
-    for (LLStringUtil::format_map_t::const_iterator iter = default_args.begin();
-         iter != default_args.end(); ++iter)
-    {
-        mSubstitutions[std::string(iter->first)] = iter->second;
-    }
+    // The default substitutions -- [APP_NAME] and the rest -- are read
+    // beside these wherever the template's words are formatted, rather
+    // than copied into every notification made.
     mSubstitutions["_URL"] = getURL();
     mSubstitutions["_NAME"] = template_name;
     // TODO: something like this so that a missing alert is sensible:
@@ -878,7 +874,7 @@ void LLNotification::init(const std::string& template_name, const LLSD& form_ele
     mForm->append(form_elements);
 
     // apply substitution to form labels
-    mForm->formatElements(mSubstitutions);
+    mForm->formatElements(LLTrans::getDefaultArgs(), mSubstitutions);
 
     mIgnored = mForm->getIgnored();
 
@@ -913,7 +909,7 @@ std::string LLNotification::getMessage() const
         return std::string();
 
     std::string message = mTemplatep->mMessage;
-    LLStringUtil::format(message, mSubstitutions);
+    LLStringUtil::format(message, LLTrans::getDefaultArgs(), mSubstitutions);
     return message;
 }
 
@@ -923,14 +919,14 @@ std::string LLNotification::getFooter() const
         return std::string();
 
     std::string footer = mTemplatep->mFooter;
-    LLStringUtil::format(footer, mSubstitutions);
+    LLStringUtil::format(footer, LLTrans::getDefaultArgs(), mSubstitutions);
     return footer;
 }
 
 std::string LLNotification::getLabel() const
 {
     std::string label = mTemplatep->mLabel;
-    LLStringUtil::format(label, mSubstitutions);
+    LLStringUtil::format(label, LLTrans::getDefaultArgs(), mSubstitutions);
     return (mTemplatep ? label : "");
 }
 
@@ -946,7 +942,7 @@ std::string LLNotification::getURL() const
     if (!mTemplatep)
         return std::string();
     std::string url = mTemplatep->mURL;
-    LLStringUtil::format(url, mSubstitutions);
+    LLStringUtil::format(url, LLTrans::getDefaultArgs(), mSubstitutions);
     return (mTemplatep ? url : "");
 }
 
@@ -1308,9 +1304,11 @@ bool LLNotifications::uniqueFilter(LLNotificationPtr pNotif)
         return true;
     }
 
-    // checks against existing unique notifications
-    for (LLNotificationMap::iterator existing_it = mUniqueNotifications.find(pNotif->getName());
-        existing_it != mUniqueNotifications.end();
+    // checks against existing unique notifications. A name can hold several,
+    // and multimap::find promises only some entry with the key, so the walk
+    // is over the whole run under it.
+    for (auto [existing_it, end] = mUniqueNotifications.equal_range(pNotif->getName());
+        existing_it != end;
         ++existing_it)
     {
         LLNotificationPtr existing_notification = existing_it->second;
@@ -1371,8 +1369,8 @@ bool LLNotifications::failedUniquenessTest(const LLSD& payload)
         // Update the existing unique notification with the data from this particular instance...
         // This guarantees that duplicate notifications will be collapsed to the one
         // most recently triggered
-        for (LLNotificationMap::iterator existing_it = mUniqueNotifications.find(pNotif->getName());
-            existing_it != mUniqueNotifications.end();
+        for (auto [existing_it, end] = mUniqueNotifications.equal_range(pNotif->getName());
+            existing_it != end;
             ++existing_it)
         {
             LLNotificationPtr existing_notification = existing_it->second;
@@ -1391,8 +1389,8 @@ bool LLNotifications::failedUniquenessTest(const LLSD& payload)
         // Add to the existing unique notification with the data from this particular instance...
         // This guarantees that duplicate notifications will be collapsed to the one
         // most recently triggered
-        for (LLNotificationMap::iterator existing_it = mUniqueNotifications.find(pNotif->getName());
-            existing_it != mUniqueNotifications.end();
+        for (auto [existing_it, end] = mUniqueNotifications.equal_range(pNotif->getName());
+            existing_it != end;
             ++existing_it)
         {
             LLNotificationPtr existing_notification = existing_it->second;
@@ -1603,7 +1601,7 @@ bool LLNotifications::loadTemplates()
 
     std::string base_filename = search_paths.front();
     LLXMLNodePtr root;
-    bool success  = LLXMLNode::getLayeredXMLNode(root, search_paths);
+    bool success  = ALXmlLayerMerge::load(search_paths, root);
 
     if (!success || root.isNull() || !root->hasName( "notifications" ))
     {

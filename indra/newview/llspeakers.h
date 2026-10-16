@@ -67,7 +67,7 @@ public:
     bool isInVoiceChannel();
 
     ESpeakerStatus  mStatus;            // current activity status in speech group
-    F32             mLastSpokeTime;     // timestamp when this speaker last spoke
+    F64             mLastSpokeTime;     // timestamp when this speaker last spoke, the speaker manager's mSpeechTimer elapsed
     F32             mSpeechVolume;      // current speech amplitude (timea average rms amplitude?)
     std::string     mDisplayName;       // cache user name for this speaker
     bool            mHasSpoken;         // has this speaker said anything this session?

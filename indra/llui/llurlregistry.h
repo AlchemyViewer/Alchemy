@@ -77,17 +77,11 @@ public:
                  const LLUrlLabelCallback &cb = &LLUrlRegistryNullCallback,
                  bool is_content_trusted = false, bool skip_non_mentions = false);
 
-    /// a slightly less efficient version of findUrl for wide strings
-    bool findUrl(const LLWString &text, LLUrlMatch &match,
-                 const LLUrlLabelCallback &cb = &LLUrlRegistryNullCallback);
-
     // return true if the given string contains a URL that findUrl would match
     bool hasUrl(const std::string &text);
-    bool hasUrl(const LLWString &text);
 
     // return true if the given string is a URL that findUrl would match
     bool isUrl(const std::string &text);
-    bool isUrl(const LLWString &text);
 
     // Set handler for url registry to be capable of parsing and populating keybindings
     void setKeybindingHandler(LLKeyBindingToStringHandler* handler);
@@ -95,7 +89,20 @@ public:
     bool containsAgentMention(const std::string& text);
 
 private:
+    // The entries' patterns as one set, asked first which of them can
+    // match anywhere in a text at all: the only test of whether a text holds
+    // a Url, which reads each pattern as its entry does
+    void buildUrlSet();
+
     std::vector<LLUrlEntryBase *> mUrlEntry;
+    ALRegexSet mUrlSet;
+    // Each entry's index in the set, in the order of mUrlEntry; -1 for one
+    // the set does not speak for, which is always tried
+    std::vector<S32> mUrlSetIndex;
+    bool mUrlSetBuilt = false;
+    // Whether the set speaks for every entry, so that a text it says none
+    // match in holds no Url
+    bool mUrlSetHasAll = false;
     LLUrlEntryBase* mUrlEntryIcon;
     LLUrlEntryBase* mLLUrlEntryInvalidSLURL;
     LLUrlEntryBase* mUrlEntryHTTPLabel;

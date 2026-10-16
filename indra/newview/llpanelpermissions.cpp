@@ -1039,31 +1039,28 @@ void shorten_name(std::string &name, const LLStyle::Params& style_params, S32 ma
 {
     const LLFontGL* font = style_params.font();
 
-    LLWString wline = utf8str_to_wstring(name);
     // panel supports two lines long names
-    S32 segment_length = font->maxDrawableChars(wline, (F32)max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
-    if (segment_length == (S32)wline.length())
+    S32 segment_length = font->maxDrawableBytes(name, (F32)max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+    if (segment_length == (S32)name.length())
     {
         // no work needed
         return;
     }
 
     S32 first_line_length = segment_length;
-    segment_length = font->maxDrawableChars(LLWStringView(wline).substr(first_line_length), (F32)max_pixels, S32_MAX, LLFontGL::ANYWHERE);
-    if (segment_length + first_line_length == (S32)wline.length())
+    segment_length = font->maxDrawableBytes(std::string_view(name).substr(first_line_length), (F32)max_pixels, S32_MAX, LLFontGL::ANYWHERE);
+    if (segment_length + first_line_length == (S32)name.length())
     {
         // no work needed
         return;
     }
 
     // name does not fit, cut it, add ...
-    F32 elipses_width = font->getWidthF32(U"....");
-    segment_length = font->maxDrawableChars(LLWStringView(wline).substr(first_line_length), (F32)max_pixels - elipses_width, S32_MAX, LLFontGL::ANYWHERE);
+    static const std::string ELLIPSIS_PAD("....");
+    F32 elipses_width = font->getWidthF32(ELLIPSIS_PAD);
+    segment_length = font->maxDrawableBytes(std::string_view(name).substr(first_line_length), (F32)max_pixels - elipses_width, S32_MAX, LLFontGL::ANYWHERE);
 
-    // Cut the wide form: maxDrawableChars counts codepoints, so applying the
-    // total to `name` (UTF-8, byte-indexed) truncated non-ASCII names in the
-    // wrong place and could slice a multi-byte sequence in half.
-    name = wstring_to_utf8str(wline.substr(0, segment_length + first_line_length)) + std::string("...");
+    name = name.substr(0, segment_length + first_line_length) + "...";
 }
 
 void LLPanelPermissions::updateOwnerName(const LLUUID& owner_id, const LLAvatarName& owner_name, const LLStyle::Params& style_params)

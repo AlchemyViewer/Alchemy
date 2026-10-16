@@ -32,6 +32,8 @@
 #include "llfocusmgr.h"
 #include "lluictrl.h"
 
+#include <algorithm>
+
 constexpr char GESTURE_AUTOCOMPLETE_FLOATER[] = "gesture_autocomplete_picker";
 
 bool LLGestureAutocompleteHelper::isActive(const LLUICtrl* ctrl) const
@@ -43,20 +45,18 @@ void LLGestureAutocompleteHelper::showHelper(
     LLUICtrl* host_ctrl,
     const std::vector<Row>& rows,
     size_t total,
-    std::function<void(std::string)> commit_cb)
+    std::function<void(const Row&, CommitAction)> commit_cb)
 {
     if (mHelperHandle.isDead())
     {
         LLFloater* helper_floater = LLFloaterReg::getInstance(GESTURE_AUTOCOMPLETE_FLOATER);
         mHelperHandle = helper_floater->getHandle();
-        mHelperCommitConn = helper_floater->setCommitCallback(
-            [this](LLUICtrl*, const LLSD& param) { onCommitGesture(param.asString()); });
     }
 
     setHostCtrl(host_ctrl);
     mRows = rows;
     mTotal = total;
-    mGestureCommitCb = commit_cb;
+    mCommitCb = commit_cb;
 
     S32 floater_x, floater_y;
     LLRect host_rect = host_ctrl->getRect();
@@ -94,11 +94,22 @@ bool LLGestureAutocompleteHelper::handleKey(const LLUICtrl* ctrl, KEY key, MASK 
     return mHelperHandle.get()->handleKey(key, mask, true);
 }
 
-void LLGestureAutocompleteHelper::onCommitGesture(const std::string& trigger)
+void LLGestureAutocompleteHelper::onCommit(const std::string& value, bool return_key)
 {
-    if (!mHostHandle.isDead() && mGestureCommitCb)
+    const auto row_it = std::find_if(
+        mRows.begin(),
+        mRows.end(),
+        [&value](const Row& row) { return row.value == value; });
+
+    if (!mHostHandle.isDead() && row_it != mRows.end() && mCommitCb)
     {
-        mGestureCommitCb(trigger);
+        const Row row = *row_it;
+        const CommitAction action = LLChatAutocompleteModel::getCommitAction(
+            return_key,
+            getHostCtrl()->getValue().asString(),
+            row);
+        auto commit_cb = mCommitCb;
+        commit_cb(row, action);
     }
 
     hideHelper(getHostCtrl());
@@ -131,7 +142,7 @@ void LLGestureAutocompleteHelper::setHostCtrl(LLUICtrl* host_ctrl)
     {
         mHostCtrlFocusLostConn.disconnect();
         mHostHandle.markDead();
-        mGestureCommitCb = {};
+        mCommitCb = {};
         mRows.clear();
         mTotal = 0;
 

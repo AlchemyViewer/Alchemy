@@ -28,6 +28,7 @@ class LLChat;
 class LLColor4;
 class LLUIColor;
 class LLUUID;
+class LLVOAvatar;
 
 class ALAvatarGroups final : public LLSingleton < ALAvatarGroups >
 {
@@ -55,6 +56,9 @@ public:
     } EColorType;
 
     LLColor4 getAvatarColor(const LLUUID& id, LLColor4 default_color, EColorType color_type);
+    // the same answer for an avatar that is in the scene, from what it
+    // already caches about being a friend, muted or staff
+    LLColor4 getAvatarColor(const LLVOAvatar* avatar, LLColor4 default_color, EColorType color_type);
     std::string getAvatarColorName(const LLUUID& id, std::string_view color_name, EColorType color_type);
 
     // IRC-style chat coloring: when enabled, gives every other speaker a stable
@@ -68,4 +72,21 @@ public:
 private:
     LLColor4 deterministicAgentColor(const LLUUID& id);
     LLColor4 nameColor(const LLUUID& id);
+
+    enum class EAvatarKind
+    {
+        SELF,
+        HIDDEN,     // a name RLV will not let us show
+        FRIEND,
+        MUTED,
+        STAFF,      // Linden, Mole or ProductEngine
+        OTHER
+    };
+    static EAvatarKind classify(const LLUUID& id);
+    static EAvatarKind classify(const LLVOAvatar* avatar);
+
+    // index into the colour table for a kind and use, or -1 to leave the
+    // caller's colour alone
+    static S32 colorIndex(EAvatarKind kind, EColorType color_type);
+    LLColor4 colorForKind(EAvatarKind kind, LLColor4 default_color, EColorType color_type);
 };

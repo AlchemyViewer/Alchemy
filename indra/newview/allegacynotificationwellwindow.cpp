@@ -112,7 +112,7 @@ void ALLegacyNotificationWellWindow::closeAll()
          iter_end = items.end();
          iter != iter_end; ++iter)
     {
-        LLSysWellItem* sys_well_item = dynamic_cast<LLSysWellItem*>(*iter);
+        LLSysWellItem* sys_well_item = ALViewType::as<LLSysWellItem>(*iter);
         if (sys_well_item)
             onItemClose(sys_well_item);
     }

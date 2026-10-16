@@ -48,6 +48,7 @@ class ALPanelPickInfo : public LLPanel, public LLAvatarPropertiesObserver, LLRem
 {
     LOG_CLASS(ALPanelPickInfo);
 public:
+    AL_VIEW_TYPE(ALPanelPickInfo, LLPanel);
 
     // Creates new panel
     static ALPanelPickInfo* create();
@@ -168,6 +169,7 @@ class ALPanelPickEdit final : public ALPanelPickInfo
 {
     LOG_CLASS(ALPanelPickEdit);
 public:
+    AL_VIEW_TYPE(ALPanelPickEdit, ALPanelPickInfo);
 
     /**
      * Creates new panel

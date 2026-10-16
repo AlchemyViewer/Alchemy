@@ -31,9 +31,11 @@
 
 class LLScrollListCtrl;
 
-class LLFloaterForgetUser : public LLFloater
+class LLFloaterForgetUser final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterForgetUser, LLFloater);
+
     LLFloaterForgetUser(const LLSD &key);
     ~LLFloaterForgetUser();
 

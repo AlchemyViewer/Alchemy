@@ -29,12 +29,14 @@
 #include "llfloater.h"
 #include "llfloaterwebcontent.h"
 
-class LLFloaterMarketplace:
+class LLFloaterMarketplace final:
     public LLFloaterWebContent
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterMarketplace, LLFloaterWebContent);
+
     void openMarketplace();
     void openMarketplaceURL(const std::string& url);
     bool static isMarketplaceURL(const std::string& url);

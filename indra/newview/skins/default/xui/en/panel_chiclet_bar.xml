@@ -85,7 +85,6 @@
          follows="right"
          height="28"
          layout="topleft"
-         min_height="28"
          min_width="37"
          name="notification_well_panel"
          top="0"

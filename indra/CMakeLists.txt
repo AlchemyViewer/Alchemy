@@ -1,215 +1,440 @@
 # -*- cmake -*-
 
-# cmake_minimum_required should appear before any
-# other commands to guarantee full compatibility
-# with the version specified
-# 3.27 is our minimum required cmake version while 4.2 is our cmake policy max version(meaning any policies of version 4.2 or below are set to NEW)
-cmake_minimum_required(VERSION 3.27...4.2 FATAL_ERROR)
+# The floor is 4.0: CMAKE_MSVC_RUNTIME_CHECKS, which the Debug configuration
+# relies on, is a plain unknown variable on anything older. Policies through
+# 4.4 are NEW.
+cmake_minimum_required(VERSION 4.0...4.4 FATAL_ERROR)
 
 include(CMakeDependentOption)
 
-set(ROOT_PROJECT_NAME "Alchemy" CACHE STRING
-    "The root project/makefile/solution name. Defaults to Alchemy.")
+set(
+  AL_PROJECT_NAME
+  "Alchemy"
+  CACHE STRING
+  "The root project/makefile/solution name. Defaults to Alchemy."
+)
 
 # Set our base channel
-set(VIEWER_CHANNEL "Alchemy Test" CACHE STRING "Viewer Channel Name")
+set(AL_CHANNEL "Alchemy Test" CACHE STRING "Viewer Channel Name")
 
 # Default deploy grid
-set(GRID agni CACHE STRING "Target Grid")
+set(AL_GRID agni CACHE STRING "Target Grid")
 
-# USE_VELOPACK controls whether to use Velopack for installer packaging (instead of NSIS/DMG)
-option(USE_VELOPACK "Use Velopack for installer packaging" OFF)
+# The Velopack update client in the viewer, and the velopack target that
+# packs the installer, or on Linux the AppImage, and the update feed; see
+# cmake/ViewerPackage.cmake.
+option(AL_USE_VELOPACK "Build the Velopack update client and the velopack packaging target" OFF)
 
 # Build executable options
-option(BUILD_VIEWER "Build the viewer project" ON)
-option(BUILD_APPEARANCE_UTIL "Build the appearance utility project" OFF)
-option(BUILD_TESTING "Build and run unit and integration tests: disable for build timing runs to reduce variation" OFF)
-option(BUILD_HEADLESS "Build with support for headless mesa OSR rendering backend" OFF)
+option(AL_BUILD_VIEWER "Build the viewer project" ON)
+option(AL_BUILD_APPEARANCE_UTILITY "Build the appearance utility project" OFF)
+option(
+  AL_BUILD_TESTS
+  "Build and run unit and integration tests: disable for build timing runs to reduce variation"
+  OFF
+)
+option(AL_BUILD_DOCS "Add the doc target that generates the API documentation with Doxygen" OFF)
+cmake_dependent_option(
+  AL_ENABLE_GL_TESTS
+  "Run the tests that stand up a GL context on a hidden window; off, they are built and registered disabled"
+  ON
+  "AL_BUILD_TESTS"
+  OFF
+)
+cmake_dependent_option(
+  AL_BUILD_FUZZERS
+  "Build the libFuzzer targets on LL's LSL compiler and VM: Clang, with address in AL_SANITIZERS; see doc/TESTING.md"
+  OFF
+  "AL_BUILD_TESTS"
+  OFF
+)
+cmake_dependent_option(
+  AL_TEST_PER_CASE
+  "Register a Catch2 binary's test cases one CTest entry each, found when ctest runs, in place of one entry a test file: for finding a failure that comes from order or shared state"
+  OFF
+  "AL_BUILD_TESTS"
+  OFF
+)
+option(AL_BUILD_SHARED_LLCOMMON "Build llcommon as a shared library" OFF)
+option(AL_BUILD_PACKAGE "Add the package target: the CPack archive of the installed tree" ON)
+
+# CMake's own BUILD_TESTING, from the CTest module, is what ctest and IDE
+# integrations read; it follows AL_BUILD_TESTS.
+set(BUILD_TESTING ${AL_BUILD_TESTS})
 
 # Dullahan build options
-option(BUILD_DULLAHAN_EXAMPLE "Build the Dullahan OpenGL example application" OFF)
+option(AL_BUILD_DULLAHAN_EXAMPLE "Build the Dullahan OpenGL example application" OFF)
 
 # Plugin Build Options
-option(BUILD_EXAMPLE_PLUGIN "Build support for SLPlugin example plugin" ON)
-option(BUILD_CEF_PLUGIN "Build support for SLPlugin CEF web plugin." ON)
-option(BUILD_VLC_PLUGIN "Build support for SLPlugin VLC media plugin." ON)
-cmake_dependent_option(BUILD_GSTREAMER_PLUGIN "Build support for SLPlugin Gstreamer media plugin." ON "UNIX;NOT APPLE" OFF)
+option(AL_BUILD_EXAMPLE_PLUGIN "Build the example media plugin, a reference for writing one" OFF)
+option(AL_BUILD_CEF_PLUGIN "Build support for SLPlugin CEF web plugin." ON)
+# GStreamer plays media on Linux. VLC there is built only when asked for, and
+# used only with MediaPluginForceVLC.
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+  set(al_vlc_plugin_default OFF)
+else()
+  set(al_vlc_plugin_default ON)
+endif()
+option(AL_BUILD_VLC_PLUGIN "Build support for SLPlugin VLC media plugin." ${al_vlc_plugin_default})
+cmake_dependent_option(
+  AL_BUILD_GSTREAMER_PLUGIN
+  "Build support for SLPlugin Gstreamer media plugin."
+  ON
+  "UNIX;NOT APPLE"
+  OFF
+)
+# Off since CEF 139: dlopen of the PulseAudio/PipeWire client libraries fails inside the CEF host process.
+cmake_dependent_option(
+  AL_USE_LINUX_VOLUME_CATCHER
+  "Build the PulseAudio/PipeWire volume catcher into the CEF media plugin."
+  OFF
+  "UNIX;NOT APPLE;AL_BUILD_CEF_PLUGIN"
+  OFF
+)
 
 # Build feature and optimization options
-option(OS_DRAG_DROP "Build the viewer with OS level drag and drop support" ON)
-option(USE_NDOF "Use NDOF space navigator joystick library." ON)
-option(USE_LTO "Enable Link Time Optimization" OFF)
-option(USE_NVAPI "Use NVidia NVAPI library for gpu profile support (Windows Only)" ON)
-option(USE_OPENXR "Enable building with OpenXR support (Experimental)" OFF)
-option(USE_PRECOMPILED_HEADERS "Enable use of precompiled header directives where supported." ON)
+option(AL_USE_NDOF "Use NDOF space navigator joystick library." ON)
+option(AL_USE_LTO "Enable Link Time Optimization" OFF)
+option(AL_USE_OPENXR "Enable building with OpenXR support (Experimental)" OFF)
+option(AL_USE_PRECOMPILED_HEADERS "Enable use of precompiled header directives where supported." ON)
 
-# Audio Engines
-option(USE_FMODSTUDIO "Enable support for the FMOD Studio audio engine" OFF)
-option(USE_FAUDIO "Enable support for the FAudio audio engine" ON)
-option(USE_OPENAL "Enable support for the OpenAL audio engine" OFF)
+# Audio Engines; FMOD Studio is with the proprietary libraries below.
+option(AL_USE_FAUDIO "Enable support for the FAudio audio engine" ON)
+option(AL_USE_OPENAL "Enable support for the OpenAL audio engine" OFF)
 
-# SIMD Options (x86_64 only)
-option(USE_SSE4_2 "Use SSE4.2/x86-64-v2 instruction sets (x86_64 only)" OFF)
-option(USE_AVX "Use AVX/x86-64-v2+avx instruction sets (x86_64 only)" OFF)
-option(USE_AVX2 "Use AVX2/x86-64-v3 instruction sets (x86_64 only)" ON)
-option(USE_AVX512 "Use AVX512/x86-64-v4 instruction sets (x86_64 only)" OFF)
+# Instruction set: an x86-64 microarchitecture level, for the viewer and the
+# vcpkg triplet alike (baseline = x86-64, v2 = SSE4.2, v3 = AVX2, v4 = AVX-512).
+# Ignored on macOS, where x86_64 is pinned to SSE4.2 for Rosetta 2.
+set(
+  AL_ISA_TIER
+  "v3"
+  CACHE STRING
+  "x86-64 microarchitecture level to build for: baseline, v2, v3 or v4"
+)
+set_property(
+  CACHE AL_ISA_TIER
+  PROPERTY STRINGS baseline v2 v3 v4
+)
+if(NOT AL_ISA_TIER MATCHES "^(baseline|v2|v3|v4)$")
+  message(FATAL_ERROR "AL_ISA_TIER must be one of baseline, v2, v3, v4 (got '${AL_ISA_TIER}')")
+endif()
 
-# Sanitizers (Mac and Linux Only)
-option(ENABLE_ASAN "Enable Address Sanitizer" OFF)
-option(ENABLE_UBSAN "Enable Undefined Behavior Sanitizer" OFF)
-option(ENABLE_THREADSAN "Enable Thread Sanitizer" OFF)
+# Sanitizers (GCC and Clang only): any of address, undefined, thread, but not
+# address and thread together, whose runtimes cannot share a process. On
+# Linux, address and thread build with Clang; see cmake/BootstrapVcpkg.cmake.
+set(
+  AL_SANITIZERS
+  ""
+  CACHE STRING
+  "Sanitizers to build with: a list drawn from address, undefined, thread"
+)
+foreach(sanitizer IN LISTS AL_SANITIZERS)
+  if(NOT sanitizer MATCHES "^(address|undefined|thread)$")
+    message(
+      FATAL_ERROR
+      "AL_SANITIZERS: unknown sanitizer '${sanitizer}' (address, undefined, thread)"
+    )
+  endif()
+endforeach()
+if("address" IN_LIST AL_SANITIZERS AND "thread" IN_LIST AL_SANITIZERS)
+  message(
+    FATAL_ERROR
+    "AL_SANITIZERS: address and thread cannot be built together; build a tree for each"
+  )
+endif()
+
+# Warnings
+option(AL_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
 # Proprietary Libraries
-option(INSTALL_PROPRIETARY "Build with support for non-free libraries" OFF)
-cmake_dependent_option(USE_KDU "Enable support for the Kakadu JPEG2000 decoding library" ON "INSTALL_PROPRIETARY" OFF)
+option(AL_ENABLE_PROPRIETARY "Build with support for non-free libraries" OFF)
+cmake_dependent_option(
+  AL_USE_KDU
+  "Enable support for the Kakadu JPEG2000 decoding library"
+  OFF
+  "AL_ENABLE_PROPRIETARY"
+  OFF
+)
 
-# TODO: Replace with commented option below once Havok support is added to vcpkg
-option(HAVOK "Use Havok physics library" OFF)
-#cmake_dependent_option(HAVOK "Use Havok physics library" ON "INSTALL_PROPRIETARY" OFF)
+# The Discord Social SDK comes from AlchemyViewer's private vcpkg registry;
+# see cmake/Discord.cmake. It is built for Windows and macOS, x64 and arm64,
+# and Linux x64, and the option is held off anywhere else. This runs before
+# project(), so on Linux the host stands for the target, as it does for the
+# triplet: nothing cross-compiles the viewer there. CMAKE_HOST_SYSTEM_PROCESSOR
+# is not set until project() runs, so the host is asked directly, as
+# cmake/BootstrapVcpkg.cmake does for the triplet.
+set(al_discord_supported ON)
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+  cmake_host_system_information(RESULT al_host_arch QUERY OS_PLATFORM)
+  if(NOT al_host_arch MATCHES "^(x86_64|AMD64|amd64)$")
+    set(al_discord_supported OFF)
+  endif()
+  unset(al_host_arch)
+endif()
+cmake_dependent_option(
+  AL_USE_DISCORD
+  "Enable Discord rich presence through the Discord Social SDK"
+  ON
+  "AL_ENABLE_PROPRIETARY;al_discord_supported"
+  OFF
+)
 
-# Uncomment when support for Discord is finalized
-#cmake_dependent_option(USE_DISCORD "Enable Discord SDK and Rich Prescence support" ON "INSTALL_PROPRIETARY" OFF)
+# FMOD Studio comes from the same registry, and is built for every platform
+# the viewer is; see cmake/FMODSTUDIO.cmake. It takes precedence over the
+# other audio engines when the viewer starts, so a proprietary build plays
+# through it.
+cmake_dependent_option(
+  AL_USE_FMODSTUDIO
+  "Enable support for the FMOD Studio audio engine"
+  ON
+  "AL_ENABLE_PROPRIETARY"
+  OFF
+)
 
 # SDL Options
-if (UNIX)
-  option(USE_SDL_WINDOW "Build with SDL based window management and input" ON)
-else ()
-  option(USE_SDL_WINDOW "Build with SDL based window management and input (experimental on Windows)" OFF)
-endif ()
+if(UNIX)
+  option(AL_USE_SDL_WINDOW "Build with SDL based window management and input" ON)
+else()
+  option(
+    AL_USE_SDL_WINDOW
+    "Build with SDL based window management and input (experimental on Windows)"
+    OFF
+  )
+endif()
 
 # Spell checking backend
-cmake_dependent_option(USE_NSSPELLCHECKER "Use the native macOS NSSpellChecker instead of Hunspell" ON "APPLE" OFF)
-cmake_dependent_option(USE_WINSPELLCHECK "Use the native Windows Spell Checking API instead of Hunspell" ON "WIN32" OFF)
+cmake_dependent_option(
+  AL_USE_NSSPELLCHECKER
+  "Use the native macOS NSSpellChecker instead of Hunspell"
+  ON
+  "APPLE"
+  OFF
+)
+cmake_dependent_option(
+  AL_USE_WINSPELLCHECK
+  "Use the native Windows Spell Checking API instead of Hunspell"
+  ON
+  "WIN32"
+  OFF
+)
 
-# Configure crash reporting
-option(RELEASE_CRASH_REPORTING "Enable use of crash reporting in release builds" OFF)
-option(NON_RELEASE_CRASH_REPORTING "Enable use of crash reporting in developer builds" OFF)
-
-# Bugsplat setup
-if (INSTALL_PROPRIETARY AND (WIN32 OR APPLE))
-    # Note that viewer_manifest.py makes decision based on BUGSPLAT_DB and not USE_BUGSPLAT
-    if (BUGSPLAT_DB)
-        set(USE_BUGSPLAT ON  CACHE BOOL "Use the BugSplat crash reporting system")
-    else (BUGSPLAT_DB)
-        set(USE_BUGSPLAT OFF CACHE BOOL "Use the BugSplat crash reporting system")
-    endif (BUGSPLAT_DB)
-else ()
-    set(USE_BUGSPLAT OFF CACHE BOOL "Use the BugSplat crash reporting system")
-    set(BUGSPLAT_DB "" CACHE STRING "BugSplat crash database name")
-endif ()
-
-# Sentry Setup
-option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
+# Crash reporting. AL_USE_SENTRY links the SDK and bakes in the project it
+# reports to; AL_ENABLE_CRASH_REPORTING is whether the viewer engages it.
+option(AL_ENABLE_CRASH_REPORTING "Send crash reports from this build" OFF)
+option(AL_USE_SENTRY "Use the Sentry crash reporting system" OFF)
+set(AL_SENTRY_DSN "" CACHE STRING "The DSN of the Sentry project crash reports go to")
 
 # Tracy Profiler
 # Default Tracy profiling on for test builds, but off for all others
 set(BUILDING_TEST_CHANNEL OFF)
-string(TOLOWER "${VIEWER_CHANNEL}" channel_lower)
+string(TOLOWER "${AL_CHANNEL}" channel_lower)
 if(channel_lower MATCHES "^alchemy test")
   set(BUILDING_TEST_CHANNEL ON)
 endif()
-cmake_dependent_option(USE_TRACY "Enable support for Tracy profiler" ON "BUILDING_TEST_CHANNEL" OFF)
-option(USE_TRACY_ON_DEMAND "Use on-demand Tracy profiling." ON)
-option(USE_TRACY_LOCAL_ONLY "Disallow remote Tracy profiling." ON)
-option(USE_TRACY_GPU "Use Tracy GPU profiling" OFF)
-option(USE_TRACY_GUI "Enable building Tracy profiler GUI" OFF)
+cmake_dependent_option(
+  AL_USE_TRACY
+  "Enable support for Tracy profiler"
+  ON
+  "BUILDING_TEST_CHANNEL"
+  OFF
+)
+option(AL_ENABLE_TRACY_ON_DEMAND "Use on-demand Tracy profiling." ON)
+option(AL_ENABLE_TRACY_LOCAL_ONLY "Disallow remote Tracy profiling." ON)
+option(AL_ENABLE_TRACY_GPU "Use Tracy GPU profiling" OFF)
+option(AL_BUILD_TRACY_GUI "Enable building Tracy profiler GUI" OFF)
 
-# Signing
-option(ENABLE_SIGNING "Enable signing the viewer" OFF)
-set(SIGNING_IDENTITY "" CACHE STRING "Specifies the signing identity to use, if necessary.")
+# Debug logging stays available in Release builds of the Test channel only.
+cmake_dependent_option(
+  AL_ENABLE_RELEASE_DEBUG_LOGGING
+  "Keep debug logging in Release builds"
+  ON
+  "BUILDING_TEST_CHANNEL"
+  OFF
+)
 
-# macOS deploy target(must be set BEFORE first project call)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS version to target for deployment (at runtime); newer APIs weak linked. Set to empty string for default value.")
+# WebRTC voice. Off in sanitized builds; see below.
+option(AL_USE_WEBRTC "Build with WebRTC voice" ON)
 
-if (APPLE)
+# macOS signing. The install step always signs the bundle: with this
+# identity, or ad-hoc when it is empty.
+set(
+  AL_SIGNING_IDENTITY
+  ""
+  CACHE STRING
+  "The macOS Developer ID to sign the bundle with; empty signs ad-hoc"
+)
+set(
+  AL_NOTARY_PROFILE
+  ""
+  CACHE STRING
+  "The notarytool keychain profile the macOS velopack target notarizes with; empty skips notarization"
+)
+
+# Warn about any option name from before the AL_ scheme.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RetiredOptions.cmake)
+
+# The oldest macOS the viewer runs on, shared with the triplets; must be set
+# before the first project() call.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/AlchemyTarget.cmake)
+set(
+  CMAKE_OSX_DEPLOYMENT_TARGET
+  "${AL_MACOS_DEPLOYMENT_TARGET}"
+  CACHE STRING
+  "Minimum macOS version to target for deployment (at runtime); newer APIs weak linked. Set to empty string for default value."
+)
+
+if(APPLE)
   # Disable app-local dependencies on macOS, since we use a custom bundle structure and don't want vcpkg to copy dependencies into the bundle.
-  set(VCPKG_APPLOCAL_DEPS OFF CACHE BOOL "Use app-local dependencies instead of system-installed dependencies")
+  set(
+    VCPKG_APPLOCAL_DEPS
+    OFF
+    CACHE BOOL
+    "Use app-local dependencies instead of system-installed dependencies"
+  )
 endif()
 
 # Set our supported configuration types
-set(CMAKE_CONFIGURATION_TYPES "Debug;OptDebug;RelWithDebInfo;Release" CACHE STRING "Supported build types.")
+set(
+  CMAKE_CONFIGURATION_TYPES
+  "Debug;OptDebug;RelWithDebInfo;Release"
+  CACHE STRING
+  "Supported build types."
+)
 
-if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
-      "Build type.  One of: Debug OptDebug Release RelWithDebInfo")
-endif (NOT CMAKE_BUILD_TYPE)
+if(NOT CMAKE_BUILD_TYPE)
+  set(
+    CMAKE_BUILD_TYPE
+    RelWithDebInfo
+    CACHE STRING
+    "Build type.  One of: Debug OptDebug Release RelWithDebInfo"
+  )
+endif()
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
+if(NOT CMAKE_BUILD_TYPE IN_LIST CMAKE_CONFIGURATION_TYPES)
+  message(
+    FATAL_ERROR
+    "CMAKE_BUILD_TYPE must be one of ${CMAKE_CONFIGURATION_TYPES} (got '${CMAKE_BUILD_TYPE}')"
+  )
+endif()
+
+# A sanitized build turns off what would stand between the sanitizers and
+# what they watch: Tracy replaces operator new and delete, and its queues and
+# Sentry's handler thread are their own synchronisation; Sentry's handler
+# takes the signals a sanitizer reports through. libwebrtc cannot be linked
+# sanitized. CEF cannot run sanitized: its prebuilt Chromium frees through
+# glibc's own __libc_free what glibc allocated through the sanitizer's
+# malloc, and its plugin process falls over at start. Before the feature
+# flags below, so vcpkg installs none of those that are features. Windows
+# builds ignore AL_SANITIZERS (00-Common.cmake).
+if(AL_SANITIZERS AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+  foreach(
+    option
+    IN
+    ITEMS AL_USE_TRACY AL_USE_SENTRY AL_ENABLE_CRASH_REPORTING AL_USE_WEBRTC AL_BUILD_CEF_PLUGIN
+  )
+    if(${option})
+      message(STATUS "${option} is off in a build with AL_SANITIZERS")
+      set(${option} OFF)
+    endif()
+  endforeach()
+endif()
 
 ##########################################################################
 # vcpkg feature flags MUST be set before the first project() call below  #
 ##########################################################################
 
-if (USE_KDU)
+if(AL_BUILD_TESTS)
+  list(APPEND VCPKG_MANIFEST_FEATURES "tests")
+endif()
+
+if(AL_USE_KDU)
   list(APPEND VCPKG_MANIFEST_FEATURES "kdu")
 endif()
 
+if(AL_USE_DISCORD)
+  list(APPEND VCPKG_MANIFEST_FEATURES "discord")
+endif()
+
+if(AL_USE_FMODSTUDIO)
+  list(APPEND VCPKG_MANIFEST_FEATURES "fmodstudio")
+endif()
+
 # Setup Tracy feature flags
-if (USE_TRACY)
+if(AL_USE_TRACY)
   list(APPEND VCPKG_MANIFEST_FEATURES "tracy")
 endif()
 
-if (USE_TRACY_LOCAL_ONLY)
+if(AL_USE_TRACY AND AL_ENABLE_TRACY_LOCAL_ONLY)
   list(APPEND VCPKG_MANIFEST_FEATURES "tracy-local")
 endif()
 
-if(USE_TRACY_ON_DEMAND)
+if(AL_USE_TRACY AND AL_ENABLE_TRACY_ON_DEMAND)
   list(APPEND VCPKG_MANIFEST_FEATURES "tracy-on-demand")
 endif()
 
-if(USE_TRACY_GUI)
+if(AL_USE_TRACY AND AL_BUILD_TRACY_GUI)
   list(APPEND VCPKG_MANIFEST_FEATURES "tracy-gui")
 endif()
 
-if(USE_OPENXR)
+if(AL_USE_OPENXR)
   list(APPEND VCPKG_MANIFEST_FEATURES "openxr")
 endif()
 
-if(USE_BUGSPLAT)
-  list(APPEND VCPKG_MANIFEST_FEATURES "bugsplat")
+if(AL_USE_WEBRTC)
+  list(APPEND VCPKG_MANIFEST_FEATURES "webrtc")
 endif()
 
-if(USE_VELOPACK)
+if(AL_USE_VELOPACK)
   list(APPEND VCPKG_MANIFEST_FEATURES "velopack")
 endif()
 
-if(USE_SENTRY)
+if(AL_USE_SENTRY)
   list(APPEND VCPKG_MANIFEST_FEATURES "sentry")
 endif()
 
-if(BUILD_HEADLESS)
-  list(APPEND VCPKG_MANIFEST_FEATURES "offscreen")
-endif()
-
-if(USE_FAUDIO)
+if(AL_USE_FAUDIO)
   list(APPEND VCPKG_MANIFEST_FEATURES "faudio")
 endif()
 
-if(USE_OPENAL)
+if(AL_USE_OPENAL)
   list(APPEND VCPKG_MANIFEST_FEATURES "openal")
 endif()
 
-if(BUILD_DULLAHAN_EXAMPLE)
+if(AL_BUILD_DULLAHAN_EXAMPLE)
   list(APPEND VCPKG_MANIFEST_FEATURES "dullahan-example")
 endif()
 
-if (NOT USE_NSSPELLCHECKER AND NOT USE_WINSPELLCHECK)
+if(NOT AL_USE_NSSPELLCHECKER AND NOT AL_USE_WINSPELLCHECK)
   list(APPEND VCPKG_MANIFEST_FEATURES "hunspell")
 endif()
 
 # Export compile_commands.json for ninja and makefile generators
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(NOT USE_PRECOMPILED_HEADERS)
-    set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
+# The install rules stage the viewer after every link; report only what
+# they changed.
+set(CMAKE_INSTALL_MESSAGE LAZY)
+
+if(NOT AL_USE_PRECOMPILED_HEADERS)
+  set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
 endif()
 
 # Include our cmake module directory
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_BINARY_DIR}")
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # Setup VCPKG toolchains and targets
 include(BootstrapVcpkg)
 
 # Generate base project after setting pre-generation variables
-project(${ROOT_PROJECT_NAME})
+project(${AL_PROJECT_NAME} LANGUAGES C CXX)
+
+# The vcpkg install ran inside project(); record what it was run against so
+# the next configure can skip it. See BootstrapVcpkg.cmake.
+if(DEFINED AL_VCPKG_INSTALL_KEY)
+  file(WRITE "${AL_VCPKG_INSTALL_STAMP_FILE}" "${AL_VCPKG_INSTALL_KEY}")
+endif()
+al_vcpkg_check_triplet_compiler()
+al_vcpkg_check_triplet_architecture()
 
 # Location of indra directory
 set(INDRA_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -218,15 +443,9 @@ set(INDRA_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 # Set up common variables
 include(Variables)
 
-# Enable supported languages
-enable_language(C CXX)
-
 if(DARWIN)
   enable_language(OBJC OBJCXX)
 endif()
-
-# Set up Python
-include(Python)
 
 # Set up our base build system variable and compiler flags
 include(00-Common)
@@ -235,100 +454,101 @@ include(Linking)
 # Set up version number generation
 include(BuildVersion)
 
-if (BUILD_TESTING)
+if(AL_BUILD_TESTS)
+  # Only the tests that spawn a Python peer need an interpreter.
+  include(Python)
+
   set(CMAKE_SKIP_TEST_ALL_DEPENDENCY FALSE)
   include(ProcessorCount)
   ProcessorCount(NUM_CORES)
 
-  # Set parallel level to decrease test runtime
-  set(CMAKE_CTEST_ARGUMENTS -j${NUM_CORES} --output-on-failure)
+  # Set parallel level to decrease test runtime. What is labelled manual runs
+  # only when asked for by its own label: benchmarks, since their numbers are
+  # their output and a shared parallel run would ruin them, and a Catch2
+  # binary's run of all its tests in one process until they are known to
+  # share one (combined_pending; see ALAddTestBinary.cmake). One label, since
+  # these arguments reach a shell, which would take a | in a regex for a pipe.
+  # Each run also writes its results as JUnit, which CI keeps.
+  set(
+    CMAKE_CTEST_ARGUMENTS
+    -j${NUM_CORES}
+    --output-on-failure
+    -LE
+    manual
+    --output-junit
+    "${CMAKE_BINARY_DIR}/Testing/test-results.xml"
+  )
 
   # Set up our test targets
   set(CTEST_TEST_TARGET_ALIAS BUILD_AND_RUN_TESTS)
   include(CTest)
 
-  set_target_properties(BUILD_AND_RUN_TESTS
-        PROPERTIES
-        FOLDER "CMakePredefinedTargets"
-        )
+  set_target_properties(BUILD_AND_RUN_TESTS PROPERTIES FOLDER "CMakePredefinedTargets")
 
   add_custom_target(BUILD_TESTS)
-  set_target_properties(BUILD_TESTS
-        PROPERTIES
-        FOLDER "CMakePredefinedTargets"
-        )
-endif ()
+  set_target_properties(BUILD_TESTS PROPERTIES FOLDER "CMakePredefinedTargets")
 
-# Declare All Dependency Includes
-include(APR)
-include(AVIF)
-include(Boost)
-include(bugsplat)
-include(CEFPlugin)
-include(Collada-Dom)
-include(CURL)
-include(DBUS)
-include(Discord)
-include(FastFloat)
-include(FAudio)
-include(FMODSTUDIO)
-include(FMT)
-include(FontConfig)
-include(FreeType)
-include(GLEXT)
-include(GLIB)
-include(GLM)
-include(Harfbuzz)
-include(Havok)
-include(Hunspell)
-include(JPEG)
-include(LLKDU)
-include(LLPhysicsExtensions)
-include(Mesa)
-include(Meshoptimizer)
-include(Mikktspace)
-include(NDOF)
-include(NSSpellChecker)
-include(NVAPI)
-include(OpenAL)
-include(OpenGL)
-include(OpenJPEG)
-include(OpenSSL)
-include(OpenXR)
-include(PlutoSVG)
-include(PNG)
-include(PugiXML)
-include(SDL3)
-include(Sentry)
-include(simdjson)
-include(simdutf)
-include(SSE2NEON)
-include(TinyEXR)
-include(TinyGLTF)
-include(Tracy)
-include(Tut)
-include(VHACD)
-include(Vorbis)
-include(WebP)
-include(WebRTC)
-include(websocketpp)
-include(WinSpellCheck)
-include(xxHash)
-include(ZLIBNG)
+  add_custom_target(BUILD_BENCHMARKS)
+  set_target_properties(BUILD_BENCHMARKS PROPERTIES FOLDER "CMakePredefinedTargets")
+  add_custom_target(
+    BUILD_AND_RUN_BENCHMARKS
+    COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> -L benchmark -V
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    USES_TERMINAL
+  )
+  add_dependencies(BUILD_AND_RUN_BENCHMARKS BUILD_BENCHMARKS)
+  set_target_properties(BUILD_AND_RUN_BENCHMARKS PROPERTIES FOLDER "CMakePredefinedTargets")
+endif()
+
+# Dependency modules, in dependency order. Each is included under a message
+# context of its own name, so `cmake --log-context` attributes every line a
+# module prints -- including the find_package() output inside it -- to that
+# module.
+set(
+  AL_DEPENDENCY_MODULES
+  Dependencies
+  APR
+  Boost
+  CEFPlugin
+  CURL
+  DBUS
+  Discord
+  FMODSTUDIO
+  GLIB
+  Harfbuzz
+  Hunspell
+  ICU
+  LLKDU
+  NDOF
+  SDL3
+  Sentry
+  Tracy
+  Velopack
+  WebRTC
+)
+
+foreach(module IN LISTS AL_DEPENDENCY_MODULES)
+  list(APPEND CMAKE_MESSAGE_CONTEXT ${module})
+  include(${module})
+  list(POP_BACK CMAKE_MESSAGE_CONTEXT)
+endforeach()
 
 # Add our test macros
-if (BUILD_TESTING)
-  include(LLAddBuildTest)
-endif ()
+if(AL_BUILD_TESTS)
+  include(ALAddTestBinary)
+endif()
 
-# Third party system library copy step
-include(Copy3rdPartyLibs)
-
-# Add our cmake modules to cmake
+# The build system's own files, for the IDE.
 add_subdirectory(cmake)
+add_subdirectory(template_verifier)
 
 add_subdirectory(dullahan)
 add_subdirectory(llprecompiled)
+add_subdirectory(alscript)
+if(AL_BUILD_TESTS)
+  # LL's LSL compiler, restored as a reference for the script tests.
+  add_subdirectory(lscript)
+endif()
 add_subdirectory(llaudio)
 add_subdirectory(llappearance)
 add_subdirectory(llcharacter)
@@ -344,14 +564,16 @@ add_subdirectory(llphysicsextensionsos)
 add_subdirectory(llprimitive)
 add_subdirectory(llrender)
 add_subdirectory(llfilesystem)
-add_subdirectory(llwebrtc)
+if(AL_USE_WEBRTC)
+  add_subdirectory(llwebrtc)
+endif()
 add_subdirectory(llwindow)
 add_subdirectory(llxml)
 add_subdirectory(llplugin)
 add_subdirectory(llui)
 add_subdirectory(viewer_components)
 
-if(BUILD_TESTING)
+if(AL_BUILD_TESTS)
   # Legacy C++ tests.
   add_subdirectory(test)
 endif()
@@ -359,7 +581,7 @@ endif()
 # viewer media plugins
 add_subdirectory(media_plugins)
 
-if (BUILD_APPEARANCE_UTIL)
+if(AL_BUILD_APPEARANCE_UTILITY)
   # Avatar Appearance Utility
   add_subdirectory(llappearanceutility)
 endif()
@@ -367,16 +589,22 @@ endif()
 # Viewer
 add_subdirectory(newview)
 
-add_subdirectory(doxygen EXCLUDE_FROM_ALL)
+if(AL_BUILD_DOCS)
+  add_subdirectory(doxygen EXCLUDE_FROM_ALL)
+endif()
 
 # sets the 'startup project' for debugging from visual studio.
-set_property(
-        DIRECTORY
-        PROPERTY VS_STARTUP_PROJECT ${VIEWER_BINARY_NAME}
-        )
+set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${AL_VIEWER_BINARY_NAME})
 
-if (BUILD_TESTING)
+if(AL_BUILD_TESTS)
   # Define after the custom targets are created so
   # individual apps can add themselves as dependencies
   add_subdirectory(integration_tests)
-endif ()
+endif()
+
+# Last, after every add_subdirectory(): every buildable target must carry the
+# shared flags, and nothing below can change a report row.
+al_check_flags_target()
+include(ConfigurationReport)
+al_feature_summary()
+al_configuration_report()

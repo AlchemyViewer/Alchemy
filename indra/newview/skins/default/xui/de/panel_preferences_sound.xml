@@ -14,7 +14,6 @@
 	<check_box label="Aktiviert" name="enable_media"/>
 	<slider label="Voice-Chat" name="Voice Volume"/>
 	<check_box label="Aktiviert" name="enable_voice_check"/>
-	<check_box label="Automatische Wiedergabe zulassen" name="media_auto_play_btn" tool_tip="Hier aktivieren, um Medien automatisch wiederzugeben." value="true"/>
 	<check_box label="Medien, die an andere Avatare angehängt sind, wiedergeben." name="media_show_on_others_btn" tool_tip="Diese Option deaktivieren, um Medien für andere Avataren, die sich in der Nähe befinden, auszublenden." value="true"/>
 	<check_box label="Sounds von Gesten abspielen" name="gesture_audio_play_btn" tool_tip="Markieren, um Sounds von Gesten zu hören" value="true"/>
 	<text name="audio_output_device_label">Ausgabegerät:</text>
@@ -46,11 +45,6 @@
         <item name="reverb_underwater"    label="Unterwasser"/>
         <item name="reverb_smallroom"     label="Kleines Zimmer"/>
     </combo_box>
-	<text name="voice_chat_settings">Voice-Chat-Einstellungen</text>
-	<line_editor label="Auslöser für Zum-Sprechen-drücken:" name="modifier_combo"/>
-	<button label="Taste festlegen" name="set_voice_hotkey_button"/>
-	<button name="set_voice_middlemouse_button" tool_tip="Auf mittlere Maustaste zurücksetzen"/>
-	<panel label="Geräte-Einstellungen" name="device_settings_panel"/>
 	<combo_box name="media_auto_play_combo">
 		<item name="autoplay_enabled" label="Ja"/>
 		<item name="autoplay_ask" label="Fragen"/>

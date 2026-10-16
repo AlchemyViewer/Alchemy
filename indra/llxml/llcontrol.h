@@ -215,7 +215,6 @@ public:
     F32         getF32(std::string_view name);
     U32         getU32(std::string_view name);
 
-    LLWString   getWString(std::string_view name);
     LLVector3   getVector3(std::string_view name);
     LLVector3d  getVector3d(std::string_view name);
     LLRect      getRect(std::string_view name);
@@ -435,7 +434,6 @@ template <> LLSD convert_to_llsd<LLColor4>(const LLColor4& in);
 template <> LLSD convert_to_llsd<LLColor3>(const LLColor3& in);
 
 template<> std::string convert_from_llsd<std::string>(const LLSD& sd, eControlType type, std::string_view control_name);
-template<> LLWString convert_from_llsd<LLWString>(const LLSD& sd, eControlType type, std::string_view control_name);
 template<> LLVector3 convert_from_llsd<LLVector3>(const LLSD& sd, eControlType type, std::string_view control_name);
 template<> LLVector3d convert_from_llsd<LLVector3d>(const LLSD& sd, eControlType type, std::string_view control_name);
 template<> LLQuaternion convert_from_llsd<LLQuaternion>(const LLSD& sd, eControlType type, std::string_view control_name);

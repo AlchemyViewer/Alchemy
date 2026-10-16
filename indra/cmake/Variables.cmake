@@ -14,48 +14,54 @@ include_guard()
 # Location of scripts directory
 set(SCRIPTS_DIR ${INDRA_SOURCE_DIR}/../scripts)
 
-# Select arch based on requested target processor
-string(TOLOWER ${CMAKE_SYSTEM_PROCESSOR} processor_lower)
+# Select arch based on requested target processor. On Windows that is the
+# compiler's: CMAKE_SYSTEM_PROCESSOR stays the host's when Visual Studio's
+# platform or a cross-compiling Developer Command Prompt targets another.
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID)
+  string(TOLOWER ${CMAKE_CXX_COMPILER_ARCHITECTURE_ID} processor_lower)
+else()
+  string(TOLOWER ${CMAKE_SYSTEM_PROCESSOR} processor_lower)
+endif()
+set(BUILD_TARGET_IS_ARM64 OFF)
+set(BUILD_TARGET_IS_X86_64 OFF)
 if(processor_lower STREQUAL "arm64" OR processor_lower STREQUAL "aarch64")
   set(ARCH arm64)
-  set(BUILD_TARGET_IS_ARM64 ON CACHE INTERNAL "ARM64 BUILD" FORCE)
+  set(BUILD_TARGET_IS_ARM64 ON)
 else()
   set(ARCH x86_64)
-  set(BUILD_TARGET_IS_X86_64 ON CACHE INTERNAL "X86_64 BUILD" FORCE)
+  set(BUILD_TARGET_IS_X86_64 ON)
 endif()
 
 # Only 64-bit architectures are supported
 set(ADDRESS_SIZE 64)
 
 # Determine build platform
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-  set(WINDOWS ON CACHE INTERNAL "Windows Build" FORCE)
-elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-  set(LINUX ON CACHE INTERNAL "Linux Build" FORCE)
-elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set(DARWIN ON CACHE INTERNAL "Darwin Build" FORCE)
-endif ()
+set(WINDOWS OFF)
+set(LINUX OFF)
+set(DARWIN OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(WINDOWS ON)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(LINUX ON)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(DARWIN ON)
+endif()
 
+set(COMPILER_IS_MSVC OFF)
+set(COMPILER_IS_CLANG_CL OFF)
+set(COMPILER_IS_CLANG OFF)
+set(COMPILER_IS_GCC OFF)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  set(COMPILER_IS_MSVC ON CACHE INTERNAL "MSVC BUILD" FORCE)
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-  if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-    set(COMPILER_IS_CLANG_CL ON CACHE INTERNAL "CLANG-CL BUILD" FORCE)
+  set(COMPILER_IS_MSVC ON)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+  if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    set(COMPILER_IS_CLANG_CL ON)
   else()
-    set(COMPILER_IS_CLANG ON CACHE INTERNAL "CLANG BUILD" FORCE)
+    set(COMPILER_IS_CLANG ON)
   endif()
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  set(COMPILER_IS_GCC ON CACHE INTERNAL "GCC BUILD" FORCE)
-endif ()
-
-
-# Check if generator is multiconfig
-get_property(LL_GENERATOR_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-
-# Compatibility with legacy cmake flags
-if(DEFINED LL_TESTS)
-  set(BUILD_TESTING ${LL_TESTS} CACHE BOOL "Build and run unit and integration tests: disable for build timing runs to reduce variation" FORCE)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(COMPILER_IS_GCC ON)
 endif()
 
 # Internal flags
-string(REPLACE " " "" VIEWER_CHANNEL_ONEWORD ${VIEWER_CHANNEL})
+string(REPLACE " " "" AL_CHANNEL_ONEWORD ${AL_CHANNEL})

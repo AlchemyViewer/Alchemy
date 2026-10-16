@@ -348,9 +348,9 @@ inline void LLColor3::exp()
     mV[VGREEN] = ::exp(mV[VGREEN]);
     mV[VBLUE] = ::exp(mV[VBLUE]);
 #else
-    mV[VRED]   = (F32)LL_FAST_EXP(mV[VRED]);
-    mV[VGREEN] = (F32)LL_FAST_EXP(mV[VGREEN]);
-    mV[VBLUE]  = (F32)LL_FAST_EXP(mV[VBLUE]);
+    mV[VRED]   = (F32)ll_fast_exp(mV[VRED]);
+    mV[VGREEN] = (F32)ll_fast_exp(mV[VGREEN]);
+    mV[VBLUE]  = (F32)ll_fast_exp(mV[VBLUE]);
 #endif
 }
 

@@ -45,7 +45,6 @@ class LLUUID;
 
 extern const LLColor4 UI_VERTEX_COLOR;
 
-bool ui_point_in_rect(S32 x, S32 y, S32 left, S32 top, S32 right, S32 bottom);
 void gl_state_for_2d(S32 width, S32 height);
 
 void gl_line_2d(S32 x1, S32 y1, S32 x2, S32 y2);
@@ -66,6 +65,12 @@ void gl_line_2d(S32 x1, S32 y1, S32 x2, S32 y2, const LLColor4 &color );
 // infinity. Fewer than two points draws nothing; coincident points are skipped.
 void gl_polyline_2d(const std::vector<LLVector2>& points, const LLColor4& color,
                     F32 width = 1.f, bool closed = false);
+// The same ribbon added to the triangles being drawn, as gl_rect_2d_in_batch
+// adds its rectangle: no texture unbound, no batch begun, ended or flushed,
+// and nothing allocated, so that many -- a tab's arrow on every row -- go to
+// GL as the one draw they are drawn in.
+void gl_polyline_2d_in_batch(const LLVector2* points, size_t count, const LLColor4& color,
+                             F32 width = 1.f, bool closed = false);
 
 // The area between `points` and the horizontal line y = `baseline_y`, flat
 // filled. The companion to gl_polyline_2d for a graph whose meaning is how much
@@ -89,15 +94,19 @@ void gl_rect_2d_offset_local( S32 left, S32 top, S32 right, S32 bottom, const LL
 void gl_rect_2d_offset_local( S32 left, S32 top, S32 right, S32 bottom, S32 pixel_offset = 0, bool filled = true );
 void gl_rect_2d(const LLRect& rect, bool filled = true );
 void gl_rect_2d(const LLRect& rect, const LLColor4& color, bool filled = true );
+// A filled rectangle in its own colour, added to the triangles being drawn:
+// it unbinds no texture and begins and ends no batch, so that many drawn
+// between one gGL.getTextureSlot(0)->unbind() and gGL.begin(LLRender::TRIANGLES)
+// and one gGL.end() go to GL as one draw, where gl_rect_2d makes each one
+// its own.
+void gl_rect_2d_in_batch(S32 left, S32 top, S32 right, S32 bottom, const LLColor4& color);
 void gl_rect_2d_checkerboard(const LLRect& rect, GLfloat alpha = 1.0f);
 
 void gl_drop_shadow(S32 left, S32 top, S32 right, S32 bottom, const LLColor4 &start_color, S32 lines);
 
 void gl_circle_2d(F32 x, F32 y, F32 radius, S32 steps, bool filled);
 void gl_arc_2d(F32 center_x, F32 center_y, F32 radius, S32 steps, bool filled, F32 start_angle, F32 end_angle);
-void gl_deep_circle( F32 radius, F32 depth );
 void gl_ring( F32 radius, F32 width, const LLColor4& center_color, const LLColor4& side_color, S32 steps, bool render_center );
-void gl_corners_2d(S32 left, S32 top, S32 right, S32 bottom, S32 length, F32 max_frac);
 void gl_washer_2d(F32 outer_radius, F32 inner_radius, S32 steps, const LLColor4& inner_color, const LLColor4& outer_color);
 void gl_washer_segment_2d(F32 outer_radius, F32 inner_radius, F32 start_radians, F32 end_radians, S32 steps, const LLColor4& inner_color, const LLColor4& outer_color);
 
@@ -119,7 +128,6 @@ void gl_washer_angular_2d(F32 outer_radius, F32 inner_radius,
 void gl_draw_image(S32 x, S32 y, LLTexture* image, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f));
 void gl_draw_scaled_target(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* target, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f));
 void gl_draw_scaled_image(S32 x, S32 y, S32 width, S32 height, LLTexture* image, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f));
-void gl_draw_rotated_image(S32 x, S32 y, F32 degrees, LLTexture* image, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f));
 void gl_draw_scaled_rotated_image(S32 x, S32 y, S32 width, S32 height, F32 degrees, LLTexture* image, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f), LLRenderTarget* target = NULL);
 void gl_draw_scaled_image_with_border(S32 x, S32 y, S32 border_width, S32 border_height, S32 width, S32 height, LLTexture* image, const LLColor4 &color, bool solid_color = false, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f), bool scale_inner = true);
 void gl_draw_scaled_image_with_border(S32 x, S32 y, S32 width, S32 height, LLTexture* image, const LLColor4 &color, bool solid_color = false, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f), const LLRectf& scale_rect = LLRectf(0.f, 1.f, 1.f, 0.f), bool scale_inner = true);
@@ -141,18 +149,6 @@ void gl_rect_2d_simple_tex( S32 width, S32 height );
       |                  |
 */
 
-typedef enum e_rounded_edge
-{
-    ROUNDED_RECT_LEFT   = 0x1,
-    ROUNDED_RECT_TOP    = 0x2,
-    ROUNDED_RECT_RIGHT  = 0x4,
-    ROUNDED_RECT_BOTTOM = 0x8,
-    ROUNDED_RECT_ALL    = 0xf
-}ERoundedEdge;
-
-
-void gl_segmented_rect_2d_tex(const S32 left, const S32 top, const S32 right, const S32 bottom, const S32 texture_width, const S32 texture_height, const S32 border_size, const U32 edges = ROUNDED_RECT_ALL);
-void gl_segmented_rect_2d_fragment_tex(const LLRect& rect, const S32 texture_width, const S32 texture_height, const S32 border_size, const F32 start_fragment, const F32 end_fragment, const U32 edges = ROUNDED_RECT_ALL);
 void gl_segmented_rect_3d_tex(const LLRectf& clip_rect, const LLRectf& center_uv_rect, const LLRectf& center_draw_rect, const LLVector3& width_vec, const LLVector3& height_vec);
 
 inline void gl_rect_2d( const LLRect& rect, bool filled )
@@ -178,11 +174,27 @@ public:
     static void popMatrix();
     static void loadIdentity();
     static void translate(F32 x, F32 y, F32 z = 0.0f);
+    // Everything under this draws, clips and measures at this scale, about
+    // the origin it is pushed at: what is under it grows where it already
+    // is, the way it would under a matrix stack. The renderer has always
+    // been able to scale the UI; what this adds is the shadow of it that
+    // clipping, text and badges read.
+    static void scale(F32 x, F32 y);
+
+    // Where a local rect lands on screen under the UI transform, which is
+    // (local + offset) * scale: the composition the renderer applies to
+    // every UI vertex. Everything that draws or clips in screen coordinates
+    // under a reset matrix asks this, rather than each writing it out and
+    // one of them forgetting a term -- which is how a scale used to move
+    // the drawing and leave the scissor behind.
+    static LLRect toScreen(const LLRect& local);
+    static void toScreen(F32 local_x, F32 local_y, F32& x, F32& y);
 
     static void setLineWidth(F32 width);
 
     LLPointer<LLUIImage> getUIImageByID(const LLUUID& image_id, S32 priority = 0);
     LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority = 0);
+    bool hasUIImage(std::string_view name) const;
 
 protected:
     // since LLRender2D has no control of image provider's lifecycle
@@ -203,6 +215,12 @@ public:
     virtual LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority) = 0;
     virtual LLPointer<LLUIImage> getUIImageByID(const LLUUID& id, S32 priority) = 0;
     virtual void cleanUp() = 0;
+
+    // Whether a name is one the provider knows, asked without loading
+    // anything: getUIImage treats an unknown name as a file to fetch, so
+    // it cannot answer this. A provider that cannot say answers yes, and
+    // a caller checking a name for a mistake finds none.
+    virtual bool hasUIImage(std::string_view name) const { return true; }
 
     // to notify holders when pointer gets deleted
     typedef void(*callback_t)();

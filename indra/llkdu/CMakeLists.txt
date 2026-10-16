@@ -1,39 +1,29 @@
 # -*- cmake -*-
 
-if (USE_KDU)
-  add_library (llkdu STATIC)
+if(AL_USE_KDU)
+  add_library(llkdu STATIC)
 
+  target_sources(
+    llkdu
+    PRIVATE llimagej2ckdu.cpp llkdumem.cpp
+    PUBLIC FILE_SET HEADERS FILES llimagej2ckdu.h llkdumem.h
+  )
 
-target_sources(llkdu
-    PRIVATE
-    llimagej2ckdu.cpp
-    llkdumem.cpp
-
-    PUBLIC
-    FILE_SET HEADERS
-    FILES
-    llimagej2ckdu.h
-    llkdumem.h
-    )
-
-  target_link_libraries(llkdu PUBLIC ll::kdu llimage llcommon)
-  target_include_directories(llkdu INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(llkdu PRIVATE al::flags PUBLIC ll::kdu llimage llcommon)
 
   # Add tests
-  if (BUILD_TESTING)
-    SET(llkdu_TEST_SOURCE_FILES
-      llimagej2ckdu.cpp
-      )
-    SET(llkdu_test_additional_HEADER_FILES
-      llimagej2ckdu.h
-      llkdumem.h
-      lltut.h
-      )
-
+  if(AL_BUILD_TESTS)
     get_property(llimage_include_dir TARGET llimage PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
-    set_property(SOURCE ${llkdu_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_LIBRARIES ll::kdu llcommon)
-    set_property(SOURCE ${llkdu_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_INCLUDE_DIRS ${llimage_include_dir})
-
-    LL_ADD_PROJECT_UNIT_TESTS(llkdu "${llkdu_TEST_SOURCE_FILES}")
-  endif ()
-endif ()
+    # The codec, compiled into its test, over the test's stubs of llimage
+    # and of the KDU calls it makes. Built only with KDU, which has no port
+    # yet: this has not been compiled since it moved to Catch2.
+    al_add_test_binary(
+      llimagej2ckdu_test
+      PROJECT llkdu
+      SOURCES tests/llimagej2ckdu_test.cpp
+      UNIT llimagej2ckdu.cpp
+      LIBRARIES ll::kdu llmath llcommon
+      INCLUDES ${llimage_include_dir}
+    )
+  endif()
+endif()

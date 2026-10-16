@@ -446,16 +446,16 @@ F32 pulse_func(F32 t, F32 z, bool tracking_avatar, std::string direction)
     return a;
 }
 
-void draw_shockwave(F32 center_z, F32 t, S32 steps, LLColor4 color)
+void draw_shockwave(F32 center_z, F64 time, S32 steps, LLColor4 color)
 {
     if (!LLTracker::sCheesyBeacon)
     {
         return;
     }
 
-    t *= 0.6284f/F_PI;
-
-    t -= (F32) (S32) t;
+    // The phase in F64, as the time is: F32 seconds of a long session move it in steps.
+    F64 phase = time * 0.6284 / F_PI;
+    F32 t = (F32)(phase - floor(phase));
 
     t = llmax(t, 0.5f);
     t -= 0.5f;
@@ -509,7 +509,7 @@ void LLTracker::drawBeacon(LLVector3 pos_agent, std::string direction, LLColor4 
     if ("DOWN" == direction)
     {
         gGL.translatef(pos_agent.mV[0], pos_agent.mV[1], pos_agent.mV[2]);
-        draw_shockwave(1024.f, gRenderStartTime.getElapsedTimeF32(), 32, fogged_color);
+        draw_shockwave(1024.f, gRenderStartTime.getElapsedTimeF64().value(), 32, fogged_color);
         height = MAX_HEIGHT - pos_agent.mV[2];
     }
     else
@@ -525,7 +525,9 @@ void LLTracker::drawBeacon(LLVector3 pos_agent, std::string direction, LLColor4 
     gGL.color4fv(fogged_color.mV);
 
     LLVector3 x_axis = LLViewerCamera::getInstance()->getLeftAxis();
-    F32 t = gRenderStartTime.getElapsedTimeF32();
+    // pulse_func's pulse repeats every 16/pi seconds, so the time is wrapped to that in F64:
+    // F32 seconds of a long session move the pulse in steps.
+    const F32 t = (F32)fmod(gRenderStartTime.getElapsedTimeF64().value(), 16.0 / F_PI);
 
     F32 x = x_axis.mV[0];
     F32 y = x_axis.mV[1];

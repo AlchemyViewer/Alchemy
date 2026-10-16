@@ -175,16 +175,6 @@ namespace LLTrace
         // ensure that buffers are exclusively owned by this recording
         void makeUnique() { mBuffers.makeUnique(); }
 
-        // Timer accessors
-        bool hasValue(const StatType<TimeBlockAccumulator>& stat);
-        F64Seconds getSum(const StatType<TimeBlockAccumulator>& stat);
-        F64Seconds getSum(const StatType<TimeBlockAccumulator::SelfTimeFacet>& stat);
-        S32 getSum(const StatType<TimeBlockAccumulator::CallCountFacet>& stat);
-
-        F64Seconds getPerSec(const StatType<TimeBlockAccumulator>& stat);
-        F64Seconds getPerSec(const StatType<TimeBlockAccumulator::SelfTimeFacet>& stat);
-        F32 getPerSec(const StatType<TimeBlockAccumulator::CallCountFacet>& stat);
-
         // CountStatHandle accessors
         bool hasValue(const StatType<CountAccumulator>& stat);
         F64 getSum(const StatType<CountAccumulator>& stat);
@@ -584,7 +574,9 @@ namespace LLTrace
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
             num_periods = llmin(num_periods, getNumRecordedPeriods());
 
-            std::vector <typename RelatedTypes<typename T::value_t>::fractional_t> buf;
+            typedef typename RelatedTypes<typename T::value_t>::fractional_t fractional_t;
+
+            std::vector<fractional_t> buf;
             for (size_t i = 1; i <= num_periods; i++)
             {
                 Recording& recording = getPrevRecording(i);
@@ -593,9 +585,15 @@ namespace LLTrace
                     buf.push_back(recording.getPerSec(stat));
                 }
             }
+            // No period contributed a sample, so there is no middle element to
+            // index. Matches the SampleAccumulator overload.
+            if (buf.empty())
+            {
+                return fractional_t(0);
+            }
             std::sort(buf.begin(), buf.end());
 
-            return typename RelatedTypes<T>::fractional_t((buf.size() % 2 == 0) ? (buf[buf.size() / 2 - 1] + buf[buf.size() / 2]) / 2 : buf[buf.size() / 2]);
+            return fractional_t((buf.size() % 2 == 0) ? (buf[buf.size() / 2 - 1] + buf[buf.size() / 2]) / 2 : buf[buf.size() / 2]);
         }
 
         template<typename T>

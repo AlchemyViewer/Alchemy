@@ -191,6 +191,9 @@ protected:
 
     ll_face_list_t    mFaceList[LLRender::NUM_TEXTURE_CHANNELS]; //reverse pointer pointing to the faces using this image as texture
     U32               mNumFaces[LLRender::NUM_TEXTURE_CHANNELS];
+    U32               mFaceWalkCursor = 0; // where the update window's next visit starts in mFaceList, counted across channels
+    F32               mFaceWalkMax = 0.f;         // largest face stat seen so far in the current rotation of the walk
+    F32               mFaceWalkRotationMax = 0.f; // the same over the last completed rotation
     LLFrameTimer      mLastFaceListUpdateTimer ;
 
     ll_volume_list_t  mVolumeList[LLRender::NUM_VOLUME_TEXTURE_CHANNELS];
@@ -215,7 +218,7 @@ public:
     static U32 sMinLargeImageSize ;
     static U32 sMaxSmallImageSize ;
     static bool sFreezeImageUpdates;
-    static F32  sCurrentTime ;
+    static F64  sCurrentTime ;
 
     // estimated free memory for textures, by bias calculation
     static F32 sFreeVRAMMegabytes;
@@ -350,8 +353,10 @@ public:
     S32 getOriginalWidth() { return mOrigWidth; }
     S32 getOriginalHeight() { return mOrigHeight; }
 
-    bool isInImageList() const {return mInImageList ;}
-    void setInImageList(bool flag) {mInImageList = flag ;}
+    bool isInImageList() const { return mListIndex >= 0; }
+    // Position in the texture list's table, -1 when not in it. The table writes it.
+    S32  getListIndex() const { return mListIndex; }
+    void setListIndex(S32 index) { mListIndex = index; }
 
     LLFrameTimer* getLastPacketTimer() {return &mLastPacketTimer;}
 
@@ -467,7 +472,7 @@ protected:
     S8              mLoadedCallbackDesiredDiscardLevel;
     bool            mPauseLoadedCallBacks;
     callback_list_t mLoadedCallbackList;
-    F32             mLastCallBackActiveTime;
+    F64             mLastCallBackActiveTime;
 
     LLPointer<LLImageRaw> mRawImage;
     S32 mRawDiscardLevel = -1;
@@ -483,7 +488,7 @@ protected:
     LLPointer<LLImageRaw> mSavedRawImage;
     S32 mSavedRawDiscardLevel;
     S32 mDesiredSavedRawDiscardLevel;
-    F32 mLastReferencedSavedRawImageTime ;
+    F64 mLastReferencedSavedRawImageTime ;
     F32 mKeptSavedRawImageTime ;
 
     LLHost mTargetHost; // if invalid, just request from agent's simulator
@@ -492,7 +497,7 @@ protected:
     LLFrameTimer mLastPacketTimer;      // Time since last packet.
     LLFrameTimer mStopFetchingTimer;    // Time since mDecodePriority == 0.f.
 
-    bool  mInImageList;             // true if image is in list (in which case don't reset priority!)
+    S32   mListIndex;               // position in gTextureList's table, -1 when not in it (in which case don't reset priority!)
     // This needs to be atomic, since it is written both in the main thread
     // and in the GL image worker thread... HB
     LLAtomicBool  mNeedsCreateTexture;

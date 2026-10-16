@@ -118,11 +118,11 @@ LLSearchEditor::~LLSearchEditor()
 void LLSearchEditor::draw()
 {
     if (mClearButton)
-        mClearButton->setVisible(!mSearchEditor->getWText().empty());
+        mClearButton->setVisible(!mSearchEditor->getText().empty());
 
     if (mHighlightTextField)
     {
-        if (!mSearchEditor->getWText().empty())
+        if (!mSearchEditor->getText().empty())
         {
             mSearchEditor->setBgImage(mEditorSearchImage);
             mSearchEditor->setBgImageFocused(mEditorSearchImage);

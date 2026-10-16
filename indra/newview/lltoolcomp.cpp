@@ -1048,7 +1048,7 @@ bool FSToolCompPose::handleDoubleClick(S32 x, S32 y, MASK mask)
         mManip->getHighlightedPart() == LLManip::LL_NO_PART)
     {
         // Possibly show some pose properties or open the pose floater
-        mPoser = dynamic_cast<FSFloaterPoser*>(LLFloaterReg::showInstance("fs_poser"));
+        mPoser = LLFloaterReg::showTypedInstance<FSFloaterPoser>("fs_poser");
         return true;
     }
     else
@@ -1193,7 +1193,7 @@ bool FSToolCompPoseTranslate::handleDoubleClick(S32 x, S32 y, MASK mask)
         mManip->getHighlightedPart() == LLManip::LL_NO_PART)
     {
         // Possibly show some pose properties or open the pose floater
-        mPoser = dynamic_cast<FSFloaterPoser*>(LLFloaterReg::showInstance("fs_poser"));
+        mPoser = LLFloaterReg::showTypedInstance<FSFloaterPoser>("fs_poser");
         return true;
     }
     else

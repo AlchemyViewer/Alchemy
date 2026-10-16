@@ -33,7 +33,7 @@
 #include "llworld.h"
 #include "llshadermgr.h"
 
-extern F32SecondsImplicit gFrameTimeSeconds;
+extern F64SecondsImplicit gFrameTimeSeconds;
 
 extern U32 get_box_fan_indices(LLCamera* camera, const LLVector4a& center);
 
@@ -43,11 +43,6 @@ LLReflectionMap::LLReflectionMap()
 
 LLReflectionMap::~LLReflectionMap()
 {
-    if (mOcclusionQuery)
-    {
-        gPipeline.mReflectionMapManager.recycleQuery(mOcclusionQuery);
-        mOcclusionQuery = 0;
-    }
 }
 
 void LLReflectionMap::update(U32 resolution, U32 face, bool force_dynamic, F32 near_clip, bool useClipPlane, LLPlane clipPlane)
@@ -213,6 +208,18 @@ void LLReflectionMap::syncToViewerObject()
     }
 }
 
+void LLReflectionMap::orphan()
+{
+    mGroup = nullptr;
+    mViewerObject = nullptr;
+    mOrphaned = true;
+
+    // The sort orders by priority before distance, so a placed probe left at 1 would still sort
+    // ahead of every automatic probe, take a place inside the budget for the update before it is
+    // deleted, and push the last automatic probe out of its cube slot.
+    mPriority = 0;
+}
+
 bool LLReflectionMap::eclipses(const LLReflectionMap* other, F32 margin) const
 {
     if (!other || other == this || !mViewerObject || mViewerObject->isDead())
@@ -351,22 +358,20 @@ bool LLReflectionMap::getBox(LLMatrix4& box)
         LLVolume* volume = mViewerObject->getVolume();
         if (volume && mViewerObject->getReflectionProbeIsBox())
         {
-            glm::mat4 mv(get_current_modelview());
             LLVector3 s = mViewerObject->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
             mRadius = s.magVec();
-            glm::mat4 scale = glm::scale(glm::vec3(s));
             if (mViewerObject->mDrawable != nullptr)
             {
-                // object to agent space (no scale)
-                glm::mat4 rm(glm::make_mat4((F32*)mViewerObject->mDrawable->getWorldMatrix().mMatrix));
-
-                // construct object to camera space (with scale)
-                mv = mv * rm * scale;
+                // object unit cube to camera space: the scale, then the object's
+                // world matrix, then the view
+                LLMatrix4a mv;
+                mv.setMul(LLMatrix4a::scaling(s.mV[0], s.mV[1], s.mV[2]), mViewerObject->mDrawable->getWorldMatrix());
+                mv.setMul(mv, LLViewerCamera::getCurrent().getModelview());
 
                 // inverse is camera space to object unit cube
-                mv = glm::inverse(mv);
+                mv.invert();
 
-                box = LLMatrix4(glm::value_ptr(mv));
+                mv.store(box);
 
                 return true;
             }
@@ -384,6 +389,11 @@ bool LLReflectionMap::isActive() const
 bool LLReflectionMap::isRelevant() const
 {
     static LLCachedControl<S32> RenderReflectionProbeLevel(gSavedSettings, "RenderReflectionProbeLevel", 3);
+
+    if (mOrphaned)
+    { // whatever it was registered for is gone; the manager deletes it on its next update
+        return false;
+    }
 
     if (mViewerObject && RenderReflectionProbeLevel > 0)
     { // not an automatic probe
@@ -413,7 +423,8 @@ bool LLReflectionMap::isRelevant() const
 void LLReflectionMap::doOcclusion(const LLVector4a& eye)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
-    if (LLGLSLShader::sProfileEnabled)
+    // Not while a shader profile holds the occlusion targets: the probe keeps what its last query said.
+    if (!gGL.queries().canBegin(ALQueryKind::Occlusion))
     {
         return;
     }
@@ -427,39 +438,37 @@ void LLReflectionMap::doOcclusion(const LLVector4a& eye)
     LLVector4a o;
     o.setSub(mOrigin, eye);
 
-    bool do_query = false;
-
     if (o.getLength3().getF32() < dist)
     { // eye is inside radius, don't attempt to occlude
-        mOccluded = false;
+        clearOcclusion();
         return;
     }
 
-    if (mOcclusionQuery == 0)
-    { // no query was previously issued, allocate one and issue
-        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("rmdo - glGenQueries");
-        mOcclusionQuery = gPipeline.mReflectionMapManager.allocateQuery();
-        do_query = true;
-    }
-    else
-    { // query was previously issued, check it and only issue a new query
-        // if previous query is available
-        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("rmdo - glGetQueryObject");
-        GLuint result = 0;
-        glGetQueryObjectuiv(mOcclusionQuery, GL_QUERY_RESULT_AVAILABLE, &result);
-
-        if (result > 0)
+    // One query at a time: the next is issued once the last has been read, or has expired unread.
+    ALQueryPool& queries = gGL.queries();
+    if (mOcclusionQuery.isValid())
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("rmdo - query result");
+        U64 passed = 0;
+        const ALQueryPool::Status status = queries.result(mOcclusionQuery, passed);
+        if (status == ALQueryPool::Status::Pending)
         {
-            do_query = true;
-            glGetQueryObjectuiv(mOcclusionQuery, GL_QUERY_RESULT, &result);
-            mOccluded = result == 0;
+            return;
+        }
+        if (status == ALQueryPool::Status::Ready)
+        {
+            mOccluded = passed == 0;
         }
     }
 
-    if (do_query)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("rmdo - push query");
-        glBeginQuery(GL_ANY_SAMPLES_PASSED, mOcclusionQuery);
+        ALQueryScope query(queries, ALQueryKind::Occlusion);
+        mOcclusionQuery = query.ticket();
+        if (!mOcclusionQuery.isValid())
+        {
+            return;
+        }
 
         LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
@@ -467,8 +476,6 @@ void LLReflectionMap::doOcclusion(const LLVector4a& eye)
         shader->uniform3f(LLShaderMgr::BOX_SIZE, mRadius, mRadius, mRadius);
 
         gPipeline.mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(LLViewerCamera::getInstance(), mOrigin));
-
-        glEndQuery(GL_ANY_SAMPLES_PASSED);
     }
 #endif
 }

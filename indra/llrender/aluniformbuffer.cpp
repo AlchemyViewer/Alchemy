@@ -184,7 +184,7 @@ namespace
     // upload/map. Resolved once; false -> the classic bind-target path is used.
     bool dsa_ok()
     {
-        static const bool ok = glNamedBufferData && glNamedBufferSubData && glNamedBufferStorage
+        static const bool ok = glCreateBuffers && glNamedBufferData && glNamedBufferSubData && glNamedBufferStorage
                             && glMapNamedBufferRange && glUnmapNamedBuffer && glFlushMappedNamedBufferRange;
         return ok;
     }

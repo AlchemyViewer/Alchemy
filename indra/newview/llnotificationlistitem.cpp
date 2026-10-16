@@ -39,7 +39,6 @@
 #include "message.h"
 #include "llnotificationsutil.h"
 #include "llviewercontrol.h"
-#include <boost/regex.hpp>
 
 LLNotificationListItem::LLNotificationListItem(const Params& p) : LLPanel(p),
     mParams(p),

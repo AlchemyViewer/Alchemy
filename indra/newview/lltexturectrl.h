@@ -95,10 +95,12 @@ enum LLPickerSource
 // LLTextureCtrl
 
 
-class LLTextureCtrl
+class LLTextureCtrl final
 : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLTextureCtrl, LLUICtrl);
+
     typedef enum e_texture_pick_op
     {
         TEXTURE_CHANGE,
@@ -310,9 +312,11 @@ typedef std::function<void()> floater_close_callback;
 typedef std::function<void(const LLUUID& asset_id)> set_image_asset_id_callback;
 typedef std::function<void(LLPointer<LLViewerTexture> texture)> set_on_update_image_stats_callback;
 
-class LLFloaterTexturePicker : public LLFloater
+class LLFloaterTexturePicker final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterTexturePicker, LLFloater);
+
     LLFloaterTexturePicker(
         LLView* owner,
         LLUUID image_asset_id,
@@ -334,14 +338,14 @@ public:
     /*virtual*/ bool    handleDragAndDrop(S32 x, S32 y, MASK mask,
         bool drop, EDragAndDropType cargo_type, void *cargo_data,
         EAcceptance *accept,
-        std::string& tooltip_msg);
-    /*virtual*/ void    draw();
-    /*virtual*/ bool    handleKeyHere(KEY key, MASK mask);
+        std::string& tooltip_msg) override;
+    /*virtual*/ void    draw() override;
+    /*virtual*/ bool    handleKeyHere(KEY key, MASK mask) override;
 
     // LLFloater overrides
-    /*virtual*/ bool    postBuild();
-    /*virtual*/ void    onOpen(const LLSD& key);
-    /*virtual*/ void    onClose(bool app_settings);
+    /*virtual*/ bool    postBuild() override;
+    /*virtual*/ void    onOpen(const LLSD& key) override;
+    /*virtual*/ void    onClose(bool app_settings) override;
 
     // New functions
     void setImageID(const LLUUID& image_asset_id, bool set_selection = true);

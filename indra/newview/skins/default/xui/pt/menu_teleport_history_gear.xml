@@ -2,5 +2,4 @@
 <menu name="Teleport History Gear Context Menu">
 	<menu_item_call label="Expandir todas as pastas" name="Expand all folders"/>
 	<menu_item_call label="Recolher todas as pastas" name="Collapse all folders"/>
-	<menu_item_call label="Limpar histórico de teletransporte" name="Clear Teleport History"/>
 </menu>

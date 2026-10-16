@@ -1,0 +1,123 @@
+/**
+ * @file alscriptkeymap.h
+ * @brief The keys Script Studio's editors answer to: the standard keymap with a person's changes over it, kept in a setting.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include "alkeymap.h"
+#include "alstudiofloater.h"
+#include "llxmlnode.h"
+
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+// The keymap every editor of the studio is given: the standard one, with
+// another editor's keys over it where a person chose one
+// (ALScriptKeyPresets), and the commands a person rebound over those, as
+// the setting says. A rebound command has only the keys the setting gives
+// it; a command the setting does not name keeps the preset's, or the
+// standard's. Keys given to a command are taken from whatever had them,
+// the preset's from the standard's and the person's from both, so that no
+// key is two commands'. The studio's own menu commands -- saving, going
+// to a line, the panes -- are rebound in the same setting, each to keys
+// of one key or two in turn; the menu shows the first.
+namespace ALScriptKeymap
+{
+    typedef std::vector<std::pair<KEY, MASK>> keys_t;
+    typedef std::vector<ALKeyChord>           chords_t;
+
+    // A command of the studio's menus a person may give keys to: the
+    // item's name in the menus, and a key it answers to as standard --
+    // the studio's own table of keyed commands (ALStudioFloater), which
+    // Script Studio gives its window as well. A command with several keys
+    // as standard is named once for each.
+    using MenuCommand = ALStudioFloater::KeyedCommand;
+    const std::vector<MenuCommand>& menuCommands();
+    // Each command of the table once, in its order.
+    const std::vector<std::string>& menuIds();
+    // Whether an item is one of them.
+    bool                 isMenuCommand(std::string_view item);
+    // Its keys, each one or two in turn: the person's, else the preset's,
+    // else the standard's; none for none. The first is the one the menu
+    // shows.
+    chords_t             menuKeys(std::string_view item);
+    ALKeyChord           menuKey(std::string_view item);
+    bool                 isMenuRebound(std::string_view item);
+    // The item's keys from now on, none for none; and the preset's, or
+    // the standard's, again.
+    void                 rebindMenu(std::string_view item, const chords_t& keys);
+    void                 restoreMenu(std::string_view item);
+
+    // A command keys are given to: an editor's, or a menu's by name.
+    struct Owner
+    {
+        ALEditorCommand command = ALEditorCommand::None;
+        std::string     menu;
+    };
+    // The commands but `keeping` whose keys a chord given to it takes:
+    // the editors' command that hears its first key -- the key pressed,
+    // or the first of two -- since the editor has a key before the studio
+    // would wait; and the menus' commands with the same keys, with keys
+    // whose first is the key given (it runs a command of its own now, and
+    // the studio would never wait for a second), or with the first of the
+    // two given as a key of its own. Taken from them where `apply`; named
+    // either way.
+    std::vector<Owner> takeKeys(const Owner& keeping, const ALKeyChord& chord, bool apply);
+
+    // The items of the studio's menu bar as a file has them: each item's
+    // name, and where it is, "View > Scrollbar > Map" -- the names the
+    // Keys tab gives the menus' commands, which are the menus' own.
+    struct MenuItem
+    {
+        std::string id;
+        std::string path;
+    };
+    std::vector<MenuItem> menuItemsIn(const LLXMLNodePtr& root);
+    // The skin's, and its language's, as the studio is built from them.
+    const std::vector<MenuItem>& studioMenuItems();
+
+    // The editors' keymap, built once for each change of the setting.
+    const ALKeymap& current();
+    keys_t   keysOf(const ALKeymap& map, ALEditorCommand command);
+    bool     isRebound(ALEditorCommand command);
+    // The command's keys from now on, in the setting; none unbinds it.
+    void     rebind(ALEditorCommand command, const keys_t& keys);
+    // Back to the preset's keys, or the standard's, for one command or for
+    // all, the menus' too: the person's own taken out.
+    void     restore(ALEditorCommand command);
+    void     restoreAll();
+    // Whether the person has keys of their own for anything.
+    bool     anyRebound();
+
+    // The editor whose keys are over the standard's (ALScriptKeyPresets),
+    // by its id; the person's own stay over it, taking its keys where they
+    // have them.
+    const std::string& preset();
+    void               setPreset(const std::string& id);
+    // The keys as a person reads them: "Ctrl+Shift+K", or the several
+    // joined.
+    std::string describe(const keys_t& keys);
+    std::string describe(const chords_t& keys);
+}

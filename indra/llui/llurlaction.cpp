@@ -27,6 +27,8 @@
 #include "linden_common.h"
 
 #include "llurlaction.h"
+#include "llmenugl.h"
+#include "lluictrlfactory.h"
 #include "llview.h"
 #include "llwindow.h"
 #include "llurlregistry.h"
@@ -38,6 +40,9 @@ LLUrlAction::url_callback_t         LLUrlAction::sOpenURLCallback;
 LLUrlAction::url_callback_t         LLUrlAction::sOpenURLInternalCallback;
 LLUrlAction::url_callback_t         LLUrlAction::sOpenURLExternalCallback;
 LLUrlAction::execute_url_callback_t LLUrlAction::sExecuteSLURLCallback;
+LLUrlAction::id_query_t             LLUrlAction::sIsFriendCallback;
+LLUrlAction::named_query_t          LLUrlAction::sIsObjectBlockedCallback;
+LLUrlAction::id_query_t             LLUrlAction::sIsObjectReachableCallback;
 
 
 void LLUrlAction::setOpenURLCallback(url_callback_t cb)
@@ -58,6 +63,140 @@ void LLUrlAction::setOpenURLExternalCallback(url_callback_t cb)
 void LLUrlAction::setExecuteSLURLCallback(execute_url_callback_t cb)
 {
     sExecuteSLURLCallback = cb;
+}
+
+void LLUrlAction::setIsFriendCallback(id_query_t cb)
+{
+    sIsFriendCallback = std::move(cb);
+}
+
+void LLUrlAction::setIsObjectBlockedCallback(named_query_t cb)
+{
+    sIsObjectBlockedCallback = std::move(cb);
+}
+
+void LLUrlAction::setIsObjectReachableCallback(id_query_t cb)
+{
+    sIsObjectReachableCallback = std::move(cb);
+}
+
+std::optional<bool> LLUrlAction::isFriend(const std::string& url)
+{
+    if (!sIsFriendCallback)
+    {
+        return std::nullopt;
+    }
+    return sIsFriendCallback(LLUUID(getUserID(url)));
+}
+
+std::optional<bool> LLUrlAction::isObjectBlocked(const std::string& url)
+{
+    if (!sIsObjectBlockedCallback)
+    {
+        return std::nullopt;
+    }
+    return sIsObjectBlockedCallback(LLUUID(getObjectId(url)), getObjectName(url));
+}
+
+std::optional<bool> LLUrlAction::isObjectReachable(const std::string& url)
+{
+    if (!sIsObjectReachableCallback)
+    {
+        return std::nullopt;
+    }
+    return sIsObjectReachableCallback(LLUUID(getObjectId(url)));
+}
+
+void LLUrlAction::adjustMenu(LLView* menu, const std::string& url, bool friends, bool blocked, bool reachable)
+{
+    if (!menu)
+    {
+        return;
+    }
+    if (friends)
+    {
+        LLView* add    = menu->findChild<LLView>("add_friend");
+        LLView* remove = menu->findChild<LLView>("remove_friend");
+        if (add && remove)
+        {
+            if (const std::optional<bool> is_friend = isFriend(url))
+            {
+                add->setEnabled(!*is_friend);
+                remove->setEnabled(*is_friend);
+            }
+        }
+    }
+    if (blocked)
+    {
+        LLView* block   = menu->findChild<LLView>("block_object");
+        LLView* unblock = menu->findChild<LLView>("unblock_object");
+        if (block && unblock)
+        {
+            if (const std::optional<bool> is_blocked = isObjectBlocked(url))
+            {
+                block->setVisible(!*is_blocked);
+                unblock->setVisible(*is_blocked);
+            }
+        }
+    }
+    if (reachable)
+    {
+        if (LLView* zoom = menu->findChild<LLView>("zoom_in"))
+        {
+            if (const std::optional<bool> is_reachable = isObjectReachable(url))
+            {
+                zoom->setEnabled(*is_reachable);
+            }
+        }
+    }
+}
+
+// static
+LLContextMenu* LLUrlAction::createMenu(const std::string& url, LLHandle<LLContextMenu>& held)
+{
+    LLUrlMatch match;
+    if (!LLMenuGL::sMenuContainer || !LLUrlRegistry::instance().findUrl(url, match) || match.getMenuName().empty())
+    {
+        return nullptr;
+    }
+    // The actions the registry's menus name, each over this URL -- by
+    // value, the menu outliving whoever asked for it.
+    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registrar;
+    registrar.add("Url.Open", [url](LLUICtrl*, const LLSD&) { LLUrlAction::openURL(url); });
+    registrar.add("Url.OpenInternal", [url](LLUICtrl*, const LLSD&) { LLUrlAction::openURLInternal(url); });
+    registrar.add("Url.OpenExternal", [url](LLUICtrl*, const LLSD&) { LLUrlAction::openURLExternal(url); });
+    registrar.add("Url.Execute", [url](LLUICtrl*, const LLSD&) { LLUrlAction::executeSLURL(url, true); });
+    registrar.add("Url.Block", [url](LLUICtrl*, const LLSD&) { LLUrlAction::blockObject(url); });
+    registrar.add("Url.Unblock", [url](LLUICtrl*, const LLSD&) { LLUrlAction::unblockObject(url); });
+    registrar.add("Url.Teleport", [url](LLUICtrl*, const LLSD&) { LLUrlAction::teleportToLocation(url); });
+    registrar.add("Url.ShowProfile", [url](LLUICtrl*, const LLSD&) { LLUrlAction::showProfile(url); });
+    registrar.add("Url.AddFriend", [url](LLUICtrl*, const LLSD&) { LLUrlAction::addFriend(url); });
+    registrar.add("Url.RemoveFriend", [url](LLUICtrl*, const LLSD&) { LLUrlAction::removeFriend(url); });
+    registrar.add("Url.ReportAbuse", [url](LLUICtrl*, const LLSD&) { LLUrlAction::reportAbuse(url); });
+    registrar.add("Url.ReportAbuseObj", [url](LLUICtrl*, const LLSD&) { LLUrlAction::reportAbuseObj(url); });
+    registrar.add("Url.SendIM", [url](LLUICtrl*, const LLSD&) { LLUrlAction::sendIM(url); });
+    registrar.add("Url.ZoomInObject", [url](LLUICtrl*, const LLSD&) { LLUrlAction::zoomInObject(url); });
+    registrar.add("Url.ShowOnMap", [url](LLUICtrl*, const LLSD&) { LLUrlAction::showLocationOnMap(url); });
+    registrar.add("Url.ShowParcelOnMap", [url](LLUICtrl*, const LLSD&) { LLUrlAction::showParcelOnMap(url); });
+    registrar.add("Url.CopyLabel", [url](LLUICtrl*, const LLSD&) { LLUrlAction::copyLabelToClipboard(url); });
+    registrar.add("Url.CopyUrl", [url](LLUICtrl*, const LLSD&) { LLUrlAction::copyURLToClipboard(url); });
+    registrar.add("Url.CopyUUID", [url](LLUICtrl*, const LLSD&) { LLUrlAction::copyUUIDToClipboard(url); });
+    if (LLContextMenu* old = held.get())
+    {
+        old->die();
+        held.markDead();
+    }
+    LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>(match.getMenuName(), LLMenuGL::sMenuContainer,
+                                                                          LLMenuHolderGL::child_registry_t::instance());
+    if (!menu)
+    {
+        return nullptr;
+    }
+    held = menu->getHandle();
+    // Whether the agent is a friend, the object blocked or near: what
+    // the viewer installed says.
+    adjustMenu(menu, url);
+    return menu;
 }
 
 void LLUrlAction::openURL(std::string url)
@@ -158,7 +297,7 @@ void LLUrlAction::showParcelOnMap(std::string url)
 
 void LLUrlAction::copyURLToClipboard(std::string url)
 {
-    LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(url));
+    LLView::getWindow()->copyTextToClipboard(url);
 }
 
 void LLUrlAction::copyUUIDToClipboard(std::string url)
@@ -166,7 +305,7 @@ void LLUrlAction::copyUUIDToClipboard(std::string url)
     std::string id_str = getUserID(url);
     if (LLUUID::validate(id_str))
     {
-        LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(id_str));
+        LLView::getWindow()->copyTextToClipboard(id_str);
     }
 }
 
@@ -175,7 +314,7 @@ void LLUrlAction::copyLabelToClipboard(std::string url)
     LLUrlMatch match;
     if (LLUrlRegistry::instance().findUrl(url, match))
     {
-        LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(match.getLabel()));
+        LLView::getWindow()->copyTextToClipboard(match.getLabel());
     }
 }
 

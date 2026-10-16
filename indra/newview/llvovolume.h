@@ -95,7 +95,7 @@ public:
     virtual bool isVolumeUnique() const = 0; // Do we need a unique LLVolume instance?
     virtual bool isVolumeGlobal() const = 0; // Are we in global space?
     virtual bool isActive() const = 0; // Is this object currently active?
-    virtual const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const = 0;
+    virtual const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const = 0;
     virtual void updateRelativeXform(bool force_identity = false) = 0;
     virtual U32 getID() const = 0;
     virtual void preRebuild() = 0;
@@ -138,7 +138,6 @@ public:
     bool isRootEdit() const override; // overridden for sake of attachments treating themselves as a root object
     bool isHUDAttachment() const override;
 
-                void    generateSilhouette(LLSelectNode* nodep, const LLVector3& view_point);
     /*virtual*/ bool    setParent(LLViewerObject* parent) override;
                 S32     getLOD() const override             { return mLOD; }
                 void    setNoLOD()                          { mLOD = NO_LOD; mLODChanged = true; }
@@ -147,7 +146,7 @@ public:
     const LLVector3     getPivotPositionAgent() const override;
     const LLMatrix4&    getRelativeXform() const                { return mRelativeXform; }
     const LLMatrix3&    getRelativeXformInvTrans() const        { return mRelativeXformInvTrans; }
-    /*virtual*/ const LLMatrix4 getRenderMatrix() const override;
+    /*virtual*/ const LLMatrix4a& getRenderMatrix() const override;
                 typedef boost::unordered_set<const LLViewerTexture*> texture_cost_t;
                 static S32 getTextureCost(const LLViewerTexture* img);
                 U32     getRenderCost(texture_cost_t &textures) const;
@@ -183,7 +182,7 @@ public:
                 bool    getVolumeChanged() const                { return mVolumeChanged; }
 
     F32 getVObjRadius() const override              { return mVObjRadius; };
-                const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const override;
+                const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const override;
 
                 void    markForUpdate() override;
                 void    faceMappingChanged() override           { mFaceMappingChanged=true; }
@@ -203,6 +202,14 @@ public:
 
     /*virtual*/ void    setSelected(bool sel) override;
     /*virtual*/ bool    setDrawableParent(LLDrawable* parentp) override;
+
+    // Whether a face draws nothing: blended at an alpha of 0, its colour's or, under a GLTF material, its base
+    // colour's, and without glow. An invisible prim. Such a face is given geometry, in
+    // LLRenderPass::PASS_ALPHA_INVISIBLE, only for Highlight Transparent, a scripted beacon or, while its object is
+    // selected, the selection outline (ALSelectionOutline), which draws faces from their vertex buffers.
+    static bool isInvisibleFace(const LLTextureEntry* te);
+    // Whether any of this object's faces is (isInvisibleFace).
+    bool hasInvisibleFace() const;
 
     /*virtual*/ void    setScale(const LLVector3 &scale, bool damped) override;
 

@@ -37,6 +37,8 @@ class LLViewerInventoryItem;
 class LLInventoryItemsList : public LLFlatListViewEx
 {
 public:
+    AL_VIEW_TYPE(LLInventoryItemsList, LLFlatListViewEx);
+
     struct Params : public LLInitParam::Block<Params, LLFlatListViewEx::Params>
     {
         Params();
@@ -69,7 +71,7 @@ public:
     */
     bool getForceRefresh() { return mForceRefresh; }
 
-    virtual bool selectItemByValue(const LLSD& value, bool select = true);
+    virtual bool selectItemByValue(const LLSD& value, bool select = true) override;
 
     void updateSelection();
 

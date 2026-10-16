@@ -87,10 +87,10 @@
 			<text name="text_box9">
 				ＵＲＬ
 			</text>
-			<text name="text_box10">
+			<text name="objects_text">
 				オブジェクト
 			</text>
-			<text name="text_box7">
+			<text name="lindens_text">
 				リンデン
 			</text>
 		</panel>

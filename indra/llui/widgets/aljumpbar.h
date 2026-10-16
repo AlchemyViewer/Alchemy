@@ -1,0 +1,178 @@
+/**
+ * @file aljumpbar.h
+ * @brief A path, where every step of it offers the steps it could have been.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include "aldeferredrebuild.h"
+#include "llpanel.h"
+#include "v4color.h"
+
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/signals2.hpp>
+
+class LLTextBox;
+
+// Where you are, as the path that got you here -- and, on each step of it,
+// what that step could have been instead.
+//
+// A breadcrumb that only walks back up is a label with buttons in it. The
+// useful part is sideways: the crumb that says which panel you are in also
+// knows the other panels in that parent, so getting to the one beside it is
+// one gesture rather than up, look, and down again. Pressing a crumb goes
+// there; its arrow offers what else it could have been.
+//
+// A path longer than the room folds from the front, because the end of a path
+// says more about where you are than the start does, and the fold is itself a
+// crumb offering what it swallowed.
+//
+// The bar holds no tree and walks nothing. It is given a path and says which
+// step was asked for; what that means is the caller's.
+class ALJumpBar : public LLPanel
+{
+public:
+    AL_VIEW_TYPE(ALJumpBar, LLPanel);
+
+    struct Params : public LLInitParam::Block<Params, LLPanel::Params>
+    {
+        // Drawn at the right end, past the path: what a caller wants said
+        // about where this path is, rather than about the path.
+        Optional<std::string> trailer;
+        Params();
+    };
+
+    struct Crumb
+    {
+        std::string label;
+        // What the caller calls this step. Answered back when it is chosen.
+        std::string value;
+        // What this step could have been: its siblings, each a label and the
+        // value it stands for. Empty leaves the crumb a plain button.
+        std::vector<std::pair<std::string, std::string> > alternatives;
+        std::string toolTip;
+        friend bool operator==(const Crumb& a, const Crumb& b)
+        {
+            return a.label == b.label && a.value == b.value && a.alternatives == b.alternatives && a.toolTip == b.toolTip;
+        }
+    };
+
+    // The path, and the bar built again for it -- but for the same path
+    // said again, which is what a caller does whenever its reasons for
+    // asking move, and which would close a crumb's list under the person
+    // choosing from it.
+    void setPath(std::vector<Crumb> crumbs);
+    const std::vector<Crumb>& path() const { return mCrumbs; }
+
+    // Said past the end of the path, in the quiet ink: not a step, so not
+    // something to click.
+    void setTrailer(const std::string& text);
+
+    // The same, in pieces, of which the ones with a value may be pressed:
+    // what the words say about the path is sometimes a way somewhere --
+    // the caret's line is where Go to Line starts, a count of problems
+    // is the list of them. A piece with no value is only said.
+    struct TrailerPart
+    {
+        std::string text;
+        std::string value;
+        std::string toolTip;
+        // Said in a colour of its own, where it is a warning; the quiet
+        // ink otherwise.
+        std::optional<LLColor4> color;
+        // Where the bar is too narrow for all of it, the pieces with the
+        // highest drop go first, the last said of those first, until the
+        // rest fits beside the path's last step; a drop of 0 never goes.
+        S32 drop = 0;
+        // A separator: said only between two pieces that are.
+        bool between = false;
+        friend bool operator==(const TrailerPart& a, const TrailerPart& b)
+        {
+            return a.text == b.text && a.value == b.value && a.toolTip == b.toolTip && a.color == b.color && a.drop == b.drop &&
+                   a.between == b.between;
+        }
+    };
+    void setTrailer(std::vector<TrailerPart> parts);
+    const std::vector<TrailerPart>& trailer() const { return mTrailerParts; }
+
+    typedef boost::signals2::signal<void(const std::string&)> trailer_signal_t;
+    boost::signals2::connection onTrailerChosen(const trailer_signal_t::slot_type& cb)
+    {
+        return mTrailerChosen.connect(cb);
+    }
+
+    // A step chosen: the crumb it was chosen on, and the value chosen there.
+    // Pressing a crumb chooses its own value, which is going there; opening
+    // it and picking a sibling chooses that one, which is going sideways.
+    // One signal, because they are one gesture with two answers.
+    typedef boost::signals2::signal<void(size_t, const std::string&)> chose_signal_t;
+    boost::signals2::connection onChose(const chose_signal_t::slot_type& cb)
+    {
+        return mChose.connect(cb);
+    }
+
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    ~ALJumpBar() override;
+
+protected:
+    friend class LLUICtrlFactory;
+    ALJumpBar(const Params& p);
+
+private:
+    // A path set from inside a crumb's own press -- which is what going
+    // there does -- is built once the press is over, since building deletes
+    // the crumb that is still on the stack.
+    void build();
+    // How many crumbs from the front are swallowed so that the rest fit, and
+    // the fold that offers them back.
+    size_t folded() const;
+    S32 widthOf(const Crumb& crumb) const;
+    // Which of the trailer's pieces are said in the room the path leaves
+    // it, keeping its last step, and how wide those are together.
+    std::vector<bool> trailerShown(S32& width) const;
+    void chose(size_t at, std::string value);
+    void choseTrailer(std::string value);
+    // The trailer's pieces given their words and their places, right up
+    // against the far edge: what a change of words alone asks for, which
+    // is every move of a caret, and needs nothing built again.
+    void layTrailer();
+
+    std::vector<Crumb>      mCrumbs;
+    std::vector<LLView*>    mParts;
+    LLView*                 mTrailer = nullptr;
+    std::vector<LLTextBox*> mTrailerPieces;
+    // Where the path ended, and how many crumbs it folded, when it was
+    // built: what the trailer's room starts from, and what a trailer of
+    // another width would have to fold again.
+    S32                     mPathEnd = 0;
+    size_t                  mFolded  = 0;
+    std::vector<TrailerPart> mTrailerParts;
+    // The pieces run together: whether there is a trailer at all.
+    std::string             mTrailerText;
+    chose_signal_t          mChose;
+    trailer_signal_t        mTrailerChosen;
+    ALDeferredRebuild       mRebuild;
+};

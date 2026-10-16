@@ -9,13 +9,7 @@
 	<text name="subject_label">
 		Objet :
 	</text>
-	<line_editor label="Saisir ici votre objet" name="subject_form"/>
-	<text name="msg_label">
-		Message :
-	</text>
 	<text_editor name="msg_form">
 		Saisir ici votre message
 	</text_editor>
-	<button label="Annuler" name="cancel_btn"/>
-	<button label="Envoyer" name="send_btn"/>
 </panel>

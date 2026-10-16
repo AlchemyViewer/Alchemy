@@ -35,7 +35,7 @@ in vec3 position;       // star center world position (shared by all 6 verts of 
 in vec4 diffuse_color;  // RGB = sRGB black-body color, A = intrinsic intensity (0..1)
 in vec2 texcoord0;      // corner offset in [-1, 1] for GPU-side billboarding
 
-out vec3 vary_world_dir;     // world-space direction from camera to star (post-rotation)
+out vec3 vary_world_dir;     // direction from camera to star in the stars' frame, before their slow rotation about z
 out vec2 vary_corner;        // corner offset, pass-through for fragment shape
 out vec4 vary_color;         // rgb = linear BB color, a = intensity
 out float vary_intensity;
@@ -80,9 +80,10 @@ void main()
     vec2 ndc_offset = pixel_offset * (2.0 / max(screen_res, vec2(1.0)));
     clip_center.xy += ndc_offset * clip_center.w;
 
-    // Smash Z to the far clip plane so stars never poke through the moon/sky. Reverse-Z
-    // (glClipControl ZERO_TO_ONE) puts the far plane at ndc z 0, not 1; the sky depth func
-    // flips to GEQUAL so it still passes against a 0-cleared buffer.
+    // On the far plane with the rest of the sky, so geometry occludes stars and the sun and
+    // moon, drawn after them, cover them. Reverse-Z (glClipControl ZERO_TO_ONE) puts the far
+    // plane at ndc z 0, not 1; the sky depth func flips to GEQUAL so it still passes against a
+    // 0-cleared buffer.
 #ifdef REVERSE_Z
     clip_center.z = 0.0;
 #else

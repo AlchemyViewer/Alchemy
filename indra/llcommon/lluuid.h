@@ -30,10 +30,16 @@
 #include <functional>
 #include <iostream>
 #include <set>
+#include <type_traits>
 #include <vector>
 #include "stdtypes.h"
 #include "llpreprocessor.h"
+#include <boost/container_hash/hash_is_avalanching.hpp>
 #include <boost/functional/hash.hpp>
+
+#if defined(_MSC_VER) && !defined(__SIZEOF_INT128__)
+#include <intrin.h>     // __umulh
+#endif
 
 class LLMutex;
 
@@ -59,7 +65,18 @@ public:
     {
         for (S32 i = 0; i < UUID_BYTES; ++i) mData[i] = bytes[i];
     }
-    explicit LLUUID(const char *in_string); // Convert from string.
+    // Convert from string. A literal is parsed as the program is compiled, so
+    // a constant made from one is constant-initialised: another file's
+    // statics, made before it would have been, read it whole rather than
+    // null, in whatever order the linker put the files. A string only the
+    // run time can read, or one it would warn of, is parsed there as ever.
+    explicit constexpr LLUUID(const char *in_string)
+    {
+        if (!std::is_constant_evaluated() || !parseLiteral(in_string))
+        {
+            set(in_string);
+        }
+    }
     explicit LLUUID(const std::string& in_string); // Convert from string.
     ~LLUUID() = default;
 
@@ -122,17 +139,6 @@ public:
     U16 getCRC16() const;
     U32 getCRC32() const;
 
-    // Returns a 64 bit digest of the UUID by XORing its two 64-bit halves.
-    // memcpy into locals avoids the strict-aliasing/alignment UB of reading
-    // a U8[16] through a U64*. Numerical output is unchanged on each platform.
-    inline U64 getDigest64() const
-    {
-        U64 a, b;
-        memcpy(&a, mData,     sizeof(a));
-        memcpy(&b, mData + 8, sizeof(b));
-        return a ^ b;
-    }
-
     static bool validate(const std::string& in_string); // Validate that the UUID string is legal.
 
     static const LLUUID null;
@@ -143,6 +149,56 @@ public:
     static bool parseUUID(const std::string& buf, LLUUID* value);
 
     U8 mData[UUID_BYTES] {};
+
+private:
+    // set's reading of a whole UUID string, for the compiler: false for
+    // anything else -- the old 35-character form, a bad digit -- which set
+    // reads, and warns of, at run time. Null and empty make the null UUID,
+    // as they do there.
+    constexpr bool parseLiteral(const char* in_string)
+    {
+        if (!in_string || !in_string[0])
+        {
+            return true;
+        }
+
+        S32 length = 0;
+        while (length < UUID_STR_SIZE + 1 && in_string[length])
+        {
+            ++length;
+        }
+        if (length != UUID_STR_SIZE)
+        {
+            return false;
+        }
+
+        auto nybble = [](char c) -> S32
+        {
+            return c >= '0' && c <= '9' ? c - '0'
+                 : c >= 'a' && c <= 'f' ? c - 'a' + 10
+                 : c >= 'A' && c <= 'F' ? c - 'A' + 10
+                 : -1;
+        };
+
+        // As set does, past the dashes without looking at them.
+        S32 pos = 0;
+        for (S32 i = 0; i < UUID_BYTES; ++i)
+        {
+            if (i == 4 || i == 6 || i == 8 || i == 10)
+            {
+                ++pos;
+            }
+            const S32 hi = nybble(in_string[pos]);
+            const S32 lo = nybble(in_string[pos + 1]);
+            if ((hi | lo) < 0)
+            {
+                return false;
+            }
+            mData[i] = (U8)((hi << 4) | lo);
+            pos += 2;
+        }
+        return true;
+    }
 };
 static_assert(std::is_trivially_copyable<LLUUID>::value, "LLUUID must be trivial copy");
 static_assert(std::is_trivially_move_assignable<LLUUID>::value, "LLUUID must be trivial move");
@@ -192,39 +248,106 @@ public:
 // exported (dllimport-in-consumers) static member can't have an inline
 // definition.
 
+namespace LL
+{
+namespace hash_detail
+{
+    // 64x64 -> 128 widening multiply. On return a holds the low half of the
+    // product and b the high half. One instruction on every target we ship.
+    LL_FORCE_INLINE void widening_mul(U64& a, U64& b) noexcept
+    {
+#if defined(__SIZEOF_INT128__)
+        const unsigned __int128 r = (unsigned __int128)a * (unsigned __int128)b;
+        a = (U64)r;
+        b = (U64)(r >> 64);
+#elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_ARM64))
+        const U64 lo = a * b;
+        const U64 hi = __umulh(a, b);
+        a = lo;
+        b = hi;
+#else
+        // 32x32 -> 64 decomposition for targets without a widening 64-bit
+        // multiply. Same result, several times the instruction count.
+        const U64 al = a & 0xffffffffULL, ah = a >> 32;
+        const U64 bl = b & 0xffffffffULL, bh = b >> 32;
+        const U64 ll = al * bl, lh = al * bh, hl = ah * bl, hh = ah * bh;
+        const U64 mid = (ll >> 32) + (lh & 0xffffffffULL) + (hl & 0xffffffffULL);
+        a = (ll & 0xffffffffULL) | (mid << 32);
+        b = hh + (lh >> 32) + (hl >> 32) + (mid >> 32);
+#endif
+    }
+
+    // Fold a widening multiply down to 64 bits.
+    LL_FORCE_INLINE U64 mul_mix(U64 a, U64 b) noexcept
+    {
+        widening_mul(a, b);
+        return a ^ b;
+    }
+
+    // Three of the four entries of wyhash's default secret, keeping wyhash's
+    // numbering so the constants can be checked against it; the 16-byte path
+    // has no use for secret[2]. Each is odd with a popcount of 32, which is
+    // what stops the multiply collapsing a structured operand.
+    inline constexpr U64 UUID_SECRET_0 = 0xa0761d6478bd642fULL;
+    inline constexpr U64 UUID_SECRET_1 = 0xe7037ed1a0b428dbULL;
+    inline constexpr U64 UUID_SECRET_3 = 0x589965cc75374cc3ULL;
+} // namespace hash_detail
+} // namespace LL
+
 // Canonical hash for LLUUID (also used by boost::container_hash via ADL).
-// Golden-ratio multiply with avalanche mixing: shift by 31 mixes the upper
-// half into the lower half; shift by 47 lifts the highest bits into output.
-// U64 arithmetic throughout keeps the byte-pack and mixing shifts well-defined
-// regardless of size_t width.
+//
+// An LLUUID is sixteen bytes, and only sometimes sixteen *random* bytes: the
+// type is also the viewer's general-purpose 16-byte key, holding tracking ids,
+// composed asset keys and other structured payloads whose entropy sits in one
+// lane and whose remaining bytes are constant or zero. The hash has to spread
+// those as well as it spreads the 122 random bits of a real v4 UUID.
+//
+// This is the 16-byte case of wyhash: two dependent widening multiplies with
+// the full 128-bit product carried between them. Every input bit reaches every
+// output bit, so callers may take the index from either end of the value --
+// a mask (`h & (n-1)`, which is what MSVC's std::unordered_map and every
+// hand-rolled table do) or a shift (which is what boost's open-addressing
+// tables do) both see a fully mixed result.
+//
+// Do not replace this with a fold of the two halves. XOR mixes nothing, and a
+// constant multiply propagates carries upward only, so either one collapses
+// whole families of these inputs onto a single bucket. The hash group in
+// lluuid_test.cpp measures the properties that rule those out.
 inline size_t hash_value(const LLUUID& id) noexcept
 {
-    U64 h = 0;
-    for (int i = 0; i < UUID_BYTES; i += 8)
-    {
-        const U64 chunk =
-              (U64)id.mData[i]
-            | ((U64)id.mData[i + 1] << 8)
-            | ((U64)id.mData[i + 2] << 16)
-            | ((U64)id.mData[i + 3] << 24)
-            | ((U64)id.mData[i + 4] << 32)
-            | ((U64)id.mData[i + 5] << 40)
-            | ((U64)id.mData[i + 6] << 48)
-            | ((U64)id.mData[i + 7] << 56);
-        h ^= (chunk * 0x9e3779b97f4a7c15ULL) ^ (h >> 31) ^ (h >> 47);
-    }
-    return (size_t)h;
+    U64 lo, hi;
+    memcpy(&lo, id.mData,     sizeof(lo));
+    memcpy(&hi, id.mData + 8, sizeof(hi));
+
+    U64 a = lo ^ LL::hash_detail::UUID_SECRET_1;
+    U64 b = hi ^ LL::hash_detail::UUID_SECRET_3;
+    LL::hash_detail::widening_mul(a, b);
+    return (size_t)LL::hash_detail::mul_mix(
+        a ^ LL::hash_detail::UUID_SECRET_0 ^ (U64)UUID_BYTES,
+        b ^ LL::hash_detail::UUID_SECRET_1);
 }
 
 namespace std
 {
     template<> struct hash<LLUUID>
     {
+        // Tells boost::unordered's open-addressing tables that the value is
+        // already mixed, so they skip their own mulx pass.
+        using is_avalanching = std::true_type;
+
         inline size_t operator()(const LLUUID& id) const noexcept
         {
             return hash_value(id);
         }
     };
+}
+
+namespace boost
+{
+    // Same claim for boost::hash, which is the default hasher for every
+    // boost::unordered_* container keyed by an LLUUID.
+    template<> struct hash_is_avalanching<boost::hash<LLUUID>> : std::true_type {};
+    template<> struct hash_is_avalanching<boost::hash<LLTransactionID>> : std::true_type {};
 }
 
 #endif // LL_LLUUID_H

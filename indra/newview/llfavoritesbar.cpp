@@ -156,11 +156,12 @@ private:
  * in createButtons function but landmark data is not available when Favorites Bar is
  * created. Thats why we are requesting landmark data after
  */
-class LLFavoriteLandmarkButton : public LLButton
+class LLFavoriteLandmarkButton final : public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLFavoriteLandmarkButton, LLButton);
 
-    bool handleToolTip(S32 x, S32 y, MASK mask)
+    bool handleToolTip(S32 x, S32 y, MASK mask) override
     {
         std::string region_name = mLandmarkInfoGetter.getName();
 
@@ -179,9 +180,9 @@ public:
         return true;
     }
 
-    /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask)
+    /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask) override
     {
-        LLFavoritesBarCtrl* fb = dynamic_cast<LLFavoritesBarCtrl*>(getParent());
+        LLFavoritesBarCtrl* fb = getParentAs<LLFavoritesBarCtrl>();
 
         if (fb)
         {
@@ -194,7 +195,7 @@ public:
     void setLandmarkID(const LLUUID& id){ mLandmarkInfoGetter.setLandmarkID(id); }
     const LLUUID& getLandmarkID() const { return mLandmarkInfoGetter.getLandmarkID(); }
 
-    void onMouseEnter(S32 x, S32 y, MASK mask)
+    void onMouseEnter(S32 x, S32 y, MASK mask) override
     {
         if (LLToolDragAndDrop::getInstance()->hasMouseCapture())
         {
@@ -221,10 +222,11 @@ private:
  * in showDropDownMenu function but landmark data is not available when Favorites Bar is
  * created. Thats why we are requesting landmark data after
  */
-class LLFavoriteLandmarkMenuItem : public LLMenuItemCallGL
+class LLFavoriteLandmarkMenuItem final : public LLMenuItemCallGL
 {
 public:
-    bool handleToolTip(S32 x, S32 y, MASK mask)
+    AL_VIEW_TYPE(LLFavoriteLandmarkMenuItem, LLMenuItemCallGL);
+    bool handleToolTip(S32 x, S32 y, MASK mask) override
     {
         std::string region_name = mLandmarkInfoGetter.getName();
         if (!region_name.empty())
@@ -240,21 +242,21 @@ public:
     const LLUUID& getLandmarkID() const { return mLandmarkInfoGetter.getLandmarkID(); }
     void setLandmarkID(const LLUUID& id) { mLandmarkInfoGetter.setLandmarkID(id); }
 
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask)
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override
     {
-        if (mMouseDownSignal)
-            (*mMouseDownSignal)(this, x, y, mask);
+        if (mouse_signal_t* signal = mouseDownSignal())
+            (*signal)(this, x, y, mask);
         return LLMenuItemCallGL::handleMouseDown(x, y, mask);
     }
 
-    virtual bool handleMouseUp(S32 x, S32 y, MASK mask)
+    virtual bool handleMouseUp(S32 x, S32 y, MASK mask) override
     {
-        if (mMouseUpSignal)
-            (*mMouseUpSignal)(this, x, y, mask);
+        if (mouse_signal_t* signal = mouseUpSignal())
+            (*signal)(this, x, y, mask);
         return LLMenuItemCallGL::handleMouseUp(x, y, mask);
     }
 
-    virtual bool handleHover(S32 x, S32 y, MASK mask)
+    virtual bool handleHover(S32 x, S32 y, MASK mask) override
     {
         if (fb)
         {
@@ -283,9 +285,10 @@ private:
  * because otherwise LLToolDragAndDrop will initiate drag and drop operation
  * with the world.
  */
-class LLFavoriteLandmarkToggleableMenu : public LLToggleableMenu
+class LLFavoriteLandmarkToggleableMenu final : public LLToggleableMenu
 {
 public:
+    AL_VIEW_TYPE(LLFavoriteLandmarkToggleableMenu, LLToggleableMenu);
     // virtual
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
         void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override
@@ -501,7 +504,7 @@ bool LLFavoritesBarCtrl::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
             else // Drag to the toolbar itself
             {
                 // Drag to a landmark button?
-                if (LLFavoriteLandmarkButton* dest = dynamic_cast<LLFavoriteLandmarkButton*>(findChildByLocalCoords(x, y)))
+                if (LLFavoriteLandmarkButton* dest = ALViewType::as<LLFavoriteLandmarkButton>(findChildByLocalCoords(x, y)))
                 {
                     setLandingTab(dest);
                 }
@@ -725,7 +728,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
             return false;
 
         // Identify the menu item hovered and the side to drop
-        LLFavoriteLandmarkMenuItem* target_item = dynamic_cast<LLFavoriteLandmarkMenuItem*>(overflow_menu->childFromPoint(x, y));
+        LLFavoriteLandmarkMenuItem* target_item = ALViewType::as<LLFavoriteLandmarkMenuItem>(overflow_menu->childFromPoint(x, y));
         if (target_item)
         {
             insert_before = true;
@@ -737,7 +740,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
             auto end = overflow_menu->getChildList()->end();
             auto check = [](const LLView* child) -> bool
                 {
-                    return dynamic_cast<const LLFavoriteLandmarkMenuItem*>(child);
+                    return ALViewType::as<LLFavoriteLandmarkMenuItem>(child) != nullptr;
                 };
             // Menu items are placed in the backward order, so the bottom goes first
             auto it = std::find_if(begin, end, check);
@@ -751,7 +754,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
     else
     {
         // Identify the button hovered and the side to drop
-        LLFavoriteLandmarkButton* hovered_button = dynamic_cast<LLFavoriteLandmarkButton*>(mLandingTab);
+        LLFavoriteLandmarkButton* hovered_button = ALViewType::as<LLFavoriteLandmarkButton>(mLandingTab);
         if (hovered_button)
         {
             insert_before = true;
@@ -759,7 +762,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
         else
         {
             // Choose the right landmark button
-            hovered_button = dynamic_cast<LLFavoriteLandmarkButton*>(mLastTab);
+            hovered_button = ALViewType::as<LLFavoriteLandmarkButton>(mLastTab);
             if (!hovered_button) [[unlikely]]
                 return false;
 
@@ -949,7 +952,7 @@ void LLFavoritesBarCtrl::updateButtons(bool force_update)
         //lets find first changed button
         while (child_it != childs->end() && first_changed_item_index < mItems.size())
         {
-            LLFavoriteLandmarkButton* button = dynamic_cast<LLFavoriteLandmarkButton*> (*child_it);
+            LLFavoriteLandmarkButton* button = (*child_it)->as<LLFavoriteLandmarkButton>();
             if (button)
             {
                 const LLViewerInventoryItem *item = mItems[first_changed_item_index].get();
@@ -979,7 +982,7 @@ void LLFavoritesBarCtrl::updateButtons(bool force_update)
             //lets remove other landmarks button and rebuild it
             child_list_const_iter_t cur_it = child_it++;
             LLFavoriteLandmarkButton* button =
-                    dynamic_cast<LLFavoriteLandmarkButton*> (*cur_it);
+                    (*cur_it)->as<LLFavoriteLandmarkButton>();
             if (button)
             {
                 if (mLastTab == button)
@@ -1030,7 +1033,7 @@ void LLFavoritesBarCtrl::updateButtons(bool force_update)
         {
             // mMoreTextBox was removed, so LLFavoriteLandmarkButtons
             // should be the only ones in the list
-            mLastTab = dynamic_cast<LLFavoriteLandmarkButton*>(childs->back());
+            mLastTab = childs->back()->as<LLFavoriteLandmarkButton>();
         }
 
         mFirstDropDownItem = j;
@@ -1250,20 +1253,25 @@ void LLFavoritesBarCtrl::fitLabelWidth(LLMenuItemCallGL* menu_item)
     // Check whether item name wider than menu
     if (menu_item->getNominalWidth() > max_width)
     {
-        S32 chars_total = static_cast<S32>(item_name.length());
-        S32 chars_fitted = 1;
         menu_item->setLabel(LLStringExplicit(""));
-        S32 label_space = max_width - menu_item->getFont()->getWidth("...") -
-                menu_item->getNominalWidth();// This returns width of menu item with empty label (pad pixels)
+        // Signed, and floored. getNominalWidth() is unsigned -- it returns the
+        // width of the item with an empty label, the pad pixels -- so working
+        // this out in the unsigned domain turns a menu narrower than its own
+        // padding into an enormous positive number that arrives here negative.
+        // A budget below zero is no budget, and the font asserts on one.
+        const S32 label_space = llmax(0,
+                (S32)max_width
+                - menu_item->getFont()->getWidth("...")
+                - (S32)menu_item->getNominalWidth());
 
-        while (chars_fitted < chars_total
-                && menu_item->getFont()->getWidth(item_name, 0, chars_fitted) < label_space)
-        {
-            chars_fitted++;
-        }
-        chars_fitted--; // Rolling back one char, that doesn't fit
+        // Measured and cut in the same unit. The re-measuring loop this
+        // replaces counted the total in bytes, asked the font about codepoints
+        // and then cut bytes again, so a non-ASCII name could be sliced through
+        // the middle of a character.
+        const S32 bytes_fitted = menu_item->getFont()->maxDrawableBytes(
+                item_name, (F32)label_space, S32_MAX, LLFontGL::ANYWHERE);
 
-        menu_item->setLabel(item_name.substr(0, chars_fitted) + "...");
+        menu_item->setLabel(item_name.substr(0, bytes_fitted) + "...");
     }
 }
 
@@ -1380,7 +1388,7 @@ void copy_slurl_to_clipboard_cb(std::string& slurl)
         LLNotificationsUtil::add("LandmarkLocationUnknown");
         return;
     }
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(slurl), 0, static_cast<S32>(slurl.size()));
+    LLClipboard::instance().copyToClipboard(slurl, 0, static_cast<S32>(slurl.size()));
 
     LLSD args;
     args["SLURL"] = slurl;
@@ -1679,7 +1687,7 @@ LLUICtrl* LLFavoritesBarCtrl::findChildByLocalCoords(S32 x, S32 y)
             // This makes the hit a bit less finicky than hitting directly on the button itself
             if (x <= rect.mRight)
             {
-                ctrl = dynamic_cast<LLUICtrl*>(*i);
+                ctrl = (*i)->as<LLUICtrl>();
                 break;
             }
         }

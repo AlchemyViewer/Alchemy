@@ -35,6 +35,8 @@ class LLToggleableMenu;
 class LLPanelPlacesTab : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelPlacesTab, LLPanel);
+
     LLPanelPlacesTab() : LLPanel() {}
     virtual ~LLPanelPlacesTab() {}
 

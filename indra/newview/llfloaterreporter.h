@@ -74,15 +74,17 @@ enum EReportType
     CS_REQUEST_REPORT = 4
 };
 
-class LLFloaterReporter
+class LLFloaterReporter final
 :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterReporter, LLFloater);
+
     LLFloaterReporter(const LLSD& key);
     /*virtual*/ ~LLFloaterReporter();
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ void onClose(bool app_quitting) override;
 
     static void onIdle(void* user_data);
 

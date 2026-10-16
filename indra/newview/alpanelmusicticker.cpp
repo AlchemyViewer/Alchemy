@@ -37,6 +37,44 @@
 
 static LLPanelInjector<ALPanelMusicTicker> t_music_ticker("music_ticker");
 
+namespace
+{
+    // The ticker cuts its strings at whatever offset it has scrolled to, so
+    // every one of those offsets has to sit on a character boundary. Stream
+    // metadata is largely accented Latin and CJK, and stepping a byte at a
+    // time drew each multi-byte character as replacement marks on the way past.
+    size_t cluster_offset(const std::string& text, S32 clusters)
+    {
+        size_t pos = 0;
+        for (S32 i = 0; i < clusters && pos < text.size(); ++i)
+        {
+            pos = utf8str_step_grapheme_forward(text, pos);
+        }
+        return pos;
+    }
+
+    S32 cluster_count(const std::string& text)
+    {
+        S32 n = 0;
+        for (size_t pos = 0; pos < text.size(); ++n)
+        {
+            pos = utf8str_step_grapheme_forward(text, pos);
+        }
+        return n;
+    }
+
+    // The slice on show once `text` has scrolled `step` characters, given that
+    // it is `extra` characters wider than its box. The window keeps its width
+    // and moves its start, so the whole string passes through it.
+    std::string ticker_window(const std::string& text, S32 extra, S32 step)
+    {
+        const S32 visible = llmax(0, cluster_count(text) - extra);
+        const size_t begin = cluster_offset(text, step);
+        const size_t end   = cluster_offset(text, step + visible);
+        return text.substr(begin, end - begin);
+    }
+}
+
 ALPanelMusicTicker::ALPanelMusicTicker() : LLPanel(),
     mPlayState(STATE_PLAYING),
     mStationScrollChars(0),
@@ -190,11 +228,11 @@ void ALPanelMusicTicker::resetTicker()
     mScrollTimer.reset();
     mCurScrollChar = 0;
     if (mStationText)
-        mStationText->setText(LLStringExplicit(mszStation.substr(0, mszStation.length() - mStationScrollChars)));
+        mStationText->setText(LLStringExplicit(ticker_window(mszStation, mStationScrollChars, 0)));
     if(mArtistText)
-        mArtistText->setText(LLStringExplicit(mszArtist.substr(0, mszArtist.length() - mArtistScrollChars)));
+        mArtistText->setText(LLStringExplicit(ticker_window(mszArtist, mArtistScrollChars, 0)));
     if(mTitleText)
-        mTitleText->setText(LLStringExplicit(mszTitle.substr(0, mszTitle.length() - mTitleScrollChars)));
+        mTitleText->setText(LLStringExplicit(ticker_window(mszTitle, mTitleScrollChars, 0)));
 }
 
 bool ALPanelMusicTicker::setStation(const std::string& station, const std::string& url)
@@ -238,19 +276,24 @@ bool ALPanelMusicTicker::setTitle(const std::string &title)
 
 S32 ALPanelMusicTicker::countExtraChars(LLTextBox *texbox, const std::string &text)
 {
-    S32 text_width = texbox->getTextPixelWidth();
-    S32 box_width = texbox->getRect().getWidth();
-    if(text_width > box_width)
+    const S32 box_width = texbox->getRect().getWidth();
+    if (texbox->getTextPixelWidth() <= box_width)
+        return 0;
+
+    // Trim whole characters off the end until what is left fits. The count is
+    // what the ticker then scrolls through, one character per step.
+    const LLFontGL* font = texbox->getFont();
+    S32 extra = 0;
+    for (size_t end = text.size(); end > 0; )
     {
-        const LLFontGL* font = texbox->getFont();
-        for(S32 count = 1; count < (S32)text.length(); count++)
-        {
-            //This isn't very efficient...
-            const std::string substr = text.substr(0, text.length() - count);
-            if (font->getWidth(substr) <= box_width)
-                return count;
-        }
+        end = utf8str_step_grapheme_backward(text, end);
+        ++extra;
+        if (font->getWidthBytes(text, 0, (S32)end) <= box_width)
+            return extra;
     }
+    // Not one character fits. Every character counted as extra would leave the
+    // scrolling window empty, so the ticker would step through nothing at all;
+    // leave the text where it is and let the box clip it.
     return 0;
 }
 
@@ -271,15 +314,15 @@ void ALPanelMusicTicker::iterateTickerOffset()
             mScrollTimer.reset();
             if (mStationText && mCurScrollChar <= mStationScrollChars)
             {
-                mStationText->setText(LLStringExplicit(mszStation.substr(mCurScrollChar, mszStation.length() - mStationScrollChars + mCurScrollChar)));
+                mStationText->setText(LLStringExplicit(ticker_window(mszStation, mStationScrollChars, mCurScrollChar)));
             }
             if(mArtistText && mCurScrollChar <= mArtistScrollChars)
             {
-                mArtistText->setText(LLStringExplicit(mszArtist.substr(mCurScrollChar, mszArtist.length()-mArtistScrollChars + mCurScrollChar)));
+                mArtistText->setText(LLStringExplicit(ticker_window(mszArtist, mArtistScrollChars, mCurScrollChar)));
             }
             if(mTitleText && mCurScrollChar <= mTitleScrollChars)
             {
-                mTitleText->setText(LLStringExplicit(mszTitle.substr(mCurScrollChar, mszTitle.length()-mTitleScrollChars + mCurScrollChar)));
+                mTitleText->setText(LLStringExplicit(ticker_window(mszTitle, mTitleScrollChars, mCurScrollChar)));
             }
         }
     }

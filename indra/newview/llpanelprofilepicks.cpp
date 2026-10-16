@@ -41,6 +41,7 @@
 #include "llpanelavatar.h"
 #include "llpanelprofile.h"
 #include "llparcel.h"
+#include "llregionhandle.h"
 #include "llstartup.h"
 #include "lltabcontainer.h"
 #include "lltextbox.h"
@@ -209,7 +210,7 @@ void LLPanelProfilePicks::selectPick(const LLUUID& pick_id)
     {
         for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
         {
-            LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+            LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
             if (pick_panel)
             {
                 if (pick_panel->getPickId() == pick_id)
@@ -258,7 +259,7 @@ void LLPanelProfilePicks::onClickNewBtn()
 
 void LLPanelProfilePicks::onClickDelete()
 {
-    LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getCurrentPanel());
+    LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getCurrentPanel());
     if (pick_panel)
     {
         LLUUID pick_id = pick_panel->getPickId();
@@ -281,10 +282,12 @@ void LLPanelProfilePicks::callbackDeletePick(const LLSD& notification, const LLS
         LLUUID pick_id = notification["payload"]["pick_id"].asUUID();
         S32 tab_idx = notification["payload"]["tab_idx"].asInteger();
 
-        LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
         if (pick_panel && pick_panel->getPickId() == pick_id)
         {
+            // Let go by its tab, and kept by nothing else.
             mTabContainer->removeTabPanel(pick_panel);
+            pick_panel->die();
         }
 
         if (pick_id.notNull())
@@ -321,7 +324,7 @@ void LLPanelProfilePicks::processProperties(const LLAvatarData* avatar_picks)
     {
         if (mTabContainer->getTabCount() > 0)
         {
-            LLPanelProfilePick* active_pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getCurrentPanel());
+            LLPanelProfilePick* active_pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getCurrentPanel());
             if (active_pick_panel)
             {
                 selected_id = active_pick_panel->getPickId();
@@ -336,7 +339,7 @@ void LLPanelProfilePicks::processProperties(const LLAvatarData* avatar_picks)
 
     for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
     {
-        LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
         if (pick_panel && pick_panel->getPickId().notNull())
         {
             std::string location = pick_panel->getPickLocation();
@@ -348,7 +351,8 @@ void LLPanelProfilePicks::processProperties(const LLAvatarData* avatar_picks)
         }
     }
 
-    mTabContainer->deleteAllTabs();
+    // The picks' panels are this one's, made again below.
+    mTabContainer->deleteAllTabs(true);
 
     LLAvatarData::picks_list_t::const_iterator it = avatar_picks->picks_list.begin();
     for (; avatar_picks->picks_list.end() != it; ++it)
@@ -433,7 +437,7 @@ void LLPanelProfilePicks::processProperties(const LLAvatarData* avatar_picks)
 void LLPanelProfilePicks::resetData()
 {
     resetLoading();
-    mTabContainer->deleteAllTabs();
+    mTabContainer->deleteAllTabs(true);
 }
 
 void LLPanelProfilePicks::updateButtons()
@@ -451,7 +455,7 @@ void LLPanelProfilePicks::apply()
     {
         for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
         {
-            LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+            LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
             if (pick_panel)
             {
                 pick_panel->apply();
@@ -481,7 +485,7 @@ bool LLPanelProfilePicks::hasUnsavedChanges()
 {
     for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
     {
-        LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
         if (pick_panel && pick_panel->isDirty())
         {
             return true;
@@ -494,7 +498,7 @@ void LLPanelProfilePicks::commitUnsavedChanges()
 {
     for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
     {
-        LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
         if (pick_panel)
         {
             pick_panel->apply();
@@ -920,7 +924,19 @@ void LLPanelProfilePick::processParcelInfo(const LLParcelData& parcel_data)
 {
     // Region might have moved since the pick was saved; refresh the stored global position
     // using the parcel info so map/teleport use the current location.
-    setPosGlobal(LLVector3d(parcel_data.global_x, parcel_data.global_y, parcel_data.global_z));
+    LLVector3d parcel_pos(parcel_data.global_x, parcel_data.global_y, parcel_data.global_z);
+    U64 old_region_handle = to_region_handle(getPosGlobal());
+    U64 new_region_handle = to_region_handle(parcel_pos);
+    if (old_region_handle != new_region_handle)
+    {
+        F32 old_origin_x, old_origin_y;
+        from_region_handle(old_region_handle, &old_origin_x, &old_origin_y);
+        LLVector3d local_offset = getPosGlobal() - LLVector3d(old_origin_x, old_origin_y, 0.0);
+
+        F32 new_origin_x, new_origin_y;
+        from_region_handle(new_region_handle, &new_origin_x, &new_origin_y);
+        setPosGlobal(LLVector3d(new_origin_x, new_origin_y, 0.0) + local_offset);
+    }
 
     setPickLocation(createLocationText(LLStringUtil::null, parcel_data.name, parcel_data.sim_name, getPosGlobal()));
 
@@ -1031,7 +1047,7 @@ std::string LLPanelProfilePick::createLocationText(const std::string& owner_name
 void LLPanelProfilePick::updateTabLabel(const std::string& title)
 {
     setLabel(title);
-    LLTabContainer* parent = dynamic_cast<LLTabContainer*>(getParent());
+    LLTabContainer* parent = getParentAs<LLTabContainer>();
     if (parent)
     {
         parent->setCurrentTabName(title);

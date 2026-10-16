@@ -44,9 +44,11 @@ class LLVoiceClientStatusObserver;
 
 // Implementation of conversations list session widgets
 
-class LLConversationViewSession : public LLFolderViewFolder
+class LLConversationViewSession final : public LLFolderViewFolder
 {
 public:
+    AL_VIEW_TYPE(LLConversationViewSession, LLFolderViewFolder);
+
     struct Params : public LLInitParam::Block<Params, LLFolderViewItem::Params>
     {
         Optional<LLFloaterIMContainer*>         container;
@@ -58,28 +60,28 @@ protected:
     friend class LLUICtrlFactory;
     LLConversationViewSession( const Params& p );
 
-    /*virtual*/ bool isHighlightAllowed();
-    /*virtual*/ bool isHighlightActive();
-    /*virtual*/ bool isFlashing() { return mFlashStateOn; }
+    /*virtual*/ bool isHighlightAllowed() override;
+    /*virtual*/ bool isHighlightActive() override;
+    /*virtual*/ bool isFlashing() override { return mFlashStateOn; }
 
     LLFloaterIMContainer* mContainer;
 
 public:
     virtual ~LLConversationViewSession();
 
-    /*virtual*/ void destroyView();
+    /*virtual*/ void destroyView() override;
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void draw();
-    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleRightMouseDown( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleMouseUp( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleRightMouseDown( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleMouseUp( S32 x, S32 y, MASK mask ) override;
 
-    /*virtual*/ S32 arrange(S32* width, S32* height);
+    /*virtual*/ S32 arrange(S32* width, S32* height) override;
 
-    /*virtual*/ void toggleOpen();
+    /*virtual*/ void toggleOpen() override;
 
-    /*virtual*/ bool isCollapsed() { return mCollapsedMode; }
+    /*virtual*/ bool isCollapsed() override { return mCollapsedMode; }
 
     void toggleCollapsedMode(bool is_collapsed);
 
@@ -89,9 +91,9 @@ public:
     void showVoiceIndicator(bool visible);
     void showTypingIndicator(bool visible);
 
-    virtual void refresh();
+    virtual void refresh() override;
 
-    /*virtual*/ void setFlashState(bool flash_state, bool alternate_color = false);
+    /*virtual*/ void setFlashState(bool flash_state, bool alternate_color = false) override;
     void setHighlightState(bool hihglight_state);
 
     LLFloater* getSessionFloater();
@@ -128,10 +130,11 @@ private:
 
 // Implementation of conversations list participant (avatar) widgets
 
-class LLConversationViewParticipant : public LLFolderViewItem
+class LLConversationViewParticipant final : public LLFolderViewItem
 {
 
 public:
+    AL_VIEW_TYPE(LLConversationViewParticipant, LLFolderViewItem);
 
     struct Params : public LLInitParam::Block<Params, LLFolderViewItem::Params>
     {
@@ -147,24 +150,24 @@ public:
     virtual ~LLConversationViewParticipant( void );
 
     bool hasSameValue(const LLUUID& uuid) { return (uuid == mUUID); }
-    /*virtual*/ void refresh();
-    void addToFolder(LLFolderViewFolder* folder);
+    /*virtual*/ void refresh() override;
+    void addToFolder(LLFolderViewFolder* folder) override;
     void addToSession(const LLUUID& session_id);
 
-    void onMouseEnter(S32 x, S32 y, MASK mask);
-    void onMouseLeave(S32 x, S32 y, MASK mask);
+    void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
-    /*virtual*/ S32 getLabelXPos();
-    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
+    /*virtual*/ S32 getLabelXPos() override;
+    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
     void allowSpeakingIndicator(bool val);
 
 protected:
     friend class LLUICtrlFactory;
     LLConversationViewParticipant( const Params& p );
     void initFromParams(const Params& params);
-    bool postBuild();
-    /*virtual*/ void draw();
-    /*virtual*/ S32 arrange(S32* width, S32* height);
+    bool postBuild() override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ S32 arrange(S32* width, S32* height) override;
 
     void onInfoBtnClick();
 

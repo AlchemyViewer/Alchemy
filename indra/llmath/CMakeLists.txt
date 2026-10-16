@@ -2,8 +2,12 @@
 
 add_library(llmath STATIC)
 
-target_sources(llmath
-    PRIVATE
+target_sources(
+  llmath
+  PRIVATE
+    alplaneset.cpp
+    alprojection.cpp
+    alsimdkernels.cpp
     llbbox.cpp
     llbboxlocal.cpp
     llcalc.cpp
@@ -16,7 +20,6 @@ target_sources(llmath
     llmeshoptimizer.cpp
     llmodularmath.cpp
     lloctree.cpp
-    llperlin.cpp
     llquaternion.cpp
     llrigginginfo.cpp
     llrect.cpp
@@ -36,92 +39,139 @@ target_sources(llmath
     v4coloru.cpp
     v4math.cpp
     xform.cpp
-    )
+)
 
-target_sources(llmath
-    PUBLIC
+target_sources(
+  llmath
+  PUBLIC
     FILE_SET HEADERS
-    FILES
-    llbbox.h
-    llbboxlocal.h
-    llcalc.h
-    llcalcparser.h
-    llcamera.h
-    llcoord.h
-    llcoordframe.h
-    llinterp.h
-    llline.h
-    llmath.h
-    llmatrix3a.h
-    llmatrix3a.inl
-    llmatrix4a.h
-    llmeshoptimizer.h
-    llmodularmath.h
-    lloctree.h
-    llperlin.h
-    llplane.h
-    llquantize.h
-    llquaternion.h
-    llquaternion2.h
-    llquaternion2.inl
-    llrect.h
-    llrigginginfo.h
-    llsimdmath.h
-    llsimdtypes.h
-    llsimdtypes.inl
-    lltreenode.h
-    llvector4a.h
-    llvector4a.inl
-    llvector4logical.h
-    llvolume.h
-    llvolumemgr.h
-    llvolumeoctree.h
-    llsdutil_math.h
-    m3math.h
-    m4math.h
-    raytrace.h
-    v2math.h
-    v3color.h
-    v3colorutil.h
-    v3dmath.h
-    v3math.h
-    v4color.h
-    v4coloru.h
-    v4math.h
-    xform.h
-    )
+      FILES
+        alplaneset.h
+        alprojection.h
+        alsimdkernels.h
+        alsimdkernels.inl
+        llbbox.h
+        llbboxlocal.h
+        llcalc.h
+        llcalcparser.h
+        llcamera.h
+        llcoord.h
+        llcoordframe.h
+        llinterp.h
+        llline.h
+        llmath.h
+        llmatrix3a.h
+        llmatrix3a.inl
+        llmatrix4a.h
+        llmeshoptimizer.h
+        llmodularmath.h
+        lloctree.h
+        llplane.h
+        llquantize.h
+        llquaternion.h
+        llquaternion2.h
+        llquaternion2.inl
+        llrect.h
+        llrigginginfo.h
+        llsimdmath.h
+        llsimdtypes.h
+        llsimdtypes.inl
+        lltreenode.h
+        llvector4a.h
+        llvector4a.inl
+        llvector4logical.h
+        llvolume.h
+        llvolumemgr.h
+        llvolumeoctree.h
+        llsdutil_math.h
+        m3math.h
+        m4math.h
+        raytrace.h
+        v2math.h
+        v3color.h
+        v3colorutil.h
+        v3dmath.h
+        v3math.h
+        v4color.h
+        v4coloru.h
+        v4math.h
+        xform.h
+)
 
-target_link_libraries(llmath PUBLIC llcommon ll::mikktspace ll::sse2neon ll::meshoptimizer)
-target_include_directories(llmath  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(llmath PRIVATE al::flags PUBLIC llcommon ll::mikktspace ll::meshoptimizer)
 target_precompile_headers(llmath REUSE_FROM llprecompiled)
 
 # Add tests
-if (BUILD_TESTING)
-  # UNIT TESTS
-  SET(llmath_TEST_SOURCE_FILES
-    llbboxlocal.cpp
-    llmodularmath.cpp
-    llrect.cpp
-    v2math.cpp
-    v3color.cpp
-    v4color.cpp
-    v4coloru.cpp
+if(AL_BUILD_TESTS)
+  # One Catch2 binary for llmath's tests, each test file run in a process of
+  # its own. Each links the library rather than compiling a copy of the file
+  # it tests, so the code under test is the code the viewer runs.
+  al_add_test_binary(
+    llmath_tests
+    PROJECT llmath
+    SOURCES
+      tests/alignment_test.cpp
+      tests/alplaneset_test.cpp
+      tests/alsimdkernels_test.cpp
+      tests/llbbox_test.cpp
+      tests/llbboxlocal_test.cpp
+      tests/llmatrix3a_test.cpp
+      tests/llmatrix4a_test.cpp
+      tests/llmodularmath_test.cpp
+      tests/lloctree_test.cpp
+      tests/llquaternion2_test.cpp
+      tests/llquaternion_test.cpp
+      tests/llrect_test.cpp
+      tests/llsdutil_math_test.cpp
+      tests/llvector4a_test.cpp
+      tests/m3math_test.cpp
+      tests/mathmisc_test.cpp
+      tests/v2math_test.cpp
+      tests/v3color_test.cpp
+      tests/v3dmath_test.cpp
+      tests/v3math_test.cpp
+      tests/v4color_test.cpp
+      tests/v4coloru_test.cpp
+      tests/v4math_test.cpp
+      tests/xform_test.cpp
+    # Nanoseconds per element for the SIMD math the geometry rebuild spends
+    # its time in, and for the choices the SIMD series makes by a number.
+    BENCH_SOURCES tests/llsimd_bench.cpp
+    LIBRARIES llmath llcommon
+  )
+
+  # The kernel test compares kernels, instantiated in it, bit for bit with each
+  # other and with the vector types' own operations. Built with the tree's
+  # reassociation and contraction, the compiler may round the same sum
+  # differently at each place it inlines it, and Clang's sanitizers move
+  # those places, so the file is built strict, where the same operations in
+  # the same order round the same. MSVC's /fp:fast does not reorder the
+  # intrinsics, and the file passes there as it is. Accuracy against a double
+  # reference, and the library's own entry built as the viewer has it, are
+  # checked to a tolerance.
+  if(NOT COMPILER_IS_MSVC AND NOT COMPILER_IS_CLANG_CL)
+    set_source_files_properties(
+      tests/alsimdkernels_test.cpp
+      PROPERTIES COMPILE_OPTIONS "-ffp-contract=off;-fno-associative-math;-fno-reciprocal-math"
     )
+  endif()
 
-  LL_ADD_PROJECT_UNIT_TESTS(llmath "${llmath_TEST_SOURCE_FILES}")
-
-  # INTEGRATION TESTS
-  set(test_libs llmath llcommon)
-  set(test_project llmath)
-  # TODO: Some of these need refactoring to be proper Unit tests rather than Integration tests.
-  LL_ADD_INTEGRATION_TEST(alignment "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llbbox llbbox.cpp "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llquaternion llquaternion.cpp "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsdutil_math "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(mathmisc "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(m3math "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(v3dmath v3dmath.cpp "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(v3math v3math.cpp "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(v4math v4math.cpp "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(xform xform.cpp "${test_libs}" "${test_project}")
-endif ()
+  # llcommon's SIMD ops layer and the batch kernels again at each other
+  # x86-64 tier, one binary a tier: code the linker folds across files would
+  # otherwise run one tier's instructions in another's test. The tree's own
+  # tier is llcommon_tests' and llmath_tests'; a variant the host cannot run
+  # skips.
+  if(BUILD_TARGET_IS_X86_64 AND NOT DARWIN)
+    foreach(tier baseline v2 v3 v4)
+      if(NOT tier STREQUAL AL_ISA_TIER)
+        al_add_test_binary(
+          simd_tests
+          PROJECT llmath
+          SOURCES tests/alsimdkernels_test.cpp ${INDRA_SOURCE_DIR}/llcommon/tests/alsimd_test.cpp
+          LIBRARIES llmath llcommon
+          ISA_TIER ${tier}
+        )
+      endif()
+    endforeach()
+  endif()
+endif()

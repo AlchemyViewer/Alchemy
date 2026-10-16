@@ -35,10 +35,12 @@
 #include "lltextbox.h"
 #include "llbutton.h"
 
-class LLVirtualTrackball
+class LLVirtualTrackball final
     : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLVirtualTrackball, LLUICtrl);
+
     enum ThumbMode
     {
         SUN,

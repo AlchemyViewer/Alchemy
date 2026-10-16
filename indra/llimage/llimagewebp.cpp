@@ -78,8 +78,8 @@ bool LLImageWebP::decode(LLImageRaw* raw_image, F32 decode_time)
 {
     llassert_always(raw_image);
 
-    LLImageDataSharedLock lockIn(this);
-    LLImageDataLock lockOut(raw_image);
+    // Both written: the decode sets this image's size from the stream.
+    LLImageDataLockPair lock(this, raw_image);
 
     resetLastError();
 
@@ -146,8 +146,7 @@ bool LLImageWebP::encode(const LLImageRaw* raw_image, F32 encode_time)
 
     resetLastError();
 
-    LLImageDataSharedLock lockIn(raw_image);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(raw_image, this);
 
     if (raw_image->isBufferInvalid() || (0 == raw_image->getDataSize()))
     {

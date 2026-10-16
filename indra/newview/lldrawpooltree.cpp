@@ -36,7 +36,6 @@
 #include "llviewercamera.h"
 #include "llviewershadermgr.h"
 #include "llrender.h"
-#include "llviewercontrol.h"
 #include "llviewerregion.h"
 #include "llenvironment.h"
 
@@ -92,7 +91,7 @@ void LLDrawPoolTree::renderDeferred(S32 pass)
 
         if (buff)
         {
-            LLMatrix4* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
+            LLMatrix4a* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
 
             llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
             LLRenderPass::applyModelMatrix(model_matrix);
@@ -117,10 +116,6 @@ void LLDrawPoolTree::beginShadowPass(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED;
 
-    static LLCachedControl<F32> shadow_offset(gSavedSettings, "RenderDeferredTreeShadowOffset");
-    static LLCachedControl<F32> shadow_bias(gSavedSettings, "RenderDeferredTreeShadowBias");
-    gGL.setPolygonOffset(shadow_offset(), shadow_bias());
-
     LLEnvironment& environment = LLEnvironment::instance();
 
     gDeferredTreeShadowProgram.bind();
@@ -137,8 +132,6 @@ void LLDrawPoolTree::endShadowPass(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED;
 
-    gGL.setPolygonOffset(gSavedSettings.getF32("RenderDeferredSpotShadowOffset"),
-                         gSavedSettings.getF32("RenderDeferredSpotShadowBias"));
     gDeferredTreeShadowProgram.unbind();
 }
 

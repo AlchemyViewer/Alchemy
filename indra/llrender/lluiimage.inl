@@ -33,43 +33,7 @@ void LLUIImage::draw(S32 x, S32 y, S32 width, S32 height, const LLColor4& color,
 {
     if (sEnableDisplayListsCollection)
     {
-        // Get display list for this configuration
-        buffer_data_list_t* display_list = findDisplayList(x, y, width, height, color, solid_color);
-
-        if (display_list && !display_list->empty())
-        {
-            // Deliberately empty pending verts.
-            // They aren't related to the image, so don't register them under draw zone
-            gGL.flush();
-            LL_PROFILE_ZONE_SCOPED;
-            //gGL.pushUIMatrix();
-
-            if (solid_color)
-            {
-                gSolidColorProgram.bind();
-            }
-
-            gGL.color4fv(color.mV); // for the shader
-
-            // Replay the cached display list
-            for (LLVertexBufferData& buffer : *display_list)
-            {
-                buffer.draw();
-            }
-
-            if (solid_color)
-            {
-                gUIProgram.bind();
-            }
-            //gGL.popUIMatrix();
-        }
-        else
-        {
-            // Create, draw and capture display list.
-            // Basically a wrapper around gl_draw_scaled_image_with_border
-            // that records the output into a list.
-            genDisplayList(x, y, width, height, color, solid_color);
-        }
+        drawCached(x, y, width, height, color, solid_color);
     }
     else
     {

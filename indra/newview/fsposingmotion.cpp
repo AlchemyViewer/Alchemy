@@ -28,12 +28,13 @@
 #include <boost/algorithm/string.hpp>
 #include "fsposingmotion.h"
 #include "llcharacter.h"
+#include "llcriticaldamp.h"
 
 FSPosingMotion::FSPosingMotion(const LLUUID& id) : LLKeyframeMotion(id)
 {
     mName = "fs_poser_pose";
     mMotionID = id;
-    mJointMotionList = &dummyMotionList;
+    mJointMotionList = new JointMotionList;
 }
 
 LLMotion::LLMotionInitStatus FSPosingMotion::onInitialize(LLCharacter* character)
@@ -74,7 +75,7 @@ bool FSPosingMotion::onActivate()
     return true;
 }
 
-bool FSPosingMotion::onUpdate(F32 time, U8* joint_mask)
+bool FSPosingMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LLQuaternion targetRotation;
     LLQuaternion currentRotation;
@@ -83,10 +84,19 @@ bool FSPosingMotion::onUpdate(F32 time, U8* joint_mask)
     LLVector3 currentScale;
     LLVector3 targetScale;
 
-    for (FSJointPose jointPose : mJointPoses)
+    // A fraction of the gap for the time this frame took, not for the frame itself.
+    const F32 interpolant = LLSmoothInterpolation::getInterpolant(mInterpolationHalfLife);
+
+    for (FSJointPose& jointPose : mJointPoses)
     {
         LLJoint* joint = jointPose.getJointState()->getJoint();
         if (!joint)
+            continue;
+
+        // A joint switched off in the poser keeps its state in the pose with no usage, so the blend ignores it and
+        // whatever else animates the joint (the eye motion moves mEyeLeft and mEyeRight every frame) carries it away
+        // from the target. Writing to that state trips LLJointState's usage assert.
+        if (!(jointPose.getJointState()->getUsage() & POSER_JOINT_STATE))
             continue;
 
         currentRotation = joint->getRotation();
@@ -98,19 +108,19 @@ bool FSPosingMotion::onUpdate(F32 time, U8* joint_mask)
 
         if (vectorsNotQuiteEqual(currentPosition, targetPosition))
         {
-            currentPosition = lerp(currentPosition, targetPosition, mInterpolationTime);
+            currentPosition = lerp(currentPosition, targetPosition, interpolant);
             jointPose.getJointState()->setPosition(currentPosition);
         }
 
         if (quatsNotQuiteEqual(currentRotation, targetRotation))
         {
-            currentRotation = slerp(mInterpolationTime, currentRotation, targetRotation);
+            currentRotation = slerp(interpolant, currentRotation, targetRotation);
             jointPose.getJointState()->setRotation(currentRotation);
         }
 
         if (vectorsNotQuiteEqual(currentScale, targetScale))
         {
-            currentScale = lerp(currentScale, targetScale, mInterpolationTime);
+            currentScale = lerp(currentScale, targetScale, interpolant);
             jointPose.getJointState()->setScale(currentScale);
         }
     }
@@ -341,17 +351,17 @@ void FSPosingMotion::getJointStateAtTime(std::string jointPoseName, F32 timeToLo
         if (!boost::iequals(jointPoseName, jm->mJointName))
             continue;
 
-        *hasRotation = (jm->mRotationCurve.mNumKeys > 0);
+        *hasRotation = (jm->mRotationCurve.getNumKeys() > 0);
         if (hasRotation)
-            jointRotation->set(jm->mRotationCurve.getValue(timeToLoadAt, mJointMotionList->mDuration));
+            jm->mRotationCurve.getValue(timeToLoadAt).store(*jointRotation);
 
-        *hasPosition = (jm->mPositionCurve.mNumKeys > 0);
+        *hasPosition = (jm->mPositionCurve.getNumKeys() > 0);
         if (hasPosition)
-            jointPosition->set(jm->mPositionCurve.getValue(timeToLoadAt, mJointMotionList->mDuration));
+            jointPosition->set(jm->mPositionCurve.getValue(timeToLoadAt).getF32ptr());
 
-        *hasScale = (jm->mScaleCurve.mNumKeys > 0);
+        *hasScale = (jm->mScaleCurve.getNumKeys() > 0);
         if (hasScale)
-            jointScale->set(jm->mScaleCurve.getValue(timeToLoadAt, mJointMotionList->mDuration));
+            jointScale->set(jm->mScaleCurve.getValue(timeToLoadAt).getF32ptr());
 
         return;
     }
@@ -380,7 +390,7 @@ bool FSPosingMotion::motionAnimatesJoints(const std::vector<S32>& recapturedJoin
         if (std::find(recapturedJointNumbers.begin(), recapturedJointNumbers.end(), joint->getJointNum()) == recapturedJointNumbers.end())
             continue;
 
-        if (jm->mRotationCurve.mNumKeys > 0)
+        if (jm->mRotationCurve.getNumKeys() > 0)
             return true;
     }
 

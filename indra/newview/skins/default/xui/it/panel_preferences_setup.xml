@@ -19,8 +19,6 @@
 		<radio_item label="Usa il browser integrato solo per i link di Second Life" name="external" tool_tip="Utilizza il browser Web predefinito di sistema per l’aiuto, link Web, ecc. Il browser integrato verrà utilizzato solo per aprire i link LindenLab/Second Life." value="1"/>
 		<radio_item label="Usa il browser integrato per tutti i link" name="external_all" tool_tip="Utilizza il browser Web integrato per l&apos;aiuto, per i link Web e così via. Questo browser si apre in una nuova finestra in [APP_NAME]." value="2"/>
 	</radio_group>
-	<check_box initial_value="true" label="Abilita plugin" name="browser_plugins_enabled"/>
-	<check_box initial_value="true" label="Accetta cookie" name="cookies_enabled"/>
 	<check_box initial_value="true" label="Abilita Javascript" name="browser_javascript_enabled"/>
 	<text name="Software updates:">
 		Aggiornamenti software:
@@ -36,12 +34,4 @@
 		Impostazioni proxy:
 	</text>
 	<button label="Regola impostazioni proxy" label_selected="Sfoglia" name="set_proxy" width="160"/>
-	<text name="os_hibernation_mode">
-		Impedisci al sistema operativo di ibernarsi se non sei Assente:
-	</text>
-	<combo_box name="os_hibernation_combobox" tool_tip="Impedisce al sistema operativo di andare in sospensione solo se l'utente non è assente">
-		<combo_box.item label="Può ibernarsi" name="can_hibernate"/>
-		<combo_box.item label="Non può ibernarsi, può spegnere lo schermo" name="cant_hibernate"/>
-		<combo_box.item label="Non può ibernarsi, non può spegnere lo schermo" name="cant_hibernate_screen"/>
-	</combo_box>
 </panel>

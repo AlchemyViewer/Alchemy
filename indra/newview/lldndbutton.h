@@ -40,9 +40,11 @@
  *
  * @see LLLandmarksPanel for example of usage of this class.
  */
-class LLDragAndDropButton : public LLButton
+class LLDragAndDropButton final : public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLDragAndDropButton, LLButton);
+
     struct Params : public LLInitParam::Block<Params, LLButton::Params> {};
 
     LLDragAndDropButton(const Params& params);
@@ -70,7 +72,7 @@ public:
         EDragAndDropType cargo_type,
         void* cargo_data,
         EAcceptance* accept,
-        std::string& tooltip_msg);
+        std::string& tooltip_msg) override;
 
 private:
     drag_drop_handler_t mDragDropHandler;

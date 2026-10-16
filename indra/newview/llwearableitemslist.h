@@ -50,16 +50,17 @@ class LLPanelWearableListItem : public LLPanelInventoryListItemBase
 {
     LOG_CLASS(LLPanelWearableListItem);
 public:
+    AL_VIEW_TYPE(LLPanelWearableListItem, LLPanelInventoryListItemBase);
 
     /**
     * Shows buttons when mouse is over
     */
-    /*virtual*/ void onMouseEnter(S32 x, S32 y, MASK mask);
+    /*virtual*/ void onMouseEnter(S32 x, S32 y, MASK mask) override;
 
     /**
     * Hides buttons when mouse is out
     */
-    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask);
+    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
 protected:
 
@@ -73,10 +74,12 @@ protected:
  * Extends LLPanelInventoryListItemBase with handling
  * double click to wear the item.
  */
-class LLPanelWearableOutfitItem : public LLPanelWearableListItem
+class LLPanelWearableOutfitItem final : public LLPanelWearableListItem
 {
     LOG_CLASS(LLPanelWearableOutfitItem);
 public:
+    AL_VIEW_TYPE(LLPanelWearableOutfitItem, LLPanelWearableListItem);
+
     struct Params : public LLInitParam::Block<Params, LLPanelWearableListItem::Params>
     {
         Optional<LLButton::Params>   add_btn, remove_btn;
@@ -84,8 +87,8 @@ public:
         Params();
     };
 
-    bool postBuild();
-    bool handleDoubleClick(S32 x, S32 y, MASK mask);
+    bool postBuild() override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
     static LLPanelWearableOutfitItem* create(LLViewerInventoryItem* item,
                                              bool worn_indication_enabled,
@@ -96,7 +99,7 @@ public:
      */
     /*virtual*/ void updateItem(const std::string& name,
                                 bool favorite,
-                                EItemState item_state = IS_DEFAULT);
+                                EItemState item_state = IS_DEFAULT) override;
 
     void onAddWearable();
     void onRemoveWearable();
@@ -116,6 +119,8 @@ class LLPanelDeletableWearableListItem : public LLPanelWearableListItem
 {
     LOG_CLASS(LLPanelDeletableWearableListItem);
 public:
+    AL_VIEW_TYPE(LLPanelDeletableWearableListItem, LLPanelWearableListItem);
+
     struct Params : public LLInitParam::Block<Params, LLPanelWearableListItem::Params>
     {
         Optional<LLButton::Params>      delete_btn;
@@ -128,7 +133,7 @@ public:
 
     virtual ~LLPanelDeletableWearableListItem() {};
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     /**
      * Make button visible during mouse over event.
@@ -140,17 +145,19 @@ protected:
 };
 
 /** Outfit list item for an attachment */
-class LLPanelAttachmentListItem : public LLPanelDeletableWearableListItem
+class LLPanelAttachmentListItem final : public LLPanelDeletableWearableListItem
 {
     LOG_CLASS(LLPanelAttachmentListItem);
 public:
+    AL_VIEW_TYPE(LLPanelAttachmentListItem, LLPanelDeletableWearableListItem);
+
     static LLPanelAttachmentListItem* create(LLViewerInventoryItem* item);
     virtual ~LLPanelAttachmentListItem() {};
 
     /** Set item title. Joint name is added to the title in parenthesis */
     /*virtual*/ void updateItem(const std::string& name,
                                 bool favorite,
-                                EItemState item_state = IS_DEFAULT);
+                                EItemState item_state = IS_DEFAULT) override;
 
 protected:
     LLPanelAttachmentListItem(LLViewerInventoryItem* item, const Params& params) : LLPanelDeletableWearableListItem(item, params) {};
@@ -161,10 +168,11 @@ protected:
  *
  * Provides buttons for editing, moving, deleting a wearable.
  */
-class LLPanelClothingListItem : public LLPanelDeletableWearableListItem
+class LLPanelClothingListItem final : public LLPanelDeletableWearableListItem
 {
     LOG_CLASS(LLPanelClothingListItem);
 public:
+    AL_VIEW_TYPE(LLPanelClothingListItem, LLPanelDeletableWearableListItem);
 
     struct Params : public LLInitParam::Block<Params, LLPanelDeletableWearableListItem::Params>
     {
@@ -182,7 +190,7 @@ public:
 
     virtual ~LLPanelClothingListItem();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     /**
      * Make button visible during mouse over event.
@@ -199,10 +207,12 @@ protected:
 
 };
 
-class LLPanelBodyPartsListItem : public LLPanelWearableListItem
+class LLPanelBodyPartsListItem final : public LLPanelWearableListItem
 {
     LOG_CLASS(LLPanelBodyPartsListItem);
 public:
+    AL_VIEW_TYPE(LLPanelBodyPartsListItem, LLPanelWearableListItem);
+
     struct Params : public LLInitParam::Block<Params, LLPanelWearableListItem::Params>
     {
         Optional<LLButton::Params>      edit_btn;
@@ -217,7 +227,7 @@ public:
 
     virtual ~LLPanelBodyPartsListItem();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     /**
     * Make button visible during mouse over event.
@@ -235,9 +245,11 @@ protected:
  *
  * A dummy item panel - displays grayed clothing icon, grayed title '<clothing> not worn' and 'add' button
  */
-class LLPanelDummyClothingListItem : public LLPanelWearableListItem
+class LLPanelDummyClothingListItem final : public LLPanelWearableListItem
 {
 public:
+    AL_VIEW_TYPE(LLPanelDummyClothingListItem, LLPanelWearableListItem);
+
     struct Params : public LLInitParam::Block<Params, LLPanelWearableListItem::Params>
     {
         Optional<LLPanel::Params> add_panel;
@@ -246,7 +258,7 @@ public:
     };
     static LLPanelDummyClothingListItem* create(LLWearableType::EType w_type);
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
     LLWearableType::EType getWearableType() const;
 
 protected:
@@ -273,8 +285,8 @@ public:
 
     virtual bool compare(const LLPanel* item1, const LLPanel* item2) const
     {
-        const LLPanelInventoryListItemBase* wearable_item1 = dynamic_cast<const LLPanelInventoryListItemBase*>(item1);
-        const LLPanelInventoryListItemBase* wearable_item2 = dynamic_cast<const LLPanelInventoryListItemBase*>(item2);
+        const LLPanelInventoryListItemBase* wearable_item1 = ALViewType::as<LLPanelInventoryListItemBase>(item1);
+        const LLPanelInventoryListItemBase* wearable_item2 = ALViewType::as<LLPanelInventoryListItemBase>(item2);
 
         if (!wearable_item1 || !wearable_item2)
         {
@@ -419,9 +431,11 @@ protected:
  * an inventory category specified by UUID and displays them
  * as a flat list.
  */
-class LLWearableItemsList : public LLInventoryItemsList
+class LLWearableItemsList final : public LLInventoryItemsList
 {
 public:
+    AL_VIEW_TYPE(LLWearableItemsList, LLInventoryItemsList);
+
     /**
      * Context menu.
      *

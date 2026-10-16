@@ -40,8 +40,11 @@ enum class ERlvBehaviourFilter {
     ALL
 };
 
-class RlvFloaterBehaviours : public LLFloater
+class RlvFloaterBehaviours final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(RlvFloaterBehaviours, LLFloater);
+private:
     friend class LLFloaterReg;
 private:
     RlvFloaterBehaviours(const LLSD& sdKey) : LLFloater(sdKey) {}
@@ -50,9 +53,9 @@ private:
      * LLFloater overrides
      */
 public:
-    /*virtual*/ void onOpen(const LLSD& sdKey);
-    /*virtual*/ void onClose(bool fQuitting);
-    /*virtual*/ bool postBuild();
+    /*virtual*/ void onOpen(const LLSD& sdKey) override;
+    /*virtual*/ void onClose(bool fQuitting) override;
+    /*virtual*/ bool postBuild() override;
 
     /*
      * Member functions
@@ -76,8 +79,11 @@ protected:
 // RlvFloaterLocks class declaration
 //
 
-class RlvFloaterLocks : public LLFloater
+class RlvFloaterLocks final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(RlvFloaterLocks, LLFloater);
+private:
     friend class LLFloaterReg;
 private:
     RlvFloaterLocks(const LLSD& sdKey) : LLFloater(sdKey) {}
@@ -86,9 +92,9 @@ private:
      * LLFloater overrides
      */
 public:
-    /*virtual*/ void onOpen(const LLSD& sdKey);
-    /*virtual*/ void onClose(bool fQuitting);
-    /*virtual*/ bool postBuild();
+    /*virtual*/ void onOpen(const LLSD& sdKey) override;
+    /*virtual*/ void onClose(bool fQuitting) override;
+    /*virtual*/ bool postBuild() override;
 
     /*
      * Member functions
@@ -108,22 +114,25 @@ protected:
 // RlvFloaterStrings class declaration
 //
 
-class RlvFloaterStrings : public LLFloater
+class RlvFloaterStrings final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(RlvFloaterStrings, LLFloater);
+private:
     friend class LLFloaterReg;
 private:
     RlvFloaterStrings(const LLSD& sdKey);
 
     // LLFloater overrides
 public:
-    /*virtual*/ void onClose(bool fQuitting);
-    /*virtual*/ bool postBuild();
+    /*virtual*/ void onClose(bool fQuitting) override;
+    /*virtual*/ bool postBuild() override;
 
     // Member functions
 protected:
     void onStringRevertDefault();
     void checkDirty(bool fRefresh);
-    void refresh();
+    void refresh() override;
 
     // Member variables
 protected:
@@ -137,8 +146,11 @@ protected:
 // RlvFloaterConsole - debug console to allow command execution without the need for a script
 //
 
-class RlvFloaterConsole : public LLFloater
+class RlvFloaterConsole final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(RlvFloaterConsole, LLFloater);
+private:
     friend class LLFloaterReg;
     template<ERlvParamType> friend struct RlvCommandHandlerBaseImpl;
     friend class RlvHandler;

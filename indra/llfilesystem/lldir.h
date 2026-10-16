@@ -108,6 +108,13 @@ class LLDir
     const std::string  getCacheDir(bool get_default = false) const; // Location of the cache.
     const std::string &getOSCacheDir() const;       // location of OS-specific cache folder (may be empty string)
     const std::string &getCAFile() const;           // File containing TLS certificate authorities
+    // What initAppDirs() did that is worth a log line: it runs before logging
+    // is set up, so the viewer logs these once it is.
+    const std::vector<std::string> &getInitNotes() const;
+    // A path saved while everything lived under one user dir (Linux before
+    // XDG), moved to where that part lives now. Any other path, or one that
+    // still exists, comes back unchanged.
+    std::string relocateLegacyPath(const std::string& path) const;
     const std::string &getDirDelimiter() const; // directory separator for platform (ie. '\' or '/' or ':')
     const std::string &getDefaultSkinDir() const;   // folder for default skin. e.g. c:\program files\second life\skins\default
     const std::string &getSkinDir() const;      // User-specified skin folder.
@@ -260,6 +267,10 @@ protected:
     std::string mAppRODataDir;           // Location for static app data
     std::string mOSUserDir;          // OS Specific user directory
     std::string mOSUserAppDir;           // OS Specific user app directory
+    std::string mUserSettingsDir;    // LL_PATH_USER_SETTINGS; empty is mOSUserAppDir/user_settings
+    std::string mLogsDir;            // LL_PATH_LOGS; empty is mOSUserAppDir/logs
+    std::string mLegacyUserAppDir;   // the single root relocateLegacyPath() maps from, if any
+    std::vector<std::string> mInitNotes;
     std::string mLindenUserDir;      // Location for Linden user-specific data
     std::string mPerAccountChatLogsDir;      // Location for chat logs.
     std::string mChatLogsDir;        // Location for chat logs.

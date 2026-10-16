@@ -30,6 +30,7 @@ indra/.distcc
 indra/out/*
 
 indra/packages/*
+indra/rust/target/
 build-*/
 indra/CMakeFiles
 indra/build-vc[0-9]*
@@ -40,7 +41,6 @@ indra/lib/mono/indra/*.pdb
 indra/lib/python/eventlet/
 indra/lib/python/mulib.*
 indra/llwindow/glh/glh_linear.h
-indra/newview/alchemy.icns
 indra/newview/app_settings/alchemy_logo.png
 indra/newview/app_settings/dictionaries
 indra/newview/app_settings/mozilla
@@ -56,10 +56,6 @@ indra/newview/filters.xml
 indra/newview/fmod.dll
 indra/newview/fmod.log
 indra/newview/fonts
-indra/newview/installers/windows/install_icon.ico
-indra/newview/installers/windows/install_splash.gif
-indra/newview/installers/windows/uninstall_icon.ico
-indra/newview/installers/windows/install_wizard_small.png
 indra/newview/mozilla-theme
 indra/newview/mozilla-universal-darwin.tgz
 indra/newview/pilot.txt
@@ -95,6 +91,7 @@ web/secondlife.com.*
 # Auto-generated from lsl_definitions package
 indra/newview/app_settings/keywords_lsl_default.xml
 indra/newview/app_settings/keywords_lua_default.xml
+indra/newview/app_settings/syntax_default/
 
 .env
 .vscode

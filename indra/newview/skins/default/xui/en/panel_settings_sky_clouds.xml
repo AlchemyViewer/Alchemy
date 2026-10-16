@@ -16,7 +16,7 @@
             top="5"
             right="-5"
             bottom="-5"
-            orientation="hoizontal">
+            orientation="horizontal">
         <layout_panel
                 name="left_lp"
                 border="true"

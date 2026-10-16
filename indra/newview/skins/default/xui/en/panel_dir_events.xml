@@ -167,7 +167,7 @@
      width="336">
         <column label="" name="icon" width="24" />
         <column label="" name="type" width="-1" />
-        <column dynamicwidth="true" label="Name" name="name" />
+        <column dynamic_width="true" label="Name" name="name" />
         <column label="Time (PT)" name="date" sort="time" width="106" />
         <column label="" name="event_id" width="-1" />
         <column label="Time" name="time" width="-1" />

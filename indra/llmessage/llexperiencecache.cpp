@@ -222,7 +222,8 @@ void LLExperienceCache::processExperience(const LLUUID& public_key, const LLSD& 
 
     if(row.has(EXPIRES))
     {
-        row[EXPIRES] = row[EXPIRES].asReal() + LLFrameTimer::getTotalSeconds();
+        // A calendar time: the cache file keeps it across sessions.
+        row[EXPIRES] = row[EXPIRES].asReal() + LLDate::now().secondsSinceEpoch();
     }
 
     if(row.has(EXPERIENCE_ID))
@@ -267,8 +268,6 @@ void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdap
 
     if (!status)
     {
-        F64 now = LLFrameTimer::getTotalSeconds();
-
         LLSD headers = httpResults[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_HEADERS];
         // build dummy entries for the failed requests
         for (RequestQueue_t::const_iterator it = requests.begin(); it != requests.end(); ++it)
@@ -279,7 +278,8 @@ void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdap
             {
                 exp[PROPERTIES] = PROPERTY_INVALID;
             }
-            exp[EXPIRES] = now + LLExperienceCacheImpl::getErrorRetryDeltaTime(status, headers);
+            // A delta, as the server sends it: processExperience adds the time.
+            exp[EXPIRES] = LLExperienceCacheImpl::getErrorRetryDeltaTime(status, headers);
             exp[EXPERIENCE_ID] = *it;
             exp["key_type"] = EXPERIENCE_ID;
             exp["uuid"] = *it;
@@ -441,7 +441,7 @@ void LLExperienceCache::erase(const LLUUID& key)
 
 void LLExperienceCache::eraseExpired()
 {
-    F64 now = LLFrameTimer::getTotalSeconds();
+    F64 now = LLDate::now().secondsSinceEpoch();
     cache_t::iterator it = mCache.begin();
     while (it != mCache.end())
     {
@@ -928,7 +928,8 @@ void LLExperienceCacheImpl::mapKeys(const LLSD& legacyKeys)
 }
 
 // Return time to retry a request that generated an error, based on
-// error type and headers.  Return value is seconds-since-epoch.
+// error type and headers.  Return value is seconds from now, a delta:
+// processExperience adds the current time to it.
 F64 LLExperienceCacheImpl::getErrorRetryDeltaTime(S32 status, LLSD headers)
 {
 

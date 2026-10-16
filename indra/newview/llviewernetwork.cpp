@@ -435,8 +435,8 @@ std::string LLGridManager::getGrid( const std::string &grid )
         {
             if (grid_iter->second.has(GRID_ID_VALUE))
             {
-                if (0 == (LLStringUtil::compareInsensitive(grid,
-                                                           grid_iter->second[GRID_ID_VALUE].asString())))
+                if (LLStringUtil::isEqualInsensitiveASCII(grid,
+                                                         grid_iter->second[GRID_ID_VALUE].asString()))
                 {
                     // found a matching label, return this name
                     grid_name = grid_iter->first;

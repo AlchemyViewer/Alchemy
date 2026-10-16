@@ -34,18 +34,7 @@ LLFloaterHandler gFloaterHandler;
 
 LLFloater* get_parent_floater(LLView* view)
 {
-    LLFloater* floater = NULL;
-    LLView* parent = view->getParent();
-    while (parent)
-    {
-        floater = dynamic_cast<LLFloater*>(parent);
-        if (floater)
-        {
-            break;
-        }
-        parent = parent->getParent();
-    }
-    return floater;
+    return view->getParentByType<LLFloater>();
 }
 
 

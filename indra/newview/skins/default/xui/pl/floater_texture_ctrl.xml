@@ -18,7 +18,6 @@
 	<button label="Przezrocz." label_selected="Przezrocz." name="None" />
 	<text name="preview_disabled" value="Podgląd wyłączony" />
 	<filter_editor label="Filtruj tekstury" name="inventory search editor" />
-	<check_box label="Pokaż foldery" name="show_folders_check" />
 	<button label="Dodaj" label_selected="Dodaj" name="l_add_btn" />
 	<button label="Usuń" label_selected="Usuń" name="l_rem_btn" />
 	<button label="Załaduj" label_selected="Załaduj" name="l_upl_btn" />

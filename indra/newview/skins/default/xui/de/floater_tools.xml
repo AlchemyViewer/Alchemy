@@ -45,11 +45,11 @@
 	<floater.string name="status_remaining_capacity">
 		Verbleibende Kapazität [LAND_CAPACITY].
 	</floater.string>
-	<button label="" label_selected="" name="button focus" tool_tip="Fokus"/>
-	<button label="" label_selected="" name="button move" tool_tip="Verschieben"/>
-	<button label="" label_selected="" name="button edit" tool_tip="Bearbeiten"/>
-	<button label="" label_selected="" name="button create" tool_tip="Erstellen"/>
-	<button label="" label_selected="" name="button land" tool_tip="Land"/>
+	<button name="button focus" tool_tip="Fokus"/>
+	<button name="button move" tool_tip="Verschieben"/>
+	<button name="button edit" tool_tip="Bearbeiten"/>
+	<button name="button create" tool_tip="Erstellen"/>
+	<button name="button land" tool_tip="Land"/>
 	<text name="text status">
 		Zum Verschieben ziehen, zum Kopieren Umschalttaste-Ziehen
 	</text>
@@ -80,22 +80,22 @@
 		<combo_box.item label="Lokal" name="Local"/>
 		<combo_box.item label="Referenz" name="Reference"/>
 	</combo_box>
-	<button label="" label_selected="Optionen..." name="Options..." tool_tip="Mehr Raster-Optionen anzeigen"/>
-	<button label="" label_selected="" name="ToolCube" tool_tip="Würfel"/>
-	<button label="" label_selected="" name="ToolPrism" tool_tip="Prisma"/>
-	<button label="" label_selected="" name="ToolPyramid" tool_tip="Pyramide"/>
-	<button label="" label_selected="" name="ToolTetrahedron" tool_tip="Tetraeder"/>
-	<button label="" label_selected="" name="ToolCylinder" tool_tip="Zylinder"/>
-	<button label="" label_selected="" name="ToolHemiCylinder" tool_tip="Halbzylinder"/>
-	<button label="" label_selected="" name="ToolCone" tool_tip="Kegel"/>
-	<button label="" label_selected="" name="ToolHemiCone" tool_tip="Halbkegel"/>
-	<button label="" label_selected="" name="ToolSphere" tool_tip="Kugel"/>
-	<button label="" label_selected="" name="ToolHemiSphere" tool_tip="Halbkugel"/>
-	<button label="" label_selected="" name="ToolTorus" tool_tip="Torus"/>
-	<button label="" label_selected="" name="ToolTube" tool_tip="Rohr"/>
-	<button label="" label_selected="" name="ToolRing" tool_tip="Ring"/>
-	<button label="" label_selected="" name="ToolTree" tool_tip="Baum"/>
-	<button label="" label_selected="" name="ToolGrass" tool_tip="Gras"/>
+	<button name="Options..." tool_tip="Mehr Raster-Optionen anzeigen"/>
+	<button name="ToolCube" tool_tip="Würfel"/>
+	<button name="ToolPrism" tool_tip="Prisma"/>
+	<button name="ToolPyramid" tool_tip="Pyramide"/>
+	<button name="ToolTetrahedron" tool_tip="Tetraeder"/>
+	<button name="ToolCylinder" tool_tip="Zylinder"/>
+	<button name="ToolHemiCylinder" tool_tip="Halbzylinder"/>
+	<button name="ToolCone" tool_tip="Kegel"/>
+	<button name="ToolHemiCone" tool_tip="Halbkegel"/>
+	<button name="ToolSphere" tool_tip="Kugel"/>
+	<button name="ToolHemiSphere" tool_tip="Halbkugel"/>
+	<button name="ToolTorus" tool_tip="Torus"/>
+	<button name="ToolTube" tool_tip="Rohr"/>
+	<button name="ToolRing" tool_tip="Ring"/>
+	<button name="ToolTree" tool_tip="Baum"/>
+	<button name="ToolGrass" tool_tip="Gras"/>
 	<check_box label="Ausgewähltes Werkzeug beibehalten" name="checkbox sticky"/>
 	<check_box label="Auswahl kopieren" name="checkbox copy selection"/>
 	<check_box initial_value="true" label="Kopie zentrieren" name="checkbox copy centers"/>
@@ -186,8 +186,7 @@
 			<text name="Group:">
 				Gruppe:
 			</text>
-			<name_box initial_value="Wird geladen..." name="Group Name Proxy"/>
-			<button label="Festlegen..." label_selected="Festlegen..." name="button set group" tool_tip="Eine Gruppe auswählen, um die Berechtigungen des Objekts zu teilen."/>
+			<button name="button set group" tool_tip="Eine Gruppe auswählen, um die Berechtigungen des Objekts zu teilen."/>
 			<check_box label="Teilen" name="checkbox share with group" tool_tip="Mit allen Mitgliedern der zugeordneten Gruppe, Ihre Berechtigungen dieses Objekt zu ändern teilen. Sie müssen Übereignen, um Rollenbeschränkungen zu aktivieren."/>
 			<button label="Übertragung" label_selected="Übertragung" name="button deed" tool_tip="Eine Übertragung bedeutet, dass das Objekt mit den Berechtigungen „Nächster Eigentümer“ weitergegeben wird. Mit der Gruppe geteilte Objekte können von einem Gruppen-Officer übertragen werden."/>
 			<text name="label click action">
@@ -294,8 +293,6 @@
 			<text name="text skew">
 				Versatz
 			</text>
-			<spinner name="Scale 1"/>
-			<spinner name="Skew"/>
 			<text name="Hollow Shape">
 				Hohlform
 			</text>
@@ -345,7 +342,6 @@
 			<text name="text revolutions">
 				Umdrehungen
 			</text>
-			<spinner name="Radius Offset"/>
 			<texture_picker label="Textur für gestaltetes  Primitiv" name="sculpt texture control" tool_tip="Klicken Sie hier, um ein Bild auszuwählen"/>
 			<check_box label="Spiegeln" name="sculpt mirror control" tool_tip="Geformtes Primitiv entlang der X-Achse spiegeln."/>
 			<check_box label="Wenden" name="sculpt invert control" tool_tip="Dreht die Normalen des geformten Primitivs von innen nach außen."/>
@@ -386,7 +382,7 @@
 			<spinner label="Kraft Y" name="FlexForceY"/>
 			<spinner label="Kraft Z" name="FlexForceZ"/>
 			<check_box label="Licht" name="Light Checkbox Ctrl" tool_tip="Verursacht, dass Objekt Licht emittiert"/>
-			<color_swatch label="" name="colorswatch" tool_tip="Klicken Sie hier, um die Farbauswahl zu öffnen"/>
+			<color_swatch name="colorswatch" tool_tip="Klicken Sie hier, um die Farbauswahl zu öffnen"/>
 			<texture_picker label="" name="light texture control" tool_tip="Klicken, um eine Bild auszuwählen (dieser Effekt funktioniert nur, wenn zeitversetzte Wiedergabe aktiviert ist)"/>
 			<spinner label="Intensität" name="Light Intensity"/>
 			<spinner label="FOV" name="Light FOV"/>
@@ -414,7 +410,7 @@
 		</panel>
 		<panel label="Textur" name="Texture"/>
 		<panel label="Inhalt" name="Contents">
-			<flyout_button label="Neues Skript" label_selected="Neues Skript" name="button new script"/>
+			<flyout_button label="Neues Skript" name="button new script"/>
 			<button label="Berechtigungen" name="button permissions"/>
 		</panel>
 	</tab_container>

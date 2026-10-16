@@ -1,0 +1,1838 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Script Studio's preferences: Colors, with a theme to pick and every
+     color to change by hand against a live preview, and the font;
+     Editor, with typing, completion, formatting, the caret and the hover
+     card; Build, with saving, the external editor, includes and the
+     preprocessor; Lints, what the LSL and SLua checkers warn of and what
+     counts as an error; Snippets, the scripter's own to write and the
+     viewer's to copy; Templates, what new scripts start with; and Keys,
+     the keyboard map. -->
+<floater
+ legacy_header_height="18"
+ can_minimize="false"
+ can_resize="true"
+ height="560"
+ layout="topleft"
+ min_height="420"
+ min_width="800"
+ name="script_studio_prefs"
+ reuse_instance="true"
+ save_rect="true"
+ single_instance="true"
+ title="Script Studio Preferences"
+ width="820">
+    <floater.string name="ThemeCustom">Custom</floater.string>
+    <floater.string name="ThemeOwn">(yours)</floater.string>
+    <floater.string name="PlaceInventory">Inventory</floater.string>
+    <floater.string name="PlaceObject">The script's object</floater.string>
+    <floater.string name="PlaceDisk">The folders on disk</floater.string>
+    <floater.string name="OrderWorldOff">Include search order; unticked places are skipped. To use the greyed places, tick the box above</floater.string>
+    <floater.string name="ThemeNewName">My Theme</floater.string>
+    <floater.string name="VimrcFromFile">With no notecard, the vimrc is the file [PATH]. It supports :map and related commands, let mapleader and :set.</floater.string>
+    <floater.string name="VimrcFromNotecard">The notecard is the vimrc. It supports :map and related commands, let mapleader and :set.</floater.string>
+    <floater.string name="VimrcUnknownNotecard">(a notecard not in inventory yet)</floater.string>
+    <floater.string name="VimrcOnlyNotecards">Only a notecard in your inventory can be the vimrc</floater.string>
+    <floater.string name="HeadingEditor">Editor</floater.string>
+    <floater.string name="HeadingSyntax">Syntax</floater.string>
+    <floater.string name="NoFolder">No folders. Use Add... to add one.</floater.string>
+    <floater.string name="SnippetUnnamed">(no name)</floater.string>
+    <floater.string name="SnippetNewName">New snippet</floater.string>
+    <floater.string name="SnippetCopyName">[NAME] (copy)</floater.string>
+    <floater.string name="SnippetBuiltin">Built into the viewer. Copy it to make a version you can change.</floater.string>
+    <floater.string name="SnippetsNotecardName">Script snippets</floater.string>
+    <floater.string name="SnippetsNotecardNotMade">the notecard could not be made</floater.string>
+    <floater.string name="SnippetsOnlyNotecards">Only a notecard in your inventory can bring snippets in</floater.string>
+    <floater.string name="SnippetsFollowOnlyNotecards">Only a notecard in your inventory can be followed for snippets</floater.string>
+    <floater.string name="SnippetFollowed">From [NAME], the notecard you follow. Copy it to make a version of your own, or change it in the notecard.</floater.string>
+    <floater.string name="SnippetNotecardUnknown">(a notecard not in inventory yet)</floater.string>
+    <floater.string name="SnippetNotecardTip">Drop a snippets notecard here to follow it: its snippets are offered beside yours, as the notecard stands whoever changes it. Cached until it changes</floater.string>
+    <floater.string name="LintLSL20001">A declaration that hides one in an outer scope</floater.string>
+    <floater.string name="LintLSL20002">An assignment used as a condition</floater.string>
+    <floater.string name="LintLSL20003">Changing to the current state</floater.string>
+    <floater.string name="LintLSL20004">Changing state in a function returning a list or a string</floater.string>
+    <floater.string name="LintLSL20005">Changing state inside an if in a function</floater.string>
+    <floater.string name="LintLSL20007">An empty if statement</floater.string>
+    <floater.string name="LintLSL20009">A variable, function or label declared but never used</floater.string>
+    <floater.string name="LintLSL20011">== between lists, which compares only their lengths</floater.string>
+    <floater.string name="LintLSL20012">A condition that is always true</floater.string>
+    <floater.string name="LintLSL20013">A condition that is always false</floater.string>
+    <floater.string name="LintLSL20014">An empty loop body</floater.string>
+    <floater.string name="LintLSL20015">integer *= float</floater.string>
+    <floater.string name="LintLSL20016">A jump that may reach the wrong label</floater.string>
+    <floater.string name="LintLSL20017">A label declared twice in one function</floater.string>
+    <floater.string name="LintLSL20018">== used as a statement</floater.string>
+    <floater.string name="LintLSL20019">A deprecated function or constant</floater.string>
+    <floater.string name="LintLSL20020">A deprecated function or constant with a replacement</floater.string>
+    <floater.string name="LintLSLSlLoopInvariantCall">llGetListLength(l) in a loop's check, l unchanged in the loop (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlSleepingCall">A call that makes the script sleep, where a Fast one does the same without (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlMergeablePrimParams">Prim-params calls one after another, which one call could make (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlCostlyListen">A listen on channel 0 for anyone, which hears every line of chat (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlFastTimer">A timer under a tenth of a second (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlFastSensor">A sensor repeat under a second (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlIntegerPast32Bits">A whole number past 0xFFFFFFFF, which LSL reads as -1 (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlStringBuild">A string joined to in a loop, which makes it anew each time round (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlRepeatedCall">The same answer asked for again in one handler, llGetOwner() and its kin (the studio's own)</floater.string>
+    <floater.string name="LintLuauUnknownGlobal">An unknown global (the type checker also reports it)</floater.string>
+    <floater.string name="LintLuauDeprecatedGlobal">A deprecated global</floater.string>
+    <floater.string name="LintLuauGlobalUsedAsLocal">A global used only inside one function</floater.string>
+    <floater.string name="LintLuauLocalShadow">A local that hides another name</floater.string>
+    <floater.string name="LintLuauSameLineStatement">Two statements on one line</floater.string>
+    <floater.string name="LintLuauMultiLineStatement">A statement continued on a line indented as a new one</floater.string>
+    <floater.string name="LintLuauLocalUnused">A local never used</floater.string>
+    <floater.string name="LintLuauFunctionUnused">A local function never used</floater.string>
+    <floater.string name="LintLuauImportUnused">A require never used</floater.string>
+    <floater.string name="LintLuauBuiltinGlobalWrite">An assignment to a builtin global</floater.string>
+    <floater.string name="LintLuauPlaceholderRead">Reading the placeholder _</floater.string>
+    <floater.string name="LintLuauUnreachableCode">Code that can never run</floater.string>
+    <floater.string name="LintLuauUnknownType">An unknown type name in a type check</floater.string>
+    <floater.string name="LintLuauForRange">A numeric for loop that never runs, or runs oddly</floater.string>
+    <floater.string name="LintLuauUnbalancedAssignment">More or fewer values than names in an assignment</floater.string>
+    <floater.string name="LintLuauImplicitReturn">A function that returns a value on some paths only</floater.string>
+    <floater.string name="LintLuauDuplicateLocal">The same local declared twice</floater.string>
+    <floater.string name="LintLuauFormatString">A malformed format string</floater.string>
+    <floater.string name="LintLuauTableLiteral">A key given twice in a table literal</floater.string>
+    <floater.string name="LintLuauUninitializedLocal">A local read before it is given a value</floater.string>
+    <floater.string name="LintLuauDuplicateFunction">The same function defined twice</floater.string>
+    <floater.string name="LintLuauDeprecatedApi">A deprecated API</floater.string>
+    <floater.string name="LintLuauTableOperations">A table function used in a way that will not work</floater.string>
+    <floater.string name="LintLuauDuplicateCondition">The same condition twice in an if chain</floater.string>
+    <floater.string name="LintLuauMisleadingAndOr">a and b or c, where b may be false or nil</floater.string>
+    <floater.string name="LintLuauCommentDirective">An unknown --! comment directive</floater.string>
+    <floater.string name="LintLuauIntegerParsing">An integer literal too big to be exact</floater.string>
+    <floater.string name="LintLuauComparisonPrecedence">not a == b, and similar comparisons</floater.string>
+    <floater.string name="LintLuauRedundantNativeAttribute">A redundant @native attribute</floater.string>
+    <floater.string name="LintLuauSlCompoundAssign">x = x + 1, where Luau has x += 1 (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlNumberTruth">A number, string, uuid, vector, quaternion or list read as true or false, which SLua counts true even at 0, empty, zero or NULL_KEY (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlNilSentinel">A find compared with -1 where it answers nil, or llcompat's with nil where it answers -1 (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlTableCompare">A table compared with one built there, {}, which it can never equal (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlZeroIndex">A list, a string or ll counted from 0, as LSL counted (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlCompatCall">llcompat's function where ll's means the same (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlBooleanNumber">A boolean compared with a number, as LSL's TRUE and FALSE were (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlGlobalAssign">A global given a value at the top where a local would do, or a function made global inside a block (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlForIndexAssign">A for loop's own variable set inside it, which Luau's for does not go on from as LSL's did (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlGlobalFunction">A function at the top made global where a local function would do (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlParenCondition">A condition in brackets, as LSL's had to be (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlAlmostSwapped">a = b and then b = a, which is no swap (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlMustUse">A call that only answers, its answer thrown away (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlGeneralizedFor">for k, v in pairs(t), where Luau's for walks t itself (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlEmptyBlock">An if, an else or a loop whose block is empty (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlIndexDivision">A list indexed by a / division, which may be a fraction (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlVectorProduct">Two vectors multiplied where a number is wanted, or taken % each other, as LSL's dot and cross products (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlSleepingCall">A call that makes the script sleep, where a Fast one does the same without (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlMergeablePrimParams">Prim-params calls one after another, which one call could make (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlCostlyListen">A listen on channel 0 for anyone, which hears every line of chat (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlFastTimer">A timer under a tenth of a second (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlFastSensor">A sensor repeat under a second (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlStringBuild">A string joined to in a loop, which makes it anew each time round (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlRepeatedCall">The same answer asked for again in one handler, llGetOwner() and its kin (the studio's own)</floater.string>
+    <floater.string name="LintLuauName">[DESCRIPTION]
+
+In a .luaurc: [NAME]</floater.string>
+    <floater.string name="PreviewLSL">// Every kind of token, to preview the colors
+#define GREETING "Hello"
+integer count = 0;
+string  name  = "Avatar\n";
+
+float half(integer n)
+{
+    return (float)n / 2.0;
+}
+
+default
+{
+    state_entry()
+    {
+        llSay(PUBLIC_CHANNEL, GREETING + " " + name);
+        llSetTimerEvent(half(count) + 1.0);
+        vector where = &lt;1.0, 0.0, 0.5&gt;;
+        @again;
+        if (++count &lt; 3) jump again;
+        llSound("", 1.0, TRUE, FALSE);
+        state other;
+    }
+}</floater.string>
+    <floater.string name="PreviewSLua">--!strict
+-- Every kind of token, to preview the colors
+local count: number = 0
+local name = "Avatar\n"
+
+local function half(n: number): number
+    return n / 2
+end
+
+function LLEvents.touch_start(detected)
+    ll.Say(PUBLIC_CHANNEL, `Hello {name}`)
+    for i = 1, #detected do
+        count += 1
+    end
+    if count &gt; 3 then
+        LLTimers:once(half(count), function()
+            ll.OwnerSay(tostring(math.pi))
+        end)
+    end
+end</floater.string>
+    <tab_container
+     follows="all"
+     height="500"
+     layout="topleft"
+     left="8"
+     name="tabs"
+     tab_min_width="80"
+     tab_position="top"
+     top="24"
+     width="804">
+        <panel
+         follows="all"
+         height="478"
+         label="Colors"
+         layout="topleft"
+         name="colors_tab"
+         width="804">
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="8"
+             name="theme_label"
+             top="10"
+             width="50">
+                Theme
+            </text>
+            <combo_box
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="theme"
+             tool_tip="A set of colors for the editor. Custom uses the colors set in the swatches"
+             top_delta="-3"
+             width="220" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Save As..."
+             layout="topleft"
+             left_pad="6"
+             name="save_theme"
+             tool_tip="Save the current colors as your own theme"
+             top_delta="0"
+             width="90" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Skin Colors"
+             layout="topleft"
+             left_pad="4"
+             name="restore_skin"
+             tool_tip="Reset every color to the skin's colors"
+             top_delta="0"
+             width="100" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="8"
+             name="font_label"
+             top_pad="12"
+             width="50">
+                Font
+            </text>
+            <font_field
+             editable="false"
+             families="monospace"
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="font"
+             tool_tip="The editor font, shown in itself. Click to choose the face, size and style, with a sample"
+             top_delta="-3"
+             width="320" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left_pad="20"
+             name="preview_label"
+             top_delta="3"
+             width="60">
+                Preview
+            </text>
+            <combo_box
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="preview_language"
+             tool_tip="Which language the preview shows"
+             top_delta="-3"
+             width="100">
+                <combo_box.item label="LSL" name="lsl" value="lsl" />
+                <combo_box.item label="SLua" name="slua" value="slua" />
+            </combo_box>
+            <layout_stack
+             animate="false"
+             follows="all"
+             height="400"
+             layout="topleft"
+             left="8"
+             name="colors_stack"
+             orientation="horizontal"
+             top_pad="10"
+             width="788">
+                <layout_panel
+                 auto_resize="false"
+                 height="400"
+                 layout="topleft"
+                 min_dim="200"
+                 name="swatch_panel"
+                 user_resize="true"
+                 width="260">
+                    <scroll_container
+                     follows="all"
+                     height="400"
+                     layout="topleft"
+                     left="0"
+                     name="swatch_scroll"
+                     top="0"
+                     width="260">
+                        <panel
+                         follows="left|top|right"
+                         height="400"
+                         layout="topleft"
+                         left="0"
+                         name="swatches"
+                         top="0"
+                         width="240" />
+                    </scroll_container>
+                </layout_panel>
+                <layout_panel
+                 auto_resize="true"
+                 height="400"
+                 layout="topleft"
+                 min_dim="200"
+                 name="preview_panel"
+                 width="518">
+                    <code_editor
+                     bg_color="ScriptBackground"
+                     bg_focus_color="ScriptBackground"
+                     bg_readonly_color="ScriptBgReadOnlyColor"
+                     bracket_match_color="ScriptBracketMatchColor"
+                     changed_color="ScriptChangedColor"
+                     bracket_color_1="ScriptBracket1Color"
+                     bracket_color_2="ScriptBracket2Color"
+                     bracket_color_3="ScriptBracket3Color"
+                     current_line_color="ScriptCurrentLineColor"
+                     cursor_color="ScriptCursorColor"
+                     find_match_color="ScriptFindMatchColor"
+                     fold_color="ScriptFoldColor"
+                     follows="all"
+                     gutter_color="ScriptGutterColor"
+                     height="400"
+                     highlight_color="ScriptHighlightColor"
+                     layout="topleft"
+                     left="0"
+                     line_number_color="ScriptLineNumberColor"
+                     name="preview"
+                     selection_color="ScriptSelectionColor"
+                     show_line_numbers="true"
+                     syntax="lsl"
+                     syntax_color_prefix="Script"
+                     text_color="ScriptText"
+                     text_readonly_color="ScriptText"
+                     tool_tip="How the editor will look. You can type here; nothing is saved"
+                     top="0"
+                     width="518" />
+                </layout_panel>
+            </layout_stack>
+        </panel>
+        <panel
+         follows="all"
+         height="478"
+         label="Editor"
+         layout="topleft"
+         name="editor_tab"
+         width="804">
+            <!-- The left column: typing, completion, formatting. -->
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="typing_heading"
+             top="12"
+             width="370">
+                Typing
+            </text>
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="tab_width_label"
+             top_pad="8"
+             width="80">
+                Tab width:
+            </text>
+            <spinner
+             control_name="ALScriptStudioTabWidth"
+             decimal_digits="0"
+             follows="left|top"
+             height="20"
+             increment="1"
+             label_width="0"
+             layout="topleft"
+             left_pad="4"
+             max_val="16"
+             min_val="1"
+             name="tab_width"
+             tool_tip="Columns between tab stops, and the width of one indentation level"
+             top_delta="-2"
+             width="60" />
+            <check_box
+             control_name="ALScriptStudioInsertSpaces"
+             follows="left|top"
+             height="20"
+             label="Indent with spaces rather than tabs"
+             layout="topleft"
+             left="12"
+             name="insert_spaces"
+             tool_tip="On, Tab, new lines and the formatter use spaces; off, tabs. For scripts with undetected indentation."
+             top_pad="6"
+             width="370" />
+            <check_box
+             control_name="ALScriptStudioDetectIndentation"
+             follows="left|top"
+             height="20"
+             label="Indent each script as it is already indented"
+             layout="topleft"
+             left="12"
+             name="detect_indentation"
+             tool_tip="Reads each script's tabs or spaces and indent width on open. The status bar shows and changes it."
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptStudioReindentOnPaste"
+             follows="left|top"
+             height="20"
+             label="Indent pasted lines to where they go"
+             layout="topleft"
+             left="12"
+             name="reindent_on_paste"
+             tool_tip="Pasted lines take the indentation where they land, keeping relative indents. One Undo restores them."
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptStudioAutoClose"
+             follows="left|top"
+             height="20"
+             label="Close brackets and quotes as they are typed"
+             layout="topleft"
+             left="12"
+             name="auto_close"
+             tool_tip="An opening bracket or quote adds its closer, or wraps a selection. Backspace deletes an empty pair"
+             top_pad="4"
+             width="370" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="completion_heading"
+             top_pad="16"
+             width="370">
+                Completion
+            </text>
+            <check_box
+             control_name="ALScriptStudioAutoComplete"
+             follows="left|top"
+             height="20"
+             label="Suggest completions as a name is typed"
+             layout="topleft"
+             left="12"
+             name="auto_complete"
+             tool_tip="The completion list opens as you type; off, only when you press Control-Space. An SLua handler completes with Luau types while LSL to SLua's Luau types option is on"
+             top_pad="6"
+             width="370" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="32"
+             name="complete_after_label"
+             top_pad="6"
+             width="190">
+                Open after this many letters:
+            </text>
+            <spinner
+             control_name="ALScriptStudioCompleteAfter"
+             decimal_digits="0"
+             follows="left|top"
+             height="20"
+             increment="1"
+             label_width="0"
+             layout="topleft"
+             left_pad="4"
+             max_val="5"
+             min_val="1"
+             name="complete_after"
+             tool_tip="How many letters of a name to type before the completion list opens"
+             top_delta="-2"
+             width="60" />
+            <check_box
+             control_name="ALScriptStudioAcceptOnEnter"
+             follows="left|top"
+             height="20"
+             label="Return accepts the selected completion (Tab always does)"
+             layout="topleft"
+             left="32"
+             name="accept_on_enter"
+             tool_tip="Off, Return starts a new line and closes the list; only Tab accepts a completion"
+             top_pad="6"
+             width="350" />
+            <check_box
+             control_name="ALScriptFragmentCompletion"
+             follows="left|top"
+             height="20"
+             label="Complete SLua from the statement being typed"
+             layout="topleft"
+             left="32"
+             name="fragment_completion"
+             tool_tip="Completion and signature help check only the statement being typed against the script's last check, and answer at once. Off, each keystroke that changed the script checks all of it before answering"
+             top_pad="4"
+             width="350" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="formatting_heading"
+             top_pad="16"
+             width="370">
+                Formatting
+            </text>
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="blank_lines_label"
+             top_pad="8"
+             width="170">
+                Blank lines kept in a row:
+            </text>
+            <spinner
+             control_name="ALScriptFormatBlankLines"
+             decimal_digits="0"
+             follows="left|top"
+             height="20"
+             increment="1"
+             label_width="0"
+             layout="topleft"
+             left_pad="4"
+             max_val="10"
+             min_val="0"
+             name="blank_lines"
+             tool_tip="The most blank lines in a row that formatting keeps; extra ones are removed"
+             top_delta="-2"
+             width="60" />
+            <check_box
+             control_name="ALScriptFormatSpacing"
+             follows="left|top"
+             height="20"
+             label="Set the spaces within lines, not only the indentation"
+             layout="topleft"
+             left="12"
+             name="format_spacing"
+             tool_tip="Formatting puts one space around operators and after commas; off, it only fixes indentation"
+             top_pad="6"
+             width="370" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="format_width_label"
+             top_pad="8"
+             width="170">
+                Break lines longer than:
+            </text>
+            <spinner
+             control_name="ALScriptFormatWidth"
+             decimal_digits="0"
+             follows="left|top"
+             height="20"
+             increment="10"
+             label_width="0"
+             layout="topleft"
+             left_pad="4"
+             max_val="400"
+             min_val="0"
+             name="format_width"
+             tool_tip="Formatting breaks a line with more columns than this at the commas of a bracket on it, each part on a line of its own; 0 never breaks a line"
+             top_delta="-2"
+             width="60" />
+            <check_box
+             control_name="ALScriptFormatBraceSpaces"
+             follows="left|top"
+             height="20"
+             label="Spaces inside SLua's braces: { 1, 2 }"
+             layout="topleft"
+             left="12"
+             name="format_brace_spaces"
+             tool_tip="Formatting and Convert to SLua put a space inside a table's braces, and a table type's, as StyLua does: { 1, 2 }, { any }. Off, {1, 2}"
+             top_pad="6"
+             width="370" />
+
+            <!-- The right column: the studio, the caret, the hover card. -->
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="general_heading"
+             top="12"
+             width="370">
+                General
+            </text>
+            <check_box
+             control_name="ALScriptStudioRestoreTabs"
+             follows="left|top"
+             height="20"
+             label="Reopen the last session's tabs"
+             layout="topleft"
+             left="412"
+             name="restore_tabs"
+             tool_tip="Reopen last session's tabs when the window opens; off, open only what you asked for"
+             top_pad="2"
+             width="370" />
+            <check_box
+             control_name="ALScriptStudioPanesWiden"
+             follows="left|top"
+             height="20"
+             label="Widen the window as the Explorer or Inspector opens"
+             layout="topleft"
+             left="412"
+             name="panes_widen"
+             tool_tip="Opening the Explorer or the Inspector widens the window by its width, and folding it narrows the window again; off, the pane takes its room from the editor"
+             top_pad="2"
+             width="370" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="caret_heading"
+             top_pad="16"
+             width="370">
+                Caret
+            </text>
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="caret_style_label"
+             top_pad="8"
+             width="60">
+                Shape:
+            </text>
+            <combo_box
+             control_name="ALScriptStudioCaretStyle"
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="caret_style"
+             tool_tip="How the caret is drawn. Vim normal mode always draws a block"
+             top_delta="-3"
+             width="140">
+                <combo_box.item label="Line" name="line" value="line" />
+                <combo_box.item label="Block" name="block" value="block" />
+                <combo_box.item label="Underline" name="underline" value="underline" />
+            </combo_box>
+            <check_box
+             control_name="ALScriptStudioCaretBlink"
+             follows="left|top"
+             height="20"
+             label="Blink"
+             layout="topleft"
+             left="412"
+             name="caret_blink"
+             tool_tip="Off, the caret stays solid"
+             top_pad="6"
+             width="370" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="hover_heading"
+             top_pad="16"
+             width="370">
+                Hover
+            </text>
+            <check_box
+             control_name="ALScriptStudioHoverCards"
+             follows="left|top"
+             height="20"
+             label="Show what a name or a problem is when the mouse rests on it"
+             layout="topleft"
+             left="412"
+             name="hover_cards"
+             tool_tip="A card with the declaration, its documentation and any problem there"
+             top_pad="6"
+             width="370" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="432"
+             name="hover_delay_label"
+             top_pad="6"
+             width="210">
+                Delay (seconds):
+            </text>
+            <spinner
+             control_name="ALScriptStudioHoverDelay"
+             decimal_digits="1"
+             follows="left|top"
+             height="20"
+             increment="0.1"
+             label_width="0"
+             layout="topleft"
+             left_pad="4"
+             max_val="5"
+             min_val="0"
+             name="hover_delay"
+             tool_tip="How long the mouse rests on a name before its card shows"
+             top_delta="-2"
+             width="60" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="vim_heading"
+             top_pad="16"
+             width="370">
+                Vim
+            </text>
+            <check_box
+             control_name="ALScriptStudioVimClipboard"
+             follows="left|top"
+             height="20"
+             label="Yank, delete and put use the system clipboard"
+             layout="topleft"
+             left="412"
+             name="vim_clipboard"
+             tool_tip="y, d, x and p with no register use the system clipboard (clipboard=unnamed). Off, only &quot;+ and &quot;* do."
+             top_pad="6"
+             width="370" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="vimrc_label"
+             top_pad="10"
+             width="370">
+                Vimrc notecard:
+            </text>
+            <line_editor
+             enabled="false"
+             follows="left|top"
+             height="22"
+             label="Drop a notecard here"
+             layout="topleft"
+             left="412"
+             max_length_bytes="255"
+             name="vimrc_notecard"
+             tool_tip="Drop an inventory notecard here to use as your vimrc wherever you log in. Cached until it changes"
+             top_pad="4"
+             width="230" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Edit"
+             layout="topleft"
+             left_pad="6"
+             name="vimrc_edit"
+             tool_tip="Open the vimrc in Script Studio: the notecard, or else the file (created if missing)"
+             top_delta="0"
+             width="64" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Clear"
+             layout="topleft"
+             left_pad="4"
+             name="vimrc_clear"
+             tool_tip="Stop using the notecard and read the vimrc file in the settings folder again"
+             top_delta="0"
+             width="64" />
+            <text
+             follows="left|top"
+             font="SansSerifSmall"
+             height="30"
+             layout="topleft"
+             left="412"
+             name="vimrc_where"
+             top_pad="4"
+             width="370"
+             wrap="true" />
+        </panel>
+        <panel
+         follows="all"
+         height="478"
+         label="Build"
+         layout="topleft"
+         name="build_tab"
+         width="804">
+            <!-- The left column: saving, the external editor, includes. -->
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="saving_heading"
+             top="12"
+             width="370">
+                Saving
+            </text>
+            <check_box
+             control_name="ALScriptStudioPreflight"
+             follows="left|top"
+             height="20"
+             label="Hold a save when the checkers find errors"
+             layout="topleft"
+             left="12"
+             name="preflight"
+             tool_tip="On, checker errors hold a save until you save again. Off, it saves and reports the error count"
+             top_pad="6"
+             width="370" />
+            <check_box
+             control_name="ALScriptFixOnSave"
+             follows="left|top"
+             height="20"
+             label="Make safe fixes when saving"
+             layout="topleft"
+             left="12"
+             name="fix_on_save"
+             tool_tip="Before saving, applies fixes that do not change behavior, as one undo step. Removes nothing"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptFormatOnSave"
+             follows="left|top"
+             height="20"
+             label="Format scripts when saving"
+             layout="topleft"
+             left="12"
+             name="format_on_save"
+             tool_tip="Formats the whole script before saving, as one undo step"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptTrimOnSave"
+             follows="left|top"
+             height="20"
+             label="Trim trailing spaces when saving"
+             layout="topleft"
+             left="12"
+             name="trim_on_save"
+             tool_tip="Removes spaces and tabs at the ends of lines before saving, as one undo step"
+             top_pad="4"
+             width="370" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="external_heading"
+             top_pad="16"
+             width="370">
+                External editor
+            </text>
+            <line_editor
+             control_name="ExternalEditor"
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left="12"
+             name="external_editor"
+             tool_tip="Command for Edit in External Editor: the program, then &quot;%s&quot; for the file. Empty: system editor"
+             top_pad="6"
+             width="290" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Browse..."
+             layout="topleft"
+             left_pad="6"
+             name="external_browse"
+             tool_tip="Choose the program to build the command from"
+             top_delta="0"
+             width="74" />
+            <button
+             follows="left|top"
+             height="22"
+             label="More Scripting Settings..."
+             layout="topleft"
+             left="12"
+             name="scripting_settings"
+             tool_tip="Opens the viewer's scripting settings: VS Code integration and WebSocket sync"
+             top_pad="6"
+             width="180" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="includes_heading"
+             top_pad="16"
+             width="370">
+                Includes
+            </text>
+            <!-- Includes from the object and the inventory, and the order the
+                 world's places and the disk are looked in, are hidden, and
+                 the world is off, until Linden Lab's own viewer settles how
+                 it takes them. -->
+            <check_box
+             control_name="ALScriptPreprocWorldIncludes"
+             follows="left|top"
+             height="20"
+             label="Include from the object and your inventory"
+             layout="topleft"
+             left="12"
+             name="preproc_world"
+             tool_tip="#include and require may use items in the script's object or your inventory; off, only disk folders"
+             top_pad="6"
+             visible="false"
+             width="370" />
+            <check_box
+             control_name="ALScriptPreprocDiskIncludes"
+             follows="left|top"
+             height="20"
+             label="Include files from folders on disk"
+             layout="topleft"
+             left="12"
+             name="preproc_disk"
+             tool_tip="#include (--#include in SLua) and require may read files in the folders below; off, nothing on disk"
+             top_delta="0"
+             width="370" />
+            <pane_list
+             column_padding="0"
+             draw_heading="false"
+             follows="left|top"
+             height="54"
+             layout="topleft"
+             left="32"
+             multi_select="false"
+             name="include_folders"
+             tool_tip="Folders an #include is searched for in, top first; a SLua script on disk in one may require what is beside it"
+             top_pad="4"
+             width="260">
+                <pane_list.columns dynamic_width="true" name="folder" />
+            </pane_list>
+            <button
+             follows="left|top"
+             height="22"
+             label="Add..."
+             layout="topleft"
+             left_pad="6"
+             name="add_folder"
+             tool_tip="Add a folder to search"
+             top_delta="0"
+             width="70" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Remove"
+             layout="topleft"
+             left_delta="0"
+             name="remove_folder"
+             tool_tip="Stop searching the selected folder"
+             top_pad="4"
+             width="70" />
+            <panel
+             class="al_panel_script_aliases"
+             filename="panel_script_studio_aliases.xml"
+             follows="left|top"
+             height="130"
+             layout="topleft"
+             left="12"
+             name="aliases_panel"
+             top_pad="10"
+             width="370" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="order_label"
+             top_pad="12"
+             visible="false"
+             width="370">
+                Include search order, first to last:
+            </text>
+            <scroll_list
+             column_padding="0"
+             draw_heading="false"
+             follows="left|top"
+             height="58"
+             layout="topleft"
+             left="12"
+             multi_select="false"
+             name="include_order"
+             tool_tip="Include search order, first match wins; unticked places are skipped"
+             top_pad="4"
+             visible="false"
+             width="220">
+                <scroll_list.columns name="on" type="checkbox" width="22" />
+                <scroll_list.columns dynamic_width="true" name="place" />
+            </scroll_list>
+            <button
+             follows="left|top"
+             height="22"
+             label="Up"
+             layout="topleft"
+             left_pad="6"
+             name="order_up"
+             tool_tip="Search the selected place earlier"
+             top_delta="0"
+             visible="false"
+             width="70" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Down"
+             layout="topleft"
+             left_delta="0"
+             name="order_down"
+             tool_tip="Search the selected place later"
+             top_pad="4"
+             visible="false"
+             width="70" />
+
+            <!-- The right column: what the preprocessor does on a save. -->
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="preproc_heading"
+             top="12"
+             width="370">
+                Preprocessor
+            </text>
+            <check_box
+             control_name="ALScriptPreprocEnabled"
+             follows="left|top"
+             height="20"
+             label="Preprocess every script when saving"
+             layout="topleft"
+             left="412"
+             name="preproc_enabled"
+             tool_tip="Preprocess every script on save, keeping the source in Firestorm's envelope. Off: only scripts that have directives, or were saved with the preprocessor before"
+             top_pad="6"
+             width="370" />
+            <check_box
+             control_name="ALScriptPreprocSwitch"
+             follows="left|top"
+             height="20"
+             label="Switch statements"
+             layout="topleft"
+             left="412"
+             name="preproc_switch"
+             tool_tip="Adds a switch statement to LSL, converted to jumps before compiling"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptPreprocLazyLists"
+             follows="left|top"
+             height="20"
+             label="Lazy lists"
+             layout="topleft"
+             left="412"
+             name="preproc_lazy"
+             tool_tip="Lets LSL read a list element with list[i], as Firestorm's preprocessor allows"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptPreprocExtensions"
+             follows="left|top"
+             height="20"
+             label="Break, continue, &amp;= |= ^= and inline"
+             layout="topleft"
+             left="412"
+             name="preproc_extensions"
+             tool_tip="Adds break, continue, &amp;= |= ^= &lt;&lt;= &gt;&gt;= and inline functions to LSL, converted before compiling"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptPreprocCompress"
+             follows="left|top"
+             height="20"
+             label="Compress the preprocessed code"
+             layout="topleft"
+             left="412"
+             name="preproc_compress"
+             tool_tip="Removes comments and extra spaces from the preprocessed code, for a smaller asset"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptPreprocLineComments"
+             follows="left|top"
+             height="20"
+             label="Mark where each line came from"
+             layout="topleft"
+             left="412"
+             name="preproc_line_comments"
+             tool_tip="Writes an @line comment wherever the preprocessed code moves to another file or skips lines, with the line and the file, as the VS Code plugin does. A file on disk is named by its path from the script's folder, never from the root of the disk. Compressed or optimized LSL drops them"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptUploadHeader"
+             follows="left|top"
+             height="20"
+             label="Say in what is saved when, and what it hashes to"
+             layout="topleft"
+             left="412"
+             name="preproc_upload_header"
+             tool_tip="A script saved preprocessed carries a few comment lines at the top of its compiled half: when it was saved, and a hash of its source and what that expanded to. A script saved as written carries none"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptUploadHeaderCreator"
+             follows="left|top"
+             height="20"
+             label="And who saved it"
+             layout="topleft"
+             left="432"
+             name="preproc_upload_creator"
+             tool_tip="The header also names you, as the one who saved the script"
+             top_pad="4"
+             width="350" />
+            <check_box
+             control_name="ALScriptPreprocOptimizer"
+             follows="left|top"
+             height="20"
+             label="Optimize LSL: fold constants, drop unused code"
+             layout="topleft"
+             left="412"
+             name="preproc_optimize"
+             tool_tip="Folds constants, removes unused code, lists each change in Problems. Math follows the compile target"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptPreprocOptimizerShrinkNames"
+             follows="left|top"
+             height="20"
+             label="Shrink names"
+             layout="topleft"
+             left="432"
+             name="preproc_shrink"
+             tool_tip="Shortens global names in the preprocessed code; your source keeps the real names"
+             top_pad="4"
+             width="350" />
+            <check_box
+             control_name="ALScriptPreprocOptimizerAddStrings"
+             follows="left|top"
+             height="20"
+             label="Join string constants"
+             layout="topleft"
+             left="432"
+             name="preproc_addstrings"
+             tool_tip="Joins adjacent string constants into one, which LSL does not do itself"
+             top_pad="4"
+             width="350" />
+            <check_box
+             control_name="ALScriptPreprocOptimizerInlining"
+             follows="left|top"
+             height="20"
+             label="Inline functions called once"
+             layout="topleft"
+             left="432"
+             name="preproc_inline"
+             tool_tip="Replaces a function called from only one place with its body, and removes the function"
+             top_pad="4"
+             width="350" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="defines_label"
+             top_pad="14"
+             width="380">
+                Macros for every script, one per line (NAME or NAME=value):
+            </text>
+            <text_editor
+             commit_on_focus_lost="true"
+             follows="left|top"
+             height="80"
+             layout="topleft"
+             left="412"
+             max_length="4096"
+             name="preproc_defines"
+             tool_tip="Macros defined before every script: DEBUG is 1, VERSION=2 is 2. A script's #define or #undef wins"
+             top_pad="4"
+             width="380"
+             word_wrap="false" />
+        </panel>
+        <panel
+         follows="all"
+         height="478"
+         label="Lints"
+         layout="topleft"
+         name="lints_tab"
+         width="804">
+            <!-- LSL's warnings, down the left. -->
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="lints_lsl_heading"
+             top="12"
+             width="380">
+                LSL warnings
+            </text>
+            <scroll_list
+             column_padding="2"
+             draw_heading="true"
+             follows="left|top|bottom"
+             height="402"
+             layout="topleft"
+             left="12"
+             multi_select="false"
+             name="lints_lsl"
+             tool_tip="Warnings from the LSL checker. On reports one; Error counts it as an error, which can hold a save"
+             top_pad="6"
+             width="384">
+                <scroll_list.columns label="On" name="on" type="checkbox" width="30" />
+                <scroll_list.columns label="Error" name="error" type="checkbox" width="40" />
+                <scroll_list.columns dynamic_width="true" label="Warning" name="lint" />
+            </scroll_list>
+            <button
+             follows="left|bottom"
+             height="22"
+             label="Defaults"
+             layout="topleft"
+             left="12"
+             name="lints_defaults"
+             tool_tip="Every lint on as a warning; SLua checked nonstrict by the old type solver, as the grid compiles"
+             top_pad="8"
+             width="100" />
+
+            <!-- Luau's lints and the mode, down the right. -->
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="408"
+             name="lints_luau_heading"
+             top="12"
+             width="384">
+                SLua lints
+            </text>
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="408"
+             name="luau_mode_label"
+             top_pad="9"
+             width="170">
+                Type checking by default:
+            </text>
+            <combo_box
+             control_name="ALScriptLuauMode"
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="luau_mode"
+             tool_tip="Where no --! comment or .luaurc sets it. Solver's default: old solver nonstrict, new strict"
+             top_delta="-3"
+             width="210">
+                <combo_box.item label="Solver's default" name="auto" value="auto" />
+                <combo_box.item label="Nonstrict, as the grid compiles" name="nonstrict" value="nonstrict" />
+                <combo_box.item label="Strict" name="strict" value="strict" />
+                <combo_box.item label="No checking" name="nocheck" value="nocheck" />
+            </combo_box>
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="408"
+             name="luau_solver_label"
+             top_pad="9"
+             width="170">
+                Type solver:
+            </text>
+            <combo_box
+             control_name="ALScriptLuauSolver"
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="luau_solver"
+             tool_tip="Luau type solver for SLua. Old is the grid's; New finds different mistakes, may be slower; some messages English only"
+             top_delta="-3"
+             width="210">
+                <combo_box.item label="Old, as the grid checks" name="old" value="old" />
+                <combo_box.item label="New" name="new" value="new" />
+            </combo_box>
+            <scroll_list
+             column_padding="2"
+             draw_heading="true"
+             follows="left|top|right|bottom"
+             height="342"
+             layout="topleft"
+             left="408"
+             multi_select="false"
+             name="lints_luau"
+             tool_tip="Lint rules for SLua. On reports one; Error counts it as an error, which can hold a save"
+             top_pad="6"
+             width="384">
+                <scroll_list.columns label="On" name="on" type="checkbox" width="30" />
+                <scroll_list.columns label="Error" name="error" type="checkbox" width="40" />
+                <scroll_list.columns dynamic_width="true" label="Lint" name="lint" />
+            </scroll_list>
+            <text
+             follows="left|bottom"
+             height="30"
+             layout="topleft"
+             left="408"
+             name="lints_luaurc"
+             top_pad="6"
+             width="384"
+             wrap="true">
+                A .luaurc next to a script overrides these for that script: each lint and the type checking mode.
+            </text>
+        </panel>
+        <panel
+         follows="all"
+         height="478"
+         label="Snippets"
+         layout="topleft"
+         name="snippets_tab"
+         width="804">
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="snippet_language_label"
+             top="13"
+             width="70">
+                Language:
+            </text>
+            <combo_box
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="snippet_language"
+             tool_tip="Show LSL or SLua snippets"
+             top_delta="-3"
+             width="100">
+                <combo_box.item label="LSL" name="lsl" value="lsl" />
+                <combo_box.item label="SLua" name="slua" value="slua" />
+            </combo_box>
+            <scroll_list
+             column_padding="4"
+             draw_heading="true"
+             follows="left|top|bottom"
+             height="374"
+             layout="topleft"
+             left="12"
+             multi_select="false"
+             name="snippet_list"
+             tool_tip="Your snippets, then the followed notecard's, then the viewer's built-in ones (copy one to change it). Drop a snippets notecard here to add its snippets to yours."
+             top_pad="8"
+             width="280">
+                <scroll_list.columns dynamic_width="true" label="Snippet" name="name" />
+                <scroll_list.columns label="Prefix" name="prefix" width="96" />
+            </scroll_list>
+            <button
+             follows="left|bottom"
+             height="22"
+             label="New"
+             layout="topleft"
+             left="12"
+             name="snippet_new"
+             tool_tip="Create a new snippet"
+             top_pad="8"
+             width="70" />
+            <button
+             follows="left|bottom"
+             height="22"
+             label="Copy"
+             layout="topleft"
+             left_pad="4"
+             name="snippet_copy"
+             tool_tip="Copy the selected snippet, built-in or yours, into your snippets to change it"
+             top_delta="0"
+             width="70" />
+            <button
+             follows="left|bottom"
+             height="22"
+             label="Delete"
+             layout="topleft"
+             left_pad="4"
+             name="snippet_delete"
+             tool_tip="Delete the selected snippet (your own only)"
+             top_delta="0"
+             width="70" />
+            <button
+             follows="left|bottom"
+             height="22"
+             label="Save to Inventory"
+             layout="topleft"
+             left="12"
+             name="snippet_to_inventory"
+             tool_tip="Save your own snippets, LSL and SLua, to a new notecard in your Notecards folder, to keep or to give. Dropping that notecard here adds its snippets."
+             top_pad="4"
+             width="140" />
+
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="306"
+             name="snippet_notecard_label"
+             top="13"
+             width="100">
+                Follow notecard:
+            </text>
+            <line_editor
+             enabled="false"
+             follows="left|top|right"
+             height="22"
+             label="Drop a notecard here"
+             layout="topleft"
+             left_pad="4"
+             max_length_bytes="255"
+             name="snippet_notecard"
+             tool_tip="Drop a snippets notecard here to follow it"
+             top_delta="-3"
+             width="314" />
+            <button
+             follows="top|right"
+             height="22"
+             label="Clear"
+             layout="topleft"
+             left_pad="4"
+             name="snippet_notecard_clear"
+             tool_tip="Stop following the notecard: its snippets are no longer offered"
+             top_delta="0"
+             width="64" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="306"
+             name="snippet_name_label"
+             top="45"
+             width="56">
+                Name:
+            </text>
+            <line_editor
+             follows="left|top|right"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             max_length_bytes="120"
+             name="snippet_name"
+             tool_tip="The name shown in the Insert menu and the completion list"
+             top_delta="-3"
+             width="426" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="306"
+             name="snippet_prefix_label"
+             top_pad="9"
+             width="56">
+                Prefix:
+            </text>
+            <line_editor
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             max_length_bytes="60"
+             name="snippet_prefix"
+             tool_tip="What to type for completion to offer this snippet"
+             top_delta="-3"
+             width="160" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="306"
+             name="snippet_detail_label"
+             top_pad="9"
+             width="56">
+                Detail:
+            </text>
+            <line_editor
+             follows="left|top|right"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             max_length_bytes="240"
+             name="snippet_detail"
+             tool_tip="A short description shown beside the name"
+             top_delta="-3"
+             width="426" />
+            <code_editor
+                     bg_color="ScriptBackground"
+                     bg_focus_color="ScriptBackground"
+                     bg_readonly_color="ScriptBgReadOnlyColor"
+                     bracket_match_color="ScriptBracketMatchColor"
+                     changed_color="ScriptChangedColor"
+                     bracket_color_1="ScriptBracket1Color"
+                     bracket_color_2="ScriptBracket2Color"
+                     bracket_color_3="ScriptBracket3Color"
+                     current_line_color="ScriptCurrentLineColor"
+                     cursor_color="ScriptCursorColor"
+                     find_match_color="ScriptFindMatchColor"
+                     fold_color="ScriptFoldColor"
+                     gutter_color="ScriptGutterColor"
+                     highlight_color="ScriptHighlightColor"
+                     line_number_color="ScriptLineNumberColor"
+                     selection_color="ScriptSelectionColor"
+                     show_line_numbers="true"
+                     syntax_color_prefix="Script"
+                     text_color="ScriptText"
+                     text_readonly_color="ScriptText"
+                     follows="all"
+                     height="262"
+                     layout="topleft"
+                     left="306"
+                     name="snippet_body"
+                     syntax="lsl"
+                     tool_tip="The text the snippet inserts"
+                     top_pad="8"
+                     width="486" />
+            <text
+             follows="left|right|bottom"
+             height="30"
+             layout="topleft"
+             left="306"
+             name="snippet_help"
+             top_pad="6"
+             width="370"
+             wrap="true">
+                ${1:text}, ${2} and $1 are Tab stops, in order; $0 is where the caret ends.
+            </text>
+            <button
+             follows="right|bottom"
+             height="22"
+             label="Edit as XML..."
+             layout="topleft"
+             left_pad="6"
+             name="snippet_xml"
+             tool_tip="Open your snippets file as XML in Script Studio"
+             top_delta="4"
+             width="110" />
+        </panel>
+        <panel
+         follows="all"
+         height="478"
+         label="Templates"
+         layout="topleft"
+         name="templates_tab"
+         width="804">
+            <text
+             follows="left|top|right"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="templates_note"
+             top="12"
+             width="780">
+                The text a new script made in the Explorer starts with. If empty, the grid's default.
+            </text>
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="template_lsl_label"
+             top_pad="8"
+             width="380">
+                LSL
+            </text>
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="template_slua_label"
+             top_delta="0"
+             width="380">
+                SLua
+            </text>
+            <code_editor
+                     bg_color="ScriptBackground"
+                     bg_focus_color="ScriptBackground"
+                     bg_readonly_color="ScriptBgReadOnlyColor"
+                     bracket_match_color="ScriptBracketMatchColor"
+                     changed_color="ScriptChangedColor"
+                     bracket_color_1="ScriptBracket1Color"
+                     bracket_color_2="ScriptBracket2Color"
+                     bracket_color_3="ScriptBracket3Color"
+                     current_line_color="ScriptCurrentLineColor"
+                     cursor_color="ScriptCursorColor"
+                     find_match_color="ScriptFindMatchColor"
+                     fold_color="ScriptFoldColor"
+                     gutter_color="ScriptGutterColor"
+                     highlight_color="ScriptHighlightColor"
+                     line_number_color="ScriptLineNumberColor"
+                     selection_color="ScriptSelectionColor"
+                     show_line_numbers="true"
+                     syntax_color_prefix="Script"
+                     text_color="ScriptText"
+                     text_readonly_color="ScriptText"
+                     follows="left|top|bottom"
+                     height="410"
+                     layout="topleft"
+                     left="12"
+                     name="template_lsl"
+                     syntax="lsl"
+                     tool_tip="The text a new LSL script starts with; if empty, the grid's default"
+                     top_pad="4"
+                     width="380" />
+            <code_editor
+                     bg_color="ScriptBackground"
+                     bg_focus_color="ScriptBackground"
+                     bg_readonly_color="ScriptBgReadOnlyColor"
+                     bracket_match_color="ScriptBracketMatchColor"
+                     changed_color="ScriptChangedColor"
+                     bracket_color_1="ScriptBracket1Color"
+                     bracket_color_2="ScriptBracket2Color"
+                     bracket_color_3="ScriptBracket3Color"
+                     current_line_color="ScriptCurrentLineColor"
+                     cursor_color="ScriptCursorColor"
+                     find_match_color="ScriptFindMatchColor"
+                     fold_color="ScriptFoldColor"
+                     gutter_color="ScriptGutterColor"
+                     highlight_color="ScriptHighlightColor"
+                     line_number_color="ScriptLineNumberColor"
+                     selection_color="ScriptSelectionColor"
+                     show_line_numbers="true"
+                     syntax_color_prefix="Script"
+                     text_color="ScriptText"
+                     text_readonly_color="ScriptText"
+                     follows="left|top|right|bottom"
+                     height="410"
+                     layout="topleft"
+                     left="412"
+                     name="template_slua"
+                     syntax="slua"
+                     tool_tip="The text a new SLua script starts with; if empty, the grid's default"
+                     top_delta="0"
+                     width="380" />
+        </panel>
+        <panel
+         follows="all"
+         height="478"
+         label="LSL to SLua"
+         layout="topleft"
+         name="convert_tab"
+         width="804">
+            <text
+             follows="left|top|right"
+             height="32"
+             layout="topleft"
+             left="12"
+             name="convert_note"
+             top="12"
+             width="780"
+             wrap="true">
+                How Code &gt; Convert to SLua writes an LSL script. Each choice changes only what means exactly what the LSL did; what it leaves as LSL had it is noted, with SLua's way.
+            </text>
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="convert_preset_label"
+             top_pad="10"
+             width="70">
+                Write it:
+            </text>
+            <combo_box
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="convert_preset"
+             tool_tip="SLua's own ways, as far as each means what the LSL did; or as close to LSL as SLua lets it be, with llcompat and the timer event"
+             top_delta="-3"
+             width="220">
+                <combo_box.item label="In SLua's own ways" name="convert_modern" value="modern" />
+                <combo_box.item label="As close to LSL as it can be" name="convert_close" value="close" />
+                <combo_box.item label="As chosen below" name="convert_custom" value="custom" />
+            </combo_box>
+            <check_box
+             control_name="ALScriptConvertLLTimers"
+             follows="left|top"
+             height="20"
+             label="Timers on LLTimers"
+             layout="topleft"
+             left="12"
+             name="convert_timers"
+             tool_tip="llSetTimerEvent's timer runs on LLTimers, calling the timer handler of the state the script is in. Off: the timer event, set going by llcompat.SetTimerEvent."
+             top_pad="10"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertDetectedTable"
+             follows="left|top"
+             height="20"
+             label="What was detected from the handler's table"
+             layout="topleft"
+             left="12"
+             name="convert_detected"
+             tool_tip="llDetectedKey(0) in a touch_start becomes detected[1]:getKey(). Off: llcompat.DetectedKey(0)."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertSLuaCalls"
+             follows="left|top"
+             height="20"
+             label="SLua's ll where it means the same as llcompat"
+             layout="topleft"
+             left="12"
+             name="convert_calls"
+             tool_tip="A boolean answer (if ll.SameGroup(id) then), a constant index moved on by one, and a find asked only whether it found, read against nil. Off: llcompat for all of them."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertIdioms"
+             follows="left|top"
+             height="20"
+             label="What SLua has in a call's stead"
+             layout="topleft"
+             left="12"
+             name="convert_idioms"
+             tool_tip="math, vector and quaternion's functions, ^, print, os.time and table.find, where they mean the same as the LSL call."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertUuidKeys"
+             follows="left|top"
+             height="20"
+             label="The script's keys as SLua's uuids"
+             layout="topleft"
+             left="12"
+             name="convert_uuid_keys"
+             tool_tip="local owner: uuid = ll.GetOwner(). Off: every key the script has held as text, as LSL held them -- local owner: string = tostring(ll.GetOwner()) -- so that a key given &quot;&quot;, or any other text, keeps it, compares with it and is sent on as it."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertHandlerFields"
+             follows="left|top"
+             height="20"
+             label="Handlers assigned to LLEvents' fields"
+             layout="topleft"
+             left="12"
+             name="convert_fields"
+             tool_tip="function LLEvents.touch_start(detected) ... end, as SLua's own scripts write one. SLua puts an assigned handler on as LLEvents:on does, beside any others, but only LLEvents:handlers finds it again for LLEvents:off. Off: LLEvents:on."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertTypes"
+             follows="left|top"
+             height="20"
+             label="Luau types on locals, parameters and returns"
+             layout="topleft"
+             left="12"
+             name="convert_types"
+             tool_tip="local count: number = 0, and function names(who: string): string, from LSL's types. Handlers the editor completes typed the same way: function LLEvents.on_rez(start_param: number)."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertKeyTextAny"
+             follows="left|top"
+             height="20"
+             label="Text given for a key written :: any, for the type checker"
+             layout="topleft"
+             left="12"
+             name="convert_key_text_any"
+             tool_tip="ll.Key2Name(name :: any): SLua's ll takes a key as text, as LSL's functions did, and the type checker asks for a uuid. Off: the text as it is, which the type checker marks for you to see to; uuid(x) stops the script on text that is no UUID, and touuid(x) gives nil for it."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertComments"
+             follows="left|top"
+             height="20"
+             label="A -- LSL: comment over each place the two languages differ"
+             layout="topleft"
+             left="12"
+             name="convert_comments"
+             tool_tip="Each place SLua means something else than LSL did, or has a way of its own, said over its line. Off: said only in Output."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertKeepComments"
+             follows="left|top"
+             height="20"
+             label="The script's own comments, each over what it stood over"
+             layout="topleft"
+             left="12"
+             name="convert_keep_comments"
+             tool_tip="// as --, and /* */ as --[[ ]], each over the global, function, handler or statement it stood over, after it where it was after it on its line, or at the end of what held it; rules of stars or slashes as dashes, and //* ... //*/ as ---[[ ... --]]. Off: the SLua has none of them."
+             top_pad="4"
+             width="700" />
+        </panel>
+        <panel
+         class="al_panel_script_keymap"
+         filename="panel_script_studio_keys.xml"
+         follows="all"
+         height="478"
+         label="Keys"
+         layout="topleft"
+         name="keys_tab"
+         width="804" />
+    </tab_container>
+    <button
+     follows="right|bottom"
+     height="22"
+     label="OK"
+     layout="topleft"
+     name="ok"
+     right="-8"
+     tool_tip="Keep your changes"
+     top_pad="6"
+     width="90" />
+    <button
+     follows="right|bottom"
+     height="22"
+     label="Cancel"
+     layout="topleft"
+     name="cancel"
+     right="-104"
+     tool_tip="Restore every color and setting to how it was when this window opened"
+     top_delta="0"
+     width="90" />
+</floater>

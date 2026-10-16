@@ -27,7 +27,6 @@
 #include "llviewerprecompiledheaders.h"
 
 #include <typeinfo>
-#include <random>
 #include <thread>
 
 #include "llinventorymodel.h"
@@ -5056,8 +5055,6 @@ LLPointer<LLInventoryValidationInfo> LLInventoryModel::validate() const
     }
 
     static LLCachedControl<bool> fake_system_folder_issues(gSavedSettings, "QAModeFakeSystemFolderIssues", false);
-    static std::default_random_engine e{};
-    static std::uniform_int_distribution<> distrib(0, 1);
     for (S32 ft=LLFolderType::FT_TEXTURE; ft<LLFolderType::FT_COUNT; ft++)
     {
         LLFolderType::EType folder_type = static_cast<LLFolderType::EType>(ft);
@@ -5072,8 +5069,8 @@ LLPointer<LLInventoryValidationInfo> LLInventoryModel::validate() const
         if (fake_system_folder_issues)
         {
             // Force all counts to be either 0 or 2, thus flagged as an error.
-            count_under_root = 2*distrib(e);
-            count_elsewhere = 2*distrib(e);
+            count_under_root = 2*ll_rand(2);
+            count_elsewhere = 2*ll_rand(2);
             validation_info->mFatalQADebugMode = true;
         }
         if (is_singleton)

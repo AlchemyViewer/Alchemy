@@ -46,6 +46,7 @@
 			<button label="Principais colidentes" label_selected="Lista dos maiores colidentes" name="Get Top Colliders" tool_tip="Gera a lista de objetos que estão experimentando as chamadas mais frequentes."/>
 			<button label="Principais scripts" label_selected="Lista dos scripts principais" name="Get Top Scripts" tool_tip="Gera a lista de objetos programados com a maior duração em tempo de execução."/>
 			<button label="Dados dos scripts" label_selected="Dados dos scripts" name="Scripts digest" tool_tip="Gera uma lista de todos os scripts e o número de ocorrências de cada um."/>
+			<panel.string name="no_target">(sem destino)</panel.string>
 		</panel>
 		<panel label="Requisição" name="request">
 			<text name="Destination:">Destino:</text>
@@ -63,6 +64,5 @@
 			<text name="Parameter:">Parametro:</text>
 			<button label="Fazer Requisição" label_selected="Fazer Requisição" name="Make Request"/>
 		</panel>
-		<panel.string name="no_target">(sem destino)</panel.string>
 	</tab_container>
 </floater>

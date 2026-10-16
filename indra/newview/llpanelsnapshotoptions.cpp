@@ -35,12 +35,13 @@
 /**
  * Provides several ways to save a snapshot.
  */
-class LLPanelSnapshotOptions
+class LLPanelSnapshotOptions final
 :   public LLPanel
 {
     LOG_CLASS(LLPanelSnapshotOptions);
 
 public:
+    AL_VIEW_TYPE(LLPanelSnapshotOptions, LLPanel);
     LLPanelSnapshotOptions();
     bool postBuild() override;
 
@@ -73,7 +74,7 @@ bool LLPanelSnapshotOptions::postBuild()
 
 void LLPanelSnapshotOptions::openPanel(const std::string& panel_name)
 {
-    LLSideTrayPanelContainer* parent = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+    LLSideTrayPanelContainer* parent = getParentAs<LLSideTrayPanelContainer>();
     if (!parent)
     {
         LL_WARNS() << "Cannot find panel container" << LL_ENDL;

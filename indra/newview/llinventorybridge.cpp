@@ -87,6 +87,9 @@
 
 #include "llenvironment.h"
 
+#include "alscriptstudio.h"
+#include "alscripttypes.h"
+
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1)
 #include "rlvactions.h"
 #include "rlvhandler.h"
@@ -456,7 +459,7 @@ void LLInvFVBridge::navigateToFolder(bool new_window, bool change_mode)
         }
         else
         {
-            LLInventorySingleFolderPanel* panel = dynamic_cast<LLInventorySingleFolderPanel*>(mInventoryPanel.get());
+            LLInventorySingleFolderPanel* panel = ALViewType::as<LLInventorySingleFolderPanel>(mInventoryPanel.get());
             if (!panel || !getInventoryModel() || mUUID.isNull())
             {
                 return;
@@ -738,7 +741,7 @@ void disable_context_entries_if_present(LLMenuGL& menu,
         std::string name = menu_item->getName();
 
         // descend into split menus:
-        LLMenuItemBranchGL* branchp = dynamic_cast<LLMenuItemBranchGL*>(menu_item);
+        LLMenuItemBranchGL* branchp = menu_item->as<LLMenuItemBranchGL>();
         if ((name == "More") && branchp)
         {
             disable_context_entries_if_present(*branchp->getBranch(), disabled_entries);
@@ -758,9 +761,9 @@ void disable_context_entries_if_present(LLMenuGL& menu,
         if (found)
         {
             menu_item->setVisible(true);
-            // A bit of a hack so we can remember that some UI element explicitly set this to be visible
-            // so that some other UI element from multi-select doesn't later set this invisible.
-            menu_item->pushVisible(true);
+            // Claim it, so a later pass over the same menu for another item in
+            // a multi-selection does not hide what this one showed.
+            LLMenuItemGL::claimContextEntry(menu_item);
 
             menu_item->setEnabled(false);
         }
@@ -784,7 +787,7 @@ void hide_context_entries(LLMenuGL& menu,
         std::string name = menu_item->getName();
 
         // descend into split menus:
-        LLMenuItemBranchGL* branchp = dynamic_cast<LLMenuItemBranchGL*>(menu_item);
+        LLMenuItemBranchGL* branchp = menu_item->as<LLMenuItemBranchGL>();
         if (((name == "More") || (name == "create_new")) && branchp)
         {
             hide_context_entries(*branchp->getBranch(), entries_to_show, disabled_entries);
@@ -802,14 +805,14 @@ void hide_context_entries(LLMenuGL& menu,
         // between two separators).
         if (found)
         {
-            const bool is_entry_separator = (dynamic_cast<LLMenuItemSeparatorGL *>(menu_item) != NULL);
+            const bool is_entry_separator = (menu_item->as<LLMenuItemSeparatorGL>() != NULL);
             found = !(is_entry_separator && is_previous_entry_separator);
             is_previous_entry_separator = is_entry_separator;
         }
 
         if (!found)
         {
-            if (!menu_item->getLastVisible())
+            if (!LLMenuItemGL::contextEntryClaimed(menu_item))
             {
                 menu_item->setVisible(false);
             }
@@ -833,9 +836,9 @@ void hide_context_entries(LLMenuGL& menu,
         else
         {
             menu_item->setVisible(true);
-            // A bit of a hack so we can remember that some UI element explicitly set this to be visible
-            // so that some other UI element from multi-select doesn't later set this invisible.
-            menu_item->pushVisible(true);
+            // Claim it, so a later pass over the same menu for another item in
+            // a multi-selection does not hide what this one showed.
+            LLMenuItemGL::claimContextEntry(menu_item);
 
             bool enabled = true;
             for (itor2 = disabled_entries.begin(); enabled && (itor2 != disabled_entries.end()); ++itor2)
@@ -1855,7 +1858,7 @@ void LLItemBridge::performAction(LLInventoryModel* model, std::string action)
         std::string buffer;
         asset_id.toString(buffer);
 
-        gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(buffer));
+        gViewerWindow->getWindow()->copyTextToClipboard(buffer);
         return;
     }
     else if ("copy_inventory_uuid" == action)
@@ -1867,7 +1870,7 @@ void LLItemBridge::performAction(LLInventoryModel* model, std::string action)
         std::string buffer;
         inventory_id.toString(buffer);
 
-        gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(buffer));
+        gViewerWindow->getWindow()->copyTextToClipboard(buffer);
         return;
     }
     else if ("show_in_main_panel" == action)
@@ -2005,7 +2008,7 @@ void copy_slurl_to_clipboard_callback_inv(const std::string& slurl)
         LLNotificationsUtil::add("LandmarkLocationUnknown");
         return;
     }
-    gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(slurl));
+    gViewerWindow->getWindow()->copyTextToClipboard(slurl);
     LLSD args;
     args["SLURL"] = slurl;
     LLNotificationsUtil::add("CopySLURL", args);
@@ -3631,7 +3634,7 @@ void LLFolderBridge::performAction(LLInventoryModel* model, std::string action)
 {
     if ("open" == action)
     {
-        LLFolderViewFolder *f = dynamic_cast<LLFolderViewFolder   *>(mInventoryPanel.get()->getItemByID(mUUID));
+        LLFolderViewFolder *f = mInventoryPanel.get()->getFolderByID(mUUID);
         if (f)
         {
             f->toggleOpen();
@@ -3872,7 +3875,7 @@ void LLFolderBridge::performAction(LLInventoryModel* model, std::string action)
     {
         LLInventoryCategory* cat = gInventory.getCategory(mUUID);
         if (!cat) return;
-        gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(mUUID.asString()));
+        gViewerWindow->getWindow()->copyTextToClipboard(mUUID.asString());
         return;
     }
 }
@@ -3925,7 +3928,7 @@ void LLFolderBridge::copyOutfitToClipboard()
         }
     }
 
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(text), 0, static_cast<S32>(text.size()));
+    LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
 }
 
 void LLFolderBridge::openItem()
@@ -8631,7 +8634,7 @@ public:
         LLViewerInventoryItem* item = getItem();
         if (item)
         {
-            LLFloaterReg::showInstance("preview_script", LLSD(mUUID), TAKE_FOCUS_YES);
+            ALScriptStudio::open(ALScriptRef(LLUUID::null, mUUID), item->getName());
         }
         LLInvFVBridgeAction::doIt();
     }

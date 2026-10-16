@@ -61,14 +61,16 @@ Ctrlキーを押しながら、メンバー名をクリックすることで複�
 			</panel.string>
 			<filter_editor label="メンバーをフィルタ" name="filter_input"/>
 			<name_list name="member_list">
-				<name_list.columns label="メンバー" name="name"/>
 				<name_list.columns label="寄付" name="donated"/>
 				<name_list.columns label="ステータス" name="online"/>
-				<name_list.columns label="タイトル" name="title"/>
 			</name_list>
 			<button label="新しい役割" name="role_create"/>
 			<button label="役割をコピー" name="role_copy"/>
 			<button label="役割を削除" name="role_delete"/>
+			<scroll_list name="role_list">
+				<name_list.columns label="タイトル" name="title"/>
+				<name_list.columns label="メンバー" name="name"/>
+			</scroll_list>
 		</panel>
 		<panel label="能力" name="actions_sub_tab" tool_tip="能力の説明と、その能力を実行できるロールとメンバーを表示できます。">
 			<panel.string name="help_text">
@@ -107,7 +109,6 @@ Ctrlキーを押しながら、メンバー名をクリックすることで複�
 		<text name="static">
 			割当られた役割
 		</text>
-		<scroll_list name="member_assigned_roles"/>
 		<text name="static2">
 			許可されたアクション
 		</text>

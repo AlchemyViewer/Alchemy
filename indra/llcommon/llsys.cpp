@@ -40,7 +40,7 @@
 #include "llevents.h"
 #include "llformat.h"
 #include "llmemory.h"
-#include "llregex.h"
+#include "alregex.h"
 #include "lltimer.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
@@ -48,7 +48,6 @@
 #include <boost/circular_buffer.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/range.hpp>
-#include "llfasttimer.h"
 
 using namespace llsd;
 
@@ -71,6 +70,7 @@ using namespace llsd;
 #   include <sys/types.h>
 #   include <mach/mach_init.h>
 #elif LL_LINUX
+#   include <cstdio>
 #   include <errno.h>
 #   include <sys/utsname.h>
 #   include <unistd.h>
@@ -91,6 +91,73 @@ static const F32 MEM_INFO_THROTTLE = 20;
 // If we only triggered FrameWatcher logging when the session framerate
 // dropped below the login framerate, we'd have very little additional data.
 static const F32 MEM_INFO_WINDOW = 10*60;
+
+#if LL_LINUX
+namespace
+{
+    // An os-release value, which is a shell word: bare, in single quotes
+    // taken literally, or in double quotes, where a backslash escapes $, `, "
+    // and \ and is kept before anything else. The format does not join
+    // quoted strings, so whatever follows the closing quote is dropped.
+    std::string os_release_value(std::string_view raw)
+    {
+        if (!raw.empty() && raw.front() == '\'')
+        {
+            raw.remove_prefix(1);
+            return std::string(raw.substr(0, raw.find('\'')));
+        }
+
+        const bool quoted = !raw.empty() && raw.front() == '"';
+        if (quoted)
+        {
+            raw.remove_prefix(1);
+        }
+        std::string value;
+        for (size_t i = 0; i < raw.size(); ++i)
+        {
+            const char c = raw[i];
+            if (quoted ? c == '"' : (c == ' ' || c == '\t'))
+            {
+                break;
+            }
+            if (c == '\\' && i + 1 < raw.size()
+                && (!quoted || std::string_view("$`\"\\").find(raw[i + 1]) != std::string_view::npos))
+            {
+                value += raw[++i];
+                continue;
+            }
+            value += c;
+        }
+        return value;
+    }
+
+    // The KEY=value lines of an os-release file. False when it can't be
+    // opened, which the spec treats as its not being there.
+    bool read_os_release(const char* path, std::map<std::string, std::string>& fields)
+    {
+        llifstream file(path);
+        if (!file.is_open())
+        {
+            return false;
+        }
+        std::string line;
+        while (std::getline(file, line))
+        {
+            const size_t equals = line.find('=');
+            if (equals == 0 || equals == std::string::npos || line.front() == '#')
+            {
+                continue;
+            }
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t'))
+            {
+                line.pop_back();
+            }
+            fields[line.substr(0, equals)] = os_release_value(std::string_view(line).substr(equals + 1));
+        }
+        return true;
+    }
+}
+#endif
 
 LLOSInfo::LLOSInfo() :
     mMajorVer(0), mMinorVer(0), mBuild(0), mOSVersionString("")
@@ -308,98 +375,91 @@ LLOSInfo::LLOSInfo() :
 
 #elif LL_LINUX
 
+    // The distribution names the system, from its os-release: the host's,
+    // which a Flatpak or other container shows at /run/host/os-release while
+    // its own /etc/os-release is the runtime's, else /etc/os-release, else
+    // /usr/lib/os-release, which the spec has /etc fall back to. A
+    // PRETTY_NAME without the version, as a rolling release's often is, gets
+    // VERSION_ID, or BUILD_ID where there is none.
+    std::map<std::string, std::string> os_release;
+    const char* os_release_path = nullptr;
+    for (const char* path : { "/run/host/os-release", "/etc/os-release", "/usr/lib/os-release" })
+    {
+        if (read_os_release(path, os_release))
+        {
+            os_release_path = path;
+            break;
+        }
+    }
+    std::string distro = os_release["PRETTY_NAME"];
+    if (distro.empty())
+    {
+        distro = !os_release["NAME"].empty() ? os_release["NAME"] : os_release["ID"];
+    }
+    const std::string& version = !os_release["VERSION_ID"].empty() ? os_release["VERSION_ID"] : os_release["BUILD_ID"];
+    if (!distro.empty() && !version.empty() && distro.find(version) == std::string::npos)
+    {
+        distro += " " + version;
+    }
+
+    // The kernel release follows it in the full string, the way Windows' build
+    // number does. Where no os-release names the distribution, the kernel's
+    // major and minor version are the simple string.
+    std::string kernel;
+    std::string kernel_simple;
     struct utsname un;
-    if(uname(&un) != -1)
+    if (uname(&un) != -1)
     {
-        mOSStringSimple.append(un.sysname);
-        mOSStringSimple.append(" ");
-        mOSStringSimple.append(un.release);
-
-        mOSString = mOSStringSimple;
-        mOSString.append(" ");
-        mOSString.append(un.version);
-        mOSString.append(" ");
-        mOSString.append(un.machine);
-
-        // Simplify 'Simple'
-        std::string ostype = mOSStringSimple.substr(0, mOSStringSimple.find_first_of(" ", 0));
-        if (ostype == "Linux")
+        kernel = llformat("%s %s", un.sysname, un.release);
+        // Fedora's release names the machine already, Debian's doesn't
+        if (!strstr(un.release, un.machine))
         {
-            // Only care about major and minor Linux versions, truncate at second '.'
-            std::string::size_type idx1 = mOSStringSimple.find_first_of(".", 0);
-            std::string::size_type idx2 = (idx1 != std::string::npos) ? mOSStringSimple.find_first_of(".", idx1+1) : std::string::npos;
-            std::string simple = mOSStringSimple.substr(0, idx2);
-            if (simple.length() > 0)
-                mOSStringSimple = simple;
+            kernel += llformat(" %s", un.machine);
         }
+        S32 kernel_major = 0;
+        S32 kernel_minor = 0;
+        sscanf(un.release, "%d.%d", &kernel_major, &kernel_minor);
+        kernel_simple = llformat("%s %d.%d", un.sysname, kernel_major, kernel_minor);
+    }
+
+    if (!distro.empty())
+    {
+        mOSStringSimple = distro;
+        mOSString = kernel.empty() ? distro : distro + " (" + kernel + ")";
+    }
+    else if (!kernel.empty())
+    {
+        mOSStringSimple = kernel_simple;
+        mOSString = kernel;
     }
     else
     {
-        mOSStringSimple.append("Unable to collect OS info");
+        mOSStringSimple = "Unable to collect OS info";
         mOSString = mOSStringSimple;
     }
 
-    const char OS_VERSION_MATCH_EXPRESSION[] = "([0-9]+)\\.([0-9]+)(\\.([0-9]+))?";
-    boost::regex os_version_parse(OS_VERSION_MATCH_EXPRESSION);
-    boost::smatch matched;
-
-    std::string glibc_version(gnu_get_libc_version());
-    if ( ll_regex_match(glibc_version, matched, os_version_parse) )
+    if (!distro.empty())
     {
-        LL_INFOS("AppInit") << "Using glibc version '" << glibc_version << "' as OS version" << LL_ENDL;
-
-        std::string version_value;
-
-        if ( matched[1].matched ) // Major version
-        {
-            version_value.assign(matched[1].first, matched[1].second);
-            if (sscanf(version_value.c_str(), "%d", &mMajorVer) != 1)
-            {
-              LL_WARNS("AppInit") << "failed to parse major version '" << version_value << "' as a number" << LL_ENDL;
-            }
-        }
-        else
-        {
-            LL_ERRS("AppInit")
-                << "OS version regex '" << OS_VERSION_MATCH_EXPRESSION
-                << "' returned true, but major version [1] did not match"
-                << LL_ENDL;
-        }
-
-        if ( matched[2].matched ) // Minor version
-        {
-            version_value.assign(matched[2].first, matched[2].second);
-            if (sscanf(version_value.c_str(), "%d", &mMinorVer) != 1)
-            {
-              LL_ERRS("AppInit") << "failed to parse minor version '" << version_value << "' as a number" << LL_ENDL;
-            }
-        }
-        else
-        {
-            LL_ERRS("AppInit")
-                << "OS version regex '" << OS_VERSION_MATCH_EXPRESSION
-                << "' returned true, but minor version [1] did not match"
-                << LL_ENDL;
-        }
-
-        if ( matched[4].matched ) // Build version (optional) - note that [3] includes the '.'
-        {
-            version_value.assign(matched[4].first, matched[4].second);
-            if (sscanf(version_value.c_str(), "%d", &mBuild) != 1)
-            {
-              LL_ERRS("AppInit") << "failed to parse build version '" << version_value << "' as a number" << LL_ENDL;
-            }
-        }
-        else
-        {
-            LL_INFOS("AppInit")
-                << "OS build version not provided; using zero"
-                << LL_ENDL;
-        }
+        LL_INFOS("AppInit") << "Distribution '" << distro << "', ID '" << os_release["ID"]
+                            << "', from " << os_release_path << LL_ENDL;
     }
     else
     {
-        LL_WARNS("AppInit") << "glibc version '" << glibc_version << "' cannot be parsed to three numbers; using all zeros" << LL_ENDL;
+        LL_WARNS("AppInit") << "No os-release names the distribution" << LL_ENDL;
+    }
+
+    // The numeric version stays glibc's, which decides whether a Linux build
+    // runs here. The login's platform_version and the update query send it,
+    // and their servers may compare it.
+    const char* glibc_version = gnu_get_libc_version();
+    if (sscanf(glibc_version, "%d.%d.%d", &mMajorVer, &mMinorVer, &mBuild) >= 2)
+    {
+        LL_INFOS("AppInit") << "Using glibc version '" << glibc_version << "' as the OS version for update checks" << LL_ENDL;
+    }
+    else
+    {
+        mMajorVer = mMinorVer = mBuild = 0;
+        LL_WARNS("AppInit") << "glibc version '" << glibc_version << "' cannot be parsed to numbers; using all zeros" << LL_ENDL;
     }
 
 #else
@@ -579,6 +639,10 @@ LLCPUInfo::LLCPUInfo()
     mHasAVX = proc.hasAVX();
     mHasAVX2 = proc.hasAVX2();
     mHasAVX512F = proc.hasAVX512F();
+    mHasNEON = proc.hasNEON();
+    mHasNEONDotProd = proc.hasNEONDotProd();
+    mHasNEONFP16 = proc.hasNEONFP16();
+    mHasSVE = proc.hasSVE();
     mHasAltivec = proc.hasAltivec();
     mCPUMHz = (F64)proc.getCPUFrequency();
     mFamily = proc.getCPUFamilyName();
@@ -631,6 +695,22 @@ LLCPUInfo::LLCPUInfo()
     if (mHasAVX512F)
     {
         mSIMDVersions.append("AVX-512F");
+    }
+    if (mHasNEON)
+    {
+        mSIMDVersions.append("NEON");
+    }
+    if (mHasNEONDotProd)
+    {
+        mSIMDVersions.append("NEON DotProd");
+    }
+    if (mHasNEONFP16)
+    {
+        mSIMDVersions.append("NEON FP16");
+    }
+    if (mHasSVE)
+    {
+        mSIMDVersions.append("SVE");
     }
 }
 
@@ -687,6 +767,26 @@ bool LLCPUInfo::hasAVX2() const
 bool LLCPUInfo::hasAVX512F() const
 {
     return mHasAVX512F;
+}
+
+bool LLCPUInfo::hasNEON() const
+{
+    return mHasNEON;
+}
+
+bool LLCPUInfo::hasNEONDotProd() const
+{
+    return mHasNEONDotProd;
+}
+
+bool LLCPUInfo::hasNEONFP16() const
+{
+    return mHasNEONFP16;
+}
+
+bool LLCPUInfo::hasSVE() const
+{
+    return mHasSVE;
 }
 
 F64 LLCPUInfo::getMHz() const
@@ -805,23 +905,28 @@ U32Kilobytes LLMemoryInfo::getHardwareMemSize()
 
 U32Kilobytes LLMemoryInfo::getPhysicalMemoryKB() const
 {
+    // Installed RAM does not change while we are running, so pay for it once.
+    static const U32Kilobytes sPhysicalMemoryKB = []
+    {
 #if LL_WINDOWS
-    MEMORYSTATUSEX state = {};
-    state.dwLength = sizeof(state);
-    GlobalMemoryStatusEx(&state);
-    return LLMemoryAdjustKBResult(U64Bytes(state.ullTotalPhys));
+        MEMORYSTATUSEX state = {};
+        state.dwLength = sizeof(state);
+        GlobalMemoryStatusEx(&state);
+        return LLMemoryAdjustKBResult(U64Bytes(state.ullTotalPhys));
 #elif LL_DARWIN
-    return getHardwareMemSize();
+        return getHardwareMemSize();
 
 #elif LL_LINUX
-    U64 phys = 0;
-    phys = (U64)(getpagesize()) * (U64)(get_phys_pages());
-    return U64Bytes(phys);
+        U64 phys = (U64)(getpagesize()) * (U64)(get_phys_pages());
+        return U32Kilobytes::convert(U64Bytes(phys));
 
 #else
-    return 0;
+        return U32Kilobytes(0);
 
 #endif
+    }();
+
+    return sPhysicalMemoryKB;
 }
 
 //static
@@ -829,9 +934,36 @@ void LLMemoryInfo::updateAvailableMemory()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
 #if LL_WINDOWS
-    // On windows loadStatsMap will fill sAvailPhysicalMemInKB,
-    // sAvailCommitMemInMB, sAllocatedMemInKB and sAllocatedPageSizeInKB
-    loadStatsMap();
+    MEMORYSTATUSEX state = {};
+    state.dwLength = sizeof(state);
+    if (GlobalMemoryStatusEx(&state))
+    {
+        LLMemory::sAvailPhysicalMemInKB = U32Kilobytes::convert(U64Bytes(state.ullAvailPhys));
+
+        // Despite the confusing naming "PageFile", this is the committed memory
+        // limit for the system or the current process, whichever is smaller.
+        LLMemory::sAvailCommitMemInMB = U32Megabytes::convert(U64Bytes(state.ullAvailPageFile));
+    }
+    else
+    {
+        // no figure is better than stack garbage read as one
+        LLMemory::sAvailPhysicalMemInKB = U32Kilobytes(U32_MAX);
+        LLMemory::sAvailCommitMemInMB = U32Megabytes(U32_MAX);
+    }
+
+    PROCESS_MEMORY_COUNTERS_EX pmem;
+    pmem.cb = sizeof(pmem);
+    // See loadStatsMap() for why this pointer is cast.
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmem, sizeof(pmem)))
+    {
+        LLMemory::sAllocatedMemInKB = U32Kilobytes::convert(U64Bytes(pmem.WorkingSetSize));
+        LLMemory::sAllocatedPageSizeInKB = U32Kilobytes::convert(U64Bytes(pmem.PagefileUsage));
+    }
+    else
+    {
+        LLMemory::sAllocatedMemInKB = U32Kilobytes(0);
+        LLMemory::sAllocatedPageSizeInKB = U32Kilobytes(0);
+    }
 
 #elif LL_DARWIN
     // use host_statistics64 to get memory info
@@ -851,8 +983,27 @@ void LLMemoryInfo::updateAvailableMemory()
     }
 
 #elif LL_LINUX
-    U64 phys = U64(getpagesize()) * U64(get_avphys_pages());
-    LLMemory::sAvailPhysicalMemInKB = U64Bytes(phys);
+    // MemAvailable is the kernel's own estimate of what can be had without
+    // swapping, page cache included. The free page count leaves the cache
+    // out, and reads as scarcity on any desktop that has been up for an hour.
+    unsigned long long avail_kb = 0;
+    if (FILE* meminfo = fopen("/proc/meminfo", "r"))
+    {
+        char line[128];
+        while (fgets(line, sizeof(line), meminfo))
+        {
+            if (sscanf(line, "MemAvailable: %llu kB", &avail_kb) == 1)
+            {
+                break;
+            }
+        }
+        fclose(meminfo);
+    }
+    if (avail_kb == 0)
+    {
+        avail_kb = (unsigned long long)getpagesize() * (unsigned long long)get_avphys_pages() / 1024ULL;
+    }
+    LLMemory::sAvailPhysicalMemInKB = U32Kilobytes((U32)llmin(avail_kb, (unsigned long long)U32_MAX - 1));
 #else
     //do not know how to collect available memory info for other systems.
     //leave it blank here for now.
@@ -944,9 +1095,6 @@ LLSD LLMemoryInfo::loadStatsMap()
     stats.add("Total Virtual MB", state.ullTotalVirtual/mb_div);  // ~134 million MB
     stats.add("Avail Virtual MB", state.ullAvailVirtual/mb_div);
 
-    LLMemory::sAvailPhysicalMemInKB = U32Kilobytes::convert(U64Bytes(state.ullAvailPhys));
-    LLMemory::sAvailCommitMemInMB = U32Megabytes::convert(U64Bytes(state.ullAvailPageFile));
-
     // SL-12122 - Call to GetPerformanceInfo() was removed here. Took
     // on order of 10 ms, causing unacceptable frame time spike every
     // second, and results were never used. If this is needed in the
@@ -963,9 +1111,6 @@ LLSD LLMemoryInfo::loadStatsMap()
     // pointer.
     if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmem, sizeof(pmem)))
     {
-        LLMemory::sAllocatedMemInKB = U32Kilobytes::convert(U64Bytes(pmem.WorkingSetSize));
-        LLMemory::sAllocatedPageSizeInKB = U32Kilobytes::convert(U64Bytes(pmem.PagefileUsage));
-
         stats.add("Page Fault Count", pmem.PageFaultCount);
         stats.add("PeakWorkingSetSize KB", pmem.PeakWorkingSetSize / div);
         stats.add("WorkingSetSize KB", pmem.WorkingSetSize / div);
@@ -979,9 +1124,6 @@ LLSD LLMemoryInfo::loadStatsMap()
     }
     else
     {
-        LLMemory::sAllocatedMemInKB = U32Kilobytes(0);
-        LLMemory::sAllocatedPageSizeInKB = U32Kilobytes(0);
-
         stats.add("Page Fault Count", 0);
         stats.add("PeakWorkingSetSize KB", 0);
         stats.add("WorkingSetSize KB", 0);
@@ -1104,22 +1246,21 @@ LLSD LLMemoryInfo::loadStatsMap()
         // DirectMap4k:      434168 kB
         // DirectMap2M:      477184 kB
 
-        // Intentionally don't pass the boost::no_except flag. This
-        // boost::regex object is constructed with a string literal, so it
-        // should be valid every time. If it becomes invalid, we WANT an
-        // exception, hopefully even before the dev checks in.
-        boost::regex stat_rx("(.+): +([0-9]+)( kB)?");
-        boost::smatch matched;
+        // The pattern is a literal, so it compiles every time; if it ever
+        // does not, we want to hear of it before the dev checks in.
+        static const ALRegex stat_rx("(.+): +([0-9]+)( kB)?");
+        llassert(stat_rx.ok());
+        ALRegexMatch matched;
 
         std::string line;
         while (std::getline(meminfo, line))
         {
             LL_DEBUGS("LLMemoryInfo") << line << LL_ENDL;
-            if (ll_regex_match(line, matched, stat_rx))
+            if (stat_rx.match(line, &matched))
             {
                 // e.g. "MemTotal:      4108424 kB"
-                LLSD::String key(matched[1].first, matched[1].second);
-                LLSD::String value_str(matched[2].first, matched[2].second);
+                LLSD::String key = matched.str(1);
+                LLSD::String value_str = matched.str(2);
                 LLSD::Integer value(0);
                 S64 intval = 0;
                 try
@@ -1201,7 +1342,7 @@ public:
 
     bool tick(const LLSD&)
     {
-        F32 timestamp(mTimer.getElapsedTimeF32());
+        const F64 timestamp(mTimer.getElapsedTimeF64());
 
         // Count this frame in the interval just completed.
         ++mFrames;
@@ -1216,7 +1357,7 @@ public:
         // Set up for next sample window. Capture values for previous frame in
         // local variables and reset data members.
         U32 frames(mFrames);
-        F32 sampleStart(mSampleStart);
+        const F64 sampleStart(mSampleStart);
         // No frames yet in next window
         mFrames = 0;
         // which starts right now
@@ -1234,7 +1375,7 @@ public:
         // How long did this actually take? As framerate slows, the duration
         // of the frame we just finished could push us WELL beyond our desired
         // sample window size.
-        F32 elapsed(timestamp - sampleStart);
+        const F32 elapsed((F32)(timestamp - sampleStart));
         F32 framerate(frames/elapsed);
 
         // Remember previous slowest framerate because we're just about to
@@ -1304,8 +1445,8 @@ private:
     // can get from LLTimer. Unfortunately the LLTimer API is missing the
     // feature we need: has at least the stated interval elapsed, and if so,
     // exactly how long has passed? So we have to do it by hand, sigh.
-    // Time at start, end of sample window
-    F32 mSampleStart, mSampleEnd;
+    // Time at start, end of sample window, in F64: the timer runs all session
+    F64 mSampleStart, mSampleEnd;
     // Frames this sample window
     U32 mFrames;
     // Sliding window of framerate samples

@@ -28,6 +28,7 @@
 
 #include "llrender.h"
 
+#include "algpubuffer.h"
 #include "alsamplerstate.h"
 #include "llvertexbuffer.h"
 #include "llcubemap.h"
@@ -37,10 +38,11 @@
 #include "lltexture.h"
 #include "llshadermgr.h"
 #include "hbxxh.h"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/gtc/matrix_inverse.hpp" // glm::affineInverse
-#include "glm/ext/matrix_clip_space.hpp" // glm::perspective / glm::ortho
-#include "glm/ext/matrix_projection.hpp" // glm::project(ZO) / glm::unProject(ZO)
+#include "alprojection.h"
+#include "llcamera.h"
+#include "llthread.h"
+
+#include <algorithm>
 
 #if GL_ARB_debug_output
 #ifndef APIENTRY
@@ -96,22 +98,14 @@ namespace
 }
 #endif // !LL_RELEASE_FOR_DOWNLOAD
 
-// Handy copies of last good GL matrices
-F32 gGLModelView[16];
-F32 gGLLastModelView[16];
-F32 gGLLastProjection[16];
-F32 gGLProjection[16];
-
-// transform from last frame's camera space to this frame's camera space (and inverse)
-glm::mat4 gGLDeltaModelView;
-glm::mat4 gGLInverseDeltaModelView;
-
 S32 gGLViewport[4];
 
 
 U32 LLRender::sUICalls = 0;
 U32 LLRender::sUIVerts = 0;
-U32 ALTextureSlot::sWhiteTexture = 0;
+U32 LLRender::sDrawCalls = 0;
+U64 LLRender::sDrawElements = 0;
+std::atomic<U32> ALTextureSlot::sWhiteTexture = 0;
 F32 LLRender::sAnisotropicFilteringLevel = 0.f;
 bool LLRender::sGLCoreProfile = false;
 bool LLRender::sNsightDebugSupport = false;
@@ -119,6 +113,7 @@ LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
 bool LLRender::sClassicMode = false;
 bool LLRender::sMirrorPass = false;
 bool LLRender::sReverseZ = false;
+bool LLRender::sCompute = false;
 bool LLRender::sGBufferNormHDR = true;
 bool LLRender::s10bitBackBuffer = false;
 
@@ -243,10 +238,13 @@ void LLLightState::setPosition(const LLVector4& position)
     //always set position because modelview matrix may have changed
     ++gGL.mLightHash;
     mPosition = position;
-    //transform position by current modelview matrix
-    glm::vec4 pos(position);
-    pos = gGL.getModelviewMatrix() * pos;
-    mPosition.set(glm::value_ptr(pos));
+    //transform position by current modelview matrix; w rides along, so a
+    //directional light's zero stays zero
+    LLVector4a pos;
+    pos.loadua(position.mV);
+    LLVector4a eye;
+    gGL.getModelviewMatrix().transform4(pos, eye);
+    mPosition.set(eye.getF32ptr());
 }
 
 void LLLightState::setConstantAttenuation(const F32& atten)
@@ -300,11 +298,11 @@ void LLLightState::setSpotDirection(const LLVector3& direction)
     ++gGL.mLightHash;
 
     //transform direction by current modelview matrix
-    glm::vec3 dir(direction);
-    const glm::mat3 mat(gGL.getModelviewMatrix());
-    dir = mat * dir;
-
-    mSpotDirection.set(glm::value_ptr(dir));
+    LLVector4a dir;
+    dir.load3(direction.mV);
+    LLVector4a eye;
+    gGL.getModelviewMatrix().rotate(dir, eye);
+    mSpotDirection.set(eye.getF32ptr());
 }
 
 LLRender::LLRender()
@@ -316,6 +314,11 @@ LLRender::LLRender()
     for (U32 i = 0; i < AL_NUM_TEXTURE_SLOTS; i++)
     {
         mTextureSlots[i].mIndex = i;
+    }
+
+    for (U32 i = 0; i < AL_NUM_IMAGE_SLOTS; ++i)
+    {
+        mImageSlots[i].mIndex = i;
     }
 
     for (U32 i = 0; i < LL_NUM_LIGHT_UNITS; ++i)
@@ -339,12 +342,15 @@ LLRender::LLRender()
     {
         for (U32 j = 0; j < LL_MATRIX_STACK_DEPTH; ++j)
         {
-            mMatrix[i][j] = glm::identity<glm::mat4>();
+            mMatrix[i][j].setIdentity();
         }
         mMatIdx[i] = 0;
         mMatHash[i] = 0;
         mCurMatHash[i] = 0xFFFFFFFF;
     }
+    mCachedInvMdv.setIdentity();
+    mCachedInvProj.setIdentity();
+    mCachedMVP.setIdentity();
 
     mLightHash = 0;
 }
@@ -356,12 +362,23 @@ LLRender::~LLRender()
 
 bool LLRender::init(bool needs_vertex_buffer)
 {
+    // LLGLState's map describes the main context. A worker thread's shared context keeps its
+    // own caps, and the map is not the worker's to write.
+    const bool main_context = on_main_thread();
+
 #if GL_ARB_debug_output && !LL_DARWIN
     if (gGLManager.mHasDebugOutput && gDebugGL)
     { //setup debug output callback
         //glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW_ARB, 0, NULL, GL_TRUE);
         glDebugMessageCallback((GLDEBUGPROC) gl_debug_callback, NULL);
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    }
+    if (main_context && gGLManager.mHasDebugOutput)
+    {
+        // Both caps are set raw: above, by a debug context's default, or by whoever made the
+        // context before this ran. They are read back rather than assumed.
+        LLGLState::seedState(GL_DEBUG_OUTPUT, glIsEnabled(GL_DEBUG_OUTPUT));
+        LLGLState::seedState(GL_DEBUG_OUTPUT_SYNCHRONOUS, glIsEnabled(GL_DEBUG_OUTPUT_SYNCHRONOUS));
     }
 #endif
 
@@ -371,6 +388,58 @@ bool LLRender::init(bool needs_vertex_buffer)
     // Fresh context: nothing is bound at UB_LIGHTS/UB_MATRICES yet, whatever a previous one had.
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
+
+    // Nor on any texture unit, and unit 0 is the active one. gGL is thread_local and outlives
+    // a context -- the GL tests make one per test -- and a fresh context hands out the same
+    // first texture names as the last one did, so a slot still caching its namesake would
+    // take the new texture for bound already and skip the bind; an active-unit index left at
+    // 3 would skip the glActiveTexture a slot-3 bind needs, and bind on unit 0 instead.
+    for (ALTextureSlot& slot : mTextureSlots)
+    {
+        slot.mCurrTexture = 0;
+        slot.mCurrTexType = ALTextureSlot::TT_NONE;
+        slot.mCurrSampler = 0;
+    }
+    mCurrTextureUnitIndex = 0;
+
+    // The same for the image units and the indirect and storage buffer bindings, which a fresh context holds at 0.
+    for (ALImageSlot& slot : mImageSlots)
+    {
+        slot.reset();
+    }
+    mDrawIndirectBuffer     = 0;
+    mDispatchIndirectBuffer = 0;
+    mStorageBindings.fill(StorageBinding());
+
+    // Nor is the last context's blending or colour mask: GL starts every context writing all
+    // four channels and blending ONE, ZERO. The mask cache takes that default. The blend
+    // factors go to unknown, so the BT_ALPHA below is issued rather than skipped for
+    // matching what the previous context was left with.
+    for (bool& write : mCurrColorMask)
+    {
+        write = true;
+    }
+    mCurrBlendColorSFactor = BF_UNDEF;
+    mCurrBlendAlphaSFactor = BF_UNDEF;
+    mCurrBlendColorDFactor = BF_UNDEF;
+    mCurrBlendAlphaDFactor = BF_UNDEF;
+
+    // The same for the rest of what the setters cache, at GL's initial values: a line
+    // width of 1, no polygon offset, three vertices a patch.
+    mLineWidth           = 1.f;
+    mPolygonOffsetFactor = 0.f;
+    mPolygonOffsetUnits  = 0.f;
+    mPatchVertices       = 3;
+
+    // The clear colour is issued rather than assumed: a window may have cleared to a colour of
+    // its own before this ran. The scissor box GL starts at is the size of the window the
+    // context was made for, which nothing here knows, so it stays unknown until set.
+    mClearColor = LLColor4(0.f, 0.f, 0.f, 0.f);
+    glClearColor(0.f, 0.f, 0.f, 0.f);
+    mScissor[0] = 0;
+    mScissor[1] = 0;
+    mScissor[2] = -1;
+    mScissor[3] = -1;
 
     // Build this context's sampler objects before anything can ask for one.
     mSamplerCache.warmup();
@@ -383,6 +452,10 @@ bool LLRender::init(bool needs_vertex_buffer)
 
     // necessary for reflection maps
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    if (main_context)
+    {
+        LLGLState::seedState(GL_TEXTURE_CUBE_MAP_SEAMLESS, GL_TRUE);
+    }
 
 #if LL_WINDOWS
     if (glGenVertexArrays == nullptr)
@@ -464,6 +537,15 @@ void LLRender::shutdown()
         mMatricesUBOHash[i] = 0xFFFFFFFFu;
     }
     mMatricesUBOBound = false;
+
+    // Its queries and fences, which it deletes only while the context is up.
+    mQueries.release();
+}
+
+void LLRender::endFrame()
+{
+    mQueries.endFrame();
+    ALUniformBuffer::endFrame();
 }
 
 void LLRender::clearSamplers()
@@ -487,7 +569,7 @@ void LLRender::refreshState(void)
     mDirty = true;
 
     // Called when GL state may have been changed behind our back, so re-assert the shared
-    // blocks' bindings along with the texture units and colour mask.
+    // blocks' bindings along with the texture units and the state the setters cache.
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
 
@@ -500,11 +582,52 @@ void LLRender::refreshState(void)
 
     mTextureSlots[active_unit].activate();
 
-    setColorMask(mCurrColorMask[0], mCurrColorMask[1], mCurrColorMask[2], mCurrColorMask[3]);
+    for (ALImageSlot& slot : mImageSlots)
+    {
+        slot.refreshState();
+    }
 
-    // Unconditional re-issue: setPolygonOffset would see the cache already agreeing with the
-    // requested value and skip the GL call, leaving the fresh context at its 0,0 default.
+    // Whatever is bound there now is not known; the next indirect draw or dispatch binds its own buffer.
+    mDrawIndirectBuffer     = UNKNOWN_BUFFER;
+    mDispatchIndirectBuffer = UNKNOWN_BUFFER;
+
+    // A storage point is bound once for the programs after it, so what each held goes back.
+    for (U32 binding = 0; binding < AL_NUM_STORAGE_BINDINGS; ++binding)
+    {
+        issueStorageBinding(binding);
+    }
+
+    // The cached state below is issued straight to GL: each setter would see its cache
+    // agreeing with the value asked for and skip the call.
+    glColorMask(mCurrColorMask[0] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[1] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[2] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[3] ? GL_TRUE : GL_FALSE);
+
+    // Blend factors still unknown since init have nothing to put back.
+    if (mCurrBlendColorSFactor != BF_UNDEF && mCurrBlendColorDFactor != BF_UNDEF &&
+        mCurrBlendAlphaSFactor != BF_UNDEF && mCurrBlendAlphaDFactor != BF_UNDEF)
+    {
+        glBlendFuncSeparate(sGLBlendFactor[mCurrBlendColorSFactor], sGLBlendFactor[mCurrBlendColorDFactor],
+                            sGLBlendFactor[mCurrBlendAlphaSFactor], sGLBlendFactor[mCurrBlendAlphaDFactor]);
+    }
+
+    glLineWidth(mLineWidth);
+
+    // Loaded only on a context with tessellation, the one that has a patch size.
+    if (glPatchParameteri)
+    {
+        glPatchParameteri(GL_PATCH_VERTICES, mPatchVertices);
+    }
+
     rebasePolygonOffset();
+
+    // The same for the clear colour and a scissor box that was ever set.
+    glClearColor(mClearColor.mV[VRED], mClearColor.mV[VGREEN], mClearColor.mV[VBLUE], mClearColor.mV[VALPHA]);
+    if (mScissor[2] >= 0)
+    {
+        glScissor(mScissor[0], mScissor[1], mScissor[2], mScissor[3]);
+    }
 
     flush();
 
@@ -608,41 +731,41 @@ void LLRender::packMatricesUBO()
 
     static_assert(sizeof(MatricesUBOData) == 368, "MatricesUBOData must match std140 (368 bytes)");
 
-    const glm::mat4& mdv  = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
-    const glm::mat4& proj = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
-    const glm::mat4& tex  = mMatrix[MM_TEXTURE0][mMatIdx[MM_TEXTURE0]];
+    const LLMatrix4a& mdv  = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
+    const LLMatrix4a& proj = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
+    const LLMatrix4a& tex  = mMatrix[MM_TEXTURE0][mMatIdx[MM_TEXTURE0]];
 
     const bool mdv_moved  = mMatHash[MM_MODELVIEW]  != mMatricesUBOHash[MM_MODELVIEW];
     const bool proj_moved = mMatHash[MM_PROJECTION] != mMatricesUBOHash[MM_PROJECTION];
 
     if (mdv_moved)
     {
-        // The modelview is affine (view * model, no perspective), so affineInverse is exact
-        // and much cheaper than a general 4x4 inverse.
-        mCachedInvMdv = glm::affineInverse(mdv);
+        // The modelview is affine (view * model, no perspective), so the affine inverse is
+        // exact and much cheaper than a general 4x4 inverse.
+        mCachedInvMdv.setAffineInverse(mdv);
     }
     if (proj_moved)
     {
         // Projection is not affine -- general inverse required.
-        mCachedInvProj = glm::inverse(proj);
+        mCachedInvProj.setInverse(proj);
     }
     if (mdv_moved || proj_moved)
     {
-        mCachedMVP = proj * mdv;
+        // the modelview first, then the projection
+        mCachedMVP.setMul(mdv, proj);
     }
 
     MatricesUBOData d;
-    memcpy(d.modelview,            glm::value_ptr(mdv),           sizeof(d.modelview));
-    memcpy(d.projection,           glm::value_ptr(proj),          sizeof(d.projection));
-    memcpy(d.modelview_projection, glm::value_ptr(mCachedMVP),    sizeof(d.modelview_projection));
-    memcpy(d.inv_proj,             glm::value_ptr(mCachedInvProj), sizeof(d.inv_proj));
-    memcpy(d.texture0,             glm::value_ptr(tex),           sizeof(d.texture0));
+    memcpy(d.modelview,            mdv.getF32ptr(),            sizeof(d.modelview));
+    memcpy(d.projection,           proj.getF32ptr(),           sizeof(d.projection));
+    memcpy(d.modelview_projection, mCachedMVP.getF32ptr(),     sizeof(d.modelview_projection));
+    memcpy(d.inv_proj,             mCachedInvProj.getF32ptr(), sizeof(d.inv_proj));
+    memcpy(d.texture0,             tex.getF32ptr(),            sizeof(d.texture0));
 
-    // normal_matrix is the upper 3x3 of transpose(inv(modelview)). Column c of that transpose
-    // is row c of the inverse, and glm stores columns contiguously -- so element k of column c
-    // is the inverse's (row c, column k), i.e. value_ptr(inv)[4*k + c]. This reproduces exactly
-    // the nine floats the loose uniformMatrix3fv used to upload.
-    const F32* inv = glm::value_ptr(mCachedInvMdv);
+    // normal_matrix is the upper 3x3 of the inverse modelview transposed: column c of the
+    // block is lane c of the inverse's first three rows, i.e. inv[4*k + c] for k = 0..2.
+    // This reproduces exactly the nine floats the loose uniformMatrix3fv used to upload.
+    const F32* inv = mCachedInvMdv.getF32ptr();
     for (U32 c = 0; c < 3; ++c)
     {
         d.normal[c][0] = inv[0 * 4 + c];
@@ -725,7 +848,9 @@ void LLRender::translatef(const GLfloat& x, const GLfloat& y, const GLfloat& z)
     flush();
 
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::translate(mMatrix[mMatrixMode][mMatIdx[mMatrixMode]], glm::vec3(x, y, z));
+        // the translation applies first: T then the stack's matrix
+        LLMatrix4a& m = mMatrix[mMatrixMode][mMatIdx[mMatrixMode]];
+        m.setMul(LLMatrix4a::translation(x, y, z), m);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -735,7 +860,8 @@ void LLRender::scalef(const GLfloat& x, const GLfloat& y, const GLfloat& z)
     flush();
 
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::scale(mMatrix[mMatrixMode][mMatIdx[mMatrixMode]], glm::vec3(x, y, z));
+        LLMatrix4a& m = mMatrix[mMatrixMode][mMatIdx[mMatrixMode]];
+        m.setMul(LLMatrix4a::scaling(x, y, z), m);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -747,8 +873,9 @@ void LLRender::ortho(F32 left, F32 right, F32 bottom, F32 top, F32 zNear, F32 zF
     {
         // al_ortho emits reversed-ZO under reverse-Z (mapping legacy z in [-1,1] fully
         // inside the [0,1] clip volume, so 2D/UI content at z in [-1,0) is not clipped),
-        // and plain glm::ortho otherwise. Converts all gGL.ortho() callers at once.
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] *= al_ortho(left, right, bottom, top, zNear, zFar);
+        // and the plain ortho otherwise. Converts all gGL.ortho() callers at once.
+        LLMatrix4a& m = mMatrix[mMatrixMode][mMatIdx[mMatrixMode]];
+        m.setMul(al_ortho(left, right, bottom, top, zNear, zFar), m);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -758,7 +885,8 @@ void LLRender::rotatef(const GLfloat& a, const GLfloat& x, const GLfloat& y, con
     flush();
 
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::rotate(mMatrix[mMatrixMode][mMatIdx[mMatrixMode]], glm::radians(a), glm::vec3(x,y,z));
+        LLMatrix4a& m = mMatrix[mMatrixMode][mMatIdx[mMatrixMode]];
+        m.setMul(LLMatrix4a::rotation(a * DEG_TO_RAD, LLVector4a(x, y, z)), m);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -798,18 +926,34 @@ void LLRender::popMatrix()
 
 void LLRender::loadMatrix(const GLfloat* m)
 {
+    LLMatrix4a loaded;
+    loaded.loadu(m);
+    loadMatrix(loaded);
+}
+
+void LLRender::loadMatrix(const LLMatrix4a& m)
+{
     flush();
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::make_mat4((GLfloat*) m);
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = m;
         mMatHash[mMatrixMode]++;
     }
 }
 
 void LLRender::multMatrix(const GLfloat* m)
 {
+    LLMatrix4a factor;
+    factor.loadu(m);
+    multMatrix(factor);
+}
+
+void LLRender::multMatrix(const LLMatrix4a& m)
+{
     flush();
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] *= glm::make_mat4(m);
+        // the new matrix applies first, then what the stack held
+        LLMatrix4a& top = mMatrix[mMatrixMode][mMatIdx[mMatrixMode]];
+        top.setMul(m, top);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -832,17 +976,17 @@ void LLRender::loadIdentity()
     {
         llassert_always(mMatrixMode < NUM_MATRIX_MODES) ;
 
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::identity<glm::mat4>();
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]].setIdentity();
         mMatHash[mMatrixMode]++;
     }
 }
 
-const glm::mat4& LLRender::getModelviewMatrix()
+const LLMatrix4a& LLRender::getModelviewMatrix()
 {
     return mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
 }
 
-const glm::mat4& LLRender::getProjectionMatrix()
+const LLMatrix4a& LLRender::getProjectionMatrix()
 {
     return mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
 }
@@ -937,13 +1081,13 @@ void LLRender::setColorMask(bool writeColor, bool writeAlpha)
 
 void LLRender::setColorMask(bool writeColorR, bool writeColorG, bool writeColorB, bool writeAlpha)
 {
-    flush();
-
     if (mCurrColorMask[0] != writeColorR ||
         mCurrColorMask[1] != writeColorG ||
         mCurrColorMask[2] != writeColorB ||
         mCurrColorMask[3] != writeAlpha)
     {
+        flush();
+
         mCurrColorMask[0] = writeColorR;
         mCurrColorMask[1] = writeColorG;
         mCurrColorMask[2] = writeColorB;
@@ -1035,6 +1179,137 @@ ALTextureSlot* LLRender::getTextureSlot(U32 index)
     {
         LL_DEBUGS() << "Non-existing texture unit layer requested: " << index << LL_ENDL;
         return &mDummySlot;
+    }
+}
+
+ALImageSlot* LLRender::getImageSlot(U32 index)
+{
+    if (index < mImageSlots.size())
+    {
+        return &mImageSlots[index];
+    }
+
+    LL_DEBUGS() << "Non-existing image unit requested: " << index << LL_ENDL;
+    return &mDummyImageSlot;
+}
+
+void LLRender::forgetTextures(S32 count, const U32* names)
+{
+    const U32* end = names + count;
+    for (ALTextureSlot& slot : mTextureSlots)
+    {
+        if (slot.mCurrTexture != 0 && std::find(names, end, slot.mCurrTexture) != end)
+        {
+            slot.mCurrTexture = 0;
+        }
+    }
+
+    // Deleting a texture an image unit holds rebinds the unit to texture 0, which is what reset() records.
+    for (ALImageSlot& slot : mImageSlots)
+    {
+        if (slot.mCurrTexture != 0 && std::find(names, end, slot.mCurrTexture) != end)
+        {
+            slot.reset();
+        }
+    }
+}
+
+void LLRender::forgetBuffer(U32 name)
+{
+    if (name == 0)
+    {
+        return;
+    }
+    // Deleting a bound buffer returns the binding to 0.
+    if (mDrawIndirectBuffer == name)
+    {
+        mDrawIndirectBuffer = 0;
+    }
+    if (mDispatchIndirectBuffer == name)
+    {
+        mDispatchIndirectBuffer = 0;
+    }
+    for (StorageBinding& binding : mStorageBindings)
+    {
+        if (binding.mName == name)
+        {
+            binding = StorageBinding();
+        }
+    }
+}
+
+void LLRender::bindStorageBuffer(U32 binding, const ALGPUBuffer& buffer)
+{
+    llassert(buffer.isAllocated());
+    setStorageBinding(binding, { buffer.getGLName(), 0, 0 });
+}
+
+void LLRender::bindStorageBuffer(U32 binding, const ALGPUBuffer& buffer, size_t offset, size_t bytes)
+{
+    llassert(gGLManager.mShaderStorageBufferOffsetAlignment > 0
+             && offset % (size_t)gGLManager.mShaderStorageBufferOffsetAlignment == 0);
+    if (!buffer.isAllocated() || bytes == 0 || offset > buffer.size() || bytes > buffer.size() - offset)
+    {
+        llassert(false);
+        return;
+    }
+    setStorageBinding(binding, { buffer.getGLName(), offset, bytes });
+}
+
+void LLRender::unbindStorageBuffer(U32 binding)
+{
+    setStorageBinding(binding, StorageBinding());
+}
+
+U32 LLRender::getStorageBuffer(U32 binding) const
+{
+    return binding < AL_NUM_STORAGE_BINDINGS ? mStorageBindings[binding].mName : 0;
+}
+
+void LLRender::setStorageBinding(U32 binding, const StorageBinding& wanted)
+{
+    llassert(sCompute);
+    llassert(binding < AL_NUM_STORAGE_BINDINGS);
+    if (binding >= AL_NUM_STORAGE_BINDINGS || !gGLManager.mHasCompute)
+    {
+        return;
+    }
+    StorageBinding& held = mStorageBindings[binding];
+    if (held.mName == wanted.mName && held.mOffset == wanted.mOffset && held.mBytes == wanted.mBytes)
+    {
+        return;
+    }
+    // What is batched was meant to see the point as it was.
+    flush();
+    held = wanted;
+    issueStorageBinding(binding);
+}
+
+void LLRender::issueStorageBinding(U32 binding) const
+{
+    if (!gGLManager.mHasCompute)
+    {
+        return;
+    }
+    const StorageBinding& held = mStorageBindings[binding];
+    if (held.mBytes != 0)
+    {
+        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, binding, held.mName, (GLintptr)held.mOffset,
+                          (GLsizeiptr)held.mBytes);
+    }
+    else
+    {
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, held.mName);
+    }
+}
+
+// static
+void LLRender::bindIndirectBuffer(U32 target, U32& bound, U32 name)
+{
+    if (bound != name)
+    {
+        glBindBuffer(target, name);
+        bound = name;
     }
 }
 
@@ -1591,11 +1866,10 @@ void LLRender::diffuseColor4ub(U8 r, U8 g, U8 b, U8 a)
 
 void LLRender::setLineWidth(F32 width)
 {
-    gGL.flush();
-
     width = llclamp(width, gGLManager.mAliasedLineRange[0], gGLManager.mAliasedLineRange[1]);
     if(mLineWidth != width)
     {
+        flush();
         mLineWidth = width;
         glLineWidth(width);
     }
@@ -1611,6 +1885,158 @@ void LLRender::setPolygonOffset(F32 factor, F32 units)
 
         const F32 sign = sReverseZ ? -1.f : 1.f;
         glPolygonOffset(sign * factor, sign * units);
+    }
+}
+
+void LLRender::setPatchVertices(U32 count)
+{
+    if (mPatchVertices != count)
+    {
+        mPatchVertices = count;
+        flush();
+        glPatchParameteri(GL_PATCH_VERTICES, count);
+    }
+}
+
+void LLRender::setClearColor(const LLColor4& color)
+{
+    if (mClearColor != color)
+    {
+        mClearColor = color;
+        glClearColor(color.mV[VRED], color.mV[VGREEN], color.mV[VBLUE], color.mV[VALPHA]);
+    }
+}
+
+void LLRender::clear(U32 mask)
+{
+    flush();
+    glClear(mask);
+}
+
+void LLRender::drawArraysInstanced(eGeomModes mode, U32 first, U32 count, U32 instances)
+{
+    // An input left in the program would read whatever buffer the last vertex buffer left on its array.
+    llassert(LLGLSLShader::sCurBoundShaderPtr && LLGLSLShader::sCurBoundShaderPtr->mAttributeMask == 0);
+    flush();
+    syncMatrices();
+    llassert(validate_bound_samplers());
+    STOP_GLERROR;
+    glDrawArraysInstanced(LLVertexBuffer::sGLMode[mode], first, count, instances);
+    STOP_GLERROR;
+    ++sDrawCalls;
+    sDrawElements += (U64)count * instances;
+}
+
+void LLRender::drawArraysIndirect(eGeomModes mode, const ALGPUBuffer& buffer, size_t offset)
+{
+    // An input left in the program would read whatever buffer the last vertex buffer left on its array.
+    llassert(LLGLSLShader::sCurBoundShaderPtr && LLGLSLShader::sCurBoundShaderPtr->mAttributeMask == 0);
+    // GL reads the command at an offset a whole number of GLuints in, and all four of its words.
+    llassert(offset % sizeof(U32) == 0);
+    if (!buffer.isAllocated() || offset + sizeof(ALDrawArraysIndirectCommand) > buffer.size())
+    {
+        llassert(false);
+        return;
+    }
+    flush();
+    syncMatrices();
+    llassert(validate_bound_samplers());
+    STOP_GLERROR;
+    bindIndirectBuffer(GL_DRAW_INDIRECT_BUFFER, mDrawIndirectBuffer, buffer.getGLName());
+    glDrawArraysIndirect(LLVertexBuffer::sGLMode[mode], reinterpret_cast<const void*>(offset));
+    STOP_GLERROR;
+    ++sDrawCalls; // its count is the GPU's to know
+}
+
+void LLRender::memoryBarrier(U32 barriers)
+{
+    llassert(sCompute);
+    if (barriers == 0 || !gGLManager.mHasCompute)
+    {
+        return;
+    }
+    // The barrier orders what was issued before it, which includes what is batched.
+    flush();
+    glMemoryBarrier(barriers);
+}
+
+void LLRender::dispatchCompute(U32 groups_x, U32 groups_y, U32 groups_z)
+{
+    llassert(sCompute);
+    llassert(LLGLSLShader::sCurBoundShaderPtr && LLGLSLShader::sCurBoundShaderPtr->isCompute());
+    if (!gGLManager.mHasCompute)
+    {
+        return;
+    }
+    flush();
+    syncMatrices();
+
+    if (groups_x == 0 || groups_y == 0 || groups_z == 0)
+    {
+        return;
+    }
+
+    // GL drops a dispatch past the limit with an error and nothing run. Said here, once, with the counts that did it,
+    // rather than left to a GL error log.
+    const U32 groups[3] = { groups_x, groups_y, groups_z };
+    for (U32 i = 0; i < 3; ++i)
+    {
+        if (groups[i] > (U32)gGLManager.mMaxComputeWorkGroupCount[i])
+        {
+            static bool s_warned = false;
+            if (!s_warned)
+            {
+                s_warned = true;
+                LL_WARNS("Shader") << "Compute dispatch of " << groups_x << "x" << groups_y << "x" << groups_z
+                                   << " groups from " << LLGLSLShader::sCurBoundShaderPtr->mName
+                                   << " exceeds the context's " << gGLManager.mMaxComputeWorkGroupCount[0] << "x"
+                                   << gGLManager.mMaxComputeWorkGroupCount[1] << "x"
+                                   << gGLManager.mMaxComputeWorkGroupCount[2] << "; nothing dispatched" << LL_ENDL;
+            }
+            return;
+        }
+    }
+
+    llassert(validate_bound_samplers());
+    STOP_GLERROR;
+    glDispatchCompute(groups_x, groups_y, groups_z);
+    STOP_GLERROR;
+}
+
+void LLRender::dispatchComputeIndirect(const ALGPUBuffer& buffer, size_t offset)
+{
+    llassert(sCompute);
+    llassert(LLGLSLShader::sCurBoundShaderPtr && LLGLSLShader::sCurBoundShaderPtr->isCompute());
+    llassert(offset % sizeof(U32) == 0);
+    if (!gGLManager.mHasCompute)
+    {
+        return;
+    }
+    if (!buffer.isAllocated() || offset + sizeof(ALDispatchIndirectCommand) > buffer.size())
+    {
+        llassert(false);
+        return;
+    }
+    flush();
+    syncMatrices();
+    llassert(validate_bound_samplers());
+    STOP_GLERROR;
+    bindIndirectBuffer(GL_DISPATCH_INDIRECT_BUFFER, mDispatchIndirectBuffer, buffer.getGLName());
+    glDispatchComputeIndirect(static_cast<GLintptr>(offset));
+    STOP_GLERROR;
+}
+
+void LLRender::setScissor(S32 x, S32 y, S32 width, S32 height)
+{
+    llassert(width >= 0 && height >= 0);
+    if (mScissor[0] != x || mScissor[1] != y || mScissor[2] != width || mScissor[3] != height)
+    {
+        flush();
+        mScissor[0] = x;
+        mScissor[1] = y;
+        mScissor[2] = width;
+        mScissor[3] = height;
+        glScissor(x, y, width, height);
     }
 }
 
@@ -1654,132 +2080,63 @@ void LLRender::debugTexUnits(void)
     LL_INFOS("TextureUnit") << "Active TexUnit Enabled : " << active_enabled << LL_ENDL;
 }
 
-glm::mat4 get_current_modelview()
+LLMatrix4a al_reverse_z_transform(const LLMatrix4a& p)
 {
-    return glm::make_mat4(gGLModelView);
-}
-
-glm::mat4 get_current_projection()
-{
-    return glm::make_mat4(gGLProjection);
-}
-
-glm::mat4 get_last_modelview()
-{
-    return glm::make_mat4(gGLLastModelView);
-}
-
-glm::mat4 get_last_projection()
-{
-    return glm::make_mat4(gGLLastProjection);
-}
-
-void copy_matrix(const glm::mat4& src, F32* dst)
-{
-    auto matp = glm::value_ptr(src);
-    for (U32 i = 0; i < 16; i++)
-    {
-        dst[i] = matp[i];
-    }
-}
-
-void set_current_modelview(const glm::mat4& mat)
-{
-    copy_matrix(mat, gGLModelView);
-}
-
-void set_current_projection(const glm::mat4& mat)
-{
-    copy_matrix(mat, gGLProjection);
-}
-
-void set_last_modelview(const glm::mat4& mat)
-{
-    copy_matrix(mat, gGLLastModelView);
-}
-
-void set_last_projection(const glm::mat4& mat)
-{
-    copy_matrix(mat, gGLLastProjection);
-}
-
-glm::mat4 al_reverse_z_transform(const glm::mat4& p)
-{
-    // z_ndc' = (1 - z_ndc)/2  =>  row2' = 0.5*(row3 - row2). glm is column-major, so
-    // row i is spread across mat[c][i]. Leaves xy and w rows untouched.
-    glm::mat4 r = p;
-    for (int c = 0; c < 4; ++c)
-    {
-        r[c][2] = 0.5f * (p[c][3] - p[c][2]);
-    }
+    // z_ndc' = (1 - z_ndc)/2: the depth column becomes 0.5 * (w column - depth column),
+    // x, y and w untouched.
+    LLVector4a depth;
+    depth.setSub(p.getColumn<3>(), p.getColumn<2>());
+    depth.mul(0.5f);
+    LLMatrix4a r = p;
+    r.setColumn<2>(depth);
     return r;
 }
 
-glm::mat4 al_perspective(F32 fovy_rad, F32 aspect, F32 z_near, F32 z_far)
+LLMatrix4a al_perspective(F32 fovy_rad, F32 aspect, F32 z_near, F32 z_far)
 {
-    // Forward branch is exactly glm::perspective (byte-identical to pre-reverse-Z callers).
-    glm::mat4 p = glm::perspective(fovy_rad, aspect, z_near, z_far);
+    // An infinite far plane is exact only when reversed: forward 24-bit depth keeps the finite plane.
+    if (std::isinf(z_far))
+    {
+        if (!LLRender::sReverseZ)
+        {
+            return LLMatrix4a::perspective(fovy_rad, aspect, z_near, FINITE_PROJECTION_FAR);
+        }
+        // Stored depth d = near / distance: the depth row is (0, 0, 0, near) against a w row of (0, 0, -1, 0).
+        LLMatrix4a p = LLMatrix4a::perspective(fovy_rad, aspect, z_near, z_near * 2.f);
+        p.setColumn<2>(LLVector4a(0.f, 0.f, 0.f, z_near));
+        return p;
+    }
+    const LLMatrix4a p = LLMatrix4a::perspective(fovy_rad, aspect, z_near, z_far);
     return LLRender::sReverseZ ? al_reverse_z_transform(p) : p;
 }
 
-glm::mat4 al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_far)
+bool al_projection_is_infinite(const LLMatrix4a& proj)
 {
-    glm::mat4 p = glm::ortho(left, right, bottom, top, z_near, z_far);
+    return LLRender::sReverseZ && proj.getColumn<2>()[2] == 0.f && proj.getColumn<3>()[2] != 0.f;
+}
+
+LLMatrix4a al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_far)
+{
+    const LLMatrix4a p = LLMatrix4a::ortho(left, right, bottom, top, z_near, z_far);
     return LLRender::sReverseZ ? al_reverse_z_transform(p) : p;
 }
 
-glm::vec3 al_project(const glm::vec3& obj, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport)
+LLVector4a al_project(const LLVector4a& obj, const LLMatrix4a& modelview, const LLMatrix4a& proj, const S32 viewport[4])
 {
-    // Under reverse-Z the projection already yields [0,1] window z, so use the ZO variant
-    // that does not re-apply the [-1,1]->[0,1] remap.
-    return LLRender::sReverseZ ? glm::projectZO(obj, modelview, proj, viewport)
-                               : glm::project(obj, modelview, proj, viewport);
+    // Under reverse-Z the projection already yields [0,1] window z, so the zero-to-one
+    // form does not re-apply the [-1,1]->[0,1] remap.
+    return LLRender::sReverseZ ? alprojection::project_zo(obj, modelview, proj, viewport)
+                               : alprojection::project(obj, modelview, proj, viewport);
 }
 
-glm::vec3 al_unproject(const glm::vec3& win, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport)
+LLVector4a al_unproject(const LLVector4a& win, const LLMatrix4a& modelview, const LLMatrix4a& proj, const S32 viewport[4])
 {
-    return LLRender::sReverseZ ? glm::unProjectZO(win, modelview, proj, viewport)
-                               : glm::unProject(win, modelview, proj, viewport);
+    return LLRender::sReverseZ ? alprojection::unproject_zo(win, modelview, proj, viewport)
+                               : alprojection::unproject(win, modelview, proj, viewport);
 }
 
-glm::vec3 mul_mat4_vec3(const glm::mat4& mat, const glm::vec3& vec)
+LLVector4a al_unproject(const LLVector4a& win, const LLMatrix4a& inverse, const S32 viewport[4])
 {
-#if 1 // SIMD path results in strange crashes. Fall back to scalar for now.
-    const float w = vec[0] * mat[0][3] + vec[1] * mat[1][3] + vec[2] * mat[2][3] + mat[3][3];
-    return glm::vec3(
-       (vec[0] * mat[0][0] + vec[1] * mat[1][0] + vec[2] * mat[2][0] + mat[3][0]) / w,
-       (vec[0] * mat[0][1] + vec[1] * mat[1][1] + vec[2] * mat[2][1] + mat[3][1]) / w,
-       (vec[0] * mat[0][2] + vec[1] * mat[1][2] + vec[2] * mat[2][2] + mat[3][2]) / w
-    );
-#else
-    LLVector4a x, y, z, s, t, p, q;
-
-    x.splat(vec.x);
-    y.splat(vec.y);
-    z.splat(vec.z);
-
-    s.splat<3>(mat[0].data);
-    t.splat<3>(mat[1].data);
-    p.splat<3>(mat[2].data);
-    q.splat<3>(mat[3].data);
-
-    s.mul(x);
-    t.mul(y);
-    p.mul(z);
-    q.add(s);
-    t.add(p);
-    q.add(t);
-
-    x.mul(mat[0].data);
-    y.mul(mat[1].data);
-    z.mul(mat[2].data);
-
-    x.add(y);
-    z.add(mat[3].data);
-    LLVector4a res;
-    res.load3(glm::value_ptr(vec));
-    res.setAdd(x, z);
-    res.div(q);
-    return glm::make_vec3(res.getF32ptr());
-#endif
+    return LLRender::sReverseZ ? alprojection::unproject_zo(win, inverse, viewport)
+                               : alprojection::unproject(win, inverse, viewport);
 }

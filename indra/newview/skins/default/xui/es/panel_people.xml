@@ -15,9 +15,6 @@
 		¿No encuentras lo que buscas? Prueba con [secondlife:///app/search/people/[SEARCH_TERM] Buscar].
 	</string>
 	<string name="no_filtered_groups_msg" value="¿No encuentras lo que buscas? Prueba con [secondlife:///app/search/groups/[SEARCH_TERM] Buscar]."/>
-	<string name="no_groups_msg" value="¿Buscas grupos en que participar? Prueba la [secondlife:///app/search/groups Búsqueda]."/>
-	<string name="MiniMapToolTipMsg" value="[REGION](Pulsa dos veces para abrir el mapa, pulsa mayús y arrastra para obtener una panorámica)"/>
-	<string name="AltMiniMapToolTipMsg" value="[REGION](Pulsa dos veces para teleportarte, pulsa mayús y arrastra para obtener una panorámica)"/>
 	<string name="GroupCountWithInfo" value="Perteneces a [COUNT] grupos y puedes unirte a [REMAINING] más. [secondlife:/// Incrementa tu límite]"/>
 	<tab_container name="tabs">
 		<panel label="CERCANA" name="nearby_panel">
@@ -40,7 +37,6 @@
 			<accordion name="friends_accordion">
 				<accordion_tab name="tab_online" title="Conectado"/>
 				<accordion_tab name="tab_all" title="Todos"/>
-				<accordion_tab name="tab_suggested_friends" title="Personas de las que podrías querer ser amigo"/>
 			</accordion>
 		</panel>
 		<panel label="GRUPOS" name="groups_panel">
@@ -63,9 +59,6 @@
 				<button name="add_friend_btn" tool_tip="Ofrecer amistad a un residente"/>
 				<dnd_button name="recent_del_btn" tool_tip="Quitar la persona seleccionada de la lista de amigos"/>
 			</panel>
-		</panel>
-		<panel label="BLOQUEADO" name="blocked_panel">
-			<panel label="Residentes y objetos ignorados" name="panel_block_list_sidetray"/>
 		</panel>
 	</tab_container>
 </panel>

@@ -30,10 +30,16 @@
 #include "llviewerprecompiledheaders.h"
 #include "llscripteditorws.h"
 
+#include "alscriptenvelope.h"
+#include "alscriptmessages.h"
+#include "alscriptpreprocessor.h"
+#include "alscriptworkspace.h"
+
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h"
-#include "llchat.h"
+#include "llcompilequeue.h"
+#include "llinventorymodel.h"
 #include "lldate.h"
 #include "llerror.h"
 #include "lleventcoro.h"
@@ -46,13 +52,11 @@
 #include "llinventorydefines.h"
 #include "llnotecard.h"
 #include "llnotificationsutil.h"
-#include "llpreviewnotecard.h"
-#include "llpreviewscript.h"
 #include "llprocess.h"
-#include "llregex.h"
 #include "llmd5.h"
 #include "llsdjson.h"
 #include "llselectmgr.h"
+#include "llsyntaxid.h"
 #include "lltrans.h"
 #include "lluuid.h"
 #include "llversioninfo.h"
@@ -65,11 +69,19 @@
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
 #include "llviewermenu.h"
-#include "llviewertexteditor.h"
 #include "llvoinventorylistener.h"
 #include "roles_constants.h"
+// [RLVa:KB]
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 #include <array>
+
+#include <openssl/rand.h>
+
+#if LL_WINDOWS
+#include <aclapi.h>
+#endif
 
 namespace
 {
@@ -79,19 +91,19 @@ namespace
     constexpr F32 NOTECARD_UPLOAD_TIMEOUT = 30.0f;
     constexpr F32 ITEM_CREATE_TIMEOUT     = 30.0f;
 
-    // Linkset flush coalescing delays (seconds).
-    constexpr F32 LINKSET_ADD_FLUSH_DELAY    = 5.0f;
-    constexpr F32 LINKSET_REMOVE_FLUSH_DELAY = 0.2f;
+    // Seconds a client has to answer the handshake: plenty to read a
+    // file, and no longer than that is a connection kept that has not
+    // proven itself.
+    constexpr F64 HANDSHAKE_TIMEOUT = 30.0;
 
-    static const boost::regex LUAU_LOCATION_PATTERN(
-        R"(^([^:]*):([0-9]+):\s*(.*)$)");
-
-    static const boost::regex LSL_LOCATION_PATTERN(
-        R"(\((\d+), (\d+)\) : ([^:]+) : (.+))");
+    // How many connections may be proving themselves at once. A client
+    // answers in a moment; past these, a connection more is closed before
+    // it is sent a challenge, and nothing is written for it.
+    constexpr size_t MAX_UNAUTHENTICATED = 4;
 
     // Creates a uniquely-named LLEventMailDrop under "<prefix>.<uuid>", passes
     // its name to kickoff (which arranges for one post to that pump), then
-    // suspends the current coroutine up to 	imeout seconds for the result.
+    // suspends the current coroutine up to timeout seconds for the result.
     // Throws RequestTimeoutError(timeout_msg) if the deadline elapses.
     template <typename Kickoff>
     LLSD await_async_result(const std::string& pump_prefix,
@@ -111,89 +123,154 @@ namespace
         return result;
     }
 
-    // Builds the (success, failure) callback pair used by LLResourceUploadInfo-
-    // derived uploads. Both outcomes post a single LLSD to pump_name:
-    //   - success: the server's response LLSD with item_id/task_id added.
-    //   - failure: { "failed": true, "reason": <reason> }.
-    auto make_asset_upload_callbacks(const std::string& pump_name)
+    LLSD object_id_command_params()
     {
-        auto on_success = [pump_name](LLUUID item_id, LLUUID task_id, LLUUID /*new_asset_id*/, LLSD response)
-        {
-            response["item_id"] = item_id;
-            response["task_id"] = task_id;
-            LLEventPumps::instance().post(pump_name, response);
-        };
-        auto on_failure = [pump_name](LLUUID /*item_id*/, LLUUID /*task_id*/, LLSD /*response*/, std::string reason)
-        {
-            LLSD failure;
-            failure["failed"] = true;
-            failure["reason"] = reason;
-            LLEventPumps::instance().post(pump_name, failure);
-            return false;
-        };
-        return std::make_pair(std::move(on_success), std::move(on_failure));
+        LLSD params(LLSD::emptyMap());
+        params["object_id"]["type"] = "string";
+        params["object_id"]["required"] = true;
+        return params;
     }
 
-    // Returns [root, *root->getChildren()] in stable order. Root must be non-null.
-    std::vector<LLViewerObject*> collect_linkset(LLViewerObject* root)
+    // An item's asset as it stands, fetched through its prim's region, or
+    // read from the cache where it is there. Throws as the fetch fails.
+    // Runs in a coroutine: the prim and the item are used before it
+    // suspends, and not after.
+    std::string fetch_item_asset(LLViewerObject* prim, LLInventoryItem* item, LLAssetType::EType type);
+
+    // The region a prim is in, which its messages and uploads go to. One
+    // whose region has gone -- disconnected, or crossing -- is out of reach
+    // for now; asked before any message is begun, since a throw part way
+    // would leave the message system holding half of one.
+    LLViewerRegion* region_of(const LLViewerObject* prim)
     {
-        std::vector<LLViewerObject*> prims;
-        const auto& children = root->getChildren();
-        prims.reserve(1 + children.size());
-        prims.push_back(root);
-        for (LLViewerObject* child : children)
+        LLViewerRegion* region = prim->getRegion();
+        if (!region)
         {
-            prims.push_back(child);
+            throw LLJSONRPCConnection::ServiceUnavailableError("The object's region is not connected");
         }
-        return prims;
+        return region;
     }
 
-    // Returns the value of NV pair key on obj as a string, or empty if
-    // obj / pair / string is null or empty. NUL-safe.
-    std::string nv_string(LLViewerObject* obj, const char* key)
+    // The object a command names, in view and in a published linkset.
+    // What RLVa refuses of an object or an item in it, refused in its
+    // words, by the rules the studio keeps (ALScriptWorkspace::rlvRefusal):
+    // a client acts as the user, and is held to what the user is.
+    void refuse_under_rlv(LLViewerObject* object, LLAssetType::EType type, ALScriptRlvUse use)
     {
-        if (!obj)
+        const std::string refused = ALScriptWorkspace::rlvRefusal(object, type, use);
+        if (!refused.empty())
         {
-            return std::string();
+            throw LLJSONRPCConnection::ForbiddenError(refused);
         }
-        LLNameValue* nv = obj->getNVPair(key);
-        if (!nv)
-        {
-            return std::string();
-        }
-        const char* s = nv->getString();
-        if (!s || s[0] == '\0')
-        {
-            return std::string();
-        }
-        return std::string(s);
     }
 
+    // Publishing scopes what a client works on; it does not keep anything
+    // from the client, which can publish any object the agent may modify
+    // with object.request. An authenticated client acts as the user.
+    LLViewerObject* published_object(const LLScriptEditorWSServer& server, const LLSD& params)
+    {
+        const LLUUID object_id = params["object_id"].asUUID();
+        if (object_id.isNull())
+        {
+            throw LLJSONRPCConnection::InvalidParams("object_id is required");
+        }
+        LLViewerObject* object = gObjectList.findObject(object_id);
+        if (!object)
+        {
+            throw LLJSONRPCConnection::InvalidParams("object_id not found");
+        }
+        LLViewerObject* root = object->getRootEdit();
+        if (!root || !server.isObjectPublished(root->getID()))
+        {
+            throw LLJSONRPCConnection::ForbiddenError("Object is not published");
+        }
+        return object;
+    }
+
+    std::string fetch_item_asset(LLViewerObject* prim, LLInventoryItem* item, LLAssetType::EType type)
+    {
+        LLSD cb_result = await_async_result(
+            "objectContentGet", ASSET_FETCH_TIMEOUT, "Asset fetch timed out",
+            [&](const std::string& pump_name)
+            {
+                gAssetStorage->getInvItemAsset(
+                    region_of(prim)->getHost(),
+                    gAgent.getID(),
+                    gAgent.getSessionID(),
+                    item->getPermissions().getOwner(),
+                    prim->getID(),
+                    item->getUUID(),
+                    item->getAssetUUID(),
+                    type,
+                    [pump_name](const LLUUID& asset_uuid, LLAssetType::EType asset_type, void*, S32 status, LLExtStat)
+                    {
+                        LLSD result;
+                        if (status == LL_ERR_NOERR)
+                        {
+                            result["asset_uuid"] = asset_uuid;
+                            result["asset_type"] = static_cast<S32>(asset_type);
+                        }
+                        else
+                        {
+                            result["error"] = status;
+                        }
+                        LLEventPumps::instance().post(pump_name, result);
+                    },
+                    nullptr,
+                    true);
+            });
+
+        if (cb_result.has("error"))
+        {
+            S32 status = cb_result["error"].asInteger();
+            if (status == LL_ERR_ASSET_REQUEST_NOT_IN_DATABASE || status == LL_ERR_FILE_EMPTY)
+                throw LLJSONRPCConnection::InvalidParams("Asset not found");
+            if (status == LL_ERR_INSUFFICIENT_PERMISSIONS)
+                throw LLJSONRPCConnection::ForbiddenError("Insufficient permissions to read asset");
+            throw LLJSONRPCConnection::InternalError("Asset fetch failed: " + std::to_string(status));
+        }
+
+        LLUUID             asset_uuid = cb_result["asset_uuid"].asUUID();
+        LLAssetType::EType asset_type = static_cast<LLAssetType::EType>(cb_result["asset_type"].asInteger());
+
+        LLFileSystem file(asset_uuid, asset_type);
+        S32 file_length = file.getSize();
+        if (file_length <= 0)
+            throw LLJSONRPCConnection::InternalError("Asset file empty or not found in cache");
+
+        std::string asset(static_cast<size_t>(file_length), '\0');
+        file.read(reinterpret_cast<U8*>(asset.data()), file_length);
+        return asset;
+    }
 }
 
 //========================================================================
 LLScriptEditorWSServer::LLScriptEditorWSServer(const std::string& name, U16 port, bool local_only):
     LLJSONRPCServer(name, port, local_only),
-    mPublishedObjectManager(
-        this,
-        [this](const LLPublishedObjectMgr::RuntimeChatEvent& event)
-        {
-            sendRuntimeEvent(event);
-        })
+    mPublishedObjectManager(this)
 {
     LL_INFOS("ScriptEditorWS") << "Created JSON-RPC script editor server: " << name
                                << " on port " << port << LL_ENDL;
 
-    registerCommand({ "viewer.teleport", "Teleport agent to an in-world object" },
-        [](U32, const LLSD& p) -> LLSD
+    // What scripts say reaches the IDE through the workspace, which hears
+    // every object's debug and owner-say chat, when forwarding is on.
+    mRuntimeConnection = ALScriptWorkspace::instance().onRuntime([this](const ALScriptRuntimeEvent& event) {
+        static LLCachedControl<bool> forward(gSavedSettings, "ExternalWebsocketForwardDebug", false);
+        if (forward)
         {
-            LLUUID object_id = p["object_id"].asUUID();
-            if (object_id.isNull())
-                throw LLJSONRPCConnection::InvalidParams("object_id is required");
+            sendRuntimeEvent(event);
+        }
+    });
+    // And what the compiler said of a script saved through it, whichever
+    // editor saved it: the workspace owns the compile, so a result is not
+    // lost with a closed floater.
+    mCompiledConnection = ALScriptWorkspace::instance().onCompiled([this](const ALScriptCompileResult& result) { sendCompiled(result); });
 
-            LLViewerObject* object = gObjectList.findObject(object_id);
-            if (!object)
-                throw LLJSONRPCConnection::InvalidParams("object_id not found");
+    registerCommand({ "viewer.teleport", "Teleport agent to an in-world object",
+                      object_id_command_params() },
+        [this](U32, const LLSD& p) -> LLSD
+        {
+            LLViewerObject* object = published_object(*this, p);
 
             LLVector3d global_pos = object->getPositionGlobal();
             gAgent.teleportViaLocation(global_pos);
@@ -203,14 +280,14 @@ LLScriptEditorWSServer::LLScriptEditorWSServer(const std::string& name, U16 port
             return response;
         });
 
-    registerCommand({ "viewer.camera.focus", "Zoom camera to an in-world object (same behavior as context menu Zoom In)" },
-        [](U32, const LLSD& p) -> LLSD
+    registerCommand({ "viewer.camera.focus",
+                      "Zoom camera to an in-world object (same behavior as context menu Zoom In)",
+                      object_id_command_params() },
+        [this](U32, const LLSD& p) -> LLSD
         {
-            LLUUID object_id = p["object_id"].asUUID();
-            if (object_id.isNull())
-                throw LLJSONRPCConnection::InvalidParams("object_id is required");
+            LLViewerObject* object = published_object(*this, p);
 
-            if (!handle_zoom_to_object(object_id))
+            if (!handle_zoom_to_object(object->getID()))
             {
                 throw LLJSONRPCConnection::InternalError(
                     "Object not found or not reachable");
@@ -221,10 +298,35 @@ LLScriptEditorWSServer::LLScriptEditorWSServer(const std::string& name, U16 port
             return response;
         });
 
-    registerCommand({ "viewer.object.save_back_to_contents", "Save an in-world object back to source object contents" },
+    registerCommand({ "viewer.object.save_back_to_contents",
+                      "Save an in-world object back to source object contents",
+                      object_id_command_params() },
         [this](U32 connection_id, const LLSD& p) -> LLSD
         {
             return this->handleSaveBackToObjectContents(connection_id, p);
+        });
+
+    registerCommand({ "viewer.script.reset_all",
+                      "Reset all scripts in an in-world object",
+                      object_id_command_params() },
+        [this](U32 connection_id, const LLSD& p) -> LLSD
+        {
+            return this->handleObjectScriptResetAll(connection_id, p);
+        });
+
+    registerCommand({ "viewer.script.recompile_all",
+                      "Recompile all scripts in an in-world object",
+                      LLSDMap("object_id",
+                              LLSDMap("type", "string")
+                                  ("required", true))
+                          ("target",
+                              LLSDMap("type", "string")
+                                  ("required", true)
+                                  ("description",
+                                      "Compilation target: luau, lsl2, mono, or auto")) },
+        [this](U32 connection_id, const LLSD& p) -> LLSD
+        {
+            return this->handleObjectScriptRecompileAll(connection_id, p);
         });
 }
 
@@ -263,11 +365,19 @@ LLScriptEditorWSServer::ptr_t LLScriptEditorWSServer::ensureServerRunning()
     ptr_t server = std::static_pointer_cast<LLScriptEditorWSServer>(
         wsmgr.findServerByName(DEFAULT_SERVER_NAME));
 
+    if (server && !server->isRunning())
+    {
+        // thread stopped/was joined
+        wsmgr.removeServer(DEFAULT_SERVER_NAME);
+        server.reset();
+    }
+
     if (!server)
     {
-        U16  port       = static_cast<U16>(gSavedSettings.getS32("ExternalWebsocketSyncPort"));
-        bool local_only = gSavedSettings.getBOOL("ExternalWebsocketSyncLocal");
-        server = std::make_shared<LLScriptEditorWSServer>(DEFAULT_SERVER_NAME, port, local_only);
+        // Local only: a client anywhere else could never read the
+        // challenge's file, so could never be let in.
+        U16 port = static_cast<U16>(gSavedSettings.getS32("ExternalWebsocketSyncPort"));
+        server = std::make_shared<LLScriptEditorWSServer>(DEFAULT_SERVER_NAME, port, true);
         wsmgr.addServer(server);
     }
 
@@ -293,13 +403,8 @@ LLScriptEditorWSServer::ptr_t LLScriptEditorWSServer::ensureServerRunning()
 std::string LLScriptEditorWSServer::buildScriptSubscriptionId(const LLUUID& object_id,
                                                               const LLUUID& item_id)
 {
-    std::string script_id = object_id.asString() + "_" + item_id.asString();
-
-    std::array<char, MD5HEX_STR_SIZE> script_id_hash_str = {};
-    LLMD5 script_id_hash((const U8*)script_id.c_str());
-    script_id_hash.hex_digest(script_id_hash_str.data());
-
-    return std::string(script_id_hash_str.data());
+    // The one identity every part of the viewer calls a script by.
+    return ALScriptRef(object_id, item_id).id();
 }
 
 std::string LLScriptEditorWSServer::buildVSCodeURI(const LLUUID& object_id,
@@ -369,7 +474,10 @@ LLWebsocketMgr::WSConnection::ptr_t LLScriptEditorWSServer::connectionFactory(LL
                                                                               LLWebsocketMgr::connection_h handle)
 {
     auto connection = std::make_shared<LLScriptEditorWSConnection>(server, handle);
-    mActiveConnections[connection->getConnectionID()] = connection;
+    {
+        LLMutexLock lock(&mConnectionsMutex);
+        mActiveConnections[connection->getConnectionID()] = connection;
+    }
 
     // Call setupConnectionMethods to register any global methods
     setupConnectionMethods(connection);
@@ -379,6 +487,11 @@ LLWebsocketMgr::WSConnection::ptr_t LLScriptEditorWSServer::connectionFactory(LL
 
 void LLScriptEditorWSServer::onStarted()
 {
+    // Nobody is connected yet, and the idle time counts from now: a
+    // server started for an editor that never connects stops too. One
+    // that connects first has its count, which update() also asks for.
+    mIdleSince = LLTimer::getTotalSeconds().value();
+
     LLSyntaxDefCache& syntax_id_mgr = LLSyntaxDefCache::instance();
     wptr_t that(std::static_pointer_cast<LLScriptEditorWSServer>(shared_from_this()));
 
@@ -405,11 +518,17 @@ void LLScriptEditorWSServer::onStopped()
     mPublishedObjectManager.clearAllStateWithListenerCleanup();
 
     mSubscriptions.clear();
-    mActiveConnections.clear();
+    {
+        LLMutexLock lock(&mConnectionsMutex);
+        mActiveConnections.clear();
+    }
 
     LL_INFOS("ScriptEditorWS") << "Script editor WebSocket server stopped, all state cleaned up" << LL_ENDL;
 
-    LLNotificationsUtil::add("ExternalEditorServerStopped");
+    if (!LLApp::isExiting())
+    {
+        LLNotificationsUtil::add("ExternalEditorServerStopped");
+    }
 }
 
 void LLScriptEditorWSServer::onConnectionOpened(const LLWebsocketMgr::WSConnection::ptr_t& connection)
@@ -418,7 +537,7 @@ void LLScriptEditorWSServer::onConnectionOpened(const LLWebsocketMgr::WSConnecti
     LLJSONRPCServer::onConnectionOpened(connection);
 
     LL_INFOS("ScriptEditorWS") << "New script editor client connected via JSON-RPC" << LL_ENDL;
-
+    mIdleSince = 0.0;
 }
 
 void LLScriptEditorWSServer::onConnectionClosed(const LLWebsocketMgr::WSConnection::ptr_t& connection)
@@ -428,23 +547,80 @@ void LLScriptEditorWSServer::onConnectionClosed(const LLWebsocketMgr::WSConnecti
 
     LL_INFOS("ScriptEditorWS") << "Script editor client disconnected" << LL_ENDL;
 
-    // Remove from active connections
+    // Remove from active connections. This runs on the server's thread;
+    // the subscriptions are the main thread's, so letting the
+    // connection's go is posted there, guarded against the server having
+    // gone by then.
     auto script_connection = std::dynamic_pointer_cast<LLScriptEditorWSConnection>(connection);
     if (script_connection)
     {
-        U32 connection_id = script_connection->getConnectionID();
-        unsubscribeConnection(connection_id);
-        mActiveConnections.erase(connection_id);
+        U32    connection_id = script_connection->getConnectionID();
+        size_t left          = 0;
+        {
+            LLMutexLock lock(&mConnectionsMutex);
+            mActiveConnections.erase(connection_id);
+            left = mActiveConnections.size();
+        }
+        std::weak_ptr<LLWebsocketMgr::WSServer> weak = weak_from_this();
+        const bool posted = LLJSONRPCConnection::postToMainThread([weak, connection_id]() {
+            if (auto self = weak.lock())
+            {
+                std::static_pointer_cast<LLScriptEditorWSServer>(self)->unsubscribeConnection(connection_id);
+            }
+        });
+        // Where it could not be, the subscriptions keep a connection that
+        // has gone, which a new one may take over.
+        LL_WARNS_IF(!posted, "ScriptEditorWS") << "Main loop not taking work; connection " << connection_id
+                                               << "'s subscriptions not let go" << LL_ENDL;
 
-        LL_DEBUGS("ScriptEditorWS") << "Removed connection from active connections. Total: "
-                                   << mActiveConnections.size() << LL_ENDL;
-        // TODO: When connections reach 0, stop the server after a timeout.
+        LL_DEBUGS("ScriptEditorWS") << "Removed connection from active connections. Total: " << left << LL_ENDL;
+        if (left == 0)
+        {
+            // Nothing listening: from here the idle time counts, and
+            // update() stops the server once it has run out.
+            mIdleSince = LLTimer::getTotalSeconds().value();
+        }
     }
 }
 
-bool LLScriptEditorWSServer::subscribeScriptEditor(const LLUUID& object_id, const LLUUID& item_id, std::string_view script_name,
-    const LLHandle<LLPanel>& editor_handle, const std::string& script_id)
+size_t LLScriptEditorWSServer::unauthenticatedConnectionCount() const
 {
+    LLMutexLock lock(&mConnectionsMutex);
+    size_t      count = 0;
+    for (const auto& [id, weak] : mActiveConnections)
+    {
+        auto connection = weak.lock();
+        if (connection && !connection->isAuthenticated())
+        {
+            ++count;
+        }
+    }
+    return count;
+}
+
+bool LLScriptEditorWSServer::update()
+{
+    // A server nobody is connected to may stop after a while, so that a
+    // port is not held for a client that has gone; it starts again the
+    // next time an editor asks for it. Zero, as it is unless set, keeps it
+    // up for the session: an editor started later finds nothing to connect
+    // to once it has stopped.
+    static LLCachedControl<S32> idle_timeout(gSavedSettings, "ExternalWebsocketSyncIdleTimeout", 0);
+    const F64                   since = mIdleSince.load();
+    if (since > 0.0 && idle_timeout > 0 && LLTimer::getTotalSeconds().value() - since >= static_cast<F64>(idle_timeout) && getConnectionCount() == 0)
+    {
+        LL_INFOS("ScriptEditorWS") << "No script editor client for " << static_cast<S32>(idle_timeout) << " seconds; stopping the server" << LL_ENDL;
+        return false;
+    }
+    return true;
+}
+
+bool LLScriptEditorWSServer::subscribeScriptEditor(const LLUUID& object_id, const LLUUID& item_id, std::string_view script_name,
+    const LLHandle<LLPanel>& editor_handle, const std::string& script_id, bool lua)
+{
+    // The subscriptions are the main thread's; a caller from any other
+    // trips here rather than races.
+    llassert(on_main_thread());
     if (editor_handle.isDead())
     {
         return false;
@@ -459,18 +635,20 @@ bool LLScriptEditorWSServer::subscribeScriptEditor(const LLUUID& object_id, cons
             item_ref.mItemID = item_id;
             item_ref.mScriptName = script_name;
             mSubscriptions.emplace(script_id,
-                EditorSubscription(item_ref, editor_handle));
+                EditorSubscription(item_ref, editor_handle, lua));
     }
     else
     {
         // Refresh existing subscription with the new editor handle
         it->second.mEditorHandle = editor_handle;
+        it->second.mLua          = lua;
     }
     return true;
 }
 
 void LLScriptEditorWSServer::unsubscribeEditor(const std::string &script_id)
 {
+    llassert(on_main_thread());
     auto it = mSubscriptions.find(script_id);
     if (it != mSubscriptions.end())
     {
@@ -495,6 +673,7 @@ void LLScriptEditorWSServer::unsubscribeEditor(const std::string &script_id)
 
 void LLScriptEditorWSServer::unsubscribeConnection(U32 connection_id)
 {
+    llassert(on_main_thread());
     for (auto it = mSubscriptions.begin(); it != mSubscriptions.end(); ++it)
     {
         if (it->second.mConnectionID == connection_id)
@@ -511,6 +690,7 @@ void LLScriptEditorWSServer::unsubscribeConnection(U32 connection_id)
 
 LLScriptEditorWSServer::SubscriptionError LLScriptEditorWSServer::updateScriptSubscription(const std::string &script_id, U32 connection_id)
 {
+    llassert(on_main_thread());
     auto it = mSubscriptions.find(script_id);
     if (it != mSubscriptions.end())
     {
@@ -520,10 +700,15 @@ LLScriptEditorWSServer::SubscriptionError LLScriptEditorWSServer::updateScriptSu
             return SubscriptionError::INVALID_EDITOR;
         }
 
-        auto con_it = mActiveConnections.find(connection_id);
-        if (con_it == mActiveConnections.end())
+        LLScriptEditorWSConnection::wptr_t connection;
         {
-            return SubscriptionError::INTERNAL_ERROR;
+            LLMutexLock lock(&mConnectionsMutex);
+            auto        con_it = mActiveConnections.find(connection_id);
+            if (con_it == mActiveConnections.end())
+            {
+                return SubscriptionError::INTERNAL_ERROR;
+            }
+            connection = con_it->second;
         }
 
         if ((it->second.mConnectionID != 0) && !it->second.mConnection.expired()
@@ -540,7 +725,7 @@ LLScriptEditorWSServer::SubscriptionError LLScriptEditorWSServer::updateScriptSu
         // it would have been cleared by unsubscribeConnection, so mConnectionID
         // is always 0 here.
         it->second.mConnectionID = connection_id;
-        it->second.mConnection   = con_it->second;
+        it->second.mConnection   = connection;
         ++mConnectionSubscriptionCounts[connection_id];
         return SubscriptionError::SUCCESS;
     }
@@ -550,6 +735,7 @@ LLScriptEditorWSServer::SubscriptionError LLScriptEditorWSServer::updateScriptSu
 
 LLHandle<LLPanel> LLScriptEditorWSServer::findEditorForScript(const std::string& script_id) const
 {
+    llassert(on_main_thread());
     auto it = mSubscriptions.find(script_id);
     if (it != mSubscriptions.end())
     {
@@ -560,6 +746,7 @@ LLHandle<LLPanel> LLScriptEditorWSServer::findEditorForScript(const std::string&
 
 std::set<std::string> LLScriptEditorWSServer::getActiveScripts() const
 {
+    llassert(on_main_thread());
     std::set<std::string> active_scripts;
     for (const auto& [script_id, subinfo] : mSubscriptions)
     {
@@ -583,27 +770,29 @@ void LLScriptEditorWSServer::setupConnectionMethods(LLJSONRPCConnection::ptr_t c
         LL_DEBUGS("ScriptEditorWS") << "Setting up script editor connection methods" << LL_ENDL;
         U32 connection_id = script_connection->getConnectionID();
 
-        // Sync methods (run on the WebSocket I/O thread; must not touch
-        // main-thread-only viewer state).
-        script_connection->registerMethod("language.syntax.id",
+        // Every one of them runs on the main thread, in a coroutine: what
+        // they read -- the subscriptions, the syntax cache and its files,
+        // the world -- is the main thread's, and the server's thread would
+        // be reading it as the main one changed it.
+        script_connection->registerAsyncMethod("language.syntax.id",
             bindHandler([](LLScriptEditorWSServer& s, auto&, auto&, auto&)
             {
                 return s.handleLanguageIdRequest();
             }));
 
-        script_connection->registerMethod("language.syntax",
+        script_connection->registerAsyncMethod("language.syntax",
             bindHandler([](LLScriptEditorWSServer& s, auto&, auto&, const LLSD& params)
             {
                 return s.handleSyntaxRequest(params);
             }));
 
-        script_connection->registerMethod("language.syntax.cache",
+        script_connection->registerAsyncMethod("language.syntax.cache",
             bindHandler([](LLScriptEditorWSServer& s, auto&, auto&, auto&)
             {
                 return s.handleSyntaxCacheRequest();
             }));
 
-        script_connection->registerMethod("language.syntax.get",
+        script_connection->registerAsyncMethod("language.syntax.get",
             bindHandler([](LLScriptEditorWSServer& s, auto&, auto&, const LLSD& params)
             {
                 return s.handleSyntaxCacheFileRequest(params);
@@ -615,7 +804,7 @@ void LLScriptEditorWSServer::setupConnectionMethods(LLJSONRPCConnection::ptr_t c
                 return s.handleScriptSubscribe(connection_id, params);
             }));
 
-        script_connection->registerMethod("script.list",
+        script_connection->registerAsyncMethod("script.list",
             bindHandler([](LLScriptEditorWSServer& s, auto&, auto&, auto&)
             {
                 return s.handleFileWatcherFileListRequest();
@@ -627,7 +816,6 @@ void LLScriptEditorWSServer::setupConnectionMethods(LLJSONRPCConnection::ptr_t c
                 return s.handleObjectUnpublish(connection_id, params);
             }));
 
-        // Async methods (dispatched to the main thread inside a coroutine).
         script_connection->registerAsyncMethod("script.unsubscribe",
             bindHandler([connection_id](LLScriptEditorWSServer& s, auto&, auto&, const LLSD& params)
             {
@@ -700,7 +888,7 @@ void LLScriptEditorWSServer::setupConnectionMethods(LLJSONRPCConnection::ptr_t c
                 return s.handleCommandExecute(connection_id, params);
             }));
 
-        script_connection->registerMethod("command.list",
+        script_connection->registerAsyncMethod("command.list",
             bindHandler([](LLScriptEditorWSServer& s, auto&, auto&, auto&)
             {
                 return s.handleCommandList();
@@ -742,6 +930,10 @@ LLSD LLScriptEditorWSServer::handleObjectScriptSetRunning(U32 connection_id, con
     if (!gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
         throw LLJSONRPCConnection::ForbiddenError("No modify permission on script");
 
+    refuse_under_rlv(prim, LLAssetType::AT_LSL_TEXT, ALScriptRlvUse::Change);
+
+    LLViewerRegion* region = region_of(prim);
+
     // Send SetScriptRunning message to simulator
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_SetScriptRunning);
@@ -752,7 +944,7 @@ LLSD LLScriptEditorWSServer::handleObjectScriptSetRunning(U32 connection_id, con
     msg->addUUIDFast(_PREHASH_ObjectID, prim_id);
     msg->addUUIDFast(_PREHASH_ItemID, item_id);
     msg->addBOOLFast(_PREHASH_Running, running);
-    msg->sendReliable(prim->getRegion()->getHost());
+    msg->sendReliable(region->getHost());
 
     LLSD response;
     response["success"] = true;
@@ -785,6 +977,10 @@ LLSD LLScriptEditorWSServer::handleObjectScriptReset(U32 connection_id, const LL
     if (!gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
         throw LLJSONRPCConnection::ForbiddenError("No modify permission on script");
 
+    refuse_under_rlv(prim, LLAssetType::AT_LSL_TEXT, ALScriptRlvUse::Change);
+
+    LLViewerRegion* region = region_of(prim);
+
     // Send ScriptReset message to simulator
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_ScriptReset);
@@ -794,10 +990,152 @@ LLSD LLScriptEditorWSServer::handleObjectScriptReset(U32 connection_id, const LL
     msg->nextBlockFast(_PREHASH_Script);
     msg->addUUIDFast(_PREHASH_ObjectID, prim_id);
     msg->addUUIDFast(_PREHASH_ItemID, item_id);
-    msg->sendReliable(prim->getRegion()->getHost());
+    msg->sendReliable(region->getHost());
 
     LLSD response;
     response["success"] = true;
+    return response;
+}
+
+LLSD LLScriptEditorWSServer::handleObjectScriptResetAll(U32 connection_id, const LLSD& params)
+{
+    LLUUID prim_id = params["object_id"].asUUID();
+    if (prim_id.isNull())
+    {
+        throw LLJSONRPCConnection::InvalidParams("object_id is required");
+    }
+
+    LLViewerObject* prim = gObjectList.findObject(prim_id);
+    if (!prim)
+    {
+        throw LLJSONRPCConnection::InvalidParams("Object not found");
+    }
+
+    LLViewerObject* root = prim->getRootEdit();
+    if (!root || !isObjectPublished(root->getID()))
+    {
+        throw LLJSONRPCConnection::ForbiddenError("Object is not published");
+    }
+    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptRlvUse::Change);
+
+    if (!prim->flagScripted())
+    {
+        throw LLJSONRPCConnection::InvalidParams(
+            "Prim contains no scripts");
+    }
+
+    if (!prim->permModify())
+    {
+        throw LLJSONRPCConnection::ForbiddenError(
+            "No modify permission on prim");
+    }
+
+    LLUUID queue_id;
+    queue_id.generate();
+
+    LLFloaterScriptQueue* queue =
+        LLFloaterReg::getTypedInstance<LLFloaterScriptQueue>(
+            "reset_queue", LLSD(queue_id));
+    if (!queue)
+    {
+        throw LLJSONRPCConnection::InternalError(
+            "Unable to open reset queue");
+    }
+
+    queue->addObject(prim->getID(), prim->getID().asString());
+    if (!queue->start())
+    {
+        queue->closeFloater();
+        throw LLJSONRPCConnection::InternalError(
+            "Unable to start reset queue");
+    }
+
+    queue->setTitle(LLTrans::getString("ResetQueueTitle"));
+
+    LLSD response;
+    response["success"] = true;
+    response["object_id"] = prim->getID();
+    response["queued"] = true;
+    return response;
+}
+
+LLSD LLScriptEditorWSServer::handleObjectScriptRecompileAll(
+    U32 connection_id, const LLSD& params)
+{
+    LLUUID object_id = params["object_id"].asUUID();
+    if (object_id.isNull())
+    {
+        throw LLJSONRPCConnection::InvalidParams("object_id is required");
+    }
+
+    std::string target = params["target"].asString();
+    if (target != "luau" &&
+        target != "lsl2" &&
+        target != "mono" &&
+        target != "auto")
+    {
+        throw LLJSONRPCConnection::InvalidParams(
+            "target must be 'luau', 'lsl2', 'mono', or 'auto'");
+    }
+
+    LLViewerObject* object = gObjectList.findObject(object_id);
+    if (!object)
+    {
+        throw LLJSONRPCConnection::InvalidParams("Object not found");
+    }
+
+    LLViewerObject* root = object->getRootEdit();
+    if (!root || root->getID() != object_id || !isObjectPublished(root->getID()))
+    {
+        throw LLJSONRPCConnection::ForbiddenError("Object is not published");
+    }
+    refuse_under_rlv(root, LLAssetType::AT_NONE, ALScriptRlvUse::Change);
+
+    if (!root->flagScripted())
+    {
+        throw LLJSONRPCConnection::InvalidParams(
+            "Object contains no scripts");
+    }
+
+    if (!root->permModify())
+    {
+        throw LLJSONRPCConnection::ForbiddenError(
+            "No modify permission on object");
+    }
+
+    if (target == "luau")
+    {
+        target = "auto-luau";
+    }
+
+    LLUUID queue_id;
+    queue_id.generate();
+
+    LLFloaterCompileQueue* queue =
+        LLFloaterReg::getTypedInstance<LLFloaterCompileQueue>(
+            "compile_queue", LLSD(queue_id));
+    if (!queue)
+    {
+        throw LLJSONRPCConnection::InternalError(
+            "Unable to open compile queue");
+    }
+
+    queue->setCompileTarget(target);
+    queue->addObject(root->getID(), root->getID().asString());
+    if (!queue->start())
+    {
+        queue->closeFloater();
+        throw LLJSONRPCConnection::InternalError(
+            "Unable to start compile queue");
+    }
+
+    queue->setTitle(LLTrans::getString("CompileQueueTitle"));
+
+    LLSD response;
+    response["success"] = true;
+    response["object_id"] = root->getID();
+    response["target"] = (target == "auto-luau") ? "luau" : target;
+    response["queued"] = true;
     return response;
 }
 
@@ -827,10 +1165,11 @@ LLSD LLScriptEditorWSServer::handleObjectModify(U32 connection_id, const LLSD& p
 
     if (!prim->permModify())
         throw LLJSONRPCConnection::ForbiddenError("No modify permission on object");
+    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptRlvUse::Change);
 
     // Step 3: Send Property Update Messages
     LLMessageSystem* msg = gMessageSystem;
-    LLHost host = prim->getRegion()->getHost();
+    LLHost host = region_of(prim)->getHost();
     U32 local_id = prim->getLocalID();
 
     if (has_name)
@@ -876,6 +1215,9 @@ LLSD LLScriptEditorWSServer::handleObjectModify(U32 connection_id, const LLSD& p
         msg->sendReliable(host);
     }
 
+    // Force a properties reply so the editor sees the change without an in-world selection.
+    LLSelectMgr::instance().requestObjectPropertiesFamily(prim);
+
     // Step 4: Return Success Response
     LLSD response;
     response["success"] = true;
@@ -898,7 +1240,7 @@ LLSD LLScriptEditorWSServer::handleObjectItemModify(U32 connection_id, const LLS
             "At least one property (name, description, or permissions) must be specified");
 
     // Step 2: Validate Published Item (reuse existing helper)
-    ValidatedItem v = validatePublishedItem(params, PERM_MODIFY);
+    ValidatedItem v = validatePublishedItem(params, PERM_MODIFY, ALScriptRlvUse::Change);
 
     LLUUID prim_id = params["prim_id"].asUUID();
     LLUUID item_id = params["item_id"].asUUID();
@@ -943,6 +1285,7 @@ void LLScriptEditorWSServer::registerCommand(const WSCommandInfo& info, WSComman
 
 bool LLScriptEditorWSConnection::hasFeature(const std::string& feature) const
 {
+    LLMutexLock lock(&mHandshakeMutex);
     return mFeatures.count(feature) > 0;
 }
 
@@ -974,6 +1317,10 @@ LLSD LLScriptEditorWSServer::handleSaveBackToObjectContents(U32 connection_id, c
         throw LLJSONRPCConnection::InvalidParams(
             "object_id not found");
     }
+
+    // A copy of it put into the object it came from: that one changed.
+    refuse_under_rlv(root, LLAssetType::AT_NONE, ALScriptRlvUse::See);
+    refuse_under_rlv(gObjectList.findObject(published_info->mSourceTaskID), LLAssetType::AT_NONE, ALScriptRlvUse::Change);
 
     if (!save_object_back_to_contents(root, published_info->mSourceTaskID))
     {
@@ -1019,6 +1366,10 @@ LLSD LLScriptEditorWSServer::handleCommandList()
         LLSD info;
         info["command"]     = entry.first.command;
         info["description"] = entry.first.description;
+        if (!entry.first.params.isUndefined())
+        {
+            info["params"] = entry.first.params;
+        }
         commands.append(info);
     }
     LLSD response;
@@ -1029,13 +1380,16 @@ LLSD LLScriptEditorWSServer::handleCommandList()
 void LLScriptEditorWSServer::sendCommandExecute(
     U32 connection_id, const std::string& command, const LLSD& params)
 {
-    auto it = mActiveConnections.find(connection_id);
-    if (it == mActiveConnections.end())
+    LLScriptEditorWSConnection::ptr_t connection;
     {
-        return;
+        LLMutexLock lock(&mConnectionsMutex);
+        auto        it = mActiveConnections.find(connection_id);
+        if (it == mActiveConnections.end())
+        {
+            return;
+        }
+        connection = it->second.lock();
     }
-
-    auto connection = it->second.lock();
     if (!connection || !connection->hasFeature("commands"))
     {
         return;
@@ -1065,9 +1419,36 @@ void LLScriptEditorWSServer::broadcastLanguageChange()
 
         if (isRunning())
         {
-            broadcastNotification("language.syntax.change", params);
+            notifyAll("language.syntax.change", params);
         }
     }
+}
+
+LLSD LLScriptEditorWSServer::handlePing(
+    const LLJSONRPCConnection::ptr_t& connection,
+    const LLSD& params) const
+{
+    LLSD result;
+    result["pong"] = "pong";
+
+    if (params.has("timestamp"))
+    {
+        result["timestamp"] = params["timestamp"];
+    }
+
+    result["server_time"] = static_cast<LLSD::Integer>(
+        LLDate::now().secondsSinceEpoch() * 1000.0);
+    return result;
+}
+
+LLSD LLScriptEditorWSServer::handleGetVersion(
+    const LLJSONRPCConnection::ptr_t& connection,
+    const LLSD& params) const
+{
+    LLSD result;
+    result["client_name"] = LLVersionInfo::instance().getChannel();
+    result["client_version"] = LLVersionInfo::instance().getVersion();
+    return result;
 }
 
 LLSD LLScriptEditorWSServer::handleLanguageIdRequest() const
@@ -1293,6 +1674,9 @@ LLSD LLScriptEditorWSServer::handleObjectRequest(U32 connection_id, const LLSD& 
             "Permission denied");
     }
 
+    // Published, its contents are listed to the client.
+    refuse_under_rlv(object, LLAssetType::AT_NONE, ALScriptRlvUse::See);
+
     bool accepted = publishObject(object_id);
     if (!accepted)
     {
@@ -1308,7 +1692,7 @@ LLSD LLScriptEditorWSServer::handleObjectRequest(U32 connection_id, const LLSD& 
 // item are valid, published, and have the required permissions.
 // Throws JSON-RPC exceptions if validation fails.
 LLScriptEditorWSServer::ValidatedItem LLScriptEditorWSServer::validatePublishedItem(
-    const LLSD& params, U32 permMask) const
+    const LLSD& params, U32 permMask, ALScriptRlvUse use) const
 {
     LLUUID prim_id = params["prim_id"].asUUID();
     LLUUID item_id = params["item_id"].asUUID();
@@ -1323,6 +1707,9 @@ LLScriptEditorWSServer::ValidatedItem LLScriptEditorWSServer::validatePublishedI
     LLViewerObject* root = prim->getRootEdit();
     if (!root || !isObjectPublished(root->getID()))
         throw LLJSONRPCConnection::ForbiddenError("Object is not published");
+
+    // Everything done with an item goes to the prim's region.
+    region_of(prim);
 
     LLInventoryItem* item = dynamic_cast<LLInventoryItem*>(prim->getInventoryObject(item_id));
     if (!item)
@@ -1347,6 +1734,8 @@ LLScriptEditorWSServer::ValidatedItem LLScriptEditorWSServer::validatePublishedI
         if (!prim->permModify())
             throw LLJSONRPCConnection::ForbiddenError("No modify permission on object");
     }
+
+    refuse_under_rlv(prim, type, use);
 
     return { prim, root, item, type };
 }
@@ -1373,70 +1762,21 @@ LLSD LLScriptEditorWSServer::handleObjectContentGet(const std::string& method, c
         }
     }
 
-    auto v = validatePublishedItem(params, required_perms);
+    auto v = validatePublishedItem(params, required_perms, ALScriptRlvUse::See);
 
     LLUUID prim_id = params["prim_id"].asUUID();
     LLUUID item_id = params["item_id"].asUUID();
 
-    LLSD cb_result = await_async_result(
-        "objectContentGet", ASSET_FETCH_TIMEOUT, "Asset fetch timed out",
-        [&](const std::string& pump_name)
-        {
-            gAssetStorage->getInvItemAsset(
-                v.prim->getRegion()->getHost(),
-                gAgent.getID(),
-                gAgent.getSessionID(),
-                v.item->getPermissions().getOwner(),
-                v.prim->getID(),
-                v.item->getUUID(),
-                v.item->getAssetUUID(),
-                v.type,
-                [pump_name](const LLUUID& asset_uuid, LLAssetType::EType asset_type, void*, S32 status, LLExtStat)
-                {
-                    LLSD result;
-                    if (status == LL_ERR_NOERR)
-                    {
-                        result["asset_uuid"] = asset_uuid;
-                        result["asset_type"] = static_cast<S32>(asset_type);
-                    }
-                    else
-                    {
-                        result["error"] = status;
-                    }
-                    LLEventPumps::instance().post(pump_name, result);
-                },
-                nullptr,
-                true);
-        });
+    const LLAssetType::EType type  = v.type;
+    const std::string        asset = fetch_item_asset(v.prim, v.item, type);
 
-    if (cb_result.has("error"))
-    {
-        S32 status = cb_result["error"].asInteger();
-        if (status == LL_ERR_ASSET_REQUEST_NOT_IN_DATABASE || status == LL_ERR_FILE_EMPTY)
-            throw LLJSONRPCConnection::InvalidParams("Asset not found");
-        if (status == LL_ERR_INSUFFICIENT_PERMISSIONS)
-            throw LLJSONRPCConnection::ForbiddenError("Insufficient permissions to read asset");
-        throw LLJSONRPCConnection::InternalError("Asset fetch failed: " + std::to_string(status));
-    }
-
-    LLUUID             asset_uuid = cb_result["asset_uuid"].asUUID();
-    LLAssetType::EType asset_type = static_cast<LLAssetType::EType>(cb_result["asset_type"].asInteger());
-
-    LLFileSystem file(asset_uuid, asset_type);
-    S32 file_length = file.getSize();
-    if (file_length <= 0)
-        throw LLJSONRPCConnection::InternalError("Asset file empty or not found in cache");
-
-    std::vector<char> buffer(file_length + 1);
-    file.read(reinterpret_cast<U8*>(buffer.data()), file_length);
-    buffer[file_length] = '\0';
-
+    LLSD        response;
     std::string text_content;
-    if (asset_type == LLAssetType::AT_NOTECARD)
+    if (type == LLAssetType::AT_NOTECARD)
     {
         // Notecards are stored in an envelope format -- use LLNotecard to extract the text
         LLNotecard notecard;
-        std::istringstream istr(std::string(buffer.data(), file_length));
+        std::istringstream istr(asset);
         if (notecard.importStream(istr))
         {
             text_content = notecard.getText();
@@ -1445,27 +1785,32 @@ LLSD LLScriptEditorWSServer::handleObjectContentGet(const std::string& method, c
         {
             throw LLJSONRPCConnection::InternalError("Failed to parse notecard format");
         }
+        // What the text cannot carry, so that a client can say why a
+        // notecard holding any cannot be saved from it.
+        response["embedded_items"] = static_cast<S32>(notecard.getItems().size());
     }
     else
     {
-        text_content = std::string(buffer.data());
+        // Up to the first NUL, as a script's source has always been read.
+        text_content = std::string(asset.c_str());
     }
 
-    LLSD response;
     response["success"] = true;
     response["prim_id"] = prim_id;
     response["item_id"] = item_id;
     response["content"] = text_content;
+    response["encoding"] = "utf-8";
     return response;
 }
 
 LLSD LLScriptEditorWSServer::handleObjectContentSave(const std::string& method, const LLSD& id, const LLSD& params)
 {
-    std::string content = params["content"].asString();
-    if (content.empty())
+    // Required, and may be empty: a notecard can be emptied.
+    if (!params.has("content") || !params["content"].isString())
         throw LLJSONRPCConnection::InvalidParams("content is required");
+    const std::string content = params["content"].asString();
 
-    auto v = validatePublishedItem(params, PERM_MODIFY);
+    auto v = validatePublishedItem(params, PERM_MODIFY, ALScriptRlvUse::Change);
 
     if (v.type == LLAssetType::AT_LSL_TEXT)
     {
@@ -1485,6 +1830,11 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     if (params.has("vm"))
     {
         compile_target = params["vm"].asString();
+        // Only what the protocol names goes to the simulator as a target.
+        if (compile_target != "luau" && compile_target != "mono" && compile_target != "lsl2")
+        {
+            throw LLJSONRPCConnection::InvalidParams("vm must be 'luau', 'mono', or 'lsl2'");
+        }
         // The client sends "luau" for the Luau VM -- but if the script is LSL
         // (not native Luau), the internal compile target is "lsl-luau".
         if (compile_target == "luau" && item->getInventorySubType() != SST_LUA)
@@ -1503,7 +1853,7 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
             compile_target = runtime;
         else
         {
-            is_lua = is_lua_script(content);
+            is_lua = ALScriptMessages::looksLikeLua(content);
             compile_target = is_lua ? "luau" : "mono";
         }
     }
@@ -1513,94 +1863,136 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     // Keep stable identifiers for use after await_async_result().
     const LLUUID prim_id = prim->getID();
     const LLUUID item_id = item->getUUID();
-
-    std::string url = prim->getRegion()->getCapability("UpdateScriptTask");
-    if (url.empty())
+    const std::string item_name = item->getName();
+    const LLUUID item_asset = item->getAssetUUID();
+    const ALScriptRef ref(prim_id, item_id);
+    // Whether it runs after: as asked, or as it runs now, which the save
+    // asks the region where it is not known -- not the item's own word,
+    // which only the newer inventory fetch fills in.
+    std::optional<bool> is_running;
+    if (params.has("running"))
+    {
+        is_running = params["running"].asBoolean();
+    }
+    if (region_of(prim)->getCapability("UpdateScriptTask").empty())
         throw LLJSONRPCConnection::InternalError("UpdateScriptTask capability not available");
 
-    LLSD cb_result = await_async_result(
+    // Sent as the studio sends it: expanded afresh where a save runs the
+    // preprocessor (ALPreprocessor::wanted) -- it is on, the script is in
+    // its envelope, or it has a directive -- so that its includes
+    // are current -- sent whatever the preprocessor found, since a save is
+    // someone's work, with what it found said. But an envelope whose
+    // compiled half was edited here, its source as it was, goes up as it
+    // is: what the source makes would take the edit away.
+    const bool  lua = compile_target == "luau";
+    std::string text = content;
+    std::vector<ALScriptDiagnostic> preprocessed;
+    std::shared_ptr<const ALSourceMap> prepared_map;
+    S32                                prepared_code_line = 0;
+    bool        as_is = false;
+    const std::optional<ALScriptEnvelope> was = ALScriptEnvelope::parse(content);
+    if (was && item_asset.notNull())
+    {
+        const std::optional<ALScriptEnvelope> held = ALScriptEnvelope::parse(fetch_item_asset(prim, item, LLAssetType::AT_LSL_TEXT));
+        as_is = held && held->source == was->source && held->expanded != was->expanded;
+    }
+    if (!as_is && ALPreprocessor::wanted(content, lua, ALScriptPreprocessor::enabled()) != ALPreprocessor::Wanted::No)
+    {
+        auto prepared = std::make_shared<ALScriptPrepared>();
+        await_async_result(
+            "objectContentSavePrepare", ASSET_FETCH_TIMEOUT, "The script's includes did not come in time",
+            [&](const std::string& pump_name)
+            {
+                ALScriptWorkspace::instance().prepare(
+                    ref, item_name, item_asset, content, lua, compile_target,
+                    [prepared, pump_name](const ALScriptPrepared& made)
+                    {
+                        *prepared = made;
+                        LLEventPumps::instance().post(pump_name, LLSD().with("done", true));
+                    },
+                    true);
+            });
+        text               = prepared->text;
+        preprocessed       = prepared->errors;
+        prepared_map       = prepared->map;
+        prepared_code_line = prepared->codeLine;
+    }
+
+    // Through the workspace, which every save goes through: it refuses what
+    // the simulator would, asks the region the experience the script runs
+    // under -- the upload sets whatever it is sent, and none takes it away
+    // -- and every editor hears it was saved.
+    ALScriptSaveOptions options;
+    options.compileTarget = compile_target;
+    options.running       = is_running;
+    options.sender        = ALScriptSender(ALScriptOrigin::Bridge);
+    if (prepared_map)
+    {
+        options.sourceMap = prepared_map;
+        options.codeLine  = prepared_code_line;
+    }
+    auto        answer    = std::make_shared<ALScriptCompileResult>();
+    std::string refused;
+    const LLSD  landed = await_async_result(
         "objectContentSave", SCRIPT_UPLOAD_TIMEOUT, "Script upload/compile timed out",
-        [&, prim_id, item_id](const std::string& pump_name)
+        [&](const std::string& pump_name)
         {
-            auto [on_success, on_failure] = make_asset_upload_callbacks(pump_name);
-            bool is_running = params.has("running") ? params["running"].asBoolean() : false;
-            LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLScriptAssetUpload>(
-                prim_id, item_id,
-                compile_target, is_running, LLUUID::null, content,
-                std::move(on_success), std::move(on_failure)));
-            LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
+            const bool sent = ALScriptWorkspace::instance().save(ref, text, options,
+                [answer, pump_name](const ALScriptCompileResult& result)
+                {
+                    *answer = result;
+                    LLEventPumps::instance().post(pump_name, LLSD().with("done", true));
+                },
+                refused);
+            if (!sent)
+            {
+                LLEventPumps::instance().post(pump_name, LLSD().with("refused", true));
+            }
         });
+    if (landed.has("refused"))
+        throw LLJSONRPCConnection::InvalidParams(refused);
+    if (answer->experienceUnknown)
+        throw LLJSONRPCConnection::InternalError(LLTrans::getString("WorkspaceExperienceUnknown"));
+    if (!answer->error.empty())
+        throw LLJSONRPCConnection::InternalError("Upload failed: " + answer->error);
 
-    if (cb_result.has("failed"))
-        throw LLJSONRPCConnection::InternalError("Upload failed: " + cb_result["reason"].asString());
-
+    // What the compiler said, as places in the text the client sent: where
+    // that went up expanded, through the expansion's map to the source,
+    // which stands in the client's text from its second line where the
+    // client sent an envelope of its own. Only where it did not compile,
+    // as the protocol has it.
     LLSD response;
     response["success"]  = true;
     response["prim_id"]  = prim_id;
     response["item_id"]  = item_id;
-    response["compiled"] = cb_result["compiled"];
-    if (!cb_result["compiled"].asBoolean() && cb_result.has("errors"))
+    response["compiled"] = answer->success;
+    const S32 source_line = was ? 1 : 0;
+    const bool is_lua     = compile_target == "luau" || compile_target == "lsl-luau";
+    if (!answer->success)
     {
         response["diagnostics"] = LLSD::emptyArray();
-
-        const bool is_lua =
-            compile_target == "luau" ||
-            compile_target == "lsl-luau";
-
-        for (const auto& error : llsd::inArray(cb_result["errors"]))
+        for (const ALScriptDiagnostic& said : answer->inSource(source_line))
         {
-            boost::smatch match;
-            LLSD diagnostic;
-            diagnostic["level"] = "ERROR";
-
-            if (is_lua &&
-                boost::regex_match(
-                    error.asString(),
-                    match,
-                    LUAU_LOCATION_PATTERN))
-            {
-                diagnostic["row"] = std::stoi(match[2].str());
-                diagnostic["column"] = 0;
-                diagnostic["message"] = match[3].str();
-            }
-            else if (!is_lua &&
-                     boost::regex_match(
-                         error.asString(),
-                         match,
-                         LSL_LOCATION_PATTERN))
-            {
-                diagnostic["row"] =
-                    std::stoi(match[1].str()) + 1;
-                diagnostic["column"] =
-                    std::stoi(match[2].str()) + 1;
-                diagnostic["level"] = match[3].str();
-                diagnostic["message"] = match[4].str();
-                diagnostic["format"] = "lsl";
-            }
-            else
-            {
-                diagnostic["row"] = 0;
-                diagnostic["column"] = 0;
-                diagnostic["message"] = error.asString();
-            }
-
-            response["diagnostics"].append(diagnostic);
+            response["diagnostics"].append(diagnosticEntry(said, is_lua));
         }
     }
 
-    // If the script is open in the viewer's editor, update it
-    LLSD floater_key;
-    floater_key["taskid"] = prim_id;
-    floater_key["itemid"] = item_id;
-    LLLiveLSLEditor* editor = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key);
-    if (editor)
+    // What the preprocessor found, which the script went up with, at the
+    // source's lines; and a compiled half that went up as it was edited.
+    for (ALScriptDiagnostic found : preprocessed)
     {
-        LLScriptEdCore* sed = editor->getScriptEdCore();
-        if (sed)
-        {
-            sed->setScriptText(LLStringExplicit(content), true);
-            sed->makeEditorPristine();
-        }
+        found.line += source_line;
+        found.hasColumn = found.hasColumn && source_line == 0;
+        response["diagnostics"].append(diagnosticEntry(found, is_lua));
+    }
+    if (as_is)
+    {
+        LLSD note;
+        note["level"]   = "WARNING";
+        note["row"]     = 0;
+        note["column"]  = 0;
+        note["message"] = LLTrans::getString("BridgeSentCompiledAsIs");
+        response["diagnostics"].append(note);
     }
 
     return response;
@@ -1609,64 +2001,78 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
 LLSD LLScriptEditorWSServer::saveNotecard(LLViewerObject* prim, LLInventoryItem* item,
                                            const std::string& content)
 {
+    // More text than a notecard is read back with makes one nobody can open.
+    if (content.size() > static_cast<size_t>(LLNotecard::MAX_SIZE))
+    {
+        throw LLJSONRPCConnection::InvalidParams("The notecard's text is " + std::to_string(content.size()) + " bytes; a notecard may hold at most " +
+                                                 std::to_string(static_cast<S32>(LLNotecard::MAX_SIZE)));
+    }
     // The task inventory can be refreshed while the upload is in flight,
     // invalidating the raw item pointer returned by validatePublishedItem().
     // Keep stable identifiers for use after await_async_result().
     const LLUUID prim_id = prim->getID();
     const LLUUID item_id = item->getUUID();
 
-    std::string url = prim->getRegion()->getCapability("UpdateNotecardTaskInventory");
-    if (url.empty())
-        throw LLJSONRPCConnection::InternalError("UpdateNotecardTaskInventory capability not available");
+    // A notecard's embedded items -- landmarks, textures, anything dropped
+    // into it -- are kept beside its text, and a save of the text alone
+    // would lose every one. One that holds any is left to the viewer's
+    // editor. One with no asset yet, new and never saved, holds none.
+    if (item->getAssetUUID().notNull())
+    {
+        LLNotecard         current;
+        std::istringstream istr(fetch_item_asset(prim, item, LLAssetType::AT_NOTECARD));
+        if (current.importStream(istr) && !current.getItems().empty())
+        {
+            throw LLJSONRPCConnection::ForbiddenError(
+                "The notecard holds embedded items, which saving its text would lose; edit it in the viewer");
+        }
+        // The fetch waited: the prim is found again, and the item not used.
+        prim = gObjectList.findObject(prim_id);
+        if (!prim)
+        {
+            throw LLJSONRPCConnection::InvalidParams("Prim not found");
+        }
+    }
 
-    // Use LLNotecard to produce the proper notecard format
-    LLNotecard notecard;
-    notecard.setText(content);
-
-    std::ostringstream ostr;
-    notecard.exportStream(ostr);
-
-    LLSD cb_result = await_async_result(
+    // Through the workspace, which every save goes through, and every
+    // editor hears of it -- the studio's notecard tabs among them.
+    auto        answer  = std::make_shared<ALScriptCompileResult>();
+    std::string refused;
+    const LLSD  landed = await_async_result(
         "objectContentSaveNotecard", NOTECARD_UPLOAD_TIMEOUT, "Notecard upload timed out",
         [&, prim_id, item_id](const std::string& pump_name)
         {
-            auto [on_success, on_failure] = make_asset_upload_callbacks(pump_name);
-            LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLBufferedAssetUploadInfo>(
-                prim_id, item_id,
-                LLAssetType::AT_NOTECARD, ostr.str(),
-                std::move(on_success), std::move(on_failure)));
-            LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
+            const bool sent = ALScriptWorkspace::instance().saveNotecard(
+                ALScriptRef(prim_id, item_id), content, {},
+                [answer, pump_name](const ALScriptCompileResult& result)
+                {
+                    *answer = result;
+                    LLEventPumps::instance().post(pump_name, LLSD().with("done", true));
+                },
+                refused, ALScriptSender(ALScriptOrigin::Bridge));
+            if (!sent)
+            {
+                LLEventPumps::instance().post(pump_name, LLSD().with("refused", true));
+            }
         });
 
-    if (cb_result.has("failed"))
-        throw LLJSONRPCConnection::InternalError("Upload failed: " + cb_result["reason"].asString());
+    if (landed.has("refused"))
+        throw LLJSONRPCConnection::InvalidParams(refused);
+    if (!answer->error.empty())
+        throw LLJSONRPCConnection::InternalError("Upload failed: " + answer->error);
 
+    // The notecard window and Script Studio hear the save through the
+    // workspace, and each takes it or asks.
     LLSD response;
     response["success"] = true;
     response["prim_id"] = prim_id;
     response["item_id"] = item_id;
-
-    // If the notecard is open in the viewer's editor, update it
-    LLSD floater_key;
-    floater_key["taskid"] = prim_id;
-    floater_key["itemid"] = item_id;
-    LLPreviewNotecard* nc = LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", floater_key);
-    if (nc)
-    {
-        LLViewerTextEditor* nc_editor = nc->getChild<LLViewerTextEditor>("Notecard Editor");
-        if (nc_editor)
-        {
-            nc_editor->setText(content);
-            nc_editor->makePristine();
-        }
-    }
-
     return response;
 }
 
 LLSD LLScriptEditorWSServer::handleObjectItemDelete(U32 connection_id, const LLSD& params)
 {
-    auto v = validatePublishedItem(params, PERM_MODIFY);
+    auto v = validatePublishedItem(params, PERM_MODIFY, ALScriptRlvUse::Change);
 
     const LLUUID prim_id = v.prim->getID();
     const LLUUID root_id = v.root->getID();
@@ -1739,6 +2145,15 @@ LLSD LLScriptEditorWSServer::handleObjectItemCreate(const std::string& method, c
     {
         throw LLJSONRPCConnection::ForbiddenError("Object is not published");
     }
+    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptRlvUse::Change);
+
+    // Nothing goes into a prim the agent may not change: the simulator
+    // would drop the request without a word, and the wait for the item
+    // run out.
+    if (!prim->permModify())
+    {
+        throw LLJSONRPCConnection::ForbiddenError("No modify permission on prim");
+    }
 
     std::string name = params["name"].asString();
     if (name.empty())
@@ -1746,7 +2161,7 @@ LLSD LLScriptEditorWSServer::handleObjectItemCreate(const std::string& method, c
         throw LLJSONRPCConnection::InvalidParams("name is required");
     }
 
-    bool has_cap = prim->getRegion() && !prim->getRegion()->getCapability("CreateTaskInventoryItem").empty();
+    bool has_cap = !region_of(prim)->getCapability("CreateTaskInventoryItem").empty();
 
     if (type == "notecard" && !has_cap)
     {
@@ -1828,9 +2243,9 @@ LLSD LLScriptEditorWSServer::handleObjectItemCreate(const std::string& method, c
     }
 
     // RAII: guarantee the pending entry is cleared on every exit path (throw
-    // or normal return), so no exception between here and the erase-on-post
-    // in onPrimInventoryChanged can leave a stale entry behind. Uses a
-    // shared_ptr custom deleter as a lightweight scope guard.
+    // or normal return); until then, every change to the prim's inventory
+    // is posted to the pump. Uses a shared_ptr custom deleter as a
+    // lightweight scope guard.
     std::shared_ptr<void> pending_guard(nullptr, [this, prim_id](void*)
     {
         mPublishedObjectManager.clearPendingItemCreate(prim_id);
@@ -1839,9 +2254,13 @@ LLSD LLScriptEditorWSServer::handleObjectItemCreate(const std::string& method, c
     if (has_cap)
     {
         prim->createInventoryItem(asset_type, inv_type, sub_type, name, desc, perms, cap_params,
-            [pump_name = result_pump.getName()](bool success, const LLSD& response)
+            [pump_name = result_pump.getName()](bool success, const LLSD& answer)
             {
-                LLEventPumps::instance().obtain(pump_name).post(response);
+                // Told from an inventory change by `answered`; posted, not
+                // obtained, since the pump is gone where the wait ran out
+                // first, and obtaining it would make one nobody reads.
+                LLEventPumps::instance().post(
+                    pump_name, LLSD().with("answered", true).with("success", success).with("answer", answer));
             });
     }
     else
@@ -1856,89 +2275,107 @@ LLSD LLScriptEditorWSServer::handleObjectItemCreate(const std::string& method, c
         prim->saveScript(new_item, true, true, LLUUID::null);
     }
 
-    // Wait for inventory change callback
-    LLSD event = llcoro::suspendUntilEventOnWithTimeout(result_pump, ITEM_CREATE_TIMEOUT, LLSD().with("timeout", true));
-
-    if (event.has("timeout"))
+    // The new item, where the prim's inventory holds one it did not before.
+    auto find_created = [&](LLViewerObject* in, LLSD& response)
     {
-        throw LLJSONRPCConnection::RequestTimeoutError("Timed out waiting for item creation");
-    }
-
-    prim = gObjectList.findObject(prim_id);
-    if (!prim)
-    {
-        throw LLJSONRPCConnection::InternalError("Prim no longer exists");
-    }
-
-    LLSD response;
-
-    // If cap returned item_id directly, use it
-    if (event.has("success") && event["success"].asBoolean() &&
-        event.has("item_id") && event["item_id"].asUUID().notNull())
-    {
-        response["item_id"]     = event["item_id"];
-        response["name"]        = event["name"];
-        response["description"] = desc;
-        response["type"]        = type;
-        response["prim_id"]     = prim_id;
-
-        if (type == "script")
-        {
-            response["subtype"] = static_cast<S32>(sub_type);
-        }
-
-        LLSD perm_entry;
-        perm_entry["owner"]      = static_cast<S32>(perms.getMaskOwner());
-        perm_entry["next_owner"] = static_cast<S32>(perms.getMaskNextOwner());
-        response["permissions"]  = perm_entry;
-        response["creator_id"]   = gAgent.getID();
-    }
-    else
-    {
-        // Fallback: search inventory (for UDP path or if cap didn't return item_id)
         LLInventoryObject::object_list_t inv;
-        prim->getInventoryContents(inv);
+        in->getInventoryContents(inv);
         for (auto& obj : inv)
         {
-            if (existing_items.find(obj->getUUID()) == existing_items.end())
+            if (existing_items.find(obj->getUUID()) != existing_items.end())
             {
-                LLInventoryItem* created = dynamic_cast<LLInventoryItem*>(obj.get());
-                if (created && created->getType() == asset_type)
+                continue;
+            }
+            LLInventoryItem* created = dynamic_cast<LLInventoryItem*>(obj.get());
+            if (!created || created->getType() != asset_type)
+            {
+                continue;
+            }
+            response["item_id"]     = created->getUUID();
+            response["name"]        = created->getName();
+            response["description"] = created->getDescription();
+            response["type"]        = type;
+
+            if (type == "script")
+            {
+                response["subtype"] = static_cast<S32>(created->getInventorySubType());
+                const std::string& runtime = created->getRuntime();
+                if (!runtime.empty())
                 {
-                    response["item_id"]     = created->getUUID();
-                    response["name"]        = created->getName();
-                    response["description"] = created->getDescription();
-                    response["type"]        = type;
-
-                    if (type == "script")
-                    {
-                        response["subtype"] = static_cast<S32>(created->getInventorySubType());
-                        const std::string& runtime = created->getRuntime();
-                        if (!runtime.empty())
-                        {
-                            response["vm"] = runtime;
-                        }
-                    }
-
-                    const LLPermissions& item_perms = created->getPermissions();
-                    LLSD perm_entry;
-                    perm_entry["owner"]      = static_cast<S32>(item_perms.getMaskOwner());
-                    perm_entry["next_owner"] = static_cast<S32>(item_perms.getMaskNextOwner());
-                    response["permissions"]  = perm_entry;
-                    response["creator_id"]   = item_perms.getCreator();
-                    response["prim_id"]      = prim_id;
-                    break;
+                    response["vm"] = runtime;
                 }
             }
+
+            const LLPermissions& item_perms = created->getPermissions();
+            LLSD perm_entry;
+            perm_entry["owner"]      = static_cast<S32>(item_perms.getMaskOwner());
+            perm_entry["next_owner"] = static_cast<S32>(item_perms.getMaskNextOwner());
+            response["permissions"]  = perm_entry;
+            response["creator_id"]   = item_perms.getCreator();
+            response["prim_id"]      = prim_id;
+            return true;
+        }
+        return false;
+    };
+
+    // The capability's answer, which names the item; or -- on the legacy
+    // path, or where the answer names none -- the prim's inventory coming
+    // to hold it. A change to the inventory that is some other item's is
+    // waited past, for as long as the time allows.
+    const F64 deadline = LLTimer::getTotalSeconds().value() + ITEM_CREATE_TIMEOUT;
+    LLSD      response;
+    for (;;)
+    {
+        const F64 left = deadline - LLTimer::getTotalSeconds().value();
+        if (left <= 0.0)
+        {
+            throw LLJSONRPCConnection::RequestTimeoutError("Timed out waiting for item creation");
+        }
+        const LLSD event = llcoro::suspendUntilEventOnWithTimeout(result_pump, static_cast<F32>(left), LLSD().with("timeout", true));
+        if (event.has("timeout"))
+        {
+            throw LLJSONRPCConnection::RequestTimeoutError("Timed out waiting for item creation");
+        }
+
+        prim = gObjectList.findObject(prim_id);
+        if (!prim)
+        {
+            throw LLJSONRPCConnection::InternalError("Prim no longer exists");
+        }
+
+        const bool  answered = event["answered"].asBoolean();
+        const LLSD& answer   = event["answer"];
+        if (answered && event["success"].asBoolean() && answer["item_id"].asUUID().notNull())
+        {
+            response["item_id"]     = answer["item_id"];
+            response["name"]        = answer["name"];
+            response["description"] = desc;
+            response["type"]        = type;
+            response["prim_id"]     = prim_id;
+
+            if (type == "script")
+            {
+                response["subtype"] = static_cast<S32>(sub_type);
+            }
+
+            LLSD perm_entry;
+            perm_entry["owner"]      = static_cast<S32>(perms.getMaskOwner());
+            perm_entry["next_owner"] = static_cast<S32>(perms.getMaskNextOwner());
+            response["permissions"]  = perm_entry;
+            response["creator_id"]   = gAgent.getID();
+            return response;
+        }
+
+        if (find_created(prim, response))
+        {
+            return response;
+        }
+        if (answered && !event["success"].asBoolean())
+        {
+            const std::string why = answer["message"].asString();
+            throw LLJSONRPCConnection::InternalError("Item creation failed" + (why.empty() ? std::string() : ": " + why));
         }
     }
-
-    if (!response.has("item_id"))
-    {
-        throw LLJSONRPCConnection::InternalError("Item was not found in updated inventory");
-    }
-
-    return response;
 }
 
 
@@ -1966,171 +2403,211 @@ void LLScriptEditorWSServer::sendUnsubscribeScriptEditor(const std::string& scri
     notifyScript(script_id, "script.unsubscribe", params);
 }
 
-void LLScriptEditorWSServer::sendCompileResults(const std::string &script_id, const LLSD &results) const
+// static
+LLSD LLScriptEditorWSServer::compiledMessage(const std::string& script_id, bool success, bool running,
+                                             const std::vector<ALScriptDiagnostic>& diagnostics, bool lua)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    LLHandle<LLPanel> editor_handle = findEditorForScript(script_id);
-    if (editor_handle.isDead())
-    {
-        return;
-    }
-    LLScriptEdContainer* editor = dynamic_cast<LLScriptEdContainer*>(editor_handle.get());
-    if (!editor)
-    {
-        return;
-    }
-    LLScriptEdCore* core = editor->getScriptEdCore();
-    bool is_lua = core && (core->isLuauLanguage());
-
     LLSD params;
-    params["script_id"] = script_id;
-    params["success"]  = results["compiled"].asBoolean();
-    params["running"]  = results["is_running"].asBoolean();
-    if (results.has("errors"))
+    params["script_id"]   = script_id;
+    params["success"]     = success;
+    params["running"]     = running;
+    params["diagnostics"] = LLSD::emptyArray();
+    for (const ALScriptDiagnostic& diagnostic : diagnostics)
     {
-        params["diagnostics"] = LLSD::emptyArray();
-
-        if (is_lua)
-        {   // lua errors: ":line: message", line is 1-based
-            for (const auto& err : llsd::inArray(results["errors"]))
-            {
-                boost::smatch match;
-                LLSD err_entry;
-
-                err_entry["column"] = 0; // TODO: Lua compiler does not provide column info
-                err_entry["level"]  = "ERROR";
-
-                if (boost::regex_match(err.asString(), match, LUAU_LOCATION_PATTERN))
-                {
-                    S32 line_number = std::stoi(match[2].str());
-                    std::string message = match[3].str();
-
-                    err_entry["row"] = line_number;
-                    err_entry["message"] = message;
-                }
-                else
-                {
-                    err_entry["row"] = 0;
-                    err_entry["message"] = err.asString();
-                }
-                params["diagnostics"].append(err_entry);
-            }
-        }
-        else
-        {   // lsl errors: "(line, column) : SEVERITY : message", line and column are 0-based
-            for (const auto& err : llsd::inArray(results["errors"]))
-            {
-                boost::smatch match;
-                LLSD err_entry;
-
-                if (boost::regex_match(err.asString(), match, LSL_LOCATION_PATTERN))
-                {
-                    S32         line_number = std::stoi(match[1].str());
-                    S32         col_number = std::stoi(match[2].str());
-                    std::string severity = match[3].str();
-                    std::string message = match[4].str();
-
-                    err_entry["row"]     = line_number + 1;
-                    err_entry["column"]  = col_number + 1;
-                    err_entry["level"]   = severity;
-                    err_entry["message"] = message;
-                    err_entry["format"]  = "lsl";
-                }
-                else
-                {
-                    err_entry["row"]     = 0;
-                    err_entry["column"]  = 0;
-                    err_entry["level"]   = "ERROR";
-                    err_entry["message"] = err.asString();
-                    err_entry["format"]  = "lsl";
-                }
-                params["diagnostics"].append(err_entry);
-            }
-        }
+        params["diagnostics"].append(diagnosticEntry(diagnostic, lua));
     }
-
-    notifyScript(script_id, "script.compiled", params);
+    return params;
 }
 
-void LLScriptEditorWSServer::forwardChatToIDE(
-    const LLChat& chat_msg,
-    LLPublishedObjectMgr::RuntimeEventAggregator::Channel channel) const
+// static
+LLSD LLScriptEditorWSServer::diagnosticEntry(const ALScriptDiagnostic& diagnostic, bool lua)
+{
+    // The protocol counts from one, and says zero for a place the
+    // compiler did not name.
+    LLSD entry;
+    entry["row"]     = diagnostic.hasLine ? diagnostic.line + 1 : 0;
+    entry["column"]  = diagnostic.hasLine && diagnostic.hasColumn ? diagnostic.column + 1 : 0;
+    entry["level"]   = diagnostic.level.empty() ? std::string("ERROR") : diagnostic.level;
+    entry["message"] = diagnostic.message;
+    if (!lua)
+    {
+        entry["format"] = "lsl";
+    }
+    return entry;
+}
+
+namespace
+{
+    // Whether an item is a Luau script.
+    bool isLuaItem(const LLInventoryItem* item)
+    {
+        return item && item->getType() == LLAssetType::AT_LSL_TEXT && item->getInventorySubType() == SST_LUA;
+    }
+}
+
+bool LLScriptEditorWSServer::holds(const ALScriptRef& ref) const
+{
+    if (mSubscriptions.find(buildScriptSubscriptionId(ref.object, ref.item)) != mSubscriptions.end())
+    {
+        return true;
+    }
+    LLViewerObject* prim = ref.inInventory() ? nullptr : gObjectList.findObject(ref.object);
+    const LLViewerObject* root = prim && prim->getRootEdit() ? prim->getRootEdit() : prim;
+    return root && isObjectPublished(root->getID());
+}
+
+void LLScriptEditorWSServer::sendCompiled(const ALScriptCompileResult& result)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    // Nothing compiled: a notecard. Nor one this bridge sent, which its
+    // client is answered about as the save's reply.
+    if (result.kind == ALScriptKind::Notecard || result.ref.item.isNull() || result.sender.origin == ALScriptOrigin::Bridge)
+    {
+        return;
+    }
+    const std::string script_id = buildScriptSubscriptionId(result.ref.object, result.ref.item);
+    const auto        subscribed = mSubscriptions.find(script_id);
+
+    LLViewerObject* prim = result.ref.inInventory() ? nullptr : gObjectList.findObject(result.ref.object);
+    LLUUID          root_id;
+    if (prim)
+    {
+        root_id = prim->getRootEdit() ? prim->getRootEdit()->getID() : prim->getID();
+    }
+    const bool published = root_id.notNull() && isObjectPublished(root_id);
+    if (subscribed == mSubscriptions.end() && !published)
+    {
+        return;
+    }
+    const LLInventoryItem* item = result.ref.inInventory() ? gInventory.getItem(result.ref.item) : prim ? prim->getInventoryItem(result.ref.item) : nullptr;
+    const bool             lua  = subscribed != mSubscriptions.end() ? subscribed->second.mLua : isLuaItem(item);
+
+    // Of the source, which is what the client has: a save from the studio
+    // went up in its envelope, expanded. An upload that failed compiled
+    // nothing, and says why at no line.
+    std::vector<ALScriptDiagnostic> said = result.inSource();
+    if (!result.error.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[REASON]"] = result.error;
+        ALScriptDiagnostic failed;
+        failed.hasLine = false;
+        failed.level   = "ERROR";
+        failed.message = LLTrans::getString("BridgeNotSaved", args);
+        said           = { failed };
+    }
+    LLSD message = compiledMessage(script_id, result.success && result.error.empty(), result.running, said, lua);
+    if (prim)
+    {
+        message["object_id"] = root_id;
+        message["prim_id"]   = result.ref.object;
+    }
+    message["item_id"] = result.ref.item;
+    if (subscribed != mSubscriptions.end())
+    {
+        notifyScript(script_id, "script.compiled", message);
+    }
+    else
+    {
+        notifyAll("script.compiled", message);
+    }
+
+    // The item's asset is another now: the prim's inventory fetched
+    // again, so that the object.update that follows says so.
+    if (published && prim && result.success && !mPublishedObjectManager.hasInventoryRequestStart(prim->getID()))
+    {
+        prim->dirtyInventory();
+        mPublishedObjectManager.setInventoryRequestStart(prim->getID(), LLTimer::getTotalSeconds().value());
+        prim->requestInventory();
+    }
+}
+
+void LLScriptEditorWSServer::sendRuntimeEvent(const ALScriptRuntimeEvent& event) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
 
-    mPublishedObjectManager.ingestRuntimeChat(chat_msg, channel);
-}
-
-void LLScriptEditorWSServer::sendRuntimeEvent(
-    const LLPublishedObjectMgr::RuntimeChatEvent& event) const
-{
+    // The protocol's channels: what an object says aloud or in an IM is
+    // the studio's to show, not the bridge's to send.
+    if (event.channel != ALScriptRuntimeEvent::Channel::Debug && event.channel != ALScriptRuntimeEvent::Channel::OwnerSay)
+    {
+        return;
+    }
 
     std::string script_id;
-    if (event.mItemID.notNull())
+    if (event.item.notNull())
     {
-        script_id = buildScriptSubscriptionId(event.mPrimID, event.mItemID);
+        script_id = buildScriptSubscriptionId(event.prim, event.item);
     }
 
-    if (!isObjectPublished(event.mRootID) &&
+    if (!isObjectPublished(event.root) &&
         (script_id.empty() || mSubscriptions.find(script_id) == mSubscriptions.end()))
     {
         return;
     }
 
     LLSD message;
-    message["object_id"] = event.mRootID;
-    message["prim_id"] = event.mPrimID;
-    message["item_id"] = event.mItemID;
-    message["object_name"] = event.mObjectName;
-    message["message"] = event.mMessage;
+    if (!script_id.empty())
+    {
+        message["script_id"] = script_id;
+    }
+    message["object_id"] = event.root;
+    message["prim_id"] = event.prim;
+    message["item_id"] = event.item;
+    message["object_name"] = event.objectName;
+    message["message"] = event.message;
 
     LLSD item;
-    item["root_id"] = event.mRootID;
-    item["prim_id"] = event.mPrimID;
-    item["item_id"] = event.mItemID;
-    item["name"] = event.mScriptName;
-    item["language"] =
-        event.mVM == LLPublishedObjectMgr::RuntimeEventAggregator::VM::LUAU
-            ? "luau"
-            : "lsl";
+    item["root_id"] = event.root;
+    item["prim_id"] = event.prim;
+    item["item_id"] = event.item;
+    item["name"] = event.scriptName;
+    item["language"] = event.lua ? "luau" : "lsl";
     message["item"] = item;
 
-    switch (event.mChannel)
+    switch (event.channel)
     {
-    case LLPublishedObjectMgr::RuntimeEventAggregator::Channel::DEBUG:
+    case ALScriptRuntimeEvent::Channel::Debug:
         message["channel"] = "debug";
         break;
-    case LLPublishedObjectMgr::RuntimeEventAggregator::Channel::OWNER_SAY:
+    case ALScriptRuntimeEvent::Channel::OwnerSay:
         message["channel"] = "owner_say";
+        break;
+    default:
         break;
     }
 
-    if (event.mIsError)
+    if (event.isError)
     {
-        message["error"] = event.mError;
-        message["line"] = event.mLine;
-        message["column"] = event.mColumn;
+        // The protocol counts from one, and says zero for a place the
+        // message did not name.
+        message["error"] = event.error;
+        message["line"] = event.line < 0 ? 0 : event.line + 1;
+        message["column"] = event.column < 0 ? 0 : event.column + 1;
         message["stack"] = LLSD::emptyArray();
-        for (const auto& line : event.mStack)
+        for (const auto& line : event.stack)
         {
             message["stack"].append(line);
         }
     }
 
-    notifyAll(event.mIsError ? "runtime.error" : "runtime.debug", message);
+    notifyAll(event.isError ? "runtime.error" : "runtime.debug", message);
 }
 
 void LLScriptEditorWSServer::notifyConnection(U32 connection_id, const std::string& method, const LLSD& params) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    auto it = mActiveConnections.find(connection_id);
-    if (it != mActiveConnections.end())
+    LLScriptEditorWSConnection::ptr_t connection;
     {
-        auto connection = it->second.lock();
-        if (connection)
+        LLMutexLock lock(&mConnectionsMutex);
+        auto        it = mActiveConnections.find(connection_id);
+        if (it != mActiveConnections.end())
         {
-            connection->notify(method, params);
+            connection = it->second.lock();
         }
+    }
+    if (connection && connection->isAuthenticated())
+    {
+        connection->notify(method, params);
     }
 }
 
@@ -2143,41 +2620,26 @@ void LLScriptEditorWSServer::notifyAll(const std::string& method, const LLSD& pa
         LLSD(), method, params, LLSD(), LLSD());
     std::string payload = LlsdToJson(envelope);
 
-
-    for (const auto& pair : mActiveConnections)
+    // The connections taken under the lock, the sending done outside it;
+    // one that has not proven itself hears nothing.
+    std::vector<LLScriptEditorWSConnection::ptr_t> connections;
     {
-        auto connection = pair.second.lock();
-        if (connection)
+        LLMutexLock lock(&mConnectionsMutex);
+        for (const auto& pair : mActiveConnections)
         {
-            connection->sendMessage(payload);
+            auto connection = pair.second.lock();
+            if (connection && connection->isAuthenticated())
+            {
+                connections.push_back(std::move(connection));
+            }
         }
     }
+    for (const auto& connection : connections)
+    {
+        connection->sendMessage(payload);
+    }
 }
 
-
-// static
-std::string LLScriptEditorWSServer::getPrimName(LLViewerObject* obj)
-{
-    std::string name = nv_string(obj, "Name");
-    if (!name.empty())
-    {
-        return name;
-    }
-
-    if (!obj)
-    {
-        return std::string();
-    }
-
-    LLSelectNode* node = LLSelectMgr::instance().getSelection()->findNode(obj);
-    if (node && !node->mName.empty())
-    {
-        return node->mName;
-    }
-
-    // Never emit an empty prim/object name to downstream tooling.
-    return obj->getID().asString();
-}
 
 bool LLScriptEditorWSServer::publishObject(const LLUUID& object_id)
 {
@@ -2195,6 +2657,12 @@ bool LLScriptEditorWSServer::publishObject(const LLUUID& object_id)
         return false;
     }
 
+    if (!ALScriptWorkspace::rlvRefusal(root, LLAssetType::AT_NONE, ALScriptRlvUse::See).empty())
+    {
+        RlvUtil::notifyBlockedGeneric();
+        return false;
+    }
+
     // If already published, unpublish first to replace cleanly
     if (isObjectPublished(object_id))
     {
@@ -2202,14 +2670,10 @@ bool LLScriptEditorWSServer::publishObject(const LLUUID& object_id)
     }
 
     // Collect root + all children
-    std::vector<LLViewerObject*> prims = collect_linkset(root);
+    std::vector<LLViewerObject*> prims = LLPublishedObjectMgr::linksetOf(root);
 
-    // Request object properties for each prim in the linkset (root + children),
-    // matching the hover path so name/description metadata is refreshed.
-    for (LLViewerObject* prim : prims)
-    {
-        LLSelectMgr::instance().requestObjectPropertiesFamily(prim);
-    }
+    // The sim coalesces properties-family requests to the root, so one request covers the linkset.
+    LLSelectMgr::instance().requestObjectPropertiesFamily(root);
 
     // Set up a PendingPublish to coordinate inventory loading across all prims.
     // We register a listener and call requestInventory() on every prim.
@@ -2239,274 +2703,38 @@ bool LLScriptEditorWSServer::isObjectPublished(const LLUUID& object_id) const
     return mPublishedObjectManager.hasPublished(object_id);
 }
 
+// The publishing's bookkeeping lives in the manager; these are the
+// world's way in, kept on the server since that is what the world holds.
 void LLScriptEditorWSServer::onPrimInventoryReady(const LLUUID& object_id, const LLUUID& prim_id)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    if (mPublishedObjectManager.handlePrimInventoryReadyEvent(object_id, prim_id))
-    {
-        LL_DEBUGS("ScriptEditorWS") << "All prim inventories ready for object " << object_id << LL_ENDL;
-        buildAndSendPublish(object_id);
-    }
-}
-
-void LLScriptEditorWSServer::buildAndSendPublish(const LLUUID& object_id)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    if (!mPublishedObjectManager.hasPendingPublish(object_id))
-    {
-        LL_WARNS("ScriptEditorWS") << "buildAndSendPublish: no pending publish for " << object_id << LL_ENDL;
-        return;
-    }
-
-    LLViewerObject* root = gObjectList.findObject(object_id);
-    if (!root)
-    {
-        LL_WARNS("ScriptEditorWS") << "buildAndSendPublish: root object gone: " << object_id << LL_ENDL;
-        mPublishedObjectManager.cancelPendingPublish(object_id);
-        return;
-    }
-
-    LLSD pub = mPublishedObjectManager.buildPublishedObjectLLSD(root);
-
-    // Store in the published registry
-    LLPublishedObjectMgr::PublishedObjectInfo info;
-    info.mObjectID          = root->getID();
-    info.mOwnerID           = root->mOwnerID;
-    info.mObjectName        = pub["object_name"].asString();
-    info.mObjectDescription = pub["object_description"].asString();
-    if (root->getRegion())
-    {
-        info.mRegionName = root->getRegion()->getName();
-    }
-    LLSelectNode* root_select_node = LLSelectMgr::instance().getSelection()->findNode(root);
-    if (root_select_node
-        && root_select_node->mValid
-        && !root_select_node->mFromTaskID.isNull()
-        && !root->isAttachment())
-    {
-        info.mCanSaveBackToContents = true;
-        info.mSourceTaskID = root_select_node->mFromTaskID;
-    }
-    else
-    {
-        info.mCanSaveBackToContents = false;
-        info.mSourceTaskID.setNull();
-    }
-
-    S32 link_num = 1;
-    std::vector<LLViewerObject*> prims = collect_linkset(root);
-    for (LLViewerObject* prim : prims)
-    {
-        LLPublishedObjectMgr::PublishedPrimInfo prim_info;
-        prim_info.mPrimID          = prim->getID();
-        prim_info.mPrimName        = getPrimName(prim);  // Use helper with selection fallback
-        prim_info.mLinkNumber      = link_num++;
-        prim_info.mInventorySerial = static_cast<S16>(prim->getInventorySerial());
-        info.mPrims.push_back(prim_info);
-    }
-
-    LLPublishedObjectMgr::PublishedObjectInfo& published_info = mPublishedObjectManager.finalizePendingPublish(object_id, std::move(info));
-
-    // Align outgoing publish payload with any property responses that arrived
-    // while inventory-gated publish was still pending.
-    pub["object_name"] = published_info.mObjectName;
-    pub["can_save_back"] = published_info.mCanSaveBackToContents;
-    pub["object_description"] = published_info.mObjectDescription;
-    if (pub.has("linked_objects"))
-    {
-        LLSD& linked_objects = pub["linked_objects"];
-        for (S32 i = 0; i < linked_objects.size(); ++i)
-        {
-            const LLUUID link_id = linked_objects[i]["link_id"].asUUID();
-            auto prim_it = std::find_if(
-                published_info.mPrims.begin(),
-                published_info.mPrims.end(),
-                [&](const LLPublishedObjectMgr::PublishedPrimInfo& p)
-                {
-                    return p.mPrimID == link_id;
-                });
-            if (prim_it != published_info.mPrims.end())
-            {
-                linked_objects[i]["link_name"] = prim_it->mPrimName;
-                linked_objects[i]["link_description"] = prim_it->mPrimDescription;
-            }
-        }
-    }
-
-    // Send notification
-    LLSD message;
-    message["object"] = pub;
-    notifyAll("object.publish", message);
-
-    LL_INFOS("ScriptEditorWS") << "Published object " << object_id
-        << " (" << pub["object_name"].asString() << ") with "
-        << (prims.size() - 1) << " linked prim(s)" << LL_ENDL;
-
-    // Re-request object properties now that the object is published so
-    // onObjectPropertyChanged can emit object.update for root and linked prims.
-    for (LLViewerObject* prim : prims)
-    {
-        LLSelectMgr::instance().requestObjectPropertiesFamily(prim);
-    }
+    mPublishedObjectManager.onPrimInventoryReady(object_id, prim_id);
 }
 
 void LLScriptEditorWSServer::onLinksetChildAdded(const LLUUID& root_id, LLViewerObject* child)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    if (!child)
-    {
-        return;
-    }
-
-    if (!mPublishedObjectManager.reconcileLinksetChildAdded(
-            root_id,
-            child,
-            LLTimer::getTotalSeconds().value()))
-    {
-        return;
-    }
-
-    // Request inventory (async; fires onPrimInventoryChanged when ready).
-    child->requestInventory();
-
-    // Start safety-timeout timer (no-op if one is already pending for this root)
-    scheduleLinksetFlush(root_id, LINKSET_ADD_FLUSH_DELAY);
+    mPublishedObjectManager.onLinksetChildAdded(root_id, child);
 }
 
 void LLScriptEditorWSServer::onLinksetChildRemoved(const LLUUID& root_id, const LLUUID& child_id)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    if (!mPublishedObjectManager.reconcileLinksetChildRemoved(root_id, child_id))
-    {
-        return;
-    }
-
-    // Schedule coalesced flush - multiple simultaneous removes share one timer
-    scheduleLinksetFlush(root_id, LINKSET_REMOVE_FLUSH_DELAY);
-}
-
-void LLScriptEditorWSServer::scheduleLinksetFlush(const LLUUID& root_id, F32 delay)
-{
-    // No-op if a timer is already pending for this root_id
-    if (mPublishedObjectManager.hasActiveLinksetFlushTimer(root_id))
-    {
-        return;
-    }
-
-    wptr_t weak = std::static_pointer_cast<LLScriptEditorWSServer>(shared_from_this());
-    LLEventTimer* t = LLEventTimer::run_after(delay, [weak, root_id]()
-    {
-        if (auto self = weak.lock())
-        {
-            self->mPublishedObjectManager.clearLinksetFlushTimer(root_id);
-            self->mPublishedObjectManager.clearPendingNewChildren(root_id); // clear any remaining pending children (timeout path)
-            self->flushLinksetUpdate(root_id);
-        }
-    });
-    mPublishedObjectManager.setLinksetFlushTimer(root_id, t->getWeak());
-}
-
-void LLScriptEditorWSServer::cancelLinksetFlushTimer(const LLUUID& root_id)
-{
-    mPublishedObjectManager.cancelLinksetFlushTimer(root_id);
-}
-
-void LLScriptEditorWSServer::flushLinksetUpdate(const LLUUID& root_id)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    LLSD update;
-    if (!mPublishedObjectManager.buildLinksetUpdateLLSD(root_id, update))
-    {
-        return;
-    }
-    notifyAll("object.update", update);
-
-    const LLSD linked_objects = update["linked_objects"];
-    LL_INFOS("ScriptEditorWS") << "Linkset update for " << root_id
-        << ": " << linked_objects.size() << " child(ren)" << LL_ENDL;
+    mPublishedObjectManager.onLinksetChildRemoved(root_id, child_id);
 }
 
 void LLScriptEditorWSServer::onPrimInventoryChanged(const LLUUID& object_id, const LLUUID& prim_id)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    if (!mPublishedObjectManager.hasPublished(object_id))
-    {
-        return;
-    }
-
-    LLViewerObject* prim = gObjectList.findObject(prim_id);
-    if (!prim)
-    {
-        return;
-    }
-
-    auto inv_result = mPublishedObjectManager.handlePrimInventoryChangedEvent(
-        object_id, prim_id, prim, LLTimer::getTotalSeconds().value());
-
-    if (inv_result.mTimingConsumed)
-    {
-        LL_DEBUGS("ScriptEditorWS") << "[Phase0] inventory refresh object_id=" << object_id
-            << " prim_id=" << prim_id
-            << " elapsed_sec=" << inv_result.mTimingElapsedSec << LL_ENDL;
-    }
-
-    if (inv_result.mKind == LLPublishedObjectMgr::InventoryChangeKind::CHILD_READY_WAIT)
-    {
-        return;
-    }
-    if (inv_result.mKind == LLPublishedObjectMgr::InventoryChangeKind::CHILD_READY_FLUSH_NOW)
-    {
-        cancelLinksetFlushTimer(object_id);
-        flushLinksetUpdate(object_id);
-        return;
-    }
-    if (inv_result.mKind == LLPublishedObjectMgr::InventoryChangeKind::ROOT_INVENTORY_UPDATE ||
-        inv_result.mKind == LLPublishedObjectMgr::InventoryChangeKind::CHILD_INVENTORY_UPDATE)
-    {
-        notifyAll("object.update", inv_result.mUpdate);
-        if (inv_result.mHasPendingItemCreate)
-        {
-            LLEventPumps::instance().post(
-                inv_result.mPendingItemCreatePump,
-                LLSD().with("prim_id", prim_id));
-        }
-
-        LL_DEBUGS("ScriptEditorWS") << "Sent object.update for prim " << prim_id
-                                    << " in object " << object_id << LL_ENDL;
-    }
+    mPublishedObjectManager.onPrimInventoryChanged(object_id, prim_id);
 }
 
 void LLScriptEditorWSServer::onObjectPropertyChanged(
     const LLUUID& prim_id, const std::string& name, const std::string& desc, S16 inventory_serial)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    LLViewerObject* prim = gObjectList.findObject(prim_id);
-    if (!prim)
-    {
-        return;
-    }
+    mPublishedObjectManager.onObjectPropertyChanged(prim_id, name, desc, inventory_serial);
+}
 
-    LLUUID root_id = prim->getRootEdit()->getID();
-
-    mPublishedObjectManager.recordPendingPropertyChange(root_id, prim_id, name, desc);
-
-    bool should_refresh_inventory = mPublishedObjectManager.markPrimInventorySerialAndDetectChange(
-        root_id,
-        prim_id,
-        inventory_serial);
-
-    LLSD update;
-    if (mPublishedObjectManager.applyPropertyChange(root_id, prim_id, name, desc, update))
-    {
-        notifyAll("object.update", update);
-    }
-
-    if (should_refresh_inventory && !mPublishedObjectManager.hasInventoryRequestStart(prim_id))
-    {
-        prim->dirtyInventory();
-        mPublishedObjectManager.setInventoryRequestStart(prim_id, LLTimer::getTotalSeconds().value());
-        prim->requestInventory();
-    }
+void LLScriptEditorWSServer::onObjectPermissionsReceived(
+    const LLUUID& prim_id, const LLUUID& owner_id, U32 owner_mask, U32 next_owner_mask)
+{
+    mPublishedObjectManager.onObjectPermissionsReceived(prim_id, owner_id, owner_mask, next_owner_mask);
 }
 
 void LLScriptEditorWSServer::unpublishObject(const LLUUID& object_id, const std::string& reason)
@@ -2541,10 +2769,46 @@ std::shared_ptr<LLScriptEditorWSServer> LLScriptEditorWSConnection::getServer() 
 void LLScriptEditorWSConnection::onOpen()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    // A few at a time may be proving themselves: this one counts too.
+    auto server = getServer();
+    if (server && server->unauthenticatedConnectionCount() > MAX_UNAUTHENTICATED)
+    {
+        LL_WARNS_ONCE("ScriptEditorWS") << "Too many connections waiting to authenticate; closing new ones" << LL_ENDL;
+        closeConnection(1013, "Try again later");
+        return;
+    }
+
     // Call parent class to set up JSON-RPC infrastructure
     LLJSONRPCConnection::onOpen();
 
     LL_INFOS("ScriptEditorWS") << "Script editor JSON-RPC connection opened" << LL_ENDL;
+
+    // Who is logged in, the syntax in use and the challenge's file are
+    // the main thread's to say: the handshake goes from there.
+    wptr_t that = weak_from_this();
+    const bool posted = postToMainThread(
+        [that]()
+        {
+            if (auto self = that.lock())
+            {
+                self->sendHandshake();
+            }
+        });
+    if (!posted)
+    {
+        LL_WARNS("ScriptEditorWS") << "Main loop not taking work; closing the new connection" << LL_ENDL;
+        closeConnection(1013, "Try again later");
+    }
+}
+
+void LLScriptEditorWSConnection::sendHandshake()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    llassert(on_main_thread());
+    if (isClosed())
+    {
+        return;
+    }
 
     // Build hello data
     LLSD handshake;
@@ -2553,14 +2817,21 @@ void LLScriptEditorWSConnection::onOpen()
     handshake["viewer_name"]      = LLVersionInfo::instance().getChannel();
     handshake["viewer_version"]   = LLVersionInfo::instance().getVersion();
 
-    handshake["agent_id"] = gAgent.getID();
-    handshake["agent_name"] = gAgentUsername;
+    // Who is logged in is told once the client has proven itself, with
+    // session.ok: anything can connect and be sent this. Read here, on the
+    // main thread; kept as a plain id and string, which -- unlike an LLSD --
+    // may be read on the server's thread as a copy here goes.
+    const LLUUID      agent_id   = gAgent.getID();
+    const std::string agent_name = gAgentUsername;
 
-    std::string challenge_file = generateChallenge();
-    if (!challenge_file.empty())
+    const Challenge challenge = writeChallenge();
+    if (challenge.mFile.empty())
     {
-        handshake["challenge"] = challenge_file;
+        // Nothing to prove itself by, so nothing it may do.
+        sendDisconnect(DisconnectReason::INTERNAL_ERROR, "Unable to issue a challenge");
+        return;
     }
+    handshake["challenge"] = challenge.mFile;
 
     LLSD languages = LLSD::emptyArray();
     languages.append("lsl");
@@ -2579,22 +2850,36 @@ void LLScriptEditorWSConnection::onOpen()
 
     wptr_t that = weak_from_this();
 
-    // Send session.handshake method call and the response
-    call("session.handshake", handshake, [that](const LLSD& result, const LLSD& error) {
-        if (error.isUndefined())
+    // The answer comes once, whichever way: from the client, as the
+    // time runs out, or as the connection closes.
+    const LLSD sent = call(
+        "session.handshake", handshake,
+        [that, challenge, agent_id, agent_name](const LLSD& result, const LLSD& error)
         {
+            // Whatever the answer, the file has done its work.
+            LLFile::remove(challenge.mFile);
             auto self = that.lock();
-            if (self)
+            if (!self)
             {
-                self->handleHandshakeResponse(result);
+                return;
             }
-        }
-        else
+            if (error.isDefined())
+            {
+                self->handleHandshakeError(error);
+                return;
+            }
+            self->handleHandshakeResponse(result, challenge.mSecret, agent_id, agent_name);
+        },
+        HANDSHAKE_TIMEOUT);
+    if (sent.isUndefined())
+    {
+        LLFile::remove(challenge.mFile);
+        if (!isClosed())
         {
-            LL_WARNS("ScriptEditorWS") << "Handshake failed: "
-                                       << error["message"].asString() << LL_ENDL;
+            handleHandshakeError(LLSD().with("code", LLJSONRPCConnection::RPCError::INTERNAL_ERROR).with("message", "Handshake not sent"));
         }
-    });
+        return;
+    }
 
     LL_INFOS("ScriptEditorWS") << "Sent handshake call to new editor client" << LL_ENDL;
 }
@@ -2602,18 +2887,10 @@ void LLScriptEditorWSConnection::onOpen()
 void LLScriptEditorWSConnection::onClose()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    // Call parent class to clean up JSON-RPC infrastructure
+    // Call parent class to clean up JSON-RPC infrastructure. What the
+    // client said of itself, and the server it came to, go with the
+    // connection: the main thread may be reading them as this closes.
     LLJSONRPCConnection::onClose();
-    mOwningServer.reset();
-
-    // Clean up handshake response data
-    mClientName.clear();
-    mClientVersion.clear();
-    mProtocolVersion.clear();
-    mScriptName.clear();
-    mScriptLanguage.clear();
-    mLanguages.clear();
-    mFeatures.clear();
 }
 
 void LLScriptEditorWSConnection::sendDisconnect(DisconnectReason reason, const std::string& message)
@@ -2626,88 +2903,201 @@ void LLScriptEditorWSConnection::sendDisconnect(DisconnectReason reason, const s
     closeConnection(1000, message);
 }
 
-void LLScriptEditorWSConnection::handleHandshakeResponse(const LLSD& result)
+void LLScriptEditorWSConnection::handleHandshakeError(const LLSD& error)
+{
+    const S32 code = error["code"].asInteger();
+    if (code == LLJSONRPCConnection::RPCError::CONNECTION_CLOSED)
+    {
+        // Gone already.
+        return;
+    }
+    LL_WARNS("ScriptEditorWS") << "Handshake failed: " << error["message"].asString() << LL_ENDL;
+    sendDisconnect(code == LLJSONRPCConnection::RPCError::REQUEST_TIMEOUT ? DisconnectReason::TIMEOUT : DisconnectReason::PROTOCOL_ERROR,
+                   "Handshake failed");
+}
+
+void LLScriptEditorWSConnection::handleHandshakeResponse(const LLSD& result, const LLUUID& secret,
+                                                         const LLUUID& agent_id, const std::string& agent_name)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     LL_INFOS("ScriptEditorWS") << "Processing handshake response from client" << LL_ENDL;
 
-    mClientName      = result["client_name"].asString();
-    mClientVersion   = result["client_version"].asString();
-    mProtocolVersion = result["protocol_version"].asString();
-
-    // Validate challenge response (if a challenge was issued).
-    const bool challenge_issued = mChallenge.notNull();
-    bool       valid_response   = true;
-    if (challenge_issued)
-    {
-        valid_response = result.has("challenge_response") &&
-            (result["challenge_response"].asUUID() == mChallenge);
-        mChallenge.setNull();
-    }
-
-    // Always clean up the temporary challenge file if one was created,
-    // regardless of validation outcome.
-    if (!mChallengeFile.empty())
-    {
-        LLFile::remove(mChallengeFile);
-        mChallengeFile.clear();
-    }
-
-    if (challenge_issued && !valid_response)
+    // Only something that could read the file knows what it says.
+    if (!result.isMap() || result["challenge_response"].asUUID() != secret)
     {
         LL_WARNS("ScriptEditorWS") << "Invalid or missing challenge response from client" << LL_ENDL;
         sendDisconnect(DisconnectReason::PROTOCOL_ERROR, "Invalid challenge response");
         return;
     }
 
-    if (mProtocolVersion != "1.0")
+    const std::string protocol_version = result["protocol_version"].asString();
+    if (protocol_version != "1.0")
     {
         LL_WARNS("ScriptEditorWS") << "Protocol version mismatch. Expected: 1.0, Got: "
-                                    << mProtocolVersion << LL_ENDL;
+                                    << protocol_version << LL_ENDL;
     }
 
-    mScriptName     = result["script_name"].asString();
-    mScriptLanguage = result["script_language"].asString();
-
-    for (const auto& lang : llsd::inArray(result["languages"]))
     {
-        if (lang.isString())
+        // Written here, on the server's thread, and read on the main one.
+        LLMutexLock lock(&mHandshakeMutex);
+        mClientName      = result["client_name"].asString();
+        mClientVersion   = result["client_version"].asString();
+        mProtocolVersion = protocol_version;
+        mScriptName      = result["script_name"].asString();
+        mScriptLanguage  = result["script_language"].asString();
+
+        for (const auto& lang : llsd::inArray(result["languages"]))
         {
-            mLanguages.insert(lang.asString());
+            if (lang.isString())
+            {
+                mLanguages.insert(lang.asString());
+            }
+        }
+
+        for (const auto& [feature, enabled] : llsd::inMap(result["features"]))
+        {
+            if (enabled.asBoolean())
+            {
+                mFeatures.insert(feature);
+            }
         }
     }
 
-    for (const auto& [feature, enabled] : llsd::inMap(result["features"]))
-    {
-        if (enabled.asBoolean())
-        {
-            mFeatures.insert(feature);
-        }
-    }
-
-    notify("session.ok");
+    // Let in before it is told so: what it asks on hearing it must be
+    // answered. Who is logged in is told now, to a client that has shown
+    // it runs as the user.
+    setAuthenticated(true);
+    LLSD ok;
+    ok["agent_id"]   = agent_id;
+    ok["agent_name"] = agent_name;
+    notify("session.ok", ok);
 
     LL_INFOS("ScriptEditorWS") << "Handshake completed successfully." << LL_ENDL;
 }
 
-std::string LLScriptEditorWSConnection::generateChallenge()
+// static
+LLScriptEditorWSConnection::Challenge LLScriptEditorWSConnection::writeChallenge()
 {
-    mChallenge.generate();
-
-    mChallengeFile = std::string(LLFile::tmpdir()) + "sl_script_challenge_" + mChallenge.asString() + ".tmp";
-
-    llofstream file(mChallengeFile.c_str());
-    if (!file.is_open())
+    // A secret nobody could work out: a new id is made of the time and
+    // the network card's address, which are anybody's to know.
+    Challenge challenge;
+    if (RAND_bytes(challenge.mSecret.mData, UUID_BYTES) != 1)
     {
-        LL_WARNS("ScriptEditorWS") << "Unable to open challenge file: " << mChallengeFile << LL_ENDL;
-        mChallenge.setNull();
-        mChallengeFile.clear();
-        return std::string();
+        LL_WARNS("ScriptEditorWS") << "Unable to make a challenge secret" << LL_ENDL;
+        return {};
     }
 
-    file << mChallenge;
-    file.close();
+    // Named for nothing it holds, made new rather than written over
+    // anything, or through a link, already by that name, and readable by
+    // the user alone: the name goes to whoever connects, and the temp
+    // folder can be everyone's.
+    const std::string file = LLFile::tmpdir() + "sl_script_challenge_" + LLUUID::generateNewID().asString() + ".tmp";
+    const std::string text = challenge.mSecret.asString();
+    if (!writeUserOnlyFile(file, text))
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to write challenge file " << file << LL_ENDL;
+        return {};
+    }
 
-    return mChallengeFile;
+    challenge.mFile = file;
+    return challenge;
+}
+
+// static
+bool LLScriptEditorWSConnection::writeUserOnlyFile(const std::string& file, const std::string& text)
+{
+#if LL_WINDOWS
+    // LLFile takes its permission bits for a read-only flag at most here,
+    // never an ACL, so 0600 would leave the file to whatever its folder
+    // grants. Made with an ACL of its own: the user's, and only theirs.
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to open the process token for the challenge file's ACL" << LL_ENDL;
+        return false;
+    }
+    DWORD needed = 0;
+    GetTokenInformation(token, TokenUser, nullptr, 0, &needed);
+    std::vector<BYTE> user_info(needed);
+    const bool got_user = needed != 0 && GetTokenInformation(token, TokenUser, user_info.data(), needed, &needed);
+    CloseHandle(token);
+    if (!got_user)
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to read the current user's SID for the challenge file's ACL" << LL_ENDL;
+        return false;
+    }
+    PSID user_sid = reinterpret_cast<PTOKEN_USER>(user_info.data())->User.Sid;
+
+    EXPLICIT_ACCESSW ea     = {};
+    ea.grfAccessPermissions = GENERIC_READ | GENERIC_WRITE | DELETE;
+    ea.grfAccessMode        = SET_ACCESS;
+    ea.grfInheritance       = NO_INHERITANCE;
+    ea.Trustee.TrusteeForm  = TRUSTEE_IS_SID;
+    ea.Trustee.TrusteeType  = TRUSTEE_IS_USER;
+    ea.Trustee.ptstrName    = reinterpret_cast<LPWSTR>(user_sid);
+
+    PACL dacl = nullptr;
+    if (SetEntriesInAclW(1, &ea, nullptr, &dacl) != ERROR_SUCCESS)
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to build an ACL for the challenge file" << LL_ENDL;
+        return false;
+    }
+
+    // Protected: a new file's ACL takes in what its folder hands down
+    // unless it says not to, and a temp folder can hand everyone read.
+    SECURITY_DESCRIPTOR sd;
+    const bool sd_ok = InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION) &&
+                       SetSecurityDescriptorDacl(&sd, TRUE, dacl, FALSE) &&
+                       SetSecurityDescriptorControl(&sd, SE_DACL_PROTECTED, SE_DACL_PROTECTED);
+    if (!sd_ok)
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to build a security descriptor for the challenge file" << LL_ENDL;
+        LocalFree(dacl);
+        return false;
+    }
+
+    SECURITY_ATTRIBUTES sa  = {};
+    sa.nLength              = sizeof(sa);
+    sa.lpSecurityDescriptor = &sd;
+    sa.bInheritHandle       = FALSE;
+
+    // CREATE_NEW, as LLFile::noreplace: whatever is there by that name is
+    // somebody else's, and stays.
+    const std::wstring wfile = ll_convert<std::wstring>(file);
+    HANDLE      handle = CreateFileW(wfile.c_str(), GENERIC_WRITE, 0, &sa, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    const DWORD error  = GetLastError();
+    LocalFree(dacl);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to make challenge file " << file << ": error " << error << LL_ENDL;
+        return false;
+    }
+    DWORD      written = 0;
+    const bool ok      = WriteFile(handle, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) && written == text.size();
+    const bool closed  = CloseHandle(handle) != FALSE;
+    if (!ok || !closed)
+    {
+        LLFile::remove(file);
+        return false;
+    }
+    return true;
+#else
+    std::error_code ec;
+    LLFile          out(file, LLFile::out | LLFile::noreplace, ec, 0600);
+    if (ec)
+    {
+        // Whatever is there by that name is somebody else's, and stays.
+        LL_WARNS("ScriptEditorWS") << "Unable to make challenge file " << file << ": " << ec.message() << LL_ENDL;
+        return false;
+    }
+    const bool written = out.write(text.data(), static_cast<S64>(text.size()), ec) == static_cast<S64>(text.size()) && !ec;
+    const bool closed  = out.close(ec) == 0;
+    if (!written || !closed)
+    {
+        LLFile::remove(file);
+        return false;
+    }
+    return true;
+#endif
 }
 

@@ -108,13 +108,14 @@ public:
     virtual void changed() { LLFloaterLand::refreshAll(); }
 };
 
-class LLPanelLandExperiences
+class LLPanelLandExperiences final
     :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandExperiences, LLPanel);
     LLPanelLandExperiences(LLSafeHandle<LLParcelSelection>& parcelp);
-    virtual bool postBuild();
-    void refresh();
+    virtual bool postBuild() override;
+    void refresh() override;
 
     void experienceAdded(const LLUUID& id, U32 xp_type, U32 access_type);
     void experienceRemoved(const LLUUID& id, U32 access_type);
@@ -130,10 +131,11 @@ protected:
 };
 
 
-class LLPanelLandEnvironment
+class LLPanelLandEnvironment final
     : public LLPanelEnvironmentInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandEnvironment, LLPanelEnvironmentInfo);
                         LLPanelLandEnvironment(LLSafeHandle<LLParcelSelection>& parcelp);
 
     virtual bool        isRegion() const override { return false; }
@@ -449,7 +451,6 @@ bool LLPanelLandGeneral::postBuild()
     mTextSalePending = getChild<LLTextBox>("SalePending");
     mTextOwnerLabel = getChild<LLTextBox>("Owner:");
     mTextOwner = getChild<LLTextBox>("OwnerText");
-    mTextOwner->setIsFriendCallback(LLAvatarActions::isFriend);
 
     mContentRating = getChild<LLTextBox>("ContentRatingText");
     mLandType = getChild<LLTextBox>("LandTypeText");
@@ -1198,7 +1199,6 @@ bool LLPanelLandObjects::postBuild()
     mIconGroup = LLUIImageList::getInstance()->getUIImage("icon_group.tga", 0);
 
     mOwnerList = getChild<LLNameListCtrl>("owner list");
-    mOwnerList->setIsFriendCallback(LLAvatarActions::isFriend);
     mOwnerList->sortByColumnIndex(3, false);
     childSetCommitCallback("owner list", onCommitList, this);
     mOwnerList->setDoubleClickCallback(onDoubleClickOwner, this);
@@ -2500,7 +2500,7 @@ void LLPanelLandAccess::refresh()
                 if (entry.mTime != 0)
                 {
                     LLStringUtil::format_map_t args;
-                    S32 now = (S32)time(NULL);
+                    S32 now = (S32)time_corrected();
                     S32 seconds = entry.mTime - now;
                     if (seconds < 0) seconds = 0;
                     prefix.assign(" (");
@@ -2549,7 +2549,7 @@ void LLPanelLandAccess::refresh()
                 if (entry.mTime != 0)
                 {
                     LLStringUtil::format_map_t args;
-                    S32 now = (S32)time(NULL);
+                    S32 now = (S32)time_corrected();
                     seconds = entry.mTime - now;
                     if (seconds < 0) seconds = 0;
 
@@ -3012,7 +3012,6 @@ bool LLPanelLandCovenant::postBuild()
     mLastRegionID = LLUUID::null;
     mNextUpdateTime = 0;
     mTextEstateOwner = getChild<LLTextBox>("estate_owner_text");
-    mTextEstateOwner->setIsFriendCallback(LLAvatarActions::isFriend);
     return true;
 }
 
@@ -3064,7 +3063,7 @@ void LLPanelLandCovenant::refresh()
     }
 
     if (mLastRegionID != region->getRegionID()
-        || mNextUpdateTime < LLTimer::getElapsedSeconds())
+        || mNextUpdateTime < LLTimer::getUptimeSeconds())
     {
         // Request Covenant Info
         // Note: LLPanelLandCovenant doesn't change Covenant's content and any
@@ -3077,7 +3076,7 @@ void LLPanelLandCovenant::refresh()
         msg->sendReliable(region->getHost());
 
         mLastRegionID = region->getRegionID();
-        mNextUpdateTime = LLTimer::getElapsedSeconds() + COVENANT_REFRESH_TIME_SEC;
+        mNextUpdateTime = LLTimer::getUptimeSeconds() + COVENANT_REFRESH_TIME_SEC;
     }
 }
 

@@ -1097,10 +1097,10 @@ bool    LLPreviewAnimation::render()
     LLViewerCamera* camera = LLViewerCamera::getInstance();
 
     LLQuaternion av_rot = avatarp->mRoot->getWorldRotation() * camera_rot;
-    camera->setOriginAndLookAt(
+    camera->lookAt(
         target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),     // camera
-        LLVector3::z_axis,                                                                  // up
-        target_pos + (mCameraOffset  * av_rot) );                                           // point of interest
+        target_pos + (mCameraOffset  * av_rot),                                             // point of interest
+        LLVector3::z_axis);                                                                 // up
 
     camera->setViewNoBroadcast(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
     camera->setAspect((F32) mFullWidth / (F32) mFullHeight);

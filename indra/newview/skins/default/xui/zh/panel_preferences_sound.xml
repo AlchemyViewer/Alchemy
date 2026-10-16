@@ -7,9 +7,6 @@
     <panel name="general_sound_panel">
 	<slider label="主音量" name="System Volume"/>
 	<check_box initial_value="true" name="mute_when_minimized"/>
-	<text name="mute_chb_label">
-		最小化時靜音
-	</text>
 	<slider label="按鍵音" name="UI Volume"/>
 	<slider label="環境音" name="Wind Volume"/>
 	<slider label="音效" name="SFX Volume"/>
@@ -19,16 +16,8 @@
 	<check_box label="已啟用" name="enable_media"/>
 	<slider label="語音聊天" name="Voice Volume"/>
 	<check_box label="已啟用" name="enable_voice_check"/>
-	<check_box label="允許媒體自動播放" name="media_auto_play_btn" tool_tip="若你想要，可以勾選這個允許媒體自動播放" value="true"/>
 	<check_box label="播放附加到其他化身身上的媒體" name="media_show_on_others_btn" tool_tip="若未勾選，將隱藏附著於附近其他化身身上的媒體" value="true"/>
 	<check_box label="播放來自姿勢的聲音" name="gesture_audio_play_btn" tool_tip="勾選即可聽到來自姿勢的聲音" value="true"/>
-	<text name="voice_chat_settings">
-		語音聊天設定
-	</text>
-	<line_editor label="「按下後說話」啟動鍵" name="modifier_combo"/>
-	<button label="設定按鍵" name="set_voice_hotkey_button"/>
-	<button name="set_voice_middlemouse_button" tool_tip="重設滑鼠中鍵按鈕"/>
-	<panel label="設備設定" name="device_settings_panel"/>
 	</panel>
 	<panel name="voice_sound_panel">
 	<text name="Listen from">

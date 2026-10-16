@@ -40,8 +40,8 @@ class LLGLTFLoader : public LLModelLoader
   public:
     typedef std::map<std::string, LLImportMaterial> material_map;
     typedef std::map<std::string, std::string> joint_viewer_parent_map_t;
-    typedef std::map<std::string, glm::mat4> joint_viewer_rest_map_t;
-    typedef std::map<S32, glm::mat4> joint_node_mat4_map_t;
+    typedef std::map<std::string, LLMatrix4a> joint_viewer_rest_map_t;
+    typedef std::map<S32, LLMatrix4a> joint_node_mat4_map_t;
 
     struct JointNodeData
     {
@@ -58,11 +58,11 @@ class LLGLTFLoader : public LLModelLoader
         S32 mJointListIdx;
         S32 mNodeIdx;
         S32 mParentNodeIdx;
-        glm::mat4 mGltfRestMatrix;
-        glm::mat4 mViewerRestMatrix;
-        glm::mat4 mOverrideRestMatrix;
-        glm::mat4 mGltfMatrix;
-        glm::mat4 mOverrideMatrix;
+        LLMatrix4a mGltfRestMatrix;
+        LLMatrix4a mViewerRestMatrix;
+        LLMatrix4a mOverrideRestMatrix;
+        LLMatrix4a mGltfMatrix;
+        LLMatrix4a mOverrideMatrix;
         std::string mName;
         bool mIsValidViewerJoint;
         bool mIsParentValidViewerJoint;
@@ -100,11 +100,11 @@ class LLGLTFLoader : public LLModelLoader
 
     struct GLTFVertex
     {
-        glm::vec3 position;
-        glm::vec3 normal;
-        glm::vec2 uv0;
-        glm::u16vec4 joints;
-        glm::vec4 weights;
+        LLVector3 position;
+        LLVector3 normal;
+        LLVector2 uv0;
+        U16 joints[4];
+        LLVector4 weights;
     };
 
 protected:
@@ -145,7 +145,7 @@ protected:
 
 private:
     bool parseMeshes();
-    void computeCombinedNodeTransform(const LL::GLTF::Asset& asset, S32 node_index, glm::mat4& combined_transform) const;
+    void computeCombinedNodeTransform(const LL::GLTF::Asset& asset, S32 node_index, LLMatrix4a& combined_transform) const;
     void processNodeHierarchy(S32 node_idx, std::map<std::string, S32>& mesh_name_counts, U32 submodel_limit, const LLVolumeParams& volume_params);
     bool addJointToModelSkin(LLMeshSkinInfo& skin_info, S32 gltf_skin_idx, size_t gltf_joint_idx);
     LLGLTFImportMaterial processMaterial(S32 material_index, S32 fallback_index);
@@ -157,12 +157,12 @@ private:
     void populateJointGroups();
     void addModelToScene(LLModel* pModel, const std::string& model_name, U32 submodel_limit, const LLMatrix4& transformation, const LLVolumeParams& volume_params, const material_map& mats);
     void buildJointGroup(LLJointData& viewer_data, const std::string& parent_group);
-    void buildOverrideMatrix(LLJointData& data, joints_data_map_t &gltf_nodes, joints_name_to_node_map_t &names_to_nodes, glm::mat4& parent_rest, glm::mat4& support_rest) const;
-    glm::mat4 buildGltfRestMatrix(S32 joint_node_index, const LL::GLTF::Skin& gltf_skin) const;
-    glm::mat4 buildGltfRestMatrix(S32 joint_node_index, const joints_data_map_t& joint_data) const;
-    glm::mat4 rotateGltfMatrixToViewerSpace(const glm::mat4& gltf_matrix) const;
-    glm::mat4 computeViewerBindMatrix(const joints_data_map_t& joints_data_map, const joint_node_mat4_map_t& rotated_bind_matrices, S32 gltf_node_index, joint_node_mat4_map_t& converted_bind_matrices) const;
-    glm::mat4 computeGltfToViewerSkeletonTransform(const joints_data_map_t& joints_data_map, S32 gltf_node_index, const std::string& joint_name) const;
+    void buildOverrideMatrix(LLJointData& data, joints_data_map_t &gltf_nodes, joints_name_to_node_map_t &names_to_nodes, LLMatrix4a& parent_rest, LLMatrix4a& support_rest) const;
+    LLMatrix4a buildGltfRestMatrix(S32 joint_node_index, const LL::GLTF::Skin& gltf_skin) const;
+    LLMatrix4a buildGltfRestMatrix(S32 joint_node_index, const joints_data_map_t& joint_data) const;
+    LLMatrix4a rotateGltfMatrixToViewerSpace(const LLMatrix4a& gltf_matrix) const;
+    LLMatrix4a computeViewerBindMatrix(const joints_data_map_t& joints_data_map, const joint_node_mat4_map_t& rotated_bind_matrices, S32 gltf_node_index, joint_node_mat4_map_t& converted_bind_matrices) const;
+    LLMatrix4a computeGltfToViewerSkeletonTransform(const joints_data_map_t& joints_data_map, S32 gltf_node_index, const std::string& joint_name) const;
     bool checkForXYrotation(const LL::GLTF::Skin& gltf_skin, S32 joint_idx, S32 bind_indx);
     void checkForXYrotation(const LL::GLTF::Skin& gltf_skin);
     void checkGlobalJointUsage();

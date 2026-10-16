@@ -565,21 +565,11 @@ Das Objekt ist möglicherweise außer Reichweite oder wurde gelöscht.</notifica
 	<notification name="SaveNotecardFailObjectNotFound">Notizkarte konnte nicht gespeichert werden, da das Objekt oder das zugehörige Objektinventar nicht gefunden wurden.
 Das Objekt ist möglicherweise außer Reichweite oder wurde gelöscht.</notification>
 	<notification name="SaveNotecardFailReason">Eine Notizkarte konnte aus folgendem Grund nicht gespeichert werden: [REASON].  Speichern Sie die Notizkarte bitte später.</notification>
-	<notification name="ScriptCannotUndo">
-		Es konnten nicht alle Änderungen in Ihrer Skriptversion rückgängig gemacht werden.
-Möchten Sie die letzte gespeicherte Version vom Server laden?
-(**Warnung** Dieser Vorgang kann nicht rückgängig gemacht werden.)
-		<usetemplate name="okcancelbuttons" notext="Abbrechen" yestext="OK"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">Skript konnte nicht gespeichert werden, weil das zugehörige Objekt nicht gefunden wurde.
-Das Objekt ist möglicherweise außer Reichweite oder wurde gelöscht.</notification>
 	<notification name="StartRegionEmpty">
 		Ihre Startregion ist nicht definiert.
 Geben Sie den Namen der Region im Feld „Startposition“ ein oder wählen Sie „Mein letzter Standort“ oder „Mein Zuhause“ als Startposition aus.
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
-	<notification name="CouldNotStartStopScript">Skript konnte nicht gestartet oder beendet werden, weil das zugehörige Objekt nicht gefunden wurde.
-Das Objekt ist möglicherweise außer Reichweite oder wurde gelöscht.</notification>
 	<notification name="CannotDownloadFile">Dateidownload nicht möglich</notification>
 	<notification label="" name="MediaFileDownloadUnsupported">
 		Sie haben einen Datei-Download angefordert, der in [SECOND_LIFE] nicht unterstützt wird.
@@ -864,10 +854,6 @@ erfassten Parzellen eine große Parzelle.
 Sie müssen der neuen Parzelle einen Namen geben und ihre Optionen festlegen.
 
 Land zusammenlegen?
-		<usetemplate name="okcancelbuttons" notext="Abbrechen" yestext="OK"/>
-	</notification>
-	<notification name="ConfirmNotecardSave">
-		Um das Objekt kopieren oder anzeigen zu können, müssen Sie zuerst diese Notizkarte speichern. Notizkarte speichern?
 		<usetemplate name="okcancelbuttons" notext="Abbrechen" yestext="OK"/>
 	</notification>
 	<notification name="ConfirmItemCopy">
@@ -1464,7 +1450,6 @@ womit Sie die Höchstgrenze von [LIMIT] überschreiten.
 	<notification label="Nachricht an alle auf diesem Grundbesitz" name="MessageEstate">
 		Geben Sie eine kurze Nachricht ein, die an jede Person auf Ihrem Grundbesitz gesendet wird.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Abbrechen"/>
 		</form>
@@ -1710,7 +1695,6 @@ Anzeige für [AMOUNT] L$ veröffentlichen?
 	<notification label="Nachricht an alle in dieser Region" name="MessageRegion">
 		Geben Sie eine kurze Nachricht ein, die an jede Person in dieser Region gesendet wird.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Abbrechen"/>
 		</form>
@@ -1787,7 +1771,6 @@ Möchten Sie diesen Kauf fortsetzen?
 Möchten Sie diesen Kauf fortsetzen?
 Geben Sie Ihr Kennwort erneut ein und klicken Sie auf OK.
 		<form name="form">
-			<input name="message"/>
 			<button name="ConfirmPurchase" text="OK"/>
 			<button name="Cancel" text="Abbrechen"/>
 		</form>
@@ -2058,9 +2041,6 @@ Dies kann die Eingabe Ihres Passworts beeinflussen.</notification>
 	<notification name="IMAcrossParentEstates">Senden von IMs über übergeordnete Grundbesitze hinweg nicht möglich.</notification>
 	<notification name="TransferInventoryAcrossParentEstates">Inventarübertragung über übergeordnete Grundbesitze hinweg nicht möglich.</notification>
 	<notification name="UnableToLoadNotecard">Notizkarten-Asset konnte nicht geladen werden.</notification>
-	<notification name="ScriptMissing">Skript fehlt in Datenbank.</notification>
-	<notification name="ScriptNoPermissions">Unzureichende Rechte zur Anzeige des Skripts.</notification>
-	<notification name="UnableToLoadScript">Skript konnte nicht geladen werden.  Bitte versuchen Sie es erneut.</notification>
 	<notification name="IncompleteInventory">Die von Ihnen angebotenen Inhalte sind noch nicht vollständig lokal verfügbar. Warten Sie kurz und wiederholen Sie dann das Angebot.</notification>
 	<notification name="CannotModifyProtectedCategories">Geschützte Kategorien können nicht geändert werden.</notification>
 	<notification name="CannotRemoveProtectedCategories">Geschützte Kategorien können nicht entfernt werden.</notification>
@@ -2553,7 +2533,6 @@ Siehe Alchemy.log für weitere Details</notification>
 mit den folgenden Einwohnern teilen:
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="Abbrechen" yestext="OK"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		Es kann nur jeweils ein Ordner geteilt werden.
@@ -2821,9 +2800,6 @@ Möchten Sie fortfahren?
 		Das ausgewählte Objekt wirkt sich auf das Navmesh aus. Wenn Sie es in einen flexiblen Pfad ändern, wird es aus dem Navmesh entfernt.
 		<usetemplate ignoretext="Das ausgewählte Objekt wirkt sich auf das Navmesh aus. Wenn Sie es in einen flexiblen Pfad ändern, wird es aus dem Navmesh entfernt." name="okcancelignore" notext="Abbrechen" yestext="OK"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">Ihr Computer entspricht nicht den Hardwareanforderungen von [APP_NAME]. [APP_NAME] setzt eine OpenGL-Grafikkarte mit Multitextur-Unterstützung voraus. Falls Ihre Grafikkarte diese Funktion unterstützt, installieren Sie die neuesten Treiber sowie die aktuellen Service Packs und Patches für Ihr Betriebssystem.
-
-Sollte das Problem fortbestehen, finden Sie weitere Hilfestellung unter [SUPPORT_SITE].</global>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
 	<global name="UnsupportedGPU">- Ihre Grafikkarte entspricht nicht den Mindestanforderungen.</global>

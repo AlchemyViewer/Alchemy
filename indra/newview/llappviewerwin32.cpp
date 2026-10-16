@@ -63,194 +63,7 @@
 #endif
 #include "llversioninfovars.h"
 
-// Sentry (https://sentry.io) crash reporting tool
-#if AL_SENTRY
-#include <sentry.h>
-#endif
-
-// Bugsplat (http://bugsplat.com) crash reporting tool
-#ifdef LL_BUGSPLAT
-#include "bugsplat/BugSplat.h"
-#include <simdjson.h>
-#include "llagent.h"                // for agent location
-#include "llmemory.h"
-#include "llstartup.h"
-#include "llviewerregion.h"
-#include "llvoavatarself.h"         // for agent name
-
-namespace
-{
-    // MiniDmpSender's constructor is defined to accept __wchar_t* instead of
-    // plain wchar_t*. That said, wunder() returns std::basic_string<__wchar_t>,
-    // NOT plain __wchar_t*, despite the apparent convenience. Calling
-    // wunder(something).c_str() as an argument expression is fine: that
-    // std::basic_string instance will survive until the function returns.
-    // Calling c_str() on a std::basic_string local to wunder() would be
-    // Undefined Behavior: we'd be left with a pointer into a destroyed
-    // std::basic_string instance. But we can do that with a macro...
-    #define WCSTR(string) wunder(string).c_str()
-
-    // It would be nice if, when wchar_t is the same as __wchar_t, this whole
-    // function would optimize away. However, we use it only for the arguments
-    // to the BugSplat API -- a handful of calls.
-    inline std::basic_string<__wchar_t> wunder(const std::wstring& str)
-    {
-        return { str.begin(), str.end() };
-    }
-
-    // when what we have in hand is a std::string, convert from UTF-8 using
-    // specific wstringize() overload
-    inline std::basic_string<__wchar_t> wunder(const std::string& str)
-    {
-        return wunder(wstringize(str));
-    }
-
-    // Irritatingly, MiniDmpSender::setCallback() is defined to accept a
-    // classic-C function pointer instead of an arbitrary C++ callable. If it
-    // did accept a modern callable, we could pass a lambda that binds our
-    // MiniDmpSender pointer. As things stand, though, we must define an
-    // actual function and store the pointer statically.
-    static MiniDmpSender *sBugSplatSender = nullptr;
-    static std::string sBugsplatDescriptionField;
-
-    bool bugsplatSendLog(UINT nCode, LPVOID lpVal1, LPVOID lpVal2)
-    {
-        if (nCode == MDSCB_EXCEPTIONCODE)
-        {
-            // send the main viewer log file, one per instance
-            // widen to wstring, convert to __wchar_t, then pass c_str()
-            sBugSplatSender->sendAdditionalFile(
-                WCSTR(LLError::logFileName()));
-
-            // second instance does not have some log files
-            // TODO: This needs fixing, if each instance now has individual logs,
-            // same should be made true for static debug files
-            if (!LLAppViewer::instance()->isSecondInstance())
-            {
-                sBugSplatSender->sendAdditionalFile(
-                    WCSTR(*LLAppViewer::instance()->getStaticDebugFile()));
-            }
-
-            sBugSplatSender->sendAdditionalFile(
-                WCSTR(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "settings.xml")));
-
-            // We don't have an email address for any user. Hijack this
-            // metadata field for the platform identifier.
-            sBugSplatSender->setDefaultUserEmail(
-                WCSTR(LLOSInfo::instance().getOSStringSimple()));
-
-            if (gAgentAvatarp)
-            {
-                // user name, when we have it
-                sBugSplatSender->setDefaultUserName(WCSTR(gAgentAvatarp->getFullname()));
-
-                sBugSplatSender->sendAdditionalFile(
-                    WCSTR(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "settings_per_account.xml")));
-            }
-
-            if (!sBugsplatDescriptionField.empty())
-            {
-                // Can be set by watchdog or other code that detects a problem
-                // and wants to add some context to the crash report.
-                // Will be visible in the BugSplat web UI.
-                sBugSplatSender->setDefaultUserDescription(WCSTR(sBugsplatDescriptionField));
-                // This type of crash is not necessarily a crash, or final.
-                // Prepare for the next one.
-                sBugsplatDescriptionField.clear();
-            }
-            else
-            {
-                // LL_ERRS message, when there is one
-                sBugSplatSender->setDefaultUserDescription(WCSTR(LLError::getFatalMessage()));
-            }
-
-            sBugSplatSender->setAttribute(WCSTR(L"OS"), WCSTR(LLOSInfo::instance().getOSStringSimple())); // In case we ever stop using email for this
-            sBugSplatSender->setAttribute(WCSTR(L"AppState"), WCSTR(LLStartUp::getStartupStateString()));
-            sBugSplatSender->setAttribute(WCSTR(L"GLVendor"), WCSTR(gGLManager.mGLVendor));
-            sBugSplatSender->setAttribute(WCSTR(L"GLVersion"), WCSTR(gGLManager.mGLVersionString));
-            sBugSplatSender->setAttribute(WCSTR(L"GPUVersion"), WCSTR(gGLManager.mDriverVersionVendorString));
-            sBugSplatSender->setAttribute(WCSTR(L"GLRenderer"), WCSTR(gGLManager.mGLRenderer));
-            sBugSplatSender->setAttribute(WCSTR(L"VRAM"), WCSTR(STRINGIZE(gGLManager.mVRAM)));
-            sBugSplatSender->setAttribute(WCSTR(L"RAM"), WCSTR(STRINGIZE(gSysMemory.getPhysicalMemoryKB().value())));
-
-            const U32 avail_kb = LLMemory::getAvailableMemKB().value();
-            if (avail_kb != U32_MAX) // filter out initial values, if one is not set, all are not set
-            {
-                // Memory usage at crash time (can be 1s obsolete)
-                sBugSplatSender->setAttribute(WCSTR(L"MemAllocatedKB"), WCSTR(std::to_string(LLMemory::getAllocatedMemKB().value())));
-                sBugSplatSender->setAttribute(WCSTR(L"MemAvailableKB"), WCSTR(std::to_string(LLMemory::getAvailableMemKB().value())));
-                sBugSplatSender->setAttribute(WCSTR(L"MemMaxPhysicalKB"), WCSTR(std::to_string(LLMemory::getMaxMemKB().value())));
-                sBugSplatSender->setAttribute(WCSTR(L"MemAvailCommitMB"), WCSTR(std::to_string(LLMemory::getAvailableCommitMemMB().value())));
-            }
-
-            if (gAgent.getRegion())
-            {
-                // region location, when we have it
-                LLVector3 loc = gAgent.getPositionAgent();
-                sBugSplatSender->resetAppIdentifier(
-                    WCSTR(STRINGIZE(gAgent.getRegion()->getName()
-                                    << '/' << loc.mV[0]
-                                    << '/' << loc.mV[1]
-                                    << '/' << loc.mV[2])));
-            }
-
-            LLAppViewer* app = LLAppViewer::instance();
-
-            // Include mainloop watchdog state if available
-            std::string watchdog_state = app->getMainloopWatchdogState();
-            if (!watchdog_state.empty())
-            {
-                sBugSplatSender->setAttribute(WCSTR(L"WatchdogState"), WCSTR(watchdog_state));
-            }
-
-            if (!app->isSecondInstance() && !app->errorMarkerExists())
-            {
-                // If marker doesn't exist, create a marker with 'other' or 'logout' code for next launch
-                // otherwise don't override existing file
-                // Any unmarked crashes will be considered as freezes
-                if (app->logoutRequestSent())
-                {
-                    app->createErrorMarker(LAST_EXEC_LOGOUT_CRASH);
-                }
-                else
-                {
-                    app->createErrorMarker(LAST_EXEC_OTHER_CRASH);
-                }
-            }
-        } // MDSCB_EXCEPTIONCODE
-
-        return false;
-    }
-}
-#endif // LL_BUGSPLAT
-
 extern bool gGPUBenchmarkMode;
-
-namespace
-{
-    void (*gOldTerminateHandler)() = NULL;
-}
-
-static void exceptionTerminateHandler()
-{
-    // reinstall default terminate() handler in case we re-terminate.
-    if (gOldTerminateHandler) std::set_terminate(gOldTerminateHandler);
-    // treat this like a regular viewer crash, with nice stacktrace etc.
-    long *null_ptr;
-    null_ptr = 0;
-    *null_ptr = 0xDEADBEEF; //Force an exception that will trigger breakpad.
-
-    // we've probably been killed-off before now, but...
-    gOldTerminateHandler(); // call old terminate() handler
-}
-
-LONG WINAPI catchallCrashHandler(EXCEPTION_POINTERS * /*ExceptionInfo*/)
-{
-    LL_WARNS() << "Hit last ditch-effort attempt to catch crash." << LL_ENDL;
-    exceptionTerminateHandler();
-    return 0;
-}
-
 
 // Create app mutex creates a unique global windows object.
 // If the object can be created it returns true, otherwise
@@ -544,7 +357,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 
     LLAppViewerWin32* viewer_app_ptr = new LLAppViewerWin32(ll_convert_wide_to_string(pCmdLine).c_str());
 
-    gOldTerminateHandler = std::set_terminate(exceptionTerminateHandler);
+    LLAppViewer::installTerminateHandler();
 
     // Set a debug info flag to indicate if multiple instances are running.
     bool found_other_instance = gGPUBenchmarkMode || !create_app_mutex();
@@ -644,17 +457,23 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
 #endif // !LL_SDL_WINDOW
 
-void LLAppViewerWin32::disableWinErrorReporting()
+void LLAppViewerWin32::setWinErrorReportingExcluded(bool excluded)
 {
     std::string executable_name = gDirUtilp->getExecutableFilename();
+    std::wstring wide_name = ll_convert<std::wstring>(executable_name);
 
-    if( S_OK == WerAddExcludedApplication(ll_convert<std::wstring>(executable_name).c_str(), FALSE ) )
+    const char* call = excluded ? "WerAddExcludedApplication" : "WerRemoveExcludedApplication";
+    HRESULT result = excluded ? WerAddExcludedApplication(wide_name.c_str(), FALSE)
+                              : WerRemoveExcludedApplication(wide_name.c_str(), FALSE);
+    if (S_OK == result)
     {
-        LL_INFOS() << "WerAddExcludedApplication() succeeded for " << executable_name << LL_ENDL;
+        LL_INFOS() << call << "() succeeded for " << executable_name << LL_ENDL;
     }
     else
     {
-        LL_INFOS() << "WerAddExcludedApplication() failed for " << executable_name << LL_ENDL;
+        // Removing an entry that is not there is the usual way here.
+        LL_INFOS() << call << "() returned 0x" << std::hex << result << std::dec
+                   << " for " << executable_name << LL_ENDL;
     }
 }
 
@@ -743,113 +562,15 @@ bool LLAppViewerWin32::init()
 {
     // Platform specific initialization.
 
-    // Turn off Windows Error Reporting
-    // (Don't send our data to Microsoft--at least until we are Logo approved and have a way
-    // of getting the data back from them.)
-    //
-    // LL_INFOS() << "Turning off Windows error reporting." << LL_ENDL;
-    disableWinErrorReporting();
-
 #ifndef LL_RELEASE_FOR_DOWNLOAD
     // Merely requesting the LLSingleton instance initializes it.
     LLWinDebug::instance();
 #endif
 
-#if LL_SEND_CRASH_REPORTS
-#if defined(LL_BUGSPLAT)
-    if (!isSecondInstance())
-    {
-        // Cleanup previous session
-        std::string log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "bugsplat.log");
-        LLFile::remove(log_file, ENOENT);
-    }
-
-    // Win7 is no longer supported
-    bool is_win_7_or_below = LLOSInfo::getInstance()->mMajorVer <= 6 && LLOSInfo::getInstance()->mMajorVer <= 1;
-
-    if (!is_win_7_or_below)
-    {
-        std::string build_data_fname(
-            gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "build_data.json"));
-        // Use llifstream instead of std::ifstream because LL_PATH_EXECUTABLE
-        // could contain non-ASCII characters, which std::ifstream doesn't handle.
-        llifstream inf(build_data_fname.c_str());
-        if (!inf.is_open())
-        {
-            LL_WARNS("BUGSPLAT") << "Can't initialize BugSplat, can't read '" << build_data_fname
-                << "'" << LL_ENDL;
-        }
-        else
-        {
-            std::string json((std::istreambuf_iterator<char>(inf)), std::istreambuf_iterator<char>());
-            simdjson::dom::parser parser;
-            simdjson::dom::element build_data;
-            simdjson::error_code err = parser.parse(json).get(build_data);
-            if (err != simdjson::SUCCESS)
-            {
-                LL_WARNS("BUGSPLAT") << "Can't initialize BugSplat, can't parse '" << build_data_fname
-                    << "': " << simdjson::error_message(err) << LL_ENDL;
-            }
-            else
-            {
-                std::string_view bugsplat_db;
-                if (build_data["BugSplat DB"].get_string().get(bugsplat_db) != simdjson::SUCCESS)
-                {
-                    LL_WARNS("BUGSPLAT") << "Can't initialize BugSplat, no 'BugSplat DB' entry in '"
-                        << build_data_fname << "'" << LL_ENDL;
-                }
-                else
-                {
-                    std::string BugSplat_DB(bugsplat_db);
-
-                    // Got BugSplat_DB, onward!
-                    std::wstring version_string(WSTRINGIZE(LL_VIEWER_VERSION_MAJOR << '.' <<
-                        LL_VIEWER_VERSION_MINOR << '.' <<
-                        LL_VIEWER_VERSION_PATCH << '.' <<
-                        LL_VIEWER_VERSION_BUILD));
-
-                    DWORD dwFlags = MDSF_NONINTERACTIVE | // automatically submit report without prompting
-                        MDSF_PREVENTHIJACKING; // disallow swiping Exception filter
-
-                    bool needs_log_file = !isSecondInstance();
-                    LL_DEBUGS("BUGSPLAT");
-                    if (needs_log_file)
-                    {
-                        // Startup only!
-                        LL_INFOS("BUGSPLAT") << "Engaged BugSplat logging to bugsplat.log" << LL_ENDL;
-                        dwFlags |= MDSF_LOGFILE | MDSF_LOG_VERBOSE;
-                    }
-                    LL_ENDL;
-
-                    // have to convert normal wide strings to strings of __wchar_t
-                    sBugSplatSender = new MiniDmpSender(
-                        WCSTR(BugSplat_DB),
-                        WCSTR(LL_TO_WSTRING(LL_VIEWER_CHANNEL)),
-                        WCSTR(version_string),
-                        nullptr,              // szAppIdentifier -- set later
-                        dwFlags);
-                    sBugSplatSender->setCallback(bugsplatSendLog);
-
-                    LL_DEBUGS("BUGSPLAT");
-                    if (needs_log_file)
-                    {
-                        // Log file will be created in %TEMP%, but it will be moved into logs folder in case of crash
-                        std::string log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "bugsplat.log");
-                        sBugSplatSender->setLogFilePath(WCSTR(log_file));
-                    }
-                    LL_ENDL;
-
-                    // engage stringize() overload that converts from wstring
-                    LL_INFOS("BUGSPLAT") << "Engaged BugSplat(" << LL_TO_STRING(LL_VIEWER_CHANNEL)
-                        << ' ' << stringize(version_string) << ')' << LL_ENDL;
-                } // got BugSplat_DB
-            } // parsed build_data.json
-        } // opened build_data.json
-    } // !is_win_7_or_below
-#endif // LL_BUGSPLAT
-#endif // LL_SEND_CRASH_REPORTS
-
     bool success = LLAppViewer::init();
+
+    // Enable WER for this process. This is a no-op if WER is not available.
+    setWinErrorReportingExcluded(false);
 
     return success;
 }
@@ -862,50 +583,6 @@ bool LLAppViewerWin32::cleanup()
     cleanupConsole();
 
     return result;
-}
-
-bool LLAppViewerWin32::reportCrashToBugsplat(void* pExcepInfo)
-{
-#if defined(LL_BUGSPLAT)
-    if (sBugSplatSender)
-    {
-        sBugSplatSender->createReport((EXCEPTION_POINTERS*)pExcepInfo);
-        return true;
-    }
-#endif // LL_BUGSPLAT
-    return false;
-}
-
-#if defined(LL_BUGSPLAT)
-static int reportCustomToBugsplatFilter(EXCEPTION_POINTERS* pExcepInfo)
-{
-    if (sBugSplatSender)
-    {
-        sBugSplatSender->createReport(pExcepInfo);
-    }
-    return EXCEPTION_EXECUTE_HANDLER;
-}
-#endif
-
-bool LLAppViewerWin32::reportCustomToBugsplat(const std::string &description)
-{
-#if defined(LL_BUGSPLAT)
-    if (sBugSplatSender)
-    {
-        sBugsplatDescriptionField = description;
-
-        __try
-        {
-            // Generate a custom exception code
-            RaiseException(0xE0000001, 0, 0, NULL);
-        }
-        __except (reportCustomToBugsplatFilter(GetExceptionInformation()))
-        {
-        }
-        return true;
-    }
-#endif // LL_BUGSPLAT
-    return false;
 }
 
 bool LLAppViewerWin32::initWindow()
@@ -1040,56 +717,6 @@ bool LLAppViewerWin32::sendURLToOtherInstance(const std::string& url)
         return true;
     }
     return false;
-}
-
-void LLAppViewerWin32::setOSHibernationMode(eHibernationMode mode)
-{
-    // ES_CONTINUOUS tells Windows to reset the idle timer
-    // and restore normal operation
-    // ES_SYSTEM_REQUIRED prevents system sleep/hibernation
-    // ES_DISPLAY_REQUIRED prevents display sleep
-
-    if (mode == LL_HIBERNATE_MODE_DEFAULT)
-    {
-        // Allow OS to hibernate - clear the previous execution state flags
-        // ES_CONTINUOUS without other flags allows the system to idle normally
-        SetThreadExecutionState(ES_CONTINUOUS);
-        LL_INFOS("OS") << "Permitted OS hibernation/sleep" << LL_ENDL;
-    }
-    else if (mode == LL_HIBERNATE_MODE_PREVENT)
-    {
-        // Prevent OS from hibernating while viewer is running
-        // ES_CONTINUOUS | ES_SYSTEM_REQUIRED keeps the system awake
-        EXECUTION_STATE result = SetThreadExecutionState(
-            ES_CONTINUOUS | ES_SYSTEM_REQUIRED
-        );
-        if (result == NULL)
-        {
-            LL_WARNS("OS") << "Failed to prevent OS hibernation, error: " << GetLastError() << LL_ENDL;
-        }
-        else
-        {
-            LL_INFOS("OS") << "Prevented OS hibernation, but allowed display sleep" << LL_ENDL;
-        }
-    }
-    else if (mode == LL_HIBERNATE_MODE_PREVENT_SCREEN)
-    {
-        // Prevent OS from hibernating or turning screen off while viewer is running
-        // ES_CONTINUOUS | ES_SYSTEM_REQUIRED keeps the system awake
-        // ES_DISPLAY_REQUIRED keeps the display on
-        EXECUTION_STATE result = SetThreadExecutionState(
-            ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
-        );
-
-        if (result == NULL)
-        {
-            LL_WARNS("OS") << "Failed to prevent OS hibernation and display sleep, error: " << GetLastError() << LL_ENDL;
-        }
-        else
-        {
-            LL_INFOS("OS") << "Prevented OS hibernation/sleep" << LL_ENDL;
-        }
-    }
 }
 
 bool LLAppViewerWin32::sendShutdownToOtherInstances(const std::wstring& install_dir)

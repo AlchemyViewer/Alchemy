@@ -66,8 +66,9 @@ public:
     static void cleanupClass();
 
     // Return a high precision number of seconds since the start of
-    // this application instance.
-    static F64SecondsImplicit getElapsedSeconds()
+    // this application instance. Static: it is not this timer's elapsed
+    // time, which is getElapsedTimeF64().
+    static F64SecondsImplicit getUptimeSeconds()
     {
         if (sTimer)
     {
@@ -79,10 +80,11 @@ public:
         }
     }
 
-    // Return a high precision usec since epoch
+    // Return a high precision usec since epoch, from totalTime(): monotonic,
+    // so for measuring; LLDate::now() is the calendar.
     static U64MicrosecondsImplicit getTotalTime();
 
-    // Return a high precision seconds since epoch
+    // Return a high precision seconds since epoch, from totalTime().
     static F64SecondsImplicit getTotalSeconds();
 
 
@@ -91,7 +93,8 @@ public:
     void stop() { mStarted = false; }
     void reset();                               // Resets the timer
     void setLastClockCount(U64 current_count);      // Sets the timer so that the next elapsed call will be relative to this time
-    void setTimerExpirySec(F32SecondsImplicit expiration);
+    void setTimerExpirySec(F32SecondsImplicit expiration);      // Expires this long from now
+    void resetWithExpiry(F32SecondsImplicit expiration) { reset(); setTimerExpirySec(expiration); }
     bool checkExpirationAndReset(F32 expiration);
     bool hasExpired() const;
     F32SecondsImplicit getElapsedTimeAndResetF32(); // Returns elapsed time in seconds with reset
@@ -122,8 +125,6 @@ struct LL_COMMON_API TimerInfo
     F64HertzImplicit        mClockFrequency;
     F64SecondsImplicit      mClockFrequencyInv;
     F64MicrosecondsImplicit mClocksToMicroseconds;
-    U64                     mTotalTimeClockCount;
-    U64                     mLastTotalTimeClockCount;
 };
 
 LL_COMMON_API TimerInfo& get_timer_info();
@@ -183,6 +184,8 @@ LL_COMMON_API struct tm* utc_to_pacific_time(time_t utc_time, bool pacific_dayli
 LL_COMMON_API void microsecondsToTimecodeString(U64MicrosecondsImplicit current_time, std::string& tcstring);
 LL_COMMON_API void secondsToTimecodeString(F32SecondsImplicit current_time, std::string& tcstring);
 
-U64MicrosecondsImplicit LL_COMMON_API totalTime();                  // Returns current system time in microseconds
+// Microseconds since the epoch, on the monotonic clock anchored to the
+// calendar once: for measuring, never steps, drifts from the calendar.
+U64MicrosecondsImplicit LL_COMMON_API totalTime();
 
 #endif

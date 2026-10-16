@@ -46,17 +46,19 @@ class LLTextureCtrl;
 class LLInventoryItem;
 class LLUUID;
 
-class LLPanelObject : public LLPanel
+class LLPanelObject final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelObject, LLPanel);
+
     LLPanelObject();
     virtual ~LLPanelObject();
 
-    virtual bool    postBuild();
-    virtual void    draw();
-    virtual void    clearCtrls();
+    virtual bool    postBuild() override;
+    virtual void    draw() override;
+    virtual void    clearCtrls() override;
 
-    void            refresh();
+    void            refresh() override;
 
     static bool     precommitValidate(const LLSD& data);
 

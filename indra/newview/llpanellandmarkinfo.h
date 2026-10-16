@@ -34,23 +34,25 @@ class LLComboBox;
 class LLLineEditor;
 class LLTextEditor;
 
-class LLPanelLandmarkInfo : public LLPanelPlaceInfo
+class LLPanelLandmarkInfo final : public LLPanelPlaceInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandmarkInfo, LLPanelPlaceInfo);
+
     LLPanelLandmarkInfo();
     /*virtual*/ ~LLPanelLandmarkInfo();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    /*virtual*/ void resetLocation();
+    /*virtual*/ void resetLocation() override;
 
     // If landmark doesn't exists, will create it at default folder
-    /*virtual*/ void setInfoType(EInfoType type);
+    /*virtual*/ void setInfoType(EInfoType type) override;
 
     // Sets CREATE_LANDMARK infotype and creates landmark at desired folder
     void setInfoAndCreateLandmark(const LLUUID& folder_id);
 
-    /*virtual*/ void processParcelInfo(const LLParcelData& parcel_data);
+    /*virtual*/ void processParcelInfo(const LLParcelData& parcel_data) override;
 
     // Displays landmark owner, creator and creation date info.
     void displayItemInfo(const LLInventoryItem* pItem);

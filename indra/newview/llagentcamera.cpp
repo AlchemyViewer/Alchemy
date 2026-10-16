@@ -29,6 +29,7 @@
 
 #include "pipeline.h"
 
+#include "alfarplane.h"
 #include "aoengine.h"
 #include "llagent.h"
 #include "llanimationstates.h"
@@ -39,6 +40,7 @@
 #include "llmorphview.h"
 #include "llmoveview.h"
 #include "llnotificationsutil.h"
+#include "llrender.h"
 #include "llselectmgr.h"
 #include "llsmoothstep.h"
 #include "lltoolmgr.h"
@@ -210,7 +212,8 @@ void LLAgentCamera::init()
 {
     // *Note: this is where LLViewerCamera::getInstance() used to be constructed.
 
-    mDrawDistance = gSavedSettings.getF32("RenderFarClip");
+    // LLPipeline::updateReverseZ clamps it again when the depth convention changes.
+    mDrawDistance = ALFarPlane::clampDrawDistance(gSavedSettings.getF32("RenderFarClip"), LLRender::sReverseZ);
 
     LLViewerCamera::getInstance()->setView(DEFAULT_FIELD_OF_VIEW);
     // Leave at 0.1 meters until we have real near clip management
@@ -413,7 +416,7 @@ void LLAgentCamera::slamLookAt(const LLVector3 &look_at)
 //-----------------------------------------------------------------------------
 LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 original_focus_point, S32 x, S32 y)
 {
-    LLMatrix4 obj_matrix = object->getRenderMatrix();
+    LLMatrix4 obj_matrix = object->getRenderMatrix().toMatrix4();
     LLQuaternion obj_rot = object->getRenderRotation();
     LLVector3 obj_pos = object->getRenderPosition();
 
@@ -1327,13 +1330,13 @@ void LLAgentCamera::updateCamera()
     if (gAgentCamera.getOrbitUpKey() || gAgentCamera.getOrbitDownKey())
     {
         F32 input_rate = gAgentCamera.getOrbitUpKey() - gAgentCamera.getOrbitDownKey();
-        cameraOrbitOver( input_rate * ORBIT_OVER_RATE / gFPSClamped );
+        cameraOrbitOver( input_rate * ORBIT_OVER_RATE * gFrameDTClamped );
     }
 
     if (gAgentCamera.getOrbitLeftKey() || gAgentCamera.getOrbitRightKey())
     {
         F32 input_rate = gAgentCamera.getOrbitLeftKey() - gAgentCamera.getOrbitRightKey();
-        cameraOrbitAround(input_rate * ORBIT_AROUND_RATE / gFPSClamped);
+        cameraOrbitAround(input_rate * ORBIT_AROUND_RATE * gFrameDTClamped);
     }
 
     if (gAgentCamera.getOrbitInKey() || gAgentCamera.getOrbitOutKey())
@@ -1343,31 +1346,31 @@ void LLAgentCamera::updateCamera()
         LLVector3d to_focus = gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstance()->getOrigin()) - calcFocusPositionTargetGlobal();
         F32 distance_to_focus = (F32)to_focus.magVec();
         // Move at distance (in meters) meters per second
-        cameraOrbitIn( input_rate * distance_to_focus / gFPSClamped );
+        cameraOrbitIn( input_rate * distance_to_focus * gFrameDTClamped );
     }
 
     if (gAgentCamera.getPanInKey() || gAgentCamera.getPanOutKey())
     {
         F32 input_rate = gAgentCamera.getPanInKey() - gAgentCamera.getPanOutKey();
-        cameraPanIn(input_rate * PAN_RATE / gFPSClamped);
+        cameraPanIn(input_rate * PAN_RATE * gFrameDTClamped);
     }
 
     if (gAgentCamera.getPanRightKey() || gAgentCamera.getPanLeftKey())
     {
         F32 input_rate = gAgentCamera.getPanRightKey() - gAgentCamera.getPanLeftKey();
-        cameraPanLeft(input_rate * -PAN_RATE / gFPSClamped );
+        cameraPanLeft(input_rate * -PAN_RATE * gFrameDTClamped );
     }
 
     if (gAgentCamera.getPanUpKey() || gAgentCamera.getPanDownKey())
     {
         F32 input_rate = gAgentCamera.getPanUpKey() - gAgentCamera.getPanDownKey();
-        cameraPanUp(input_rate * PAN_RATE / gFPSClamped );
+        cameraPanUp(input_rate * PAN_RATE * gFrameDTClamped );
     }
 
     if (getRollLeftKey() || getRollRightKey())
     {
         F32 input_rate = getRollRightKey() - getRollLeftKey();
-        cameraRollOver(input_rate * ROLL_RATE / gFPSClamped);
+        cameraRollOver(input_rate * ROLL_RATE * gFrameDTClamped);
     }
 
     // Clear camera keyboard keys.
@@ -1900,7 +1903,7 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(bool *hit_limit)
             head_offset.mdV[VX] += gAgentAvatarp->mHeadOffset.mV[VX];
             head_offset.mdV[VY] += gAgentAvatarp->mHeadOffset.mV[VY];
             head_offset.mdV[VZ] += gAgentAvatarp->mHeadOffset.mV[VZ];
-            const LLMatrix4& mat = ((LLViewerObject*) gAgentAvatarp->getParent())->getRenderMatrix();
+            const LLMatrix4 mat = ((LLViewerObject*) gAgentAvatarp->getParent())->getRenderMatrix().toMatrix4();
             camera_position_global = gAgent.getPosGlobalFromAgent
                                 ((gAgentAvatarp->getPosition()+
                                  LLVector3(head_offset)*gAgentAvatarp->getRotation()) * mat);

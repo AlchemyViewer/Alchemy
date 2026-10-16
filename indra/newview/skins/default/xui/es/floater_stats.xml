@@ -30,23 +30,6 @@
 					<stat_bar label="Raw Mem" name="rawmemstat"/>
 					<stat_bar label="Bound Mem" name="glboundmemstat"/>
 				</stat_view>
-				<stat_view label="Memoria utilizada" name="memory">
-					<stat_bar label="LLTrace" name="LLTrace"/>
-					<stat_bar label="UI" name="LLView"/>
-					<stat_bar label="Fuentes" name="LLFontFreetype"/>
-					<stat_bar label="Inventario" name="LLInventoryObject"/>
-					<stat_bar label="Objetos del visor" name="LLViewerObject"/>
-					<stat_bar label="Datos de grupo de árbol octal" name="LLViewerOctreeGroup"/>
-					<stat_bar label="Datos de árbol octal" name="LLViewerOctreeEntry"/>
-					<stat_bar label="Caché de objetos del visor" name="LLVOCacheEntry"/>
-					<stat_bar label="Objetos dibujables" name="LLDrawable"/>
-					<stat_bar label="Datos de cara" name="LLFace"/>
-					<stat_bar label="Información de dibujo" name="LLDrawInfo"/>
-					<stat_bar label="Datos de textura" name="LLTexture"/>
-					<stat_bar label="Datos de imagen" name="LLImage"/>
-					<stat_bar label="Datos de imagen GL" name="LLImageGL"/>
-					<stat_bar label="Memorias intermedias de vértice" name="LLVertexBuffer"/>
-				</stat_view>
 				<stat_view label="Red" name="network">
 					<stat_bar label="Paquetes salientes" name="packetsinstat"/>
 					<stat_bar label="Paquetes entrantes" name="packetsoutstat"/>
@@ -91,18 +74,18 @@
 						<stat_bar label="E/S bombeo" name="simpumpiomsec"/>
 					</stat_view>
 				</stat_view>
+				<stat_bar name="simpendinguploads" label="Cargas pendientes"/>
+				<stat_bar name="simpendingdownloads" label="Descargas pendientes"/>
+				<stat_bar name="simoutpps" label="Paquetes Salientes"/>
+				<stat_bar name="siminpps" label="Paquetes Entrantes"/>
+				<stat_bar name="simscripteps" label="Eventos preestablecidos"/>
+				<stat_bar name="simactivescripts" label="Scripts/Eventos preestablecidos Activos"/>
+				<stat_bar name="simactiveobjects" label="Objetos activos"/>
+				<stat_bar name="simobjects" label="Objetos"/>
+				<stat_bar name="simchildagents" label="Agentes Secundarios"/>
+				<stat_bar name="simmainagents" label="Agente Principal"/>
+				<stat_bar name="simagentups" label="Actualizaciones del agente"/>
 			</stat_view>
 		</container_view>
-		<stat_bar name="simpendinguploads" label="Cargas pendientes"/>
-		<stat_bar name="simpendingdownloads" label="Descargas pendientes"/>
-		<stat_bar name="simchildagents" label="Agentes Secundarios"/>
-		<stat_bar name="simagentups" label="Actualizaciones del agente"/>
-		<stat_bar name="simscripteps" label="Eventos preestablecidos"/>
-		<stat_bar name="simmainagents" label="Agente Principal"/>
-		<stat_bar name="simactivescripts" label="Scripts/Eventos preestablecidos Activos"/>
-		<stat_bar name="simactiveobjects" label="Objetos activos"/>
-		<stat_bar name="simobjects" label="Objetos"/>
-		<stat_bar name="siminpps" label="Paquetes Entrantes"/>
-		<stat_bar name="simoutpps" label="Paquetes Salientes"/>
 	</scroll_container>
 </floater>

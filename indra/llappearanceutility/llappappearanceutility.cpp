@@ -156,6 +156,7 @@ static const apr_getopt_option_t APPEARANCE_UTILITY_OPTIONS[] =
     {"treemap", 'm', 1, "Output LLFrameTimer to specified file in graphviz treemap/pachwork format."},
     {"threshold", 's', 1, "Percent threshold of max LLFrameTimer time in order to appear on treemap. Default is 1%."},
     {"joint-offsets",'j',0,"Extract joint positions from skin."},
+    {"headless", 'H', 0, "Render on a window that is never shown. Default is the platform's window."},
     {"help", 'h', 0, "Print the help message."},
     {0, 0, 0, 0}
 };
@@ -206,7 +207,8 @@ LLAppAppearanceUtility::LLAppAppearanceUtility(int argc, char** argv) :
     mOutput(nullptr),
     mAppName(argv[0]),
     mDebugMode(false),
-    mBakeTextureSize(512)
+    mBakeTextureSize(512),
+    mHeadless(false)
 {
 }
 
@@ -297,6 +299,9 @@ void LLAppAppearanceUtility::parseArguments()
         //  break;
         case 'd':
             mDebugMode = true;
+            break;
+        case 'H':
+            mHeadless = true;
             break;
         default:
             usage(std::cerr);

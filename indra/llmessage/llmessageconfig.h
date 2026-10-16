@@ -34,12 +34,6 @@
 static constexpr char messageConfigFileName[] = "message.xml";
 static constexpr F32 messageConfigRefreshRate = 5.f; // seconds
 
-static std::string sServerName;
-static std::string sConfigDir;
-
-static std::string sServerDefault;
-static LLSD sMessages;
-
 class LLSD;
 
 class LLMessageConfig
@@ -78,7 +72,7 @@ public:
     std::string mServerDefault;
 
     static LLMessageConfigFile& instance();
-        // return the singleton configuration file
+        // return the configuration file of the directory initClass last named
 
     /* virtual */ bool loadFile();
     void loadServerDefaults(const LLSD& data);

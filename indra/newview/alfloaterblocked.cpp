@@ -880,7 +880,7 @@ void ALFloaterBlocked::onOpen(const LLSD& sdParam)
 
 void ALFloaterBlocked::onFilterEdit(const std::string& strFilter)
 {
-    if (ALPanelBlockBase* pCurPanel = dynamic_cast<ALPanelBlockBase*>(m_pBlockedTabs->getCurrentPanel()))
+    if (ALPanelBlockBase* pCurPanel = ALPanelBlockBase::fromView(m_pBlockedTabs->getCurrentPanel()))
     {
         pCurPanel->setFilterString(strFilter);
     }
@@ -891,7 +891,7 @@ void ALFloaterBlocked::onTabSelect(const LLSD& sdParam)
     LLPanel* pActivePanel = m_pBlockedTabs->getPanelByName(sdParam.asString());
     if (pActivePanel)
     {
-        if (ALPanelBlockBase* pActivePanelBase = dynamic_cast<ALPanelBlockBase*>(pActivePanel))
+        if (ALPanelBlockBase* pActivePanelBase = ALPanelBlockBase::fromView(pActivePanel))
             m_pFilterEditor->setText(pActivePanelBase->getFilterString());
         pActivePanel->onOpen(mKey);
     }

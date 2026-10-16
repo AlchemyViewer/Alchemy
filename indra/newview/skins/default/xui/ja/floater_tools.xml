@@ -122,9 +122,6 @@
 	<text name="selection_empty">
 		選択されていません。
 	</text>
-	<text name="selection_faces">
-		選択された面：[FACES_STRING]
-	</text>
 	<tab_container name="Object Info Tabs">
 		<panel label="一般" name="General">
 			<panel.string name="text deed continued">
@@ -280,21 +277,18 @@
 			<spinner label="Ｘ" name="Pos X"/>
 			<spinner label="Ｙ" name="Pos Y"/>
 			<spinner label="Ｚ" name="Pos Z"/>
-			<menu_button name="clipboard_pos_btn" tool_tip="位置のペースト時のオプションを選択します。"/>
 			<text name="label size" tool_tip="サイズ（メートル）">
 				サイズ（メートル）
 			</text>
 			<spinner label="Ｘ" name="Scale X"/>
 			<spinner label="Ｙ" name="Scale Y"/>
 			<spinner label="Ｚ" name="Scale Z"/>
-			<menu_button name="clipboard_size_btn" tool_tip="サイズのペースト時のオプションを選択します。"/>
 			<text name="label rotation" tool_tip="回転（角度）">
 				回転角°
 			</text>
 			<spinner label="Ｘ" name="Rot X"/>
 			<spinner label="Ｙ" name="Rot Y"/>
 			<spinner label="Ｚ" name="Rot Z"/>
-			<menu_button name="clipboard_rot_btn" tool_tip="回転のペースト時のオプションを選択します。"/>
 			<!--
 			<text name="label basetype">プリムの種類</text>
 			-->
@@ -308,7 +302,6 @@
 				<combo_box.item label="輪（リング）" name="Ring"/>
 				<combo_box.item label="スカルプト" name="Sculpted"/>
 			</combo_box>
-			<menu_button name="clipboard_obj_params_btn" tool_tip="オブジェクトのパラメータのペースト時のオプションを選択します。"/>
 			<text name="text cut">
 				パスカット（始点と終点）
 			</text>
@@ -392,7 +385,6 @@
 			<panel.string name="Convex Hull">
 				凸包
 			</panel.string>
-			<menu_button name="clipboard_features_params_btn" tool_tip="特徴のペースト時のオプションを選択します。"/>
 			<text name="select_single">
 				編集したいプリムを１つだけ選択してください。
 			</text>
@@ -413,7 +405,6 @@
 			<check_box label="射影元" name="Light Checkbox Ctrl" tool_tip="オブジェクトが投影元になります。"/>
 			<color_swatch name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます"/>
 			<texture_picker label="画像" name="light texture control" tool_tip="クリックで射影テクスチャを選択します。（遅延描画有効時のみ）"/>
-			<menu_button name="clipboard_light_params_btn" tool_tip="光源のパラメータのペースト時のオプションを選択します。"/>
 			<spinner label="強度" name="Light Intensity"/>
 			<spinner label="ＦｏＶ" name="Light FOV"/>
 			<spinner label="半径" name="Light Radius"/>
@@ -457,7 +448,7 @@
 		</panel>
 		<panel label="テクスチャ" name="Texture"/>
 		<panel label="中身" name="Contents">
-			<flyout_button label="新しいスクリプト" label_selected="新しいスクリプト" name="button new script"/>
+			<flyout_button label="新しいスクリプト" name="button new script"/>
 			<button label="権限" name="button permissions"/>
 			<filter_editor label="フィルタテキストを入力" name="contents_filter"/>
 		</panel>

@@ -76,9 +76,11 @@ private:
 };
 #endif // 0
 
-class LLFloaterProfileTexture : public LLFloater
+class LLFloaterProfileTexture final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterProfileTexture, LLFloater);
+
     LLFloaterProfileTexture(LLView* owner);
     ~LLFloaterProfileTexture();
 

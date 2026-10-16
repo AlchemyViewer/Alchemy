@@ -42,6 +42,7 @@ class LLWebRTCProtocolParser;
 #include "llcoros.h"
 #include "llparcel.h"
 #include "llmutelist.h"
+#include "workqueue.h"
 #include <queue>
 
 #include "llvoiceclient.h"
@@ -80,6 +81,8 @@ public:
     // connections must still release their peer connections normally --  see
     // drainConnections() and ~LLVoiceWebRTCConnection().
     static bool isWebRTCTerminated() { return sWebRTCTerminated; }
+
+    LL::WorkQueue::weak_t getVoiceWorkQueue() const { return mVoiceWorkQueue; }
 
     const LLVoiceVersionInfo& getVersion() override;
     void                      updateVersion();
@@ -464,7 +467,7 @@ private:
     /// llwebrtc::terminate().  Bounded and best effort.
     void drainConnections();
 
-    LL::WorkQueue::weak_t mMainQueue;
+    LL::WorkQueue::ptr_t mVoiceWorkQueue;
 
     F32 mTuningMicGain;
     int mTuningSpeakerVolume;
@@ -684,7 +687,7 @@ class LLVoiceWebRTCConnection :
     } EVoiceConnectionState;
 
     EVoiceConnectionState mVoiceConnectionState;
-    LL::WorkQueue::weak_t mMainQueue;
+    LL::WorkQueue::weak_t mVoiceMainQueue;
 
     void setVoiceConnectionState(EVoiceConnectionState new_voice_connection_state)
     {

@@ -1,0 +1,126 @@
+/**
+ * @file alscriptmessages.h
+ * @brief What the compilers and the running scripts say, read: pure, and so testable.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include "llsd.h"
+#include "stdtypes.h"
+
+#include <string>
+#include <string_view>
+#include <vector>
+
+// The reading of what the servers and the two VMs say: the compiler's
+// error lines turned into places and words, a run-time error's header
+// taken apart, and whether a script's text looks like Lua. Text in,
+// values out, nothing of the viewer's in it -- the shapes change under
+// us whenever a simulator or a VM is upgraded, and this is where a test
+// can hold them still.
+namespace ALScriptMessages
+{
+    // A place the words of a message name, as `previously declared at
+    // (345, 1)`: where it stands in them, and the line and column it
+    // names, zero-based. Written again as the source counts, where the
+    // text the compiler had is not the source's.
+    struct Mention
+    {
+        size_t at     = 0;
+        size_t length = 0;
+        S32    line   = 0;
+        S32    column = 0;
+    };
+
+    // Zero-based line and column, as everything in the studio counts.
+    struct Place
+    {
+        S32         line      = 0;
+        S32         column    = 0;
+        bool        hasColumn = false;
+        // A line named at all: not by what matched no compiler's form.
+        bool        hasLine   = false;
+        // The compiler's own word: ERROR, WARNING, or WARN.
+        std::string level;
+        std::string message;
+        std::vector<Mention> mentions;
+    };
+
+    // One line of what a compiler said. Luau names the chunk and a
+    // one-based line; LSL gives a zero-based line and column in
+    // brackets with its level between colons; the grid's LSL compiler
+    // for Luau's VM, which is Tailslide, says `Line 320: WARN: words`,
+    // its line and the places its words name, `(345, 1)`, one-based;
+    // anything else is an error with no place. The language's form is
+    // tried first, then the other's, then Tailslide's.
+    Place readDiagnostic(const std::string& line, bool lua);
+    // Every line of them.
+    std::vector<Place> readDiagnostics(const LLSD& errors, bool lua);
+
+    // No `default` state anywhere means Lua: the same guess the legacy
+    // editor made.
+    bool looksLikeLua(std::string_view content);
+
+    // How a run-time error's first line reads: the object's name and the
+    // script's, before the words. False where the line is no such
+    // header, which is every other thing a script says.
+    struct Header
+    {
+        std::string object;
+        std::string script;
+    };
+    bool readRuntimeHeader(const std::string& line, Header& out);
+    // Whether a line ends with the words that mark a run-time error,
+    // which is how the lines that follow are known to belong with it.
+    bool endsRuntimeError(const std::string& line);
+
+    // Where a run-time error happened, from the lines that followed its
+    // header: Luau's `chunk:12: words`, LSL's `(12, 3) : ERROR : words`.
+    // False where none of them says, and then the first line that is not
+    // the header is the words.
+    struct Location
+    {
+        S32         line   = -1;
+        S32         column = -1;
+        std::string message;
+    };
+    bool readRuntimeLocation(const std::vector<std::string>& lines, bool lua, Location& out);
+
+    // A frame of a Luau stack as a traceback lists it -- `chunk:12`,
+    // `chunk:12 function name`, `[string "chunk"]:12: in function 'f'`
+    // -- by its chunk and its zero-based line. False for a line that is
+    // no such frame: `stack traceback:`, a C function's `[C] function
+    // error`, or the error's own words.
+    struct Frame
+    {
+        std::string chunk;
+        S32         line = -1;
+    };
+    bool readStackFrame(const std::string& line, Frame& out);
+
+    // Whether a line said after a run-time error's words goes on with
+    // them: a place the error names -- Luau's `chunk:12: words`, LSL's
+    // `(12, 3) : ERROR : words` -- `stack traceback:`, or a frame of the
+    // stack, a C function's and a folded middle's among them. Anything
+    // else a script says after is its own.
+    bool continuesRuntimeError(const std::string& line);
+}

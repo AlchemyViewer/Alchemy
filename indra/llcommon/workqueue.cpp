@@ -151,7 +151,7 @@ namespace
 
     U32 exception_filter(U32 code, struct _EXCEPTION_POINTERS* exception_infop)
     {
-        if (LLApp::instance()->reportCrashToBugsplat((void*)exception_infop))
+        if (LLApp::instance()->reportCrash((void*)exception_infop))
         {
             // Handled
             return EXCEPTION_CONTINUE_SEARCH;
@@ -315,6 +315,20 @@ bool LL::WorkQueue::tryPost(const Work& callable)
     {
         LLError::LLUserWarningMsg::showOutOfMemory();
         LL_ERRS("LLCoros") << "Bad memory allocation in WorkQueue::tryPost" << LL_ENDL;
+        return false;
+    }
+}
+
+bool LL::WorkQueue::tryPostFor(const std::chrono::milliseconds& timeout, const Work& callable)
+{
+    try
+    {
+        return mQueue.tryPushFor(timeout, Work(callable));
+    }
+    catch (std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS("LLCoros") << "Bad memory allocation in WorkQueue::tryPostFor" << LL_ENDL;
         return false;
     }
 }

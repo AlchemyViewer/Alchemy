@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <context_menu name="Self Pie">
-	<menu_item_call label="Usiądź tu" name="Sit Down Here" />
-	<menu_item_call label="Wstań" name="Stand Up" />
 	<context_menu label="Zdejmij" name="Take Off &gt;">
 		<context_menu label="Ubrania" name="Clothes &gt;">
 			<menu_item_call label="Koszulę" name="Shirt" />
@@ -23,7 +21,6 @@
 	</context_menu>
 	<menu_item_call label="Mój wygląd" name="Chenge Outfit" />
 	<menu_item_call label="Edytuj strój" name="Edit Outfit" />
-	<menu_item_call label="Edytuj kształt" name="Edit My Shape" />
 	<menu_item_call label="Uniesienie" name="Hover Height"/>
 	<menu_item_call label="Znajomi" name="Friends..." />
 	<menu_item_call label="Grupy" name="Groups..." />

@@ -58,7 +58,6 @@
 #include "lldefs.h"
 #include "lldepthstack.h"
 #include "llerror.h"
-#include "llfasttimer.h"
 #include "llframetimer.h"
 #include "llinstancetracker.h"
 #include "llpointer.h"
@@ -127,11 +126,5 @@
 
 #include <boost/signals2.hpp>
 #include <simdjson.h>
-
-#include "glm/glm.hpp"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/ext/quaternion_float.hpp"
-#include "glm/gtx/quaternion.hpp"
-#include "glm/gtx/matrix_decompose.hpp"
 
 #endif

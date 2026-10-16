@@ -47,6 +47,7 @@
 #include "llcircuit.h"
 #include "lltimer.h"
 #include "llpacketring.h"
+#include "alnetimpairment.h"
 #include "llhost.h"
 #include "llhttpnode.h"
 //#include "llpacketack.h"
@@ -338,6 +339,11 @@ class LLMessageSystem : public LLMessageSenderInterface
  protected:
     LLPacketRing        mHighPriorityInbound;
     LLPacketRing        mLowPriorityInbound;
+#if AL_NET_IMPAIRMENT
+    // Deliberate damage to the inbound stream, so the recovery paths can be watched on a link
+    // that is not actually broken. Compiled out of the build that ships.
+    ALNetImpairment     mNetImpairment;
+#endif
 
  public:
     LLReliablePacketParams      mReliablePacketParams;
@@ -975,6 +981,15 @@ private:
     // run for this packet back when it was buffered (see bufferInboundPacket()).
     // Returns packet_size, or 0 if no packet or packet was dropped.
     S32  receivePacketOrDrop(char* datap, bool& packet_id_already_checked);
+
+public:
+#if AL_NET_IMPAIRMENT
+    // Synthetic loss and reordering. Safe to call every frame; zero loss and zero reordering
+    // leave the stream untouched.
+    void setNetImpairment(F32 loss_percent, F32 burst_packets, F32 reorder_percent, S32 reorder_delay);
+    const ALNetImpairment& getNetImpairment() const { return mNetImpairment; }
+#endif
+private:
 
     // Read one raw packet from mSocket into inbound message queues
     // Returns packet_size (0 if no packet was available).

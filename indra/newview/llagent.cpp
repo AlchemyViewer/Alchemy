@@ -455,7 +455,7 @@ LLAgent::LLAgent() :
     mAutoPilotUseRotation(false),
     mAutoPilotTargetFacing(LLVector3::zero),
     mAutoPilotTargetDist(0.f),
-    mAutoPilotNoProgressFrameCount(0),
+    mAutoPilotNoProgressTime(0.f),
     mAutoPilotRotationThreshold(0.f),
     mAutoPilotFinishedCallback(nullptr),
     mAutoPilotCallbackData(nullptr),
@@ -607,6 +607,9 @@ void LLAgent::setFirstLogin(bool b)
         {
             setFeatureVersion(UI_FEATURE_VERSION, UI_FEATURE_FLAGS);
         }
+
+        // Shared environment on teleport should only be enabled by default for new users;
+        gSavedSettings.setBOOL("SwitchToSharedEnvAfterTeleport", true);
     }
 }
 
@@ -681,10 +684,17 @@ void LLAgent::showLatestFeatureNotification(const std::string key)
 
 void LLAgent::ageChat()
 {
+    // Every movement key held this frame asks, and the frame is one dt however many there are.
+    if (mChatAgedFrame == LLFrameTimer::getFrameCount())
+    {
+        return;
+    }
+    mChatAgedFrame = LLFrameTimer::getFrameCount();
+
     if (isAgentAvatarValid())
     {
         // get amount of time since I last chatted
-        F64 elapsed_time = (F64)gAgentAvatarp->mChatTimer.getElapsedTimeF32();
+        F64 elapsed_time = gAgentAvatarp->mChatTimer.getElapsedTimeF64();
         // add in frame time * 3 (so it ages 4x)
         gAgentAvatarp->mChatTimer.setAge(elapsed_time + (F64)gFrameDTClamped * (CHAT_AGE_FAST_RATE - 1.0));
     }
@@ -1151,10 +1161,6 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
     // with a server request.
     LLUrlEntryParcel::setRegionHost(getRegionHost());
 
-    // Must shift hole-covering water object locations because local
-    // coordinate frame changed.
-    LLWorld::getInstance()->updateWaterObjects();
-
     // keep a list of regions we've been too
     // this is just an interesting stat, logged at the dataserver
     // we could trake this at the dataserver side, but that's harder
@@ -1261,6 +1267,38 @@ void LLAgent::sendReliableMessage()
         return;
     }
     gMessageSystem->sendReliable(mRegionp->getHost());
+}
+
+//-----------------------------------------------------------------------------
+// setHealth()
+//-----------------------------------------------------------------------------
+void LLAgent::setHealth(S32 health)
+{
+    if (health == mHealth)
+    {
+        return;
+    }
+
+    // A big enough drop is worth hearing. Read before the value moves, since
+    // the sound is about the size of the change.
+    if (mHealth > health)
+    {
+        static LLCachedControl<F32> reduction_threshold(gSavedSettings, "UISndHealthReductionThreshold");
+        if (mHealth > (health + reduction_threshold) && isAgentAvatarValid())
+        {
+            make_ui_sound(gAgentAvatarp->getSex() == SEX_FEMALE
+                              ? "UISndHealthReductionF"
+                              : "UISndHealthReductionM");
+        }
+    }
+
+    mHealth = health;
+    mHealthChangedSignal(mHealth);
+}
+
+boost::signals2::connection LLAgent::addHealthChangedCallback(const health_changed_signal_t::slot_type& cb)
+{
+    return mHealthChangedSignal.connect(cb);
 }
 
 //-----------------------------------------------------------------------------
@@ -1413,7 +1451,7 @@ void LLAgent::resetAxes()
     mFrameAgent.resetAxes();
 }
 
-// Copied from LLCamera::setOriginAndLookAt
+// Copied from LLCoordFrame::lookAt
 // Look_at must be unit vector
 //-----------------------------------------------------------------------------
 // resetAxes()
@@ -1633,8 +1671,6 @@ void LLAgent::setAFK()
         setControlFlags(AGENT_CONTROL_AWAY | AGENT_CONTROL_STOP);
         gAwayTimer.start();
     }
-
-    LLAppViewer::instance()->setPermitOSHibernation(true);
 }
 
 //-----------------------------------------------------------------------------
@@ -1652,13 +1688,6 @@ void LLAgent::clearAFK()
     {
         sendAnimationRequest(ANIM_AGENT_AWAY, ANIM_REQUEST_STOP);
         clearControlFlags(AGENT_CONTROL_AWAY);
-    }
-
-    if (isAgentAvatarValid())
-    {
-        // Only set this if agent is inworld, login screen
-        // shouldn't prevent hibernation.
-        LLAppViewer::instance()->setPermitOSHibernation(false);
     }
 }
 
@@ -1796,7 +1825,7 @@ void LLAgent::startAutoPilotGlobal(
         mAutoPilotUseRotation = false;
     }
 
-    mAutoPilotNoProgressFrameCount = 0;
+    mAutoPilotNoProgressTime = 0.f;
 }
 
 //-----------------------------------------------------------------------------
@@ -1928,15 +1957,15 @@ void LLAgent::autoPilot(F32 *delta_yaw)
 
         if (target_dist >= mAutoPilotTargetDist)
         {
-            mAutoPilotNoProgressFrameCount++;
+            mAutoPilotNoProgressTime += gFrameDTClamped;
             bool out_of_time = false;
             if (getFlying())
             {
-                out_of_time = mAutoPilotNoProgressFrameCount > AUTOPILOT_MAX_TIME_NO_PROGRESS_FLY * gFPSClamped;
+                out_of_time = mAutoPilotNoProgressTime > AUTOPILOT_MAX_TIME_NO_PROGRESS_FLY;
             }
             else
             {
-                out_of_time = mAutoPilotNoProgressFrameCount > AUTOPILOT_MAX_TIME_NO_PROGRESS_WALK * gFPSClamped;
+                out_of_time = mAutoPilotNoProgressTime > AUTOPILOT_MAX_TIME_NO_PROGRESS_WALK;
             }
             if (out_of_time)
             {
@@ -1966,7 +1995,7 @@ void LLAgent::autoPilot(F32 *delta_yaw)
             direction = mAutoPilotTargetFacing;
         }
 
-        yaw = 4.f * yaw / gFPSClamped;
+        yaw = 4.f * yaw * gFrameDTClamped;
 
         // figure out which direction to turn
         LLVector3 scratch(at % direction);
@@ -2782,7 +2811,7 @@ void LLAgent::onAnimStop(const LLUUID& id)
         setControlFlags(AGENT_CONTROL_FINISH_ANIM);
 
         // now trigger dusting self off animation
-        if (isAgentAvatarValid() && !gAgentAvatarp->mBelowWater && rand() % 3 == 0)
+        if (isAgentAvatarValid() && !gAgentAvatarp->mBelowWater && ll_rand(3) == 0)
             sendAnimationRequest( ANIM_AGENT_BRUSH, ANIM_REQUEST_START );
     }
     else if (id == ANIM_AGENT_PRE_JUMP || id == ANIM_AGENT_LAND || id == ANIM_AGENT_MEDIUM_LAND)
@@ -3596,7 +3625,8 @@ LLColor4 LLAgent::getEffectColor()
     if(AlchemyRainbowEffects)
     {
         LLColor3 rainbow;
-        rainbow.setHSL(fmodf((F32)LLFrameTimer::getElapsedSeconds()/4.f, 1.f), 1.f, 0.5f);
+        // The hue's fraction taken in F64, before the uptime of a long session rounds it.
+        rainbow.setHSL((F32)fmod(LLFrameTimer::getUptimeSeconds().value() / 4.0, 1.0), 1.f, 0.5f);
         effect_color.set(rainbow, 1.0f);
     }
     return effect_color;
@@ -4841,7 +4871,7 @@ void LLAgent::fidget()
 {
     if (!getAFK())
     {
-        F32 curTime = mFidgetTimer.getElapsedTimeF32();
+        const F64 curTime = mFidgetTimer.getElapsedTimeF64();
         if (curTime > mNextFidgetTime)
         {
             // pick a random fidget anim here

@@ -56,7 +56,6 @@ const U8 FACE_DO_NOT_BATCH_TEXTURES = 255;
 
 class alignas(16) LLFace
 {
-    LL_ALIGN_NEW
 public:
     LLFace(const LLFace& rhs) = delete;
     const LLFace& operator=(const LLFace& rhs) = delete;
@@ -81,8 +80,8 @@ public:
     }
     ~LLFace()  { destroy(); }
 
-    const LLMatrix4& getWorldMatrix()   const   { return mVObjp->getWorldMatrix(mXform); }
-    const LLMatrix4& getRenderMatrix() const;
+    const LLMatrix4a& getWorldMatrix()  const   { return mVObjp->getWorldMatrix(mXform); }
+    const LLMatrix4a& getRenderMatrix() const;
     U32             getIndicesCount()   const   { return mIndicesCount; };
     S32             getIndicesStart()   const   { return mIndicesIndex; };
     U16             getGeomCount()      const   { return mGeomCount; }      // vertex count for this face
@@ -139,7 +138,7 @@ public:
     void            setDrawable(LLDrawable *drawable);
     void            setTEOffset(const S32 te_offset);
 
-    void            renderIndexed();
+    void            renderIndexed(U32 mode = LLRender::TRIANGLES);
 
     void            setFaceColor(const LLColor4& color); // override material color
     void            unsetFaceColor(); // switch back to material color
@@ -188,7 +187,6 @@ public:
     void        renderSelectedUV();
 
     void        renderSelected(LLViewerTexture *image, const LLColor4 &color);
-    void        renderOneWireframe(const LLColor4 &color, F32 fogCfx, bool wireframe_selection, bool bRenderHiddenSelections, bool shader);
 
     F32         getKey()                    const   { return mDistance; }
 
@@ -256,9 +254,8 @@ public:
 
     LLVector2       mTexExtents[2];
     F32             mDistance;
-    F32         mLastUpdateTime;
-    F32         mLastSkinTime;
-    F32         mLastMoveTime;
+    F64         mLastUpdateTime;
+    F64         mLastMoveTime;
     LLMatrix4*  mTextureMatrix;
     LLMatrix4*  mSpecMapMatrix;
     LLMatrix4*  mNormalMapMatrix;
@@ -307,7 +304,7 @@ private:
     std::vector<S32> mRiggedIndex;
 
     // gFrameTimeSeconds when mPixelArea was last updated
-    F32         mLastPixelAreaUpdate = 0.f;
+    F64         mLastPixelAreaUpdate = 0.0;
 
     // virtual size of face in texture area  (mPixelArea adjusted by texture repeats)
     // used to determine desired resolution of texture

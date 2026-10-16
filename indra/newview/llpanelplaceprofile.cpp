@@ -342,7 +342,7 @@ void LLPanelPlaceProfile::displaySelectedParcelInfo(LLParcel* parcel,
         return;
 
     if (mLastSelectedRegionID != region->getRegionID()
-        || mNextCovenantUpdateTime < LLTimer::getElapsedSeconds())
+        || mNextCovenantUpdateTime < LLTimer::getUptimeSeconds())
     {
         // send EstateCovenantInfo message
         // Note: LLPanelPlaceProfile doesn't change Covenant's content and any
@@ -353,7 +353,7 @@ void LLPanelPlaceProfile::displaySelectedParcelInfo(LLParcel* parcel,
         msg->addUUIDFast(_PREHASH_AgentID,  gAgent.getID());
         msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
         msg->sendReliable(region->getHost());
-        mNextCovenantUpdateTime = LLTimer::getElapsedSeconds() + COVENANT_REFRESH_TIME_SEC;
+        mNextCovenantUpdateTime = LLTimer::getUptimeSeconds() + COVENANT_REFRESH_TIME_SEC;
     }
 
     LLParcelData parcel_data;

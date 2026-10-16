@@ -50,7 +50,7 @@ in vec4 vary_fragcoord;
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
 float blinnPhongLobe(float nh, float glossiness);
-void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
+void calcDiffuseSpecular(vec3 baseColor, float metallic, out vec3 diffuseColor, out vec3 specularColor);
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
 vec3 clampRadiance(vec3 c);
 float unpackRoughness(vec2 p);

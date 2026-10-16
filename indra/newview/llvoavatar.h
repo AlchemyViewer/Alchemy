@@ -48,6 +48,7 @@
 #include "llavatarappearancedefines.h"
 #include "lltexglobalcolor.h"
 #include "lldriverparam.h"
+#include "algputimer.h"
 #include "llviewertexlayer.h"
 #include "material_codes.h"     // LL_MCODE_END
 #include "llrigginginfo.h"
@@ -90,7 +91,6 @@ class LLVOAvatar :
     public LLViewerObject,
     public boost::signals2::trackable
 {
-    LL_ALIGN_NEW;
     LOG_CLASS(LLVOAvatar);
 
 public:
@@ -242,7 +242,7 @@ public:
     /*virtual*/ F32             getPixelArea() const;
     /*virtual*/ LLVector3d      getPosGlobalFromAgent(const LLVector3 &position);
     /*virtual*/ LLVector3       getPosAgentFromGlobal(const LLVector3d &position);
-    virtual void                updateVisualParams();
+    virtual bool                updateVisualParams();
 
 /**                    Inherited
  **                                                                            **
@@ -288,6 +288,7 @@ public:
     virtual void    idleUpdateAppearanceAnimation();
     void            idleUpdateLipSync(bool voice_enabled);
     void            idleUpdateLoadingEffect();
+    void            startCloudParticles();
     void            idleUpdateWindEffect();
     void            idleUpdateNameTag(const LLVector3& root_pos_last);
     void            idleUpdateNameTagText(bool new_name);
@@ -316,8 +317,14 @@ public:
     void markAttachmentComplexityDirty(const LLUUID& object_id, bool force_reset_attachment = false);
     void markBodyPartsComplexityDirty();
 
+    // A profile's GPU time is taken between these two.
     void placeProfileQuery();
-    void readProfileQuery(S32 retries);
+    void endProfileQuery();
+    // Takes the last profile's GPU time once its frame has been read, waiting for nothing. Once a frame, from
+    // idleUpdate().
+    void readProfileQuery();
+    // whether a profile's GPU time is still to be read; another profile must wait for it
+    bool isProfilePending() const { return mGPUTimer.isPending(); }
 
     // get the GPU time in ms of rendering this avatar including all attachments
     // returns 0.f if this avatar has not been profiled using gPipeline.profileAvatar
@@ -371,13 +378,16 @@ public:
     static bool     sShowAnimationDebug; // show animation debug info
     static bool     sShowCollisionVolumes;  // show skeletal collision volumes
     static bool     sVisibleInFirstPerson;
+    // bumped whenever the mute or friend list changes; the per-avatar caches
+    // of membership are renewed against them
+    static U32      sMuteListGeneration;
+    static U32      sBuddyListGeneration;
     static S32      sNumLODChangesThisFrame;
     static S32      sNumVisibleChatBubbles;
     static bool     sDebugInvisible;
     static bool     sShowAttachmentPoints;
     static F32      sLODFactor; // user-settable LOD factor
     static F32      sPhysicsLODFactor; // user-settable physics LOD factor
-    static bool     sJointDebug; // output total number of joints being touched for each avatar
 
     static LLPointer<LLViewerTexture>  sCloudTexture;
 
@@ -487,6 +497,8 @@ public:
     LLVector3           mTargetRootToHeadOffset;
 
     S32                 mLastSkeletonSerialNum;
+    // resolved once, since the parameters are added when the avatar loads
+    LLVisualParam*      mMaleParam = nullptr;
 
 
 /**                    Skeleton
@@ -502,6 +514,7 @@ public:
     U32         renderImpostor(LLColor4U color = LLColor4U(255,255,255,255), S32 diffuse_channel = 0);
     bool        isVisuallyMuted();
     bool        isInMuteList() const;
+    bool        isStaffUser() const;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
     bool        isRlvSilhouette() const;
 // [/RLVa:KB]
@@ -555,7 +568,6 @@ public:
 
     U32         renderRigid();
     U32         renderSkinned();
-    F32         getLastSkinTime() { return mLastSkinTime; }
     U32         renderTransparent(bool first_pass);
     void        renderCollisionVolumes();
     void        renderBones(const std::string &selected_joint = std::string());
@@ -574,27 +586,34 @@ private:
     bool        shouldAlphaMask();
 
     bool        mNeedsSkin; // avatar has been animated and verts have not been updated
-    F32         mLastSkinTime; //value of gFrameTimeSeconds at last skin update
 
     S32         mUpdatePeriod;
+    // An avatar wearing animesh is asked both of these once for itself and
+    // once more per attachment, every frame. Both answers hold for the frame
+    // they were worked out in.
+    S32         mUpdatePeriodFrame;
+    S32         mNeedsUpdateFrame;
+    bool        mNeedsUpdate;
     S32         mNumInitFaces; //number of faces generated when creating the avatar drawable, does not inculde splitted faces due to long vertex buffer.
 
     // profile handle
-    U32 mGPUTimerQuery = 0;
+    ALGPUTimer mGPUTimer;
 
     // profile results
 
     // GPU render time in ms
     F32 mGPURenderTime = 0.f;
-    bool mGPUProfilePending = false;
 
     // CPU render time in ms
     F32 mCPURenderTime = 0.f;
 
     mutable bool        mCachedInMuteList;
-    mutable F64         mCachedMuteListUpdateTime;
+    mutable U32         mCachedMuteListGeneration = U32_MAX;
     mutable bool        mCachedInBuddyList = false;
-    mutable F64         mCachedBuddyListUpdateTime = 0.0;
+    mutable U32         mCachedBuddyListGeneration = U32_MAX;
+    // final once the name is known; an avatar's staff status never changes
+    mutable bool        mIsStaffUser = false;
+    mutable bool        mStaffUserKnown = false;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
     mutable bool        mCachedIsRlvSilhouette = false;
     mutable F64         mCachedRlvSilhouetteUpdateTime = 0.f;
@@ -724,6 +743,9 @@ private:
 public:
     virtual bool isImpostor();
     bool        shouldImpostor(const F32 rank_factor = 1.0);
+    // the rank half of shouldImpostor, for callers that have already
+    // established this avatar is neither self nor visually muted
+    bool        shouldImpostorByRank(const F32 rank_factor = 1.0) const;
     bool        needsImpostorUpdate() const;
     const LLVector3& getImpostorOffset() const;
     const LLVector2& getImpostorDim() const;
@@ -738,7 +760,7 @@ public:
 // [/RLVa:KB]
 //  bool        mNeedsImpostorUpdate;
     S32         mLastImpostorUpdateReason;
-    F32SecondsImplicit mLastImpostorUpdateFrameTime;
+    F64SecondsImplicit mLastImpostorUpdateFrameTime;
     const LLVector3*  getLastAnimExtents() const { return mLastAnimExtents; }
     void        setNeedsExtentUpdate(bool val) { mNeedsExtentUpdate = val; }
 
@@ -777,7 +799,7 @@ public:
 private:
     F32         mWindFreq;
     LLFrameTimer mRippleTimer;
-    F32         mRippleTimeLast;
+    F64         mRippleTimeLast;    // mRippleTimer's elapsed time, which runs as long as the avatar
     LLVector3   mRippleAccel;
     LLVector3   mLastVel;
 
@@ -1031,6 +1053,10 @@ private:
     //--------------------------------------------------------------------
 public:
     bool            isVisible() const;
+    // Whether what this avatar draws is inside the view this frame. The
+    // same as isVisible() for an avatar; an animated object answers for its
+    // volume, since it never draws anything of its own.
+    virtual bool    isInView() const;
     virtual bool    shouldRenderRigged() const;
     void            setVisibilityRank(U32 rank);
     U32             getVisibilityRank() const { return mVisibilityRank; }
@@ -1087,6 +1113,8 @@ public:
 public:
     bool                hasHUDAttachment() const;
     LLBBox              getHUDBBox() const;
+    // One HUD attachment point's share of getHUDBBox, in the same frame.
+    static LLBBox       getHUDBBox(const LLViewerJointAttachment* attachment);
     void                resetHUDAttachments();
     S32                 getMaxAttachments() const;
     bool                canAttachMoreObjects(U32 n=1) const;
@@ -1115,8 +1143,7 @@ protected:
     bool            processSingleAnimationStateChange(const LLUUID &anim_id, bool start);
     void            resetAnimations();
 private:
-    LLTimer         mAnimTimer;
-    F32             mTimeLast;
+    F64             mTimeLast;  // LLFrameTimer::getUptimeSeconds() at the last root update, negative before the first
 
     //--------------------------------------------------------------------
     // Animation state data
@@ -1244,7 +1271,8 @@ private:
     F32             mNameAlpha;
     S32             mRenderGroupTitles;
     LLColor4        mNameTagColor;
-    std::string     mDistanceString;
+    // what the distance line last showed, in the whole metres it prints
+    S32             mDistanceMetres;
 
     //--------------------------------------------------------------------
     // Display the name (then optionally fade it out)
@@ -1258,6 +1286,18 @@ private:
     bool            mTyping;
     bool            mTypingLast;
     LLFrameTimer    mTypingTimer;
+
+    // What the chat bubble last built. A chat line's text never changes once
+    // it has been said; what moves frame to frame is which lines are still
+    // shown and how far each has faded. Rebuilding for the fade alone re-wrapped
+    // and re-shaped every line of every chatting avatar on screen, every frame,
+    // and threw away the glyphs each had already shaped.
+    struct BubbleLine
+    {
+        std::string mText;
+        U8          mStyle;
+    };
+    std::vector<BubbleLine> mBubbleChatLines;
 
 /**                    Name
  **                                                                            **
@@ -1320,9 +1360,9 @@ public:
     void                dumpAvatarTEs(const std::string& context) const;
 
     static F32          sUnbakedTime; // Total seconds with >=1 unbaked avatars
-    static F32          sUnbakedUpdateTime; // Last time stats were updated (to prevent multiple updates per frame)
+    static U32          sUnbakedUpdateFrame; // LLFrameTimer::getFrameCount() the stats were last updated in (to prevent multiple updates per frame)
     static F32          sGreyTime; // Total seconds with >=1 grey avatars
-    static F32          sGreyUpdateTime; // Last time stats were updated (to prevent multiple updates per frame)
+    static U32          sGreyUpdateFrame; // LLFrameTimer::getFrameCount() the stats were last updated in (to prevent multiple updates per frame)
 protected:
     S32                 getUnbakedPixelAreaRank();
     bool                mHasGrey = false;

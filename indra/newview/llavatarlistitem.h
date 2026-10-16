@@ -48,9 +48,11 @@ typedef enum
     SP_COUNT
 } EShowPermissionType;
 
-class LLAvatarListItem : public LLPanel, public LLFriendObserver
+class LLAvatarListItem final : public LLPanel, public LLFriendObserver
 {
 public:
+    AL_VIEW_TYPE(LLAvatarListItem, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         Optional<LLStyle::Params>   default_style,

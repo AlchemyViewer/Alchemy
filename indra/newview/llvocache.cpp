@@ -34,26 +34,37 @@
 #include "llagentcamera.h"
 #include "llmemory.h"
 #include "llsdserialize.h"
+#include "llmemorystream.h"
 #include "llworld.h" // For LLWorld::getInstance()
 
 #include <fmt/xchar.h>
 
+#include <bitset>
+#include <sstream>
+
 //static variables
-U32 LLVOCacheEntry::sMinFrameRange = 0;
+// The least aggressive of the values updateDebugSettings can pick, so that a
+// read before the first update keeps entries rather than dropping them.
+U32 LLVOCacheEntry::sMinFrameRange = 64;
 F32 LLVOCacheEntry::sNearRadius = 1.0f;
 F32 LLVOCacheEntry::sRearFarRadius = 1.0f;
+// Nothing is outside the eviction radius until the settings have been read.
+F32 LLVOCacheEntry::sEvictFarRadius = F32_MAX;
+F32 LLVOCacheEntry::sMemoryAdjustFactor = 1.0f;
 F32 LLVOCacheEntry::sFrontPixelThreshold = 1.0f;
 F32 LLVOCacheEntry::sRearPixelThreshold = 1.0f;
 bool LLVOCachePartition::sNeedsOcclusionCheck = false;
 
-const S32 ENTRY_HEADER_SIZE = 6 * sizeof(S32);
+// local id, CRC, hit count, body size
+const S32 ENTRY_HEADER_SIZE = 4 * sizeof(S32);
 const S32 MAX_ENTRY_BODY_SIZE = 10000;
-
-bool check_read(LLFile* apr_file, void* src, S32 n_bytes)
-{
-    std::error_code ec;
-    return apr_file->read(src, n_bytes, ec) == n_bytes && !ec;
-}
+// No cache file is legitimately anywhere near this. One that is has been
+// damaged or planted, and is not read into memory to find out which.
+const S64 MAX_CACHE_FILE_SIZE = 512 * 1024 * 1024;
+// An override record is a map of arrays of maps of arrays: four levels deep.
+const S32 MAX_OVERRIDE_LLSD_DEPTH = 16;
+// A file with this many unreadable records is not a cache with a bad record in it.
+const U32 MAX_UNREADABLE_RECORDS = 16;
 
 bool check_write(LLFile* apr_file, void* src, S32 n_bytes)
 {
@@ -63,16 +74,14 @@ bool check_write(LLFile* apr_file, void* src, S32 n_bytes)
 
 // Material Override Cache needs a version label, so we can upgrade this later.
 const std::string LLGLTFOverrideCacheEntry::VERSION_LABEL = {"GLTFCacheVer"};
-const int LLGLTFOverrideCacheEntry::VERSION = 1;
+const int LLGLTFOverrideCacheEntry::VERSION = 2;
 
 bool LLGLTFOverrideCacheEntry::fromLLSD(const LLSD& data)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
-    llassert(data.has("local_id"));
-    llassert(data.has("object_id"));
-    llassert(data.has("region_handle_x") && data.has("region_handle_y"));
-
+    // A record missing these is rejected, not asserted on: it can come from a
+    // cache file as easily as from the wire, and the caller skips it.
     if (!data.has("local_id"))
     {
         return false;
@@ -106,13 +115,16 @@ bool LLGLTFOverrideCacheEntry::fromLLSD(const LLSD& data)
             sides.size() != 0 &&
             sides.size() == gltf_llsd.size())
         {
+            mSides.reserve(sides.size());
             for (int i = 0; i < sides.size(); ++i)
             {
-                S32 side_idx = sides[i].asInteger();
-                mSides[side_idx] = gltf_llsd[i];
-                LLGLTFMaterial* override_mat = new LLGLTFMaterial();
-                override_mat->applyOverrideLLSD(gltf_llsd[i]);
-                mGLTFMaterial[side_idx] = override_mat;
+                // a face index outside any object's range is not an override
+                const S32 side = sides[i].asInteger();
+                if (side < 0 || side >= (S32)LLTEContents::MAX_TES)
+                {
+                    continue;
+                }
+                mSides[side] = gltf_llsd[i];
             }
         }
         else
@@ -121,16 +133,24 @@ bool LLGLTFOverrideCacheEntry::fromLLSD(const LLSD& data)
         }
     }
 
-    llassert(mSides.size() == mGLTFMaterial.size());
-#ifdef SHOW_ASSERT
-    for (auto const & side : mSides)
-    {
-        // check that mSides and mGLTFMaterial have exactly the same keys present
-        llassert(mGLTFMaterial.count(side.first) == 1);
-    }
-#endif
-
     return true;
+}
+
+void LLGLTFOverrideCacheEntry::materialize()
+{
+    if (!mGLTFMaterial.empty() || mSides.empty())
+    {
+        return;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+
+    mGLTFMaterial.reserve(mSides.size());
+    for (const auto& [side, override_llsd] : mSides)
+    {
+        LLGLTFMaterial* override_mat = new LLGLTFMaterial();
+        override_mat->applyOverrideLLSD(override_llsd);
+        mGLTFMaterial[side] = override_mat;
+    }
 }
 
 LLSD LLGLTFOverrideCacheEntry::toLLSD() const
@@ -145,11 +165,8 @@ LLSD LLGLTFOverrideCacheEntry::toLLSD() const
     data["object_id"] = mObjectId;
     data["local_id"] = (LLSD::Integer) mLocalId;
 
-    llassert(mSides.size() == mGLTFMaterial.size());
     for (auto const & side : mSides)
     {
-        // check that mSides and mGLTFMaterial have exactly the same keys present
-        llassert(mGLTFMaterial.count(side.first) == 1);
         data["sides"].append(LLSD::Integer(side.first));
         data["gltf_llsd"].append(side.second);
     }
@@ -167,7 +184,6 @@ LLVOCacheEntry::LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &
     mCRC(crc),
     mUpdateFlags(-1),
     mHitCount(0),
-    mDupeCount(0),
     mCRCChangeCount(0),
     mState(INACTIVE),
     mSceneContrib(0.f),
@@ -186,7 +202,6 @@ LLVOCacheEntry::LLVOCacheEntry()
     mCRC(0),
     mUpdateFlags(-1),
     mHitCount(0),
-    mDupeCount(0),
     mCRCChangeCount(0),
     mBuffer(NULL),
     mState(INACTIVE),
@@ -198,10 +213,14 @@ LLVOCacheEntry::LLVOCacheEntry()
     mDP.assignBuffer(mBuffer, 0);
 }
 
-LLVOCacheEntry::LLVOCacheEntry(LLFile* apr_file)
+LLVOCacheEntry::LLVOCacheEntry(const U8*& cursor, const U8* end)
 :   LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
-    mBuffer(NULL),
+    mLocalID(0),
+    mCRC(0),
     mUpdateFlags(-1),
+    mHitCount(0),
+    mCRCChangeCount(0),
+    mBuffer(NULL),
     mState(INACTIVE),
     mSceneContrib(0.f),
     mValid(false),
@@ -209,47 +228,32 @@ LLVOCacheEntry::LLVOCacheEntry(LLFile* apr_file)
     mBSphereRadius(-1.0f)
 {
     S32 size = -1;
-    bool success;
-    static U8 data_buffer[ENTRY_HEADER_SIZE];
+    const size_t avail = (size_t)(end - cursor);
+    bool success = avail >= (size_t)ENTRY_HEADER_SIZE;
 
     mDP.assignBuffer(mBuffer, 0);
 
-    success = check_read(apr_file, (void *)data_buffer, ENTRY_HEADER_SIZE);
     if (success)
     {
-        memcpy(&mLocalID, data_buffer, sizeof(U32));
-        memcpy(&mCRC, data_buffer + sizeof(U32), sizeof(U32));
-        memcpy(&mHitCount, data_buffer + (2 * sizeof(U32)), sizeof(S32));
-        memcpy(&mDupeCount, data_buffer + (3 * sizeof(U32)), sizeof(S32));
-        memcpy(&mCRCChangeCount, data_buffer + (4 * sizeof(U32)), sizeof(S32));
-        memcpy(&size, data_buffer + (5 * sizeof(U32)), sizeof(S32));
+        memcpy(&mLocalID, cursor, sizeof(U32));
+        memcpy(&mCRC, cursor + sizeof(U32), sizeof(U32));
+        memcpy(&mHitCount, cursor + (2 * sizeof(U32)), sizeof(S32));
+        memcpy(&size, cursor + (3 * sizeof(U32)), sizeof(S32));
 
-        // Corruption in the cache entries
-        if ((size > MAX_ENTRY_BODY_SIZE) || (size < 1))
+        // A bogus size means the rest of the file is bogus too; the caller
+        // discards it, so there is nothing to skip past.
+        if ((size > MAX_ENTRY_BODY_SIZE) || (size < 1) || (avail - ENTRY_HEADER_SIZE) < (size_t)size)
         {
-            // We've got a bogus size, skip reading it.
-            // We won't bother seeking, because the rest of this file
-            // is likely bogus, and will be tossed anyway.
-            LL_WARNS() << "Bogus cache entry, size " << size << ", aborting!" << LL_ENDL;
+            LL_WARNS() << "Bogus cache entry, size " << size << " with " << avail << " bytes left, aborting!" << LL_ENDL;
             success = false;
         }
     }
-    if(success && size > 0)
+    if(success)
     {
         mBuffer = new U8[size];
-        success = check_read(apr_file, mBuffer, size);
-
-        if(success)
-        {
-            mDP.assignBuffer(mBuffer, size);
-        }
-        else
-        {
-            // Improve logging around vocache
-            LL_WARNS() << "Error loading cache entry for " << mLocalID << ", size " << size << " aborting!" << LL_ENDL;
-            delete[] mBuffer ;
-            mBuffer = NULL ;
-        }
+        memcpy(mBuffer, cursor + ENTRY_HEADER_SIZE, size);
+        mDP.assignBuffer(mBuffer, size);
+        cursor += ENTRY_HEADER_SIZE + size;
     }
 
     if(!success)
@@ -257,7 +261,6 @@ LLVOCacheEntry::LLVOCacheEntry(LLFile* apr_file)
         mLocalID = 0;
         mCRC = 0;
         mHitCount = 0;
-        mDupeCount = 0;
         mCRCChangeCount = 0;
         mBuffer = NULL;
         mEntry = NULL;
@@ -431,7 +434,6 @@ void LLVOCacheEntry::dump() const
     LL_INFOS() << "local " << mLocalID
         << " crc " << mCRC
         << " hits " << mHitCount
-        << " dupes " << mDupeCount
         << " change " << mCRCChangeCount
         << LL_ENDL;
 }
@@ -449,23 +451,72 @@ S32 LLVOCacheEntry::writeToBuffer(U8 *data_buffer) const
     memcpy(data_buffer, &mLocalID, sizeof(U32));
     memcpy(data_buffer + sizeof(U32), &mCRC, sizeof(U32));
     memcpy(data_buffer + (2 * sizeof(U32)), &mHitCount, sizeof(S32));
-    memcpy(data_buffer + (3 * sizeof(U32)), &mDupeCount, sizeof(S32));
-    memcpy(data_buffer + (4 * sizeof(U32)), &mCRCChangeCount, sizeof(S32));
-    memcpy(data_buffer + (5 * sizeof(U32)), &size, sizeof(S32));
+    memcpy(data_buffer + (3 * sizeof(U32)), &size, sizeof(S32));
     memcpy(data_buffer + ENTRY_HEADER_SIZE, (void*)mBuffer, size);
 
     return ENTRY_HEADER_SIZE + size;
+}
+
+//static
+F32 LLVOCacheEntry::memoryAdjustFactor(F32 allocated_MB, F32 physical_MB, F32 heap_cap_MB,
+                                       F32 low_setting_MB, F32 high_setting_MB,
+                                       bool low_is_explicit, bool high_is_explicit)
+{
+    // The default settings date from 32-bit builds and sit far below what a
+    // 64-bit viewer uses at rest, which pinned the factor at 0 and left the
+    // scene permanently loading at its tightest radii. A bound left at its
+    // default follows installed RAM; one set by hand is taken as it is, in
+    // either direction. Settings can also arrive the wrong way round.
+    F32 low_bound_MB = low_is_explicit ? low_setting_MB : llmax(low_setting_MB, physical_MB * 0.25f);
+    F32 high_bound_MB = high_is_explicit ? high_setting_MB : llmax(high_setting_MB, physical_MB * 0.6f);
+    high_bound_MB = llmax(high_bound_MB, low_bound_MB + 1.f);
+
+    // Once the allocation reaches the heap cap, free memory reads as none and
+    // the last-resort limits take over. The gradual ones have to be finished
+    // before that, so both bounds shrink together until the tightest point
+    // sits under the cap.
+    const F32 cap_MB = heap_cap_MB * 0.9f;
+    if (high_bound_MB > cap_MB)
+    {
+        low_bound_MB *= cap_MB / high_bound_MB;
+        high_bound_MB = cap_MB;
+    }
+
+    const F32 clamped_memory = llclamp(allocated_MB, low_bound_MB, high_bound_MB);
+    const F32 adjust_range = llmax(high_bound_MB - low_bound_MB, 1.f);
+    return llclamp((high_bound_MB - clamped_memory) / adjust_range, 0.f, 1.f);
+}
+
+//static
+F32 LLVOCacheEntry::evictRadius(F32 rear_far_radius, F32 min_radius, F32 draw_radius)
+{
+    // A quarter again beyond the radius that loads an entry, so that turning
+    // around does not cross both radii at once, and never inside
+    // SceneLoadMinRadius, whose own description is that everything within it
+    // stays loaded. The floor is that setting rather than the pressure-scaled
+    // sNearRadius, so memory pressure cannot pull the two radii back together
+    // at the moment it switches eviction on. The sphere is the whole sphere,
+    // not just the part behind the camera, and nothing beyond the draw distance
+    // is drawn, so the draw distance caps it; above four fifths of it the band
+    // narrows to what is left.
+    constexpr F32 EVICT_HYSTERESIS = 1.25f;
+    return llclamp(rear_far_radius * EVICT_HYSTERESIS, llmin(min_radius, draw_radius), draw_radius);
 }
 
 #ifndef LL_TEST
 //static
 void LLVOCacheEntry::updateDebugSettings()
 {
+    // A default-constructed LLFrameTimer reads no elapsed time, so the once-a-
+    // second throttle used to skip the first call and leave the statics at their
+    // initial values for a second of scene loading.
     static LLFrameTimer timer;
-    if(timer.getElapsedTimeF32() < 1.0f) //update frequency once per second.
+    static bool first_update = true;
+    if(!first_update && timer.getElapsedTimeF32() < 1.0f) //update frequency once per second.
     {
         return;
     }
+    first_update = false;
     timer.reset();
 
     //objects within the view frustum whose visible area is greater than this threshold will be loaded
@@ -482,12 +533,21 @@ void LLVOCacheEntry::updateDebugSettings()
     static LLCachedControl<U32> low_mem_bound_MB(gSavedSettings,"SceneLoadLowMemoryBound");
     static LLCachedControl<U32> high_mem_bound_MB(gSavedSettings,"SceneLoadHighMemoryBound");
 
-    LLMemory::updateMemoryInfo() ;
-    U32 allocated_mem = LLMemory::getAllocatedMemKB().value();
+    LLMemory::updateFreeSystemMemory() ;
     static const F32 KB_to_MB = 1.f / 1024.f;
-    U32 clamped_memory = (U32)llclamp(allocated_mem * KB_to_MB, (F32) low_mem_bound_MB, (F32) high_mem_bound_MB);
-    const F32 adjust_range = (F32)(high_mem_bound_MB - low_mem_bound_MB);
-    const F32 adjust_factor = (high_mem_bound_MB - clamped_memory) / adjust_range; // [0, 1]
+    const F32 allocated_MB = LLMemory::getAllocatedMemKB().value() * KB_to_MB;
+
+    // a bound left at its default follows installed RAM; one set by hand is
+    // the bound
+    static const U32 low_default = gSavedSettings.getControl("SceneLoadLowMemoryBound")->getDefault().asInteger();
+    static const U32 high_default = gSavedSettings.getControl("SceneLoadHighMemoryBound")->getDefault().asInteger();
+    const F32 physical_MB = LLMemory::getMaxMemKB().value() * KB_to_MB;
+    const F32 heap_cap_MB = LLMemory::getMaxHeapSizeKB().value() * KB_to_MB;
+    const F32 adjust_factor = memoryAdjustFactor(allocated_MB, physical_MB, heap_cap_MB,
+                                                 (F32)low_mem_bound_MB, (F32)high_mem_bound_MB,
+                                                 (U32)low_mem_bound_MB != low_default,
+                                                 (U32)high_mem_bound_MB != high_default); // [0, 1]
+    sMemoryAdjustFactor = adjust_factor;
 
     //min radius: all objects within this radius remain loaded in memory
     static LLCachedControl<F32> min_radius(gSavedSettings,"SceneLoadMinRadius");
@@ -510,6 +570,7 @@ void LLVOCacheEntry::updateDebugSettings()
     const F32 max_radius = rear_max_radius_frac * draw_radius;
     const F32 clamped_max_radius = llclamp(max_radius, min_radius_plus_one, draw_radius); // [sNearRadius, mDrawDistance]
     sRearFarRadius = min_radius_plus_one + ((clamped_max_radius - min_radius_plus_one) * adjust_factor);
+    sEvictFarRadius = evictRadius(sRearFarRadius, (F32)min_radius, draw_radius);
 
     //the number of frames invisible objects stay in memory
     static LLCachedControl<U32> inv_obj_time(gSavedSettings,"NonvisibleObjectsInMemoryTime");
@@ -543,57 +604,83 @@ F32 LLVOCacheEntry::getSquaredPixelThreshold(bool is_front)
 
 extern bool gCubeSnapshot;
 
-bool LLVOCacheEntry::isAnyVisible(const LLVector4a& camera_origin, const LLVector4a& local_camera_origin, F32 dist_threshold)
+// Eviction was switched off in 2024 for paging objects still within view distance
+// in and out of memory as the camera turned. The distance that decided that was
+// sRearFarRadius, which the memory bounds pinned to two metres on every 64-bit
+// machine until those bounds were repaired; whether that was the whole of it is
+// what AlchemyVOCacheEvictionMode exists to measure.
+
+//static
+bool LLVOCacheEntry::staysInMemory(const VisibilityFacts& facts)
 {
-#if 0
-    // this is ill-conceived and should be removed pending QA
-    // In the name of saving memory, we evict objects that are still within view distance from memory
-    // This results in constant paging of objects in and out of memory, leading to poor performance
-    // and many unacceptable visual glitches when rotating the camera
-
-    // Honestly, the entire VOCache partition system needs to be removed since it doubles the overhead of
-    // the spatial partition system and is redundant to the object cache, but this is a start
-    //  - davep 2024.06.07
-
-    LLOcclusionCullingGroup* group = (LLOcclusionCullingGroup*)getGroup();
-    if(!group)
-    {
-        return false;
-    }
-
     //any visible
-    bool vis = group->isAnyRecentlyVisible();
+    bool vis = facts.mHasGroup && facts.mGroupRecentlyVisible;
 
     //not ready to remove
     if(!vis)
     {
-        S32 cur_vis = llmax(group->getAnyVisible(), (S32)getVisible());
-        vis = (cur_vis + (S32)sMinFrameRange > LLViewerOctreeEntryData::getCurrentFrame());
+        const S32 cur_vis = facts.mHasGroup
+            ? llmax(facts.mGroupAnyVisibleFrame, facts.mEntryVisibleFrame)
+            : facts.mEntryVisibleFrame;
+        vis = (cur_vis + (S32)facts.mMinFrameRange > facts.mCurrentFrame);
     }
 
     //within the back sphere
-    if(!vis && !mParentID && !group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
+    if(!vis && !facts.mIsChild && !facts.mGroupOccluded)
     {
-        LLVector4a lookAt;
-
-        if(mBSphereRadius > 0.f)
-        {
-            lookAt.setSub(mBSphereCenter, local_camera_origin);
-            dist_threshold += mBSphereRadius;
-        }
-        else
-        {
-            lookAt.setSub(getPositionGroup(), camera_origin);
-            dist_threshold += getBinRadius();
-        }
-
-        vis = (lookAt.dot3(lookAt).getF32() < dist_threshold * dist_threshold);
+        const F32 threshold = facts.mDistThreshold + facts.mRadius;
+        vis = (facts.mDistanceSquared < threshold * threshold);
     }
 
     return vis;
-#else
-    return true;
-#endif
+}
+
+bool LLVOCacheEntry::isAnyVisible(const LLVector4a& camera_origin, const LLVector4a& local_camera_origin, F32 dist_threshold)
+{
+    // A drawable carries no group while it moves between spatial groups, and
+    // LLSpatialBridge::cleanupReferences clears one for a whole child list.
+    // Answering "invisible" there evicts objects mid-rebin, so ask the octree
+    // only when there is an octree to ask and let the frame window below judge
+    // the rest.
+    LLOcclusionCullingGroup* group = (LLOcclusionCullingGroup*)getGroup();
+
+    VisibilityFacts facts;
+    facts.mHasGroup             = (group != NULL);
+    facts.mGroupRecentlyVisible = group && group->isAnyRecentlyVisible();
+    facts.mGroupOccluded        = group && group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED);
+    facts.mGroupAnyVisibleFrame = group ? group->getAnyVisible() : 0;
+    facts.mEntryVisibleFrame    = (S32)getVisible();
+    facts.mCurrentFrame         = LLViewerOctreeEntryData::getCurrentFrame();
+    facts.mMinFrameRange        = sMinFrameRange;
+    facts.mIsChild              = (mParentID > 0);
+    facts.mDistThreshold        = dist_threshold;
+
+    // The saved sphere is written when an entry leaves the render pipeline and
+    // describes it in region-local space; an entry that is back in the pipeline
+    // shares its drawable's octree entry, in agent space, and that is where it
+    // actually is. Each is measured against its own camera origin. Measuring at
+    // all is a pointer chase into the octree, so it is skipped where the sphere
+    // test cannot be reached, and an entry with no place in the world is left
+    // infinitely far away so the sphere is never what keeps it.
+    facts.mDistanceSquared = F32_MAX;
+    if(!facts.mIsChild && !facts.mGroupOccluded)
+    {
+        LLVector4a lookAt;
+        if(!isState(ACTIVE) && mBSphereRadius > 0.f)
+        {
+            lookAt.setSub(mBSphereCenter, local_camera_origin);
+            facts.mRadius = mBSphereRadius;
+            facts.mDistanceSquared = lookAt.dot3(lookAt).getF32();
+        }
+        else if(getEntry())
+        {
+            lookAt.setSub(getPositionGroup(), camera_origin);
+            facts.mRadius = getBinRadius();
+            facts.mDistanceSquared = lookAt.dot3(lookAt).getF32();
+        }
+    }
+
+    return staysInMemory(facts);
 }
 
 void LLVOCacheEntry::calcSceneContribution(const LLVector4a& camera_origin, bool needs_update, U32 last_update, F32 max_dist)
@@ -797,6 +884,7 @@ public:
           mPixelThreshold(pixel_threshold)
     {
         mLocalShift = shift;
+        mNearFirst = false; // the groups it finds go into a set (LLViewerRegion::addVisibleGroup)
         mUseObjectCacheOcclusion = use_object_cache_occlusion;
         mNearRadius = LLVOCacheEntry::sNearRadius;
     }
@@ -813,9 +901,19 @@ public:
                 return false;
             }
 
-            group->checkOcclusion();
+            // A query that has just come back finding the group in view makes it seen now. processGroup would
+            // otherwise take a group not seen in the last two frames for one new to the view, and query it again
+            // instead of adding it: while the camera rests this cull runs only every few frames (cull), so each
+            // answer would come back too late to count, and the group's objects would never be created.
+            if (group->checkOcclusion())
+            {
+                group->setVisible();
+            }
 
-            if (group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
+            // An occluded group is asked again on its needsUpdate() frame. While the camera rests, this cull runs only
+            // on frames that never fall on half the groups' (cull), so one whose last query is a period old is let
+            // through all the same, or it would stay hidden after whatever hid it had gone.
+            if (group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED) && !group->isOcclusionRetestDue())
             {
                 return true;
             }
@@ -914,6 +1012,7 @@ public:
         : LLViewerOctreeCull(camera), mRegionp(regionp), mPixelThreshold(pixel_threshold), mUseObjectCacheOcclusion(use_occlusion)
     {
         mLocalShift = shift;
+        mNearFirst = false; // the groups it finds go into a set, as the front cull's do
         mSphereRadius = LLVOCacheEntry::sRearFarRadius;
     }
 
@@ -981,7 +1080,10 @@ void LLVOCachePartition::selectBackObjects(LLCamera &camera, F32 pixel_threshold
 
     if(mBackSlectionEnabled < 0)
     {
-        mBackSlectionEnabled = LLVOCacheEntry::sMinFrameRange - 1;
+        // sMinFrameRange is unsigned, so subtracting from zero wrapped to
+        // U32_MAX and narrowed to -1, which the llmax below then read as one
+        // pass instead of sixty-three.
+        mBackSlectionEnabled = (S32)llmax(LLVOCacheEntry::sMinFrameRange, 1u) - 1;
         mBackSlectionEnabled = llmax(mBackSlectionEnabled, (S32)1);
     }
 
@@ -1294,7 +1396,8 @@ void LLVOCache::removeEntry(HeaderEntryInfo* entry)
     LL_DEBUGS() << "Removing entry for region with filename" << getObjectCacheFilename(entry->mHandle) << LL_ENDL;
 
     // make sure corresponding LLViewerRegion also clears its in-memory cache
-    LLViewerRegion* regionp = LLWorld::instance().getRegionFromHandle(entry->mHandle);
+    LLWorld* world = LLWorld::getInstance();
+    LLViewerRegion* regionp = world ? world->getRegionFromHandle(entry->mHandle) : nullptr;
     if (regionp)
     {
         regionp->clearVOCacheFromMemory();
@@ -1401,55 +1504,48 @@ void LLVOCache::readCacheHeader()
         std::error_code ec;
         LLFile apr_file(mHeaderFilePath, LLFile::in|LLFile::binary, ec);
 
-        //read the meta element
-        success = check_read(&apr_file, &mMetaInfo, sizeof(HeaderMetaInfo)) ;
+        // The header is a fixed-size file: the meta record followed by
+        // MAX_NUM_OBJECT_ENTRIES slots. One read takes all of it.
+        constexpr size_t header_size = sizeof(HeaderMetaInfo) + MAX_NUM_OBJECT_ENTRIES * sizeof(HeaderEntryInfo);
+        std::vector<U8> data(header_size);
+        const S64 got = (apr_file && !ec) ? apr_file.read(data.data(), (S64)header_size, ec) : -1;
+        success = !ec && got >= (S64)sizeof(HeaderMetaInfo);
 
         if(success)
         {
-            HeaderEntryInfo* entry = NULL ;
+            const U8* cursor = data.data();
+            const U8* end = cursor + (size_t)got;
+            memcpy(&mMetaInfo, cursor, sizeof(HeaderMetaInfo));
+            cursor += sizeof(HeaderMetaInfo);
+
             mNumEntries = 0 ;
             U32 num_read = 0 ;
             while(num_read++ < MAX_NUM_OBJECT_ENTRIES)
             {
-                if(!entry)
-                {
-                    entry = new HeaderEntryInfo() ;
-                }
-                success = check_read(&apr_file, entry, sizeof(HeaderEntryInfo));
-
-                if(!success) //failed
+                if ((size_t)(end - cursor) < sizeof(HeaderEntryInfo))
                 {
                     LL_WARNS() << "Error reading cache header entry. (entry_index=" << mNumEntries << ")" << LL_ENDL;
-                    delete entry ;
-                    entry = NULL ;
+                    success = false;
                     break ;
                 }
-                else if(entry->mTime == INVALID_TIME)
+                HeaderEntryInfo record;
+                memcpy(&record, cursor, sizeof(HeaderEntryInfo));
+                cursor += sizeof(HeaderEntryInfo);
+                if(record.mTime == INVALID_TIME)
                 {
                     continue ; //an empty entry
                 }
 
-                entry->mIndex = mNumEntries++ ;
+                HeaderEntryInfo* entry = new HeaderEntryInfo(record);
+                // The slot it was read from, which is where updateEntry writes
+                // it back. Counting the live ones instead put every entry
+                // after a hole one slot too early.
+                entry->mIndex = (S32)num_read - 1;
+                mNumEntries++;
                 mHeaderEntryQueue.insert(entry) ;
                 mHandleEntryMap[entry->mHandle] = entry ;
-                entry = NULL ;
-            }
-            if(entry)
-            {
-                delete entry ;
             }
         }
-
-        //---------
-        //debug code
-        //----------
-        //std::string name ;
-        //for(header_entry_queue_t::iterator iter = mHeaderEntryQueue.begin() ; success && iter != mHeaderEntryQueue.end(); ++iter)
-        //{
-        //  getObjectCacheFilename((*iter)->mHandle, name) ;
-        //  LL_INFOS() << name << LL_ENDL ;
-        //}
-        //-----------
     }
     else
     {
@@ -1484,31 +1580,35 @@ void LLVOCache::writeCacheHeader()
 
     bool success = true ;
     {
-        std::error_code ec;
-        LLFile apr_file(mHeaderFilePath, LLFile::out|LLFile::binary|LLFile::trunc, ec);
+        std::vector<U8> data;
+        data.reserve(sizeof(HeaderMetaInfo) + MAX_NUM_OBJECT_ENTRIES * sizeof(HeaderEntryInfo));
+        auto append = [&data](const void* src, size_t n)
+        {
+            const U8* p = static_cast<const U8*>(src);
+            data.insert(data.end(), p, p + n);
+        };
 
-        //write the meta element
-        success = check_write(&apr_file, &mMetaInfo, sizeof(HeaderMetaInfo)) ;
+        append(&mMetaInfo, sizeof(HeaderMetaInfo));
 
         mNumEntries = 0 ;
-        for(header_entry_queue_t::iterator iter = mHeaderEntryQueue.begin() ; success && iter != mHeaderEntryQueue.end(); ++iter)
+        for(header_entry_queue_t::iterator iter = mHeaderEntryQueue.begin() ; iter != mHeaderEntryQueue.end(); ++iter)
         {
             (*iter)->mIndex = mNumEntries++ ;
-            success = check_write(&apr_file, (void*)*iter, sizeof(HeaderEntryInfo));
+            append(*iter, sizeof(HeaderEntryInfo));
         }
 
         mNumEntries = static_cast<U32>(mHeaderEntryQueue.size());
-        if(success && mNumEntries < MAX_NUM_OBJECT_ENTRIES)
+        HeaderEntryInfo empty{};
+        empty.mTime = INVALID_TIME ;
+        for(U32 i = mNumEntries ; i < MAX_NUM_OBJECT_ENTRIES ; i++)
         {
-            HeaderEntryInfo entry{};
-            entry.mTime = INVALID_TIME ;
-            for(S32 i = mNumEntries ; success && i < MAX_NUM_OBJECT_ENTRIES ; i++)
-            {
-                //fill the cache with the default entry.
-                success = check_write(&apr_file, &entry, sizeof(HeaderEntryInfo)) ;
-
-            }
+            //fill the cache with the default entry.
+            append(&empty, sizeof(HeaderEntryInfo));
         }
+
+        std::error_code ec;
+        LLFile apr_file(mHeaderFilePath, LLFile::out|LLFile::binary|LLFile::trunc, ec);
+        success = !ec && bool(apr_file) && check_write(&apr_file, data.data(), (S32)data.size());
     }
 
     if(!success)
@@ -1517,6 +1617,31 @@ void LLVOCache::writeCacheHeader()
         mReadOnly = true ; //disable the cache.
     }
     return ;
+}
+
+S32 LLVOCache::firstFreeSlot() const
+{
+    // The header file is a fixed array of slots and the queue knows which are
+    // taken; a removal leaves a hole rather than closing up, so the count of
+    // live entries says nothing about where the next one can go. The purge
+    // keeps the count under the cache size, which is at most the slot count,
+    // so there is always one.
+    std::bitset<MAX_NUM_OBJECT_ENTRIES> taken;
+    for (const HeaderEntryInfo* entry : mHeaderEntryQueue)
+    {
+        if (entry->mIndex >= 0 && (U32)entry->mIndex < MAX_NUM_OBJECT_ENTRIES)
+        {
+            taken.set((size_t)entry->mIndex);
+        }
+    }
+    for (U32 slot = 0; slot < MAX_NUM_OBJECT_ENTRIES; ++slot)
+    {
+        if (!taken.test(slot))
+        {
+            return (S32)slot;
+        }
+    }
+    return (S32)MAX_NUM_OBJECT_ENTRIES - 1;
 }
 
 bool LLVOCache::updateEntry(const HeaderEntryInfo* entry)
@@ -1532,6 +1657,7 @@ bool LLVOCache::updateEntry(const HeaderEntryInfo* entry)
 // this in turn forces a rewrite after a partial read due to corruption.
 bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_entry_map_t& cache_entry_map)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     if(!mEnabled)
     {
         LL_WARNS() << "Not reading cache for handle " << handle << "): Cache is currently disabled." << LL_ENDL;
@@ -1542,7 +1668,8 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
     handle_entry_map_t::iterator iter = mHandleEntryMap.find(handle) ;
     if(iter == mHandleEntryMap.end()) //no cache
     {
-        LL_WARNS() << "No handle map entry for " << handle << LL_ENDL;
+        // the normal case for a region never visited from this cache
+        LL_DEBUGS("VOCache") << "No handle map entry for " << handle << LL_ENDL;
         return false; // arguably no a problem, but we'll mark this as dirty anyway.
     }
 
@@ -1553,6 +1680,8 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
         LLUUID cache_id;
         filename = getObjectCacheFilename(handle);
 
+        // The file is read whole and decoded from memory: a region's cache
+        // runs to tens of thousands of entries, and LLFile is unbuffered.
         std::error_code ec;
         LLFile apr_file(filename, LLFile::in|LLFile::binary, ec);
         if (!apr_file || ec)
@@ -1560,19 +1689,26 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
             success = false;
         }
 
-        S64 file_size = apr_file.size(ec);
-        if (0 >= file_size || ec)
+        const S64 file_size = success ? apr_file.size(ec) : 0;
+        if (file_size < (S64)(UUID_BYTES + sizeof(S32)) || file_size > MAX_CACHE_FILE_SIZE || ec)
         {
             success = false;
         }
 
+        std::vector<U8> data;
         if (success)
         {
-            success = check_read(&apr_file, cache_id.mData, UUID_BYTES);
+            data.resize((size_t)file_size);
+            success = apr_file.read(data.data(), file_size, ec) == file_size && !ec;
         }
 
         if(success)
         {
+            const U8* cursor = data.data();
+            const U8* end = cursor + data.size();
+
+            memcpy(cache_id.mData, cursor, UUID_BYTES);
+            cursor += UUID_BYTES;
             if(cache_id != id)
             {
                 LL_INFOS() << "Cache ID doesn't match for this region, discarding"<< LL_ENDL;
@@ -1581,159 +1717,200 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
 
             if(success)
             {
-                success = check_read(&apr_file, &num_entries, sizeof(S32)) ;
+                memcpy(&num_entries, cursor, sizeof(S32));
+                cursor += sizeof(S32);
 
-                if(success)
+                // Every entry is at least a header and one body byte, so the
+                // bytes left bound how many the count can honestly claim.
+                const S32 max_possible = (S32)((end - cursor) / (ENTRY_HEADER_SIZE + 1));
+                cache_entry_map.reserve((size_t)llclamp(num_entries, 0, max_possible));
+
+                S32 i = 0;
+                for (; i < num_entries && cursor < end; i++)
                 {
-                    for (S32 i = 0; i < num_entries && file_size > apr_file.tell(ec); i++)
+                    LLPointer<LLVOCacheEntry> entry = new LLVOCacheEntry(cursor, end);
+                    const U32 local_id = entry->getLocalID();
+                    if (!local_id)
                     {
-                        LLPointer<LLVOCacheEntry> entry = new LLVOCacheEntry(&apr_file);
-                        if (!entry->getLocalID())
-                        {
-                            LL_WARNS() << "Aborting cache file load for " << filename << ", cache file corruption!" << LL_ENDL;
-                            success = false ;
-                            break ;
-                        }
-                        cache_entry_map[entry->getLocalID()] = entry;
+                        LL_WARNS() << "Aborting cache file load for " << filename << ", cache file corruption!" << LL_ENDL;
+                        success = false ;
+                        break ;
                     }
+                    cache_entry_map.insert_or_assign(local_id, std::move(entry));
+                }
+
+                // A file shorter than its own count is truncated. Fail it so
+                // the region marks the cache dirty and rewrites it, rather than
+                // carrying the truncation for good.
+                if (success && i != num_entries)
+                {
+                    LL_WARNS() << "Object cache " << filename << " holds " << i << " of " << num_entries << " entries, rewriting" << LL_ENDL;
+                    success = false;
                 }
             }
         }
     }
 
-    if(!success)
-    {
-        if(cache_entry_map.empty())
-        {
-            removeEntry(iter->second) ;
-        }
-    }
-
+    LL_PROFILE_ZONE_NUM(cache_entry_map.size());
     LL_DEBUGS("GLTF", "VOCache") << "Read " << cache_entry_map.size() << " entries from object cache " << filename << ", expected " << num_entries << ", success=" << (success?"True":"False") << LL_ENDL;
     return success;
 }
 
 // We now pass in the cache entry map, so that we can remove entries from extras that are no longer in the primary cache.
-void LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map)
+// Returns false when the file is present but unusable; the caller decides what
+// to remove, so this can run anywhere without reaching into the region or the
+// object list.
+bool LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     int loaded= 0;
     int discarded = 0;
-    // get ViewerRegion pointer from handle
-    LLViewerRegion* pRegion = LLWorld::getInstance()->getRegionFromHandle(handle);
     if(!mEnabled)
     {
         LL_WARNS() << "Not reading cache for handle " << handle << "): Cache is currently disabled." << LL_ENDL;
-        return ;
+        return true;
     }
     llassert_always(mInitialized);
 
-    handle_entry_map_t::iterator iter = mHandleEntryMap.find(handle) ;
-    if(iter == mHandleEntryMap.end()) //no cache
+    if(mHandleEntryMap.find(handle) == mHandleEntryMap.end()) //no cache
     {
-        LL_WARNS() << "No handle map entry for " << handle << LL_ENDL;
-        return;
+        LL_DEBUGS("VOCache") << "No handle map entry for " << handle << LL_ENDL;
+        return true;
     }
 
-    std::filesystem::path filename(getObjectCacheExtrasFilename(handle));
-    llifstream in(filename, std::ios::in | std::ios::binary);
+    // An override is kept only when the primary cache holds its object, so an
+    // empty primary cache means there is nothing here worth parsing.
+    if (cache_entry_map.empty())
+    {
+        return true;
+    }
 
-    std::string line;
-    std::getline(in, line);
-    if(!in.good())
+    // The file is thousands of small LLSD documents, each handed to a fresh
+    // parser, so it is read once and parsed from memory.
+    std::string contents;
+    {
+        std::error_code ec;
+        LLFile file(getObjectCacheExtrasFilename(handle), LLFile::in|LLFile::binary, ec);
+        const S64 size = (file && !ec) ? file.size(ec) : 0;
+        if (size <= 0 || size > MAX_CACHE_FILE_SIZE || ec)
+        {
+            LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
+            return false;
+        }
+        contents.resize((size_t)size);
+        if (file.read(contents.data(), size, ec) != size || ec)
+        {
+            LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
+            return false;
+        }
+    }
+    const U8* cursor = reinterpret_cast<const U8*>(contents.data());
+    const U8* end = cursor + contents.size();
+
+    // The version is a text line so that a reader of an earlier format rejects
+    // the file by version instead of parsing what follows.
+    const U8* eol = static_cast<const U8*>(memchr(cursor, '\n', contents.size()));
+    if (!eol)
     {
         LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
+        return false;
     }
-    // file formats need versions, let's add one. legacy cache files will be considered version 0
-    // This will make it easier to upgrade/revise later.
-    int versionNumber=0;
+    std::string line(reinterpret_cast<const char*>(cursor), (size_t)(eol - cursor));
+    cursor = eol + 1;
+
+    int versionNumber = 0;
     if (line.compare(0, LLGLTFOverrideCacheEntry::VERSION_LABEL.length(), LLGLTFOverrideCacheEntry::VERSION_LABEL) == 0)
     {
-        std::string versionStr = line.substr(LLGLTFOverrideCacheEntry::VERSION_LABEL.length()+1); // skip the version label and ':'
-        versionNumber = std::stol(versionStr);
+        try
+        {
+            versionNumber = std::stol(line.substr(LLGLTFOverrideCacheEntry::VERSION_LABEL.length() + 1)); // skip the version label and ':'
+        }
+        catch (std::logic_error&)  // either invalid_argument or out_of_range
+        {
+            versionNumber = 0;
+        }
     }
-    // For future versions we may call a legacy handler here, but realistically we'll just consider this cache out of date.
-    // The important thing is to make sure it gets removed.
+    // An older or newer format is simply out of date; the caller drops it.
     if(versionNumber != LLGLTFOverrideCacheEntry::VERSION)
     {
         LL_WARNS() << "Unexpected version number " << versionNumber << " for extras cache for handle " << handle << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
+        return false;
     }
 
     LL_DEBUGS("VOCache") << "Reading extras cache for handle " << handle << ", version " << versionNumber << LL_ENDL;
-    std::getline(in, line);
-    if(!LLUUID::validate(line))
+
+    if ((size_t)(end - cursor) < UUID_BYTES + sizeof(U32))
     {
-        LL_WARNS() << "Failed reading extras cache for handle" << handle << ". invalid uuid line: '" << line << "'" << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
+        LL_WARNS() << "Failed reading extras cache for handle " << handle << ": truncated header" << LL_ENDL;
+        return false;
     }
 
-    LLUUID cache_id(line);
+    LLUUID cache_id;
+    memcpy(cache_id.mData, cursor, UUID_BYTES);
+    cursor += UUID_BYTES;
     if(cache_id != id)
     {
         // if the cache id doesn't match the expected region we should just kill the file.
         LL_WARNS() << "Cache ID doesn't match for this region, deleting it" << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
+        return false;
     }
 
-    U32 num_entries;  // if removal was enabled during write num_entries might be wrong
-    std::getline(in, line);
-    if(!in.good())
-    {
-        LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
-    }
-    try
-    {
-        num_entries = std::stol(line);
-    }
-    catch(std::logic_error&)  // either invalid_argument or out_of_range
-    {
-        LL_WARNS() << "Failed reading extras cache for handle " << handle << ". unreadable num_entries" << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
-    }
+    U32 num_entries = 0;
+    memcpy(&num_entries, cursor, sizeof(U32));
+    cursor += sizeof(U32);
 
     LL_DEBUGS("GLTF") << "Beginning reading extras cache for handle " << handle << " from " << getObjectCacheExtrasFilename(handle) << LL_ENDL;
 
     LLSD entry_llsd;
-    for (U32 i = 0; i < num_entries && !in.eof(); i++)
+    U32 unreadable = 0;
+    for (U32 i = 0; i < num_entries; i++)
     {
-        static const U32 max_size = 4096;
-        bool success = LLSDSerialize::deserialize(entry_llsd, in, max_size);
-        // check bool(in) this time since eof is not a failure condition here
-        if(!success || !in)
+        U32 length = 0;
+        if ((size_t)(end - cursor) < sizeof(U32))
         {
-            LL_WARNS() << "Failed reading extras cache for handle " << handle << ", entry number " << i << " cache patrtial load only." << LL_ENDL;
-            in.close();
-            removeGenericExtrasForHandle(handle);
-            break;
+            LL_WARNS() << "Failed reading extras cache for handle " << handle << ", entry number " << i << ": file truncated" << LL_ENDL;
+            return false;
+        }
+        memcpy(&length, cursor, sizeof(U32));
+        cursor += sizeof(U32);
+        if (length == 0 || (size_t)(end - cursor) < length)
+        {
+            LL_WARNS() << "Failed reading extras cache for handle " << handle << ", entry number " << i << ": file truncated" << LL_ENDL;
+            return false;
+        }
+
+        // Each record carries its own length, so one that fails to parse is
+        // stepped over instead of costing the rest of the file -- up to a
+        // point: a file full of them is not a cache with a bad record in it.
+        // The depth cap keeps a crafted record from recursing the parser off
+        // the stack.
+        LLMemoryStream record(cursor, (S32)length);
+        const bool parsed = LLSDSerialize::fromBinary(entry_llsd, record, length, MAX_OVERRIDE_LLSD_DEPTH) != LLSDParser::PARSE_FAILURE;
+        cursor += length;
+        if (!parsed)
+        {
+            if (++unreadable > MAX_UNREADABLE_RECORDS)
+            {
+                LL_WARNS() << "Failed reading extras cache for handle " << handle << ": " << unreadable << " unreadable records, giving up" << LL_ENDL;
+                return false;
+            }
+            LL_DEBUGS("VOCache") << "Failed reading extras cache for handle " << handle << ", entry number " << i << ": unreadable record skipped" << LL_ENDL;
+            discarded++;
+            continue;
         }
 
         LLGLTFOverrideCacheEntry entry;
-        entry.fromLLSD(entry_llsd);
-        U32 local_id = entry_llsd["local_id"].asInteger();
+        if (!entry.fromLLSD(entry_llsd))
+        {
+            discarded++;
+            continue;
+        }
+        const U32 local_id = entry.mLocalId;
         // only add entries that exist in the primary cache
         // this is a self-healing test that avoids us polluting the cache with entries that are no longer valid based on the main cache.
         if(cache_entry_map.find(local_id)!= cache_entry_map.end())
         {
-            // attempt to backfill a null objectId, though these shouldn't be in the persisted cache really
-            if(entry.mObjectId.isNull() && pRegion)
-            {
-                gObjectList.getUUIDFromLocal( entry.mObjectId, local_id, pRegion->getHost().getAddress(), pRegion->getHost().getPort() );
-            }
-            cache_extras_entry_map[local_id] = entry;
+            cache_extras_entry_map[local_id] = std::move(entry);
             loaded++;
         }
         else
@@ -1741,7 +1918,13 @@ void LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
             discarded++;
         }
     }
+    LL_PROFILE_ZONE_NUM(loaded);
+    if (unreadable > 0)
+    {
+        LL_WARNS() << "Extras cache for handle " << handle << " had " << unreadable << " unreadable records" << LL_ENDL;
+    }
     LL_DEBUGS("GLTF") << "Completed reading extras cache for handle " << handle << ", " << loaded << " loaded, " << discarded << " discarded" << LL_ENDL;
+    return true;
 }
 
 void LLVOCache::purgeEntries(U32 size)
@@ -1761,6 +1944,8 @@ void LLVOCache::purgeEntries(U32 size)
 
 void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    LL_PROFILE_ZONE_NUM(cache_entry_map.size());
     std::filesystem::path filename = getObjectCacheFilename(handle);
     if(!mEnabled)
     {
@@ -1787,7 +1972,8 @@ void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry:
         entry = new HeaderEntryInfo();
         entry->mHandle = handle ;
         entry->mTime = (U32)time(NULL) ;
-        entry->mIndex = mNumEntries++;
+        entry->mIndex = firstFreeSlot();
+        mNumEntries++;
         mHeaderEntryQueue.insert(entry) ;
         mHandleEntryMap[handle] = entry ;
     }
@@ -1812,75 +1998,57 @@ void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry:
 
     if(!dirty_cache)
     {
-        if (!LLAppViewer::instance()->isQuitting())
-        {
-            LL_WARNS() << "Skipping write to cache for " << filename << " (handle:" << handle << "): cache not dirty" << LL_ENDL;
-        }
+        // Every neighbor region that saw no cache miss gets here on a
+        // teleport; that is the expected case, not a warning.
+        LL_DEBUGS("VOCache") << "Skipping write to cache for " << filename << " (handle:" << handle << "): cache not dirty" << LL_ENDL;
         return ; //nothing changed, no need to update.
     }
 
     //write to cache file
     bool success = true ;
     {
-        std::error_code ec;
-        LLFile apr_file(filename, LLFile::in|LLFile::out|LLFile::trunc|LLFile::binary, ec);
+        // The whole file is laid out in memory first, so the entry count in
+        // the header is the number actually written -- with removal enabled
+        // that is fewer than the map holds -- and the disk sees one write.
+        std::vector<U8> data;
+        data.reserve(UUID_BYTES + sizeof(S32) + cache_entry_map.size() * (ENTRY_HEADER_SIZE + 512));
+        data.insert(data.end(), id.mData, id.mData + UUID_BYTES);
+        const size_t count_offset = data.size();
+        data.resize(data.size() + sizeof(S32));
 
-        success = check_write(&apr_file, (void*)id.mData, UUID_BYTES);
-
-        if(success)
+        S32 num_entries = 0;
+        for (LLVOCacheEntry::vocache_entry_map_t::const_iterator iter = cache_entry_map.begin(); success && iter != cache_entry_map.end(); ++iter)
         {
-            S32 num_entries = static_cast<S32>(cache_entry_map.size()); // if removal is enabled num_entries might be wrong
-            success = check_write(&apr_file, &num_entries, sizeof(S32));
-            if (success)
+            if (!removal_enabled || iter->second->isValid())
             {
-                const S32 buffer_size = 32768; //should be large enough for couple MAX_ENTRY_BODY_SIZE
-                U8 data_buffer[buffer_size]; // generaly entries are fairly small, so collect them and drop onto disk in one go
-                S32 size_in_buffer = 0;
-
-                // This can have a lot of entries, so might be better to dump them into buffer first and write in one go.
-                for (LLVOCacheEntry::vocache_entry_map_t::const_iterator iter = cache_entry_map.begin(); success && iter != cache_entry_map.end(); ++iter)
+                const LLDataPackerBinaryBuffer* dp = iter->second->getDP();
+                const S32 body = dp ? dp->getBufferSize() : 0;
+                if (body < 1 || body > MAX_ENTRY_BODY_SIZE)
                 {
-                    if (!removal_enabled || iter->second->isValid())
-                    {
-                        S32 size = iter->second->writeToBuffer(data_buffer + size_in_buffer);
-
-                        if (size > ENTRY_HEADER_SIZE) // body is minimum of 1
-                        {
-                            size_in_buffer += size;
-                        }
-                        else
-                        {
-                            LL_WARNS() << "Failed to write cache entry to buffer for " << filename << ", entry number " << iter->second->getLocalID() << LL_ENDL;
-                            success = false;
-                            break;
-                        }
-
-                        // Make sure we have space in buffer for next element
-                        if (buffer_size - size_in_buffer < MAX_ENTRY_BODY_SIZE + ENTRY_HEADER_SIZE)
-                        {
-                            success = check_write(&apr_file, (void*)data_buffer, size_in_buffer);
-                            size_in_buffer = 0;
-                            if (!success)
-                            {
-                                LL_WARNS() << "Failed to write cache to disk " << filename << LL_ENDL;
-                                break;
-                            }
-                        }
-                    }
+                    LL_WARNS() << "Failed to write cache entry to buffer for " << filename << ", entry number " << iter->second->getLocalID() << LL_ENDL;
+                    success = false;
+                    break;
                 }
 
-                if (success && size_in_buffer > 0)
-                {
-                    // final write
-                    success = check_write(&apr_file, (void*)data_buffer, size_in_buffer);
-                    if(!success)
-                    {
-                        LL_WARNS() << "Failed to write cache entry to disk " << filename << LL_ENDL;
-                    }
-                    size_in_buffer = 0;
-                }
-                LL_DEBUGS("VOCache") << "Wrote " << num_entries << " entries to the primary VOCache file " << filename << ". success = " << (success ? "True":"False") << LL_ENDL;
+                const size_t pos = data.size();
+                data.resize(pos + ENTRY_HEADER_SIZE + body);
+                iter->second->writeToBuffer(data.data() + pos);
+                num_entries++;
             }
+        }
+
+        if (success)
+        {
+            memcpy(data.data() + count_offset, &num_entries, sizeof(S32));
+
+            std::error_code ec;
+            LLFile apr_file(filename, LLFile::in|LLFile::out|LLFile::trunc|LLFile::binary, ec);
+            success = !ec && bool(apr_file) && check_write(&apr_file, data.data(), (S32)data.size());
+            if(!success)
+            {
+                LL_WARNS() << "Failed to write cache to disk " << filename << LL_ENDL;
+            }
+            LL_DEBUGS("VOCache") << "Wrote " << num_entries << " entries to the primary VOCache file " << filename << ". success = " << (success ? "True":"False") << LL_ENDL;
         }
     }
 
@@ -1930,67 +2098,61 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
     }
 
     std::filesystem::path filename = getObjectCacheExtrasFilename(handle);
-    llofstream out(filename, std::ios::out | std::ios::binary);
-    if(!out.good())
-    {
-        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
-        removeGenericExtrasForHandle(handle);
-        return;
-    }
-    // It is good practice to version file formats so let's add one.
-    // legacy versions will be treated as version 0.
-    out << LLGLTFOverrideCacheEntry::VERSION_LABEL << ":" << LLGLTFOverrideCacheEntry::VERSION << '\n';
 
-    out << id << '\n';
-    if(!out.good())
+    if (!dirty_cache)
     {
-        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
-        removeGenericExtrasForHandle(handle);
-        return;
-    }
-    // Because we don't write out all the entries we need to record a placeholder and rewrite this later
-    auto num_entries_placeholder = out.tellp();
-    out << std::setw(10) << std::setfill('0') << 0 << '\n';
-    if(!out.good())
-    {
-        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
-        removeGenericExtrasForHandle(handle);
+        LL_DEBUGS("VOCache") << "Skipping write of extras cache for handle " << handle << ": overrides not dirty" << LL_ENDL;
         return;
     }
 
     // get ViewerRegion pointer from handle
-    LLViewerRegion* pRegion = LLWorld::getInstance()->getRegionFromHandle(handle);
+    LLWorld* world = LLWorld::getInstance();
+    LLViewerRegion* pRegion = world ? world->getRegionFromHandle(handle) : nullptr;
+
+    // Laid out in memory first and written once: a text version line an older
+    // reader can reject, the cache id, the count of records actually written,
+    // then each record as its length followed by its LLSD in binary form. The
+    // records are serialised straight into the one stream; each length is
+    // filled in behind its record once that is known.
+    std::ostringstream out;
+    out << LLGLTFOverrideCacheEntry::VERSION_LABEL << ':' << LLGLTFOverrideCacheEntry::VERSION << '\n';
+    out.write(reinterpret_cast<const char*>(id.mData), UUID_BYTES);
+    const U32 zero = 0;
+    const std::streampos count_pos = out.tellp();
+    out.write(reinterpret_cast<const char*>(&zero), sizeof(U32));
 
     U32 num_entries = 0;
     U32 skipped = 0;
     size_t inmem_entries = cache_extras_entry_map.size();
-    for (auto [local_id, entry] : cache_extras_entry_map)
+    for (const auto& [local_id, entry] : cache_extras_entry_map)
     {
         // Only write out GLTFOverrides that we can actually apply again on import.
         // worst case we have an extra cache miss.
         // Note: A null mObjectId is valid when in memory as we might have a data race between GLTF of the object itself.
         // This remains a valid state to persist as it is consistent with the localid checks on import with the main cache.
         // the mObjectId will be updated if/when the local object is updated from the gObject list (due to full update)
-        if(entry.mObjectId.isNull() && pRegion)
+        LLUUID object_id = entry.mObjectId;
+        if(object_id.isNull() && pRegion)
         {
-            gObjectList.getUUIDFromLocal( entry.mObjectId, local_id, pRegion->getHost().getAddress(), pRegion->getHost().getPort() );
+            gObjectList.getUUIDFromLocal( object_id, local_id, pRegion->getHost().getAddress(), pRegion->getHost().getPort() );
         }
 
-        if( entry.mSides.size() > 0 &&
-            entry.mSides.size() == entry.mGLTFMaterial.size()
-          )
+        // The file holds the override LLSD; the materials are rebuilt from it
+        // on load, so whether they were built here does not matter.
+        if (!entry.mSides.empty())
         {
             LLSD entry_llsd = entry.toLLSD();
             entry_llsd["local_id"] = (S32)local_id;
-            LLSDSerialize::serialize(entry_llsd, out, LLSDSerialize::LLSD_XML);
-            out << '\n';
-            if(!out.good())
-            {
-                // We're not in a good place when this happens so we might as well nuke the file.
-                LL_WARNS() << "Failed writing extras cache for handle " << handle << ". Corrupted cache file " << filename << " removed." << LL_ENDL;
-                removeGenericExtrasForHandle(handle);
-                return;
-            }
+            entry_llsd["object_id"] = object_id;
+
+            const std::streampos length_pos = out.tellp();
+            out.write(reinterpret_cast<const char*>(&zero), sizeof(U32));
+            LLSDSerialize::toBinary(entry_llsd, out);
+            const std::streampos end_pos = out.tellp();
+            const U32 length = (U32)((end_pos - length_pos) - (std::streamoff)sizeof(U32));
+            out.seekp(length_pos);
+            out.write(reinterpret_cast<const char*>(&length), sizeof(U32));
+            out.seekp(end_pos);
             num_entries++;
         }
         else
@@ -1998,13 +2160,19 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
             skipped++;
         }
     }
-    // Rewrite the placeholder
-    out.seekp(num_entries_placeholder);
-    out << std::setw(10) << std::setfill('0') << num_entries << '\n';
-    if(!out.good())
+    out.seekp(count_pos);
+    out.write(reinterpret_cast<const char*>(&num_entries), sizeof(U32));
+    std::string data = out.str();
+
+    std::error_code ec;
+    LLFile file(filename, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+    if (ec || !file || !check_write(&file, data.data(), (S32)data.size()))
     {
-        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
-        removeGenericExtrasForHandle(handle);
+        // A half-written file would read as a bad cache next time and take the
+        // object cache down with it. The object cache just written is sound,
+        // so only this file goes.
+        LL_WARNS() << "Failed writing extras cache for handle " << handle << ". Corrupted cache file " << filename << " removed." << LL_ENDL;
+        LLFile::remove(filename);
         return;
     }
     LL_DEBUGS("GLTF") << "Completed writing extras cache for handle " << handle << ", " << num_entries << " entries. Total in RAM: " << inmem_entries << " skipped (no persist): " << skipped << LL_ENDL;

@@ -40,7 +40,7 @@
 #include "llframetimer.h"
 
 #include "lleditmenuhandler.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llspellcheckmenuhandler.h"
 #include "lluictrl.h"
 #include "lluiimage.h"
@@ -59,6 +59,8 @@ class LLLineEditor
 : public LLUICtrl, public LLEditMenuHandler, protected LLPreeditor, public LLSpellCheckMenuHandler
 {
 public:
+    AL_VIEW_TYPE(LLLineEditor, LLUICtrl);
+    LLView* asView() override { return this; }
 
     typedef std::function<void (LLLineEditor* caller)> keystroke_callback_t;
 
@@ -125,6 +127,7 @@ protected:
 
 public:
     virtual ~LLLineEditor();
+
 
     // mousehandler overrides
     /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
@@ -204,13 +207,22 @@ public:
     const std::string&  getLabel()  { return mLabel.getString(); }
 
     void            setDefaultText() { setText(mDefaultText); }
-    void            setText(const LLStringExplicit &new_text);
+    void            setText(ALStringViewExplicit new_text);
 
     const std::string& getText() const override { return mText.getString(); }
-    const LLWString&   getWText() const    { return mText.getWString(); }
-    LLWString getConvertedText() const; // trimmed text with paragraphs converted to newlines
 
-    S32             getLength() const   { return mText.length(); }
+    // Bumped whenever getText() could have moved. Anything outside this class
+    // caching work derived from the field's text -- a measured width, shaped
+    // glyphs -- names the field and this counter as its source, rather than
+    // keeping a copy of the text to compare against.
+    U32             getTextGeneration() const { return mText.getGeneration(); }
+
+    std::string getConvertedText() const; // trimmed text with paragraphs converted to newlines
+
+    // Named for its unit. Every offset this class takes and hands back --
+    // cursor, selection, scroll, preedit -- is a byte offset into getText(),
+    // sitting at a character start.
+    S32             getLengthBytes() const   { return mText.lengthBytes(); }
 
     S32             getCursor() const   { return mCursorPos; }
     void            setCursor( S32 pos );
@@ -229,6 +241,10 @@ public:
 
     void setCursorColor(const LLUIColor& c)          { mCursorColor = c; }
     const LLColor4& getCursorColor() const          { return mCursorColor.get(); }
+    // A flat background in a colour rather than the skin's image, for a
+    // field that sits inside something with colours of its own.
+    void setBgColor(const LLUIColor& c)              { mBgColor = c; mUseBgColor = true; }
+    void setHighlightColor(const LLUIColor& c)       { mHighlightColor = c; }
 
     void setFgColor( const LLUIColor& c )            { mFgColor = c; }
     void setReadOnlyFgColor( const LLUIColor& c )    { mReadOnlyFgColor = c; }
@@ -279,7 +295,7 @@ public:
     void            setPrevalidateInput(LLTextValidate::Validator validator);
     static bool     postvalidateFloat(const std::string &str);
 
-    bool            prevalidateInput(const LLWString& wstr);
+    bool            prevalidateInput(std::string_view str);
     bool            evaluateFloat();
 
     // line history support:
@@ -297,7 +313,7 @@ public:
     bool getShowContextMenu() const { return mShowContextMenu; }
 
     // Autoreplace
-    typedef std::function<void(S32&, S32&, LLWString&, S32&, const LLWString&)> autoreplace_callback_t;
+    typedef std::function<void(S32&, S32&, std::string&, S32&, const std::string&)> autoreplace_callback_t;
     autoreplace_callback_t mAutoreplaceCallback;
     void            setAutoreplaceCallback(autoreplace_callback_t cb) { mAutoreplaceCallback = cb; }
 
@@ -317,6 +333,17 @@ public:
     // bounce the highlight rect across the full glyph. Returns true if the
     // cursor moved.
     bool            dragSelectCursorTo(S32 local_mouse_x);
+
+    // In password mode the field draws one bullet per character rather than
+    // the text. A bullet is three bytes whatever it stands in for, so an
+    // offset into the text and the matching offset into what is drawn are
+    // different numbers, and anything that measures the drawn form has to
+    // carry its offsets across. Outside password mode drawnText() is the text
+    // itself and both maps are the identity.
+    std::string_view drawnText(std::string& buffer) const;
+    S32             toDrawnOffset(S32 text_offset) const;
+    S32             fromDrawnOffset(S32 drawn_offset) const;
+
     S32             findPixelNearestPos(S32 cursor_offset = 0) const;
     S32             calcCursorPos(S32 mouse_x);
     bool            handleSpecialKey(KEY key, MASK mask);
@@ -333,15 +360,15 @@ public:
     bool            hasPreeditString() const;
     // Implementation (overrides) of LLPreeditor
     /*virtual*/ void    resetPreedit() override;
-    /*virtual*/ void    updatePreedit(const LLWString &preedit_string,
+    /*virtual*/ void    updatePreedit(std::string_view preedit_string,
                         const segment_lengths_t &preedit_segment_lengths, const standouts_t &preedit_standouts, S32 caret_position) override;
     /*virtual*/ void    markAsPreedit(S32 position, S32 length) override;
     /*virtual*/ void    getPreeditRange(S32 *position, S32 *length) const override;
     /*virtual*/ bool    getPreeditLocation(S32 query_position, LLCoordGL *coord, LLRect *bounds, LLRect *control) const override;
     /*virtual*/ S32     getPreeditFontSize() const override;
-    /*virtual*/ LLWString getPreeditString() const override { return getWText(); }
+    /*virtual*/ const std::string& getPreeditStringUtf8() const override { return getText(); }
 
-    void            setText(const LLStringExplicit &new_text, bool use_size_limit);
+    void            setText(ALStringViewExplicit new_text, bool use_size_limit);
 
     void            setContextMenu(LLContextMenu* new_context_menu);
 
@@ -358,10 +385,18 @@ protected:
 
     LLViewBorder* mBorder;
     const LLFontGL* mGLFont;
-    LLFontVertexBuffer mFontBufferPreSelection;
-    LLFontVertexBuffer mFontBufferSelection;
-    LLFontVertexBuffer mFontBufferPostSelection;
-    LLFontVertexBuffer mFontBufferLabel;
+    // Mutable: measuring is a const question of the same cache the draw fills.
+    // The pre-selection cache answers the widths -- all four are keyed on the
+    // same text, so any would, and naming one keeps the slots in one place.
+    mutable LLFontTextCache mFontBufferPreSelection;
+    LLFontTextCache mFontBufferSelection;
+    LLFontTextCache mFontBufferPostSelection;
+    LLFontTextCache mFontBufferLabel;
+
+    // A span of this editor's own text, measured through that cache. Only the
+    // text it is keyed on: the password form draws bullets, which are a
+    // different string and must not be measured against this.
+    S32 textWidth(S32 offset, S32 max_bytes) const;
     std::string mDefaultText;
     S32         mMaxLengthBytes;            // Max length of the UTF8 string in bytes
     S32         mMaxLengthChars;            // Maximum number of characters in the string
@@ -382,8 +417,6 @@ protected:
     bool        mIsSelecting;               // Selection for clipboard operations
     S32         mSelectionStart;
     S32         mSelectionEnd;
-    S32         mLastSelectionX;
-    S32         mLastSelectionY;
     S32         mLastSelectionStart;
     S32         mLastSelectionEnd;
 
@@ -427,9 +460,9 @@ protected:
     bool        mUseBgColor;
     bool        mDrawFocusBorder;
 
-    LLWString   mPreeditWString;
-    LLWString   mPreeditOverwrittenWString;
-    std::vector<S32> mPreeditPositions;
+    std::string mPreeditString;
+    std::string mPreeditOverwrittenString;
+    std::vector<S32> mPreeditPositions;   // byte offsets into mText
     LLPreeditor::standouts_t mPreeditStandouts;
 
     LLHandle<LLContextMenu> mContextMenuHandle;

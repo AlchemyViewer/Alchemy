@@ -31,10 +31,16 @@
 
 #include "llrendertarget.h"
 #include "alsamplerstate.h"
+#include "llimagegl.h"
 #include "llrender.h"
 #include "llgl.h"
+#include "llglslshader.h"
+#include "llglstates.h"
 
+#include <algorithm>
 #include <bit>
+#include <cmath>
+#include <limits>
 
 LLRenderTarget* LLRenderTarget::sBoundTarget = NULL;
 U32 LLRenderTarget::sBytesAllocated = 0;
@@ -59,13 +65,21 @@ namespace
         switch (internal_format)
         {
             case GL_R8:
+            case GL_R8I:
+            case GL_R8UI:
                 return 1;
             case GL_RG8:
             case GL_R16:
             case GL_R16F:
+            case GL_RG8I:
+            case GL_RG8UI:
+            case GL_R16I:
+            case GL_R16UI:
                 return 2;
             case GL_RGB8:
             case GL_SRGB8:
+            case GL_RGB8I:
+            case GL_RGB8UI:
                 return 3;
             case GL_RGBA8:
             case GL_SRGB8_ALPHA8:
@@ -75,20 +89,51 @@ namespace
             case GL_RG16F:
             case GL_R32F:
             case GL_RGB9_E5:
+            case GL_RGBA8I:
+            case GL_RGBA8UI:
+            case GL_RGB10_A2UI:
+            case GL_RG16I:
+            case GL_RG16UI:
+            case GL_R32I:
+            case GL_R32UI:
                 return 4;
             case GL_RGB16:
             case GL_RGB16F:
+            case GL_RGB16I:
+            case GL_RGB16UI:
                 return 6;
             case GL_RGBA16:
             case GL_RGBA16F:
             case GL_RG32F:
+            case GL_RGBA16I:
+            case GL_RGBA16UI:
+            case GL_RG32I:
+            case GL_RG32UI:
                 return 8;
             case GL_RGB32F:
+            case GL_RGB32I:
+            case GL_RGB32UI:
                 return 12;
             case GL_RGBA32F:
+            case GL_RGBA32I:
+            case GL_RGBA32UI:
                 return 16;
             default:
                 return 4;
+        }
+    }
+
+    // The clear colour as an integer attachment takes it: each component rounded to the nearest integer and held to
+    // the 32-bit range of the attachment's sign, so a negative one clears an unsigned attachment to 0 and a huge one to
+    // its top. A narrower format takes the result as GL converts it.
+    void integer_clear_value(const LLColor4& colour, GLint (&signed_value)[4], GLuint (&unsigned_value)[4])
+    {
+        for (U32 c = 0; c < 4; ++c)
+        {
+            const F64 rounded = std::isfinite(colour.mV[c]) ? std::round((F64)colour.mV[c]) : 0.0;
+            signed_value[c]   = (GLint)llclamp(rounded, (F64)std::numeric_limits<GLint>::min(),
+                                               (F64)std::numeric_limits<GLint>::max());
+            unsigned_value[c] = (GLuint)llclamp(rounded, 0.0, (F64)std::numeric_limits<GLuint>::max());
         }
     }
 
@@ -208,6 +253,17 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
     llassert(!isBoundInStack());
     llassert(!stencil || depth); // stencil requires depth
 
+    // flush() regenerates attachment 0's mips, and GL builds none of an integer texture's: glGenerateMipmap refuses
+    // it. An integer target with mips fills them itself, as MIPS_MANUAL.
+    if (generateMipMaps == MIPS_AUTO && LLImageGL::isIntegerFormat(color_fmt))
+    {
+        LL_WARNS() << "Integer render target format 0x" << std::hex << color_fmt << std::dec
+                   << " cannot have its mips generated; allocate it MIPS_MANUAL." << LL_ENDL;
+        llassert(false);
+        release();
+        return false;
+    }
+
     resx = llmin(resx, (U32) gGLManager.mGLMaxTextureSize);
     resy = llmin(resy, (U32) gGLManager.mGLMaxTextureSize);
 
@@ -284,6 +340,7 @@ void LLRenderTarget::setColorAttachment(LLImageGL* img, LLGLuint use_name)
     }
 
     mTex.push_back(use_name);
+    mExternalFormat = (U32)img->getStorageInternalFormat();
 
     glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
@@ -307,6 +364,7 @@ void LLRenderTarget::releaseColorAttachment()
     glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
 
     mTex.clear();
+    mExternalFormat = 0;
 }
 
 bool LLRenderTarget::addColorAttachment(U32 color_fmt)
@@ -347,7 +405,10 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
         // against a single-level texture it is a spec-defined no-op and MIPS_AUTO targets
         // (the luminance map auto-exposure averages through) silently lose their mips.
         const S32 levels = llmax(1, (S32)mMipLevels);
-        LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(mUsage), color_fmt, mResX, mResY, GL_RGBA, GL_UNSIGNED_BYTE, NULL, levels);
+        // No pixels go with the storage, but the format they would come in agrees with it.
+        const U32 integer_format = LLImageGL::integerPixelFormat(color_fmt);
+        LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(mUsage), color_fmt, mResX, mResY,
+                                     integer_format ? integer_format : GL_RGBA, GL_UNSIGNED_BYTE, NULL, levels);
         if (glGetError() != GL_NO_ERROR)
         {
             LL_WARNS() << "Could not allocate color buffer for render target." << LL_ENDL;
@@ -363,8 +424,9 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
 
     // No filter or wrap state is written onto the texture object here. It is expressed as a
     // sampler instead -- see getDefaultColorSampler, which encodes the same choices (bilinear
-    // for attachment 0, point for the data attachments, mirrored repeat off rectangles) and
-    // is what ALTextureSlot::bind hands out to callers that do not name a sampler.
+    // for attachment 0, point for the data attachments and any integer one, mirrored repeat
+    // off rectangles) and is what ALTextureSlot::bind hands out to callers that do not name a
+    // sampler.
     //
     // This was the last texture-object sampling state in the engine. Leaving it here as well
     // would not be harmless redundancy: it makes filtering a property of the resource, so two
@@ -528,6 +590,7 @@ void LLRenderTarget::release()
 
     mTex.clear();
     mInternalFormat.clear();
+    mExternalFormat = 0;
 
     mResX = mResY = 0;
 }
@@ -535,9 +598,15 @@ void LLRenderTarget::release()
 void LLRenderTarget::bindTarget()
 {
     LL_PROFILE_GPU_ZONE("bindTarget");
+    // What gGL has batched belongs to the framebuffer bound before this one.
+    gGL.flush();
     llassert(mFBO);
     llassert(!isBoundInStack());
 
+    // The pass drawing into the framebuffer bound before ends here, and a shader profile's queries with it; they count
+    // on for the pass that follows.
+    LLGLSLShader* profiled = LLGLSLShader::suspendProfileQuery();
+    gGL.queries().checkPassBoundary();
     glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
     sCurFBO = mFBO;
 
@@ -557,6 +626,10 @@ void LLRenderTarget::bindTarget()
         glDrawBuffers(static_cast<GLsizei>(mTex.size()), drawbuffers);
         glReadBuffer(GL_COLOR_ATTACHMENT0);
     }
+    for (U32 draw_buffer = 0; draw_buffer < mDrawBuffers.size(); ++draw_buffer)
+    {
+        mDrawBuffers[draw_buffer] = draw_buffer < mTex.size() ? (S8)draw_buffer : -1;
+    }
     check_framebuffer_status();
 
     glViewport(0, 0, mResX, mResY);
@@ -565,11 +638,15 @@ void LLRenderTarget::bindTarget()
 
     mPreviousRT = sBoundTarget;
     sBoundTarget = this;
+
+    LLGLSLShader::resumeProfileQuery(profiled);
 }
 
 void LLRenderTarget::clear(U32 mask_in)
 {
     LL_PROFILE_GPU_ZONE("clear");
+    // What gGL has batched is drawn before the clear, not after it.
+    gGL.flush();
     llassert(mFBO);
     U32 mask = GL_COLOR_BUFFER_BIT;
     if (mUseDepth)
@@ -580,19 +657,65 @@ void LLRenderTarget::clear(U32 mask_in)
     {
         mask |= GL_STENCIL_BUFFER_BIT;
     }
+    mask &= mask_in;
     if (mFBO)
     {
         check_framebuffer_status();
         stop_glerror();
-        glClear(mask & mask_in);
+        // glClear of an integer colour buffer is undefined, so a target holding one clears its colour a draw buffer at
+        // a time, each by the call its kind takes. Depth and stencil still go through glClear.
+        bool integer_colour = false;
+        for (U32 attachment = 0; attachment < mTex.size(); ++attachment)
+        {
+            integer_colour |= LLImageGL::isIntegerFormat(getInternalFormat(attachment));
+        }
+        if ((mask & GL_COLOR_BUFFER_BIT) && integer_colour)
+        {
+            clearColorBuffers();
+            mask &= ~GL_COLOR_BUFFER_BIT;
+        }
+        if (mask != 0)
+        {
+            glClear(mask);
+        }
         stop_glerror();
     }
     else
     {
-        LLGLEnable scissor(GL_SCISSOR_TEST);
-        glScissor(0, 0, mResX, mResY);
+        LLGLSScissor scissor(0, 0, mResX, mResY);
         stop_glerror();
-        glClear(mask & mask_in);
+        glClear(mask);
+    }
+}
+
+void LLRenderTarget::clearColorBuffers()
+{
+    const LLColor4& colour = gGL.getClearColor();
+    GLint  signed_value[4];
+    GLuint unsigned_value[4];
+    integer_clear_value(colour, signed_value, unsigned_value);
+
+    for (U32 draw_buffer = 0; draw_buffer < mDrawBuffers.size(); ++draw_buffer)
+    {
+        const S32 attachment = mDrawBuffers[draw_buffer];
+        if (attachment < 0 || attachment >= (S32)mTex.size())
+        {
+            continue;
+        }
+
+        const U32 format = getInternalFormat((U32)attachment);
+        if (!LLImageGL::isIntegerFormat(format))
+        {
+            glClearBufferfv(GL_COLOR, (GLint)draw_buffer, colour.mV);
+        }
+        else if (LLImageGL::isSignedIntegerFormat(format))
+        {
+            glClearBufferiv(GL_COLOR, (GLint)draw_buffer, signed_value);
+        }
+        else
+        {
+            glClearBufferuiv(GL_COLOR, (GLint)draw_buffer, unsigned_value);
+        }
     }
 }
 
@@ -610,6 +733,16 @@ U32 LLRenderTarget::getTexture(U32 attachment) const
 U32 LLRenderTarget::getNumTextures() const
 {
     return static_cast<U32>(mTex.size());
+}
+
+U32 LLRenderTarget::getInternalFormat(U32 attachment) const
+{
+    if (attachment < mInternalFormat.size())
+    {
+        return mInternalFormat[attachment];
+    }
+    // setColorAttachment's texture, the one attachment of a target that leaves mInternalFormat empty.
+    return attachment == 0 && mInternalFormat.empty() && !mTex.empty() ? mExternalFormat : 0;
 }
 
 void LLRenderTarget::bindTexture(U32 index, S32 channel, ALSampler key)
@@ -632,11 +765,12 @@ U32 LLRenderTarget::getDefaultColorSampler(U32 attachment) const
 {
     // Attachment 0 is the one a pass normally reads as an image, so it filters. Everything
     // behind it carries data -- normals, ORM, indices -- where interpolating between texels
-    // produces values that mean nothing.
+    // produces values that mean nothing. An integer attachment is read texel by texel wherever
+    // it is: GL filters no integers, and a filtering sampler leaves it incomplete, reading 0.
     //
     // Mirror either way. A caller that wants something else asks for it through bindTexture.
-    return gGL.getSampler((attachment == 0) ? ALSamplers::BilinearMirror
-                                            : ALSamplers::PointMirror);
+    const bool filtered = attachment == 0 && !LLImageGL::isIntegerFormat(getInternalFormat(attachment));
+    return gGL.getSampler(filtered ? ALSamplers::BilinearMirror : ALSamplers::PointMirror);
 }
 
 U32 LLRenderTarget::getDefaultDepthSampler() const
@@ -681,6 +815,8 @@ void LLRenderTarget::flush()
     else
     {
         sBoundTarget = nullptr;
+        LLGLSLShader* profiled = LLGLSLShader::suspendProfileQuery();
+        gGL.queries().checkPassBoundary();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         sCurFBO = 0;
         glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
@@ -688,6 +824,7 @@ void LLRenderTarget::flush()
         sCurResY = gGLViewport[3];
         glReadBuffer(GL_BACK);
         glDrawBuffer(GL_BACK);
+        LLGLSLShader::resumeProfileQuery(profiled);
     }
 }
 
@@ -750,6 +887,9 @@ void LLRenderTarget::copyContents(LLRenderTarget& source, S32 srcX0, S32 srcY0, 
 void LLRenderTarget::copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0,
                                                S32 dstX1, S32 dstY1, U32 mask, U32 filter)
 {
+    // What gGL has batched is drawn before the blit reads or overwrites it.
+    gGL.flush();
+
     if (!source.mFBO)
     {
         LL_WARNS() << "Cannot copy framebuffer contents for non FBO render targets." << LL_ENDL;
@@ -773,6 +913,28 @@ void LLRenderTarget::copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
         stop_glerror();
     }
+}
+
+void LLRenderTarget::copyFromBound(S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0, S32 dstX1, S32 dstY1,
+                                   U32 filter)
+{
+    // What gGL has batched is drawn into the bound framebuffer before the blit reads it.
+    gGL.flush();
+
+    if (!mFBO)
+    {
+        LL_WARNS() << "Cannot copy into a render target without a framebuffer." << LL_ENDL;
+        return;
+    }
+
+    LL_PROFILE_GPU_ZONE("LLRenderTarget::copyFromBound");
+    // glBlitFramebuffer writes only where the scissor test passes.
+    LLGLDisable scissor(GL_SCISSOR_TEST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, sCurFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFBO);
+    glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, GL_COLOR_BUFFER_BIT, filter);
+    stop_glerror();
+    glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
 }
 
 bool LLRenderTarget::isComplete() const
@@ -808,7 +970,30 @@ void LLRenderTarget::setDrawBuffers(U32 count)
 
     const U32 wanted = (count == 0) ? attachments : llmin(count, attachments);
 
+    // What gGL has batched goes to the attachments selected when it was drawn.
+    gGL.flush();
     glDrawBuffers(static_cast<GLsizei>(wanted), drawbuffers);
+    for (U32 draw_buffer = 0; draw_buffer < mDrawBuffers.size(); ++draw_buffer)
+    {
+        mDrawBuffers[draw_buffer] = draw_buffer < wanted ? (S8)draw_buffer : -1;
+    }
+}
+
+void LLRenderTarget::setDrawOutput(U32 output)
+{
+    llassert(sBoundTarget == this);
+    llassert(!mTex.empty());
+
+    // As many outputs as the G-buffer writes; GL guarantees at least eight draw buffers.
+    GLenum drawbuffers[] = { GL_NONE, GL_NONE, GL_NONE, GL_NONE };
+    llassert(output < LL_ARRAY_SIZE(drawbuffers));
+    output = llmin(output, (U32)LL_ARRAY_SIZE(drawbuffers) - 1);
+    drawbuffers[output] = GL_COLOR_ATTACHMENT0;
+
+    gGL.flush();
+    glDrawBuffers(static_cast<GLsizei>(output + 1), drawbuffers);
+    mDrawBuffers.fill(-1);
+    mDrawBuffers[output] = 0;
 }
 
 bool LLRenderTarget::isBoundInStack() const

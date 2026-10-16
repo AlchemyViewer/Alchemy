@@ -98,13 +98,17 @@ public:
     /*virtual*/ bool setVisualParamWeight(const char* param_name, F32 weight);
     /*virtual*/ bool setVisualParamWeight(S32 index, F32 weight);
     /*virtual*/ bool setVisualParamWeight(S32 index, S32 type, F32 weight);
-    /*virtual*/ void updateVisualParams();
+    /*virtual*/ bool updateVisualParams();
     void writeWearablesToAvatar();
     /*virtual*/ void idleUpdateAppearanceAnimation();
 
 private:
     // helper function. Passed in param is assumed to be in avatar's parameter list.
-    bool setParamWeight(const LLViewerVisualParam *param, F32 weight);
+    bool setParamWeight(LLViewerVisualParam *param, F32 weight);
+
+    // How many of the weights the last writeWearablesToAvatar pushed were
+    // weights the avatar did not already have. Read by the profiler.
+    static S32 sParamWeightsChanged;
 
     std::mutex          mJointMapMutex; // getJoint gets used from mesh thread
 

@@ -1193,7 +1193,7 @@ bool LLOutfitGalleryItem::openOutfitsContent()
         if (panel)
         {
             LLAccordionCtrl* accordion = panel->getChild<LLAccordionCtrl>("outfits_accordion");
-            LLOutfitsList* outfit_list = dynamic_cast<LLOutfitsList*>(panel);
+            LLOutfitsList* outfit_list = panel->as<LLOutfitsList>();
             if (accordion != NULL && outfit_list != NULL)
             {
                 outfit_list->setSelectedOutfitByUUID(mUUID);
@@ -1305,7 +1305,7 @@ void LLOutfitGalleryGearMenu::onUpdateItemsVisibility()
 
 bool LLOutfitGalleryGearMenu::hasDefaultImage()
 {
-    LLOutfitGallery* gallery = dynamic_cast<LLOutfitGallery*>(mOutfitList);
+    LLOutfitGallery* gallery = ALViewType::as<LLOutfitGallery>(mOutfitList);
     LLUUID selected_outfit_id = getSelectedOutfitID();
     if (gallery && selected_outfit_id.notNull())
     {
@@ -1517,7 +1517,7 @@ void LLOutfitGallerySortMenu::onSort(LLSD::String param)
     }
     gSavedSettings.setS32("OutfitGallerySortOrder", new_sort_order);
 
-    LLOutfitGallery* gallery = dynamic_cast<LLOutfitGallery*>(mPanelHandle.get());
+    LLOutfitGallery* gallery = ALViewType::as<LLOutfitGallery>(mPanelHandle.get());
     if (gallery)
     {
         gallery->reArrangeRows();

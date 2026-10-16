@@ -38,9 +38,11 @@ class LLMediaCtrl;
 class LLTextBox;
 class LLFloaterMediaSettings;
 
-class LLPanelMediaSettingsGeneral : public LLPanel
+class LLPanelMediaSettingsGeneral final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelMediaSettingsGeneral, LLPanel);
+
     LLPanelMediaSettingsGeneral();
     ~LLPanelMediaSettingsGeneral();
 
@@ -53,8 +55,8 @@ public:
     // Hook that the floater calls after applying changes to the panel
     void postApply();
 
-    bool postBuild();
-    /*virtual*/ void draw();
+    bool postBuild() override;
+    /*virtual*/ void draw() override;
     /*virtual*/ void onClose(bool app_quitting);
 
     void setParent( LLFloaterMediaSettings* parent );

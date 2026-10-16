@@ -23,11 +23,6 @@
 	<text_editor name="charter">
 		Устав группы
 	</text_editor>
-	<name_list name="visible_members">
-		<name_list.columns label="Участник" name="name"/>
-		<name_list.columns label="Титул" name="title"/>
-		<name_list.columns label="Статус" name="status"/>
-	</name_list>
 	<text name="my_group_settngs_label">
 		Я
 	</text>

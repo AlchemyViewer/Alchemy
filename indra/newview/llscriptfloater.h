@@ -147,9 +147,10 @@ private:
  * LLScriptFloater will create script form based on notification data and
  * will auto fit the form.
  */
-class LLScriptFloater : public LLDockableFloater
+class LLScriptFloater final : public LLDockableFloater
 {
 public:
+    AL_VIEW_TYPE(LLScriptFloater, LLDockableFloater);
 
     /**
      * key - UUID of scripted Object
@@ -175,17 +176,17 @@ public:
     /**
      * Close notification if script floater is closed.
      */
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onClose(bool app_quitting) override;
 
     /**
      * Hide all notification toasts when we show dockable floater
      */
-    /*virtual*/ void setDocked(bool docked, bool pop_on_undock = true);
+    /*virtual*/ void setDocked(bool docked, bool pop_on_undock = true) override;
 
     /**
      * Hide all notification toasts when we show dockable floater
      */
-    /*virtual*/ void setVisible(bool visible);
+    /*virtual*/ void setVisible(bool visible) override;
 
     bool getSavePosition() { return mSaveFloaterPosition; }
 
@@ -212,9 +213,9 @@ protected:
      */
     void onMouseDown();
 
-    /*virtual*/ void onFocusLost();
+    /*virtual*/ void onFocusLost() override;
 
-    /*virtual*/ void onFocusReceived();
+    /*virtual*/ void onFocusReceived() override;
 
     void dockToChiclet(bool dock);
 

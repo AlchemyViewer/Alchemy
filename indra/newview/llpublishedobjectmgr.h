@@ -41,7 +41,6 @@
 #include <vector>
 
 class LLScriptEditorWSServer;
-class LLChat;
 class LLPublishedPrimListener;
 class LLViewerObject;
 
@@ -55,6 +54,11 @@ public:
         S32         mLinkNumber;
         std::string mPrimDescription;
         S16         mInventorySerial;
+        // Its inventory as last sent, undefined until it was: an answer
+        // that says the same -- anyone asking the prim gets one -- is not
+        // sent again.
+        LLSD        mSentInventory;
+        LLSD        mPermissions;
     };
 
     struct PublishedObjectInfo
@@ -73,6 +77,7 @@ public:
         std::string mRegionName;
         bool        mCanSaveBackToContents{ false };
         LLUUID      mSourceTaskID;
+        LLSD        mPermissions;
         std::vector<PublishedPrimInfo> mPrims;
         std::vector<std::unique_ptr<LLPublishedPrimListener>> mListeners;
     };
@@ -99,6 +104,7 @@ public:
     enum class InventoryChangeKind
     {
         NOT_PUBLISHED,
+        UNCHANGED,
         CHILD_READY_WAIT,
         CHILD_READY_FLUSH_NOW,
         ROOT_INVENTORY_UPDATE,
@@ -121,123 +127,25 @@ public:
         std::string mPendingItemCreatePump;
     };
 
-    class RuntimeEventAggregator
-    {
-    public:
-        enum class Channel
-        {
-            DEBUG,
-            OWNER_SAY
-        };
-
-        enum class VM
-        {
-            LSL2,
-            LUAU
-        };
-
-        struct StackFrame
-        {
-            S32         mLine{ 0 };
-            std::string mFunction;
-            std::string mSource;
-        };
-
-        struct ParsedError
-        {
-            std::string             mSource;
-            std::string             mError;
-            S32                     mLine{ 0 };
-            S32                     mColumn{ 0 };
-            std::vector<StackFrame> mStack;
-        };
-
-        struct Fragment
-        {
-            LLUUID      mFromID;
-            std::string mFromName;
-            std::string mText;
-        };
-
-        using fragments_t = std::vector<Fragment>;
-
-        struct RuntimeEvent
-        {
-            VM          mVM;
-            Channel     mChannel;
-            fragments_t mFragments;
-            ParsedError mError;
-        };
-
-        using FlushCallback = std::function<void(const RuntimeEvent&)>;
-
-        explicit RuntimeEventAggregator(FlushCallback flush_callback);
-
-        void ingest(const LLUUID& from_id,
-                    const std::string& from_name,
-                    const std::string& text,
-                    VM vm,
-                    Channel channel);
-        void flushExpired();
-        void flush();
-        ParsedError parseError(VM vm,
-                               const fragments_t& fragments) const;
-        bool hasPending() const;
-
-    private:
-        struct PendingBurst
-        {
-            LLUUID      mFromID;
-            std::string mFromName;
-            VM          mVM{ VM::LSL2 };
-            Channel     mChannel{ Channel::DEBUG };
-            fragments_t mFragments;
-            LLTimer     mTimer;
-        };
-
-        static constexpr F32 FRAGMENT_TIMEOUT = 1.0f;
-
-        void flushPending();
-        bool isNewBurst(const LLUUID& from_id,
-                const std::string& from_name,
-                VM vm,
-                Channel channel) const;
-
-        FlushCallback mFlushCallback;
-        std::unique_ptr<PendingBurst> mPending;
-    };
-
-    struct RuntimeChatEvent
-    {
-        RuntimeEventAggregator::Channel mChannel;
-        RuntimeEventAggregator::VM      mVM;
-        LLUUID                          mRootID;
-        LLUUID                          mPrimID;
-        LLUUID                          mItemID;
-        std::string                     mObjectName;
-        std::string                     mScriptName;
-        std::string                     mMessage;
-        std::string                     mError;
-        S32                             mLine{ 0 };
-        S32                             mColumn{ 0 };
-        std::vector<std::string>        mStack;
-        bool                            mIsError{ false };
-    };
-
-    using RuntimeEventCallback =
-        std::function<void(const RuntimeChatEvent&)>;
-
-    explicit LLPublishedObjectMgr(
-        LLScriptEditorWSServer* server = nullptr,
-        RuntimeEventCallback runtime_event_callback = {});
+    explicit LLPublishedObjectMgr(LLScriptEditorWSServer* server = nullptr);
     ~LLPublishedObjectMgr();
 
-    void flushExpiredRuntimeFragments();
-    void ingestRuntimeChat(
-        const LLChat& chat_msg,
-        RuntimeEventAggregator::Channel channel);
-    std::optional<RuntimeChatEvent> buildRuntimeChatEvent(
-        const RuntimeEventAggregator::RuntimeEvent& event) const;
+    // The root and its children, in a stable order; the root must not be null.
+    static std::vector<LLViewerObject*> linksetOf(LLViewerObject* root);
+
+    // What the world tells the server, and what it comes to: a publish
+    // sent once every prim's inventory is in, an object.update for a
+    // property or an inventory that changed, a linkset's children added
+    // or removed sent together after a short wait.
+    void onPrimInventoryReady(const LLUUID& object_id, const LLUUID& prim_id);
+    void onPrimInventoryChanged(const LLUUID& object_id, const LLUUID& prim_id);
+    void onObjectPropertyChanged(const LLUUID& prim_id, const std::string& name, const std::string& desc, S16 inventory_serial = -1);
+    void onObjectPermissionsReceived(const LLUUID& prim_id, const LLUUID& owner_id, U32 owner_mask, U32 next_owner_mask);
+    void onLinksetChildAdded(const LLUUID& root_id, LLViewerObject* child);
+    void onLinksetChildRemoved(const LLUUID& root_id, const LLUUID& child_id);
+    void buildAndSendPublish(const LLUUID& object_id);
+    void scheduleLinksetFlush(const LLUUID& root_id, F32 delay);
+    void flushLinksetUpdate(const LLUUID& root_id);
 
     bool hasPublished(const LLUUID& object_id) const { return mPublishedObjects.find(object_id) != mPublishedObjects.end(); }
     void erasePublished(const LLUUID& object_id) { mPublishedObjects.erase(object_id); }
@@ -256,6 +164,12 @@ public:
     LLSD buildPrimInventoryLLSD(LLViewerObject* object) const;
     LLSD buildPublishedObjectLLSD(LLViewerObject* root) const;
     LLSD buildObjectListLLSD() const;
+
+    // Both depend on a valid LLSelectNode, so they yield nothing until ObjectProperties arrives.
+    static LLSD getObjectPermissionsLLSD(LLViewerObject* object);
+    static bool computeCanSaveBack(LLViewerObject* root, LLUUID& source_task_id);
+    static LLSD makePermissionsLLSD(U32 owner_mask, U32 next_owner_mask);
+
     bool buildLinksetUpdateLLSD(const LLUUID& root_id, LLSD& update) const;
     bool reconcileLinksetChildAdded(const LLUUID& root_id, LLViewerObject* child, F64 request_start_sec);
     bool reconcileLinksetChildRemoved(const LLUUID& root_id, const LLUUID& child_id);
@@ -275,6 +189,13 @@ public:
         const std::string& name,
         const std::string& desc,
         LLSD& update);
+    bool applyPermissionsChange(
+        const LLUUID& root_id,
+        const LLUUID& prim_id,
+        const LLUUID& owner_id,
+        U32 owner_mask,
+        U32 next_owner_mask,
+        LLSD& update);
 
     void beginPendingPublish(const LLUUID& object_id, const std::vector<LLViewerObject*>& prims);
     bool hasPendingPublish(const LLUUID& object_id) const;
@@ -290,8 +211,10 @@ public:
     bool cleanupObjectStateForUnpublish(const LLUUID& object_id);
     void clearAllStateWithListenerCleanup();
 
+    // An item.create waiting on a prim, told of every change to its
+    // inventory until the wait clears it: a change may be another item's.
     bool reservePendingItemCreate(const LLUUID& prim_id, std::string&& pump_name);
-    bool consumePendingItemCreate(const LLUUID& prim_id, std::string& pump_name);
+    bool findPendingItemCreate(const LLUUID& prim_id, std::string& pump_name) const;
     void clearPendingItemCreate(const LLUUID& prim_id);
 
     bool consumePendingNewChild(const LLUUID& root_id, const LLUUID& child_id, bool& root_empty_after_remove);
@@ -309,11 +232,6 @@ public:
 
 private:
     LLScriptEditorWSServer* mServer{ nullptr };
-    std::unique_ptr<RuntimeEventAggregator> mRuntimeEventAggregator;
-    RuntimeEventCallback mRuntimeEventCallback;
-    std::unique_ptr<LLEventTimer> mRuntimeFlushTimer;
-
-    static constexpr F32 RUNTIME_FLUSH_INTERVAL = 0.25f;
 
     void cancelPendingPublishWithCleanup(const LLUUID& object_id);
     void clearPublishedListeners(const LLUUID& object_id);
@@ -325,8 +243,25 @@ private:
     using linkset_flush_timer_map_t = std::map<LLUUID, std::weak_ptr<LLEventTimer>>;
     using inventory_request_start_map_t = std::map<LLUUID, F64>;
 
+    // Each item's revision: a number that goes up whenever the item's
+    // asset is another, so that a client holding the item's content knows
+    // to fetch it again without being told the asset itself. Kept as the
+    // inventory is listed, which is why a const listing may change it.
+    // Drawn from one count for every item, so that an item listed again
+    // after its entry went -- its object unpublished and published again --
+    // has a higher revision than it had before, never a lower one.
+    struct Revision
+    {
+        LLUUID asset;
+        U32    number{ 0 };
+        LLUUID root; ///< The object it was last listed in, whose unpublishing lets it go
+    };
+    using revision_map_t = std::map<LLUUID, Revision>;
+
     published_map_t mPublishedObjects;
     pending_publish_map_t mPendingPublishes;
+    mutable revision_map_t mRevisions;
+    mutable U32 mLastRevision{ 0 };
     pending_item_create_map_t mPendingItemCreates;
     new_child_prims_map_t mNewChildPrims;
     linkset_flush_timer_map_t mLinksetFlushTimers;

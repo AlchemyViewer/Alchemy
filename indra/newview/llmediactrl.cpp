@@ -377,7 +377,7 @@ void LLMediaCtrl::showContextMenu(S32 x, S32 y)
 
         // stinson 05/05/2014 : use this as the parent of the context menu if the static menu
         // container has yet to be created
-        LLPanel* menuParent = (LLMenuGL::sMenuContainer != NULL) ? dynamic_cast<LLPanel*>(LLMenuGL::sMenuContainer) : dynamic_cast<LLPanel*>(this);
+        LLPanel* menuParent = (LLMenuGL::sMenuContainer != NULL) ? static_cast<LLPanel*>(LLMenuGL::sMenuContainer) : this;
         llassert(menuParent != NULL);
         menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
             "menu_media_ctrl.xml", menuParent, LLViewerMenuHolderGL::child_registry_t::instance());
@@ -684,8 +684,8 @@ void LLMediaCtrl::navigateTo( std::string url_in, std::string mime_type, bool cl
     // don't browse to anything that starts with secondlife:// or sl://
     const std::string protocol1 = "secondlife://";
     const std::string protocol2 = "sl://";
-    if ((LLStringUtil::compareInsensitive(url_in.substr(0, protocol1.length()), protocol1) == 0) ||
-        (LLStringUtil::compareInsensitive(url_in.substr(0, protocol2.length()), protocol2) == 0))
+    if (LLStringUtil::isEqualInsensitiveASCII(url_in.substr(0, protocol1.length()), protocol1) ||
+        LLStringUtil::isEqualInsensitiveASCII(url_in.substr(0, protocol2.length()), protocol2))
     {
         // TODO: Print out/log this attempt?
         // LL_INFOS() << "Rejecting attempt to load restricted website :" << urlIn << LL_ENDL;
@@ -1467,7 +1467,7 @@ LLMediaCtrl* LLMediaCtrlListener::findMediaCtrl(const std::string& path)
     {
         return nullptr;
     }
-    return dynamic_cast<LLMediaCtrl*>(view);
+    return view->as<LLMediaCtrl>();
 }
 
 void LLMediaCtrlListener::getMediaInfo(const LLSD& request)

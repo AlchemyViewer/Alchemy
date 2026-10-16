@@ -403,8 +403,7 @@ void LLAgentWearables::saveWearableAs(const LLWearableType::EType type,
         LL_WARNS() << "LLAgent::saveWearableAs() no inventory item." << LL_ENDL;
         return;
     }
-    std::string trunc_name(new_name);
-    LLStringUtil::truncate(trunc_name, DB_INV_ITEM_NAME_STR_LEN);
+    std::string trunc_name = utf8str_truncate(new_name, DB_INV_ITEM_NAME_STR_LEN);
     LLViewerWearable* new_wearable = LLWearableList::instance().createCopy(
         old_wearable,
         trunc_name);
@@ -653,6 +652,15 @@ void LLAgentWearables::wearableUpdated(LLWearable *wearable, bool removed)
     }
 
     LLWearableData::wearableUpdated(wearable, removed);
+
+    // Every wear, and every change to something already worn, arrives here.
+    // What the wearable says has to reach the avatar, and after the line above
+    // has settled the values it takes from its neighbours.
+    if (!removed && isAgentAvatarValid())
+    {
+        wearable->writeToAvatar(gAgentAvatarp);
+        gAgentAvatarp->updateVisualParams();
+    }
 
     if (!removed)
     {

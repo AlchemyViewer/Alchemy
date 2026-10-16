@@ -45,18 +45,20 @@ class LLColorSwatchCtrl;
 class LLTextureCtrl;
 class LLVOVolume;
 
-class LLPanelVolume : public LLPanel
+class LLPanelVolume final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelVolume, LLPanel);
+
     LLPanelVolume();
     virtual ~LLPanelVolume();
 
-    virtual void    draw();
-    virtual void    clearCtrls();
+    virtual void    draw() override;
+    virtual void    clearCtrls() override;
 
-    virtual bool    postBuild();
+    virtual bool    postBuild() override;
 
-    void            refresh();
+    void            refresh() override;
 
     void            sendIsLight();
 

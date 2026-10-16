@@ -69,7 +69,7 @@ void main()
     float z = ndcZFromScreenDepth(texture(depthMap, tc).r);
     vec4 ndc = vec4(0.0, 0.0, z, 1.0);
     vec4 p = inv_proj*ndc;
-    float depth = p.z/p.w;
+    float depth = p.z/max(p.w, 0.000001); // deferredUtil's RECONSTRUCT_W_FLOOR
 
     vec4 diff = texture(diffuseRect, vary_fragcoord.xy);
 

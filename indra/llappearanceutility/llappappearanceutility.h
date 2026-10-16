@@ -31,6 +31,7 @@
 
 #include "llapp.h"
 #include "lltracerecording.h"
+#include "llwindow.h"
 
 enum EResult
 {
@@ -85,6 +86,8 @@ public:
     void usage(std::ostream& ostr);
     bool isDebugMode() const { return mDebugMode; }
     S32 bakeTextureSize() const { return mBakeTextureSize; }
+    // The platform's window, or with --headless one that is never shown.
+    ALWindowBackend windowBackend() const { return mHeadless ? ALWindowBackend::Hidden : ALWindowBackend::Native; }
 
 private:
     int mArgc;
@@ -98,6 +101,7 @@ private:
     LLUUID mAgentID;
     S32 mBakeTextureSize;
     bool mDebugMode;
+    bool mHeadless;
 };
 
 

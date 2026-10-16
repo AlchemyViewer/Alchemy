@@ -81,7 +81,7 @@
 		<combo_box.item label="本地" name="Local"/>
 		<combo_box.item label="參考" name="Reference"/>
 	</combo_box>
-	<button label="" name="Options..." tool_tip="察看更多格線選項"/>
+	<button name="Options..." tool_tip="察看更多格線選項"/>
 	<button name="ToolCube" tool_tip="立方體"/>
 	<button name="ToolPrism" tool_tip="稜鏡體"/>
 	<button name="ToolPyramid" tool_tip="金字塔"/>
@@ -189,7 +189,6 @@
 			<text name="Group:">
 				群組：
 			</text>
-			<name_box initial_value="載入中..." name="Group Name Proxy"/>
 			<button name="button set group" tool_tip="選擇一個群組以分享這物件的權限"/>
 			<check_box label="分享" name="checkbox share with group" tool_tip="允許此群組所有成員共享你修改此物件的權限。 你必須讓渡才能啟動角色限制。"/>
 			<button label="讓渡" label_selected="讓渡" name="button deed" tool_tip="「讓渡」會把這物件贈送出去並賦予「下一個所有人」權限。 群組所分享的物件可由群組職員加以讓渡。"/>
@@ -414,7 +413,7 @@
 		</panel>
 		<panel label="材質" name="Texture"/>
 		<panel label="內容" name="Contents">
-			<flyout_button label="新腳本" label_selected="新腳本" name="button new script"/>
+			<flyout_button label="新腳本" name="button new script"/>
 			<button label="權限" name="button permissions"/>
 		</panel>
 	</tab_container>

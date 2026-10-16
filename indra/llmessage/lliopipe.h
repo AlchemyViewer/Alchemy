@@ -234,6 +234,16 @@ protected:
     LLIOPipe();
 
     /**
+     * @brief A copy is a pipe of its own, held by nothing yet.
+     *
+     * LLCloneIOFactory makes each chain's pipe a copy of its original, which
+     * its handle holds: a copy of the count would start the copy referenced,
+     * and it would never be freed.
+     */
+    LLIOPipe(const LLIOPipe&) : mReferenceCount(0) {}
+    LLIOPipe& operator=(const LLIOPipe&) { return *this; }
+
+    /**
      * @brief Process the data in buffer
      */
     virtual EStatus process_impl(

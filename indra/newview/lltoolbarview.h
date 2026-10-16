@@ -38,9 +38,11 @@ class LLLayoutPanel;
 
 // Parent of all LLToolBar
 
-class LLToolBarView : public LLUICtrl
+class LLToolBarView final : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLToolBarView, LLUICtrl);
+
     // Xui structure of the toolbar panel
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params> {};
 

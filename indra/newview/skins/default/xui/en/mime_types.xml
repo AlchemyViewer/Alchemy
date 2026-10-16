@@ -496,8 +496,8 @@
             media_plugin_libvlc
         </impl>
     </mimetype>
-  <mimetype name="application/octet-stream">
-    <label name="video/octet-stream">
+  <mimetype name="video/octet-stream">
+    <label name="video/octet-stream_label">
       Movie
     </label>
     <widgettype>

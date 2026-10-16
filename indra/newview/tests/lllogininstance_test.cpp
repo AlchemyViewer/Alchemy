@@ -38,7 +38,7 @@
 // std headers
 // external library headers
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "llevents.h"
 #include "llnotificationsutil.h"
 #include "lltrans.h"
@@ -50,17 +50,17 @@
 
 // Constants
 const std::string VIEWERLOGIN_URI("viewerlogin_uri");
-const std::string VIEWERLOGIN_GRIDLABEL("viewerlogin_grid");
-
-const std::string APPVIEWER_SERIALNUMBER("appviewer_serialno");
-
-const std::string VIEWERLOGIN_CHANNEL("invalid_channel");
-const std::string VIEWERLOGIN_VERSION("invalid_version");
 
 // Link seams.
 
 //-----------------------------------------------------------------------------
-static LLEventStream gTestPump("test_pump");
+// The login's event pump, made the first time it is asked for rather than as
+// the process starts: a pump's name is its key among LLEventPumps'.
+static LLEventPump& testPump()
+{
+    static LLEventStream pump("test_pump");
+    return pump;
+}
 
 #include "../llslurl.h"
 #include "../llstartup.h"
@@ -90,7 +90,7 @@ class LLLogin::Impl
 };
 LLLogin::LLLogin() {}
 LLLogin::~LLLogin() {}
-LLEventPump& LLLogin::getEventPump() { return gTestPump; }
+LLEventPump& LLLogin::getEventPump() { return testPump(); }
 void LLLogin::connect(const std::string& uri, const LLSD& credentials)
 {
     gLoginURI = uri;
@@ -194,7 +194,7 @@ std::string LLGridManager::getGridId(const std::string& grid)
 
 //-----------------------------------------------------------------------------
 #include "../llviewercontrol.h"
-LLControlGroup gSavedSettings("Global");
+LLControlGroup gSavedSettings("lllogininstance");
 
 LLControlGroup::LLControlGroup(const std::string& name) :
     LLInstanceTracker<LLControlGroup, std::string>(name){}
@@ -249,18 +249,11 @@ void LLProgressView::setMessage(std::string const &){}
 
 //-----------------------------------------------------------------------------
 // LLNotifications
+namespace
+{
 class MockNotifications : public LLNotificationsInterface
 {
-    std::function<void (const LLSD&, const LLSD&)> mResponder;
-    int mAddedCount;
-
 public:
-    MockNotifications() :
-        mResponder(0),
-        mAddedCount(0)
-    {
-    }
-
     virtual ~MockNotifications() {}
 
     /* virtual */ LLNotificationPtr add(
@@ -269,37 +262,10 @@ public:
                     const LLSD& payload,
                     LLNotificationFunctorRegistry::ResponseFunctor functor)
     {
-        mResponder = functor;
-        mAddedCount++;
         return LLNotificationPtr((LLNotification*)NULL);
     }
-
-    void sendYesResponse()
-    {
-        LLSD notification;
-        LLSD response;
-        response = 1;
-        mResponder(notification, response);
-    }
-
-    void sendNoResponse()
-    {
-        LLSD notification;
-        LLSD response;
-        response = 2;
-        mResponder(notification, response);
-    }
-
-    void sendBogusResponse()
-    {
-        LLSD notification;
-        LLSD response;
-        response = 666;
-        mResponder(notification, response);
-    }
-
-    int addedCount() { return mAddedCount; }
 };
+} // anonymous namespace
 
 S32 LLNotification::getSelectedOption(const LLSD& notification, const LLSD& response)
 {
@@ -327,14 +293,19 @@ std::string xml_escape_string(const std::string& in)
 }
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
     struct lllogininstance_data
     {
         lllogininstance_data() : logininstance(LLLoginInstance::getInstance())
         {
+            // The grid manager the login asks for its URIs and grid, made
+            // with the stubbed constructor above: getInstance() is null
+            // until one is, and a member called through null undefined.
+            LLGridManager::createInstance();
+
             // Global initialization
             gLoginURI.clear();
             gLoginCreds.clear();
@@ -372,6 +343,13 @@ namespace tut
             logininstance->setNotificationsInterface(&notifications);
             logininstance->setPlatformInfo("win", "1.3.5", "Windows Bogus Version 100.6.6.6");
         }
+        ~lllogininstance_data()
+        {
+            // The login instance outlives the test: not left holding the
+            // fixture's notifications once they are gone.
+            logininstance->setNotificationsInterface(nullptr);
+            LLGridManager::deleteSingleton();
+        }
 
         LLLoginInstance* logininstance;
         LLPointer<LLCredential> agentCredential;
@@ -379,19 +357,13 @@ namespace tut
         MockNotifications notifications;
     };
 
-    typedef test_group<lllogininstance_data> lllogininstance_group;
-    typedef lllogininstance_group::object lllogininstance_object;
-    lllogininstance_group llsdmgr("LLLoginInstance");
-
-    template<> template<>
-    void lllogininstance_object::test<1>()
+    TEST_CASE_METHOD(lllogininstance_data, "LLLoginInstance: a successful connect keeps the response until a disconnect", "[LLLoginInstance]")
     {
-        set_test_name("Test Simple Success And Disconnect");
-
         // Test default connect.
         logininstance->connect(agentCredential);
 
-        ensure_equals("Default connect uri", gLoginURI, VIEWERLOGIN_URI);
+        UNSCOPED_INFO("Default connect uri");
+        CHECK(gLoginURI == VIEWERLOGIN_URI);
 
         // Dummy success response.
         LLSD response;
@@ -401,14 +373,14 @@ namespace tut
         response["transfer_rate"] = 7;
         response["data"] = "test_data";
 
-        gTestPump.post(response);
+        testPump().post(response);
 
-        ensure("Success response", logininstance->authSuccess());
-        ensure_equals("Test Response Data", logininstance->getResponse().asString(), "test_data");
+        CHECK(logininstance->authSuccess());
+        CHECK(logininstance->getResponse().asString() == "test_data");
 
         logininstance->disconnect();
 
-        ensure_equals("Called Login Module Disconnect", gDisconnectCalled, true);
+        CHECK(gDisconnectCalled);
 
         response.clear();
         response["state"] = "offline";
@@ -417,25 +389,25 @@ namespace tut
         response["transfer_rate"] = 0;
         response["data"] = "test_data";
 
-        gTestPump.post(response);
+        testPump().post(response);
 
-        ensure("Disconnected", !(logininstance->authSuccess()));
+        UNSCOPED_INFO("Disconnected");
+        CHECK_FALSE(logininstance->authSuccess());
     }
 
-    template<> template<>
-    void lllogininstance_object::test<2>()
+    TEST_CASE_METHOD(lllogininstance_data, "LLLoginInstance: accepting the TOS or a critical message reconnects with it agreed", "[LLLoginInstance]")
     {
-        set_test_name("Test User TOS/Critical message Interaction");
-
         const std::string test_uri = "testing-uri";
 
         // Test default connect.
         logininstance->connect(test_uri, agentCredential);
 
         // connect should call LLLogin::connect to init gLoginURI and gLoginCreds.
-        ensure_equals("Default connect uri", gLoginURI, "testing-uri");
-        ensure_equals("Default for agree to tos", gLoginCreds["params"]["agree_to_tos"].asBoolean(), false);
-        ensure_equals("Default for read critical", gLoginCreds["params"]["read_critical"].asBoolean(), false);
+        CHECK(gLoginURI == "testing-uri");
+        UNSCOPED_INFO("Default for agree to tos");
+        CHECK_FALSE(gLoginCreds["params"]["agree_to_tos"].asBoolean());
+        UNSCOPED_INFO("Default for read critical");
+        CHECK_FALSE(gLoginCreds["params"]["read_critical"].asBoolean());
 
         // TOS failure response.
         LLSD response;
@@ -444,45 +416,64 @@ namespace tut
         response["progress"] = 0.0;
         response["transfer_rate"] = 7;
         response["data"]["reason"] = "tos";
-        gTestPump.post(response);
+        testPump().post(response);
 
-        ensure_equals("TOS Dialog type", gTOSType, "message_tos");
-        ensure("TOS callback given", gTOSReplyPump != 0);
+        UNSCOPED_INFO("TOS Dialog type");
+        CHECK(gTOSType == "message_tos");
+        UNSCOPED_INFO("TOS callback given");
+        REQUIRE(gTOSReplyPump != 0);
         gTOSReplyPump->post(false); // Call callback denying TOS.
-        ensure("No TOS, failed auth", logininstance->authFailure());
+        UNSCOPED_INFO("No TOS, failed auth");
+        CHECK(logininstance->authFailure());
 
         // Start again.
         logininstance->connect(test_uri, agentCredential);
-        gTestPump.post(response); // Fail for tos again.
+        testPump().post(response); // Fail for tos again.
         gTOSReplyPump->post(true); // Accept tos, should reconnect w/ agree_to_tos.
-        ensure_equals("Accepted agree to tos", gLoginCreds["params"]["agree_to_tos"].asBoolean(), true);
-        ensure("Incomplete login status", !logininstance->authFailure() && !logininstance->authSuccess());
+        UNSCOPED_INFO("Accepted agree to tos");
+        CHECK(gLoginCreds["params"]["agree_to_tos"].asBoolean());
+        {
+            INFO("Incomplete login status");
+            REQUIRE_FALSE(logininstance->authFailure());
+            CHECK_FALSE(logininstance->authSuccess());
+        }
 
         // Fail connection, attempt connect again.
         // The new request should have reset agree to tos to default.
         response["data"]["reason"] = "key"; // bad creds.
-        gTestPump.post(response);
-        ensure("TOS auth failure", logininstance->authFailure());
+        testPump().post(response);
+        UNSCOPED_INFO("Bad credentials, failed auth");
+        CHECK(logininstance->authFailure());
 
         logininstance->connect(test_uri, agentCredential);
-        ensure_equals("Reset to default for agree to tos", gLoginCreds["params"]["agree_to_tos"].asBoolean(), false);
+        UNSCOPED_INFO("Reset to default for agree to tos");
+        CHECK_FALSE(gLoginCreds["params"]["agree_to_tos"].asBoolean());
 
         // Critical Message failure response.
         logininstance->connect(test_uri, agentCredential);
         response["data"]["reason"] = "critical"; // Change response to "critical message"
-        gTestPump.post(response);
+        testPump().post(response);
 
-        ensure_equals("TOS Dialog type", gTOSType, "message_critical");
-        ensure("TOS callback given", gTOSReplyPump != 0);
+        UNSCOPED_INFO("TOS Dialog type");
+        CHECK(gTOSType == "message_critical");
+        UNSCOPED_INFO("TOS callback given");
+        REQUIRE(gTOSReplyPump != 0);
         gTOSReplyPump->post(true);
-        ensure_equals("Accepted read critical message", gLoginCreds["params"]["read_critical"].asBoolean(), true);
-        ensure("Incomplete login status", !logininstance->authFailure() && !logininstance->authSuccess());
+        UNSCOPED_INFO("Accepted read critical message");
+        CHECK(gLoginCreds["params"]["read_critical"].asBoolean());
+        {
+            INFO("Incomplete login status");
+            REQUIRE_FALSE(logininstance->authFailure());
+            CHECK_FALSE(logininstance->authSuccess());
+        }
 
         // Fail then attempt new connection
         response["data"]["reason"] = "key"; // bad creds.
-        gTestPump.post(response);
-        ensure("TOS auth failure", logininstance->authFailure());
+        testPump().post(response);
+        UNSCOPED_INFO("Bad credentials, failed auth");
+        CHECK(logininstance->authFailure());
         logininstance->connect(test_uri, agentCredential);
-        ensure_equals("Default for agree to tos", gLoginCreds["params"]["read_critical"].asBoolean(), false);
+        UNSCOPED_INFO("Reset to default for read critical");
+        CHECK_FALSE(gLoginCreds["params"]["read_critical"].asBoolean());
     }
 }

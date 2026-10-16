@@ -1838,7 +1838,7 @@ void LLFlatListViewEx::setForceShowingUnmatchedItems(bool show, bool notify_pare
 
 void LLFlatListViewEx::setFilterSubString(const std::string& filter_str, bool notify_parent)
 {
-    if (0 != LLStringUtil::compareInsensitive(filter_str, mFilterSubString))
+    if (!LLStringUtil::isEqualInsensitiveASCII(filter_str, mFilterSubString))
     {
         mFilterSubString = filter_str;
         updateNoItemsMessage(mFilterSubString);

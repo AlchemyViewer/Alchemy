@@ -32,8 +32,12 @@
 #include "llagent.h"
 #include "llappviewer.h"
 #include "llsdserialize.h"
+#include "lluri.h"
 #include "llviewerregion.h"
 #include "llcorehttputil.h"
+
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 
 
 //-----------------------------------------------------------------------------
@@ -48,14 +52,38 @@ namespace
     const std::string FILENAME_INTERNAL_LUA        = "lua_keywords.xml";
     const std::string FILENAME_DEFAULT_LSL         = "keywords_lsl_default.xml";
     const std::string FILENAME_DEFAULT_LUA         = "keywords_lua_default.xml";
+    const std::string FILENAME_LUAU_DEFINITIONS    = "secondlife.d.luau";
+    const std::string FILENAME_LUAU_DOCS           = "secondlife.docs.json";
+    const std::string FILENAME_LSL_BUILTINS        = "builtins.txt";
 
     constexpr U32     LLSD_SYNTAX_LSL_VERSION_EXPECTED = 2;
+    // Longest file name, in bytes, a region may give a syntax definition.
+    constexpr size_t  MAX_DEFINITION_NAME_LENGTH = 128;
     const std::string LLSD_SYNTAX_LSL_VERSION_KEY("llsd-lsl-syntax-version");
 
     const std::unordered_set<std::string> MEMCACHED_LLSD = {
         FILENAME_INTERNAL_LSL,
         FILENAME_INTERNAL_LUA
     };
+
+    // A keyword file as the region sent it. Every file of the definitions
+    // comes as its bytes, the keyword files too; those are read as their
+    // cached copies are, or nothing where they do not read.
+    LLSD keywordsFrom(const LLSD& contents)
+    {
+        if (!contents.isBinary())
+        {
+            return contents;
+        }
+        const LLSD::Binary&                                      bytes = contents.asBinary();
+        boost::iostreams::stream<boost::iostreams::array_source> in(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        LLSD                                                     parsed;
+        if (!LLSDSerialize::deserialize(parsed, in, static_cast<llssize>(bytes.size())))
+        {
+            return LLSD();
+        }
+        return parsed;
+    }
 } // namespace
 
 //========================================================================
@@ -130,6 +158,20 @@ bool LLSyntaxDefCache::updateSyntaxId()
         }
     }
     return false;
+}
+
+void LLSyntaxDefCache::forceUpdate()
+{
+    updateSyntaxId();
+    if (mCapabilityURL.empty())
+    {
+        // No region to ask: what is kept, or the shipped definitions, read
+        // again, and those listening told as a fetch would tell them.
+        checkCacheAndLoad(mSyntaxId);
+        mSyntaxIDChangedSignal();
+        return;
+    }
+    fetchKeywords();
 }
 
 void LLSyntaxDefCache::handleRegionChanged()
@@ -309,15 +351,33 @@ void LLSyntaxDefCache::fetchKeywordsDefsCoro(std::string url, LLUUID syntax_id)
 
         for (const auto &[filename, contents] : llsd::inMap(files))
         {
+            // The region names the file, and the name is joined onto the
+            // cache directory as it stands. A definition's name is also short
+            // and not hidden.
+            if (!LLFile::isSafeFileName(filename) || filename.size() > MAX_DEFINITION_NAME_LENGTH
+                || filename.starts_with('.'))
+            {
+                LL_WARNS("SyntaxLSL") << "Skipping syntax definition with unsafe file name '"
+                                      << LLURI::escape(filename.substr(0, MAX_DEFINITION_NAME_LENGTH))
+                                      << "' (" << filename.size() << " bytes)." << LL_ENDL;
+                continue;
+            }
+
             std::string full_path = gDirUtilp->add(path, filename);
 
-            if (filename == FILENAME_INTERNAL_LSL)
+            // Kept only where it reads as definitions this viewer knows,
+            // as the cached copy would be on the next login.
+            if (filename == FILENAME_INTERNAL_LSL || filename == FILENAME_INTERNAL_LUA)
             {
-                lsl_keywords = contents;
-            }
-            else if (filename == FILENAME_INTERNAL_LUA)
-            {
-                lua_keywords = contents;
+                const LLSD keywords = keywordsFrom(contents);
+                if (isSupportedVersion(keywords))
+                {
+                    (filename == FILENAME_INTERNAL_LSL ? lsl_keywords : lua_keywords) = keywords;
+                }
+                else
+                {
+                    LL_WARNS("SyntaxLSL") << "Unknown or unsupported version of syntax file " << filename << "." << LL_ENDL;
+                }
             }
 
             if (writeCacheFile(full_path, contents))
@@ -354,6 +414,19 @@ void LLSyntaxDefCache::buildCachePaths(const LLUUID &syntax_id)
     else
     {
         mFileCachePaths.clear();
+        // Everything the definitions ship beyond the keyword files -- the
+        // Luau type definitions, their documentation, the LSL builtins --
+        // as laid out under app_settings/syntax_default. The two keyword
+        // files are named last so that their copies under app_settings,
+        // which every build has, are the ones read.
+        std::string default_dir = buildCacheDirectoryName(LLUUID::null);
+        if (gDirUtilp->fileExists(default_dir))
+        {
+            for (const auto& file : gDirUtilp->getFilesInDir(default_dir))
+            {
+                mFileCachePaths.addNamePath(file, gDirUtilp->add(default_dir, file));
+            }
+        }
         mFileCachePaths.addNamePath(
             FILENAME_INTERNAL_LSL,
             gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, FILENAME_DEFAULT_LSL));
@@ -523,6 +596,21 @@ void LLSyntaxDefCache::loadKeywordsIntoLLSD()
     }
 
     mSyntaxIDChangedSignal();
+}
+
+std::string LLSyntaxDefCache::getLuauDefinitionsPath() const
+{
+    return mFileCachePaths.getPath(FILENAME_LUAU_DEFINITIONS);
+}
+
+std::string LLSyntaxDefCache::getLuauDocsPath() const
+{
+    return mFileCachePaths.getPath(FILENAME_LUAU_DOCS);
+}
+
+std::string LLSyntaxDefCache::getLSLBuiltinsPath() const
+{
+    return mFileCachePaths.getPath(FILENAME_LSL_BUILTINS);
 }
 
 std::vector<std::string> LLSyntaxDefCache::getCacheFileNames() const

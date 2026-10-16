@@ -25,7 +25,7 @@
  *     vec3 applyVibrance             (vec3 col)   // step 9
  *     vec3 applyHueShift             (vec3 col)   // step 10
  *     vec3 applyLUTGrading           (vec3 col)   // step 11
- *     vec3 applyChannelCurves        (vec3 col)   // step 12
+ *     vec3 applyChannelCurves        (vec3 col)   // step 12 (baked 1D LUT)
  *
  * Optimisation notes:
  *   - Every uniform here is fed a PRECOMPUTED value from pipeline.cpp. The
@@ -35,7 +35,11 @@
  *   - Fast-path identity checks still live shader-side because this file is
  *     attached to multiple programs with different defaults; doing them on
  *     the CPU would require shader-variant plumbing we don't have.
- *   - Shared helpers (`CG_LUMA`, `cg_rgb2hsv`/`cg_hsv2rgb`, `cg_sCurve`) are
+ *   - The two samplers (`uColorGradeLut`, `uToneCurveLut`) are only read
+ *     behind a uniform branch on their strength/amount, so the CPU can leave
+ *     them unbound whenever it uploads 0 and nothing is ever sampled from a
+ *     unit that happens to hold something else.
+ *   - Shared helpers (`CG_LUMA`, `cg_rgb2hsv`/`cg_hsv2rgb`, `cg_ramp`) are
  *     prefixed `cg_`/`CG_` to avoid colliding with `LUMA` in
  *     postEffectUtilsF, which can be linked into the same program.
  *
@@ -138,16 +142,27 @@ vec3 applyLiftGammaGain(vec3 col)
 //
 // Lightroom-style, luminance-preserving. The CPU computes
 // `tint / max(dot(tint, LUMA), 1e-4)` for each of the three tints and uploads
-// them as `*Ratio` uniforms, and also precomputes the luma split point
-// `uSplitToneMid = 0.5 + balance * 0.4`. The shader just multiplies ratios by
-// the pixel's luma and blends through the luma masks.
+// them as `*Ratio` uniforms, and folds each luma ramp into a {scale, bias}
+// pair (ALCurveModel::splitToneRamp): the shadow ramp spans
+// [mid - shadow_width, mid] and the highlight ramp [mid, mid + highlight_width],
+// with mid = 0.5 + balance * 0.4. Per ramp the shader is one FMA, a clamp and
+// the Hermite cubic -- no divides -- and because the two ramps meet at `mid`
+// without overlapping, the three weights always sum to 1.
 
-uniform vec3  uShadowRatio;      // default vec3(1) — shadow tint / dot(tint, LUMA).
-uniform vec3  uMidtoneRatio;     // default vec3(1) — midtone  tint / dot(tint, LUMA).
-uniform vec3  uHighlightRatio;   // default vec3(1) — highlight tint / dot(tint, LUMA).
-uniform float uMidtoneAmount;    // [0, 1] default 0 — midtone strength.
-uniform float uSplitToneMid;     // default 0.5 — pre-slid luma split point.
-uniform float uToneAmount;       // [0, 1] default 0 — shadow/highlight strength.
+uniform vec3  uShadowRatio;             // default vec3(1) — shadow tint / dot(tint, LUMA).
+uniform vec3  uMidtoneRatio;            // default vec3(1) — midtone  tint / dot(tint, LUMA).
+uniform vec3  uHighlightRatio;          // default vec3(1) — highlight tint / dot(tint, LUMA).
+uniform float uMidtoneAmount;           // [0, 1] default 0 — midtone strength.
+uniform vec2  uSplitToneShadowRamp;     // (1/ws, -(mid - ws)/ws) — the shadow weight is 1 - ramp.
+uniform vec2  uSplitToneHighlightRamp;  // (1/wh, -mid/wh).
+uniform float uToneAmount;              // [0, 1] default 0 — shadow/highlight strength.
+
+// smoothstep with its edges pre-folded into a scale/bias pair by the CPU.
+float cg_ramp(float l, vec2 ramp)
+{
+    float t = clamp(l * ramp.x + ramp.y, 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
 
 vec3 applySplitToning(vec3 col)
 {
@@ -158,10 +173,10 @@ vec3 applySplitToning(vec3 col)
     if (uToneAmount <= 0.0 && uMidtoneAmount <= 0.0)
         return col;
 
-    float l = dot(col, CG_LUMA);
+    float l  = dot(col, CG_LUMA);
 
-    float hi = smoothstep(uSplitToneMid,        uSplitToneMid + 0.35, l);
-    float lo = 1.0 - smoothstep(uSplitToneMid - 0.35, uSplitToneMid,  l);
+    float hi = cg_ramp(l, uSplitToneHighlightRamp);
+    float lo = 1.0 - cg_ramp(l, uSplitToneShadowRamp);
     float md = max(1.0 - hi - lo, 0.0);
 
     vec3 result = col;
@@ -317,30 +332,38 @@ vec3 applyLUTGrading(vec3 col)
 
 
 // =============================================================================
-// Step 12 — Per-channel filmic curves  (DISPLAY space)
+// Step 12 — Tone curve  (DISPLAY space)
 // =============================================================================
 //
-// `uCurveInvRange` holds `1 / max(shoulder - toe, 1e-4)` from the CPU, so the
-// per-pixel inner loop is: subtract, multiply, clamp, cubic, mix — no divs.
+// Master + per-channel monotone splines, composited as master(channel(x)) and
+// baked by LLPipeline::bakeToneCurveLut into a 512x1 RGBA16 row whose R, G and
+// B texels are the three composite curves. `uToneCurveLutScale` is the
+// half-texel mapping (1 - 1/N, 0.5/N) -- the same convention applyLUTGrading
+// uses above -- so x = 0 and x = 1 read texel 0 and texel N-1 exactly and the
+// hardware's linear filter interpolates between the baked samples. That
+// reconstruction is good to well under 1/1024 for any curve the editor can
+// make; a segment narrower than a few texels is the accepted limit of a LUT
+// of any size, and the editor's minimum point spacing sits well inside it.
+//
+// `uToneCurveAmount` is 0 whenever the section is bypassed, every curve is
+// identity, or the texture does not exist. That is the fast path, and it
+// leaves the sampler unread, so nothing needs to be bound there.
 
-uniform vec3 uCurveToe;        // default vec3(0).
-uniform vec3 uCurveInvRange;   // default vec3(1) — 1 / (shoulder - toe).
-uniform vec3 uCurveStrength;   // default vec3(0) — per-channel blend.
-
-float cg_sCurve(float x, float toe, float invRange, float strength)
-{
-    float t = clamp((x - toe) * invRange, 0.0, 1.0);
-    float s = t * t * (3.0 - 2.0 * t);
-    return mix(x, s, strength);
-}
+uniform sampler2D uToneCurveLut;
+uniform vec2      uToneCurveLutScale;   // (1 - 1/N, 0.5/N); unused on the fast path.
+uniform float     uToneCurveAmount;     // [0, 1] default 0 — blend toward the curved value.
 
 vec3 applyChannelCurves(vec3 col)
 {
-    if (all(equal(uCurveStrength, vec3(0.0))))
+    if (uToneCurveAmount <= 0.0)
         return col;
 
-    return vec3(
-        cg_sCurve(col.r, uCurveToe.r, uCurveInvRange.r, uCurveStrength.r),
-        cg_sCurve(col.g, uCurveToe.g, uCurveInvRange.g, uCurveStrength.g),
-        cg_sCurve(col.b, uCurveToe.b, uCurveInvRange.b, uCurveStrength.b));
+    // No input clamp: the sampler is clamp-to-edge, so an over-range channel
+    // saturates to the end texel, and the caller clamps the result anyway.
+    vec3 u = col * uToneCurveLutScale.x + uToneCurveLutScale.y;
+    vec3 curved = vec3(
+        textureLod(uToneCurveLut, vec2(u.r, 0.5), 0.0).r,
+        textureLod(uToneCurveLut, vec2(u.g, 0.5), 0.0).g,
+        textureLod(uToneCurveLut, vec2(u.b, 0.5), 0.0).b);
+    return mix(col, curved, uToneCurveAmount);
 }

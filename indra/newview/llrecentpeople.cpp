@@ -121,20 +121,20 @@ void LLRecentPeople::updateAvatarsArrivalTime(uuid_vec_t& uuids)
         }
         else
         {
-            mAvatarsArrivalTime[*id_it] = LLDate::now().secondsSinceEpoch();
+            mAvatarsArrivalTime[*id_it] = LLFrameTimer::getTotalSeconds();
         }
     }
 }
 
-F32 LLRecentPeople::getArrivalTimeByID(const LLUUID& id)
+F64 LLRecentPeople::getArrivalTimeByID(const LLUUID& id)
 {
     id_to_time_map_t::const_iterator it = mAvatarsArrivalTime.find(id);
 
     if (it != mAvatarsArrivalTime.end())
     {
-        return (F32)(it->second);
+        return it->second;
     }
-    return (F32)LLDate::now().secondsSinceEpoch();
+    return LLFrameTimer::getTotalSeconds();
 }
 
 bool LLRecentPeople::save() const

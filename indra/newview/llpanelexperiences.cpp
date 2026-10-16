@@ -74,7 +74,7 @@ LLExperienceItem* LLPanelExperiences::getSelectedExperienceItem()
     LLPanel* selected_item = mExperiencesList->getSelectedItem();
     if (!selected_item) return NULL;
 
-    return dynamic_cast<LLExperienceItem*>(selected_item);
+    return selected_item->as<LLExperienceItem>();
 }
 
 void LLPanelExperiences::setExperienceList( const LLSD& experiences )
@@ -220,8 +220,8 @@ bool LLPanelSearchExperiences::postBuild( void )
 
 bool LLExperienceItemComparator::compare(const LLPanel* item1, const LLPanel* item2) const
 {
-    const LLExperienceItem* experience_item1 = dynamic_cast<const LLExperienceItem*>(item1);
-    const LLExperienceItem* experience_item2 = dynamic_cast<const LLExperienceItem*>(item2);
+    const LLExperienceItem* experience_item1 = ALViewType::as<LLExperienceItem>(item1);
+    const LLExperienceItem* experience_item2 = ALViewType::as<LLExperienceItem>(item2);
 
     if (!experience_item1 || !experience_item2)
     {

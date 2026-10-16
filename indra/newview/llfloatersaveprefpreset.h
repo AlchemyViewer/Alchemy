@@ -32,10 +32,12 @@
 
 class LLComboBox;
 
-class LLFloaterSavePrefPreset : public LLFloater
+class LLFloaterSavePrefPreset final : public LLFloater
 {
 
 public:
+    AL_VIEW_TYPE(LLFloaterSavePrefPreset, LLFloater);
+
     LLFloaterSavePrefPreset(const LLSD &key);
 
     bool postBuild() override;

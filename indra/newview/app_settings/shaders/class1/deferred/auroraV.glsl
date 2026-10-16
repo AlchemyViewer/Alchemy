@@ -36,6 +36,13 @@ void main()
 {
     gl_Position = modelview_projection_matrix * vec4(position, 1.0);
 
+    // On the far plane with the rest of the sky; reverse-Z puts it at ndc z 0.
+#ifdef REVERSE_Z
+    gl_Position.z = 0.0;
+#else
+    gl_Position.z = gl_Position.w;
+#endif
+
     // Pass dome-local position so the fragment shader can derive a sky
     // direction without caring about the outer viewer transforms.
     vary_local_pos = position;

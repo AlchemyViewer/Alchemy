@@ -357,7 +357,7 @@ protected:
     // Maintain a timestamp for each request so a request that receives no reply
     // does not block future requests forever.
     // Map avatar_id+request_type -> U32 timestamp in seconds
-    typedef std::map< std::pair<LLUUID, EAvatarProcessorType>, U32> timestamp_map_t;
+    typedef std::map< std::pair<LLUUID, EAvatarProcessorType>, F64> timestamp_map_t;
     timestamp_map_t mRequestTimestamps;
 
     // Is returned by isHideAgeSupportedByServer()

@@ -33,9 +33,11 @@ class LLTextBox;
 class LLTextEditor;
 class LLButton;
 
-class LLPanelEventInfo : public LLPanel
+class LLPanelEventInfo final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelEventInfo, LLPanel);
+
     LLPanelEventInfo();
     /*virtual*/ ~LLPanelEventInfo();
 

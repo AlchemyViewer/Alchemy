@@ -43,10 +43,12 @@ typedef std::function<void (S32 x, S32 y, LLToolBarButton* button)> tool_startdr
 typedef std::function<bool (S32 x, S32 y, const LLUUID& uuid, LLAssetType::EType type)> tool_handledrag_callback_t;
 typedef std::function<bool (void* data, EDragAndDropType cargo_type, S32 x, S32 y, LLToolBar* toolbar)> tool_handledrop_callback_t;
 
-class LLToolBarButton : public LLButton
+class LLToolBarButton final : public LLButton
 {
     friend class LLToolBar;
 public:
+    AL_VIEW_TYPE(LLToolBarButton, LLButton);
+
     struct Params : public LLInitParam::Block<Params, LLButton::Params>
     {
         Optional<LLUI::RangeS32::Params>    button_width;
@@ -62,29 +64,34 @@ public:
     LLToolBarButton(const Params& p);
     ~LLToolBarButton();
 
-    bool handleMouseDown(S32 x, S32 y, MASK mask);
-    bool handleHover(S32 x, S32 y, MASK mask);
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
 
-    void reshape(S32 width, S32 height, bool called_from_parent = true);
-    void setEnabled(bool enabled);
-    void setCommandId(const LLCommandId& id) { mId = id; }
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    void setEnabled(bool enabled) override;
+    // Takes the command with the id, so the two cannot come apart. Commands are
+    // registered once from commands.xml and never removed, so what is kept here
+    // outlives the button; the alternative was looking the id up in the manager
+    // on every frame this button drew.
+    void setCommandId(const LLCommandId& id);
     LLCommandId getCommandId() const { return mId; }
 
     void setStartDragCallback(tool_startdrag_callback_t cb)   { mStartDragItemCallback  = cb; }
     void setHandleDragCallback(tool_handledrag_callback_t cb) { mHandleDragItemCallback = cb; }
 
-    void onMouseEnter(S32 x, S32 y, MASK mask);
-    void onMouseLeave(S32 x, S32 y, MASK mask);
-    void onMouseCaptureLost();
+    void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    void onMouseLeave(S32 x, S32 y, MASK mask) override;
+    void onMouseCaptureLost() override;
 
-    void onCommit();
+    void onCommit() override;
 
-    virtual const std::string getToolTip() const;
+    std::string getToolTip() const override;
 
 private:
     void callIfEnabled(LLUICtrl::commit_callback_t commit, LLUICtrl* ctrl, const LLSD& param );
 
     LLCommandId     mId;
+    LLCommand*      mCommand { nullptr };   // owned by LLCommandManager, outlives this
     S32             mMouseDownX;
     S32             mMouseDownY;
     LLUI::RangeS32  mWidthRange;
@@ -175,11 +182,23 @@ namespace LLInitParam
 }
 
 
-class LLToolBar
+class LLToolBar final
 :   public LLUICtrl
 {
     friend class LLToolBarButton;
 public:
+    AL_VIEW_TYPE(LLToolBar, LLUICtrl);
+
+    // Say that something a toolbar button's availability or pressed state could
+    // be derived from has changed, so the bars ask their buttons again on the
+    // next idle instead of reusing what they last worked out.
+    //
+    // Deliberately one number for every toolbar and every cause: what a button
+    // reads is decided by a predicate named in commands.xml and looked up in
+    // the enable-callback registry, so there is no way from here to know which
+    // buttons a given change reaches. Bumping it costs one pass over the
+    // buttons of the visible bars.
+    static void requestRefresh() { ++sRefreshGeneration; }
 
     class LLCenterLayoutPanel : public LLLayoutPanel
     {
@@ -234,15 +253,15 @@ public:
     };
 
     // virtuals
-    bool postBuild();
-    void draw();
-    void reshape(S32 width, S32 height, bool called_from_parent = true);
-    bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    bool postBuild() override;
+    void draw() override;
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     virtual bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
-                                   std::string& tooltip_msg);
+                                   std::string& tooltip_msg) override;
 
     static const int RANK_NONE = -1;
     bool addCommand(const LLCommandId& commandId, int rank = RANK_NONE);
@@ -292,6 +311,10 @@ private:
 
     void initFromParams(const Params&);
     void createContextMenu();
+    // Moves and resizes this bar as well as its buttons, so it is run from the
+    // idle callback rather than from draw -- a view that relocates itself while
+    // being drawn leaves the matrix its parent pushed pointing at where it used
+    // to be.
     void updateLayoutAsNeeded();
     void createButtons();
     void resizeButtonsInRow(std::vector<LLToolBarButton*>& buttons_in_row, S32 max_row_girth);
@@ -343,6 +366,18 @@ private:
     LLHandle<class LLView>          mRemoveButtonHandle;
 
     LLToolBarButton*                mRightMouseTargetButton;
+
+    // Settles what every button on this bar shows and where it sits. Registered
+    // as an idle callback by the constructor rather than reached from draw:
+    // deciding what a button shows runs a predicate apiece, and placing them
+    // moves the bar itself. Neither belongs on every frame.
+    static void                     onIdleUpdate(void* userdata);
+    void                            updateButtonStates();
+
+    // Where this bar had reached the last time it asked. Starts behind the
+    // count below, so a bar asks once before it first draws.
+    U32                             mRefreshedGeneration { 0 };
+    static U32                      sRefreshGeneration;
 
     bool                            mNeedsLayout;
     bool                            mModified;

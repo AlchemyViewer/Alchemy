@@ -107,6 +107,8 @@ public:
 
     virtual LLUUID  getUUID() const         { return mItemValue.asUUID(); }
     LLSD    getValue() const                { return mItemValue; }
+    // Made again where it stands, the same row (ALPaneList::setRows).
+    void    setValue(const LLSD& value)     { mItemValue = value; }
     LLSD    getAltValue() const             { return mItemAltValue; }
 
     void    setRect(LLRect rect)            { mRectangle = rect; }
@@ -121,6 +123,11 @@ public:
     S32     getNumColumns() const;
 
     LLScrollListCell *getColumn(const S32 i) const;
+    template <class T> T* getColumn(const S32 i) const
+    {
+        LLScrollListCell* cell = getColumn(i);
+        return cell ? cell->as<T>() : nullptr;
+    }
 
     std::string getContentsCSV() const;
 

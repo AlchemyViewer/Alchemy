@@ -6,11 +6,6 @@
 	<text name="UI Size:">
 		UI størrelse:
 	</text>
-	<check_box label="Vis script fejl i:" name="show_script_errors"/>
-	<radio_group name="show_location">
-		<radio_item label="Chat" name="0"/>
-		<radio_item label="Separat vindue" name="1"/>
-	</radio_group>
 	<check_box label="Tillad flere åbne klienter" name="allow_multiple_viewer_check"/>
 	<check_box label="Vælg netværk ved login" name="show_grid_selection_check"/>
 	<check_box label="Vælg avanceret menu" name="show_advanced_menu_check"/>

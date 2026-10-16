@@ -1049,8 +1049,9 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector3>& vertices,
                 scale_mat.mMatrix[2][2] = scale*length;
                 scale_mat *= matrix;
 
-                glm::mat4 norm(glm::make_mat4((F32*) scale_mat.mMatrix));
-                LLMatrix4 norm_mat = LLMatrix4(glm::value_ptr(glm::transpose(glm::inverse(norm))));
+                LLMatrix4a norm;
+                norm.setNormalMatrix(LLMatrix4a(scale_mat));
+                LLMatrix4 norm_mat = norm.toMatrix4();
 
                 appendMesh(vertices, normals, tex_coords, colors, indices, index_offset, scale_mat, norm_mat,
                             sLODVertexOffset[trunk_LOD], sLODVertexCount[trunk_LOD], sLODIndexCount[trunk_LOD], sLODIndexOffset[trunk_LOD]);
@@ -1098,8 +1099,9 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector3>& vertices,
 
                 scale_mat *= matrix;
 
-                glm::mat4 norm(glm::make_mat4((F32*)scale_mat.mMatrix));
-                LLMatrix4 norm_mat = LLMatrix4(glm::value_ptr(glm::transpose(glm::inverse(norm))));
+                LLMatrix4a norm;
+                norm.setNormalMatrix(LLMatrix4a(scale_mat));
+                LLMatrix4 norm_mat = norm.toMatrix4();
 
                 appendMesh(vertices, normals, tex_coords, colors, indices, index_offset, scale_mat, norm_mat, 0, LEAF_VERTICES, LEAF_INDICES, 0);
             }

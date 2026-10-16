@@ -34,14 +34,14 @@
 #include "llstring.h"
 #include "lluiimage.h"
 #include "llview.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 
 //
 // Declarations
 //
 
 class LLFontGL;
-class LLFontVertexBuffer;
+class LLFontTextCache;
 class LLScrollContainer;
 class LLUICtrlFactory;
 
@@ -89,10 +89,12 @@ namespace LLInitParam
 // Classes
 //
 
-class LLBadge
+class LLBadge final
 : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLBadge, LLUICtrl);
+
     struct Params
     : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
@@ -133,9 +135,9 @@ public:
 
     bool                addToView(LLView * view);
 
-    virtual void        draw();
+    virtual void        draw() override;
 
-    const std::string   getLabel() const { return wstring_to_utf8str(mLabel); }
+    const std::string&  getLabel() const { return mLabel.getString(); }
     void                setLabel( const LLStringExplicit& label);
 
     void                setDrawAtParentTop(bool draw_at_top) { mDrawAtParentTop = draw_at_top;}
@@ -145,7 +147,7 @@ private:
     LLUIColor               mBorderColor;
 
     const LLFontGL*         mGLFont;
-    LLFontVertexBuffer      mFontBuffer;
+    LLFontTextCache      mFontBuffer;
 
     LLPointer< LLUIImage >  mImage;
     LLUIColor               mImageColor;

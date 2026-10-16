@@ -34,9 +34,6 @@
 #include "llmath.h"
 #include <boost/algorithm/string.hpp>
 
-S32 LLJoint::sNumUpdates = 0;
-S32 LLJoint::sNumTouches = 0;
-
 template <class T>
 bool attachment_map_iter_compare_key(const T& a, const T& b)
 {
@@ -193,13 +190,49 @@ void LLJoint::setSupport(const std::string& support_name)
 
 //-----------------------------------------------------------------------------
 // touch()
-// Sets all dirty flags for all children, recursively.
+// Sets all dirty flags for all children, recursively, and tells every joint
+// above that there is now something dirty below it.
 //-----------------------------------------------------------------------------
 void LLJoint::touch(U32 flags)
 {
+    if (flags & MATRIX_DIRTY)
+    {
+        // updateWorldMatrixChildren does not descend into a joint that reports
+        // nothing dirty in or below it, so a dirty matrix has to be announced
+        // upwards or the sweep will walk straight past it. The walk stops at
+        // the first joint already carrying the mark, so the second write of a
+        // frame usually costs one step.
+        //
+        // This sits outside the early-out below on purpose: a joint can be
+        // dirty already and still need the mark, because a joint that leaves
+        // the sweep keeps its flags while its ancestors lose theirs.
+        //
+        // The written joint carries the mark itself when it has children.
+        // They are dirtied below, and a world matrix asked of this joint
+        // before the sweep clears its own matrix flag: without the mark the
+        // sweep would turn back here with everything below still waiting.
+        if (!mChildren.empty())
+        {
+            mDirtyFlags |= SUBTREE_DIRTY;
+        }
+        for (LLJoint* ancestor = mParent;
+             ancestor && !(ancestor->mDirtyFlags & SUBTREE_DIRTY);
+             ancestor = ancestor->mParent)
+        {
+            ancestor->mDirtyFlags |= SUBTREE_DIRTY;
+        }
+    }
+
+    dirtySubtree(flags);
+}
+
+//-----------------------------------------------------------------------------
+// dirtySubtree()
+//-----------------------------------------------------------------------------
+void LLJoint::dirtySubtree(U32 flags)
+{
     if ((flags | mDirtyFlags) != mDirtyFlags)
     {
-        sNumTouches++;
         mDirtyFlags |= flags;
         U32 child_flags = flags;
         if (flags & ROTATION_DIRTY)
@@ -209,7 +242,7 @@ void LLJoint::touch(U32 flags)
 
         for (LLJoint* joint : mChildren)
         {
-            joint->touch(child_flags);
+            joint->dirtySubtree(child_flags);
         }
     }
 }
@@ -318,14 +351,19 @@ const LLVector3& LLJoint::getPosition()
     return mXform.getPosition();
 }
 
-bool do_debug_joint(const std::string& name)
+// Whether a joint's writes are being traced by name. Every setter asks, so in
+// a shipped build the answer is a constant and the compiler drops the sites.
+#ifdef LL_RELEASE_FOR_DOWNLOAD
+static inline bool do_debug_joint(const std::string&)
 {
-    if (std::find(LLJoint::s_debugJointNames.begin(), LLJoint::s_debugJointNames.end(),name) != LLJoint::s_debugJointNames.end())
-    {
-        return true;
-    }
     return false;
 }
+#else
+static bool do_debug_joint(const std::string& name)
+{
+    return LLJoint::s_debugJointNames.find(name) != LLJoint::s_debugJointNames.end();
+}
+#endif
 
 //--------------------------------------------------------------------
 // setPosition()
@@ -764,12 +802,12 @@ void LLJoint::setWorldPosition( const LLVector3& pos )
         return;
     }
 
-    LLMatrix4 temp_matrix = getWorldMatrix();
+    LLMatrix4 temp_matrix = getWorldMatrix().toMatrix4();
     temp_matrix.mMatrix[VW][VX] = pos.mV[VX];
     temp_matrix.mMatrix[VW][VY] = pos.mV[VY];
     temp_matrix.mMatrix[VW][VZ] = pos.mV[VZ];
 
-    LLMatrix4 parentWorldMatrix = mParent->getWorldMatrix();
+    LLMatrix4 parentWorldMatrix = mParent->getWorldMatrix().toMatrix4();
     LLMatrix4 invParentWorldMatrix = parentWorldMatrix.invert();
 
     temp_matrix *= invParentWorldMatrix;
@@ -798,7 +836,12 @@ void LLJoint::setRotation( const LLQuaternion& rot )
 {
     if (rot.isFinite())
     {
-    //  if (mXform.getRotation() != rot)
+        // Writing an unchanged rotation still dirties this joint and, through
+        // touch(), every joint below it -- for anything near the root that is
+        // most of the skeleton. The pose blender rewrites each animated joint
+        // every frame, so a motion holding a pose arrives here with the value
+        // already in place.
+        if (mXform.getRotation() != rot)
         {
             mXform.setRotation(rot);
             touch(MATRIX_DIRTY | ROTATION_DIRTY);
@@ -836,18 +879,56 @@ void LLJoint::setWorldRotation( const LLQuaternion& rot )
         return;
     }
 
-    LLMatrix4 temp_mat(rot);
+    // The local rotation that composes with the parent's world orientation to
+    // give this one. That is what the world rotation is built from -- the
+    // local rotation times the parent's, all the way up -- so scale plays no
+    // part in it, and neither does the position.
+    //
+    // This used to go through matrices: one built from the rotation, one from
+    // the parent with its translation zeroed, that one inverted, the two
+    // multiplied and a quaternion pulled back out. Six of those run every
+    // frame for a standing avatar, two per leg in the inverse kinematics and
+    // one per ankle, and none of them gave back the rotation they were asked
+    // for when the parent carried a scale. LLMatrix4::invert transposes, which
+    // inverts a rotation but not a scale, and the extraction adds one to the
+    // trace before taking a root, which no later normalize can undo. The
+    // joints this runs on are a motion's copies of the avatar's leg joints and
+    // they carry the avatar's joint scales, so on a reshaped leg the answer
+    // was wrong by however far the scale was from one.
+    LLQuaternion2 parent_inverse;
+    parent_inverse.setInverse(LLQuaternion2(mParent->getWorldRotation()));
 
-    LLMatrix4 parentWorldMatrix = mParent->getWorldMatrix();
-    parentWorldMatrix.mMatrix[VW][VX] = 0;
-    parentWorldMatrix.mMatrix[VW][VY] = 0;
-    parentWorldMatrix.mMatrix[VW][VZ] = 0;
+    LLQuaternion2 local;
+    local.setMul(LLQuaternion2(rot), parent_inverse);
 
-    LLMatrix4 invParentWorldMatrix = parentWorldMatrix.invert();
+    LLQuaternion local_rotation;
+    local.store(local_rotation);
+    setRotation(local_rotation);
+}
 
-    temp_mat *= invParentWorldMatrix;
+//--------------------------------------------------------------------
+// setWorldRotationIfMoved()
+//--------------------------------------------------------------------
+void LLJoint::setWorldRotationIfMoved( const LLQuaternion& rot )
+{
+    // A rotation recomputed every frame from inputs that did not change does
+    // not come back bit identical, so the equality compare in setRotation
+    // never fires for a caller fed from one. The avatar root is written from
+    // a slerp toward a target it is already sitting on, and slerp blends its
+    // two arguments rather than returning either, so the root lands a
+    // rounding short of where it already was and dirties the skeleton, every
+    // frame, forever.
+    //
+    // What this tolerance costs is a residual: an interpolating caller stops
+    // once its step falls below it, leaving a gap of the tolerance over the
+    // interpolant. For the root that is at worst a hundredth of a degree,
+    // which moves a joint a metre out by a tenth of a millimetre.
+    constexpr F32 ROTATION_UNCHANGED_EPSILON = 1.e-6f;
 
-    setRotation(LLQuaternion(temp_mat));
+    if (getWorldRotation().isNotEqualEps(rot, ROTATION_UNCHANGED_EPSILON))
+    {
+        setWorldRotation(rot);
+    }
 }
 
 
@@ -876,13 +957,16 @@ void LLJoint::setScale( const LLVector3& requested_scale, bool apply_attachment_
         }
         scale = active_override;
     }
-    if ((mXform.getScale() != scale) && do_debug_joint(getName()))
+    if (mXform.getScale() == scale)
+    {
+        return;
+    }
+    if (do_debug_joint(getName()))
     {
         LL_DEBUGS("Avatar") << " joint " << getName() << " set scale " << scale << LL_ENDL;
     }
     mXform.setScale(scale);
     touch();
-
 }
 
 
@@ -890,18 +974,11 @@ void LLJoint::setScale( const LLVector3& requested_scale, bool apply_attachment_
 //--------------------------------------------------------------------
 // getWorldMatrix()
 //--------------------------------------------------------------------
-const LLMatrix4 &LLJoint::getWorldMatrix()
+const LLMatrix4a& LLJoint::getWorldMatrix()
 {
     updateWorldMatrixParent();
 
     return mXform.getWorldMatrix();
-}
-
-const LLMatrix4a& LLJoint::getWorldMatrix4a()
-{
-    updateWorldMatrixParent();
-
-    return mWorldMatrix;
 }
 
 
@@ -959,19 +1036,31 @@ void LLJoint::updateWorldPRSParent()
 
 //-----------------------------------------------------------------------------
 // updateWorldMatrixChildren()
+// Returns the number of world matrices recomputed in this subtree.
 //-----------------------------------------------------------------------------
-void LLJoint::updateWorldMatrixChildren()
+S32 LLJoint::updateWorldMatrixChildren()
 {
-    if (!this->mUpdateXform) return;
+    // The recursion is the cost here, not the recompute: the walk is a pointer
+    // chase over joints that are each their own allocation, and a skeleton of
+    // them does not fit in L1. A joint carrying neither its own dirty matrix
+    // nor the mark that says one is below it has nothing under it to visit.
+    if (!mUpdateXform || !(mDirtyFlags & (MATRIX_DIRTY | SUBTREE_DIRTY)))
+    {
+        return 0;
+    }
 
+    S32 updated = 0;
     if (mDirtyFlags & MATRIX_DIRTY)
     {
         updateWorldMatrix();
+        ++updated;
     }
     for (LLJoint* joint : mChildren)
     {
-        joint->updateWorldMatrixChildren();
+        updated += joint->updateWorldMatrixChildren();
     }
+    mDirtyFlags &= ~SUBTREE_DIRTY;
+    return updated;
 }
 
 //-----------------------------------------------------------------------------
@@ -981,10 +1070,55 @@ void LLJoint::updateWorldMatrix()
 {
     if (mDirtyFlags & MATRIX_DIRTY)
     {
-        sNumUpdates++;
+        // The transform builds straight into its own LLMatrix4a, so there is
+        // one world matrix per joint rather than a scalar one to copy from.
         mXform.updateMatrix(false);
-        mWorldMatrix.loadu(mXform.getWorldMatrix());
-        mDirtyFlags = 0x0;
+        // The subtree mark survives: this joint's matrix is current, but a
+        // joint below it may still be waiting, and updateWorldMatrixParent
+        // reaches here without visiting any of them.
+        mDirtyFlags &= ~ALL_DIRTY;
+    }
+}
+
+//-----------------------------------------------------------------------------
+// setUpdateXform()
+//-----------------------------------------------------------------------------
+void LLJoint::setUpdateXform( bool update )
+{
+    // A joint without this is out of the sweep along with everything below it,
+    // and its dirty flags go stale there because nothing clears them while its
+    // ancestors clear theirs. Coming back in has to be announced, or the sweep
+    // will keep walking past a joint that never rebuilt its world matrix.
+    if (update && !mUpdateXform)
+    {
+        mUpdateXform = true;
+        touch();
+    }
+    else
+    {
+        mUpdateXform = update;
+    }
+}
+
+//-----------------------------------------------------------------------------
+// touchIfXformParentMoved()
+//-----------------------------------------------------------------------------
+void LLJoint::touchIfXformParentMoved()
+{
+    // A joint learns its world matrix is stale from a write to itself or to a
+    // joint above it. The root of a joint tree can hang off an LLXform that is
+    // no joint at all -- an avatar sitting on an object hangs its root off the
+    // seat's transform -- and the transforms written to the root are then seat
+    // relative, so they hold still while the seat carries the joint somewhere
+    // else. Nothing in the tree hears about that, so ask the parent directly.
+    const LLVector3 last_position = mXform.getWorldPosition();
+    const LLQuaternion last_rotation = mXform.getWorldRotation();
+
+    mXform.update();
+
+    if (mXform.getWorldPosition() != last_position || mXform.getWorldRotation() != last_rotation)
+    {
+        touch();
     }
 }
 

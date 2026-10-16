@@ -83,6 +83,13 @@ bool Animation::prep(Asset& asset)
 void Animation::update(Asset& asset, F32 dt)
 {
     mTime += dt;
+    // apply() plays the time modulo the loop, so keeping it to one loop changes nothing it
+    // shows, and an F32 that grew for hours would round each frame's dt away.
+    const F32 loop_length = mMaxTime - mMinTime;
+    if (loop_length > 0.f)
+    {
+        mTime = fmodf(mTime, loop_length);
+    }
 
     apply(asset, mTime);
 }
@@ -268,9 +275,10 @@ void Animation::RotationChannel::apply(Asset& asset, Sampler& sampler, F32 time)
         sampler.getFrameInfo(asset, time, frameIndex, t);
 
         // interpolate
-        quat qf = glm::slerp(mRotations[frameIndex], mRotations[frameIndex + 1], t);
+        quat qf;
+        qf.setSlerp(mRotations[frameIndex], mRotations[frameIndex + 1], t);
 
-        qf = glm::normalize(qf);
+        qf.normalize();
 
         node.setRotation(qf);
     }
@@ -406,7 +414,8 @@ void Skin::uploadMatrixPalette(Asset& asset)
     {
         Node& joint = asset.mNodes[mJoints[i]];
         // build matrix palette in asset space
-        t_mp[i] = joint.mAssetMatrix * mInverseBindMatricesData[i];
+        // out of the bind pose, then into asset space
+        t_mp[i].setMul(mInverseBindMatricesData[i], joint.mAssetMatrix);
     }
 
     std::vector<F32> glmp;
@@ -417,7 +426,7 @@ void Skin::uploadMatrixPalette(Asset& asset)
 
     for (U32 i = 0; i < joint_count; ++i)
     {
-        F32* m = glm::value_ptr(t_mp[i]);
+        const F32* m = t_mp[i].getF32ptr();
 
         U32 idx = i * 12;
 

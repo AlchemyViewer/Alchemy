@@ -205,7 +205,7 @@ public:
     bool isModerator() const { return mIsModerator; }
     void moderateVoice(bool mute_voice) { mIsModeratorMuted = mute_voice; }
     void setIsModerator(bool is_moderator) { mIsModerator = is_moderator; mNeedsRefresh = true; }
-    void setTimeNow() { mLastActiveTime = LLFrameTimer::getElapsedSeconds(); mNeedsRefresh = true; }
+    void setTimeNow() { mLastActiveTime = LLFrameTimer::getUptimeSeconds(); mNeedsRefresh = true; }
     void setDistance(F64 dist) { mDistToAgent = dist; mNeedsRefresh = true; }
 
     void buildContextMenu(LLMenuGL& menu, U32 flags);
@@ -266,8 +266,7 @@ public:
     void                setEmptyLookupMessage(const std::string& message) { }
     std::string         getEmptyLookupMessage(bool is_empty_folder = false) const { return mEmpty; }
     bool                showAllResults() const { return true; }
-    std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const { return std::string::npos; }
-    std::string::size_type getFilterStringSize() const { return 0; }
+    Match getFilterMatch(LLFolderViewModelItem*) const { return Match(); }
 
     bool                isActive() const { return false; }
     bool                isModified() const { return false; }

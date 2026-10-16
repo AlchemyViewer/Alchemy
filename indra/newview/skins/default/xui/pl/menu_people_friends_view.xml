@@ -3,6 +3,8 @@
 	<menu_item_check label="Sortuj według imion" name="sort_name" />
 	<menu_item_check label="Sortuj według statusu" name="sort_status" />
 	<menu_item_check name="view_icons" label="Pokazuj ikonki" />
-	<menu_item_check name="view_permissions" label="Pokazuj zezwolenia" />
 	<menu_item_check name="view_conversation" label="Pokaż dziennik rozmów..." />
+	<context_menu name="People Show Permissions">
+		<menu_item_check name="view_permissions" label="Pokazuj zezwolenia" />
+	</context_menu>
 </toggleable_menu>

@@ -35,13 +35,14 @@
 #include "v2math.h"
 #include "llrect.h"
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include <set>
 #include <vector>
 
 // Renders a 2D text billboard floating at the location specified.
 class LLDrawable;
 class LLHUDText;
+class LLHUDTextScope;
 
 struct lltextobject_further_away
 {
@@ -54,23 +55,37 @@ protected:
     class LLHUDTextSegment
     {
     public:
-        LLHUDTextSegment(const LLWString& text, const LLFontGL::StyleFlags style, const LLColor4& color, const LLFontGL* font)
+        LLHUDTextSegment(std::string text, const LLFontGL::StyleFlags style, const LLColor4& color, const LLFontGL* font)
         :   mColor(color),
             mStyle(style),
-            mText(text),
+            mText(std::move(text)),
             mFont(font)
         {}
         F32 getWidth(const LLFontGL* font);
-        const LLWString& getText() const { return mText; }
-        void clearFontWidthMap() { mFontWidthMap.clear(); }
+        const std::string& getText() const { return mText; }
+
+        // Draws this line through the scope, from the same cache the width
+        // came out of -- one piece of text, one place its work is kept.
+        void draw(LLHUDTextScope& scope, const LLFontGL& font, U8 style,
+                  LLFontGL::ShadowType shadow, F32 x_offset, F32 y_offset,
+                  const LLColor4& color) const;
+
+        // Let go of the shaped glyphs, keeping the segment. For text that has
+        // gone off screen and may come back.
+        void releaseGeometry() const { mFontCache.reset(); }
 
         LLColor4                mColor;
         LLFontGL::StyleFlags    mStyle;
         const LLFontGL*         mFont;
-        LLFontVertexBuffer      mFontBuffer;
     private:
-        LLWString               mText;
-        std::map<const LLFontGL*, F32> mFontWidthMap;
+        std::string             mText;
+
+        // What this segment's text costs to measure and to draw, kept between
+        // frames. A segment is measured once per frame per font to place it
+        // and then drawn, and its text never changes -- segments are rebuilt
+        // wholesale, not edited. The cache notices a font or scale change for
+        // itself, which is what the manual sweep on reshape used to be for.
+        mutable LLFontTextCache mFontCache;
     };
 
 public:
@@ -119,12 +134,25 @@ public:
     bool getHidden() const { return mHidden; }
     void setHidden( bool hide ) { mHidden = hide; }
     void setOnHUDAttachment(bool on_hud) { mOnHUDAttachment = on_hud; }
+
+    // Drop what every line of this text has shaped, keeping the lines. Called
+    // when it leaves the screen, so only what is on it holds geometry.
+    void releaseTextGeometry();
+
     void shift(const LLVector3& offset);
 
     static void shiftAll(const LLVector3& offset);
     static void renderAllHUD();
     static void reshape();
     static void setDisplayText(bool flag) { sDisplayText = flag ; }
+
+    // Let go of the lists the per-frame passes keep. They hold references, so
+    // an object text they still name outlives the sweep that marked it dead
+    // and is destroyed at static-destruction time instead -- after the GL
+    // context, while its lines still hold the vertex buffers they shaped.
+    // Called from LLHUDObject::cleanupHUDObjects, which is where every one of
+    // them is marked dead and where the last reference should be dropped.
+    static void releaseTextObjects();
 
 // [RLVa:KB] - Checked: RLVa-2.0.3
     const std::string& getObjectText() const                        { return mObjText; }
@@ -177,6 +205,15 @@ private:
 
     static bool    sDisplayText ;
     static std::set<LLPointer<LLHUDText> > sTextObjects;
+    // The same objects in one run of memory, for the passes that visit all of
+    // them every frame. The set stays the authority on what exists -- it is
+    // what insertion and removal work against, and removal can happen while a
+    // pass is running -- so this is rebuilt from it only when it changes, and
+    // holds its own references so a removal mid-pass cannot pull an object
+    // out from under one.
+    static std::vector<LLPointer<LLHUDText> > sAllTextObjects;
+    static bool sAllTextObjectsDirty;
+    static const std::vector<LLPointer<LLHUDText> >& getAllTextObjects();
     static std::vector<LLPointer<LLHUDText> > sVisibleTextObjects;
     static std::vector<LLPointer<LLHUDText> > sVisibleHUDTextObjects;
     typedef std::set<LLPointer<LLHUDText> >::iterator TextObjectIterator;

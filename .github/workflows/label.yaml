@@ -2,8 +2,13 @@ name: Pull Request Labeler
 on:
   - pull_request_target
 
+permissions: {}
+
 jobs:
   triage:
+    # Applying labels needs pull-requests: write. Creating one would need
+    # issues: write as well, so every label in labeler.yaml must already
+    # exist in the repository.
     permissions:
       contents: read
       pull-requests: write

@@ -41,7 +41,7 @@
 #include "llagentcamera.h"
 #include "llfocusmgr.h"
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
 // Require DirectInput version 8
 #define DIRECTINPUT_VERSION 0x0800
 
@@ -109,7 +109,7 @@ std::ostream& operator<<(std::ostream& out, NDOF_Device* ptr)
 #endif // LIB_NDOF
 
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
 // this should reflect ndof and set axises, see ndofdev_win.cpp from ndof package
 BOOL CALLBACK EnumObjectsCallback(const DIDEVICEOBJECTINSTANCE* inst, VOID* user_data)
 {
@@ -328,7 +328,9 @@ LLViewerJoystick::LLViewerJoystick()
     memset(mBtn, 0, sizeof(mBtn));
 
     // factor in bandwidth? bandwidth = gViewerStats->mKBitStat
-    mPerfScale = 4000.f / (F32)gSysCPU.getMHz(); // hmm.  why?
+    // An unknown clock (0) leaves the scale alone rather than infinite.
+    const F64 cpu_mhz = gSysCPU.getMHz();
+    mPerfScale = cpu_mhz > 0.0 ? 4000.f / (F32)cpu_mhz : 1.f; // hmm.  why?
 
     mLastDeviceUUID = LLSD::Integer(1);
 }
@@ -378,7 +380,7 @@ void LLViewerJoystick::init(bool autoenable)
             void* win_callback = nullptr;
             std::function<bool(std::string&, LLSD&, void*)> osx_callback;
             // di8_devices_callback callback is immediate and happens in scope of getInputDevices()
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
             // space navigator is marked as DI8DEVCLASS_GAMECTRL in ndof lib
             device_type = DI8DEVCLASS_GAMECTRL;
             win_callback = &di8_devices_callback;
@@ -475,7 +477,7 @@ void LLViewerJoystick::initDevice(LLSD &guid)
     std::function<bool(std::string&, LLSD&, void*)> osx_callback;
     mDriverState = JDS_INITIALIZING;
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     // space navigator is marked as DI8DEVCLASS_GAMECTRL in ndof lib
     device_type = DI8DEVCLASS_GAMECTRL;
     win_callback = &di8_devices_callback;
@@ -1417,7 +1419,7 @@ void LLViewerJoystick::scanJoystick()
 // -----------------------------------------------------------------------------
 bool LLViewerJoystick::isDeviceUUIDSet()
 {
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     // for ease of comparison and to dial less with platform specific variables, we store id as LLSD binary
     return mLastDeviceUUID.isBinary();
 #elif LL_DARWIN
@@ -1434,7 +1436,7 @@ LLSD LLViewerJoystick::getDeviceUUID()
 
 std::string LLViewerJoystick::getDeviceUUIDString()
 {
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     // Might be simpler to just convert _GUID into string everywhere, store and compare as string
     if (mLastDeviceUUID.isBinary())
     {
@@ -1466,7 +1468,7 @@ std::string LLViewerJoystick::getDeviceUUIDString()
 
 void LLViewerJoystick::saveDeviceIdToSettings()
 {
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     // can't save as binary directly,
     // someone editing the xml will corrupt it
     // so convert to string first
@@ -1481,7 +1483,7 @@ void LLViewerJoystick::saveDeviceIdToSettings()
 void LLViewerJoystick::loadDeviceIdFromSettings()
 {
     LLSD dev_id = gSavedSettings.getLLSD("JoystickDeviceUUID");
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     // We can't save binary data to gSavedSettings, somebody editing the file will corrupt it,
     // so _GUID data gets converted to string (we probably can convert it to LLUUID with memcpy)
     // and here we need to convert it back to binary from string

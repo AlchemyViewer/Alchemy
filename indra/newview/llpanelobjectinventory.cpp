@@ -54,7 +54,6 @@
 #include "llpreviewanim.h"
 #include "llpreviewgesture.h"
 #include "llpreviewnotecard.h"
-#include "llpreviewscript.h"
 #include "llpreviewsound.h"
 #include "llpreviewtexture.h"
 #include "llscrollcontainer.h"
@@ -68,6 +67,7 @@
 #include "llviewerobjectlist.h"
 #include "llviewermessage.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
+#include "alscriptstudio.h"
 #include "rlvactions.h"
 #include "rlvhandler.h"
 #include "rlvlocks.h"
@@ -757,66 +757,8 @@ bool LLTaskCategoryBridge::dragOrDrop(MASK mask, bool drop,
                                       std::string& tooltip_msg)
 {
     //LL_INFOS() << "LLTaskCategoryBridge::dragOrDrop()" << LL_ENDL;
-    bool accept = false;
     LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID());
-    if(object)
-    {
-        switch(cargo_type)
-        {
-        case DAD_CATEGORY:
-            accept = LLToolDragAndDrop::getInstance()->dadUpdateInventoryCategory(object,drop);
-            break;
-        case DAD_TEXTURE:
-        case DAD_SOUND:
-        case DAD_LANDMARK:
-        case DAD_OBJECT:
-        case DAD_NOTECARD:
-        case DAD_CLOTHING:
-        case DAD_BODYPART:
-        case DAD_ANIMATION:
-        case DAD_GESTURE:
-        case DAD_CALLINGCARD:
-        case DAD_MESH:
-        case DAD_SETTINGS:
-        case DAD_MATERIAL:
-            accept = LLToolDragAndDrop::isInventoryDropAcceptable(object, (LLViewerInventoryItem*)cargo_data);
-            if(accept && drop)
-            {
-                LLToolDragAndDrop::dropInventory(object,
-                                                 (LLViewerInventoryItem*)cargo_data,
-                                                 LLToolDragAndDrop::getInstance()->getSource(),
-                                                 LLToolDragAndDrop::getInstance()->getSourceID());
-            }
-            break;
-        case DAD_SCRIPT:
-            // *HACK: In order to resolve SL-22177, we need to block
-            // drags from notecards and objects onto other
-            // objects. uncomment the simpler version when we have
-            // that right.
-            //accept = LLToolDragAndDrop::isInventoryDropAcceptable(object, (LLViewerInventoryItem*)cargo_data);
-            if(LLToolDragAndDrop::isInventoryDropAcceptable(
-                   object, (LLViewerInventoryItem*)cargo_data)
-               && (LLToolDragAndDrop::SOURCE_WORLD != LLToolDragAndDrop::getInstance()->getSource())
-               && (LLToolDragAndDrop::SOURCE_NOTECARD != LLToolDragAndDrop::getInstance()->getSource()))
-            {
-                accept = true;
-            }
-            if(accept && drop)
-            {
-                LLViewerInventoryItem* item = (LLViewerInventoryItem*)cargo_data;
-                // rez in the script active by default, rez in
-                // inactive if the control key is being held down.
-                bool active = ((mask & MASK_CONTROL) == 0);
-                LLToolDragAndDrop::dropScript(object, item, active,
-                                              LLToolDragAndDrop::getInstance()->getSource(),
-                                              LLToolDragAndDrop::getInstance()->getSourceID());
-            }
-            break;
-        default:
-            break;
-        }
-    }
-    return accept;
+    return object && LLToolDragAndDrop::getInstance()->dropIntoContents(object, mask, drop, cargo_type, cargo_data);
 }
 
 ///----------------------------------------------------------------------------
@@ -1032,20 +974,8 @@ void LLTaskLSLBridge::openItem()
 // [/RLVa:KB]
     if (object->permModify() || gAgent.isGodlike())
     {
-        LLSD floater_key;
-        floater_key["taskid"] = mPanel->getTaskUUID();
-        floater_key["itemid"] = mUUID;
-
-        LLLiveLSLEditor* preview = LLFloaterReg::showTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key, TAKE_FOCUS_YES);
-        if (preview)
-        {
-            LLSelectNode *node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode(NULL, true);
-            if (node && node->mValid)
-            {
-                preview->setObjectName(node->mName);
-            }
-            preview->setObjectID(mPanel->getTaskUUID());
-        }
+        const LLInventoryItem* item = findItem();
+        ALScriptStudio::open(ALScriptRef(mPanel->getTaskUUID(), mUUID), item ? item->getName() : std::string());
     }
     else
     {
@@ -1056,7 +986,7 @@ void LLTaskLSLBridge::openItem()
 // virtual
 bool LLTaskLSLBridge::removeItem()
 {
-    LLFloaterReg::hideInstance("preview_scriptedit", LLSD(mUUID));
+    ALScriptStudio::itemRemoved(ALScriptRef(mPanel->getTaskUUID(), mUUID));
     return LLTaskInvFVBridge::removeItem();
 }
 
@@ -1492,6 +1422,7 @@ void LLPanelObjectInventory::clearContents()
 {
     mHaveInventory = false;
     mIsInventoryEmpty = true;
+    mInventoryFailed = false;
     if (LLToolDragAndDrop::getInstance() && LLToolDragAndDrop::getInstance()->getSource() == LLToolDragAndDrop::SOURCE_WORLD)
     {
         LLToolDragAndDrop::getInstance()->endDrag();
@@ -1612,6 +1543,10 @@ void LLPanelObjectInventory::updateInventory()
         }
 
         mHaveInventory = !mIsInventoryEmpty || !objectp->isInventoryDirty();
+        // No inventory because the request for it failed, which is not an
+        // object with nothing in it. Asked again when the object is chosen
+        // again, not on every refresh: a request that failed is apt to.
+        mInventoryFailed = !inventory_root && objectp->isInventoryRequestFailed();
         if (objectp->isInventoryDirty())
         {
             // Inventory is dirty, yet we received inventoryChanged() callback.
@@ -1858,7 +1793,11 @@ void LLPanelObjectInventory::draw()
     if (mIsInventoryEmpty)
     {
         std::string text;
-        if (!mHaveInventory && mTaskUUID.notNull())
+        if (mInventoryFailed)
+        {
+            text = LLTrans::getString("ContentsUnavailable");
+        }
+        else if (!mHaveInventory && mTaskUUID.notNull())
         {
             text = LLTrans::getString("LoadingContents");
         }

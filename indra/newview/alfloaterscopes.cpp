@@ -25,6 +25,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alfloaterscopes.h"
+#include "alsurface.h"
 
 #include "alcolorwheelmodel.h"
 #include "llcombobox.h"
@@ -373,7 +374,7 @@ void ALFloaterScopes::drawHistogram(const ALScopeData& data, EMode mode, const L
         }
     }
 
-    gl_rect_2d(plot, LLUIColorTable::instance().getColor("DefaultShadowLight").get(), false);
+    gl_rect_2d(plot, ALSurface::well().get(), false);
 }
 
 void ALFloaterScopes::drawWaveChannel(const ALScopeData& data, ALScopeData::EChannel channel,
@@ -489,7 +490,7 @@ void ALFloaterScopes::drawWaveform(const ALScopeData& data, EMode mode, const LL
         }
     }
 
-    gl_rect_2d(panel, LLUIColorTable::instance().getColor("DefaultShadowLight").get(), false);
+    gl_rect_2d(panel, ALSurface::well().get(), false);
 }
 
 void ALFloaterScopes::updateReadouts(const ALScopeData& data)
@@ -682,7 +683,7 @@ void ALFloaterScopes::drawVectorscope(const ALScopeData& data, const LLRect& pan
         }
     }
 
-    gl_rect_2d(panel, LLUIColorTable::instance().getColor("DefaultShadowLight").get(), false);
+    gl_rect_2d(panel, ALSurface::well().get(), false);
 }
 
 void ALFloaterScopes::drawScope(const ALScopeData& data, EMode mode, const LLRect& rect) const

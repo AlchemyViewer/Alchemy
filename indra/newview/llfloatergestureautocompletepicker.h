@@ -29,9 +29,11 @@
 
 class LLScrollListCtrl;
 
-class LLFloaterGestureAutocompletePicker : public LLFloater
+class LLFloaterGestureAutocompletePicker final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterGestureAutocompletePicker, LLFloater);
+
     LLFloaterGestureAutocompletePicker(const LLSD& key);
 
     bool postBuild() override;
@@ -41,7 +43,7 @@ public:
     void goneFromFront() override;
 
 private:
-    bool commitSelected();
+    bool commitSelected(bool return_key = false);
 
     LLScrollListCtrl* mGestureList;
 };

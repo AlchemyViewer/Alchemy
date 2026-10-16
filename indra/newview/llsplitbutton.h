@@ -36,10 +36,12 @@
 #ifndef LL_LLSPLITBUTTON_H
 #define LL_LLSPLITBUTTON_H
 
-class LLSplitButton
+class LLSplitButton final
     :   public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLSplitButton, LLUICtrl);
+
     typedef enum e_arrow_position
     {
         LEFT,
@@ -70,9 +72,9 @@ public:
     virtual ~LLSplitButton();
 
     //Overridden
-    virtual void    onFocusLost();
-    virtual void    setFocus(bool b);
-    virtual void    setEnabled(bool enabled);
+    virtual void    onFocusLost() override;
+    virtual void    setFocus(bool b) override;
+    virtual void    setEnabled(bool enabled) override;
 
     //Callbacks
     void    onArrowBtnDown();
@@ -80,7 +82,7 @@ public:
     void    onItemSelected(LLUICtrl* ctrl);
     void    setSelectionCallback(commit_callback_t cb) { mSelectionCallback = cb; }
 
-    virtual bool handleMouseUp(S32 x, S32 y, MASK mask);
+    virtual bool handleMouseUp(S32 x, S32 y, MASK mask) override;
 
     virtual void    showButtons();
     virtual void    hideButtons();

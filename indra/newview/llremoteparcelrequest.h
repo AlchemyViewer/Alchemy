@@ -36,6 +36,8 @@
 
 class LLMessageSystem;
 class LLRemoteParcelInfoObserver;
+class LLVector3;
+class LLVector3d;
 
 struct LLParcelData
 {
@@ -84,6 +86,9 @@ public:
     void sendParcelInfoRequest(const LLUUID& parcel_id);
 
     static void processParcelInfoReply(LLMessageSystem* msg, void**);
+    // Hands a parcel's information, however it arrived, to the observers
+    // waiting on that parcel and to the URL entries that name it.
+    void processParcelData(const LLParcelData& parcel_data);
 
     bool requestRegionParcelInfo(const std::string &url, const LLUUID &regionId,
         const LLVector3 &regionPos, const LLVector3d& globalPos, LLHandle<LLRemoteParcelInfoObserver> observerHandle);

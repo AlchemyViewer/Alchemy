@@ -28,6 +28,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llskinningutil.h"
+#include "alsimdkernels.h"
 #include "llvoavatar.h"
 #include "llviewercontrol.h"
 #include "llmeshrepository.h"
@@ -141,8 +142,6 @@ void LLSkinningUtil::initSkinningMatrixPalette(
         return;
     }
 
-    LLMatrix4a world[LL_CHARACTER_MAX_ANIMATED_JOINTS];
-
     for (S32 j = 0; j < count; ++j)
     {
         S32 joint_num = skin->mJointNums[j];
@@ -150,7 +149,8 @@ void LLSkinningUtil::initSkinningMatrixPalette(
 
         if (joint)
         {
-            world[j] = joint->getWorldMatrix4a();
+            // bind space to world, straight from the joint's own matrix
+            mat[j].setMulNoAlias(skin->mInvBindMatrix[j], joint->getWorldMatrix());
         }
         else
         {
@@ -169,17 +169,6 @@ void LLSkinningUtil::initSkinningMatrixPalette(
 #endif
             dump_avatar_and_skin_state("initSkinningMatrixPalette joint not found", avatar, skin);
         }
-    }
-
-    //NOTE: pointer striders used here as a micro-optimization over vector/array lookups
-    const LLMatrix4a* invBind = &(skin->mInvBindMatrix[0]);
-    const LLMatrix4a* w = world;
-    LLMatrix4a* m = mat;
-    LLMatrix4a* end = m + count;
-
-    while (m < end)
-    {
-        matMulUnsafe(*(invBind++), *(w++), *(m++));
     }
 }
 
@@ -229,56 +218,25 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
     LLMatrix4a& final_mat,
     U32 max_joints)
 {
-    bool valid_weights = true;
-    final_mat.clear();
-
-    S32 idx[4];
-
-    LLVector4 wght;
-
-    F32 scale = 0.f;
-    for (U32 k = 0; k < 4; k++)
+    if (handle_bad_scale)
     {
-        F32 w = weights[k];
-
-        // BENTO potential optimizations
-        // - Do clamping in unpackVolumeFaces() (once instead of every time)
-        // - int vs floor: if we know w is
-        // >= 0.0, we can use int instead of floorf; the latter
-        // allegedly has a lot of overhead due to ieeefp error
-        // checking which we should not need.
-        idx[k] = llclamp((S32) floorf(w), (S32)0, (S32)max_joints-1);
-
-        wght[k] = w - floorf(w);
-        scale += wght[k];
+        // unpackVolumeFaces() leaves no vertex with every weight zero, so
+        // this is the first joint alone, and a sign the data was not
+        // unpacked here
+        F32 scale = 0.f;
+        for (U32 k = 0; k < 4; k++)
+        {
+            scale += weights[k] - floorf(weights[k]);
+        }
+        if (scale <= 0.f)
+        {
+            llassert(false);
+            const S32 joint = llclamp((S32) floorf(weights[0]), (S32)0, (S32)max_joints-1);
+            final_mat = mat[joint];
+            return;
+        }
     }
-    if (handle_bad_scale && scale <= 0.f)
-    {
-        wght = LLVector4(1.0f, 0.0f, 0.0f, 0.0f);
-        valid_weights = false;
-    }
-    else
-    {
-        // This is enforced  in unpackVolumeFaces()
-        llassert(scale>0.f);
-        wght *= 1.f/scale;
-    }
-
-    for (U32 k = 0; k < 4; k++)
-    {
-        F32 w = wght[k];
-
-        LLMatrix4a src;
-        src.setMul(mat[idx[k]], w);
-
-        final_mat.add(src);
-    }
-    // SL-366 - with weight validation/cleanup code, it should no longer be
-    // possible to hit the bad scale case.
-    llassert(valid_weights);
-    // When building for Release, the above llassert() goes away. Ward off
-    // variable-set-but-unused error.
-    (void)valid_weights;
+    alsimd::skin_blend(weights, mat, max_joints, final_mat);
 }
 
 void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)

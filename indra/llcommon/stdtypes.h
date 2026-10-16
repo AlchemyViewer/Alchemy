@@ -31,6 +31,7 @@
 #include <climits>
 #include <limits>
 #include <type_traits>
+#include <utility>
 
 typedef signed char             S8;
 typedef unsigned char           U8;
@@ -134,13 +135,11 @@ public:
     constexpr
     operator TO() const
     {
-        // The reason we skip the
-        // assert(value >= std::numeric_limits<TO>::lowest());
-        // like the overload below is that to perform the above comparison,
-        // the compiler promotes the signed lowest() to the unsigned FROM
-        // type, making it hugely positive -- so a reasonable 'value' will
-        // always fail the assert().
-        assert(mValue <= std::numeric_limits<TO>::max());
+        // An unsigned value is never below a signed type's lowest(), so only
+        // the upper bound needs checking. std::cmp_less_equal compares across
+        // signedness by value, without the promotion that would otherwise
+        // turn a signed limit into a huge unsigned one.
+        assert(std::cmp_less_equal(mValue, std::numeric_limits<TO>::max()));
         return static_cast<TO>(mValue);
     }
 

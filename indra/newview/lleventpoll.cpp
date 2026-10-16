@@ -208,12 +208,12 @@ namespace Details
                     || status == LLCore::HttpStatus(HTTP_SERVICE_UNAVAILABLE)
                     || status == LLCore::HttpStatus(HTTP_GATEWAY_TIME_OUT))
                 {
-                    if (message_time.getElapsedSeconds() < MIN_SECONDS_PASSED)
+                    if (message_time.getElapsedTimeF64() < MIN_SECONDS_PASSED)
                     {
                         // Server is supposed to hold request for 20 to 30 seconds.
                         // If it didn't hold the request at least for 10s, treat as an error.
                         LL_WARNS("LLEventPollImpl") << "Response arrived too early, status: " << status.toTerseString()
-                            << ", time passed: " << message_time.getElapsedSeconds() << LL_ENDL;
+                            << ", time passed: " << message_time.getElapsedTimeF64() << LL_ENDL;
                     }
                     else
                     {

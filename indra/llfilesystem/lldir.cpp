@@ -98,14 +98,28 @@ std::vector<std::string> LLDir::getFilesInDir(const std::string &dirname)
     if (std::filesystem::is_directory(dir_path, ec))
     {
         std::filesystem::directory_iterator end_iter;
-        for (std::filesystem::directory_iterator dir_itr(dir_path);
-             dir_itr != end_iter;
-             ++dir_itr)
+        try
         {
-            if (std::filesystem::is_regular_file(dir_itr->status()))
+            for (std::filesystem::directory_iterator dir_itr(dir_path);
+                 dir_itr != end_iter;
+                 ++dir_itr)
             {
-                v.push_back(ll_convert<std::string>(dir_itr->path().filename().u8string()));
+                try
+                {
+                    if (std::filesystem::is_regular_file(dir_itr->status()))
+                    {
+                        v.push_back(ll_convert<std::string>(dir_itr->path().filename().u8string()));
+                    }
+                }
+                catch (const std::system_error& e)
+                {
+                    LL_WARNS() << "Exception accessing directory entry: " << e.what() << LL_ENDL;
+                }
             }
+        }
+        catch (const std::system_error& e)
+        {
+            LL_WARNS() << "Exception iterating directory: " << e.what() << LL_ENDL;
         }
     }
     return v;
@@ -385,6 +399,50 @@ const std::string &LLDir::getCAFile() const
     return mCAFile;
 }
 
+const std::vector<std::string> &LLDir::getInitNotes() const
+{
+    return mInitNotes;
+}
+
+std::string LLDir::relocateLegacyPath(const std::string& path) const
+{
+    if (mLegacyUserAppDir.empty() || fileExists(path))
+    {
+        return path;
+    }
+    std::string_view rest(path);
+    if (!LLStringUtil::startsWith(path, mLegacyUserAppDir))
+    {
+        return path;
+    }
+    rest.remove_prefix(mLegacyUserAppDir.size());
+    if (!rest.empty() && rest.front() != '/')
+    {
+        // a sibling that only shares the prefix, like ~/.alchemynext-old
+        return path;
+    }
+    rest.remove_prefix(std::min<size_t>(rest.size(), 1));
+
+    // The parts that moved out on their own, then everything else, which
+    // moved with the user app dir.
+    const std::string_view part(rest.substr(0, rest.find('/')));
+    std::string_view below(rest.substr(part.size()));
+    below.remove_prefix(std::min<size_t>(below.size(), 1));
+    if (part == "user_settings" && !mUserSettingsDir.empty())
+    {
+        return add(mUserSettingsDir, below);
+    }
+    if (part == "logs" && !mLogsDir.empty())
+    {
+        return add(mLogsDir, below);
+    }
+    if (part == "cache")
+    {
+        return add(getCacheDir(true), below);
+    }
+    return add(getOSUserAppDir(), rest);
+}
+
 const std::string &LLDir::getDirDelimiter() const
 {
     return mDirDelimiter;
@@ -498,7 +556,7 @@ std::string LLDir::getExpandedFilename(ELLPath location, std::string_view subdir
         break;
 
     case LL_PATH_USER_SETTINGS:
-        prefix = add(getOSUserAppDir(), "user_settings");
+        prefix = mUserSettingsDir.empty() ? add(getOSUserAppDir(), "user_settings") : mUserSettingsDir;
         break;
 
     case LL_PATH_PER_SL_ACCOUNT:
@@ -534,7 +592,7 @@ std::string LLDir::getExpandedFilename(ELLPath location, std::string_view subdir
         break;
 
     case LL_PATH_LOGS:
-        prefix = add(getOSUserAppDir(), "logs");
+        prefix = mLogsDir.empty() ? add(getOSUserAppDir(), "logs") : mLogsDir;
         break;
 
     case LL_PATH_TEMP:
@@ -1035,6 +1093,9 @@ void LLDir::dumpCurrentDirectories(LLError::ELevel level)
     LL_VLOGS(level, "AppInit", "Directories") << "  AppRODataDir:          " << getAppRODataDir() << LL_ENDL;
     LL_VLOGS(level, "AppInit", "Directories") << "  OSUserDir:             " << getOSUserDir() << LL_ENDL;
     LL_VLOGS(level, "AppInit", "Directories") << "  OSUserAppDir:          " << getOSUserAppDir() << LL_ENDL;
+    LL_VLOGS(level, "AppInit", "Directories") << "  UserSettingsDir:       " << getExpandedFilename(LL_PATH_USER_SETTINGS, "") << LL_ENDL;
+    LL_VLOGS(level, "AppInit", "Directories") << "  LogsDir:               " << getExpandedFilename(LL_PATH_LOGS, "") << LL_ENDL;
+    LL_VLOGS(level, "AppInit", "Directories") << "  CacheDir:              " << getCacheDir() << LL_ENDL;
     LL_VLOGS(level, "AppInit", "Directories") << "  LindenUserDir:         " << getLindenUserDir() << LL_ENDL;
     LL_VLOGS(level, "AppInit", "Directories") << "  TempDir:               " << getTempDir() << LL_ENDL;
     LL_VLOGS(level, "AppInit", "Directories") << "  CAFile:                " << getCAFile() << LL_ENDL;

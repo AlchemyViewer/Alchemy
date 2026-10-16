@@ -410,6 +410,10 @@ private:
     llssize         mStreamRead{ 0 };   // bytes of mBuffer that came from mInput
     bool            mCanSeek{ false };
     bool            mAtEOF{ false };
+    // Bytes the next refill asks the stream for. Starts small so a run of
+    // short documents in one stream does not pay a large read and rewind
+    // for each, and doubles while a document keeps needing more.
+    std::streamsize mBlock{ 4 * 1024 };
 
     // One entry per element still open, innermost last. The name offset lets an
     // end tag be matched without a second name lookup.
@@ -695,6 +699,7 @@ void LLSDXMLParser::Impl::reset()
     mStreamRead = 0;
     mCanSeek = false;
     mAtEOF = false;
+    mBlock = 4 * 1024;
 }
 
 
@@ -799,10 +804,12 @@ bool LLSDXMLParser::Impl::refill()
     {
         // Overshoot is fine: whatever the document does not consume is handed
         // back to the caller by rewindStream().
-        static const std::streamsize BLOCK = 64 * 1024;
+        constexpr std::streamsize MAX_BLOCK = 64 * 1024;
+        const std::streamsize block = mBlock;
+        mBlock = (mBlock < MAX_BLOCK) ? mBlock * 2 : MAX_BLOCK;
         const size_t old_size = mBuffer.size();
-        mBuffer.resize(old_size + (size_t)BLOCK);
-        mInput->read(&mBuffer[old_size], BLOCK);
+        mBuffer.resize(old_size + (size_t)block);
+        mInput->read(&mBuffer[old_size], block);
         const std::streamsize got = mInput->gcount();
         mBuffer.resize(old_size + (size_t)got);
         if (got <= 0)

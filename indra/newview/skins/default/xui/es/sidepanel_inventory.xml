@@ -22,21 +22,5 @@
 				</panel>
 			</layout_panel>
 		</layout_stack>
-		<panel name="button_panel">
-			<layout_stack name="button_panel_ls">
-				<layout_panel name="info_btn_lp">
-					<button label="Perfil" name="info_btn" tool_tip="Mostrar el perfil del objeto"/>
-				</layout_panel>
-				<layout_panel name="share_btn_lp">
-					<button label="Compartir" name="share_btn" tool_tip="Compartir un objeto del inventario"/>
-				</layout_panel>
-				<layout_panel name="shop_btn_lp">
-					<button label="Comprar" name="shop_btn" tool_tip="Abrir la página web del mercado"/>
-					<button label="Ponerme" name="wear_btn" tool_tip="Ponerme el vestuario seleccionado"/>
-					<button label="Jugar" name="play_btn"/>
-					<button label="Teleportarte" name="teleport_btn" tool_tip="Teleportar a la zona elegida"/>
-				</layout_panel>
-			</layout_stack>
-		</panel>
 	</panel>
 </panel>

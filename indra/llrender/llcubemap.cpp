@@ -138,8 +138,7 @@ void LLCubeMap::initRawData(const std::vector<LLPointer<LLImageRaw> >& rawimages
     // Yes, I know that this is inefficient! - djs 08/08/02
     for (int i = 0; i < 6; i++)
     {
-        LLImageDataSharedLock lockIn(rawimages[i]);
-        LLImageDataLock lockOut(mRawImages[i]);
+        LLImageDataCopyLock lock(rawimages[i], mRawImages[i]);
 
         const U8 *sd = rawimages[i]->getData();
         U8 *td = mRawImages[i]->getData();
@@ -241,7 +240,7 @@ void LLCubeMap::disableTexture(void)
     }
 }
 
-void LLCubeMap::setMatrix(S32 stage)
+void LLCubeMap::setMatrix(S32 stage, const LLMatrix4a& modelview_matrix)
 {
     mMatrixStage = stage;
 
@@ -250,9 +249,10 @@ void LLCubeMap::setMatrix(S32 stage)
     // No getTextureSlot(stage)->activate() here any more: it guarded a texture matrix stack
     // that MM_TEXTURE0 no longer selects through the active unit. See LLRender::eMatrixMode.
 
-    LLVector3 x(gGLModelView+0);
-    LLVector3 y(gGLModelView+4);
-    LLVector3 z(gGLModelView+8);
+    const F32* modelview = modelview_matrix.getF32ptr();
+    LLVector3 x(modelview+0);
+    LLVector3 y(modelview+4);
+    LLVector3 z(modelview+8);
 
     LLMatrix3 mat3;
     mat3.setRows(x,y,z);

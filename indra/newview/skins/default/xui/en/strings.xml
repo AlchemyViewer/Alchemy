@@ -320,6 +320,945 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="BUTTON_DOCK">Dock</string>
 	<string name="BUTTON_HELP">Show Help</string>
 
+	<!-- The popovers over a colour field and a font field, alcolorfield.cpp and alfontfield.cpp -->
+	<string name="ColorFieldFilter">Filter</string>
+	<string name="ColorFieldNames">Names</string>
+	<string name="ColorFieldCustom">Custom</string>
+	<string name="ImageFieldNoMatch">No picture by that name</string>
+	<string name="ImageFieldNoMatchHow">Clear the filter to see them all.</string>
+	<string name="ColorTableFilter">Find a color</string>
+	<string name="ColorTableOnlyChanged">Only colors I changed</string>
+	<string name="ColorTableGroupChanged">Changed by you</string>
+	<string name="ColorTableGroupAdded">Added by you</string>
+	<string name="ColorTableTipField">[NAME]</string>
+	<string name="ColorTableTipSource">Declared in [SOURCE].</string>
+	<string name="ColorTableTipUnwritten">The skin's color. Change it and it is yours.</string>
+	<string name="ColorTableTipRemove">Back to the skin's [NAME].</string>
+	<string name="ColorTableNothing">No colors</string>
+	<string name="ColorTableNothingHow">The skin declares none, or none of them carry your changes.</string>
+	<string name="ColorTableNoMatch">No color by that name</string>
+	<string name="ColorTableNoMatchHow">Clear the search to see them all.</string>
+	<string name="ColorTableRefersTo">Refers to [NAME]: the skin draws this as that color.</string>
+	<string name="ColorTableWas">The skin's: [VALUE]</string>
+	<string name="ColorTableUsers">Painted on [COUNT] shapes; the mark lists them.</string>
+	<string name="ColorTableUnused">Painted on no shape.</string>
+	<string name="FontFieldFilter">Filter fonts</string>
+	<string name="FontFieldSize">Size</string>
+	<string name="FontFieldBold">Bold</string>
+	<string name="FontFieldItalic">Italic</string>
+	<string name="FontFieldUnderline">Underline</string>
+	<string name="FontFieldOK">OK</string>
+	<string name="FontFieldCancel">Cancel</string>
+
+	<!-- A setting row's button back to its default, alsettingrow.cpp -->
+	<string name="SettingRowReset">Reset to [VALUE]</string>
+
+	<!-- XUI Studio's outline, beside a row's name -->
+	<string name="XUITreeHidden">hidden</string>
+	<string name="XUITreeHiddenHere">hidden here</string>
+	<string name="XUITreeDisabled">disabled</string>
+
+	<!-- What the code editor's hover card says of a string literal
+	     (alcodeeditor.cpp): its size, which is what the type alone never
+	     says. The bytes are of what the string holds, with each escape
+	     counted as what it stands for; the characters are said only
+	     where they are not the same number, and what it is written as
+	     only where the escapes make that longer. -->
+	<string name="CodeStringHead">string</string>
+	<string name="CodeFixLink">Fix: [TITLE]</string>
+	<string name="CodeFixNone">Nothing to fix or refactor here</string>
+	<string name="CodeInlayWrite">Ctrl-double-click to insert '[TEXT]'</string>
+	<string name="CodeInlayWriteMac">Command-double-click to insert '[TEXT]'</string>
+	<string name="CodeDeprecated">(deprecated)</string>
+	<string name="CodeStringBytesA">[COUNT] byte</string>
+	<string name="CodeStringBytesB">[COUNT] bytes</string>
+	<string name="CodeStringCharactersA">[COUNT] character</string>
+	<string name="CodeStringCharactersB">[COUNT] characters</string>
+	<string name="CodeStringWritten">[COUNT] in source</string>
+
+	<!-- The find bar over an editor's top right corner (alfindbar.cpp):
+	     its tips, its fields' labels and what its count says. -->
+	<string name="FindBarReplaceToo">Toggle replace</string>
+	<string name="FindBarFind">Find</string>
+	<string name="FindBarCase">Match case</string>
+	<string name="FindBarWord">Match whole words</string>
+	<string name="FindBarPattern">Match a regular expression</string>
+	<string name="FindBarPrevious">Previous match (shift-return)</string>
+	<string name="FindBarNext">Next match (return)</string>
+	<string name="FindBarInSelection">Find in selection</string>
+	<string name="FindBarClose">Close (escape)</string>
+	<string name="FindBarReplace">Replace</string>
+	<string name="FindBarKeepCase">Keep each match's case: HELLO, Hello or hello</string>
+	<string name="FindBarReplaceOne">Replace this match and find the next</string>
+	<string name="FindBarReplaceAll">Replace all matches as one undo step</string>
+	<string name="FindBarBadPattern">Invalid regular expression</string>
+	<string name="FindBarNone">No results</string>
+	<string name="FindBarOf">[CURRENT] of [TOTAL]</string>
+	<string name="ScriptWordSleep">The script sleeps [SECONDS] s after this</string>
+	<string name="ScriptWordGodMode">Requires god mode</string>
+	<string name="FindBarWrappedToTop">Reached the end; continued from the top</string>
+	<string name="FindBarWrappedToBottom">Reached the start; continued from the bottom</string>
+
+	<!-- The bar over a comparison (aldiffbar.cpp): which change the caret
+	     is in, the steps through them, and the ways of showing them. -->
+	<string name="DiffBarPrevious">Previous change</string>
+	<string name="DiffBarNext">Next change</string>
+	<string name="DiffBarFold">Fold away what is the same</string>
+	<string name="DiffBarIgnore">What to ignore</string>
+	<string name="DiffBarCopy">Copy this change, or the whole comparison as a unified diff</string>
+	<!-- A peek at a change from the code editor (alchangepeek.cpp): its bar. -->
+	<string name="PeekChanged">Changed since saved · [CURRENT] of [TOTAL]</string>
+	<string name="PeekAdded">Added since saved · [CURRENT] of [TOTAL]</string>
+	<string name="PeekRemoved">Taken out since saved · [CURRENT] of [TOTAL]</string>
+	<string name="PeekTakeBack">Take this change back</string>
+	<string name="PeekPrevious">Previous change</string>
+	<string name="PeekNext">Next change</string>
+	<string name="CodePeekChange">Peek at this change</string>
+	<string name="PeekClose">Close</string>
+	<string name="DiffBarInline">Show the changes inline, in one text</string>
+	<!-- The same button while the changes are inline: back to two sides. -->
+	<string name="DiffBarSideBySide">Show side by side</string>
+	<string name="DiffBarSwap">Swap the sides</string>
+	<string name="DiffBarDone">Back to the text</string>
+	<string name="DiffBarTakeBack">Take this change back</string>
+	<string name="DiffBarOf">Change [CURRENT] of [TOTAL]</string>
+	<string name="DiffBarChangesA">[COUNT] change</string>
+	<string name="DiffBarChangesB">[COUNT] changes</string>
+	<string name="DiffBarNone">No changes</string>
+	<!-- After the count, where a comparison by structure compared a change by lines. -->
+	<string name="DiffBarByLines">· by lines</string>
+	<!-- The count's tooltip while it says so: why. -->
+	<string name="DiffBarByLinesTip">A change too large to compare by structure was compared by lines</string>
+	<!-- After the count, while a merge is settled: the conflicts left. -->
+	<string name="DiffBarConflictsA">· [COUNT] conflict left</string>
+	<string name="DiffBarConflictsB">· [COUNT] conflicts left</string>
+	<string name="DiffBarConflictsNone">· no conflicts left</string>
+	<!-- Settling the conflict the caret is in, in a merge. -->
+	<string name="DiffBarTheirs">Theirs</string>
+	<string name="DiffBarTheirsTip">Settle this conflict with the other side's lines</string>
+	<string name="DiffBarMine">Mine</string>
+	<string name="DiffBarMineTip">Settle this conflict keeping your lines</string>
+	<string name="DiffBarBoth">Both</string>
+	<string name="DiffBarBothTip">Settle this conflict with your lines, then the other side's</string>
+	<!-- Stepping the left through its versions: a script's saves. -->
+	<string name="DiffBarOlder">An older version on the left</string>
+	<string name="DiffBarNewer">A newer version on the left</string>
+	<string name="DiffBarVersions">Which version is on the left, oldest to newest</string>
+	<!-- A comparison's row standing for lines the same folded away. -->
+	<string name="DiffFoldedLinesA">⋯ 1 line the same ⋯</string>
+	<string name="DiffFoldedLinesB">⋯ [COUNT] lines the same ⋯</string>
+
+	<!-- The row of tabs over an editor (altabstrip.cpp): the button that
+	     lists them all once they run past it. -->
+	<!-- Script Studio's editor colors, as the preferences list them (ALScriptTheme::labelOf). -->
+	<string name="ScriptColorLabel_ScriptText">Text</string>
+	<string name="ScriptColorLabel_ScriptBackground">Background</string>
+	<string name="ScriptColorLabel_ScriptBgReadOnlyColor">Background, read-only</string>
+	<string name="ScriptColorLabel_ScriptCursorColor">Caret</string>
+	<string name="ScriptColorLabel_ScriptSelectionColor">Selection</string>
+	<string name="ScriptColorLabel_ScriptSelectionInactiveColor">Selection, unfocused</string>
+	<string name="ScriptColorLabel_ScriptCurrentLineColor">Current line</string>
+	<string name="ScriptColorLabel_ScriptGutterColor">Gutter</string>
+	<string name="ScriptColorLabel_ScriptLineNumberColor">Line numbers</string>
+	<string name="ScriptColorLabel_ScriptActiveLineNumberColor">Caret's line number</string>
+	<string name="ScriptColorLabel_ScriptBracketMatchColor">Matching bracket</string>
+	<string name="ScriptColorLabel_ScriptFindMatchColor">Find match</string>
+	<string name="ScriptColorLabel_ScriptFoldColor">Fold marks</string>
+	<string name="ScriptColorLabel_ScriptIndentGuideColor">Indent guides</string>
+	<string name="ScriptColorLabel_ScriptWhitespaceColor">Whitespace</string>
+	<string name="ScriptColorLabel_ScriptHighlightColor">Highlighted references</string>
+	<string name="ScriptColorLabel_ScriptChangedColor">Changed lines</string>
+	<string name="ScriptColorLabel_ScriptStickyHeaderColor">Sticky headers</string>
+	<string name="ScriptColorLabel_ScriptInlayHintColor">Parameter name hints</string>
+	<string name="ScriptColorLabel_ScriptInlayHintBgColor">Parameter name hints, background</string>
+	<string name="ScriptColorLabel_ScriptHeatColor">Memory heat</string>
+	<string name="ScriptColorLabel_ScriptErrorColor">Errors</string>
+	<string name="ScriptColorLabel_ScriptWarningColor">Warnings</string>
+	<string name="ScriptColorLabel_ScriptNoteColor">Notes</string>
+	<string name="ScriptColorLabel_ScriptRuntimeErrorColor">Run-time errors</string>
+	<string name="ScriptColorLabel_ScriptWidgetColor">Pop-ups</string>
+	<string name="ScriptColorLabel_ScriptWidgetBorderColor">Pop-ups, border</string>
+	<string name="ScriptColorLabel_ScriptWidgetSelectionColor">Pop-ups, chosen row</string>
+	<string name="ScriptColorLabel_ScriptBracket1Color">Rainbow brackets, level 1</string>
+	<string name="ScriptColorLabel_ScriptBracket2Color">Rainbow brackets, level 2</string>
+	<string name="ScriptColorLabel_ScriptBracket3Color">Rainbow brackets, level 3</string>
+	<string name="ScriptColorLabel_ScriptComment">Comment</string>
+	<string name="ScriptColorLabel_ScriptDocComment">Doc comment</string>
+	<string name="ScriptColorLabel_ScriptString">String</string>
+	<string name="ScriptColorLabel_ScriptEscape">Escape</string>
+	<string name="ScriptColorLabel_ScriptNumber">Number</string>
+	<string name="ScriptColorLabel_ScriptKeyword">Keyword</string>
+	<string name="ScriptColorLabel_ScriptControl">Control</string>
+	<string name="ScriptColorLabel_ScriptType">Type</string>
+	<string name="ScriptColorLabel_ScriptConstant">Constant</string>
+	<string name="ScriptColorLabel_ScriptFunction">Function</string>
+	<string name="ScriptColorLabel_ScriptEvent">Event</string>
+	<string name="ScriptColorLabel_ScriptLabel">Label</string>
+	<string name="ScriptColorLabel_ScriptOperator">Operator</string>
+	<string name="ScriptColorLabel_ScriptPunctuation">Punctuation</string>
+	<string name="ScriptColorLabel_ScriptPreprocessor">Preprocessor</string>
+	<string name="ScriptColorLabel_ScriptTag">Tag</string>
+	<string name="ScriptColorLabel_ScriptAttribute">Attribute</string>
+	<string name="ScriptColorLabel_ScriptAttributeValue">Attribute value</string>
+	<string name="ScriptColorLabel_ScriptEntity">Entity</string>
+	<string name="ScriptColorLabel_ScriptVariable">Variable</string>
+	<string name="ScriptColorLabel_ScriptParameter">Parameter</string>
+	<string name="ScriptColorLabel_ScriptProperty">Property</string>
+	<string name="ScriptColorLabel_ScriptDeprecated">Deprecated</string>
+	<string name="ScriptColorLabel_ScriptInvalid">Invalid</string>
+	<string name="ScriptColorLabel_ScriptNamespace">Namespace</string>
+	<string name="ScriptColorLabel_ScriptState">State</string>
+	<string name="ScriptColorLabel_ScriptGlobalVariable">Global variable</string>
+	<string name="ScriptColorLabel_ScriptPath">Path</string>
+	<!-- A command's keys in a tip, and a tip with them after it. -->
+	<string name="KeysInTip">([KEYS])</string>
+	<string name="TipWithKeys">[TIP] ([KEYS])</string>
+	<string name="TabStripList">All tabs</string>
+	<string name="QuickOpenNone">Nothing matches</string>
+
+	<!-- The vim keymap's words, in the band under the editor's text
+	     (alvimkeymap.cpp): the modes, the questions, and what a command
+	     says of what it did or could not do. The E-numbers are vim's own,
+	     which people search for; keep them. -->
+	<string name="VimRecording">recording @[REGISTER]</string>
+	<string name="VimModeInsert">-- INSERT --</string>
+	<string name="VimModeReplace">-- REPLACE --</string>
+	<string name="VimModeVisual">-- VISUAL --</string>
+	<string name="VimModeVisualLine">-- VISUAL LINE --</string>
+	<string name="VimModeVisualBlock">-- VISUAL BLOCK --</string>
+	<string name="VimConfirmReplace">replace with [WITH] (y/n/a/q/l)?</string>
+	<string name="VimConfirmReplaceLines">replace with [WITH] (over [COUNT] lines) (y/n/a/q/l)?</string>
+	<string name="VimTooRecursive">E169: Command too recursive</string>
+	<string name="VimNoPreviousCommand">E30: No previous command line</string>
+	<string name="VimNoInsertedText">E29: No inserted text yet</string>
+	<string name="VimNoPreviousPattern">E35: No previous regular expression</string>
+	<string name="VimNoPreviousSubstitute">E33: No previous substitute regular expression</string>
+	<string name="VimNoFileName">E32: No file name</string>
+	<string name="VimNoAlternate">E23: No alternate file</string>
+	<string name="VimMarkNotSet">E20: Mark not set</string>
+	<string name="CodeFixSpelling">Change to "[WORD]"</string>
+	<string name="CodeFixAddWord">Add "[WORD]" to the dictionary</string>
+	<string name="VimOneCommand">-- (insert) --</string>
+	<string name="VimBadOffset">E486: Pattern not found: [PATTERN]</string>
+	<string name="VimBadMark">E191: Argument must be a letter or forward/backward quote</string>
+	<string name="VimNoChanges">E664: Changelist is empty</string>
+	<string name="VimChangesStart">E662: At start of changelist</string>
+	<string name="VimChangesEnd">E663: At end of changelist</string>
+	<string name="VimNoFileUnderCursor">E446: No file name under cursor</string>
+	<string name="VimNoSpellCheck">E756: Spell checking is not enabled</string>
+	<string name="VimNoMisspelling">No misspelled words</string>
+	<string name="VimMisspellingCut">Still checking the spelling: search again to go on</string>
+	<string name="VimNoSuggestions">Sorry, no suggestions</string>
+	<string name="VimNotAddable">E764: Cannot add this word</string>
+	<string name="VimNothingInRegister">E353: Nothing in register [REGISTER]</string>
+	<string name="VimCountTooLarge">Too large a count: it would put in [SIZE,number,1] MB</string>
+	<string name="VimBadPattern">E486: [ERROR]</string>
+	<string name="VimPatternNotFound">E486: Pattern not found: [PATTERN]</string>
+	<string name="VimUnknownOption">E518: Unknown option: [OPTION]</string>
+	<string name="VimBadOptionValue">E474: Invalid argument: [OPTION]</string>
+	<string name="VimGlobalRecursive">E147: Cannot do :global recursive</string>
+	<string name="VimNotACommand">E492: Not an editor command: [LINE]</string>
+	<string name="VimInvalidAddress">E14: Invalid address</string>
+	<string name="VimMoveIntoItself">E134: Cannot move a range of lines into itself</string>
+	<string name="VimTrailingCharacters">E488: Trailing characters: [TEXT]</string>
+	<string name="VimPositiveCount">E939: Positive count required</string>
+	<!-- The counted ones take a form by the count as LLTrans's
+	     getCountString picks it: A for one, B for the rest in English;
+	     a language that counts a third way adds a C (Russian: 2-4). -->
+	<string name="VimLinesYankedA">1 line yanked</string>
+	<string name="VimLinesYankedB">[COUNT] lines yanked</string>
+	<string name="VimLinesYankedIntoA">1 line yanked into "[REGISTER]</string>
+	<string name="VimLinesYankedIntoB">[COUNT] lines yanked into "[REGISTER]</string>
+	<string name="VimBlockYankedA">block of 1 line yanked</string>
+	<string name="VimBlockYankedB">block of [COUNT] lines yanked</string>
+	<string name="VimBlockYankedIntoA">block of 1 line yanked into "[REGISTER]</string>
+	<string name="VimBlockYankedIntoB">block of [COUNT] lines yanked into "[REGISTER]</string>
+	<string name="VimFewerLinesA">1 fewer line</string>
+	<string name="VimFewerLinesB">[COUNT] fewer lines</string>
+	<string name="VimMoreLinesA">1 more line</string>
+	<string name="VimMoreLinesB">[COUNT] more lines</string>
+	<string name="VimLinesShiftedRightA">1 line >ed 1 time</string>
+	<string name="VimLinesShiftedRightB">[COUNT] lines >ed 1 time</string>
+	<string name="VimLinesShiftedLeftA">1 line &lt;ed 1 time</string>
+	<string name="VimLinesShiftedLeftB">[COUNT] lines &lt;ed 1 time</string>
+	<string name="VimLinesChangedA">1 line changed</string>
+	<string name="VimLinesChangedB">[COUNT] lines changed</string>
+	<string name="VimLinesIndentedA">1 line indented</string>
+	<string name="VimLinesIndentedB">[COUNT] lines indented</string>
+	<string name="VimLinesMovedA">1 line moved</string>
+	<string name="VimLinesMovedB">[COUNT] lines moved</string>
+	<string name="VimOnLinesA">on 1 line</string>
+	<string name="VimOnLinesB">on [COUNT] lines</string>
+	<string name="VimSubstitutionsA">1 substitution [ON_LINES]</string>
+	<string name="VimSubstitutionsB">[COUNT] substitutions [ON_LINES]</string>
+	<string name="VimMatchesA">1 match [ON_LINES]</string>
+	<string name="VimMatchesB">[COUNT] matches [ON_LINES]</string>
+	<string name="VimLinesPickedA">1 line</string>
+	<string name="VimLinesPickedB">[COUNT] lines</string>
+	<string name="VimInvalidArgument">E474: Invalid argument</string>
+	<string name="VimMapExpr">E474: &lt;expr&gt; mappings are not supported</string>
+	<string name="VimNoSuchMapping">E31: No such mapping</string>
+	<string name="VimNoMappingFound">No mapping found</string>
+	<string name="VimMappingExists">E227: Mapping already exists for [KEYS]</string>
+	<string name="VimRecursiveMapping">E223: Recursive mapping</string>
+	<string name="VimBadExpression">E15: Invalid expression: [VALUE]</string>
+	<string name="VimLetOnly">Only mapleader and maplocalleader are set with :let</string>
+	<string name="VimrcLine">line [NUMBER]: [ERROR]</string>
+	<string name="VimrcTooLarge">The vimrc is too large to read.</string>
+	<string name="VimrcNotNotecard">The vimrc item is not a readable notecard.</string>
+	<string name="SnippetsFollowedNotNotecard">The followed snippets item is not a readable notecard.</string>
+	<string name="SnippetsFollowedNotSnippets">The followed notecard holds no snippets Script Studio can read.</string>
+
+	<!-- Script Studio's own words about a script, from the alscript
+	     library: each problem carries a key and the words it is about,
+	     and the studio puts them into the string for the key, so that a
+	     language may say them its own way. Keep the [1], [2]... marks. -->
+	<!-- The preprocessor's own problems (alpreprocessor.cpp); [1], [2] are the names and words the problem is about -->
+	<string name="PreprocBadCase">cannot find ':' or '{' after case</string>
+	<string name="PreprocBadDirective">ill formed preprocessor directive '#[1]'</string>
+	<string name="PreprocBadInclude">ill formed #include directive</string>
+	<string name="PreprocBadParameters">ill formed parameter list of macro '[1]'</string>
+	<string name="PreprocBadSwitch">ill formed switch statement</string>
+	<string name="PreprocSwitchValueRepeated">the switch's value is worked out again for each case: put it in a local first</string>
+	<string name="PreprocDefineNeedsName">macro name missing in #define</string>
+	<string name="PreprocDefinedNeedsClose">missing ')' after 'defined'</string>
+	<string name="PreprocDefinedNeedsName">macro name missing after 'defined'</string>
+	<string name="PreprocDefinedNotAName">'defined' cannot be used as a macro name</string>
+	<string name="PreprocDirectiveNeedsName">macro name missing in #[1]</string>
+	<string name="PreprocDivisionByZero">division by zero in preprocessor expression</string>
+	<string name="PreprocDuplicateParameter">duplicate macro parameter '[1]'</string>
+	<string name="PreprocElifAfterElse">#elif after #else</string>
+	<string name="PreprocElifWithoutIf">#elif without #if</string>
+	<string name="PreprocElseAfterElse">#else after #else</string>
+	<string name="PreprocElseWithoutIf">#else without #if</string>
+	<string name="PreprocEndifWithoutIf">#endif without #if</string>
+	<string name="PreprocExpectedClose">expected ')' in preprocessor expression</string>
+	<string name="PreprocExpectedColon">expected ':' in preprocessor expression</string>
+	<string name="PreprocExpectedValue">expected a value in preprocessor expression</string>
+	<string name="PreprocIfNeedsExpression">#if with no expression</string>
+	<string name="PreprocIfWithoutEndif">#if without #endif at the end of the file</string>
+	<string name="PreprocBackslashSpace">backslash and newline separated by space</string>
+	<string name="PreprocIntegerTooLarge">integer constant '[1]' is too large for its type</string>
+	<string name="PreprocBadCharacter">'[1]' is not a character constant</string>
+	<string name="PreprocVaArgsNotAName">'__VA_ARGS__' cannot be used as a macro name</string>
+	<string name="PreprocVaArgsNotAParameter">'__VA_ARGS__' cannot be a macro parameter</string>
+	<string name="PreprocVaArgsOutside">__VA_ARGS__ can only appear in the expansion of a variadic macro</string>
+	<string name="PreprocExtraTokens">extra tokens at end of #[1] directive</string>
+	<string name="PreprocPragmaNeedsString">_Pragma takes a string literal in parentheses</string>
+	<string name="PreprocBadLine">#line takes a line number from 1 to 2147483647, and may take a file name in quotes after it</string>
+	<string name="PreprocTooMuch">the macros expand to more than this preprocessor will make; nothing was preprocessed</string>
+	<string name="PreprocExpressionTooDeep">the expression nests too deeply for this preprocessor</string>
+	<string name="PreprocMacrosTooDeep">macros are invoked inside each other's arguments more deeply than this preprocessor follows; nothing was preprocessed</string>
+	<string name="PreprocTokenTooLong">the macros make a token longer than a script may be; nothing was preprocessed</string>
+	<string name="PreprocFailed">the preprocessor could not finish ([1]); nothing was preprocessed</string>
+	<string name="PreprocIncludeInWorld">could not find include file '[1]': one so named is in the object or the inventory, but includes from there are off. Includes come from folders on disk: turn on Build &gt; Include from Disk, and add the folder with Build &gt; Add Include Folder...</string>
+	<string name="PreprocIncludeNotOnDisk">could not find include file '[1]': the disk was not looked in. Includes come from folders on disk: turn on Build &gt; Include from Disk, and add the folder with Build &gt; Add Include Folder...</string>
+	<string name="PreprocModuleNotOnDisk">could not find module '[1]': the disk was not looked in. Modules come from folders on disk: turn on Build &gt; Include from Disk, and add the folder with Build &gt; Add Include Folder...</string>
+	<string name="PreprocModuleInWorld">could not find module '[1]': one so named is in the object or the inventory, but modules from there are off. Modules come from folders on disk: turn on Build &gt; Include from Disk, and add the folder with Build &gt; Add Include Folder...</string>
+	<string name="PreprocIncludeNotFetched">include file '[1]' could not be fetched, and the script is not sent without it</string>
+	<string name="CompileQueueSkippedSaving">Skipped "[SCRIPT_NAME]": a save of it is on its way, which a recompile would land over.</string>
+	<string name="CompileQueueUnsavedInStudio">Script Studio has unsaved changes to "[SCRIPT_NAME]"; the recompile uses the version saved on the server, without them.</string>
+	<string name="ScriptMasterGone">its file is no longer there</string>
+	<string name="ScriptMasterUnreadable">its file could not be read</string>
+	<string name="ScriptMasterOutOfReach">its object is out of reach</string>
+	<string name="ScriptMasterNoContents">the region did not say in time what its object holds</string>
+	<string name="ScriptMasterRlvHeld">RLVa keeps what its object holds from being seen or changed</string>
+	<string name="ScriptMasterItemGone">it is gone from where it was</string>
+	<string name="ScriptMasterNotSLua">its file is SLua, and the script is no longer</string>
+	<string name="ScriptMasterNotLSL">its file is LSL, and the script is no longer</string>
+	<string name="ScriptMasterNotNotecard">it is no longer a notecard</string>
+	<string name="ScriptMasterNotScript">it is no longer a script</string>
+	<string name="ScriptMasterNotecardCarries">it carries items in the world, which a file cannot hold</string>
+	<string name="ScriptMasterExpandFailed">the preprocessor found errors in it, listed among its file's problems</string>
+	<string name="ScriptMasterWorldUnread">what it holds in-world could not be read, to keep it in History first</string>
+	<string name="ScriptMasterToastFailed">[FILE] was not sent to [NAME]: [WHY].</string>
+	<string name="ScriptMasterToastNotCompiled">[NAME] went up from [FILE], and did not compile.</string>
+	<string name="ScriptMasterToastHeld">[NAME] was changed in-world since [FILE] was last sent to it, so it was not sent.</string>
+	<string name="ScriptMasterToastDiffering">[NAME] was changed in-world: it no longer holds [FILE].</string>
+	<string name="ScriptMasterToastSuspended">[NAME]'s link to [FILE] is held: [WHY].</string>
+	<string name="ScriptMasterToastOrphaned">[NAME] is gone from where it was; its link to [FILE] is kept a while, should it come back.</string>
+	<string name="ScriptMasterToastPending">[FILE] was not sent to [NAME]: [WHY].</string>
+	<string name="ScriptMasterToastMore">And [COUNT] more.</string>
+	<string name="ScriptMasterToastOpen">Script Studio's Output has them.</string>
+	<string name="ScriptMasterFilesA">[FILE]</string>
+	<string name="ScriptMasterFilesTwo">[FILE] and one other file</string>
+	<string name="ScriptMasterFilesB">[FILE] and [COUNT] other files</string>
+	<string name="ScriptMasterPlacesA">all in one place</string>
+	<string name="ScriptMasterPlacesB">across [COUNT] places</string>
+	<string name="ScriptMasterNotSentA">One script that includes [FILES] was not sent; Send from Files sends it.</string>
+	<string name="ScriptMasterNotSentB">[COUNT] scripts that include [FILES] were not sent; Send from Files sends them.</string>
+	<string name="BridgeNotSaved">Not saved: [REASON]</string>
+	<string name="BridgeSentCompiledAsIs">The compiled half was changed and its source was not, so it went up as it is rather than as its source expands.</string>
+	<string name="PreprocIncludeSentWithout">include file '[1]' could not be fetched, and the script went up without it</string>
+	<string name="PreprocObjectUnanswered">the object this script is in did not say what it holds -- it did not answer in time, or is out of view -- so no include was looked for in it; save again once it answers</string>
+	<string name="PreprocNestsTooDeep">blocks nest more deeply than this preprocessor follows; nothing was preprocessed</string>
+	<string name="PreprocIncludeNeedsClose">missing '&gt;' in #include</string>
+	<string name="PreprocIncludeNotFound">could not find include file '[1]'</string>
+	<string name="PreprocIncludeTooDeep">#include nested too deeply at '[1]'</string>
+	<string name="PreprocMacroRedefined">macro '[1]' redefined</string>
+	<string name="PreprocModuleNotFound">could not find module '[1]'</string>
+	<string name="PreprocModuleBesideInit">'[1]' is both [2] and the folder's init [3]; the file is taken</string>
+	<string name="PreprocRequireUnread">'[1]' is never read, but [2] still goes with the script, since a require runs it: about [3] bytes of bytecode</string>
+	<string name="PreprocModuleNotFoundWhy">could not find module '[1]': [2]</string>
+	<string name="PreprocRequireNoChildAmbiguous">could not find module '[1]': '[2]' is ambiguous there</string>
+	<string name="PreprocRequireNoChild">could not find module '[1]': there is no '[2]'</string>
+	<string name="PreprocRequireNotAlias">could not find module '[1]': no .luaurc, and no SLua alias of Script Studio's, names @[2]</string>
+	<string name="PreprocRequireAliasCycle">could not find module '[1]': its aliases name each other in a circle ([2])</string>
+	<string name="PreprocRequireConfigAmbiguous">could not find module '[1]': a folder on the way to @[2] has both a .luaurc and a .config.luau, which Luau reads as neither</string>
+	<string name="PreprocRequireAliasUnresolved">could not find module '[1]': the alias "[2]" could not be read</string>
+	<string name="PreprocRequireNoParentOf">could not find module '[1]': there is no folder above '[2]'</string>
+	<string name="PreprocRequireNoParent">could not find module '[1]': there is no folder above this script</string>
+	<string name="PreprocRequireBadPrefix">could not find module '[1]': a require path starts with ./, ../ or @</string>
+	<string name="PreprocRequireReserved">could not find module '[1]': the alias @[2] is reserved, as every alias starting @sl- is Second Life's</string>
+	<string name="PreprocRequireClimbs">could not find module '[1]': a require through an alias may not climb out of its folder, as '[2]' does</string>
+	<string name="PreprocRequireAliasTarget">could not find module '[1]': its alias stands for '[2]', which is not there</string>
+	<string name="PreprocRequireNoModule">could not find module '[1]': there is no module at '[2]'</string>
+	<string name="PreprocRequireAliasNamesDisk">could not find module '[1]': its alias stands for '[2]', a path on disk, which a .luaurc in the world may not name</string>
+	<string name="PreprocRequireNotAdmitted">could not find module '[1]': '[2]' is there, but no include folder or alias lets a require read it. Add its folder with Build &gt; Add Include Folder...</string>
+	<string name="PreprocRequireAliasRefused">could not find module '[1]': the configuration in '[2]' names '[3]', which is outside its folder and outside the include folders</string>
+	<string name="PreprocRequireConfigBroken">could not find module '[1]': the configuration '[2]' on the way could not be read: [3]</string>
+	<string name="PreprocModuleSearched">could not find module '[1]': a require no longer searches the include folders, where it found [2]</string>
+	<string name="PreprocNoVariableBefore">no variable before '[1]'</string>
+	<string name="PreprocNotAnInteger">'[1]' is not an integer constant</string>
+	<string name="PreprocOutsideLoop">[1] outside a loop</string>
+	<string name="PreprocPasteAtEnd">'##' cannot be at either end of a macro body</string>
+	<string name="PreprocPastingInvalid">pasting '[1]' and '[2]' does not give a valid token</string>
+	<string name="PreprocRequireTooDeep">require nested too deeply at '[1]'</string>
+	<string name="PreprocRequiresItself">'[1]' requires itself</string>
+	<string name="PreprocReservedWordAsName">'[1]' is a name here, which break and continue reserve</string>
+	<string name="PreprocStringizeNeedsParameter">'#' is not followed by a macro parameter</string>
+	<string name="PreprocTooFewArguments">too few arguments for macro '[1]'</string>
+	<string name="PreprocTooManyArguments">too many arguments for macro '[1]'</string>
+	<string name="PreprocUndefNeedsName">macro name missing in #undef</string>
+	<string name="PreprocUnexpectedInExpression">unexpected '[1]' in preprocessor expression</string>
+	<string name="PreprocUnterminatedArguments">unterminated argument list invoking macro '[1]'</string>
+
+	<!-- What const promises, held to (allslconsts.cpp); [1], [2] are the names -->
+	<string name="ConstAssigned">[1] is const: its value is set where it is declared, and nowhere else</string>
+	<string name="ConstWithoutValue">the const [1] needs a value where it is declared</string>
+	<string name="ConstNotKnown">the value of the const [1] cannot be worked out before the script runs</string>
+	<string name="ConstFunctionSets">the const function [1] sets [2]: what it gives back must come of its arguments alone</string>
+	<string name="ConstFunctionReads">the const function [1] reads [2], which the script changes</string>
+	<string name="ConstFunctionCalls">the const function [1] calls [2], which does more than work out a value</string>
+	<string name="ConstFunctionChangesState">the const function [1] changes state</string>
+
+	<!-- The optimizer's notes on what it did (allsloptimizer.cpp) -->
+	<string name="OptimizerDoRunsOnce">a do loop whose condition is always false runs once; kept its body</string>
+	<string name="OptimizerDroppedCast">dropped the cast in [1]</string>
+	<string name="OptimizerEvaluated">evaluated [1] to [2]</string>
+	<string name="OptimizerDroppedDefault">left out [1]'s initializer, which is its default</string>
+	<string name="OptimizerFolded">folded [1] to [2]</string>
+	<string name="OptimizerSizes">optimized from [1] to [2] bytes of source; script memory is the simulator's to say</string>
+	<string name="OptimizerSizesWeighed">optimized from [1] to [2] bytes of source, and from [3] to [4] bytes of code on [5]</string>
+	<string name="OptimizerStoppedEarly">stopped after [1] rounds: there may be more to do</string>
+	<string name="InlinerStoppedEarly">stopped putting functions in place part way: there may be more to put in place</string>
+	<string name="OptimizerIfAlwaysFalse">the condition of this if is always false; kept only what runs</string>
+	<string name="OptimizerIfAlwaysTrue">the condition of this if is always true; kept only what runs</string>
+	<string name="OptimizerInlinedConstant">inlined [1] to [2]</string>
+	<string name="OptimizerKeptCall">kept [1] in the local [2], which its [3] places read</string>
+	<string name="OptimizerKeptConstant">kept [1] in the global [2], which its [3] places read</string>
+	<string name="OptimizerReturnedTruth">returned the truth of what [1] chose</string>
+	<string name="OptimizerMergedWays">wrote the if [1] once, its ways being the same</string>
+	<string name="OptimizerMergedEnds">wrote what both ways of the if [1] end with once, after it</string>
+	<string name="OptimizerMergedStarts">wrote what both ways of the if [1] begin with once, before it</string>
+	<string name="OptimizerDroppedElse">dropped the else of if ([1]), whose way never goes on</string>
+	<string name="OptimizerJumpAsIf">wrote the jump to [1] over what follows as an else</string>
+	<string name="OptimizerSelectAsArithmetic">wrote [1] as arithmetic</string>
+	<string name="OptimizerSetBeforeIf">set the value of [1]'s else before it</string>
+	<string name="OptimizerLoopAsDo">ran the loop on ([1]) as a do, its first check known to pass</string>
+	<string name="OptimizerLoopNeverRuns">removed the loop on ([1]), its first check known to fail</string>
+	<string name="OptimizerForeverAsJump">ran the loop on ([1]), which never ends, by a jump back</string>
+	<string name="OptimizerCountedDown">counted the loop while ([1]) down to nought</string>
+	<string name="OptimizerRemovedEmptyIf">removed if ([1]), which has nothing to do either way</string>
+	<string name="OptimizerMergedIfs">wrote if ([1]) as one if</string>
+	<string name="OptimizerKeyAsTruth">wrote [1] as the key itself, which is a key found or NULL_KEY</string>
+	<string name="OptimizerRemovedParameter">removed the parameter [1] of [2], which it never reads, and what its calls gave it</string>
+	<string name="OptimizerConstantParameter">made the parameter [1] of [2] a local, every call giving it the same value</string>
+	<string name="OptimizerUnreadResult">made [1] return nothing, as no call reads what it returns</string>
+	<string name="OptimizerLocalizedGlobal">made the global [1] a local where it is used, each setting it before it reads it</string>
+	<string name="OptimizerDeadStore">removed the value [1] is set to here, which it is set again before anything reads</string>
+	<string name="OptimizerNoDefinitions">the LSL definitions are not loaded, so nothing was optimized</string>
+	<string name="OptimizerUncompiled">not optimized: the script does not compile as it stands, and compiling it says why</string>
+	<string name="OptimizerWroteUncompilable">not optimized: what the optimizer made of this script did not compile ([1]), so it goes as it was; please report it</string>
+	<string name="OptimizerRemovedFor">removed a for loop whose condition is always false; its initialisers stay</string>
+	<string name="OptimizerRemovedFunction">removed the unused function [1]</string>
+	<string name="OptimizerRemovedGlobal">removed the unused global [1]</string>
+	<string name="OptimizerRemovedLabel">removed the label [1], which nothing jumps to</string>
+	<string name="OptimizerRemovedLocal">removed the unused local [1]</string>
+	<string name="OptimizerRemovedNoEffect">removed [1], which does nothing</string>
+	<string name="OptimizerRemovedState">removed the state [1], which nothing enters</string>
+	<string name="OptimizerRemovedUncalled">removed the function [1], which nothing that runs calls</string>
+	<string name="OptimizerRemovedUnentered">removed the state [1], which nothing that runs enters</string>
+	<string name="OptimizerRemovedWriteOnly">removed [1], which is set and never read</string>
+	<string name="OptimizerRemovedEmptyHandler">removed the empty handler of [1], which having changes nothing</string>
+	<string name="OptimizerRemovedUnreachable">removed [1], which can never run</string>
+	<string name="OptimizerRemovedWhile">removed a while loop whose condition is always false</string>
+	<string name="OptimizerRenamed">renamed the [1] [2] to [3]</string>
+	<string name="OptimizerSettled">settled [1] to [2]</string>
+	<string name="OptimizerSimplified">simplified [1] to [2]</string>
+	<string name="OptimizerSubstitutedLocal">put the value of [1] where it is read, and removed it</string>
+	<string name="OptimizerSwappedBranches">swapped the branches of if ([1]) and dropped the !</string>
+	<string name="OptimizerSwappedOnXor">wrote if ([1]) as if ([2]), its branches swapped</string>
+	<string name="OptimizerTurnedEmptyBranch">turned an empty if branch around</string>
+	<string name="OptimizerWroteAs">wrote [1] as [2]</string>
+
+	<!-- The inliner's notes (allslinliner.cpp) -->
+	<string name="InlinerPutExpression">put what the function [1] returns in place of a call</string>
+	<string name="InlinerPutExpressionOnce">put what the function [1] returns in place of its one call</string>
+	<string name="InlinerPutFunction">put the function [1] in place of a call</string>
+	<string name="InlinerPutFunctionOnce">put the function [1] in place of its one call</string>
+	<string name="InlinerChoseFunction">put the function [1] in place at its [2] calls, of what put in place so made the code [3] bytes smaller on [4]</string>
+	<string name="InlinerLoopAsJumps">wrote the loop as a label, an if and a jump back, for a call in its condition to go in place</string>
+
+	<!-- What the studio says in place of Luau's own words (alluauservice.cpp) -->
+	<string name="LuauKeyNotFound">Key '[1]' not found in [2]</string>
+	<string name="LuauKeyNotFoundDidYouMean">Key '[1]' not found in [2]; did you mean '[3]'?</string>
+	<string name="LuauCheckTimedOut">Type checking stopped after [1] seconds; what it found before then is shown</string>
+	<string name="LuauModuleNotOneValue">This module returns [1] values; a module must return exactly one to be required</string>
+
+	<!-- What a fix offered for a problem does (alscriptfixes.cpp) -->
+	<string name="ScriptFixInsert">Insert '[1]'</string>
+	<string name="ScriptFixChange">Change '[1]' to '[2]'</string>
+	<string name="ScriptFixUseInstead">Use '[2]' instead of '[1]'</string>
+	<string name="ScriptFixUnused">Rename to '_[1]'</string>
+	<string name="ScriptFixRemoveRequire">Remove the require of [1]</string>
+	<string name="ScriptFixSuppress">Suppress '[1]' on this line</string>
+	<string name="ScriptFixCast">Cast to [1]</string>
+	<string name="ScriptFixCompare">Compare with '=='</string>
+	<string name="ScriptFixBrackets">Wrap the assignment in brackets</string>
+	<string name="ScriptFixAssign">Assign with '='</string>
+	<string name="ScriptFixIntFloat">Multiply as a float, then cast to integer</string>
+	<string name="ScriptFixReturn">Write 'return' instead</string>
+	<string name="ScriptFixEmptyIf">Take out the ';' that ends the if</string>
+	<string name="ScriptFixScope">Put it in braces of its own</string>
+	<string name="ScriptFixParameterType">Declare '[1]' as [2]</string>
+	<string name="ScriptFixEventParameters">Write the parameters '[1]' takes</string>
+	<string name="ScriptFixToString">Wrap in tostring()</string>
+	<string name="ScriptFixColon">Call with ':'</string>
+	<string name="ScriptFixDot">Call with '.'</string>
+	<string name="ScriptFixLocal">Make '[1]' local</string>
+	<string name="ScriptFixInitNil">Initialize '[1]' with nil</string>
+	<string name="ScriptFixRemove">Remove '[1]'</string>
+	<string name="ScriptFixOptimized">Write '[1]' here</string>
+	<string name="ScriptFixRemoveUnreachable">Remove what can never run</string>
+	<string name="ScriptFixRemoveNoEffect">Remove what does nothing</string>
+	<string name="ScriptFixRequire">Require '[1]'</string>
+	<string name="ScriptFixRequireField">Take '[1]' from '[2]'</string>
+	<string name="ScriptFixRequireAs">Require it as '[1]'</string>
+	<string name="ScriptFixRequireAlias">Name [3] as the SLua alias @[2], and require it as '[1]'</string>
+	<string name="ScriptFixInclude">Include '[1]'</string>
+	<string name="ScriptFixCompoundAssign">Write it [1] [2]= ...</string>
+	<string name="ScriptFixHoistCall">Work out [1] once, before the loop</string>
+	<string name="ScriptFixCompareZero">Compare it: [1] ~= 0</string>
+	<string name="ScriptFixEqualsZero">Ask whether it is 0: [1] == 0</string>
+	<string name="ScriptFixAskFound">Write it [1] [2]</string>
+	<string name="ScriptFixWriteIt">Write it [1]</string>
+	<string name="ScriptFixDeclareFirst">Declare local [1] before it is first named</string>
+	<string name="ScriptFixUnbracket">Take out the brackets</string>
+	<string name="ScriptFixRemoveElse">Take out the empty else</string>
+	<string name="ScriptFixStringParts">Put [1]'s pieces in a table, joined once after the loop</string>
+	<string name="ScriptFixKeepCall">Keep [1] in a local, [2]</string>
+	<string name="ScriptFixNoteDone">Done: take the note out</string>
+	<string name="ScriptFixNoteLint">[1], and take the note out</string>
+	<string name="ScriptFixMakeStrict">Make the script --!strict</string>
+	<string name="ScriptActionAnnotate">Declare it as '[1]'</string>
+	<string name="ScriptActionExtract">Put it in a local, '[1]'</string>
+	<string name="ScriptActionInterpolate">Write it as an interpolated string</string>
+	<string name="ScriptActionInvertIf">Invert the if</string>
+	<string name="ScriptActionHandler">Add a handler for '[1]'</string>
+	<string name="ScriptActionStringGlobal">Put the string in a global, '[1]', for its [2] uses</string>
+	<string name="ScriptActionListSum">Write the list as a sum</string>
+
+	<!-- What the engines say, taken apart by ALMessageMap and said again
+	     with the words put in: Tailslide's messages by their error code,
+	     Luau's lints by their name, Luau's commonest type errors by their
+	     shape. Keep the [1], [2]... marks; a mark may stand twice. The
+	     English here is the engines' own, held to almessagemap.cpp and
+	     to the engines by scripts/content_tools/check_script_strings.py. -->
+	<string name="LSLDuplicateDeclaration">'[1]' is already declared, on line [2].</string>
+	<string name="LSLInvalidOperator">Invalid operator: [1] [2] [3].</string>
+	<string name="LSLWrongType">'[1]' is a [3], and cannot be used as a [2].</string>
+	<string name="LSLTooDeep">Nested more than [1] levels deep, too deep for Script Studio to analyze; the script still saves and compiles.</string>
+	<string name="LSLUndeclared">'[1]' is not declared.</string>
+	<string name="LSLUndeclaredWithSuggestion">'[1]' is not declared; did you mean '[2]'?</string>
+	<string name="LSLInvalidMember">'[2]' is not a member of '[1]'.</string>
+	<string name="LSLMemberNotVariable">'[1].[2]' cannot be read: '[1]' is a [3].</string>
+	<string name="LSLMemberWrongType">'[1].[2]' cannot be read: '[1]' is not a vector or a rotation.</string>
+	<string name="LSLArgumentWrongType">Argument [2] of '[3]' is a [1], but the parameter is '[4] [5]'.</string>
+	<string name="LSLTooManyArguments">Too many arguments to '[1]'.</string>
+	<string name="LSLTooFewArguments">Too few arguments to '[1]'.</string>
+	<string name="LSLChangeStateInFunction">A function cannot change state.</string>
+	<string name="LSLWrongTypeInAssignment">'[1] [2]' cannot be given a [3] value.</string>
+	<string name="LSLWrongTypeInMemberAssignment">A [1] member cannot be given a [2] value; it takes a float or an integer.</string>
+	<string name="LSLReturnValueInEventHandler">An event handler cannot return a value.</string>
+	<string name="LSLBadReturnType">Returning a [1] value from a [2] function.</string>
+	<string name="LSLNotAllPathsReturn">Not every way through the function returns a value.</string>
+	<string name="LSLGlobalInitializerNotConstant">A global's first value must be a constant.</string>
+	<string name="LSLNoEventHandlers">A state must handle at least one event.</string>
+	<string name="LSLParserStackDepth">Nested too deeply: Second Life's compiler will give a syntax error here.</string>
+	<string name="LSLBuiltinLvalue">'[1]' is a constant and cannot be assigned to.</string>
+	<string name="LSLShadowConstant">'[1]' is a constant and cannot be declared as a variable.</string>
+	<string name="LSLArgumentWrongTypeEvent">Parameter [2] of '[3]' is declared as '[1]'; it should be '[4] [5]'.</string>
+	<string name="LSLTooManyArgumentsEvent">Too many parameters for the event '[1]'.</string>
+	<string name="LSLTooFewArgumentsEvent">Too few parameters for the event '[1]'.</string>
+	<string name="LSLInvalidEvent">'[1]' is not an event.</string>
+	<string name="LSLEventAsIdentifier">'[1]' is an event's name, and cannot be used as a name here.</string>
+	<string name="LSLDeclarationInvalidHere">'[1]' cannot be declared here; put it in a block of its own, between { and }.</string>
+	<string name="LSLMultipleEventHandlers">The event '[1]' is handled more than once in this state.</string>
+	<string name="LSLListInList">A list cannot hold another list.</string>
+	<string name="LSLIllegalCast">A [1] cannot be cast to a [2].</string>
+	<string name="LSLNullInList">A list cannot hold something with no value, such as a call that returns nothing.</string>
+	<string name="LSLStackHeapCollision">Stack-heap collision: this needs more memory than a script has.</string>
+	<string name="LSLVoidInCondition">A call that returns nothing cannot be a condition.</string>
+	<string name="LSLShadowDeclaration">'[1]' hides the '[1]' declared on line [2].</string>
+	<string name="LSLAssignmentInComparison">An assignment used as a condition: put it in parentheses if that is meant, or compare with ==.</string>
+	<string name="LSLChangeToCurrentState">Changing to the state the script is already in does what return does; use return instead.</string>
+	<string name="LSLChangeStateHackCorrupt">Changing state in a function that returns a list or a string corrupts the stack.</string>
+	<string name="LSLChangeStateHack">Changing state from a function inside an if statement is a hack, and may have unintended side effects.</string>
+	<string name="LSLEmptyIf">The if statement is empty.</string>
+	<string name="LSLDeclaredButNotUsed">[1] '[2]' is declared but never used.</string>
+	<string name="LSLUnusedEventParameter">The event's parameter '[1]' is never used.</string>
+	<string name="LSLListCompare">== on two lists compares only their lengths.</string>
+	<string name="LSLConditionAlwaysTrue">The condition is always true.</string>
+	<string name="LSLConditionAlwaysFalse">The condition is always false.</string>
+	<string name="LSLEmptyLoop">The loop's body is empty.</string>
+	<string name="LSLIntFloatMulAssign">'integer *= float' can behave unpredictably as it runs; prefer 'i = (integer)(i * f)'.</string>
+	<string name="LSLJumpToWrongLabel">'jump [1];' may go to the wrong label: another label in this function has the same name.</string>
+	<string name="LSLDuplicateLabelName">The label '@[1]' is declared more than once in this function, which may cause undesired behavior.</string>
+	<string name="LSLEqAsStatement">An == comparison used as a statement: its answer is thrown away.</string>
+	<string name="LSLDeprecated">'[1]' is deprecated.</string>
+	<string name="LSLDeprecatedWithReplacement">'[1]' is deprecated; use '[2]' instead.</string>
+	<string name="LSLSyntaxMissing">Missing [1].</string>
+	<string name="LSLSyntaxUnexpected">Did not expect [1] here.</string>
+	<string name="LSLSyntaxUnexpectedWanted">Did not expect [1] here; expected [2].</string>
+	<string name="LSLParameterUntyped">The parameter '[1]' needs its type before it: integer, float, string, key, vector, rotation or list.</string>
+	<string name="LSLSlIntegerPast32Bits">LSL reads [1] as [2]: past 0xFFFFFFFF, the most its 32 bits hold, a number stops there, which is -1</string>
+	<string name="LSLSlLoopInvariantCall">[1] is worked out again on every turn of the loop, though nothing in the loop changes what it is given: a local set before the loop works it out once</string>
+	<string name="LSLSlSleepingCall">[1] makes the script sleep [2] s each call; [3] does the same without the sleep</string>
+	<string name="LSLSlSleepingCallOften">[1] makes the script sleep [2] s each time it runs here, in a loop or the timer event; [3] does the same without the sleep</string>
+	<string name="LSLSlSleepingTexture">[1] makes the script sleep [2] s each call; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
+	<string name="LSLSlSleepingTextureOften">[1] makes the script sleep [2] s each time it runs here, in a loop or the timer event; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
+	<string name="LSLSlMergeablePrimParams">These [1] calls to [2] could be one, with all their rules, and PRIM_LINK_TARGET where the link changes</string>
+	<string name="LSLSlCostlyListen">This listens on channel 0 for anyone, so the script wakes for every line of chat nearby. A name, a key, or another channel hears less</string>
+	<string name="LSLSlFastTimer">A timer every [1] s, under a tenth of a second, fires every few of the region's 45 frames a second, and the time it takes is time other scripts there wait for</string>
+	<string name="LSLSlFastSensor">A sensor sweeping every [1] s, under a second, searches round the object that often: once a second or less is plenty for most</string>
+	<string name="LSLSlStringBuild">[1] is joined to with + in a loop, which copies all of it each time round. In SLua the pieces put in a table and joined once, with table.concat, are quicker</string>
+	<string name="LSLSlRepeatedCall">[1] is called [2] times here, and answers the same each time: a local set once holds it</string>
+	<string name="LuauLintUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
+	<string name="LuauLintDeprecatedGlobal">Global '[1]' is deprecated, use '[2]' instead</string>
+	<string name="LuauLintDeprecatedGlobalPlain">Global '[1]' is deprecated</string>
+	<string name="LuauLintGlobalUsedAsLocalFunction">Global '[1]' is only used in the enclosing function '[2]'; consider changing it to local</string>
+	<string name="LuauLintGlobalUsedAsLocalLine">Global '[1]' is only used in the enclosing function defined at line [2]; consider changing it to local</string>
+	<string name="LuauLintGlobalNeverRead">Global '[1]' is never read before being written. Consider changing it to local</string>
+	<string name="LuauLintLocalShadow">Variable '[1]' shadows previous declaration at line [2]</string>
+	<string name="LuauLintLocalShadowGlobal">Variable '[1]' shadows a global variable used at line [2]</string>
+	<string name="LuauLintLocalShadowGlobalPlain">Variable '[1]' shadows a global variable</string>
+	<string name="LuauLintSameLineStatement">A new statement is on the same line; add semi-colon on previous statement to silence</string>
+	<string name="LuauLintMultiLineStatement">Statement spans multiple lines; use indentation to silence</string>
+	<string name="LuauLintLocalUnused">Variable '[1]' is never used; prefix with '_' to silence</string>
+	<string name="LuauLintFunctionUnused">Function '[1]' is never used; prefix with '_' to silence</string>
+	<string name="LuauLintImportUnused">Import '[1]' is never used; prefix with '_' to silence</string>
+	<string name="LuauLintBuiltinGlobalWrite">Built-in global '[1]' is overwritten here; consider using a local or changing the name</string>
+	<string name="LuauLintPlaceholderRead">Placeholder value '_' is read here; consider using a named variable</string>
+	<string name="LuauLintUnreachableCode">Unreachable code (previous statement always [1]s)</string>
+	<string name="LuauLintUnknownType">Unknown type '[1]'</string>
+	<string name="LuauLintUnknownTypeExpected">Unknown type '[1]' (expected [2])</string>
+	<string name="LuauLintForRangeEnd">For loop ends at [1] instead of [2]; did you forget to specify step?</string>
+	<string name="LuauLintForRangeBackwards">For loop should iterate backwards; did you forget to specify -1 as step? Also consider changing 0 to 1 since arrays start at 1</string>
+	<string name="LuauLintForRangeBackwardsPlain">For loop should iterate backwards; did you forget to specify -1 as step?</string>
+	<string name="LuauLintForRangeZero">For loop starts at 0, but arrays start at 1</string>
+	<string name="LuauLintUnbalancedAssignmentNil">Assigning [1] values to [2] variables initializes extra variables with nil; add 'nil' to value list to silence</string>
+	<string name="LuauLintUnbalancedAssignmentUnused">Assigning [1] values to [2] variables leaves some values unused</string>
+	<string name="LuauLintImplicitReturnNamed">Function '[1]' can implicitly return no values even though there's an explicit return at line [2]; add explicit return to silence</string>
+	<string name="LuauLintImplicitReturn">Function can implicitly return no values even though there's an explicit return at line [1]; add explicit return to silence</string>
+	<string name="LuauLintDuplicateLocalLine">Variable '[1]' already defined on line [2]</string>
+	<string name="LuauLintDuplicateLocalColumn">Variable '[1]' already defined on column [2]</string>
+	<string name="LuauLintDuplicateParameterLine">Function parameter '[1]' already defined on line [2]</string>
+	<string name="LuauLintDuplicateParameterColumn">Function parameter '[1]' already defined on column [2]</string>
+	<string name="LuauLintDuplicateSelf">Function parameter 'self' already defined implicitly</string>
+	<string name="LuauLintUninitializedLocal">Variable '[1]' defined at line [2] is never initialized or assigned; initialize with 'nil' to silence</string>
+	<string name="LuauLintDuplicateFunction">Duplicate function definition: '[1]' also defined on line [2]</string>
+	<string name="LuauLintDuplicateConditionLine">Condition has already been checked on line [1]</string>
+	<string name="LuauLintDuplicateConditionColumn">Condition has already been checked on column [1]</string>
+	<string name="LuauLintMisleadingAndOr">The and-or expression always evaluates to the second alternative because the first alternative is [1]; consider using if-then-else expression instead</string>
+	<string name="LuauLintIntegerParsingDecimal">Number literal exceeded available precision and was truncated to closest representable number</string>
+	<string name="LuauLintIntegerParsingHex">Hexadecimal number literal exceeded available precision and was truncated to 2^64</string>
+	<string name="LuauLintIntegerParsingBinary">Binary number literal exceeded available precision and was truncated to 2^64</string>
+	<string name="LuauLintIntegerParsingClamped">Integer number literal was clamped because it was out of range</string>
+	<string name="LuauLintFormatString">Invalid format string: [1]</string>
+	<string name="LuauLintPackFormat">Invalid pack format: [1]</string>
+	<string name="LuauLintMatchPattern">Invalid match pattern: [1]</string>
+	<string name="LuauLintMatchReplacement">Invalid match replacement: [1]</string>
+	<string name="LuauLintDateFormat">Invalid date format: [1]</string>
+	<string name="LuauLintTableFieldDuplicate">Table field '[1]' is a duplicate; previously defined at line [2]</string>
+	<string name="LuauLintTableIndexDuplicateList">Table index [1] is a duplicate; previously defined as a list entry</string>
+	<string name="LuauLintTableIndexDuplicate">Table index [1] is a duplicate; previously defined at line [2]</string>
+	<string name="LuauLintTableTypeFieldRead">Table type field '[1]' already has a read type defined at line [2]</string>
+	<string name="LuauLintTableTypeFieldWrite">Table type field '[1]' already has a write type defined at line [2]</string>
+	<string name="LuauLintTableTypeFieldDuplicate">Table type field '[1]' is a duplicate; previously defined at line [2]</string>
+	<string name="LuauLintTableTypeFieldReadWrite">Table type field '[1]' is already read-write; previously defined at line [2]</string>
+	<string name="LuauLintTableInsertZero">table.insert uses index 0 but arrays are 1-based; did you mean 1 instead?</string>
+	<string name="LuauLintTableInsertAppend">table.insert will append the value to the table; consider removing the second argument for efficiency</string>
+	<string name="LuauLintTableInsertBeforeLast">table.insert will insert the value before the last element, which is likely a bug; consider removing the second argument or wrap it in parentheses to silence</string>
+	<string name="LuauLintTableInsertMultiple">table.insert may change behavior if the call returns more than one result; consider adding parentheses around second argument</string>
+	<string name="LuauLintTableRemoveZero">table.remove uses index 0 but arrays are 1-based; did you mean 1 instead?</string>
+	<string name="LuauLintTableRemoveBeforeLast">table.remove will remove the value before the last element, which is likely a bug; consider removing the second argument or wrap it in parentheses to silence</string>
+	<string name="LuauLintTableMoveZero">table.move uses index 0 but arrays are 1-based; did you mean 1 instead?</string>
+	<string name="LuauLintTableCreateLiteral">table.create with a table literal will reuse the same object for all elements; consider using a for loop instead</string>
+	<string name="LuauLintTableStringKeys">Using '[1]' on a table with string keys is likely a bug</string>
+	<string name="LuauLintTableNoArrayPart">Using '[1]' on a table without an array part is likely a bug</string>
+	<string name="LuauLintNotPrecedence">not X [1] Y is equivalent to (not X) [2] Y; add parentheses to silence</string>
+	<string name="LuauLintNotPrecedenceEquality">not X [1] Y is equivalent to (not X) [2] Y; consider using X [3] Y, or add parentheses to silence</string>
+	<string name="LuauLintComparisonChain">X [1] Y [2] Z is equivalent to (X [3] Y) [4] Z; did you mean X [5] Y and Y [6] Z?</string>
+	<string name="LuauLintComparisonPrecedence">X [1] Y [2] Z is equivalent to (X [3] Y) [4] Z; add parentheses to silence</string>
+	<string name="LuauLintDirectiveUnknown">Unknown comment directive '[1]'</string>
+	<string name="LuauLintDirectiveUnknownDidYouMean">Unknown comment directive '[1]'; did you mean '[2]'?</string>
+	<string name="LuauLintDirectiveNolintUnknown">nolint directive refers to unknown lint rule '[1]'</string>
+	<string name="LuauLintDirectiveNolintUnknownDidYouMean">nolint directive refers to unknown lint rule '[1]'; did you mean '[2]'?</string>
+	<string name="LuauLintDirectiveLate">Comment directive is ignored because it is placed after the first non-comment token</string>
+	<string name="LuauLintDirectiveModeTwice">Comment directive with the type checking mode has already been used</string>
+	<string name="LuauLintDirectiveModeExtra">Comment directive with the type checking mode has extra symbols at the end of the line</string>
+	<string name="LuauLintDirectiveNativeExtra">native directive has extra symbols at the end of the line</string>
+	<string name="LuauLintDirectiveOptimizeLevel">optimize directive requires an optimization level</string>
+	<string name="LuauLintDirectiveOptimizeUnknown">optimize directive uses unknown optimization level '[1]', 0..2 expected</string>
+	<string name="LuauLintRedundantNativeAttribute">native attribute on a function is redundant in a native module; consider removing it</string>
+	<string name="LuauLintDeprecatedMemberUseReason">Member '[1]' is deprecated, use '[2]' instead. [3]</string>
+	<string name="LuauLintDeprecatedMemberUse">Member '[1]' is deprecated, use '[2]' instead</string>
+	<string name="LuauLintDeprecatedMemberReason">Member '[1]' is deprecated. [2]</string>
+	<string name="LuauLintDeprecatedMember">Member '[1]' is deprecated</string>
+	<string name="LuauLintDeprecatedFunctionUseReason">Function '[1]' is deprecated, use '[2]' instead. [3]</string>
+	<string name="LuauLintDeprecatedFunctionUse">Function '[1]' is deprecated, use '[2]' instead</string>
+	<string name="LuauLintDeprecatedFunctionReason">Function '[1]' is deprecated. [2]</string>
+	<string name="LuauLintDeprecatedFunction">Function '[1]' is deprecated</string>
+	<string name="LuauLintSlCompoundAssign">Luau's [2]= says this once: [1] [2]= ...</string>
+	<string name="LuauLintSlNumberTruth">[1] is a number, and Luau counts every number true, 0 too: [1] ~= 0 asks whether it is not 0</string>
+	<string name="LuauLintSlNumberTruthNot">not [1] is always false: [1] is a number, and Luau counts every number true, 0 too. [1] == 0 asks whether it is 0</string>
+	<string name="LuauLintSlIntegerTruth">[1] is an integer, and SLua counts every integer true, 0i too: [2] asks whether it is not 0</string>
+	<string name="LuauLintSlIntegerTruthNot">not [1] is always false: [1] is an integer, and SLua counts every integer true, 0i too. [2] asks whether it is 0</string>
+	<string name="LuauLintSlStringTruth">[1] is a string, and SLua counts every string true, "" too: [2] asks whether it is not empty</string>
+	<string name="LuauLintSlStringTruthNot">not [1] is always false: [1] is a string, and SLua counts every string true, "" too. [2] asks whether it is empty</string>
+	<string name="LuauLintSlUuidTruth">[1] is a uuid, and SLua counts every uuid true, NULL_KEY too: [2] asks whether it is not NULL_KEY</string>
+	<string name="LuauLintSlUuidTruthNot">not [1] is always false: [1] is a uuid, and SLua counts every uuid true, NULL_KEY too. [2] asks whether it is NULL_KEY</string>
+	<string name="LuauLintSlVectorTruth">[1] is a vector, and SLua counts every vector true, ZERO_VECTOR too: [2] asks whether it is not zero</string>
+	<string name="LuauLintSlVectorTruthNot">not [1] is always false: [1] is a vector, and SLua counts every vector true, ZERO_VECTOR too. [2] asks whether it is zero</string>
+	<string name="LuauLintSlQuaternionTruth">[1] is a quaternion, and SLua counts every quaternion true, ZERO_ROTATION too: [2] asks whether it is not ZERO_ROTATION</string>
+	<string name="LuauLintSlQuaternionTruthNot">not [1] is always false: [1] is a quaternion, and SLua counts every quaternion true, ZERO_ROTATION too. [2] asks whether it is ZERO_ROTATION</string>
+	<string name="LuauLintSlListTruth">[1] is a list, and SLua counts every table true, an empty one too: [2] asks whether it has anything in it</string>
+	<string name="LuauLintSlListTruthNot">not [1] is always false: [1] is a list, and SLua counts every table true, an empty one too. [2] asks whether it is empty</string>
+	<string name="LuauLintSlNilSentinel">[1] == [4] never holds: [2] answers [3] where it finds nothing, not [4]. [1] == [3] asks whether it found nothing</string>
+	<string name="LuauLintSlNilSentinelAlways">[1] ~= [4] always holds: [2] answers [3] where it finds nothing, not [4]. [1] ~= [3] asks whether it found something</string>
+	<string name="LuauLintSlNilSentinelOrder">Comparing [1] with a number is an error where [2] finds nothing: it answers nil there, not -1. [1] [5] asks the same</string>
+	<string name="LuauLintSlTableCompare">[1] == {} is always false: {} is a new table, equal to no other. [2] asks whether [1] is empty</string>
+	<string name="LuauLintSlTableCompareAlways">[1] ~= {} is always true: {} is a new table, equal to no other. [2] asks whether [1] has anything in it</string>
+	<string name="LuauLintSlTableCompareItems">[1] can never equal a table built where it is compared: a new table is equal to no other. LSL compared lists by their lengths alone, which #[1] gives</string>
+	<string name="LuauLintSlZeroIndex">[1][0] is nothing: Luau's lists count from 1, where LSL's counted from 0. [1][1] is the first</string>
+	<string name="LuauLintSlZeroIndexLoop">This loop counts from 0 to [1] - 1, as LSL's lists did, but Luau's count from 1: [2] reads nothing at 0 and never the last. for [3] = 1, [1] counts as Luau does</string>
+	<string name="LuauLintSlZeroIndexSub">[1] counts from 1 and takes 0 as 1, so it ends a character sooner than LSL's llGetSubString with the same numbers</string>
+	<string name="LuauLintSlZeroIndexArg">[1] counts from 1 in SLua, as Luau does: its first is 1, not 0</string>
+	<string name="LuauLintSlZeroIndexFound">[1] is never 0: [2] answers from 1, where LSL's answered from 0, so its first is 1</string>
+	<string name="LuauLintSlCompatCall">[1] is LSL's, kept for scripts moved from it; ll's means the same here: [2]</string>
+	<string name="LuauLintSlBooleanNumber">[1] == [2] never holds: [1] is true or false, never a number as LSL's truths were</string>
+	<string name="LuauLintSlBooleanNumberAlways">[1] ~= [2] always holds: [1] is true or false, never a number as LSL's truths were</string>
+	<string name="LuauLintSlBooleanNumberChoice">[1] asks no more than [2]: its 1 or 0 is made only to be compared</string>
+	<string name="LuauLintSlGlobalAssign">This makes [1] a global. A local is quicker for Luau to read</string>
+	<string name="LuauLintSlGlobalFunction">function [1] makes a global. local function [1] is quicker for Luau to call</string>
+	<string name="LuauLintSlForIndexAssign">[1] is set here, but the for gives [1] its own next value each time round, whatever it was set to: LSL's for went on from it. A while loop does</string>
+	<string name="LuauLintSlGlobalInFunction">[1] is made a global inside a function. A local of the script's, declared before the first function that names it, is shared the same and quicker for Luau to read</string>
+	<string name="LuauLintSlGlobalFunctionInScope">function [1] here makes a global, and only once this runs. local function [1] keeps it to this block</string>
+	<string name="LuauLintSlParenCondition">Luau's [1] needs no brackets round its condition, where LSL's did</string>
+	<string name="LuauLintSlAlmostSwapped">[1] = [2] and then [2] = [1] leave both [2]: a swap is [3]</string>
+	<string name="LuauLintSlMustUse">[1] changes nothing and only answers, and nothing reads its answer here</string>
+	<string name="LuauLintSlGeneralizedFor">Luau's for walks a table given as it is: in [1] says what in [2] says</string>
+	<string name="LuauLintSlGeneralizedForList">Luau's for walks a table given as it is: in [1] walks a list as in [2] does, where the list has no gaps</string>
+	<string name="LuauLintSlEmptyBlock">This [1]'s block is empty: it does nothing</string>
+	<string name="LuauLintSlIndexDivision">[1] may be a fraction, which a list has nothing at: Luau's / divides as floats do, where LSL's integers divided whole. [2] rounds down</string>
+	<string name="LuauLintSlVectorProduct">[1] multiplies each part of two vectors, and gives a vector: LSL's * of two vectors was their dot product, a number. vector.dot([2], [3]) is LSL's</string>
+	<string name="LuauLintSlVectorCross">[1] is the cross product of two vectors, as LSL's % was. vector.cross([2], [3]) says so plainly</string>
+	<string name="LuauLintSlSleepingCall">[1] makes the script sleep [2] s each call; [3] does the same without the sleep</string>
+	<string name="LuauLintSlSleepingCallOften">[1] makes the script sleep [2] s each time it runs here, in a loop or a timer; [3] does the same without the sleep</string>
+	<string name="LuauLintSlSleepingTexture">[1] makes the script sleep [2] s each call; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
+	<string name="LuauLintSlSleepingTextureOften">[1] makes the script sleep [2] s each time it runs here, in a loop or a timer; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
+	<string name="LuauLintSlMergeablePrimParams">These [1] calls to [2] could be one, with all their rules, and PRIM_LINK_TARGET where the link changes</string>
+	<string name="LuauLintSlCostlyListen">This listens on channel 0 for anyone, so the script wakes for every line of chat nearby. A name, a key, or another channel hears less</string>
+	<string name="LuauLintSlFastTimer">A timer every [1] s, under a tenth of a second, fires every few of the region's 45 frames a second, and the time it takes is time other scripts there wait for</string>
+	<string name="LuauLintSlFastSensor">A sensor sweeping every [1] s, under a second, searches round the object that often: once a second or less is plenty for most</string>
+	<string name="LuauLintSlStringBuild">[1] is joined to with .. in a loop, which makes a new string each time round. SLua's way is to put the pieces in a table and join them once, with table.concat</string>
+	<string name="LuauLintSlRepeatedCall">[1] is called [2] times here, and answers the same each time: a local set once holds it</string>
+	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
+	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
+	<string name="LuauUnknownType">Unknown type '[1]'</string>
+	<string name="LuauTypeMismatchUnreachableReason">Expected this to be unreachable, but got [1]; [2]</string>
+	<string name="LuauTypeMismatchUnreachable">Expected this to be unreachable, but got [1]</string>
+	<string name="LuauTypeMismatchExactlyReason">Expected this to be exactly [1], but got [2]; [3]</string>
+	<string name="LuauTypeMismatchExactly">Expected this to be exactly [1], but got [2]</string>
+	<string name="LuauTypeMismatchReason">Expected this to be [1], but got [2]; [3]</string>
+	<string name="LuauTypeMismatch">Expected this to be [1], but got [2]</string>
+	<string name="LuauArgumentCountRangeOnlyOne">Argument count mismatch. Function '[1]' expects [2] to [3] arguments, but only 1 is specified</string>
+	<string name="LuauArgumentCountRangeOnly">Argument count mismatch. Function '[1]' expects [2] to [3] arguments, but only [4] are specified</string>
+	<string name="LuauArgumentCountRangeNone">Argument count mismatch. Function '[1]' expects [2] to [3] arguments, but none are specified</string>
+	<string name="LuauArgumentCountRange">Argument count mismatch. Function '[1]' expects [2] to [3] arguments, but [4] are specified</string>
+	<string name="LuauArgumentCountAtLeastOnlyOne">Argument count mismatch. Function '[1]' expects at least [2] arguments, but only 1 is specified</string>
+	<string name="LuauArgumentCountAtLeastOnly">Argument count mismatch. Function '[1]' expects at least [2] arguments, but only [3] are specified</string>
+	<string name="LuauArgumentCountAtLeastNone">Argument count mismatch. Function '[1]' expects at least [2] arguments, but none are specified</string>
+	<string name="LuauArgumentCountAtLeastOneNone">Argument count mismatch. Function '[1]' expects at least 1 argument, but none are specified</string>
+	<string name="LuauArgumentCountAtLeast">Argument count mismatch. Function '[1]' expects at least [2] arguments, but [3] are specified</string>
+	<string name="LuauArgumentCountOneNone">Argument count mismatch. Function '[1]' expects 1 argument, but none are specified</string>
+	<string name="LuauArgumentCountOne">Argument count mismatch. Function '[1]' expects 1 argument, but [2] are specified</string>
+	<string name="LuauArgumentCountOnlyOne">Argument count mismatch. Function '[1]' expects [2] arguments, but only 1 is specified</string>
+	<string name="LuauArgumentCountOnly">Argument count mismatch. Function '[1]' expects [2] arguments, but only [3] are specified</string>
+	<string name="LuauArgumentCountNone">Argument count mismatch. Function '[1]' expects [2] arguments, but none are specified</string>
+	<string name="LuauArgumentCountOneGiven">Argument count mismatch. Function '[1]' expects [2] arguments, but 1 is specified</string>
+	<string name="LuauArgumentCount">Argument count mismatch. Function '[1]' expects [2] arguments, but [3] are specified</string>
+	<string name="LuauReturnCountOne">Expected to return 1 value, but [1] are returned here</string>
+	<string name="LuauReturnCountOneGiven">Expected to return [1] values, but 1 is returned here</string>
+	<string name="LuauReturnCount">Expected to return [1] values, but [2] are returned here</string>
+	<string name="LuauFunctionResultOne">Function only returns 1 value, but [1] are required here</string>
+	<string name="LuauFunctionResult">Function only returns [1] values, but [2] are required here</string>
+	<string name="LuauCannotCallUnion">Cannot call a value of type [1] in union:&#10;  [2]</string>
+	<string name="LuauCannotCall">Cannot call a value of type [1]</string>
+	<string name="LuauCouldBeNil">Value of type '[1]' could be nil</string>
+	<string name="LuauUnknownRequireUnsupported">Unknown require: unsupported path</string>
+	<string name="LuauUnknownRequire">Unknown require: [1]</string>
+	<string name="LuauNotTakeSelf">This function does not take self. Did you mean to use a dot instead of a colon?</string>
+	<string name="LuauRequiresSelf">This function must be called with self. Did you mean to use a colon instead of a dot?</string>
+	<string name="LuauMissingPropertyDidYouMeanOneOf">Key '[1]' not found in table '[2]'.  Did you mean one of [3]?</string>
+	<string name="LuauMissingPropertyDidYouMean">Key '[1]' not found in table '[2]'.  Did you mean '[3]'?</string>
+	<string name="LuauMissingExternPropertyDidYouMeanOneOf">Key '[1]' not found in external type '[2]'.  Did you mean one of [3]?</string>
+	<string name="LuauMissingExternPropertyDidYouMean">Key '[1]' not found in external type '[2]'.  Did you mean '[3]'?</string>
+	<string name="LuauNoSuchKey">Type '[1]' does not have key '[2]'</string>
+	<string name="LuauNotATable">Expected type table, got '[1]' instead</string>
+	<string name="LuauCannotAddProperty">Cannot add property '[1]' to table '[2]'</string>
+	<string name="LuauCannotCompare">Cannot compare unrelated types '[1]' and '[2]' with '[3]'</string>
+	<string name="LuauRedefinedTypeAt">Redefinition of type '[1]', previously defined at line [2]</string>
+	<string name="LuauRedefinedType">Redefinition of type '[1]'</string>
+	<string name="LuauCheckedCall">the function '[1]' expects to get a [2] as its [3] argument, but is being given a [4]</string>
+	<string name="LuauFailsAtRuntimeIn">in the function '[1]', 'the argument '[2]' is used in a way that will error at runtime</string>
+	<string name="LuauFailsAtRuntime">the argument '[1]' is used in a way that will error at runtime</string>
+
+	<!-- What the LSL to SLua converter notes where the two languages differ
+	     (allsltoslua.cpp): in a comment marked LSL over the line, and at the
+	     LSL's place. [1], [2], [3] are names, the definitions' own words, or code -->
+	<string name="SluaSharedAssigned">set where the assignment's value is used</string>
+	<string name="SluaSharedCalled">read where a call of the script's in the same statement changes it</string>
+	<string name="SluaSharedHeld">given a list another may hold</string>
+	<string name="SluaSharedGiven">given to another variable</string>
+	<string name="SluaSharedReturned">returned by a function</string>
+	<string name="SluaSharedKept">passed to a function of the script's that keeps it</string>
+	<string name="SluaKeyText">LSL's keys held any text; SLua's uuid() stops the script on text that is no UUID, as it would here, where only a uuid will do.</string>
+	<string name="SluaKeyEmpty">SLua's uuid of no text is NULL_KEY: it equals NULL_KEY and reads as NULL_KEY's text, where LSL's key of no text did neither.</string>
+	<string name="SluaKeyCase">SLua's uuid writes a key's letters small, and finds it the same key as one written small, where LSL's key kept its capitals and was compared as text.</string>
+	<string name="SluaVectorText">ll.DumpList2String writes a vector's or a rotation's parts as LSL did, with five places; SLua's tostring writes as few as each needs, &lt;1, 2, 3&gt;, which tovector reads back the same.</string>
+	<string name="SluaUuidText">uuid() stops the script on text that is no UUID, where LSL's keys held any text; touuid() answers nil instead.</string>
+	<string name="SluaKeyAsText">SLua's ll takes a key as text, as LSL's functions did, so text is given as it is; `:: any` tells the type checker, which asks for a uuid. uuid() would stop the script on text that is no UUID.</string>
+	<string name="SluaKeyAsTextBare">SLua's ll takes a key as text, as LSL's functions did, so text is given as it is, though the type checker asks for a uuid: `:: any` quiets it, uuid() stops the script on text that is no UUID, and touuid() gives nil for it.</string>
+	<string name="SluaList2KeyText">Keys are held as text, so llList2Key's item is read as List2String reads it, as LSL gave it, where SLua's List2Key answers NULL_KEY for text that is no UUID; a number's or a vector's text is given, where LSL gave "".</string>
+	<string name="SluaDetectedTable">detected[n] is what LSL read with llDetected*(n - 1): SLua counts it from 1, and one past its end is an error, where LSL answered nothing.</string>
+	<string name="SluaMathDomain">math.sqrt, math.log and math.log10 answer nan or -inf out of their range, where LSL answered 0 or stopped with a math error.</string>
+	<string name="SluaBase64Decode">llbase64.decode keeps every byte it decodes, a NUL and what is not UTF-8 among them, where LSL's llBase64ToString cut the string at a NUL and made what was not UTF-8 '?'.</string>
+	<string name="SluaAbsent">SLua has no [1], in ll or in llcompat: it is left out.</string>
+	<string name="SluaUse">SLua would use [1] for [2].</string>
+	<string name="SluaCompatOnlyTimer">SLua's ll has no SetTimerEvent; llcompat's is LSL's. SLua's own timers are LLTimers:every(seconds, callback) and LLTimers:once, several at a time.</string>
+	<string name="SluaCompatOnly">SLua's ll has no [1]; llcompat.[1] is LSL's.</string>
+	<string name="SluaDetected">llcompat.Detected* count from 0, as LSL's did. SLua's own way is the handler's detected table: detected[n + 1]:getKey(), :getName(), :getPos() and the rest.</string>
+	<string name="SluaDeprecatedForWhy">SLua deprecates ll.[1], for [2]: [3]</string>
+	<string name="SluaDeprecatedFor">SLua deprecates ll.[1], for [2].</string>
+	<string name="SluaDeprecatedWhy">SLua deprecates ll.[1]: [2]</string>
+	<string name="SluaDeprecated">SLua deprecates ll.[1].</string>
+	<string name="SluaXorBase64Wrong">SLua deprecates ll.XorBase64Strings, for ll.XorBase64, which XORs correctly where this did not, and so answers otherwise: ll.XorBase64Strings is LSL's.</string>
+	<string name="SluaXorBase64Nul">SLua deprecates ll.XorBase64StringsCorrect, for ll.XorBase64, which answers otherwise where the second string holds a NUL, which ended it here: ll.XorBase64StringsCorrect is LSL's.</string>
+	<string name="SluaIndexFound">llcompat.[1] counts from 0 and says -1 for none, as LSL did; ll.[1] counts from 1 and says nil.</string>
+	<string name="SluaIndex">llcompat.[1] takes indexes from 0, as LSL did; ll.[1] takes them from 1.</string>
+	<string name="SluaBool">llcompat.[1] answers 1 or 0, as LSL did; ll.[1] answers true or false.</string>
+	<string name="SluaBoolList">llcompat.[1]'s list has 1 or 0 where LSL's did; ll.[1]'s has true or false there.</string>
+	<string name="SluaRightFirst">LSL ran the right side of this before the left, and Luau runs the left first: one side changes what the other reads.</string>
+	<string name="SluaRightFirstWorld">LSL ran the right side of this before the left, and Luau runs the left first: [1] may change what [2] does or finds outside the script.</string>
+	<string name="SluaRightFirstSet">LSL ran the right side of this before the left, and Luau runs the left first: [1] is set on one side and read or set on the other.</string>
+	<string name="SluaRightFirstCall">LSL ran the right side of this before the left, and Luau runs the left first: [1] sets [2], which the other side reads or sets too.</string>
+	<string name="SluaBit32Signed">bit32 answers 0 to 4294967295, where LSL's integers were signed: bit32.s32 makes the answer LSL's where it could pass 2147483647 and is read as a number.</string>
+	<string name="SluaHexSign">SLua reads [1] as [2], where LSL wrapped it to [3]: bit32 takes either the same, so it stays as written where only bit32 reads it, and is [3] where it is read as a number.</string>
+	<string name="SluaIntegerPast32Bits">LSL reads [1] as -1: past 0xFFFFFFFF, the most its 32 bits hold, a number stops there.</string>
+	<string name="SluaListCompare">LSL compares lists by their lengths alone, and != answers the difference of them.</string>
+	<string name="SluaHeaderOrder">SLua passes ll.HTTPRequest a custom_header table's headers sorted by name, where LSL's list passed them in the order written; nothing else differs.</string>
+	<string name="SluaShortCircuit">[1] leaves its right side unrun once the left decides it; LSL ran both sides, the right one first.</string>
+	<string name="SluaUuid">SLua's uuid holds a key; LSL's key could hold any text.</string>
+	<string name="SluaAssignInExpression">SLua's assignments are statements: this one is made by a function called where it stood.</string>
+	<string name="SluaStringBuild">[1] is built with .. in a loop, which makes a new string each time. SLua's way is to put the pieces in a table and join them once, with table.concat.</string>
+	<string name="SluaMemoryHack">([1] = [2]) + [1] spared LSO's memory, clearing [1] once LSL, going right to left, had read it. Luau goes left to right and needs no such thing: the clearing is left out.</string>
+	<string name="SluaStateSame">a change to the state the script is in; a script of one state has no other to go to.</string>
+	<string name="SluaJump">jump [1]: SLua has no goto, and this jump is neither out of a loop nor to its next turn. Rewrite it.</string>
+	<string name="SluaListCopy">LSL's lists were values, and [1] is [2], so each + makes a new list of it, as LSL did. Where nothing else holds it, table.insert([1], x) grows it in place.</string>
+	<string name="SluaStateExit">state_exit runs as a script leaves a state, and this one has no other: it never ran.</string>
+	<string name="SluaTimer">the timer event, set going by llcompat.SetTimerEvent; LLTimers:every is SLua's own.</string>
+	<string name="SluaStates">LSL let go of a state's listens, sensor repeats and targets as it left the state; setState does not. Remove them yourself where the script relied on it.</string>
+	<string name="SluaTimers">SLua's LLTimers can run several timers at once: LLTimers:every(seconds, callback), LLTimers:once(seconds, callback) and LLTimers:off(timer).</string>
+	<string name="SluaTimerStates">the timer event, set going by llcompat.SetTimerEvent, keeps going from state to state, as LSL's did; LLTimers:every is SLua's own.</string>
+	<string name="SluaHeader">Written from LSL by Script Studio. Each "-- LSL:" comment marks a place where
+SLua means something else than LSL did, or has a way of its own: read it, then
+delete it. LSL's integers wrapped at 32 bits and its floats were single
+precision; SLua's numbers are doubles, which do neither.</string>
+	<string name="SluaHeaderPlain">Written from LSL by Script Studio. LSL's integers wrapped at 32 bits and its
+floats were single precision; SLua's numbers are doubles, which do neither.</string>
+
+	<!-- What the script workspace says when a load, a save or a queue
+	     cannot go ahead (alscriptworkspace.cpp), and the analyzers when
+	     their definitions are missing (alscriptanalysis.cpp) -->
+	<string name="WorkspaceNoSuchItem">no such item</string>
+	<string name="WorkspaceNotPermitted">not permitted</string>
+	<string name="WorkspaceNoSuchItemInObject">no such item in the object</string>
+	<string name="WorkspaceNoSuchObject">no such object</string>
+	<string name="WorkspaceLuaNotForTarget">a SLua script does not compile for [TARGET]</string>
+	<string name="WorkspaceLSLNotForTarget">an LSL script does not compile for [TARGET]</string>
+	<string name="WorkspaceAssetUnreadable">the asset could not be read</string>
+	<string name="WorkspaceNotecardUnreadable">the notecard could not be read</string>
+	<string name="WorkspaceNotecardUnwritable">the notecard could not be written</string>
+	<string name="WorkspaceNotecardTooLarge">the notecard text is [SIZE] bytes and the limit is [LIMIT] bytes; a larger notecard cannot be opened again</string>
+	<string name="WorkspaceUploadFailed">the upload failed</string>
+	<string name="WorkspaceScriptTooLarge">the script is [SIZE] bytes and the limit is [LIMIT] bytes</string>
+	<string name="WorkspaceNoRegion">not connected to a region</string>
+	<string name="WorkspaceRegionCannotUpdateScripts">the region cannot update scripts</string>
+	<string name="WorkspaceTransferFolder">Passed between objects</string>
+	<string name="WorkspaceTransferNoFolder">no folder could be made in the trash for what passes between the objects</string>
+	<string name="WorkspaceExperienceUnknown">the region did not say which experience the script uses, and saving without it would remove the script from that experience</string>
+	<string name="WorkspaceRegionCannotUpdateNotecards">the region cannot update notecards</string>
+	<string name="WorkspaceRegionCannotMakeNotecard">the region cannot make a notecard in an object</string>
+	<string name="WorkspaceNameNeeded">a name is needed</string>
+	<string name="WorkspaceObjectNotModifiable">you do not have permission to modify the object</string>
+	<string name="WorkspaceNoTrash">no Trash folder</string>
+	<string name="WorkspaceNothingToDo">nothing to do</string>
+	<string name="WorkspaceQueueCannotOpen">the queue could not be opened</string>
+	<string name="WorkspaceQueueWouldNotStart">the queue could not start</string>
+	<string name="AnalysisNoLuauDefinitions">No Luau definitions at [PATH]</string>
+	<string name="AnalysisNoLSLBuiltins">No LSL builtins</string>
+
+	<!-- Why an edit of a XUI file could not be made (alxuiedit.cpp), in
+	     XUI Studio's status line -->
+	<string name="XUIEditNoFile">no file to write</string>
+	<string name="XUIEditCannotOpen">could not open [PATH]</string>
+	<string name="XUIEditCannotWrite">could not write [PATH]</string>
+	<string name="XUIEditNoElement">no element at that path</string>
+	<string name="XUIEditCannotRead">could not read the element</string>
+	<string name="XUIEditTextAroundChildren">the text of [NAME] is written around its children</string>
+	<string name="XUIEditMoveIntoItself">an element cannot be moved into itself</string>
+	<string name="XUIEditMoveBesideItself">an element cannot be moved beside itself</string>
+	<string name="XUIEditRootNotCopied">the root is not a thing to copy</string>
+	<string name="XUIEditNoPlaceFor">could not find where [NAME] would go</string>
+	<string name="XUIEditNotCarried">the element does not carry [NAME]</string>
+	<string name="XUIEditAlreadyCarries">the element already carries [NAME]</string>
+	<string name="XUIEditSameName">that is the name it has</string>
+	<string name="XUIEditWouldCrossEdge">[NAME] would cross the edge it is measured from, which moves the element to the other side of its parent rather than by [COUNT] pixels</string>
+
+	<!-- A notecard's items, as buttons in its text, and a notecard full, in
+	     the notecard window and in Script Studio (alnotecardembedded.cpp) -->
+	<string name="EmbeddedItemOpenTip">[NAME], embedded in the notecard: click to open it</string>
+	<string name="EmbeddedItemPlayTip">[NAME], embedded in the notecard: click to play it and copy it to your inventory</string>
+	<string name="EmbeddedItemCopyTip">[NAME], embedded in the notecard: click to copy it to your inventory</string>
+	<string name="NotecardReadOnlyDrop">This notecard cannot be changed</string>
+	<string name="NotecardDropNoCopy">You cannot copy this item, so it cannot be added to the notecard</string>
+	<string name="NotecardCopyUnsaved">Save the notecard first: [NAME] can only be copied from a saved notecard</string>
+	<string name="NotecardCopyFailed">[NAME] could not be copied: not connected to a region</string>
+	<string name="NotecardCopyRefused">[NAME] could not be copied: [ERROR]</string>
+	<string name="NotecardFull">[NAME] is full: a notecard holds at most [LIMIT] bytes</string>
+
 	<!-- ToolTips for notecards -->
 	<string name="TooltipNotecardNotAllowedTypeDrop">
 Items of this type can't be attached
@@ -2448,6 +3387,7 @@ If you continue to receive this message, please contact Second Life support for 
     <string name="no_copy_lbl"     value=" no copy" />
 	<string name="LoadingContents">Loading contents...</string>
 	<string name="NoContents">No contents</string>
+	<string name="ContentsUnavailable">The contents could not be loaded</string>
 	<string name="WornOnAttachmentPoint" value=" (worn on [ATTACHMENT_POINT])" />
 	<string name="AttachmentErrorMessage" value=" ([ATTACHMENT_ERROR])" />
 	<string name="ActiveGesture" value="[GESLABEL] (active)"/>
@@ -2697,9 +3637,6 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="CompileSuccessful">Compile successful!</string>
 	<string name="CompileSuccessfulSaving">Compile successful, saving...</string>
 	<string name="SaveComplete">Save complete.</string>
-	<string name="UploadFailed">File upload failed: </string>
-	<string name="ObjectOutOfRange">Script (object out of range)</string>
-	<string name="ScriptWasDeleted">Script (deleted from inventory)</string>
 	
 	<!-- god tools -->
 	<string name="GodToolsObjectOwnedBy">Object [OBJECT] owned by [OWNER]</string>
@@ -2822,7 +3759,6 @@ If you continue to receive this message, please contact Second Life support for 
     <string name="ATTACH_HIND_RFOOT">Right Hind Foot</string>
 
 	<!-- script editor -->
-	<string name="CursorPos">Line [LINE], Column [COLUMN]</string>
 
 	<!-- panel dir browser -->
 	<string name="PanelDirCountFound">[COUNT] found</string>
@@ -4081,7 +5017,7 @@ Try enclosing path to the editor with double quotes.
  <string name="ExternalEditorCommandParseError">Error parsing the external editor command.</string>
  <string name="ExternalEditorFailedToRun">External editor failed to run.</string>
  <string name="ExternalEditorFailedToStart">Failed to start the WebSocket server. Ensure the ExternalWebsocketSyncEnable setting is on.</string>
- <string name="VSCodeLaunchFailed">Failed to launch VS Code. Ensure the 'code' command is available on your PATH.</string>
+ <string name="VSCodeLaunchFailed">Could not start VS Code. Make sure the 'code' command is on your PATH.</string>
 
  <!--  Machine translation of chat messahes -->
  <string name="TranslationFailed">Translation failed: [REASON]</string>
@@ -4237,6 +5173,7 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_Debug_Label">Debug Settings</string>
   <string name="Command_Destinations_Label">Destinations</string>
   <string name="Command_Environments_Label">My Environments</string>
+  <string name="Command_Feedback_Label">Feedback</string>
   <string name="Command_Gestures_Label">Gestures</string>
   <string name="Command_Grid_Status_Label">Grid status</string>
   <string name="Command_Inventory_Label">Inventory</string>
@@ -4260,6 +5197,7 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_Report_Abuse_Label">Report Abuse</string>
   <string name="Command_SceneExplorer_Label">Scene Explorer</string>
   <string name="Command_Scripts_Label">My Scripts</string>
+  <string name="Command_ScriptStudio_Label">Script Studio</string>
   <string name="Command_Stats_Label">Statistics</string>
   <string name="Command_Search_Label">Search</string>
   <string name="Command_Snapshot_Label">Snapshot</string>
@@ -4282,10 +5220,11 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_Debug_Tooltip">Debug settings for advanced users</string>
   <string name="Command_Destinations_Tooltip">Destinations of interest</string>
   <string name="Command_Environments_Tooltip">My Environments</string>
+  <string name="Command_Feedback_Tooltip">Tell the Alchemy developers what's wrong or what you'd like</string>
   <string name="Command_Gestures_Tooltip">Gestures for your avatar</string>
   <string name="Command_Grid_Status_Tooltip">Show current Grid status</string>
   <string name="Command_Inventory_Tooltip">View and use your belongings</string>
-  <string name="Command_Lightbox_Settings_Tooltip">Holds various useful photo-centric options.</string>
+  <string name="Command_Lightbox_Settings_Tooltip">Shape the picture: exposure and color grading, lens effects, render quality and the sky</string>
   <string name="Command_LocalAssets_Tooltip">Preview local mesh, animation, texture, and material files</string>
   <string name="Command_Map_Tooltip">Map of the world</string>
   <string name="Command_Marketplace_Tooltip">Go shopping</string>
@@ -4305,6 +5244,7 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_Report_Abuse_Tooltip">Report Abuse</string>
   <string name="Command_SceneExplorer_Tooltip">Browse and filter everything in the region</string>
   <string name="Command_Scripts_Tooltip">Scripts attached to your avatar</string>
+  <string name="Command_ScriptStudio_Tooltip">Write, check and save scripts</string>
   <string name="Command_Stats_Tooltip">Statistics like FPS, network usage and sim performance</string>
   <string name="Command_Search_Tooltip">Find places, events, people</string>
   <string name="Command_Snapshot_Tooltip">Open the snapshot floater</string>
@@ -4534,4 +5474,26 @@ and report the problem.
     <string name="TooltipDistance">
         Distance: [OBJECT_DISTANCE]
     </string>
+
+    <!-- Discord rich presence -->
+    <string name="DiscordViaViewer">via [APP_NAME]</string>
+    <string name="DiscordHiddenRegion">Hidden Region</string>
+
+    <!-- What ended the previous run, for the question about it -->
+    <string name="AlchemyFeedbackCrashed">Alchemy crashed the last time it ran.</string>
+    <string name="AlchemyFeedbackFroze">Alchemy stopped responding the last time it ran.</string>
+    <string name="AlchemyFeedbackCrashedQuitting">Alchemy crashed while quitting the last time it ran.</string>
+    <string name="AlchemyFeedbackFrozeQuitting">Alchemy stopped responding while quitting the last time it ran.</string>
+
+    <!-- When a report was written -->
+    <string name="AlchemyFeedbackDate">[day,datetime,local] [mth,datetime,local]</string>
+
+    <!-- Feedback that did not reach the developers -->
+    <string name="AlchemyFeedbackRateLimited">Too many reports are reaching the server right now. Try again later.</string>
+    <string name="AlchemyFeedbackTooLarge">That's too large to send. It can go without the attachments.</string>
+    <string name="AlchemyFeedbackRejected">The server refused this report. You can report it on GitHub instead.</string>
+    <string name="AlchemyFeedbackUnreachable">Couldn't reach the server. Check your connection and try again.</string>
+    <string name="AlchemyFeedbackRateLimitedQueued">The server is busy. Your report will be sent automatically later; you can close this window.</string>
+    <string name="AlchemyFeedbackUnreachableQueued">Couldn't reach the server. Your report will be sent automatically once it can be; you can close this window.</string>
+    <string name="AlchemyFeedbackDisconnectedQueued">You're disconnected. Your report will be sent the next time Alchemy starts; you can close this window.</string>
 </strings>

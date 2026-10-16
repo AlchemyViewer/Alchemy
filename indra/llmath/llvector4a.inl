@@ -28,79 +28,67 @@
 // LOAD/STORE
 ////////////////////////////////////
 
-// Load from 16-byte aligned src array (preferred method of loading)
 inline void LLVector4a::load4a(const F32* src)
 {
-    mQ = _mm_load_ps(src);
+    mQ = alsimd::load(src);
 }
 
-// Load from unaligned src array (NB: Significantly slower than load4a)
 inline void LLVector4a::loadua(const F32* src)
 {
-    mQ = _mm_loadu_ps(src);
+    mQ = alsimd::loadu(src);
 }
 
-// Load only three floats beginning at address 'src'. Slowest method.
 inline void LLVector4a::load3(const F32* src)
 {
-    // mQ = { 0.f, src[2], src[1], src[0] } = { W, Z, Y, X }
-    // NB: This differs from the convention of { Z, Y, X, W }
-    mQ = _mm_set_ps(0.f, src[2], src[1], src[0]);
+    mQ = alsimd::load3(src);
 }
 
-// Store to a 16-byte aligned memory address
 inline void LLVector4a::store4a(F32* dst) const
 {
-    _mm_store_ps(dst, mQ);
+    alsimd::store(dst, mQ);
 }
 
 ////////////////////////////////////
 // BASIC GET/SET
 ////////////////////////////////////
 
-// Return a "this" as an F32 pointer.
+// The register type aliases float under every compiler here: GCC gives a
+// vector type its element's alias set, Clang gives it the character type's,
+// and MSVC declares it as a union of the lanes.
 F32* LLVector4a::getF32ptr()
 {
-    return (F32*) &mQ;
+    return reinterpret_cast<F32*>(&mQ);
 }
 
-// Return a "this" as a const F32 pointer.
-const F32* const LLVector4a::getF32ptr() const
+const F32* LLVector4a::getF32ptr() const
 {
-    return (const F32* const) &mQ;
+    return reinterpret_cast<const F32*>(&mQ);
 }
 
-// Read-only access a single float in this vector. Do not use in proximity to any function call that manipulates
-// the data at the whole vector level or you will incur a substantial penalty. Consider using the splat functions instead
 inline F32 LLVector4a::operator[](const S32 idx) const
 {
-    alignas(16) F32 tmp[4];
-    _mm_store_ps(tmp, mQ);
-    return tmp[idx];
+    return alsimd::lane(mQ, idx);
 }
 
-// Prefer this method for read-only access to a single element. Prefer the templated version if the elem is known at compile time.
 inline LLSimdScalar LLVector4a::getScalarAt(const S32 idx) const
 {
-    // Return appropriate LLQuad. It will be cast to LLSimdScalar automatically (should be effectively a nop)
     switch (idx)
     {
         case 0:
             return mQ;
         case 1:
-            return _mm_shuffle_ps(mQ, mQ, _MM_SHUFFLE(1, 1, 1, 1));
+            return alsimd::splat<1>(mQ);
         case 2:
-            return _mm_shuffle_ps(mQ, mQ, _MM_SHUFFLE(2, 2, 2, 2));
+            return alsimd::splat<2>(mQ);
         case 3:
         default:
-            return _mm_shuffle_ps(mQ, mQ, _MM_SHUFFLE(3, 3, 3, 3));
+            return alsimd::splat<3>(mQ);
     }
 }
 
-// Prefer this method for read-only access to a single element. Prefer the templated version if the elem is known at compile time.
 template <int N> LL_FORCE_INLINE LLSimdScalar LLVector4a::getScalarAt() const
 {
-    return _mm_shuffle_ps(mQ, mQ, _MM_SHUFFLE(N, N, N, N));
+    return alsimd::splat<N>(mQ);
 }
 
 template<> LL_FORCE_INLINE LLSimdScalar LLVector4a::getScalarAt<0>() const
@@ -108,316 +96,164 @@ template<> LL_FORCE_INLINE LLSimdScalar LLVector4a::getScalarAt<0>() const
     return mQ;
 }
 
-// Set to an x, y, z and optional w provided
 inline void LLVector4a::set(F32 x, F32 y, F32 z, F32 w)
 {
-    mQ = _mm_set_ps(w, z, y, x);
+    mQ = alsimd::set(x, y, z, w);
 }
 
-// Set to all zeros
 inline void LLVector4a::clear()
 {
-    mQ = _mm_setzero_ps();
+    mQ = alsimd::zero();
 }
 
 inline void LLVector4a::splat(const F32 x)
 {
-    mQ = _mm_set_ps1(x);
+    mQ = alsimd::set1(x);
 }
 
 inline void LLVector4a::splat(const LLSimdScalar& x)
 {
-    mQ = _mm_shuffle_ps( x.getQuad(), x.getQuad(), _MM_SHUFFLE(0,0,0,0) );
+    mQ = alsimd::splat<0>(x.getQuad());
 }
 
-// Set all 4 elements to element N of src, with N known at compile time
 template <int N> void LLVector4a::splat(const LLVector4a& src)
 {
-    mQ = _mm_shuffle_ps(src.mQ, src.mQ, _MM_SHUFFLE(N, N, N, N) );
+    mQ = alsimd::splat<N>(src.mQ);
 }
 
-// Set all 4 elements to element i of v, with i NOT known at compile time
 inline void LLVector4a::splat(const LLVector4a& v, U32 i)
 {
     switch (i)
     {
         case 0:
-            mQ = _mm_shuffle_ps(v.mQ, v.mQ, _MM_SHUFFLE(0, 0, 0, 0));
+            mQ = alsimd::splat<0>(v.mQ);
             break;
         case 1:
-            mQ = _mm_shuffle_ps(v.mQ, v.mQ, _MM_SHUFFLE(1, 1, 1, 1));
+            mQ = alsimd::splat<1>(v.mQ);
             break;
         case 2:
-            mQ = _mm_shuffle_ps(v.mQ, v.mQ, _MM_SHUFFLE(2, 2, 2, 2));
+            mQ = alsimd::splat<2>(v.mQ);
             break;
         case 3:
-            mQ = _mm_shuffle_ps(v.mQ, v.mQ, _MM_SHUFFLE(3, 3, 3, 3));
+            mQ = alsimd::splat<3>(v.mQ);
             break;
     }
 }
 
-// Select bits from sourceIfTrue and sourceIfFalse according to bits in mask
 inline void LLVector4a::setSelectWithMask( const LLVector4Logical& mask, const LLVector4a& sourceIfTrue, const LLVector4a& sourceIfFalse )
 {
-    // ((( sourceIfTrue ^ sourceIfFalse ) & mask) ^ sourceIfFalse )
-    // E.g., sourceIfFalse = 1010b, sourceIfTrue = 0101b, mask = 1100b
-    // (sourceIfTrue ^ sourceIfFalse) = 1111b --> & mask = 1100b --> ^ sourceIfFalse = 0110b,
-    // as expected (01 from sourceIfTrue, 10 from sourceIfFalse)
-    // Courtesy of Mark++, http://markplusplus.wordpress.com/2007/03/14/fast-sse-select-operation/
-    mQ = _mm_xor_ps( sourceIfFalse, _mm_and_ps( mask, _mm_xor_ps( sourceIfTrue, sourceIfFalse ) ) );
+    mQ = alsimd::select(mask, sourceIfTrue.mQ, sourceIfFalse.mQ);
 }
 
 ////////////////////////////////////
 // ALGEBRAIC
 ////////////////////////////////////
 
-// Set this to the element-wise (a + b)
 inline void LLVector4a::setAdd(const LLVector4a& a, const LLVector4a& b)
 {
-    mQ = _mm_add_ps(a.mQ, b.mQ);
+    mQ = alsimd::add(a.mQ, b.mQ);
 }
 
-// Set this to element-wise (a - b)
 inline void LLVector4a::setSub(const LLVector4a& a, const LLVector4a& b)
 {
-    mQ = _mm_sub_ps(a.mQ, b.mQ);
+    mQ = alsimd::sub(a.mQ, b.mQ);
 }
 
-// Set this to element-wise multiply (a * b)
 inline void LLVector4a::setMul(const LLVector4a& a, const LLVector4a& b)
 {
-    mQ = _mm_mul_ps(a.mQ, b.mQ);
+    mQ = alsimd::mul(a.mQ, b.mQ);
 }
 
-// Set this to element-wise quotient (a / b)
 inline void LLVector4a::setDiv(const LLVector4a& a, const LLVector4a& b)
 {
-    mQ = _mm_div_ps( a.mQ, b.mQ );
+    mQ = alsimd::div(a.mQ, b.mQ);
 }
 
-// Set this to the element-wise absolute value of src
 inline void LLVector4a::setAbs(const LLVector4a& src)
 {
-    mQ = _mm_andnot_ps(_mm_set1_ps(-0.f), src.mQ);
+    mQ = alsimd::abs(src.mQ);
 }
 
-// Add to each component in this vector the corresponding component in rhs
+inline void LLVector4a::setNeg(const LLVector4a& src)
+{
+    mQ = alsimd::neg(src.mQ);
+}
+
 inline void LLVector4a::add(const LLVector4a& rhs)
 {
-    mQ = _mm_add_ps(mQ, rhs.mQ);
+    mQ = alsimd::add(mQ, rhs.mQ);
 }
 
-// Subtract from each component in this vector the corresponding component in rhs
 inline void LLVector4a::sub(const LLVector4a& rhs)
 {
-    mQ = _mm_sub_ps(mQ, rhs.mQ);
+    mQ = alsimd::sub(mQ, rhs.mQ);
 }
 
-// Multiply each component in this vector by the corresponding component in rhs
 inline void LLVector4a::mul(const LLVector4a& rhs)
 {
-    mQ = _mm_mul_ps(mQ, rhs.mQ);
+    mQ = alsimd::mul(mQ, rhs.mQ);
 }
 
-// Divide each component in this vector by the corresponding component in rhs
 inline void LLVector4a::div(const LLVector4a& rhs)
 {
-    // TODO: Check accuracy, maybe add divFast
-    mQ = _mm_div_ps(mQ, rhs.mQ);
+    mQ = alsimd::div(mQ, rhs.mQ);
 }
 
-// Multiply this vector by x in a scalar fashion
 inline void LLVector4a::mul(const F32 x)
 {
-    LLVector4a t;
-    t.splat(x);
-
-    mQ = _mm_mul_ps(mQ, t.mQ);
+    mQ = alsimd::mul(mQ, alsimd::set1(x));
 }
 
-// Set this to (a x b) (geometric cross-product)
+inline void LLVector4a::negate()
+{
+    mQ = alsimd::neg(mQ);
+}
+
 inline void LLVector4a::setCross3(const LLVector4a& a, const LLVector4a& b)
 {
-    // Vectors are stored in memory in w, z, y, x order from high to low
-    // Set vector1 = { a[W], a[X], a[Z], a[Y] }
-    const LLQuad vector1 = _mm_shuffle_ps( a.mQ, a.mQ, _MM_SHUFFLE( 3, 0, 2, 1 ));
-    // Set vector2 = { b[W], b[Y], b[X], b[Z] }
-    const LLQuad vector2 = _mm_shuffle_ps( b.mQ, b.mQ, _MM_SHUFFLE( 3, 1, 0, 2 ));
-    // mQ = { a[W]*b[W], a[X]*b[Y], a[Z]*b[X], a[Y]*b[Z] }
-    mQ = _mm_mul_ps( vector1, vector2 );
-    // vector3 = { a[W], a[Y], a[X], a[Z] }
-    const LLQuad vector3 = _mm_shuffle_ps( a.mQ, a.mQ, _MM_SHUFFLE( 3, 1, 0, 2 ));
-    // vector4 = { b[W], b[X], b[Z], b[Y] }
-    const LLQuad vector4 = _mm_shuffle_ps( b.mQ, b.mQ, _MM_SHUFFLE( 3, 0, 2, 1 ));
-    // mQ = { 0, a[X]*b[Y] - a[Y]*b[X], a[Z]*b[X] - a[X]*b[Z], a[Y]*b[Z] - a[Z]*b[Y] }
-    mQ = _mm_sub_ps( mQ, _mm_mul_ps( vector3, vector4 ));
+    mQ = alsimd::cross3(a.mQ, b.mQ);
 }
 
-/* This function works, but may be slightly slower than the one below on older machines
- inline void LLVector4a::setAllDot3(const LLVector4a& a, const LLVector4a& b)
- {
- // ab = { a[W]*b[W], a[Z]*b[Z], a[Y]*b[Y], a[X]*b[X] }
- const LLQuad ab = _mm_mul_ps( a.mQ, b.mQ );
- // yzxw = { a[W]*b[W], a[Z]*b[Z], a[X]*b[X], a[Y]*b[Y] }
- const LLQuad wzxy = _mm_shuffle_ps( ab, ab, _MM_SHUFFLE(3, 2, 0, 1 ));
- // xPlusY = { 2*a[W]*b[W], 2 * a[Z] * b[Z], a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y] }
- const LLQuad xPlusY = _mm_add_ps(ab, wzxy);
- // xPlusYSplat = { a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y], a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y] }
- const LLQuad xPlusYSplat = _mm_movelh_ps(xPlusY, xPlusY);
- // zSplat = { a[Z]*b[Z], a[Z]*b[Z], a[Z]*b[Z], a[Z]*b[Z] }
- const LLQuad zSplat = _mm_shuffle_ps( ab, ab, _MM_SHUFFLE( 2, 2, 2, 2 ));
- // mQ = { a[Z] * b[Z] + a[Y] * b[Y] + a[X] * b[X], same, same, same }
- mQ = _mm_add_ps(zSplat, xPlusYSplat);
- }*/
-
-// Set all elements to the dot product of the x, y, and z elements in a and b
 inline void LLVector4a::setAllDot3(const LLVector4a& a, const LLVector4a& b)
 {
-#if (defined(__AVX__) || defined(__AVX2__) || defined(__arm64__) || defined(__aarch64__))
-    mQ = _mm_dp_ps(a.mQ, b.mQ, 0x7f);
-#else
-    // ab = { a[W]*b[W], a[Z]*b[Z], a[Y]*b[Y], a[X]*b[X] }
-    const LLQuad ab = _mm_mul_ps( a.mQ, b.mQ );
-    // yzxw = { a[W]*b[W], a[Z]*b[Z], a[X]*b[X], a[Y]*b[Y] }
-    const __m128i wzxy = _mm_shuffle_epi32(_mm_castps_si128(ab), _MM_SHUFFLE(3, 2, 0, 1 ));
-    // xPlusY = { 2*a[W]*b[W], 2 * a[Z] * b[Z], a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y] }
-    const LLQuad xPlusY = _mm_add_ps(ab, _mm_castsi128_ps(wzxy));
-    // xPlusYSplat = { a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y], a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y] }
-    const LLQuad xPlusYSplat = _mm_movelh_ps(xPlusY, xPlusY);
-    // zSplat = { a[Z]*b[Z], a[Z]*b[Z], a[Z]*b[Z], a[Z]*b[Z] }
-    const __m128i zSplat = _mm_shuffle_epi32(_mm_castps_si128(ab), _MM_SHUFFLE( 2, 2, 2, 2 ));
-    // mQ = { a[Z] * b[Z] + a[Y] * b[Y] + a[X] * b[X], same, same, same }
-    mQ = _mm_add_ps(_mm_castsi128_ps(zSplat), xPlusYSplat);
-#endif
+    mQ = alsimd::dot3(a.mQ, b.mQ);
 }
 
-// Set all elements to the dot product of the x, y, z, and w elements in a and b
 inline void LLVector4a::setAllDot4(const LLVector4a& a, const LLVector4a& b)
 {
-#if (defined(__AVX__) || defined(__AVX2__) || defined(__arm64__) || defined(__aarch64__))
-    mQ = _mm_dp_ps(a.mQ, b.mQ, 0xff);
-#else
-    // ab = { a[W]*b[W], a[Z]*b[Z], a[Y]*b[Y], a[X]*b[X] }
-    const LLQuad ab = _mm_mul_ps( a.mQ, b.mQ );
-    // yzxw = { a[W]*b[W], a[Z]*b[Z], a[X]*b[X], a[Y]*b[Y] }
-    const __m128i zwxy = _mm_shuffle_epi32(_mm_castps_si128(ab), _MM_SHUFFLE(2, 3, 0, 1 ));
-    // zPlusWandXplusY = { a[W]*b[W] + a[Z]*b[Z], a[Z] * b[Z] + a[W]*b[W], a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y] }
-    const LLQuad zPlusWandXplusY = _mm_add_ps(ab, _mm_castsi128_ps(zwxy));
-    // xPlusYSplat = { a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y], a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y] }
-    const LLQuad xPlusYSplat = _mm_movelh_ps(zPlusWandXplusY, zPlusWandXplusY);
-    const LLQuad zPlusWSplat = _mm_movehl_ps(zPlusWandXplusY, zPlusWandXplusY);
-
-    // mQ = { a[W]*b[W] + a[Z] * b[Z] + a[Y] * b[Y] + a[X] * b[X], same, same, same }
-    mQ = _mm_add_ps(xPlusYSplat, zPlusWSplat);
-#endif
+    mQ = alsimd::dot4(a.mQ, b.mQ);
 }
 
-// Return the 3D dot product of this vector and b
 inline LLSimdScalar LLVector4a::dot3(const LLVector4a& b) const
 {
-#if (defined(__AVX__) || defined(__AVX2__) || defined(__arm64__) || defined(__aarch64__))
-    return _mm_dp_ps(mQ, b.mQ, 0x7f);
-#else
-    const LLQuad ab = _mm_mul_ps( mQ, b.mQ );
-    const LLQuad splatY = _mm_castsi128_ps( _mm_shuffle_epi32( _mm_castps_si128(ab), _MM_SHUFFLE(1, 1, 1, 1) ) );
-    const LLQuad splatZ = _mm_castsi128_ps( _mm_shuffle_epi32( _mm_castps_si128(ab), _MM_SHUFFLE(2, 2, 2, 2) ) );
-    const LLQuad xPlusY = _mm_add_ps( ab, splatY );
-    return _mm_add_ps( xPlusY, splatZ );
-#endif
+    return alsimd::dot3(mQ, b.mQ);
 }
 
-// Return the 4D dot product of this vector and b
 inline LLSimdScalar LLVector4a::dot4(const LLVector4a& b) const
 {
-#if (defined(__AVX__) || defined(__AVX2__) || defined(__arm64__) || defined(__aarch64__))
-    return _mm_dp_ps(mQ, b.mQ, 0xff);
-#else
-    // ab = { w, z, y, x }
-    const LLQuad ab = _mm_mul_ps( mQ, b.mQ );
-    // upperProdsInLowerElems = { y, x, y, x }
-    const LLQuad upperProdsInLowerElems = _mm_movehl_ps( ab, ab );
-    // sumOfPairs = { w+y, z+x, 2y, 2x }
-    const LLQuad sumOfPairs = _mm_add_ps( upperProdsInLowerElems, ab );
-    // shuffled = { z+x, z+x, z+x, z+x }
-    const LLQuad shuffled = _mm_castsi128_ps( _mm_shuffle_epi32( _mm_castps_si128( sumOfPairs ), _MM_SHUFFLE(1, 1, 1, 1) ) );
-    return _mm_add_ss( sumOfPairs, shuffled );
-#endif
+    return alsimd::dot4(mQ, b.mQ);
 }
 
-// Normalize this vector with respect to the x, y, and z components only. Accurate to 22 bites of precision. W component is destroyed
-// Note that this does not consider zero length vectors!
 inline void LLVector4a::normalize3()
 {
-    // lenSqrd = a dot a
-    LLVector4a lenSqrd; lenSqrd.setAllDot3( *this, *this );
-    // rsqrt = approximate reciprocal square (i.e., { ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2 }
-    const LLQuad rsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-    // Now we do one round of Newton-Raphson approximation to get full accuracy
-    // According to the Newton-Raphson method, given a first 'w' for the root of f(x) = 1/x^2 - a (i.e., x = 1/sqrt(a))
-    // the next better approximation w[i+1] = w - f(w)/f'(w) = w - (1/w^2 - a)/(-2*w^(-3))
-    // w[i+1] = w + 0.5 * (1/w^2 - a) * w^3 = w + 0.5 * (w - a*w^3) = 1.5 * w - 0.5 * a * w^3
-    // = 0.5 * w * (3 - a*w^2)
-    // Our first approx is w = rsqrt. We need out = a * w[i+1] (this is the input vector 'a', not the 'a' from the above formula
-    // which is actually lenSqrd). So out = a * [0.5*rsqrt * (3 - lenSqrd*rsqrt*rsqrt)]
-    const LLQuad AtimesRsqrt = _mm_mul_ps( lenSqrd.mQ, rsqrt );
-    const LLQuad AtimesRsqrtTimesRsqrt = _mm_mul_ps( AtimesRsqrt, rsqrt );
-    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt);
-    const LLQuad nrApprox = _mm_mul_ps(_mm_set_ps1(0.5f), _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
-    mQ = _mm_mul_ps( mQ, nrApprox );
+    mQ = alsimd::mul(mQ, alsimd::rsqrt(alsimd::dot3(mQ, mQ)));
 }
 
-// Normalize this vector with respect to all components. Accurate to 22 bites of precision.
-// Note that this does not consider zero length vectors!
 inline void LLVector4a::normalize4()
 {
-    // lenSqrd = a dot a
-    LLVector4a lenSqrd; lenSqrd.setAllDot4( *this, *this );
-    // rsqrt = approximate reciprocal square (i.e., { ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2 }
-    const LLQuad rsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-    // Now we do one round of Newton-Raphson approximation to get full accuracy
-    // According to the Newton-Raphson method, given a first 'w' for the root of f(x) = 1/x^2 - a (i.e., x = 1/sqrt(a))
-    // the next better approximation w[i+1] = w - f(w)/f'(w) = w - (1/w^2 - a)/(-2*w^(-3))
-    // w[i+1] = w + 0.5 * (1/w^2 - a) * w^3 = w + 0.5 * (w - a*w^3) = 1.5 * w - 0.5 * a * w^3
-    // = 0.5 * w * (3 - a*w^2)
-    // Our first approx is w = rsqrt. We need out = a * w[i+1] (this is the input vector 'a', not the 'a' from the above formula
-    // which is actually lenSqrd). So out = a * [0.5*rsqrt * (3 - lenSqrd*rsqrt*rsqrt)]
-    const LLQuad AtimesRsqrt = _mm_mul_ps( lenSqrd.mQ, rsqrt );
-    const LLQuad AtimesRsqrtTimesRsqrt = _mm_mul_ps( AtimesRsqrt, rsqrt );
-    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt );
-    const LLQuad nrApprox = _mm_mul_ps(_mm_set_ps1(0.5f), _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
-    mQ = _mm_mul_ps( mQ, nrApprox );
+    mQ = alsimd::mul(mQ, alsimd::rsqrt(alsimd::dot4(mQ, mQ)));
 }
 
-// Normalize this vector with respect to the x, y, and z components only. Accurate to 22 bites of precision. W component is destroyed
-// Note that this does not consider zero length vectors!
 inline LLSimdScalar LLVector4a::normalize3withLength()
 {
-    // lenSqrd = a dot a
-    LLVector4a lenSqrd; lenSqrd.setAllDot3( *this, *this );
-    // rsqrt = approximate reciprocal square (i.e., { ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2 }
-    const LLQuad rsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-    // Now we do one round of Newton-Raphson approximation to get full accuracy
-    // According to the Newton-Raphson method, given a first 'w' for the root of f(x) = 1/x^2 - a (i.e., x = 1/sqrt(a))
-    // the next better approximation w[i+1] = w - f(w)/f'(w) = w - (1/w^2 - a)/(-2*w^(-3))
-    // w[i+1] = w + 0.5 * (1/w^2 - a) * w^3 = w + 0.5 * (w - a*w^3) = 1.5 * w - 0.5 * a * w^3
-    // = 0.5 * w * (3 - a*w^2)
-    // Our first approx is w = rsqrt. We need out = a * w[i+1] (this is the input vector 'a', not the 'a' from the above formula
-    // which is actually lenSqrd). So out = a * [0.5*rsqrt * (3 - lenSqrd*rsqrt*rsqrt)]
-    const LLQuad AtimesRsqrt = _mm_mul_ps( lenSqrd.mQ, rsqrt );
-    const LLQuad AtimesRsqrtTimesRsqrt = _mm_mul_ps( AtimesRsqrt, rsqrt );
-    const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt );
-    const LLQuad nrApprox = _mm_mul_ps(_mm_set_ps1(0.5f), _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
-    mQ = _mm_mul_ps( mQ, nrApprox );
-    return _mm_sqrt_ss(lenSqrd);
+    const LLQuad lenSqrd = alsimd::dot3(mQ, mQ);
+    mQ = alsimd::mul(mQ, alsimd::rsqrt(lenSqrd));
+    return alsimd::sqrt(lenSqrd);
 }
 
-// Normalize this vector with respect to the x, y, and z components only. Accurate only to 10-12 bits of precision. W component is destroyed
-// Note that this does not consider zero length vectors!
 inline void LLVector4a::normalize3fast()
 {
-    LLVector4a lenSqrd; lenSqrd.setAllDot3( *this, *this );
-    const LLQuad approxRsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-    mQ = _mm_mul_ps( mQ, approxRsqrt );
+    mQ = alsimd::mul(mQ, alsimd::rsqrt_fast(alsimd::dot3(mQ, mQ)));
 }
 
 inline void LLVector4a::normalize3fast_checked(LLVector4a* d)
@@ -428,16 +264,15 @@ inline void LLVector4a::normalize3fast_checked(LLVector4a* d)
         return;
     }
 
-    LLVector4a lenSqrd; lenSqrd.setAllDot3( *this, *this );
+    const LLQuad lenSqrd = alsimd::dot3(mQ, mQ);
 
-    if (lenSqrd[0] <= FLT_EPSILON)
+    if (alsimd::lane<0>(lenSqrd) <= FLT_EPSILON)
     {
         *this = d ? *d : LLVector4a(0,1,0,1);
         return;
     }
 
-    const LLQuad approxRsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-    mQ = _mm_mul_ps( mQ, approxRsqrt );
+    mQ = alsimd::mul(mQ, alsimd::rsqrt_fast(lenSqrd));
 }
 
 // Convert an absolute length tolerance to the equivalent absolute lensq
@@ -445,92 +280,59 @@ inline void LLVector4a::normalize3fast_checked(LLVector4a* d)
 // |len - 1| * (len + 1) for len >= 0. The check we want -- |len - 1| <=
 // tolerance -- is equivalent to |lensq - 1| <= tolerance * (len + 1), and
 // the upper-boundary case len = 1 + tolerance gives the largest safe
-// threshold: tolerance * (2 + tolerance) = 2*tolerance + tolerance^2. The
-// previous code multiplied tolerance by itself, which produced tolerance^2
-// and made the effective length tolerance roughly tolerance^2 / 2 -- two
-// orders of magnitude tighter than the documented behaviour at the default
-// tolerance = 1e-3 (effective ~5e-7).
-static LL_FORCE_INLINE LLSimdScalar lensq_tolerance_from_len(LLSimdScalar lenTol)
+// threshold: tolerance * (2 + tolerance) = 2*tolerance + tolerance^2.
+static LL_FORCE_INLINE F32 lensq_tolerance_from_len(F32 lenTol)
 {
-    const LLSimdScalar two = _mm_set_ss(2.f);
-    return _mm_mul_ss(lenTol, _mm_add_ss(lenTol, two));
+    return lenTol * (2.f + lenTol);
 }
 
-// Return true if this vector is normalized with respect to x,y,z up to tolerance
-inline LLBool32 LLVector4a::isNormalized3( F32 tolerance ) const
+inline bool LLVector4a::isNormalized3( F32 tolerance ) const
 {
-    const LLSimdScalar tol = lensq_tolerance_from_len(_mm_load_ss(&tolerance));
-    LLVector4a lenSquared; lenSquared.setAllDot3( *this, *this );
-    LLVector4a ones; ones.splat(1.f);
-    lenSquared.sub( ones );
-    lenSquared.setAbs(lenSquared);
-    return _mm_comile_ss( lenSquared, tol );
+    const LLQuad lenSquared = alsimd::dot3(mQ, mQ);
+    const F32 off = alsimd::lane<0>(alsimd::abs(alsimd::sub(lenSquared, alsimd::set1(1.f))));
+    return off <= lensq_tolerance_from_len(tolerance);
 }
 
-// Return true if this vector is normalized with respect to all components up to tolerance
-inline LLBool32 LLVector4a::isNormalized4( F32 tolerance ) const
+inline bool LLVector4a::isNormalized4( F32 tolerance ) const
 {
-    const LLSimdScalar tol = lensq_tolerance_from_len(_mm_load_ss(&tolerance));
-    LLVector4a lenSquared; lenSquared.setAllDot4( *this, *this );
-    LLVector4a ones; ones.splat(1.f);
-    lenSquared.sub( ones );
-    lenSquared.setAbs(lenSquared);
-    return _mm_comile_ss( lenSquared, tol );
+    const LLQuad lenSquared = alsimd::dot4(mQ, mQ);
+    const F32 off = alsimd::lane<0>(alsimd::abs(alsimd::sub(lenSquared, alsimd::set1(1.f))));
+    return off <= lensq_tolerance_from_len(tolerance);
 }
 
-// Set all elements to the length of vector 'v'
 inline void LLVector4a::setAllLength3( const LLVector4a& v )
 {
-    LLVector4a lenSqrd;
-    lenSqrd.setAllDot3(v, v);
-
-    mQ = _mm_sqrt_ps(lenSqrd.mQ);
+    mQ = alsimd::sqrt(alsimd::dot3(v.mQ, v.mQ));
 }
 
-// Get this vector's length
 inline LLSimdScalar LLVector4a::getLength3() const
 {
-    // Previously did `dot3((const LLVector4a)mQ)`, which used the implicit
-    // LLVector4a(LLQuad) ctor to materialize a fresh LLVector4a from the same
-    // storage we already have via `*this`. Pass *this directly.
-    return _mm_sqrt_ss( dot3(*this) );
+    return alsimd::sqrt(alsimd::dot3(mQ, mQ));
 }
 
-// Set the components of this vector to the minimum of the corresponding components of lhs and rhs
 inline void LLVector4a::setMin(const LLVector4a& lhs, const LLVector4a& rhs)
 {
-    mQ = _mm_min_ps(lhs.mQ, rhs.mQ);
+    mQ = alsimd::min(lhs.mQ, rhs.mQ);
 }
 
-// Set the components of this vector to the maximum of the corresponding components of lhs and rhs
 inline void LLVector4a::setMax(const LLVector4a& lhs, const LLVector4a& rhs)
 {
-    mQ = _mm_max_ps(lhs.mQ, rhs.mQ);
+    mQ = alsimd::max(lhs.mQ, rhs.mQ);
 }
 
-// Set this to  lhs + (rhs-lhs)*c
 inline void LLVector4a::setLerp(const LLVector4a& lhs, const LLVector4a& rhs, F32 c)
 {
-    LLVector4a t;
-    t.setSub(rhs,lhs);
-    t.mul(c);
-    setAdd(lhs, t);
+    mQ = alsimd::fmadd(alsimd::sub(rhs.mQ, lhs.mQ), alsimd::set1(c), lhs.mQ);
 }
 
-inline LLBool32 LLVector4a::isFinite3() const
+inline bool LLVector4a::isFinite3() const
 {
-    const __m128i nanOrInfMaskV = _mm_set1_epi32(0x7f800000);
-    const __m128i maskResult = _mm_and_si128(_mm_castps_si128(mQ), nanOrInfMaskV);
-    const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32(maskResult, nanOrInfMaskV));
-    return !equalityCheck.areAnySet(LLVector4Logical::MASK_XYZ);
+    return !alsimd::any3(alsimd::nonfinite(mQ));
 }
 
-inline LLBool32 LLVector4a::isFinite4() const
+inline bool LLVector4a::isFinite4() const
 {
-    const __m128i nanOrInfMaskV = _mm_set1_epi32(0x7f800000);
-    const __m128i maskResult = _mm_and_si128(_mm_castps_si128(mQ), nanOrInfMaskV);
-    const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32(maskResult, nanOrInfMaskV));
-    return !equalityCheck.areAnySet(LLVector4Logical::MASK_XYZW);
+    return !alsimd::any(alsimd::nonfinite(mQ));
 }
 
 inline void LLVector4a::setRotatedInv( const LLRotation& rot, const LLVector4a& vec )
@@ -547,77 +349,56 @@ inline void LLVector4a::setRotatedInv( const LLQuaternion2& quat, const LLVector
 
 inline void LLVector4a::clamp( const LLVector4a& low, const LLVector4a& high )
 {
-    const LLVector4Logical highMask = greaterThan( high );
-    const LLVector4Logical lowMask = lessThan( low );
-
-    setSelectWithMask( highMask, high, *this );
-    setSelectWithMask( lowMask, low, *this );
+    mQ = alsimd::select(alsimd::cmpgt(mQ, high.mQ), high.mQ, mQ);
+    mQ = alsimd::select(alsimd::cmplt(mQ, low.mQ), low.mQ, mQ);
 }
 
 
 ////////////////////////////////////
 // LOGICAL
 ////////////////////////////////////
-// The functions in this section will compare the elements in this vector
-// to those in rhs and return an LLVector4Logical with all bits set in elements
-// where the comparison was true and all bits unset in elements where the comparison
-// was false. See llvector4logica.h
-////////////////////////////////////
-// WARNING: Other than equals3 and equals4, these functions do NOT account
-// for floating point tolerance. You should include the appropriate tolerance
-// in the inputs.
-////////////////////////////////////
 
 inline LLVector4Logical LLVector4a::greaterThan(const LLVector4a& rhs) const
 {
-    return _mm_cmpgt_ps(mQ, rhs.mQ);
+    return alsimd::cmpgt(mQ, rhs.mQ);
 }
 
 inline LLVector4Logical LLVector4a::lessThan(const LLVector4a& rhs) const
 {
-    return _mm_cmplt_ps(mQ, rhs.mQ);
+    return alsimd::cmplt(mQ, rhs.mQ);
 }
 
 inline LLVector4Logical LLVector4a::greaterEqual(const LLVector4a& rhs) const
 {
-    return _mm_cmpge_ps(mQ, rhs.mQ);
+    return alsimd::cmpge(mQ, rhs.mQ);
 }
 
 inline LLVector4Logical LLVector4a::lessEqual(const LLVector4a& rhs) const
 {
-    return _mm_cmple_ps(mQ, rhs.mQ);
+    return alsimd::cmple(mQ, rhs.mQ);
 }
 
 inline LLVector4Logical LLVector4a::equal(const LLVector4a& rhs) const
 {
-    return _mm_cmpeq_ps(mQ, rhs.mQ);
+    return alsimd::cmpeq(mQ, rhs.mQ);
 }
 
-// Returns true if this and rhs are componentwise equal up to the specified absolute tolerance
 inline bool LLVector4a::equals4(const LLVector4a& rhs, F32 tolerance ) const
 {
-    LLVector4a diff; diff.setSub( *this, rhs );
-    diff.setAbs( diff );
-    const LLQuad tol = _mm_set_ps1(tolerance);
-    const LLQuad cmp = _mm_cmplt_ps( diff, tol );
-    return (_mm_movemask_ps( cmp ) & LLVector4Logical::MASK_XYZW) == LLVector4Logical::MASK_XYZW;
+    const LLQuad diff = alsimd::abs(alsimd::sub(mQ, rhs.mQ));
+    return alsimd::all(alsimd::cmplt(diff, alsimd::set1(tolerance)));
 }
 
 inline bool LLVector4a::equals3(const LLVector4a& rhs, F32 tolerance ) const
 {
-    LLVector4a diff; diff.setSub( *this, rhs );
-    diff.setAbs( diff );
-    const LLQuad tol = _mm_set_ps1(tolerance);
-    const LLQuad t = _mm_cmplt_ps( diff, tol );
-    return (_mm_movemask_ps( t ) & LLVector4Logical::MASK_XYZ) == LLVector4Logical::MASK_XYZ;
-
+    const LLQuad diff = alsimd::abs(alsimd::sub(mQ, rhs.mQ));
+    return alsimd::all3(alsimd::cmplt(diff, alsimd::set1(tolerance)));
 }
 
 ////////////////////////////////////
 // OPERATORS
 ////////////////////////////////////
 
-// Do NOT add aditional operators without consulting someone with SSE experience
 inline const LLVector4a& LLVector4a::operator= ( const LLQuad& rhs )
 {
     mQ = rhs;

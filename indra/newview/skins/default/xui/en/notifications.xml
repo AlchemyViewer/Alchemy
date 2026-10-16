@@ -1731,6 +1731,465 @@ Save Changes?
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioSaveChanges"
+   type="alertmodal">
+Save changes to &quot;[NAME]&quot;?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Don&apos;t Save"
+     yestext="Save"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSaveChangesMany"
+   type="alertmodal">
+[COUNT] scripts have unsaved changes. Save them before closing?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Don&apos;t Save"
+     yestext="Save All"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="New Item"
+   name="ScriptStudioNewItem"
+   type="alertmodal">
+Enter a name for the new [KIND]:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="name" type="text" value="[NAME]" />
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Create"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="Description"
+   name="ScriptStudioDescribe"
+   type="alertmodal">
+Enter a description for [NAME]:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="description" type="text" value="[DESCRIPTION]" max_length_chars="127" />
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Save"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="Save Theme"
+   name="ScriptStudioSaveTheme"
+   type="alertmodal">
+Enter a name to save the current colors as a theme:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="name" type="text" value="[NAME]" />
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Save"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioThemeNotSaved"
+   type="alertmodal">
+Could not save the theme to [PATH].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioThemeNameShipped"
+   type="alertmodal">
+A built-in theme is already named &quot;[NAME]&quot;. Choose another name.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNone"
+   type="alertmodal">
+You have no snippets of your own to save. Make one with New, or Copy a built-in one, first.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsTooLarge"
+   type="alertmodal">
+Your snippets come to [SIZE] bytes, and a notecard holds [LIMIT]. Delete some, or keep them with Edit as XML instead.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNotSaved"
+   type="alertmodal">
+Your snippets could not be saved to the notecard &quot;[NAME]&quot;: [REASON].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ScriptStudioSnippetsSaved"
+   log_to_chat="false"
+   type="notifytip">
+Saved [COUNT] snippets to the notecard &quot;[NAME]&quot; in your Notecards folder.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNotRead"
+   type="alertmodal">
+The notecard &quot;[NAME]&quot; could not be read: [REASON].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNotSnippets"
+   type="alertmodal">
+The notecard &quot;[NAME]&quot; does not hold snippets. Save to Inventory on the Snippets tab makes a notecard that does.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ScriptStudioSnippetsAdded"
+   log_to_chat="false"
+   type="notifytip">
+Snippets from &quot;[NAME]&quot;: [ADDED] added, [RENAMED] added under a numbered name as theirs was taken, [SKIPPED] you had already.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioDeleteItems"
+   type="alertmodal">
+[QUESTION]
+    <tag>confirm</tag>
+    <form name="form">
+      <ignore name="ignore"
+       session_only="true"
+       text="Confirm before deleting items from an object in Script Studio"/>
+      <button
+       default="true"
+       index="0"
+       name="Delete"
+       text="Delete"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioQuitUnsaved"
+   type="alertmodal">
+&quot;[NAME]&quot; has unsaved changes. Save them, keep them to reopen next time, or discard them?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Save"
+       text="Save"/>
+      <button
+       index="1"
+       name="Keep"
+       text="Keep for Next Time"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Don&apos;t Save"/>
+      <button
+       index="3"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioQuitUnsavedMany"
+   type="alertmodal">
+[COUNT] scripts and notecards have unsaved changes. Save them, keep them to reopen next time, or discard them?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Save"
+       text="Save"/>
+      <button
+       index="1"
+       name="Keep"
+       text="Keep for Next Time"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Don&apos;t Save"/>
+      <button
+       index="3"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioKeptOne"
+   type="alertmodal">
+You kept unsaved changes to [NAMES] for next time. They reopen when Script Studio opens. Open it now?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Script Studio"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioKept"
+   type="alertmodal">
+You kept unsaved changes to [COUNT] scripts and notecards for next time: [NAMES]. They reopen when Script Studio opens. Open it now?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Script Studio"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+    </form>
+  </notification>
+
+
+  <notification
+   icon="alertmodal.tga"
+   name="RecoveredUnsavedOne"
+   type="alertmodal">
+Unsaved changes to [NAMES] were kept when the viewer last closed. Open them to review and save, or discard them. Until then, they are in Script Studio's File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Them"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Discard Them"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="RecoveredUnsaved"
+   type="alertmodal">
+Unsaved changes to [COUNT] scripts and notecards were kept when the viewer last closed: [NAMES]. Open them to review and save, or discard them. Until then, they are in Script Studio's File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Them"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Discard Them"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioDeleteItemOpen"
+   type="alertmodal">
+Delete &quot;[NAME]&quot; from the object? This cannot be undone. Its unsaved changes are kept for a week in File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Delete"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioDeleteItemsOpen"
+   type="alertmodal">
+Delete [COUNT] items from their objects? This cannot be undone. Unsaved changes in open items are kept for a week in File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Delete"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioReplaceAll"
+   type="alertmodal">
+Replace [PLACES] in [SCRIPTS] with &quot;[WITH]&quot;? You can undo each one's changes in one step. Those not open will open with the changes unsaved.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Replace"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioFixAll"
+   type="alertmodal">
+Apply [FIXES] in &quot;[NAME]&quot;, one per problem, such as &quot;[EXAMPLE]&quot;? You can undo them in one step, or preview them first.[LEFT]
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Preview"
+     yestext="Fix"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioPrefsChanged"
+   type="alertmodal">
+Keep the changes made to Script Studio&apos;s preferences?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Discard"
+     yestext="Keep"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioRevert"
+   type="alertmodal">
+Revert &quot;[NAME]&quot; to its last saved version? Your unsaved changes are kept for a week in File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Revert"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioResetScripts"
+   type="alertmodal">
+Reset [COUNT] scripts? Each one clears its variables and starts again from state_entry.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Reset"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioStopScripts"
+   type="alertmodal">
+Stop [COUNT] scripts? They stay stopped until you start them again.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Stop"/>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ScriptStudioMasters"
+   log_to_chat="false"
+   type="notifytip">
+[MESSAGE]
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioMastersSendUsers"
+   type="alertmodal">
+[FILES] changed on disk. That changes [COUNT] scripts in the world linked to files, [PLACES]. Send them now? Scripts not sent wait for Send from Files.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Don't Send"
+     yestext="Send All"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioFileChanged"
+   type="alertmodal">
+[NAME] changed on disk, and this tab has unsaved changes. Reload it from disk, or keep your changes?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Keep Mine"
+     yestext="Read from Disk"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioLinkUnsaved"
+   type="alertmodal">
+&quot;[NAME]&quot; has unsaved changes, and linking it to [FILE] makes the file what it holds. Write your changes to the file, replacing everything in it? Or discard them and take the file as it is? Discarded changes are kept for a week in File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Discard Changes"
+     yestext="Write to File"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="DeleteNotecard"
    type="alertmodal">
    <unique/>
@@ -1807,28 +2266,7 @@ There was a problem saving a notecard due to the following reason: [REASON].  Pl
 <tag>fail</tag>
   </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="ScriptCannotUndo"
-   type="alertmodal">
-Could not undo all changes in your version of the script.
-Would you like to load the server&apos;s last saved version?
-(**Warning** This operation cannot be undone.)
-    <tag>confirm</tag>
-    <usetemplate
-     name="okcancelbuttons"
-     notext="Cancel"
-     yestext="OK"/>
-  </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="SaveScriptFailObjectNotFound"
-   type="alertmodal">
-Could not save the script because the object it is in could not be found.
-The object may be out of range or may have been deleted.
-<tag>fail</tag>
-  </notification>
 
   <notification
    icon="alertmodal.tga"
@@ -1842,14 +2280,6 @@ Please type the Region name in Start Location box or choose My Last Location or 
      yestext="OK"/>
   </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="CouldNotStartStopScript"
-   type="alertmodal">
-Could not start or stop the script because the object it is on could not be found.
-The object may be out of range or may have been deleted.
-  <tag>fail</tag>
-  </notification>
 
   <notification
    icon="alertmodal.tga"
@@ -1931,6 +2361,23 @@ This is often the case with new hardware that hasn&apos;t been tested yet with [
        text="My graphics card could not be identified"/>
     </form>
   <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="SoftwareRenderer"
+   type="alertmodal">
+[APP_NAME] is drawing with [RENDERER], which renders on the CPU instead of the graphics card, so it will be very slow.
+
+This usually means the graphics driver did not load. Common causes:
+- NVIDIA&apos;s driver without its EGL platform library: egl-wayland on Wayland, egl-x11 on X11.
+- No Mesa driver installed for the graphics card, or no permission to open /dev/dri.
+- A virtual machine or container without access to the GPU, or WSL without its d3d12 driver.
+    <tag>fail</tag>
+    <usetemplate
+     ignoretext="Graphics are being drawn on the CPU"
+     name="okignore"
+     yestext="OK"/>
   </notification>
 
   <notification
@@ -3184,17 +3631,6 @@ Join land?
      yestext="OK"/>
   </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="ConfirmNotecardSave"
-   type="alertmodal">
-This notecard needs to be saved before the item can be copied or viewed. Save notecard?
-    <tag>confirm</tag>
-    <usetemplate
-     name="okcancelbuttons"
-     notext="Cancel"
-     yestext="OK"/>
-  </notification>
 
   <notification
    icon="alertmodal.tga"
@@ -5820,6 +6256,17 @@ You won't receive any more notifications that you're about to visit a region wit
 
   <notification
    icon="alertmodal.tga"
+   name="RegionTPAccessBlocked_NotifyAdultsOnly"
+   type="alertmodal">
+    <tag>fail</tag>
+    The region you are trying to visit is rated [REGIONMATURITY_CAP], which is not available on your account type.
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="LandClaimAccessBlocked"
    type="alertmodal">
     The land you're trying to claim has a maturity rating exceeding your current preferences.  You can change your preferences using Me &gt; Preferences &gt; General.
@@ -7487,29 +7934,8 @@ Please try again.
      yestext="OK"/>
   </notification>
 
-  <notification
-   icon="notifytip.tga"
-   name="ScriptMissing"
-   type="notifytip">
-Script is missing from database.
-  <tag>fail</tag>
-  </notification>
 
-  <notification
-   icon="notifytip.tga"
-   name="ScriptNoPermissions"
-   type="notifytip">
-Insufficient permissions to view script.
-  <tag>fail</tag>
-  </notification>
 
-  <notification
-   icon="notifytip.tga"
-   name="UnableToLoadScript"
-   type="notifytip">
-Unable to load script.  Please try again.
-  <tag>fail</tag>
-  </notification>
 
   <notification
    icon="notifytip.tga"
@@ -9326,6 +9752,16 @@ Failed to save snapshot to [PATH]: Directory does not exist.
   </notification>
 
   <notification icon="notifytip.tga"
+    name="CutoutSnapshotSaved" type="notifytip">
+That snapshot was a cutout: only what Cutout is set to was drawn. It stays on until you uncheck Cutout in the snapshot window.
+  </notification>
+
+  <notification icon="notifytip.tga"
+    name="CutoutTargetMissing" type="notifytip">
+No snapshot was saved: what Cutout is set to is not in view. Turn the camera to it, pick it again, or uncheck Cutout in the snapshot window.
+  </notification>
+
+  <notification icon="notifytip.tga"
     name="SnapshotSavedToComputer" type="notifytip">
 Screenshot saved to:
     [FILEPATH]
@@ -9351,14 +9787,14 @@ Can not overwrite default preset.
     icon="notifytip.tga"
     name="LightBoxWhiteBalanceTooDark"
     type="notifytip">
-That spot is too dark to read a colour from. Pick something well lit that should look white or grey.
+That spot is too dark to read a color from. Pick something well lit that should look white or grey.
   </notification>
 
   <notification
     icon="notifytip.tga"
     name="LightBoxWhiteBalanceUnreachable"
     type="notifytip">
-Temperature and tint cannot neutralise that. It looks like a coloured surface rather than a neutral one under coloured light.
+Temperature and tint cannot neutralize that. It looks like a colored surface rather than a neutral one under colored light.
   </notification>
 
   <notification
@@ -13448,6 +13884,158 @@ Always Run disabled.
 	 Irrevocably destroying object. Hope you didn't need that.
  </notification>
 
+ <notification
+  icon="alertmodal.tga"
+  name="AlchemyCrashReportConsent"
+  type="alertmodal">
+Send crash reports to the Alchemy developers?
+
+A report carries where the viewer crashed, its log, your settings and your avatar name. It goes to Sentry, where only the Alchemy developers can see it, and never without this permission. Preferences can change the answer later.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Don't send"
+     yestext="Send reports"/>
+ </notification>
+
+ <notification
+  icon="alert.tga"
+  name="AlchemyFeedbackAfterCrash"
+  type="alert">
+[WHAT] If you remember what you were doing, telling the developers helps them find the cause.
+    <form name="form">
+      <button
+       index="0"
+       name="tell"
+       text="Tell us what happened"/>
+      <button
+       default="true"
+       index="1"
+       name="not_now"
+       text="Not now"/>
+      <ignore text="Ask what happened after Alchemy crashes or stops responding"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackSent"
+  type="notify">
+Thanks. Your feedback reached the Alchemy developers.
+Reference: [REF]
+    <form name="form">
+      <button
+       index="0"
+       name="copy"
+       text="Copy reference"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyFeedbackQueued"
+  type="notifytip">
+Your feedback couldn't reach the server yet. It will be sent automatically.
+ </notification>
+
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyFeedbackQueuedDisconnected"
+  type="notifytip">
+You're disconnected, so your feedback will be sent the next time Alchemy starts.
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackKeptSent"
+  type="notify">
+Feedback you sent earlier has now reached the Alchemy developers.
+Reference: [REF]
+    <form name="form">
+      <button
+       index="0"
+       name="copy"
+       text="Copy reference"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackFailed"
+  type="notify">
+Your feedback was not sent. [REASON]
+
+Your message is saved in Send Feedback.
+    <form name="form">
+      <button
+       index="0"
+       name="open"
+       text="Open"/>
+      <button
+       default="true"
+       index="1"
+       name="dismiss"
+       text="Dismiss"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackGivenUpRestored"
+  type="notify">
+Feedback you wrote on [DATE] could not reach the Alchemy developers, and Alchemy has stopped trying. Your message is back in Send Feedback.
+    <form name="form">
+      <button
+       index="0"
+       name="open"
+       text="Open"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackGivenUp"
+  type="notify">
+Feedback you wrote on [DATE] could not reach the Alchemy developers, and Alchemy has stopped trying.
+    <form name="form">
+      <button
+       index="0"
+       name="copy"
+       text="Copy message"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="alertmodal.tga"
+  name="AlchemyFeedbackSendTest"
+  type="alertmodal">
+Send a test report to the Alchemy developers? It carries your system information and this session's log, and your avatar's name if Send Feedback is set to include it.
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Send"/>
+ </notification>
+
   <notification
    icon="alertmodal.tga"
    name="SceneExplorerFullRegion"
@@ -13540,5 +14128,35 @@ Incoming instant messages from anyone who is not your friend will now be answere
      ignoretext="I change my status to autorespond mode for non-friends"
      name="okignore"
      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="XUIStudioRemoveOrphans"
+   type="alertmodal">
+Take every orphaned value out of every file of [LANG]?
+
+An orphan is a value the language writes for something the base no longer has: an element whose name is gone, an element with no name, or an attribute the base's element does not carry. The merge applies none of them.
+
+This writes the files and cannot be undone from here.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Remove"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="XUIStudioCloseDocument"
+   type="alertmodal">
+[FILE] has edits that are not saved.
+Save them before letting it go?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Don&apos;t Save"
+     yestext="Save"/>
   </notification>
 </notifications>

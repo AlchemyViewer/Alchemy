@@ -215,6 +215,22 @@ public:
     F32             getVelocityZ() const    { return getVelocity().mV[VZ]; } // ! HACK !
 
     //--------------------------------------------------------------------
+    // Health
+    //--------------------------------------------------------------------
+public:
+    typedef boost::signals2::signal<void(S32)> health_changed_signal_t;
+
+    S32             getHealth() const { return mHealth; }
+    // Arrives in HealthMessage as a percentage. Plays the damage sound and
+    // notifies below, both only when the value actually moves.
+    void            setHealth(S32 health);
+    boost::signals2::connection addHealthChangedCallback(const health_changed_signal_t::slot_type& cb);
+
+private:
+    S32                         mHealth { 100 };
+    health_changed_signal_t     mHealthChangedSignal;
+
+    //--------------------------------------------------------------------
     // Coordinate System
     //--------------------------------------------------------------------
 public:
@@ -345,7 +361,7 @@ private:
     LLFrameTimer    mFidgetTimer;
     LLFrameTimer    mFocusObjectFadeTimer;
     LLFrameTimer    mMoveTimer;
-    F32             mNextFidgetTime;
+    F64             mNextFidgetTime;    // on mFidgetTimer, which runs all session
     S32             mCurrentFidget;
 
     //--------------------------------------------------------------------
@@ -396,6 +412,7 @@ protected:
     void            ageChat();              // Helper function to prematurely age chat when agent is moving
 private:
     LLFrameTimer    mChatTimer;
+    U32             mChatAgedFrame = 0;     // LLFrameTimer::getFrameCount() of the last ageChat(), which ages a frame once
     LLUUID          mLastChatterID;
     F32             mNearChatRadius;
 
@@ -613,7 +630,7 @@ private:
     bool            mAutoPilotUseRotation;
     LLVector3       mAutoPilotTargetFacing;
     F32             mAutoPilotTargetDist;
-    S32             mAutoPilotNoProgressFrameCount;
+    F32             mAutoPilotNoProgressTime;   // seconds without getting closer
     F32             mAutoPilotRotationThreshold;
     std::string     mAutoPilotBehaviorName;
     void            (*mAutoPilotFinishedCallback)(bool, void *);

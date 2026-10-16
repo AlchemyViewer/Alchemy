@@ -62,7 +62,7 @@ public:
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
     virtual bool onActivate();
     virtual F32 getEaseInDuration();
-    virtual bool onUpdate(F32 activeTime, U8* joint_mask);
+    virtual bool onUpdate(F64 activeTime, U8* joint_mask);
 
 protected:
     //-------------------------------------------------------------------------

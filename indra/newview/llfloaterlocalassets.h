@@ -35,6 +35,8 @@ class LLTabContainer;
 class LLFloaterLocalAssets final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterLocalAssets, LLFloater);
+
     LLFloaterLocalAssets(const LLSD& key);
     ~LLFloaterLocalAssets() override;
 

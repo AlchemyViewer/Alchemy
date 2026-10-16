@@ -1510,15 +1510,21 @@ bool LLGestureMgr::matchPrefix(const std::string& in_str, std::string* out_str)
                 continue;
             }
 
-            std::string trigger_trunc = trigger;
-            LLStringUtil::truncate(trigger_trunc, in_len);
+            // A trigger is whatever the gesture's author typed, so cutting it
+            // to a byte count can split a character and hand the comparison
+            // ill-formed UTF-8, which the collator has no good answer for.
+            const std::string trigger_trunc = utf8str_truncate(trigger, (S32)in_len);
             if (!LLStringUtil::compareInsensitive(in_str, trigger_trunc))
             {
+                // The rest of the trigger begins where the part that matched
+                // ends. Counting from the typed string instead assumes the two
+                // are the same length, and a caseless match does not promise
+                // that -- folding can change how many bytes a word takes.
                 if (rest_of_match.compare("") == 0)
                 {
-                    rest_of_match = trigger.substr(in_str.size());
+                    rest_of_match = trigger.substr(trigger_trunc.size());
                 }
-                std::string cur_rest_of_match = trigger.substr(in_str.size());
+                std::string cur_rest_of_match = trigger.substr(trigger_trunc.size());
                 buf = "";
                 S32 i=0;
 

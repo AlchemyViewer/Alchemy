@@ -32,10 +32,6 @@
 #include "v3math.h"
 #include "v2math.h"
 
-#include "glm/vec3.hpp"
-#include "glm/vec4.hpp"
-#include "glm/gtc/type_ptr.hpp"
-
 class LLMatrix3;
 class LLMatrix4;
 class LLQuaternion;
@@ -77,12 +73,6 @@ public:
         mV[VW] = (F32)sd[VW].asReal();
     }
 
-    // GLM interop
-    explicit LLVector4(const glm::vec3& vec); // Initializes LLVector4 to (vec, 1)
-    explicit LLVector4(const glm::vec4& vec); // Initializes LLVector4 to vec
-    explicit operator glm::vec3() const;      // Initializes glm::vec3 to (vec[0]. vec[1], vec[2])
-    explicit operator glm::vec4() const;      // Initializes glm::vec4 to (vec[0]. vec[1], vec[2], vec[3])
-
     inline bool isFinite() const;                                   // checks to see if all values of LLVector3 are finite
 
     constexpr void clear() noexcept;        // Clears LLVector4 to (0, 0, 0, 1)
@@ -94,8 +84,6 @@ public:
     constexpr void set(const LLVector4 &vec) noexcept;          // Sets LLVector4 to vec
     constexpr void set(const LLVector3 &vec, F32 w = 1.f) noexcept; // Sets LLVector4 to LLVector3 vec
     constexpr void set(const F32 *vec) noexcept;                // Sets LLVector4 to vec
-    inline void set(const glm::vec4& vec); // Sets LLVector4 to vec
-    inline void set(const glm::vec3& vec, F32 w = 1.f); // Sets LLVector4 to LLVector3 vec with w defaulted to 1
 
     constexpr void setVec(F32 x, F32 y, F32 z) noexcept;        // deprecated
     constexpr void setVec(F32 x, F32 y, F32 z, F32 w) noexcept; // deprecated
@@ -215,22 +203,6 @@ inline LLVector4::LLVector4(const LLSD &sd)
     setValue(sd);
 }
 
-inline LLVector4::LLVector4(const glm::vec3& vec)
-{
-    mV[VX] = vec.x;
-    mV[VY] = vec.y;
-    mV[VZ] = vec.z;
-    mV[VW] = 1.f;
-}
-
-inline LLVector4::LLVector4(const glm::vec4& vec)
-{
-    mV[VX] = vec.x;
-    mV[VY] = vec.y;
-    mV[VZ] = vec.z;
-    mV[VW] = vec.w;
-}
-
 inline bool LLVector4::isFinite() const
 {
     return llfinite(mV[VX]) && llfinite(mV[VY]) && llfinite(mV[VZ]) && llfinite(mV[VW]);
@@ -287,21 +259,6 @@ constexpr void LLVector4::set(const F32* vec) noexcept
     mV[VY] = vec[VY];
     mV[VZ] = vec[VZ];
     mV[VW] = vec[VW];
-}
-inline void LLVector4::set(const glm::vec4& vec)
-{
-    mV[VX] = vec.x;
-    mV[VY] = vec.y;
-    mV[VZ] = vec.z;
-    mV[VW] = vec.w;
-}
-
-inline void LLVector4::set(const glm::vec3& vec, F32 w)
-{
-    mV[VX] = vec.x;
-    mV[VY] = vec.y;
-    mV[VZ] = vec.z;
-    mV[VW] = w;
 }
 
 // deprecated
@@ -455,16 +412,6 @@ inline constexpr const LLVector4& operator/=(LLVector4& a, F32 k) noexcept
 inline constexpr LLVector4 operator-(const LLVector4& a) noexcept
 {
     return LLVector4( -a.mV[VX], -a.mV[VY], -a.mV[VZ] );
-}
-
-inline LLVector4::operator glm::vec3() const
-{
-    return glm::vec3(mV[VX], mV[VY], mV[VZ]);
-}
-
-inline LLVector4::operator glm::vec4() const
-{
-    return glm::make_vec4(mV);
 }
 
 // [RLVa:KB] - RlvBehaviourModifierCompMin/Max

@@ -61,6 +61,8 @@ const F32 LOD_1_SCREEN_COVERAGE = 0.30f;
 const F32 LOD_2_SCREEN_COVERAGE = 0.40f;
 
 std::set<LLPointer<LLHUDNameTag> > LLHUDNameTag::sTextObjects;
+std::vector<LLPointer<LLHUDNameTag> > LLHUDNameTag::sAllTextObjects;
+bool LLHUDNameTag::sAllTextObjectsDirty = true;
 std::vector<LLPointer<LLHUDNameTag> > LLHUDNameTag::sVisibleTextObjects;
 bool LLHUDNameTag::sDisplayText = true ;
 const F32 LLHUDNameTag::NAMETAG_MAX_WIDTH = 298.f;
@@ -103,9 +105,30 @@ LLHUDNameTag::LLHUDNameTag(const U8 type)
 {
     LLPointer<LLHUDNameTag> ptr(this);
     sTextObjects.insert(ptr);
+    sAllTextObjectsDirty = true;
 
     mRoundedRectImgp = LLUI::getUIImage("Rounded_Rect");
     mRoundedRectTopImgp = LLUI::getUIImage("Rounded_Rect_Top");
+}
+
+void LLHUDNameTag::releaseTextObjects()
+{
+    // The set stays: it is the authority on what exists, and each tag drops
+    // its own place in it as it is marked dead. These two are derived from it
+    // and are only held between frames to save rebuilding them.
+    sAllTextObjects.clear();
+    sAllTextObjectsDirty = true;
+    sVisibleTextObjects.clear();
+}
+
+const std::vector<LLPointer<LLHUDNameTag> >& LLHUDNameTag::getAllTextObjects()
+{
+    if (sAllTextObjectsDirty)
+    {
+        sAllTextObjects.assign(sTextObjects.begin(), sTextObjects.end());
+        sAllTextObjectsDirty = false;
+    }
+    return sAllTextObjects;
 }
 
 LLHUDNameTag::~LLHUDNameTag()
@@ -172,9 +195,6 @@ bool LLHUDNameTag::lineSegmentIntersect(const LLVector4a& start, const LLVector4
     LLVector3 width_vec = mWidth * x_pixel_vec;
     LLVector3 height_vec = mHeight * y_pixel_vec;
 
-    LLCoordGL screen_pos;
-    LLViewerCamera::getInstance()->projectPosAgentToScreen(position, screen_pos, false);
-
     LLVector2 screen_offset;
     screen_offset = updateScreenPos(mPositionOffset);
 
@@ -238,7 +258,7 @@ void LLHUDNameTag::renderText()
     }
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-
+    LL_PROFILE_ZONE_NUM(mTextSegments.size() + mLabelSegments.size());
 
     LLColor4 shadow_color(0.f, 0.f, 0.f, 1.f);
     F32 alpha_factor = 1.f;
@@ -272,18 +292,13 @@ void LLHUDNameTag::renderText()
     // scale screen size of borders down
     //RN: for now, text on hud objects is never occluded
 
-    LLVector3 x_pixel_vec;
-    LLVector3 y_pixel_vec;
-
-    LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+    const LLVector3& x_pixel_vec = mPixelRightVec;
+    const LLVector3& y_pixel_vec = mPixelUpVec;
 
     LLVector3 width_vec = mWidth * x_pixel_vec;
     LLVector3 height_vec = mHeight * y_pixel_vec;
 
     mRadius = (width_vec + height_vec).magVec() * 0.5f;
-
-    LLCoordGL screen_pos;
-    LLViewerCamera::getInstance()->projectPosAgentToScreen(mPositionAgent, screen_pos, false);
 
     LLVector2 screen_offset = updateScreenPos(mPositionOffset);
 
@@ -323,6 +338,11 @@ void LLHUDNameTag::renderText()
 
     F32 y_offset = (F32)mOffsetY;
 
+    // One scope for the label and the text alike. What it sets up -- the pixel
+    // basis at this position, the viewport, and the 2D projection the font
+    // draws under -- is per position, and both are drawn at the same one.
+    LLHUDTextScope scope(render_position, false);
+
     // Render label
     {
         for(std::vector<LLHUDTextSegment>::iterator segment_iter = mLabelSegments.begin();
@@ -343,7 +363,7 @@ void LLHUDNameTag::renderText()
             }
 
             LLColor4 label_color(0.f, 0.f, 0.f, alpha_factor);
-            hud_render_text(segment_iter->getText(), render_position, *fontp, segment_iter->mStyle, LLFontGL::NO_SHADOW, x_offset, y_offset, label_color, false);
+            segment_iter->draw(scope, *fontp, segment_iter->mStyle, LLFontGL::NO_SHADOW, x_offset, y_offset, label_color);
         }
     }
 
@@ -388,7 +408,7 @@ void LLHUDNameTag::renderText()
             text_color = segment_iter->mColor;
             text_color.mV[VALPHA] *= alpha_factor;
 
-            hud_render_text(segment_iter->getText(), render_position, *fontp, style, shadow, x_offset, y_offset, text_color, false);
+            segment_iter->draw(scope, *fontp, style, shadow, x_offset, y_offset, text_color);
         }
     }
     /// Reset the default color to white.  The renderer expects this to be the default.
@@ -398,12 +418,32 @@ void LLHUDNameTag::renderText()
 void LLHUDNameTag::setString(const std::string &text_utf8)
 {
     mTextSegments.clear();
+    mLineSegmentCounts.clear();
     addLine(text_utf8, mColor);
 }
 
 void LLHUDNameTag::clearString()
 {
     mTextSegments.clear();
+    mLineSegmentCounts.clear();
+}
+
+void LLHUDNameTag::setLineColor(S32 line_index, const LLColor4& color)
+{
+    if (line_index < 0 || line_index >= (S32)mLineSegmentCounts.size())
+    {
+        return;
+    }
+    S32 first = 0;
+    for (S32 i = 0; i < line_index; ++i)
+    {
+        first += mLineSegmentCounts[i];
+    }
+    const S32 count = llmin(mLineSegmentCounts[line_index], (S32)mTextSegments.size() - first);
+    for (S32 i = 0; i < count; ++i)
+    {
+        mTextSegments[first + i].mColor = color;
+    }
 }
 
 
@@ -414,19 +454,25 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                         const bool use_ellipses,
                         F32 max_pixels)
 {
-    LLWString wline = utf8str_to_wstring(text_utf8);
-    if (!wline.empty())
+    // Recorded whether or not this line produces anything, so the line
+    // numbering a caller sees matches the order it added them in.
+    const S32 segments_before = (S32)mTextSegments.size();
+    if (!text_utf8.empty())
     {
+        // Wrapping shapes the text to find where it breaks, and every segment
+        // it produces is a fresh cache. Named because a tag rebuilt on a frame
+        // pays this and a tag that was left alone does not.
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+        LL_PROFILE_ZONE_NUM(text_utf8.size());
         // use default font for segment if custom font not specified
         if (!font)
         {
             font = mFontp;
         }
-        typedef boost::tokenizer<boost::char_separator<llwchar>, LLWString::const_iterator, LLWString > tokenizer;
-        static const LLWString seps(U"\r\n");
-        boost::char_separator<llwchar> sep(seps.c_str());
+        typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+        boost::char_separator<char> sep("\r\n");
 
-        tokenizer tokens(wline, sep);
+        tokenizer tokens(text_utf8, sep);
         tokenizer::iterator iter = tokens.begin();
 
         max_pixels = llmin(max_pixels, NAMETAG_MAX_WIDTH);
@@ -441,26 +487,27 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                 do
                 {
                     // Measure against a view of the token's tail. substr() on the
-                    // token itself would heap-allocate a whole LLWString on every
+                    // token itself would heap-allocate a whole string on every
                     // pass just to hand the font a pointer.
-                    const LLWStringView tail = LLWStringView(*iter).substr(line_length);
-                    auto segment_length = font->maxDrawableChars(tail, max_pixels, S32_MAX, LLFontGL::ANYWHERE);
-                    if (segment_length + line_length < wline.length()) // since we only draw one string, line_length should be 0
+                    const std::string_view tail = std::string_view(*iter).substr(line_length);
+                    auto segment_length = font->maxDrawableBytes(tail, max_pixels, S32_MAX, LLFontGL::ANYWHERE);
+                    if (segment_length + line_length < text_utf8.length()) // since we only draw one string, line_length should be 0
                     {
                         // token does does not fit into signle line, need to draw "...".
                         // Use four dots for ellipsis width to generate padding
-                        F32 elipses_width = font->getWidthF32(U"....");
+                        static const std::string ELLIPSIS_PAD("....");
+                        F32 elipses_width = font->getWidthF32(ELLIPSIS_PAD);
                         // truncated string length
-                        segment_length = font->maxDrawableChars(tail, max_pixels - elipses_width, S32_MAX, LLFontGL::ANYWHERE);
-                        LLHUDTextSegment segment(iter->substr(line_length, segment_length) + U"...", style, color, font);
-                        mTextSegments.push_back(segment);
+                        segment_length = font->maxDrawableBytes(tail, max_pixels - elipses_width, S32_MAX, LLFontGL::ANYWHERE);
+                        LLHUDTextSegment segment(iter->substr(line_length, segment_length) + "...", style, color, font);
+                        mTextSegments.push_back(std::move(segment));
                         break; // consider it to be complete
                     }
                     else
                     {
                         // token fits fully into string
                         LLHUDTextSegment segment(iter->substr(line_length, segment_length), style, color, font);
-                        mTextSegments.push_back(segment);
+                        mTextSegments.push_back(std::move(segment));
                         line_length += segment_length;
                     }
                 } while (line_length != iter->size());
@@ -471,15 +518,16 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                 // "QualityAssurance AssuresQuality 1" will be split into two lines "QualityAssurance" and "AssuresQuality"
                 do
                 {
-                    S32 segment_length = font->maxDrawableChars(LLWStringView(*iter).substr(line_length), max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                    S32 segment_length = font->maxDrawableBytes(std::string_view(*iter).substr(line_length), max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                     LLHUDTextSegment segment(iter->substr(line_length, segment_length), style, color, font);
-                    mTextSegments.push_back(segment);
+                    mTextSegments.push_back(std::move(segment));
                     line_length += segment_length;
                 } while (line_length != iter->size());
             }
             ++iter;
         }
     }
+    mLineSegmentCounts.push_back((S32)mTextSegments.size() - segments_before);
 }
 
 void LLHUDNameTag::setLabel(const std::string &label_utf8)
@@ -490,16 +538,12 @@ void LLHUDNameTag::setLabel(const std::string &label_utf8)
 
 void LLHUDNameTag::addLabel(const std::string& label_utf8, F32 max_pixels)
 {
-    LLWString wstr = utf8string_to_wstring(label_utf8);
-    if (!wstr.empty())
+    if (!label_utf8.empty())
     {
-        static const LLWString seps(U"\r\n");
-        static const LLWString empty;
+        typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+        boost::char_separator<char> sep("\r\n", "", boost::keep_empty_tokens);
 
-        typedef boost::tokenizer<boost::char_separator<llwchar>, LLWString::const_iterator, LLWString > tokenizer;
-        boost::char_separator<llwchar> sep(seps.c_str(), empty.c_str(), boost::keep_empty_tokens);
-
-        tokenizer tokens(wstr, sep);
+        tokenizer tokens(label_utf8, sep);
         tokenizer::iterator iter = tokens.begin();
 
         max_pixels = llmin(max_pixels, NAMETAG_MAX_WIDTH);
@@ -509,10 +553,10 @@ void LLHUDNameTag::addLabel(const std::string& label_utf8, F32 max_pixels)
             U32 line_length = 0;
             do
             {
-                S32 segment_length = mFontp->maxDrawableChars(LLWStringView(*iter).substr(line_length),
+                S32 segment_length = mFontp->maxDrawableBytes(std::string_view(*iter).substr(line_length),
                     max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                 LLHUDTextSegment segment(iter->substr(line_length, segment_length), LLFontGL::NORMAL, mColor, mFontp);
-                mLabelSegments.push_back(segment);
+                mLabelSegments.push_back(std::move(segment));
                 line_length += segment_length;
             }
             while (line_length != iter->size());
@@ -570,6 +614,7 @@ void LLHUDNameTag::updateVisibility()
     if (!mSourceObject)
     {
         //LL_WARNS() << "LLHUDNameTag::updateScreenPos -- mSourceObject is NULL!" << LL_ENDL;
+        LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, mPixelUpVec, mPixelRightVec);
         mVisible = true;
         sVisibleTextObjects.push_back(LLPointer<LLHUDNameTag> (this));
         return;
@@ -610,14 +655,13 @@ void LLHUDNameTag::updateVisibility()
         return;
     }
 
-    LLVector3 x_pixel_vec;
-    LLVector3 y_pixel_vec;
-
-    LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+    // Taken here, where the position it is derived from has just settled, and
+    // read from everywhere else this frame.
+    LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, mPixelUpVec, mPixelRightVec);
 
     LLVector3 render_position = mPositionAgent +
-            (x_pixel_vec * mPositionOffset.mV[VX]) +
-            (y_pixel_vec * mPositionOffset.mV[VY]);
+            (mPixelRightVec * mPositionOffset.mV[VX]) +
+            (mPixelUpVec * mPositionOffset.mV[VY]);
 
     mOffscreen = false;
     if (!LLViewerCamera::getInstance()->sphereInFrustum(render_position, mRadius))
@@ -641,10 +685,7 @@ LLVector2 LLHUDNameTag::updateScreenPos(const LLVector2 &offset)
 {
     LLCoordGL screen_pos;
     LLVector2 screen_pos_vec;
-    LLVector3 x_pixel_vec;
-    LLVector3 y_pixel_vec;
-    LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
-    LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * x_pixel_vec) + (offset.mV[VY] * y_pixel_vec);
+    LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * mPixelRightVec) + (offset.mV[VY] * mPixelUpVec);
     if (!LLViewerCamera::getInstance()->projectPosAgentToScreen(world_pos, screen_pos, false) && mVisibleOffScreen)
     {
         // bubble off-screen, so find a spot for it along screen edge
@@ -680,6 +721,11 @@ LLVector2 LLHUDNameTag::updateScreenPos(const LLVector2 &offset)
 
 void LLHUDNameTag::updateSize()
 {
+    // Asked once per visible tag per frame, after the level of detail is
+    // decided, because the level is what says how many lines are measured.
+    // The count is the segments it walks.
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(mTextSegments.size() + mLabelSegments.size());
     static LLCachedControl<F32> name_tag_hpad(gSavedSettings, "NameTagHPad", 16.f);
     static LLCachedControl<F32> name_tag_vpad(gSavedSettings, "NameTagVPad", 12.f);
     static LLCachedControl<F32> name_tag_linepad(gSavedSettings, "NameTagLinePad", 3.f); // aka "leading"
@@ -737,23 +783,47 @@ void LLHUDNameTag::updateSize()
 void LLHUDNameTag::updateAll()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(sTextObjects.size());
     // iterate over all text objects, calculate their restoration forces,
     // and add them to the visible set if they are on screen and close enough
     sVisibleTextObjects.clear();
 
-    TextObjectIterator text_it;
-    for (text_it = sTextObjects.begin(); text_it != sTextObjects.end(); ++text_it)
     {
-        LLHUDNameTag* textp = (*text_it);
-        textp->mTargetPositionOffset.clearVec();
-        textp->updateSize();
-        textp->updateVisibility();
+        // Every tag that exists, on screen or not. What separates this from
+        // the passes below is that they are over the visible set and this one
+        // is not, so the two counts want telling apart.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("nametag size and visibility");
+        LL_PROFILE_ZONE_NUM(sTextObjects.size());
+        for (const LLPointer<LLHUDNameTag>& text_ptr : getAllTextObjects())
+        {
+            LLHUDNameTag* textp = text_ptr;
+            textp->mTargetPositionOffset.clearVec();
+            // No size here. Deciding visibility does not read one -- it works
+            // from the distance and from the radius the last draw left behind
+            // -- and every tag that survives is sized again below once its
+            // level of detail is known, which is what decides how many lines
+            // there are to measure. Sizing here measured every tag in the
+            // region to arrive at a number that was either thrown away or
+            // recomputed.
+            const bool was_visible = textp->getVisible();
+            textp->updateVisibility();
+            if (!textp->getVisible() && was_visible)
+            {
+                // Going out of sight is worth the shaped glyphs; staying out
+                // of sight is not worth asking again, which is why this reads
+                // the change rather than the state.
+                textp->releaseTextGeometry();
+            }
+        }
     }
 
     // sort back to front for rendering purposes
     std::sort(sVisibleTextObjects.begin(), sVisibleTextObjects.end(), llhudnametag_further_away());
 
     // iterate from front to back, and set LOD based on current screen coverage
+    {
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("nametag lod");
+    LL_PROFILE_ZONE_NUM(sVisibleTextObjects.size());
     F32 screen_area = (F32)(gViewerWindow->getWindowWidthScaled() * gViewerWindow->getWindowHeightScaled());
     F32 current_screen_area = 0.f;
     std::vector<LLPointer<LLHUDNameTag> >::reverse_iterator r_it;
@@ -781,6 +851,7 @@ void LLHUDNameTag::updateAll()
         textp->mTargetPositionOffset = textp->updateScreenPos(LLVector2::zero);
         current_screen_area += (F32)(textp->mSoftScreenRect.getWidth() * textp->mSoftScreenRect.getHeight());
     }
+    }
 
     LLTrace::CountStatHandle<>* camera_vel_stat = LLViewerCamera::getVelocityStat();
     F32 camera_vel = (F32)LLTrace::get_frame_recording().getLastRecording().getPerSec(*camera_vel_stat);
@@ -789,10 +860,23 @@ void LLHUDNameTag::updateAll()
         return;
     }
 
+    // Every visible tag against every other, several times over. The count is
+    // the visible set; the work is that number squared, per iteration.
+    {
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("nametag overlap");
+    LL_PROFILE_ZONE_NUM(sVisibleTextObjects.size());
+
     VisibleTextObjectIterator src_it;
 
     for (S32 i = 0; i < NUM_OVERLAP_ITERATIONS; i++)
     {
+        // Nothing here moves a tag except an overlap, so a pass that finds
+        // none leaves the arrangement exactly as the next pass would find it,
+        // and the one after that. Stopping is the same answer, reached
+        // sooner: tags that have spread apart -- which is what these
+        // iterations are for -- pay one pass instead of ten.
+        bool any_overlap = false;
+
         for (src_it = sVisibleTextObjects.begin(); src_it != sVisibleTextObjects.end(); ++src_it)
         {
             LLHUDNameTag* src_textp = (*src_it);
@@ -805,6 +889,7 @@ void LLHUDNameTag::updateAll()
 
                 if (src_textp->mSoftScreenRect.overlaps(dst_textp->mSoftScreenRect))
                 {
+                    any_overlap = true;
                     LLRectf intersect_rect = src_textp->mSoftScreenRect;
                     intersect_rect.intersectWith(dst_textp->mSoftScreenRect);
                     intersect_rect.stretch(-BUFFER_SIZE * 0.5f);
@@ -846,6 +931,12 @@ void LLHUDNameTag::updateAll()
                 }
             }
         }
+
+        if (!any_overlap)
+        {
+            break;
+        }
+    }
     }
 
     VisibleTextObjectIterator this_object_it;
@@ -882,6 +973,7 @@ S32 LLHUDNameTag::getMaxLines()
 void LLHUDNameTag::markDead()
 {
     sTextObjects.erase(LLPointer<LLHUDNameTag>(this));
+    sAllTextObjectsDirty = true;
     LLHUDObject::markDead();
 }
 
@@ -922,40 +1014,40 @@ void LLHUDNameTag::addPickable(std::set<LLViewerObject*> &pick_list)
 }
 
 //static
-// called when UI scale changes, to flush font width caches
 void LLHUDNameTag::reshape()
 {
-    TextObjectIterator text_it;
-    for (text_it = sTextObjects.begin(); text_it != sTextObjects.end(); ++text_it)
-    {
-        LLHUDNameTag* textp = (*text_it);
-        std::vector<LLHUDTextSegment>::iterator segment_iter;
-        for (segment_iter = textp->mTextSegments.begin();
-             segment_iter != textp->mTextSegments.end(); ++segment_iter )
-        {
-            segment_iter->clearFontWidthMap();
-        }
-        for(segment_iter = textp->mLabelSegments.begin();
-            segment_iter != textp->mLabelSegments.end(); ++segment_iter )
-        {
-            segment_iter->clearFontWidthMap();
-        }
-    }
+    // Nothing to flush: a segment's cache compares the scale and DPI it
+    // measured at against the current ones, so a UI scale change invalidates
+    // it wherever it is, without a sweep over every nametag in the world.
 }
 
 //============================================================================
 
 F32 LLHUDNameTag::LLHUDTextSegment::getWidth(const LLFontGL* font)
 {
-    std::map<const LLFontGL*, F32>::iterator iter = mFontWidthMap.find(font);
-    if (iter != mFontWidthMap.end())
+    mFontCache.setSource(this, 0);
+    return mFontCache.getWidthBytes(font, mText, 0, S32_MAX, false);
+}
+
+void LLHUDNameTag::releaseTextGeometry()
+{
+    for (const LLHUDTextSegment& segment : mTextSegments)
     {
-        return iter->second;
+        segment.releaseGeometry();
     }
-    else
+    for (const LLHUDTextSegment& segment : mLabelSegments)
     {
-        F32 width = font->getWidthF32(mText);
-        mFontWidthMap[font] = width;
-        return width;
+        segment.releaseGeometry();
     }
+}
+
+void LLHUDNameTag::LLHUDTextSegment::draw(LLHUDTextScope& scope, const LLFontGL& font, U8 style,
+                                          LLFontGL::ShadowType shadow, F32 x_offset, F32 y_offset,
+                                          const LLColor4& color) const
+{
+    // Named the same way the measurement names it, and about the same text.
+    // A segment holds one string for as long as it exists, so the version
+    // never moves; segments are replaced rather than edited.
+    mFontCache.setSource(this, 0);
+    scope.draw(mText, font, style, shadow, x_offset, y_offset, color, &mFontCache);
 }

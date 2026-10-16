@@ -34,7 +34,6 @@
 #include "apr_poll.h"
 
 #include "llapr.h"
-#include "llfasttimer.h"
 #include "llstl.h"
 
 // These should not be enabled in production, but they can be
@@ -174,6 +173,12 @@ LLPumpIO::LLPumpIO(apr_pool_t* pool) :
 
 LLPumpIO::~LLPumpIO()
 {
+    // Removed as the pump removes them, which frees the client data their
+    // descriptors carry: the list's own destructor would not.
+    for (current_chain_t chain = mRunningChains.begin(); chain != mRunningChains.end();)
+    {
+        chain = removeRunningChain(chain);
+    }
     cleanup();
 }
 
@@ -422,6 +427,13 @@ void LLPumpIO::pump()
 
 LLPumpIO::current_chain_t LLPumpIO::removeRunningChain(LLPumpIO::current_chain_t& run_chain)
 {
+    // The pollset still holds the chain's descriptors, and the client data
+    // freed below: the next poll would read it for a descriptor still ready,
+    // so the pollset is rebuilt first, however the chain came to be removed.
+    if(!(*run_chain).mDescriptors.empty())
+    {
+        mRebuildPollset = true;
+    }
     std::for_each(
                 (*run_chain).mDescriptors.begin(),
                 (*run_chain).mDescriptors.end(),
@@ -688,9 +700,6 @@ void LLPumpIO::pump(const S32& poll_timeout)
             // This chain is done. Clean up any allocated memory and
             // erase the chain info.
             run_chain = removeRunningChain(run_chain);
-
-            // *NOTE: may not always need to rebuild the pollset.
-            mRebuildPollset = true;
         }
         else
         {

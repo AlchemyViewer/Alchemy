@@ -39,6 +39,8 @@ class LLTextBox;
 class LLDragHandle : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLDragHandle, LLView);
+
     struct Params
     :   public LLInitParam::Block<Params, LLView::Params>
     {
@@ -65,7 +67,8 @@ public:
 
     virtual void setValue(const LLSD& value);
 
-    void            setForeground(bool b)       { mForeground = b; }
+    // Colours the title to match, which is the whole of what the state is for.
+    void            setForeground(bool b);
     bool            getForeground() const       { return mForeground; }
     void            setMaxTitleWidth(S32 max_width) {mMaxTitleWidth = llmin(max_width, mMaxTitleWidth); }
     S32             getMaxTitleWidth() const { return mMaxTitleWidth; }
@@ -76,9 +79,9 @@ public:
     virtual void    setTitle( const std::string& title ) = 0;
     virtual std::string getTitle() const = 0;
 
-    virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
+    virtual bool    handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
 
 protected:
     LLDragHandle(const Params&);
@@ -107,17 +110,21 @@ private:
 
 
 // Use this one for traditional top-of-window draggers
-class LLDragHandleTop
+class LLDragHandleTop final
 : public LLDragHandle
 {
+public:
+    AL_VIEW_TYPE(LLDragHandleTop, LLDragHandle);
+
+private:
 protected:
     LLDragHandleTop(const Params& p) : LLDragHandle(p) {}
     friend class LLUICtrlFactory;
 public:
-    virtual void    setTitle( const std::string& title );
-    virtual std::string getTitle() const;
-    virtual void    draw();
-    virtual void    reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual void    setTitle( const std::string& title ) override;
+    virtual std::string getTitle() const override;
+    virtual void    draw() override;
+    virtual void    reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
 private:
     void    reshapeTitleBox();
@@ -125,17 +132,20 @@ private:
 
 
 // Use this for left-side, vertical text draggers
-class LLDragHandleLeft
+class LLDragHandleLeft final
 : public LLDragHandle
 {
+public:
+    AL_VIEW_TYPE(LLDragHandleLeft, LLDragHandle);
+
+private:
 protected:
     LLDragHandleLeft(const Params& p) : LLDragHandle(p) {}
     friend class LLUICtrlFactory;
 public:
-    virtual void    setTitle( const std::string& title );
-    virtual std::string getTitle() const;
-    virtual void    draw();
-    virtual void    reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual void    setTitle( const std::string& title ) override;
+    virtual std::string getTitle() const override;
+    virtual void    draw() override;
 
 };
 

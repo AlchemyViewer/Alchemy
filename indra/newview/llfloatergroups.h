@@ -51,9 +51,11 @@ class LLScrollListCtrl;
 class LLButton;
 class LLFloaterGroupPicker;
 
-class LLFloaterGroupPicker : public LLFloater
+class LLFloaterGroupPicker final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterGroupPicker, LLFloater);
+
     LLFloaterGroupPicker(const LLSD& seed);
     ~LLFloaterGroupPicker();
 
@@ -61,7 +63,7 @@ public:
     typedef boost::signals2::signal<void (LLUUID id)> signal_t;
     void setSelectGroupCallback(const signal_t::slot_type& cb) { mGroupSelectSignal.connect(cb); }
     void setPowersMask(U64 powers_mask);
-    bool postBuild();
+    bool postBuild() override;
 
     // for cases like inviting avatar to group we don't want the none option
     void removeNoneOption();
@@ -80,21 +82,23 @@ protected:
     static instance_map_t sInstances;
 };
 
-class LLPanelGroups : public LLPanel, public LLOldEvents::LLSimpleListener
+class LLPanelGroups final : public LLPanel, public LLOldEvents::LLSimpleListener
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroups, LLPanel);
+
     LLPanelGroups();
     virtual ~LLPanelGroups();
 
     //LLEventListener
-    /*virtual*/ bool handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& userdata);
+    /*virtual*/ bool handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& userdata) override;
 
     // clear the group list, and get a fresh set of info.
     void reset();
 
 protected:
     // initialize based on the type
-    bool postBuild();
+    bool postBuild() override;
 
     // highlight_id is a group id to highlight
     void enableButtons();

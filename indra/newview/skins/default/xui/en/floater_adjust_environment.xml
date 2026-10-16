@@ -297,7 +297,7 @@
                               user_resize="false"
                               height="150"
                               width="310"
-                              min_height="0"
+                              min_width="0"
                               visible="true">
                     <text follows="top|left"
                           font="SansSerifBold"
@@ -451,7 +451,7 @@
                               user_resize="false"
                               height="150"
                               width="160"
-                              min_height="0"
+                              min_width="0"
                               visible="true">
                     <text follows="top|left"
                           font="SansSerifBold"

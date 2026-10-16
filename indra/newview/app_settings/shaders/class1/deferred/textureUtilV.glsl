@@ -176,36 +176,3 @@ vec4 tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] kh
     float sign_flip = khr_scale_sign.x * khr_scale_sign.y;
     return vec4((weights.x * vertex_tangent.xyz) + (weights.y * vertex_binormal.xyz), vertex_tangent.w * sign_flip);
 }
-
-// Similar to tangent_space_transform but no texture animation support.
-vec4 terrain_tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] khr_gltf_transform)
-{
-    // Immediately convert to left-handed coordinate system, but it has no
-    // effect here because y is 0 ((1,0) -> (1,0))
-    vec2 weights = vec2(1, 0);
-
-    // Apply inverse KHR_texture_transform (rotation and scale sign only)
-    float khr_rotation = -khr_gltf_transform[0].z;
-    mat2 khr_rotation_mat = mat2(
-        cos(khr_rotation),-sin(khr_rotation),
-        sin(khr_rotation), cos(khr_rotation)
-    );
-    weights = khr_rotation_mat * weights;
-    vec2 khr_scale_sign = sign(khr_gltf_transform[0].xy);
-    weights *= khr_scale_sign.xy;
-
-    // Set weights to default if 0 for some reason
-    weights.x += 1.0 - abs(sign(sign(weights.x) + (0.5 * sign(weights.y))));
-
-    // Convert back to right-handed coordinate system
-    weights.y = -weights.y;
-
-    // Similar to the MikkTSpace-compatible method of extracting the binormal
-    // from the normal and tangent, as seen in the fragment shader
-    vec3 vertex_binormal = vertex_tangent.w * cross(vertex_normal, vertex_tangent.xyz);
-
-    // An additional sign flip prevents the binormal from being flipped as a
-    // result of a propagation of the tangent sign during the cross product.
-    float sign_flip = khr_scale_sign.x * khr_scale_sign.y;
-    return vec4((weights.x * vertex_tangent.xyz) + (weights.y * vertex_binormal.xyz), vertex_tangent.w * sign_flip);
-}

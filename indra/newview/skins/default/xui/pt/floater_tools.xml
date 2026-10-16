@@ -45,11 +45,11 @@
 	<floater.string name="status_remaining_capacity">
 		Capacidade restante [LAND_CAPACITY].
 	</floater.string>
-	<button label="" label_selected="" name="button focus" tool_tip="Foco"/>
-	<button label="" label_selected="" name="button move" tool_tip="Mover"/>
-	<button label="" label_selected="" name="button edit" tool_tip="Editar"/>
-	<button label="" label_selected="" name="button create" tool_tip="Criar"/>
-	<button label="" label_selected="" name="button land" tool_tip="Terra"/>
+	<button name="button focus" tool_tip="Foco"/>
+	<button name="button move" tool_tip="Mover"/>
+	<button name="button edit" tool_tip="Editar"/>
+	<button name="button create" tool_tip="Criar"/>
+	<button name="button land" tool_tip="Terra"/>
 	<text name="text status" width="280">
 		Arrastar para mover, shift+Arrastar para copiar
 	</text>
@@ -80,22 +80,22 @@
 		<combo_box.item label="Local" name="Local"/>
 		<combo_box.item label="Referência" name="Reference"/>
 	</combo_box>
-	<button label="" label_selected="Opções..." name="Options..." tool_tip="Mais opções de grade"/>
-	<button label="" label_selected="" name="ToolCube" tool_tip="Cubo"/>
-	<button label="" label_selected="" name="ToolPrism" tool_tip="Prisma"/>
-	<button label="" label_selected="" name="ToolPyramid" tool_tip="Pirâmide"/>
-	<button label="" label_selected="" name="ToolTetrahedron" tool_tip="Tetraedro"/>
-	<button label="" label_selected="" name="ToolCylinder" tool_tip="Cilindro"/>
-	<button label="" label_selected="" name="ToolHemiCylinder" tool_tip="Semi-cilindro"/>
-	<button label="" label_selected="" name="ToolCone" tool_tip="Cone"/>
-	<button label="" label_selected="" name="ToolHemiCone" tool_tip="Semi-cone"/>
-	<button label="" label_selected="" name="ToolSphere" tool_tip="Esfera"/>
-	<button label="" label_selected="" name="ToolHemiSphere" tool_tip="Semi-esfera"/>
-	<button label="" label_selected="" name="ToolTorus" tool_tip="Toróide"/>
-	<button label="" label_selected="" name="ToolTube" tool_tip="Tubo"/>
-	<button label="" label_selected="" name="ToolRing" tool_tip="Anel"/>
-	<button label="" label_selected="" name="ToolTree" tool_tip="Árvore"/>
-	<button label="" label_selected="" name="ToolGrass" tool_tip="Grama"/>
+	<button name="Options..." tool_tip="Mais opções de grade"/>
+	<button name="ToolCube" tool_tip="Cubo"/>
+	<button name="ToolPrism" tool_tip="Prisma"/>
+	<button name="ToolPyramid" tool_tip="Pirâmide"/>
+	<button name="ToolTetrahedron" tool_tip="Tetraedro"/>
+	<button name="ToolCylinder" tool_tip="Cilindro"/>
+	<button name="ToolHemiCylinder" tool_tip="Semi-cilindro"/>
+	<button name="ToolCone" tool_tip="Cone"/>
+	<button name="ToolHemiCone" tool_tip="Semi-cone"/>
+	<button name="ToolSphere" tool_tip="Esfera"/>
+	<button name="ToolHemiSphere" tool_tip="Semi-esfera"/>
+	<button name="ToolTorus" tool_tip="Toróide"/>
+	<button name="ToolTube" tool_tip="Tubo"/>
+	<button name="ToolRing" tool_tip="Anel"/>
+	<button name="ToolTree" tool_tip="Árvore"/>
+	<button name="ToolGrass" tool_tip="Grama"/>
 	<check_box label="Ficar com ferramenta selecionada" name="checkbox sticky"/>
 	<check_box label="Copiar seleção" name="checkbox copy selection"/>
 	<check_box initial_value="true" label="Copiar parte central" name="checkbox copy centers"/>
@@ -186,8 +186,7 @@
 			<text name="Group:">
 				Grupo:
 			</text>
-			<name_box initial_value="Carregando..." name="Group Name Proxy"/>
-			<button label="Definir..." label_selected="Definir..." name="button set group" tool_tip="Selecione o grupo que terá acesso à autorização do objeto"/>
+			<button name="button set group" tool_tip="Selecione o grupo que terá acesso à autorização do objeto"/>
 			<check_box label="Compartilhar" name="checkbox share with group" tool_tip="Permitir que todos os membros do grupo tenhas suas permissões de modificação para este objeto.  Faça uma doação para ativar restrições de função."/>
 			<button label="Doar" label_selected="Doar" name="button deed" tool_tip="Ao doar este item, o próximo dono terá permissões de próximo dono.  Objetos de grupos podem ser doados por um oficial do grupo."/>
 			<text name="label click action">
@@ -383,7 +382,7 @@
 			<spinner label="Força Y" name="FlexForceY"/>
 			<spinner label="Força Z" name="FlexForceZ"/>
 			<check_box label="Luz" name="Light Checkbox Ctrl" tool_tip="Faz com que o objeto emita luz"/>
-			<color_swatch label="" name="colorswatch" tool_tip="Selecionar a cor"/>
+			<color_swatch name="colorswatch" tool_tip="Selecionar a cor"/>
 			<texture_picker label="" name="light texture control" tool_tip="Clique para selecionar uma imagem de projeção (só com renderização suspesa ativada)"/>
 			<spinner label="Intensidade" name="Light Intensity"/>
 			<spinner label="FOV" name="Light FOV"/>
@@ -411,7 +410,7 @@
 		</panel>
 		<panel label="Textura" name="Texture"/>
 		<panel label="Conteúdo" name="Contents">
-			<flyout_button label="Novo script" label_selected="Novo script" name="button new script"/>
+			<flyout_button label="Novo script" name="button new script"/>
 			<button label="Autorizações" name="button permissions"/>
 		</panel>
 	</tab_container>

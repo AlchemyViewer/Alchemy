@@ -45,11 +45,11 @@
 	<floater.string name="status_remaining_capacity">
 		Capacité restante [LAND_CAPACITY].
 	</floater.string>
-	<button label="" label_selected="" name="button focus" tool_tip="Mise au point"/>
-	<button label="" label_selected="" name="button move" tool_tip="Déplacer"/>
-	<button label="" label_selected="" name="button edit" tool_tip="Modifier"/>
-	<button label="" label_selected="" name="button create" tool_tip="Créer"/>
-	<button label="" label_selected="" name="button land" tool_tip="Terrain"/>
+	<button name="button focus" tool_tip="Mise au point"/>
+	<button name="button move" tool_tip="Déplacer"/>
+	<button name="button edit" tool_tip="Modifier"/>
+	<button name="button create" tool_tip="Créer"/>
+	<button name="button land" tool_tip="Terrain"/>
 	<text name="text status">
 		Glissez pour déplacer, Maj-glissez pour copier.
 	</text>
@@ -80,22 +80,22 @@
 		<combo_box.item label="Local" name="Local"/>
 		<combo_box.item label="Référence" name="Reference"/>
 	</combo_box>
-	<button label="" label_selected="Options..." name="Options..." tool_tip="Afficher d&apos;autres options de grille"/>
-	<button label="" label_selected="" name="ToolCube" tool_tip="Cube"/>
-	<button label="" label_selected="" name="ToolPrism" tool_tip="Prisme droit"/>
-	<button label="" label_selected="" name="ToolPyramid" tool_tip="Pyramide"/>
-	<button label="" label_selected="" name="ToolTetrahedron" tool_tip="Tétraèdre"/>
-	<button label="" label_selected="" name="ToolCylinder" tool_tip="Cylindre"/>
-	<button label="" label_selected="" name="ToolHemiCylinder" tool_tip="Demi-cylindre"/>
-	<button label="" label_selected="" name="ToolCone" tool_tip="Cône"/>
-	<button label="" label_selected="" name="ToolHemiCone" tool_tip="Demi-cône"/>
-	<button label="" label_selected="" name="ToolSphere" tool_tip="Sphère"/>
-	<button label="" label_selected="" name="ToolHemiSphere" tool_tip="Demi-sphère"/>
-	<button label="" label_selected="" name="ToolTorus" tool_tip="Tore"/>
-	<button label="" label_selected="" name="ToolTube" tool_tip="Tube"/>
-	<button label="" label_selected="" name="ToolRing" tool_tip="Anneau"/>
-	<button label="" label_selected="" name="ToolTree" tool_tip="Arbre"/>
-	<button label="" label_selected="" name="ToolGrass" tool_tip="Herbe"/>
+	<button name="Options..." tool_tip="Afficher d&apos;autres options de grille"/>
+	<button name="ToolCube" tool_tip="Cube"/>
+	<button name="ToolPrism" tool_tip="Prisme droit"/>
+	<button name="ToolPyramid" tool_tip="Pyramide"/>
+	<button name="ToolTetrahedron" tool_tip="Tétraèdre"/>
+	<button name="ToolCylinder" tool_tip="Cylindre"/>
+	<button name="ToolHemiCylinder" tool_tip="Demi-cylindre"/>
+	<button name="ToolCone" tool_tip="Cône"/>
+	<button name="ToolHemiCone" tool_tip="Demi-cône"/>
+	<button name="ToolSphere" tool_tip="Sphère"/>
+	<button name="ToolHemiSphere" tool_tip="Demi-sphère"/>
+	<button name="ToolTorus" tool_tip="Tore"/>
+	<button name="ToolTube" tool_tip="Tube"/>
+	<button name="ToolRing" tool_tip="Anneau"/>
+	<button name="ToolTree" tool_tip="Arbre"/>
+	<button name="ToolGrass" tool_tip="Herbe"/>
 	<check_box label="Maintenir l&apos;outil sélect." name="checkbox sticky"/>
 	<check_box label="Copier la sélection" name="checkbox copy selection"/>
 	<check_box initial_value="true" label="Centrer" name="checkbox copy centers"/>
@@ -186,8 +186,7 @@
 			<text name="Group:">
 				Groupe :
 			</text>
-			<name_box initial_value="Chargement..." name="Group Name Proxy"/>
-			<button label="Définir..." label_selected="Définir..." name="button set group" tool_tip="Choisissez un groupe pour partager les droits de cet objet"/>
+			<button name="button set group" tool_tip="Choisissez un groupe pour partager les droits de cet objet"/>
 			<check_box label="Partager" name="checkbox share with group" tool_tip="Autorisez tous les membres du groupe choisi à utiliser et à partager vos droits pour cet objet. Pour activer les restrictions de rôles, vous devez d&apos;abord cliquer sur Transférer."/>
 			<button label="Céder" label_selected="Céder" name="button deed" tool_tip="En cédant un objet, vous donnez aussi les droits au prochain propriétaire. Seul un officier peut céder les objets d&apos;un groupe."/>
 			<text name="label click action">
@@ -383,7 +382,7 @@
 			<spinner label="Force Y" name="FlexForceY"/>
 			<spinner label="Force Z" name="FlexForceZ"/>
 			<check_box label="Lumière" name="Light Checkbox Ctrl" tool_tip="Permet aux objets d&apos;émettre de la lumière"/>
-			<color_swatch label="" name="colorswatch" tool_tip="Cliquez pour ouvrir le sélecteur de couleurs"/>
+			<color_swatch name="colorswatch" tool_tip="Cliquez pour ouvrir le sélecteur de couleurs"/>
 			<texture_picker label="" name="light texture control" tool_tip="Cliquez pour choisir une image de projection (n&apos;a d&apos;effet que si le rendu différé est activé)"/>
 			<spinner label="Intensité" name="Light Intensity"/>
 			<spinner label="Angle de champ" name="Light FOV"/>
@@ -411,7 +410,7 @@
 		</panel>
 		<panel label="Texture" name="Texture"/>
 		<panel label="Contenu" name="Contents">
-			<flyout_button label="Nouveau script" label_selected="Nouveau script" name="button new script"/>
+			<flyout_button label="Nouveau script" name="button new script"/>
 			<button label="Droits" name="button permissions"/>
 		</panel>
 	</tab_container>

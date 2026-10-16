@@ -42,6 +42,11 @@ LLFlyoutButton::LLFlyoutButton(const Params& p)
     mButton->setLabel(LLStringUtil::null);
 // [/SL:KB]
 
+    LLRect rect = getLocalRect();
+    mButton->setRect(LLRect(rect.mRight - p.arrow_button_width,
+        rect.mTop, rect.mRight, rect.mBottom));
+    mButton->setFollows(FOLLOWS_BOTTOM | FOLLOWS_TOP | FOLLOWS_RIGHT);
+
     // Always use text box
     // Text label button
     LLButton::Params bp(p.action_button);
@@ -104,4 +109,3 @@ void LLFlyoutButton::setToggleState(bool state)
 {
     mToggleState = state;
 }
-

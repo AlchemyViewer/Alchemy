@@ -1,9 +1,33 @@
 # -*- cmake -*-
 
-add_library (llui STATIC)
+add_library(llui STATIC)
 
-target_sources(llui
-    PRIVATE
+# Linden Lab's widgets are at the top, as upstream has them. Alchemy's own
+# are in folders, each a part of the library and each on the include path,
+# so that a header is named alone wherever it is used:
+#   base/     what every part leans on: a view's type, words in the skin's
+#             language, a surface's colours, matching, placing, dragging;
+#   text/     the text view and what it is made of: the document, its undo,
+#             editing, layout, search, the ruler and the find bar;
+#   code/     the code editor over it: cards, completion, fixes, folds,
+#             snippets, the grammar and the highlighter, the keymap;
+#   diff/     two texts compared: the diff, the view and its bar;
+#   vim/      vim over a text view;
+#   xui/      XUI Studio's model of a skin's files;
+#   fields/   the property grid and the fields it edits values with;
+#   studio/   a studio's window: its panes, folds, docks and quick open;
+#   widgets/  small widgets of ours the rest are built from.
+
+target_sources(
+  llui
+  PRIVATE
+    fields/alangledial.cpp
+    base/aldraggesture.cpp
+    fields/alcornerfield.cpp
+    fields/aloffsetpad.cpp
+    fields/alpicturefield.cpp
+    studio/alpanefolds.cpp
+    studio/alpaneroom.cpp
     fsvirtualtrackpad.cpp
     llaccordionctrl.cpp
     llaccordionctrltab.cpp
@@ -11,6 +35,7 @@ target_sources(llui
     llbadgeholder.cpp
     llbadgeowner.cpp
     llbutton.cpp
+    llchatautocompletemodel.cpp
     llchatentry.cpp
     llchatmentionhelper.cpp
     llcheckboxctrl.cpp
@@ -40,7 +65,6 @@ target_sources(llui
     llfolderviewitem.cpp
     llfolderviewmodel.cpp
     lliconctrl.cpp
-    llkeywords.cpp
     lllayoutstack.cpp
     lllineeditor.cpp
     llloadingindicator.cpp
@@ -104,208 +128,623 @@ target_sources(llui
     llviewmodel.cpp
     llview.cpp
     llviewquery.cpp
-    llviewereventrecorder.cpp
     llvirtualtrackball.cpp
     llwindowshade.cpp
     llxuiparser.cpp
+    xui/alcanvasview.cpp
+    fields/alcolorfield.cpp
+    fields/alcolortablepanel.cpp
+    fields/alcolorsheet.cpp
+    base/aldeferredrebuild.cpp
+    diff/aldiffbar.cpp
+    diff/aldiffcolors.cpp
+    diff/aldiffedit.cpp
+    diff/aldifffill.cpp
+    diff/aldifflexer.cpp
+    diff/aldiffmerge.cpp
+    diff/aldiffmodel.cpp
+    diff/aldiffmoves.cpp
+    diff/aldiffrangesame.cpp
+    diff/aldiffsame.cpp
+    diff/aldiffsplice.cpp
+    diff/aldifftokens.cpp
+    diff/aldiffview.cpp
+    diff/allinediff.cpp
+    diff/allinepairs.cpp
+    diff/alstructuraldiff.cpp
+    diff/altextmerge.cpp
+    diff/alunifieddiff.cpp
+    diff/alworddiff.cpp
+    studio/aldockpanel.cpp
+    studio/alemptystate.cpp
+    fields/alflagsfield.cpp
+    studio/alhistorylist.cpp
+    fields/alimagefield.cpp
+    widgets/aljumpbar.cpp
+    studio/alpanelist.cpp
+    base/alplace.cpp
+    widgets/alpopover.cpp
+    studio/alquickask.cpp
+    studio/alquickopen.cpp
+    widgets/alscopebar.cpp
+    fields/alsettingrow.cpp
+    widgets/alspecimenlist.cpp
+    studio/alstudiofloater.cpp
+    base/alsurface.cpp
+    code/alcodecards.cpp
+    code/alcodeliterals.cpp
+    code/alchangepeek.cpp
+    code/alchangessincesaved.cpp
+    code/alcodeeditor.cpp
+    code/albracketindex.cpp
+    code/alcompletionmodel.cpp
+    base/alfuzzymatch.cpp
+    code/alfixlistmodel.cpp
+    code/alfoldmodel.cpp
+    text/alsmartselect.cpp
+    code/alsnippetsession.cpp
+    text/alfindbar.cpp
+    widgets/alflatbutton.cpp
+    studio/alkeycapture.cpp
+    code/alkeychord.cpp
+    code/alkeymap.cpp
+    studio/almenuslot.cpp
+    vim/alvimcommandline.cpp
+    vim/alvimexcommands.cpp
+    vim/alvimkeymap.cpp
+    vim/alvimmappings.cpp
+    vim/alvimpattern.cpp
+    vim/alvimregisters.cpp
+    vim/alvimsearch.cpp
+    xui/alxuiservice.cpp
+    widgets/alchoicelist.cpp
+    widgets/alchoicepopup.cpp
+    studio/aloutputview.cpp
+    code/alsyntaxgrammar.cpp
+    code/alsyntaxhighlighter.cpp
+    widgets/altabstrip.cpp
+    text/altextcarets.cpp
+    diff/altextdiff.cpp
+    text/altextdocument.cpp
+    text/altextediting.cpp
+    text/altextfind.cpp
+    text/altextgotoline.cpp
+    text/altextindent.cpp
+    text/altextlayout.cpp
+    text/altextruler.cpp
+    text/altextsearch.cpp
+    text/altextspelling.cpp
+    text/altextview.cpp
+    text/altextundo.cpp
+    text/alnotecarditems.cpp
+    fields/alfieldeditors.cpp
+    studio/alfolderfilter.cpp
+    fields/alfollowscontrol.cpp
+    fields/alfontfield.cpp
+    fields/alcolorpicker.cpp
+    fields/alpropertygrid.cpp
+    xui/alxuicatalog.cpp
+    xui/alxuidiagnostics.cpp
+    xui/alxuiedit.cpp
+    xui/alxuifields.cpp
+    xui/alxuidocuments.cpp
+    xui/alxuilint.cpp
+    xui/alxuinotes.cpp
+    xui/alxuioverlay.cpp
+    xui/alxuischema.cpp
+    xui/alxuiselection.cpp
+    xui/alxuishellbuild.cpp
+    xui/alxuisourcemap.cpp
+    xui/alxuitranslate.cpp
+    xui/alxuitreemodel.cpp
     llxyvector.cpp
-
-    PUBLIC
+  PUBLIC
     FILE_SET HEADERS
-    FILES
-    fsvirtualtrackpad.h
-    llaccordionctrl.h
-    llaccordionctrltab.h
-    llbadge.h
-    llbadgeholder.h
-    llbadgeowner.h
-    llbutton.h
-    llcallbackmap.h
-    llchatentry.h
-    llchat.h
-    llchatmentionhelper.h
-    llcheckboxctrl.h
-    llclipboard.h
-    llcombobox.h
-    llcommandmanager.h
-    llconsole.h
-    llcontainerview.h
-    llctrlselectioninterface.h
-    lldraghandle.h
-    lldockablefloater.h
-    lldockcontrol.h
-    lleditmenuhandler.h
-    llemojidictionary.h
-    llemojihelper.h
-    llf32uictrl.h
-    llfiltereditor.h
-    llflashtimer.h
-    llflatlistview.h
-    llfloater.h
-    llfloaterreg.h
-    llfloaterreglistener.h
-    llflyoutbutton.h
-    llfocusmgr.h
-    llgestureautocompletehelper.h
-    llfolderview.h
-    llfolderviewitem.h
-    llfolderviewmodel.h
-    llfunctorregistry.h
-    llhelp.h
-    lliconctrl.h
-    llkeywords.h
-    lllayoutstack.h
-    lllazyvalue.h
-    lllineeditor.h
-    llloadingindicator.h
-    lllocalcliprect.h
-    llmenubutton.h
-    llmenugl.h
-    llmodaldialog.h
-    llmultifloater.h
-    llmultisliderctrl.h
-    llmultislider.h
-    llnotificationptr.h
-    llnotifications.h
-    llnotificationslistener.h
-    llnotificationsutil.h
-    llnotificationtemplate.h
-    llnotificationvisibilityrule.h
-    llpanel.h
-    llprogressbar.h
-    llradiogroup.h
-    llresizebar.h
-    llresizehandle.h
-    llresmgr.h
-    llsearchablecontrol.h
-    llsearcheditor.h
-    llscrollbar.h
-    llscrollcontainer.h
-    llscrollingpanellist.h
-    llscrolllistcell.h
-    llscrolllistcolumn.h
-    llscrolllistctrl.h
-    llscrolllistitem.h
-    llsliderctrl.h
-    llslider.h
-    llspellcheck.h
-    llspellcheckengine.h
-    llspellcheckmenuhandler.h
-    llspinctrl.h
-    llstatbar.h
-    llstatgraph.h
-    llstatview.h
-    llstyle.h
-    lltabcontainer.h
-    lltextbase.h
-    lltextbox.h
-    lltexteditor.h
-    lltextparser.h
-    lltextutil.h
-    lltextvalidate.h
-    lltimectrl.h
-    lltoggleablemenu.h
-    lltoolbar.h
-    lltooltip.h
-    lltrans.h
-    lltransutil.h
-    lluicolortable.h
-    lluiconstants.h
-    lluictrlfactory.h
-    lluictrl.h
-    lluifwd.h
-    llui.h
-    lluicolor.h
-    lluistring.h
-    llundo.h
-    llurlaction.h
-    llurlentry.h
-    llurlmatch.h
-    llurlregistry.h
-    llviewborder.h
-    llviewinject.h
-    llviewmodel.h
-    llview.h
-    llviewereventrecorder.h
-    llviewquery.h
-    llvirtualtrackball.h
-    llwindowshade.h
-    llxuiparser.h
-    llxyvector.h
-    )
+      FILES
+        fields/alangledial.h
+        base/aldraggesture.h
+        fields/alcornerfield.h
+        fields/aloffsetpad.h
+        fields/alpicturefield.h
+        studio/alpanefolds.h
+        studio/alpaneroom.h
+        text/altextcaret.h
+        base/alviewtype.h
+        fsvirtualtrackpad.h
+        llaccordionctrl.h
+        llaccordionctrltab.h
+        llbadge.h
+        llbadgeholder.h
+        llbadgeowner.h
+        llbutton.h
+        llcallbackmap.h
+        llchatautocompletemodel.h
+        llchatentry.h
+        llchat.h
+        llchatmentionhelper.h
+        llcheckboxctrl.h
+        llclipboard.h
+        llcombobox.h
+        llcommandmanager.h
+        llconsole.h
+        llcontainerview.h
+        llctrlselectioninterface.h
+        lldraghandle.h
+        lldockablefloater.h
+        lldockcontrol.h
+        lleditmenuhandler.h
+        llemojidictionary.h
+        llemojihelper.h
+        llf32uictrl.h
+        llfiltereditor.h
+        llflashtimer.h
+        llflatlistview.h
+        llfloater.h
+        llfloaterreg.h
+        llfloaterreglistener.h
+        llflyoutbutton.h
+        llfocusmgr.h
+        llgestureautocompletehelper.h
+        llfolderview.h
+        llfolderviewitem.h
+        llfolderviewmodel.h
+        llfunctorregistry.h
+        llhelp.h
+        lliconctrl.h
+        lllayoutstack.h
+        lllazyvalue.h
+        lllineeditor.h
+        llloadingindicator.h
+        lllocalcliprect.h
+        llmenubutton.h
+        llmenugl.h
+        llmodaldialog.h
+        llmultifloater.h
+        llmultisliderctrl.h
+        llmultislider.h
+        llnotificationptr.h
+        llnotifications.h
+        llnotificationslistener.h
+        llnotificationsutil.h
+        llnotificationtemplate.h
+        llnotificationvisibilityrule.h
+        llpanel.h
+        llprogressbar.h
+        llradiogroup.h
+        llresizebar.h
+        llresizehandle.h
+        llresmgr.h
+        llsearchablecontrol.h
+        llsearcheditor.h
+        llscrollbar.h
+        llscrollcontainer.h
+        llscrollingpanellist.h
+        llscrolllistcell.h
+        llscrolllistcolumn.h
+        llscrolllistctrl.h
+        llscrolllistitem.h
+        llsliderctrl.h
+        llslider.h
+        llspellcheck.h
+        llspellcheckengine.h
+        llspellcheckmenuhandler.h
+        llspinctrl.h
+        llstatbar.h
+        llstatgraph.h
+        llstatview.h
+        llstyle.h
+        lltabcontainer.h
+        lltextbase.h
+        lltextbox.h
+        lltexteditor.h
+        lltextparser.h
+        lltextutil.h
+        lltextvalidate.h
+        lltimectrl.h
+        lltoggleablemenu.h
+        lltoolbar.h
+        lltooltip.h
+        lltrans.h
+        lltransutil.h
+        lluicolortable.h
+        lluiconstants.h
+        lluictrlfactory.h
+        lluictrl.h
+        lluifwd.h
+        llui.h
+        lluicolor.h
+        lluistring.h
+        llundo.h
+        llurlaction.h
+        llurlentry.h
+        llurlmatch.h
+        llurlregistry.h
+        llviewborder.h
+        llviewinject.h
+        llviewmodel.h
+        llview.h
+        llviewquery.h
+        llvirtualtrackball.h
+        llwindowshade.h
+        llxuiparser.h
+        xui/alcanvasview.h
+        fields/alcolorfield.h
+        fields/alcolortablepanel.h
+        fields/alcolorsheet.h
+        base/aldeferredrebuild.h
+        diff/aldiffbar.h
+        diff/aldiffcolors.h
+        diff/aldiffedit.h
+        diff/aldifffill.h
+        diff/aldiffids.h
+        diff/aldifflexer.h
+        diff/aldiffmerge.h
+        diff/aldiffmodel.h
+        diff/aldiffmoves.h
+        diff/aldiffrangesame.h
+        diff/aldiffsame.h
+        diff/aldiffsplice.h
+        diff/aldifftokens.h
+        diff/aldiffview.h
+        diff/allinediff.h
+        diff/allinepairs.h
+        diff/alstructuraldiff.h
+        diff/altextmerge.h
+        diff/alunifieddiff.h
+        diff/alworddiff.h
+        studio/aldockpanel.h
+        studio/alemptystate.h
+        fields/alflagsfield.h
+        studio/alhistorylist.h
+        studio/alkeyshome.h
+        fields/alimagefield.h
+        widgets/aljumpbar.h
+        studio/alpanelist.h
+        base/alplace.h
+        widgets/alpopover.h
+        studio/alquickask.h
+        studio/alquickopen.h
+        base/alsaid.h
+        text/altextchars.h
+        widgets/alscopebar.h
+        fields/alsettingrow.h
+        widgets/alspecimenlist.h
+        studio/alstudiofloater.h
+        base/alsurface.h
+        base/alundostack.h
+        base/alstringmatch.h
+        code/alcodecards.h
+        code/alcodeliterals.h
+        code/alchangepeek.h
+        code/alchangessincesaved.h
+        code/alcodeeditor.h
+        code/albracketindex.h
+        code/alcompletionmodel.h
+        base/alfuzzymatch.h
+        code/alfixlistmodel.h
+        code/alfoldmodel.h
+        text/alsmartselect.h
+        code/alsnippetsession.h
+        studio/alfindings.h
+        text/alanchoredranges.h
+        text/alfenwicktree.h
+        text/alfindbar.h
+        widgets/alflatbutton.h
+        studio/alkeycapture.h
+        code/alkeychord.h
+        code/alkeymap.h
+        text/allinetable.h
+        text/almaxima.h
+        studio/almenuslot.h
+        text/alprefixsums.h
+        vim/alvimcommandline.h
+        vim/alvimexcommands.h
+        vim/alvimhost.h
+        vim/alvimkeymap.h
+        vim/alvimmappings.h
+        vim/alvimpattern.h
+        vim/alvimregisters.h
+        vim/alvimsearch.h
+        vim/alvimtext.h
+        xui/alxuiservice.h
+        widgets/alchoicelist.h
+        widgets/alchoicepopup.h
+        studio/aloutputview.h
+        code/alsyntaxgrammar.h
+        code/alsyntaxhighlighter.h
+        widgets/altabstrip.h
+        text/altextcarets.h
+        diff/altextdiff.h
+        text/altextdocument.h
+        text/altextediting.h
+        text/altextfeatures.h
+        text/altextfind.h
+        text/altextgotoline.h
+        text/altextindent.h
+        text/altextlayout.h
+        text/altextruler.h
+        text/altextsearch.h
+        text/altextspelling.h
+        text/altextview.h
+        text/altextundo.h
+        text/alnotecarditems.h
+        fields/alfieldeditors.h
+        studio/alfolderfilter.h
+        fields/alfollowscontrol.h
+        fields/alfontfield.h
+        fields/alcolorpicker.h
+        fields/alpropertygrid.h
+        xui/alxuicatalog.h
+        xui/alxuidiagnostics.h
+        xui/alxuiedit.h
+        xui/alxuifields.h
+        xui/alxuidocuments.h
+        xui/alxuifindings.h
+        xui/alxuilint.h
+        xui/alxuinotes.h
+        xui/alxuioverlay.h
+        xui/alxuischema.h
+        xui/alxuiselection.h
+        xui/alxuishellbuild.h
+        xui/alxuisourcemap.h
+        xui/alxuitranslate.h
+        xui/alxuitreemodel.h
+        llxyvector.h
+)
 
 # Spell checking: the backend-agnostic LLSpellChecker core (llspellcheck.cpp) is always compiled;
 # exactly one platform engine is selected by build option — native macOS NSSpellChecker
 # (Objective-C++), native Windows Spell Checking API, or Hunspell (default).
 target_sources(llui PRIVATE llspellcheck.cpp)
-if (USE_NSSPELLCHECKER)
+if(AL_USE_NSSPELLCHECKER)
   target_sources(llui PRIVATE llspellcheckengine_mac.mm)
   set_source_files_properties(llspellcheckengine_mac.mm PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
-elseif (USE_WINSPELLCHECK)
+elseif(AL_USE_WINSPELLCHECK)
   target_sources(llui PRIVATE llspellcheckengine_win32.cpp)
   set_source_files_properties(llspellcheckengine_win32.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
-else ()
+else()
   target_sources(llui PRIVATE llspellcheckengine_hunspell.cpp)
-endif ()
+endif()
 
-SET(llurlentry_TEST_DEPENDENCIES
-    llurlmatch.cpp
-    llurlregistry.cpp
-    )
+target_include_directories(
+  llui
+  PUBLIC base text code diff vim xui fields studio widgets
+)
 
-set_source_files_properties(llurlentry.cpp
-    PROPERTIES LL_TEST_ADDITIONAL_SOURCE_FILES
-    "${llurlentry_TEST_DEPENDENCIES}"
-    )
+target_link_libraries(
+  llui
+  PRIVATE al::flags
+  PUBLIC
+    llrender
+    llwindow
+    llimage
+    llinventory
+    llmessage
+    llcorehttp
+    llfilesystem
+    llxml
+    llmath
+    llcommon
+  PRIVATE ll::fastfloat ll::icu
+)
 
-target_include_directories( llui  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
-# Libraries on which this library depends, needed for Linux builds
-# Sort by high-level to low-level
-target_link_libraries(llui
-        PUBLIC
-        llrender
-        llwindow
-        llimage
-        llinventory
-        llmessage
-        llcorehttp
-        llfilesystem
-        llxml
-        llmath
-        llcommon
-    )
-
-if (USE_NSSPELLCHECKER)
-    target_link_libraries(llui PUBLIC ll::nsspellchecker)
-elseif (USE_WINSPELLCHECK)
-    target_link_libraries(llui PUBLIC ll::winspellcheck)
-else ()
-    target_link_libraries(llui PUBLIC ll::hunspell)
-endif ()
+if(AL_USE_NSSPELLCHECKER)
+  target_link_libraries(llui PUBLIC ll::nsspellchecker)
+elseif(AL_USE_WINSPELLCHECK)
+  target_link_libraries(llui PUBLIC ll::winspellcheck)
+else()
+  target_link_libraries(llui PUBLIC ll::hunspell)
+endif()
 
 target_precompile_headers(llui REUSE_FROM llprecompiled)
 
+# The console utilities over the UI: a XUI file built and fingerprinted
+# without a viewer, the overlay census that gates the merge, and the
+# translation repair. They live beside the library they are about rather
+# than under tests, since two of them write to the source tree and none of
+# them is a test.
+add_subdirectory(utils)
+
 # Add tests
-if(BUILD_TESTING)
-  if (USE_NSSPELLCHECKER)
+if(AL_BUILD_TESTS)
+  if(AL_USE_NSSPELLCHECKER)
     set(spellcheck_lib ll::nsspellchecker)
-  elseif (USE_WINSPELLCHECK)
+  elseif(AL_USE_WINSPELLCHECK)
     set(spellcheck_lib ll::winspellcheck)
-  else ()
+  else()
     set(spellcheck_lib ll::hunspell)
-  endif ()
-  set(test_libs llmessage llcorehttp llxml llrender llcommon ${spellcheck_lib})
+  endif()
 
-  SET(llui_TEST_SOURCE_FILES
-      llurlmatch.cpp
-      )
-  set_property( SOURCE ${llui_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_LIBRARIES ${test_libs})
-  LL_ADD_PROJECT_UNIT_TESTS(llui "${llui_TEST_SOURCE_FILES}")
+  set(
+    test_libs
+    llmessage
+    llcorehttp
+    llxml
+    llrender
+    llcommon
+    ${spellcheck_lib}
+  )
+  # What llui asks the viewer for, defined once: compiled here and linked
+  # into every test and benchmark below. A test file holds no copy of its
+  # own, since two in one binary would not link.
+  add_library(llui_test_fakes OBJECT tests/llui_test_fakes.cpp)
+  target_link_libraries(llui_test_fakes PRIVATE al::flags llcommon)
+  set_target_properties(llui_test_fakes PROPERTIES FOLDER "Tests/llui")
 
-  # INTEGRATION TESTS
-  set(test_libs llui llmessage llcorehttp llxml llrender llcommon ${spellcheck_lib})
-  set(test_project llui)
-  LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llemojidictionary llemojidictionary.cpp "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llxuiparser "" "${test_libs}" "${test_project}")
+  # What llui's test binaries set up for the process, put back after every
+  # case, and give the state guard to check: once for the binary with no GL,
+  # once for the one that draws.
+  add_library(llui_test_checks OBJECT tests/llui_test_checks.cpp)
+  add_library(llui_gl_test_checks OBJECT tests/llui_test_checks.cpp)
+  target_compile_definitions(llui_gl_test_checks PRIVATE LLUI_TEST_GL=1)
+  foreach(checks llui_test_checks llui_gl_test_checks)
+    target_link_libraries(${checks} PRIVATE al::flags al_test_support llui)
+    target_compile_definitions(
+      ${checks}
+      PRIVATE "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+    )
+    set_target_properties(${checks} PROPERTIES FOLDER "Tests/llui")
+  endforeach()
+
+  # llui's tests with no GL but the colour table's: templates tested whole
+  # in their headers; text, strings, XUI and parsing; a file of llui's
+  # each, from the key map to the URL entries; what comparing two texts is
+  # made of, and the merges and grammars over it; and every widget above
+  # LLView, built over one headless UI on the source tree's skins and fonts.
+  al_add_test_binary(
+    llui_tests
+    PROJECT llui
+    SOURCES
+      tests/alanchoredranges_test.cpp
+      tests/alangledial_test.cpp
+      tests/albracketindex_test.cpp
+      tests/alcanvasview_test.cpp
+      tests/alchangepeek_test.cpp
+      tests/alchoicelist_test.cpp
+      tests/alcodecards_test.cpp
+      tests/alcodeeditor_test.cpp
+      tests/alcolorfield_test.cpp
+      tests/alcolorpicker_test.cpp
+      tests/alcolorsheet_test.cpp
+      tests/alcolortablepanel_test.cpp
+      tests/alcompletionmodel_test.cpp
+      tests/alcornerfield_test.cpp
+      tests/aldifflexer_test.cpp
+      tests/aldiffmerge_test.cpp
+      tests/aldiffmodel_test.cpp
+      tests/aldiffview_test.cpp
+      tests/aldockpanel_test.cpp
+      tests/aldraggesture_test.cpp
+      tests/alemptystate_test.cpp
+      tests/alfenwicktree_test.cpp
+      tests/alfindbar_test.cpp
+      tests/alfixlistmodel_test.cpp
+      tests/alflagsfield_test.cpp
+      tests/alfolderfilter_test.cpp
+      tests/alfoldmodel_test.cpp
+      tests/alfollowscontrol_test.cpp
+      tests/alfontfield_test.cpp
+      tests/alfuzzymatch_test.cpp
+      tests/alhistorylist_test.cpp
+      tests/alimagefield_test.cpp
+      tests/aljumpbar_test.cpp
+      tests/alkeycapture_test.cpp
+      tests/alkeymap_test.cpp
+      tests/allinetable_test.cpp
+      tests/almaxima_test.cpp
+      tests/almenuslot_test.cpp
+      tests/alnotecarditems_test.cpp
+      tests/aloffsetpad_test.cpp
+      tests/aloutputview_test.cpp
+      tests/alpanefolds_test.cpp
+      tests/alpanelist_test.cpp
+      tests/alpaneroom_test.cpp
+      tests/alplace_test.cpp
+      tests/alpopover_test.cpp
+      tests/alprefixsums_test.cpp
+      tests/alpropertygrid_test.cpp
+      tests/alquickopen_test.cpp
+      tests/alscopebar_test.cpp
+      tests/alsettingrow_test.cpp
+      tests/alsnippetsession_test.cpp
+      tests/alspecimenlist_test.cpp
+      tests/alstringmatch_test.cpp
+      tests/alstudiofloater_test.cpp
+      tests/alsurface_test.cpp
+      tests/alsyntaxgrammars_test.cpp
+      tests/alsyntaxhighlighter_test.cpp
+      tests/altabstrip_test.cpp
+      tests/altextcarets_test.cpp
+      tests/altextdiff_test.cpp
+      tests/altextdocument_test.cpp
+      tests/altextediting_test.cpp
+      tests/altextfind_test.cpp
+      tests/altextgotoline_test.cpp
+      tests/altextindent_test.cpp
+      tests/altextlayout_test.cpp
+      tests/altextsearch_test.cpp
+      tests/altextspelling_test.cpp
+      tests/altextundo_test.cpp
+      tests/altextview_test.cpp
+      tests/alundostack_test.cpp
+      tests/alunifieddiff_test.cpp
+      tests/alviewtype_test.cpp
+      tests/alvimkeymap_test.cpp
+      tests/alvimmappings_test.cpp
+      tests/alvimpattern_test.cpp
+      tests/alvimregisters_test.cpp
+      tests/alxuicatalog_test.cpp
+      tests/alxuidiagnostics_test.cpp
+      tests/alxuidocuments_test.cpp
+      tests/alxuiedit_test.cpp
+      tests/alxuifields_test.cpp
+      tests/alxuifill_test.cpp
+      tests/alxuifindings_test.cpp
+      tests/alxuilint_test.cpp
+      tests/alxuinotes_test.cpp
+      tests/alxuioverlay_test.cpp
+      tests/alxuischema_test.cpp
+      tests/alxuiselection_test.cpp
+      tests/alxuiservice_test.cpp
+      tests/alxuishellbuild_test.cpp
+      tests/alxuisourcemap_test.cpp
+      tests/alxuitranslate_test.cpp
+      tests/alxuitreemodel_test.cpp
+      tests/llaccordionctrltab_test.cpp
+      tests/llchatautocompletemodel_test.cpp
+      tests/llcombobox_test.cpp
+      tests/llconsole_test.cpp
+      tests/llemojidictionary_test.cpp
+      tests/llfloater_test.cpp
+      tests/llfocusmgr_test.cpp
+      tests/lllayoutstack_test.cpp
+      tests/llradiogroup_test.cpp
+      tests/llresizebar_test.cpp
+      tests/llspinctrl_test.cpp
+      tests/llstatbar_test.cpp
+      tests/lltabcontainer_test.cpp
+      tests/lltextparser_test.cpp
+      tests/lluistring_test.cpp
+      tests/llurlentry_test.cpp
+      tests/llurlmatch_test.cpp
+      tests/llurlregistry_test.cpp
+      tests/llview_test.cpp
+      tests/llxuiparser_test.cpp
+    # The benchmarks: comparing big scripts, by lines and laid out, and what
+    # each comparison says of some edits, which each change to how texts are
+    # compared is measured and judged by; and the code editor over
+    # 50,000-line scripts, which each change to the edit pipeline, the
+    # highlighter, the layout, the folds or find is measured by.
+    BENCH_SOURCES tests/altextdiff_bench.cpp tests/altextengine_bench.cpp
+    SUPPORT llui_test_fakes llui_test_checks llrender_test_checks llcommon_test_checks
+    LIBRARIES llui ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # The colour table's own tests, alone: each loads documents of its own,
+  # and a name, once in the table, stays there for every case after it.
+  al_add_test_binary(
+    lluicolortable_test
+    PROJECT llui
+    SOURCES tests/lluicolortable_test.cpp
+    SUPPORT llui_test_fakes llrender_test_checks llcommon_test_checks
+    LIBRARIES llui ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # What the text view, a surface and its tab strip, and a comparison draw,
+  # read back from llrender's hidden window: one GL context, and the
+  # headless UI's fonts with GL textures on it.
+  al_add_test_binary(
+    llui_gl_tests
+    PROJECT llui
+    SOURCES tests/aldiffview_gl_test.cpp tests/alsurface_gl_test.cpp tests/altextview_gl_test.cpp
+    # The same editor drawn, a frame at a time, into llrender's hidden
+    # window: what the drawing steps are measured by.
+    BENCH_SOURCES tests/altextdraw_bench.cpp
+    SUPPORT llui_test_fakes llui_gl_test_checks llrender_test_checks llcommon_test_checks
+    LIBRARIES llui ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+    GL
+  )
 endif()

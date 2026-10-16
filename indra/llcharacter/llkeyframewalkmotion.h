@@ -34,8 +34,8 @@
 #include "llcharacter.h"
 #include "v3dmath.h"
 
-#define MIN_REQUIRED_PIXEL_AREA_WALK_ADJUST (20.f)
-#define MIN_REQUIRED_PIXEL_AREA_FLY_ADJUST (20.f)
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_WALK_ADJUST = 20.f;
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_FLY_ADJUST = 20.f;
 
 //-----------------------------------------------------------------------------
 // class LLKeyframeWalkMotion
@@ -67,7 +67,7 @@ public:
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
     virtual bool onActivate();
     virtual void onDeactivate();
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
 
 public:
     //-------------------------------------------------------------------------
@@ -75,8 +75,8 @@ public:
     //-------------------------------------------------------------------------
     LLCharacter *mCharacter;
     F32         mCyclePhase;
-    F32         mRealTimeLast;
-    F32         mAdjTimeLast;
+    F64         mRealTimeLast;  // onUpdate()'s time
+    F64         mAdjTimeLast;   // the cycle's own time, scaled by speed: as long-running as onUpdate()'s
     S32         mDownFoot;
 };
 
@@ -95,6 +95,10 @@ public:
     // all subclasses must implement such a function and register it
     static LLMotion *create(const LLUUID &id) { return new LLWalkAdjustMotion(id); }
 
+    // The playback rate that would put the planted foot on the ground, given
+    // how fast the avatar is going and how fast the foot is going with it.
+    static F32 speedMultiplier(F32 speed, F32 foot_speed, F32 min_multiplier, F32 max_multiplier);
+
 public:
     //-------------------------------------------------------------------------
     // animation callbacks to be implemented by subclasses
@@ -102,7 +106,7 @@ public:
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
     virtual bool onActivate();
     virtual void onDeactivate();
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
     virtual LLJoint::JointPriority getPriority(){return LLJoint::HIGH_PRIORITY;}
     virtual bool getLoop() { return true; }
     virtual F32 getDuration() { return 0.f; }
@@ -122,7 +126,7 @@ public:
     LLJoint*        mPelvisJoint;
     LLVector3d      mLastLeftFootGlobalPos;
     LLVector3d      mLastRightFootGlobalPos;
-    F32             mLastTime;
+    F64             mLastTime;      // onUpdate()'s time: walk adjust is active all session
     F32             mAdjustedSpeed;
     F32             mAnimSpeed;
     F32             mRelativeDir;
@@ -152,7 +156,7 @@ public:
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
     virtual bool onActivate();
     virtual void onDeactivate() {};
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
     virtual LLJoint::JointPriority getPriority(){return LLJoint::HIGHER_PRIORITY;}
     virtual bool getLoop() { return true; }
     virtual F32 getDuration() { return 0.f; }

@@ -139,7 +139,7 @@
                 <layout_panel
                  height="200"
                  layout="topleft"
-                 min_width="10"
+                 min_height="10"
                  name="panel5"
                  width="670" />
             </layout_stack>

@@ -40,10 +40,12 @@ class LLViewerFetchedTexture;
 //
 
 //
-class LLThumbnailCtrl
+class LLThumbnailCtrl final
 : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLThumbnailCtrl, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<LLViewBorder::Params> border;

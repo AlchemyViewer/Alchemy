@@ -29,9 +29,11 @@
 
 #include "llfloater.h"
 
-class LLFloaterSpellCheckerSettings : public LLFloater
+class LLFloaterSpellCheckerSettings final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterSpellCheckerSettings, LLFloater);
+
     LLFloaterSpellCheckerSettings(const LLSD& key);
 
     void draw() override;
@@ -49,9 +51,11 @@ protected:
     bool mMainSelectionChanged{ false };
 };
 
-class LLFloaterSpellCheckerImport : public LLFloater
+class LLFloaterSpellCheckerImport final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterSpellCheckerImport, LLFloater);
+
     LLFloaterSpellCheckerImport(const LLSD& key);
 
     bool postBuild() override;

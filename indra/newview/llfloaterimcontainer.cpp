@@ -51,6 +51,7 @@
 #include "llfloaterreporter.h"
 #include "llimview.h"
 #include "llnotificationsutil.h"
+#include "lltextbox.h"
 #include "lltoolbarview.h"
 #include "lltransientfloatermgr.h"
 #include "llviewercontrol.h"
@@ -368,33 +369,19 @@ void LLFloaterIMContainer::addFloater(LLFloater* floaterp,
     // Add the floater
     LLMultiFloater::addFloater(floaterp, select_added_floater, insertion_point);
 
+    mSessions[session_id] = floaterp;
+    floaterp->mCloseSignal.connect(boost::bind(&LLFloaterIMContainer::onCloseFloater, this, session_id));
 
-
-    LLIconCtrl* icon = 0;
-    bool is_in_group = gAgent.isInGroup(session_id, true);
+    // Whose picture the conversation shows: the group's, or the other
+    // party's.
     LLUUID icon_id;
-
-    if (is_in_group)
+    if (gAgent.isInGroup(session_id, true))
     {
-        LLGroupIconCtrl::Params icon_params;
-        icon_params.group_id = session_id;
-        icon = LLUICtrlFactory::instance().create<LLGroupIconCtrl>(icon_params);
         icon_id = session_id;
-
-        mSessions[session_id] = floaterp;
-        floaterp->mCloseSignal.connect(boost::bind(&LLFloaterIMContainer::onCloseFloater, this, session_id));
     }
-    else
-    {   LLUUID avatar_id = session_id.notNull()?
-            LLIMModel::getInstance()->getOtherParticipantID(session_id) : LLUUID();
-
-        LLAvatarIconCtrl::Params icon_params;
-        icon_params.avatar_id = avatar_id;
-        icon = LLUICtrlFactory::instance().create<LLAvatarIconCtrl>(icon_params);
-        icon_id = avatar_id;
-
-        mSessions[session_id] = floaterp;
-        floaterp->mCloseSignal.connect(boost::bind(&LLFloaterIMContainer::onCloseFloater, this, session_id));
+    else if (session_id.notNull())
+    {
+        icon_id = LLIMModel::getInstance()->getOtherParticipantID(session_id);
     }
 
     LLFloaterIMSessionTab* floater = LLFloaterIMSessionTab::getConversation(session_id);
@@ -406,8 +393,6 @@ void LLFloaterIMContainer::addFloater(LLFloater* floaterp,
     // forced resize of the floater
     LLRect wrapper_rect = this->mTabContainer->getLocalRect();
     floaterp->setRect(wrapper_rect);
-
-    mTabContainer->setTabImage(floaterp, icon);
 }
 
 
@@ -669,7 +654,7 @@ void LLFloaterIMContainer::handleConversationModelEvent(const LLSD& event)
     LLUUID session_id = event.get("session_uuid").asUUID();
     LLUUID participant_id = event.get("participant_uuid").asUUID();
 
-    LLConversationViewSession* session_view = dynamic_cast<LLConversationViewSession*>(get_ptr_in_map(mConversationsWidgets,session_id));
+    LLConversationViewSession* session_view = ALViewType::as<LLConversationViewSession>(get_ptr_in_map(mConversationsWidgets,session_id));
     if (!session_view)
     {
         // We skip events that are not associated with a session
@@ -860,7 +845,7 @@ void LLFloaterIMContainer::setVisible(bool visible)
         conversations_widgets_map::iterator widget_it = mConversationsWidgets.begin();
         for (; widget_it != mConversationsWidgets.end(); ++widget_it)
         {
-            LLConversationViewSession* widget = dynamic_cast<LLConversationViewSession*>(widget_it->second);
+            LLConversationViewSession* widget = ALViewType::as<LLConversationViewSession>(widget_it->second);
             if (widget)
             {
                 LLFloater* session_floater = widget->getSessionFloater();
@@ -882,7 +867,7 @@ void LLFloaterIMContainer::getDetachedConversationFloaters(floater_list_t& float
 
     for (const auto& [key, fvi] : mConversationsWidgets)
     {
-        LLConversationViewSession* widget = dynamic_cast<LLConversationViewSession*>(fvi);
+        LLConversationViewSession* widget = ALViewType::as<LLConversationViewSession>(fvi);
         if (widget)
         {
             LLFloater* session_floater = widget->getSessionFloater();
@@ -1006,7 +991,7 @@ void LLFloaterIMContainer::collapseConversationsPane(bool collapse, bool save_is
     for (conversations_widgets_map::iterator widget_it = mConversationsWidgets.begin();
             widget_it != mConversationsWidgets.end(); ++widget_it)
     {
-        LLConversationViewSession* widget = dynamic_cast<LLConversationViewSession*>(widget_it->second);
+        LLConversationViewSession* widget = ALViewType::as<LLConversationViewSession>(widget_it->second);
         if (widget)
         {
             widget->toggleCollapsedMode(collapse);
@@ -1573,19 +1558,18 @@ void LLFloaterIMContainer::doToSelectedGroup(const LLSD& userdata)
     {
         if (auto group = LLGroupMgr::getInstance()->getGroupData(mSelectedSession))
         {
-            LLWString wstr = utf8str_to_wstring(group->mName);
-            LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.length()));
+            LLClipboard::instance().copyToClipboard(group->mName, 0, narrow(group->mName.length()));
         }
     }
     else if (action == "copy_group_slurl")
     {
-        LLWString wstr = utf8str_to_wstring(LLSLURL("group", mSelectedSession, "about").getSLURLString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.length()));
+        const std::string slurl = LLSLURL("group", mSelectedSession, "about").getSLURLString();
+        LLClipboard::instance().copyToClipboard(slurl, 0, narrow(slurl.length()));
     }
     else if (action == "copy_group_id")
     {
-        LLWString wstr = utf8str_to_wstring(mSelectedSession.asString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.length()));
+        const std::string id_str = mSelectedSession.asString();
+        LLClipboard::instance().copyToClipboard(id_str, 0, narrow(id_str.length()));
     }
 }
 
@@ -1868,7 +1852,7 @@ void LLFloaterIMContainer::clearAllFlashStates()
     conversations_widgets_map::iterator widget_it = mConversationsWidgets.begin();
     for (;widget_it != mConversationsWidgets.end(); ++widget_it)
     {
-        LLConversationViewSession* widget = dynamic_cast<LLConversationViewSession*>(widget_it->second);
+        LLConversationViewSession* widget = ALViewType::as<LLConversationViewSession>(widget_it->second);
         if (widget)
         {
             widget->setFlashState(false);
@@ -2510,7 +2494,7 @@ void LLFloaterIMContainer::openNearbyChat()
     //(which it should be...), open it so to make the list of participants visible. This happens to be the most common case when opening the Chat floater.
     if((mConversationsItems.size() == 1)&&(!mConversationsPane->isCollapsed()))
     {
-        LLConversationViewSession* nearby_chat = dynamic_cast<LLConversationViewSession*>(get_ptr_in_map(mConversationsWidgets,LLUUID()));
+        LLConversationViewSession* nearby_chat = ALViewType::as<LLConversationViewSession>(get_ptr_in_map(mConversationsWidgets,LLUUID()));
         if (nearby_chat)
         {
             reSelectConversation();
@@ -2537,7 +2521,7 @@ void LLFloaterIMContainer::updateSpeakBtnState()
 void LLFloaterIMContainer::updateTypingState(const LLUUID& session_id, bool typing)
 {
     //Finds the conversation line item to flash using the session_id
-    LLConversationViewSession * widget = dynamic_cast<LLConversationViewSession *>(get_ptr_in_map(mConversationsWidgets, session_id));
+    LLConversationViewSession * widget = ALViewType::as<LLConversationViewSession>(get_ptr_in_map(mConversationsWidgets, session_id));
 
     if (widget)
     {
@@ -2553,7 +2537,7 @@ bool LLFloaterIMContainer::isConversationLoggingAllowed()
 void LLFloaterIMContainer::flashConversationItemWidget(const LLUUID& session_id, bool is_flashes, bool alternate_color)
 {
     //Finds the conversation line item to flash using the session_id
-    LLConversationViewSession * widget = dynamic_cast<LLConversationViewSession *>(get_ptr_in_map(mConversationsWidgets,session_id));
+    LLConversationViewSession * widget = ALViewType::as<LLConversationViewSession>(get_ptr_in_map(mConversationsWidgets,session_id));
 
     if (widget)
     {
@@ -2564,7 +2548,7 @@ void LLFloaterIMContainer::flashConversationItemWidget(const LLUUID& session_id,
 void LLFloaterIMContainer::highlightConversationItemWidget(const LLUUID& session_id, bool is_highlighted)
 {
     //Finds the conversation line item to highlight using the session_id
-    LLConversationViewSession * widget = dynamic_cast<LLConversationViewSession *>(get_ptr_in_map(mConversationsWidgets,session_id));
+    LLConversationViewSession * widget = ALViewType::as<LLConversationViewSession>(get_ptr_in_map(mConversationsWidgets,session_id));
 
     if (widget)
     {
@@ -2657,7 +2641,7 @@ void LLFloaterIMContainer::expandConversation()
 {
     if(!mConversationsPane->isCollapsed())
     {
-        LLConversationViewSession* widget = dynamic_cast<LLConversationViewSession*>(get_ptr_in_map(mConversationsWidgets,getSelectedSession()));
+        LLConversationViewSession* widget = ALViewType::as<LLConversationViewSession>(get_ptr_in_map(mConversationsWidgets,getSelectedSession()));
         if (widget)
         {
             widget->setOpen(!widget->isOpen());
@@ -2669,7 +2653,7 @@ bool LLFloaterIMContainer::isParticipantListExpanded()
     bool is_expanded = false;
     if(!mConversationsPane->isCollapsed())
     {
-        LLConversationViewSession* widget = dynamic_cast<LLConversationViewSession*>(get_ptr_in_map(mConversationsWidgets,getSelectedSession()));
+        LLConversationViewSession* widget = ALViewType::as<LLConversationViewSession>(get_ptr_in_map(mConversationsWidgets,getSelectedSession()));
         if (widget)
         {
             is_expanded = widget->isOpen();

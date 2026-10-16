@@ -36,9 +36,10 @@
 #include "lliconctrl.h"
 #include "llsdparam.h"
 
-class LLHintPopup : public LLPanel
+class LLHintPopup final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLHintPopup, LLPanel);
 
     typedef enum e_popup_direction
     {
@@ -110,7 +111,7 @@ public:
 
     LLHintPopup(const Params&);
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     void onClickClose()
     {
@@ -120,7 +121,7 @@ public:
             LLNotifications::instance().cancel(mNotification);
         }
     }
-    void draw();
+    void draw() override;
     void hide() { if(!mHidden) {mHidden = true; mFadeTimer.reset();} }
 
 private:

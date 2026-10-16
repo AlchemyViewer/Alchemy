@@ -7,7 +7,4 @@
 		<accordion_tab name="tab_wearables" title="Tragbare Objekte"/>
 		<accordion_tab name="tab_temp_attachments" title="Temporäre Anhänge"/>
 	</accordion>
-	<panel name="bottom_panel">
-		<menu_button name="options_gear_btn" tool_tip="Zusätzliche Optionen anzeigen"/>
-	</panel>
 </panel>

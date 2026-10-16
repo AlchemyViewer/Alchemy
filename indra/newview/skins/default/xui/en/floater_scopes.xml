@@ -89,7 +89,8 @@
 	 right="-8"
 	 height="230"
 	 background_visible="false"
-	 name="scope_plot" />
+	 name="scope_plot"
+	 tool_tip="Right-click a scope to choose what it shows: a histogram, a waveform, a parade or the vectorscope." />
 	<text
 	 follows="left|bottom|right"
 	 layout="topleft"

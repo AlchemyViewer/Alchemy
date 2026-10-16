@@ -12,26 +12,17 @@
 	<floater.string name="done_text">
 		Finalizado el cambio de permisos solicitado.
 	</floater.string>
-	<check_box label="Animación" name="check_animation"/>
 	<icon name="icon_animation" tool_tip="Animaciones"/>
-	<check_box label="Partes del cuerpo" name="check_bodypart"/>
 	<icon name="icon_bodypart" tool_tip="Partes del cuerpo"/>
-	<check_box label="Ropa" name="check_clothing"/>
 	<icon name="icon_clothing" tool_tip="Ropa"/>
-	<check_box label="Gestos" name="check_gesture"/>
 	<icon name="icon_gesture" tool_tip="Gestos"/>
-	<check_box label="Notas" name="check_notecard"/>
 	<icon name="icon_notecard" tool_tip="Notas"/>
-	<check_box label="Objetos" name="check_object"/>
 	<icon name="icon_object" tool_tip="Objetos"/>
-	<check_box label="Scripts" name="check_script"/>
 	<icon name="icon_script" tool_tip="Scripts"/>
-	<check_box label="Sonidos" name="check_sound"/>
 	<icon name="icon_sound" tool_tip="Sonidos"/>
-	<check_box label="Texturas" name="check_texture"/>
 	<icon name="icon_texture" tool_tip="Texturas"/>
 	<icon name="icon_setting" tool_tip="Configuración de entorno"/>
-	<button label="√ Todos" label_selected="Todo" name="check_all"/>
+	<button label="√ Todos" name="check_all"/>
 	<button label="Limpiar" label_selected="Ninguno" name="check_none"/>
 	<text name="newperms">
 		Ajustar los permisos del contenido a

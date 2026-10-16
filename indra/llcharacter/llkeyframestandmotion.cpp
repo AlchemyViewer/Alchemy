@@ -158,8 +158,9 @@ void LLKeyframeStandMotion::onDeactivate()
 //-----------------------------------------------------------------------------
 // LLKeyframeStandMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLKeyframeStandMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLKeyframeStandMotion::onUpdate(F64 time, U8* joint_mask)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     //-------------------------------------------------------------------------
     // let the base class update the cycle
     //-------------------------------------------------------------------------
@@ -284,10 +285,11 @@ bool LLKeyframeStandMotion::onUpdate(F32 time, U8* joint_mask)
     //-------------------------------------------------------------------------
     if ( mTrackAnkles )
     {
-        LLVector4 dirLeft4 = mAnkleLeftJoint.getWorldMatrix().getFwdRow4();
-        LLVector4 dirRight4 = mAnkleRightJoint.getWorldMatrix().getFwdRow4();
-        LLVector3 dirLeft = vec4to3( dirLeft4 );
-        LLVector3 dirRight = vec4to3( dirRight4 );
+        // The forward row of the world matrix, which is the row the matrix
+        // already holds: copying all sixteen floats into an LLMatrix4 to read
+        // three of them ran twice a frame for every standing avatar.
+        LLVector3 dirLeft( mAnkleLeftJoint.getWorldMatrix().getRow<0>().getF32ptr() );
+        LLVector3 dirRight( mAnkleRightJoint.getWorldMatrix().getRow<0>().getF32ptr() );
 
         LLVector3 up;
         LLVector3 dir;

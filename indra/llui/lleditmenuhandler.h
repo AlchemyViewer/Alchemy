@@ -27,12 +27,17 @@
 #ifndef LLEDITMENUHANDLER_H
 #define LLEDITMENUHANDLER_H
 
+class LLView;
+
 // Interface used by menu system for plug-in hotkey/menu handling
 class LLEditMenuHandler
 {
 public:
     // this is needed even though this is just an interface class.
     virtual ~LLEditMenuHandler();
+
+    // The view this handler is, or null for a handler that is not one.
+    virtual LLView* asView() = 0;
 
     virtual void    undo() {};
     virtual bool    canUndo() const { return false; }

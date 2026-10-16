@@ -121,7 +121,7 @@ public:
         *position = mCursorPos;
         return true;
     }
-#if (LL_WINDOWS || LL_SDL_WINDOW) && !LL_MESA_HEADLESS
+#if LL_WINDOWS || LL_SDL_WINDOW
     /*virtual*/ bool getCursorDelta(LLCoordCommon* delta) override
     {
         if (!delta) return false;
@@ -145,8 +145,8 @@ public:
     /*virtual*/ void releaseMouse() override {}
     /*virtual*/ void setMouseClipping( bool b ) override {}
     /*virtual*/ bool isClipboardTextAvailable() override {return false; }
-    /*virtual*/ bool pasteTextFromClipboard(LLWString &dst) override {return false; }
-    /*virtual*/ bool copyTextToClipboard(const LLWString &src) override {return false; }
+    /*virtual*/ bool pasteTextFromClipboard(std::string &dst) override {return false; }
+    /*virtual*/ bool copyTextToClipboard(const std::string &src) override {return false; }
     /*virtual*/ void flashIcon(F32 seconds) override {}
     /*virtual*/ F32 getGamma() override {return 1.0f; }
     /*virtual*/ bool setGamma(const F32 gamma) override {return false; } // Set the gamma

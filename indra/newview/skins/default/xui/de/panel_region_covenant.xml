@@ -21,7 +21,6 @@
 	<text name="covenant_timestamp_text" width="320">
 		Letzte Änderung am Mittwoch, den 31. Dez. 1969, 16:00:00
 	</text>
-	<button label="?" name="covenant_help"/>
 	<text_editor bottom="-247" height="162" name="covenant_editor">
 		Für diesen Grundbesitz fehlt der Vertrag.
 	</text_editor>

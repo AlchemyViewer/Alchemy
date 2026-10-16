@@ -28,6 +28,7 @@
 
 #include "llviewermenu.h"
 
+
 // linden library includes
 #include "llavatarnamecache.h"  // IDEVO (I Are Not Men!)
 #include "llcombobox.h"
@@ -37,12 +38,13 @@
 #include "llinventorypanel.h"
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
-#include "llviewereventrecorder.h"
 #include "v4coloru.h"
 
 // newview includes
 #include "alavataractions.h"
+#include "alfeedback.h"
 #include "alfloaterblocked.h"
+#include "alfloaterfeedback.h"
 #include "alviewermenu.h"
 #include "llagent.h"
 #include "llagentaccess.h"
@@ -111,6 +113,7 @@
 #include "llstatusbar.h"
 #include "llterrainpaintmap.h"
 #include "lltextureview.h"
+#include "lltoolbar.h"
 #include "lltoolbarview.h"
 #include "lltoolcomp.h"
 #include "lltoolmgr.h"
@@ -146,7 +149,6 @@
 #include "llpathfindingmanager.h"
 #include "llstartup.h"
 #include <unordered_map>
-#include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include "llcleanup.h"
 #include "llviewershadermgr.h"
@@ -297,6 +299,9 @@ void force_error_coroprocedure_crash();
 void force_error_work_queue_crash();
 void force_error_thread_crash();
 void force_exception_thread_crash();
+void force_error_abort();
+void force_error_stack_overflow();
+void force_error_terminate();
 
 void handle_force_delete();
 void print_object_info();
@@ -2223,31 +2228,6 @@ class LLAdvancedCheckShowPointAt : public view_listener_t
 
 
 
-/////////////////////////
-// DEBUG JOINT UPDATES //
-/////////////////////////
-
-
-class LLAdvancedToggleDebugJointUpdates : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        LLVOAvatar::sJointDebug = !(LLVOAvatar::sJointDebug);
-        return true;
-    }
-};
-
-class LLAdvancedCheckDebugJointUpdates : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        bool new_value = LLVOAvatar::sJointDebug;
-        return new_value;
-    }
-};
-
-
-
 /////////////////
 // DISABLE LOD //
 /////////////////
@@ -2451,44 +2431,6 @@ class LLAdvancedPurgeShaderCache : public view_listener_t
         return true;
     }
 };
-
-////////////////////
-// EVENT Recorder //
-///////////////////
-
-
-class LLAdvancedViewerEventRecorder : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        std::string command = userdata.asString();
-        if ("start playback" == command)
-        {
-            LL_INFOS() << "Event Playback starting" << LL_ENDL;
-            LLViewerEventRecorder::instance().playbackRecording();
-            LL_INFOS() << "Event Playback completed" << LL_ENDL;
-        }
-        else if ("stop playback" == command)
-        {
-            // Future
-        }
-        else if ("start recording" == command)
-        {
-            LLViewerEventRecorder::instance().setEventLoggingOn();
-            LL_INFOS() << "Event recording started" << LL_ENDL;
-        }
-        else if ("stop recording" == command)
-        {
-            LLViewerEventRecorder::instance().setEventLoggingOff();
-            LL_INFOS() << "Event recording stopped" << LL_ENDL;
-        }
-
-        return true;
-    }
-};
-
-
-
 
 /////////////////
 // AGENT PILOT //
@@ -2832,6 +2774,33 @@ class LLAdvancedForceExceptionThreadCrash : public view_listener_t
     bool handleEvent(const LLSD& userdata)
     {
         force_exception_thread_crash();
+        return true;
+    }
+};
+
+class LLAdvancedForceErrorAbort : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        force_error_abort();
+        return true;
+    }
+};
+
+class LLAdvancedForceErrorStackOverflow : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        force_error_stack_overflow();
+        return true;
+    }
+};
+
+class LLAdvancedForceErrorTerminate : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        force_error_terminate();
         return true;
     }
 };
@@ -4402,7 +4371,7 @@ void handle_reset_interest_lists()
 
 void handle_dump_focus()
 {
-    LLUICtrl *ctrl = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl *ctrl = gFocusMgr.getKeyboardFocusCtrl();
 
     LL_INFOS() << "Keyboard focus " << (ctrl ? ctrl->getName() : "(none)") << LL_ENDL;
 }
@@ -6069,6 +6038,11 @@ class LLToolsToggleScriptEditorServer : public view_listener_t
                 LLScriptEditorWSServer::ensureServerRunning();
             }
         }
+
+        if (gFloaterTools)
+        {
+            gFloaterTools->dirty();
+        }
         return true;
     }
 };
@@ -6421,7 +6395,7 @@ class LLEditDelete : public view_listener_t
 
 void handle_spellcheck_replace_with_suggestion(const LLUICtrl* ctrl, const LLSD& param)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (!spellcheck_handler) || (!spellcheck_handler->getSpellCheck()) )
     {
@@ -6439,8 +6413,8 @@ void handle_spellcheck_replace_with_suggestion(const LLUICtrl* ctrl, const LLSD&
 
 bool visible_spellcheck_suggestion(LLUICtrl* ctrl, const LLSD& param)
 {
-    LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(ctrl);
-    const LLContextMenu* menu = (item) ? dynamic_cast<const LLContextMenu*>(item->getParent()) : NULL;
+    LLMenuItemGL* item = ALViewType::as<LLMenuItemGL>(ctrl);
+    const LLContextMenu* menu = (item) ? item->getParentAs<LLContextMenu>() : NULL;
     const LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<const LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (!spellcheck_handler) || (!spellcheck_handler->getSpellCheck()) )
     {
@@ -6459,7 +6433,7 @@ bool visible_spellcheck_suggestion(LLUICtrl* ctrl, const LLSD& param)
 
 void handle_spellcheck_add_to_dictionary(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (spellcheck_handler) && (spellcheck_handler->canAddToDictionary()) )
     {
@@ -6469,14 +6443,14 @@ void handle_spellcheck_add_to_dictionary(const LLUICtrl* ctrl)
 
 bool enable_spellcheck_add_to_dictionary(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     const LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<const LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     return (spellcheck_handler) && (spellcheck_handler->canAddToDictionary());
 }
 
 void handle_spellcheck_add_to_ignore(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (spellcheck_handler) && (spellcheck_handler->canAddToIgnore()) )
     {
@@ -6486,7 +6460,7 @@ void handle_spellcheck_add_to_ignore(const LLUICtrl* ctrl)
 
 bool enable_spellcheck_add_to_ignore(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     const LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<const LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     return (spellcheck_handler) && (spellcheck_handler->canAddToIgnore());
 }
@@ -7371,7 +7345,7 @@ void handle_edit_outfit()
 
 void handle_now_wearing()
 {
-    LLSidepanelAppearance *panel_appearance = dynamic_cast<LLSidepanelAppearance *>(LLFloaterSidePanelContainer::getPanel("appearance"));
+    LLSidepanelAppearance *panel_appearance = LLFloaterSidePanelContainer::getPanel<LLSidepanelAppearance>("appearance");
     if (panel_appearance && panel_appearance->isInVisibleChain() && panel_appearance->isCOFPanelVisible())
     {
         LLFloaterReg::findInstance("appearance")->closeFloater();
@@ -8003,7 +7977,7 @@ static bool onEnableAttachmentLabel(LLUICtrl* ctrl, const LLSD& data)
     bool fRlvEnable = true;
 // [/RLVa:KB]
     std::string label;
-    LLMenuItemGL* menu = dynamic_cast<LLMenuItemGL*>(ctrl);
+    LLMenuItemGL* menu = ALViewType::as<LLMenuItemGL>(ctrl);
     if (menu)
     {
         const LLViewerJointAttachment *attachment = get_if_there(gAgentAvatarp->mAttachmentPoints, data["index"].asInteger(), (LLViewerJointAttachment*)NULL);
@@ -9309,6 +9283,98 @@ class LLToolsShowHiddenSelection : public view_listener_t
     }
 };
 
+// Whether the selection's outlines or its wireframe are drawn: the options they share apply only then.
+static bool selection_lines_shown()
+{
+    return gSavedSettings.getBOOL("RenderHighlightSelections") || gSavedSettings.getBOOL("AlchemySelectionWireframe");
+}
+
+class LLToolsEnableSelectionOutlineOptions : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return selection_lines_shown();
+    }
+};
+
+// Outline Whole Faces: checked where whole faces are outlined, which Highlight Transparent makes them; enabled where
+// the setting decides it, which RLVa's Highlight Transparent restriction and Highlight Transparent itself take away,
+// and while there are lines for it to shape.
+class LLToolsCheckOutlineWholeFaces : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return LLDrawPoolAlpha::sShowDebugAlpha ||
+               (gSavedSettings.getBOOL("AlchemySelectionOutlineGeometry") && RlvActions::canHighlightTransparent());
+    }
+};
+
+class LLToolsEnableOutlineWholeFaces : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return !LLDrawPoolAlpha::sShowDebugAlpha && RlvActions::canHighlightTransparent() && selection_lines_shown();
+    }
+};
+
+// The Selection Outline Options menu's widths: the contour's, with the narrower one beside the wireframe that goes
+// with it.
+class LLToolsSelectionOutlineWidth : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        const F32 width = (F32)userdata.asReal();
+        const F32 beside_wireframe = width <= 3.f ? 2.f : (width <= 5.f ? 4.f : 6.f);
+        gSavedSettings.setF32("AlchemySelectionOutlineWidth", width);
+        gSavedSettings.setF32("AlchemySelectionOutlineWireframeWidth", beside_wireframe);
+        return true;
+    }
+};
+
+class LLToolsCheckSelectionOutlineWidth : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return ll_round(gSavedSettings.getF32("AlchemySelectionOutlineWidth")) == userdata.asInteger();
+    }
+};
+
+// The Selection Outline Options menu's contrast (ALSelectionOutline::EContrast).
+class LLToolsSelectionOutlineContrast : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        gSavedSettings.setS32("AlchemySelectionOutlineContrast", userdata.asInteger());
+        return true;
+    }
+};
+
+class LLToolsCheckSelectionOutlineContrast : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return gSavedSettings.getS32("AlchemySelectionOutlineContrast") == userdata.asInteger();
+    }
+};
+
+// The Selection Outline Options menu's wireframe widths.
+class LLToolsSelectionWireframeWidth : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        gSavedSettings.setF32("AlchemySelectionWireframeWidth", (F32)userdata.asReal());
+        return true;
+    }
+};
+
+class LLToolsCheckSelectionWireframeWidth : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return ll_round(gSavedSettings.getF32("AlchemySelectionWireframeWidth")) == userdata.asInteger();
+    }
+};
+
 class LLToolsShowSelectionLightRadius : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -9541,6 +9607,21 @@ void force_exception_thread_crash()
     LLAppViewer::instance()->forceExceptionThreadCrash();
 }
 
+void force_error_abort()
+{
+    LLAppViewer::instance()->forceErrorAbort();
+}
+
+void force_error_stack_overflow()
+{
+    LLAppViewer::instance()->forceErrorStackOverflow();
+}
+
+void force_error_terminate()
+{
+    LLAppViewer::instance()->forceErrorTerminate();
+}
+
 class LLToolsUseSelectionForGrid : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -9665,6 +9746,11 @@ void handle_show_url(const LLSD& param)
 
 void handle_report_bug(const LLSD& param)
 {
+    if (ALFeedback::available())
+    {
+        ALFloaterFeedback::show();
+        return;
+    }
     std::string url = gSavedSettings.getString("ReportBugURL");
     LLWeb::loadURLExternal(url);
 }
@@ -9975,6 +10061,10 @@ class LLViewShowHUDAttachments : public view_listener_t
 // [/RLVa:KB]
 
         LLPipeline::sShowHUDAttachments = !LLPipeline::sShowHUDAttachments;
+        // Two toolbar predicates read this flag, and this is the only place a
+        // person changes it -- the rest are snapshot code hiding HUDs around a
+        // capture and putting them back.
+        LLToolBar::requestRefresh();
         return true;
     }
 };
@@ -10525,8 +10615,6 @@ void initialize_menus()
     // Don't prepend MenuName.Foo because these can be used in any menu.
     enable.add("IsGodCustomerService", boost::bind(&is_god_customer_service));
 
-    enable.add("displayViewerEventRecorderMenuItems",boost::bind(&LLViewerEventRecorder::displayViewerEventRecorderMenuItems,&LLViewerEventRecorder::instance()));
-
     view_listener_t::addEnable(new LLUploadCostCalculator(), "Upload.CalculateCosts");
 
     view_listener_t::addEnable(new LLUpdateMembershipLabel(), "Membership.UpdateLabel");
@@ -10618,6 +10706,15 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToolsSelectBySurrounding(), "Tools.SelectBySurrounding");
     view_listener_t::addMenu(new LLToolsSelectionLODMode(), "Tools.SelectionLODMode");
     view_listener_t::addMenu(new LLToolsShowHiddenSelection(), "Tools.ShowHiddenSelection");
+    view_listener_t::addMenu(new LLToolsCheckOutlineWholeFaces(), "Tools.CheckOutlineWholeFaces");
+    view_listener_t::addMenu(new LLToolsEnableOutlineWholeFaces(), "Tools.EnableOutlineWholeFaces");
+    view_listener_t::addMenu(new LLToolsEnableSelectionOutlineOptions(), "Tools.EnableSelectionOutlineOptions");
+    view_listener_t::addMenu(new LLToolsSelectionOutlineWidth(), "Tools.SelectionOutlineWidth");
+    view_listener_t::addMenu(new LLToolsCheckSelectionOutlineWidth(), "Tools.CheckSelectionOutlineWidth");
+    view_listener_t::addMenu(new LLToolsSelectionOutlineContrast(), "Tools.SelectionOutlineContrast");
+    view_listener_t::addMenu(new LLToolsCheckSelectionOutlineContrast(), "Tools.CheckSelectionOutlineContrast");
+    view_listener_t::addMenu(new LLToolsSelectionWireframeWidth(), "Tools.SelectionWireframeWidth");
+    view_listener_t::addMenu(new LLToolsCheckSelectionWireframeWidth(), "Tools.CheckSelectionWireframeWidth");
     view_listener_t::addMenu(new LLToolsShowSelectionLightRadius(), "Tools.ShowSelectionLightRadius");
     view_listener_t::addMenu(new LLToolsEditLinkedParts(), "Tools.EditLinkedParts");
     view_listener_t::addMenu(new LLToolsSnapObjectXY(), "Tools.SnapObjectXY");
@@ -10780,8 +10877,6 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedCheckShowLookAt(), "Advanced.CheckShowLookAt");
     view_listener_t::addMenu(new LLAdvancedToggleShowPointAt(), "Advanced.ToggleShowPointAt");
     view_listener_t::addMenu(new LLAdvancedCheckShowPointAt(), "Advanced.CheckShowPointAt");
-    view_listener_t::addMenu(new LLAdvancedToggleDebugJointUpdates(), "Advanced.ToggleDebugJointUpdates");
-    view_listener_t::addMenu(new LLAdvancedCheckDebugJointUpdates(), "Advanced.CheckDebugJointUpdates");
     view_listener_t::addMenu(new LLAdvancedToggleDisableLOD(), "Advanced.ToggleDisableLOD");
     view_listener_t::addMenu(new LLAdvancedCheckDisableLOD(), "Advanced.CheckDisableLOD");
     view_listener_t::addMenu(new LLAdvancedToggleDebugCharacterVis(), "Advanced.ToggleDebugCharacterVis");
@@ -10805,7 +10900,6 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedAgentPilot(), "Advanced.AgentPilot");
     view_listener_t::addMenu(new LLAdvancedToggleAgentPilotLoop(), "Advanced.ToggleAgentPilotLoop");
     view_listener_t::addMenu(new LLAdvancedCheckAgentPilotLoop(), "Advanced.CheckAgentPilotLoop");
-    view_listener_t::addMenu(new LLAdvancedViewerEventRecorder(), "Advanced.EventRecorder");
 
     // Advanced > Debugging
     view_listener_t::addMenu(new LLAdvancedForceErrorBreakpoint(), "Advanced.ForceErrorBreakpoint");
@@ -10823,6 +10917,9 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedForceErrorWorkQueueCrash(), "Advanced.ForceErrorWorkQueueCrash");
     view_listener_t::addMenu(new LLAdvancedForceErrorThreadCrash(), "Advanced.ForceErrorThreadCrash");
     view_listener_t::addMenu(new LLAdvancedForceExceptionThreadCrash(), "Advanced.ForceExceptionThreadCrash");
+    view_listener_t::addMenu(new LLAdvancedForceErrorAbort(), "Advanced.ForceErrorAbort");
+    view_listener_t::addMenu(new LLAdvancedForceErrorStackOverflow(), "Advanced.ForceErrorStackOverflow");
+    view_listener_t::addMenu(new LLAdvancedForceErrorTerminate(), "Advanced.ForceErrorTerminate");
     view_listener_t::addMenu(new LLAdvancedForceErrorDisconnectViewer(), "Advanced.ForceErrorDisconnectViewer");
 
     // Advanced (toplevel)
@@ -11000,6 +11097,9 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToggleControl(), "ToggleControl");
     view_listener_t::addMenu(new LLToggleShaderControl(), "ToggleShaderControl");
     view_listener_t::addMenu(new LLCheckControl(), "CheckControl");
+    // Develop > Rendering > Far Plane, a radio over AlchemyRenderFarPlaneForce
+    commit.add("Advanced.SetFarPlaneForce", [](LLUICtrl*, const LLSD& param) { gSavedSettings.setS32("AlchemyRenderFarPlaneForce", param.asInteger()); });
+    enable.add("Advanced.CheckFarPlaneForce", [](LLUICtrl*, const LLSD& param) { return gSavedSettings.getS32("AlchemyRenderFarPlaneForce") == param.asInteger(); });
     view_listener_t::addMenu(new LLResetControl(), "ResetControl");
 
     view_listener_t::addMenu(new LLToggleControlPerAccount(), "ToggleControlPerAccount");

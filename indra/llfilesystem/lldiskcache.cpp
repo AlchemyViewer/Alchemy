@@ -119,7 +119,7 @@ void LLDiskCache::purge()
     }
 
     std::error_code ec;
-    auto start_time = std::chrono::high_resolution_clock::now();
+    auto start_time = std::chrono::steady_clock::now();
 
     typedef std::pair<std::filesystem::file_time_type, std::pair<uintmax_t, std::filesystem::path>> file_info_t;
     std::vector<file_info_t> file_info;
@@ -195,7 +195,7 @@ void LLDiskCache::purge()
 
     if (mEnableCacheDebugInfo)
     {
-        auto end_time = std::chrono::high_resolution_clock::now();
+        auto end_time = std::chrono::steady_clock::now();
         auto execute_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
         // Log afterward so it doesn't affect the time measurement

@@ -422,7 +422,7 @@ void LLConversationItemSession::setParticipantIsModerator(const LLUUID& particip
 
 void LLConversationItemSession::setTimeNow(const LLUUID& participant_id)
 {
-    mLastActiveTime = LLFrameTimer::getElapsedSeconds();
+    mLastActiveTime = LLFrameTimer::getUptimeSeconds();
     mNeedsRefresh = true;
     LLConversationItemParticipant* participant = findParticipant(participant_id);
     if (participant)

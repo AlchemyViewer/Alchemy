@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "llchatautocompletemodel.h"
 #include "llhandle.h"
 #include "llsingleton.h"
 
@@ -42,22 +43,18 @@ class LLGestureAutocompleteHelper : public LLSingleton<LLGestureAutocompleteHelp
     ~LLGestureAutocompleteHelper() override {}
 
 public:
-    struct Row
-    {
-        std::string value;
-        std::string trigger;
-        std::string name;
-    };
+    using Row = LLChatAutocompleteModel::Candidate;
+    using CommitAction = LLChatAutocompleteModel::CommitAction;
 
     bool isActive(const LLUICtrl* ctrl) const;
     void showHelper(
         LLUICtrl* host_ctrl,
         const std::vector<Row>& rows,
         size_t total,
-        std::function<void(std::string)> commit_cb);
+        std::function<void(const Row&, CommitAction)> commit_cb);
     void hideHelper(const LLUICtrl* ctrl = nullptr);
     bool handleKey(const LLUICtrl* ctrl, KEY key, MASK mask);
-    void onCommitGesture(const std::string& trigger);
+    void onCommit(const std::string& value, bool return_key);
 
     const std::vector<Row>& rows() const { return mRows; }
     size_t total() const { return mTotal; }
@@ -72,8 +69,7 @@ private:
     LLHandle<LLUICtrl>  mHostHandle;
     LLHandle<LLFloater> mHelperHandle;
     boost::signals2::connection mHostCtrlFocusLostConn;
-    boost::signals2::connection mHelperCommitConn;
-    std::function<void(std::string)> mGestureCommitCb;
+    std::function<void(const Row&, CommitAction)> mCommitCb;
 
     std::vector<Row> mRows;
     size_t mTotal = 0;

@@ -2543,8 +2543,7 @@ void LLModelPreview::updateStatusMessages()
     S32 phys_tris = 0;
     S32 phys_hulls = 0;
     S32 phys_points = 0;
-    S32 which_mode = 0;
-    S32 file_mode = 1;
+    bool physics_from_file = false;
 
     //get the triangle count for the whole scene
     for (LLModelLoader::scene::iterator iter = mScene[LLModel::LOD_PHYSICS].begin(), endIter = mScene[LLModel::LOD_PHYSICS].end(); iter != endIter; ++iter)
@@ -2679,16 +2678,11 @@ void LLModelPreview::updateStatusMessages()
             fmp->childEnable("decompose_cancel");
         }
 
-        LLCtrlSelectionInterface* iface = fmp->childGetSelectionInterface("physics_lod_combo");
-        if (iface)
-        {
-            which_mode = iface->getFirstSelectedIndex();
-            file_mode = iface->getItemCount() - 1;
-        }
+        physics_from_file = fmp->childGetValue("physics_lod_combo").asString() == "file";
     }
 
 
-    if (which_mode == file_mode)
+    if (physics_from_file)
     {
         mFMP->childEnable("physics_file");
         mFMP->childEnable("physics_browse");
@@ -2890,9 +2884,7 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
         LLMatrix4a mat_normal;
         if (skinned)
         {
-            glm::mat4 m = glm::make_mat4((F32*)mdl->mSkinInfo.mBindShapeMatrix.getF32ptr());
-            m = glm::transpose(glm::inverse(m));
-            mat_normal.loadu(glm::value_ptr(m));
+            mat_normal.setNormalMatrix(mdl->mSkinInfo.mBindShapeMatrix);
         }
 
         // O(1) per-vertex weight lookup for the skin-weight buffer fill below;
@@ -3177,9 +3169,13 @@ void LLModelPreview::lookupLODModelFiles(S32 lod)
 
     if (ext_pos != std::string::npos)
     {
-        // Replace extension with LOD suffix + original extension
+        // Replace extension with LOD suffix + original extension. The offset
+        // was found in the lowercased copy, and lowercasing is not
+        // length-preserving, so carry it back before it indexes the name the
+        // file is actually called.
+        const size_t ext_at = utf8str_bytes_from_cased_bytes(lod_filename, ext_pos, false);
         std::string lod_file_to_check = lod_filename;
-        lod_file_to_check.replace(ext_pos, found_ext.size(), getLodSuffix(next_lod) + found_ext);
+        lod_file_to_check.replace(ext_at, found_ext.size(), getLodSuffix(next_lod) + found_ext);
 
         if (gDirUtilp->fileExists(lod_file_to_check))
         {
@@ -3495,10 +3491,10 @@ bool LLModelPreview::render()
 
     LLQuaternion av_rot = camera_rot;
     F32 camera_distance = show_skin_weight ? SKIN_WEIGHT_CAMERA_DISTANCE : mCameraDistance;
-    LLViewerCamera::getInstance()->setOriginAndLookAt(
+    LLViewerCamera::getInstance()->lookAt(
         target_pos + ((LLVector3(camera_distance, 0.f, 0.f) + offset) * av_rot),        // camera
-        LLVector3::z_axis,                                                                  // up
-        target_pos);                                            // point of interest
+        target_pos,                                                                         // point of interest
+        LLVector3::z_axis);                                                                 // up
 
 
     z_near = llclamp(z_far * 0.001f, 0.001f, 0.1f);
@@ -3694,7 +3690,7 @@ bool LLModelPreview::render()
 
                                         if (i + 1 >= hull_colors.size())
                                         {
-                                            hull_colors.push_back(LLColor4U(rand() % 128 + 127, rand() % 128 + 127, rand() % 128 + 127, 128));
+                                            hull_colors.push_back(LLColor4U(ll_rand(128) + 127, ll_rand(128) + 127, ll_rand(128) + 127, 128));
                                         }
 
                                         gGL.diffuseColor4ubv(hull_colors[i].mV);
@@ -3834,10 +3830,10 @@ bool LLModelPreview::render()
             getPreviewAvatar()->addPelvisFixup(mPelvisZOffset, fake_mesh_id);
             bool pelvis_recalc = false;
 
-            LLViewerCamera::getInstance()->setOriginAndLookAt(
+            LLViewerCamera::getInstance()->lookAt(
                 target_pos + ((LLVector3(camera_distance, 0.f, 0.f) + offset) * av_rot),        // camera
-                LLVector3::z_axis,                                                                  // up
-                target_pos);                                            // point of interest
+                target_pos,                                                                         // point of interest
+                LLVector3::z_axis);                                                                 // up
 
             for (LLModelLoader::scene::iterator iter = mScene[mPreviewLOD].begin(); iter != mScene[mPreviewLOD].end(); ++iter)
             {

@@ -59,15 +59,17 @@ class LLPanelMarketplaceInbox;
 // including all the fixin's (e.g. AllItems/RecentItems tabs, filter floaters).
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLPanelMainInventory : public LLPanel, LLInventoryObserver
+class LLPanelMainInventory final : public LLPanel, LLInventoryObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelMainInventory, LLPanel);
+
     friend class LLFloaterInventoryFinder;
 
     LLPanelMainInventory(const LLPanel::Params& p = getDefaultParams());
     ~LLPanelMainInventory();
 
-    bool postBuild();
+    bool postBuild() override;
 
     enum EViewModeType
     {
@@ -76,17 +78,17 @@ public:
         MODE_COMBINATION
     };
 
-    virtual bool handleKeyHere(KEY key, MASK mask);
+    virtual bool handleKeyHere(KEY key, MASK mask) override;
 
     // Inherited functionality
     /*virtual*/ bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                        EDragAndDropType cargo_type,
                                        void* cargo_data,
                                        EAcceptance* accept,
-                                       std::string& tooltip_msg);
-    /*virtual*/ void changed(U32);
-    /*virtual*/ void draw();
-    /*virtual*/ void    onVisibilityChange ( bool new_visibility );
+                                       std::string& tooltip_msg) override;
+    /*virtual*/ void changed(U32) override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ void    onVisibilityChange ( bool new_visibility ) override;
 
     LLInventoryPanel* getPanel() { return mActivePanel; }
     LLInventoryPanel* getActivePanel() { return mActivePanel; }
@@ -156,7 +158,6 @@ protected:
     static void onFoldersByName(void *user_data);
     static bool checkFoldersByName(void *user_data);
 
-    static bool incrementalFind(LLFolderViewItem* first_item, const char *find_text, bool backward);
     void onFilterSelected();
 
     const std::string getFilterSubString();
@@ -174,7 +175,7 @@ protected:
     void updatePanelVisibility();
     void updateCombinationVisibility();
 
-    void onFocusReceived();
+    void onFocusReceived() override;
     void onSelectSearchType();
     void updateSearchTypeCombo();
     void setSearchType(LLInventoryFilter::ESearchType type);

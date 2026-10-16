@@ -41,6 +41,7 @@ class ALPanelProfileLegacyTab
     , public LLAvatarPropertiesObserver
 {
 public:
+    AL_VIEW_TYPE(ALPanelProfileLegacyTab, LLPanel);
 
     /**
      * Sets avatar ID, sets panel as observer of avatar related info replies from server.

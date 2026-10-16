@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="floater_translation_settings" title="НАСТРОЙКИ ПЕРЕВОДА ЧАТА">
-	<string name="bing_api_key_not_verified">
-		Bing appID не подтвержден. Повторите попытку.
-	</string>
 	<string name="google_api_key_not_verified">
 		Ключ Google API не подтвержден. Повторите попытку.
-	</string>
-	<string name="bing_api_key_verified">
-		Bing appID подтвержден.
 	</string>
 	<string name="google_api_key_verified">
 		Ключ Google API подтвержден.
@@ -39,13 +33,8 @@
 		Выберите сервис перевода:
 	</text>
 	<radio_group name="translation_service_rg">
-		<radio_item initial_value="bing" label="Bing Translator" name="bing"/>
 		<radio_item initial_value="google" label="Google Translate" name="google"/>
 	</radio_group>
-	<text name="bing_api_key_label">
-		Bing [http://www.bing.com/developers/createapp.aspx AppID]:
-	</text>
-	<button label="Подтвердить" name="verify_bing_api_key_btn"/>
 	<text name="google_api_key_label">
 		Google [http://code.google.com/apis/language/translate/v2/getting_started.html#auth Ключ API]:
 	</text>

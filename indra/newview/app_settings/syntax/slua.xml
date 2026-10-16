@@ -1,0 +1,717 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  A highlighting grammar for SLua, read by ALSyntaxGrammar (indra/llui).
+
+  states: named lists of rules, tried in order at every position. A rule
+  matches one of: match (a literal; whole_word to refuse it inside a word),
+  chars (a class, with min and max; unicode for everything beyond ASCII),
+  word (an identifier, looked up in `tables`, each a table and the kind a
+  word found there is; `qualified` looks a word after `head.` up as
+  `head.word` and by no other name, for tables that name `ll.Say`), span
+  (an opening with an end, an escape, and multiline; one that is not ends
+  with its line, but for a line that ends in its unless_after, as an
+  eol's), span_regex with end_regex (where \1
+  stands for the opening's first capture), regex (anchored where it is
+  tried; not_after_chars, a class the character before it may not be in,
+  and consume, the group that is the token, the rest of the match only
+  read), or eol (the line's end; unless_after names what, ending a line,
+  carries the state on to the next, unless it is part of a longer escape).
+  It names the kind it makes and where it goes: push, pop or next.
+  What nothing matches is one character of the state's default kind.
+  Patterns are RE2's, which has no lookaround and no backreference:
+  not_after_chars, consume and an opener's unless stand in for them.
+
+  words: the words the grammar itself puts in its tables; the language
+  service adds the rest at runtime.
+
+  indent: how the language indents. opens, a pattern found at the end
+  of the text before the caret, which sends a new line in a level - or a
+  list of them, each a pattern or a map of one, regex, and unless, what
+  keeps it from opening a block if found anywhere from where it starts -
+  and closes, one matched at the start of a line's text, which brings the
+  line out to the level of what opened it as it is typed. once, patterns
+  as opens are, for a head that sends only the next line in a level, and
+  once_except, what that line may begin with to stay level with the head
+  instead. ends, the word a block is closed with, which Return puts in
+  under a block that is not closed, and after, the openers it closes.
+  continues, how a comment goes on to a new line: each a regex matched
+  at the start of the line's text, what the new line begins with, and
+  unless, what ends the comment.
+
+  folds: the words blocks are made of, which fold as brackets do: opens,
+  closes, middles that close one and open the next, and joined, the
+  middles whose own opener follows on the line and makes no second block.
+  pairs: the brackets and quotes typed in pairs, each its opener and
+  its closer, which the editor closes as the opener is typed.
+
+  member_separators: what comes between a name and a member of it, after
+  which completion opens; a dot where a grammar does not say.
+
+  completes_in: where what is typed completes as code does though a
+  comment or a string holds it, each a regex matched against a line's text
+  up to the caret.
+
+  path_strings: the strings that name a file, each a regex matched against
+  a line's text up to the string's opening quote; what is typed in one
+  completes as a path.
+-->
+<llsd>
+  <map>
+    <key>name</key>
+    <string>slua</string>
+    <key>pairs</key>
+    <array>
+      <string>()</string>
+      <string>[]</string>
+      <string>{}</string>
+      <string>""</string>
+      <string>''</string>
+      <string>``</string>
+    </array>
+    <key>line_comment</key>
+    <string>--</string>
+    <key>member_separators</key>
+    <string>.:</string>
+    <key>completes_in</key>
+    <array>
+      <!-- The comments that say how a script is checked. -->
+      <string>^\s*--!\w*$</string>
+    </array>
+    <key>path_strings</key>
+    <array>
+      <string>\brequire\s*\(\s*$</string>
+      <string>--#include\s*$</string>
+    </array>
+    <key>extensions</key>
+    <array>
+      <string>luau</string>
+      <string>lua</string>
+    </array>
+    <key>indent</key>
+    <map>
+      <key>opens</key>
+      <array>
+        <string>(\b(then|do|else|repeat)|[{(\[])[ \t]*(--.*)?$</string>
+        <map>
+          <key>regex</key>
+          <string>\bfunction\b.*\)([ \t]*:[^=]*)?[ \t]*(--.*)?$</string>
+          <key>unless</key>
+          <string>\bend\b</string>
+        </map>
+      </array>
+      <key>closes</key>
+      <string>(end|else|elseif|until)\b|[})\]]</string>
+      <key>ends</key>
+      <map>
+        <key>word</key>
+        <string>end</string>
+        <key>after</key>
+        <array>
+          <string>\b(then|do)[ \t]*(--.*)?$</string>
+          <map>
+            <key>regex</key>
+            <string>\bfunction\b.*\)([ \t]*:[^=]*)?[ \t]*(--.*)?$</string>
+            <key>unless</key>
+            <string>\bend\b</string>
+          </map>
+        </array>
+      </map>
+    </map>
+    <key>folds</key>
+    <map>
+      <key>opens</key>
+      <array>
+        <string>function</string>
+        <string>do</string>
+        <string>then</string>
+        <string>repeat</string>
+      </array>
+      <key>closes</key>
+      <array>
+        <string>end</string>
+        <string>until</string>
+      </array>
+      <key>middles</key>
+      <array>
+        <string>else</string>
+        <string>elseif</string>
+      </array>
+      <key>joined</key>
+      <array>
+        <string>elseif</string>
+      </array>
+    </map>
+    <key>words</key>
+    <map>
+      <key>control</key>
+      <array>
+        <string>and</string>
+        <string>break</string>
+        <string>continue</string>
+        <string>do</string>
+        <string>else</string>
+        <string>elseif</string>
+        <string>end</string>
+        <string>for</string>
+        <string>function</string>
+        <string>if</string>
+        <string>in</string>
+        <string>local</string>
+        <string>not</string>
+        <string>or</string>
+        <string>repeat</string>
+        <string>return</string>
+        <string>then</string>
+        <string>until</string>
+        <string>while</string>
+      </array>
+      <key>constant</key>
+      <array>
+        <string>true</string>
+        <string>false</string>
+        <string>nil</string>
+      </array>
+    </map>
+    <key>states</key>
+    <map>
+      <key>main</key>
+      <array>
+        <map>
+          <key>regex</key>
+          <string>--#include\b</string>
+          <key>kind</key>
+          <string>preprocessor</string>
+          <key>push</key>
+          <string>include</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>--#(?:if|ifdef|ifndef|elif|else|endif|define|undef|error|warning|pragma|line)\b</string>
+          <key>kind</key>
+          <string>preprocessor</string>
+          <key>push</key>
+          <string>directive</string>
+        </map>
+        <map>
+          <key>span_regex</key>
+          <string>--\[(=*)\[</string>
+          <key>end_regex</key>
+          <string>\]\1\]</string>
+          <key>kind</key>
+          <string>comment</string>
+        </map>
+        <map>
+          <key>match</key>
+          <string>--</string>
+          <key>kind</key>
+          <string>comment</string>
+          <key>push</key>
+          <string>line_comment</string>
+        </map>
+        <map>
+          <key>span_regex</key>
+          <string>\[(=*)\[</string>
+          <key>end_regex</key>
+          <string>\]\1\]</string>
+          <key>kind</key>
+          <string>string</string>
+        </map>
+        <!-- A string one word long with a dot or a slash in it names a
+             file or an address rather than saying anything: a path, and no
+             prose. -->
+        <map>
+          <key>regex</key>
+          <string>"[^"\s\\]*[./][^"\s\\]*"</string>
+          <key>kind</key>
+          <string>path</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>'[^'\s\\]*[./][^'\s\\]*'</string>
+          <key>kind</key>
+          <string>path</string>
+        </map>
+        <!-- A quoted string ends with its line, but for a line it ends
+             with a backslash, which goes on onto the next. -->
+        <map>
+          <key>span</key>
+          <string>"</string>
+          <key>end</key>
+          <string>"</string>
+          <key>escape</key>
+          <string>\</string>
+          <key>kind</key>
+          <string>string</string>
+          <key>multiline</key>
+          <boolean>0</boolean>
+          <key>unless_after</key>
+          <string>\</string>
+        </map>
+        <map>
+          <key>span</key>
+          <string>'</string>
+          <key>end</key>
+          <string>'</string>
+          <key>escape</key>
+          <string>\</string>
+          <key>kind</key>
+          <string>string</string>
+          <key>multiline</key>
+          <boolean>0</boolean>
+          <key>unless_after</key>
+          <string>\</string>
+        </map>
+        <map>
+          <key>match</key>
+          <string>`</string>
+          <key>kind</key>
+          <string>string</string>
+          <key>push</key>
+          <string>template</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>0[xX][0-9a-fA-F_]+i?</string>
+          <key>kind</key>
+          <string>number</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>0[bB][01_]+i?</string>
+          <key>kind</key>
+          <string>number</string>
+        </map>
+        <!-- Two dots or three, a concatenation or the varargs, ahead of a
+             number that begins with its point: the second dot of ..5 is
+             not the start of .5. -->
+        <map>
+          <key>chars</key>
+          <string>.</string>
+          <key>min</key>
+          <integer>2</integer>
+          <key>max</key>
+          <integer>3</integer>
+          <key>kind</key>
+          <string>punctuation</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>[0-9][0-9_]*i|[0-9][0-9_]*(\.[0-9_]*)?([eE][+-]?[0-9_]+)?|\.[0-9][0-9_]*([eE][+-]?[0-9_]+)?</string>
+          <key>kind</key>
+          <string>number</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>@[A-Za-z_][A-Za-z0-9_]*</string>
+          <key>kind</key>
+          <string>attribute</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>(require)\s*\(\s*["']</string>
+          <key>consume</key>
+          <integer>1</integer>
+          <key>not_after_chars</key>
+          <string>A-Za-z0-9_.:</string>
+          <key>kind</key>
+          <string>function</string>
+          <key>push</key>
+          <string>require</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>(export)\s+(?:local|const|function|type)\b</string>
+          <key>consume</key>
+          <integer>1</integer>
+          <key>not_after_chars</key>
+          <string>A-Za-z0-9_.:</string>
+          <key>kind</key>
+          <string>control</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>(const)\s+[A-Za-z_]</string>
+          <key>consume</key>
+          <integer>1</integer>
+          <key>not_after_chars</key>
+          <string>A-Za-z0-9_.:</string>
+          <key>kind</key>
+          <string>control</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>(type)\s+[A-Za-z_][A-Za-z0-9_]*\s*[&lt;=]</string>
+          <key>consume</key>
+          <integer>1</integer>
+          <key>not_after_chars</key>
+          <string>A-Za-z0-9_.:</string>
+          <key>kind</key>
+          <string>control</string>
+        </map>
+        <map>
+          <key>word</key>
+          <boolean>1</boolean>
+          <key>qualified</key>
+          <boolean>1</boolean>
+          <key>tables</key>
+          <array>
+            <map>
+              <key>table</key>
+              <string>control</string>
+              <key>kind</key>
+              <string>control</string>
+            </map>
+            <map>
+              <key>table</key>
+              <string>type</string>
+              <key>kind</key>
+              <string>type</string>
+            </map>
+            <map>
+              <key>table</key>
+              <string>event</string>
+              <key>kind</key>
+              <string>event</string>
+            </map>
+            <map>
+              <key>table</key>
+              <string>function</string>
+              <key>kind</key>
+              <string>function</string>
+            </map>
+            <map>
+              <key>table</key>
+              <string>deprecated</string>
+              <key>kind</key>
+              <string>deprecated</string>
+            </map>
+            <map>
+              <key>table</key>
+              <string>constant</string>
+              <key>kind</key>
+              <string>constant</string>
+            </map>
+          </array>
+        </map>
+        <!-- One character at a time, which run together as one operator
+             all the same: a run taken whole would take the dashes of a
+             comment right after it, a plus and then a long comment. -->
+        <map>
+          <key>chars</key>
+          <string>+\-*/%^#=~&lt;&gt;&amp;|?</string>
+          <key>max</key>
+          <integer>1</integer>
+          <key>kind</key>
+          <string>operator</string>
+        </map>
+        <map>
+          <key>chars</key>
+          <string>(){}[];:,.</string>
+          <key>max</key>
+          <integer>1</integer>
+          <key>kind</key>
+          <string>punctuation</string>
+        </map>
+      </array>
+      <key>require</key>
+      <map>
+        <key>default</key>
+        <string>text</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>match</key>
+            <string>(</string>
+            <key>kind</key>
+            <string>punctuation</string>
+          </map>
+          <map>
+            <key>span</key>
+            <string>"</string>
+            <key>end</key>
+            <string>"</string>
+            <key>escape</key>
+            <string>\</string>
+            <key>kind</key>
+            <string>path</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+          </map>
+          <map>
+            <key>span</key>
+            <string>'</string>
+            <key>end</key>
+            <string>'</string>
+            <key>escape</key>
+            <string>\</string>
+            <key>kind</key>
+            <string>path</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+          </map>
+          <map>
+            <key>match</key>
+            <string>)</string>
+            <key>kind</key>
+            <string>punctuation</string>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
+      <key>directive</key>
+      <map>
+        <key>default</key>
+        <string>preprocessor</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>match</key>
+            <string>--</string>
+            <key>kind</key>
+            <string>comment</string>
+            <key>push</key>
+            <string>line_comment</string>
+          </map>
+          <map>
+            <key>regex</key>
+            <string>"[^"\s\\]*[./][^"\s\\]*"</string>
+            <key>kind</key>
+            <string>path</string>
+          </map>
+          <!-- A macro's string ends with its line, which a backslash
+               carries on onto the next as it carries the directive. -->
+          <map>
+            <key>span</key>
+            <string>"</string>
+            <key>end</key>
+            <string>"</string>
+            <key>escape</key>
+            <string>\</string>
+            <key>kind</key>
+            <string>string</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+            <key>unless_after</key>
+            <string>\</string>
+          </map>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
+            <key>unless_after</key>
+            <string>\</string>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
+      <key>include</key>
+      <map>
+        <key>default</key>
+        <string>preprocessor</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>match</key>
+            <string>--</string>
+            <key>kind</key>
+            <string>comment</string>
+            <key>push</key>
+            <string>line_comment</string>
+          </map>
+          <!-- A file's name, which ends with its line: one left open is
+               no reason for the lines below to be names. -->
+          <map>
+            <key>span</key>
+            <string>"</string>
+            <key>end</key>
+            <string>"</string>
+            <key>kind</key>
+            <string>path</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+          </map>
+          <map>
+            <key>span</key>
+            <string>&lt;</string>
+            <key>end</key>
+            <string>&gt;</string>
+            <key>kind</key>
+            <string>path</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+          </map>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
+      <key>line_comment</key>
+      <map>
+        <key>default</key>
+        <string>comment</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
+      <key>template</key>
+      <map>
+        <key>default</key>
+        <string>string</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>regex</key>
+            <string>\\.</string>
+            <key>kind</key>
+            <string>escape</string>
+          </map>
+          <map>
+            <key>match</key>
+            <string>`</string>
+            <key>kind</key>
+            <string>string</string>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+          <map>
+            <key>match</key>
+            <string>{</string>
+            <key>kind</key>
+            <string>punctuation</string>
+            <key>push</key>
+            <string>interpolation</string>
+          </map>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
+            <key>unless_after</key>
+            <string>\</string>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
+      <key>interpolation</key>
+      <map>
+        <key>default</key>
+        <string>text</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>match</key>
+            <string>}</string>
+            <key>kind</key>
+            <string>punctuation</string>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+          <map>
+            <key>span</key>
+            <string>"</string>
+            <key>end</key>
+            <string>"</string>
+            <key>escape</key>
+            <string>\</string>
+            <key>kind</key>
+            <string>string</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+          </map>
+          <map>
+            <key>span</key>
+            <string>'</string>
+            <key>end</key>
+            <string>'</string>
+            <key>escape</key>
+            <string>\</string>
+            <key>kind</key>
+            <string>string</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+          </map>
+          <map>
+            <key>regex</key>
+            <string>0[xX][0-9a-fA-F_]+i?|0[bB][01_]+i?|[0-9][0-9_]*i|[0-9][0-9_]*(\.[0-9_]*)?([eE][+-]?[0-9_]+)?</string>
+            <key>kind</key>
+            <string>number</string>
+          </map>
+          <map>
+            <key>word</key>
+            <boolean>1</boolean>
+            <key>qualified</key>
+            <boolean>1</boolean>
+            <key>tables</key>
+            <array>
+              <map>
+                <key>table</key>
+                <string>control</string>
+                <key>kind</key>
+                <string>control</string>
+              </map>
+              <map>
+                <key>table</key>
+                <string>type</string>
+                <key>kind</key>
+                <string>type</string>
+              </map>
+              <map>
+                <key>table</key>
+                <string>function</string>
+                <key>kind</key>
+                <string>function</string>
+              </map>
+              <map>
+                <key>table</key>
+                <string>deprecated</string>
+                <key>kind</key>
+                <string>deprecated</string>
+              </map>
+              <map>
+                <key>table</key>
+                <string>constant</string>
+                <key>kind</key>
+                <string>constant</string>
+              </map>
+            </array>
+          </map>
+          <map>
+            <key>chars</key>
+            <string>+\-*/%^#=~&lt;&gt;&amp;|?</string>
+            <key>kind</key>
+            <string>operator</string>
+          </map>
+          <map>
+            <key>chars</key>
+            <string>()[];:,.</string>
+            <key>max</key>
+            <integer>1</integer>
+            <key>kind</key>
+            <string>punctuation</string>
+          </map>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
+    </map>
+  </map>
+</llsd>

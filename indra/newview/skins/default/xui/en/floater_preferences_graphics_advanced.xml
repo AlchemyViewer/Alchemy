@@ -36,7 +36,7 @@
     layout="topleft"
     left="30"
     min_val="64"
-    max_val="512"
+    max_val="2048"
     name="DrawDistance"
     top_delta="16"
     width="330">

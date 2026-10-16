@@ -504,17 +504,6 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
-    <key>AnalyzePerformance</key>
-    <map>
-      <key>Comment</key>
-      <string>Request performance analysis for a particular viewer run</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
     <key>AnimateTextures</key>
     <map>
       <key>Comment</key>
@@ -1495,6 +1484,61 @@
         <key>Value</key>
         <integer>1</integer>
     </map>
+    <key>BuyCurrencyHTML</key>
+    <map>
+      <key>Comment</key>
+      <string>Use HTML based L$ packs floater instead of legacy XUI version</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>BuyCurrencyPacksURL</key>
+    <map>
+      <key>Comment</key>
+      <string>URL for the L$ packs purchase floater</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string>https://accounts.secondlife.com/packs/floater?lang=[LANGUAGE]&amp;shortfall=[SHORTFALL]</string>
+    </map>
+    <key>BuyCurrencyAddPaymentURL</key>
+    <map>
+      <key>Comment</key>
+      <string>URL the viewer probes at login; a 200 means the L$ packs floater handles residents without a payment method</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string>https://accounts.secondlife.com/packs/floater/add-payment-enabled</string>
+    </map>
+    <key>PaymentMethodURL</key>
+    <map>
+      <key>Comment</key>
+      <string>URL for adding a payment method</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string>https://secondlife.com/my/lindex/buy.php?associate_for_viewer=1</string>
+    </map>
+    <key>PaymentMethodStagingURL</key>
+    <map>
+      <key>Comment</key>
+      <string>URL for adding a payment method on the Damballah</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string>https://secondlife-staging.com/my/lindex/buy.php?associate_for_viewer=1</string>
+    </map>
     <key>EnableButtonFlashing</key>
     <map>
       <key>Comment</key>
@@ -1505,39 +1549,6 @@
       <string>Boolean</string>
       <key>Value</key>
       <integer>1</integer>
-    </map>
-    <key>EnableDiscord</key>
-    <map>
-      <key>Comment</key>
-      <string>When set, connect to Discord to enable Rich Presence</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-    </map>
-    <key>ShowDiscordActivityDetails</key>
-    <map>
-      <key>Comment</key>
-      <string>When set, show avatar name on Discord Rich Presence</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>ShowDiscordActivityState</key>
-    <map>
-      <key>Comment</key>
-      <string>When set, show location on Discord Rich Presence</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
     </map>
     <key>EnableDiskCacheDebugInfo</key>
     <map>
@@ -1840,9 +1851,9 @@
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>S32</string>
+      <string>Boolean</string>
       <key>Value</key>
-      <integer>0</integer>
+      <boolean>0</boolean>
     </map>
     <key>ChatBubbleOpacity</key>
     <map>
@@ -2850,7 +2861,7 @@
     <key>HeadlessClient</key>
     <map>
       <key>Comment</key>
-      <string>Run in headless mode by disabling GL rendering, keyboard, etc</string>
+      <string>Run with no desktop: render on a window that is never shown, with no splash, keyboard or mouse</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -4362,28 +4373,6 @@
       <key>Value</key>
       <array/>
     </map>
-    <key>LSLFindCaseInsensitivity</key>
-        <map>
-        <key>Comment</key>
-            <string>Use case insensitivity when searching in LSL editor</string>
-        <key>Persist</key>
-            <integer>1</integer>
-        <key>Type</key>
-            <string>Boolean</string>
-        <key>Value</key>
-            <integer>0</integer>
-        </map>
-    <key>LSLFindDirection</key>
-    <map>
-        <key>Comment</key>
-        <string>Direction to search in LSL editor(true means up)</string>
-        <key>Persist</key>
-        <integer>1</integer>
-        <key>Type</key>
-        <string>Boolean</string>
-        <key>Value</key>
-        <integer>0</integer>
-    </map>
     <key>LSLHelpURL</key>
     <map>
       <key>Comment</key>
@@ -4394,17 +4383,6 @@
       <string>String</string>
       <key>Value</key>
       <string>https://wiki.secondlife.com/wiki/[LSL_STRING]</string>
-    </map>
-    <key>LSLFontSizeName</key>
-    <map>
-        <key>Comment</key>
-        <string>Text font size in LSL editor</string>
-        <key>Persist</key>
-        <integer>1</integer>
-        <key>Type</key>
-        <string>String</string>
-        <key>Value</key>
-        <string>Monospace</string>
     </map>
     <key>GridStatusRSS</key>
     <map>
@@ -4754,28 +4732,6 @@
       <string>Log network traffic</string>
       <key>Persist</key>
       <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>LogMetrics</key>
-    <map>
-      <key>Comment</key>
-      <string>Log viewer metrics</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string/>
-    </map>
-    <key>LogPerformance</key>
-    <map>
-      <key>Comment</key>
-      <string>Log performance analysis for a particular viewer run</string>
-      <key>Persist</key>
-      <integer>0</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
@@ -5455,7 +5411,7 @@
   <key>MediaPluginForceVLC</key>
   <map>
     <key>Comment</key>
-    <string>Force use of VLC based media plugin. (Linux Only)</string>
+    <string>Play media on Linux with the VLC plugin rather than GStreamer, where the viewer was built with it (AL_BUILD_VLC_PLUGIN).</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
@@ -7549,7 +7505,7 @@
     <key>QuickBuyCurrency</key>
     <map>
       <key>Comment</key>
-      <string>Toggle between HTML based currency purchase floater and legacy XUI version</string>
+      <string>(Deprecated) Use BuyCurrencyHTML instead</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -8606,28 +8562,6 @@
     <key>Value</key>
     <real>4.0</real>
   </map>
-  <key>RenderDeferredSpotShadowBias</key>
-  <map>
-    <key>Comment</key>
-    <string>Bias value for spot shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>-64.0</real>
-  </map>
-  <key>RenderDeferredSpotShadowOffset</key>
-  <map>
-    <key>Comment</key>
-    <string>Offset value for spot shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>0.8</real>
-  </map>
 
   <key>RenderShadowBias</key>
   <map>
@@ -8768,33 +8702,11 @@
     <key>Value</key>
     <real>1.0</real>
   </map>
-  <key>RenderDeferredTreeShadowBias</key>
-  <map>
-    <key>Comment</key>
-    <string>Bias value for tree shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>1.0</real>
-  </map>
-  <key>RenderDeferredTreeShadowOffset</key>
-  <map>
-    <key>Comment</key>
-    <string>Offset value for tree shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>1.0</real>
-  </map>
 
   <key>RenderHoverGlowEnable</key>
   <map>
     <key>Comment</key>
-    <string>DEPRECATED --- Show glow effect when hovering on interactive objects.</string>
+    <string>Show glow effect when hovering on interactive objects.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
@@ -8842,7 +8754,7 @@
   <key>RenderHighlightColor</key>
   <map>
     <key>Comment</key>
-    <string>Brightness of mouseover highlights.</string>
+    <string>Color of mouseover highlights.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
@@ -10025,28 +9937,6 @@
     <key>Value</key>
     <real>4.0</real>
   </map>
-  <key>RenderUseExposureSkySettings</key>
-  <map>
-    <key>Comment</key>
-    <string>Use exposure sky settings instead of deriving from HDR scale.</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
-  <key>RenderDynamicExposureCoefficient</key>
-  <map>
-    <key>Comment</key>
-    <string>Luminance coefficient for dynamic exposure</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>0.5</real>
-  </map>
   <key>RenderDynamicExposureEnabled</key>
   <map>
     <key>Comment</key>
@@ -10057,39 +9947,6 @@
     <string>Boolean</string>
     <key>Value</key>
     <integer>1</integer>
-  </map>
-  <key>RenderDynamicExposureSpeedError</key>
-  <map>
-    <key>Comment</key>
-    <string>Speed at which dynamic exposure adapts while far from the target exposure</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>0.1</real>
-  </map>
-  <key>RenderDynamicExposureSpeedTarget</key>
-  <map>
-    <key>Comment</key>
-    <string>Speed at which dynamic exposure settles once near the target exposure</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>2.0</real>
-  </map>
-  <key>RenderDiffuseLuminanceScale</key>
-  <map>
-    <key>Comment</key>
-    <string>Luminance adjustment for diffuse surfaces to aid auto-exposure behavior</string>
-    <key>Persist</key>
-    <integer>0</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>0.5</real>
   </map>
     <key>RenderShaderLODThreshold</key>
     <map>
@@ -10193,7 +10050,7 @@
     <key>RenderTerrainPBRPlanarSampleCount</key>
     <map>
       <key>Comment</key>
-      <string>How many UV planes to sample PBR terrain textures from. 1 is "flat", 3 is triplanar mapping (aka box mapping)</string>
+      <string>How many UV planes to sample terrain textures from, PBR and legacy alike. 1 is "flat", 3 is triplanar mapping (aka box mapping)</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -10300,17 +10157,6 @@
         <key>Value</key>
         <integer>0</integer>
     </map>
-    <key>RenderUIBuffer</key>
-    <map>
-      <key>Comment</key>
-      <string>Cache ui render in a screen aligned buffer.</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
     <key>RenderUnloadedAvatar</key>
     <map>
       <key>Comment</key>
@@ -10322,17 +10168,6 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
-  <key>RenderUseAdvancedAtmospherics</key>
-  <map>
-    <key>Comment</key>
-    <string>Use fancy precomputed atmospherics and stuff.</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
   <key>RenderUseTriStrips</key>
   <map>
     <key>Comment</key>
@@ -10749,13 +10584,13 @@
 		<key>ReportBugURL</key>
 		<map>
 			<key>Comment</key>
-			<string>URL used for filing bugs from viewer</string>
+			<string>URL used for filing bugs from a viewer built without feedback reports</string>
 			<key>Persist</key>
 			<integer>1</integer>
 			<key>Type</key>
 			<string>String</string>
 			<key>Value</key>
-			<string>https://feedback.secondlife.com/</string>
+			<string>https://github.com/AlchemyViewer/Alchemy/issues</string>
 		</map>
 	<key>RevokePermsOnStopAnimation</key>
     <map>
@@ -11043,17 +10878,6 @@
 		<key>Value</key>
 		<real>0.02</real>
 	</map>
-    <key>ScriptHelpFollowsCursor</key>
-    <map>
-      <key>Comment</key>
-      <string>Scripting help window updates contents based on script editor contents under text cursor</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
     <key>ScriptsCanShowUI</key>
     <map>
       <key>Comment</key>
@@ -11123,79 +10947,13 @@
     <key>SelectionHighlightAlpha</key>
     <map>
       <key>Comment</key>
-      <string>Opacity of selection highlight (0.0 = completely transparent, 1.0 = completely opaque)</string>
+      <string>Half the opacity of selection outlines: 0.0 transparent, 0.5 and over opaque. Applies live.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
       <real>0.40000000596</real>
-    </map>
-    <key>SelectionHighlightAlphaTest</key>
-    <map>
-      <key>Comment</key>
-      <string>Alpha value below which pixels are displayed on selection highlight line (0.0 = show all pixels, 1.0 = show now pixels)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.1</real>
-    </map>
-    <key>SelectionHighlightThickness</key>
-    <map>
-      <key>Comment</key>
-      <string>Thickness of selection highlight line (fraction of view distance)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.00999999977648</real>
-    </map>
-    <key>SelectionHighlightUAnim</key>
-    <map>
-      <key>Comment</key>
-      <string>Rate at which texture animates along U direction in selection highlight line (fraction of texture per second)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.0</real>
-    </map>
-    <key>SelectionHighlightUScale</key>
-    <map>
-      <key>Comment</key>
-      <string>Scale of texture display on selection highlight line (fraction of texture size)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.1</real>
-    </map>
-    <key>SelectionHighlightVAnim</key>
-    <map>
-      <key>Comment</key>
-      <string>Rate at which texture animates along V direction in selection highlight line (fraction of texture per second)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.5</real>
-    </map>
-    <key>SelectionHighlightVScale</key>
-    <map>
-      <key>Comment</key>
-      <string>Scale of texture display on selection highlight line (fraction of texture size)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>1.0</real>
     </map>
     <key>ServerChoice</key>
     <map>
@@ -11357,17 +11115,6 @@
       <string>Show log in SL window</string>
       <key>Persist</key>
       <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>ShowEventRecorderMenuItems</key>
-    <map>
-      <key>Comment</key>
-      <string>Whether or not Event Recorder menu choices - Start / Stop event recording should appear in the (currently) Develop menu</string>
-      <key>Persist</key>
-      <integer>0</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
@@ -13174,7 +12921,7 @@
       <key>Type</key>
       <string>S32</string>
       <key>Value</key>
-      <real>3</real>
+      <integer>3</integer>
     </map>
     <key>HUDScaleFactor</key>
     <map>
@@ -13823,7 +13570,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>1</integer>
+      <integer>0</integer>
     </map>
     <key>PreferredBrowserBehavior</key>
     <map>
@@ -13858,17 +13605,6 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
-  <key>RenderOcclusionTimeout</key>
-  <map>
-    <key>Comment</key>
-    <string>Maximum number of frames to wait on an occlusion query before forcibly reading it back</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>8</integer>
-  </map>
   <key>UseObjectCacheOcclusion</key>
   <map>
     <key>Comment</key>
@@ -14541,17 +14277,6 @@
         <key>Value</key>
         <integer>9020</integer>
     </map>
-    <key>ExternalWebsocketSyncLocal</key>
-    <map>
-        <key>Comment</key>
-        <string>Should the JSONRPC server listen only for local connections.</string>
-        <key>Persist</key>
-        <integer>1</integer>
-        <key>Type</key>
-        <string>Boolean</string>
-        <key>Value</key>
-        <integer>1</integer>
-    </map>
     <key>ExternalEditorTightIntegration</key>
     <map>
         <key>Comment</key>
@@ -15018,17 +14743,6 @@
       <string>S32</string>
       <key>Value</key>
       <integer>180</integer>
-    </map>
-    <key>OSHibernationMode</key>
-    <map>
-        <key>Comment</key>
-        <string>Whether to prevent OS from hibernating. 0 - can hibernate; 1 - can't hibernate, can turn screen off; 2 - can't hibernate, can't turn screen off </string>
-        <key>Persist</key>
-        <integer>1</integer>
-        <key>Type</key>
-        <string>S32</string>
-        <key>Value</key>
-        <integer>0</integer>
     </map>
     <key>HeightUnits</key>
     <map>
@@ -16572,6 +16286,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>GPUBenchmarkResult</key>
+    <map>
+      <key>Comment</key>
+      <string>Cached GPU benchmark bandwidth in GB/sec (-1 for failure), with the GPU vendor, the renderer without the kernel release, and the full OpenGL driver version. Reset to rerun the benchmark.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>LLSD</string>
+      <key>Value</key>
+      <map />
+    </map>
     <key>SkipBenchmark</key>
     <map>
       <key>Comment</key>
@@ -16903,17 +16628,6 @@
     <key>Value</key>
     <integer>0</integer>
   </map>
-  <key>ColorSettingsHideDefault</key>
-  <map>
-    <key>Comment</key>
-    <string>Show non-default settings only in Color Settings list</string>
-    <key>Persist</key>
-    <integer>0</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
   <key>DebugSettingsHideDefault</key>
   <map>
     <key>Comment</key>
@@ -17171,17 +16885,6 @@
     <map>
       <key>Comment</key>
       <string>Whether or not to LRU purge the disk cache during startup on main thread</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>ScriptEditorDisableSyntaxHighlight</key>
-    <map>
-      <key>Comment</key>
-      <string>Disable syntax highlighting in script editor for performance testing</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

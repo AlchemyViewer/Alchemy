@@ -131,7 +131,9 @@ void LLAssetInfo::setName( const std::string& name )
 {
     if( !name.empty() )
     {
-        mName.assign( name, 0, llmin((U32)name.size(), (U32)DB_INV_ITEM_NAME_STR_LEN) );
+        // The database field bounds bytes, so the cut has to as well -- but it
+        // has to land between characters, not through one.
+        mName = utf8str_truncate( name, DB_INV_ITEM_NAME_STR_LEN );
         mName.erase( std::remove(mName.begin(), mName.end(), '|'),
                      mName.end() );
     }
@@ -143,8 +145,7 @@ void LLAssetInfo::setDescription( const std::string& desc )
 {
     if( !desc.empty() )
     {
-        mDescription.assign( desc, 0, llmin((U32)desc.size(),
-                                            (U32)DB_INV_ITEM_DESC_STR_LEN) );
+        mDescription = utf8str_truncate( desc, DB_INV_ITEM_DESC_STR_LEN );
         mDescription.erase( std::remove(mDescription.begin(),
                                         mDescription.end(), '|'),
                             mDescription.end() );

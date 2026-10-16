@@ -165,10 +165,10 @@ bool LLViewerParcelOverlay::encroachesOwned(const std::vector<LLBBox>& boxes) co
         LLVector3 min = boxes[i].getMinAgent();
         LLVector3 max = boxes[i].getMaxAgent();
 
-        S32 left   = S32(llclamp((min.mV[VX] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
-        S32 right  = S32(llclamp((max.mV[VX] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
-        S32 top    = S32(llclamp((min.mV[VY] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
-        S32 bottom = S32(llclamp((max.mV[VY] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
+        S32 left   = gridIndex(min.mV[VX]);
+        S32 right  = gridIndex(max.mV[VX]);
+        S32 top    = gridIndex(min.mV[VY]);
+        S32 bottom = gridIndex(max.mV[VY]);
 
         for (S32 row = top; row <= bottom; row++)
         {
@@ -193,10 +193,10 @@ bool LLViewerParcelOverlay::encroachesOnUnowned(const std::vector<LLBBox>& boxes
         LLVector3 min = boxes[i].getMinAgent();
         LLVector3 max = boxes[i].getMaxAgent();
 
-        S32 left   = S32(llclamp((min.mV[VX] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
-        S32 right  = S32(llclamp((max.mV[VX] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
-        S32 top    = S32(llclamp((min.mV[VY] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
-        S32 bottom = S32(llclamp((max.mV[VY] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
+        S32 left   = gridIndex(min.mV[VX]);
+        S32 right  = gridIndex(max.mV[VX]);
+        S32 top    = gridIndex(min.mV[VY]);
+        S32 bottom = gridIndex(max.mV[VY]);
 
         for (S32 row = top; row <= bottom; row++)
         {
@@ -215,6 +215,8 @@ bool LLViewerParcelOverlay::encroachesOnUnowned(const std::vector<LLBBox>& boxes
 
 bool LLViewerParcelOverlay::encroachesOnNearbyParcel(const std::vector<LLBBox>& boxes) const
 {
+    const F32 region_width = mParcelGridsPerEdge * PARCEL_GRID_STEP_METERS;
+
     // boxes are expected to already be axis aligned
     for (U32 i = 0; i < boxes.size(); ++i)
     {
@@ -224,16 +226,16 @@ bool LLViewerParcelOverlay::encroachesOnNearbyParcel(const std::vector<LLBBox>& 
         // If an object crosses region borders it crosses a parcel
         if (   min.mV[VX] < 0
             || min.mV[VY] < 0
-            || max.mV[VX] > REGION_WIDTH_METERS
-            || max.mV[VY] > REGION_WIDTH_METERS)
+            || max.mV[VX] > region_width
+            || max.mV[VY] > region_width)
         {
             return true;
         }
 
-        S32 left   = S32(llclamp((min.mV[VX] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
-        S32 right  = S32(llclamp((max.mV[VX] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
-        S32 bottom = S32(llclamp((min.mV[VY] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
-        S32 top    = S32(llclamp((max.mV[VY] / PARCEL_GRID_STEP_METERS), 0.f, REGION_WIDTH_METERS - 1.f));
+        S32 left   = gridIndex(min.mV[VX]);
+        S32 right  = gridIndex(max.mV[VX]);
+        S32 bottom = gridIndex(min.mV[VY]);
+        S32 top    = gridIndex(max.mV[VY]);
 
         const S32 GRIDS_PER_EDGE = mParcelGridsPerEdge;
 
@@ -308,6 +310,11 @@ U8 LLViewerParcelOverlay::parcelFlags(S32 row, S32 col, U8 flags) const
         return flags;
     }
     return mOwnership[row * mParcelGridsPerEdge + col] & flags;
+}
+
+S32 LLViewerParcelOverlay::gridIndex(F32 meters) const
+{
+    return S32(llclamp(meters / PARCEL_GRID_STEP_METERS, 0.f, F32(mParcelGridsPerEdge - 1)));
 }
 
 F32 LLViewerParcelOverlay::getOwnedRatio() const

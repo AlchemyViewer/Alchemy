@@ -30,6 +30,7 @@
 #include <map>
 #include <set>
 
+#include <boost/signals2/signal.hpp>
 #include <boost/unordered_map.hpp>
 
 // common includes
@@ -78,6 +79,13 @@ public:
 
     bool killObject(LLViewerObject *objectp);
     void killObjects(LLViewerRegion *regionp); // Kill all objects owned by a particular region.
+
+    // An object into the list or out of it, by its id, as it happens, for
+    // whoever follows objects by id to hear of it rather than poll. One
+    // heard arriving is not whole yet -- its parent, its name and the rest
+    // of its update come after -- so a listener reads it a moment later.
+    typedef boost::signals2::signal<void(const LLUUID& id, bool arrived)> presence_signal_t;
+    boost::signals2::connection onPresence(const presence_signal_t::slot_type& slot) { return mPresenceSignal.connect(slot); }
     void killAllObjects();
 
     void cleanDeadObjects(const bool use_timer = true); // Clean up the dead object list.
@@ -177,6 +185,10 @@ public:
     // used to discount stats from this frame
     bool mWasPaused;
 
+    // between send_agent_pause() and send_agent_resume(): every frame is discounted, and so is the
+    // frame after the resume, which the pause stalled
+    bool mAgentPaused;
+
     void getUUIDFromLocal(LLUUID &id,
                                 const U32 local_id,
                                 const U32 ip,
@@ -210,6 +222,7 @@ protected:
     uuid_set_t   mDeadObjects;
 
     boost::unordered_map<LLUUID, LLPointer<LLViewerObject>> mUUIDObjectMap;
+    presence_signal_t mPresenceSignal;
 
     //set of objects that need to update their cost
     uuid_set_t   mStaleObjectCost;

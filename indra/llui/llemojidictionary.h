@@ -43,7 +43,7 @@
 //   Hair:   "" / "red" / "curly" / "white" / "bald".
 struct LLEmojiVariant
 {
-    LLWString Character;
+    std::string Character;
     U8 Tone { 0 };
     U8 Tone2 { 0 };
     S8 Gender { -1 };
@@ -53,10 +53,10 @@ struct LLEmojiVariant
 
 struct LLEmojiDescriptor
 {
-    // LLWString because multi-codepoint emoji sequences (ZWJ families, flag
+    // UTF-8. Multi-codepoint emoji sequences (ZWJ families, flag
     // pairs, keycap, tag subdivision flags) are all addressed as a single
     // logical emoji at this layer.
-    LLWString Character;
+    std::string Character;
     // Top-level emojibase group (e.g. "smileys and emotion").
     std::string Category;
     // Emojibase subgroup (e.g. "face-smiling"). Optional — empty for
@@ -78,7 +78,7 @@ struct LLEmojiGroup
     // Full sequence (not a single codepoint) so default-text emoji that
     // need U+FE0F (variation selector-16) for emoji presentation render
     // correctly — e.g. ✈ U+2708, 🛩 U+1F6E9, ⏲ U+23F2.
-    LLWString Character;
+    std::string Character;
     std::list<std::string> Categories;
 };
 
@@ -88,11 +88,11 @@ struct LLEmojiGroup
 
 struct LLEmojiSearchResult
 {
-    LLWString Character;
+    std::string Character;
     std::string String;
     std::size_t Begin, End;
 
-    LLEmojiSearchResult(LLWString character, const std::string& string, std::size_t begin, std::size_t end)
+    LLEmojiSearchResult(std::string character, const std::string& string, std::size_t begin, std::size_t end)
         : Character(std::move(character))
         , String(string)
         , Begin(begin)
@@ -113,30 +113,30 @@ class LLEmojiDictionary : public LLParamSingleton<LLEmojiDictionary>, public LLI
 public:
     typedef std::map<std::string, std::string> cat2cat_map_t;
     typedef std::map<std::string, const LLEmojiGroup*> cat2group_map_t;
-    // Keyed by full emoji sequence (LLWString) so ZWJ families and flag
+    // Keyed by the full emoji sequence, in UTF-8, so ZWJ families and flag
     // pairs have their own entries distinct from their component codepoints.
-    typedef std::map<LLWString, const LLEmojiDescriptor*> emoji2descr_map_t;
+    typedef std::map<std::string, const LLEmojiDescriptor*, std::less<>> emoji2descr_map_t;
     typedef std::map<std::string, const LLEmojiDescriptor*> code2descr_map_t;
     typedef std::map<std::string, std::vector<const LLEmojiDescriptor*>> cat2descrs_map_t;
     // Variant lookups: each pair is (base descriptor, index into base->Variants).
     typedef std::pair<const LLEmojiDescriptor*, S32> variant_ref_t;
-    typedef std::map<LLWString, variant_ref_t> variant_emoji2ref_map_t;
+    typedef std::map<std::string, variant_ref_t, std::less<>> variant_emoji2ref_map_t;
     typedef std::map<std::string, variant_ref_t> variant_code2ref_map_t;
 
     static void initClass();
-    LLWString findMatchingEmojis(const std::string& needle) const;
+    std::string findMatchingEmojis(const std::string& needle) const;
     static bool searchInShortCode(std::size_t& begin, std::size_t& end, const std::string& shortCode, const std::string& needle);
     void findByShortCode(std::vector<LLEmojiSearchResult>& result, const std::string& needle) const;
-    const LLEmojiDescriptor* getDescriptorFromEmoji(const LLWString& emoji) const;
+    const LLEmojiDescriptor* getDescriptorFromEmoji(std::string_view emoji) const;
     const LLEmojiDescriptor* getDescriptorFromShortCode(const std::string& short_code) const;
-    // Resolve a shortcode to the LLWString that should be inserted on
+    // Resolve a shortcode to the text that should be inserted on
     // commit. For variant shortcodes (e.g. :thumbs_up_dark_skin_tone:)
     // this is the variant's character — getDescriptorFromShortCode
     // intentionally returns the *base* descriptor for those, so callers
     // that insert text must go through this helper instead of reading
     // descriptor->Character directly.
-    LLWString getEmojiFromShortCode(const std::string& short_code) const;
-    std::string getNameFromEmoji(const LLWString& emoji) const;
+    std::string getEmojiFromShortCode(const std::string& short_code) const;
+    std::string getNameFromEmoji(std::string_view emoji) const;
     // Single-codepoint predicate — used in per-codepoint iteration (font
     // fallback selection, shaping-run detection). For multi-codepoint
     // lookups, go through getDescriptorFromEmoji.
@@ -146,7 +146,7 @@ public:
     // Returns nullptr if the sequence isn't a known variant. When non-null
     // and outIndex is provided, *outIndex is set to the index into
     // base->Variants for the matched variant.
-    const LLEmojiDescriptor* getBaseFromVariant(const LLWString& emoji, S32* outIndex = nullptr) const;
+    const LLEmojiDescriptor* getBaseFromVariant(std::string_view emoji, S32* outIndex = nullptr) const;
     // Pick the best variant on a base descriptor for a given preference
     // across all four axes:
     //   tone   : 0 = no preference, 1..5 = light..dark
@@ -187,7 +187,7 @@ private:
     void loadGroups();
     void loadEmojis();
 
-    static LLWString loadIcon(const LLSD& sd);
+    static std::string loadIcon(const LLSD& sd);
     static std::list<std::string> loadCategories(const LLSD& sd);
     static std::list<std::string> loadShortCodes(const LLSD& sd);
     void translateCategories(std::list<std::string>& categories);

@@ -79,6 +79,9 @@ typedef struct dir_query
 
 class ALFloaterDirectory final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(ALFloaterDirectory, LLFloater);
+private:
     friend class ALPanelSearchClassifieds;
     friend class ALPanelSearchEvents;
     friend class ALPanelSearchGroups;

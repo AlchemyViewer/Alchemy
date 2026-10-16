@@ -39,6 +39,8 @@
 class LLScrollingPanel : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLScrollingPanel, LLPanel);
+
     LLScrollingPanel(const LLPanel::Params& params) : LLPanel(params) {}
     virtual void updatePanel(bool allow_modify) = 0;
 };
@@ -47,9 +49,11 @@ public:
 /*
  * A set of panels that are displayed in a sequence inside a scroll container.
  */
-class LLScrollingPanelList : public LLUICtrl
+class LLScrollingPanelList final : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLScrollingPanelList, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<bool> is_horizontal;
@@ -66,9 +70,9 @@ public:
 
     typedef std::deque<LLScrollingPanel*>   panel_list_t;
 
-    virtual void setValue(const LLSD& value) {};
+    virtual void setValue(const LLSD& value) override {};
 
-    virtual void        draw();
+    virtual void        draw() override;
 
     void                clearPanels();
     S32                 addPanel(LLScrollingPanel* panel, bool back = false);

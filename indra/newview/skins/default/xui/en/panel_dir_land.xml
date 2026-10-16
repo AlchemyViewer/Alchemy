@@ -214,7 +214,7 @@
      search_column="2"
      width="336">
         <column label="" name="icon" width="24" />
-        <column dynamicwidth="true" label="Name" name="name" />
+        <column dynamic_width="true" label="Name" name="name" />
         <column label="Type" name="landtype" width="50" />
         <column label="L$ Price" name="price" width="65" />
         <column label="Area" name="area" width="50" />

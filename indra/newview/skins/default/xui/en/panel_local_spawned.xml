@@ -21,7 +21,7 @@
     multi_select="true"
     search_column="1">
     <column name="icon" label="" width="20"/>
-    <column name="unit_name" label="Name" dynamicwidth="true"/>
+    <column name="unit_name" label="Name" dynamic_width="true"/>
     <column name="status" label="Status" width="120"/>
   </scroll_list>
   <button

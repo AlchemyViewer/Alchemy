@@ -28,7 +28,6 @@
 #include "llinventory.h"
 
 #include "lldbstrings.h"
-#include "llfasttimer.h"
 #include "llinventorydefines.h"
 #include "llxorcipher.h"
 #include "llsd.h"
@@ -365,7 +364,10 @@ void LLInventoryObject::correctInventoryName(std::string& name)
     LLStringUtil::replaceNonstandardASCII(name, ' ');
     LLStringUtil::replaceChar(name, '|', ' ');
     LLStringUtil::trim(name);
-    LLStringUtil::truncate(name, DB_INV_ITEM_NAME_STR_LEN);
+    // The database field bounds bytes, so the cut has to as well -- but
+    // LLStringUtil::truncate is a plain resize and would leave half a character
+    // behind in a name the whole grid then renders.
+    name = utf8str_truncate(name, DB_INV_ITEM_NAME_STR_LEN);
 }
 
 time_t LLInventoryObject::getCreationDate() const

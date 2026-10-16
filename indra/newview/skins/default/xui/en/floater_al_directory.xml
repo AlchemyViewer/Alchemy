@@ -170,7 +170,7 @@ Your search terms were missing a query string.
     left="0"
     width="300"
     bottom="-1"
-    min_height="10"
+    min_width="10"
     name="results_lp">
      <scroll_list
       layout="topleft"
@@ -194,7 +194,7 @@ Your search terms were missing a query string.
     bottom="-1"
     left="405"
     width="313"
-    min_height="10"
+    min_width="10"
     name="detail_lp">
      <panel
       follows="all"

@@ -55,10 +55,18 @@ class LLUIImage;
 class LLPanel : public LLUICtrl, public LLBadgeHolder
 {
 public:
+    AL_VIEW_TYPE(LLPanel, LLUICtrl);
+
     struct LocalizedString : public LLInitParam::Block<LocalizedString>
     {
         Mandatory<std::string>  name;
         Mandatory<std::string>  value;
+
+        // Swallowed for the same reason LLView swallows it: translate="false"
+        // is a cue for translation tools, and 642 strings in the default
+        // skin's English carry it. LLView's copy does not reach here, since
+        // a string is not a view.
+        Ignored                 needs_translate;
 
         LocalizedString();
     };
@@ -114,13 +122,15 @@ public:
     /*virtual*/ ~LLPanel();
 
     // LLView interface
-    /*virtual*/ bool    isPanel() const;
-    /*virtual*/ void    draw();
-    /*virtual*/ bool    handleKeyHere( KEY key, MASK mask );
-    /*virtual*/ void    onVisibilityChange ( bool new_visibility );
+    /*virtual*/ bool    isPanel() const override;
+    LLView*             badgeHolderView() override { return this; }
+    LLBadgeHolder*      asBadgeHolder() override { return this; }
+    /*virtual*/ void    draw() override;
+    /*virtual*/ bool    handleKeyHere( KEY key, MASK mask ) override;
+    /*virtual*/ void    onVisibilityChange ( bool new_visibility ) override;
 
     // From LLFocusableElement
-    /*virtual*/ void    setFocus( bool b );
+    /*virtual*/ void    setFocus( bool b ) override;
 
     // New virtuals
     virtual     void    refresh();  // called in setFocus()

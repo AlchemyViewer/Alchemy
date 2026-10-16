@@ -37,7 +37,7 @@
 #define EDITING_EASEIN_DURATION 0.0f
 #define EDITING_EASEOUT_DURATION 0.5f
 #define EDITING_PRIORITY LLJoint::HIGH_PRIORITY
-#define MIN_REQUIRED_PIXEL_AREA_EDITING 500.f
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_EDITING = 500.f;
 
 //-----------------------------------------------------------------------------
 // class LLEditingMotion
@@ -45,7 +45,6 @@
 class alignas(16) LLEditingMotion :
     public LLMotion
 {
-    LL_ALIGN_NEW
 public:
     // Constructor
     LLEditingMotion(const LLUUID &id);
@@ -100,7 +99,7 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();

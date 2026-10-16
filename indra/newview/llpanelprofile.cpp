@@ -507,11 +507,12 @@ LLAgentHandler gAgentHandler;
 /// LLFloaterProfilePermissions
 ///----------------------------------------------------------------------------
 
-class LLFloaterProfilePermissions
+class LLFloaterProfilePermissions final
     : public LLFloater
     , public LLFriendObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterProfilePermissions, LLFloater);
     LLFloaterProfilePermissions(LLView * owner, const LLUUID &avatar_id);
     ~LLFloaterProfilePermissions();
     bool postBuild() override;
@@ -1044,7 +1045,7 @@ void LLPanelProfileSecondLife::setProfileImageUploaded(const LLUUID &image_asset
     LLFloater *floater = mFloaterProfileTextureHandle.get();
     if (floater)
     {
-        LLFloaterProfileTexture * texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture * texture_view = floater->as<LLFloaterProfileTexture>();
         texture_view->loadAsset(mSecondLifePic->getImageAssetId());
     }
 
@@ -1056,7 +1057,7 @@ bool LLPanelProfileSecondLife::hasUnsavedChanges()
     LLFloater *floater = mFloaterPermissionsHandle.get();
     if (floater)
     {
-        LLFloaterProfilePermissions* perm = dynamic_cast<LLFloaterProfilePermissions*>(floater);
+        LLFloaterProfilePermissions* perm = floater->as<LLFloaterProfilePermissions>();
         if (perm && perm->hasUnsavedChanges())
         {
             return true;
@@ -1071,7 +1072,7 @@ void LLPanelProfileSecondLife::commitUnsavedChanges()
     LLFloater *floater = mFloaterPermissionsHandle.get();
     if (floater)
     {
-        LLFloaterProfilePermissions* perm = dynamic_cast<LLFloaterProfilePermissions*>(floater);
+        LLFloaterProfilePermissions* perm = floater->as<LLFloaterProfilePermissions>();
         if (perm && perm->hasUnsavedChanges())
         {
             perm->onApplyRights();
@@ -1519,13 +1520,13 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
     }
     else if (item_name == "copy_user_slurl")
     {
-        LLWString wstr = utf8str_to_wstring(LLSLURL("agent", getAvatarId(), "about").getSLURLString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+        const std::string slurl = LLSLURL("agent", getAvatarId(), "about").getSLURLString();
+        LLClipboard::instance().copyToClipboard(slurl, 0, narrow(slurl.size()));
     }
     else if (item_name == "copy_user_id")
     {
-        LLWString wstr = utf8str_to_wstring(getAvatarId().asString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, static_cast<S32>(wstr.size()));
+        const std::string id_str = getAvatarId().asString();
+        LLClipboard::instance().copyToClipboard(id_str, 0, static_cast<S32>(id_str.size()));
     }
     else if (item_name == "agent_permissions")
     {
@@ -1542,20 +1543,20 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
             LL_WARNS() << "Failed to get agent data" << LL_ENDL;
             return;
         }
-        LLWString wstr;
+        std::string name_str;
         if (item_name == "copy_display_name")
         {
-            wstr = utf8str_to_wstring(av_name.getDisplayName(true));
+            name_str = av_name.getDisplayName(true);
         }
         else if (item_name == "copy_username")
         {
-            wstr = utf8str_to_wstring(av_name.getUserName());
+            name_str = av_name.getUserName();
         }
         else if (item_name == "copy_full_name")
         {
-            wstr = utf8str_to_wstring(av_name.getCompleteName(true, true));
+            name_str = av_name.getCompleteName(true, true);
         }
-        LLClipboard::instance().copyToClipboard(wstr, 0, static_cast<S32>(wstr.size()));
+        LLClipboard::instance().copyToClipboard(name_str, 0, static_cast<S32>(name_str.size()));
     }
     else if (item_name == "edit_display_name")
     {
@@ -1675,7 +1676,7 @@ void LLPanelProfileSecondLife::onAvatarNameCacheSetName(const LLUUID& agent_id, 
 
     LL_INFOS("LegacyProfile") << "name-change now " << LLDate::now() << " next_update "
         << LLDate(av_name.mNextUpdate) << LL_ENDL;
-    F64 now_secs = LLDate::now().secondsSinceEpoch();
+    F64 now_secs = (F64)time_corrected();
 
     if (now_secs < av_name.mNextUpdate)
     {
@@ -1798,7 +1799,7 @@ void LLPanelProfileSecondLife::onShowAgentProfileTexture()
     }
     else // already open
     {
-        LLFloaterProfileTexture * texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture * texture_view = floater->as<LLFloaterProfileTexture>();
         texture_view->setMinimized(false);
         texture_view->setVisibleAndFrontmost(true);
         if (mSecondLifePic->getImageAssetId().notNull())
@@ -1888,7 +1889,7 @@ void LLPanelProfileSecondLife::onCommitProfileImage(const LLUUID& id)
     LLFloater* floater = mFloaterProfileTextureHandle.get();
     if (floater)
     {
-        LLFloaterProfileTexture* texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture* texture_view = floater->as<LLFloaterProfileTexture>();
         if (texture_view)
         {
             if (id.isNull())
@@ -2321,7 +2322,7 @@ void LLPanelProfileFirstLife::onShowAgentFirstlifeTexture()
     }
     else // already open
     {
-        LLFloaterProfileTexture* texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture* texture_view = floater->as<LLFloaterProfileTexture>();
         texture_view->setMinimized(false);
         texture_view->setVisibleAndFrontmost(true);
         if (mPicture->getImageAssetId().notNull())
@@ -2455,7 +2456,7 @@ bool LLPanelProfile::postBuild()
 
 void LLPanelProfile::onTabChange()
 {
-    LLPanelProfileTab* active_panel = dynamic_cast<LLPanelProfileTab*>(mTabContainer->getCurrentPanel());
+    LLPanelProfileTab* active_panel = ALViewType::as<LLPanelProfileTab>(mTabContainer->getCurrentPanel());
     if (active_panel)
     {
         active_panel->updateData();

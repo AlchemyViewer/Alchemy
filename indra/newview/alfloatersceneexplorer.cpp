@@ -15,6 +15,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alfloatersceneexplorer.h"
+#include "alsurface.h"
 
 #include "message.h"
 
@@ -249,7 +250,7 @@ namespace
     // and reads near-black on dark skins.)
     const LLColor4& heatColor(F32 value, F32 caution, F32 alert)
     {
-        static const LLUIColor normal = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+        const LLUIColor& normal = ALSurface::text();
         static const LLUIColor warn   = LLUIColorTable::instance().getColor("AlertCautionTextColor", LLColor4::yellow);
         static const LLUIColor danger = LLUIColorTable::instance().getColor("Red", LLColor4::red);
         if (value >= alert)
@@ -269,7 +270,7 @@ namespace
 
     const LLColor4& labelColor()
     {
-        static const LLUIColor label = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+        const LLUIColor& label = ALSurface::text();
         return label.get();
     }
 
@@ -313,19 +314,26 @@ namespace
     // Restore the all-visible/enabled baseline LLFolderView::updateMenuOptions
     // establishes before buildContextMenu, so the gear button path starts from
     // the same state as the right-click popup.
-    void resetMenuEntries(LLMenuGL& menu)
+    void restoreMenuEntries(LLMenuGL& menu)
     {
         for (LLView* menu_item : *menu.getChildList())
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(menu_item))
+            if (LLMenuItemBranchGL* branch = ALViewType::as<LLMenuItemBranchGL>(menu_item))
             {
                 if (branch->getBranch())
-                    resetMenuEntries(*branch->getBranch());
+                    restoreMenuEntries(*branch->getBranch());
             }
-            menu_item->setVisible(false);
-            menu_item->pushVisible(true);
+            menu_item->setVisible(true);
             menu_item->setEnabled(true);
         }
+    }
+
+    void resetMenuEntries(LLMenuGL& menu)
+    {
+        // Claims made for the previous open stop counting here, once, rather
+        // than at each level of the walk below.
+        LLMenuItemGL::beginContextBuild();
+        restoreMenuEntries(menu);
     }
 
     // Show only the listed entries (the llinventorybridge hide_context_entries
@@ -339,7 +347,7 @@ namespace
         bool prev_was_separator = true;
         for (LLView* menu_item : *menu.getChildList())
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(menu_item))
+            if (LLMenuItemBranchGL* branch = ALViewType::as<LLMenuItemBranchGL>(menu_item))
             {
                 if (branch->getBranch())
                     hideMenuEntries(*branch->getBranch(), show, disabled);
@@ -349,7 +357,7 @@ namespace
             bool found = std::find(show.begin(), show.end(), name) != show.end();
             if (found)
             {
-                const bool is_separator = dynamic_cast<LLMenuItemSeparatorGL*>(menu_item) != nullptr;
+                const bool is_separator = ALViewType::as<LLMenuItemSeparatorGL>(menu_item) != nullptr;
                 found = !(is_separator && prev_was_separator);
                 prev_was_separator = is_separator;
             }
@@ -358,14 +366,14 @@ namespace
             {
                 // Multi-selection passes call this repeatedly; don't re-hide
                 // an entry an earlier selected item explicitly showed.
-                if (!menu_item->getLastVisible())
+                if (!LLMenuItemGL::contextEntryClaimed(menu_item))
                     menu_item->setVisible(false);
                 menu_item->setEnabled(false);
             }
             else
             {
                 menu_item->setVisible(true);
-                menu_item->pushVisible(true);
+                LLMenuItemGL::claimContextEntry(menu_item);
                 menu_item->setEnabled(
                     std::find(disabled.begin(), disabled.end(), name) == disabled.end());
             }
@@ -568,7 +576,9 @@ bool ALFloaterSceneExplorer::handleKeyHere(KEY key, MASK mask)
     // view itself leaves RETURN unhandled (it only consumes it mid-rename),
     // and routing it through openItem() would be wrong — folder expansion
     // calls openItem() too, which is why it stays inert for folder types.
-    if (key == KEY_RETURN && mask == MASK_NONE && mTree && mTree->hasFocus())
+    // The folder view is no control and never holds the keyboard itself: the
+    // tree has it when its scroller does, so ask the panel that holds both.
+    if (key == KEY_RETURN && mask == MASK_NONE && mTree && mTreePanel->hasFocus())
     {
         ALSceneExplorerItem* item = getSelectedItem();
         if (item && !item->isContainer() && !item->isDerenderedType())
@@ -748,6 +758,11 @@ void ALFloaterSceneExplorer::buildTree()
     scroller_rect.translate(-scroller_rect.mLeft, -scroller_rect.mBottom);
     LLScrollContainer::Params sp(LLUICtrlFactory::getDefaultParams<LLFolderViewScrollContainer>());
     sp.rect(scroller_rect);
+    // A click on the tree focuses mTreePanel, which passes the keyboard to its
+    // first tab stop. Be that stop, as the inventory's scroller is: it hands
+    // keys to the folder view, which takes none itself. Left on the panel, the
+    // arrows, type-ahead and Page Up/Down would never reach the tree.
+    sp.tab_stop = true;
     LLScrollContainer* scroller = LLUICtrlFactory::create<LLFolderViewScrollContainer>(sp);
     scroller->setFollowsAll();
     mTreePanel->addChild(scroller);
@@ -2994,8 +3009,7 @@ void ALFloaterSceneExplorer::doCopy(const LLSD& param)
     if (out.empty())
         return;
 
-    const LLWString wout = utf8str_to_wstring(out);
-    LLClipboard::instance().copyToClipboard(wout, 0, (S32)wout.size());
+    LLClipboard::instance().copyToClipboard(out, 0, (S32)out.size());
 }
 
 void ALFloaterSceneExplorer::doCopyResults()
@@ -3056,8 +3070,7 @@ void ALFloaterSceneExplorer::doCopyResults()
     if (!rows)
         return;
 
-    const LLWString wout = utf8str_to_wstring(out);
-    LLClipboard::instance().copyToClipboard(wout, 0, (S32)wout.size());
+    LLClipboard::instance().copyToClipboard(out, 0, (S32)out.size());
 }
 
 void ALFloaterSceneExplorer::doShowOnMap()

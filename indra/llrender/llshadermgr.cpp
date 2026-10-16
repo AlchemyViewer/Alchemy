@@ -29,11 +29,14 @@
 
 #include "linden_common.h"
 #include "llshadermgr.h"
+#include "algpubuffer.h"
 #include "llrender.h"
 #include "llfile.h"
 #include "lldir.h"
 #include "llsdutil.h"
 #include "llsdserialize.h"
+
+#include <fmt/format.h>
 
 #if LL_DARWIN
 #include "OpenGL/OpenGL.h"
@@ -90,8 +93,71 @@ std::string LLShaderMgr::variantObjectKey(const std::string& path, U32 axes, con
     // and no second copy was compiled. Absence is always that decision and never a failure:
     // loadBasicShaders aborts the whole load if a copy it did want fails to build.
     const std::string key = path + suffix;
-    const auto& objects = (stage == GL_VERTEX_SHADER) ? mVertexShaderObjects : mFragmentShaderObjects;
-    return objects.count(key) ? key : path;
+    return mShaderObjects[stageIndex(stage)].contains(key) ? key : path;
+}
+
+// static
+LLShaderMgr::EShaderStage LLShaderMgr::stageIndex(GLenum type)
+{
+    switch (type)
+    {
+        case GL_VERTEX_SHADER:          return STAGE_VERTEX;
+        case GL_TESS_CONTROL_SHADER:    return STAGE_TESS_CONTROL;
+        case GL_TESS_EVALUATION_SHADER: return STAGE_TESS_EVALUATION;
+        case GL_GEOMETRY_SHADER:        return STAGE_GEOMETRY;
+        case GL_FRAGMENT_SHADER:        return STAGE_FRAGMENT;
+        case GL_COMPUTE_SHADER:         return STAGE_COMPUTE;
+        default:
+            LL_ERRS("Shaders") << "Unknown shader stage " << type << LL_ENDL;
+            return STAGE_VERTEX;
+    }
+}
+
+// static
+const char* LLShaderMgr::stageDefine(GLenum type)
+{
+    switch (stageIndex(type))
+    {
+        case STAGE_VERTEX:          return "#define VERTEX_SHADER 1\n";
+        case STAGE_TESS_CONTROL:    return "#define TESS_CONTROL_SHADER 1\n";
+        case STAGE_TESS_EVALUATION: return "#define TESS_EVALUATION_SHADER 1\n";
+        case STAGE_GEOMETRY:        return "#define GEOMETRY_SHADER 1\n";
+        case STAGE_FRAGMENT:        return "#define FRAGMENT_SHADER 1\n";
+        case STAGE_COMPUTE:         return "#define COMPUTE_SHADER 1\n";
+        default:                    return "";
+    }
+}
+
+void LLShaderMgr::clearShaderObjects()
+{
+    for (auto& objects : mShaderObjects)
+    {
+        for (const auto& object : objects)
+        {
+            deleteShaderObject(object.second);
+        }
+        objects.clear();
+    }
+}
+
+U32 LLShaderMgr::sLiveObjects = 0;
+
+// static
+void LLShaderMgr::deleteShaderObject(GLuint object)
+{
+    if (object == 0)
+    {
+        return;
+    }
+    llassert(sLiveObjects > 0);
+    sLiveObjects -= sLiveObjects > 0 ? 1 : 0;
+    glDeleteShader(object);
+#if LL_DARWIN
+    // Apple's GL 4.1 core driver spuriously raises GL_INVALID_OPERATION on glDeleteShader of a
+    // just-detached, valid shader. Drain it. Commit 7e9bf817a7 removed the original sweep on the
+    // belief that the driver had been fixed; empirically it has not been.
+    flush_glerror();
+#endif
 }
 
 bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
@@ -103,6 +169,14 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
     {
         return true;
     }
+
+    // A compute program is its one stage, and GL links a compute shader with no other: nothing below, all of it
+    // vertex, tessellation and fragment objects, may reach it. No feature has a compute object to give it.
+    if (shader->isCompute())
+    {
+        return true;
+    }
+
     //////////////////////////////////////
     // Attach Vertex Shader Features First
     //////////////////////////////////////
@@ -203,9 +277,61 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
+    if (features->hasWaterSurface)
+    {
+        if (!shader->attachVertexObject("environment/waterSurface.glsl"))
+        {
+            return false;
+        }
+    }
+
     if (!shader->attachVertexObject("deferred/textureUtilV.glsl"))
     {
         return false;
+    }
+
+    ///////////////////////////////////////////
+    // Attach Tessellation Evaluation Features
+    ///////////////////////////////////////////
+
+    if (features->hasTessellatedTerrain)
+    {
+        // GLSL resolves calls within a stage: the evaluation stage needs its own copy of the
+        // surface it evaluates. atmosphericsVarsV declares the outputs the fragment side's
+        // atmosphericsVarsF expects to find in the stage before it, which with tessellation is
+        // this one.
+        for (const char* object : { "deferred/terrainSurface.glsl", "windlight/atmosphericsVarsV.glsl" })
+        {
+            if (!shader->attachStageObject(GL_TESS_EVALUATION_SHADER, object))
+            {
+                return false;
+            }
+        }
+        // The fragment stage reads the same surface for the normal under each fragment.
+        if (!shader->attachFragmentObject("deferred/terrainSurface.glsl"))
+        {
+            return false;
+        }
+    }
+
+    if (features->hasWaterWaves)
+    {
+        // The waves' control stage culls the patches the scene's depth hides, through the depth pyramid.
+        if (!shader->attachStageObject(GL_TESS_CONTROL_SHADER, "deferred/depthPyramidUtil.glsl"))
+        {
+            return false;
+        }
+
+        // The waves' evaluation stage displaces the surface by heights read through the lattice the fragment stage
+        // reads the normals through. atmosphericsVarsV declares the outputs the fragment side's atmosphericsVarsF
+        // expects to find in the stage before it, which with tessellation is this one, as for the terrain.
+        for (const char* object : { "environment/waterSurface.glsl", "deferred/hexLatticeUtil.glsl", "windlight/atmosphericsVarsV.glsl" })
+        {
+            if (!shader->attachStageObject(GL_TESS_EVALUATION_SHADER, object))
+            {
+                return false;
+            }
+        }
     }
 
     ///////////////////////////////////////
@@ -224,6 +350,18 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         if (!shader->attachFragmentObject("environment/srgbF.glsl"))
         {
             return false;
+        }
+    }
+
+    if (features->hasWaterSurface)
+    {
+        // The water's wave reads hex-tile on the lattice terrain shares.
+        for (const char* object : { "environment/waterSurface.glsl", "deferred/hexLatticeUtil.glsl" })
+        {
+            if (!shader->attachFragmentObject(object))
+            {
+                return false;
+            }
         }
     }
 
@@ -306,9 +444,12 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->isPBRTerrain)
     {
-        if (!shader->attachFragmentObject("deferred/pbrterrainUtilF.glsl"))
+        for (const char* object : { "deferred/pbrterrainUtilF.glsl", "deferred/hexLatticeUtil.glsl" })
         {
-            return false;
+            if (!shader->attachFragmentObject(object))
+            {
+                return false;
+            }
         }
     }
 
@@ -500,19 +641,53 @@ void LLShaderMgr::dumpObjectLog(GLuint ret, bool warns, const std::string& filen
     }
 }
 
-GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, const std::string& cache_key)
+GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, const std::string& cache_key, U32 min_glsl_version)
+{
+    const GLuint object = compileShaderFile(filename, shader_level, type, defines, texture_index_channels, min_glsl_version);
+    if (object)
+    {
+        // Into the map, which owns it. The key is the path unless the caller asked for a distinct
+        // one -- a shared object compiled a second time under different defines needs its own
+        // entry, since attach is by key (see variantObjectKey). An object already under the key is
+        // the manager's too, and goes.
+        GLuint& slot = mShaderObjects[stageIndex(type)][cache_key.empty() ? filename : cache_key];
+        if (slot != 0 && slot != object)
+        {
+            deleteShaderObject(slot);
+        }
+        slot = object;
+    }
+    return object;
+}
+
+GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, U32 min_glsl_version)
 {
     GLenum error = GL_NO_ERROR;
 
     error = glGetError();
     if (error != GL_NO_ERROR)
     {
-        LL_SHADER_LOADING_WARNS() << "GL ERROR entering loadShaderFile(): " << error << " for file: " << filename << LL_ENDL;
+        LL_SHADER_LOADING_WARNS() << "GL ERROR entering compileShaderFile(): " << error << " for file: " << filename << LL_ENDL;
     }
 
     if (filename.empty())
     {
         LL_WARNS("ShaderLoading") << "tried loading empty filename" << LL_ENDL;
+        return 0;
+    }
+
+    // A compute stage, and a stage that reads storage blocks or images, compiles at GLSL 4.30 -- the version that
+    // makes `buffer` and `shared` keywords, which is why no other stage is raised to it. The context's GLSL is what the
+    // feature manager left it at, and a stage it cannot give its version to fails here rather than compiling at one it
+    // was not written for. No lower class can do better, so there is nothing to retry.
+    const U32 required_version = llmax(min_glsl_version, type == GL_COMPUTE_SHADER ? 430u : 0u);
+    const U32 context_version  = (U32)(gGLManager.mGLSLVersionMajor * 100 + gGLManager.mGLSLVersionMinor);
+    llassert(required_version % 10 == 0);
+    if (required_version > context_version)
+    {
+        LL_WARNS("ShaderLoading") << filename << " needs GLSL " << required_version / 100 << "."
+                                  << required_version % 100 << "; the context gives " << gGLManager.mGLSLVersionMajor
+                                  << "." << gGLManager.mGLSLVersionMinor << LL_ENDL;
         return 0;
     }
 
@@ -609,15 +784,9 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     {
         if (major_version >= 4)
         {
-            //set version to 400 or 420
-            if (minor_version >= 20)
-            {
-                shader_code_text[shader_code_count++] = strdup("#version 420\n");
-            }
-            else
-            {
-                shader_code_text[shader_code_count++] = strdup("#version 400\n");
-            }
+            //set version to 400 or 420, or to what the stage requires past that
+            const U32 version = llmax(minor_version >= 20 ? 420u : 400u, required_version);
+            shader_code_text[shader_code_count++] = strdup(fmt::format("#version {}\n", version).c_str());
         }
         else if (major_version == 3)
         {
@@ -654,14 +823,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         }
     }
 
-    if (type == GL_FRAGMENT_SHADER)
-    {
-        extra_code_text[extra_code_count++] = strdup("#define FRAGMENT_SHADER 1\n");
-    }
-    else
-    {
-        extra_code_text[extra_code_count++] = strdup("#define VERTEX_SHADER 1\n");
-    }
+    extra_code_text[extra_code_count++] = strdup(stageDefine(type));
 
     // Use alpha float to store bit flags
     // See: C++: addDeferredAttachment(), shader: frag_data[2]
@@ -997,6 +1159,10 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 
     //create shader object
     GLuint ret = glCreateShader(type);
+    if (ret)
+    {
+        ++sLiveObjects;
+    }
 
     error = glGetError();
     if (error != GL_NO_ERROR)
@@ -1004,7 +1170,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         LL_WARNS("ShaderLoading") << "GL ERROR in glCreateShader: " << error << " for file: " << open_file_name << LL_ENDL;
         if (ret)
         {
-            glDeleteShader(ret); //no longer need handle
+            deleteShaderObject(ret); //no longer need handle
             ret = 0;
         }
     }
@@ -1019,7 +1185,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         if (error != GL_NO_ERROR)
         {
             LL_WARNS("ShaderLoading") << "GL ERROR in glShaderSource: " << error << " for file: " << open_file_name << LL_ENDL;
-            glDeleteShader(ret); //no longer need handle
+            deleteShaderObject(ret); //no longer need handle
             ret = 0;
         }
     }
@@ -1034,7 +1200,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         if (error != GL_NO_ERROR)
         {
             LL_WARNS("ShaderLoading") << "GL ERROR in glCompileShader: " << error << " for file: " << open_file_name << LL_ENDL;
-            glDeleteShader(ret); //no longer need handle
+            deleteShaderObject(ret); //no longer need handle
             ret = 0;
         }
     }
@@ -1053,7 +1219,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             LL_WARNS("ShaderLoading") << "GLSL Compilation Error:" << LL_ENDL;
             dumpObjectLog(ret, true, open_file_name);
             dumpShaderSource(shader_code_count, shader_code_text);
-            glDeleteShader(ret); //no longer need handle
+            deleteShaderObject(ret); //no longer need handle
             ret = 0;
         }
         else
@@ -1066,7 +1232,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     }
     else
     {
-        LL_DEBUGS("ShaderLoading") << "loadShaderFile() completed, ret: " << U32(ret) << LL_ENDL;
+        LL_DEBUGS("ShaderLoading") << "compileShaderFile() completed, ret: " << U32(ret) << LL_ENDL;
         ret = 0;
     }
     stop_glerror();
@@ -1077,19 +1243,8 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         free(shader_code_text[i]);
     }
 
-    //successfully loaded, save results
     if (ret)
     {
-        // Add shader file to map. The key is the path unless the caller asked for a distinct
-        // one -- a shared object compiled a second time under different defines needs its own
-        // entry, since attach is by key (see variantObjectKey).
-        const std::string& key = cache_key.empty() ? filename : cache_key;
-        if (type == GL_VERTEX_SHADER) {
-            mVertexShaderObjects[key] = ret;
-        }
-        else if (type == GL_FRAGMENT_SHADER) {
-            mFragmentShaderObjects[key] = ret;
-        }
         shader_level = try_gpu_class;
     }
     else
@@ -1097,12 +1252,12 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         if (shader_level > 1)
         {
             shader_level--;
-            return loadShaderFile(filename, shader_level, type, defines, texture_index_channels, cache_key);
+            return compileShaderFile(filename, shader_level, type, defines, texture_index_channels, min_glsl_version);
         }
         LL_WARNS("ShaderLoading") << "Failed to load " << filename << LL_ENDL;
     }
 
-    LL_DEBUGS("ShaderLoading") << "loadShaderFile() completed, ret: " << U32(ret) << LL_ENDL;
+    LL_DEBUGS("ShaderLoading") << "compileShaderFile() completed, ret: " << U32(ret) << LL_ENDL;
     return ret;
 }
 
@@ -1235,7 +1390,7 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
                     ProgramBinaryData binary_info = ProgramBinaryData();
                     binary_info.mBinaryFormat = data_pair.second["binary_format"].asInteger();
                     binary_info.mBinaryLength = data_pair.second["binary_size"].asInteger();
-                    binary_info.mLastUsedTime = (F32)data_pair.second["last_used"].asReal();
+                    binary_info.mLastUsedTime = data_pair.second["last_used"].asReal();
                     mShaderBinaryCache.insert_or_assign(LLUUID(data_pair.first), binary_info);
                 }
             }
@@ -1290,8 +1445,8 @@ void LLShaderMgr::persistShaderCacheMetadata()
 
     size_t removed = 0;
 
-    static const F32 LRU_TIME = (60.f * 60.f) * 24.f * 7.f; // 14 days
-    const F32 current_time = (F32)LLTimer::getTotalSeconds();
+    static const F64 LRU_TIME = (60.0 * 60.0) * 24.0 * 7.0; // 7 days
+    const F64 current_time = LLDate::now().secondsSinceEpoch();
     for (auto it = mShaderBinaryCache.begin(); it != mShaderBinaryCache.end();)
     {
         const ProgramBinaryData& shader_metadata = it->second;
@@ -1387,7 +1542,7 @@ bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
                         glGetProgramiv(shader->mProgramObject, GL_LINK_STATUS, &success);
                         if (error == GL_NO_ERROR && success == GL_TRUE)
                         {
-                            binary_iter->second.mLastUsedTime = (F32)LLTimer::getTotalSeconds();
+                            binary_iter->second.mLastUsedTime = LLDate::now().secondsSinceEpoch();
                             LL_INFOS() << "Loaded cached binary for shader: " << shader->mName << LL_ENDL;
                             return true;
                         }
@@ -1457,7 +1612,7 @@ bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
             filep.write(program_binary.data(), program_binary.size(), ec);
             filep.close();
 
-            binary_info.mLastUsedTime = (F32)LLTimer::getTotalSeconds();
+            binary_info.mLastUsedTime = LLDate::now().secondsSinceEpoch();
 
             mShaderBinaryCache.insert_or_assign(shader->mShaderHash, binary_info);
             return true;
@@ -1507,9 +1662,11 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("normal_texcoord"); // (GLTF)
     mReservedUniforms.push_back("metallic_roughness_texcoord"); // (GLTF)
 
-    mReservedUniforms.push_back("terrain_texture_transforms"); // (GLTF)
+    mReservedUniforms.push_back("terrain_uv_transform");
+    mReservedUniforms.push_back("terrain_uv_offset");
+    mReservedUniforms.push_back("terrain_normal_axes");
 
-    llassert(mReservedUniforms.size() == LLShaderMgr::TERRAIN_TEXTURE_TRANSFORMS +1);
+    llassert(mReservedUniforms.size() == LLShaderMgr::TERRAIN_NORMAL_AXES +1);
 
     mReservedUniforms.push_back("viewport");
 
@@ -1678,6 +1835,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("res_scale");
     mReservedUniforms.push_back("dof_width");
     mReservedUniforms.push_back("dof_height");
+    mReservedUniforms.push_back("dof_uv_scale");
 
     mReservedUniforms.push_back("depthMap");
     mReservedUniforms.push_back("shadowMap0");
@@ -1707,11 +1865,11 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("skin_origin");
 
     mReservedUniforms.push_back("screenTex");
-    mReservedUniforms.push_back("exclusionTex");
+    mReservedUniforms.push_back("exclusionDistort");
     mReservedUniforms.push_back("eyeVec");
     mReservedUniforms.push_back("time");
-    mReservedUniforms.push_back("waveDir1");
-    mReservedUniforms.push_back("waveDir2");
+    mReservedUniforms.push_back("waterBigPhase");
+    mReservedUniforms.push_back("waterLittlePhase");
     mReservedUniforms.push_back("lightDir");
     mReservedUniforms.push_back("specular");
     mReservedUniforms.push_back("lightExp");
@@ -1720,7 +1878,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterFogDensity");
     mReservedUniforms.push_back("waterFogKS");
     mReservedUniforms.push_back("refScale");
-    mReservedUniforms.push_back("waterHeight");
     mReservedUniforms.push_back("waterPlane");
     mReservedUniforms.push_back("waterSign");
     mReservedUniforms.push_back("normScale");
@@ -1751,6 +1908,15 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("alpha_ramp");
     mReservedUniforms.push_back("paint_map");
+
+    mReservedUniforms.push_back("terrain_height_map");
+    mReservedUniforms.push_back("terrain_composition_map");
+    mReservedUniforms.push_back("terrain_tess_origin");
+    mReservedUniforms.push_back("terrain_tess_density");
+    mReservedUniforms.push_back("terrain_grid_scale");
+    mReservedUniforms.push_back("terrain_smoothing");
+    mReservedUniforms.push_back("parcel_overlay");
+    mReservedUniforms.push_back("show_parcel_owners");
 
     mReservedUniforms.push_back("detail_0_base_color");
     mReservedUniforms.push_back("detail_1_base_color");
@@ -1871,7 +2037,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("tonemap_mix");
     mReservedUniforms.push_back("tonemap_params");
     mReservedUniforms.push_back("hdri_split_screen");
-    mReservedUniforms.push_back("diffuse_luminance_scale");
+    mReservedUniforms.push_back("meter_params");
+    mReservedUniforms.push_back("meterMap");
+    mReservedUniforms.push_back("exposureHistogram");
 
     // Stars/Aurora/Meteors
     mReservedUniforms.push_back("custom_alpha");
@@ -1916,8 +2084,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uLensFlareStarburstSpikes");
     mReservedUniforms.push_back("uLensFlareStarburstSharpness");
     mReservedUniforms.push_back("uLensFlareStarburstFalloff");
-    mReservedUniforms.push_back("uLensFlareOcclusionTaps");
     mReservedUniforms.push_back("uLensFlareLightColor");
+    mReservedUniforms.push_back("uLensFlareStateMap");
+    mReservedUniforms.push_back("uLensFlareFadeTime");
 
     // Color Correction LUT
     mReservedUniforms.push_back("uColorGradeLut");
@@ -1935,7 +2104,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uHighlightRatio");
     mReservedUniforms.push_back("uMidtoneRatio");
     mReservedUniforms.push_back("uMidtoneAmount");
-    mReservedUniforms.push_back("uSplitToneMid");
+    mReservedUniforms.push_back("uSplitToneShadowRamp");
+    mReservedUniforms.push_back("uSplitToneHighlightRamp");
     mReservedUniforms.push_back("uToneAmount");
 
     // Display-space grading
@@ -1949,10 +2119,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uVibrance");
     mReservedUniforms.push_back("uHueShiftNorm");
 
-    // Per-channel filmic curves
-    mReservedUniforms.push_back("uCurveToe");
-    mReservedUniforms.push_back("uCurveInvRange");
-    mReservedUniforms.push_back("uCurveStrength");
+    // Tone curve LUT
+    mReservedUniforms.push_back("uToneCurveLut");
+    mReservedUniforms.push_back("uToneCurveLutScale");
+    mReservedUniforms.push_back("uToneCurveAmount");
 
     // Vignette
     mReservedUniforms.push_back("uVignetteAmount");
@@ -1991,10 +2161,137 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uRefWipeMode");
     mReservedUniforms.push_back("uRefWipePos");
 
+    // Geometric lens distortion
+    mReservedUniforms.push_back("uLensDistortAmount");
+    mReservedUniforms.push_back("uLensDistortK");
+    mReservedUniforms.push_back("uLensDistortScale");
+    mReservedUniforms.push_back("uLensDistortSqueeze");
+    mReservedUniforms.push_back("uLensDistortCenter");
+    mReservedUniforms.push_back("uLensDistortTangential");
+
+    // Bokeh
+    mReservedUniforms.push_back("uBokehHighlightThreshold");
+    mReservedUniforms.push_back("uBokehHighlightGain");
+    mReservedUniforms.push_back("uBokehHighlightClamp");
+    mReservedUniforms.push_back("uBokehBlades");
+    mReservedUniforms.push_back("uBokehApertureRotation");
+    mReservedUniforms.push_back("uBokehApertureCurvature");
+    mReservedUniforms.push_back("uBokehApertureConst");
+    mReservedUniforms.push_back("uBokehAnamorphic");
+    mReservedUniforms.push_back("uBokehCatEye");
+    mReservedUniforms.push_back("uBokehFringeAmount");
+    mReservedUniforms.push_back("uBokehFringeNearTint");
+    mReservedUniforms.push_back("uBokehFringeFarTint");
+
+    // Lens dirt
+    mReservedUniforms.push_back("uLensDirtMap");
+    mReservedUniforms.push_back("uLensDirtStrength");
+    mReservedUniforms.push_back("uLensDirtBloomResponse");
+    mReservedUniforms.push_back("uLensDirtFlareResponse");
+
+    // Lens dirt generation
+    mReservedUniforms.push_back("uDirtResolution");
+    mReservedUniforms.push_back("uDirtSeed");
+    mReservedUniforms.push_back("uDirtGrime");
+    mReservedUniforms.push_back("uDirtMoteScale");
+    mReservedUniforms.push_back("uDirtSmudge");
+    mReservedUniforms.push_back("uDirtScratches");
+    mReservedUniforms.push_back("uDirtToe");
+    mReservedUniforms.push_back("uDirtGain");
+
+    // Cross-screen filter
+    mReservedUniforms.push_back("uCrossTexel");
+    mReservedUniforms.push_back("uCrossDir");
+    mReservedUniforms.push_back("uCrossLength");
+    mReservedUniforms.push_back("uCrossFalloff");
+    mReservedUniforms.push_back("uCrossChromatic");
+    mReservedUniforms.push_back("uCrossPassScale");
+    mReservedUniforms.push_back("uCrossStrength");
+    mReservedUniforms.push_back("uCrossRegion");
+    mReservedUniforms.push_back("uCrossClamp");
+
+    mReservedUniforms.push_back("uBokehSpherical");
+    mReservedUniforms.push_back("uBokehFieldStretch");
+    mReservedUniforms.push_back("uBokehFieldFalloff");
+    mReservedUniforms.push_back("uBokehComaAsymmetry");
+
+    mReservedUniforms.push_back("crossFilterMap");
+
+    mReservedUniforms.push_back("uCutoutPremultiplied");
+
     // Text Shadow
     mReservedUniforms.push_back("textShadowMode");
 
     // End Alchemy Effects Stack
+
+    mReservedUniforms.push_back("shPartial");
+
+    mReservedUniforms.push_back("waterFar");
+    mReservedUniforms.push_back("waterRim");
+
+    mReservedUniforms.push_back("eyeToSky");
+    mReservedUniforms.push_back("skyBehindMap");
+
+    mReservedUniforms.push_back("moonQuadCenter");
+    mReservedUniforms.push_back("moonQuadU");
+    mReservedUniforms.push_back("moonQuadV");
+
+    // Selection outlines, hover glow and wireframe (ALSelectionOutline)
+    mReservedUniforms.push_back("selection_id");
+    mReservedUniforms.push_back("selection_priority");
+    mReservedUniforms.push_back("selection_show_hidden");
+    mReservedUniforms.push_back("selection_outlined");
+    mReservedUniforms.push_back("selection_scene_depth");
+    mReservedUniforms.push_back("outline_width");
+    mReservedUniforms.push_back("outline_inner_width");
+    mReservedUniforms.push_back("outline_glow_radius");
+    mReservedUniforms.push_back("outline_glow_brightness");
+    mReservedUniforms.push_back("wireframe_pass");
+    mReservedUniforms.push_back("wireframe_width");
+    mReservedUniforms.push_back("selectionIdMap");
+    mReservedUniforms.push_back("selectionJumpMap");
+    mReservedUniforms.push_back("selectionTileMap");
+    mReservedUniforms.push_back("selectionPalette");
+    mReservedUniforms.push_back("selectionGlowReachMap");
+    mReservedUniforms.push_back("selectionGlowRowMap");
+    mReservedUniforms.push_back("selectionBackdrop");
+    mReservedUniforms.push_back("selection_contrast");
+    mReservedUniforms.push_back("selection_keep_cut");
+    mReservedUniforms.push_back("selectionTileDepthMap");
+    mReservedUniforms.push_back("outline_rim_width");
+
+    mReservedUniforms.push_back("waterCellMap");
+    mReservedUniforms.push_back("waterCellSquare");
+    mReservedUniforms.push_back("waterDefaultHeight");
+    mReservedUniforms.push_back("waterRings");
+    mReservedUniforms.push_back("waterSweepPhase");
+    mReservedUniforms.push_back("waterLayout");
+    mReservedUniforms.push_back("waterGlintRoughness");
+    mReservedUniforms.push_back("waterLatticeFrac");
+    mReservedUniforms.push_back("waterLatticeBase");
+    mReservedUniforms.push_back("waterMapMean");
+    mReservedUniforms.push_back("waterPatchRect");
+    mReservedUniforms.push_back("waterTessDensity");
+    mReservedUniforms.push_back("waterMaxDisplacement");
+    mReservedUniforms.push_back("waterCullPlanes");
+    mReservedUniforms.push_back("waterHeightMap");
+    mReservedUniforms.push_back("waterHeightMap2");
+    mReservedUniforms.push_back("waterWaveAmp");
+    mReservedUniforms.push_back("waterWaveReach");
+    mReservedUniforms.push_back("waterWaveEye");
+    mReservedUniforms.push_back("waterRaise");
+
+    // The depth pyramid
+    mReservedUniforms.push_back("depthPyramid");
+    mReservedUniforms.push_back("depthPyramidSource");
+    mReservedUniforms.push_back("depthPyramidTarget");
+    mReservedUniforms.push_back("depthPyramidLevel");
+    mReservedUniforms.push_back("depthPyramidSize");
+    mReservedUniforms.push_back("depthPyramidCount");
+
+    // The waves' patches
+    mReservedUniforms.push_back("waterOcclusion");
+    mReservedUniforms.push_back("waterPatchOrder");
 
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a
@@ -2029,5 +2326,50 @@ void LLShaderMgr::initAttribsAndUniforms()
                       << "array uniforms are declared here by their bare name" << LL_ENDL;
         }
     }
+
+    // The storage blocks, each with its element count, in eGLSLReservedStorageBlocks order.
+    mReservedStorageBlocks.clear();
+
+    // The same three checks, and that every block's points fit the ones every compute context has.
+    if (mReservedStorageBlocks.size() != END_RESERVED_STORAGE_BLOCKS)
+    {
+        LL_ERRS() << "Reserved storage block table has " << mReservedStorageBlocks.size()
+                  << " entries but eGLSLReservedStorageBlocks declares " << (U32)END_RESERVED_STORAGE_BLOCKS
+                  << " -- the enum and the table are out of sync" << LL_ENDL;
+    }
+    std::set<std::string> block_check;
+    U32 points = 0;
+    for (const ReservedStorageBlock& block : mReservedStorageBlocks)
+    {
+        if (!block_check.insert(block.mName).second)
+        {
+            LL_ERRS() << "Duplicate reserved storage block name found: " << block.mName << LL_ENDL;
+        }
+        if (block.mName.find('[') != std::string::npos || block.mCount == 0)
+        {
+            LL_ERRS() << "Reserved storage block '" << block.mName << "' carries a subscript or no elements; "
+                      << "an array of blocks is declared by its bare name and its count" << LL_ENDL;
+        }
+        points += block.mCount;
+    }
+    if (points > AL_NUM_STORAGE_BINDINGS)
+    {
+        LL_ERRS() << "The reserved storage blocks take " << points << " binding points; every compute context has "
+                  << AL_NUM_STORAGE_BINDINGS << LL_ENDL;
+    }
+}
+
+S32 LLShaderMgr::getStorageBlockBinding(S32 block, U32 element) const
+{
+    if (block < 0 || block >= (S32)mReservedStorageBlocks.size() || element >= mReservedStorageBlocks[block].mCount)
+    {
+        return -1;
+    }
+    U32 binding = element;
+    for (S32 i = 0; i < block; ++i)
+    {
+        binding += mReservedStorageBlocks[i].mCount;
+    }
+    return binding < AL_NUM_STORAGE_BINDINGS ? (S32)binding : -1;
 }
 

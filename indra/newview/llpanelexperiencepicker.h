@@ -33,9 +33,11 @@ class LLScrollListCtrl;
 class LLLineEditor;
 
 
-class LLPanelExperiencePicker : public LLPanel
+class LLPanelExperiencePicker final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelExperiencePicker, LLPanel);
+
     friend class LLExperienceSearchResponder;
     friend class LLFloaterExperiencePicker;
 
@@ -47,7 +49,7 @@ public:
     LLPanelExperiencePicker();
     virtual ~LLPanelExperiencePicker();
 
-    bool postBuild();
+    bool postBuild() override;
 
     void addFilter(filter_function func){mFilters.push_back(func);}
     template <class IT>

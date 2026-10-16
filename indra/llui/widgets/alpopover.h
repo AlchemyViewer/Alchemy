@@ -1,0 +1,209 @@
+/**
+ * @file alpopover.h
+ * @brief A small panel shown beside the thing it is about, until it is not wanted.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include "llfloater.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+
+#include <boost/signals2.hpp>
+
+// A panel put beside the control it is about, over whatever is under it, and
+// gone as soon as it is not wanted.
+//
+// It is a floater because that is the only thing in this library that is not
+// clipped by its parent: a list dropped from a row of a property grid inside a
+// scroll container has nowhere to go. It carries none of a floater's chrome --
+// no close box, no minimise, no drag bar unless a caller asks for a title --
+// because it is not a window and should not read as one.
+//
+// Three ways out, and a caller applying on close needs to tell them apart:
+// choosing something (a caller calls settle()), pressing escape, or looking
+// somewhere else. Escape means the caller should keep what it had.
+//
+// The content is the caller's panel, given whole: this places it, shows it,
+// and deletes it. What is in it, how big it is and what choosing means are
+// none of this widget's business.
+//
+// A popover with more to it than a panel -- one that draws in its own
+// header, or resizes -- derives from this, builds its own content, and
+// opens with openBeside(): the placing and the three ways out are the same
+// for every one of them.
+//
+// A popover is a window of its own, so a key pressed over it never climbs
+// to the window it opened from, and a Control key would go to the viewer's
+// menu bar instead. Keys the popover and its content do not take go home
+// to the floater the anchor was in, the way a pane out in a window of its
+// own sends them (ALPanelFloater), so a window's own shortcuts still answer
+// while one of its popovers has the keyboard. And it is that window's
+// dependent: it closes when the window does, however the window went.
+class ALPopover : public LLFloater
+{
+public:
+    AL_VIEW_TYPE(ALPopover, LLFloater);
+
+    // Under `anchor` and left-aligned with it, or above it where under would
+    // be off the bottom of the screen and above would not. The popover takes
+    // `content`, and takes its size from it. Null where there is nothing to
+    // put it beside.
+    //
+    // A title is drawn where one is given; where none is, the panel is the
+    // whole of it and there is no bar to drag it by.
+    static ALPopover* show(LLView* anchor, LLPanel* content,
+                           const std::string& title = LLStringUtil::null);
+    // Over the anchor instead: centred on it a little below its top,
+    // where a prompt over a window goes, as a quick open does.
+    static ALPopover* showOver(LLView* anchor, LLPanel* content,
+                               const std::string& title = LLStringUtil::null);
+    // Beside a rect of the screen rather than beside the anchor's own: what
+    // is on a zoomed or panned canvas, whose place only the canvas can say
+    // (ALCanvasView::screenRectOf), or the pointer. The anchor is still
+    // what it is about -- the window keys go home to, and that it closes
+    // with.
+    static ALPopover* showAt(const LLRect& screen, LLView* anchor, LLPanel* content,
+                             const std::string& title = LLStringUtil::null);
+
+    // What a popover this size is built from: no close box, no minimise,
+    // no tear-off, nothing saved, and a size a person may change only
+    // where asked.
+    static LLFloater::Params paramsFor(S32 width, S32 height,
+                                       const std::string& title = LLStringUtil::null,
+                                       bool resizable = false);
+
+    // The same, at the size the last popover of this kind was left at, or
+    // the size given where none has been: how much of a colour wheel a
+    // person wants to see is theirs to decide, and once decided it should
+    // not have to be decided again for the next one. A popover built from
+    // these remembers its size as it closes.
+    static LLFloater::Params paramsRemembered(const std::string& kind, S32 width, S32 height,
+                                              const std::string& title = LLStringUtil::null,
+                                              bool resizable = true);
+
+    // Opened beside the anchor as ALPlace::under() puts it -- under it with
+    // their left edges together, above it where under would run off the
+    // bottom and above would not, kept on screen across -- then shown and
+    // given the keyboard.
+    void openBeside(const LLView* anchor);
+    // The same beside a rect of the screen, for the anchor.
+    void openBeside(const LLRect& screen, const LLView* anchor);
+    // Opened over the anchor: centred on it, its top a little below the
+    // anchor's, shoved back on screen where it would run off.
+    void openOver(const LLView* anchor);
+
+    // Gone, having settled: what a caller calls when the thing in it has been
+    // chosen, and what a return key does. The closed signal says it was
+    // not escaped. A popover with more to note about settling than that
+    // overrides it, and is reached however the settling came.
+    virtual void settle();
+
+    // Gone, keeping nothing.
+    virtual void escape();
+
+    // Told as it goes: true where it was escaped, so a caller that applies on
+    // close knows to apply nothing.
+    typedef boost::signals2::signal<void(bool)> closed_signal_t;
+    boost::signals2::connection onClosed(const closed_signal_t::slot_type& cb)
+    {
+        return mClosed.connect(cb);
+    }
+
+    bool escaped() const { return mEscaped; }
+
+    // The floater the anchor was in, which unhandled keys go home to.
+    LLFloater* home() const { return mHome.get(); }
+
+    void onClose(bool app_quitting) override;
+    void onFocusLost() override;
+    bool handleKeyHere(KEY key, MASK mask) override;
+    bool hasAccelerators() const override { return !mHome.isDead(); }
+
+protected:
+    friend class LLUICtrlFactory;
+    ALPopover(const LLFloater::Params& p);
+
+private:
+    // The window the anchor is in, adopted as where keys go home to.
+    void adopt(const LLView* anchor);
+    void openAt(LLRect where);
+    // The floater view the home window is in, or the global one.
+    LLFloaterView* homeFloaterView() const;
+    // A rect of the screen in that view's coordinates, which is where a
+    // popover's own rect is: views are not all at the screen's origin.
+    LLRect screenRectToView(const LLRect& screen) const;
+
+    // Closed from the keyboard, the keyboard back where it was when it
+    // opened, where nothing else has taken it: not the world's.
+    void giveKeysBack();
+
+    bool                mEscaped = false;
+    bool                mSaidSo = false;    // the signal is sent once
+    closed_signal_t     mClosed;
+    LLHandle<LLFloater> mHome;
+    LLHandle<LLView>    mKeysBefore;
+    // What paramsRemembered was asked for, and so what the size is kept as.
+    std::string         mSizeKind;
+};
+
+// The one popover a control or a window has up at a time -- a field's, a
+// studio's quick open, a window's own. Opening another closes the one it
+// held; the one held is told of as it goes, while what was picked in it is
+// still there to read; and one let go of says nothing more about the one
+// up now.
+class ALPopoverSlot
+{
+public:
+    typedef std::function<void(bool escaped)> closed_t;
+
+    ALPopoverSlot() = default;
+    ALPopoverSlot(const ALPopoverSlot&)            = delete;
+    ALPopoverSlot& operator=(const ALPopoverSlot&) = delete;
+    // What it holds dies without a word, as drop() has it.
+    ~ALPopoverSlot();
+
+    // What is up, or null.
+    ALPopover* get() const { return mHeld.get(); }
+    bool       isOpen() const { return !mHeld.isDead(); }
+
+    // Holds a popover, open or about to be, and tells `closed` as it goes
+    // -- true where it was escaped. Whatever it held before is escaped
+    // first; an owner closes that before making the next, since the next
+    // takes the keyboard and the one it held settles as it loses it. The
+    // one held already, held again, is only told of to someone new.
+    void hold(ALPopover* popover, closed_t closed = {});
+    // Closes what it holds: escaped, keeping nothing, or settled, keeping
+    // what was picked; told of as it goes either way.
+    void close(bool escape = true);
+    // Lets go of what it holds without a word, the popover dying: for an
+    // owner torn down under it, which is not to be called back.
+    void drop();
+
+private:
+    LLHandle<ALPopover>                mHeld;
+    boost::signals2::scoped_connection mClosed;
+    // Whether the slot is still here after an owner, told, went with it.
+    std::shared_ptr<bool>              mAlive = std::make_shared<bool>(true);
+};

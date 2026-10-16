@@ -39,7 +39,7 @@ public:
     static void updateClass();
     virtual ~LLMortician();
     void die();
-    bool isDead() { return mIsDead; }
+    bool isDead() const { return mIsDead; }
 
     // sets destroy immediate true
     static void setZealous(bool b);

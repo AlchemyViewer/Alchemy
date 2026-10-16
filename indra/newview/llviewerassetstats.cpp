@@ -34,6 +34,8 @@
 #include "llsdparam.h"
 #include "llsdutil.h"
 
+#include <cmath>
+
 /*
  * Classes and utility functions for per-thread and per-region
  * asset and experiential metrics to be aggregated grid-wide.
@@ -273,13 +275,19 @@ void LLViewerAssetStats::getStat(LLTrace::Recording& rec, T& req, LLViewerAssetS
         || rec.getSampleCount(sDequeued[cat])
         || rec.getSampleCount(sResponse[cat]))
     {
+        // With nothing answered, or nothing fetched, there is nothing to take
+        // the least, the most or the mean of: zeros, rather than what an
+        // empty minimum, maximum and mean come out as (the largest float,
+        // the smallest, and NaN).
+        const S32 responses = rec.getSampleCount(sResponse[cat]);
+        const S32 fetches   = rec.getSampleCount(sBytesFetched[cat]);
         req .enqueued(rec.getSampleCount(sEnqueued[cat]))
             .dequeued(rec.getSampleCount(sDequeued[cat]))
-            .resp_count(rec.getSampleCount(sResponse[cat]))
-            .resp_min(rec.getMin(sResponse[cat]).value())
-            .resp_max(rec.getMax(sResponse[cat]).value())
-            .resp_mean(rec.getMean(sResponse[cat]).value())
-            .resp_mean_bytes(rec.getMean(sBytesFetched[cat]));
+            .resp_count(responses)
+            .resp_min(responses ? rec.getMin(sResponse[cat]).value() : 0.0)
+            .resp_max(responses ? rec.getMax(sResponse[cat]).value() : 0.0)
+            .resp_mean(responses ? rec.getMean(sResponse[cat]).value() : 0.0)
+            .resp_mean_bytes(fetches ? rec.getMean(sBytesFetched[cat]) : 0.0);
     }
 }
 
@@ -311,7 +319,10 @@ void LLViewerAssetStats::getStats(AssetStats& stats, bool compact_output)
         getStat(rec, r.get_other_http, EVACOtherHTTPGet, compact_output);
         getStat(rec, r.get_other_udp, EVACOtherUDPGet, compact_output);
 
-        S32 fps = (S32)rec.getLastValue(LLStatViewer::FPS_SAMPLE);
+        // NaN where the recording took no frame-rate sample, which no cast
+        // to an integer may be given.
+        const F64 last_fps = rec.getLastValue(LLStatViewer::FPS_SAMPLE);
+        S32 fps = std::isfinite(last_fps) ? (S32)last_fps : 0;
         if (!compact_output || fps != 0)
         {
             r.fps   .count(fps)

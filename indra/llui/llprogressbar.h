@@ -31,10 +31,12 @@
 #include "lluictrl.h"
 #include "lluiimage.h"
 
-class LLProgressBar
+class LLProgressBar final
     : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLProgressBar, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<LLUIImage*>    image_bar,

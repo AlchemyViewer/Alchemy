@@ -31,6 +31,8 @@
 #define LLPANEL_CPP
 #include "llpanel.h"
 
+#include "alxuishellbuild.h"
+
 #include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "llrect.h"
@@ -57,9 +59,22 @@ LLPanel::factory_stack_t    LLPanel::sFactoryStack;
 template class LLPanel* LLView::getChild<class LLPanel>(
     std::string_view name, bool recurse) const;
 
+namespace
+{
+    // QAMode turns a missing string from a warning into a crash. Asked of the
+    // group by name: indexing the map inserts a null under a name nobody
+    // registered and then hands it back to be dereferenced.
+    bool qaMode()
+    {
+        LLControlGroup* config = LLUI::getInstance()->getSettingGroup("config");
+        return config && config->getBOOL("QAMode");
+    }
+}
+
 LLPanel::LocalizedString::LocalizedString()
 :   name("name"),
-    value("value")
+    value("value"),
+    needs_translate("translate")
 {}
 
 const LLPanel::Params& LLPanel::getDefaultParams()
@@ -270,7 +285,7 @@ bool LLPanel::handleKeyHere( KEY key, MASK mask )
 {
     bool handled = false;
 
-    LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl* cur_focus = gFocusMgr.getKeyboardFocusCtrl();
 
     // handle user hitting ESC to defocus
     if (key == KEY_ESCAPE)
@@ -306,7 +321,7 @@ bool LLPanel::handleKeyHere( KEY key, MASK mask )
     // If RETURN was pressed and something has focus, call onCommit()
     if (!handled && cur_focus && key == KEY_RETURN && mask == MASK_NONE)
     {
-        LLButton* focused_button = dynamic_cast<LLButton*>(cur_focus);
+        LLButton* focused_button = cur_focus->as<LLButton>();
         if (focused_button && focused_button->getCommitOnReturn())
         {
             // current focus is a return-capturing button,
@@ -373,7 +388,7 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent)
     LLPanel* panelp = NULL;
 
     {
-        if(!class_attr.empty())
+        if(!class_attr.empty() && !ALXUIShellBuild::active())
         {
             panelp = LLRegisterPanelClass::instance().createPanelClass(class_attr);
             if (!panelp)
@@ -403,7 +418,7 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent)
     panelp->mCommitCallbackRegistrar.pushScope();
     panelp->mEnableCallbackRegistrar.pushScope();
 
-    panelp->initPanelXML(node, parent, LLUICtrlFactory::getDefaultParams<LLPanel>());
+    const bool built = panelp->initPanelXML(node, parent, LLUICtrlFactory::getDefaultParams<LLPanel>());
 
     panelp->mCommitCallbackRegistrar.popScope();
     panelp->mEnableCallbackRegistrar.popScope();
@@ -411,6 +426,15 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent)
     if (!panelp->getFactoryMap().empty())
     {
         sFactoryStack.pop_back();
+    }
+
+    if (!built)
+    {
+        // Never parented -- initPanelXML adds the panel to its parent on the
+        // way out, and it did not get there. Handing it back leaves it in the
+        // tree of nobody, holding whatever it built.
+        delete panelp;
+        return NULL;
     }
 
     return panelp;
@@ -449,11 +473,20 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
     setToolTip(p.tool_tip());
     setFromXUI(p.from_xui);
 
-    mHoverCursor = getCursorFromString(p.hover_cursor);
+    mHoverCursor = getCursorFromString(p.hover_cursor());
 
     if (p.has_border)
     {
-        addBorder(p.border);
+        // The constructor built one from this same block, before the rect
+        // above was settled; all it needs is that rect.
+        if (mBorder)
+        {
+            mBorder->setShape(getLocalRect());
+        }
+        else
+        {
+            addBorder(p.border);
+        }
     }
     // let constructors set this value if not provided
     if (p.use_bounding_rect.isProvided())
@@ -503,22 +536,28 @@ bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, const LLPanel::Par
             factory->pushFileName(mXMLFilename);
 
             LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Load Extern Panel Reference");
-            if (!LLUICtrlFactory::getLayeredXMLNode(mXMLFilename, referenced_xml))
+            const bool parsed = LLUICtrlFactory::getLayeredXMLNode(mXMLFilename, referenced_xml);
+            if (parsed)
             {
-                LL_WARNS() << "Couldn't parse panel from: " << mXMLFilename << LL_ENDL;
+                // Get filename after pushFileName
+                const std::string& updated_filename = factory->getCurFileName();
+                parser.readXUI(referenced_xml, params, updated_filename);
 
-                return false;
+                // add children using dimensions from referenced xml for consistent layout
+                setShape(params.rect);
+                LLUICtrlFactory::createChildren(this, referenced_xml, registry);
             }
 
-            // Get filename after pushFileName
-            const std::string& updated_filename = factory->getCurFileName();
-            parser.readXUI(referenced_xml, params, updated_filename);
-
-            // add children using dimensions from referenced xml for consistent layout
-            setShape(params.rect);
-            LLUICtrlFactory::createChildren(this, referenced_xml, registry);
-
+            // Popped on the way out whichever way that is. The name left on the
+            // stack is the one every widget built after this reports as its
+            // own, and the source map and the lint read it.
             factory->popFileName();
+
+            if (!parsed)
+            {
+                LL_WARNS() << "Couldn't parse panel from: " << mXMLFilename << LL_ENDL;
+                return false;
+            }
         }
 
         // ask LLUICtrlFactory for filename, since xml_filename might be empty
@@ -567,7 +606,7 @@ std::string LLPanel::getString(std::string_view name, const LLStringUtil::format
         return formatted_string.getString();
     }
     std::string err_str("Failed to find string " + std::string(name) + " in panel " + getName()); //*TODO: Translate
-    if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
+    if(qaMode())
     {
         LL_ERRS() << err_str << LL_ENDL;
     }
@@ -586,7 +625,7 @@ std::string LLPanel::getString(std::string_view name) const
         return found_it->second;
     }
     std::string err_str("Failed to find string " + std::string(name) +" in panel " + getName()); //*TODO: Translate
-    if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
+    if(qaMode())
     {
         LL_ERRS() << err_str << LL_ENDL;
     }

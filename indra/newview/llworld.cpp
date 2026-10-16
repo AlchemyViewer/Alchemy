@@ -53,11 +53,14 @@
 #include "llvlcomposition.h"
 #include "llvoavatar.h"
 #include "llvocache.h"
-#include "llvowater.h"
 #include "message.h"
 #include "pipeline.h"
 #include "llappviewer.h"        // for do_disconnect()
 #include "llscenemonitor.h"
+#include "alfarplane.h"
+#include <fmt/format.h>
+
+#include <algorithm>
 #include <deque>
 #include <queue>
 #include <map>
@@ -74,7 +77,6 @@ U32         gAgentPauseSerialNum = 0;
 //
 const S32 WORLD_PATCH_SIZE = 16;
 
-extern LLColor4U MAX_WATER_COLOR;
 
 const U32 LLWorld::mWidth = 256;
 
@@ -95,27 +97,12 @@ LLWorld::LLWorld() :
     mLastPacketsLost(0),
     mSpaceTimeUSec(0)
 {
-    for (S32 i = 0; i < EDGE_WATER_OBJECTS_COUNT; i++)
-    {
-        mEdgeWaterObjects[i] = NULL;
-    }
-
-    LLPointer<LLImageRaw> raw = new LLImageRaw(1,1,4);
-    U8 *default_texture = raw->getData();
-    *(default_texture++) = MAX_WATER_COLOR.mV[0];
-    *(default_texture++) = MAX_WATER_COLOR.mV[1];
-    *(default_texture++) = MAX_WATER_COLOR.mV[2];
-    *(default_texture++) = MAX_WATER_COLOR.mV[3];
-
-    mDefaultWaterTexturep = LLViewerTextureManager::getLocalTexture(raw.get(), false);
-
     LLViewerRegion::sVOCacheCullingEnabled = gSavedSettings.getBOOL("RequestFullRegionCache") && gSavedSettings.getBOOL("ObjectCacheEnabled");
 }
 
 
 void LLWorld::resetClass()
 {
-    mHoleWaterObjects.clear();
     gObjectList.destroy();
     gSky.cleanup(); // references an object
     for(region_list_t::iterator region_it = mRegionList.begin(); region_it != mRegionList.end(); )
@@ -126,12 +113,6 @@ void LLWorld::resetClass()
 
     LLViewerPartSim::getInstance()->destroyClass();
 
-    mDefaultWaterTexturep = NULL ;
-    for (S32 i = 0; i < EDGE_WATER_OBJECTS_COUNT; i++)
-    {
-        mEdgeWaterObjects[i] = NULL;
-    }
-
     //make all visible drawbles invisible.
     LLDrawable::incrementVisible();
 
@@ -141,6 +122,7 @@ void LLWorld::resetClass()
 
 LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     LL_INFOS() << "Add region with handle: " << region_handle << " on host " << host << LL_ENDL;
     LLViewerRegion *regionp = getRegionFromHandle(region_handle);
     std::string seedUrl;
@@ -240,14 +222,13 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
         }
     }
 
-    updateWaterObjects();
-
     return regionp;
 }
 
 
 void LLWorld::removeRegion(const LLHost &host)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     F32 x, y;
 
     LLViewerRegion *regionp = getRegion(host);
@@ -293,8 +274,6 @@ void LLWorld::removeRegion(const LLHost &host)
     mVisibleRegionList.remove(regionp);
 
     mRegionRemovedSignal(regionp);
-
-    updateWaterObjects();
 
     //double check all objects of this region are removed.
     gObjectList.clearAllMapObjectsInRegion(regionp) ;
@@ -359,17 +338,28 @@ LLVector3d  LLWorld::clipToVisibleRegions(const LLVector3d &start_pos, const LLV
     LLVector3 region_coord = regionp->getPosRegionFromGlobal(end_pos);
     F64 clip_factor = 1.0;
     F32 region_width = regionp->getWidth();
+
+    // How far back along the travel to walk to land on the border. The axis that left the region
+    // is not always the axis that moved: a position that was already outside on one axis and is
+    // travelling purely along the other divides by a zero delta here, and the resulting infinity
+    // survives llclamp as a NaN that ends up in the object's position and then in the octree.
+    // With no motion on the offending axis there is no crossing to solve for, so hold still.
+    auto clip_along = [](F64 excess, F64 travel) -> F64
+    {
+        return (travel > 0.0) ? (excess / travel) : 0.0;
+    };
+
     if (region_coord.mV[VX] < 0.f)
     {
         if (region_coord.mV[VY] < region_coord.mV[VX])
         {
             // clip along y -
-            clip_factor = -(region_coord.mV[VY] / delta_pos_abs.mdV[VY]);
+            clip_factor = clip_along(-region_coord.mV[VY], delta_pos_abs.mdV[VY]);
         }
         else
         {
             // clip along x -
-            clip_factor = -(region_coord.mV[VX] / delta_pos_abs.mdV[VX]);
+            clip_factor = clip_along(-region_coord.mV[VX], delta_pos_abs.mdV[VX]);
         }
     }
     else if (region_coord.mV[VX] > region_width)
@@ -377,23 +367,23 @@ LLVector3d  LLWorld::clipToVisibleRegions(const LLVector3d &start_pos, const LLV
         if (region_coord.mV[VY] > region_coord.mV[VX])
         {
             // clip along y +
-            clip_factor = (region_coord.mV[VY] - region_width) / delta_pos_abs.mdV[VY];
+            clip_factor = clip_along(region_coord.mV[VY] - region_width, delta_pos_abs.mdV[VY]);
         }
         else
         {
             //clip along x +
-            clip_factor = (region_coord.mV[VX] - region_width) / delta_pos_abs.mdV[VX];
+            clip_factor = clip_along(region_coord.mV[VX] - region_width, delta_pos_abs.mdV[VX]);
         }
     }
     else if (region_coord.mV[VY] < 0.f)
     {
         // clip along y -
-        clip_factor = -(region_coord.mV[VY] / delta_pos_abs.mdV[VY]);
+        clip_factor = clip_along(-region_coord.mV[VY], delta_pos_abs.mdV[VY]);
     }
     else if (region_coord.mV[VY] > region_width)
     {
         // clip along y +
-        clip_factor = (region_coord.mV[VY] - region_width) / delta_pos_abs.mdV[VY];
+        clip_factor = clip_along(region_coord.mV[VY] - region_width, delta_pos_abs.mdV[VY]);
     }
 
     // clamp to within region dimensions
@@ -466,7 +456,7 @@ bool LLWorld::positionRegionValidGlobal(const LLVector3d &pos_global)
 // Allow objects to go up to their radius underground.
 F32 LLWorld::getMinAllowedZ(LLViewerObject* object, const LLVector3d &global_pos)
 {
-    F32 land_height = resolveLandHeightGlobal(global_pos);
+    F32 land_height = resolveLandHeightGlobal(global_pos, object->getRegion());
     F32 radius = 0.5f * object->getScale().length();
     return land_height - radius;
 }
@@ -509,9 +499,14 @@ F32 LLWorld::resolveLandHeightAgent(const LLVector3 &pos_agent)
 }
 
 
-F32 LLWorld::resolveLandHeightGlobal(const LLVector3d &pos_global)
+F32 LLWorld::resolveLandHeightGlobal(const LLVector3d &pos_global, LLViewerRegion* regionp)
 {
-    LLViewerRegion *regionp = getRegionFromPosGlobal(pos_global);
+    // Every moving object asks this every frame about the ground under its next position, which is
+    // nearly always in the region it is already in. Try that one before walking the region list.
+    if (!regionp || !regionp->pointInRegionGlobal(pos_global))
+    {
+        regionp = getRegionFromPosGlobal(pos_global);
+    }
     if (regionp)
     {
         return regionp->getLand().resolveHeightGlobal(pos_global);
@@ -659,7 +654,6 @@ void LLWorld::updateVisibilities()
             if (LLViewerCamera::getInstance()->AABBInFrustum(bounds[0], bounds[1]))
             {
                 regionp->calculateCameraDistance();
-                regionp->getLand().updatePatchVisibilities(gAgent);
             }
             else
             {
@@ -747,16 +741,62 @@ void LLWorld::updateRegions(F32 max_update_time)
     sample(sNumActiveCachedObjects, mNumOfActiveCachedObjects);
 }
 
-void LLWorld::clearAllVisibleObjects()
+void LLWorld::logObjectCacheInfo() const
 {
-    for (region_list_t::iterator iter = mRegionList.begin();
-         iter != mRegionList.end(); ++iter)
+    U32 total_cached = 0;
+    U32 total_active = 0;
+    U32 total_waiting = 0;
+    U64 total_bytes = 0;
+    U64 total_evicted = 0;
+    U64 total_built = 0;
+    U64 total_missed = 0;
+
+    for (const LLViewerRegion* regionp : mRegionList)
     {
-        //clear all cached visible objects.
-        (*iter)->clearCachedVisibleObjects();
+        U32 cached = 0, active = 0, waiting = 0;
+        U64 bytes = 0, evicted = 0, built = 0;
+        regionp->getObjectCacheFootprint(cached, active, waiting, bytes, evicted, built);
+        const U64 missed = regionp->getRegionCacheMissCount();
+
+        LL_INFOS() << "VOCACHE: " << regionp->getName()
+                   << " cached " << cached
+                   << " active " << active
+                   << " waiting " << waiting
+                   << fmt::format(" {:.2f} MB", (F64)bytes / (1024.0 * 1024.0))
+                   << " evicted " << evicted
+                   << " built " << built
+                   << " missed " << missed
+                   << LL_ENDL;
+
+        total_cached += cached;
+        total_active += active;
+        total_waiting += waiting;
+        total_bytes += bytes;
+        total_evicted += evicted;
+        total_built += built;
+        total_missed += missed;
     }
-    clearHoleWaterObjects();
-    clearEdgeWaterObjects();
+
+    LL_INFOS() << "VOCACHE: " << mRegionList.size() << " regions"
+               << " cached " << total_cached
+               << " active " << total_active
+               << " waiting " << total_waiting
+               << fmt::format(" {:.2f} MB", (F64)total_bytes / (1024.0 * 1024.0))
+               << " evicted " << total_evicted
+               << " built " << total_built
+               << " missed " << total_missed
+               << LL_ENDL;
+
+    // The policy those figures were taken under. evicted, built and missed are
+    // cumulative for each region's life, so a rate is the difference between
+    // two of these lines.
+    LL_INFOS() << "VOCACHE: policy"
+               << fmt::format(" factor {:.2f}", LLVOCacheEntry::sMemoryAdjustFactor)
+               << fmt::format(" near {:.1f}m", LLVOCacheEntry::sNearRadius)
+               << fmt::format(" rear {:.1f}m", LLVOCacheEntry::sRearFarRadius)
+               << fmt::format(" evict {:.1f}m", LLVOCacheEntry::sEvictFarRadius)
+               << " frames " << LLVOCacheEntry::sMinFrameRange
+               << LL_ENDL;
 }
 
 void LLWorld::updateParticles()
@@ -857,17 +897,7 @@ F32 LLWorld::getLandFarClip() const
 void LLWorld::setLandFarClip(const F32 far_clip)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
-    static S32 const rwidth = (S32)REGION_WIDTH_U32;
-    S32 const n1 = (llceil(mLandFarClip) - 1) / rwidth;
-    S32 const n2 = (llceil(far_clip) - 1) / rwidth;
-    bool need_water_objects_update = n1 != n2;
-
     mLandFarClip = far_clip;
-
-    if (need_water_objects_update)
-    {
-        updateWaterObjects();
-    }
 }
 
 // Some region that we're connected to, but not the one we're in, gave us
@@ -884,160 +914,6 @@ void LLWorld::waterHeightRegionInfo(std::string const& sim_name, F32 water_heigh
     }
 }
 
-void LLWorld::clearHoleWaterObjects()
-{
-    for (std::list<LLPointer<LLVOWater> >::iterator iter = mHoleWaterObjects.begin();
-        iter != mHoleWaterObjects.end(); ++iter)
-    {
-        LLVOWater* waterp = (*iter).get();
-        gObjectList.killObject(waterp);
-    }
-    mHoleWaterObjects.clear();
-}
-
-void LLWorld::clearEdgeWaterObjects()
-{
-    for (S32 i = 0; i < EDGE_WATER_OBJECTS_COUNT; i++)
-    {
-        gObjectList.killObject(mEdgeWaterObjects[i]);
-        mEdgeWaterObjects[i] = NULL;
-    }
-}
-
-void LLWorld::updateWaterObjects()
-{
-    if (!gAgent.getRegion())
-    {
-        return;
-    }
-    if (mRegionList.empty())
-    {
-        LL_WARNS() << "No regions!" << LL_ENDL;
-        return;
-    }
-
-    // First, determine the min and max "box" of water objects
-    S32 min_x = 0;
-    S32 min_y = 0;
-    S32 max_x = 0;
-    S32 max_y = 0;
-    U32 region_x, region_y;
-
-    S32 rwidth = 256;
-
-    // We only want to fill in water for stuff that's near us, say, within 256 or 512m
-    S32 range = LLViewerCamera::getInstance()->getFar() > 256.f ? 512 : 256;
-
-    LLViewerRegion* regionp = gAgent.getRegion();
-    from_region_handle(regionp->getHandle(), &region_x, &region_y);
-
-    min_x = (S32)region_x - range;
-    min_y = (S32)region_y - range;
-    max_x = (S32)region_x + range;
-    max_y = (S32)region_y + range;
-
-    for (region_list_t::iterator iter = mRegionList.begin();
-         iter != mRegionList.end(); ++iter)
-    {
-        LLViewerRegion* regionp = *iter;
-        LLVOWater* waterp = regionp->getLand().getWaterObj();
-        if (waterp)
-        {
-            gObjectList.updateActive(waterp);
-        }
-    }
-
-    clearHoleWaterObjects();
-
-    // Use the water height of the region we're on for areas where there is no region
-    F32 water_height = gAgent.getRegion()->getWaterHeight();
-
-    // Now, get a list of the holes
-    S32 x, y;
-    for (x = min_x; x <= max_x; x += rwidth)
-    {
-        for (y = min_y; y <= max_y; y += rwidth)
-        {
-            U64 region_handle = to_region_handle(x, y);
-            if (!getRegionFromHandle(region_handle))
-            {   // No region at that area, so make water
-                LLVOWater* waterp = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_WATER, gAgent.getRegion());
-                waterp->setPositionGlobal(LLVector3d(x + rwidth/2,
-                                                     y + rwidth/2,
-                                                     256.f + water_height));
-                waterp->setScale(LLVector3((F32)rwidth, (F32)rwidth, 512.f));
-                gPipeline.createObject(waterp);
-                mHoleWaterObjects.push_back(waterp);
-            }
-        }
-    }
-
-    // Update edge water objects
-    S32 wx, wy;
-    S32 center_x, center_y;
-    wx = (max_x - min_x) + rwidth;
-    wy = (max_y - min_y) + rwidth;
-    center_x = min_x + (wx >> 1);
-    center_y = min_y + (wy >> 1);
-
-    S32 add_boundary[4] = {
-        (S32)(512 - (max_x - region_x)),
-        (S32)(512 - (max_y - region_y)),
-        (S32)(512 - (region_x - min_x)),
-        (S32)(512 - (region_y - min_y)) };
-
-    S32 dir;
-    for (dir = 0; dir < EDGE_WATER_OBJECTS_COUNT; dir++)
-    {
-        S32 dim[2] = { 0 };
-        switch (gDirAxes[dir][0])
-        {
-        case -1: dim[0] = add_boundary[2]; break;
-        case  0: dim[0] = wx; break;
-        default: dim[0] = add_boundary[0]; break;
-        }
-        switch (gDirAxes[dir][1])
-        {
-        case -1: dim[1] = add_boundary[3]; break;
-        case  0: dim[1] = wy; break;
-        default: dim[1] = add_boundary[1]; break;
-        }
-
-        // Resize and reshape the water objects
-        const S32 water_center_x = center_x + ll_round((wx + dim[0]) * 0.5f * gDirAxes[dir][0]);
-        const S32 water_center_y = center_y + ll_round((wy + dim[1]) * 0.5f * gDirAxes[dir][1]);
-
-        LLVOWater* waterp = mEdgeWaterObjects[dir];
-        if (!waterp || waterp->isDead())
-        {
-            // The edge water objects can be dead because they're attached to the region that the
-            // agent was in when they were originally created.
-            mEdgeWaterObjects[dir] = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_VOID_WATER,
-                                                                                 gAgent.getRegion());
-            waterp = mEdgeWaterObjects[dir];
-            waterp->setIsEdgePatch(true);
-            gPipeline.createObject(waterp);
-        }
-
-        waterp->setRegion(gAgent.getRegion());
-        LLVector3d water_pos(water_center_x, water_center_y, 256.f + water_height) ;
-        LLVector3 water_scale((F32) dim[0], (F32) dim[1], 512.f);
-
-        //stretch out to horizon
-        water_scale.mV[0] += fabsf(2048.f * gDirAxes[dir][0]);
-        water_scale.mV[1] += fabsf(2048.f * gDirAxes[dir][1]);
-
-        water_pos.mdV[0] += 1024.f * gDirAxes[dir][0];
-        water_pos.mdV[1] += 1024.f * gDirAxes[dir][1];
-
-        waterp->setPositionGlobal(water_pos);
-        waterp->setScale(water_scale);
-
-        gObjectList.updateActive(waterp);
-    }
-}
-
-
 void LLWorld::shiftRegions(const LLVector3& offset)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -1048,11 +924,6 @@ void LLWorld::shiftRegions(const LLVector3& offset)
     }
 
     LLViewerPartSim::getInstance()->shift(offset);
-}
-
-LLViewerTexture* LLWorld::getDefaultWaterTexture()
-{
-    return mDefaultWaterTexturep;
 }
 
 void LLWorld::setSpaceTimeUSec(const U64MicrosecondsImplicit space_time_usec)
@@ -1260,6 +1131,7 @@ void send_agent_pause()
     }
 
     gObjectList.mWasPaused = true;
+    gObjectList.mAgentPaused = true;
     LLViewerStats::instance().getRecording().stop();
 }
 
@@ -1320,7 +1192,9 @@ void send_agent_resume()
         gMessageSystem->sendReliable(regionp->getHost());
     }
 
-    // Resume data collection to ignore invalid rates
+    // Resume data collection to ignore invalid rates. The next frame's stats are still skipped, for
+    // the time this pause stalled it.
+    gObjectList.mAgentPaused = false;
     LLViewerStats::instance().getRecording().resume();
 
     LLAppViewer::instance()->resumeMainloopTimeout();

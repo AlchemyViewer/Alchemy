@@ -44,14 +44,13 @@
 #include "llfloaterreg.h"
 #include "llfocusmgr.h"
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llwindow.h"
 #include "llnotificationsutil.h"
 #include "llrender.h"
 #include "lluictrlfactory.h"
 #include "llhelp.h"
 #include "lldockablefloater.h"
-#include "llviewereventrecorder.h"
 
 static LLDefaultChildRegistry::Register<LLButton> r("button");
 
@@ -179,7 +178,7 @@ LLButton::LLButton(const LLButton::Params& p)
     mFadeWhenDisabled(false),
     mForcePressedState(false),
     mDisplayPressedState(p.display_pressed_state),
-    mLastDrawCharsCount(0),
+    mLastDrawBytesCount(0),
     mMouseDownSignal(NULL),
     mMouseUpSignal(NULL),
     mHeldDownSignal(NULL),
@@ -201,7 +200,7 @@ LLButton::LLButton(const LLButton::Params& p)
     }
 
     static LLUICachedControl<S32> llbutton_orig_h_pad ("UIButtonOrigHPad", 0);
-    static Params default_params(LLUICtrlFactory::getDefaultParams<LLButton>());
+    const Params& default_params = LLUICtrlFactory::getDefaultParams<LLButton>();
 
     if (!p.label_selected.isProvided())
     {
@@ -210,7 +209,7 @@ LLButton::LLButton(const LLButton::Params& p)
 
     // Hack to make sure there is space for at least one character
     if (getRect().mRight >= 0 && getRect().getWidth() > 0 &&
-        getRect().getWidth() - (mRightHPad + mLeftHPad) < mGLFont->getWidth(std::string(" ")))
+        getRect().getWidth() - (mRightHPad + mLeftHPad) < mGLFont->getWidth(" "))
     {
         // Use old defaults
         mLeftHPad = llbutton_orig_h_pad;
@@ -335,25 +334,21 @@ void LLButton::onCommit()
 void LLButton::setUnselectedLabelColor(const LLUIColor& c)
 {
     mUnselectedLabelColor = c;
-    mFontBuffer.reset();
 }
 
 void LLButton::setSelectedLabelColor(const LLUIColor& c)
 {
     mSelectedLabelColor = c;
-    mFontBuffer.reset();
 }
 
 void LLButton::setUseEllipses(bool use_ellipses)
 {
     mUseEllipses = use_ellipses;
-    mFontBuffer.reset();
 }
 
 void LLButton::setUseFontColor(bool use_font_color)
 {
     mUseFontColor = use_font_color;
-    mFontBuffer.reset();
 }
 
 boost::signals2::connection LLButton::setClickedCallback(const CommitCallbackParam& cb)
@@ -425,14 +420,20 @@ bool LLButton::postBuild()
 
 void LLButton::onVisibilityChange(bool new_visibility)
 {
-    mFontBuffer.reset();
+    // Going out of sight is worth releasing the captured geometry for. Coming
+    // into sight is not the moment to throw away what is about to be drawn --
+    // and this is called on every visible descendant of whatever changed, so a
+    // floater opening used to reset every button in it.
+    if (!new_visibility)
+    {
+        mFontBuffer.reset();
+    }
     return LLUICtrl::onVisibilityChange(new_visibility);
 }
 
 void LLButton::dirtyRect()
 {
     LLUICtrl::dirtyRect();
-    mFontBuffer.reset();
 }
 
 bool LLButton::handleUnicodeCharHere(llwchar uni_char)
@@ -483,10 +484,12 @@ bool LLButton::handleMouseDown(S32 x, S32 y, MASK mask)
             setFocus(true);
         }
 
+#if !LL_RELEASE_FOR_DOWNLOAD
         if (!mFunctionName.empty())
         {
             LL_DEBUGS("UIUsage") << "calling mouse down function " << mFunctionName << LL_ENDL;
         }
+#endif
 
         /*
          * ATTENTION! This call fires another mouse down callback.
@@ -494,8 +497,6 @@ bool LLButton::handleMouseDown(S32 x, S32 y, MASK mask)
          * by calling LLUICtrl::mMouseDownSignal(x, y, mask);
          */
         LLUICtrl::handleMouseDown(x, y, mask);
-
-        LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
 
         if(mMouseDownSignal) (*mMouseDownSignal)(this, LLSD());
 
@@ -531,8 +532,6 @@ bool LLButton::handleMouseUp(S32 x, S32 y, MASK mask)
          * by calling LLUICtrl::mMouseUpSignal(x, y, mask);
          */
         LLUICtrl::handleMouseUp(x, y, mask);
-        LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
-
         // Regardless of where mouseup occurs, handle callback
         if(mMouseUpSignal) (*mMouseUpSignal)(this, LLSD());
 
@@ -624,11 +623,7 @@ void LLButton::onMouseLeave(S32 x, S32 y, MASK mask)
 
 void LLButton::setHighlight(bool b)
 {
-    if (mNeedsHighlight != b)
-    {
-        mNeedsHighlight = b;
-        mFontBuffer.reset();
-    }
+    mNeedsHighlight = b;
 }
 
 bool LLButton::handleHover(S32 x, S32 y, MASK mask)
@@ -653,7 +648,10 @@ bool LLButton::handleHover(S32 x, S32 y, MASK mask)
         }
 
         // We only handle the click if the click both started and ended within us
-        getWindow()->setCursor(mHoverHandCursor ? UI_CURSOR_HAND : UI_CURSOR_ARROW);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(mHoverHandCursor ? UI_CURSOR_HAND : UI_CURSOR_ARROW);
+        }
         LL_DEBUGS("UserInput") << "hover handled by " << getName() << LL_ENDL;
     }
     return true;
@@ -978,7 +976,7 @@ void LLButton::draw()
     }
 
     // Draw label
-    const LLWString& label = getCurrentLabel();
+    const std::string& label = getCurrentLabel().getString();
     if (!label.empty()) // Unselected label assignments
     {
         S32 x;
@@ -1006,7 +1004,9 @@ void LLButton::draw()
         // LLFontGL::render expects S32 max_chars variable but process in a separate way -1 value.
         // Due to U32_MAX is equal to S32 -1 value I have rest this value for non-ellipses mode.
         // Not sure if it is really needed. Probably S32_MAX should be always passed as max_chars.
-        mLastDrawCharsCount = mFontBuffer.render(mGLFont, label, 0,
+        const LLUIString& label_source = getCurrentLabel();
+        mFontBuffer.setSource(&label_source, label_source.getGeneration());
+        mLastDrawBytesCount = mFontBuffer.renderBytes(mGLFont, label, 0,
             (F32)x,
             (F32)(getRect().getHeight() / 2 + mBottomVPad),
             label_color % alpha,
@@ -1048,7 +1048,6 @@ void LLButton::setToggleState(bool b)
         setFlashing(false); // stop flash state whenever the selected/unselected state if reset
         // Unselected label assignments
         autoResize();
-        mFontBuffer.reset();
     }
 }
 
@@ -1077,13 +1076,11 @@ bool LLButton::toggleState()
 void LLButton::setLabel( const std::string& label )
 {
     mUnselectedLabel = mSelectedLabel = label;
-    mFontBuffer.reset();
 }
 
 void LLButton::setLabel( const LLUIString& label )
 {
     mUnselectedLabel = mSelectedLabel = label;
-    mFontBuffer.reset();
 }
 
 void LLButton::setLabel( const LLStringExplicit& label )
@@ -1097,37 +1094,35 @@ bool LLButton::setLabelArg( const std::string& key, const LLStringExplicit& text
 {
     mUnselectedLabel.setArg(key, text);
     mSelectedLabel.setArg(key, text);
-    mFontBuffer.reset();
     return true;
 }
 
 void LLButton::setLabelUnselected( const LLStringExplicit& label )
 {
     mUnselectedLabel = label;
-    mFontBuffer.reset();
 }
 
 void LLButton::setLabelSelected( const LLStringExplicit& label )
 {
     mSelectedLabel = label;
-    mFontBuffer.reset();
 }
 
 void LLButton::setDisabledLabelColor(const LLUIColor& c)
 {
     mDisabledLabelColor = c;
-    mFontBuffer.reset();
 }
 
 void LLButton::setFont(const LLFontGL* font)
 {
     mGLFont = (font ? font : LLFontGL::getFontSansSerif());
-    mFontBuffer.reset();
 }
 
 bool LLButton::labelIsTruncated() const
 {
-    return getCurrentLabel().getString().size() > mLastDrawCharsCount;
+    // Both sides in bytes. They used to disagree: the draw reported the
+    // characters it had got through, and the label was measured in the UTF-8
+    // it is stored as.
+    return (S32)getCurrentLabel().getString().size() > mLastDrawBytesCount;
 }
 
 const LLUIString& LLButton::getCurrentLabel() const
@@ -1138,7 +1133,6 @@ const LLUIString& LLButton::getCurrentLabel() const
 void LLButton::setDropShadowedText(bool b)
 {
     mDropShadowedText = b;
-    mFontBuffer.reset();
 }
 
 void LLButton::setImageUnselected(LLPointer<LLUIImage> image)
@@ -1157,8 +1151,9 @@ void LLButton::autoResize()
 
 void LLButton::resize(const LLUIString& label)
 {
-    // get label length
-    S32 label_width = mGLFont->getWidth(label.getWString());
+    // get label length, from the cache that holds this label's glyphs
+    mFontBuffer.setSource(&label, label.getGeneration());
+    S32 label_width = llceil(mFontBuffer.getWidthBytes(mGLFont, label.getString(), 0, S32_MAX, false));
     // get current btn length
     S32 btn_width =getRect().getWidth();
     // check if it need resize
@@ -1224,7 +1219,6 @@ void LLButton::setImageDisabledSelected(LLPointer<LLUIImage> image)
     mImageDisabledSelected = image;
     mDisabledImageColor = mImageColor;
     mFadeWhenDisabled = true;
-    mFontBuffer.reset();
 }
 
 void LLButton::setImagePressed(LLPointer<LLUIImage> image)
@@ -1330,7 +1324,7 @@ void LLButton::addImageAttributeToXML(LLXMLNodePtr node,
 void LLButton::toggleFloaterAndSetToggleState(LLUICtrl* ctrl, const LLSD& sdname)
 {
     bool floater_vis = LLFloaterReg::toggleInstance(sdname.asString());
-    LLButton* button = dynamic_cast<LLButton*>(ctrl);
+    LLButton* button = ALViewType::as<LLButton>(ctrl);
     if (button)
         button->setToggleState(floater_vis);
 }
@@ -1339,7 +1333,7 @@ void LLButton::toggleFloaterAndSetToggleState(LLUICtrl* ctrl, const LLSD& sdname
 // Gets called once
 void LLButton::setFloaterToggle(LLUICtrl* ctrl, const LLSD& sdname)
 {
-    LLButton* button = dynamic_cast<LLButton*>(ctrl);
+    LLButton* button = ALViewType::as<LLButton>(ctrl);
     if (!button)
         return;
     // Get the visibility control name for the floater
@@ -1353,7 +1347,7 @@ void LLButton::setFloaterToggle(LLUICtrl* ctrl, const LLSD& sdname)
 // static
 void LLButton::setDockableFloaterToggle(LLUICtrl* ctrl, const LLSD& sdname)
 {
-    LLButton* button = dynamic_cast<LLButton*>(ctrl);
+    LLButton* button = ALViewType::as<LLButton>(ctrl);
     if (!button)
         return;
     // Get the visibility control name for the floater

@@ -31,6 +31,8 @@
 #include "llmutex.h"
 #include "llthread.h"
 
+#include <atomic>
+
 constexpr U32 WATCHDOG_SLEEP_TIME_USEC = 1000000U;
 
 // This class runs the watchdog timing thread.
@@ -54,6 +56,7 @@ public:
         shutdown();
     }
 
+    // Set from the main thread while run() reads them.
     void setSleepTime(long ms) { mSleepMsecs = ms; }
     void stop()
     {
@@ -72,8 +75,8 @@ public:
     }
 
 private:
-    long mSleepMsecs;
-    bool mStopping;
+    std::atomic<long> mSleepMsecs;
+    std::atomic<bool> mStopping;
 };
 
 // LLWatchdogEntry
@@ -122,58 +125,76 @@ LLWatchdogTimeout::~LLWatchdogTimeout()
 
 bool LLWatchdogTimeout::isAlive() const
 {
+    std::lock_guard lock(mMutex);
     return (mTimer.getStarted() && !mTimer.hasExpired());
 }
 
 bool LLWatchdogTimeout::hasExpired() const
 {
+    std::lock_guard lock(mMutex);
     return mTimer.hasExpired();
 }
 
 bool LLWatchdogTimeout::started() const
 {
+    std::lock_guard lock(mMutex);
     return mTimer.getStarted();
 }
 
 void LLWatchdogTimeout::reset()
 {
+    std::lock_guard lock(mMutex);
     mTimer.setTimerExpirySec(mTimeout);
 }
 
 void LLWatchdogTimeout::setTimeout(F32 d)
 {
+    std::lock_guard lock(mMutex);
     mTimeout = d;
 }
 
 void LLWatchdogTimeout::start(std::string_view state)
 {
-    if (mTimeout == 0)
     {
-        LL_WARNS() << "Cant' start watchdog entry - no timeout set" << LL_ENDL;
-        return;
+        std::lock_guard lock(mMutex);
+        if (mTimeout == 0)
+        {
+            LL_WARNS() << "Cant' start watchdog entry - no timeout set" << LL_ENDL;
+            return;
+        }
+        if (!state.empty())
+        {
+            mPingState = state;
+        }
+        mTimer.start();
+        mTimer.setTimerExpirySec(mTimeout); // timer expiration set to 0 by start()
     }
-    // Order of operation is very important here.
     // After LLWatchdogEntry::start() is called
     // LLWatchdogTimeout::isAlive() will be called asynchronously.
-    ping(state);
-    mTimer.start();
-    mTimer.setTimerExpirySec(mTimeout); // timer expiration set to 0 by start()
     LLWatchdogEntry::start();
 }
 
 void LLWatchdogTimeout::stop()
 {
     LLWatchdogEntry::stop();
+    std::lock_guard lock(mMutex);
     mTimer.stop();
 }
 
 void LLWatchdogTimeout::ping(std::string_view state)
 {
+    std::lock_guard lock(mMutex);
     if (!state.empty())
     {
         mPingState = state;
     }
-    reset();
+    mTimer.setTimerExpirySec(mTimeout);
+}
+
+std::string LLWatchdogTimeout::getLastState() const
+{
+    std::lock_guard lock(mMutex);
+    return mPingState;
 }
 
 // LLWatchdog

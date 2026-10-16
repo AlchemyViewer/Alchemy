@@ -37,10 +37,12 @@
  * It gets icon id by group id from the LLGroupMgr.
  * If group data is not loaded yet it subscribes as LLGroupMgr observer and requests necessary data.
  */
-class LLGroupIconCtrl
+class LLGroupIconCtrl final
     : public LLIconCtrl, public LLGroupMgrObserver
 {
 public:
+    AL_VIEW_TYPE(LLGroupIconCtrl, LLIconCtrl);
+
     struct Params : public LLInitParam::Block<Params, LLIconCtrl::Params>
     {
         Optional <LLUUID> group_id;
@@ -64,7 +66,7 @@ public:
      *
      * @params value - if LLUUID - it is processed as group id otherwise base method is called.
      */
-    virtual void setValue(const LLSD& value);
+    virtual void setValue(const LLSD& value) override;
 
     /**
      * Sets icon_id as icon value directly. Avoids LLGroupMgr cache checks for group id
@@ -75,7 +77,7 @@ public:
     void setIconId(const LLUUID& icon_id);
 
     // LLGroupMgrObserver observer trigger
-    virtual void changed(LLGroupChange gc);
+    virtual void changed(LLGroupChange gc) override;
 
     const std::string&  getGroupName() const { return mGroupName; }
     void setDrawTooltip(bool value) { mDrawTooltip = value;}

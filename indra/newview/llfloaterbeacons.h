@@ -30,11 +30,12 @@
 
 #include "llfloater.h"
 
-class LLFloaterBeacons : public LLFloater
+class LLFloaterBeacons final : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterBeacons, LLFloater);
 
     bool postBuild() override;
 

@@ -60,8 +60,6 @@ class LLVolumeOctree;
 #include "llalignedarray.h"
 #include "llrigginginfo.h"
 
-#include <array>
-
 //============================================================================
 
 constexpr S32 MIN_DETAIL_FACES = 6;
@@ -832,29 +830,18 @@ public:
 class LLVolumeFace
 {
 public:
+    // A vertex as the importers and the optimizer pass it around: position,
+    // normal and texture coordinate in one block, so a vector of them is one
+    // allocation.
     class VertexData
     {
-        enum
-        {
-            POSITION = 0,
-            NORMAL = 1
-        };
-
-    private:
-        void init();
     public:
-        VertexData();
-        VertexData(const VertexData& rhs);
-        const VertexData& operator=(const VertexData& rhs);
-
-        ~VertexData();
-        LLVector4a& getPosition();
-        LLVector4a& getNormal();
-        const LLVector4a& getPosition() const;
-        const LLVector4a& getNormal() const;
-        void setPosition(const LLVector4a& pos);
-        void setNormal(const LLVector4a& norm);
-
+        LLVector4a& getPosition() { return mPosition; }
+        LLVector4a& getNormal() { return mNormal; }
+        const LLVector4a& getPosition() const { return mPosition; }
+        const LLVector4a& getNormal() const { return mNormal; }
+        void setPosition(const LLVector4a& pos) { mPosition = pos; }
+        void setNormal(const LLVector4a& norm) { mNormal = norm; }
 
         LLVector2 mTexCoord;
 
@@ -863,7 +850,8 @@ public:
         bool compareNormal(const VertexData& rhs, F32 angle_cutoff) const;
 
     private:
-        LLVector4a* mData;
+        LLVector4a mPosition;
+        LLVector4a mNormal;
     };
 
     LLVolumeFace();
@@ -919,15 +907,6 @@ public:
     void destroyOctree();
     // Get a reference to the octree, which may be null
     const LLVolumeOctree* getOctree() const;
-
-    // Part of silhouette generation (used by selection outlines)
-    // Populates the provided edge array with numbers corresponding to
-    // *partial* logic of whether a particular index should be rendered
-    // as a silhouette edge. -1 indicates the index should be rendered as a
-    // silhouette edge. See generateSilhouetteVertices for the full logic.
-    // Silhouette edges can only be generated for some types of prims. If a
-    // silhouette edge cannot be generated, the edge array will be left empty.
-    void generateSilhouetteEdge(const LLVolume* volume, std::vector<S32>& edge) const;
 
     enum
     {
@@ -1043,7 +1022,7 @@ public:
     const LLVector4a& getMeshPt(const U32 i) const          { return mMesh[i]; }
 
 
-    void setDirty();
+    void setDirty() { mPathp->setDirty(); mProfilep->setDirty(); }
 
     void regen();
     void genTangents(S32 face);
@@ -1060,13 +1039,6 @@ public:
     static void getLoDTriangleCounts(const LLVolumeParams& params, S32* counts);
 
     S32 getNumTriangles(S32* vcount = nullptr) const;
-
-    void generateSilhouetteVertices(std::vector<LLVector3> &vertices,
-                                    std::vector<LLVector3> &normals,
-                                    const LLVector3& view_vec,
-                                    const LLMatrix4& mat,
-                                    const LLMatrix3& norm_mat,
-                                    S32 face_index);
 
     //get the face index of the face that intersects with the given line segment at the point
     //closest to start.  Moves end to the point of intersection.  Returns -1 if no intersection.
@@ -1133,11 +1105,6 @@ public:
     F32 mSurfaceArea; //unscaled surface area
     bool mIsMeshAssetLoaded;
     bool mIsMeshAssetUnavaliable;
-
-    // Cache for sculpt geometry validation results
-    static constexpr S32 SCULPT_CACHE_SIZE = 6;  // 0 to 5 inclusive
-    enum class LLSculptValidationState : S8 { Unvalidated, Valid, Invalid };
-    std::array<LLSculptValidationState, SCULPT_CACHE_SIZE> mSculptValidationCache;
 
     const LLVolumeParams mParams;
     LLPath *mPathp;

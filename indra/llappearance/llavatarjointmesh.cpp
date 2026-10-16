@@ -28,7 +28,6 @@
 // Header Files
 //-----------------------------------------------------------------------------
 #include "linden_common.h"
-#include "llfasttimer.h"
 #include "llrender.h"
 
 #include "llavatarjointmesh.h"
@@ -155,7 +154,7 @@ LLAvatarJointMesh::LLAvatarJointMesh()
     mFace = NULL;
 
     mMeshID = 0;
-    mUpdateXform = false;
+    setUpdateXform(false);
 
     mValid = false;
 
@@ -357,19 +356,19 @@ void LLAvatarJointMesh::setupJoint(LLAvatarJoint* current_joint)
         // additional extended-skeleton joints lie between this joint
         // and the original parent.
         LLJoint *ancestor = getBaseSkeletonAncestor(current_joint);
-        if(jrd.size() && jrd.back()->mWorldMatrix == &ancestor->getWorldMatrix())
+        if(jrd.size() && jrd.back()->mJoint == ancestor)
         {
             // ...then just add ourselves
             LLAvatarJoint* jointp = js.mJoint;
-            jrd.push_back(new LLJointRenderData(&jointp->getWorldMatrix(), &js));
+            jrd.push_back(new LLJointRenderData(jointp, &js));
             LL_DEBUGS("Avatar") << "add joint[" << (jrd.size()-1) << "] = " << js.mJoint->getName() << LL_ENDL;
         }
         // otherwise add our ancestor and ourselves
         else
         {
-            jrd.push_back(new LLJointRenderData(&ancestor->getWorldMatrix(), NULL));
+            jrd.push_back(new LLJointRenderData(ancestor, NULL));
             LL_DEBUGS("Avatar") << "add2 ancestor joint[" << (jrd.size()-1) << "] = " << ancestor->getName() << LL_ENDL;
-            jrd.push_back(new LLJointRenderData(&current_joint->getWorldMatrix(), &js));
+            jrd.push_back(new LLJointRenderData(current_joint, &js));
             LL_DEBUGS("Avatar") << "add2 joint[" << (jrd.size()-1) << "] = " << current_joint->getName() << LL_ENDL;
         }
     }

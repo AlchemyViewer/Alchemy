@@ -383,8 +383,12 @@ bool LLMultiFloater::handleKeyHere(KEY key, MASK mask)
 
 bool LLMultiFloater::addChild(LLView* child, S32 tab_group)
 {
-    LLTabContainer* tab_container = dynamic_cast<LLTabContainer*>(child);
-    if (tab_container)
+    if (!child)
+    {
+        return false;
+    }
+
+    if (LLTabContainer* tab_container = child->as<LLTabContainer>())
     {
         // store pointer to tab container
         setTabContainer(tab_container);
@@ -397,7 +401,8 @@ bool LLMultiFloater::addChild(LLView* child, S32 tab_group)
 LLFloater* LLMultiFloater::getActiveFloater()
 {
     // Tabs may host plain LLPanels; only return one if it's actually a floater.
-    return dynamic_cast<LLFloater*>(mTabContainer->getCurrentPanel());
+    LLPanel* panelp = mTabContainer->getCurrentPanel();
+    return panelp ? panelp->as<LLFloater>() : nullptr;
 }
 
 S32 LLMultiFloater::getFloaterCount() const
@@ -439,8 +444,7 @@ void LLMultiFloater::setFloaterFlashing(LLFloater* floaterp, bool flashing)
 
 void LLMultiFloater::onTabSelected()
 {
-    LLFloater* floaterp = dynamic_cast<LLFloater*>(mTabContainer->getCurrentPanel());
-    if (floaterp)
+    if (LLFloater* floaterp = getActiveFloater())
     {
         tabOpen(floaterp, true);
     }

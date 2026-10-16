@@ -68,14 +68,31 @@ public:
     virtual bool    wantsKeyUpKeyDown() const;
     virtual bool    wantsReturnKey() const;
 
+    // The element as a view, or null for one that is not.
+    virtual LLView* asView() { return nullptr; }
+
     virtual void    onTopLost();    // called when registered as top ctrl and user clicks elsewhere
 protected:
     virtual void    onFocusReceived();
     virtual void    onFocusLost();
-    focus_signal_t*  mFocusLostCallback;
-    focus_signal_t*  mFocusReceivedCallback;
-    focus_signal_t*  mFocusChangedCallback;
-    focus_signal_t*  mTopLostCallback;
+
+private:
+    // Four signals of which a view almost always has none. Focus callbacks are
+    // set on a handful of controls, and every LLView in the viewer inherits
+    // this class -- an open inventory holds two hundred thousand of them. The
+    // block is allocated by whichever callback is connected first.
+    struct FocusCallbacks
+    {
+        focus_signal_t* mFocusLost { nullptr };
+        focus_signal_t* mFocusReceived { nullptr };
+        focus_signal_t* mFocusChanged { nullptr };
+        focus_signal_t* mTopLost { nullptr };
+
+        ~FocusCallbacks();
+    };
+
+    FocusCallbacks* mFocusCallbacks { nullptr };
+    FocusCallbacks& focusCallbacks();
 };
 
 
@@ -88,12 +105,17 @@ public:
     // Mouse Captor
     void            setMouseCapture(LLMouseHandler* new_captor);    // new_captor = NULL to release the mouse.
     LLMouseHandler* getMouseCapture() const { return mMouseCaptor; }
+    LLView*         getMouseCaptureView() const { return mMouseCaptorView; }
     void            removeMouseCaptureWithoutCallback( const LLMouseHandler* captor );
     bool            childHasMouseCapture( const LLView* parent ) const;
 
     // Keyboard Focus
     void            setKeyboardFocus(LLFocusableElement* new_focus, bool lock = false, bool keystrokes_only = false);       // new_focus = NULL to release the focus.
     LLFocusableElement*     getKeyboardFocus() const { return mKeyboardFocus; }
+    // The focused element as a view, or null when it is not one.
+    LLView*         getKeyboardFocusView() const { return mKeyboardFocusView; }
+    // As a control, or null when it is not one.
+    LLUICtrl*       getKeyboardFocusCtrl() const;
     LLFocusableElement*     getLastKeyboardFocus() const { return mLastKeyboardFocus; }
     bool            childHasKeyboardFocus( const LLView* parent ) const;
     void            removeKeyboardFocusWithoutCallback( const LLFocusableElement* focus );
@@ -125,7 +147,7 @@ public:
     void            releaseFocusIfNeeded( LLView* top_view );
     void            lockFocus();
     void            unlockFocus();
-    bool            focusLocked() const { return mLockedView != NULL; }
+    bool            focusLocked() const { return mLockedView != nullptr; }
 
     bool            keyboardFocusHasAccelerators() const;
 
@@ -136,9 +158,14 @@ private:
 
     // Mouse Captor
     LLMouseHandler*     mMouseCaptor;               // Mouse events are premptively routed to this object
+    LLView*             mMouseCaptorView;           // the same object as a view, or null when it is not one
 
     // Keyboard Focus
+    // The view is kept beside the element because every control that draws
+    // asks whether it has focus, and reaching the view from the element is a
+    // cross-cast. Both are written together, in the two places either is.
     LLFocusableElement* mKeyboardFocus;             // Keyboard events are preemptively routed to this object
+    LLView*             mKeyboardFocusView;         // the same object as a view, or null when it is not one
     LLFocusableElement* mLastKeyboardFocus;         // who last had focus
     LLFocusableElement* mDefaultKeyboardFocus;
     bool                mKeystrokesOnly;

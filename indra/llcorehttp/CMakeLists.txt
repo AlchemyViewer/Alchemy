@@ -1,9 +1,10 @@
 # -*- cmake -*-
 
-add_library (llcorehttp STATIC)
+add_library(llcorehttp STATIC)
 
-target_sources(llcorehttp
-    PRIVATE
+target_sources(
+  llcorehttp
+  PRIVATE
     bufferarray.cpp
     bufferstream.cpp
     httpcommon.cpp
@@ -28,53 +29,45 @@ target_sources(llcorehttp
     _httprequestqueue.cpp
     _httpservice.cpp
     _refcounted.cpp
-    )
+)
 
-target_sources(llcorehttp
-    PUBLIC
+target_sources(
+  llcorehttp
+  PUBLIC
     FILE_SET HEADERS
-    FILES
-    bufferarray.h
-    bufferstream.h
-    httpcommon.h
-    llhttpconstants.h
-    httphandler.h
-    httpheaders.h
-    httpoptions.h
-    httprequest.h
-    httpresponse.h
-    httpstats.h
-    llwebsocketmgr.h
-    lljsonrpcws.h
-    _httpinternal.h
-    _httplibcurl.h
-    _httpopcancel.h
-    _httpoperation.h
-    _httpoprequest.h
-    _httpopsetget.h
-    _httpopsetpriority.h
-    _httppolicy.h
-    _httppolicyclass.h
-    _httppolicyglobal.h
-    _httpreadyqueue.h
-    _httpreplyqueue.h
-    _httprequestqueue.h
-    _httpservice.h
-    _mutex.h
-    _refcounted.h
-    _thread.h
-    )
+      FILES
+        bufferarray.h
+        bufferstream.h
+        httpcommon.h
+        llhttpconstants.h
+        httphandler.h
+        httpheaders.h
+        httpoptions.h
+        httprequest.h
+        httpresponse.h
+        httpstats.h
+        llwebsocketmgr.h
+        lljsonrpcws.h
+        _httpinternal.h
+        _httplibcurl.h
+        _httpopcancel.h
+        _httpoperation.h
+        _httpoprequest.h
+        _httpopsetget.h
+        _httpopsetpriority.h
+        _httppolicy.h
+        _httppolicyclass.h
+        _httppolicyglobal.h
+        _httpreadyqueue.h
+        _httpreplyqueue.h
+        _httprequestqueue.h
+        _httpservice.h
+        _mutex.h
+        _refcounted.h
+        _thread.h
+)
 
-target_link_libraries(
-        llcorehttp
-        PUBLIC
-        llmath
-        llcommon
-        ll::libcurl
-        ll::openssl
-        ll::websocketpp
-  )
-target_include_directories( llcorehttp INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(llcorehttp PRIVATE al::flags PUBLIC llmath llcommon ll::libcurl ll::openssl)
 # llmessage depends on llcorehttp, yet llcorehttp also depends on llmessage (at least for includes).
 # Cannot/Should not use target_link_libraries here to add llmessage to the dependencies, as that would
 # lead to circular dependencies (or in case of cmake, the first project declaring it's dependencies wins)
@@ -82,73 +75,49 @@ target_include_directories(llcorehttp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../llm
 target_precompile_headers(llcorehttp REUSE_FROM llprecompiled)
 
 # tests
-option(LLCOREHTTP_TESTS "Build and run llcorehttp integration tests specifically" ON)
-if (BUILD_TESTING AND LLCOREHTTP_TESTS)
-  SET(llcorehttp_TEST_SOURCE_FILES
-      )
+if(AL_BUILD_TESTS)
+  # The state guard's checks on what llcorehttp keeps for the process, for
+  # every test binary that links it.
+  add_library(llcorehttp_test_checks OBJECT tests/llcorehttp_test_checks.cpp)
+  target_link_libraries(llcorehttp_test_checks PRIVATE al::flags al_test_support llcorehttp llmessage)
+  set_target_properties(llcorehttp_test_checks PROPERTIES FOLDER "Tests/llcorehttp")
 
-  set(llcorehttp_TEST_HEADER_FILES
-      tests/test_httpstatus.hpp
-      tests/test_refcounted.hpp
-      tests/test_httpoperation.hpp
-      tests/test_httprequest.hpp
-      tests/test_httprequestqueue.hpp
-      tests/test_httpheaders.hpp
-      tests/test_bufferarray.hpp
-      tests/test_bufferstream.hpp
-      tests/test_jsonrpcws.hpp
-      )
-
-  list(APPEND llcorehttp_TEST_SOURCE_FILES ${llcorehttp_TEST_HEADER_FILES})
-
-  # LL_ADD_PROJECT_UNIT_TESTS(llcorehttp "${llcorehttp_TEST_SOURCE_FILES}")
-
-  #    set(TEST_DEBUG on)
-  set(test_libs
-          llcorehttp
-          llmessage
-          llcommon
-      )
-  set(test_project llcorehttp)
-
-  # If http_proxy is in the current environment (e.g. to fetch s3-proxy
-  # autobuild packages), suppress it for this integration test: it screws up
-  # the tests.
-  LL_ADD_INTEGRATION_TEST(llcorehttp
-                          "${llcorehttp_TEST_SOURCE_FILES}"
-                          "${test_libs}"
-                          "${test_project}"
-                          "-Dhttp_proxy"
-                          ${Python3_EXECUTABLE}
-                          "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
-                          )
+  # The suites run under a Python peer that serves the requests they make.
+  # An http_proxy in the environment would put a proxy between the two, so
+  # the run clears it.
+  al_add_test_binary(
+    llcorehttp_tests
+    PROJECT llcorehttp
+    SOURCES
+      tests/bufferarray_test.cpp
+      tests/bufferstream_test.cpp
+      tests/httpheaders_test.cpp
+      tests/httpoperation_test.cpp
+      tests/httprequest_test.cpp
+      tests/httprequestqueue_test.cpp
+      tests/httpstatus_test.cpp
+      tests/jsonrpcws_test.cpp
+      tests/refcounted_test.cpp
+      tests/websocketmgr_test.cpp
+    LIBRARIES llcorehttp llmessage llcommon
+    SUPPORT llcorehttp_test_checks
+    PYTHON
+    LAUNCHER ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
+    ENVIRONMENT "http_proxy="
+  )
 
   #
   # Example Programs
   #
-  SET(llcorehttp_EXAMPLE_SOURCE_FILES
-      examples/http_texture_load.cpp
-      )
+  add_executable(http_texture_load examples/http_texture_load.cpp)
+  set_target_properties(
+    http_texture_load
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}" FOLDER "Tests/llcorehttp"
+  )
 
-  set(example_libs
-          llcorehttp
-          llmessage
-          llcommon
-      )
+  target_link_libraries(http_texture_load PRIVATE al::flags llcorehttp llmessage llcommon)
 
-  add_executable(http_texture_load
-                 ${llcorehttp_EXAMPLE_SOURCE_FILES}
-                 )
-  set_target_properties(http_texture_load
-                        PROPERTIES
-                        RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}"
-                        FOLDER "Tests/llcorehttp"
-                        )
-
-  target_link_libraries(http_texture_load ${example_libs})
-
-  if (WINDOWS)
-    target_link_options(http_texture_load PRIVATE $<$<CONFIG:Release>:/DEBUG:NONE>)
+  if(WINDOWS)
+    set_target_properties(http_texture_load PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)
   endif()
-
-endif (BUILD_TESTING AND LLCOREHTTP_TESTS)
+endif()

@@ -32,6 +32,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/unordered_map.hpp>
+
 #include "llassettype.h"
 #include "llfoldertype.h"
 #include "llframetimer.h"

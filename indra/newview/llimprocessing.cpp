@@ -43,7 +43,7 @@
 #include "llnotificationsutil.h"
 #include "llnotificationmanager.h"
 #include "llpanelgroup.h"
-#include "llregex.h"
+#include "alregex.h"
 #include "llregionhandle.h"
 #include "llsdserialize.h"
 #include "llslurl.h"
@@ -141,20 +141,20 @@ static std::string clean_name_from_im(const std::string& name, EInstantMessage t
 static std::string clean_name_from_task_im(const std::string& msg,
     bool from_group)
 {
-    boost::smatch match;
-    static const boost::regex returned_exp(
+    ALRegexMatch match;
+    static const ALRegex returned_exp(
         "(.*been returned to your inventory lost and found folder by )(.+)( (from|near).*)");
-    if (ll_regex_match(msg, match, returned_exp))
+    if (returned_exp.match(msg, &match))
     {
         // match objects are 1-based for groups
-        std::string final = match[1].str();
-        std::string name = match[2].str();
+        std::string final = match.str(1);
+        std::string name = match.str(2);
         // Don't try to clean up group names
         if (!from_group)
         {
             final += LLCacheName::buildUsername(name);
         }
-        final += match[3].str();
+        final += match.str(3);
         return final;
     }
     return msg;

@@ -154,7 +154,7 @@ namespace LLInitParam
         }
     }
 
-    void BlockDescriptor::addParam(param_handle_t handle,
+    ParamDescriptor* BlockDescriptor::addParam(param_handle_t handle,
                                    ParamDescriptor::merge_func_t merge_func,
                                    ParamDescriptor::deserialize_func_t deserialize_func,
                                    ParamDescriptor::serialize_func_t serialize_func,
@@ -188,6 +188,8 @@ namespace LLInitParam
         {
             mValidationList.emplace_back(handle, validation_func);
         }
+
+        return param;
     }
 
     static std::vector<BlockDescriptor*>& block_descriptor_registry()
@@ -313,6 +315,15 @@ namespace LLInitParam
             << "  descriptor objects     : ~" << descriptor_bytes << " bytes\n"
             << "  approximate total      : ~"
             << (named_node_bytes + list_node_bytes + descriptor_bytes) << " bytes\n";
+
+        // The type each descriptor was declared with, which a developer build
+        // keeps beside the table for the schema to read and a shipped one
+        // does not keep at all.
+        if (const size_t recorded = ALParamTypes::count())
+        {
+            out << "  recorded param types   : " << recorded
+                << ", ~" << ALParamTypes::bytes() << " bytes\n";
+        }
 
         // A name declared at two levels of one chain resolves to the nearer,
         // which is how Ignored swallows an attribute a base would otherwise

@@ -36,11 +36,13 @@ struct LLEmojiDescriptor;
 struct LLEmojiSearchResult;
 struct LLEmojiVariant;
 
-class LLFloaterEmojiPicker : public LLFloater
+class LLFloaterEmojiPicker final : public LLFloater
 {
     using super = LLFloater;
 
 public:
+    AL_VIEW_TYPE(LLFloaterEmojiPicker, LLFloater);
+
     // The callback function will be called with an emoji char.
     typedef std::function<void(llwchar)> pick_callback_t;
     typedef std::function<void ()> close_callback_t;
@@ -59,8 +61,8 @@ public:
 
     void hideFloater() const;
 
-    static std::list<LLWString>& getRecentlyUsed();
-    static void onEmojiUsed(const LLWString& emoji);
+    static std::list<std::string>& getRecentlyUsed();
+    static void onEmojiUsed(const std::string& emoji);
 
     static void loadState();
     static void saveState();
@@ -70,7 +72,7 @@ private:
     void fillGroups();
     void fillCategoryFrequentlyUsed(std::map<std::string, std::vector<LLEmojiSearchResult>>& cats);
     void fillGroupEmojis(std::map<std::string, std::vector<LLEmojiSearchResult>>& cats, U32 index);
-    void createGroupButton(LLButton::Params& params, const LLRect& rect, const LLWString& emoji);
+    void createGroupButton(LLButton::Params& params, const LLRect& rect, const std::string& emoji);
     void resizeGroupButtons();
     void selectEmojiGroup(U32 index);
     void fillEmojis(bool fromResize = false);
@@ -90,7 +92,7 @@ private:
     void refreshToneStripHighlight();
     void showVariantFlyout(LLEmojiGridIcon* baseIcon);
     void dismissVariantFlyout();
-    void commitVariant(const LLWString& sequence);
+    void commitVariant(const std::string& sequence);
     // Keyboard nav over the 2D flyout grid. Returns true when the
     // event was consumed.
     bool moveFlyoutFocus(S32 dRow, S32 dCol);

@@ -27,5 +27,4 @@
 		24:00 AM PST
 	</text>
 	<button name="media_toggle_btn" tool_tip="Tüm Ortam Öğelerini Başlat/Durdur (Müzik, Video, Web sayfaları)"/>
-	<button name="volume_btn" tool_tip="Küresel Ses Kontrolü"/>
 </panel>

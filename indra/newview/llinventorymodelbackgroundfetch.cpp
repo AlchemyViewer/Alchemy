@@ -579,9 +579,13 @@ void LLInventoryModelBackgroundFetch::incrFetchFolderCount(S32 fetching)
 {
     incrFetchCount(fetching);
     mFetchFolderCount += fetching;
-    if (mFetchCount < 0)
+    // Clamped on its own count, and named apart in the warning. This is the
+    // one isFolderFetchProcessingComplete reads, and it treats anything at or
+    // below zero as nothing outstanding, so a folder response arriving without
+    // a request behind it must not be allowed to push it under.
+    if (mFetchFolderCount < 0)
     {
-        LL_WARNS_ONCE(LOG_INV) << "Inventory fetch count fell below zero (0)." << LL_ENDL;
+        LL_WARNS_ONCE(LOG_INV) << "Inventory folder fetch count fell below zero (0)." << LL_ENDL;
         mFetchFolderCount = 0;
     }
 }

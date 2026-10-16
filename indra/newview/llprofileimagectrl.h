@@ -30,9 +30,11 @@
 #include "lliconctrl.h"
 #include "llviewertexture.h"
 
-class LLProfileImageCtrl: public LLIconCtrl
+class LLProfileImageCtrl final: public LLIconCtrl
 {
 public:
+    AL_VIEW_TYPE(LLProfileImageCtrl, LLIconCtrl);
+
     struct Params: public LLInitParam::Block<Params, LLIconCtrl::Params>
     {
     };

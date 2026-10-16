@@ -46,16 +46,17 @@ class LLFloaterInspect final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterInspect, LLFloater);
 
 //  static void show(void* ignored = NULL);
-    void onOpen(const LLSD& key);
-    virtual bool postBuild();
+    void onOpen(const LLSD& key) override;
+    virtual bool postBuild() override;
     void dirty();
     LLUUID getSelectedUUID();
-    virtual void draw();
-    virtual void refresh();
+    virtual void draw() override;
+    virtual void refresh() override;
 //  static bool isVisible();
-    virtual void onFocusReceived();
+    virtual void onFocusReceived() override;
     void onClickCreatorProfile();
     void onClickOwnerProfile();
     void onSelectObject();

@@ -79,7 +79,6 @@ protected:
 
 class alignas(16) LLDriverParam : public LLViewerVisualParam
 {
-    LL_ALIGN_NEW
 private:
     // Hide the default constructor.  Force construction with LLAvatarAppearance.
     LLDriverParam() {}

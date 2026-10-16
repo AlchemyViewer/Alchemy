@@ -38,7 +38,7 @@ class LLProgressBar;
 class LLViewerTexture;
 class LLTextBox;
 
-class LLProgressView :
+class LLProgressView final :
     public LLPanel,
     public LLViewerMediaObserver
 
@@ -46,20 +46,22 @@ class LLProgressView :
     LOG_CLASS(LLProgressView);
 
 public:
+    AL_VIEW_TYPE(LLProgressView, LLPanel);
+
     LLProgressView();
     virtual ~LLProgressView();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
     void drawStartTexture(F32 alpha);
 
-    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
-    /*virtual*/ void setVisible(bool visible);
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleKeyHere(KEY key, MASK mask) override;
+    /*virtual*/ void setVisible(bool visible) override;
 
     // inherited from LLViewerMediaObserver
-    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event);
+    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
 
     void setText(const std::string& text);
     void setPercent(const F32 percent);

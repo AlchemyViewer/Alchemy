@@ -35,12 +35,13 @@ class LLLineEditor;
 class LLTextEditor;
 class LLLandmarksInventoryObserver;
 
-class LLFloaterCreateLandmark:
+class LLFloaterCreateLandmark final:
     public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterCreateLandmark, LLFloater);
 
     LLFloaterCreateLandmark(const LLSD& key);
     ~LLFloaterCreateLandmark();

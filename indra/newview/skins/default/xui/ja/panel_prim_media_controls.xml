@@ -61,6 +61,7 @@
 					<icon name="media_whitelist_flag" tool_tip="ホワイトリスト有効"/>
 				</layout_panel>
 			</layout_stack>
+			<icon name="media_secure_lock_flag" tool_tip="セキュアブラウジング"/>
 		</layout_panel>
 		<layout_panel name="media_play_position">
 			<slider_bar name="media_play_slider" tool_tip="ムービー再生進行"/>
@@ -85,5 +86,4 @@
 			<button name="new_window_btn" tool_tip="ＵＲＬをブラウザで開く"/>
 		</layout_panel>
 	</layout_stack>
-	<icon name="media_secure_lock_flag" tool_tip="セキュアブラウジング"/>
 </panel>

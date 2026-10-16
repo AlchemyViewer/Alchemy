@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Joystick" title="OYUN ÇUBUĞU YAPILANDIRMA">
-	<floater.string name="NoDevice">
-		cihaz tespit edilmedi
-	</floater.string>
-	<check_box label="Oyun Çub. Etkşt:" name="enable_joystick"/>
 	<spinner label="X Eks. Haritalama" name="JoystickAxis1"/>
 	<spinner label="Y Eks. Haritalama" name="JoystickAxis2"/>
 	<spinner label="Z Eks. Haritalama" name="JoystickAxis0"/>

@@ -31,18 +31,20 @@
 
 class LLFlatListView;
 
-class LLPanelGroupExperiences : public LLPanelGroupTab
+class LLPanelGroupExperiences final : public LLPanelGroupTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupExperiences, LLPanelGroupTab);
+
     LLPanelGroupExperiences();
     virtual ~LLPanelGroupExperiences();
 
     // LLPanelGroupTab
-    virtual void activate();
+    virtual void activate() override;
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
-    virtual void setGroupID(const LLUUID& id);
+    virtual void setGroupID(const LLUUID& id) override;
 
     void setExperienceList(const LLSD& experiences);
 

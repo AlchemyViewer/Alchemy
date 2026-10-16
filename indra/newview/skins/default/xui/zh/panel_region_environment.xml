@@ -36,24 +36,10 @@
 				...
 			</text>
 		</layout_panel>
+	</layout_stack>
+	<layout_stack name="ls_main">
 		<layout_panel name="pnl_environment_config">
-			<layout_stack>
-				<layout_panel name="pnl_environment_config">
-					<layout_stack>
-						<layout_panel name="pnl_environment_current">
-							<button label="[USEDEFAULT]" name="btn_usedefault"/>
-							<button label="使用收納區" name="btn_select_inventory"/>
-							<button label="自訂" name="btn_edit"/>
-							<check_box label="地段所有人可強制設定環境" name="chk_allow_override"/>
-						</layout_panel>
-						<layout_panel name="pnl_environment_length">
-							<text name="lbl_apparent_time">
-								[HH]:[MM][AP] ([PRC]%)
-							</text>
-						</layout_panel>
-						<layout_panel name="pnl_environment_buttons"/>
-					</layout_stack>
-				</layout_panel>
+			<layout_stack name="ls_environment_config">
 				<layout_panel name="pnl_environment_altitudes">
 					<panel name="pnl_alt1">
 						<text name="txt_alt1">
@@ -109,6 +95,23 @@
 						<settings_drop_target name="sdt_water" tool_tip="將一個設定從收納區拖曳到這個目標箱框，便可把它選定為目前的水文。"/>
 					</panel>
 					<button label="重設" name="btn_rst_altitudes" tool_tip="重設為預設高度"/>
+				</layout_panel>
+				<layout_panel name="pnl_environment_day">
+					<layout_stack>
+						<layout_panel name="pnl_environment_length">
+							<text name="lbl_apparent_time">
+								[HH]:[MM][AP] ([PRC]%)
+							</text>
+						</layout_panel>
+					</layout_stack>
+					<layout_stack name="ls_environment_current">
+						<layout_panel name="pnl_environment_current">
+							<button label="[USEDEFAULT]" name="btn_usedefault"/>
+							<button label="使用收納區" name="btn_select_inventory"/>
+							<button label="自訂" name="btn_edit"/>
+							<check_box label="地段所有人可強制設定環境" name="chk_allow_override"/>
+						</layout_panel>
+					</layout_stack>
 				</layout_panel>
 			</layout_stack>
 		</layout_panel>

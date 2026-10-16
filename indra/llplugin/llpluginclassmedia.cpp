@@ -1345,6 +1345,10 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
             mHistoryBackAvailable = message.getValueBoolean("history_back_available");
             mHistoryForwardAvailable = message.getValueBoolean("history_forward_available");
             mMediaName = message.getValue("name");
+            if (message.hasValue("metadata"))
+            {
+                mMediaMetadata = message.getValueLLSD("metadata");
+            }
             mediaEvent(LLPluginClassMediaOwner::MEDIA_EVENT_NAME_CHANGED);
         }
         else if(message_name == "pick_file")

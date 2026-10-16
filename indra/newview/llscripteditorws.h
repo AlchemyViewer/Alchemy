@@ -27,6 +27,7 @@
 #pragma once
 
 #include "lljsonrpcws.h"
+#include "alscripttypes.h"
 #include "llpublishedobjectmgr.h"
 #include "llsd.h"
 #include "lluuid.h"
@@ -39,14 +40,13 @@
 #include <vector>
 #include <map>
 #include <set>
+#include "llmutex.h"
+
 #include <atomic>
 #include <functional>
 
 // Forward declarations
-class LLLiveLSLEditor;
-class LLScriptEdContainer;
 class LLScriptEditorWSServer;
-class LLChat;
 class LLPanel;
 class LLViewerObject;
 class LLInventoryItem;
@@ -69,6 +69,10 @@ public:
     LLScriptEditorWSConnection(const LLWebsocketMgr::WSServer::ptr_t server, const LLWebsocketMgr::connection_h& handle) :
         LLJSONRPCConnection(server, handle)
     {
+        // Anything that can reach the port can connect: nothing it asks
+        // is answered until it has proven it can read the user's files.
+        setAuthenticated(false);
+
         // Reserve id 0 as the "unassigned" sentinel used by EditorSubscription;
         // on wrap, skip past it.
         U32 id;
@@ -93,19 +97,42 @@ public:
 
 private:
     using string_set_t = std::set<std::string>;
+
+    // What the client proves itself with: a secret written to a file only
+    // the user can read, under a name that says nothing of it. The client
+    // is told where the file is and answers with what it says.
+    struct Challenge
+    {
+        LLUUID      mSecret;
+        std::string mFile;
+    };
+    // Empty where no secret could be made or written.
+    static Challenge writeChallenge();
+    // A new file, readable by the user alone: mode 0600, or on Windows an
+    // ACL of its own. False where anything is there by that name already.
+    static bool writeUserOnlyFile(const std::string& path, const std::string& text);
+    // Who the viewer is and what the client must answer, on the main
+    // thread.
+    void sendHandshake();
+
     /**
      * @brief Handle the handshake response from the client
      * @param result The response data from the client containing client information
+     * @param secret What the challenge file said, which the client must answer with
+     * @param agent_id Who is logged in, told with session.ok
+     * @param agent_name Their username, told with it
      */
-    void handleHandshakeResponse(const LLSD& result);
-    std::string generateChallenge();
+    void handleHandshakeResponse(const LLSD& result, const LLUUID& secret, const LLUUID& agent_id, const std::string& agent_name);
+    // The handshake refused, unanswered in time, or never sent.
+    void handleHandshakeError(const LLSD& error);
 
-    LLScriptEdContainer*                    getEditor() const;
     std::shared_ptr<LLScriptEditorWSServer> getServer() const;
 
     U32 mConnectionID{ 0 }; ///< Unique identifier for this connection
 
-    // Client handshake response data
+    // Client handshake response data, written as the client answers, on
+    // the server's thread, and read on the main one: under the lock.
+    mutable LLMutex mHandshakeMutex;
     std::string  mClientName;      ///< Name of the external editor client
     std::string  mClientVersion;   ///< Version of the external editor client
     std::string  mProtocolVersion; ///< JSON-RPC protocol version supported by client
@@ -113,8 +140,6 @@ private:
     std::string  mScriptLanguage;  ///< Programming language of the script (lsl, luau, etc.)
     string_set_t mLanguages;       ///< Set of supported scripting languages
     string_set_t mFeatures;        ///< Active client features (live_sync, compilation, etc.)
-    LLUUID       mChallenge;
-    std::string  mChallengeFile;   ///< Temporary file used for challenge-response verification
 
     static std::atomic<U32> sNextConnectionID;
 };
@@ -132,28 +157,39 @@ private:
  * ## Architecture
  *
  * The server acts as a JSON-RPC communication hub between:
- * - LLLiveLSLEditor instances (in-world script editing)
+ * - Script Studio's tabs (in-world script editing)
  * - External script editors (VS Code, Atom, Sublime Text, etc.)
  * - Script compilation and save services
  *
  * ## Usage
  *
  * @code
- * // Create and start the JSON-RPC server
- * auto server = std::make_shared<LLScriptEditorWSServer>("script_editor_server", 9020);
- * LLWebsocketMgr::getInstance()->addServer(server);
- * LLWebsocketMgr::getInstance()->startServer("script_editor_server");
+ * // Start the server, or find it running; null where it is disabled or
+ * // could not start
+ * LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::ensureServerRunning();
  *
- * // Associate with an LSL editor
- * server->associateEditor(editor_handle, script_id);
+ * // Hold a script open in a viewer editor for live sync with a client
+ * const std::string script_id = LLScriptEditorWSServer::buildScriptSubscriptionId(object_id, item_id);
+ * server->subscribeScriptEditor(object_id, item_id, script_name, editor_handle, script_id);
  * @endcode
  *
  * ## Security Considerations
  *
- * - Server binds to localhost only by default for security
+ * - Server binds to localhost only: a client anywhere else could never read
+ *   the challenge's file
+ * - A connection from a browser -- any upgrade request with an Origin -- is
+ *   refused, so no web page, the viewer's own included, can reach it
+ * - Nothing a client asks is answered, and nothing is sent it but the
+ *   handshake, until it has answered the handshake's challenge with what a
+ *   file only the user can read says; a wrong answer, or none within 30
+ *   seconds, closes it. Who is logged in is told with session.ok, once
+ *   it has
+ * - A few connections at a time may be proving themselves; one more is
+ *   closed (1013) before it is sent a challenge
  * - JSON-RPC 2.0 structured protocol with validation
- * - Rate limiting handled by base JSON-RPC server
  * - Error handling with standardized JSON-RPC error codes
+ * - Nothing limits how often a client asks: an authenticated client is
+ *   the user's own
  */
 class LLScriptEditorWSServer : public LLJSONRPCServer
 {
@@ -197,22 +233,23 @@ public:
 
     void onStarted() override;
     void onStopped() override;
+    // False once nobody has been connected for the idle timeout, which
+    // stops the server.
+    bool update() override;
     void onConnectionOpened(const LLWebsocketMgr::WSConnection::ptr_t& connection) override;
     void onConnectionClosed(const LLWebsocketMgr::WSConnection::ptr_t& connection) override;
 
+    // A viewer editor holding a script open for live sync, by the
+    // subscription id; `lua` says which compiler's words to expect in
+    // its results.
     bool subscribeScriptEditor(const LLUUID& object_id, const LLUUID& item_id, std::string_view script_name,
-        const LLHandle<LLPanel>& editor_handle, const std::string &script_id);
+        const LLHandle<LLPanel>& editor_handle, const std::string &script_id, bool lua = false);
     void unsubscribeEditor(const std::string &script_id);
 
     void notifyScript(const std::string& script_id, const std::string& method, const LLSD& message) const;
     void sendUnsubscribeScriptEditor(const std::string& script_id);
-    void sendCompileResults(const std::string& script_id, const LLSD& results) const;
 
     LLHandle<LLPanel> findEditorForScript(const std::string& script_id) const;
-
-    void forwardChatToIDE(
-        const LLChat& chat_msg,
-        LLPublishedObjectMgr::RuntimeEventAggregator::Channel channel) const;
 
     std::set<std::string> getActiveScripts() const;
 
@@ -220,22 +257,34 @@ public:
     bool publishObject(const LLUUID& object_id);
     void unpublishObject(const LLUUID& object_id, const std::string& reason = "");
     bool isObjectPublished(const LLUUID& object_id) const;
+    // Whether a client holds a script: subscribed to it, or its object
+    // published to one -- where saving it from elsewhere gives it two
+    // masters.
+    bool holds(const ALScriptRef& ref) const;
 
-    // *TODO*: These should be moved to LLPublishedObjectMgr at some point.
+    // The world's way in to the publishing, which the manager does.
     void onPrimInventoryReady(const LLUUID& object_id, const LLUUID& prim_id);
     void onPrimInventoryChanged(const LLUUID& object_id, const LLUUID& prim_id);
     void onObjectPropertyChanged(const LLUUID& prim_id, const std::string& name, const std::string& desc, S16 inventory_serial = -1);
+    void onObjectPermissionsReceived(const LLUUID& prim_id, const LLUUID& owner_id, U32 owner_mask, U32 next_owner_mask);
     void onLinksetChildAdded(const LLUUID& root_id, LLViewerObject* child);
     void onLinksetChildRemoved(const LLUUID& root_id, const LLUUID& child_id);
 
     static bool isEnabled();
     static bool isTightIntegration();
 
+    // Connections open and not yet authenticated. Any thread's.
+    size_t unauthenticatedConnectionCount() const;
+
 protected:
     LLWebsocketMgr::WSConnection::ptr_t connectionFactory(LLWebsocketMgr::WSServer::ptr_t server,
                                                          LLWebsocketMgr::connection_h handle) override;
 
     void setupConnectionMethods(LLJSONRPCConnection::ptr_t connection) override;
+    LLSD handlePing(const LLJSONRPCConnection::ptr_t& connection,
+                    const LLSD& params) const override;
+    LLSD handleGetVersion(const LLJSONRPCConnection::ptr_t& connection,
+                          const LLSD& params) const override;
 
     void broadcastLanguageChange();
 
@@ -257,6 +306,8 @@ protected:
     LLSD handleObjectList() const;
     LLSD handleObjectScriptSetRunning(U32 connection_id, const LLSD& params);
     LLSD handleObjectScriptReset(U32 connection_id, const LLSD& params);
+    LLSD handleObjectScriptResetAll(U32 connection_id, const LLSD& params);
+    LLSD handleObjectScriptRecompileAll(U32 connection_id, const LLSD& params);
     LLSD handleObjectModify(U32 connection_id, const LLSD& params);
     LLSD handleObjectItemModify(U32 connection_id, const LLSD& params);
     LLSD handleCommandExecute(U32 connection_id, const LLSD& params);
@@ -271,16 +322,13 @@ protected:
         LLInventoryItem*   item{ nullptr };
         LLAssetType::EType type{ LLAssetType::AT_NONE };
     };
-    ValidatedItem validatePublishedItem(const LLSD& params, U32 permMask) const;
+    // And what RLVa allows of it: seeing it, or changing it
+    // (ALScriptWorkspace::rlvRefusal), refused in RLVa's words.
+    ValidatedItem validatePublishedItem(const LLSD& params, U32 permMask, ALScriptRlvUse use) const;
 
     // --- Object Content Publishing (helpers) ---
-    static std::string getPrimName(LLViewerObject* obj);
     void notifyConnection(U32 connection_id, const std::string& method, const LLSD& params) const;
     void notifyAll(const std::string& method, const LLSD& params) const;
-    void buildAndSendPublish(const LLUUID& object_id);
-    void scheduleLinksetFlush(const LLUUID& root_id, F32 delay);
-    void cancelLinksetFlushTimer(const LLUUID& root_id);
-    void flushLinksetUpdate(const LLUUID& root_id);
 
     /// Wraps `fn` in a MethodHandler with a weak-ptr guard on this server,
     /// so the handler safely no-ops after server shutdown. `fn` is called
@@ -303,20 +351,38 @@ protected:
     }
 
 private:
-    void sendRuntimeEvent(
-        const LLPublishedObjectMgr::RuntimeChatEvent& event) const;
+    // What a script said, from the workspace, to whoever published its
+    // object or subscribed to it.
+    void sendRuntimeEvent(const ALScriptRuntimeEvent& event) const;
+    // What the compiler said of a script saved through the workspace --
+    // by Script Studio, the compile queue, anything but a client's own
+    // object.content.save, which is answered inline -- to the connection
+    // subscribed to it, else to everyone with its object published; and
+    // the prim's inventory fetched again, so that the object.update
+    // that follows carries the item's new revision.
+    void sendCompiled(const ALScriptCompileResult& result);
+    // The script.compiled message for a result, in the protocol's terms:
+    // its diagnostics are places in the text the client has
+    // (ALScriptCompileResult::inSource).
+    static LLSD compiledMessage(const std::string& script_id, bool success, bool running,
+                                const std::vector<ALScriptDiagnostic>& diagnostics, bool lua);
+    // One diagnostic in the protocol's terms: its row and column counted
+    // from one, and nought for a place not named.
+    static LLSD diagnosticEntry(const ALScriptDiagnostic& diagnostic, bool lua);
 
     struct EditorSubscription
     {
-        EditorSubscription(const ItemRef& item_ref, LLHandle<LLPanel> editor_handle):
+        EditorSubscription(const ItemRef& item_ref, LLHandle<LLPanel> editor_handle, bool lua):
             mItemRef(item_ref),
-            mEditorHandle(editor_handle)
+            mEditorHandle(editor_handle),
+            mLua(lua)
         {
         }
         U32 mConnectionID{ 0 };
         ItemRef mItemRef;
         LLScriptEditorWSConnection::wptr_t mConnection;
         LLHandle<LLPanel> mEditorHandle;
+        bool mLua{ false };
     };
     using subscriptions_t = std::unordered_map<std::string, EditorSubscription>;
 
@@ -325,14 +391,25 @@ private:
 
     subscriptions_t mSubscriptions;
     std::unordered_map<U32, S32> mConnectionSubscriptionCounts;
+    // Written on the server's thread as connections come and go, read on
+    // the main one as messages go out: under the lock either way.
+    mutable LLMutex                                   mConnectionsMutex;
     std::map<U32, LLScriptEditorWSConnection::wptr_t> mActiveConnections;
 
+    // The manager sends through the server and names prims as it does.
+    friend class LLPublishedObjectMgr;
     mutable LLPublishedObjectMgr mPublishedObjectManager;
+    // Since when nobody has been connected -- the server's start, or the
+    // last client's going -- in the timer's seconds; zero while one is.
+    std::atomic<F64>             mIdleSince{ 0.0 };
+    boost::signals2::scoped_connection mRuntimeConnection;
+    boost::signals2::scoped_connection mCompiledConnection;
 
     struct WSCommandInfo
     {
         std::string command;
         std::string description;
+        LLSD params;
     };
     enum WSCommandError
     {

@@ -30,15 +30,17 @@
 #include "linden_common.h"
 
 #include "llmotioncontroller.h"
-#include "llfasttimer.h"
 #include "llkeyframemotion.h"
 #include "llmath.h"
 #include "lltimer.h"
 #include "llanimationstates.h"
 #include "llstl.h"
 
-// This is why LL_CHARACTER_MAX_ANIMATED_JOINTS needs to be a multiple of 4.
-const S32 NUM_JOINT_SIGNATURE_STRIDES = LL_CHARACTER_MAX_ANIMATED_JOINTS / 4;
+// The signatures are merged eight joints at a time, so this is why
+// LL_CHARACTER_MAX_ANIMATED_JOINTS needs to be a multiple of eight.
+const S32 NUM_JOINT_SIGNATURE_STRIDES = LL_CHARACTER_MAX_ANIMATED_JOINTS / 8;
+static_assert(LL_CHARACTER_MAX_ANIMATED_JOINTS % 8 == 0,
+              "the joint signature merge reads the table eight joints at a time");
 const U32 MAX_MOTION_INSTANCES = 32;
 
 //-----------------------------------------------------------------------------
@@ -123,6 +125,24 @@ LLMotion *LLMotionRegistry::createMotion( const LLUUID &id )
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 
+namespace
+{
+    // The index to visit after the motion at index. That motion may have
+    // taken itself off the list on the way past, in which case the next one
+    // is already in its slot; or its update may have started another motion,
+    // which goes in at the front and shifts everything down, in which case
+    // the walk carries on from wherever the visited one has moved to.
+    size_t next_motion(const LLMotionController::motion_list_t& motions, size_t index, const LLMotion* visited)
+    {
+        if (index < motions.size() && motions[index] == visited)
+        {
+            return index + 1;
+        }
+        auto at = std::find(motions.begin(), motions.end(), visited);
+        return at == motions.end() ? index : (size_t)(at - motions.begin()) + 1;
+    }
+}
+
 //-----------------------------------------------------------------------------
 // LLMotionController()
 // Class Constructor
@@ -130,6 +150,7 @@ LLMotion *LLMotionRegistry::createMotion( const LLUUID &id )
 LLMotionController::LLMotionController()
     : mTimeFactor(sCurrentTimeFactor),
       mCharacter(NULL),
+      mContinuousTime(0.f),
       mAnimTime(0.f),
       mPrevTimerElapsed(0.f),
       mLastTime(0.0f),
@@ -159,7 +180,7 @@ void LLMotionController::incMotionCounts(S32& num_motions, S32& num_loading_moti
     num_motions += static_cast<S32>(mAllMotions.size());
     num_loading_motions += static_cast<S32>(mLoadingMotions.size());
     num_loaded_motions += static_cast<S32>(mLoadedMotions.size());
-    num_active_motions += static_cast<S32>(mActiveMotions.size());
+    num_active_motions += static_cast<S32>(getNumActiveMotions());
     num_deprecated_motions += static_cast<S32>(mDeprecatedMotions.size());
 }
 
@@ -170,7 +191,8 @@ void LLMotionController::deleteAllMotions()
 {
     mLoadingMotions.clear();
     mLoadedMotions.clear();
-    mActiveMotions.clear();
+    mActiveMotions[LLMotion::NORMAL_BLEND].clear();
+    mActiveMotions[LLMotion::ADDITIVE_BLEND].clear();
 
     for_each(mAllMotions.begin(), mAllMotions.end(), DeletePairedPointer());
     mAllMotions.clear();
@@ -247,16 +269,56 @@ void LLMotionController::purgeExcessMotions()
 void LLMotionController::deactivateStoppedMotions()
 {
     // Since we're hidden, deactivate any stopped motions.
-    for (motion_list_t::iterator iter = mActiveMotions.begin();
-         iter != mActiveMotions.end(); )
+    for (motion_list_t& motions : mActiveMotions)
     {
-        motion_list_t::iterator curiter = iter++;
-        LLMotion* motionp = *curiter;
-        if (motionp->isStopped())
+        LLMotion* motionp = nullptr;
+        for (size_t i = 0; i < motions.size(); i = next_motion(motions, i, motionp))
         {
-            deactivateMotionInstance(motionp);
+            motionp = motions[i];
+            if (motionp->isStopped())
+            {
+                deactivateMotionInstance(motionp);
+            }
         }
     }
+}
+
+//-----------------------------------------------------------------------------
+// computeQuantumStep()
+//-----------------------------------------------------------------------------
+LLMotionController::QuantumStep LLMotionController::computeQuantumStep(F64 continuous_time, F32 time_step, S32 last_count)
+{
+    // One quantum ahead of real time, on purpose: the pose computed for the
+    // boundary this lands on is what the frames until then interpolate
+    // toward, so by the time real time reaches it the pose has arrived.
+    // That is the +1. It was never the defect -- the defect was the caller
+    // writing the snapped time back into its accumulator, which turned the
+    // lookahead into a full quantum of advance every frame.
+    const F64 quanta = continuous_time / time_step;
+    const F64 whole = llmax(0.0, floor(quanta));
+
+    QuantumStep step;
+    step.count = (S32)whole + 1;
+    step.interp = (F32)llclamp(quanta - whole, 0.0, 1.0);
+    step.advanced = (step.count != last_count);
+    return step;
+}
+
+//-----------------------------------------------------------------------------
+// quantumInterpolant()
+//-----------------------------------------------------------------------------
+F32 LLMotionController::quantumInterpolant(F32 interp, F32 last_interp)
+{
+    // The blender lerps from wherever the pose is now toward the quantum's
+    // target, so the fraction it needs is of the distance still to go, not
+    // of the whole quantum. Handed interp - last_interp instead, it closed
+    // on the target geometrically -- (1-du)^n of the way still to go after
+    // n frames -- and the boundary snapped the remainder.
+    if (last_interp >= 1.f)
+    {
+        return 1.f;
+    }
+    return llclamp((interp - last_interp) / (1.f - last_interp), 0.f, 1.f);
 }
 
 //-----------------------------------------------------------------------------
@@ -264,23 +326,64 @@ void LLMotionController::deactivateStoppedMotions()
 //-----------------------------------------------------------------------------
 void LLMotionController::setTimeStep(F32 step)
 {
+    if (step == mTimeStep)
+    {
+        return;
+    }
+
+    // The quantum count is in units of the old step, and the blender is
+    // part way toward a target computed on the old grid. Finish that move,
+    // drop the cache and let the next update start the new grid from
+    // scratch, whichever direction the change is.
+    mPoseBlender.interpolate(1.f);
+    clearBlenders();
+    mTimeStepCount = 0;
+    mLastInterp = 0.f;
+
+    const bool entering = (mTimeStep == 0.f);
     mTimeStep = step;
 
-    if (step != 0.f)
+    if (step != 0.f && entering)
     {
-        // make sure timestamps conform to new quantum
-        for (motion_list_t::iterator iter = mActiveMotions.begin();
-             iter != mActiveMotions.end(); ++iter)
+        // make sure timestamps conform to new quantum -- once, on the way
+        // in. Doing it on every change walked them backwards a fraction of
+        // a step each time the quantum moved a rung.
+        for (motion_list_t& motions : mActiveMotions)
         {
-            LLMotion* motionp = *iter;
-            F32 activation_time = motionp->mActivationTimestamp;
-            motionp->mActivationTimestamp = (F32)(llfloor(activation_time / step)) * step;
-            bool stopped = motionp->isStopped();
-            motionp->setStopTime((F32)(llfloor(motionp->getStopTime() / step)) * step);
-            motionp->setStopped(stopped);
-            motionp->mSendStopTimestamp = (F32)llfloor(motionp->mSendStopTimestamp / step) * step;
+            for (LLMotion* motionp : motions)
+            {
+                motionp->mActivationTimestamp = floor(motionp->mActivationTimestamp / step) * step;
+                // setStopTime stops a motion, and the keyframe motion's
+                // override aligns whatever time it is handed to the loop, so
+                // a running motion is left alone rather than given a stop
+                // time it never had. A motion that never stops itself has no
+                // send-stop time to snap either.
+                if (motionp->isStopped())
+                {
+                    motionp->mStopTimestamp = floor(motionp->mStopTimestamp / step) * step;
+                }
+                if (motionp->mSendStopTimestamp != F32_MAX)
+                {
+                    motionp->mSendStopTimestamp = floor(motionp->mSendStopTimestamp / step) * step;
+                }
+            }
         }
     }
+}
+
+//-----------------------------------------------------------------------------
+// quantizeTimeStep()
+//-----------------------------------------------------------------------------
+F32 LLMotionController::quantizeTimeStep(F32 requested_step)
+{
+    // The request is a smooth function of screen size and crowd size, so
+    // left alone it changes a little every frame, and every change costs a
+    // pose recompute and a cache. Sixteenths are exact in binary, which
+    // keeps the clock's accumulation exact at every rung.
+    constexpr F32 RUNG = 1.f / 16.f;
+    constexpr F32 MAX_STEP = 0.25f;
+    const F32 capped = llmin(requested_step, MAX_STEP);
+    return llmax(0.f, floorf(capped / RUNG)) * RUNG;
 }
 
 //-----------------------------------------------------------------------------
@@ -318,6 +421,14 @@ void LLMotionController::removeMotion( const LLUUID& id)
     removeMotionInstance(motionp);
 }
 
+//-----------------------------------------------------------------------------
+// removeActiveMotion()
+//-----------------------------------------------------------------------------
+void LLMotionController::removeActiveMotion(LLMotion* motion)
+{
+    std::erase(mActiveMotions[motion->getBlendType()], motion);
+}
+
 // removes instance of a motion from all runtime structures, but does
 // not erase entry by ID, as this could be a duplicate instance
 // use removeMotion(id) to remove all references to a given motion by id.
@@ -330,7 +441,7 @@ void LLMotionController::removeMotionInstance(LLMotion* motionp)
             motionp->deactivate();
         mLoadingMotions.erase(motionp);
         mLoadedMotions.erase(motionp);
-        mActiveMotions.remove(motionp);
+        removeActiveMotion(motionp);
         delete motionp;
     }
 }
@@ -510,6 +621,7 @@ void LLMotionController::resetJointSignatures()
 {
     memset(&mJointSignature[0][0], 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
     memset(&mJointSignature[1][0], 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
+    memset(&mJointSaturated[0], 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
 }
 
 //-----------------------------------------------------------------------------
@@ -558,12 +670,14 @@ void LLMotionController::updateIdleMotion(LLMotion* motionp)
 void LLMotionController::updateIdleActiveMotions()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
-    for (motion_list_t::iterator iter = mActiveMotions.begin();
-         iter != mActiveMotions.end(); )
+    for (motion_list_t& motions : mActiveMotions)
     {
-        motion_list_t::iterator curiter = iter++;
-        LLMotion* motionp = *curiter;
-        updateIdleMotion(motionp);
+        LLMotion* motionp = nullptr;
+        for (size_t i = 0; i < motions.size(); i = next_motion(motions, i, motionp))
+        {
+            motionp = motions[i];
+            updateIdleMotion(motionp);
+        }
     }
 }
 
@@ -573,21 +687,26 @@ void LLMotionController::updateIdleActiveMotions()
 void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_type)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    motion_list_t& motions = mActiveMotions[anim_type];
+    LL_PROFILE_ZONE_NUM(motions.size());
     bool update_result = true;
-    U8 last_joint_signature[LL_CHARACTER_MAX_ANIMATED_JOINTS];
+    S32 motions_blended = 0;
+    S32 joint_states_blended = 0;
 
-    memset(&last_joint_signature, 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
+    // A joint an additive motion writes is composed onto whatever is under it
+    // rather than replacing it, so nothing an additive motion does saturates a
+    // joint. The mask is cleared before each pass and only the normal one
+    // fills it.
+    const bool saturates = (anim_type == LLMotion::NORMAL_BLEND);
 
-    // iterate through active motions in chronological order
-    for (motion_list_t::iterator iter = mActiveMotions.begin();
-         iter != mActiveMotions.end(); )
+    // the same for every motion this frame, and a virtual call
+    const F32 pixel_area = mCharacter->getPixelArea();
+
+    // newest motion first; a motion may take itself off the list on the way past
+    LLMotion* motionp = nullptr;
+    for (size_t i = 0; i < motions.size(); i = next_motion(motions, i, motionp))
     {
-        motion_list_t::iterator curiter = iter++;
-        LLMotion* motionp = *curiter;
-        if (motionp->getBlendType() != anim_type)
-        {
-            continue;
-        }
+        motionp = motions[i];
 
         bool update_motion = false;
 
@@ -597,40 +716,39 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
         }
         else
         {
-            for (S32 i = 0; i < NUM_JOINT_SIGNATURE_STRIDES; i++)
+            for (S32 stride = 0; stride < NUM_JOINT_SIGNATURE_STRIDES; stride++)
             {
-                // The joint signatures live in U8[] arrays; treating four-byte
-                // strides as U32 directly is strict-aliasing UB. memcpy in/out
-                // of U32 locals lets GCC fold each direction to a single load
-                // or store while staying inside the rules.
-                const S32 offset = i * 4;
+                // The joint signatures live in U8[] arrays; treating eight-byte
+                // strides as U64 directly is strict-aliasing UB. memcpy in/out
+                // of U64 locals lets the compiler fold each direction to a
+                // single load or store while staying inside the rules. The
+                // per-joint values are nested bit masks -- a priority of n is
+                // 0xff >> (7 - n) -- so an OR of two of them is the higher of
+                // the two, and eight of them merge in one instruction.
+                const S32 offset = stride * 8;
 
                 // Pass 0: merge motionp's pass-0 signature into our pass-0
                 // signature; if any new bits land, mark for update.
-                U32 cur0;
-                std::memcpy(&cur0, &mJointSignature[0][offset], sizeof(U32));
-                U32 test0;
-                std::memcpy(&test0, &motionp->mJointSignature[0][offset], sizeof(U32));
-                if ((cur0 | test0) > cur0)
+                U64 cur0;
+                std::memcpy(&cur0, &mJointSignature[0][offset], sizeof(U64));
+                U64 test0;
+                std::memcpy(&test0, &motionp->mJointSignature[0][offset], sizeof(U64));
+                if ((cur0 | test0) != cur0)
                 {
                     cur0 |= test0;
-                    std::memcpy(&mJointSignature[0][offset], &cur0, sizeof(U32));
+                    std::memcpy(&mJointSignature[0][offset], &cur0, sizeof(U64));
                     update_motion = true;
                 }
 
-                // Snapshot pass 1 of our previous signature into
-                // last_joint_signature, then do the same merge as pass 0.
-                U32 last1;
-                std::memcpy(&last1, &mJointSignature[1][offset], sizeof(U32));
-                std::memcpy(&last_joint_signature[offset], &last1, sizeof(U32));
-
-                U32 cur1 = last1;
-                U32 test1;
-                std::memcpy(&test1, &motionp->mJointSignature[1][offset], sizeof(U32));
-                if ((cur1 | test1) > cur1)
+                // Pass 1, the same merge as pass 0.
+                U64 cur1;
+                std::memcpy(&cur1, &mJointSignature[1][offset], sizeof(U64));
+                U64 test1;
+                std::memcpy(&test1, &motionp->mJointSignature[1][offset], sizeof(U64));
+                if ((cur1 | test1) != cur1)
                 {
                     cur1 |= test1;
-                    std::memcpy(&mJointSignature[1][offset], &cur1, sizeof(U32));
+                    std::memcpy(&mJointSignature[1][offset], &cur1, sizeof(U64));
                     update_motion = true;
                 }
             }
@@ -644,8 +762,15 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
 
         LLPose *posep = motionp->getPose();
 
+        // Both are virtual, both are asked for two or three times on the way
+        // through, and neither can change between here and the end of this
+        // motion's turn: a motion's ease is fixed when it is loaded, or, for
+        // the fall, when it is activated.
+        const F32 ease_in_duration = motionp->getEaseInDuration();
+        const F32 ease_out_duration = motionp->getEaseOutDuration();
+
         // only filter by LOD after running every animation at least once (to prime the avatar state)
-        if (mHasRunOnce && motionp->getMinPixelArea() > mCharacter->getPixelArea())
+        if (mHasRunOnce && motionp->getMinPixelArea() > pixel_area)
         {
             motionp->fadeOut();
 
@@ -663,7 +788,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
 
             if (motionp->getFadeWeight() < 0.01f)
             {
-                if (motionp->isStopped() && mAnimTime > motionp->getStopTime() + motionp->getEaseOutDuration())
+                if (motionp->isStopped() && mAnimTime > motionp->getStopTime() + ease_out_duration)
                 {
                     posep->setWeight(0.f);
                     deactivateMotionInstance(motionp);
@@ -679,7 +804,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
         //**********************
         // MOTION INACTIVE
         //**********************
-        if (motionp->isStopped() && mAnimTime > motionp->getStopTime() + motionp->getEaseOutDuration())
+        if (motionp->isStopped() && mAnimTime > motionp->getStopTime() + ease_out_duration)
         {
             // this motion has gone on too long, deactivate it
             // did we have a chance to stop it?
@@ -687,8 +812,19 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
             {
                 // if not, let's stop it this time through and deactivate it the next
 
-                posep->setWeight(motionp->getFadeWeight());
-                motionp->onUpdate(motionp->getStopTime() - motionp->mActivationTimestamp, last_joint_signature);
+                // The ease out is already over by the time this branch is
+                // reached, so this last update exists to give the motion the
+                // stop time it never saw, not to show it. Writing the fade
+                // weight here brought the motion up to full for that one
+                // frame: a short animation stopped while it was still easing
+                // in -- the land during a busy transition, or any motion
+                // whose ease out a long frame stepped clean over -- was
+                // holding a fraction of a weight and flashed to all of it
+                // before deactivating on the next frame. Hold the weight it
+                // has, which for a motion that played out to its end is the
+                // full weight it already had.
+                posep->setWeight(llmin(motionp->getFadeWeight(), posep->getWeight()));
+                motionp->onUpdate(motionp->getStopTime() - motionp->mActivationTimestamp, mJointSaturated);
             }
             else
             {
@@ -710,23 +846,23 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
                 motionp->mResidualWeight = motionp->getPose()->getWeight();
             }
 
-            if (motionp->getEaseOutDuration() == 0.f)
+            if (ease_out_duration == 0.f)
             {
                 posep->setWeight(0.f);
             }
             else
             {
-                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight * cubic_step(1.f - ((mAnimTime - motionp->getStopTime()) / motionp->getEaseOutDuration())));
+                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight * cubic_step(1.f - (F32)((mAnimTime - motionp->getStopTime()) / ease_out_duration)));
             }
 
             // perform motion update
-            update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, last_joint_signature);
+            update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, mJointSaturated);
         }
 
         //**********************
         // MOTION ACTIVE
         //**********************
-        else if (mAnimTime > motionp->mActivationTimestamp + motionp->getEaseInDuration())
+        else if (mAnimTime > motionp->mActivationTimestamp + ease_in_duration)
         {
             posep->setWeight(motionp->getFadeWeight());
 
@@ -744,7 +880,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
 
             // perform motion update
             {
-                update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, last_joint_signature);
+                update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, mJointSaturated);
             }
         }
 
@@ -757,22 +893,22 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
             {
                 motionp->mResidualWeight = motionp->getPose()->getWeight();
             }
-            if (motionp->getEaseInDuration() == 0.f)
+            if (ease_in_duration == 0.f)
             {
                 posep->setWeight(motionp->getFadeWeight());
             }
             else
             {
                 // perform motion update
-                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight + (1.f - motionp->mResidualWeight) * cubic_step((mAnimTime - motionp->mActivationTimestamp) / motionp->getEaseInDuration()));
+                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight + (1.f - motionp->mResidualWeight) * cubic_step((F32)((mAnimTime - motionp->mActivationTimestamp) / ease_in_duration)));
             }
             // perform motion update
-            update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, last_joint_signature);
+            update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, mJointSaturated);
         }
         else
         {
             posep->setWeight(0.f);
-            update_result = motionp->onUpdate(0.f, last_joint_signature);
+            update_result = motionp->onUpdate(0.f, mJointSaturated);
         }
 
         // allow motions to deactivate themselves
@@ -790,8 +926,31 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
         }
 
         // even if onupdate returns false, add this motion in to the blend one last time
-        mPoseBlender.addMotion(motionp);
+        mPoseBlender.addMotion(motionp, mJointSaturated);
+        ++motions_blended;
+        joint_states_blended += posep->getNumJointStates();
+
+        // and then it owns what it writes, for everything still to come
+        if (saturates && posep->getWeight() >= 1.f)
+        {
+            for (S32 stride = 0; stride < NUM_JOINT_SIGNATURE_STRIDES; stride++)
+            {
+                const S32 offset = stride * 8;
+
+                U64 owned;
+                std::memcpy(&owned, &mJointSaturated[offset], sizeof(U64));
+                U64 mine;
+                std::memcpy(&mine, &motionp->mJointSignature[1][offset], sizeof(U64));
+                if ((owned | mine) != owned)
+                {
+                    owned |= mine;
+                    std::memcpy(&mJointSaturated[offset], &owned, sizeof(U64));
+                }
+            }
+        }
     }
+    LL_PROFILE_ZONE_NUM(motions_blended);
+    LL_PROFILE_ZONE_NUM(joint_states_blended);
 }
 
 //-----------------------------------------------------------------------------
@@ -855,8 +1014,8 @@ void LLMotionController::updateMotions(bool force_update)
     bool use_quantum = (mTimeStep != 0.f);
 
     // Always update mPrevTimerElapsed
-    F32 cur_time = mTimer.getElapsedTimeF32();
-    F32 delta_time = cur_time - mPrevTimerElapsed;
+    const F64 cur_time = mTimer.getElapsedTimeF64();
+    const F64 delta_time = cur_time - mPrevTimerElapsed;
     mPrevTimerElapsed = cur_time;
     mLastTime = mAnimTime;
 
@@ -866,22 +1025,20 @@ void LLMotionController::updateMotions(bool force_update)
     // Update timing info for this time step.
     if (!mPaused)
     {
-        F32 update_time = mAnimTime + delta_time * mTimeFactor;
+        // The continuous clock is the only accumulator, and it moves on
+        // every frame, including the ones that leave below. The quantized
+        // clock is derived from it and never fed back: written back, its
+        // one-quantum lookahead became a full quantum of advance every frame
+        // whatever the frame time, which is SL-763.
+        mContinuousTime += delta_time * mTimeFactor;
         if (use_quantum)
         {
-            F32 time_interval = fmodf(update_time, mTimeStep);
-
-            // always animate *ahead* of actual time
-            S32 quantum_count = llmax(0, llfloor((update_time - time_interval) / mTimeStep)) + 1;
-            if (quantum_count == mTimeStepCount)
+            const QuantumStep step = computeQuantumStep(mContinuousTime, mTimeStep, mTimeStepCount);
+            if (!step.advanced)
             {
-                // we're still in same time quantum as before, so just interpolate and exit
-                if (!mPaused)
-                {
-                    F32 interp = time_interval / mTimeStep;
-                    mPoseBlender.interpolate(interp - mLastInterp);
-                    mLastInterp = interp;
-                }
+                // still in the same quantum: move the pose toward its target
+                mPoseBlender.interpolate(quantumInterpolant(step.interp, mLastInterp));
+                mLastInterp = step.interp;
 
                 updateLoadingMotions();
 
@@ -892,13 +1049,13 @@ void LLMotionController::updateMotions(bool force_update)
             mPoseBlender.interpolate(1.f);
             clearBlenders();
 
-            mTimeStepCount = quantum_count;
-            mAnimTime = (F32)quantum_count * mTimeStep;
+            mTimeStepCount = step.count;
+            mAnimTime = (F64)step.count * mTimeStep;
             mLastInterp = 0.f;
         }
         else
         {
-            mAnimTime = update_time;
+            mAnimTime = mContinuousTime;
         }
     }
 
@@ -942,7 +1099,7 @@ void LLMotionController::updateMotionsMinimal()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // Always update mPrevTimerElapsed
-    mPrevTimerElapsed = mTimer.getElapsedTimeF32();
+    mPrevTimerElapsed = mTimer.getElapsedTimeF64();
 
     purgeExcessMotions();
     updateLoadingMotions();
@@ -956,7 +1113,7 @@ void LLMotionController::updateMotionsMinimal()
 //-----------------------------------------------------------------------------
 // activateMotionInstance()
 //-----------------------------------------------------------------------------
-bool LLMotionController::activateMotionInstance(LLMotion *motion, F32 time)
+bool LLMotionController::activateMotionInstance(LLMotion *motion, F64 time)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // It's not clear why the getWeight() line seems to be crashing this, but
@@ -998,12 +1155,13 @@ bool LLMotionController::activateMotionInstance(LLMotion *motion, F32 time)
 
     if (motion->isActive())
     {
-        mActiveMotions.remove(motion);
+        removeActiveMotion(motion);
     }
-    mActiveMotions.push_front(motion);
+    motion_list_t& motions = mActiveMotions[motion->getBlendType()];
+    motions.insert(motions.begin(), motion);
 
     motion->activate(time);
-    motion->onUpdate(0.f, mJointSignature[1]);
+    motion->onUpdate(0.f, mJointSaturated);
 
     if (mAnimTime >= motion->mSendStopTimestamp)
     {
@@ -1035,7 +1193,7 @@ bool LLMotionController::deactivateMotionInstance(LLMotion *motion)
     else
     {
         // for motions that we are keeping, simply remove from active queue
-        mActiveMotions.remove(motion);
+        removeActiveMotion(motion);
     }
 
     return true;
@@ -1099,7 +1257,8 @@ void LLMotionController::dumpMotions()
             state_string += std::string("l");
         if (mLoadedMotions.find(motion) != mLoadedMotions.end())
             state_string += std::string("L");
-        if (std::find(mActiveMotions.begin(), mActiveMotions.end(), motion)!=mActiveMotions.end())
+        const motion_list_t& active = mActiveMotions[motion->getBlendType()];
+        if (std::find(active.begin(), active.end(), motion) != active.end())
             state_string += std::string("A");
         if (mDeprecatedMotions.find(motion) != mDeprecatedMotions.end())
             state_string += std::string("D");
@@ -1127,24 +1286,24 @@ void LLMotionController::deactivateAllMotions()
 void LLMotionController::flushAllMotions()
 {
     std::vector<std::pair<LLUUID,F32> > active_motions;
-    active_motions.reserve(mActiveMotions.size());
-    for (motion_list_t::iterator iter = mActiveMotions.begin();
-         iter != mActiveMotions.end(); )
+    active_motions.reserve(getNumActiveMotions());
+    for (motion_list_t& motions : mActiveMotions)
     {
-        motion_list_t::iterator curiter = iter++;
-        LLMotion* motionp = *curiter;
-        F32 dtime = mAnimTime - motionp->mActivationTimestamp;
-        active_motions.push_back(std::make_pair(motionp->getID(),dtime));
-        motionp->deactivate(); // don't call deactivateMotionInstance() because we are going to reactivate it
+        for (LLMotion* motionp : motions)
+        {
+            F32 dtime = (F32)(mAnimTime - motionp->mActivationTimestamp);
+            active_motions.push_back(std::make_pair(motionp->getID(),dtime));
+            motionp->deactivate(); // don't call deactivateMotionInstance() because we are going to reactivate it
+        }
+        motions.clear();
     }
-    mActiveMotions.clear();
 
     // delete all motion instances
     deleteAllMotions();
 
     // kill current hand pose that was previously called out by
     // keyframe motion
-    mCharacter->removeAnimationData("Hand Pose");
+    mCharacter->clearHandPoseRequest();
 
     // restart motions
     for (std::vector<std::pair<LLUUID,F32> >::value_type& motion_pair : active_motions)

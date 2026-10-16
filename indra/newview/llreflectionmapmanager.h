@@ -48,7 +48,6 @@ void renderReflectionProbe(LLReflectionMap* probe);
 
 class alignas(16) LLReflectionMapManager
 {
-    LL_ALIGN_NEW
 public:
     enum class DetailLevel
     {
@@ -119,7 +118,6 @@ public:
 
     // release any GL state
     void cleanup();
-    void cleanupQueryPool();
 
     // maintain reflection probes
     void update();
@@ -178,10 +176,6 @@ public:
     U32 probeCount();
     U32 probeMemory();
 
-    // glDeleteQueries is expensive, so we maintain a pool of queries
-    GLuint allocateQuery();
-    void recycleQuery(GLuint query);
-
 private:
     friend class LLPipeline;
     friend class LLHeroProbeManager;
@@ -195,6 +189,9 @@ private:
     // delete the probe with the given index in mProbes
     void deleteProbe(U32 i);
 
+    // stop generating mUpdatingProbe partway through, so the next probe starts from its first pass
+    void abandonProbeUpdate();
+
     // get a free cube index
     // returns -1 if allocation failed
     S32 allocateCubeIndex();
@@ -207,8 +204,6 @@ private:
 
     // bind UBO used for rendering
     void setUniforms();
-
-    std::deque<GLuint>                                    mQueryPool;
 
     // render target for cube snapshots
     // used to generate mipmaps without doing a copy-to-texture
@@ -227,6 +222,11 @@ private:
     // Signed, so RGBA16F rather than the unsigned float the radiance chain uses.
     LLRenderTarget mSHCoeffs;
 
+    // Scratch for the row-parallel form of the SH projection: the same nine columns, one row of
+    // partial sums per face row of the mip being integrated (6 x ALProbeSHProjectionRes rows).
+    // Sized in update(), consumed by the reduce pass, never kept between probes.
+    LLRenderTarget mSHPartial;
+
     // list of free cubemap indices
     std::list<S32> mCubeFree;
 
@@ -235,6 +235,10 @@ private:
 
     // update the specified face of the specified probe
     void updateProbeFace(LLReflectionMap* probe, U32 face);
+
+    // face edge length of the probe mip the SH irradiance projection integrates over, from
+    // ALProbeSHProjectionRes, and in `mip` the level of mTexture that holds it
+    U32 shProjectionRes(S32& mip) const;
 
     // list of active reflection maps
     std::vector<LLPointer<LLReflectionMap> > mProbes;
@@ -281,11 +285,11 @@ private:
     // resolution of reflection probes
     U32 mProbeResolution = 128;
 
-    // resolution of irradiance maps
-    // Face edge length the SH projection integrates over. Irradiance is band-limited to nine
-    // coefficients, so this only has to be fine enough not to alias the source before the
-    // integral -- it is not an output resolution and does not bound reconstruction quality.
-    U32 mSHProjectionRes = 32;
+    // Linear supersample factor of a capture: faces render at mProbeResolution times this,
+    // are Gaussian blurred and downsampled to the probe. ALProbeSuperSample, applied by
+    // initReflectionMaps like the resolution (the aux render target pack follows it).
+    U32 mSuperSample = 4;
+    U32 superSample() const { return mSuperSample; }
 
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;
@@ -300,7 +304,7 @@ private:
 
     // if true, only update the default probe
     bool mPaused = false;
-    F32 mResumeTime = 0.f;
+    F64 mResumeTime = 0.0;
 
     ReflectionProbeData mProbeData;
 };

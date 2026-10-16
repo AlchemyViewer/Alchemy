@@ -1,40 +1,17 @@
 # -*- cmake -*-
 
-set(login_SOURCE_FILES
-    lllogin.cpp
-    )
+add_library(lllogin STATIC)
 
-set(login_HEADER_FILES
-    lllogin.h
-    )
+target_sources(lllogin PRIVATE lllogin.cpp PUBLIC FILE_SET HEADERS FILES lllogin.h)
 
-list(APPEND
-    login_SOURCE_FILES
-    ${login_HEADER_FILES}
-    )
+target_link_libraries(
+  lllogin
+  PRIVATE al::flags
+  PUBLIC llmessage llcorehttp llcommon llmath llxml
+)
 
-add_library(lllogin STATIC
-            ${login_SOURCE_FILES}
-            )
-target_include_directories( lllogin  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
-
-target_link_libraries(lllogin
-        llmessage
-        llcorehttp
-        llcommon
-        llmath
-        llxml
-    )
-
-if(BUILD_TESTING)
-  SET(lllogin_TEST_SOURCE_FILES
-      lllogin.cpp
-      )
-  set_source_files_properties(
-    lllogin.cpp
-    PROPERTIES
-    LL_TEST_ADDITIONAL_LIBRARIES llmessage llcorehttp llcommon
-    )
-
-  LL_ADD_PROJECT_UNIT_TESTS(lllogin "${lllogin_TEST_SOURCE_FILES}")
+if(AL_BUILD_TESTS)
+  # Alone: each case makes an LLTestApp, of which a process may have one at a
+  # time, and its end clears every event pump in the process.
+  al_add_test_binary(lllogin_test PROJECT lllogin SOURCES tests/lllogin_test.cpp LIBRARIES lllogin)
 endif()

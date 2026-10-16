@@ -29,37 +29,22 @@
 
 #include "lldrawpool.h"
 
-
-class LLFace;
-class LLHeavenBody;
-class LLWaterSurface;
 class LLGLSLShader;
 
-class LLDrawPoolWater final: public LLFacePool
+// The water surface: no faces, objects or partitions. It draws the pipeline's water field (ALWaterSurface) with the
+// water or underwater program, after the opaque world and before the alpha that lies above the water.
+class LLDrawPoolWater final : public LLDrawPool
 {
 protected:
-    LLPointer<LLViewerTexture> mWaterImagep[2];
     LLPointer<LLViewerTexture> mWaterNormp[2];
 
-    LLPointer<LLViewerTexture> mOpaqueWaterImagep;
-
 public:
-    static bool sSkipScreenCopy;
-    static bool sNeedsReflectionUpdate;
-    static bool sNeedsDistortionUpdate;
-    static F32 sWaterFogEnd;
-
-    enum
-    {
-        VERTEX_DATA_MASK =  LLVertexBuffer::MAP_VERTEX |
-                            LLVertexBuffer::MAP_NORMAL |
-                            LLVertexBuffer::MAP_TEXCOORD0
-    };
-
-    virtual U32 getVertexDataMask() override { return VERTEX_DATA_MASK; }
-
     LLDrawPoolWater();
-    /*virtual*/ ~LLDrawPoolWater();
+    ~LLDrawPoolWater() override = default;
+
+    bool isDead() override { return false; }
+    LLViewerTexture* getTexture() override { return nullptr; }
+    void resetDrawOrders() override {}
 
     S32 getNumPostDeferredPasses() override;
     void beginPostDeferredPass(S32 pass) override;
@@ -67,19 +52,10 @@ public:
 
     void prerender() override;
 
-    LLViewerTexture *getDebugTexture() override;
-    LLColor3 getDebugColor() const; // For AGP debug display
-
-    void setTransparentTextures(const LLUUID& transparentTextureId, const LLUUID& nextTransparentTextureId);
-    void setOpaqueTexture(const LLUUID& opaqueTextureId);
     void setNormalMaps(const LLUUID& normalMapId, const LLUUID& nextNormalMapId);
 
-    void pushWaterPlanes(int pass);
-
-protected:
-    void renderOpaqueLegacyWater();
+    /// The environment's wave normal map `i`: the current one (0) and the next (1), null before either is set.
+    LLViewerTexture* getNormalMap(S32 i) const { return mWaterNormp[i]; }
 };
-
-void cgErrorCallback();
 
 #endif // LL_LLDRAWPOOLWATER_H

@@ -170,6 +170,26 @@ public:
     }
 
 
+    // Every entry, active scopes first and the default registrar last, which
+    // is the order a lookup takes them in. A registry filled by static
+    // registrars has an empty default registrar: each of those files into a
+    // scope the singleton owns, so this is the only way to enumerate one.
+    template <typename FUNC>
+    void forEachItem(FUNC func) const
+    {
+        for (const Registrar* scope : mActiveScopes)
+        {
+            for (auto it = scope->beginItems(); it != scope->endItems(); ++it)
+            {
+                func(it->first, it->second);
+            }
+        }
+        for (auto it = mDefaultRegistrar.beginItems(); it != mDefaultRegistrar.endItems(); ++it)
+        {
+            func(it->first, it->second);
+        }
+    }
+
     Registrar& defaultRegistrar()
     {
         return mDefaultRegistrar;

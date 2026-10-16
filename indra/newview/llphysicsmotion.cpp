@@ -43,7 +43,10 @@
 typedef std::map<std::string, std::string> controller_map_t;
 typedef std::map<std::string, F32> default_controller_map_t;
 
-#define MIN_REQUIRED_PIXEL_AREA_AVATAR_PHYSICS_MOTION 0.f
+// Where head turning stops too: an avatar about twenty-two pixels on a side,
+// well below where a bounce could be seen. This was zero, so the six
+// sub-motions integrated forces for every avatar at every distance.
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_AVATAR_PHYSICS_MOTION = 500.f;
 // we use TIME_ITERATION_STEP_MAX in division operation, make sure this is a simple
 // value and devision result won't end with repeated/recurring tail like 1.333(3)
 #define TIME_ITERATION_STEP_MAX 0.05f // minimal step size will end up as 0.025
@@ -110,7 +113,9 @@ public:
                 mLastTime(0),
                 mPosition_local(0),
                 mVelocityJoint_local(0),
-                mPositionLastUpdate_local(0)
+                mPositionLastUpdate_local(0),
+                mDriverParam(NULL),
+                mIsSelf(false)
         {
                 mJointState = new LLJointState;
 
@@ -124,7 +129,7 @@ public:
 
         ~LLPhysicsMotion() {}
 
-        bool onUpdate(F32 time);
+        bool onUpdate(F64 time);
 
         LLPointer<LLJointState> getJointState()
         {
@@ -132,40 +137,18 @@ public:
         }
 protected:
 
-        F32 getParamValue(eParamName param)
+        // Every controller is resolved once in initialize, to a visual param or
+        // to nothing, so this is a read. It used to retry the whole lookup --
+        // a map find, a lowercased name through the string table, and an
+        // operator[] on a static map -- on every call for every controller
+        // that had not resolved, which is most of them on most avatars.
+        F32 getParamValue(eParamName param) const
         {
-            static std::string controller_key[] =
-            {
-                "Smoothing",
-                "Mass",
-                "Gravity",
-                "Spring",
-                "Gain",
-                "Damping",
-                "Drag",
-                "MaxEffect"
-            };
-
-            if (!mParamCache[param])
-            {
-                const controller_map_t::const_iterator& entry = mParamControllers.find(controller_key[param]);
-                if (entry == mParamControllers.end())
-                {
-                        return sDefaultController[controller_key[param]];
-                }
-                const std::string& param_name = (*entry).second.c_str();
-                mParamCache[param] = mCharacter->getVisualParam(param_name.c_str());
-            }
-
-            if (mParamCache[param])
-            {
-                return mParamCache[param]->getWeight();
-            }
-            else
-            {
-                return sDefaultController[controller_key[param]];
-            }
+            const LLVisualParam* cached = mParamCache[param];
+            return cached ? cached->getWeight() : sDefaultController[param];
         }
+
+        void resolveParams();
 
 
         void setParamValue(const LLViewerVisualParam *param,
@@ -190,32 +173,59 @@ private:
         LLVector3 mPosition_world;
 
         LLViewerVisualParam *mParamDriver;
+        // mParamDriver as the driver it has to be, cast once
+        LLDriverParam *mDriverParam;
         const controller_map_t mParamControllers;
 
         LLPointer<LLJointState> mJointState;
         LLCharacter *mCharacter;
+        bool mIsSelf;
 
-        F32 mLastTime;
+        F64 mLastTime;  // onUpdate()'s time: physics is active as long as the avatar is
 
         LLVisualParam* mParamCache[NUM_PARAMS];
 
-        static default_controller_map_t sDefaultController;
+        // indexed by eParamName; what a controller falls back to when the
+        // avatar has no visual param for it
+        static const F32 sDefaultController[NUM_PARAMS];
 };
 
-default_controller_map_t initDefaultController()
+const F32 LLPhysicsMotion::sDefaultController[NUM_PARAMS] =
 {
-        default_controller_map_t controller;
-        controller["Mass"] = 0.2f;
-        controller["Gravity"] = 0.0f;
-        controller["Damping"] = .05f;
-        controller["Drag"] = 0.15f;
-        controller["MaxEffect"] = 0.1f;
-        controller["Spring"] = 0.1f;
-        controller["Gain"] = 10.0f;
-        return controller;
-}
+        0.0f,   // SMOOTHING, never asked for
+        0.2f,   // MASS
+        0.0f,   // GRAVITY
+        0.1f,   // SPRING
+        10.0f,  // GAIN
+        0.05f,  // DAMPING
+        0.15f,  // DRAG
+        0.1f,   // MAX_EFFECT
+};
 
-default_controller_map_t LLPhysicsMotion::sDefaultController = initDefaultController();
+void LLPhysicsMotion::resolveParams()
+{
+        static const char* const controller_key[NUM_PARAMS] =
+        {
+                "Smoothing",
+                "Mass",
+                "Gravity",
+                "Spring",
+                "Gain",
+                "Damping",
+                "Drag",
+                "MaxEffect"
+        };
+
+        for (U32 i = 0; i < NUM_PARAMS; ++i)
+        {
+                mParamCache[i] = NULL;
+                const controller_map_t::const_iterator entry = mParamControllers.find(controller_key[i]);
+                if (entry != mParamControllers.end())
+                {
+                        mParamCache[i] = mCharacter->getVisualParam(entry->second.c_str());
+                }
+        }
+}
 
 bool LLPhysicsMotion::initialize()
 {
@@ -230,6 +240,18 @@ bool LLPhysicsMotion::initialize()
                 return false;
         }
 
+        // The update used to establish both of these inside its sub-step
+        // loop, with a dynamic_cast each, every step of every frame. Neither
+        // changes after this.
+        mDriverParam = dynamic_cast<LLDriverParam*>(mParamDriver);
+        if (mDriverParam == NULL)
+        {
+                LL_INFOS() << "[ " << mParamDriverName << " ] is not a driver param" << LL_ENDL;
+                return false;
+        }
+        mIsSelf = dynamic_cast<LLVOAvatarSelf*>(mCharacter) != NULL;
+
+        resolveParams();
         return true;
 }
 
@@ -451,7 +473,7 @@ F32 LLPhysicsMotion::calculateAcceleration_local(const F32 velocity_local, const
         return smoothed_acceleration_local;
 }
 
-bool LLPhysicsMotionController::onUpdate(F32 time, U8* joint_mask)
+bool LLPhysicsMotionController::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // Skip if disabled globally.
@@ -477,7 +499,7 @@ bool LLPhysicsMotionController::onUpdate(F32 time, U8* joint_mask)
 }
 
 // Return true if character has to update visual params.
-bool LLPhysicsMotion::onUpdate(F32 time)
+bool LLPhysicsMotion::onUpdate(F64 time)
 {
         // static FILE *mFileWrite = fopen("c:\\temp\\avatar_data.txt","w");
 
@@ -494,7 +516,7 @@ bool LLPhysicsMotion::onUpdate(F32 time)
         // Get all parameters and settings
         //
 
-        const F32 time_delta = time - mLastTime;
+        const F32 time_delta = (F32)(time - mLastTime);
 
     // If less than 1FPS, we don't want to be spending time updating physics at all.
         if (time_delta > 1.0)
@@ -505,10 +527,14 @@ bool LLPhysicsMotion::onUpdate(F32 time)
 
         // Higher LOD is better.  This controls the granularity
         // and frequency of updates for the motions.
+        // Physics turned off. This returned true, and true means the character
+        // has to update its visual params -- so the setting meant to cost the
+        // least ran the full visual param sweep on every avatar every frame.
         const F32 lod_factor = LLVOAvatar::sPhysicsLODFactor;
         if (lod_factor == 0)
         {
-                return true;
+                mLastTime = time;
+                return false;
         }
 
         LLJoint *joint = mJointState->getJoint();
@@ -550,6 +576,17 @@ bool LLPhysicsMotion::onUpdate(F32 time)
     ////////////////////////////////////////////////////////////////////////////////
 
     bool update_visuals = false;
+
+    // None of this moves between sub-steps: no step writes the joint, the
+    // character's pixel area is this frame's, and the LOD factor is a
+    // setting. Gravity always points downward in world space.
+    const F32 gravity_local = toLocal(LLVector3(0, 0, 1));
+    const F32 area_for_max_settings = 0.0;
+    const F32 area_for_min_settings = 1400.0;
+    const F32 area_for_this_setting = area_for_max_settings + (area_for_min_settings-area_for_max_settings)*(1.0f-lod_factor);
+    const F32 pixel_area = sqrtf(mCharacter->getPixelArea());
+    const bool visible_enough = (pixel_area > area_for_this_setting) || mIsSelf;
+    const F32 min_delta = (1.0001f-lod_factor)*0.4f;
 
     // Break up the physics into a bunch of iterations so that differing framerates will show
     // roughly the same behavior.
@@ -593,10 +630,8 @@ bool LLPhysicsMotion::onUpdate(F32 time)
         // F = ma
         const F32 force_accel = behavior_gain * (acceleration_joint_local * behavior_mass);
 
-        // Gravity always points downward in world space.
         // F = mg
-        const LLVector3 gravity_world(0,0,1);
-        const F32 force_gravity = (toLocal(gravity_world) * behavior_gravity * behavior_mass);
+        const F32 force_gravity = (gravity_local * behavior_gravity * behavior_mass);
 
         // Damping is a restoring force that opposes the current velocity.
         // F = -kv
@@ -632,7 +667,7 @@ bool LLPhysicsMotion::onUpdate(F32 time)
         // Temporary debugging setting to cause all avatars to move, for profiling purposes.
         if (physics_test)
         {
-            velocity_new_local = sin(time*4.0f);
+            velocity_new_local = (F32)sin(time*4.0);
         }
         // Calculate the new parameters, or remain unchanged if max speed is 0.
         F32 position_new_local = position_current_local + velocity_new_local*time_iteration_step;
@@ -663,23 +698,18 @@ bool LLPhysicsMotion::onUpdate(F32 time)
                                    0.0f,
                                    1.0f);
 
-        LLDriverParam *driver_param = dynamic_cast<LLDriverParam *>(mParamDriver);
-        llassert_always(driver_param);
-        if (driver_param)
+        // If this is one of our "hidden" driver params, then make sure it's
+        // the default value.
+        if ((mDriverParam->getGroup() != VISUAL_PARAM_GROUP_TWEAKABLE) &&
+            (mDriverParam->getGroup() != VISUAL_PARAM_GROUP_TWEAKABLE_NO_TRANSMIT))
         {
-            // If this is one of our "hidden" driver params, then make sure it's
-            // the default value.
-            if ((driver_param->getGroup() != VISUAL_PARAM_GROUP_TWEAKABLE) &&
-                (driver_param->getGroup() != VISUAL_PARAM_GROUP_TWEAKABLE_NO_TRANSMIT))
-            {
-                mCharacter->setVisualParamWeight(driver_param, 0);
-            }
-            S32 num_driven = driver_param->getDrivenParamsCount();
-            for (S32 i = 0; i < num_driven; ++i)
-            {
-                const LLViewerVisualParam *driven_param = driver_param->getDrivenParam(i);
-                setParamValue(driven_param,position_new_local_clamped, behavior_maxeffect);
-            }
+            mCharacter->setVisualParamWeight(mDriverParam, 0);
+        }
+        S32 num_driven = mDriverParam->getDrivenParamsCount();
+        for (S32 i = 0; i < num_driven; ++i)
+        {
+            const LLViewerVisualParam *driven_param = mDriverParam->getDrivenParam(i);
+            setParamValue(driven_param,position_new_local_clamped, behavior_maxeffect);
         }
 
         //
@@ -695,17 +725,10 @@ bool LLPhysicsMotion::onUpdate(F32 time)
         // the graphics LOD settings.
 
         // For non-self, if the avatar is small enough visually, then don't update.
-        const F32 area_for_max_settings = 0.0;
-        const F32 area_for_min_settings = 1400.0;
-        const F32 area_for_this_setting = area_for_max_settings + (area_for_min_settings-area_for_max_settings)*(1.0f-lod_factor);
-            const F32 pixel_area = sqrtf(mCharacter->getPixelArea());
-
-        const bool is_self = (dynamic_cast<LLVOAvatarSelf *>(mCharacter) != NULL);
-        if ((pixel_area > area_for_this_setting) || is_self)
+        if (visible_enough)
         {
             const F32 position_diff_local = llabs(mPositionLastUpdate_local-position_new_local_clamped);
-            const F32 min_delta = (1.0001f-lod_factor)*0.4f;
-            if (llabs(position_diff_local) > min_delta)
+            if (position_diff_local > min_delta)
             {
                 update_visuals = true;
                 mPositionLastUpdate_local = position_new_local;

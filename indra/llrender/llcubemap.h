@@ -52,7 +52,9 @@ public:
 
     void disable(void);
     void disableTexture(void);
-    void setMatrix(S32 stage);
+    // Loads the rotation of the modelview into the texture matrix, so the
+    // lookup direction is in world space
+    void setMatrix(S32 stage, const LLMatrix4a& modelview);
     void restoreMatrix();
 
     U32 getResolution() { return mImages[0].notNull() ? mImages[0]->getWidth(0) : 0; }

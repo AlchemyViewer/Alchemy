@@ -19,6 +19,8 @@
 #include "lltrans.h"
 #include "rlvhandler.h"
 
+#include <fmt/format.h>
+
 static const size_t num_collision_sounds = 28;
 const LLUUID collision_sounds[num_collision_sounds] =
 {
@@ -265,7 +267,7 @@ bool ALFloaterExploreSounds::tick()
         else
         {
             LLStringUtil::format_map_t format_args;
-            format_args["TIME"] = llformat("%.1f", static_cast<F32>((LLTimer::getElapsedSeconds() - item.mTimeStopped) / 60.0));
+            format_args["TIME"] = llformat("%.1f", static_cast<F32>((LLTimer::getUptimeSeconds() - item.mTimeStopped) / 60.0));
             str_not_playing.setArgs(format_args);
             playing_column["value"] = str_not_playing.getString();
         }
@@ -448,7 +450,7 @@ void ALFloaterExploreSounds::handleStop()
                 if (iter != sound_log.end())
                 {
                     iter->second->mPlaying = false;
-                    iter->second->mTimeStopped = LLTimer::getElapsedSeconds();
+                    iter->second->mTimeStopped = LLTimer::getUptimeSeconds();
                 }
                 else
                 {
@@ -457,7 +459,7 @@ void ALFloaterExploreSounds::handleStop()
                         if (histItem.mID == item.mID)
                         {
                             histItem.mPlaying = false;
-                            histItem.mTimeStopped = LLTimer::getElapsedSeconds();
+                            histItem.mTimeStopped = LLTimer::getUptimeSeconds();
                             break;
                         }
                     }

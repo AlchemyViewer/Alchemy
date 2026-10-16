@@ -38,13 +38,11 @@
 
 #include "llcommon.h"
 
-#include "llerrorcontrol.h"
 #include "llframetimer.h"
 #include "lllivefile.h"
 #include "llmemory.h"
 #include "llstl.h" // for DeletePointer()
 #include "llstring.h"
-#include "llthread.h" // for on_main_thread()
 #include "lleventtimer.h"
 #include "stringize.h"
 #include "llcleanup.h"
@@ -129,6 +127,12 @@ LLApp::~LLApp()
     setStopped();
 
     SUBSYSTEM_CLEANUP_DBG(LLCommon);
+
+    // Gone, so instance() no longer finds it.
+    if (sApplication == this)
+    {
+        sApplication = NULL;
+    }
 }
 
 // static
@@ -197,7 +201,6 @@ void LLApp::setupErrorHandling(bool second_instance)
 
 #else  // ! LL_WINDOWS
 
-#if ! defined(LL_BUGSPLAT)
     //
     // Start up signal handling.
     //
@@ -205,7 +208,6 @@ void LLApp::setupErrorHandling(bool second_instance)
     // thread, asynchronous signals can be delivered to any thread (in theory)
     //
     setup_signals();
-#endif // ! LL_BUGSPLAT
 
 #endif // ! LL_WINDOWS
 }
@@ -377,6 +379,11 @@ void LLApp::sendOutOfDiskSpaceNotification()
 }
 
 #ifndef LL_WINDOWS
+// With a crash reporter in the process, the crash signals are its own:
+// crashpad on Linux and SentryCrash on macOS install their handlers after
+// this runs, and a handler of ours underneath would have nothing to add once
+// the reporter re-raises. The signals the app answers itself, for a graceful
+// quit or to ignore, stay with it either way.
 void setup_signals()
 {
     //
@@ -387,14 +394,11 @@ void setup_signals()
     sigemptyset( &act.sa_mask );
     act.sa_flags = SA_SIGINFO;
 
+#if ! AL_SENTRY
     // Synchronous signals
-#   ifndef LL_BUGSPLAT
     sigaction(SIGABRT, &act, NULL);
-#   endif
-    sigaction(SIGALRM, &act, NULL);
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGFPE, &act, NULL);
-    sigaction(SIGHUP, &act, NULL);
     sigaction(SIGILL, &act, NULL);
     sigaction(SIGPIPE, &act, NULL);
     sigaction(SIGSEGV, &act, NULL);
@@ -402,6 +406,20 @@ void setup_signals()
 
     sigaction(LL_HEARTBEAT_SIGNAL, &act, NULL);
     sigaction(LL_SMACKDOWN_SIGNAL, &act, NULL);
+
+    // Asynchronous signals that result in core
+    sigaction(SIGQUIT, &act, NULL);
+#else // AL_SENTRY
+    // SentryCrash counts a broken pipe as a crash, and leaves an ignored
+    // signal alone.
+    struct sigaction ignore;
+    ignore.sa_handler = SIG_IGN;
+    sigemptyset( &ignore.sa_mask );
+    ignore.sa_flags = 0;
+    sigaction(SIGPIPE, &ignore, NULL);
+#endif // AL_SENTRY
+
+    sigaction(SIGALRM, &act, NULL);
 
     // Asynchronous signals that are normally ignored
 #ifndef LL_IGNORE_SIGCHLD
@@ -413,10 +431,6 @@ void setup_signals()
     sigaction(SIGHUP, &act, NULL);
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT, &act, NULL);
-
-    // Asynchronous signals that result in core
-    sigaction(SIGQUIT, &act, NULL);
-
 }
 
 void clear_signals()
@@ -426,14 +440,11 @@ void clear_signals()
     sigemptyset( &act.sa_mask );
     act.sa_flags = SA_SIGINFO;
 
+#if ! AL_SENTRY
     // Synchronous signals
-#   ifndef LL_BUGSPLAT
     sigaction(SIGABRT, &act, NULL);
-#   endif
-    sigaction(SIGALRM, &act, NULL);
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGFPE, &act, NULL);
-    sigaction(SIGHUP, &act, NULL);
     sigaction(SIGILL, &act, NULL);
     sigaction(SIGPIPE, &act, NULL);
     sigaction(SIGSEGV, &act, NULL);
@@ -442,19 +453,22 @@ void clear_signals()
     sigaction(LL_HEARTBEAT_SIGNAL, &act, NULL);
     sigaction(LL_SMACKDOWN_SIGNAL, &act, NULL);
 
+    // Asynchronous signals that result in core
+    sigaction(SIGQUIT, &act, NULL);
+#endif // ! AL_SENTRY
+
+    sigaction(SIGALRM, &act, NULL);
+
     // Asynchronous signals that are normally ignored
 #ifndef LL_IGNORE_SIGCHLD
     sigaction(SIGCHLD, &act, NULL);
 #endif // LL_IGNORE_SIGCHLD
+    sigaction(SIGUSR2, &act, NULL);
 
     // Asynchronous signals that result in attempted graceful exit
     sigaction(SIGHUP, &act, NULL);
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT, &act, NULL);
-
-    // Asynchronous signals that result in core
-    sigaction(SIGUSR2, &act, NULL);
-    sigaction(SIGQUIT, &act, NULL);
 }
 
 const char* signal_to_string(int sig) {
@@ -473,8 +487,6 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 {
     // Unix implementation of synchronous signal handler
     // This runs in the thread that threw the signal.
-    // We do the somewhat sketchy operation of blocking in here until the error handler
-    // has gracefully stopped the app.
 
     // FIXME(brad) - we are using this handler for asynchronous signals as well, so sLogInSignal is currently
     // disabled for safety.  we need to find a way to selectively reenable it when it is safe.
@@ -497,7 +509,8 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 
         return;
     case SIGABRT:
-        // Note that this handler is not set for SIGABRT when using Bugsplat
+        // With a crash reporter in the process this handler is not installed
+        // for SIGABRT, or any other crash signal; see setup_signals().
         // Abort just results in termination of the app, no funky error handling.
         if (LLApp::sLogInSignal)
         {
@@ -543,11 +556,6 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
                 {
                     LL_WARNS() << "Signal handler - Handling smackdown signal!" << LL_ENDL;
                 }
-                else
-                {
-                    // Don't log anything, even errors - this is because this signal could happen anywhere.
-                    LLError::setDefaultLevel(LLError::LEVEL_NONE);
-                }
 
                 // Change the signal that we reraise to SIGABRT, so we generate a core dump.
                 signum = SIGABRT;
@@ -555,54 +563,21 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 
             if (LLApp::sLogInSignal)
             {
-                LL_WARNS() << "Signal handler - Handling fatal signal!" << LL_ENDL;
+                LL_WARNS() << "Signal handler - Fatal signal, passing it back to the operating system" << LL_ENDL;
             }
 
-            if (LLApp::isError())
-            {
-                // Received second fatal signal while handling first, just die right now
-                // Set the signal handlers back to default before handling the signal - this makes the next signal wipe out the app.
-                clear_signals();
-
-                if (LLApp::sLogInSignal)
-                {
-                    LL_WARNS() << "Signal handler - Got another fatal signal while in the error handler, die now!" << LL_ENDL;
-                }
-                raise(signum);
-                return;
-            }
-
-            if (LLApp::sLogInSignal)
-            {
-                LL_WARNS() << "Signal handler - Flagging error status and waiting for shutdown" << LL_ENDL;
-            }
-
-            if (LLApp::isCrashloggerDisabled()) // Don't gracefully handle any signal, crash and core for a gdb post mortem
-            {
-                clear_signals();
-                LL_WARNS() << "Fatal signal received, not handling the crash here, passing back to operating system" << LL_ENDL;
-                raise(signum);
-                return;
-            }
-
-            if (!on_main_thread())
-            {
-                // A fatal signal on a helper thread cannot be handled gracefully:
-                // setError() posts events and joins thread pools, which deadlocks
-                // if the crashing thread is one the shutdown depends on, e.g. a
-                // libdispatch worker inside the macOS GL driver. Crash instead.
-                clear_signals();
-                raise(signum);
-                return;
-            }
-
-            // Flag status to ERROR
-            LLApp::setError();
-
-            if (LLApp::sLogInSignal)
-            {
-                LL_WARNS() << "Signal handler - App is stopped, reraising signal" << LL_ENDL;
-            }
+            // A fatal signal is never handled here, on any thread. LLApp::setError()
+            // posts the status change, and its listeners close work queues and join
+            // thread pools -- none of it safe inside a signal handler, least of all
+            // after a fault, when the heap may already be damaged. Each worker that
+            // exits frees its malloc cache on the way out and aborts on that damage,
+            // so the core records a worker's abort instead of the fault that started
+            // it; and a fault on a thread the shutdown waits for, such as a
+            // libdispatch worker inside the macOS GL driver, deadlocks outright.
+            // LLApp::isError() is no safer, since it locks a fiber mutex.
+            //
+            // Restoring the default handlers before re-raising also covers a second
+            // fatal signal: it takes the process down by default.
             clear_signals();
             raise(signum);
             return;

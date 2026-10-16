@@ -21,7 +21,6 @@
 	<check_box label="Terraformen blockieren" name="block_terraform_check"/>
 	<check_box label="Fliegen blockieren" name="block_fly_check"/>
 	<check_box label="Überfliegen von Parzellen blockieren" name="block_fly_over_check" tool_tip="Zugangsprüfungen nach oben ausdehnen, um Überfliegen einer Parzelle zu verhindern"/>
-	<check_box label="Schaden zulassen" name="allow_damage_check"/>
 	<check_box label="Stoßen beschränken" name="restrict_pushobject"/>
 	<check_box label="Landwiederverkauf zulassen" name="allow_land_resell_check"/>
 	<check_box label="Landumverteilung zulassen" name="allow_parcel_changes_check"/>
@@ -41,4 +40,7 @@
 	<button label="Alle Einwohner nach Hause teleportieren..." name="kick_all_btn"/>
 	<button label="Nachricht an Region senden..." name="im_btn"/>
 	<button label="Telehub verwalten..." name="manage_telehub_btn"/>
+	<panel name="Combat">
+		<check_box label="Schaden zulassen" name="allow_damage_check"/>
+	</panel>
 </panel>

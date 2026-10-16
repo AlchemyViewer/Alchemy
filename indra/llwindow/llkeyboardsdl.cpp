@@ -121,12 +121,18 @@ LLKeyboardSDL::LLKeyboardSDL()
     mTranslateKeyMap[SDLK_F10] = KEY_F10;
     mTranslateKeyMap[SDLK_F11] = KEY_F11;
     mTranslateKeyMap[SDLK_F12] = KEY_F12;
+    mTranslateKeyMap[SDLK_APPLICATION] = KEY_CONTEXT_MENU;
+    mTranslateKeyMap[SDLK_MENU] = KEY_CONTEXT_MENU;
     mTranslateKeyMap[SDLK_PLUS]   = '=';
     mTranslateKeyMap[SDLK_COMMA]  = ',';
     mTranslateKeyMap[SDLK_MINUS]  = '-';
     mTranslateKeyMap[SDLK_PERIOD] = '.';
     mTranslateKeyMap[SDLK_GRAVE] = '`';
-    mTranslateKeyMap[SDLK_SLASH] = KEY_DIVIDE;
+    // The main-row slash is '/', as Win32 maps VK_OEM_2: LL moved it off the
+    // keypad's code there because that broke typing into media prims
+    // (EXT-3650), and as KEY_DIVIDE it also fired the start_gesture binding
+    // the keypad's slash has. Only the keypad's slash is KEY_DIVIDE, above.
+    mTranslateKeyMap[SDLK_SLASH] = '/';
     mTranslateKeyMap[SDLK_SEMICOLON] = ';';
     mTranslateKeyMap[SDLK_LEFTBRACKET] = '[';
     mTranslateKeyMap[SDLK_BACKSLASH] = '\\';
@@ -201,7 +207,15 @@ MASK LLKeyboardSDL::updateModifiers(const MASK mask)
 
     if(mask & SDL_KMOD_CTRL)
     {
+#if LL_DARWIN
+        // The Mac's own Control key, apart from Command: what a shortcut
+        // is made with there is Command, which is MASK_CONTROL, and
+        // Control is left to whoever asks for it by name -- Control-Tab,
+        // the text system's line keys, vim's chords.
+        out_mask |= MASK_MAC_CONTROL;
+#else
         out_mask |= MASK_CONTROL;
+#endif
     }
 
     if(mask & SDL_KMOD_ALT)
@@ -325,7 +339,16 @@ MASK LLKeyboardSDL::currentMask(bool for_mouse_event)
     if (mask & SDL_KMOD_SHIFT)
         result |= MASK_SHIFT;
     if (mask & SDL_KMOD_CTRL)
+    {
+#if LL_DARWIN
+        // A click with Control held is a Control-click, as the tools and
+        // the camera have always had it; a key with it is the Mac's own
+        // Control, as updateModifiers says.
+        result |= for_mouse_event ? MASK_CONTROL : MASK_MAC_CONTROL;
+#else
         result |= MASK_CONTROL;
+#endif
+    }
     if (mask & SDL_KMOD_ALT)
         result |= MASK_ALT;
 

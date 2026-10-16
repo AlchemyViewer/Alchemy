@@ -263,7 +263,7 @@ PICK: TEXTURE
      search_column="1"
      visible="false">
         <column name="icon" label="" width="20" />
-        <column name="unit_name" label="Name" dynamicwidth="true" />
+        <column name="unit_name" label="Name" dynamic_width="true" />
     </scroll_list>
 
 <!-- middle: bake mode -->

@@ -15,5 +15,9 @@
 		</text>
 		<button label="" name="edit_outfit_btn" tool_tip="編輯這裝扮"/>
 	</panel>
-	<filter_editor label="裝扮過濾器" name="Filter"/>
+	<layout_stack name="top_menu_panel">
+		<layout_panel name="filter_panel">
+			<filter_editor label="裝扮過濾器" name="Filter"/>
+		</layout_panel>
+	</layout_stack>
 </panel>

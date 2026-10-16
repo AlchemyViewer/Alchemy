@@ -274,10 +274,10 @@ bool LLDirPicker::getDir(std::string* filename, bool blocking)
     if (blocking)
     {
         send_agent_resume();
+        // Account for the fact that the app has been stalled.
+        LLFrameTimer::updateFrameTime();
     }
 
-    // Account for the fact that the app has been stalled.
-    LLFrameTimer::updateFrameTime();
     return success;
 }
 

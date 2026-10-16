@@ -33,9 +33,11 @@
 
 //=========================================================================
 
-class LLFloaterTrackPicker : public LLFloater
+class LLFloaterTrackPicker final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterTrackPicker, LLFloater);
+
     LLFloaterTrackPicker(LLView * owner, const LLSD &params = LLSD());
     virtual ~LLFloaterTrackPicker() override;
 

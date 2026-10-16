@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  A highlighting grammar for JSON, read by ALSyntaxGrammar (indra/llui).
+
+  states: named lists of rules, tried in order at every position. A rule
+  matches one of: match (a literal; whole_word to refuse it inside a word),
+  chars (a class, with min and max; unicode for everything beyond ASCII),
+  word (an identifier, looked up in `tables`, each a table and the kind a
+  word found there is), span (an opening with an end, an escape, and
+  multiline; one that is not ends with its line, but for a line that ends
+  in its unless_after, as an eol's), span_regex with end_regex (where \1
+  stands for the opening's first capture), regex (anchored where it is
+  tried; not_after_chars, a class the character before it may not be in,
+  and consume, the group that is the token, the rest of the match only
+  read), or eol (the line's end; unless_after names what, ending a line,
+  carries the state on to the next, unless it is part of a longer escape).
+  It names the kind it makes and where it goes: push, pop or next.
+  What nothing matches is one character of the state's default kind.
+  Patterns are RE2's, which has no lookaround and no backreference:
+  not_after_chars, consume and an opener's unless stand in for them.
+
+  words: the words the grammar itself puts in its tables; the language
+  service adds the rest at runtime.
+
+  indent: how the language indents. opens, a pattern found at the end
+  of the text before the caret, which sends a new line in a level - or a
+  list of them, each a pattern or a map of one, regex, and unless, what
+  keeps it from opening a block if found anywhere from where it starts -
+  and closes, one matched at the start of a line's text, which brings the
+  line out to the level of what opened it as it is typed.
+  pairs: the brackets and quotes typed in pairs, each its opener and
+  its closer, which the editor closes as the opener is typed.
+-->
+<llsd>
+  <map>
+    <key>name</key>
+    <string>json</string>
+    <key>pairs</key>
+    <array>
+      <string>{}</string>
+      <string>[]</string>
+      <string>""</string>
+    </array>
+    <key>extensions</key>
+    <array>
+      <string>json</string>
+    </array>
+    <key>indent</key>
+    <map>
+      <key>opens</key>
+      <string>[{\[][ \t]*$</string>
+      <key>closes</key>
+      <string>[}\]]</string>
+    </map>
+    <key>words</key>
+    <map>
+      <key>constant</key>
+      <array>
+        <string>true</string>
+        <string>false</string>
+        <string>null</string>
+      </array>
+    </map>
+    <key>states</key>
+    <map>
+      <key>main</key>
+      <array>
+        <map>
+          <key>regex</key>
+          <string>("(?:[^"\\]|\\.)*")\s*:</string>
+          <key>consume</key>
+          <integer>1</integer>
+          <key>kind</key>
+          <string>property</string>
+        </map>
+        <!-- A value one word long with a dot or a slash in it names a
+             file, a module or an address: a path, and no prose. -->
+        <map>
+          <key>regex</key>
+          <string>"[^"\s\\]*[./][^"\s\\]*"</string>
+          <key>kind</key>
+          <string>path</string>
+        </map>
+        <map>
+          <key>span</key>
+          <string>"</string>
+          <key>end</key>
+          <string>"</string>
+          <key>escape</key>
+          <string>\</string>
+          <key>kind</key>
+          <string>string</string>
+          <key>multiline</key>
+          <boolean>0</boolean>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?</string>
+          <key>kind</key>
+          <string>number</string>
+        </map>
+        <map>
+          <key>word</key>
+          <boolean>1</boolean>
+          <key>tables</key>
+          <array>
+            <map>
+              <key>table</key>
+              <string>constant</string>
+              <key>kind</key>
+              <string>constant</string>
+            </map>
+          </array>
+        </map>
+        <map>
+          <key>chars</key>
+          <string>{}[]:,</string>
+          <key>max</key>
+          <integer>1</integer>
+          <key>kind</key>
+          <string>punctuation</string>
+        </map>
+      </array>
+    </map>
+  </map>
+</llsd>

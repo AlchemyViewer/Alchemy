@@ -1,0 +1,562 @@
+/**
+ * @file alxuitreemodel.cpp
+ * @brief Folder-view model over a built view tree for XUI Studio's hierarchy pane.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "alxuitreemodel.h"
+
+#include "alxuisourcemap.h"
+#include "llrender2dutils.h"
+#include "lltrans.h"
+#include "llui.h"
+#include "lluicolortable.h"
+#include "lluictrlfactory.h"
+#include "llview.h"
+
+// ---------------------------------------------------------------------------
+// ALXUITreeSort
+// ---------------------------------------------------------------------------
+bool ALXUITreeSort::operator()(const ALXUITreeItem* a, const ALXUITreeItem* b) const
+{
+    return a->getOrder() < b->getOrder();
+}
+
+// ---------------------------------------------------------------------------
+// ALXUITreeFilter
+// ---------------------------------------------------------------------------
+ALXUITreeFilter::ALXUITreeFilter()
+:   ALFolderFilter("xui_tree")
+{
+}
+
+void ALXUITreeFilter::setShowCodeBuilt(bool show)
+{
+    if (show == mShowCodeBuilt)
+    {
+        return;
+    }
+    mShowCodeBuilt = show;
+    setModified();
+}
+
+bool ALXUITreeFilter::check(const LLFolderViewModelItem* item)
+{
+    const ALXUITreeItem* row = static_cast<const ALXUITreeItem*>(item);
+    if (!mShowCodeBuilt && !row->isFromXML())
+    {
+        return false;
+    }
+    return words().empty() || row->getSearchableName().find(words()) != std::string::npos;
+}
+
+// ---------------------------------------------------------------------------
+// ALXUITreeModel
+// ---------------------------------------------------------------------------
+ALXUITreeModel::ALXUITreeModel()
+:   base_t(new ALXUITreeSort(), new ALXUITreeFilter())
+{
+}
+
+ALXUITreeModel::~ALXUITreeModel()
+{
+    clear();
+}
+
+void ALXUITreeModel::clear()
+{
+    // The items are reference counted and the folder view holds them as
+    // long as its widgets live; releasing the maps releases this side.
+    mRoot = nullptr;
+    mByPath.clear();
+    mByView.clear();
+}
+
+ALXUITreeItem* ALXUITreeModel::build(LLView* root, const ALXUISourceMap& source_map)
+{
+    clear();
+    if (!root)
+    {
+        return nullptr;
+    }
+    mRoot = buildItem(root, source_map, ALXUISelection::path_t(), 0);
+    return mRoot.get();
+}
+
+ALXUITreeItem* ALXUITreeModel::buildItem(LLView* view, const ALXUISourceMap& source_map,
+                                         const ALXUISelection::path_t& path, S32 order)
+{
+    const ALXUISourceMap::Origin* origin = source_map.find(view);
+    std::string tag;
+    if (origin)
+    {
+        tag = origin->tag;
+    }
+    else if (const std::string* registered = LLUICtrlFactory::widgetTag(view->viewType()))
+    {
+        tag = *registered;
+    }
+    else
+    {
+        tag = view->viewType()->mName;
+    }
+
+    ALXUITreeItem* item = new ALXUITreeItem(view, tag, origin != nullptr, order, path, *this);
+    mByPath.emplace(ALXUISelection::toString(path), item);
+    mByView.emplace(view, item);
+
+    // Children in creation order, which is the reverse of the list; a
+    // repeated name among them takes its ordinal in that order.
+    const LLView::child_list_t& children = *view->getChildList();
+    boost::unordered_map<std::string, S32> seen;
+    S32 child_order = 0;
+    for (auto it = children.rbegin(); it != children.rend(); ++it)
+    {
+        LLView* child = *it;
+        ALXUISelection::path_t child_path(path);
+        child_path.push_back(ALXUISelection::step(child->getName(), seen[child->getName()]++));
+        item->addChild(buildItem(child, source_map, child_path, child_order++));
+    }
+    return item;
+}
+
+ALXUITreeItem* ALXUITreeModel::itemFor(const ALXUISelection::path_t& path) const
+{
+    auto it = mByPath.find(ALXUISelection::toString(path));
+    return it == mByPath.end() ? nullptr : it->second;
+}
+
+ALXUITreeItem* ALXUITreeModel::itemFor(const LLView* view) const
+{
+    auto it = mByView.find(view);
+    return it == mByView.end() ? nullptr : it->second;
+}
+
+bool ALXUITreeModel::rebind(const ALXUISelection::path_t& path, LLView* root)
+{
+    ALXUITreeItem* item = itemFor(path);
+    if (!item || !root)
+    {
+        return false;
+    }
+    bool every = true;
+    // Depth first from the row the rebuilt element is on: it and everything
+    // under it were built from views that have gone.
+    std::vector<ALXUITreeItem*> waiting{ item };
+    while (!waiting.empty())
+    {
+        ALXUITreeItem* one = waiting.back();
+        waiting.pop_back();
+        LLView* now = ALXUISelection::resolve(root, one->getPath());
+        if (!now)
+        {
+            // The path names nothing here any more, so this row is showing a
+            // view that has gone and no walk of this tree will find what
+            // replaced it. Saying so is the whole of what the caller can act
+            // on: a row left pointing at a deleted view is drawn.
+            every = false;
+        }
+        else if (now != one->getView())
+        {
+            mByView.erase(one->getView());
+            one->setView(now);
+            mByView[now] = one;
+        }
+        for (auto child = one->getChildrenBegin(); child != one->getChildrenEnd(); ++child)
+        {
+            waiting.push_back(static_cast<ALXUITreeItem*>(child->get()));
+        }
+    }
+    return every;
+}
+
+bool ALXUITreeModel::startDrag(std::vector<LLFolderViewModelItem*>& items)
+{
+    // One element at a time: a drag carries the row it began on, and what
+    // else was selected stays where it is.
+    if (!mDragStart || items.empty() || !items.front())
+    {
+        return false;
+    }
+    return mDragStart(static_cast<ALXUITreeItem*>(items.front())->getPath());
+}
+
+bool ALXUITreeItem::isItemMovable() const
+{
+    return mFromXML && !mPath.empty() && mModel.canDrag();
+}
+
+void ALXUITreeModel::buildContextMenu(ALXUITreeItem& item, LLMenuGL& menu, U32 flags)
+{
+    if (mContextMenu)
+    {
+        mContextMenu(item, menu, flags);
+    }
+}
+
+void ALXUITreeModel::rowHovered(const ALXUITreeItem* item)
+{
+    if (item == mRowHover)
+    {
+        return;
+    }
+    mRowHover = item;
+    if (mHover)
+    {
+        mHover(item);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ALXUITreeItem
+// ---------------------------------------------------------------------------
+ALXUITreeItem::ALXUITreeItem(LLView* view, std::string tag, bool from_xml, S32 order,
+                             ALXUISelection::path_t path, ALXUITreeModel& model)
+:   ALFilteredItem(model),
+    mView(view),
+    mTag(std::move(tag)),
+    mName(view->getName()),
+    mPath(std::move(path)),
+    mModel(model),
+    mOrder(order),
+    mFromXML(from_xml),
+    mAuthoredVisible(view->getVisible())
+{
+    mSearchable = utf8str_tolower(mName) + " " + mTag;
+}
+
+bool ALXUITreeItem::isShown() const
+{
+    return mView->getVisible();
+}
+
+void ALXUITreeItem::setShown(bool shown)
+{
+    mView->setVisible(shown);
+}
+
+LLFontGL::StyleFlags ALXUITreeItem::getLabelStyle() const
+{
+    return mFromXML ? LLFontGL::NORMAL : LLFontGL::ITALIC;
+}
+
+std::string ALXUITreeItem::getLabelSuffix() const
+{
+    const LLRect& rect = mView->getRect();
+    std::string suffix;
+    // The findings on this row and everything below it, first, so it sits
+    // against the name rather than at the end of the line.
+    if (const S32 findings = mModel.badgeFor(mPath))
+    {
+        suffix += "  [" + std::to_string(findings) + "]";
+    }
+    suffix += "  " + mTag + "  " + std::to_string(rect.getWidth()) + "x" + std::to_string(rect.getHeight());
+    // Read once: this is asked of every row on every frame the outline
+    // is drawn.
+    static const std::string hidden = LLTrans::getString("XUITreeHidden");
+    static const std::string hidden_here = LLTrans::getString("XUITreeHiddenHere");
+    static const std::string disabled = LLTrans::getString("XUITreeDisabled");
+    if (!isShown())
+    {
+        suffix += "  " + (isAuthoredVisible() ? hidden_here : hidden);
+    }
+    if (!mView->getEnabled())
+    {
+        suffix += "  " + disabled;
+    }
+    return suffix;
+}
+
+void ALXUITreeItem::buildContextMenu(LLMenuGL& menu, U32 flags)
+{
+    mModel.buildContextMenu(*this, menu, flags);
+}
+
+void ALXUITreeItem::setPassedFilter(bool passed, S32 filter_generation,
+                                    std::string::size_type string_offset,
+                                    std::string::size_type string_size)
+{
+    // Only an arrange applies pass and fail to the widgets, and nothing
+    // else asks for one when a filter changes.
+    const S32 last_generation = mLastFilterGeneration;
+    LLFolderViewModelItemCommon::setPassedFilter(passed, filter_generation, string_offset, string_size);
+    const bool before = mPrevPassedAllFilters;
+    mPrevPassedAllFilters = passedFilter(filter_generation);
+    if (before != mPrevPassedAllFilters
+        || (mPrevPassedAllFilters && last_generation < mRootViewModel.getFilter().getFirstSuccessGeneration()))
+    {
+        LLFolderViewFolder* parent_folder = mFolderViewItem ? mFolderViewItem->getParentFolder() : nullptr;
+        if (parent_folder)
+        {
+            parent_folder->requestArrange();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The eye
+// ---------------------------------------------------------------------------
+namespace
+{
+    LLRect eyeRect(S32 row_width, S32 row_height, S32 item_height)
+    {
+        const S32 right = row_width - 2;
+        const S32 top = row_height - 1;
+        return LLRect(right - ALXUITreeEye::WIDTH, top, right, top - item_height + 2);
+    }
+
+    void drawEye(const LLRect& rect, bool shown, bool selected)
+    {
+        static const LLUIImagePtr on = LLUI::getUIImage("Profile_Group_Visibility_On");
+        static const LLUIImagePtr off = LLUI::getUIImage("Profile_Group_Visibility_Off");
+        const LLUIImagePtr& image = shown ? on : off;
+        if (image.isNull())
+        {
+            return;
+        }
+        const S32 size = llmin(rect.getWidth(), rect.getHeight()) - 2;
+        const S32 x = rect.mLeft + (rect.getWidth() - size) / 2;
+        const S32 y = rect.mBottom + (rect.getHeight() - size) / 2;
+        LLColor4 color = LLColor4::white;
+        if (!shown && !selected)
+        {
+            color.mV[VALPHA] = 0.5f;
+        }
+        image->draw(x, y, size, size, color);
+    }
+}
+
+// static
+LLRect ALXUITreeEye::rectIn(const LLFolderViewItem& row)
+{
+    return eyeRect(row.getRect().getWidth(), row.getRect().getHeight(), row.getItemHeight());
+}
+
+// static
+void ALXUITreeEye::draw(const LLFolderViewItem& row)
+{
+    const ALXUITreeItem* item = static_cast<const ALXUITreeItem*>(row.getViewModelItem());
+    if (!item)
+    {
+        return;
+    }
+    drawEye(rectIn(row), item->isShown(), row.isSelected());
+}
+
+// static
+bool ALXUITreeEye::hit(const LLFolderViewItem& row, S32 x, S32 y)
+{
+    return rectIn(row).pointInRect(x, y);
+}
+
+// static
+void ALXUITreeEye::drawCanvasHover(const LLFolderViewItem& row)
+{
+    const ALXUITreeItem* item = static_cast<const ALXUITreeItem*>(row.getViewModelItem());
+    if (!item || item->getModel().canvasHover() != item)
+    {
+        return;
+    }
+    static const LLUIColor color = LLUIColorTable::instance().getColor("MenuItemHighlightBgColor", LLColor4(0.5f, 0.5f, 0.5f, 0.3f));
+    const S32 top = row.getRect().getHeight();
+    LLColor4 fill = color.get();
+    fill.mV[VALPHA] *= 0.5f;
+    gl_rect_2d(0, top, row.getRect().getWidth(), top - row.getItemHeight(), fill);
+}
+
+// static
+void ALXUITreeEye::reportHover(const LLFolderViewItem& row, S32 y, bool inside)
+{
+    const ALXUITreeItem* item = static_cast<const ALXUITreeItem*>(row.getViewModelItem());
+    if (!item)
+    {
+        return;
+    }
+    // A folder's rectangle holds its children; only the strip at the top
+    // is the row itself.
+    const bool on_row = inside && y > row.getRect().getHeight() - row.getItemHeight();
+    item->getModel().rowHovered(on_row ? item : nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// ALXUITreeFolder, ALXUITreeRow
+// ---------------------------------------------------------------------------
+void ALXUITreeFolder::draw()
+{
+    ALXUITreeEye::drawCanvasHover(*this);
+    LLFolderViewFolder::draw();
+    ALXUITreeEye::draw(*this);
+    ALXUITreeDrop::draw(*this, mDropZone);
+}
+
+// Over the rows it holds, the drag is theirs; over its own line, it is
+// about this element -- before it, into it, or after it.
+bool ALXUITreeFolder::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
+                                        void* cargo_data, EAcceptance* accept, std::string& tooltip_msg)
+{
+    if (isOpen() && y < getRect().getHeight() - getItemHeight())
+    {
+        return LLFolderViewFolder::handleDragAndDrop(x, y, mask, drop, cargo_type, cargo_data,
+                                                     accept, tooltip_msg);
+    }
+    return ALXUITreeDrop::dragOver(*this, mDropZone, y, drop, cargo_type, cargo_data, accept, tooltip_msg);
+}
+
+bool ALXUITreeFolder::handleHover(S32 x, S32 y, MASK mask)
+{
+    const bool handled = LLFolderViewFolder::handleHover(x, y, mask);
+    if (!isOpen() || y > getRect().getHeight() - getItemHeight())
+    {
+        ALXUITreeEye::reportHover(*this, y, true);
+    }
+    return handled;
+}
+
+void ALXUITreeFolder::onMouseLeave(S32 x, S32 y, MASK mask)
+{
+    LLFolderViewFolder::onMouseLeave(x, y, mask);
+    ALXUITreeEye::reportHover(*this, y, false);
+}
+
+bool ALXUITreeFolder::handleMouseDown(S32 x, S32 y, MASK mask)
+{
+    if (ALXUITreeEye::hit(*this, x, y))
+    {
+        static_cast<ALXUITreeItem*>(getViewModelItem())->toggleShown();
+        return true;
+    }
+    return LLFolderViewFolder::handleMouseDown(x, y, mask);
+}
+
+bool ALXUITreeFolder::handleDoubleClick(S32 x, S32 y, MASK mask)
+{
+    if (ALXUITreeEye::hit(*this, x, y))
+    {
+        return true;
+    }
+    return LLFolderViewFolder::handleDoubleClick(x, y, mask);
+}
+
+void ALXUITreeRow::draw()
+{
+    ALXUITreeEye::drawCanvasHover(*this);
+    LLFolderViewItem::draw();
+    ALXUITreeEye::draw(*this);
+    ALXUITreeDrop::draw(*this, mDropZone);
+}
+
+bool ALXUITreeRow::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
+                                     void* cargo_data, EAcceptance* accept, std::string& tooltip_msg)
+{
+    return ALXUITreeDrop::dragOver(*this, mDropZone, y, drop, cargo_type, cargo_data, accept, tooltip_msg);
+}
+
+namespace ALXUITreeDrop
+{
+    // How much of a row's line each edge takes: a third where the middle
+    // means into, a half where there is no middle.
+    ALXUITreeModel::DropZone zoneAt(const LLFolderViewItem& row, S32 y, bool container)
+    {
+        const S32 top = row.getRect().getHeight();
+        const S32 height = row.getItemHeight();
+        const S32 from_top = top - y;
+        if (container)
+        {
+            if (from_top < height / 3)
+            {
+                return ALXUITreeModel::DropZone::Before;
+            }
+            if (from_top > height - height / 3)
+            {
+                return ALXUITreeModel::DropZone::After;
+            }
+            return ALXUITreeModel::DropZone::Into;
+        }
+        return from_top < height / 2 ? ALXUITreeModel::DropZone::Before : ALXUITreeModel::DropZone::After;
+    }
+
+    bool dragOver(LLFolderViewItem& row, S8& zone, S32 y, bool drop, EDragAndDropType type,
+                  void* cargo, EAcceptance* accept, std::string& tip)
+    {
+        ALXUITreeItem* item = static_cast<ALXUITreeItem*>(row.getViewModelItem());
+        const ALXUITreeModel& model = item->model();
+        const ALXUITreeModel::DropZone where = zoneAt(row, y, model.isContainer(item->getPath()));
+        const bool taken = model.dropAt(item->getPath(), where, drop, type, cargo, tip);
+        zone = taken && !drop ? (S8)where : -1;
+        *accept = taken ? ACCEPT_YES_SINGLE : ACCEPT_NO;
+        return true;
+    }
+
+    // A line along the edge the element would go beside, or a box around
+    // the row it would go into. Drawn for the one frame after the drag
+    // said so, since nothing says when it has moved on.
+    void draw(const LLFolderViewItem& row, S8& zone)
+    {
+        if (zone < 0)
+        {
+            return;
+        }
+        static const LLUIColor ink = LLUIColorTable::instance().getColor("MenuItemHighlightColor", LLColor4::white);
+        const S32 top = row.getRect().getHeight();
+        const S32 bottom = top - row.getItemHeight();
+        const S32 left = row.getIndentation();
+        const S32 right = row.getRect().getWidth() - 2;
+        gGL.getTextureSlot(0)->unbind();
+        switch ((ALXUITreeModel::DropZone)zone)
+        {
+        case ALXUITreeModel::DropZone::Before:
+            gl_rect_2d(left, top, right, top - 2, ink.get(), true);
+            break;
+        case ALXUITreeModel::DropZone::After:
+            gl_rect_2d(left, bottom + 2, right, bottom, ink.get(), true);
+            break;
+        case ALXUITreeModel::DropZone::Into:
+            gl_rect_2d(left, top, right, bottom, ink.get(), false);
+            break;
+        }
+        zone = -1;
+    }
+}
+
+bool ALXUITreeRow::handleHover(S32 x, S32 y, MASK mask)
+{
+    const bool handled = LLFolderViewItem::handleHover(x, y, mask);
+    ALXUITreeEye::reportHover(*this, y, true);
+    return handled;
+}
+
+void ALXUITreeRow::onMouseLeave(S32 x, S32 y, MASK mask)
+{
+    LLFolderViewItem::onMouseLeave(x, y, mask);
+    ALXUITreeEye::reportHover(*this, y, false);
+}
+
+bool ALXUITreeRow::handleMouseDown(S32 x, S32 y, MASK mask)
+{
+    if (ALXUITreeEye::hit(*this, x, y))
+    {
+        static_cast<ALXUITreeItem*>(getViewModelItem())->toggleShown();
+        return true;
+    }
+    return LLFolderViewItem::handleMouseDown(x, y, mask);
+}

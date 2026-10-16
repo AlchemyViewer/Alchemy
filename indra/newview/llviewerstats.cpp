@@ -63,6 +63,9 @@
 #include "llcorehttputil.h"
 #include "llinventorymodel.h"
 #include "lltranslate.h"
+#if LL_VELOPACK
+#include "llvelopack.h"
+#endif
 
 // "Minimal Vulkan" to get max API Version
 
@@ -487,8 +490,6 @@ void update_statistics()
     sample(LLStatViewer::DRAW_DISTANCE,   (F64)gSavedSettings.getF32("RenderFarClip"));
     sample(LLStatViewer::CHAT_BUBBLES,    gSavedSettings.getBOOL("UseChatBubbles"));
 
-    typedef LLTrace::StatType<LLTrace::TimeBlockAccumulator>::instance_tracker_t stat_type_t;
-
     if (gAgent.getRegion() && isAgentAvatarValid())
     {
         LLCircuitData *cdp = gMessageSystem->mCircuitInfo.findCircuit(gAgent.getRegion()->getHost());
@@ -551,7 +552,7 @@ void update_statistics()
 
             auto tot_frame_time_raw = LLPerfStats::StatsRecorder::getSceneStat(LLPerfStats::StatType_t::RENDER_FRAME);
             // cumulative avatar time (includes idle processing, attachments and base av)
-            auto tot_avatar_time_raw = LLPerfStats::us_to_raw(LLVOAvatar::getTotalGPURenderTime());
+            auto tot_avatar_time_raw = LLPerfStats::ms_to_raw(LLVOAvatar::getTotalGPURenderTime());
             // cumulative avatar render specific time (a bit arbitrary as the processing is too.)
             // auto tot_av_idle_time_raw = LLPerfStats::StatsRecorder::getSum(AvType, LLPerfStats::StatType_t::RENDER_IDLE);
             // auto tot_avatar_render_time_raw = tot_avatar_time_raw - tot_av_idle_time_raw;
@@ -660,7 +661,7 @@ void send_viewer_stats(bool include_preferences)
 
     time_t ltime;
     time(&ltime);
-    F32 run_time = F32(LLFrameTimer::getElapsedSeconds());
+    F32 run_time = F32(LLFrameTimer::getUptimeSeconds());
 
     agent["start_time"] = S32(ltime - S32(run_time));
 
@@ -679,10 +680,12 @@ void send_viewer_stats(bool include_preferences)
     }
 
     // report time the viewer has spent in the foreground
-    agent["foreground_time"] = gForegroundTime.getElapsedTimeF32();
+    const F32 foreground_time = gForegroundTime.getElapsedTimeF32();
+    agent["foreground_time"] = foreground_time;
 
-    // send fps only for time app spends in foreground
-    agent["fps"] = (F32)gForegroundFrameCount / gForegroundTime.getElapsedTimeF32();
+    // send fps only for time app spends in foreground. There is none yet if the window has not had
+    // focus since the scene load started, and the division would send 0/0.
+    agent["fps"] = foreground_time > 0.f ? (F32)gForegroundFrameCount / foreground_time : 0.f;
 
     agent["normalized_session_jitter"] = LLViewerStats::instance().getLastNormalizedSessionJitter();
     agent["normalized_frametime_variance"] = LLViewerStats::instance().getLastNormalizedFrametimeVariance();
@@ -809,7 +812,7 @@ void send_viewer_stats(bool include_preferences)
     fail["off_circuit"] = (S32) gMessageSystem->mOffCircuitPackets;
     fail["invalid"] = (S32) gMessageSystem->mInvalidOnCircuitPackets;
 #if LL_VELOPACK
-    fail["missing_updater"] = false;
+    fail["missing_updater"] = !velopack_is_installed();
 #else
     fail["missing_updater"] = true;
 #endif

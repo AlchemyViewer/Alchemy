@@ -51,11 +51,11 @@
 #include "llsdserialize.h"
 #include "lljoint.h"
 
-#include "glm/mat4x4.hpp"
-#include "glm/gtc/type_ptr.hpp"
+#include "llmatrix4a.h"
 #include "llmatrix4a.h"
 
-#include <boost/regex.hpp>
+#include "alregex.h"
+
 #include <boost/algorithm/string/replace.hpp>
 
 std::string colladaVersion[VERSIONTYPE_COUNT+1] =
@@ -1187,26 +1187,15 @@ std::string LLDAELoader::preprocessDAE(std::string filename)
 
     LL_INFOS() << "Preprocessing dae file to remove spaces from the names, ids, etc." << LL_ENDL;
 
-    try
-    {
-        boost::regex re("\"[\\w\\.@#$-]*(\\s[\\w\\.@#$-]*)+\"");
-        boost::sregex_iterator next(buffer.begin(), buffer.end(), re);
-        boost::sregex_iterator end;
-        while (next != end)
-        {
-            boost::smatch match = *next;
-            std::string s = match.str();
-            LL_INFOS() << s << " found" << LL_ENDL;
-            boost::replace_all(s, " ", "_");
-            LL_INFOS() << "Replacing with " << s << LL_ENDL;
-            boost::replace_all(buffer, match.str(), s);
-            next++;
-        }
-    }
-    catch (boost::regex_error &)
-    {
-        LL_INFOS() << "Regex error" << LL_ENDL;
-    }
+    // Each quoted name with a space in it, spaces made underscores.
+    static const ALRegex re("\"[\\w\\.@#$-]*(\\s[\\w\\.@#$-]*)+\"");
+    re.replaceEach(buffer, [](const ALRegexMatch& match) {
+        std::string s = match.str();
+        LL_INFOS() << s << " found" << LL_ENDL;
+        boost::replace_all(s, " ", "_");
+        LL_INFOS() << "Replacing with " << s << LL_ENDL;
+        return s;
+    });
 
     return buffer;
 }
@@ -1229,9 +1218,9 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
         mesh_scale *= normalized_transformation;
         normalized_transformation = mesh_scale;
 
-        glm::mat4 inv_mat = glm::make_mat4((F32*)normalized_transformation.mMatrix);
-        inv_mat = glm::inverse(inv_mat);
-        LLMatrix4 inverse_normalized_transformation(glm::value_ptr(inv_mat));
+        LLMatrix4a inv_mat;
+        inv_mat.setInverse(LLMatrix4a(normalized_transformation));
+        const LLMatrix4 inverse_normalized_transformation = inv_mat.toMatrix4();
 
         domSkin::domBind_shape_matrix* bind_mat = skin->getBind_shape_matrix();
 
@@ -1250,10 +1239,10 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
                 }
             }
 
-            skin_info.mBindShapeMatrix.loadu(mat);
+            skin_info.mBindShapeMatrix.set(mat);
 
             LLMatrix4a trans(normalized_transformation);
-            matMul(trans, skin_info.mBindShapeMatrix, skin_info.mBindShapeMatrix);
+            skin_info.mBindShapeMatrix.setMul(trans, skin_info.mBindShapeMatrix);
         }
 
 

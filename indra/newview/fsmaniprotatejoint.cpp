@@ -115,13 +115,6 @@ static void renderPulsingSphere(const LLVector3& joint_world_position, const LLC
         gGL.popMatrix();
     }
     gGL.popMatrix();
-
-    // Check for OpenGL errors
-    GLenum err;
-    while ((err = glGetError()) != GL_NO_ERROR)
-    {
-        LL_INFOS() << "OpenGL Error: " << err << LL_ENDL;
-    }
 }
 
 static void renderStaticSphere(const LLVector3& joint_world_position, const LLColor4& color = LLColor4(1.f, 1.f, 0.f, .6f), float radius=0.01f)
@@ -160,13 +153,6 @@ static void renderStaticSphere(const LLVector3& joint_world_position, const LLCo
         gGL.popMatrix();
     }
     gGL.popMatrix();
-
-    // Check for OpenGL errors
-    GLenum err;
-    while ((err = glGetError()) != GL_NO_ERROR)
-    {
-        LL_INFOS() << "OpenGL Error: " << err << LL_ENDL;
-    }
 }
 
 bool FSManipRotateJoint::isMouseOverJoint(S32 mouseX, S32 mouseY, const LLVector3& jointWorldPos, F32 jointRadius, F32& outDistanceFromCamera, F32& outRayDistanceFromCenter) const
@@ -908,10 +894,10 @@ void FSManipRotateJoint::renderNameXYZ(const LLQuaternion& rot)
         LLGLDepthTest gls_depth(GL_FALSE);
 
         auto renderTextWithShadow = [&](const std::string& text, F32 x, F32 y, const LLColor4& color) {
-            font->render(utf8str_to_wstring(text), 0, x + 1.f, y - 2.f, LLColor4::black,
+            font->renderBytes(text, 0, x + 1.f, y - 2.f, LLColor4::black,
                 LLFontGL::LEFT, LLFontGL::BASELINE,
                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, 1000, nullptr);
-            font->render(utf8str_to_wstring(text), 0, x, y, color,
+            font->renderBytes(text, 0, x, y, color,
                 LLFontGL::LEFT, LLFontGL::BASELINE,
                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, 1000, nullptr);
         };
@@ -1100,7 +1086,7 @@ bool FSManipRotateJoint::handleMouseUp(S32 x, S32 y, MASK mask)
     }
     else if (mHighlightedJoint)
     {
-        auto* poser = dynamic_cast<FSFloaterPoser*>(LLFloaterReg::findInstance("fs_poser"));
+        auto* poser = LLFloaterReg::findTypedInstance<FSFloaterPoser>("fs_poser");
         if (poser)
             poser->selectJointByName(mHighlightedJoint->getName());
 
@@ -1524,7 +1510,7 @@ LLQuaternion FSManipRotateJoint::getSelectedJointWorldRotation()
     if (!mJoint || !mAvatar)
         return joinRot;
 
-    auto* poser = dynamic_cast<FSFloaterPoser*>(LLFloaterReg::findInstance("fs_poser"));
+    auto* poser = LLFloaterReg::findTypedInstance<FSFloaterPoser>("fs_poser");
     if (!poser)
         return joinRot;
 

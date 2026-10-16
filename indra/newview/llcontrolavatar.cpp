@@ -47,6 +47,8 @@ LLControlAvatar::LLControlAvatar(const LLUUID& id, const LLPCode pcode, LLViewer
     mGlobalScale(1.0f),
     mMarkedForDeath(false),
     mRootVolp(NULL),
+    mAttachedAvatar(NULL),
+    mAttachedAvatarFrame(-1),
     mControlAVBridge(NULL),
     mScaleConstraintFixup(1.0),
     mRegionChanged(false)
@@ -79,22 +81,31 @@ void LLControlAvatar::initInstance()
     mInitFlags |= 1<<4;
 }
 
+LLVOAvatar *LLControlAvatar::findAttachedAvatar() const
+{
+    // Held for the frame it was found in. What it walks is the object parent
+    // chain, which only changes when an attach or detach is processed, and
+    // that happens before any of this frame's avatar work. markDead drops it
+    // along with the root volume.
+    const S32 frame = LLDrawable::getCurrentFrame();
+    if (frame != mAttachedAvatarFrame)
+    {
+        mAttachedAvatarFrame = frame;
+        mAttachedAvatar = (mRootVolp && mRootVolp->isAttachment())
+            ? mRootVolp->getAvatarAncestor()
+            : NULL;
+    }
+    return mAttachedAvatar;
+}
+
 const LLVOAvatar *LLControlAvatar::getAttachedAvatar() const
 {
-    if (mRootVolp && mRootVolp->isAttachment())
-    {
-        return mRootVolp->getAvatarAncestor();
-    }
-    return NULL;
+    return findAttachedAvatar();
 }
 
 LLVOAvatar *LLControlAvatar::getAttachedAvatar()
 {
-    if (mRootVolp && mRootVolp->isAttachment())
-    {
-        return mRootVolp->getAvatarAncestor();
-    }
-    return NULL;
+    return findAttachedAvatar();
 }
 
 void LLControlAvatar::getNewConstraintFixups(LLVector3& new_pos_fixup, F32& new_scale_fixup) const
@@ -183,14 +194,13 @@ void LLControlAvatar::matchVolumeTransform()
                 {
                     setPositionAgent(mRootVolp->getRenderPosition());
                 }
-                attach->updateWorldPRSParent();
                 LLVector3 joint_pos = attach->getWorldPosition();
                 LLQuaternion joint_rot = attach->getWorldRotation();
                 LLVector3 obj_pos = mRootVolp->mDrawable->getPosition();
                 LLQuaternion obj_rot = mRootVolp->mDrawable->getRotation();
                 obj_pos.rotVec(joint_rot);
                 mRoot->setWorldPosition(obj_pos + joint_pos);
-                mRoot->setWorldRotation(obj_rot * joint_rot);
+                mRoot->setWorldRotationIfMoved(obj_rot * joint_rot);
                 setRotation(mRoot->getRotation());
 
                 setGlobalScale(mScaleConstraintFixup);
@@ -236,7 +246,7 @@ void LLControlAvatar::matchVolumeTransform()
             }
 #endif
             setRotation(bind_rot*obj_rot);
-            mRoot->setWorldRotation(bind_rot*obj_rot);
+            mRoot->setWorldRotationIfMoved(bind_rot*obj_rot);
             if (getRegion() && !isDead())
             {
                 setPositionAgent(vol_pos);
@@ -372,6 +382,8 @@ void LLControlAvatar::idleUpdate(LLAgent &agent, const F64 &time)
 void LLControlAvatar::markDead()
 {
     mRootVolp = NULL;
+    mAttachedAvatar = NULL;
+    mAttachedAvatarFrame = -1;
     super::markDead();
     mControlAVBridge = NULL;
 }
@@ -697,6 +709,28 @@ bool LLControlAvatar::isImpostor()
         return attached_av->isImpostor();
     }
     return LLVOAvatar::isImpostor();
+}
+
+// virtual
+bool LLControlAvatar::isInView() const
+{
+    // An attached animated object is drawn with its avatar. Its volumes sit
+    // in that avatar's attachment bridge, which the pipeline leaves unstamped
+    // while the avatar is impostored, so their own stamp says nothing: the
+    // avatar's answer is the answer for everything hanging off it.
+    if (const LLVOAvatar* attached_av = getAttachedAvatar())
+    {
+        return attached_av->isInView();
+    }
+
+    // An animated object's own drawable never draws anything, so the base
+    // class answers visible for it regardless of the cull. What is drawn is
+    // the volume, whose drawable roots the control-avatar bridge and is
+    // stamped by the cull like any other.
+    return LLVOAvatar::isInView()
+        && mRootVolp
+        && mRootVolp->mDrawable.notNull()
+        && mRootVolp->mDrawable->isVisible();
 }
 
 // static

@@ -404,7 +404,7 @@ void LLSpeakerMgr::update(bool resort_ok)
                 // reset inactivity expiration
                 if (speakerp->mStatus != LLSpeaker::STATUS_SPEAKING)
                 {
-                    speakerp->mLastSpokeTime = mSpeechTimer.getElapsedTimeF32();
+                    speakerp->mLastSpokeTime = mSpeechTimer.getElapsedTimeF64();
                     speakerp->mHasSpoken = true;
                     fireEvent(new LLSpeakerUpdateSpeakerEvent(speakerp), "update_speaker");
                 }
@@ -647,7 +647,7 @@ void LLSpeakerMgr::speakerChatted(const LLUUID& speaker_id)
     LLPointer<LLSpeaker> speakerp = findSpeaker(speaker_id);
     if (speakerp.notNull())
     {
-        speakerp->mLastSpokeTime = mSpeechTimer.getElapsedTimeF32();
+        speakerp->mLastSpokeTime = mSpeechTimer.getElapsedTimeF64();
         speakerp->mHasSpoken = true;
         fireEvent(new LLSpeakerUpdateSpeakerEvent(speakerp), "update_speaker");
     }
@@ -1026,10 +1026,6 @@ void LLLocalSpeakerMgr::updateSpeakerList()
     uuid_vec_t avatar_ids;
     std::vector<LLVector3d> positions;
     LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), CHAT_NORMAL_RADIUS);
-#ifdef LL_DISCORD
-    if (gSavedSettings.getBOOL("EnableDiscord"))
-        LLAppViewer::updateDiscordPartyCurrentSize((S32)avatar_ids.size());
-#endif
     for(U32 i=0; i<avatar_ids.size(); i++)
     {
         setSpeaker(avatar_ids[i]);

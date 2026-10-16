@@ -179,7 +179,7 @@
      left_pad="6"
      top="2"
      name="presets_icon_graphic"
-     tool_tip="Graphics Presets"
+     tool_tip="Graphics presets. Click to open the Lightbox."
      width="16">
         <click_callback
          function="Floater.ToggleOrBringToFront"

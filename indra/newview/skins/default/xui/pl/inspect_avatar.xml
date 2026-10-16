@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater name="inspect_avatar">
 	<slider name="volume_slider" tool_tip="Poziom głośności" />
-	<text name="avatar_profile_link" value="[[LINK] Pokaż pełny profil]" />
 </floater>

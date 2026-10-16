@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<!-- What a comparison lets go of in telling lines the same (ALDiffView),
+     under the blanks button of its bar: each checked while it is. Comments
+     only where a grammar says where they are; case only where the host
+     offers it, for prose. -->
+<context_menu
+ layout="topleft"
+ name="menu_diff_ignore">
+    <menu_item_check
+     label="Whitespace"
+     name="whitespace">
+        <menu_item_check.on_click
+         function="DiffIgnore.Toggle"
+         parameter="whitespace" />
+        <menu_item_check.on_check
+         function="DiffIgnore.Checked"
+         parameter="whitespace" />
+    </menu_item_check>
+    <menu_item_check
+     label="Whitespace at Line Ends"
+     name="trailing">
+        <menu_item_check.on_click
+         function="DiffIgnore.Toggle"
+         parameter="trailing" />
+        <menu_item_check.on_check
+         function="DiffIgnore.Checked"
+         parameter="trailing" />
+    </menu_item_check>
+    <menu_item_check
+     label="Blank Lines"
+     name="blank_lines">
+        <menu_item_check.on_click
+         function="DiffIgnore.Toggle"
+         parameter="blank_lines" />
+        <menu_item_check.on_check
+         function="DiffIgnore.Checked"
+         parameter="blank_lines" />
+    </menu_item_check>
+    <menu_item_check
+     label="Comments"
+     name="comments">
+        <menu_item_check.on_click
+         function="DiffIgnore.Toggle"
+         parameter="comments" />
+        <menu_item_check.on_check
+         function="DiffIgnore.Checked"
+         parameter="comments" />
+        <menu_item_check.on_visible
+         function="DiffIgnore.Offered"
+         parameter="comments" />
+    </menu_item_check>
+    <menu_item_check
+     label="Case"
+     name="case">
+        <menu_item_check.on_click
+         function="DiffIgnore.Toggle"
+         parameter="case" />
+        <menu_item_check.on_check
+         function="DiffIgnore.Checked"
+         parameter="case" />
+        <menu_item_check.on_visible
+         function="DiffIgnore.Offered"
+         parameter="case" />
+    </menu_item_check>
+</context_menu>

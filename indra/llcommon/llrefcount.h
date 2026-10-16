@@ -117,13 +117,16 @@ public:
         llassert(mRef.load(std::memory_order_relaxed) >= 1);
 
         // Release, so that every write made through this reference happens-before the
-        // destructor. The acquire fence on the final decrement then pairs with the
-        // releases from *all* threads' decrements, so ~T() observes their writes too.
-        // This is the standard shared_ptr refcount idiom -- do not weaken the decrement
-        // to relaxed, or the destructor can race the last writer's stores.
-        if (mRef.fetch_sub(1, std::memory_order_release) == 1)
+        // destructor; acquire, so that the thread making the final decrement, which
+        // deletes, observes every other thread's writes. Do not weaken it to relaxed,
+        // or the destructor can race the last writer's stores. A release decrement
+        // with an acquire fence on the final one alone orders the same, and is a
+        // little cheaper on ARM, but ThreadSanitizer does not follow fences: it
+        // reported every object shared between threads as raced at its deletion.
+        // libc++'s shared_ptr decrements acq_rel too, and on x86 both compile to the
+        // same locked subtraction.
+        if (mRef.fetch_sub(1, std::memory_order_acq_rel) == 1)
         {
-            std::atomic_thread_fence(std::memory_order_acquire);
             // If we hit zero, the caller should be the only smart pointer owning the object and we can delete it.
             // It is technically possible for a vanilla pointer to mess this up, or another thread to
             // jump in, find this object, create another smart pointer and end up dangling, but if

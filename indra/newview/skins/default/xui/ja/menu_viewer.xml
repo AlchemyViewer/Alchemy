@@ -239,7 +239,6 @@
 		<menu_item_call label="やり直し" name="Redo"/>
 	</menu>
 	<menu label="ヘルプ" name="Help">
-		<menu_item_call label="ガイドブック" name="How To"/>
 		<!--
 		<menu_item_call label="チュートリアル" name="Tutorial"/>
 		-->
@@ -249,7 +248,6 @@
 		<menu_item_call label="Second Lifeサポートポータル" name="Support portal"/>
 		<menu_item_call label="Second Lifeブログ" name="Second Life Blogs"/>
 		<menu_item_call label="嫌がらせの報告" name="Report Abuse"/>
-		<menu_item_call label="バグの報告" name="Report Bug"/>
 		<menu_item_call label="衝突・プッシュ＆打撃" name="Bumps, Pushes &amp;amp; Hits"/>
 		<menu_item_call label="[APP_NAME]について" name="About Second Life"/>
 	</menu>
@@ -312,7 +310,7 @@
 			<menu_item_check label="アルファマスク" name="Rendering Type Alpha Mask"/>
 			<menu_item_check label="明るさ全開のアルファマスク" name="Rendering Type Fullbright Alpha Mask"/>
 			<menu_item_check label="グロー" name="Rendering Type Glow"/>
-			<menu_item_check label="明るさ全開" name="Rendering Type Glow"/>
+			<menu_item_check label="明るさ全開" name="Rendering Type Fullbright"/>
 			<menu_item_check label="アルファ" name="Rendering Type Alpha"/>
 			<menu_item_check label="樹木" name="Rendering Type Tree"/>
 			<menu_item_check label="アバター" name="Rendering Type Character"/>
@@ -363,8 +361,6 @@
 		<menu label="コンソール" name="Consoles">
 			<menu_item_check label="テクスチャのコンソール" name="Texture Console"/>
 			<menu_item_check label="デバッグコンソール" name="Debug Console"/>
-			<menu_item_call label="通知コンソール" name="Notifications"/>
-			<menu_item_check label="メモリ" name="Memory"/>
 			<menu_item_check label="シーンの統計" name="Scene Statistics"/>
 			<menu_item_check label="シーンの読み込みモニター" name="Scene Loading Monitor"/>
 			<menu_item_check label="リージョンのデバッグコンソール" name="Region Debug Console"/>
@@ -404,12 +400,6 @@
 			<menu_item_call label="スレッド内で例外クラッシュを発生させる" name="Force an Exception Crash in a Thread"/>
 			<menu_item_call label="ビューアの接続遮断を実行する" name="Force Disconnect Viewer"/>
 			<menu_item_call label="メモリリークをシミュレートする" name="Memory Leaking Simulation"/>
-		</menu>
-		<menu label="ＧＬＴＦ" name="GLTF">
-			<menu_item_call label="開く…" name="Open..."/>
-			<menu_item_call label="名前をつけて保存…" name="Save As..."/>
-			<menu_item_call label="アップロード…" name="Upload..."/>
-			<menu_item_call label="編集…" name="Edit..."/>
 		</menu>
 		<menu label="ビデオ" name="Video">
 			<menu_item_call label="1080✕1920" name="1080x1920"/>
@@ -494,9 +484,6 @@
 		</menu>
 		<menu_item_call label="スクリプト付きカメラをダンプ" name="Dump Scripted Camera"/>
 		<menu label="レコーダー" name="Recorder">
-			<menu_item_call label="イベントの記録開始" name="Start event recording"/>
-			<menu_item_call label="イベントの記録停止" name="Stop event recording"/>
-			<menu_item_call label="イベントの記録のプレイバック" name="Playback event recording"/>
 			<menu_item_call label="再生開始" name="Start Playback"/>
 			<menu_item_call label="再生停止" name="Stop Playback"/>
 			<menu_item_check label="再生をループ" name="Loop Playback"/>
@@ -525,7 +512,6 @@
 			<menu_item_call label="フォントをテクスチャにダンプ" name="Dump Font Textures"/>
 			<menu_item_call label="SelectMgrをダンプ" name="Dump SelectMgr"/>
 			<menu_item_call label="インベントリの出力" name="Dump Inventory"/>
-			<menu_item_call label="タイマーをダンプ" name="Dump Timers"/>
 			<menu_item_call label="フォーカスホルダーをダンプ" name="Dump Focus Holder"/>
 			<menu_item_call label="選択したオブジェクト情報をプリント" name="Print Selected Object Info"/>
 			<menu_item_call label="エージェント情報をプリント" name="Print Agent Info"/>
@@ -540,7 +526,6 @@
 			<menu_item_check label="WindowProcのデバッグ" name="Debug WindowProc"/>
 		</menu>
 		<menu label="ＸＵＩ／色" name="XUI">
-			<menu_item_call label="ＸＵＩプレビューツール" name="UI Preview Tool"/>
 			<menu_item_call label="色の設定" name="Color Settings"/>
 			<menu_item_call label="色の設定をリロード" name="Reload Color Settings"/>
 			<menu_item_call label="フォントテストを表示" name="Show Font Test"/>
@@ -576,7 +561,6 @@
 			<menu_item_check label="アニメーション情報" name="Animation Info"/>
 			<menu_item_check label="見えているものを表示する" name="Show Look At"/>
 			<menu_item_check label="クリックした場所を表示する" name="Show Point At"/>
-			<menu_item_check label="ジョイント部分の更新をデバッグ" name="Debug Joint Updates"/>
 			<menu_item_check label="ＬｏＤを無効にする" name="Disable LOD"/>
 			<menu_item_check label="キャラクターのVisをデバッグ" name="Debug Character Vis"/>
 			<menu_item_check label="キャラクターのRezステートをデバッグ" name="Debug Character Rez State"/>
@@ -593,7 +577,6 @@
 		</menu>
 		<menu_item_call label="圧縮画像" name="Compress Images"/>
 		<menu_item_call label="圧縮ファイルテスト" name="Compress File Test"/>
-		<menu_item_call label="Visual Leak Detectorを有効にする" name="Enable Visual Leak Detector"/>
 		<menu_item_check label="デバッグ用のミニダンプを出力する" name="Output Debug Minidump"/>
 		<menu_item_check label="次回の起動時にコンソールウィンドウを表示する" name="Console Window"/>
 		<menu label="ログレベルを設定" name="Set Logging Level">

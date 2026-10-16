@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <panel name="panel_profile" label="Profil">
-	<string name="date_format" value="Urodziny: [day,datetime,slt] [mth,datetime,slt] [year,datetime,slt]" />
 	<string name="CaptionTextAcctInfo">
 Konto: [ACCTTYPE]
 [PAYMENTINFO]
@@ -14,14 +13,10 @@ Konto: [ACCTTYPE]
 		<layout_panel name="partner_layout">
 			<text name="partner_link" value="Partner: (ładowanie...)" />
 		</layout_panel>
-		<layout_panel name="frind_layout">
-			<text name="frind_text" value="Jesteście znajomymi" />
-		</layout_panel>
 		<layout_panel name="account_layout">
 			<text name="account_info" value="Konto: (ładowanie...)" />
 		</layout_panel>
 		<layout_panel name="settings_panel">
-			<text name="search_label" value="Profil w wyszukiwarce:" />
 			<combo_box name="show_in_search" tool_tip="Pozwól innym zobaczyć Cię w wynikach wyszukiwania">
 				<combo_box.item name="Hide" label="Ukryj" />
 				<combo_box.item name="Show" label="Pokaż" />

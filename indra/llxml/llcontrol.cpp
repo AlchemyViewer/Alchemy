@@ -44,6 +44,7 @@
 #include "llrect.h"
 #include "llxmltree.h"
 #include "llsdserialize.h"
+#include "llsdutil.h"
 #include "llfile.h"
 #include "lltimer.h"
 #include "lldir.h"
@@ -82,7 +83,6 @@ template <> S32 convert_from_llsd<S32>(const LLSD& sd, eControlType type, std::s
 template <> U32 convert_from_llsd<U32>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> F32 convert_from_llsd<F32>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> std::string convert_from_llsd<std::string>(const LLSD& sd, eControlType type, std::string_view control_name);
-template <> LLWString convert_from_llsd<LLWString>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLVector3 convert_from_llsd<LLVector3>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLVector3d convert_from_llsd<LLVector3d>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLRect convert_from_llsd<LLRect>(const LLSD& sd, eControlType type, std::string_view control_name);
@@ -104,6 +104,60 @@ LLSD getCount;
 settings_vec_t getCount_v;
 F64 start_time = 0;
 std::string SETTINGS_PROFILE = "settings_profile.log";
+
+namespace
+{
+// llsd_equals, except that an Integer and a Real holding the same number are
+// equal. For a setting they are one value: a point list that arrived as
+// [[0,0],[1,1]] from the notation parser or a hand edit is the same curve as
+// its real-typed default, and must count as at default and as unchanged.
+bool llsd_settings_equal(const LLSD& a, const LLSD& b)
+{
+    const bool a_number = a.isInteger() || a.isReal();
+    const bool b_number = b.isInteger() || b.isReal();
+    if (a_number && b_number)
+    {
+        return a.asReal() == b.asReal();
+    }
+    if (a.type() != b.type())
+    {
+        return false;
+    }
+    if (a.isArray())
+    {
+        if (a.size() != b.size())
+        {
+            return false;
+        }
+        LLSD::array_const_iterator ai = a.beginArray();
+        LLSD::array_const_iterator bi = b.beginArray();
+        for (; ai != a.endArray() && bi != b.endArray(); ++ai, ++bi)
+        {
+            if (!llsd_settings_equal(*ai, *bi))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (a.isMap())
+    {
+        if (a.size() != b.size())
+        {
+            return false;
+        }
+        for (LLSD::map_const_iterator it = a.beginMap(); it != a.endMap(); ++it)
+        {
+            if (!b.has(it->first) || !llsd_settings_equal(it->second, b[it->first]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    return llsd_equals(a, b);
+}
+} // namespace
 
 bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
 {
@@ -138,6 +192,13 @@ bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
         break;
     case TYPE_STRING:
         result = a.asString() == b.asString();
+        break;
+    case TYPE_LLSD:
+        // Deep equality by value, so that a write of the value already held
+        // fires nothing, a control holding its default is at default and not
+        // persisted, and a reset from a value equal to the default is not a
+        // change.
+        result = llsd_settings_equal(a, b);
         break;
     default:
         break;
@@ -579,11 +640,6 @@ F32 LLControlGroup::getF32(std::string_view name)
 std::string LLControlGroup::getString(std::string_view name)
 {
     return get<std::string>(name);
-}
-
-LLWString LLControlGroup::getWString(std::string_view name)
-{
-    return get<LLWString>(name);
 }
 
 std::string LLControlGroup::getText(std::string_view name)
@@ -1424,12 +1480,6 @@ std::string convert_from_llsd<std::string>(const LLSD& sd, eControlType type, st
         CONTROL_ERRS << "Invalid string value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
         return LLStringUtil::null;
     }
-}
-
-template<>
-LLWString convert_from_llsd<LLWString>(const LLSD& sd, eControlType type, std::string_view control_name)
-{
-    return utf8str_to_wstring(convert_from_llsd<std::string>(sd, type, control_name));
 }
 
 template<>

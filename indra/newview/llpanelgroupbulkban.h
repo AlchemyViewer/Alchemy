@@ -32,16 +32,18 @@
 
 class LLAvatarName;
 
-class LLPanelGroupBulkBan : public LLPanelGroupBulk
+class LLPanelGroupBulkBan final : public LLPanelGroupBulk
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupBulkBan, LLPanelGroupBulk);
+
     LLPanelGroupBulkBan(const LLUUID& group_id);
     ~LLPanelGroupBulkBan() {}
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     static void callbackClickSubmit(void* userdata);
-    virtual void submit();
+    virtual void submit() override;
 private:
     std::string buildResidentsArgument(std::vector<LLAvatarName> avatar_names, const std::string &format);
 };

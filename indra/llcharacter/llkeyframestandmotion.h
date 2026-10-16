@@ -40,7 +40,6 @@
 class alignas(16) LLKeyframeStandMotion :
     public LLKeyframeMotion
 {
-    LL_ALIGN_NEW
 public:
     // Constructor
     LLKeyframeStandMotion(const LLUUID &id);
@@ -64,7 +63,7 @@ public:
     virtual LLMotionInitStatus onInitialize(LLCharacter *character);
     virtual bool onActivate();
     void    onDeactivate();
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
 
 public:
     //-------------------------------------------------------------------------

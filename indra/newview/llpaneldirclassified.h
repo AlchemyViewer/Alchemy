@@ -36,16 +36,18 @@ class LLComboBox;
 class LLLineEditor;
 class LLScrollListCtrl;
 
-class LLPanelDirClassified : public LLPanelDirBrowser
+class LLPanelDirClassified final : public LLPanelDirBrowser
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirClassified, LLPanelDirBrowser);
+
     LLPanelDirClassified();
     /*virtual*/ ~LLPanelDirClassified();
 
-    bool postBuild();
+    bool postBuild() override;
 
     // Request the classifieds from the database
-    void performQuery();
+    void performQuery() override;
 
 protected:
     // onClickNext and onClickPrev are special case searches

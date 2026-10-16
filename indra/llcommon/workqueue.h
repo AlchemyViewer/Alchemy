@@ -261,9 +261,17 @@ namespace LL
         bool post(const Work&) override;
 
         /**
-         * post work, unless the queue is full
+         * post work, unless the queue is full -- or its lock is held at
+         * that moment, by a consumer popping as likely as not
          */
         bool tryPost(const Work&) override;
+
+        /**
+         * post work, waiting no longer than timeout for the queue's lock
+         * and for room in it: false where it was not posted in that time,
+         * or the queue is closed
+         */
+        bool tryPostFor(const std::chrono::milliseconds& timeout, const Work&);
 
     private:
         using Queue = LLThreadSafeQueue<Work>;

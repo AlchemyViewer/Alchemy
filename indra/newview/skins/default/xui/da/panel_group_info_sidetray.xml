@@ -35,7 +35,6 @@
 		</layout_panel>
 		<layout_panel name="btn_apply_lp">
 			<button label="Gem" label_selected="Gem" name="btn_apply"/>
-			<button label="Opret gruppe" name="btn_create" tool_tip="Opret en ny gruppe"/>
 		</layout_panel>
 	</layout_stack>
 </panel>

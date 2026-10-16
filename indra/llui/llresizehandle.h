@@ -32,9 +32,11 @@
 #include "llcoord.h"
 
 
-class LLResizeHandle : public LLView
+class LLResizeHandle final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLResizeHandle, LLView);
+
     enum ECorner { LEFT_TOP, LEFT_BOTTOM, RIGHT_TOP, RIGHT_BOTTOM };
 
     struct Params : public LLInitParam::Block<Params, LLView::Params>

@@ -30,6 +30,8 @@
 #include <vector>
 #include <map>
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include "lldir.h"
 #include "llimage.h"
 #include "lluuid.h"
@@ -83,10 +85,26 @@ public:
         CREATE_REQUEST_ERROR_TRANSITION = -4,
     };
 
+    // What a texture reads from its running request: the worker's state and
+    // the progress figures the texture console shows. createRequest fills it
+    // for the request it made and getRequestFinished for a request that is
+    // not finished, each under the worker lock it already holds, so the
+    // caller does not come back for it with a second lookup.
+    struct FetchStatus
+    {
+        S32  mState = 0;                    // LLTextureFetchWorker::INVALID
+        F32  mDataProgress = 0.f;
+        F32  mRequestedPriority = 0.f;
+        U32  mFetchPriority = 0;
+        F32  mFetchDeltaTime = 999999.f;
+        F32  mRequestDeltaTime = 999999.f;
+        bool mCanUseHTTP = false;           // written only when the worker has work
+    };
+
     // Threads:  T* (but Tmain mostly)
-    // returns discard on success, fail code otherwise
+    // returns discard on success, fail code otherwise; status is filled on success
     S32 createRequest(FTType f_type, const std::string& url, const LLUUID& id, const LLHost& host, F32 priority,
-                      S32 w, S32 h, S32 c, S32 discard, bool needs_aux, bool can_use_http);
+                      S32 w, S32 h, S32 c, S32 discard, bool needs_aux, bool can_use_http, FetchStatus& status);
 
     // Requests that a fetch operation be deleted from the queue.
     // If @cancel is true, also stops any I/O operations pending.
@@ -103,9 +121,10 @@ public:
 
     // Threads:  T*
     // keep in mind that if fetcher isn't done, it still might need original raw image
+    // status is filled when the request is not finished
     bool getRequestFinished(const LLUUID& id, S32& discard_level, S32& worker_state,
                             LLPointer<LLImageRaw>& raw, LLPointer<LLImageRaw>& aux,
-                            LLCore::HttpStatus& last_http_get_status);
+                            LLCore::HttpStatus& last_http_get_status, FetchStatus& status);
 
     // Threads:  T*
     bool updateRequestPriority(const LLUUID& id, F32 priority);
@@ -118,15 +137,6 @@ public:
 
     // Threads:  T*
     bool isFromLocalCache(const LLUUID& id);
-
-    // get the current fetch state, if any, from the given UUID
-    S32 getFetchState(const LLUUID& id);
-
-    // @return  Fetch state of an active given image and associates statistics
-    //          See also getStateString
-    // Threads:  T*
-    S32 getFetchState(const LLUUID& id, F32& decode_progress_p, F32& requested_priority_p,
-                      U32& fetch_priority_p, F32& fetch_dtime_p, F32& request_dtime_p, bool& can_use_http);
 
     // @return  Fetch last state of given image
     // Threads:  T*
@@ -324,8 +334,11 @@ private:
 
     LLTextureCache* mTextureCache;
 
-    // Map of all requests by UUID
-    typedef std::map<LLUUID,LLTextureFetchWorker*> map_t;
+    // All requests by UUID. An open-addressing flat map, reserved at
+    // construction: a lookup under the lock is one probe whatever the size.
+    // A rehash moves every entry, so nothing holds a pointer or iterator
+    // into it across an unlock.
+    typedef boost::unordered_flat_map<LLUUID, LLTextureFetchWorker*> map_t;
     map_t mRequestMap;                                                  // Mfq
 
     // Set of requests that require network data

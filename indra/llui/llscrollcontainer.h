@@ -55,6 +55,8 @@ struct ScrollContainerRegistry : public LLChildRegistry<ScrollContainerRegistry>
 class LLScrollContainer : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLScrollContainer, LLUICtrl);
+
     // Note: vertical comes before horizontal because vertical
     // scrollbars have priority for mouse and keyboard events.
 
@@ -85,7 +87,7 @@ protected:
 public:
     virtual ~LLScrollContainer( void );
 
-    virtual void    setValue(const LLSD& value) { mInnerRect.setValue(value); }
+    virtual void    setValue(const LLSD& value) override { mInnerRect.setValue(value); }
 
     void            setBorderVisible( bool b );
 
@@ -103,23 +105,33 @@ public:
     bool            isAtTop() const { return mScrollbar[VERTICAL]->isAtBeginning(); }
     bool            isAtBottom() const { return mScrollbar[VERTICAL]->isAtEnd(); }
     S32             getDocPosVertical() const { return mScrollbar[VERTICAL]->getDocPos(); }
+    // Put back where it was scrolled to, for a caller that took the document
+    // away and built it again. Clamped to what there is to scroll now, which
+    // is not always what there was to scroll then.
+    void            setDocPosVertical(S32 pos) { mScrollbar[VERTICAL]->setDocPos(pos); }
     S32             getDocPosHorizontal() const { return mScrollbar[HORIZONTAL]->getDocPos(); }
+    void            setDocPosHorizontal(S32 pos) { mScrollbar[HORIZONTAL]->setDocPos(pos); }
+    // What is scrolled, for a caller working out where a point of it is.
+    LLView*         getScrolledView() const { return mScrolledView; }
     S32             getBorderWidth() const;
 
     // LLView functionality
-    virtual void    reshape(S32 width, S32 height, bool called_from_parent = true);
-    virtual bool    handleKeyHere(KEY key, MASK mask);
-    virtual bool    handleUnicodeCharHere(llwchar uni_char);
-    virtual bool    handleScrollWheel( S32 x, S32 y, LLScrollDelta delta );
-    virtual bool    handleScrollHWheel( S32 x, S32 y, LLScrollDelta delta );
+    virtual void    reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    virtual bool    handleKeyHere(KEY key, MASK mask) override;
+    virtual bool    handleUnicodeCharHere(llwchar uni_char) override;
+    virtual bool    handleScrollWheel( S32 x, S32 y, LLScrollDelta delta ) override;
+    virtual bool    handleScrollHWheel( S32 x, S32 y, LLScrollDelta delta ) override;
     virtual bool    handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
-                                   std::string& tooltip_msg);
+                                   std::string& tooltip_msg) override;
 
-    virtual void    draw();
-    virtual bool    addChild(LLView* view, S32 tab_group = 0);
+    virtual void    draw() override;
+    virtual bool    addChild(LLView* view, S32 tab_group = 0) override;
+    // The scrolled view taken out is no longer what is scrolled: the next
+    // one added is, which is how a container shows another view in turn.
+    void            removeChild(LLView* view) override;
 
     bool canAutoScroll(S32 x, S32 y);
     bool autoScroll(S32 x, S32 y);

@@ -13,7 +13,4 @@
 		<accordion_tab name="1_month_and_older" title="1 mês e mais velhos"/>
 		<accordion_tab name="6_months_and_older" title="6 meses e mais velhos"/>
 	</accordion>
-	<panel name="bottom_panel">
-		<button name="gear_btn" tool_tip="Mostrar opções adicionais"/>
-	</panel>
 </panel>

@@ -7,21 +7,16 @@
 		<menu_item_call label="[APP_NAME]&apos;den Çık" name="Quit"/>
 	</menu>
 	<menu label="Yardım" name="Help">
-		<menu_item_call label="Nasıl yapılır..." name="How To"/>
-		<menu_item_call label="Hızlı Başlangıç" name="Quickstart"/>
 		<menu_item_call label="Bilgi Bankası" name="Knowledge Base"/>
 		<menu_item_call label="Wiki" name="Wiki"/>
 		<menu_item_call label="Topluluk Forumları" name="Community Forums"/>
 		<menu_item_call label="Destek porteli" name="Support portal"/>
-		<menu_item_call label="[SECOND_LIFE] Haberler" name="Second Life News"/>
 		<menu_item_call label="[SECOND_LIFE] Bloklar" name="Second Life Blogs"/>
-		<menu_item_call label="Hata Bildir" name="Report Bug"/>
 		<menu_item_call label="[APP_NAME] Hakkında" name="About Second Life"/>
 	</menu>
 	<menu_item_check label="Hata Ayıklama Menüsünü Göster" name="Show Debug Menu"/>
 	<menu label="Hata ayıkla" name="Debug">
 		<menu_item_call label="Hata Ayıklama Ayarlarını Göster" name="Debug Settings"/>
-		<menu_item_call label="XKA Önizleme Aracı" name="UI Preview Tool"/>
 		<menu label="KA Testleri" name="UI Tests"/>
 		<menu_item_call label="Pencere Büyüklüğünü Ayarla..." name="Set Window Size..."/>
 		<menu_item_call label="Hizmet Şartlarını Göster" name="TOS"/>

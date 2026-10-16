@@ -240,7 +240,7 @@ void LLFloaterChatAlerts::onEntrySave()
     LLHighlightEntry  newEntry;
     LLHighlightEntry* pEntry = (m_idCurEntry.notNull()) ? LLTextParser::instance().getHighlightById(m_idCurEntry)
                                                         : (m_fNewEntry ? &newEntry : nullptr);
-    if ((pEntry) && (m_pKeywordEditor->getLength() > 0))
+    if ((pEntry) && (m_pKeywordEditor->getLengthBytes() > 0))
     {
         if ((m_pKeywordEditor->isDirty()) || (m_fNewEntry))
         {

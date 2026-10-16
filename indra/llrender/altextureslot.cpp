@@ -49,12 +49,12 @@ static const GLenum sGLTextureType[] =
     GL_TEXTURE_3D
 };
 
-U32 ALTextureSlot::sSamplerBinds  = 0;
-U32 ALTextureSlot::sSamplerSkips  = 0;
-U32 ALTextureSlot::sTextureBinds  = 0;
-U32 ALTextureSlot::sSamplerBindsFlushed = 0;
-U32 ALTextureSlot::sSamplerBindsSplitBatch = 0;
-U32 ALTextureSlot::sSamplerBindsShadowCycle = 0;
+thread_local U32 ALTextureSlot::sSamplerBinds  = 0;
+thread_local U32 ALTextureSlot::sSamplerSkips  = 0;
+thread_local U32 ALTextureSlot::sTextureBinds  = 0;
+thread_local U32 ALTextureSlot::sSamplerBindsFlushed = 0;
+thread_local U32 ALTextureSlot::sSamplerBindsSplitBatch = 0;
+thread_local U32 ALTextureSlot::sSamplerBindsShadowCycle = 0;
 
 ALTextureSlot::ALTextureSlot(S32 index)
     : mCurrTexType(TT_NONE),
@@ -337,7 +337,13 @@ bool ALTextureSlot::bind(LLImageGL* texture, bool for_rendering, bool forceBind,
         mCurrTexture = texname;
         glBindTexture(sGLTextureType[texture->getTarget()], mCurrTexture);
         stop_glerror();
-        texture->updateBindStats();
+        // A name passed in is one an upload writes into, on the LLImageGL thread or before
+        // it publishes: not a use of the texture, and the frame time the stats stamp with is
+        // the main thread's.
+        if (!usename)
+        {
+            texture->updateBindStats();
+        }
     }
 
     // The sampler is deliberately LEFT ALONE.
@@ -384,12 +390,6 @@ bool ALTextureSlot::bind(LLCubeMap* cubeMap, ALSampler key)
             mCurrTexture = cubeMap->mImages[0]->getTexName();
             glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
             cubeMap->mImages[0]->updateBindStats();
-            // Named by the caller, not read off face 0. A cube map is as much a shared
-            // resource as any other texture -- the environment map is sampled by every
-            // shiny surface in the scene -- so which sampler a pass wants is the pass's
-            // business.
-            bindSampler(gGL.getSampler(key));
-            return true;
         }
         else
         {
@@ -397,6 +397,13 @@ bool ALTextureSlot::bind(LLCubeMap* cubeMap, ALSampler key)
             return false;
         }
     }
+
+    // Named by the caller, not read off face 0. A cube map is as much a shared
+    // resource as any other texture -- the environment map is sampled by every
+    // shiny surface in the scene -- so which sampler a pass wants is the pass's
+    // business. Outside the redundancy check, as in bindImpl: the same cube can be
+    // bound again after a pass that left a different sampler on this slot.
+    bindSampler(gGL.getSampler(key));
     return true;
 }
 

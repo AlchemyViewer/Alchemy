@@ -46,13 +46,110 @@
 
 #include <cstdio>
 
+#if LL_LINUX
+#include <link.h>
+#endif
+
+// An LLVector3 as FMOD takes it. The two are laid out alike, but reading one
+// through a pointer to the other breaks strict aliasing, which GCC rejects.
+static FMOD_VECTOR to_fmod_vector(const LLVector3& v)
+{
+    return FMOD_VECTOR{ v.mV[VX], v.mV[VY], v.mV[VZ] };
+}
+
 FMOD_RESULT F_CALL windCallback(FMOD_DSP_STATE *dsp_state, float *inbuffer, float *outbuffer, unsigned int length, int inchannels, int *outchannels);
 
 FMOD::ChannelGroup *LLAudioEngine_FMODSTUDIO::mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT] = {0};
 float LLAudioEngine_FMODSTUDIO::sReverbSendScale = 0.0f;
 
+// True when the call failed. A channel that finished or was stolen answers
+// every later call on its handle with an error, which is how FMOD reports the
+// end of a channel's life, so those stay out of the log; anything else is a
+// real failure and is logged as one.
+static inline bool Check_FMOD_Error(FMOD_RESULT result, const char *string)
+{
+    if (result == FMOD_OK)
+        return false;
+    if (result == FMOD_ERR_INVALID_HANDLE || result == FMOD_ERR_CHANNEL_STOLEN)
+    {
+        LL_DEBUGS("FMOD") << string << " Error: " << FMOD_ErrorString(result) << LL_ENDL;
+    }
+    else
+    {
+        LL_WARNS("FMOD") << string << " Error: " << FMOD_ErrorString(result) << LL_ENDL;
+    }
+    return true;
+}
+
 namespace
 {
+    // FMOD's voices: one for every sound the engine plays at once, and
+    // headroom for the internet stream and the streams still closing behind
+    // it. FMOD mixes 64 voices unless told otherwise and makes the rest
+    // virtual, which is silent, so the mixer is sized to match.
+    constexpr int FMOD_VOICES = LL_MAX_AUDIO_CHANNELS + 10;
+
+    // Delivers FMOD's system events to the engine that registered for them.
+    // FMOD calls it from System::update, on the thread that runs the engine.
+    FMOD_RESULT F_CALL system_callback(FMOD_SYSTEM*, FMOD_SYSTEM_CALLBACK_TYPE type, void*, void*, void* userdata)
+    {
+        if (type == FMOD_SYSTEM_CALLBACK_DEVICELISTCHANGED && userdata)
+        {
+            static_cast<LLAudioEngine_FMODSTUDIO*>(userdata)->onDeviceListChanged();
+        }
+        return FMOD_OK;
+    }
+
+#if LL_LINUX
+    // glibc puts a thread's static TLS, the thread_locals of every module
+    // loaded with the process, at the top of the stack the thread asked for,
+    // so the thread runs on what is left. FMOD sizes its threads for itself,
+    // the mixer at 80 KB, and when the viewer's thread_locals came to 74 KB
+    // the mixer was left a few, and the wind callback's first random number,
+    // which seeds a generator on the stack, ran off the end.
+    // Each FMOD thread is asked for its own stack plus the TLS. Every module
+    // with TLS is counted, though one opened later has its TLS elsewhere, and
+    // the margin covers glibc's surplus and the thread descriptor.
+    void reserve_fmod_thread_stacks()
+    {
+        size_t tls = 0;
+        dl_iterate_phdr([](dl_phdr_info* info, size_t, void* data)
+        {
+            for (ElfW(Half) i = 0; i < info->dlpi_phnum; ++i)
+            {
+                const ElfW(Phdr)& phdr = info->dlpi_phdr[i];
+                if (phdr.p_type == PT_TLS)
+                {
+                    const size_t align = phdr.p_align ? phdr.p_align : 1;
+                    *static_cast<size_t*>(data) += (phdr.p_memsz + align - 1) / align * align;
+                }
+            }
+            return 0;
+        }, &tls);
+        const FMOD_THREAD_STACK_SIZE reserve = static_cast<FMOD_THREAD_STACK_SIZE>(tls + 16 * 1024);
+
+        constexpr std::pair<FMOD_THREAD_TYPE, FMOD_THREAD_STACK_SIZE> stacks[] = {
+            { FMOD_THREAD_TYPE_MIXER, FMOD_THREAD_STACK_SIZE_MIXER },
+            { FMOD_THREAD_TYPE_FEEDER, FMOD_THREAD_STACK_SIZE_FEEDER },
+            { FMOD_THREAD_TYPE_STREAM, FMOD_THREAD_STACK_SIZE_STREAM },
+            { FMOD_THREAD_TYPE_FILE, FMOD_THREAD_STACK_SIZE_FILE },
+            { FMOD_THREAD_TYPE_NONBLOCKING, FMOD_THREAD_STACK_SIZE_NONBLOCKING },
+            { FMOD_THREAD_TYPE_RECORD, FMOD_THREAD_STACK_SIZE_RECORD },
+            { FMOD_THREAD_TYPE_GEOMETRY, FMOD_THREAD_STACK_SIZE_GEOMETRY },
+            { FMOD_THREAD_TYPE_PROFILER, FMOD_THREAD_STACK_SIZE_PROFILER },
+            { FMOD_THREAD_TYPE_CONVOLUTION1, FMOD_THREAD_STACK_SIZE_CONVOLUTION1 },
+            { FMOD_THREAD_TYPE_CONVOLUTION2, FMOD_THREAD_STACK_SIZE_CONVOLUTION2 },
+        };
+        for (const auto& [type, stack] : stacks)
+        {
+            Check_FMOD_Error(FMOD::Thread_SetAttributes(type, FMOD_THREAD_AFFINITY_GROUP_DEFAULT,
+                                                        FMOD_THREAD_PRIORITY_DEFAULT, stack + reserve),
+                             "FMOD::Thread_SetAttributes");
+        }
+        LL_INFOS("AppInit") << "FMOD threads reserve " << reserve << " bytes of stack for static TLS" << LL_ENDL;
+    }
+#endif
+
     // Serialise an FMOD_GUID into the canonical Windows-style
     // "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" form. Used as the stable
     // device id in the picker UI / settings; round-trips via simple
@@ -122,11 +219,13 @@ namespace
 }
 
 LLAudioEngine_FMODSTUDIO::LLAudioEngine_FMODSTUDIO(bool enable_profiler,
+                                                     U32 resample_method,
                                                      std::string preferred_device_id)
 :   mInited(false),
     mWindDSP(nullptr),
     mSystem(nullptr),
     mEnableProfiler(enable_profiler),
+    mResampleMethod(resample_method),
     mWindDSPDesc(nullptr),
     mPreferredDeviceId(std::move(preferred_device_id))
 {
@@ -139,21 +238,17 @@ LLAudioEngine_FMODSTUDIO::~LLAudioEngine_FMODSTUDIO()
     // mSystem gets cleaned up at shutdown()
 }
 
-
-static inline bool Check_FMOD_Error(FMOD_RESULT result, const char *string)
-{
-    if (result == FMOD_OK)
-        return false;
-    LL_DEBUGS("FMOD") << string << " Error: " << FMOD_ErrorString(result) << LL_ENDL;
-    return true;
-}
-
 bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title)
 {
     U32 version;
     FMOD_RESULT result;
 
     LL_DEBUGS("AppInit") << "LLAudioEngine_FMODSTUDIO::init() initializing FMOD" << LL_ENDL;
+
+#if LL_LINUX
+    // Before System_Create, which starts FMOD's threads.
+    reserve_fmod_thread_stacks();
+#endif
 
     result = FMOD::System_Create(&mSystem);
     if (Check_FMOD_Error(result, "FMOD::System_Create"))
@@ -171,50 +266,42 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
             << " expected:" << FMOD_VERSION << LL_ENDL;
     }
 
-    // Resolve preferred device id -> FMOD driver index. Default (0)
-    // when id is empty or no current driver matches — covers unplugged
-    // or replaced devices without forcing a re-pick. Must run before
-    // mSystem->init() — that's when FMOD locks in the driver.
-    int active_driver = 0;
-    if (!mPreferredDeviceId.empty())
-    {
-        int num_drivers = 0;
-        mSystem->getNumDrivers(&num_drivers);
-        bool matched = false;
-        for (int i = 0; i < num_drivers; ++i)
-        {
-            FMOD_GUID g{};
-            char name[256] = {0};
-            if (mSystem->getDriverInfo(i, name, sizeof(name), &g,
-                                        nullptr, nullptr, nullptr) != FMOD_OK)
-                continue;
-            if (guid_to_string(g) == mPreferredDeviceId)
-            {
-                active_driver = i;
-                mActiveDeviceId = mPreferredDeviceId;
-                name[sizeof(name)-1] = '\0';
-                mActiveDeviceName = name;
-                matched = true;
-                break;
-            }
-        }
-        if (!matched)
-        {
-            LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init() preferred "
-                                   "driver id '" << mPreferredDeviceId
-                                << "' not present; using system default."
-                                << LL_ENDL;
-        }
-    }
-    if (active_driver != 0)
-    {
-        mSystem->setDriver(active_driver);
-    }
+    // Before System::init, which is when FMOD sizes its mixer and opens
+    // the driver.
+    Check_FMOD_Error(mSystem->setSoftwareChannels(FMOD_VOICES), "FMOD::System::setSoftwareChannels");
+    selectOutputDriver();
+
+    // A device plugged in or taken out, or a new system default, comes back
+    // through System::update as a changed device list.
+    Check_FMOD_Error(mSystem->setUserData(this), "FMOD::System::setUserData");
+    Check_FMOD_Error(mSystem->setCallback(&system_callback, FMOD_SYSTEM_CALLBACK_DEVICELISTCHANGED),
+                     "FMOD::System::setCallback");
 
     FMOD_ADVANCEDSETTINGS settings;
     memset(&settings, 0, sizeof(settings));
     settings.cbSize = sizeof(FMOD_ADVANCEDSETTINGS);
+    // FMODResampleMethod, which is read only here: FMOD takes the resampler
+    // with the settings it initialises with.
+    const char* resampler = "spline";
     settings.resamplerMethod = FMOD_DSP_RESAMPLER_SPLINE;
+    switch (mResampleMethod)
+    {
+    case 0:
+        resampler = "linear";
+        settings.resamplerMethod = FMOD_DSP_RESAMPLER_LINEAR;
+        break;
+    case 1:
+        resampler = "cubic";
+        settings.resamplerMethod = FMOD_DSP_RESAMPLER_CUBIC;
+        break;
+    case 2:
+        break;
+    default:
+        LL_WARNS("AppInit") << "FMODResampleMethod " << mResampleMethod << " is none of 0 (linear), 1 (cubic) "
+                            << "and 2 (spline); using spline" << LL_ENDL;
+        break;
+    }
+    LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): resampler " << resampler << LL_ENDL;
 
     result = mSystem->setAdvancedSettings(&settings);
     Check_FMOD_Error(result, "FMOD::System::setAdvancedSettings");
@@ -237,7 +324,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
         {
             LL_DEBUGS("AppInit") << "Trying PulseAudio audio output..." << LL_ENDL;
             if (mSystem->setOutput(FMOD_OUTPUTTYPE_PULSEAUDIO) == FMOD_OK &&
-                (result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, const_cast<char*>(app_title.c_str()))) == FMOD_OK)
+                (result = mSystem->init(FMOD_VOICES, fmod_flags, const_cast<char*>(app_title.c_str()))) == FMOD_OK)
             {
                 LL_DEBUGS("AppInit") << "PulseAudio output initialized OKAY" << LL_ENDL;
                 audio_ok = true;
@@ -259,7 +346,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
         {
             LL_DEBUGS("AppInit") << "Trying ALSA audio output..." << LL_ENDL;
             if (mSystem->setOutput(FMOD_OUTPUTTYPE_ALSA) == FMOD_OK &&
-                (result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, 0)) == FMOD_OK)
+                (result = mSystem->init(FMOD_VOICES, fmod_flags, 0)) == FMOD_OK)
             {
                 LL_DEBUGS("AppInit") << "ALSA audio output initialized OKAY" << LL_ENDL;
                 audio_ok = true;
@@ -282,8 +369,8 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 
     // We're interested in logging which output method we
     // ended up with, for QA purposes.
-    FMOD_OUTPUTTYPE output_type;
-    mSystem->getOutput(&output_type);
+    FMOD_OUTPUTTYPE output_type = FMOD_OUTPUTTYPE_UNKNOWN;
+    Check_FMOD_Error(mSystem->getOutput(&output_type), "FMOD::System::getOutput");
     switch (output_type)
     {
     case FMOD_OUTPUTTYPE_NOSOUND:
@@ -300,7 +387,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
     // initialize the FMOD engine
     // number of channel in this case looks to be identiacal to number of max simultaneously
     // playing objects and we can set practically any number
-    result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, 0);
+    result = mSystem->init(FMOD_VOICES, fmod_flags, 0);
     if (Check_FMOD_Error(result, "Error initializing FMOD Studio with default settins, retrying with other format"))
     {
         result = mSystem->setSoftwareFormat(44100, FMOD_SPEAKERMODE_STEREO, 0/*- ignore*/);
@@ -308,7 +395,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
         {
             return false;
         }
-        result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, 0);
+        result = mSystem->init(FMOD_VOICES, fmod_flags, 0);
     }
     if (Check_FMOD_Error(result, "Error initializing FMOD Studio"))
     {
@@ -404,71 +491,99 @@ void LLAudioEngine_FMODSTUDIO::setOutputDevice(const std::string& id)
         return;
     }
 
-    // Resolve preferred id (or empty -> driver 0) to a driver index.
-    int target = 0;
-    if (!id.empty())
+    selectOutputDriver();
+    mDevicesChangedSignal();
+}
+
+void LLAudioEngine_FMODSTUDIO::onDeviceListChanged()
+{
+    if (!mSystem || !mInited)
     {
-        int num_drivers = 0;
-        mSystem->getNumDrivers(&num_drivers);
-        bool matched = false;
-        for (int i = 0; i < num_drivers; ++i)
+        return;
+    }
+
+    LL_INFOS("FMOD") << "The output devices changed" << LL_ENDL;
+    selectOutputDriver();
+    mDevicesChangedSignal();
+}
+
+bool LLAudioEngine_FMODSTUDIO::describeDriver(int index, std::string& id, std::string& name) const
+{
+    FMOD_GUID guid{};
+    char driver_name[256] = {};
+    if (Check_FMOD_Error(mSystem->getDriverInfo(index, driver_name, sizeof(driver_name), &guid, nullptr, nullptr, nullptr),
+                         "FMOD::System::getDriverInfo"))
+    {
+        return false;
+    }
+    driver_name[sizeof(driver_name) - 1] = '\0';
+    id = guid_to_string(guid);
+    name = driver_name;
+    return true;
+}
+
+void LLAudioEngine_FMODSTUDIO::selectOutputDriver()
+{
+    int num_drivers = 0;
+    if (Check_FMOD_Error(mSystem->getNumDrivers(&num_drivers), "FMOD::System::getNumDrivers") || num_drivers <= 0)
+    {
+        return;
+    }
+
+    // The preferred device while it is there, else the system default, which
+    // FMOD always lists first. Following the default this way is what moves
+    // the sound to headphones plugged in after launch, and back again.
+    int target = 0;
+    std::string target_id;
+    std::string target_name;
+    for (int i = 0; i < num_drivers && !mPreferredDeviceId.empty(); ++i)
+    {
+        std::string id;
+        std::string name;
+        if (describeDriver(i, id, name) && id == mPreferredDeviceId)
         {
-            FMOD_GUID g{};
-            char name[256] = {0};
-            if (mSystem->getDriverInfo(i, name, sizeof(name), &g,
-                                        nullptr, nullptr, nullptr) != FMOD_OK)
-                continue;
-            if (guid_to_string(g) == id)
-            {
-                target = i;
-                matched = true;
-                break;
-            }
+            target = i;
+            target_id = std::move(id);
+            target_name = std::move(name);
+            break;
         }
-        if (!matched)
+    }
+    if (target_id.empty())
+    {
+        if (!mPreferredDeviceId.empty())
         {
-            LL_INFOS() << "LLAudioEngine_FMODSTUDIO::setOutputDevice() driver id '"
-                       << id << "' not found among live drivers; preference "
-                       "saved but no live swap performed." << LL_ENDL;
+            LL_INFOS("FMOD") << "Output device " << mPreferredDeviceId << " is not present; using the system default"
+                             << LL_ENDL;
+        }
+        if (!describeDriver(0, target_id, target_name))
+        {
             return;
         }
     }
 
-    int current = 0;
-    mSystem->getDriver(&current);
-    if (target == current) return;
-
-    // Per FMOD docs (System::setDriver), when called after System::init the
-    // current driver is shut down and the newly selected one is
-    // initialized — so this is a true hot-swap, no manual teardown
-    // needed. Active channels may glitch briefly while FMOD reinitialises
-    // its output but the system stays alive.
-    LL_INFOS() << "LLAudioEngine_FMODSTUDIO::setOutputDevice() switching to "
-                  "driver " << target << " (id '"
-               << (id.empty() ? "<system default>" : id.c_str()) << "')"
-               << LL_ENDL;
-    FMOD_RESULT result = mSystem->setDriver(target);
-    if (Check_FMOD_Error(result, "FMOD::System::setDriver"))
+    // Once FMOD is running, setDriver restarts the output, so it is left
+    // alone when the device is already the one playing. Driver indices are
+    // no guide to that: a changed device list renumbers them.
+    if (mInited)
     {
-        LL_WARNS() << "LLAudioEngine_FMODSTUDIO::setOutputDevice() setDriver "
-                      "failed; preference saved but live swap aborted."
-                   << LL_ENDL;
-        return;
+        int live = 0;
+        std::string live_id;
+        std::string live_name;
+        if (!Check_FMOD_Error(mSystem->getDriver(&live), "FMOD::System::getDriver")
+            && describeDriver(live, live_id, live_name) && live_id == target_id)
+        {
+            mActiveDeviceId = std::move(target_id);
+            mActiveDeviceName = std::move(target_name);
+            return;
+        }
     }
 
-    // Refresh active id + display name from the live driver.
-    FMOD_GUID g{};
-    char name[256] = {0};
-    if (mSystem->getDriverInfo(target, name, sizeof(name), &g,
-                                nullptr, nullptr, nullptr) == FMOD_OK)
+    LL_INFOS("FMOD") << "Output device: " << target_name << " " << target_id << LL_ENDL;
+    if (!Check_FMOD_Error(mSystem->setDriver(target), "FMOD::System::setDriver"))
     {
-        name[sizeof(name)-1] = '\0';
-        mActiveDeviceId = guid_to_string(g);
-        mActiveDeviceName = name;
+        mActiveDeviceId = std::move(target_id);
+        mActiveDeviceName = std::move(target_name);
     }
-
-    // Notify any subscribed UIs that the active device shifted.
-    mDevicesChangedSignal();
 }
 
 // virtual
@@ -549,9 +664,13 @@ void LLAudioEngine_FMODSTUDIO::shutdown()
     LL_INFOS("FMOD") << "LLAudioEngine_FMODSTUDIO::shutdown() closing FMOD Studio" << LL_ENDL;
     if (mSystem)
     {
+        // No more device news: the engine it would reach is going.
+        Check_FMOD_Error(mSystem->setCallback(nullptr, FMOD_SYSTEM_CALLBACK_DEVICELISTCHANGED), "FMOD::System::setCallback");
         mSystem->close();
         mSystem->release();
+        mSystem = nullptr;
     }
+    mInited = false;
     LL_INFOS("FMOD") << "LLAudioEngine_FMODSTUDIO::shutdown() done closing FMOD Studio" << LL_ENDL;
 
     delete mListenerp;
@@ -802,7 +921,9 @@ void LLAudioChannelFMODSTUDIO::update3DPosition()
 
         LLVector3 float_pos;
         float_pos.setVec(mCurrentSourcep->getPositionGlobal());
-        FMOD_RESULT result = mChannelp->set3DAttributes((FMOD_VECTOR*)float_pos.mV, (FMOD_VECTOR*)mCurrentSourcep->getVelocity().mV);
+        const FMOD_VECTOR position = to_fmod_vector(float_pos);
+        const FMOD_VECTOR velocity = to_fmod_vector(mCurrentSourcep->getVelocity());
+        FMOD_RESULT result = mChannelp->set3DAttributes(&position, &velocity);
         Check_FMOD_Error(result, "FMOD::Channel::set3DAttributes");
     }
 }
@@ -821,8 +942,11 @@ void LLAudioChannelFMODSTUDIO::updateLoop()
     // sample position looks like it's going backwards.  Not reliable; may
     // yield false negatives.
     //
-    U32 cur_pos;
-    mChannelp->getPosition(&cur_pos, FMOD_TIMEUNIT_PCMBYTES);
+    unsigned int cur_pos = 0;
+    if (Check_FMOD_Error(mChannelp->getPosition(&cur_pos, FMOD_TIMEUNIT_PCMBYTES), "FMOD::Channel::getPosition"))
+    {
+        return;
+    }
 
     if (cur_pos < (U32)mLastSamplePos)
     {
@@ -883,23 +1007,23 @@ void LLAudioChannelFMODSTUDIO::setReverbWet(float wet)
 
 void LLAudioChannelFMODSTUDIO::playSynced(LLAudioChannel *channelp)
 {
-    LLAudioChannelFMODSTUDIO *fmod_channelp = (LLAudioChannelFMODSTUDIO*)channelp;
-    if (!(fmod_channelp->mChannelp && mChannelp))
+    // Start where the sync master is, by time rather than by bytes: the two
+    // sounds need not share a format. Where that cannot be had, play from the
+    // start rather than not at all.
+    auto* master = static_cast<LLAudioChannelFMODSTUDIO*>(channelp);
+    auto* buffer = static_cast<LLAudioBufferFMODSTUDIO*>(mCurrentBufferp);
+    if (master && master->mChannelp && mChannelp && buffer && buffer->getSound())
     {
-        // Don't have channels allocated to both the master and the slave
-        return;
+        unsigned int master_ms = 0;
+        unsigned int length_ms = 0;
+        if (!Check_FMOD_Error(master->mChannelp->getPosition(&master_ms, FMOD_TIMEUNIT_MS), "FMOD::Channel::getPosition")
+            && !Check_FMOD_Error(buffer->getSound()->getLength(&length_ms, FMOD_TIMEUNIT_MS), "FMOD::Sound::getLength")
+            && length_ms > 0)
+        {
+            Check_FMOD_Error(mChannelp->setPosition(master_ms % length_ms, FMOD_TIMEUNIT_MS), "FMOD::Channel::setPosition");
+        }
     }
 
-    U32 cur_pos;
-    if (Check_FMOD_Error(mChannelp->getPosition(&cur_pos, FMOD_TIMEUNIT_PCMBYTES), "Unable to retrieve current position"))
-        return;
-
-    cur_pos %= mCurrentBufferp->getLength();
-
-    // Try to match the position of our sync master
-    Check_FMOD_Error(mChannelp->setPosition(cur_pos, FMOD_TIMEUNIT_PCMBYTES), "Unable to set current position");
-
-    // Start us playing
     play();
 }
 
@@ -911,9 +1035,13 @@ bool LLAudioChannelFMODSTUDIO::isPlaying()
         return false;
     }
 
-    bool paused, playing;
-    mChannelp->getPaused(&paused);
-    mChannelp->isPlaying(&playing);
+    bool paused = false;
+    bool playing = false;
+    if (Check_FMOD_Error(mChannelp->getPaused(&paused), "FMOD::Channel::getPaused")
+        || Check_FMOD_Error(mChannelp->isPlaying(&playing), "FMOD::Channel::isPlaying"))
+    {
+        return false;
+    }
     return !paused && playing;
 }
 
@@ -995,8 +1123,11 @@ U32 LLAudioBufferFMODSTUDIO::getLength()
         return 0;
     }
 
-    U32 length;
-    mSoundp->getLength(&length, FMOD_TIMEUNIT_PCMBYTES);
+    unsigned int length = 0;
+    if (Check_FMOD_Error(mSoundp->getLength(&length, FMOD_TIMEUNIT_PCMBYTES), "FMOD::Sound::getLength"))
+    {
+        return 0;
+    }
     return length;
 }
 
@@ -1026,10 +1157,11 @@ FMOD_RESULT F_CALL windCallback(FMOD_DSP_STATE *dsp_state, float *inbuffer, floa
     // outbuffer = the buffer passed from the previous DSP unit.
     // length = length in samples at this mix time.
 
-    LLWindGen<LLAudioEngine_FMODSTUDIO::MIXBUFFERFORMAT> *windgen = nullptr;
     FMOD::DSP *thisdsp = (FMOD::DSP *)dsp_state->instance;
 
-    thisdsp->getUserData((void **)&windgen);
+    void* user_data = nullptr;
+    thisdsp->getUserData(&user_data);
+    auto* windgen = static_cast<LLWindGen<LLAudioEngine_FMODSTUDIO::MIXBUFFERFORMAT>*>(user_data);
 
     if (windgen)
     {

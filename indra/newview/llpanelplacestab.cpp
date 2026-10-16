@@ -73,7 +73,7 @@ void LLPanelPlacesTab::onRegionResponse(const LLVector3d& landmark_global_pos,
         return;
     }
 
-    LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(sl_url));
+    LLView::getWindow()->copyTextToClipboard(sl_url);
 
     LLSD args;
     args["SLURL"] = sl_url;

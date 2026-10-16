@@ -36,7 +36,7 @@
 #include "llwlhandlers.h"
 #include "lltrans.h"
 #include "lltrace.h"
-#include "llfasttimer.h"
+#include "alfarplane.h"
 #include "llviewercamera.h"
 #include "pipeline.h"
 #include "llsky.h"
@@ -278,7 +278,7 @@ namespace
 
         LLSettingsBase::Seconds getAdjustedNow() const
         {
-            LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch());
+            LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch() + gUTCOffset);
 
             return (now + mCycleOffset);
         }
@@ -1587,14 +1587,19 @@ LLVector4 LLEnvironment::getMoonDirectionCFR() const
     return light_direction_cfr;
 }
 
-LLVector4 LLEnvironment::getClampedLightNorm() const
+LLVector3 LLEnvironment::getClampedLightDirection() const
 {
     LLVector3 light_direction = getLightDirection();
     if (light_direction.mV[2] < -0.1f)
     {
         light_direction.mV[2] = -0.1f;
     }
-    return toLightNorm(light_direction);
+    return light_direction;
+}
+
+LLVector4 LLEnvironment::getClampedLightNorm() const
+{
+    return toLightNorm(getClampedLightDirection());
 }
 
 LLVector4 LLEnvironment::getClampedSunNorm() const
@@ -1629,7 +1634,7 @@ extern bool gCubeSnapshot;
 //-------------------------------------------------------------------------
 void LLEnvironment::update(const LLViewerCamera * cam)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT; //LL_RECORD_BLOCK_TIME(FTM_ENVIRONMENT_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     //F32Seconds now(LLDate::now().secondsSinceEpoch());
     if (!gCubeSnapshot)
     {
@@ -1650,6 +1655,8 @@ void LLEnvironment::update(const LLViewerCamera * cam)
         mLastCamYaw = cam->getYaw() + SUN_DELTA_YAW;
     }
 
+    mEyeToSky = ALFarPlane::eyeToSkyFrame(cam->frameModelview());
+
     updateSettingsUniforms();
 
     LLGLSLShader::dirtyEnvironmentUniforms();
@@ -1659,9 +1666,12 @@ void LLEnvironment::updateCloudScroll()
 {
     // This is a function of the environment rather than the sky, since it should
     // persist through sky transitions.
-    static LLTimer s_cloud_timer;
+    // On the frame clock, as update()'s day-cycle delta is, so the clouds and the sky move by
+    // the same time.
+    static LLFrameTimer s_cloud_timer;
 
-    F64 delta_t = s_cloud_timer.getElapsedTimeAndResetF64();
+    const F64 delta_t = s_cloud_timer.getElapsedTimeF64();
+    s_cloud_timer.reset();
 
     if (mCurrentEnvironment->getSky() && !mCloudScrollPaused)
     {
@@ -1674,6 +1684,10 @@ void LLEnvironment::updateCloudScroll()
         {
             LLVector2 cloud_delta = static_cast<F32>(delta_t) * (mCurrentEnvironment->getSky()->getCloudScrollRate()) / 100.0;
             mCloudScrollDelta += cloud_delta;
+            // It offsets coordinates the noise repeats over every whole unit, so only its
+            // fraction shows; kept to that, it does not lose the frame's step to its own size.
+            mCloudScrollDelta.mV[VX] -= floorf(mCloudScrollDelta.mV[VX]);
+            mCloudScrollDelta.mV[VY] -= floorf(mCloudScrollDelta.mV[VY]);
         }
     }
 
@@ -1683,9 +1697,12 @@ namespace
 {
     // The CPU block must exactly match the std140 layout the shaders declare. Each vec3 is
     // paired with a trailing scalar (fills the vec3's std140 tail), so the C++ float[3]+float
-    // packing reproduces std140 with no manual padding; only the final 16-byte round needs it.
-    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 160,
-                  "Environment UBO layout must match std140 (160 bytes)");
+    // packing reproduces std140 with no manual padding; only the round to 16 bytes before
+    // eyeToSky needs it, a mat3's columns being vec4-aligned.
+    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 208,
+                  "Environment UBO layout must match std140 (208 bytes)");
+    static_assert(offsetof(LLEnvironment::EnvironmentUBOData, eyeToSky) == 160,
+                  "eyeToSky must start on a 16-byte boundary, as a std140 mat3 does");
 
     // LLShaderMgr uniform enum -> (byte offset in the block, float component count). The pack
     // walks the per-frame LLShaderUniforms buckets and writes any setting whose enum appears
@@ -1746,6 +1763,7 @@ namespace
         {
             members.push_back({ f.uniform, nullptr, f.offset, false });
         }
+        members.push_back({ LLShaderMgr::EYE_TO_SKY, nullptr, (U32)offsetof(LLEnvironment::EnvironmentUBOData, eyeToSky), true });
         LLGLSLShader::registerEngineBlockLayout("Environment", std::move(members));
         return true;
     }();
@@ -1887,6 +1905,11 @@ void LLEnvironment::packEnvironmentUBO()
 
     pack_group(mSkyUniforms);
     pack_group(mWaterUniforms);
+
+    for (U32 column = 0; column < 3; ++column)
+    {
+        memcpy(&d.eyeToSky[column * 4], &mEyeToSky[column * 3], 3 * sizeof(F32));
+    }
 
     mEnvUBODirty = true;
 }
@@ -2924,7 +2947,8 @@ void LLEnvironment::DayInstance::setBlenders(const LLSettingsBlender::ptr_t &sky
 
 LLSettingsBase::TrackPosition LLEnvironment::DayInstance::getProgress() const
 {
-    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch());
+    // The region's day runs on the server's clock, not this machine's.
+    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch() + gUTCOffset);
     now += mDayOffset;
 
     if ((mDayLength <= 0) || !mDayCycle)
@@ -2940,7 +2964,7 @@ LLSettingsBase::TrackPosition LLEnvironment::DayInstance::secondsToKeyframe(LLSe
 
 void LLEnvironment::DayInstance::animate()
 {
-    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch());
+    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch() + gUTCOffset);
 
     now += mDayOffset;
 

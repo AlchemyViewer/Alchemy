@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Joystick" title="JOYSTICK OPSÆTNING">
-	<check_box label="Aktiver Joystick:" name="enable_joystick"/>
 	<spinner label="X akse mapping" name="JoystickAxis1" label_width="115" width="155"/>
 	<spinner label="Y akse mapping" name="JoystickAxis2" label_width="115" width="155"/>
 	<spinner label="Z akse mapping" name="JoystickAxis0" label_width="115" width="155"/>
@@ -56,17 +55,12 @@
 	<text name="Feathering">
 		Respons
 	</text>
-	<slider label="" name="AvatarFeathering"/>
-	<slider label="" name="BuildFeathering"/>
-	<slider label="" name="FlycamFeathering"/>
 	<text name="ZoomScale2">
 		Zoom følsomhed
 	</text>
-	<spinner label="" name="FlycamAxisScale6"/>
 	<text name="ZoomDeadZone">
 		Zoom min. udslag
 	</text>
-	<spinner label="" name="FlycamAxisDeadZone6"/>
 	<button label="SpaceNavigator Defaults" name="SpaceNavigatorDefaults"/>
 	<button label="OK" label_selected="OK" name="ok_btn"/>
 	<button label="Annullér" label_selected="Annullér" name="cancel_btn"/>
@@ -78,7 +72,4 @@
 		<stat_bar label="Akse 4" name="axis4"/>
 		<stat_bar label="Akse 5" name="axis5"/>
 	</stat_view>
-	<string name="NoDevice">
-		intet joystick fundet
-	</string>
 </floater>

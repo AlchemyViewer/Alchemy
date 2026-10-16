@@ -1,60 +1,36 @@
 # -*- cmake -*-
 include_guard()
 
-include(FreeType)
 include(DBUS)
 
 add_library(ll::uilibraries INTERFACE IMPORTED)
 
-if (LINUX)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(WAYLAND_CLIENT wayland-client)
-
-  if(WAYLAND_CLIENT_FOUND)
-      target_include_directories(ll::uilibraries SYSTEM INTERFACE ${WAYLAND_CLIENT_INCLUDE_DIRS})
-      target_compile_definitions(ll::uilibraries INTERFACE LL_WAYLAND=1)
-  else()
-      message("pkgconfig could not find wayland client, compiling without full wayland support")
-  endif()
-
-  find_package(X11)
-  if(X11_FOUND)
-      target_compile_definitions(ll::uilibraries INTERFACE LL_X11=1)
-  else()
-      message("Could not find X11, compiling without full X11 support")
-  endif()
-
-
-  target_link_libraries(ll::uilibraries INTERFACE
-          ll::fontconfig
-          ll::freetype
-          ll::dbus
-  )
+if(LINUX)
+  # The window is SDL's and GL is EGL on Wayland and X11 alike, so the viewer
+  # itself needs neither wayland-client nor X11: no headers, no defines.
+  target_link_libraries(ll::uilibraries INTERFACE ll::fontconfig ll::freetype ll::dbus)
 elseif(DARWIN)
-  target_link_libraries(ll::uilibraries INTERFACE
-          ${CARBON_LIBRARY}
-          )
+  target_link_libraries(ll::uilibraries INTERFACE ${CARBON_LIBRARY})
 elseif(WINDOWS)
-  target_link_libraries(ll::uilibraries INTERFACE
-          UxTheme
-          Dwmapi
-          Shcore
-          comdlg32 # Common Dialogs for ChooseColor
-          ole32
-          dxgi
-          d3d9
-          dinput8
-          dxguid
-          opengl32
-          kernel32
-          odbc32
-          odbccp32
-          oleaut32
-          shell32
-          shlwapi
-          Vfw32
-          wer
-          winspool
-          imm32
-          )
+  target_link_libraries(
+    ll::uilibraries
+    INTERFACE
+      UxTheme
+      Dwmapi
+      Shcore
+      comdlg32 # Common Dialogs for ChooseColor
+      ole32
+      dxgi
+      d3d9
+      dinput8
+      dxguid
+      opengl32
+      kernel32
+      oleaut32
+      shell32
+      shlwapi
+      wer
+      winspool
+      imm32
+  )
 endif()

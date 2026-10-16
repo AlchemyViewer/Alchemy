@@ -28,26 +28,23 @@
 
 #include "llsurface.h"
 
-#include "llpatchvertexarray.h"
+#include "alterrainsurfacemaps.h"
 #include "patch_dct.h"
 #include "patch_code.h"
 #include "llbitpack.h"
 #include "llviewerobjectlist.h"
 #include "llregionhandle.h"
 #include "llagent.h"
-#include "llagentcamera.h"
 #include "llworld.h"
 #include "llviewercontrol.h"
 #include "llviewertexture.h"
 #include "llsurfacepatch.h"
-#include "llvowater.h"
 #include "pipeline.h"
 #include "llviewerregion.h"
 #include "lldrawpoolterrain.h"
 #include "llworldmipmap.h"
 
 extern LLPipeline gPipeline;
-extern bool gShiftFrame;
 
 namespace
 {
@@ -76,20 +73,14 @@ LLSurface::LLSurface(U32 type, LLViewerRegion *regionp) :
 {
     // Surface data
     mSurfaceZ = nullptr;
-    mNorm = nullptr;
 
     // Patch data
     mPatchList = nullptr;
-
-    // One of each for each camera
-    mVisiblePatchCount = 0;
 
     mHasZData = false;
     // "uninitialized" min/max z
     mMinZ = 10000.f;
     mMaxZ = -10000.f;
-
-    mWaterObjp = nullptr;
 
     // In here temporarily.
     mSurfacePatchUpdateCount = 0;
@@ -105,8 +96,6 @@ LLSurface::~LLSurface()
 {
     delete [] mSurfaceZ;
     mSurfaceZ = nullptr;
-
-    delete [] mNorm;
 
     mGridsPerEdge = 0;
     mGridsPerPatchEdge = 0;
@@ -138,7 +127,6 @@ void LLSurface::initClasses()
 void LLSurface::setRegion(LLViewerRegion *regionp)
 {
     mRegionp = regionp;
-    mWaterObjp = nullptr; // depends on regionp, needs recreating
 }
 
 // Assumes that arguments are powers of 2, and that
@@ -159,8 +147,6 @@ void LLSurface::create(const S32 grids_per_edge,
 
     mOriginGlobal.setVec(origin_global);
 
-    mPVArray.create(mGridsPerEdge, mGridsPerPatchEdge, LLWorld::getInstance()->getRegionScale());
-
     S32 number_of_grids = mGridsPerEdge * mGridsPerEdge;
 
     /////////////////////////////////////
@@ -168,19 +154,13 @@ void LLSurface::create(const S32 grids_per_edge,
     // Initialize data arrays for surface
     ///
     mSurfaceZ = new F32[number_of_grids];
-    mNorm = new LLVector3[number_of_grids];
 
     // Reset the surface to be a flat square grid
     for(S32 i=0; i < number_of_grids; i++)
     {
         // Surface is flat and zero
-        // Normals all point up
         mSurfaceZ[i] = 0.0f;
-        mNorm[i].setVec(0.f, 0.f, 1.f);
     }
-
-
-    mVisiblePatchCount = 0;
 
 
     ///////////////////////
@@ -192,6 +172,8 @@ void LLSurface::create(const S32 grids_per_edge,
 
     // Has to be done after texture initialization
     createPatchData();
+
+    mSurfaceMaps = std::make_unique<ALTerrainSurfaceMaps>(*this);
 }
 
 LLViewerTexture* LLSurface::getSTexture()
@@ -237,19 +219,6 @@ void LLSurface::initTextures()
     // Main surface texture
     //
     createSTexture();
-
-    ///////////////////////
-    //
-    // Water object
-    //
-    if (gSavedSettings.getBOOL("RenderWater") )
-    {
-        mWaterObjp = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_WATER, mRegionp);
-        gPipeline.createObject(mWaterObjp);
-        LLVector3d water_pos_global = from_region_handle(mRegionp->getHandle());
-        water_pos_global += LLVector3d(128.0, 128.0, DEFAULT_WATER_HEIGHT);     // region doesn't have a valid water height yet
-        mWaterObjp->setPositionGlobal(water_pos_global);
-    }
 }
 
 
@@ -272,18 +241,6 @@ void LLSurface::setOriginGlobal(const LLVector3d &origin_global)
             new_origin_global.mdV[1] = mOriginGlobal.mdV[1] + j * mMetersPerGrid * mGridsPerPatchEdge;
             patchp->setOriginGlobal(new_origin_global);
         }
-    }
-
-    // Hack!
-    if (mWaterObjp.notNull() && mWaterObjp->mDrawable.notNull())
-    {
-        const F64 x = origin_global.mdV[VX] + 128.0;
-        const F64 y = origin_global.mdV[VY] + 128.0;
-        const F64 z = mWaterObjp->getPositionGlobal().mdV[VZ];
-
-        LLVector3d water_origin_global(x, y, z);
-
-        mWaterObjp->setPositionGlobal(water_origin_global);
     }
 }
 
@@ -317,8 +274,14 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
     S32 i;
     LLSurfacePatch *patchp, *neighbor_patchp;
 
+    // The patch walk below pairs our edge patches with the neighbour's by index, and the
+    // surface maps' apron reads the neighbour's grid as a continuation of ours: both need the
+    // same grid spacing with the neighbour's grid 0 on our last column. LLWorld connects
+    // regions only at exact handle offsets, which gives the alignment; the spacing is checked.
+    llassert(neighborp->mMetersPerGrid == mMetersPerGrid);
     mNeighbors[direction] = neighborp;
     neighborp->mNeighbors[gDirOpposite[direction]] = this;
+    dirtySurfaceMaps();
 
     // Connect patches
     if (NORTHEAST == direction)
@@ -514,6 +477,9 @@ void LLSurface::disconnectNeighbor(LLSurface *surfacep)
     {
         (mPatchList + i)->disconnectNeighbor(surfacep);
     }
+
+    // The apron that read the departed surface now repeats our own edge.
+    dirtySurfaceMaps();
 }
 
 
@@ -572,31 +538,6 @@ void LLSurface::moveZ(const S32 x, const S32 y, const F32 delta)
 }
 
 
-void LLSurface::updatePatchVisibilities(LLAgent &agent)
-{
-    if (gShiftFrame)
-    {
-        return;
-    }
-
-    LLVector3 pos_region = mRegionp->getPosRegionFromGlobal(gAgentCamera.getCameraPositionGlobal());
-
-    LLSurfacePatch *patchp;
-
-    mVisiblePatchCount = 0;
-    for (S32 i=0; i<mNumberOfPatches; i++)
-    {
-        patchp = mPatchList + i;
-
-        patchp->updateVisibility();
-        if (patchp->getVisible())
-        {
-            mVisiblePatchCount++;
-            patchp->updateCameraDistanceRegion(pos_region);
-        }
-    }
-}
-
 bool LLSurface::idleUpdate(F32 max_update_time)
 {
     if (!gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_TERRAIN))
@@ -616,14 +557,14 @@ bool LLSurface::idleUpdate(F32 max_update_time)
         getRegion()->dirtyHeights();
     }
 
-    // Always call updateNormals() / updateVerticalStats()
+    // Always fill the corner and update the vertical stats
     //  every frame to avoid artifacts
     for(std::set<LLSurfacePatch *>::iterator iter = mDirtyPatchList.begin();
         iter != mDirtyPatchList.end(); )
     {
         std::set<LLSurfacePatch *>::iterator curiter = iter++;
         LLSurfacePatch *patchp = *curiter;
-        patchp->updateNormals();
+        patchp->updateNorthEastCorner();
         patchp->updateVerticalStats();
         if (max_update_time == 0.f || update_timer.getElapsedTimeF32() < max_update_time)
         {
@@ -638,6 +579,12 @@ bool LLSurface::idleUpdate(F32 max_update_time)
 
     // some patches changed, update region reflection probes
     mRegionp->updateReflectionProbes(did_update);
+
+    // A patch's composition regenerated; the neighbours' border column reads it.
+    if (did_update)
+    {
+        dirtySurfaceMaps();
+    }
 
     return did_update;
 }
@@ -706,6 +653,7 @@ void LLSurface::decompressDCTPatch(LLBitPack &bitpack, LLGroupHeader *gopp, bool
         // Dirty patch statistics, and flag that the patch has data.
         patchp->dirtyZ();
         patchp->setHasReceivedData();
+        dirtySurfaceMaps();
     }
 }
 
@@ -737,6 +685,11 @@ F32 LLSurface::resolveHeightRegion(const F32 x, const F32 y) const
         y >= 0.f  &&
         y <= mMetersPerEdge)
     {
+        if (isSmoothing())
+        {
+            return smoothHeight(x, y, nullptr, nullptr);
+        }
+
         const S32 left   = llfloor(x * oometerspergrid);
         const S32 bottom = llfloor(y * oometerspergrid);
 
@@ -816,6 +769,16 @@ LLVector3 LLSurface::resolveNormalGlobal(const LLVector3d& pos_global) const
         pos_global.mdV[VY] >= mOriginGlobal.mdV[VY]  &&
         pos_global.mdV[VY] < mOriginGlobal.mdV[VY] + mMetersPerEdge)
     {
+        if (isSmoothing())
+        {
+            F32 dzdx, dzdy;
+            smoothHeight((F32)(pos_global.mdV[VX] - mOriginGlobal.mdV[VX]),
+                       (F32)(pos_global.mdV[VY] - mOriginGlobal.mdV[VY]), &dzdx, &dzdy);
+            normal.setVec(-dzdx, -dzdy, 1.f);
+            normal.normVec();
+            return normal;
+        }
+
         U32 i, j, k;
         F32 dx, dy;
         i = (U32) ((pos_global.mdV[VX] - mOriginGlobal.mdV[VX]) * oometerspergrid);
@@ -947,7 +910,6 @@ std::ostream& operator<<(std::ostream &s, const LLSurface &S)
     s << "  mPatchesPerEdge = " << S.mPatchesPerEdge << "\n";
     s << "  mOriginGlobal = " << S.mOriginGlobal << "\n";
     s << "  mMetersPerGrid = " << S.mMetersPerGrid << "\n";
-    s << "  mVisiblePatchCount = " << S.mVisiblePatchCount << "\n";
     s << "}";
     return s;
 }
@@ -964,9 +926,6 @@ void LLSurface::createPatchData()
 
     // Allocate memory
     mPatchList = new LLSurfacePatch[mNumberOfPatches];
-
-    // One of each for each camera
-    mVisiblePatchCount = mNumberOfPatches;
 
     for (j=0; j<mPatchesPerEdge; j++)
     {
@@ -988,7 +947,6 @@ void LLSurface::createPatchData()
             S32 data_offset = i * mGridsPerPatchEdge + j * mGridsPerPatchEdge * mGridsPerEdge;
 
             patchp->setDataZ(mSurfaceZ + data_offset);
-            patchp->setDataNorm(mNorm + data_offset);
 
 
             // We make each patch point to its neighbors so we can do resolution checking
@@ -1082,25 +1040,12 @@ void LLSurface::destroyPatchData()
 
     delete [] mPatchList;
     mPatchList = nullptr;
-    mVisiblePatchCount = 0;
 }
 
 
 void LLSurface::setTextureSize(const S32 texture_size)
 {
     sTextureSize = texture_size;
-}
-
-
-U32 LLSurface::getRenderLevel(const U32 render_stride) const
-{
-    return mPVArray.mRenderLevelp[render_stride];
-}
-
-
-U32 LLSurface::getRenderStride(const U32 render_level) const
-{
-    return mPVArray.mRenderStridep[render_level];
 }
 
 
@@ -1136,36 +1081,66 @@ void LLSurface::dirtySurfacePatch(LLSurfacePatch *patchp)
     mDirtyPatchList.insert(patchp);
 }
 
+F32 LLSurface::sampleZ(S32 gx, S32 gy) const
+{
+    bool has_neighbor[8];
+    for (U32 dir = 0; dir < 8; ++dir)
+    {
+        has_neighbor[dir] = mNeighbors[dir] != nullptr;
+    }
+    return sampleZ(gx, gy, has_neighbor);
+}
+
+F32 LLSurface::sampleZ(S32 gx, S32 gy, const bool (&has_neighbor)[8]) const
+{
+    const U32 dir = ALTerrainSurfaceMaps::resolve(gx, gy, mGridsPerEdge, has_neighbor);
+    const LLSurface* owner = dir == MIDDLE ? this : mNeighbors[dir];
+    // A neighbour with fewer rows than this surface is read at its edge, not past it.
+    const S32 last = owner->mGridsPerEdge - 1;
+    return owner->getZ(llclamp(gx, 0, last), llclamp(gy, 0, last));
+}
+
+// static
+bool LLSurface::isSmoothing()
+{
+    static LLCachedControl<bool> smoothing(gSavedSettings, "AlchemyRenderTerrainSmoothing", true);
+    return smoothing;
+}
+
+F32 LLSurface::smoothHeight(F32 x, F32 y, F32* dzdx, F32* dzdy) const
+{
+    bool has_neighbor[8];
+    for (U32 dir = 0; dir < 8; ++dir)
+    {
+        has_neighbor[dir] = mNeighbors[dir] != nullptr;
+    }
+    const F32 oometerspergrid = 1.f / mMetersPerGrid;
+    const F32 h = ALTerrainSurfaceMaps::smoothHeight(x * oometerspergrid, y * oometerspergrid,
+        [&](S32 gx, S32 gy) { return sampleZ(gx, gy, has_neighbor); }, dzdx, dzdy);
+    if (dzdx) *dzdx *= oometerspergrid;
+    if (dzdy) *dzdy *= oometerspergrid;
+    return h;
+}
+
+void LLSurface::dirtySurfaceMaps()
+{
+    if (mSurfaceMaps)
+    {
+        mSurfaceMaps->markDirty();
+    }
+    for (LLSurface* neighbor : mNeighbors)
+    {
+        if (neighbor && neighbor->mSurfaceMaps)
+        {
+            neighbor->mSurfaceMaps->markDirty();
+        }
+    }
+}
+
 
 void LLSurface::setWaterHeight(F32 height)
 {
-    if (!mWaterObjp.isNull())
-    {
-        LLVector3 water_pos_region = mWaterObjp->getPositionRegion();
-        bool changed = water_pos_region.mV[VZ] != height;
-        water_pos_region.mV[VZ] = height;
-        mWaterObjp->setPositionRegion(water_pos_region);
-        if (changed)
-        {
-            LLWorld::getInstance()->updateWaterObjects();
-        }
-    }
-    else
-    {
-        LL_WARNS() << "LLSurface::setWaterHeight with no water object!" << LL_ENDL;
-    }
+    mWaterHeight = height;
 }
 
-F32 LLSurface::getWaterHeight() const
-{
-    if (!mWaterObjp.isNull())
-    {
-        // we have a water object, the usual case
-        return mWaterObjp->getPositionRegion().mV[VZ];
-    }
-    else
-    {
-        return DEFAULT_WATER_HEIGHT;
-    }
-}
 

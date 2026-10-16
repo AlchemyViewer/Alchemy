@@ -29,15 +29,17 @@
 
 #include "llpaneldirbrowser.h"
 
-class LLPanelDirGroups : public LLPanelDirBrowser
+class LLPanelDirGroups final : public LLPanelDirBrowser
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirGroups, LLPanelDirBrowser);
+
     LLPanelDirGroups();
     virtual ~LLPanelDirGroups();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    /*virtual*/ void performQuery();
+    /*virtual*/ void performQuery() override;
 
     static void onClickSearch(void *userdata);
 };

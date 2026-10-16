@@ -2026,81 +2026,62 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 }
 
 // One-off listener that updates the build floater UI when the agent inventory adds or removes an item
-class PBRPickerAgentListener : public LLInventoryObserver
+PBRPickerAgentListener::PBRPickerAgentListener() : LLInventoryObserver()
 {
-protected:
-    bool mChangePending = true;
-public:
-    PBRPickerAgentListener() : LLInventoryObserver()
+    gInventory.addObserver(this);
+}
+
+PBRPickerAgentListener ::~PBRPickerAgentListener()
+{
+    gInventory.removeObserver(this);
+    mChangePending = false;
+}
+
+void PBRPickerAgentListener::changed(U32 mask)
+{
+    if (!(mask & (ADD | REMOVE)))
     {
-        gInventory.addObserver(this);
+        return;
     }
 
-    const bool isListening()
+    if (gFloaterTools)
     {
-        return mChangePending;
+        gFloaterTools->dirty();
     }
-
-    void changed(U32 mask) override
-    {
-        if (!(mask & (ADD | REMOVE)))
-        {
-            return;
-        }
-
-        if (gFloaterTools)
-        {
-            gFloaterTools->dirty();
-        }
-        gInventory.removeObserver(this);
-        mChangePending = false;
-    }
-
-    ~PBRPickerAgentListener() override
-    {
-        gInventory.removeObserver(this);
-        mChangePending = false;
-    }
-};
+    gInventory.removeObserver(this);
+    mChangePending = false;
+}
 
 // One-off listener that updates the build floater UI when the prim inventory updates
-class PBRPickerObjectListener : public LLVOInventoryListener
+PBRPickerObjectListener::PBRPickerObjectListener(LLViewerObject* object)
+: mObjectp(object)
 {
-protected:
-    LLViewerObject* mObjectp;
-    bool mChangePending = true;
-public:
+    registerVOInventoryListener(mObjectp, nullptr);
+}
 
-    PBRPickerObjectListener(LLViewerObject* object)
-    : mObjectp(object)
-    {
-        registerVOInventoryListener(mObjectp, nullptr);
-    }
+PBRPickerObjectListener::~PBRPickerObjectListener()
+{
+    removeVOInventoryListener();
+    mChangePending = false;
+}
 
-    const bool isListeningFor(const LLViewerObject* objectp) const
-    {
-        return mChangePending && (objectp == mObjectp);
-    }
+const bool PBRPickerObjectListener::isListeningFor(const LLViewerObject* objectp) const
+{
+    return mChangePending && (objectp == mObjectp);
+}
 
-    void inventoryChanged(LLViewerObject* object,
-        LLInventoryObject::object_list_t* inventory,
-        S32 serial_num,
-        void* user_data) override
+void PBRPickerObjectListener::inventoryChanged(LLViewerObject* object,
+    LLInventoryObject::object_list_t* inventory,
+    S32 serial_num,
+    void* user_data)
+{
+    if (gFloaterTools)
     {
-        if (gFloaterTools)
-        {
-            gFloaterTools->dirty();
-        }
-        removeVOInventoryListener();
-        mChangePending = false;
+        gFloaterTools->dirty();
     }
-
-    ~PBRPickerObjectListener()
-    {
-        removeVOInventoryListener();
-        mChangePending = false;
-    }
-};
+    removeVOInventoryListener();
+    mChangePending = false;
+}
 
 void LLPanelFace::updateUIGLTF(LLViewerObject* objectp, bool& has_pbr_material, bool& has_faces_without_pbr, bool force_set_values)
 {
@@ -5378,7 +5359,7 @@ void LLPanelFace::LLSelectedTE::getImageFormat(LLGLenum& image_format_to_return,
             {
                 format = image->getPrimaryFormat();
                 missing = image->isMissingAsset();
-                if (format == GL_RGBA || format == GL_ALPHA || format == GL_RED) // GL_RED is used for alpha in deprecated format swizzle cases
+                if (format == GL_RGBA || image->isAlphaOnly())
                 {
                     mHasAlpha = true;
                 }
@@ -5611,8 +5592,7 @@ void LLPanelFace::LLSelectedTEMaterial::getCurrentDiffuseAlphaMode(U8& diffuse_a
             LLViewerTexture* image = object->getTEImage(face);
             if (image)
             {
-                LLGLenum format = image->getPrimaryFormat();
-                if (format == GL_RGBA || format == GL_ALPHA || format == GL_RED) // GL_RED is used for alpha in deprecated format swizzle cases
+                if (image->getPrimaryFormat() == GL_RGBA || image->isAlphaOnly())
                 {
                     has_alpha = true;
                 }

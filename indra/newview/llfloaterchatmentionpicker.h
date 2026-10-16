@@ -30,9 +30,11 @@
 
 class LLAvatarList;
 
-class LLFloaterChatMentionPicker : public LLFloater
+class LLFloaterChatMentionPicker final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterChatMentionPicker, LLFloater);
+
     LLFloaterChatMentionPicker(const LLSD& key);
 
     virtual bool postBuild() override;

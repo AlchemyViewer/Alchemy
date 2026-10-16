@@ -2,14 +2,6 @@
 <llsd>
   <map>
     <!-- Please insert new keys in alphabetical order. -->
-    <key>analyzeperformance</key>
-    <map>
-      <key>desc</key>
-      <string>When used in conjunction with logperformance, analyzes result of log against baseline.</string>
-      <key>map-to</key>
-      <string>AnalyzePerformance</string>
-    </map>
-
     <key>autologin</key>
     <map>
       <key>desc</key>
@@ -181,24 +173,6 @@
       <integer>3</integer>
       <key>map-to</key>
       <string>UserLoginInfo</string>
-    </map>
-
-    <key>logmetrics</key>
-    <map>
-      <key>desc</key>
-      <string>Log metrics for benchmarking</string>
-      <key>count</key>
-      <integer>1</integer>
-      <key>map-to</key>
-      <string>LogMetrics</string>
-    </map>
-
-    <key>logperformance</key>
-    <map>
-      <key>desc</key>
-      <string>Log performance metrics for benchmarking</string>
-      <key>map-to</key>
-      <string>LogPerformance</string>
     </map>
 
     <key>multiple</key>		  

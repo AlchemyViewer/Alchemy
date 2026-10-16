@@ -4,7 +4,6 @@
  height="560"
  min_width="420"
  min_height="420"
- layout="topleft"
  name="floater_lightbox_settings"
  positioning="cascading"
  title="Lightbox"
@@ -17,42 +16,142 @@
 	 name="look_name_modified">
 		[NAME] *
 	</floater.string>
+	<!-- The badge on the Look tab while grading sections are switched off
+	     for comparison: how many. The tab's tooltip says what the number
+	     counts, since a badge has no tooltip of its own. -->
+	<floater.string
+	 name="bypass_badge">
+		[COUNT]
+	</floater.string>
+	<floater.string
+	 name="find_placeholder">
+		Find a setting or section
+	</floater.string>
+	<!-- What the undo history calls its steps. A step made some other way is
+	     called after the setting it changed, by the name its row shows. -->
+	<floater.string
+	 name="history_reset_section">
+		Reset [SECTION]
+	</floater.string>
+	<floater.string
+	 name="history_reset_setting">
+		Reset [SETTING]
+	</floater.string>
+	<floater.string
+	 name="history_look">
+		Look: [NAME]
+	</floater.string>
+	<floater.string
+	 name="history_revert">
+		Revert to [NAME]
+	</floater.string>
+	<floater.string
+	 name="history_white_balance">
+		White balance pick
+	</floater.string>
+	<floater.string
+	 name="history_settings">
+		[COUNT] settings
+	</floater.string>
+	<floater.string
+	 name="history_start">
+		Start of history
+	</floater.string>
+	<floater.string
+	 name="history_empty_headline">
+		Nothing to undo yet
+	</floater.string>
+	<floater.string
+	 name="history_empty_sentence">
+		Each change to the grade is listed here as you make it. Double-click one to go back to it.
+	</floater.string>
+	<!-- The inline colour picker a colour row's swatch opens: the button that
+	     goes on to the viewer's own picker, for typed numbers and the
+	     eyedropper. -->
+	<floater.string
+	 name="color_full_picker">
+		Full picker...
+	</floater.string>
+	<floater.string
+	 name="color_full_picker_tooltip">
+		Open the viewer's color picker, with typed values and the eyedropper, starting from the color picked here
+	</floater.string>
+	<!-- A tab taken out into a window of its own: the window's title, the
+	     pop-out button's two tooltips, and what the tab says while its page
+	     is away. -->
+	<floater.string
+	 name="pane_title">
+		Lightbox: [TAB]
+	</floater.string>
+	<floater.string
+	 name="pane_take_out_tooltip">
+		Take the [TAB] tab out into a window of its own
+	</floater.string>
+	<floater.string
+	 name="pane_put_back_tooltip">
+		Put the [TAB] tab back in the Lightbox
+	</floater.string>
+	<floater.string
+	 name="pane_away_headline">
+		[TAB] is in a window of its own
+	</floater.string>
+	<floater.string
+	 name="pane_away_sentence">
+		Move that window wherever it is handy. Closing it puts the tab back here, and so does the button below.
+	</floater.string>
+	<floater.string
+	 name="pane_put_back">
+		Put it back
+	</floater.string>
+	<!-- Every button the floater has but one: the Look, its history, Scopes
+	     and Find. The one that is not here is the pop-out, which acts on the
+	     tab that is up and so sits at the end of the tab strip (the bottom
+	     of the tab_container below). That move is what let the bar stop
+	     setting min_width, and let the Looks combo stretch with the floater
+	     instead of being the fixed 150px that was left over. -->
 	<panel
 	 name="lightbox_topbar"
 	 follows="left|top|right"
 	 layout="topleft"
-	 left="4"
-	 top="18"
+	 left="6"
+	 top="16"
 	 right="-4"
-	 height="22">
+	 height="26">
+		<!-- Everything left of the buttons, which are held to the right edge:
+		     261 is the nine of them (24 each) with their gaps, and 6 of margin.
+		     left="1" puts its left edge at the floater's x 7, over the tab
+		     container's. -->
 		<combo_box
-		 follows="left|top"
+		 follows="left|top|right"
 		 layout="topleft"
-		 left="6"
-		 top="1"
-		 width="150"
-		 height="20"
+		 left="1"
+		 top="0"
+		 right="-261"
+		 height="24"
 		 name="looks_combo"
 		 tool_tip="Apply a saved Look (a bundle of the aesthetic settings from the Look and Lens tabs). A * after the name means the settings have been changed since that Look was applied.">
 			<combo_box.commit_callback
 			 function="LightBox.LookSelected" />
 		</combo_box>
-		<!-- Icons rather than labels. Four words cost 192px of a bar that has
-		     412 to spend at min_width, and the room they were using is what
-		     the history pair at the end now sits in. Every overlay here is an
-		     existing 18px viewer icon, so the tooltip carries the name.
-		     Save, Undo and Redo are all from the script editor's set, which is
-		     why they sit together without looking assembled: a floppy disk,
-		     not Cam_Save, which is a camcorder and reads as one. -->
+		<!-- Icons rather than labels: four words would cost 192px of a bar
+		     whose spare width is the Looks combo's to have. Every overlay
+		     here is an existing 18px viewer icon, so the tooltip carries the
+		     name. Save, Undo and Redo are all from the script editor's set,
+		     which is why they sit together without looking assembled: a
+		     floppy disk, not Cam_Save, which is a camcorder and reads as one.
+
+		     Placed by `right` rather than `left_pad`, since they follow the
+		     right edge: the last is 6 in from it, and each one before it is 25
+		     further in (24 and a gap of 1), plus 10 where the group changes,
+		     for a gap of 11. -->
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="6"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-236"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Script_Save"
 		 name="look_save"
 		 tool_tip="Save: overwrite the current Look with the settings as they are now">
@@ -60,14 +159,13 @@
 			 function="LightBox.LookSave" />
 		</button>
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="4"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-211"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Conv_toolbar_plus"
 		 name="look_saveas"
 		 tool_tip="Save As: save the current settings as a new Look">
@@ -75,14 +173,13 @@
 			 function="LightBox.LookSaveAs" />
 		</button>
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="4"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-186"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="TrashItem_Off"
 		 name="look_delete"
 		 tool_tip="Delete a saved Look">
@@ -90,14 +187,13 @@
 			 function="LightBox.LookDelete" />
 		</button>
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="4"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-161"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Refresh_Off"
 		 name="look_revert"
 		 tool_tip="Revert: discard changes and re-apply the last applied Look">
@@ -107,14 +203,13 @@
 		<!-- Set apart from the four above: those act on the Look, these on the
 		     grade's own history, and the gap is the only thing that says so. -->
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="12"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-126"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Script_Undo"
 		 name="look_undo"
 		 tool_tip="Undo the last grading change (Ctrl+Z). One drag of a control is one step.">
@@ -122,19 +217,33 @@
 			 function="LightBox.Undo" />
 		</button>
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="4"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-101"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Script_Redo"
 		 name="look_redo"
-		 tool_tip="Redo the change just undone (Ctrl+Y, or Ctrl+Shift+Z)">
+		 tool_tip="Redo the change just undone (Ctrl+Y, or Ctrl+Shift+Z)"
+		 top="0">
 			<button.commit_callback
 			 function="LightBox.Redo" />
+		</button>
+		<!-- The same stack as the two above, as a list: in their group. -->
+		<button
+		 follows="top|right"
+		 layout="topleft"
+		 right="-76"
+		 top="0"
+		 width="24"
+		 height="24"
+		 label=""
+		 image_overlay="Conv_toolbar_call_log"
+		 name="look_history"
+		 tool_tip="History: every grading change since the Lightbox opened, by name. Double-click one to go back or forward to it.">
+			<button.commit_callback
+			 function="LightBox.History" />
 		</button>
 		<!-- Set apart again, for the third kind of thing in this bar: the two
 		     groups above act on this floater's own state, and this opens
@@ -151,14 +260,13 @@
 		     shut it again. Any "open that window" button added to this bar has
 		     the same problem; reach for Floater.Toggle. -->
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="12"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-41"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Command_Stats_Icon"
 		 name="open_scopes"
 		 tool_tip="Scopes: measure the frame you are grading -- histogram, waveform, parade and vectorscope, up to four at once. Click again to close.">
@@ -166,42 +274,117 @@
 			 function="Floater.Toggle"
 			 parameter="scopes" />
 		</button>
+		<!-- A fourth kind of thing, so set apart again: this finds a place in
+		     the floater. The list it opens hangs from this bar and is as wide
+		     as it. It sits over the pop-out button at the end of the tab strip,
+		     so the right edge of the two rows is one column. -->
+		<button
+		 follows="top|right"
+		 layout="topleft"
+		 right="-6"
+		 top="0"
+		 width="24"
+		 height="24"
+		 label=""
+		 image_overlay="Command_Search_Icon"
+		 name="lightbox_find"
+		 tool_tip="Find a setting or section by name, and go to it (Ctrl+F)">
+			<button.commit_callback
+			 function="LightBox.Find" />
+		</button>
 	</panel>
+	<!-- fill_width shares the strip between the four tabs instead of leaving
+	     the right-hand third of it empty. Each page's tool_tip is copied onto
+	     its tab button when the page is added, which is where it belongs;
+	     postBuild then clears it from the page itself, because a page's own
+	     tooltip would otherwise pop up over every caption and gap on it.
+
+	     tab_padding_right keeps the strip's right end for the pop-out button
+	     at the bottom of this element: fill_width shares out only what is
+	     left (LLTabContainer::stripRoom), so the tabs stop 8px short of it
+	     (448, the right of the pages, less 37, is 411; the button starts at
+	     419).
+
+	     left="7" lines the tabs up with the Looks combo in the bar above,
+	     which is why this does not match the bar's left="6". -->
 	<tab_container
 	 follows="all"
 	 layout="topleft"
-	 left="4"
+	 left="7"
 	 top_pad="2"
 	 right="-4"
 	 height="512"
 	 name="lightbox_tabs"
 	 tab_position="top"
-	 tab_min_width="70">
+	 tab_min_width="70"
+	 tab_padding_right="37"
+	 fill_width="true">
 		<panel
 		 filename="panel_lightbox_look.xml"
 		 label="Look"
 		 layout="topleft"
-		 name="tab_look" />
+		 name="tab_look"
+		 tool_tip="Exposure and tone mapping, color grading, the 3D LUT and the tone curve. A number on this tab counts the grading sections switched off for comparison." />
 		<panel
 		 filename="panel_lightbox_lens.xml"
 		 label="Lens"
 		 layout="topleft"
-		 name="tab_lens" />
+		 name="tab_lens"
+		 tool_tip="Camera and film effects: depth of field and bokeh, lens aberrations, bloom/glow and the cross filter, lens flare, lens dirt, chromatic aberration, distortion, vignette, grain and sharpening." />
 		<panel
 		 filename="panel_lightbox_scene.xml"
 		 label="Scene"
 		 layout="topleft"
-		 name="tab_scene" />
+		 name="tab_scene"
+		 tool_tip="Render quality: anti-aliasing, reflections, mirrors, shadows and ambient occlusion, performance, and preview aids." />
 		<!-- Last, because it is the odd one out: the other three hold settings
 		     this floater owns, and this one also reaches out and changes the
 		     world's environment. It is the one you use first, though, before
 		     there is a grade to speak of, which is an argument for the other
-		     end; the tab strip has 452px and four tabs at tab_min_width fit in
-		     280, so the order is free to change if that reads better in use. -->
+		     end; fill_width gives the four tabs equal shares of the strip
+		     whatever their order, so the order is free to change if that reads
+		     better in use. -->
 		<panel
 		 filename="panel_lightbox_sky.xml"
 		 label="Sky"
 		 layout="topleft"
-		 name="tab_sky" />
+		 name="tab_sky"
+		 tool_tip="The day cycle, which changes the world's environment for you, and sky effects drawn only on your screen." />
+		<!-- The strip's own button: it acts on the tab that is up, so it sits
+		     at the end of the tabs, and it is the only button that belongs
+		     here. Anything that is not about a tab goes in the bar above.
+
+		     In the tab_container and not laid over it as a sibling: a
+		     tab_container makes a tab of every panel it is given but keeps
+		     any other child as it is, and a sibling laid over the strip would
+		     overlap the whole tab_container for XUI Studio's lint. So never
+		     wrap strip buttons in a panel of their own; a panel here would be
+		     a fifth tab. The button stays out of the tabs' mouse capture,
+		     which ends where tab_padding_right begins (lltabcontainer test 28
+		     pins all of that).
+
+		     right="-6" puts it under Find in the bar above, so the right edge
+		     of the two rows is one column. It is 24x24 like the bar's
+		     buttons, by eye: the strip is 23 tall, so by the numbers its
+		     bottom edge sits a pixel into the page, but in the viewer 24
+		     reads as the same height as the tabs, and 23 looked misaligned.
+		     The lint only reports overlaps of 2px or more. The icon and
+		     tooltip are set from C++ to match the tab that is up (while its
+		     page is out, the button brings it back), so the ones here are
+		     only the starting state. -->
+		<button
+		 follows="top|right"
+		 layout="topleft"
+		 right="-6"
+		 top="0"
+		 width="24"
+		 height="24"
+		 label=""
+		 image_overlay="Conv_toolbar_arrow_ne"
+		 name="lightbox_pop_out"
+		 tool_tip="Take this tab out into a window of its own">
+			<button.commit_callback
+			 function="LightBox.PopOut" />
+		</button>
 	</tab_container>
 </floater>

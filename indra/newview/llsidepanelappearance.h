@@ -40,15 +40,17 @@ class LLViewerWearable;
 class LLPanelOutfitsInventory;
 class LLLoadingIndicator;
 
-class LLSidepanelAppearance : public LLPanel
+class LLSidepanelAppearance final : public LLPanel
 {
     LOG_CLASS(LLSidepanelAppearance);
 public:
+    AL_VIEW_TYPE(LLSidepanelAppearance, LLPanel);
+
     LLSidepanelAppearance();
     virtual ~LLSidepanelAppearance();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
     void refreshCurrentOutfitName(const std::string& name = "");
 

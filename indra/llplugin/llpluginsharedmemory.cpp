@@ -142,8 +142,11 @@ LLPluginSharedMemoryPlatformImpl::~LLPluginSharedMemoryPlatformImpl()
 bool LLPluginSharedMemory::map(void)
 {
     mMappedAddress = ::mmap(NULL, mSize, PROT_READ | PROT_WRITE, MAP_SHARED, mImpl->mSharedMemoryFD, 0);
-    if(mMappedAddress == NULL)
+    if(mMappedAddress == MAP_FAILED)
     {
+        LL_WARNS("Plugin") << "mmap failed: " << errno << LL_ENDL;
+        // NULL is what isMapped() and unmap() take for unmapped.
+        mMappedAddress = NULL;
         return false;
     }
 

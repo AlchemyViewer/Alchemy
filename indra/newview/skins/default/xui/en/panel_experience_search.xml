@@ -134,11 +134,9 @@
         name="maturity"
         label=""/>
       <columns
-        user_resize="true"
         name="experience_name"
         label="Name"/>
       <columns
-        user_resize="true"
         name="owner"
         label="Owner"/>
     </scroll_list>

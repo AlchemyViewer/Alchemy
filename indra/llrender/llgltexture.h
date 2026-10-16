@@ -142,6 +142,7 @@ public:
     bool       getBoundRecently() const;
     S32Bytes   getTextureMemory() const ;
     LLGLenum   getPrimaryFormat() const;
+    bool       isAlphaOnly() const;
     bool       getIsAlphaMask() const ;
     ALTextureSlot::eTextureType getTarget(void) const ;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)

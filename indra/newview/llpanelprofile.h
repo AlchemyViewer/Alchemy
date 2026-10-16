@@ -67,12 +67,14 @@ class LLViewerFetchedTexture;
 /**
 * Panel for displaying Avatar's second life related info.
 */
-class LLPanelProfileSecondLife
+class LLPanelProfileSecondLife final
     : public LLPanelProfilePropertiesProcessorTab
     , public LLFriendObserver
     , public LLVoiceClientStatusObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileSecondLife, LLPanelProfilePropertiesProcessorTab);
+
     LLPanelProfileSecondLife();
     /*virtual*/ ~LLPanelProfileSecondLife();
 
@@ -219,11 +221,13 @@ private:
 /**
 * Panel for displaying Avatar's web profile and home page.
 */
-class LLPanelProfileWeb
+class LLPanelProfileWeb final
     : public LLPanelProfileTab
     , public LLViewerMediaObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileWeb, LLPanelProfileTab);
+
     LLPanelProfileWeb();
     /*virtual*/ ~LLPanelProfileWeb();
 
@@ -259,10 +263,12 @@ private:
 /**
 * Panel for displaying Avatar's first life related info.
 */
-class LLPanelProfileFirstLife
+class LLPanelProfileFirstLife final
     : public LLPanelProfilePropertiesProcessorTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileFirstLife, LLPanelProfilePropertiesProcessorTab);
+
     LLPanelProfileFirstLife();
     /*virtual*/ ~LLPanelProfileFirstLife();
 
@@ -312,10 +318,12 @@ protected:
 /**
  * Panel for displaying Avatar's notes and modifying friend's rights.
  */
-class LLPanelProfileNotes
+class LLPanelProfileNotes final
     : public LLPanelProfilePropertiesProcessorTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileNotes, LLPanelProfilePropertiesProcessorTab);
+
     LLPanelProfileNotes();
     /*virtual*/ ~LLPanelProfileNotes();
 
@@ -349,10 +357,12 @@ protected:
 /**
 * Container panel for the profile tabs
 */
-class LLPanelProfile
+class LLPanelProfile final
     : public LLPanelProfileTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfile, LLPanelProfileTab);
+
     LLPanelProfile();
     /*virtual*/ ~LLPanelProfile();
 

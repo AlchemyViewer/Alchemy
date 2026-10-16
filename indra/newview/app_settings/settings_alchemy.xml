@@ -46,6 +46,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALMesaRDNA35SettingsRestored</key>
+        <map>
+            <key>Comment</key>
+            <string>Set once SkipBenchmark and UseOcclusion have been checked on a Radeon RDNA 3.5 APU under Mesa, and restored if they still held what earlier viewers' AMD driver workaround set there by mistake.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALMeshNotifyBudgetMs</key>
         <map>
             <key>Comment</key>
@@ -56,6 +67,39 @@
             <string>F32</string>
             <key>Value</key>
             <real>2.0</real>
+        </map>
+        <key>ALProbeSHProjectionRes</key>
+        <map>
+            <key>Comment</key>
+            <string>Face edge length, in texels, of the reflection probe mip that the spherical-harmonic irradiance projection integrates over. Rounded to a mip and clamped between 4 and the probe resolution. Irradiance has only nine coefficients, so 8 reproduces a full-resolution integration to within half a percent; 32 is the previous fixed value and costs sixteen times the GPU work per probe update.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>8</integer>
+        </map>
+        <key>ALProbeSHProjectionTwoPass</key>
+        <map>
+            <key>Comment</key>
+            <string>Run the reflection probe spherical-harmonic projection as two passes: one fragment per coefficient and cube row sums its row, then a reduce adds the rows. The same result as the single pass to floating-point rounding, spread over hundreds of fragments instead of nine, so a probe update no longer stalls the GPU. Off reproduces the single-pass draw.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALProbeSuperSample</key>
+        <map>
+            <key>Comment</key>
+            <string>Linear supersample factor of a reflection probe capture: each face renders at the probe resolution times this (4 = the original 512 for a 128 probe, sixteen times the pixels), is blurred and downsampled to the probe. 2 costs about a quarter of the GPU fill per face at a small cost in radiance sharpness on mirror-like surfaces; 1 renders at probe resolution. Rebuilds the render targets when changed.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>2</integer>
         </map>
         <key>ALSceneExplorerActivateAction</key>
         <map>
@@ -233,6 +277,924 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALSnapshotCutout</key>
+        <map>
+            <key>Comment</key>
+            <string>Snapshots draw only the picked avatar or object and fill the rest with ALSnapshotCutoutFill. Applies to the snapshot floater and File &gt; Take Snapshot to Disk; off at every login.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSnapshotCutoutFill</key>
+        <map>
+            <key>Comment</key>
+            <string>What fills a cutout snapshot around its subject. Alpha 0 leaves it transparent, 1 fills it solid; formats without alpha (JPEG, BMP, postcards) always use the colour solid.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color4</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>ALSnapshotCutoutIncludeSeated</key>
+        <map>
+            <key>Comment</key>
+            <string>A cutout of an object includes the avatars sitting on it, and what they wear.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSnapshotCutoutSupersample</key>
+        <map>
+            <key>Comment</key>
+            <string>A cutout snapshot is rendered this many times larger each way and averaged down, which is where its smooth edges come from (1-4). Lowered automatically when the render would be too large.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
+        <key>ALScriptPreprocCompress</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor strips comments and needless blanks from what it uploads.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocDiskIncludeFolder</key>
+        <map>
+            <key>Comment</key>
+            <string>The folders #include looks in when includes from disk are on, one to a line, in the order looked in.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
+        </map>
+        <key>ALScriptSLuaAliases</key>
+        <map>
+            <key>Comment</key>
+            <string>SLua aliases Script Studio names, one to a line as name=folder: require("@name/x") reads x from the folder on disk, where no .luaurc names the alias. Naming a folder lets a require read it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
+        </map>
+        <key>ALScriptPreprocDiskIncludes</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor reads files on disk: #include from the include folders, and a SLua require from the folders its .luaurc or the SLua aliases name. Off, nothing on disk.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocWorldIncludes</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor resolves #include and require from the object holding the script and from the agent's inventory: for SLua, a require relative to a script in the world, and a .luaurc notecard or item. Off, only folders on disk are looked in, and a script in the world reaches them through a SLua alias.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocEnabled</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio runs the preprocessor over every script it saves, uploading the expanded code with the source kept in Firestorm's envelope. A script that came wrapped, or that has a directive of the preprocessor's, is preprocessed on saving whatever this says.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocIncludeOrder</key>
+        <map>
+            <key>Comment</key>
+            <string>Where the preprocessor looks for an LSL #include, or a SLua --#include, in order: any of inventory, object and disk. A SLua require does not search.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>inventory object disk</string>
+        </map>
+        <key>ALScriptPreprocLazyLists</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor rewrites list[i] reads and writes as llList2Type and lazy_list_set calls (LSL).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocLineComments</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor writes an @line comment wherever its text moves to another file or skips lines, saying the line and the file -- one on disk by its path from the script's folder, never from the root -- as Linden Lab's VS Code plugin does.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptMastersAskOver</key>
+        <map>
+            <key>Comment</key>
+            <string>A save of a file on disk that scripts in the world include sends those scripts again. Where more than this many would change, or they are in more than one object, Script Studio asks first.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>8</integer>
+        </map>
+        <key>ALScriptMastersEnabled</key>
+        <map>
+            <key>Comment</key>
+            <string>Files on disk linked as the masters of scripts in the world, and the files they include, are watched while you are logged in, and a save made outside Script Studio sends the scripts. A save in Script Studio sends them either way.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptMastersQuiet</key>
+        <map>
+            <key>Comment</key>
+            <string>Seconds that files linked to scripts in the world must go unchanged, after a save made outside Script Studio, before the scripts are sent: a checkout of many files sends each script once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>ALScriptMastersSkipUnchanged</key>
+        <map>
+            <key>Comment</key>
+            <string>A send Script Studio makes of its own from a file on disk -- an include's users, Send from Files -- is skipped where what would go up is what the script already holds. A save of the file itself always goes up.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptUploadHeader</key>
+        <map>
+            <key>Comment</key>
+            <string>A script saved preprocessed carries a header at the top of its compiled half, after the target line: what the save hashes to (XXH128 of the target, the source and the expansion) and when. A script saved as written carries none.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptUploadHeaderCreator</key>
+        <map>
+            <key>Comment</key>
+            <string>The upload header (ALScriptUploadHeader) also names who saved the script.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocOptimizer</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor runs the LSL optimizer over what it uploads: constants folded, dead code and unused names removed, and every change listed among the problems as a note.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocOptimizerAddStrings</key>
+        <map>
+            <key>Comment</key>
+            <string>The optimizer joins adjacent string literals, which makes a new entry in the constant pool.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocOptimizerShrinkNames</key>
+        <map>
+            <key>Comment</key>
+            <string>The optimizer shortens every name the script owns; the Preprocessed tab and the notes say which became what.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocOptimizerInlining</key>
+        <map>
+            <key>Comment</key>
+            <string>The optimizer puts a user function called from one place in that place, and drops the function.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocExtensions</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor takes break and continue in loops and the &amp;= |= ^= &lt;&lt;= &gt;&gt;= assignments in LSL, as LSL-PyOptimizer does, and writes the LSL they stand for.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocSwitch</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor rewrites switch statements as jump tables (LSL).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptStudioFontFamily</key>
+        <map>
+            <key>Comment</key>
+            <string>The font family Script Studio's editors use, by its name in fonts.xml; empty for the Monospace family, which follows the UI font overrides.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptStudioFontSize</key>
+        <map>
+            <key>Comment</key>
+            <string>The size Script Studio's editors use, by its name in fonts.xml; empty for the Monospace size.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptStudioFontZoom</key>
+        <map>
+            <key>Comment</key>
+            <string>Points added to the size of Script Studio's editors' text by zooming it (Control-= and Control-minus, Control and the wheel); 0 for the size as chosen.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptStudioFontStyle</key>
+        <map>
+            <key>Comment</key>
+            <string>The style Script Studio's editors' font is drawn in: empty, BOLD, ITALIC or BOLD|ITALIC.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptStudioTheme</key>
+        <map>
+            <key>Comment</key>
+            <string>The theme Script Studio's editor colours were last set from, by name; empty once a colour is changed by hand.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptStudioKeymap</key>
+        <map>
+            <key>Comment</key>
+            <string>The editor commands Script Studio's keyboard map rebound, each to the keys given; a command not named keeps the standard keys.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
+        <key>ALScriptStudioKeymapPreset</key>
+        <map>
+            <key>Comment</key>
+            <string>The editor whose keys Script Studio takes over its own: studio, vscode, visual_studio, jetbrains or xcode. A person's own keys stay over them.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>studio</string>
+        </map>
+        <key>ALScriptStudioTabWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>How many columns a tab stop is in Script Studio's editors, and how far the formatter indents a level with spaces.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
+        <key>ALScriptLintLevels</key>
+        <map>
+            <key>Comment</key>
+            <string>What Script Studio's linters say of each warning a scripter changed from its default: "off", "warning" or "error", by "lsl:" and Tailslide's number or "luau:" and the lint's name. A .luaurc beside an SLua script overrides these for its lints.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
+        <key>ALScriptLuauMode</key>
+        <map>
+            <key>Comment</key>
+            <string>The type checking an SLua script is analyzed in where neither a --! comment nor a .luaurc says: "auto", nonstrict with the old type solver and strict with the new, whose nonstrict finds little; "nonstrict", as the grid compiles; "strict"; or "nocheck".</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>auto</string>
+        </map>
+        <key>ALScriptLuauSolver</key>
+        <map>
+            <key>Comment</key>
+            <string>Which of Luau's two type solvers Script Studio checks SLua scripts with: "old" or "new".</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>old</string>
+        </map>
+        <key>ALScriptLuauCheckSeconds</key>
+        <map>
+            <key>Comment</key>
+            <string>The longest one type check of an SLua script may take, in seconds, before it stops and what it found by then is shown; 0 for as long as it takes. Every script is checked on one thread, so a script that takes long to check holds up the rest.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>5.0</real>
+        </map>
+        <key>ALScriptFragmentCompletion</key>
+        <map>
+            <key>Comment</key>
+            <string>As an SLua script is typed, answer a completion or signature help over the statement being typed, checked alone against the script's last check, rather than checking the whole script again first. Off, every keystroke that changed the script checks all of it before answering.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioAutoComplete</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's completion list opens on its own as a name is typed; off, only when asked for (Control-Space).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioCompleteAfter</key>
+        <map>
+            <key>Comment</key>
+            <string>How many letters of a name are typed before Script Studio's completion list opens on its own.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
+        <key>ALScriptStudioAcceptOnEnter</key>
+        <map>
+            <key>Comment</key>
+            <string>Return takes the completion chosen in Script Studio's list, as Tab does; off, Return starts a new line and only Tab takes it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertLLTimers</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua puts llSetTimerEvent's timer on LLTimers, calling the timer handler of the state the script is in, rather than the timer event llcompat.SetTimerEvent sets going.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertDetectedTable</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua reads what was detected from the handler's detected table, detected[i + 1]:getKey(), where the call stands in the handler, rather than through llcompat.Detected*.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertSLuaCalls</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua calls SLua's ll rather than llcompat where it means the same: a boolean answer, a constant index moved on by one, a find asked only whether it found, read against nil.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertIdioms</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua writes what SLua has in a call's stead where it means the same: math, vector and quaternion's functions, ^, print, os.time and table.find.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertHandlerFields</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua assigns handlers to LLEvents' fields (function LLEvents.touch_start(...)) rather than putting them on with LLEvents:on. SLua puts an assigned handler on as LLEvents:on does, beside any others.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptConvertTypes</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua writes Luau types on locals, parameters and what functions return, from LSL's types; and the SLua handlers the editor completes have their parameters typed as the definitions type them.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptConvertUuidKeys</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua holds the script's own keys as SLua's uuids: its key variables, its functions' and handlers' key parameters, and what its functions give. Off, as text, as LSL held them, so that a key given "" or any other text keeps it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertKeyTextAny</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua writes text given where SLua's ll takes a key as x :: any, which the type checker takes; off, as it is, which the type checker marks for the scripter to see to. The script runs the same either way.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertComments</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua writes a -- LSL: comment over each place where SLua means something else than LSL did, or has a way of its own.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertKeepComments</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua carries the script's own comments over, each over what it stood over, or after it where it was after it on its line: // as --, and /* */ as --[[ ]].</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioAutoClose</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio closes a bracket or a quote as it is opened, types over the closer, wraps a selection in the pair typed, and takes both away with one Backspace between them.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioDiffAlgorithm</key>
+        <map>
+            <key>Comment</key>
+            <string>How Script Studio's comparisons, and a notecard's, choose the lines that stay: histogram, patience, minimal or structural.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>histogram</string>
+        </map>
+        <key>ALScriptStudioCaretStyle</key>
+        <map>
+            <key>Comment</key>
+            <string>How Script Studio draws the caret outside vim's normal mode: line, block or underline.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>line</string>
+        </map>
+        <key>ALScriptStudioCaretBlink</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's caret blinks; off, it stays lit.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>PoolSizeScriptUpload</key>
+        <map>
+            <key>Comment</key>
+            <string>How many script and notecard saves go up at once -- Save All, a recompile of an object, the compile queue -- apart from the shared upload queue of textures and meshes. Read at startup.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
+        <key>ALScriptStudioVimClipboard</key>
+        <map>
+            <key>Comment</key>
+            <string>In Script Studio's vim mode, what is yanked, deleted and put with no register named goes by the system clipboard, as vim's clipboard=unnamed; off, as vim has it, it stays the editor's own, and only "+ and "* reach the clipboard. :set clipboard changes it for the session.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptStudioHoverCards</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio shows what a name or a problem is in a card when the mouse rests on it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioHoverDelay</key>
+        <map>
+            <key>Comment</key>
+            <string>How long in seconds the mouse rests on a name in Script Studio before its card shows.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>ALScriptFormatBlankLines</key>
+        <map>
+            <key>Comment</key>
+            <string>How many blank lines in a row Script Studio's formatter leaves.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
+        <key>ALScriptFormatSpacing</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's formatter sets the spaces within a line -- around operators, after commas -- as well as the indentation; off, only the indentation.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptFormatBraceSpaces</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio writes a space inside SLua's braces, { 1, 2 } and { any }, as StyLua does: its formatter, and Convert to SLua; off, {1, 2}.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptFormatWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>How many columns a line may take before Script Studio's formatter breaks it, at the commas of a bracket on it; 0 never breaks a line.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>120</integer>
+        </map>
+        <key>ALScriptFixOnSave</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio makes the fixes that change nothing a script does before saving it, as one step to undo; none that takes code out.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptFormatOnSave</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio formats a script before saving it, as one step to undo.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptTrimOnSave</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio takes the blanks off the end of every line before saving a script, as one step to undo.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptTemplateLSL</key>
+        <map>
+            <key>Comment</key>
+            <string>What a new LSL script made in Script Studio starts with; empty, the grid's own.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptTemplateSLua</key>
+        <map>
+            <key>Comment</key>
+            <string>What a new SLua script made in Script Studio starts with; empty, the grid's own.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptPreprocDefines</key>
+        <map>
+            <key>Comment</key>
+            <string>Macros the preprocessor defines for every script, one to a line: NAME, which is 1, or NAME=value.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptStudioReindentOnPaste</key>
+        <map>
+            <key>Comment</key>
+            <string>Lines pasted into a line's indentation in Script Studio are brought to where they go, each as far in from the first as it was; one Undo leaves them as they were copied.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioDetectIndentation</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio reads how each script is indented -- tabs or spaces, and how many a level -- from its own lines, and types, formats and inserts snippets alike; the tab width and spaces settings are for a script that does not say.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioInsertSpaces</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's editors indent with spaces to the next tab stop rather than with a tab character, and the formatter indents alike, where a script does not say its own.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioPreflight</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio holds a save when the analyzers find errors in the script, until a second save asks for it to compile anyway. Off, the save goes up and the errors are said.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioRestoreTabs</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio opens again the tabs that were open when it was last put away, and says how many came back; off, it opens with what it was opened for alone.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioPanesWiden</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's window widens by the Explorer's or the Inspector's width as it opens, as far as the screen goes, and narrows by as much as it folds; off, the pane takes its room from the editor.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptStudioState</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio: the editor switches, and the window's rect, pane sizes and folds, restored when it opens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
+        <key>ALSimulatePacketLoss</key>
+        <map>
+            <key>Comment</key>
+            <string>Testing aid, absent from release builds: average percentage of inbound UDP packets to discard before the viewer sees them. Exercises the recovery paths -- prediction phase-out, region-crossing expiry -- that a healthy connection never reaches. 0 disables.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>ALSimulatePacketLossBurst</key>
+        <map>
+            <key>Comment</key>
+            <string>Testing aid: mean length in packets of a simulated loss burst. Real loss arrives in runs rather than spread evenly, and the distinction matters -- the same average loss concentrated into longer outages is what actually strands a moving object. 1 leaves losses unclustered. Does not change the average loss rate.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>ALSimulatePacketReorder</key>
+        <map>
+            <key>Comment</key>
+            <string>Testing aid, absent from release builds: percentage of surviving inbound packets to deliver late, so they arrive out of sequence. Exercises the per-object out-of-order guard. 0 disables.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>ALSimulatePacketReorderDelay</key>
+        <map>
+            <key>Comment</key>
+            <string>Testing aid: how many later packets a delayed packet is released behind. Larger values put an update further out of sequence when it finally arrives.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>3</integer>
+        </map>
+        <key>ALLightboxState</key>
+        <map>
+            <key>Comment</key>
+            <string>Lightbox: the window's shape, which tabs were out in windows of their own and where those windows were, restored when it opens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
+        <key>ALXUIStudioState</key>
+        <map>
+            <key>Comment</key>
+            <string>XUI Studio: the last file, skin, languages, inspector tab and switches, and the window's rect, pane widths and folds, restored when it opens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
+        <key>ALXUIStudioRealFloaterDenyList</key>
+        <map>
+            <key>Comment</key>
+            <string>XUI Studio: floaters never built for real, whatever "Build the Registered Floater" says. Names as LLFloaterReg knows them, separated by spaces or commas.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
         <key>NumpadControl</key>
         <map>
             <key>Comment</key>
@@ -276,6 +1238,17 @@
             <string>String</string>
             <key>Value</key>
             <string></string>
+        </map>
+        <key>FMODResampleMethod</key>
+        <map>
+            <key>Comment</key>
+            <string>The resampler FMOD Studio uses for a sound whose sample rate is not the output's: 0 Linear, 1 Cubic, 2 Spline, the slowest and the best. Takes effect when audio next starts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>2</integer>
         </map>
         <key>AudioFAudioInnerRadius</key>
         <map>
@@ -397,6 +1370,61 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>AlchemyCrashReportConsent</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether crash reports may be sent: 0 not yet asked, 1 allowed, 2 declined</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyFeedbackHideInterface</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether a feedback report's screenshot is of the world alone, without windows, chat or HUDs</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyFeedbackIncludeAvatar</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether a feedback report names the avatar who sent it</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyFeedbackRememberEmail</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether the email address given in a feedback report is kept for the next one</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyFeedbackScreenshotDelay</key>
+        <map>
+            <key>Comment</key>
+            <string>Seconds Send Feedback waits, once its window is open, before taking the screenshot</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.3</real>
         </map>
         <key>AlchemyDisableClickToSit</key>
         <map>
@@ -684,6 +1712,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyTurnTowardSelectedObjects</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatically turn the avatar toward selected objects when the camera is not focused on the avatar.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyDisableMouseSteering</key>
         <map>
             <key>Comment</key>
@@ -691,6 +1730,17 @@
                 Disable mouse steering. Doing so will stop your camera from resetting, and your
                 avatar from rotating when you click yourself (escape key-like behaviour).
             </string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyTextureDiscardOnFocusLoss</key>
+        <map>
+            <key>Comment</key>
+            <string>Treat losing window focus as being in the background, discarding textures after TextureDiscardBackgroundedTime even while the viewer is still on screen. Minimized and hidden windows discard regardless.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1206,6 +2256,61 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderDisableCompute</key>
+        <map>
+            <key>Comment</key>
+            <string>Use no compute shaders even where the GPU has them (OpenGL 4.3): everything built on compute takes its other path or is off. For diagnosing a driver. Change triggers a shader rebuild.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyRenderDepthBoundsTest</key>
+        <map>
+            <key>Comment</key>
+            <string>Hold the full-screen lighting and haze passes, and each local light, to the depths they reach with the depth bounds test where the GPU has it (GL_EXT_depth_bounds_test); off, they keep to the depth test. For diagnosing a driver. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderFarPlaneForce</key>
+        <map>
+            <key>Comment</key>
+            <string>Debug A/B for the main view's projection: 0 automatic (infinite on reverse-Z, finite 1024 m on forward-Z), 1 force a finite plane at twice the draw distance and never under 1024 m, 2 force infinite on reverse-Z (forward-Z ignores it). Probe captures are never forced.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyRenderFarPlaneOverlay</key>
+        <map>
+            <key>Comment</key>
+            <string>Debug: draw column pairs from 500 m to 100 km around the camera with the main projection, nearer orange and farther cyan, depth tested against each other only and laid over the frame, to see where the projection clips and whether depth order holds. Ignores the scene, object culling and reach.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyRenderMemoryDrawDistanceLimit</key>
+        <map>
+            <key>Comment</key>
+            <string>Shrink draw distance while free system memory is critically low, restoring it as memory frees up. Turn off to keep the full draw distance at all times.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderShadowDepth32F</key>
         <map>
             <key>Comment</key>
@@ -1228,6 +2333,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderShadowOcclusion</key>
+        <map>
+            <key>Comment</key>
+            <string>Occlusion culling for the sun's shadow cascades: a caster the sun cannot see past the casters nearer it is left out of the shadow map. Experimental; spot light shadows are never culled.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderShadowPCSSScale</key>
         <map>
             <key>Comment</key>
@@ -1239,6 +2355,105 @@
             <key>Value</key>
             <real>200.0</real>
         </map>
+        <key>AlchemyRenderTerrainHexTiling</key>
+        <map>
+            <key>Comment</key>
+            <string>Hex-tile terrain textures, PBR and legacy alike: each cell of a hexagonal lattice shows the texture at its own offset and rotation, hiding the repeat. Up to three fetches per texture per projection. Change triggers a shader rebuild.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyRenderTerrainSmoothing</key>
+        <map>
+            <key>Comment</key>
+            <string>Draw the terrain as a smooth surface through its height samples instead of the flat-triangle surface the simulator collides against. The smooth surface stays within each metre cell's corner heights, so it differs from the collision surface by less than one cell's rise. Picks, foot planting and parcel lines follow the drawn surface; the simulator does not.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderTerrainTessDensity</key>
+        <map>
+            <key>Comment</key>
+            <string>Base density of the terrain tessellation: metres of patch edge per level, divided by the distance to the camera, so at 64 a 16 m patch is split 64 ways (25 cm) within 16 m of the camera, 16 ways (1 m) at 64 m and not at all past 1 km. The terrain detail slider multiplies it. Triangle count grows with the square; clamped to 8 to 256.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>64</real>
+        </map>
+        <key>AlchemyRenderWaterGlintRoughness</key>
+        <map>
+            <key>Comment</key>
+            <string>Roughness of the sun's reflection on water, which sets how far each wave face's glint spreads: low gives small, hard sparkles, high soft ones that run together into a broad path. 0.35 matches WindLight's water. 0.05 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.35</real>
+        </map>
+        <key>AlchemyRenderWaterTessDensity</key>
+        <map>
+            <key>Comment</key>
+            <string>Tessellation density of the water's waves: an edge's level is its length times this over its distance from the camera, as the terrain's. Sets how far the waves reach, where the vertex spacing grows to half the large waves' wavelength. 8 to 256.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>32</real>
+        </map>
+        <key>AlchemyRenderWaterWaveHeight</key>
+        <map>
+            <key>Comment</key>
+            <string>Height of the water's waves over what its normal maps integrate to: 1 raises the surface as its shading says it slopes. 0 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>AlchemyRenderWaterWaves</key>
+        <map>
+            <key>Comment</key>
+            <string>Displace the water near the camera into waves, the heights integrated from the normal maps that shade it, so the surface's crests lie where its shading's are. Needs tessellation (OpenGL 4.0).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderWaterOcclusionCull</key>
+        <map>
+            <key>Comment</key>
+            <string>Cull the water's wave patches the scene hides, against a depth pyramid of the main view built with compute, so they are never tessellated. Needs compute (OpenGL 4.3).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderWaterHextile</key>
+        <map>
+            <key>Comment</key>
+            <string>Which of the water's wave layers are hex-tiled, so their repeat does not show: each cell of a hexagonal lattice fixed in the world shows the normal map at its own offset, never turned. 0 none, 1 the large waves, 2 the large and medium waves. Up to three reads per tiled layer instead of one. Change triggers a shader rebuild.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderTonemapType</key>
         <map>
             <key>Comment</key>
@@ -1249,6 +2464,105 @@
             <string>S32</string>
             <key>Value</key>
             <integer>1</integer>
+        </map>
+        <key>AlchemyExposureCompensation</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatic exposure's bias, in stops: +1 doubles the image's brightness, -1 halves it. -4 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>AlchemyExposureMinEV</key>
+        <map>
+            <key>Comment</key>
+            <string>The darkest scene automatic exposure opens up for, in stops below middle grey: -3 brightens a dark scene by at most 8x. -8 to 0.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>-2.0</real>
+        </map>
+        <key>AlchemyExposureMaxEV</key>
+        <map>
+            <key>Comment</key>
+            <string>The brightest scene automatic exposure stops down for, in stops above middle grey: 4 darkens a bright scene by at most 16x. 0 to 8.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
+        <key>AlchemyExposureLowPercent</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatic exposure ignores the darkest part of the frame, this percentage of it by weight, so deep shadow does not move it. 0 to 50.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>10.0</real>
+        </map>
+        <key>AlchemyExposureHighPercent</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatic exposure ignores the brightest part of the frame, everything above this percentage of it by weight, so the sun and glints do not move it. 50 to 100.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>95.0</real>
+        </map>
+        <key>AlchemyExposureSpeedUp</key>
+        <map>
+            <key>Comment</key>
+            <string>How fast automatic exposure adapts to a brighter scene, as a rate per second: 3 covers 95% of the change in one second. 0.1 to 10.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>3.0</real>
+        </map>
+        <key>AlchemyExposureSpeedDown</key>
+        <map>
+            <key>Comment</key>
+            <string>How fast automatic exposure adapts to a darker scene, as a rate per second: 1 covers 63% of the change in one second. 0.1 to 10.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>AlchemyExposureMeteringMode</key>
+        <map>
+            <key>Comment</key>
+            <string>Which part of the frame automatic exposure meters: 0 = the whole frame evenly, 1 = center-weighted, 2 = a spot in the middle.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyExposureSkyWeight</key>
+        <map>
+            <key>Comment</key>
+            <string>How much the sky counts toward automatic exposure: 0 ignores it, 1 counts it like any other part of the frame. 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
         </map>
         <key>AlchemyScopeLayout</key>
         <map>
@@ -1349,6 +2663,72 @@
             <key>Value</key>
             <real>0.5</real>
         </map>
+        <key>AlchemySelectionOutlineWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the outline around selected objects, in the world and on the HUD, at a UI scale of 1, while the selection wireframe is off; it grows with the UI scale. Range 1 to 16. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>3.0</real>
+        </map>
+        <key>AlchemySelectionOutlineWireframeWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the outline around selected objects while the selection wireframe is on, at a UI scale of 1; it grows with the UI scale. Range 1 to 16. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
+        <key>AlchemySelectionOutlineContrast</key>
+        <map>
+            <key>Comment</key>
+            <string>How selection outlines stay visible over what lies behind them. 0: drawn in their colours as they are. 1: their lightness, the wireframe's too, moved away from that of what lies around them where the two are too alike, their hue kept. 2: their colours as they are, the outline cased by a thin rim, dark around a light line and light around a dark one. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
+        <key>AlchemySelectionOutlineGeometry</key>
+        <map>
+            <key>Comment</key>
+            <string>Outline and wireframe the whole faces of selected objects, whatever their textures' alpha cuts away, so an alpha card shows its card rather than its leaf. Not while RLVa prevents Highlight Transparent; always while Highlight Transparent is on. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemySelectionWireframe</key>
+        <map>
+            <key>Comment</key>
+            <string>Draw the triangles of selected objects as lines under their outline, in the world and on the HUD, with hidden lines dimmed while hidden selections are shown. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemySelectionWireframeWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the selection wireframe's lines at a UI scale of 1; it grows with the UI scale. Range 1 to 8. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
         <key>AlchemyRenderUBOUpdateMode</key>
         <map>
             <key>Comment</key>
@@ -1400,6 +2780,28 @@
             <string>LLSD</string>
             <key>Value</key>
             <map />
+        </map>
+        <key>AlchemyVOCacheEvictionMode</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether cached objects the camera cannot see are dropped from memory and rebuilt when they are needed again. 0 never, 1 only while memory is short, 2 always.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyVOCacheLogFrequency</key>
+        <map>
+            <key>Comment</key>
+            <string>Seconds between object cache footprint log lines (entry counts and packed bytes per region). 0 disables the logging.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
         </map>
         <key>ChatAlerts</key>
         <map>
@@ -1921,6 +3323,267 @@
             <key>Value</key>
             <real>0.0</real>
         </map>
+        <key>RenderCrossFilterStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the cross-screen (star) filter - the etched glass filter that diffracts every bright point in frame into a star. 0 disables. The arms carry a highlight's light spread along their length, so they are much dimmer than the core and this generally wants a large value - try 8 and work outward. Unlike the starburst under Lens Flare, which is locked to the sun, this streaks every highlight. Streaks ride on the bloom pyramid, so bloom strength 0 silences them. HDR only. Range 0 to 32.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderCrossFilterPoints</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of arms on each star. 4 is the classic cross filter, 6 and 8 match the denser gratings. Odd counts give an asymmetric star, since the arms are spread evenly rather than in opposed pairs. Range 2 to 12.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
+        <key>RenderCrossFilterAngle</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotation of the whole star in degrees, as if turning the filter in its thread. Range 0 to 360.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderCrossFilterLength</key>
+        <map>
+            <key>Comment</key>
+            <string>Spacing of the samples that build each arm, which sets how far the star reaches. 1.0 is the tuned value and gives a clean continuous streak; higher spreads the arms further, and lower draws them in tight. The range stops at 2 because beyond that the samples building each arm stop overlapping and the streak breaks up into a repeating lattice rather than getting longer. Length and falloff work together - a long streak with a fast falloff still fades out early, which is usually what reads best. Range 0.25 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderCrossFilterFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>How quickly each arm fades along its length, measured as how much brightness is lost between the core of a highlight and the tip of its arm. Low values give long even spokes; high values keep the star tight around the highlight. This changes only the shape of the arms - brightness belongs to Strength. Range 0.1 to 3.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.5</real>
+        </map>
+        <key>RenderCrossFilterChromatic</key>
+        <map>
+            <key>Comment</key>
+            <string>Rainbow dispersion along the arms. A real star filter is a diffraction grating, and a grating separates wavelengths by angle, so the tips of the streaks go coloured while the core stays white. 0 gives clean white spokes. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensDirtStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the lens dirt overlay - grime on the front element catching bloom and flare, the way a real lens lights up when something bright is in frame. 0 disables. 0.3 is a subtle used-lens feel; 1.0 is a filthy one. Only lights up where there is already bloom or flare to catch, so a flat scene stays clean no matter how high this goes. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensDirtBloomResponse</key>
+        <map>
+            <key>Comment</key>
+            <string>How strongly bloom lights up the dirt. 0 means bloom passes through a clean lens; 1 is the full response. Raise it for hazy sunlit shots where the grime should catch everything. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtFlareResponse</key>
+        <map>
+            <key>Comment</key>
+            <string>How strongly the lens flare lights up the dirt. 0 means the flare passes through a clean lens; 1 is the full response. This is the response that reads most like a real lens, since flare and grime share the same front element. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtGain</key>
+        <map>
+            <key>Comment</key>
+            <string>Overall brightness of the generated dirt plate, applied after the tone curve. Mostly a trim for Toe: raise it when a high Toe has crushed the plate too far. Range 0.5 to 2.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtGrime</key>
+        <map>
+            <key>Comment</key>
+            <string>How much muck is on the glass. Scales every layer of dust and grit at once, so this is the master density. Starting points, with Smudge and Toe to match: a lens that has been outdoors 0.45 / 0.5 / 1.8, one nobody has wiped in a while 1.0 / 1.0 / 1.6, a damaged one 0.95 / 0.9 / 1.2 with scratches, and filthy 1.9 / 1.5 / 1.2. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtMoteScale</key>
+        <map>
+            <key>Comment</key>
+            <string>Size of the dust motes. Above 1 the specks grow and thin out, which reads as a lens that has picked up a few big flecks rather than an even film; below 1 they shrink and multiply into finer grime. Range 0.5 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtScratches</key>
+        <map>
+            <key>Comment</key>
+            <string>How many scratches cross the glass. 0 is undamaged; around 16 reads as a well-used lens with coating chips. Scratches are straight and bright where dust is soft and scattered, so a few go a long way. Range 0 to 32.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderLensDirtSeed</key>
+        <map>
+            <key>Comment</key>
+            <string>Reshuffles the grime - every value lays the dirt out differently at the same settings. It also moves the overall density by twenty or thirty percent, because dirt pools rather than spreading evenly and where it pools changes with the seed. If a plate comes out dirtier than the last, that is this and not Grime. Range 0 to 999.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>7</integer>
+        </map>
+        <key>RenderLensDirtSmudge</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the wipe marks - the broad, soft smears a cloth leaves behind, as opposed to the discrete specks. Raise it for a lens cleaned in a hurry. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtToe</key>
+        <map>
+            <key>Comment</key>
+            <string>Shapes the low end of the plate - how much of the faint grime survives into the result. Lower values keep the midtones dirt actually lives in; higher values crush them and leave only the brightest specks, which reads clean no matter how high Strength goes. Range 0.6 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.6</real>
+        </map>
+        <key>RenderLensDistortionAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Overall strength of the geometric lens distortion. 0 disables the effect entirely. 0.25 is a subtle wide-angle bend; 1.0 applies the shape coefficients in full. Only the world view is warped - nametags, selection outlines and UI are drawn afterwards and stay straight. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensDistortionK1</key>
+        <map>
+            <key>Comment</key>
+            <string>Primary radial distortion coefficient. Negative values give barrel distortion (straight lines bow outward, the wide-angle look); positive values give pincushion (lines bow inward, common on telephoto). -0.2 is a mild wide angle, -0.4 approaches a fisheye look. Has no effect until Amount is raised. Range -0.5 to 0.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>-0.2</real>
+        </map>
+        <key>RenderLensDistortionK2</key>
+        <map>
+            <key>Comment</key>
+            <string>Secondary radial distortion coefficient, shaping the falloff toward the corners. Leave at 0 for a simple bend; small non-zero values reproduce the moustache distortion of real wide-angle lenses, where the bend reverses direction near the frame edge. Range -0.25 to 0.25.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensDistortionSqueeze</key>
+        <map>
+            <key>Comment</key>
+            <string>Anamorphic desqueeze factor. 1.0 is a spherical lens and does nothing. 1.33 and 2.0 match the common anamorphic formats, stretching the image horizontally the way a desqueezed cinema frame looks. Range 0.5 to 2.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDistortionFit</key>
+        <map>
+            <key>Comment</key>
+            <string>How the warped image is rescaled - 0 = none (pincushion can show black corners), 1 = fit (scaled so nothing ever goes black; the usual choice), 2 = fill (scaled so the whole undistorted frame stays visible, which can letterbox the corners)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderLensDistortionCenter</key>
+        <map>
+            <key>Comment</key>
+            <string>[-0.5, 0.5] Offset of the optical axis from the frame center, x and y, z component unused. Non-zero values decenter the distortion the way a shifted or tilted lens does. Leave at zero for a centered lens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderLensDistortionTangential</key>
+        <map>
+            <key>Comment</key>
+            <string>[-0.05, 0.05] Brown-Conrady tangential (decentering) coefficients p1 and p2 in x and y, z component unused. These model a lens element mounted slightly off-axis and shear the image rather than bending it radially. Realistic values are tiny - below 0.01. Leave at zero unless deliberately faking a misaligned lens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
         <key>RenderColorGrade</key>
         <map>
             <key>Comment</key>
@@ -2031,6 +3694,28 @@
             <string>F32</string>
             <key>Value</key>
             <real>0.0</real>
+        </map>
+        <key>RenderSplitToneShadowWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>How far below the split point, in luma from 0 to 1, the shadow tint ramps from nothing to full strength. Range 0.02 (a hard edge) to 0.5 (very soft). Default 0.35, the value that was fixed in the shader before it became a setting.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.35</real>
+        </map>
+        <key>RenderSplitToneHighlightWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>How far above the split point, in luma from 0 to 1, the highlight tint ramps from nothing to full strength. Range 0.02 (a hard edge) to 0.5 (very soft). Default 0.35, the value that was fixed in the shader before it became a setting.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.35</real>
         </map>
         <key>RenderColorGradeWhiteBalanceCCT</key>
         <map>
@@ -2198,50 +3883,96 @@
             <key>Value</key>
             <real>0.0</real>
         </map>
-        <key>RenderColorGradeCurveToe</key>
+        <key>RenderColorGradeCurveMaster</key>
         <map>
             <key>Comment</key>
-            <string>Per-channel filmic curve toe point (RGB). Pixels at or below this input level flatten toward black. Try (0.05, 0.05, 0.1) to lift shadow blues.</string>
+            <string>Tone curve applied to every channel, after the per-channel curves. An array of [input, output] control points, both 0 to 1, sorted by input with the first at input 0 and the last at input 1, up to 16 from the graph and 64 from a file; a monotone cubic spline passes through them. [[0,0],[1,1]] is a straight line (no change). Edited in the Lightbox Tone Curve graph.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Color3</string>
+            <string>LLSD</string>
             <key>Value</key>
             <array>
-                <real>0.0</real>
-                <real>0.0</real>
-                <real>0.0</real>
+                <array>
+                    <real>0.0</real>
+                    <real>0.0</real>
+                </array>
+                <array>
+                    <real>1.0</real>
+                    <real>1.0</real>
+                </array>
             </array>
         </map>
-        <key>RenderColorGradeCurveShoulder</key>
+        <key>RenderColorGradeCurveRed</key>
         <map>
             <key>Comment</key>
-            <string>Per-channel filmic curve shoulder point (RGB). Pixels at or above this input level flatten toward white. Lower values (around 0.85) give a tighter roll-off.</string>
+            <string>Tone curve for the red channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16 from the graph and 64 from a file; [[0,0],[1,1]] is no change.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Color3</string>
+            <string>LLSD</string>
             <key>Value</key>
             <array>
-                <real>1.0</real>
-                <real>1.0</real>
-                <real>1.0</real>
+                <array>
+                    <real>0.0</real>
+                    <real>0.0</real>
+                </array>
+                <array>
+                    <real>1.0</real>
+                    <real>1.0</real>
+                </array>
             </array>
         </map>
-        <key>RenderColorGradeCurveStrength</key>
+        <key>RenderColorGradeCurveGreen</key>
         <map>
             <key>Comment</key>
-            <string>Per-channel curve blend strength (RGB). 0 disables; 0.4 is typical film, differing values per channel create cross-process looks.</string>
+            <string>Tone curve for the green channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16 from the graph and 64 from a file; [[0,0],[1,1]] is no change.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Color3</string>
+            <string>LLSD</string>
             <key>Value</key>
             <array>
-                <real>0.0</real>
-                <real>0.0</real>
-                <real>0.0</real>
+                <array>
+                    <real>0.0</real>
+                    <real>0.0</real>
+                </array>
+                <array>
+                    <real>1.0</real>
+                    <real>1.0</real>
+                </array>
             </array>
+        </map>
+        <key>RenderColorGradeCurveBlue</key>
+        <map>
+            <key>Comment</key>
+            <string>Tone curve for the blue channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16 from the graph and 64 from a file; [[0,0],[1,1]] is no change.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <array>
+                <array>
+                    <real>0.0</real>
+                    <real>0.0</real>
+                </array>
+                <array>
+                    <real>1.0</real>
+                    <real>1.0</real>
+                </array>
+            </array>
+        </map>
+        <key>RenderColorGradeCurveAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>How much of the tone curves is applied. 0 leaves the image untouched, 1 applies the curves fully. Range 0 to 1, default 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
         </map>
         <key>RenderCVDMode</key>
         <map>
@@ -2617,7 +4348,7 @@
         <key>RenderLensFlareStarburstSpikes</key>
         <map>
             <key>Comment</key>
-            <string>Number of aperture-like spikes in the starburst. Real cameras typically show 2x the blade count (6-blade = 12 spikes, etc). Range 1 to 32.</string>
+            <string>Angular frequency of the starburst rather than a literal spike count - it draws two opposed spikes per cycle, so the star carries twice this many primary spikes (the default 4 gives 8, matching an 8-blade iris) with fainter secondary rays between them. Real lenses show one spike per aperture blade when the blade count is even and two per blade when it is odd, so use half the blade count for an even iris (6 blades = 3) and the blade count itself for an odd one (7 blades = 7). Range 1 to 32.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -2647,27 +4378,27 @@
             <key>Value</key>
             <real>0.25</real>
         </map>
-        <key>RenderLensFlareOcclusionRadius</key>
+        <key>RenderLensFlareOcclusionScale</key>
         <map>
             <key>Comment</key>
-            <string>How wide the sun-occlusion test samples the scene depth. Larger values let thin geometry (foliage, wires) dim the flare more gracefully. Range 0.005 to 0.1.</string>
+            <string>Size of the sun-occlusion probe as a multiple of the sun disc; it follows zoom and the sky's sun scale. Below 1 only the core of the disc counts, above 1 objects near the sun start to dim the flare. Range 0.25 to 2.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>0.02</real>
+            <real>1.0</real>
         </map>
-        <key>RenderLensFlareOcclusionTaps</key>
+        <key>RenderLensFlareFadeTime</key>
         <map>
             <key>Comment</key>
-            <string>Number of depth samples for sun-occlusion testing. Higher values give smoother partial occlusion transitions at a small performance cost. Range 1 to 32.</string>
+            <string>Seconds for the lens flare to fade in when the sun is revealed; it fades out in 0.6 of this, and never faster whatever passes in front of the sun. Longer is calmer through foliage and fences. Range 0.1 to 1.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>S32</string>
+            <string>F32</string>
             <key>Value</key>
-            <integer>9</integer>
+            <real>0.35</real>
         </map>
         <key>RenderParcelSelectionToMaxHeight</key>
         <map>
@@ -2679,6 +4410,17 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>RenderPreferDiscreteGPU</key>
+        <map>
+            <key>Comment</key>
+            <string>Linux: on a hybrid-graphics machine, whose integrated GPU drives the display, render on the discrete GPU, unless DRI_PRIME or NVIDIA's offload variables already choose one. Read at startup. Windows always asks for the discrete GPU.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
         </map>
         <key>RenderTonemapACESWhite</key>
         <map>
@@ -3000,6 +4742,39 @@
             <key>Value</key>
             <integer>4095</integer>
         </map>
+        <key>ALInterpolationCadenceAware</key>
+        <map>
+            <key>Comment</key>
+            <string>Experimental: measure how often each object actually sends updates, and taper off its predicted motion once it has been silent for several times its own interval (see ALInterpolationCadenceFactor). Off, the taper is gated on the object's circuit looking broken, which is the stock behaviour.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALInterpolationCadenceFactor</key>
+        <map>
+            <key>Comment</key>
+            <string>How many of an object's own update intervals of silence before its predicted motion starts tapering off. Bounded below by InterpolationPhaseOut and above by 10 seconds. Lower stops stale objects sooner at the cost of stopping ones the simulator simply had nothing to say about; higher lets them coast.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>4.0</real>
+        </map>
+        <key>ALInterpolationMaxFrameStep</key>
+        <map>
+            <key>Comment</key>
+            <string>Largest span of time, in seconds, that a single frame may carry a moving object forward. Bounds what happens when the viewer resumes from a stall -- a snapshot floater holding time frozen, a long hitch, a minimised window -- instead of advancing everything by the whole pause at once. 0 disables the limit.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
         <key>ClickingAvatarKeepsCamera</key>
         <map>
             <key>Comment</key>
@@ -3024,6 +4799,179 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>RenderBokehHighlightGain</key>
+        <map>
+            <key>Comment</key>
+            <string>Extra weight given to bright samples inside the defocus blur, which makes out-of-focus highlights read as distinct bokeh discs rather than a smooth blur. 0 is a plain average and is also the cheapest. 0.5 is a gentle lift; 2.0 is a strong cinematic pop. Range 0 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehHighlightThreshold</key>
+        <map>
+            <key>Comment</key>
+            <string>Brightness above which the highlight boost starts to apply. 0 boosts the whole range; raising it restricts the effect to genuine highlights and leaves midtones averaging normally. Only has an effect when Highlight Gain is above 0. Range 0 to 8.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehHighlightClamp</key>
+        <map>
+            <key>Comment</key>
+            <string>Ceiling on how much radiance a single sample may contribute to a neighbouring bokeh disc. A specular glint can carry thousands of times the brightness of its surroundings; uncapped it spreads into a large blob that flickers as the camera moves. The in-focus pixel keeps its full intensity either way - only its contribution to the blur is capped. 0 disables the cap. Range 0 to 1024.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>64.0</real>
+        </map>
+        <key>RenderBokehApertureBlades</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of aperture blades shaping the out-of-focus highlights. 0 gives the perfectly round bokeh of an idealised lens. 5 to 9 reproduce real diaphragms, where the discs become visible polygons - 6 is the most common on stills lenses. Values below 3 are treated as circular. Range 0 to 11.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderBokehApertureRotation</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotation of the aperture polygon in degrees. Only has an effect when Aperture Blades is 3 or more. Range 0 to 360.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehApertureCurvature</key>
+        <map>
+            <key>Comment</key>
+            <string>Rounds the aperture blades back toward a circle. 0 gives hard straight-edged polygons; 1 is fully round, matching a rounded diaphragm held wide open. Only has an effect when Aperture Blades is 3 or more. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehAnamorphicSqueeze</key>
+        <map>
+            <key>Comment</key>
+            <string>Stretches out-of-focus highlights into ovals, the way the cylindrical element of an anamorphic lens does. 1.0 is a round spherical-lens disc. Above 1 gives taller-than-wide ovals, the classic anamorphic signature; below 1 gives wider-than-tall. The stretch preserves area, so this changes the shape of the blur without changing how strong it is. Range 0.25 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderBokehCatEyeAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Optical vignetting, also called cat's eye. Toward the frame edges the lens barrel clips the aperture, squeezing round bokeh into lens-shaped slivers that lean away from the centre while the middle of the frame stays round. Strength follows distance from the centre of the image circle, so on a wide display the sides clip well before the top and bottom do. 0 disables. 0.45 is a natural fast-prime look; 1.0 is heavy. The range runs past the old maximum because measuring from the image circle lowered the offset everywhere -- a value tuned before that change wants roughly half again as much. Range 0 to 1.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFringeAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Longitudinal chromatic aberration - the colour cast real glass leaves on the rim of an out-of-focus highlight, which flips hue either side of the focal plane. 0 disables. 0.2 is a subtle uncorrected-lens feel; 0.6 is strong. This is separate from the frame-wide fringe under Chromatic Aberration, which appears whether or not anything is defocused. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFringeNearTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Colour cast on highlights in front of the focal plane. The default light magenta matches the usual signature of uncorrected glass; swap with the far tint to reverse the effect.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>0.85</real>
+                <real>1.0</real>
+            </array>
+        </map>
+        <key>RenderBokehFringeFarTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Colour cast on highlights behind the focal plane. The default light green is the counterpart to the near tint; a real lens shifts hue in opposite directions either side of focus.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.85</real>
+                <real>1.0</real>
+                <real>0.9</real>
+            </array>
+        </map>
+        <key>RenderBokehSphericalAberration</key>
+        <map>
+            <key>Comment</key>
+            <string>Spherical aberration - how the light inside an out-of-focus highlight is spread across it. 0 is the evenly lit disc of a perfectly corrected lens. Positive brightens the rim and hollows out the middle, the soap-bubble look; negative fills the middle and softens the edge, the creamy look. The sign flips either side of the focal plane exactly as it does in real glass, so a lens with bright-rimmed background bokeh has bright-centred foreground bokeh. Needs a few pixels of blur before there is any shape to work with, and fades out below that. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFieldStretch</key>
+        <map>
+            <key>Comment</key>
+            <string>Field aberration - stretches out-of-focus highlights toward the frame edges while the centre stays round. 0 disables. Positive stretches them across the radius so they line up along circles and the frame appears to swirl, the look of old fast portrait glass; negative stretches them along the radius into comet shapes. Area-preserving, so highlights change shape without changing brightness. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFieldFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>How quickly field aberration builds from the centre of the frame toward the corners. 1 spreads it fairly evenly across the frame; higher values keep the middle clean and concentrate the deformation at the edges. Shape control only; use RenderBokehFieldStretch to toggle the effect. Range 1 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
+        <key>RenderBokehComaAsymmetry</key>
+        <map>
+            <key>Comment</key>
+            <string>Comatic asymmetry - draws each out-of-focus highlight into a comet whose tail points away from the centre of frame, the way a real lens flares off-axis. Zero on the optical axis and strongest in the corners, and it follows the highlight's actual shape, so it stays aligned with an anamorphic squeeze or a swirl rather than drifting off them. 0 disables. Pairs with RenderBokehFieldStretch, which supplies the elongation the tail runs along. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
         </map>
         <key>AllowNoCopyRezRestoreToWorld</key>
         <map>
@@ -3096,6 +5044,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyIMShowSeconds</key>
+        <map>
+            <key>Comment</key>
+            <string>Show seconds in chat timestamps and include seconds in chat logs.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ChatOOCPrefix</key>
         <map>
             <key>Comment</key>
@@ -3117,6 +5076,17 @@
             <string>String</string>
             <key>Value</key>
             <string>))</string>
+        </map>
+        <key>ExternalWebsocketSyncIdleTimeout</key>
+        <map>
+            <key>Comment</key>
+            <string>Seconds the script editor server stays up with no editor connected, from its start or the last one's going, before it stops; zero keeps it up for the session.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
         </map>
         <key>FindLandSort</key>
         <map>

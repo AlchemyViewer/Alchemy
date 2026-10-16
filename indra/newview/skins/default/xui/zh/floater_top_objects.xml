@@ -58,6 +58,4 @@
 	<button label="過濾器" name="filter_parcel_btn"/>
 	<button label="退回所選擇的" name="return_selected_btn"/>
 	<button label="全部退回" name="return_all_btn"/>
-	<button label="停用所選的" name="disable_selected_btn"/>
-	<button label="全部停用" name="disable_all_btn"/>
 </floater>

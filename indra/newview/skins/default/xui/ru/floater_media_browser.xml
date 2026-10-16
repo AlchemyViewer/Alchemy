@@ -23,7 +23,6 @@
 		</layout_panel>
 		<layout_panel name="external_controls">
 			<button label="Открыть в моем браузере" name="open_browser"/>
-			<check_box label="Всегда открывать в моем браузере" name="open_always"/>
 			<button label="Закрыть" name="close"/>
 		</layout_panel>
 	</layout_stack>

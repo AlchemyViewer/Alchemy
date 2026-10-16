@@ -53,7 +53,6 @@
 #include "llmanipscale.h"
 #include "llinventorymodel.h"
 #include "llmenubutton.h"
-#include "llpreviewscript.h"
 #include "llresmgr.h"
 #include "llselectmgr.h"
 #include "llspinctrl.h"

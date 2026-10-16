@@ -52,14 +52,16 @@ protected:
     bool beingDebugged() override;
 
     bool restoreErrorTrap() override;
-    void initCrashReporting(bool reportFreeze);
+
+#if LL_LINUX
+    bool initHardwareTest() override; // Chooses the GPU before the window loads EGL.
+#endif
 
     bool initParseCommandLine(LLCommandLineParser& clp) override;
 
     bool initSLURLHandler() override;
     bool sendURLToOtherInstance(const std::string& url) override;
 
-    void setOSHibernationMode(eHibernationMode mode) override;
 };
 
 #endif // LL_LLAPPVIEWERSDL_H

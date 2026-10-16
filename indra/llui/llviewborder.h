@@ -29,9 +29,11 @@
 
 #include "llview.h"
 
-class LLViewBorder : public LLView
+class LLViewBorder final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLViewBorder, LLView);
+
     typedef enum e_bevel { BEVEL_IN, BEVEL_OUT, BEVEL_BRIGHT, BEVEL_NONE } EBevel ;
     typedef enum e_style { STYLE_LINE, STYLE_TEXTURE } EStyle;
 
@@ -66,10 +68,10 @@ protected:
 public:
     virtual void setValue(const LLSD& val) { setRect(LLRect(val)); }
 
-    virtual bool isCtrl() const { return false; }
+    virtual bool isCtrl() const override { return false; }
 
     // llview functionality
-    virtual void draw();
+    virtual void draw() override;
 
     static bool getBevelFromAttribute(LLXMLNodePtr node, LLViewBorder::EBevel& bevel_style);
 

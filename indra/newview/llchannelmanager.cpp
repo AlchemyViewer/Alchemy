@@ -94,7 +94,7 @@ LLScreenChannel* LLChannelManager::createNotificationChannel()
     p.toast_align = NA_TOP;
 
     // Getting a Channel for our notifications
-    return dynamic_cast<LLScreenChannel*> (LLChannelManager::getInstance()->getChannel(p));
+    return ALViewType::as<LLScreenChannel>(LLChannelManager::getInstance()->getChannel(p));
 }
 
 //--------------------------------------------------------------------------
@@ -253,9 +253,7 @@ void LLChannelManager::muteAllChannels(bool mute)
 
 void LLChannelManager::killToastsFromChannel(const LLUUID& channel_id, const LLScreenChannel::Matcher& matcher)
 {
-    LLScreenChannel
-            * screen_channel =
-                    dynamic_cast<LLScreenChannel*> (findChannelByID(channel_id));
+    LLScreenChannel* screen_channel = ALViewType::as<LLScreenChannel>(findChannelByID(channel_id));
     if (screen_channel != NULL)
     {
         screen_channel->killMatchedToasts(matcher);

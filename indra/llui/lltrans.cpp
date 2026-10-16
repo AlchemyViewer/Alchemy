@@ -150,10 +150,7 @@ std::string LLTrans::getString(std::string_view xml_desc, const LLStringUtil::fo
     if (iter != sStringTemplates.end())
     {
         std::string text = iter->second.mText;
-        LLStringUtil::format_map_t args = sDefaultArgs;
-        args.insert(msg_args.begin(), msg_args.end());
-        LLStringUtil::format(text, args);
-
+        formatWithDefaults(text, msg_args);
         return text;
     }
     else
@@ -163,6 +160,32 @@ std::string LLTrans::getString(std::string_view xml_desc, const LLStringUtil::fo
     }
 }
 
+// Most of strings.xml has nothing bracketed in it at all, and most callers
+// add no arguments of their own, so neither case has to format twice --
+// and the test that decides is the same one format() would run anyway.
+// Where a caller does add arguments, the format reads the defaults and
+// the caller's side by side rather than from a merge of them, which was a
+// copy of the whole default map -- a node and two strings per entry -- for
+// every string formatted.
+//static
+void LLTrans::formatWithDefaults(std::string& text, const LLStringUtil::format_map_t& msg_args)
+{
+    if (text.find('[') == std::string::npos)
+    {
+        return;
+    }
+
+    if (msg_args.empty())
+    {
+        LLStringUtil::format(text, sDefaultArgs);
+        return;
+    }
+
+    // The defaults over the caller's, as the merge had it, with no map
+    // made: the format looks in both.
+    LLStringUtil::format(text, sDefaultArgs, msg_args);
+}
+
 //static
 std::string LLTrans::getDefString(std::string_view xml_desc, const LLStringUtil::format_map_t& msg_args)
 {
@@ -170,10 +193,7 @@ std::string LLTrans::getDefString(std::string_view xml_desc, const LLStringUtil:
     if (iter != sDefaultStringTemplates.end())
     {
         std::string text = iter->second.mText;
-        LLStringUtil::format_map_t args = sDefaultArgs;
-        args.insert(msg_args.begin(), msg_args.end());
-        LLStringUtil::format(text, args);
-
+        formatWithDefaults(text, msg_args);
         return text;
     }
     else
@@ -235,9 +255,7 @@ bool LLTrans::findString(std::string& result, std::string_view xml_desc, const L
     if (iter != sStringTemplates.end())
     {
         std::string text = iter->second.mText;
-        LLStringUtil::format_map_t args = sDefaultArgs;
-        args.insert(msg_args.begin(), msg_args.end());
-        LLStringUtil::format(text, args);
+        formatWithDefaults(text, msg_args);
         result = text;
         return true;
     }
@@ -270,6 +288,22 @@ bool LLTrans::findString(std::string& result, std::string_view xml_desc, const L
 
 //static
 std::string LLTrans::getCountString(std::string_view language, std::string_view xml_desc, S32 count)
+{
+    const char* form = countForm(language, count);
+
+    // Translate that string
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = llformat("%d", count);
+
+    // Look up "AgeYearsB" or "AgeWeeksC" including the "form"; the
+    // description is a view, which is not a C string.
+    std::string key(xml_desc);
+    key += form;
+    return getString(key, args);
+}
+
+//static
+const char* LLTrans::countForm(std::string_view language, S32 count)
 {
     // Compute which string identifier to use
     const char* form = "";
@@ -323,14 +357,7 @@ std::string LLTrans::getCountString(std::string_view language, std::string_view 
             form = "B";
         }
     }
-
-    // Translate that string
-    LLStringUtil::format_map_t args;
-    args["[COUNT]"] = llformat("%d", count);
-
-    // Look up "AgeYearsB" or "AgeWeeksC" including the "form"
-    std::string key = llformat("%s%s", xml_desc.data(), form);
-    return getString(key, args);
+    return form;
 }
 
 void LLTrans::setDefaultArg(const std::string& name, const std::string& value)

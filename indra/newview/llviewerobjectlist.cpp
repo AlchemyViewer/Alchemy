@@ -29,7 +29,6 @@
 #include "llviewerobjectlist.h"
 
 #include "message.h"
-#include "llfasttimer.h"
 #include "llrender.h"
 #include "llwindow.h"       // decBusyCount()
 
@@ -108,6 +107,7 @@ LLViewerObjectList::LLViewerObjectList()
     mNumOrphans = 0;
     mNumNewObjects = 0;
     mWasPaused = false;
+    mAgentPaused = false;
     mNumDeadObjectUpdates = 0;
     mNumUnknownUpdates = 0;
 }
@@ -465,8 +465,10 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         return;
     }
 
-    U8 compressed_dpbuffer[2048];
-    LLDataPackerBinaryBuffer compressed_dp(compressed_dpbuffer, 2048);
+    // A variable block can be as large as the packet that carried it, and the
+    // message reader never yields a packet larger than MAX_BUFFER_SIZE.
+    U8 compressed_dpbuffer[MAX_BUFFER_SIZE];
+    LLDataPackerBinaryBuffer compressed_dp(compressed_dpbuffer, sizeof(compressed_dpbuffer));
     LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instance();
 
     for (i = 0; i < num_objects; i++)
@@ -478,9 +480,21 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         {
             compressed_dp.reset();
 
+            // getSizeFast returns a negative sentinel for a missing block or
+            // variable, and getBinaryDataFast silently truncates at max_size.
+            // The packer's bounds checks trust the size it is handed, so a
+            // block we cannot hold whole must not be decoded at all.
             S32 uncompressed_length = mesgsys->getSizeFast(_PREHASH_ObjectData, i, _PREHASH_Data);
+            if (uncompressed_length < 0 || uncompressed_length > (S32)sizeof(compressed_dpbuffer))
+            {
+                LL_WARNS() << "Object data block " << i << " declares " << uncompressed_length
+                    << " bytes against a " << sizeof(compressed_dpbuffer) << " byte buffer"
+                    << " from " << mesgsys->getSender() << ", skipping" << LL_ENDL;
+                recorder.objectUpdateFailure();
+                continue;
+            }
             LL_DEBUGS("ObjectUpdate") << "got binary data from message to compressed_dpbuffer" << LL_ENDL;
-            mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_Data, compressed_dpbuffer, 0, i, 2048);
+            mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_Data, compressed_dpbuffer, 0, i, (S32)sizeof(compressed_dpbuffer));
             compressed_dp.assignBuffer(compressed_dpbuffer, uncompressed_length);
 
             if (update_type != OUT_TERSE_IMPROVED) // OUT_FULL_COMPRESSED only?
@@ -886,48 +900,52 @@ void LLViewerObjectList::update(LLAgent &agent)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
-    // Update globals
-    LLViewerObject::setVelocityInterpolate( gSavedSettings.getBOOL("VelocityInterpolate") );
-    LLViewerObject::setPingInterpolate( gSavedSettings.getBOOL("PingInterpolate") );
+    // Update globals. These are read every frame for every object, so they come from cached
+    // controls rather than a string lookup per frame per key.
+    static LLCachedControl<bool> velocity_interpolate(gSavedSettings, "VelocityInterpolate", true);
+    static LLCachedControl<bool> ping_interpolate(gSavedSettings, "PingInterpolate", false);
+    static LLCachedControl<F32> interpolation_time(gSavedSettings, "InterpolationTime", 3.f);
+    static LLCachedControl<F32> interpolation_phase_out(gSavedSettings, "InterpolationPhaseOut", 1.f);
+    static LLCachedControl<F32> region_crossing_time(gSavedSettings, "RegionCrossingInterpolationTime", 1.f);
+    static LLCachedControl<bool> cadence_aware(gSavedSettings, "ALInterpolationCadenceAware", false);
+    static LLCachedControl<F32> cadence_factor(gSavedSettings, "ALInterpolationCadenceFactor", 4.f);
+    static LLCachedControl<F32> max_frame_step(gSavedSettings, "ALInterpolationMaxFrameStep", 0.5f);
 
-    F32 interp_time = gSavedSettings.getF32("InterpolationTime");
-    F32 phase_out_time = gSavedSettings.getF32("InterpolationPhaseOut");
-    F32 region_interp_time = llclamp(gSavedSettings.getF32("RegionCrossingInterpolationTime"), 0.5f, 5.f);
+    LLViewerObject::setVelocityInterpolate( velocity_interpolate );
+    LLViewerObject::setPingInterpolate( ping_interpolate );
+
+    F32 interp_time = interpolation_time;
+    F32 phase_out_time = interpolation_phase_out;
+    F32 region_interp_time = llclamp((F32)region_crossing_time, 0.5f, 5.f);
     if (interp_time < 0.0 ||
         phase_out_time < 0.0 ||
         phase_out_time > interp_time)
     {
-        LL_WARNS() << "Invalid values for InterpolationTime or InterpolationPhaseOut, resetting to defaults" << LL_ENDL;
+        // Warn once rather than once per frame for as long as the setting stays bad.
+        LL_WARNS_ONCE() << "Invalid values for InterpolationTime or InterpolationPhaseOut, resetting to defaults" << LL_ENDL;
         interp_time = 3.0f;
         phase_out_time = 1.0f;
     }
-    LLViewerObject::setPhaseOutUpdateInterpolationTime( interp_time );
-    LLViewerObject::setMaxUpdateInterpolationTime( phase_out_time );
+
+    LLViewerObject::setPredictionCadenceAware( cadence_aware );
+    LLViewerObject::setPredictionCadenceFactor( llmax((F32)cadence_factor, 1.f) );
+    LLViewerObject::setPredictionMaxFrameStep( llmax((F32)max_frame_step, 0.f) );
+    // InterpolationTime is the outer bound -- how long prediction may run at all -- and
+    // InterpolationPhaseOut is where the taper between the two begins. The setters had these
+    // crossed, which inverted the invariant LLViewerObject asserts on itself and left the taper
+    // unreachable: every phase-out evaluation found itself already past the (smaller) maximum and
+    // stopped the object dead in one frame.
+    LLViewerObject::setMaxUpdateInterpolationTime( interp_time );
+    LLViewerObject::setPhaseOutUpdateInterpolationTime( phase_out_time );
     LLViewerObject::setMaxRegionCrossingInterpolationTime(region_interp_time);
 
-    gAnimateTextures = gSavedSettings.getBOOL("AnimateTextures");
-
-    // update global timer
-    F32 last_time = gFrameTimeSeconds;
-    U64Microseconds time = totalTime();              // this will become the new gFrameTime when the update is done
-    // Time _can_ go backwards, for example if the user changes the system clock.
-    // It doesn't cause any fatal problems (just some oddness with stats), so we shouldn't assert here.
-//  llassert(time > gFrameTime);
-    F64Seconds time_diff = time - gFrameTime;
-    gFrameTime  = time;
-    F64Seconds time_since_start = gFrameTime - gStartTime;
-    gFrameTimeSeconds = time_since_start;
-
-    gFrameIntervalSeconds = gFrameTimeSeconds - last_time;
-    if (gFrameIntervalSeconds < 0.f)
-    {
-        gFrameIntervalSeconds = 0.f;
-    }
+    static LLCachedControl<bool> animate_textures(gSavedSettings, "AnimateTextures", true);
+    gAnimateTextures = animate_textures;
 
     //clear avatar LOD change counter
     LLVOAvatar::sNumLODChangesThisFrame = 0;
 
-    const F64 frame_time = LLFrameTimer::getElapsedSeconds();
+    const F64 frame_time = LLFrameTimer::getUptimeSeconds();
 
     LLViewerObject *objectp = NULL;
 
@@ -968,7 +986,8 @@ void LLViewerObjectList::update(LLAgent &agent)
 
     std::vector<LLViewerObject*>::iterator idle_end = idle_list.begin()+idle_count;
 
-    if (gSavedSettings.getBOOL("FreezeTime"))
+    static LLCachedControl<bool> freeze_time(gSavedSettings, "FreezeTime", false);
+    if (freeze_time)
     {
 
         for (std::vector<LLViewerObject*>::iterator iter = idle_list.begin();
@@ -983,12 +1002,34 @@ void LLViewerObjectList::update(LLAgent &agent)
     }
     else
     {
+        // Objects first, then avatars. A seated avatar pulls its seat's drawable forward from inside
+        // its own idleUpdate (LLPipeline::updateMoveDampedAsync), so that it can pose its skeleton on
+        // the seat's position for this frame -- which only works if the seat has already been
+        // interpolated. Left to list order, it depended on which of the two had rezzed first: when
+        // the rider came first it moved the seat toward last frame's position and stamped it
+        // EARLY_MOVE, the seat's own fresh move was then skipped, and vehicle and rider were drawn a
+        // frame behind -- or not, for the next vehicle over, and it could change when an unrelated
+        // object was removed from the list. No non-avatar idleUpdate reads avatar state, so nothing
+        // needs the reverse order.
         for (std::vector<LLViewerObject*>::iterator idle_iter = idle_list.begin();
             idle_iter != idle_end; idle_iter++)
         {
             objectp = *idle_iter;
             llassert(objectp->isActive());
+            if (!objectp->isAvatar())
+            {
                 objectp->idleUpdate(agent, frame_time);
+            }
+        }
+
+        for (std::vector<LLViewerObject*>::iterator idle_iter = idle_list.begin();
+            idle_iter != idle_end; idle_iter++)
+        {
+            objectp = *idle_iter;
+            if (objectp->isAvatar())
+            {
+                objectp->idleUpdate(agent, frame_time);
+            }
         }
 
         //update flexible objects
@@ -1013,8 +1054,9 @@ void LLViewerObjectList::update(LLAgent &agent)
     // don't factor frames that were paused into the stats
     if (! mWasPaused)
     {
-        LLViewerStats::getInstance()->updateFrameStats(time_diff);
+        LLViewerStats::getInstance()->updateFrameStats(F64Seconds(gFrameIntervalSeconds.value()));
     }
+    mWasPaused = mAgentPaused;
 
     /*
     // Debugging code for viewing orphans, and orphaned parents
@@ -1380,6 +1422,7 @@ void LLViewerObjectList::cleanupReferences(LLViewerObject *objectp)
     LL_DEBUGS("ObjectUpdate") << " dereferencing id " << objectp->mID << LL_ENDL;
 
     mUUIDObjectMap.erase(objectp->mID);
+    mPresenceSignal(objectp->mID, false);
 
     //if (objectp->getRegion())
     //{
@@ -2022,6 +2065,7 @@ LLViewerObject *LLViewerObjectList::createObjectViewer(const LLPCode pcode, LLVi
     }
 
     mUUIDObjectMap[fullid] = objectp;
+    mPresenceSignal(fullid, true);
 
     mObjects.push_back(objectp);
 
@@ -2045,6 +2089,7 @@ LLViewerObject *LLViewerObjectList::createObjectFromCache(const LLPCode pcode, L
 
     objectp->mLocalID = local_id;
     mUUIDObjectMap[uuid] = objectp;
+    mPresenceSignal(uuid, true);
     setUUIDAndLocal(uuid,
                     local_id,
                     regionp->getHost().getAddress(),
@@ -2084,6 +2129,7 @@ LLViewerObject *LLViewerObjectList::createObject(const LLPCode pcode, LLViewerRe
     }
 
     mUUIDObjectMap[fullid] = objectp;
+    mPresenceSignal(fullid, true);
     setUUIDAndLocal(fullid,
                     local_id,
                     gMessageSystem->getSenderIP(),
@@ -2236,7 +2282,7 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
             addDebugBeacon(objectp->getPositionAgent(),"");
 #endif
             gPipeline.markMoved(objectp->mDrawable);
-            objectp->setChanged(LLXform::MOVED | LLXform::SILHOUETTE);
+            objectp->setChanged(LLXform::MOVED);
 
             // Flag the object as no longer orphaned
             childp->mOrphaned = false;

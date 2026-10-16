@@ -50,6 +50,8 @@ class LLNotificationForm;
 class LLToastNotifyPanel: public LLCheckBoxToastPanel, public LLInstanceTracker<LLToastNotifyPanel, LLUUID, LLInstanceTrackerReplaceOnCollision>
 {
 public:
+    AL_VIEW_TYPE(LLToastNotifyPanel, LLCheckBoxToastPanel);
+
     /**
      * Constructor for LLToastNotifyPanel.
      *
@@ -63,7 +65,7 @@ public:
     LLToastNotifyPanel(const LLNotificationPtr& pNotification, const LLRect& rect = LLRect::null, bool show_images = true);
 
     virtual void init( LLRect rect, bool show_images );
-    virtual void deleteAllChildren();
+    virtual void deleteAllChildren() override;
 
     virtual ~LLToastNotifyPanel();
     LLPanel * getControlPanel() { return mControlPanel; }
@@ -140,9 +142,10 @@ protected:
     static const std::string sFontScript;
 };
 
-class LLIMToastNotifyPanel : public LLToastNotifyPanel
+class LLIMToastNotifyPanel final : public LLToastNotifyPanel
 {
 public:
+    AL_VIEW_TYPE(LLIMToastNotifyPanel, LLToastNotifyPanel);
 
     LLIMToastNotifyPanel(LLNotificationPtr& pNotification,
                         const LLUUID& session_id,
@@ -152,12 +155,12 @@ public:
 
     void compactButtons();
 
-    virtual void updateNotification();
-    virtual void init( LLRect rect, bool show_images );
+    virtual void updateNotification() override;
+    virtual void init( LLRect rect, bool show_images ) override;
 
     ~LLIMToastNotifyPanel();
 
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
 protected:
     LLTextBase* mParentText;

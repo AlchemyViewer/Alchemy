@@ -36,10 +36,12 @@ class LLScrollbar;
 // LLPanelEmojiComplete
 //
 
-class LLPanelEmojiComplete : public LLUICtrl
+class LLPanelEmojiComplete final : public LLUICtrl
 {
     friend class LLUICtrlFactory;
 public:
+    AL_VIEW_TYPE(LLPanelEmojiComplete, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<bool>       autosize;
@@ -70,7 +72,7 @@ public:
 
 public:
     size_t getEmojiCount() const { return mEmojis.size(); }
-    void setEmojis(const std::vector<LLWString>& emojis);
+    void setEmojis(const std::vector<std::string>& emojis);
     void setEmojiHint(const std::string& hint);
     bool isAutoSize() const { return mAutoSize; }
     U32 getMaxShortCodeWidth() const;
@@ -112,9 +114,11 @@ protected:
 // LLFloaterEmojiComplete
 //
 
-class LLFloaterEmojiComplete : public LLFloater
+class LLFloaterEmojiComplete final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterEmojiComplete, LLFloater);
+
     LLFloaterEmojiComplete(const LLSD& sdKey);
 
 public:

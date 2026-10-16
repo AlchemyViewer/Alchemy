@@ -34,6 +34,7 @@
 #include "llinstantmessage.h"
 
 #include "alavataractions.h"
+#include "alchattimestamp.h"
 #include "alfloaterblocked.h"
 #include "llimview.h"
 #include "llcommandhandler.h"
@@ -124,9 +125,10 @@ public:
 };
 LLObjectIMHandler gObjectIMHandler;
 
-class LLChatHistoryHeader: public LLPanel
+class LLChatHistoryHeader final: public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLChatHistoryHeader, LLPanel);
     LLChatHistoryHeader()
     :   LLPanel(),
         mInfoCtrl(NULL),
@@ -176,7 +178,7 @@ public:
         }
     }
 
-    bool handleMouseUp(S32 x, S32 y, MASK mask)
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override
     {
         return LLPanel::handleMouseUp(x,y,mask);
     }
@@ -200,7 +202,7 @@ public:
             if (mTime > 0) // have frame time
             {
                 time_t current_time = time_corrected();
-                time_t message_time = (time_t)(current_time - LLFrameTimer::getElapsedSeconds() + mTime);
+                time_t message_time = (time_t)(current_time - LLFrameTimer::getUptimeSeconds() + mTime);
 
                 // Report abuse shouldn't use AM/PM, use 24-hour time
                 time_string = "[" + LLTrans::getString("TimeMonth") + "]/["
@@ -222,7 +224,7 @@ public:
 
                 // Just add current date if not full.
                 // Should be fine since both times are supposed to be SLT.
-                if (!time_string.empty() && time_string.size() < 7)
+                if (!time_string.empty() && time_string.find('/') == std::string::npos)
                 {
                     time_string = "[" + LLTrans::getString("TimeMonth") + "]/["
                         + LLTrans::getString("TimeDay") + "]/["
@@ -502,7 +504,7 @@ public:
             if (mTime > 0) // have frame time
             {
                 time_t current_time = time_corrected();
-                time_t message_time = (time_t)(current_time - LLFrameTimer::getElapsedSeconds() + mTime);
+                time_t message_time = (time_t)(current_time - LLFrameTimer::getUptimeSeconds() + mTime);
 
                 // Report abuse shouldn't use AM/PM, use 24-hour time
                 time_string = "[" + LLTrans::getString("TimeMonth") + "]/["
@@ -524,7 +526,7 @@ public:
 
                 // Just add current date if not full.
                 // Should be fine since both times are supposed to be SLT.
-                if (!time_string.empty() && time_string.size() < 7)
+                if (!time_string.empty() && time_string.find('/') == std::string::npos)
                 {
                     time_string = "[" + LLTrans::getString("TimeMonth") + "]/["
                         + LLTrans::getString("TimeDay") + "]/["
@@ -663,7 +665,7 @@ public:
         return false;
     }
 
-    bool postBuild()
+    bool postBuild() override
     {
         setDoubleClickCallback(boost::bind(&LLChatHistoryHeader::showInspector, this));
 
@@ -705,7 +707,7 @@ public:
         return  child->pointInView(local_x, local_y);
     }
 
-    bool handleRightMouseDown(S32 x, S32 y, MASK mask)
+    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override
     {
         if(pointInChild("avatar_icon",x,y) || pointInChild("user_name",x,y))
         {
@@ -739,7 +741,7 @@ public:
     {
         if (!info_ctrl) return;
 
-        LLChatHistoryHeader* header = dynamic_cast<LLChatHistoryHeader*>(info_ctrl->getParent());
+        LLChatHistoryHeader* header = info_ctrl->getParentAs<LLChatHistoryHeader>();
         if (!header) return;
 
         header->showInspector();
@@ -928,7 +930,7 @@ public:
         }
     }
 
-    /*virtual*/ void draw()
+    /*virtual*/ void draw() override
     {
         LLTextBox* user_name = mUserNameTextBox; //getChild<LLTextBox>("user_name");
         LLTextBox* time_box = mTimeBoxTextBox; //getChild<LLTextBox>("time_box");
@@ -954,8 +956,8 @@ public:
         if (mUserNameFont)
         {
             LLTextBox* user_name = getChild<LLTextBox>("user_name");
-            const LLWString& text = user_name->getWText();
-            mMinUserNameWidth = mUserNameFont->getWidth(text) + PADDING;
+            const std::string& text = user_name->getText();
+            mMinUserNameWidth = mUserNameFont->getWidthBytes(text, 0, S32_MAX) + PADDING;
         }
     }
 
@@ -1114,7 +1116,7 @@ private:
 
         LLRect rect_before = time_box->getRect();
 
-        time_box->setValue(chat.mTimeStr);
+        time_box->setValue(ALChatTimestamp::format(chat.mTimeStr, gSavedSettings.getBOOL("AlchemyIMShowSeconds")));
 
         // set necessary textbox width to fit all text
         time_box->reshapeToFitText();
@@ -1228,13 +1230,6 @@ LLChatHistory::LLChatHistory(const LLChatHistory::Params& p)
     editor_params.text_valign = LLFontGL::VAlign::VCENTER;
     editor_params.use_color = true;
     mEditor = LLUICtrlFactory::create<LLTextEditor>(editor_params, this);
-    mEditor->setIsFriendCallback(LLAvatarActions::isFriend);
-    mEditor->setIsObjectBlockedCallback(boost::bind(&LLMuteList::isMuted, LLMuteList::getInstance(), _1, _2, 0));
-    mEditor->setIsObjectReachableCallback([](const LLUUID& obj_id)
-        {
-            LLViewerObject* object = gObjectList.findObject(obj_id);
-            return object && object->isReachable();
-        });
 // [SL:KB] - Patch: Chat-Alerts | Checked: 2012-07-10 (Catznip-3.3)
     mEditor->setHighlightsCallback(boost::bind(&LLChatHistory::onTextHighlight, this, _1, _2));
 // [/SL:KB]
@@ -1346,6 +1341,7 @@ void LLChatHistory::clear()
 void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LLStyle::Params& input_append_params)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    const std::string time = ALChatTimestamp::format(chat.mTimeStr, gSavedSettings.getBOOL("AlchemyIMShowSeconds"));
     bool use_plain_text_chat_history = args["chat_history_style"].asInteger() >= 1;
     bool use_irssi_text_chat_history = args["chat_history_style"].asInteger() >= 2;
     bool square_brackets = false; // square brackets necessary for a system messages
@@ -1474,7 +1470,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                 timestamp_style.color(timestamp_color);
                 timestamp_style.readonly_color(timestamp_color);
             }
-            mEditor->appendText("[" + chat.mTimeStr + "] ", prependNewLineState, timestamp_style);
+            mEditor->appendText("[" + time + "] ", prependNewLineState, timestamp_style);
             prependNewLineState = false;
         }
 
@@ -1529,12 +1525,12 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                     }
                     else
                     {
-                        LLWString from_text = utf8string_to_wstring(chat.mFromName);
-                        size_t i = from_text.length();
-                        if (i > name_column) from_text.erase(name_column);
-                        else if (i < name_column) from_text = LLWString(name_column - i, ' ') + from_text;
+                        std::string from_text = chat.mFromName;
+                        size_t i = utf8str_codepoint_count(from_text);
+                        if (i > name_column) from_text = utf8str_symbol_truncate(from_text, name_column);
+                        else if (i < name_column) from_text = std::string(name_column - i, ' ') + from_text;
 
-                        mEditor->appendText("<" + wstring_to_utf8str(from_text) + ">", prependNewLineState, link_params);
+                        mEditor->appendText("<" + from_text + ">", prependNewLineState, link_params);
                         prependNewLineState = false;
                         mEditor->appendText(alchemyFancyChatDivider, prependNewLineState, name_params);
                     }
@@ -1575,13 +1571,13 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                     }
                     else
                     {
-                        LLWString from_text = utf8string_to_wstring(chat.mFromName);
+                        std::string from_text = chat.mFromName;
                         std::string text_padding;
-                        size_t i = from_text.length();
-                        if (i >= name_column) from_text = from_text.substr(0, name_column);
+                        size_t i = utf8str_codepoint_count(from_text);
+                        if (i >= name_column) from_text = utf8str_symbol_truncate(from_text, name_column);
                         else if (i < name_column) text_padding = std::string(name_column - i, ' ');
 
-                        mEditor->appendText("<" + text_padding + "[" + std::string(link_params.link_href) + " " + wstring_to_utf8str(from_text) + "]>", prependNewLineState, link_params);
+                        mEditor->appendText("<" + text_padding + "[" + std::string(link_params.link_href) + " " + from_text + "]>", prependNewLineState, link_params);
                         prependNewLineState = false;
                         mEditor->appendText(alchemyFancyChatDivider, false, name_params);
                     }
@@ -1620,12 +1616,12 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                     }
                     else
                     {
-                        LLWString from_text = utf8string_to_wstring(chat.mFromName);
-                        size_t i = from_text.length();
-                        if (i >= name_column) from_text = from_text.substr(0, name_column);
-                        else if (i < name_column) from_text = LLWString(name_column - i, ' ') + from_text;
+                        std::string from_text = chat.mFromName;
+                        size_t i = utf8str_codepoint_count(from_text);
+                        if (i >= name_column) from_text = utf8str_symbol_truncate(from_text, name_column);
+                        else if (i < name_column) from_text = std::string(name_column - i, ' ') + from_text;
 
-                        mEditor->appendText("<<nolink>" + wstring_to_utf8str(from_text) + "</nolink>>", prependNewLineState, body_message_params);
+                        mEditor->appendText("<<nolink>" + from_text + "</nolink>>", prependNewLineState, body_message_params);
                         prependNewLineState = false;
                         mEditor->appendText(alchemyFancyChatDivider, prependNewLineState, name_params);
                     }
@@ -1648,12 +1644,12 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
         p.left_pad = mLeftWidgetPad;
         p.right_pad = mRightWidgetPad;
 
-        LLDate new_message_time = LLDate::now();
+        const F64 new_message_time = LLFrameTimer::getTotalSeconds();
         if (!teleport_separator
             && mLastFromName == chat.mFromName
             && mLastFromID == chat.mFromID
-            && mLastMessageTime.notNull()
-            && (new_message_time.secondsSinceEpoch() - mLastMessageTime.secondsSinceEpoch()) < 60.0
+            && mLastMessageTime > 0.0
+            && (new_message_time - mLastMessageTime) < 60.0
             && mIsLastMessageFromLog == message_from_log)  //distinguish between current and previous chat session's histories
         {
             view = getSeparator();
@@ -1676,7 +1672,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                 return;
             }
 
-            p.top_pad = mEditor->getLength() ? mTopHeaderPad : 0;
+            p.top_pad = mEditor->getLengthBytes() ? mTopHeaderPad : 0;
             p.bottom_pad = teleport_separator ? mBottomSeparatorPad : mBottomHeaderPad;
         }
         p.view = view;
@@ -1689,7 +1685,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
         view->reshape(target_rect.getWidth(), view->getRect().getHeight());
         view->setOrigin(target_rect.mLeft, view->getRect().mBottom);
 
-        std::string widget_associated_text = "\n[" + chat.mTimeStr + "] ";
+        std::string widget_associated_text = "\n[" + time + "] ";
         if (utf8str_trim(chat.mFromName).size() != 0 && chat.mFromName != SYSTEM_FROM)
             widget_associated_text += chat.mFromName + delimiter;
 
@@ -1716,7 +1712,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                 // Note: it might be better to simply add a "pending offer" flag somewhere
                 for (auto& panel : LLToastNotifyPanel::instance_snapshot())
                 {
-                    LLIMToastNotifyPanel * imtoastp = dynamic_cast<LLIMToastNotifyPanel *>(&panel);
+                    LLIMToastNotifyPanel * imtoastp = panel.as<LLIMToastNotifyPanel>();
                     const std::string& notification_name = panel.getNotificationName();
                     if (notification_name == "OfferFriendship"
                         && panel.isControlPanelEnabled()

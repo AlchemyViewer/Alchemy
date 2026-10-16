@@ -56,9 +56,11 @@ class LLFloaterSellLandUI final
 :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterSellLandUI, LLFloater);
+
     LLFloaterSellLandUI(const LLSD& key);
     virtual ~LLFloaterSellLandUI();
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onClose(bool app_quitting) override;
 
 private:
     class SelectionObserver : public LLParcelObserver
@@ -101,7 +103,7 @@ private:
     void onBuyerNameCache(const LLAvatarName& av_name);
 
 public:
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     bool setParcel(LLViewerRegion* region, LLParcelSelectionHandle parcel);
     static bool callbackHighlightTransferable(const LLSD& notification, const LLSD& response);

@@ -36,9 +36,11 @@
 class LLAvatarName;
 class LLScrollListCtrl;
 
-class LLFloaterAvatarPicker :public LLFloater
+class LLFloaterAvatarPicker final :public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterAvatarPicker, LLFloater);
+
     typedef boost::signals2::signal<bool(const uuid_vec_t&), boost_boolean_combiner> validate_signal_t;
     typedef validate_signal_t::slot_type validate_callback_t;
 
@@ -55,7 +57,7 @@ public:
     LLFloaterAvatarPicker(const LLSD& key);
     virtual ~LLFloaterAvatarPicker();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void setOkBtnEnableCb(validate_callback_t cb);
 
@@ -65,7 +67,7 @@ public:
     bool handleDragAndDrop(S32 x, S32 y, MASK mask,
                            bool drop, EDragAndDropType cargo_type,
                            void *cargo_data, EAcceptance *accept,
-                           std::string& tooltip_msg);
+                           std::string& tooltip_msg) override;
 
     void openFriendsTab();
     bool isExcludeAgentFromSearchResults() {return mExcludeAgentFromSearchResults;}
@@ -93,8 +95,8 @@ private:
     LLScrollListCtrl* getActiveList();
 
     void drawFrustum();
-    virtual void draw();
-    virtual bool handleKeyHere(KEY key, MASK mask);
+    virtual void draw() override;
+    virtual bool handleKeyHere(KEY key, MASK mask) override;
 
     LLUUID              mQueryID;
     int                 mNumResultsReturned;
