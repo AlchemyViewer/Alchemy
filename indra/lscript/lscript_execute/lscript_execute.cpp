@@ -4046,7 +4046,7 @@ void lscript_run(const std::string& filename, BOOL b_debug)
         // to check how to abort or error out gracefully
         // from this function. XXXTBD
     }
-    LLFILE* file = LLFile::fopen(filename, "r");  /* Flawfinder: ignore */
+    LLFILE* file = LLFile::fopen(filename, LLFILE_MODE("r"));  /* Flawfinder: ignore */
     if(file)
     {
         execute = new LLScriptExecuteLSL2(file);

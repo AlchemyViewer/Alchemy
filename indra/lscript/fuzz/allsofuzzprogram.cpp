@@ -883,7 +883,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     const ll_fuzz_lso::Outcome outcome = ll_fuzz_lso::compileAndRun(text);
     if (print)
     {
-        std::cerr << (outcome.compiled ? "--- ran: " + (outcome.fault.empty() ? std::string("no fault") : outcome.fault) + "\n"
+        std::cerr << (outcome.compiled ? "--- ran: " + (outcome.fault.empty() ? std::string("no fault") : outcome.fault) +
+                                             (outcome.capped ? " (steps ran out)" : "") + "\n"
                                        : "--- not compiled\n" + outcome.messages + "--- end\n");
     }
     return 0;

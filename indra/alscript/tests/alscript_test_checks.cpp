@@ -29,6 +29,7 @@
 #include "../core/alscriptengine.h"
 #include "../lsl/allslservice.h"
 #include "../luau/alluauservice.h"
+#include "../luau/alluautaskpool.h"
 
 #include "alteststateguard.h"
 
@@ -108,6 +109,13 @@ namespace
             // A case leaves no thread inside Tailslide, where the next
             // case's would count as a second thread in at once.
             ll_test::StateGuard::add("Tailslide's engine", engineOwner);
+            // Nor has it put a second thread in while one was in: the count
+            // grows with each clash, and names the case whose it was.
+            ll_test::StateGuard::add("Tailslide's clashes", [] { return std::to_string(al_script_engine::clashes().load()); });
+            // Nor does it leave a pool of Luau's module threads alive, in a
+            // service or frontend it kept, to run on through the cases after
+            // it.
+            ll_test::StateGuard::add("Luau's module threads", [] { return std::to_string(ALLuauTaskPool::liveThreads()); });
             // A case that loads builtins of its own says so: they stay for
             // every case after it.
             ll_test::StateGuard::add("Tailslide's builtins", builtinCount);

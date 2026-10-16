@@ -26,6 +26,7 @@
 
 #include "../preprocessor/aldiskincludes.h"
 
+#include "altestlinks.h"
 #include "fsyspath.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -120,7 +121,7 @@ namespace
         REQUIRE(blessed.folders().size() == size_t(1));
     }
 
-    TEST_CASE("aldiskincludes: links followed before judging; only sensibly sized ordinary files read", "[aldiskincludes]")
+    TEST_CASE("aldiskincludes: a link is followed before judging, so one out of the folder is not read", "[aldiskincludes]")
     {
         Scratch           s;
         const std::string secret = s.write("private/secret.txt", "the author's own\n");
@@ -128,19 +129,33 @@ namespace
         ALDiskIncludes blessed;
         blessed.bless(s.at("lib"));
 
+#if LL_WINDOWS
+        // Windows' own link to a folder, which any user may make, so it is
+        // tried on every Windows machine, where a symlink may not be.
+        UNSCOPED_INFO("nor a file through a junction to a folder outside");
+        REQUIRE(!ll_test::createDirectoryJunction(s.root / "private", s.root / "lib" / "hatch"));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/hatch/secret.txt")));
+#endif
         std::error_code ec;
         fs::create_symlink(fsyspath(secret), s.root / "lib" / "innocent.lsl", ec);
-        if (!ec)
+        if (ec)
         {
-            UNSCOPED_INFO("a link out of the folder is not read");
-            REQUIRE_FALSE(blessed.admits(s.at("lib/innocent.lsl")));
+            SKIP("no symlinks here: " << ec.message());
         }
+        UNSCOPED_INFO("a link out of the folder is not read");
+        REQUIRE_FALSE(blessed.admits(s.at("lib/innocent.lsl")));
         fs::create_directory_symlink(s.root / "private", s.root / "lib" / "door", ec);
-        if (!ec)
-        {
-            UNSCOPED_INFO("nor a file through a linked folder");
-            REQUIRE_FALSE(blessed.admits(s.at("lib/door/secret.txt")));
-        }
+        REQUIRE(!ec);
+        UNSCOPED_INFO("nor a file through a linked folder");
+        REQUIRE_FALSE(blessed.admits(s.at("lib/door/secret.txt")));
+    }
+
+    TEST_CASE("aldiskincludes: only sensibly sized ordinary files are read", "[aldiskincludes]")
+    {
+        Scratch s;
+        s.write("lib/util.lsl", "x\n");
+        ALDiskIncludes blessed;
+        blessed.bless(s.at("lib"));
 
         const std::string big = s.write("lib/big.lsl", std::string(static_cast<size_t>(ALDiskIncludes::MAX_BYTES) + 1, 'x'));
         UNSCOPED_INFO("a file past the limit is not read");

@@ -29,12 +29,22 @@
 #include "alscriptstack.h"
 
 #include <algorithm>
+#include <atomic>
+
+namespace
+{
+    // The threads of every pool alive, counted as the owner's thread starts
+    // and joins them, so that what the count says is settled by the time a
+    // pool's destructor returns.
+    std::atomic<unsigned> sLiveThreads{ 0 };
+}
 
 ALLuauTaskPool::ALLuauTaskPool(unsigned threads)
 {
     for (unsigned i = 0; i < std::max(threads, 1u); ++i)
     {
         mThreads.emplace_back([this]() { work(); });
+        ++sLiveThreads;
     }
 }
 
@@ -48,7 +58,14 @@ ALLuauTaskPool::~ALLuauTaskPool()
     for (std::thread& thread : mThreads)
     {
         thread.join();
+        --sLiveThreads;
     }
+}
+
+// static
+unsigned ALLuauTaskPool::liveThreads()
+{
+    return sLiveThreads.load();
 }
 
 void ALLuauTaskPool::run(std::vector<std::function<void()>> tasks)

@@ -162,7 +162,7 @@ inline void bytestream_int2float(U8 *stream, S32 &offset)
 // Returns true on success, return false and clip copy on buffer overflow
 inline bool bytestream2char(char *buffer, const U8 *stream, S32 &offset, S32 buffsize)
 {
-    S32 source_len = strlen( (const char *)stream+offset );
+    S32 source_len = static_cast<S32>(strlen( (const char *)stream+offset ));
     S32 copy_len = buffsize - 1;
     if( copy_len > source_len )
     {
@@ -1081,7 +1081,7 @@ inline void safe_instruction_bytestream2char(char *buffer, U8 *stream, S32 &offs
     // then halt the script via safe_isntruction_check_address. Now we don't bother
     // copying a thing if there's an error.
 
-    if( safe_instruction_check_address(stream, offset, strlen( (const char *)stream + offset ) + 1 ) )
+    if( safe_instruction_check_address(stream, offset, static_cast<S32>(strlen( (const char *)stream + offset ) + 1) ) )
     {
         // Takes the same parms as this function. Won't overread, per above check.
         bytestream2char( buffer, stream, offset, buffsize );

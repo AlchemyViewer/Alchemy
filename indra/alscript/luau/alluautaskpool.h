@@ -50,6 +50,11 @@ public:
     // How many threads one has here: a few, leaving the machine the rest.
     static unsigned threadsWanted();
 
+    // How many threads the pools alive have between them, for the tests'
+    // state guard: a pool a test case leaves alive, in a service it kept,
+    // runs its threads on through the cases after it.
+    static unsigned liveThreads();
+
 private:
     void work();
 

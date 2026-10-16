@@ -204,10 +204,10 @@ BOOL lscript_compile(const char* src_filename, const char* dst_filename,
 	init_temp_jumps();
 	gAllocationManager = new LLScriptAllocationManager();
 
-	yyin = LLFile::fopen(std::string(src_filename), "r");
+	yyin = LLFile::fopen(std::string(src_filename), LLFILE_MODE("r"));
 	if (yyin)
 	{
-		yyout = LLFile::fopen(std::string(err_filename), "w");
+		yyout = LLFile::fopen(std::string(err_filename), LLFILE_MODE("w"));
 
 		// Reset the lexer's internal buffering.
 
@@ -221,7 +221,7 @@ BOOL lscript_compile(const char* src_filename, const char* dst_filename,
 			char compiled[256];
 			sprintf(compiled, "%s.o", src_filename);
 			LLFILE* compfile;
-			compfile = LLFile::fopen(compiled, "w");
+			compfile = LLFile::fopen(compiled, LLFILE_MODE("w"));
 #endif
 
 			if(dst_filename)
