@@ -111,6 +111,7 @@ namespace
             TEST_SOURCE_MAP,
             TEST_UINT_MAP,
             TEST_INT_MAP,
+            TEST_BOOLS,
             TEST_RESERVED_END
         };
 
@@ -128,6 +129,7 @@ namespace
             "testSourceMap",
             "testUintMap",
             "testIntMap",
+            "testBools",
         };
         static_assert(std::size(kTestReservedNames) == TEST_RESERVED_END - TEST_COUNT, "one name per test entry");
 
@@ -496,6 +498,15 @@ namespace
               "void main()\n"
               "{\n"
               "    frag_color = test_global_stub(vec4(0.25, 0.5, 0.75, 1.0));\n"
+              "}\n" },
+
+            // A bool array under a reserved name, both elements read so the whole array stays active.
+            { "test/boolsF.glsl",
+              "uniform bool testBools[2];\n"
+              "out vec4 frag_color;\n"
+              "void main()\n"
+              "{\n"
+              "    frag_color = vec4(testBools[0] ? 1.0 : 0.0, testBools[1] ? 1.0 : 0.0, 0.0, 1.0);\n"
               "}\n" },
         };
 
@@ -1005,6 +1016,71 @@ namespace
         require_ints("true by INT_MIN", "uGrainAnimate", { 1 });
         mShader.uniform1f(LLShaderMgr::GRAIN_ANIMATE, negative_zero);
         require_ints("false by -0.0, the same bits", "uGrainAnimate", { 0 });
+
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // The other setters a bool takes -- the uint one, and the float one's fast and array forms -- each followed by
+    // the int set that repeats the last one: AMD's driver drops that set unless every set of a bool reaches GL as an
+    // int (see LLGLSLShader::mBoolLocations). Any float but zero is true, 0.5 included.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a bool holds an int set made after its uint and float setters' other forms", "[llglslshader_gl]")
+    {
+        setUp();
+
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 1);
+        mShader.uniform1ui(LLShaderMgr::GRAIN_ANIMATE, 0u);
+        require_ints("false by uint", "uGrainAnimate", { 0 });
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 1);
+        require_ints("true by int after the uint", "uGrainAnimate", { 1 });
+
+        mShader.fastUniform1f(LLShaderMgr::GRAIN_ANIMATE, 0.f);
+        require_ints("false by the fast float", "uGrainAnimate", { 0 });
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 1);
+        require_ints("true by int after the fast float", "uGrainAnimate", { 1 });
+
+        const F32 zero = 0.f;
+        mShader.uniform1fv(LLShaderMgr::GRAIN_ANIMATE, 1, &zero);
+        require_ints("false by the float array form", "uGrainAnimate", { 0 });
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 1);
+        require_ints("true by int after the float array form", "uGrainAnimate", { 1 });
+
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 0);
+        mShader.uniform1f(LLShaderMgr::GRAIN_ANIMATE, 0.5f);
+        require_ints("true by 0.5", "uGrainAnimate", { 1 });
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 0);
+        require_ints("false by int after 0.5", "uGrainAnimate", { 0 });
+
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A bool array set whole by ints, then by floats, then by the ints again holds the ints: the driver that drops a
+    // bool's repeated int set drops an array's too.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a bool array takes int and float array sets and holds whichever set it last", "[llglslshader_gl]")
+    {
+        setUpShaders();
+        REQUIRE(buildProgram(mDraw, "bools (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/boolsF.glsl", GL_FRAGMENT_SHADER } }));
+        mDraw.bind();
+
+        // What the two elements hold, as GL reads them back.
+        const auto require_elements = [this](const char* what, GLint first, GLint second)
+        {
+            INFO(what);
+            GLint held[2] = { -1, -1 };
+            glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testBools[0]"), &held[0]);
+            glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testBools[1]"), &held[1]);
+            REQUIRE(held[0] == first);
+            REQUIRE(held[1] == second);
+        };
+
+        const GLint ints[2] = { 1, 0 };
+        const F32 floats[2] = { 0.f, 0.5f };
+        mDraw.uniform1iv(TEST_BOOLS, 2, ints);
+        require_elements("by ints", 1, 0);
+        mDraw.uniform1fv(TEST_BOOLS, 2, floats);
+        require_elements("by floats", 0, 1);
+        mDraw.uniform1iv(TEST_BOOLS, 2, ints);
+        require_elements("by the ints again", 1, 0);
 
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }

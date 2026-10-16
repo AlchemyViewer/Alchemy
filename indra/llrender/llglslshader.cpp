@@ -185,6 +185,10 @@ namespace
     inline U32 uniform_bits(GLuint v)  { return v; }
     inline U32 uniform_bits(GLfloat v) { return std::bit_cast<U32>(v); }
 
+    // A value as GL takes it for a bool: false at zero, -0 included, and true anywhere else, NaN included.
+    inline GLint bool_value(GLfloat v) { return v != 0.f; }
+    inline GLint bool_value(GLuint v)  { return v != 0u; }
+
     // Every sampler type GL has: the float ones, shadow included, and the int and unsigned forms of each dimension.
     bool is_sampler_type(GLenum type)
     {
@@ -879,6 +883,7 @@ void LLGLSLShader::unloadInternal()
         size = 0;
     }
     mUniform.clear();
+    mBoolLocations.clear();
     // program state is going away with the program
     mUniformCache.clear();
     mMinimumAlpha = MINIMUM_ALPHA_UNSET;
@@ -1281,6 +1286,10 @@ void LLGLSLShader::mapUniform(const gl_uniform_data_t& gl_uniform)
 
         LLStaticHashedString hashedName(name);
         mUniformMap[hashedName] = location;
+        if (type == GL_BOOL)
+        {
+            mBoolLocations.push_back(location);
+        }
 
         LL_DEBUGS("ShaderUniform") << "Uniform " << name << " is at location " << location << LL_ENDL;
 
@@ -1489,6 +1498,7 @@ bool LLGLSLShader::mapUniforms()
     mActiveImageUnits = 0;
     mUniform.clear();
     mUniformMap.clear();
+    mBoolLocations.clear();
     mTexture.clear();
     mImage.clear();
     mStorage.clear();
@@ -2089,6 +2099,49 @@ S32 LLGLSLShader::disableTexture(S32 uniform, ALTextureSlot::eTextureType mode)
     return index;
 }
 
+bool LLGLSLShader::isBoolLocation(GLint location) const
+{
+    return std::find(mBoolLocations.begin(), mBoolLocations.end(), location) != mBoolLocations.end();
+}
+
+void LLGLSLShader::uploadFloat(GLint location, GLfloat x) const
+{
+    if (isBoolLocation(location))
+    {
+        glUniform1i(location, bool_value(x));
+    }
+    else
+    {
+        glUniform1f(location, x);
+    }
+}
+
+void LLGLSLShader::uploadFloats(GLint location, U32 count, const GLfloat* v) const
+{
+    if (isBoolLocation(location))
+    {
+        std::vector<GLint> bools(count);
+        std::transform(v, v + count, bools.begin(), [](GLfloat x) { return bool_value(x); });
+        glUniform1iv(location, count, bools.data());
+    }
+    else
+    {
+        glUniform1fv(location, count, v);
+    }
+}
+
+void LLGLSLShader::uploadUInt(GLint location, GLuint x) const
+{
+    if (isBoolLocation(location))
+    {
+        glUniform1i(location, bool_value(x));
+    }
+    else
+    {
+        glUniform1ui(location, x);
+    }
+}
+
 void LLGLSLShader::uniform1i(U32 index, GLint x)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
@@ -2127,7 +2180,7 @@ void LLGLSLShader::uniform1f(U32 index, GLfloat x)
         const GLint location = mUniform[index];
         if (location >= 0 && mUniformCache.changed(location, UniformCache::Kind::Float, uniform_bits(x)))
         {
-            glUniform1f(location, x);
+            uploadFloat(location, x);
         }
     }
 }
@@ -2142,7 +2195,7 @@ void LLGLSLShader::fastUniform1f(U32 index, GLfloat x)
     llassert(index < mUniform.size());
     llassert(mUniform[index] >= 0);
     const GLint location = mUniform[index];
-    glUniform1f(location, x);
+    uploadFloat(location, x);
     mUniformCache.uploaded(location, UniformCache::Kind::Float, uniform_bits(x));
 }
 
@@ -2162,7 +2215,7 @@ void LLGLSLShader::uniform1ui(U32 index, GLuint x)
         const GLint location = mUniform[index];
         if (location >= 0 && mUniformCache.changed(location, UniformCache::Kind::UInt, uniform_bits(x)))
         {
-            glUniform1ui(location, x);
+            uploadUInt(location, x);
         }
     }
 }
@@ -2322,11 +2375,11 @@ void LLGLSLShader::uniform1fv(U32 index, U32 count, const GLfloat* v)
         if (count != 1)
         {
             mUniformCache.forget(location);
-            glUniform1fv(location, count, v);
+            uploadFloats(location, count, v);
         }
         else if (mUniformCache.changed(location, UniformCache::Kind::Float, uniform_bits(v[0])))
         {
-            glUniform1fv(location, 1, v);
+            uploadFloats(location, 1, v);
         }
     }
 }
