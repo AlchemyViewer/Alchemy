@@ -92,8 +92,8 @@ std::string LLControlGroup::getString(std::string_view name)
     return "";
 }
 
-// Stub for --no-verify-ssl-cert
-bool LLControlGroup::getBOOL(std::string_view name) { return false; }
+// Stub for --no-verify-ssl-cert, which the handler reads once as it starts: unset
+LLControlVariablePtr LLControlGroup::getControl(std::string_view name) { return nullptr; }
 
 LLSD LLCredential::getLoginParams()
 {

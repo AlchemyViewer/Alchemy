@@ -37,6 +37,7 @@
 #include "llviewercontrol.h"
 #include "llexception.h"
 #include "stringize.h"
+#include <atomic>
 #include <vector>
 #include <ios>
 #include <openssl/ossl_typ.h>
@@ -55,6 +56,15 @@
 
 
 static const std::string DEFAULT_CREDENTIAL_STORAGE = "credential";
+
+namespace
+{
+    // NoVerifySSLCert, for LLBasicCertificateStore::validate, which the HTTP service's
+    // thread calls on every connection's certificate: the settings are the main thread's,
+    // and a lookup in them can meet a setting being declared there. Set on the main thread
+    // by LLSecAPIBasicHandler::init, and kept by the setting's signal.
+    std::atomic<bool> sNoVerifySSLCert{false};
+}
 
 // compat
 #define LEGACY_PASSWORD_STORAGE 1
@@ -1053,7 +1063,7 @@ void LLBasicCertificateStore::validate(int validation_policy,
                                        const LLSD& validation_params)
 {
     // If --no-verify-ssl-cert was passed on the command line, stop right now.
-    if (gSavedSettings.getBOOL("NoVerifySSLCert"))
+    if (sNoVerifySSLCert.load(std::memory_order_relaxed))
     {
         LL_WARNS_ONCE("SECAPI") << "All Certificate validation disabled; viewer operation is insecure" << LL_ENDL;
         return;
@@ -1290,6 +1300,13 @@ LLSecAPIBasicHandler::LLSecAPIBasicHandler()
 
 void LLSecAPIBasicHandler::init()
 {
+    if (LLControlVariablePtr control = gSavedSettings.getControl("NoVerifySSLCert"))
+    {
+        sNoVerifySSLCert = control->getValue().asBoolean();
+        mNoVerifySSLCertConnection = control->getSignal()->connect(
+            [](LLControlVariable*, const LLSD& value, const LLSD&) { sNoVerifySSLCert = value.asBoolean(); });
+    }
+
     mProtectedDataMap = LLSD::emptyMap();
     if (mProtectedDataFilename.length() == 0)
     {
