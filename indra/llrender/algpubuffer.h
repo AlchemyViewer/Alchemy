@@ -76,11 +76,16 @@ class ALGPUBuffer
 public:
     enum EFlags : U32
     {
-        DYNAMIC  = 1 << 0,  // upload() may rewrite it (GL_DYNAMIC_STORAGE_BIT)
-        READBACK = 1 << 1,  // the CPU reads it: mapped for reading for as long as it lives, where persistent maps
-                            // resolved (GL 4.4), and kept in memory the CPU reads quickly
-        STREAM   = 1 << 2,  // the CPU writes it often: mapped for writing for as long as it lives, where persistent
-                            // maps resolved, and upload() copies into the map; elsewhere upload() is DYNAMIC's
+        DYNAMIC        = 1 << 0,  // upload() may rewrite it (GL_DYNAMIC_STORAGE_BIT)
+        READBACK       = 1 << 1,  // the CPU reads it: mapped for reading for as long as it lives, where persistent
+                                  // maps resolved (GL 4.4), and kept in memory the CPU reads quickly
+        STREAM         = 1 << 2,  // the CPU writes it often: mapped for writing for as long as it lives, where
+                                  // persistent maps resolved, and upload() copies into the map; elsewhere upload() is
+                                  // DYNAMIC's
+        FLUSH_EXPLICIT = 1 << 3,  // with STREAM, and not READBACK (asserted): the write map is not coherent, and what
+                                  // the CPU writes there reaches the GPU only once flushMapped() publishes its range
+                                  // (GL_MAP_FLUSH_EXPLICIT_BIT). For drivers that put a coherent map in uncached or
+                                  // write-combined memory, which the CPU writes slowly
     };
 
     ALGPUBuffer() = default;
@@ -108,13 +113,19 @@ public:
     U32    getGLName() const { return mName; }
     U32    getFlags() const { return mFlags; }
 
-    // The persistent map of a READBACK or STREAM store, coherent both ways; null where persistent maps did not resolve
-    // and for any other store. The CPU sees what the GPU wrote once a fence after the write has signalled, and the
-    // GPU sees what the CPU wrote in any command issued after the write.
+    // The persistent map of a READBACK or STREAM store, coherent both ways unless FLUSH_EXPLICIT; null where persistent
+    // maps did not resolve and for any other store. The CPU sees what the GPU wrote once a fence after the write has
+    // signalled, and the GPU sees what the CPU wrote in any command issued after the write -- for FLUSH_EXPLICIT, after
+    // the flushMapped() that published it.
     U8* getMapped() const { return mMapped; }
 
+    // Publish [offset, offset + bytes) of a FLUSH_EXPLICIT store's map to the GPU, which sees those bytes in any
+    // command issued after this. Nothing to do for a coherent map or a store with none, so a caller need not ask which
+    // it has.
+    void flushMapped(size_t offset, size_t bytes);
+
     // Write `bytes` from `data` at `offset`. DYNAMIC and STREAM buffers only (asserted). A mapped STREAM store takes
-    // it as a copy into the map, which the GPU must not be reading.
+    // it as a copy into the map, which the GPU must not be reading, flushed there for FLUSH_EXPLICIT.
     void upload(size_t offset, const void* data, size_t bytes);
 
     // Set every 4-byte word to `value`.
