@@ -258,8 +258,11 @@ void main()
             {
                 float scol = fres*blinnPhongLobe(nh, spec.a)*gt/(nh*nl);
                 vec3 speccol = dlit*scol*spec.rgb*shadow;
-                speccol = clamp(speccol, vec3(0), vec3(1));
-                final_color += speccol;
+                // Bounded as pointLightF bounds its highlight, against a runaway divide by the
+                // two cosines, not at 1. A ceiling of 1 flat-topped every glossy highlight under a
+                // projector, while the same material lit by a point light, or blended and lit
+                // forward by this light, kept its peak.
+                final_color += clampRadiance(speccol);
             }
         }
 
