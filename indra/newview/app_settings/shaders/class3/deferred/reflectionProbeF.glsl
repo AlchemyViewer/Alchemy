@@ -1034,14 +1034,12 @@ void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 no
     color.rgb += glossenv*0.5;
 }
 
- void applyLegacyEnv(inout vec3 color, vec3 legacyenv, vec4 spec, vec3 pos, vec3 norm, float envIntensity)
- {
-    vec3 reflected_color = legacyenv;
-    vec3 lookAt = normalize(pos);
-    float fresnel = 1.0+dot(lookAt, norm.xyz);
-    fresnel *= fresnel;
-    fresnel = min(fresnel+envIntensity, 1.0);
-    reflected_color *= (envIntensity*fresnel);
-    color = mix(color.rgb, reflected_color*0.5, envIntensity);
- }
+// The legacy Environment value is how much of a mirror the surface is: its colour gives way to
+// the reflection by envIntensity, as it gave way to the sky's environment map before PBR and as
+// the path without probes (class2) still does. At 1 the surface shows the probe as it is, which
+// is what pbrIbl makes of a polished white metal.
+void applyLegacyEnv(inout vec3 color, vec3 legacyenv, vec4 spec, vec3 pos, vec3 norm, float envIntensity)
+{
+    color = mix(color.rgb, legacyenv, envIntensity);
+}
 
