@@ -82,9 +82,9 @@ LLUICtrlFactory::LLUICtrlFactory()
 
 LLUICtrlFactory::~LLUICtrlFactory()
 {
-    // go ahead and leak mDummyPanel since this is static destructor time
-    //delete mDummyPanel;
-    //mDummyPanel = NULL;
+    // What was built on it has been given its own parent by now.
+    delete mDummyPanel;
+    mDummyPanel = NULL;
 }
 
 void LLUICtrlFactory::loadWidgetTemplate(const std::string& widget_tag, LLInitParam::BaseBlock& block)

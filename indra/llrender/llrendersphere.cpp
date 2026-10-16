@@ -53,6 +53,12 @@ inline LLVector3 polar_to_cart(F32 latitude, F32 longitude)
 }
 
 
+void LLRenderSphere::cleanupGL()
+{
+    mVertexBuffer = nullptr;
+    mSpherePoints.clear();
+}
+
 void LLRenderSphere::renderGGL()
 {
     LL_PROFILE_ZONE_SCOPED;

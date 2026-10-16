@@ -1769,6 +1769,13 @@ void LLInventoryModel::updateCategory(const LLViewerInventoryCategory* cat, U32 
     }
     else
     {
+        // addCategory() leaves the Meshes folder out, so it has no place in the tree
+        // either: arrays made for it here would be lost to the next update's.
+        if (cat->getPreferredType() == LLFolderType::FT_MESH)
+        {
+            return;
+        }
+
         // add this category
         LLPointer<LLViewerInventoryCategory> new_cat = new LLViewerInventoryCategory(cat->getOwnerID());
         new_cat->copyViewerCategory(cat);
