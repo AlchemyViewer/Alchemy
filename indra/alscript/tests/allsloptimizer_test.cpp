@@ -3577,4 +3577,88 @@ namespace
         UNSCOPED_INFO("a length no single is, which the simulator gives by a way not known, left: " + luau);
         CHECK(in(luau, "llVecMag("));
     }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: an inlined return converts as the return did to the function's type", "[allsloptimizer]")
+    {
+        // The return makes 3 a float, so half(3) / 2 is 1.5, not the 1 an
+        // integer's division gives; and makes "x" a key, false in a
+        // condition, where a string with something in it is true.
+        const std::string source = "float half(integer n)\n{\n    return n;\n}\n"
+                                   "key id(string s)\n{\n    return s;\n}\n"
+                                   "default\n{\n    touch_start(integer t)\n    {\n"
+                                   "        llOwnerSay((string)(half(3) / 2));\n"
+                                   "        if (id(\"x\"))\n        {\n            llOwnerSay(\"a key\");\n        }\n"
+                                   "    }\n}\n";
+        const ALLSLInliner::Result put = ALLSLInliner::run(source);
+        {
+            INFO("each cast to what its function returns: " + put.text);
+            CHECK(in(put.text, "(float)"));
+            CHECK(in(put.text, "(key)"));
+        }
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            o.inlining                = true;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            UNSCOPED_INFO("optimized: " + notes(r));
+            REQUIRE(r.optimized);
+            INFO("as written: " + r.text);
+            CHECK(in(r.text, "1.500000"));
+            CHECK_FALSE(in(r.text, "llOwnerSay(\"1\")"));
+            // The condition a key's, or settled as one's: false.
+            CHECK((in(r.text, "(key)") || !in(r.text, "llOwnerSay(\"a key\")")));
+        }
+    }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a division that may be by nought is neither removed nor moved", "[allsloptimizer]")
+    {
+        const std::string source = wrap("", "        integer d = (integer)llFrand(2);\n"
+                                            "        integer q = 100 / d;\n"
+                                            "        float f = 1.0 / llFrand(1);\n"
+                                            "        integer m = 7 % d;\n"
+                                            "        integer kept = 100 / 4;\n"
+                                            "        llOwnerSay(\"done\");\n");
+        const std::string moved = wrap("", "        integer d = (integer)llFrand(2);\n"
+                                           "        integer q = 100 / d;\n"
+                                           "        llOwnerSay(\"before\");\n"
+                                           "        llOwnerSay((string)q);\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono })
+        {
+            const std::string text = require_optimized(source, target);
+            {
+                INFO("each that may stop the script stays: " + text);
+                CHECK(in(text, "100 / "));
+                CHECK(in(text, " / llFrand(1)"));
+                CHECK(in(text, "7 % "));
+            }
+            {
+                INFO("one by a constant other than nought is folded and goes: " + text);
+                CHECK_FALSE(in(text, "kept"));
+                CHECK_FALSE(in(text, "100 / 4"));
+                CHECK_FALSE(in(text, "25"));
+            }
+            const std::string after = require_optimized(moved, target);
+            INFO("the division before what was said before it: " + after);
+            const size_t divides = after.find("100 / ");
+            const size_t says    = after.find("\"before\"");
+            REQUIRE(divides != std::string::npos);
+            REQUIRE(says != std::string::npos);
+            CHECK(divides < says);
+        }
+    }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a folded list holding a key is left a call since a literal makes it a string", "[allsloptimizer]")
+    {
+        const std::string source = wrap("", "        list l = llList2List([(key)\"a822ff2b-ff02-461d-b45d-dcd10a2de0c2\", 1], 0, 0);\n"
+                                            "        if (llFrand(1) < 0.5)\n        {\n            l = [];\n        }\n"
+                                            "        llOwnerSay((string)llGetListEntryType(l, 0));\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono })
+        {
+            const std::string text = require_optimized(source, target);
+            INFO("the key still a key: " + text);
+            CHECK_FALSE(in(text, "[\"a822ff2b"));
+            CHECK(in(text, "(key)\"a822ff2b-ff02-461d-b45d-dcd10a2de0c2\""));
+        }
+    }
 } // anonymous namespace

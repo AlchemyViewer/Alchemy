@@ -401,9 +401,13 @@ namespace ALLSLPasses
                     {
                         return false;
                     }
+                    // Each item as a literal of its own: not a key, which
+                    // would be a string in the list, llGetListEntryType's
+                    // TYPE_STRING and found by no llListFindList for it,
+                    // as ALLSLValues::literal has it.
                     for (LSLASTNode* item : *cv)
                     {
-                        if (!inlineable(static_cast<LSLConstant*>(item)) && item->getIType() != LST_KEY)
+                        if (!inlineable(static_cast<LSLConstant*>(item)))
                         {
                             return false;
                         }
