@@ -607,6 +607,29 @@ namespace
         CHECK(rgb->getMaxAlpha() == 255);
     }
 
+    // The alpha layout is worked out with the format, once for a component count. An image
+    // that comes to want its mask after an upload works both out again on the next, and
+    // reads alpha from the fourth channel rather than the first.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a mask wanted after an upload reads alpha from the alpha channel", "[LLImageGL]")
+    {
+        constexpr U16 W = 16, H = 16;
+        // Red full and alpha clear: read from the first channel, it would look opaque.
+        LLPointer<LLImageRaw> raw = makeRaw(W, H, 4, 0x00);
+        for (size_t i = 0; i < (size_t)W * H; ++i)
+        {
+            raw->getData()[i * 4] = 0xFF;
+        }
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        img->setNeedsAlphaAndPickMask(false);
+        REQUIRE(img->createGLTexture(0, raw.get()));
+        UNSCOPED_INFO("no mask wanted reads as opaque");
+        CHECK(img->getMaxAlpha() == 255);
+
+        img->setNeedsAlphaAndPickMask(true);
+        REQUIRE(img->createGLTexture(0, raw.get()));
+        CHECK(img->getMaxAlpha() == 0);
+    }
+
     // An edit writes through the ACTIVE unit, and a bind that finds the texture
     // already cached on slot 0 skips activating it. With another unit left active
     // the write went to whatever that unit held. The glyph atlas does exactly this:

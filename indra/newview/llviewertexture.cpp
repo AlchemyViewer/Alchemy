@@ -1557,12 +1557,17 @@ bool LLViewerFetchedTexture::preCreateTexture(S32 usename/*= 0*/)
 
 bool LLViewerFetchedTexture::createTexture(S32 usename/*= 0*/)
 {
+    return createTexture(usename, mBoostLevel);
+}
+
+bool LLViewerFetchedTexture::createTexture(S32 usename, S32 category)
+{
     if (!mNeedsCreateTexture)
     {
         return false;
     }
 
-    bool res = mGLTexturep->createGLTexture(mRawDiscardLevel, mRawImage, usename, true, mBoostLevel);
+    bool res = mGLTexturep->createGLTexture(mRawDiscardLevel, mRawImage, usename, true, category);
 
     return res;
 }
@@ -1629,13 +1634,13 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
                 // before the post -- see LLImageGL::beginUpload -- and released in the
                 // callback below, whether or not a texture came of it.
                 LLPointer<LLImageGL> gl_image = mGLTexturep;
-                gl_image->beginUpload();
+                gl_image->beginUpload(mRawImage->getComponents());
                 ref();
                 mainq->postTo(
                     mImageQueue,
                     // work to be done on LLImageGL worker thread
 #if LL_IMAGEGL_THREAD_CHECK
-                    [this, data, data_copy, size]()
+                    [this, data, data_copy, size, category = mBoostLevel]()
                     {
                         mGLTexturep->mActiveThread = LLThread::currentID();
                         //verify data is unmodified
@@ -1643,11 +1648,11 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
                         llassert(mRawImage->getDataSize() == size);
                         llassert(memcmp(data, data_copy, size) == 0);
 #else
-                    [this]()
+                    [this, category = mBoostLevel]()
                     {
 #endif
                         //actually create the texture on a background thread
-                        createTexture();
+                        createTexture(0, category);
 
 #if LL_IMAGEGL_THREAD_CHECK
                         //verify data is unmodified

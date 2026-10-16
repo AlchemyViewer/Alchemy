@@ -103,7 +103,8 @@ U32 LLImageGL::sFrameCount = 0;
 // texture memory accounting (for macOS)
 static LLMutex sTexMemMutex;
 static boost::unordered_map<U32, U64> sTextureAllocs;
-static U64 sTextureBytes = 0;
+// Changed under sTexMemMutex, and read by getTextureBytesAllocated without it.
+static std::atomic<U64> sTextureBytes{0};
 
 // track a texture alloc on the currently bound texture.
 // asserts that no currently tracked alloc exists
@@ -879,6 +880,7 @@ void LLImageGL::init(bool usemipmaps)
     mPickMaskHeight = 0;
     mUseMipMaps = usemipmaps;
     mHasExplicitFormat = false;
+    mFormatComponents = -1;
 
     mIsMask = false;
     mMaxAlpha = 255;
@@ -1048,6 +1050,7 @@ void LLImageGL::setExplicitFormat( LLGLint internal_format, LLGLenum primary_for
     // Note: must be called before createTexture()
     // Note: it's up to the caller to ensure that the format matches the number of components.
     mHasExplicitFormat = true;
+    mFormatComponents = -1;
     mFormatInternal = internal_format;
     mFormatPrimary = primary_format;
     if(type_format == 0)
@@ -1950,52 +1953,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
 
     if( !mHasExplicitFormat )
     {
-        switch (mComponents)
-        {
-        case 1:
-            // Single-channel -- used by font glyph maps, but the path is generic for
-            // any 1-component upload. resolveDeprecatedFormat below stores it as R8,
-            // read back through a gray-replicate swizzle.
-            mFormatInternal = GL_LUMINANCE8;
-            mFormatPrimary = GL_LUMINANCE;
-            mFormatType = GL_UNSIGNED_BYTE;
-            break;
-        case 2:
-            // Two-channel (luminance + alpha): RG8 under the matching swizzle, the
-            // same way.
-            mFormatInternal = GL_LUMINANCE8_ALPHA8;
-            mFormatPrimary = GL_LUMINANCE_ALPHA;
-            mFormatType = GL_UNSIGNED_BYTE;
-            break;
-        case 3:
-            // sRGB, not linear. The bits are identical either way -- an 8-bit texture
-            // uploaded from a JPEG2000/PNG/TGA asset already holds sRGB-encoded values --
-            // so this changes nothing about what is stored, only whether GL is willing to
-            // decode it. Sampling is unaffected unless a bind asks for the decode with
-            // ALSampler::SRGBDecode, and nothing does by default.
-            //
-            // Worth stating why it cannot be narrowed to colour textures: the same
-            // LLViewerFetchedTexture object serves whichever glTF slot references its UUID
-            // (see fetch_texture), so one image can be base colour for one material and a
-            // normal map for another. The format cannot know; only the bind can. Which is
-            // exactly the split the sampler work established.
-            mFormatInternal = GL_SRGB8;
-            mFormatPrimary = GL_RGB;
-            mFormatType = GL_UNSIGNED_BYTE;
-            break;
-        case 4:
-            mFormatInternal = GL_SRGB8_ALPHA8;
-            mFormatPrimary = GL_RGBA;
-            mFormatType = GL_UNSIGNED_BYTE;
-            break;
-        default:
-            LL_ERRS() << "Bad number of components for texture: " << (U32)getComponents() << LL_ENDL;
-        }
-
-        // Calc alpha layout first (keys on the deprecated names), then
-        // rewrite the format to core-profile-valid forms.
-        calcAlphaChannelOffsetAndStride() ;
-        resolveDeprecatedFormat();
+        resolveComponentFormat(mComponents);
     }
 
     if(!to_create) //not create a gl texture
@@ -2313,7 +2271,21 @@ void LLImageGL::beginUpload()
     mPublished.mComponents          = mComponents;
     mPublished.mCurrentDiscardLevel = mCurrentDiscardLevel;
     mPublished.mMaxDiscardLevel     = mMaxDiscardLevel;
+    mPublished.mFormatPrimary          = mFormatPrimary;
+    mPublished.mDeprecatedSourceFormat = mDeprecatedSourceFormat;
+    mPublished.mTextureMemory          = mTextureMemory;
     mUploadInFlight = true;
+}
+
+void LLImageGL::beginUpload(S8 components)
+{
+    llassert(on_main_thread());
+    // With no upload of this image under way, nothing reads the format while it is set.
+    if (!mUploadInFlight && !mHasExplicitFormat)
+    {
+        resolveComponentFormat(components);
+    }
+    beginUpload();
 }
 
 void LLImageGL::endUpload()
@@ -2748,6 +2720,8 @@ void LLImageGL::setNeedsAlphaAndPickMask(bool need_mask)
     if(mNeedsAlphaAndPickMask != need_mask)
     {
         mNeedsAlphaAndPickMask = need_mask;
+        // The alpha layout is worked out with the format, so the next upload works both out again.
+        mFormatComponents = -1;
 
         if(mNeedsAlphaAndPickMask)
         {
@@ -2874,6 +2848,65 @@ void LLImageGL::applySwizzleForDeprecatedFormat(ALTextureSlot::eTextureType type
         return;  // not a format we re-express via swizzle
     }
     glTexParameteriv(ALTextureSlot::getInternalType(type), GL_TEXTURE_SWIZZLE_RGBA, mask);
+}
+
+// The format of an image without an explicit one, from its component count. Worked out
+// once a count: beginUpload does it on the main thread before an upload is posted, so the
+// upload on LLImageGLThread finds it done and writes none of what the main thread reads.
+void LLImageGL::resolveComponentFormat(S8 components)
+{
+    if (components == mFormatComponents)
+    {
+        return;
+    }
+
+    switch (components)
+    {
+    case 1:
+        // Single-channel -- used by font glyph maps, but the path is generic for
+        // any 1-component upload. resolveDeprecatedFormat below stores it as R8,
+        // read back through a gray-replicate swizzle.
+        mFormatInternal = GL_LUMINANCE8;
+        mFormatPrimary = GL_LUMINANCE;
+        mFormatType = GL_UNSIGNED_BYTE;
+        break;
+    case 2:
+        // Two-channel (luminance + alpha): RG8 under the matching swizzle, the
+        // same way.
+        mFormatInternal = GL_LUMINANCE8_ALPHA8;
+        mFormatPrimary = GL_LUMINANCE_ALPHA;
+        mFormatType = GL_UNSIGNED_BYTE;
+        break;
+    case 3:
+        // sRGB, not linear. The bits are identical either way -- an 8-bit texture
+        // uploaded from a JPEG2000/PNG/TGA asset already holds sRGB-encoded values --
+        // so this changes nothing about what is stored, only whether GL is willing to
+        // decode it. Sampling is unaffected unless a bind asks for the decode with
+        // ALSampler::SRGBDecode, and nothing does by default.
+        //
+        // Worth stating why it cannot be narrowed to colour textures: the same
+        // LLViewerFetchedTexture object serves whichever glTF slot references its UUID
+        // (see fetch_texture), so one image can be base colour for one material and a
+        // normal map for another. The format cannot know; only the bind can. Which is
+        // exactly the split the sampler work established.
+        mFormatInternal = GL_SRGB8;
+        mFormatPrimary = GL_RGB;
+        mFormatType = GL_UNSIGNED_BYTE;
+        break;
+    case 4:
+        mFormatInternal = GL_SRGB8_ALPHA8;
+        mFormatPrimary = GL_RGBA;
+        mFormatType = GL_UNSIGNED_BYTE;
+        break;
+    default:
+        LL_ERRS() << "Bad number of components for texture: " << (U32)components << LL_ENDL;
+    }
+
+    // Calc alpha layout first (keys on the deprecated names), then
+    // rewrite the format to core-profile-valid forms.
+    calcAlphaChannelOffsetAndStride() ;
+    resolveDeprecatedFormat();
+    mFormatComponents = components;
 }
 
 void LLImageGL::resolveDeprecatedFormat()
