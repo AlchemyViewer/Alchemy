@@ -41,12 +41,13 @@ namespace
         LLInventoryType::EIconName mIconName;
     };
 
-    // In key order, which the table enforces.
+    // In key order, which the table enforces. A default name is the key of
+    // its translation in strings.xml.
     constexpr SettingsRow SETTINGS_ROWS[] = {
         { LLSettingsType::ST_NONE,     "New Settings", LLInventoryType::ICONNAME_SETTINGS },
         { LLSettingsType::ST_SKY,      "New Sky",      LLInventoryType::ICONNAME_SETTINGS_SKY },
         { LLSettingsType::ST_WATER,    "New Water",    LLInventoryType::ICONNAME_SETTINGS_WATER },
-        { LLSettingsType::ST_DAYCYCLE, "New Day",      LLInventoryType::ICONNAME_SETTINGS_DAY },
+        { LLSettingsType::ST_DAYCYCLE, "New Daycycle", LLInventoryType::ICONNAME_SETTINGS_DAY },
         { LLSettingsType::ST_INVALID,  "New Settings", LLInventoryType::ICONNAME_SETTINGS },
     };
 

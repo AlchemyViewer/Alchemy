@@ -557,7 +557,7 @@ namespace
             { -1,  "New Settings", LLInventoryType::ICONNAME_SETTINGS },
             { 0,   "New Sky",      LLInventoryType::ICONNAME_SETTINGS_SKY },
             { 1,   "New Water",    LLInventoryType::ICONNAME_SETTINGS_WATER },
-            { 2,   "New Day",      LLInventoryType::ICONNAME_SETTINGS_DAY },
+            { 2,   "New Daycycle", LLInventoryType::ICONNAME_SETTINGS_DAY },
             { 255, "New Settings", LLInventoryType::ICONNAME_SETTINGS },
         };
         for (const SettingsRow& row : rows)

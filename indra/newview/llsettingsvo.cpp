@@ -131,7 +131,7 @@ void LLSettingsVOBase::createNewInventoryItem(LLSettingsType::type_e stype, cons
 
     create_inventory_settings(gAgent.getID(), gAgent.getSessionID(),
         parent_id, LLTransactionID::tnull,
-        std::string(LLSettingsType::getDefaultName(stype)), "",
+        LLTrans::getString(LLSettingsType::getDefaultName(stype)), "",
         stype, nextOwnerPerm, cb);
 }
 
