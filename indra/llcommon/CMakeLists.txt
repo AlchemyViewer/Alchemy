@@ -121,6 +121,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alenumtable.h
         alfilewrite.h
         allinebreaks.h
         almainloop.h
@@ -306,6 +307,7 @@ if(AL_BUILD_TESTS)
     llcommon_tests
     PROJECT llcommon
     SOURCES
+      tests/alenumtable_test.cpp
       tests/alfilewrite_test.cpp
       tests/alrecoverystore_test.cpp
       tests/alregex_test.cpp
