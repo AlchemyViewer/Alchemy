@@ -46,10 +46,11 @@ namespace
     namespace fs = std::filesystem;
 
     // Whether any part of a path is one of DOS's device names -- CON, PRN,
-    // AUX, NUL, COM1 to COM9, LPT1 to LPT9, with or without an extension
-    // -- which Windows opens as the device wherever the part stands, so
-    // that even asking how such a path stands opens it. Elsewhere, no
-    // name is a device.
+    // AUX, NUL, COM1 to COM9, LPT1 to LPT9, and COM and LPT with a
+    // superscript one, two or three, which Windows takes for the digit,
+    // with or without an extension -- which Windows opens as the device
+    // wherever the part stands, so that even asking how such a path stands
+    // opens it. Elsewhere, no name is a device.
     bool deviceName(const std::string& path)
     {
 #if LL_WINDOWS
@@ -65,8 +66,12 @@ namespace
             {
                 c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
             }
+            const bool port = stem.compare(0, 3, "COM") == 0 || stem.compare(0, 3, "LPT") == 0;
+            // ¹, ² and ³ in UTF-8, as the part's string is.
+            const std::string_view number = port ? std::string_view(stem).substr(3) : std::string_view();
             if (stem == "CON" || stem == "PRN" || stem == "AUX" || stem == "NUL" ||
-                (stem.size() == 4 && (stem.compare(0, 3, "COM") == 0 || stem.compare(0, 3, "LPT") == 0) && stem[3] >= '1' && stem[3] <= '9'))
+                (number.size() == 1 && number[0] >= '1' && number[0] <= '9') || number == "\xC2\xB9" || number == "\xC2\xB2" ||
+                number == "\xC2\xB3")
             {
                 return true;
             }

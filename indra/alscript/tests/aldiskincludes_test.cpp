@@ -547,11 +547,12 @@ namespace
     TEST_CASE("aldiskincludes: a DOS device's name under a blessed folder is refused before the disk is asked", "[aldiskincludes]")
     {
 #if LL_WINDOWS
-        // Windows opens CON, PRN, AUX, NUL, COM1 to COM9 and LPT1 to LPT9
-        // as the device wherever the name stands in a path, extension or
-        // not, so even asking how such a path stands opens it. Nothing
-        // here can see that the disk was not asked -- NUL answers, and
-        // COM3 may wait on a port -- so this says only what is answered.
+        // Windows opens CON, PRN, AUX, NUL, COM1 to COM9 and LPT1 to LPT9,
+        // and COM and LPT with a superscript one, two or three, as the
+        // device wherever the name stands in a path, extension or not, so
+        // even asking how such a path stands opens it. Nothing here can
+        // see that the disk was not asked -- NUL answers, and COM3 may
+        // wait on a port -- so this says only what is answered.
         Scratch           s;
         const std::string script = s.write("lib/a.lsl", "integer a;\n");
         ALDiskIncludes    blessed;
@@ -562,6 +563,13 @@ namespace
         REQUIRE_FALSE(blessed.admits(s.at("lib/lpt1")));
         REQUIRE_FALSE(blessed.admits(s.at("lib/con/a.lsl")));
         REQUIRE_FALSE(blessed.mayFromConfig(s.at("lib/aux"), s.at("lib")));
+        // ¹, ² and ³ in UTF-8, as a path's string is.
+        for (const char* name : { "COM\xC2\xB9", "com\xC2\xB2.lsl", "COM\xC2\xB3", "LPT\xC2\xB9.lsl", "lpt\xC2\xB2", "LPT\xC2\xB3" })
+        {
+            INFO(name);
+            CHECK_FALSE(blessed.admits(s.at(std::string("lib/") + name)));
+            CHECK_FALSE(blessed.mayFromConfig(s.at(std::string("lib/") + name), s.at("lib")));
+        }
         UNSCOPED_INFO("a file is still a file");
         CHECK(blessed.admits(script).value_or("") == script);
         // A name that only begins like one is a file.
@@ -569,6 +577,9 @@ namespace
         CHECK(blessed.admits(console).value_or("") == console);
         const std::string com = s.write("lib/com10.lsl", "integer c;\n");
         CHECK(blessed.admits(com).value_or("") == com);
+        // Nor is a superscript past three a digit to Windows.
+        const std::string four = s.write("lib/com\xE2\x81\xB4.lsl", "integer c;\n");
+        CHECK(blessed.admits(four).value_or("") == four);
 #endif
     }
 }
