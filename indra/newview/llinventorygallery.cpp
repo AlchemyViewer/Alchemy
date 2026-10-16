@@ -2841,7 +2841,7 @@ void LLInventoryGalleryItem::setType(LLAssetType::EType type, LLInventoryType::E
     mIsFolder = (mType == LLAssetType::AT_CATEGORY);
     mIsLink = is_link;
 
-    std::string icon_name = LLInventoryIcon::getIconName(mType, inventory_type, flags);
+    std::string_view icon_name = LLInventoryIcon::getIconName(mType, inventory_type, flags);
     if (mIsFolder)
     {
         mSortGroup = SG_NORMAL_FOLDER;

@@ -149,7 +149,7 @@ void LLFloaterBuy::show(const LLSaleInfo& sale_info)
     LLSD row;
 
     // Compute icon for this item
-    std::string icon_name = LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT,
+    std::string_view icon_name = LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT,
                                      LLInventoryType::IT_OBJECT);
 
     row["columns"][0]["column"] = "icon";
@@ -257,7 +257,7 @@ void LLFloaterBuy::inventoryChanged(LLViewerObject* obj,
             item_is_multi = true;
         }
 
-        std::string icon_name = LLInventoryIcon::getIconName(inv_item->getType(),
+        std::string_view icon_name = LLInventoryIcon::getIconName(inv_item->getType(),
                              inv_item->getInventoryType(),
                              inv_item->getFlags(),
                              item_is_multi);
