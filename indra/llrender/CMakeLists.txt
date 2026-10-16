@@ -220,7 +220,8 @@ if(AL_BUILD_TESTS)
   #   it, and integer images;
   # - LLVertexBuffer: what a buffer draws straight after an upload, after a
   #   second upload and after a new size, and that an upload sends only the
-  #   stores its map wrote.
+  #   stores its map wrote; and LLRenderSphere's buffer drawn under the debug
+  #   GL checks.
   al_add_test_binary(
     llrender_gl_shared_tests
     PROJECT llrender
@@ -240,6 +241,7 @@ if(AL_BUILD_TESTS)
       tests/llglslshader_gl_test.cpp
       tests/llrender2dutils_gl_test.cpp
       tests/llrendertarget_gl_test.cpp
+      tests/llrendersphere_gl_test.cpp
       tests/lluiimage_test.cpp
       tests/llvertexbuffer_gl_test.cpp
     LIBRARIES llrender
