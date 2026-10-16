@@ -394,16 +394,30 @@ namespace
     // LLSharedMutex
     //------------------------------------------------------------------------
 
-    // Whether another thread is kept from taking a lock exclusively right now. The
-    // writer holds its own reference, since a blocked one outlives the call.
-    bool writerExcluded(std::shared_ptr<LLSharedMutex> mutex)
+    // Whether a writer on another thread takes a lock within limit. The writer holds
+    // its own reference, since a blocked one outlives the call.
+    bool writerGetsIn(std::shared_ptr<LLSharedMutex> mutex, std::chrono::milliseconds limit)
     {
         Worker writer([mutex]()
             {
                 mutex->lockExclusive();
                 mutex->unlockExclusive();
             });
-        return !writer.finishesWithin(BLOCKED);
+        return writer.finishesWithin(limit);
+    }
+
+    // Whether another thread is kept from taking a lock exclusively right now.
+    bool writerExcluded(std::shared_ptr<LLSharedMutex> mutex)
+    {
+        return !writerGetsIn(mutex, BLOCKED);
+    }
+
+    // Whether another thread takes a lock exclusively once nothing holds it. A writer
+    // an earlier probe left queued must wake and get through first, so this allows as
+    // long as a release may take, not as long as a blocked thread is given.
+    bool writerAdmitted(std::shared_ptr<LLSharedMutex> mutex)
+    {
+        return writerGetsIn(mutex, RELEASED);
     }
 
     struct llsharedmutex_data
@@ -415,6 +429,12 @@ namespace
         bool othersExcluded()
         {
             return writerExcluded(mShared);
+        }
+
+        // Whether another thread takes the lock exclusively once nothing holds it.
+        bool othersAdmitted()
+        {
+            return writerAdmitted(mShared);
         }
     };
 
@@ -500,7 +520,8 @@ namespace
     TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: a writer gets in while readers keep overlapping", "[llsharedmutex]")
     {
         // A lock that lets new readers in past a waiting writer, as glibc's default rwlock
-        // does, keeps the writer out for as long as the readers overlap.
+        // does, keeps the writer out for as long as the readers overlap. The SRW lock lets
+        // them in only when it wakes the writer, so under load it fails here now and then.
         std::atomic<bool> stop{false};
         auto read = [&]()
         {
@@ -541,7 +562,7 @@ namespace
         UNSCOPED_INFO("released on the first of two unlocks");
         CHECK(othersExcluded());
         mMutex.unlockExclusive();
-        CHECK_FALSE(othersExcluded());
+        CHECK(othersAdmitted());
     }
 
     TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: shared nests inside exclusive without releasing it", "[llsharedmutex]")
@@ -554,7 +575,7 @@ namespace
         UNSCOPED_INFO("the nested shared unlock released the exclusive hold");
         CHECK(othersExcluded());
         mMutex.unlockExclusive();
-        CHECK_FALSE(othersExcluded());
+        CHECK(othersAdmitted());
     }
 
     TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: shared re-entry releases on the last unlock", "[llsharedmutex]")
@@ -565,7 +586,7 @@ namespace
         UNSCOPED_INFO("released on the first of two shared unlocks");
         CHECK(othersExcluded());
         mMutex.unlockShared();
-        CHECK_FALSE(othersExcluded());
+        CHECK(othersAdmitted());
     }
 
     TEST_CASE("llsharedmutex: shared holds on several mutexes release in any order", "[llsharedmutex]")
@@ -581,15 +602,15 @@ namespace
 
         b->unlockShared();
         b->unlockShared();
-        CHECK_FALSE(writerExcluded(b));
+        CHECK(writerAdmitted(b));
         CHECK(writerExcluded(a));
         CHECK(writerExcluded(c));
 
         a->unlockShared();
-        CHECK_FALSE(writerExcluded(a));
+        CHECK(writerAdmitted(a));
         CHECK(writerExcluded(c));
 
         c->unlockShared();
-        CHECK_FALSE(writerExcluded(c));
+        CHECK(writerAdmitted(c));
     }
 }
