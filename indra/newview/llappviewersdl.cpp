@@ -101,14 +101,19 @@ static void handleUrl(const char* url_utf8);
 #include <dbus/dbus.h>
 #include <unistd.h>         // getpagesize(), getppid(), readlink()
 
-// The bus name is the application ID, one to a channel, so a link is handed
-// only to a running viewer of this channel: not another channel's, nor Linden
-// Lab's or another fork's, which share LL's com.secondlife.ViewerAppAPIService.
-// ViewerInstall.cmake builds the ID to the bus's rules, dot-separated elements
-// of [a-z0-9_] none beginning with a digit; only the length is left to check.
-// The object path and interface stay LL's.
-#define VIEWERAPI_SERVICE   AL_VIEWER_APP_ID
+// A viewer owns two bus names. The first is the application ID, one to a
+// channel, so a link can go to a running viewer of this channel before any
+// other. ViewerInstall.cmake builds the ID to the bus's rules, dot-separated
+// elements of [a-z0-9_] none beginning with a digit; only the length is left
+// to check. The second is LL's com.secondlife.ViewerAppAPIService, which
+// Linden Lab's viewer and other forks share: a link is handed to whichever
+// viewer holds it, so opening a secondlife:// link reaches the viewer that is
+// running rather than starting another. A viewer that finds it held waits in
+// the bus's queue for it, as GDBus viewers do, and has it when the viewers
+// ahead of it quit. The object path and interface are LL's.
+#define VIEWERAPI_SERVICE        AL_VIEWER_APP_ID
 static_assert(sizeof(VIEWERAPI_SERVICE) - 1 <= 255, "A D-Bus name is at most 255 characters");
+#define VIEWERAPI_SHARED_SERVICE "com.secondlife.ViewerAppAPIService"
 #define VIEWERAPI_PATH      "/com/secondlife/ViewerAppAPI"
 #define VIEWERAPI_INTERFACE "com.secondlife.ViewerAppAPI"
 #endif
@@ -1013,6 +1018,35 @@ static const DBusObjectPathVTable sViewerApiVTable =
     nullptr
 };
 
+// Asks the bus for name with flags: DO_NOT_QUEUE for a name that must be ours
+// now, so we never silently wait behind an existing owner. A name another
+// process holds is no error to libdbus, only a reply, so the reply is what says
+// the name is ours. On failure, failure says why.
+static bool acquireBusName(const char* name, unsigned int flags, std::string& failure)
+{
+    DBusError err;
+    dbus_error_init(&err);
+
+    const int reply = dbus_bus_request_name(gDBusConn, name, flags, &err);
+    if (dbus_error_is_set(&err))
+    {
+        failure = err.message;
+        dbus_error_free(&err);
+        return false;
+    }
+    if (reply == DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
+        || reply == DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER)
+    {
+        return true;
+    }
+
+    const char* result = reply == DBUS_REQUEST_NAME_REPLY_EXISTS   ? "EXISTS, another process owns it"
+                       : reply == DBUS_REQUEST_NAME_REPLY_IN_QUEUE ? "IN_QUEUE, behind its owner"
+                                                                   : "an unknown reply";
+    failure = std::string(result) + " (" + std::to_string(reply) + ")";
+    return false;
+}
+
 //virtual
 bool LLAppViewerSDL::initSLURLHandler()
 {
@@ -1037,28 +1071,54 @@ bool LLAppViewerSDL::initSLURLHandler()
         return false;
     }
 
-    // Claim the well-known service name. DO_NOT_QUEUE so we never silently wait
-    // behind an existing owner. A name another process holds, as it is for a
-    // second viewer of this channel (AllowMultipleViewers), is no error to
-    // libdbus, only a reply, so the reply is what says the name is ours.
-    const int reply = dbus_bus_request_name(gDBusConn, VIEWERAPI_SERVICE, DBUS_NAME_FLAG_DO_NOT_QUEUE, &err);
-    if (dbus_error_is_set(&err))
+    // Claim the well-known service names. This channel's must be ours, as a
+    // second viewer of this channel (AllowMultipleViewers) finds it held. LL's
+    // is shared, so another viewer holding it is no failure: links reach that
+    // viewer, and this one stays reachable by its own name. It is asked for in
+    // the queue, so it comes to this viewer in its turn as the viewers holding
+    // it quit; asked for with DO_NOT_QUEUE, it never would.
+    std::string failure;
+    if (!acquireBusName(VIEWERAPI_SERVICE, DBUS_NAME_FLAG_DO_NOT_QUEUE, failure))
     {
-        LL_WARNS() << "Failed to acquire dbus name " << VIEWERAPI_SERVICE << ": " << err.message << LL_ENDL;
-        dbus_error_free(&err);
+        LL_WARNS() << "Failed to acquire dbus name " << VIEWERAPI_SERVICE << ": " << failure << LL_ENDL;
         return false;
     }
-    if (reply != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
-        && reply != DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER)
+    if (!acquireBusName(VIEWERAPI_SHARED_SERVICE, 0, failure))
     {
-        const char* result = reply == DBUS_REQUEST_NAME_REPLY_EXISTS   ? "EXISTS, another process owns it"
-                           : reply == DBUS_REQUEST_NAME_REPLY_IN_QUEUE ? "IN_QUEUE, behind its owner"
-                                                                       : "an unknown reply";
-        LL_WARNS() << "Failed to acquire dbus name " << VIEWERAPI_SERVICE << ": " << result
-                   << " (" << reply << ")" << LL_ENDL;
+        LL_INFOS() << "Not the owner of dbus name " << VIEWERAPI_SHARED_SERVICE << ": " << failure << LL_ENDL;
+    }
+
+    return true;
+}
+
+// Hands url to the viewer that owns service, with the sender's activation token
+// when there is one. Blocks for the reply, which is how it is known to have
+// been taken. On failure err is set, for the caller to look at and free.
+static bool callGoSLURL(DBusConnection* connection, const char* service,
+                        const char* url, const char* token, DBusError* err)
+{
+    DBusMessage* message = dbus_message_new_method_call(service, VIEWERAPI_PATH,
+                                                        VIEWERAPI_INTERFACE, "GoSLURL");
+    if (!message)
+    {
+        dbus_set_error_const(err, DBUS_ERROR_NO_MEMORY, "Cannot create dbus method call");
         return false;
     }
 
+    dbus_message_append_args(message, DBUS_TYPE_STRING, &url, DBUS_TYPE_INVALID);
+    if (token)
+    {
+        dbus_message_append_args(message, DBUS_TYPE_STRING, &token, DBUS_TYPE_INVALID);
+    }
+
+    DBusMessage* reply = dbus_connection_send_with_reply_and_block(connection, message, 2000, err);
+    dbus_message_unref(message);
+    if (!reply)
+    {
+        return false;
+    }
+
+    dbus_message_unref(reply);
     return true;
 }
 
@@ -1076,17 +1136,6 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
         return false;
     }
 
-    DBusMessage* message = dbus_message_new_method_call(VIEWERAPI_SERVICE, VIEWERAPI_PATH,
-                                                        VIEWERAPI_INTERFACE, "GoSLURL");
-    if (!message)
-    {
-        LL_WARNS() << "Cannot create dbus method call." << LL_ENDL;
-        return false;
-    }
-
-    const char* curl = url.c_str();
-    dbus_message_append_args(message, DBUS_TYPE_STRING, &curl, DBUS_TYPE_INVALID);
-
     // The launcher's activation token is for a window this process will never
     // show, so it goes with the link: on Wayland the running viewer can take
     // focus only with one. Older GIO put it in DESKTOP_STARTUP_ID alone, and
@@ -1096,29 +1145,47 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
     {
         token = getenv("DESKTOP_STARTUP_ID");
     }
-    if (token && *token && dbus_validate_utf8(token, nullptr))
+    if (!token || !*token || !dbus_validate_utf8(token, nullptr))
     {
-        dbus_message_append_args(message, DBUS_TYPE_STRING, &token, DBUS_TYPE_INVALID);
+        token = nullptr;
     }
 
-    // Block for a reply. If no other instance owns the name this returns null
-    // with an error set (ServiceUnknown) -> we are the primary instance ->
-    // return false so startup continues normally.
-    DBusMessage* reply = dbus_connection_send_with_reply_and_block(connection, message, 2000, &err);
-    dbus_message_unref(message);
+    // A running viewer of this channel first, then whichever holds LL's name.
+    // Each is tried only if nothing owned the one before: an owner that did
+    // not take the link is not passed over for another.
+    static const char* const services[] = { VIEWERAPI_SERVICE, VIEWERAPI_SHARED_SERVICE };
+    for (const char* service : services)
+    {
+        bool handed_off = callGoSLURL(connection, service, url.c_str(), token, &err);
+        if (!handed_off && token
+            && (dbus_error_has_name(&err, DBUS_ERROR_INVALID_ARGS)
+                || dbus_error_has_name(&err, DBUS_ERROR_UNKNOWN_METHOD)))
+        {
+            // A viewer from before the token took GoSLURL(s) alone.
+            dbus_error_free(&err);
+            handed_off = callGoSLURL(connection, service, url.c_str(), nullptr, &err);
+        }
+        if (handed_off)
+        {
+            LL_INFOS() << "Handed SLURL to the viewer running as " << service << LL_ENDL;
+            return true;
+        }
 
-    const bool handed_off = (reply != nullptr);
-    if (reply)
-    {
-        dbus_message_unref(reply);
-    }
-    else
-    {
-        LL_INFOS() << "No running instance to hand off SLURL to: " << err.message << LL_ENDL;
+        // No owner is ServiceUnknown, from dbus-daemon and dbus-broker alike,
+        // since the call may start a service; NameHasNoOwner is the answer to
+        // one that may not. An owner that quits or times out without replying
+        // is NoReply, and may have taken the link, so it is not passed over.
+        const bool no_owner = dbus_error_has_name(&err, DBUS_ERROR_SERVICE_UNKNOWN)
+                           || dbus_error_has_name(&err, DBUS_ERROR_NAME_HAS_NO_OWNER);
+        LL_INFOS() << "No running instance of " << service << " to hand off SLURL to: " << err.message << LL_ENDL;
         dbus_error_free(&err);
+        if (!no_owner)
+        {
+            return false;
+        }
     }
 
-    return handed_off;
+    return false;
 }
 
 #elif LL_DARWIN
