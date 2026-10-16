@@ -42,7 +42,8 @@ namespace
     constexpr S32 W = 16;
     constexpr S32 H = 16;
 
-    // A pixel column in the right half of the target.
+    // Pixel columns in the left and right halves of the target.
+    constexpr S32 LEFT  = W / 4;
     constexpr S32 RIGHT = W * 3 / 4;
 
     const char* kColourVertex =
@@ -205,6 +206,29 @@ namespace
     };
 
 
+    // An upload binds the buffer it sends, which is not the buffer the attribute pointers were last set against.
+    // The draw that follows must still read the buffer it was given, not the one drawn before it.
+    TEST_CASE_METHOD(llvertexbuffer_gl_data, "llvertexbuffer_gl: a buffer drawn straight after its upload draws its own vertices", "[llvertexbuffer_gl]")
+    {
+        setUp();
+        const LLColor4U red(255, 0, 0, 255);
+        const LLColor4U green(0, 255, 0, 255);
+
+        LLPointer<LLVertexBuffer> left = makeBuffer(4, 6);
+        writeQuad(*left, 0, -1.f, 0.f, red);
+        writeIndices(*left, 0, 0);
+        uploadAndDrawFromScratch(*left);
+
+        LLPointer<LLVertexBuffer> right = makeBuffer(4, 6);
+        writeQuad(*right, 0, 0.f, 1.f, green);
+        writeIndices(*right, 0, 0);
+        right->unmapBuffer();
+        draw(*right);
+
+        CHECK(at(LEFT) == packed(red));
+        CHECK(at(RIGHT) == packed(green));
+    }
+
     // A buffer drawn, written again at the same size and drawn at once draws what it holds now.
     TEST_CASE_METHOD(llvertexbuffer_gl_data, "llvertexbuffer_gl: a buffer written again draws what was written last", "[llvertexbuffer_gl]")
     {
@@ -223,6 +247,34 @@ namespace
         mTarget.clear();
         draw(*vb);
 
+        CHECK(at(RIGHT) == packed(blue));
+    }
+
+    // A buffer given a new size has new stores, and draws from them: its indices past the old vertex count reach
+    // vertices the old store never had.
+    TEST_CASE_METHOD(llvertexbuffer_gl_data, "llvertexbuffer_gl: a buffer given more vertices draws from its new store", "[llvertexbuffer_gl]")
+    {
+        setUp();
+        const LLColor4U red(255, 0, 0, 255);
+        const LLColor4U green(0, 255, 0, 255);
+        const LLColor4U blue(0, 0, 255, 255);
+
+        LLPointer<LLVertexBuffer> vb = makeBuffer(4, 6);
+        writeQuad(*vb, 0, 0.f, 1.f, green);
+        writeIndices(*vb, 0, 0);
+        uploadAndDrawFromScratch(*vb);
+        REQUIRE(at(RIGHT) == packed(green));
+
+        REQUIRE(vb->allocateBuffer(8, 12));
+        writeQuad(*vb, 0, -1.f, 0.f, red);
+        writeQuad(*vb, 4, 0.f, 1.f, blue);
+        writeIndices(*vb, 0, 0);
+        writeIndices(*vb, 6, 4);
+        vb->unmapBuffer();
+        mTarget.clear();
+        draw(*vb);
+
+        CHECK(at(LEFT) == packed(red));
         CHECK(at(RIGHT) == packed(blue));
     }
 

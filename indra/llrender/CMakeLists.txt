@@ -218,8 +218,9 @@ if(AL_BUILD_TESTS)
   #   conditional draws;
   # - ALImageSlot: what a unit issues, re-issues and forgets as LLRender keeps
   #   it, and integer images;
-  # - LLVertexBuffer: what a buffer draws after a second upload, and that an
-  #   upload sends only the stores its map wrote.
+  # - LLVertexBuffer: what a buffer draws straight after an upload, after a
+  #   second upload and after a new size, and that an upload sends only the
+  #   stores its map wrote.
   al_add_test_binary(
     llrender_gl_shared_tests
     PROJECT llrender

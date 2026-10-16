@@ -734,6 +734,16 @@ U32 LLVertexBuffer::sGLRenderIndices = 0;
 U32 LLVertexBuffer::sLastMask = 0;
 U32 LLVertexBuffer::sVertexCount = 0;
 
+// What the attribute pointers were last set up from: the buffer, the GL name it had, and the
+// attributes the program read. Being bound is not the same thing. An upload binds the buffer it
+// sends and leaves the pointers where the last draw set them, and a pointer keeps the buffer bound
+// when it was set, whatever is bound after. Cleared with the bindings by unbind(), and by a buffer
+// that goes or works out its offsets again, so a buffer made where a gone one was is never taken
+// for it.
+static const LLVertexBuffer* sSetupBuffer = nullptr;
+static U32 sSetupGLBuffer = 0;
+static U32 sSetupMask = 0;
+
 
 //NOTE: each component must be AT LEAST 4 bytes in size to avoid a performance penalty on AMD hardware
 const U32 LLVertexBuffer::sTypeSize[LLVertexBuffer::TYPE_MAX] =
@@ -1033,6 +1043,7 @@ void LLVertexBuffer::unbind()
     STOP_GLERROR;
     sGLRenderBuffer = 0;
     sGLRenderIndices = 0;
+    sSetupBuffer = nullptr;
 }
 
 //static
@@ -1142,6 +1153,11 @@ U32 LLVertexBuffer::calcVertexSize(const U32& typemask)
 //virtual
 LLVertexBuffer::~LLVertexBuffer()
 {
+    if (sSetupBuffer == this)
+    {
+        sSetupBuffer = nullptr;
+    }
+
     if (mMapped)
     { // is on the mapped buffer list but doesn't need to be flushed
         mMapped = false;
@@ -1279,6 +1295,12 @@ bool LLVertexBuffer::updateNumVerts(U32 nverts)
     llassert(nverts >= 0);
 
     bool success = true;
+
+    // The offsets are worked out again, and the attribute pointers were set from the old ones.
+    if (sSetupBuffer == this)
+    {
+        sSetupBuffer = nullptr;
+    }
 
     U32 needed_size = calcOffsets(mTypeMask, mOffsets, nverts);
 
@@ -1782,13 +1804,17 @@ void LLVertexBuffer::setBuffer()
     {
         glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
         sGLRenderBuffer = mGLBuffer;
-
-        setupVertexBuffer();
     }
-    else if (sLastMask != data_mask)
+
+    // Bound is not set up (see sSetupBuffer): the pointers are set whenever they were last set
+    // for another buffer, another name of this one, or another program's attributes. Which arrays
+    // are enabled is setupClientArrays' to say, and sLastMask with it.
+    if (sSetupBuffer != this || sSetupGLBuffer != mGLBuffer || sSetupMask != data_mask)
     {
         setupVertexBuffer();
-        sLastMask = data_mask;
+        sSetupBuffer = this;
+        sSetupGLBuffer = mGLBuffer;
+        sSetupMask = data_mask;
     }
 
     if (mGLIndices != sGLRenderIndices)
