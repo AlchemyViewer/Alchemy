@@ -18,68 +18,23 @@
 	<text name="ShadersPrefText3">
 		Wysoka
 	</text>
-	<slider label="Detale postaci:" name="AvatarMeshDetail2" />
 	<slider label="Pole widzenia:" name="DrawDistance" />
-	<check_box label="Zaawansowane oświetlenie" name="UseLightShaders2" />
-	<panel label="CustomGraphics" name="CustomGraphics Panel">
-		<text name="ShadersText">
-			Cieniowanie pikseli:
-		</text>
-		<check_box label="Przezroczysta woda" name="TransparentWater" />
-		<check_box label="Mapping wypukłości i połysk" name="BumpShiny" />
-		<check_box label="Lokalne światła" name="LocalLights" />
-		<check_box label="Shadery atmosfery" name="WindLightUseAtmosShaders" />
-		<check_box label="Zaawansowane oświetlenie" name="UseLightShaders" />
-		<check_box label="Okluzja otoczenia" name="UseSSAO" />
-		<check_box label="Włącz głębię ostrości" name="UseDoF" />
-		<text name="shadows_label">
-			Cienie:
-		</text>
+	<panel name="CustomGraphics Panel">
 		<combo_box name="ShadowDetail">
 			<combo_box.item label="Brak" name="0" />
 			<combo_box.item label="Słońce/Księżyc" name="1" />
 			<combo_box.item label="Słońce/Księżyc + inne źródła" name="2" />
 		</combo_box>
-		<text name="reflection_label">
-			Odbicia w wodzie:
-		</text>
 		<combo_box name="Reflections">
 			<combo_box.item label="Minimalne" name="0" />
 			<combo_box.item label="Teren i drzewa" name="1" />
 			<combo_box.item label="Wszystkie obiekty statyczne" name="2" />
-			<combo_box.item label="Wszystkie awatary i obiekty" name="3" />
-			<combo_box.item label="Wszystko" name="4" />
 		</combo_box>
-		<slider label="Fizyka postaci:" name="AvatarPhysicsDetail" />
 		<slider label="Pole widzenia:" name="DrawDistance" />
-		<slider label="Maks. ilość cząsteczek:" name="MaxParticleCount" />
-		<slider label="Maks. il. wyświetlanych awatarów:" name="MaxNumberAvatarDrawn" />
-		<slider label="Jakość post-procesu:" name="RenderPostProcess" />
-		<text name="MeshDetailText">
-			Poziom szczegółowości obiektów (LOD):
-		</text>
-		<slider label="  Obiekty i skulpty:" name="ObjectMeshDetail" />
-		<slider label="  Obiekty elastyczne:" name="FlexibleMeshDetail" />
-		<slider label="  Drzewa:" name="TreeMeshDetail" />
-		<slider label="  Awatary:" name="AvatarMeshDetail" />
-		<slider label="  Teren:" name="TerrainMeshDetail" />
-		<slider label="  Niebo:" name="SkyMeshDetail" />
-		<text name="AvatarRenderingText">
-			Rendering awatarów:
-		</text>
-		<check_box label="Upraszczaj oddalone awatary" name="AvatarImpostors" />
-		<check_box label="Rendering awatara przez GPU" name="AvatarVertexProgram" />
-		<check_box label="Elastyczne tkaniny ubrań" name="AvatarCloth" />
-		<text name="TerrainDetailText">
-			Szczegóły terenu:
-		</text>
 		<radio_group name="TerrainDetailRadio">
 			<radio_item label="Mało" name="0" />
 			<radio_item label="Dużo" name="2" />
 		</radio_group>
 	</panel>
-	<button label="Zastosuj" label_selected="Zastosuj" name="Apply" />
 	<button label="Resetuj" name="Defaults" />
-	<button label="Zaawansowane" name="Advanced" />
-	<button label="Sprzęt" label_selected="Sprzęt" name="GraphicsHardwareButton" />
 </panel>

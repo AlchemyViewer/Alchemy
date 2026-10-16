@@ -75,10 +75,10 @@ private:
     EPointAtType                mTargetType;
     LLVector3d                  mTargetOffsetGlobal;
     LLVector3                   mLastSentOffsetGlobal;
-    F32                         mKillTime;
+    F64                         mKillTime;      // on mTimer, which runs as long as the effect
     LLFrameTimer                mTimer;
     LLVector3                   mTargetPos;
-    F32                         mLastSendTime;
+    F64                         mLastSendTime;  // on mTimer
 };
 
 #endif // LL_LLHUDEFFECTPOINTAT_H

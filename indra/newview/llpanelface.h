@@ -28,12 +28,14 @@
 #define LL_LLPANELFACE_H
 
 #include "v4color.h"
+#include "llinventoryobserver.h"
 #include "llpanel.h"
 #include "llgltfmaterial.h"
 #include "llmaterial.h"
 #include "llmaterialmgr.h"
 #include "lltextureentry.h"
 #include "llselectmgr.h"
+#include "llvoinventorylistener.h"
 
 #include <memory>
 
@@ -54,8 +56,35 @@ class LLMediaCtrl;
 class LLMenuButton;
 class LLRadioGroup;
 
-class PBRPickerAgentListener;
-class PBRPickerObjectListener;
+// One-off listener that updates the build floater UI when the agent inventory adds or removes an item
+class PBRPickerAgentListener : public LLInventoryObserver
+{
+protected:
+    bool mChangePending = true;
+
+public:
+    PBRPickerAgentListener();
+    ~PBRPickerAgentListener() override;
+
+    const bool isListening() { return mChangePending; }
+
+    void changed(U32 mask) override;
+};
+
+// One-off listener that updates the build floater UI when the prim inventory updates
+class PBRPickerObjectListener : public LLVOInventoryListener
+{
+protected:
+    LLViewerObject* mObjectp;
+    bool            mChangePending = true;
+
+public:
+    PBRPickerObjectListener(LLViewerObject* object);
+    ~PBRPickerObjectListener() override;
+
+    const bool isListeningFor(const LLViewerObject* objectp) const;
+    void inventoryChanged(LLViewerObject* object, LLInventoryObject::object_list_t* inventory, S32 serial_num, void* user_data) override;
+};
 
 // Represents an edit for use in replicating the op across one or more materials in the selection set.
 //
@@ -98,21 +127,23 @@ public:
     virtual DataType get(LLTextureEntry* entry) { return (entry*(TEGetFunc)); }
 };
 
-class LLPanelFace : public LLPanel
+class LLPanelFace final : public LLPanel
 {
 public:
-    virtual bool    postBuild();
+    AL_VIEW_TYPE(LLPanelFace, LLPanel);
+
+    virtual bool    postBuild() override;
     LLPanelFace();
     virtual ~LLPanelFace();
 
-    void            refresh();
+    void            refresh() override;
     void            refreshMedia();
     void            unloadMedia();
 
     static void onMaterialOverrideReceived(const LLUUID& object_id, S32 side);
 
-    /*virtual*/ void onVisibilityChange(bool new_visibility);
-    /*virtual*/ void draw();
+    /*virtual*/ void onVisibilityChange(bool new_visibility) override;
+    /*virtual*/ void draw() override;
 
     LLMaterialPtr createDefaultMaterial(LLMaterialPtr current_material)
     {
@@ -244,6 +275,8 @@ protected:
     void onCommitGlow();
     void onCommitPlanarAlign();
     void onCommitRepeatsPerMeter();
+
+    void onClickBtnSelectSameTexture(const LLUICtrl* ctrl, const LLSD& user_data);
 
     void onCommitGLTFTextureScaleU();
     void onCommitGLTFTextureScaleV();
@@ -562,8 +595,10 @@ private:
 
     void setMaterialOverridesFromSelection();
 
-    LLMenuButton*   mMenuClipboardColor;
-    LLMenuButton*   mMenuClipboardTexture;
+    LLButton* mBtnCopyColor = nullptr;
+    LLButton* mBtnPasteColor = nullptr;
+    LLButton* mBtnCopyTextures = nullptr;
+    LLButton* mBtnPasteTextures = nullptr;
 
     bool mIsAlpha;
     bool mExcludeWater { false };
@@ -652,7 +687,7 @@ public:
         static void getCurrent(LLMaterialPtr& material_ptr, bool& identical_material);
         static void getMaxSpecularRepeats(F32& repeats, bool& identical);
         static void getMaxNormalRepeats(F32& repeats, bool& identical);
-        static void getCurrentDiffuseAlphaMode(U8& diffuse_alpha_mode, bool& identical, bool diffuse_texture_has_alpha);
+        static void getCurrentDiffuseAlphaMode(U8& diffuse_alpha_mode, bool& identical);
         static void selectionNormalScaleAutofit(LLPanelFace* panel_face, F32 repeats_per_meter);
         static void selectionSpecularScaleAutofit(LLPanelFace* panel_face, F32 repeats_per_meter);
 
@@ -697,7 +732,7 @@ public:
     {
     public:
         static void getFace(class LLFace*& face_to_return, bool& identical_face);
-        static void getImageFormat(LLGLenum& image_format_to_return, bool& identical_face, bool& missing_asset);
+        static void getImageFormat(LLGLenum& image_format_to_return, bool& has_alpha, bool& identical_face, bool& missing_asset);
         static void getTexId(LLUUID& id, bool& identical);
         static void getPbrMaterialId(LLUUID& id, bool& identical, bool& has_pbr, bool& has_faces_without_pbr);
         static void getObjectScaleS(F32& scale_s, bool& identical);

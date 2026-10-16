@@ -1,50 +1,49 @@
 # -*- cmake -*-
 
-project(media_plugin_libvlc)
-
-include(00-Common)
-include(LLCommon)
-include(LLImage)
-include(LLWindow)
-include(Linking)
 include(PluginAPI)
-
 include(LibVLCPlugin)
 
-### media_plugin_libvlc
+### media_plugin_libvlc - dedicated host executable that statically links the
+### LibVLC media plugin together with the slplugin host driver (there is no
+### dlopen'd plugin library any more).
 
+add_executable(media_plugin_libvlc WIN32 MACOSX_BUNDLE)
 
-set(media_plugin_libvlc_SOURCE_FILES
+target_sources(
+  media_plugin_libvlc
+  PRIVATE
+    ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
+    ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_static.cpp
     media_plugin_libvlc.cpp
-    )
-
-add_library(media_plugin_libvlc
-    SHARED
-    ${media_plugin_libvlc_SOURCE_FILES}
-    )
-
-target_link_libraries(media_plugin_libvlc
-        media_plugin_base
-        ll::libvlc
 )
 
-if (WINDOWS)
-  set_target_properties(
-    media_plugin_libvlc
-    PROPERTIES
-    LINK_FLAGS "/MANIFEST:NO /NODEFAULTLIB:LIBCMT"
-    )
-endif (WINDOWS)
-
-if (DARWIN)
-  # Don't prepend 'lib' to the executable name, and don't embed a full path in the library's install name
-  set_target_properties(
-    media_plugin_libvlc
-    PROPERTIES
-    PREFIX ""
-    BUILD_WITH_INSTALL_RPATH 1
-    INSTALL_RPATH "@executable_path/../Frameworks"
-    LINK_FLAGS "-exported_symbols_list ${CMAKE_CURRENT_SOURCE_DIR}/../base/media_plugin_base.exp"
+if(DARWIN)
+  target_sources(media_plugin_libvlc PRIVATE ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm)
+  set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm
+    PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE
   )
+endif()
 
-endif (DARWIN)
+target_link_libraries(
+  media_plugin_libvlc
+  PRIVATE al::flags media_plugin_base ll::libvlc llplugin llmessage llcommon ll::pluginlibraries
+)
+
+if(WINDOWS)
+  set_target_properties(
+    media_plugin_libvlc
+    PROPERTIES
+      EXCLUDE_FROM_DEFAULT_BUILD_DEBUG ON
+      RUNTIME_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
+  )
+  target_link_options(media_plugin_libvlc PRIVATE /MANIFEST:NO)
+elseif(DARWIN)
+  set_target_properties(
+    media_plugin_libvlc
+    PROPERTIES
+      BUILD_WITH_INSTALL_RPATH 1
+      INSTALL_RPATH
+        "@executable_path/../../../../Frameworks;@executable_path/../Frameworks;@executable_path/../Frameworks/plugins"
+  )
+endif()

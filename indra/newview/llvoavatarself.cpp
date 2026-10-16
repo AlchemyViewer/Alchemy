@@ -60,7 +60,6 @@
 #include "llstartup.h"
 #include "llsdserialize.h"
 #include "llcorehttputil.h"
-#include "lluiusage.h"
 // [RLVa:KB] - Checked: RLVa-2.0.2
 #include "rlvhandler.h"
 #include "rlvhelper.h"
@@ -353,7 +352,7 @@ bool LLVOAvatarSelf::buildSkeletonSelf(const LLAvatarSkeletonInfo *info)
     // SL-315
     mScreenp->setWorldPosition(LLVector3::zero);
     // need to update screen agressively when sidebar opens/closes, for example
-    mScreenp->mUpdateXform = true;
+    mScreenp->setUpdateXform(true);
     return true;
 }
 
@@ -778,7 +777,28 @@ bool LLVOAvatarSelf::setVisualParamWeight(S32 index, F32 weight)
     return setParamWeight(param,weight);
 }
 
-bool LLVOAvatarSelf::setParamWeight(const LLViewerVisualParam *param, F32 weight)
+bool LLVOAvatarSelf::setVisualParamWeight(S32 index, S32 type, F32 weight)
+{
+    LLViewerVisualParam* param = (LLViewerVisualParam*)LLCharacter::getVisualParam(index);
+    if (!param)
+    {
+        return false;
+    }
+    if (param->getWearableType() == type)
+    {
+        return setParamWeight(param, weight);
+    }
+    else
+    {
+        // setVisualParamWeight at the moment is only used in writeToAvatar.
+        // The type is supposed to match since wearable is a subset of avatar by type.
+        llassert(false);
+        LL_WARNS() << "Visual param index " << index << " is not of type " << type << LL_ENDL;
+    }
+    return false;
+}
+
+bool LLVOAvatarSelf::setParamWeight(LLViewerVisualParam *param, F32 weight)
 {
     if (!param)
     {
@@ -799,18 +819,32 @@ bool LLVOAvatarSelf::setParamWeight(const LLViewerVisualParam *param, F32 weight
         }
     }
 
-    return LLCharacter::setVisualParamWeight(param,weight);
+    // How much of the wearable push is a push at all, for a capture to answer
+    // before anything is gated on it.
+    if (param->getWeight() != weight)
+    {
+        ++sParamWeightsChanged;
+    }
+
+    // Every caller of this found the parameter in this character's own map, so
+    // it is this character's parameter, and asking the map for it again by the
+    // id it was found under gives back the one already in hand.
+    param->setWeight(weight);
+    return true;
 }
 
 /*virtual*/
-void LLVOAvatarSelf::updateVisualParams()
+bool LLVOAvatarSelf::updateVisualParams()
 {
-    LLVOAvatar::updateVisualParams();
+    return LLVOAvatar::updateVisualParams();
 }
+
+S32 LLVOAvatarSelf::sParamWeightsChanged = 0;
 
 void LLVOAvatarSelf::writeWearablesToAvatar()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    sParamWeightsChanged = 0;
     for (U32 type = 0; type < LLWearableType::WT_COUNT; type++)
     {
         LLWearable *wearable = gAgentWearables.getTopWearable((LLWearableType::EType)type);
@@ -820,20 +854,32 @@ void LLVOAvatarSelf::writeWearablesToAvatar()
         }
     }
 
+    LL_PROFILE_ZONE_NUM(sParamWeightsChanged);
 }
 
 /*virtual*/
 void LLVOAvatarSelf::idleUpdateAppearanceAnimation()
 {
-    // Animate all top-level wearable visual parameters
-    gAgentWearables.animateAllWearableParams(calcMorphAmount());
+    // Only a morph gives either of these anything to do. animateAllWearableParams
+    // moves nothing unless a parameter is animating, and the push after it was
+    // writing weights the avatar already had -- measured at none changed, every
+    // frame, once an appearance had settled.
+    //
+    // Everything that changes a worn wearable outside a morph pushes it itself:
+    // the sliders and the shape importer in the appearance editor, reverting an
+    // edit, a clothing colour, the morph tool, an outfit change, and wearing or
+    // changing a single wearable, which all arrive at LLAgentWearables::wearableUpdated.
+    if (mAppearanceAnimating)
+    {
+        // Animate all top-level wearable visual parameters
+        gAgentWearables.animateAllWearableParams(calcMorphAmount());
 
-    // Apply wearable visual params to avatar
-    writeWearablesToAvatar();
+        // Apply wearable visual params to avatar
+        writeWearablesToAvatar();
+    }
 
     //allow avatar to process updates
     LLVOAvatar::idleUpdateAppearanceAnimation();
-
 }
 
 // virtual
@@ -1265,25 +1311,33 @@ const LLViewerJointAttachment *LLVOAvatarSelf::attachObject(LLViewerObject *view
     // Should just be the last object added
     if (attachment->isObjectAttached(viewer_object))
     {
-        const LLUUID& attachment_id = viewer_object->getAttachmentItemID();
-        LLAppearanceMgr::instance().registerAttachment(attachment_id);
         updateLODRiggedAttachments();
 
-// [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Modified: RLVa-1.2.1a
-        // NOTE: RLVa event handlers should be invoked *after* LLVOAvatar::attachObject() calls LLViewerJointAttachment::addObject()
-        if (mAttachmentSignal)
+        // Client-only objects (e.g. local mesh previews) have no inventory item
+        // and never participate in COF or RLV state. Do the rigged-render refresh
+        // above for them, but skip the inventory sync and RLV/appearance
+        // bookkeeping a real attachment would trigger.
+        if (!viewer_object->isLocalOnly())
         {
-            (*mAttachmentSignal)(viewer_object, attachment, ACTION_ATTACH);
-        }
-        if (rlv_handler_t::isEnabled())
-        {
-            RlvAttachmentLockWatchdog::instance().onAttach(viewer_object, attachment);
-            gRlvHandler.onAttach(viewer_object, attachment);
+            const LLUUID& attachment_id = viewer_object->getAttachmentItemID();
+            LLAppearanceMgr::instance().registerAttachment(attachment_id);
 
-            if ( (attachment->getIsHUDAttachment()) && (!gRlvAttachmentLocks.hasLockedHUD()) )
-                gRlvAttachmentLocks.updateLockedHUD();
-        }
+// [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Modified: RLVa-1.2.1a
+            // NOTE: RLVa event handlers should be invoked *after* LLVOAvatar::attachObject() calls LLViewerJointAttachment::addObject()
+            if (mAttachmentSignal)
+            {
+                (*mAttachmentSignal)(viewer_object, attachment, ACTION_ATTACH);
+            }
+            if (rlv_handler_t::isEnabled())
+            {
+                RlvAttachmentLockWatchdog::instance().onAttach(viewer_object, attachment);
+                gRlvHandler.onAttach(viewer_object, attachment);
+
+                if ( (attachment->getIsHUDAttachment()) && (!gRlvAttachmentLocks.hasLockedHUD()) )
+                    gRlvAttachmentLocks.updateLockedHUD();
+            }
 // [/RLVa:KB]
+        }
     }
 
     return attachment;
@@ -1293,10 +1347,13 @@ const LLViewerJointAttachment *LLVOAvatarSelf::attachObject(LLViewerObject *view
 bool LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
 {
     const LLUUID attachment_id = viewer_object->getAttachmentItemID();
+    // Client-only objects (e.g. local mesh previews) have no inventory item and
+    // never participate in COF or RLV state -- skip that bookkeeping below.
+    const bool is_local = viewer_object->isLocalOnly();
 
 // [RLVa:KB] - Checked: 2010-03-05 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
     // NOTE: RLVa event handlers should be invoked *before* LLVOAvatar::detachObject() calls LLViewerJointAttachment::removeObject()
-    if (rlv_handler_t::isEnabled())
+    if (rlv_handler_t::isEnabled() && !is_local)
     {
         for (attachment_map_t::const_iterator itAttachPt = mAttachmentPoints.begin(); itAttachPt != mAttachmentPoints.end(); ++itAttachPt)
         {
@@ -1337,7 +1394,11 @@ bool LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
         // Make sure the inventory is in sync with the avatar.
 
         // Update COF contents, don't trigger appearance update.
-        if (!isAgentAvatarValid())
+        if (is_local)
+        {
+            // No inventory item to unregister for a client-only preview.
+        }
+        else if (!isAgentAvatarValid())
         {
             LL_INFOS() << "removeItemLinks skipped, avatar is under destruction" << LL_ENDL;
         }
@@ -2318,9 +2379,9 @@ void LLVOAvatarSelf::appearanceChangeMetricsCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("appearanceChangeMetrics", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("appearanceChangeMetrics", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts  = std::make_shared<LLCore::HttpOptions>();
 
     S32 currentSequence = mMetricSequence;
     if (S32_MAX == ++mMetricSequence)
@@ -2804,7 +2865,6 @@ void LLVOAvatarSelf::onCustomizeStart(bool disable_camera_switch)
 {
     if (isAgentAvatarValid())
     {
-        LLUIUsage::instance().logCommand("Avatar.CustomizeStart");
         if (!gAgentAvatarp->mEndCustomizeCallback.get())
         {
             gAgentAvatarp->mEndCustomizeCallback = new LLUpdateAppearanceOnDestroy;
@@ -2842,7 +2902,7 @@ void LLVOAvatarSelf::onCustomizeEnd(bool disable_camera_switch)
         // Dereferencing the previous callback will cause
         // updateAppearanceFromCOF to be called, whenever all refs
         // have resolved.
-        gAgentAvatarp->mEndCustomizeCallback = NULL;
+        gAgentAvatarp->mEndCustomizeCallback = nullptr;
     }
 }
 
@@ -2983,16 +3043,14 @@ void LLVOAvatarSelf::dumpScratchTextureByteCount()
     LL_INFOS() << "Scratch Texture GL: " << (sScratchTexBytes/1024) << "KB" << LL_ENDL;
 }
 
-void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
+void LLVOAvatarSelf::dumpWearableInfo(LLFile& outfile)
 {
-    apr_file_t* file = outfile.getFileHandle();
-    if (!file)
+    if (!outfile)
     {
         return;
     }
 
-
-    apr_file_printf( file, "\n<wearable_info>\n" );
+    outfile.printf("\n<wearable_info>\n");
 
     LLWearableData *wd = getWearableData();
     LLWearableType *wr_inst = LLWearableType::getInstance();
@@ -3002,7 +3060,7 @@ void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
         for (U32 j=0; j< wd->getWearableCount((LLWearableType::EType)type); j++)
         {
             LLViewerWearable *wearable = gAgentWearables.getViewerWearable((LLWearableType::EType)type,j);
-            apr_file_printf( file, "\n\t    <wearable type=\"%s\" name=\"%s\"/>\n",
+            outfile.printf("\n\t    <wearable type=\"%s\" name=\"%s\"/>\n",
                              type_name.c_str(), wearable->getName().c_str() );
             LLWearable::visual_param_vec_t v_params;
             wearable->getVisualParams(v_params);
@@ -3010,11 +3068,11 @@ void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
                  it != v_params.end(); ++it)
             {
                 LLVisualParam *param = *it;
-                dump_visual_param(file, param, param->getWeight());
+                dump_visual_param(&outfile, param, param->getWeight());
             }
         }
     }
-    apr_file_printf( file, "\n</wearable_info>\n" );
+    outfile.printf("\n</wearable_info>\n");
 }
 
 //// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0

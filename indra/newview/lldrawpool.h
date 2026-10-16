@@ -40,6 +40,7 @@ class LLDrawInfo;
 class LLVOAvatar;
 class LLGLSLShader;
 class LLMeshSkinInfo;
+class LLFetchedGLTFMaterial;
 
 class LLDrawPool
 {
@@ -56,7 +57,6 @@ public:
         //
         POOL_SKY = 1,
         POOL_WATEREXCLUSION,
-        POOL_WL_SKY,
         POOL_SIMPLE,
         POOL_FULLBRIGHT,
         POOL_BUMP,
@@ -70,6 +70,7 @@ public:
         POOL_FULLBRIGHT_ALPHA_MASK,
         POOL_AVATAR,
         POOL_CONTROL_AV, // Animesh
+        POOL_WL_SKY, // after every opaque pool, so the depth test spares it all they cover
         POOL_GLOW,
         POOL_ALPHA_PRE_WATER,
         POOL_VOIDWATER,
@@ -120,13 +121,31 @@ public:
     virtual LLViewerTexture* getTexture() = 0;
     virtual bool isFacePool() { return false; }
     virtual void resetDrawOrders() = 0;
-    virtual void pushFaceGeometry() {}
 
     S32 mShaderLevel;
     S32 mId;
     U32 mType;              // Type of draw pool
     bool mSkipRender;
 };
+
+// The converted legacy G-buffer writers bind their colour textures with
+// ALSamplers::AnisoWrapSRGB (alsamplerstate.h). Hardware decodes the texture, the shader
+// linearises the prim tint in its vertex stage, and the deferred pass's hoisted
+// GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes on store -- all three together, or
+// the pass renders at the wrong gamma.
+//
+// Converted: diffuse, diffusealphamask (incl. grass), bump, tree, terrain, materials,
+// avatar skin, PBR. The remaining raw writers -- the WL sky family, the avatar
+// impostor/rigid passes, and the parcel-owner overlay -- opt OUT of the hoisted encode
+// locally and keep the AnisoWrap default on their samples.
+//
+// A pass gets the vertex-stage half for free if its vertex shader is shared with a converted
+// pass, which is how grass came to linearise its tint while sampling and storing sRGB. The
+// linearisation is keyed on LINEAR_DIFFUSE for that reason -- the same define mLinearDiffuse
+// is derived from -- so a program that has not opted in cannot pick up half a conversion.
+//
+// Data textures never take the decode even in a converted pass -- terrain's alpha_ramp is a
+// mask read through .a, and alpha is not part of the sRGB transfer function anyway.
 
 class LLRenderPass : public LLDrawPool
 {
@@ -352,7 +371,37 @@ public:
 
     static void applyModelMatrix(const LLDrawInfo& params);
     // For rendering that doesn't use LLDrawInfo for some reason
-    static void applyModelMatrix(const LLMatrix4* model_matrix);
+    static void applyModelMatrix(const LLMatrix4a* model_matrix);
+
+    // Bind an indexed-texture batch (tex0..texN-1, see objects/indexedTextureV.glsl).
+    //
+    // A null entry inside the batch gets a white stand-in rather than being skipped: the
+    // ladder is selected per-vertex, so a skipped slot means some vertex samples whatever
+    // texture the previous draw happened to leave on that unit -- the wrong image, not merely
+    // an unused one.
+    //
+    // Channels ABOVE the batch are deliberately left alone. The program declares the full
+    // ladder, so they do hold a previous draw's textures, but an ordinary 2D texture under an
+    // unreached sampler2D is defined and costs nothing; clearing them would mean up to N
+    // redundant binds on every draw in the hottest loop in the renderer. What must never land
+    // there is a texture whose SAMPLER disagrees with the declaration -- in practice a shadow
+    // map under a compare sampler, which is undefined even where the shader's dynamic branch
+    // never reaches it. LLPipeline::bindShadowMaps is the only compare-sampler bind in the
+    // tree and it publishes its units in LLGLSLShader::sCompareSamplerUnits, which bind()
+    // releases before any program that declares no shadow samplers runs.
+    // validate_bound_samplers() asserts the invariant at the draw under gDebugGL.
+    //
+    // So: a NEW compare sampler, or any depth texture bound outside that tracking, breaks
+    // this. Publish it in the same mask rather than clearing the tail here.
+    //
+    // The diffuse sampler is derived from the bound program, not named by the caller:
+    // AnisoWrap, plus the SRGBDecode bit when the program's mLinearDiffuse (the
+    // LINEAR_DIFFUSE permutation) says the pass shades in linear. The matching re-encode
+    // on store comes from the deferred pass's hoisted GL_FRAMEBUFFER_SRGB
+    // (renderGeomDeferred); raw pass-through writers -- the WL sky family, the avatar
+    // impostor/rigid passes -- opt out of that encode locally and keep undecoded samples,
+    // letting the lighting pass's decoded read close the loop instead.
+    static void bindIndexedTextures(const LLDrawInfo& params, const LLGLSLShader* shader);
     void pushBatches(U32 type, bool texture = true, bool batch_textures = false);
     void pushUntexturedBatches(U32 type);
 
@@ -362,6 +411,27 @@ public:
     // push full GLTF batches
     // assumes draw infos of given type have valid GLTF materials
     void pushGLTFBatches(U32 type);
+
+    // Which material maps an indexed GLTF batch binds and uploads. Trimming the set
+    // skips needless texture binds / uniform uploads (and the normal-map discard-level
+    // fetch) when a pass samples only some maps.
+    enum eGLTFIndexedMaps
+    {
+        GLTF_MAPS_FULL = 0,    // base color + normal + ORM + emissive (GBuffer write)
+        GLTF_MAPS_BASE_COLOR,  // base color only (shadow alpha-mask discard)
+        GLTF_MAPS_GLOW,        // base color + emissive (glow/emissive pass)
+    };
+
+    // Indexed (multi-material) GLTF PBR helpers. Indexed and scalar draw infos
+    // coexist in the same render map (PASS_GLTF_PBR); they are distinguished by
+    // mGLTFMaterialList.size() > 1. Shadow/probe passes use the plain
+    // pushGLTFBatches (rendering everything scalar for depth); only the main
+    // opaque GBuffer pass splits the two:
+    //   pushGLTFBatchesScalar  -- renders only single-material infos
+    //   pushGLTFBatchesIndexed -- renders only multi-material infos (indexed program bound)
+    void pushGLTFBatchesScalar(U32 type);
+    void pushGLTFBatchesIndexed(U32 type, eGLTFIndexedMaps maps = GLTF_MAPS_FULL);
+    static void pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps maps = GLTF_MAPS_FULL);
 
     // like pushGLTFBatches, but will not bind textures or set up texture transforms
     void pushUntexturedGLTFBatches(U32 type);
@@ -375,14 +445,35 @@ public:
     void pushRiggedGLTFBatches(U32 type, bool textured);
     void pushUntexturedRiggedGLTFBatches(U32 type);
 
+    // rigged indexed/scalar split (see pushGLTFBatchesScalar/Indexed); each batch
+    // is one avatar+skin (the accumulation breaks on skin change), so the matrix
+    // palette is uploaded per draw info as usual.
+    void pushRiggedGLTFBatchesScalar(U32 type);
+    void pushRiggedGLTFBatchesIndexed(U32 type, eGLTFIndexedMaps maps = GLTF_MAPS_FULL);
+    static void pushRiggedGLTFBatchIndexed(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin, eGLTFIndexedMaps maps = GLTF_MAPS_FULL);
+
     // push a single GLTF draw call
-    static void pushGLTFBatch(LLDrawInfo& params);
-    static void pushRiggedGLTFBatch(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin);
+    // lastMat/lastTex track the most recently bound material+media texture so
+    // consecutive draws sharing a material skip the redundant LLFetchedGLTFMaterial::bind
+    static void pushGLTFBatch(LLDrawInfo& params, LLFetchedGLTFMaterial*& lastMat, LLViewerTexture*& lastTex);
+    static void pushRiggedGLTFBatch(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin, LLFetchedGLTFMaterial*& lastMat, LLViewerTexture*& lastTex);
     static void pushUntexturedGLTFBatch(LLDrawInfo& params);
     static void pushUntexturedRiggedGLTFBatch(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin);
 
     void pushMaskBatches(U32 type, bool texture = true, bool batch_textures = false);
     void pushRiggedMaskBatches(U32 type, bool texture = true, bool batch_textures = false);
+    // indexed (multi-material) legacy material shadow alpha-mask: binds per-slot
+    // diffuse + per-slot cutoff array, then draws. Assumes the indexed material
+    // shadow program is bound.
+    void pushMaskBatchesIndexed(U32 type, bool rigged);
+
+    // Emissive/glow indexed split. Multi-material (indexed) glow batches coexist
+    // with scalar/plain ones in PASS_GLOW, distinguished by mMaterialSlotList.size()
+    // > 1. The scalar sweep skips multi-material infos (they would render the whole
+    // range with slot 0's diffuse); the indexed sweep binds each slot's diffuse to
+    // unit s and draws under the indexed emissive program.
+    void pushEmissiveBatchesScalar(U32 type, bool rigged);
+    void pushEmissiveBatchesIndexed(U32 type, bool rigged);
     void pushBatch(LLDrawInfo& params, bool texture, bool batch_textures = false);
     void pushUntexturedBatch(LLDrawInfo& params);
     void pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_textures = false);
@@ -432,9 +523,6 @@ public:
     void printDebugInfo() const;
 
     bool isFacePool() { return true; }
-
-    // call drawIndexed on every draw face
-    void pushFaceGeometry();
 
     friend class LLFace;
     friend class LLPipeline;

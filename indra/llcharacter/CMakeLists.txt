@@ -1,11 +1,10 @@
 # -*- cmake -*-
 
-project(llcharacter)
+add_library(llcharacter STATIC)
 
-include(00-Common)
-include(LLCommon)
-
-set(llcharacter_SOURCE_FILES
+target_sources(
+  llcharacter
+  PRIVATE
     llanimationstates.cpp
     llbvhloader.cpp
     llcharacter.cpp
@@ -17,60 +16,79 @@ set(llcharacter_SOURCE_FILES
     lljointsolverrp3.cpp
     llkeyframefallmotion.cpp
     llkeyframemotion.cpp
-    llkeyframemotionparam.cpp
     llkeyframestandmotion.cpp
     llkeyframewalkmotion.cpp
     llmotioncontroller.cpp
     llmotion.cpp
     llmultigesture.cpp
     llpose.cpp
-    llstatemachine.cpp
     lltargetingmotion.cpp
     llvisualparam.cpp
-    )
+)
 
-set(llcharacter_HEADER_FILES
-    CMakeLists.txt
-
-    llanimationstates.h
-    llbvhloader.h
-    llbvhconsts.h
-    llcharacter.h
-    lleditingmotion.h
-    llgesture.h
-    llhandmotion.h
-    llheadrotmotion.h
-    lljoint.h
-    lljointsolverrp3.h
-    lljointstate.h
-    llkeyframefallmotion.h
-    llkeyframemotion.h
-    llkeyframemotionparam.h
-    llkeyframestandmotion.h
-    llkeyframewalkmotion.h
-    llmotion.h
-    llmotioncontroller.h
-    llmultigesture.h
-    llpose.h
-    llstatemachine.h
-    lltargetingmotion.h
-    llvisualparam.h
-    )
-
-list(APPEND llcharacter_SOURCE_FILES ${llcharacter_HEADER_FILES})
-
-add_library (llcharacter ${llcharacter_SOURCE_FILES})
-target_include_directories( llcharacter  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
+target_sources(
+  llcharacter
+  PUBLIC
+    FILE_SET HEADERS
+      FILES
+        llanimationstates.h
+        llbvhloader.h
+        llbvhconsts.h
+        llcharacter.h
+        lleditingmotion.h
+        llgesture.h
+        llhandmotion.h
+        llheadrotmotion.h
+        lljoint.h
+        lljointsolverrp3.h
+        lljointstate.h
+        llkeyframefallmotion.h
+        llkeyframemotion.h
+        llkeyframestandmotion.h
+        llkeyframewalkmotion.h
+        llmotion.h
+        llmotioncontroller.h
+        llmultigesture.h
+        llpose.h
+        lltargetingmotion.h
+        llvisualparam.h
+)
 
 target_link_libraries(
-        llcharacter
-        llcommon
-        llmath
-        llmessage
-        llfilesystem
-        llxml
-    )
+  llcharacter
+  PRIVATE al::flags
+  PUBLIC llcommon llmath llmessage llfilesystem llxml
+)
 
-if (USE_PRECOMPILED_HEADERS)
-  target_precompile_headers(llcharacter REUSE_FROM llprecompiled)
-endif ()
+target_precompile_headers(llcharacter REUSE_FROM llprecompiled)
+
+if(AL_BUILD_TESTS)
+  # The state guard's checks on what llcharacter keeps for the process, for
+  # every test binary that links it.
+  add_library(llcharacter_test_checks OBJECT tests/llcharacter_test_checks.cpp)
+  target_link_libraries(llcharacter_test_checks PRIVATE al::flags al_test_support llcharacter)
+  set_target_properties(llcharacter_test_checks PROPERTIES FOLDER "Tests/llcharacter")
+
+  # The translation table the BVH parser reads is shipped by newview, and one
+  # it refuses stops every BVH upload, so llbvhloader's tests read the shipped
+  # file itself. The joint names a .bvh may use come from the shipped
+  # skeleton, and the root joint check will not pass without them, so the
+  # tests read it too.
+  al_add_test_binary(
+    llcharacter_tests
+    PROJECT llcharacter
+    SOURCES
+      tests/llbvhloader_test.cpp
+      tests/llcharacter_test.cpp
+      tests/lljoint_test.cpp
+      tests/llkeyframemotion_test.cpp
+      tests/llmotioncontroller_test.cpp
+      tests/llmultigesture_test.cpp
+      tests/llpose_test.cpp
+    LIBRARIES llcharacter
+    SUPPORT llcharacter_test_checks
+    DEFINES
+      "AL_SHIPPED_ANIM_INI=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/app_settings/anim.ini\""
+      "AL_SHIPPED_AVATAR_SKELETON=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/character/avatar_skeleton.xml\""
+  )
+endif()

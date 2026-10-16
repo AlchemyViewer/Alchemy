@@ -43,46 +43,42 @@
 #include "llmath.h"
 #include "m4math.h"
 #include "llstring.h"
-#include "llstacktrace.h"
 
 #include "llglheaders.h"
 #include "llglslshader.h"
+#include "llimagegl.h"
+#include "llshadermgr.h"
 
-#include "glm/glm.hpp"
-#include <glm/gtc/matrix_access.hpp>
-#include "glm/gtc/type_ptr.hpp"
+#include <fmt/format.h>
 
-#if LL_MESA
-#  include "GL/osmesa.h"
-#  define LL_GET_PROC_ADDRESS(func) OSMesaGetProcAddress(func)
-#elif LL_SDL_WINDOW
+
+#if LL_SDL_WINDOW
+#  include "llwindowsdl.h"
 #  include "SDL3/SDL.h"
 #  define LL_GET_PROC_ADDRESS(func) SDL_GL_GetProcAddress(func)
 #elif LL_WINDOWS
-#  define LL_GET_PROC_ADDRESS(p)   wglGetProcAddress(p)
-#elif LL_LINUX
-#  define LL_GET_PROC_ADDRESS(p)   glXGetProcAddressARB(p)
+#  include "llwindowwin32.h"
+#  define LL_GET_PROC_ADDRESS(func) LLWindowWin32::getProcAddress(func)
 #endif
 
 #if LL_WINDOWS
 #include "lldxhardware.h"
 #endif
 
+#if LL_LINUX
+#include <sys/utsname.h>
+#endif
+
 #ifdef _DEBUG
 //#define GL_STATE_VERIFY
 #endif
 
-
 bool gDebugSession = false;
 bool gDebugGLSession = false;
-bool gClothRipple = false;
 bool gHeadlessClient = false;
 bool gNonInteractive = false;
 bool gGLActive = false;
 
-static const std::string HEADLESS_VENDOR_STRING("Linden Lab");
-static const std::string HEADLESS_RENDERER_STRING("Headless");
-static const std::string HEADLESS_VERSION_STRING("1.0");
 
 llofstream gFailLog;
 
@@ -92,6 +88,677 @@ llofstream gFailLog;
 #define APIENTRY
 #endif
 
+// ---------------------------------------------------------------------------------------
+// Program sampler introspection, shared by the debug dump and the draw-time validator.
+//
+// What a program DECLARES is the missing half of every sampler/texture diagnostic: the
+// driver reports object names, and the engine's reserved-uniform table only knows engine
+// names -- which for a reflection-driven Slang program leaves the interesting channels
+// anonymous. GL_ACTIVE_UNIFORMS knows all of them, including the sampler TYPE, which is the
+// actual discriminator between correct and undefined.
+// ---------------------------------------------------------------------------------------
+namespace
+{
+    struct ProgramSampler
+    {
+        std::string mName;
+        GLenum      mType      = 0;
+        GLint       mUnit      = -1;
+        GLenum      mTarget    = 0;
+        GLenum      mBinding   = 0;
+        bool        mIsShadow  = false;
+        bool        mIsInteger = false;
+    };
+
+    // The kind of texel an image uniform reads and writes, and so the kind of format its unit must hold.
+    enum class TexelKind : U8
+    {
+        FLOAT,      // float and normalized formats
+        SIGNED,     // the signed integer formats
+        UNSIGNED,   // the unsigned integer formats
+    };
+
+    struct ProgramImage
+    {
+        std::string mName;
+        GLint       mUnit = -1;
+        TexelKind   mKind = TexelKind::FLOAT;
+    };
+
+    struct ProgramSamplerCache
+    {
+        // Revalidation key: a relinked program can reuse its name, and GL is free to hand a
+        // deleted name back out. Cheap enough to re-check every call.
+        GLint                      mUniformCount = -1;
+        std::vector<ProgramSampler> mSamplers;
+        std::vector<ProgramImage>   mImages;
+    };
+
+    std::map<GLuint, ProgramSamplerCache> sProgramSamplerCache;
+
+    // Every sampler type GL has, as mapUniformTextureChannel gives each a unit: the texture target it reads, the binding
+    // naming the texture bound there, whether it compares, and whether it returns integers.
+    struct SamplerType
+    {
+        GLenum mType;
+        GLenum mTarget;
+        GLenum mBinding;
+        bool   mIsShadow;
+        bool   mIsInteger;
+    };
+
+    constexpr SamplerType sSamplerTypes[] =
+    {
+        { GL_SAMPLER_1D,                                   GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   false, false },
+        { GL_SAMPLER_1D_SHADOW,                            GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   true,  false },
+        { GL_INT_SAMPLER_1D,                               GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_1D,                      GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   false, true  },
+        { GL_SAMPLER_2D,                                   GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   false, false },
+        { GL_SAMPLER_2D_SHADOW,                            GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   true,  false },
+        { GL_INT_SAMPLER_2D,                               GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D,                      GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   false, true  },
+        { GL_SAMPLER_3D,                                   GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   false, false },
+        { GL_INT_SAMPLER_3D,                               GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_3D,                      GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   false, true  },
+        { GL_SAMPLER_CUBE,                                 GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             false, false },
+        { GL_SAMPLER_CUBE_SHADOW,                          GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             true,  false },
+        { GL_INT_SAMPLER_CUBE,                             GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_CUBE,                    GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             false, true  },
+        { GL_SAMPLER_1D_ARRAY,                             GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             false, false },
+        { GL_SAMPLER_1D_ARRAY_SHADOW,                      GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             true,  false },
+        { GL_INT_SAMPLER_1D_ARRAY,                         GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_1D_ARRAY,                GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             false, true  },
+        { GL_SAMPLER_2D_ARRAY,                             GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             false, false },
+        { GL_SAMPLER_2D_ARRAY_SHADOW,                      GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             true,  false },
+        { GL_INT_SAMPLER_2D_ARRAY,                         GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_ARRAY,                GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             false, true  },
+        { GL_SAMPLER_CUBE_MAP_ARRAY,                       GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       false, false },
+        { GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW,                GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       true,  false },
+        { GL_INT_SAMPLER_CUBE_MAP_ARRAY,                   GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY,          GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       false, true  },
+        { GL_SAMPLER_2D_RECT,                              GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            false, false },
+        { GL_SAMPLER_2D_RECT_SHADOW,                       GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            true,  false },
+        { GL_INT_SAMPLER_2D_RECT,                          GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_RECT,                 GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            false, true  },
+        { GL_SAMPLER_2D_MULTISAMPLE,                       GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       false, false },
+        { GL_INT_SAMPLER_2D_MULTISAMPLE,                   GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE,          GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       false, true  },
+        { GL_SAMPLER_2D_MULTISAMPLE_ARRAY,                 GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, false, false },
+        { GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY,             GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY,    GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, false, true  },
+        { GL_SAMPLER_BUFFER,                               GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               false, false },
+        { GL_INT_SAMPLER_BUFFER,                           GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_BUFFER,                  GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               false, true  },
+    };
+
+    bool sampler_target_for_type(GLenum type, GLenum& target, GLenum& binding, bool& is_shadow, bool& is_integer)
+    {
+        for (const SamplerType& entry : sSamplerTypes)
+        {
+            if (entry.mType == type)
+            {
+                target     = entry.mTarget;
+                binding    = entry.mBinding;
+                is_shadow  = entry.mIsShadow;
+                is_integer = entry.mIsInteger;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Every image type GL has, and the kind of texel each reads and writes.
+    struct ImageType
+    {
+        GLenum    mType;
+        TexelKind mKind;
+    };
+
+    constexpr ImageType sImageTypes[] =
+    {
+        { GL_IMAGE_1D,                                   TexelKind::FLOAT    },
+        { GL_IMAGE_2D,                                   TexelKind::FLOAT    },
+        { GL_IMAGE_3D,                                   TexelKind::FLOAT    },
+        { GL_IMAGE_2D_RECT,                              TexelKind::FLOAT    },
+        { GL_IMAGE_CUBE,                                 TexelKind::FLOAT    },
+        { GL_IMAGE_BUFFER,                               TexelKind::FLOAT    },
+        { GL_IMAGE_1D_ARRAY,                             TexelKind::FLOAT    },
+        { GL_IMAGE_2D_ARRAY,                             TexelKind::FLOAT    },
+        { GL_IMAGE_CUBE_MAP_ARRAY,                       TexelKind::FLOAT    },
+        { GL_IMAGE_2D_MULTISAMPLE,                       TexelKind::FLOAT    },
+        { GL_IMAGE_2D_MULTISAMPLE_ARRAY,                 TexelKind::FLOAT    },
+        { GL_INT_IMAGE_1D,                               TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D,                               TexelKind::SIGNED   },
+        { GL_INT_IMAGE_3D,                               TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_RECT,                          TexelKind::SIGNED   },
+        { GL_INT_IMAGE_CUBE,                             TexelKind::SIGNED   },
+        { GL_INT_IMAGE_BUFFER,                           TexelKind::SIGNED   },
+        { GL_INT_IMAGE_1D_ARRAY,                         TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_ARRAY,                         TexelKind::SIGNED   },
+        { GL_INT_IMAGE_CUBE_MAP_ARRAY,                   TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_MULTISAMPLE,                   TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_MULTISAMPLE_ARRAY,             TexelKind::SIGNED   },
+        { GL_UNSIGNED_INT_IMAGE_1D,                      TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D,                      TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_3D,                      TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_RECT,                 TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_CUBE,                    TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_BUFFER,                  TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_1D_ARRAY,                TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_ARRAY,                TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY,          TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE,          TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE_ARRAY,    TexelKind::UNSIGNED },
+    };
+
+    bool image_kind_for_type(GLenum type, TexelKind& kind)
+    {
+        for (const ImageType& entry : sImageTypes)
+        {
+            if (entry.mType == type)
+            {
+                kind = entry.mKind;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // The kind of texel a sized format holds.
+    TexelKind texel_kind_of_format(GLint internal_format)
+    {
+        if (!LLImageGL::isIntegerFormat(internal_format))
+        {
+            return TexelKind::FLOAT;
+        }
+        return LLImageGL::isSignedIntegerFormat(internal_format) ? TexelKind::SIGNED : TexelKind::UNSIGNED;
+    }
+
+    const char* texel_kind_name(TexelKind kind)
+    {
+        switch (kind)
+        {
+        case TexelKind::SIGNED:   return "signed integer";
+        case TexelKind::UNSIGNED: return "unsigned integer";
+        case TexelKind::FLOAT:
+        default:                  return "float";
+        }
+    }
+
+    // Sampler state means nothing to a buffer texture, which has none, or to a multisample one, read only by
+    // texelFetch; nor does a buffer texture have the levels the format query asks about.
+    bool target_has_sampler_state(GLenum target)
+    {
+        return target != GL_TEXTURE_BUFFER && target != GL_TEXTURE_2D_MULTISAMPLE
+            && target != GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
+    }
+
+    // Re-entrancy latch for gl_debug_callback; see the guard there for why.
+    thread_local bool sInDebugCallback = false;
+
+    struct DebugCallbackGuard
+    {
+        DebugCallbackGuard()  { sInDebugCallback = true;  }
+        ~DebugCallbackGuard() { sInDebugCallback = false; }
+    };
+
+    // glGetTexLevelParameteriv describes one IMAGE, and a cube map is six of them -- so it
+    // takes a face target and rejects GL_TEXTURE_CUBE_MAP outright ("The cube map target is
+    // not available for specifying or querying cube map images", GL_INVALID_ENUM). Every
+    // face of every cube we build shares an internal format -- glTexStorage2D allocates all
+    // six in one call, and the per-face uploads are handed the same explicit format -- so
+    // +X answers for the whole object.
+    //
+    // Only the LEVEL query needs this. glGetTexParameteriv describes the OBJECT and does
+    // take the general target, which is why the compare-mode reads nearby are fine as they
+    // are.
+    GLenum level_query_target(GLenum target)
+    {
+        return target == GL_TEXTURE_CUBE_MAP ? GL_TEXTURE_CUBE_MAP_POSITIVE_X : target;
+    }
+
+    bool is_depth_format(GLint internal_format)
+    {
+        return internal_format == GL_DEPTH_COMPONENT16
+            || internal_format == GL_DEPTH_COMPONENT24
+            || internal_format == GL_DEPTH_COMPONENT32
+            || internal_format == GL_DEPTH_COMPONENT32F
+            || internal_format == GL_DEPTH24_STENCIL8
+            || internal_format == GL_DEPTH32F_STENCIL8;
+    }
+
+    // Whether the texture bound at `target` is read as its stencil, through an integer sampler: a stencil-only one
+    // always, and a depth-stencil one where GL 4.3's stencil texturing has set its mode so. Below 4.3 a depth-stencil
+    // texture is read as its depth.
+    bool reads_stencil(GLenum target, GLint internal_format)
+    {
+        if (internal_format == GL_STENCIL_INDEX8)
+        {
+            return true;
+        }
+        if ((internal_format != GL_DEPTH24_STENCIL8 && internal_format != GL_DEPTH32F_STENCIL8)
+            || gGLManager.mGLVersion < 4.29f)
+        {
+            return false;
+        }
+        GLint mode = GL_DEPTH_COMPONENT;
+        glGetTexParameteriv(target, GL_DEPTH_STENCIL_TEXTURE_MODE, &mode);
+        return mode == GL_STENCIL_INDEX;
+    }
+
+    // Whether a sampler, or the texture object where none is bound, reads texel by texel: the only way GL reads an
+    // integer texture, which a filtering one leaves incomplete.
+    bool reads_nearest(GLuint sampler, GLenum target)
+    {
+        GLint min_filter = 0;
+        GLint mag_filter = 0;
+        if (sampler != 0)
+        {
+            glGetSamplerParameteriv(sampler, GL_TEXTURE_MIN_FILTER, &min_filter);
+            glGetSamplerParameteriv(sampler, GL_TEXTURE_MAG_FILTER, &mag_filter);
+        }
+        else
+        {
+            glGetTexParameteriv(target, GL_TEXTURE_MIN_FILTER, &min_filter);
+            glGetTexParameteriv(target, GL_TEXTURE_MAG_FILTER, &mag_filter);
+        }
+        return mag_filter == GL_NEAREST && (min_filter == GL_NEAREST || min_filter == GL_NEAREST_MIPMAP_NEAREST);
+    }
+
+    // The samplers and images `program` declares, each with the unit its uniform holds.
+    const ProgramSamplerCache& get_program_bindings(GLuint program)
+    {
+        GLint uniform_count = 0;
+        glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &uniform_count);
+
+        ProgramSamplerCache& cached = sProgramSamplerCache[program];
+        if (cached.mUniformCount == uniform_count)
+        {
+            return cached;
+        }
+
+        cached.mUniformCount = uniform_count;
+        cached.mSamplers.clear();
+        cached.mImages.clear();
+
+        GLint max_name_len = 0;
+        glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_name_len);
+        if (max_name_len <= 0)
+        {
+            return cached;
+        }
+        std::vector<GLchar> name_buf((size_t)max_name_len);
+
+        for (GLint i = 0; i < uniform_count; ++i)
+        {
+            GLsizei written = 0;
+            GLint   size    = 0;
+            GLenum  type    = 0;
+            glGetActiveUniform(program, (GLuint)i, (GLsizei)name_buf.size(), &written, &size, &type, name_buf.data());
+            if (written <= 0)
+            {
+                continue;
+            }
+
+            ProgramSampler sampler;
+            ProgramImage   image;
+            const bool is_sampler =
+                sampler_target_for_type(type, sampler.mTarget, sampler.mBinding, sampler.mIsShadow, sampler.mIsInteger);
+            if (!is_sampler && !image_kind_for_type(type, image.mKind))
+            {
+                continue;
+            }
+
+            const std::string name(name_buf.data(), (size_t)written);
+            const GLint location = glGetUniformLocation(program, name.c_str());
+            if (location < 0)
+            {
+                continue;
+            }
+
+            if (is_sampler)
+            {
+                sampler.mName = name;
+                sampler.mType = type;
+                glGetUniformiv(program, location, &sampler.mUnit);
+                cached.mSamplers.push_back(sampler);
+            }
+            else
+            {
+                image.mName = name;
+                glGetUniformiv(program, location, &image.mUnit);
+                cached.mImages.push_back(image);
+            }
+        }
+
+        return cached;
+    }
+}
+
+void forget_program_samplers(U32 program)
+{
+    sProgramSamplerCache.erase(program);
+}
+
+// Dump per-unit texture and sampler state.
+//
+// The driver's message names a sampler and a texture object but not the UNIT or the
+// UNIFORM, which is the part you need: a mismatch between what a program declares and what
+// is bound is nearly always one specific channel, and hunting it from two bare object names
+// means guessing. Correlating unit -> uniform -> texture -> sampler turns that into reading.
+//
+// Only reports units with something bound, and restores the active unit -- a debug callback
+// must not perturb the state it is describing.
+static void log_texture_unit_state()
+{
+    if (!glGetSamplerParameteriv || !glGetTexLevelParameteriv)
+    {
+        return;
+    }
+
+    GLint max_units = 0;
+    glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &max_units);
+    max_units = llmin(max_units, (GLint)AL_NUM_TEXTURE_SLOTS);
+
+    GLint saved_active_unit = GL_TEXTURE0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active_unit);
+
+    // What the PROGRAM declares, per unit. See get_program_bindings.
+    struct UnitUniform
+    {
+        std::string mName;
+        GLenum      mType     = 0;
+        bool        mIsShadow = false;
+    };
+    std::vector<UnitUniform> channel_uniform((size_t)max_units);
+
+    GLint program = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+    if (program != 0 && glGetActiveUniform && glGetUniformiv)
+    {
+        for (const ProgramSampler& sampler : get_program_bindings((GLuint)program).mSamplers)
+        {
+            if (sampler.mUnit >= 0 && sampler.mUnit < max_units)
+            {
+                channel_uniform[(size_t)sampler.mUnit] = { sampler.mName, sampler.mType, sampler.mIsShadow };
+            }
+        }
+    }
+
+    static const struct { GLenum mTarget; GLenum mBinding; const char* mName; } targets[] =
+    {
+        { GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   "1D"          },
+        { GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             "1D_ARRAY"    },
+        { GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   "2D"          },
+        { GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             "2D_ARRAY"    },
+        { GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   "3D"          },
+        { GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             "CUBE"        },
+        { GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       "CUBE_ARRAY"  },
+        { GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            "RECT"        },
+        { GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       "2D_MS"       },
+        { GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, "2D_MS_ARRAY" },
+        { GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               "BUFFER"      },
+    };
+
+    LL_WARNS() << "Texture units:" << LL_ENDL;
+
+    for (GLint unit = 0; unit < max_units; ++unit)
+    {
+        glActiveTexture(GL_TEXTURE0 + unit);
+
+        GLint sampler = 0;
+        glGetIntegerv(GL_SAMPLER_BINDING, &sampler);
+
+        for (const auto& target : targets)
+        {
+            GLint texture = 0;
+            glGetIntegerv(target.mBinding, &texture);
+            if (texture == 0)
+            {
+                continue;
+            }
+
+            // GL_TEXTURE_COMPARE_MODE on the texture and on the sampler are separate state;
+            // a bound sampler wins, so print both -- disagreement is the usual culprit.
+            GLint internal_format = 0;
+            GLint tex_compare     = GL_NONE;
+            if (target_has_sampler_state(target.mTarget))
+            {
+                glGetTexLevelParameteriv(level_query_target(target.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
+                glGetTexParameteriv(target.mTarget, GL_TEXTURE_COMPARE_MODE, &tex_compare);
+            }
+
+            const bool is_depth = is_depth_format(internal_format);
+
+            const UnitUniform& declared = channel_uniform[(size_t)unit];
+
+            std::ostringstream line;
+            line << "  unit " << unit;
+            if (!declared.mName.empty())
+            {
+                line << " (" << declared.mName
+                     << (declared.mIsShadow ? " : shadow" : " : non-shadow")
+                     << " type=0x" << std::hex << declared.mType << std::dec << ")";
+            }
+            line << " " << target.mName << " tex=" << texture
+                 << " format=0x" << std::hex << internal_format << std::dec
+                 << (is_depth ? " DEPTH" : "")
+                 << " tex_compare=" << (tex_compare == GL_NONE ? "none" : "REF_TO_TEXTURE")
+                 << " sampler=" << sampler;
+
+            if (sampler != 0)
+            {
+                GLint smp_compare = GL_NONE;
+                GLint min_filter  = 0;
+                GLint mag_filter  = 0;
+                GLint wrap_s      = 0;
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_COMPARE_MODE, &smp_compare);
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_MIN_FILTER, &min_filter);
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_MAG_FILTER, &mag_filter);
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_WRAP_S, &wrap_s);
+
+                line << " [compare=" << (smp_compare == GL_NONE ? "none" : "REF_TO_TEXTURE")
+                     << " min=0x" << std::hex << min_filter
+                     << " mag=0x" << mag_filter
+                     << " wrap=0x" << wrap_s << std::dec << "]";
+
+                // The exact pairing the driver calls undefined behaviour -- but ONLY when
+                // the program reads that unit with a non-shadow sampler. The same state
+                // under a sampler2DShadow is correct and expected.
+                if (is_depth && smp_compare != GL_NONE)
+                {
+                    if (!declared.mName.empty() && !declared.mIsShadow)
+                    {
+                        line << "  <-- UB: '" << declared.mName
+                             << "' is non-shadow over a depth texture + compare sampler";
+                    }
+                    else if (declared.mName.empty())
+                    {
+                        line << "  (stale: depth + compare, program declares nothing here)";
+                    }
+                }
+            }
+
+            LL_WARNS() << line.str() << LL_ENDL;
+        }
+    }
+
+    glActiveTexture(saved_active_unit);
+}
+
+
+// Check every sampler and image the bound program declares against what is actually bound.
+//
+// Catches the mismatch AT THE DRAW THAT CAUSES IT, naming the uniform -- rather than via a
+// driver warning that reports two object names and leaves you inferring which bind site was
+// responsible. That inference is expensive: the depth-texture-under-a-compare-sampler bug
+// this was written for took five wrong diagnoses before the state was made visible.
+//
+// Reports only what GL actually calls undefined, so an assertion here means a real defect.
+// In particular an EMPTY unit is fine: reading one is defined, and declaring more samplers
+// than a draw fills is normal.
+//
+// gDebugGL only, and hooked through llassert() like LLVertexBuffer::validateRange, so it
+// compiles out entirely otherwise. Enumerating a program's uniforms is cached per program.
+bool validate_bound_samplers()
+{
+    if (!gDebugGL || !glGetSamplerParameteriv || !glGetTexLevelParameteriv)
+    {
+        return true;
+    }
+
+    GLint program = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+    if (program == 0)
+    {
+        return true;
+    }
+
+    GLint saved_active_unit = GL_TEXTURE0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active_unit);
+
+    const char* shader_name = LLGLSLShader::sCurBoundShaderPtr
+                                  ? LLGLSLShader::sCurBoundShaderPtr->mName.c_str()
+                                  : "<unknown>";
+    std::string failure;
+
+    const ProgramSamplerCache& bindings = get_program_bindings((GLuint)program);
+    for (const ProgramSampler& sampler : bindings.mSamplers)
+    {
+        if (sampler.mUnit < 0)
+        {
+            continue;
+        }
+
+        glActiveTexture(GL_TEXTURE0 + sampler.mUnit);
+
+        GLint texture = 0;
+        glGetIntegerv((GLenum)sampler.mBinding, &texture);
+        if (texture == 0)
+        {
+            // NOT an error. Reading an unbound unit is defined -- it yields (0,0,0,1) -- and
+            // programs routinely declare more samplers than a given draw fills: the indexed
+            // batching array is tex0..tex20 whatever the batch size. Nothing to validate.
+            continue;
+        }
+
+        // Nothing below applies to a texture with no sampler state, which reads as it is whatever is bound.
+        if (!target_has_sampler_state(sampler.mTarget))
+        {
+            continue;
+        }
+
+        // A bound sampler object overrides the texture's own compare state, so it decides.
+        GLint bound_sampler = 0;
+        glGetIntegerv(GL_SAMPLER_BINDING, &bound_sampler);
+
+        GLint compare_mode = GL_NONE;
+        if (bound_sampler != 0)
+        {
+            glGetSamplerParameteriv((GLuint)bound_sampler, GL_TEXTURE_COMPARE_MODE, &compare_mode);
+        }
+        else
+        {
+            glGetTexParameteriv(sampler.mTarget, GL_TEXTURE_COMPARE_MODE, &compare_mode);
+        }
+
+        GLint internal_format = 0;
+        glGetTexLevelParameteriv(level_query_target(sampler.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
+        const bool is_depth = is_depth_format(internal_format);
+
+        // The two pairings GL calls undefined, in both directions.
+        if (!sampler.mIsShadow && is_depth && compare_mode != GL_NONE)
+        {
+            failure = llformat("'%s' (unit %d) is a non-shadow sampler over depth texture %d "
+                               "with comparisons enabled on sampler %d",
+                               sampler.mName.c_str(), sampler.mUnit, texture, bound_sampler);
+            break;
+        }
+        if (sampler.mIsShadow && compare_mode == GL_NONE)
+        {
+            failure = llformat("'%s' (unit %d) is a shadow sampler over texture %d with "
+                               "comparisons DISABLED (sampler %d)",
+                               sampler.mName.c_str(), sampler.mUnit, texture, bound_sampler);
+            break;
+        }
+        if (sampler.mIsShadow && !is_depth)
+        {
+            failure = llformat("'%s' (unit %d) is a shadow sampler over non-depth texture %d "
+                               "(format 0x%x)",
+                               sampler.mName.c_str(), sampler.mUnit, texture, internal_format);
+            break;
+        }
+
+        // An integer texture reads only through an integer sampler, and an integer sampler reads only an integer
+        // texture or a texture read as its stencil, which a float one cannot read. Every other pairing is undefined.
+        const bool integer_texture = LLImageGL::isIntegerFormat(internal_format);
+        const bool stencil_texture = reads_stencil(sampler.mTarget, internal_format);
+        if (sampler.mIsInteger != (integer_texture || stencil_texture))
+        {
+            failure = fmt::format("'{}' (unit {}) is {} sampler over {} texture {} (format {:#x})", sampler.mName,
+                                  sampler.mUnit, sampler.mIsInteger ? "an integer" : "a float",
+                                  integer_texture   ? "an integer"
+                                  : stencil_texture ? "a stencil-mode"
+                                                    : "a non-integer",
+                                  texture, internal_format);
+            break;
+        }
+        // And GL reads integers texel by texel: under a filtering sampler the texture is incomplete, and reads 0.
+        if (sampler.mIsInteger && !reads_nearest((GLuint)bound_sampler, sampler.mTarget))
+        {
+            failure = fmt::format("'{}' (unit {}) is an integer sampler over texture {} filtered by sampler {}, "
+                                  "which leaves it incomplete",
+                                  sampler.mName, sampler.mUnit, texture, bound_sampler);
+            break;
+        }
+    }
+
+    glActiveTexture(saved_active_unit);
+
+    // An image reads and writes a texel's bits as its unit's format lays them out, and the uniform's type says which
+    // kind of value that is: a float image over an integer format, or the reverse, is undefined. An empty unit is not
+    // -- its loads read 0 and its stores go nowhere.
+    if (failure.empty() && gGLManager.mHasCompute)
+    {
+        for (const ProgramImage& image : bindings.mImages)
+        {
+            if (image.mUnit < 0)
+            {
+                continue;
+            }
+            GLint texture = 0;
+            glGetIntegeri_v(GL_IMAGE_BINDING_NAME, (GLuint)image.mUnit, &texture);
+            if (texture == 0)
+            {
+                continue;
+            }
+            GLint format = 0;
+            glGetIntegeri_v(GL_IMAGE_BINDING_FORMAT, (GLuint)image.mUnit, &format);
+            const TexelKind bound = texel_kind_of_format(format);
+            if (bound != image.mKind)
+            {
+                failure = fmt::format("'{}' (image unit {}) is a {} image over texture {} bound as {} format {:#x}",
+                                      image.mName, image.mUnit, texel_kind_name(image.mKind), texture,
+                                      texel_kind_name(bound), format);
+                break;
+            }
+        }
+    }
+
+    if (failure.empty())
+    {
+        return true;
+    }
+
+    LL_WARNS() << "----- SAMPLER BINDING INVALID -------" << LL_ENDL;
+    LL_WARNS() << "Shader: " << shader_name << LL_ENDL;
+    LL_WARNS() << failure << LL_ENDL;
+    LL_WARNS() << "-------------------------------------" << LL_ENDL;
+    log_texture_unit_state();
+
+    return false;
+}
+
 void APIENTRY gl_debug_callback(GLenum source,
                                 GLenum type,
                                 GLuint id,
@@ -100,6 +767,20 @@ void APIENTRY gl_debug_callback(GLenum source,
                                 const GLchar* message,
                                 GLvoid* userParam)
 {
+    // This callback makes GL calls of its own -- the buffer/shader/texture-unit dump below.
+    // Any error one of THOSE raises comes straight back here, which reports it, dumps
+    // again, and raises it again: one real fault turns into a burst of identical messages
+    // whose true origin is buried, and every one of them re-reads the state it is meant to
+    // be describing. That is exactly how the cube-map level query above showed up.
+    //
+    // Per-thread because the texture upload thread has its own context and its own
+    // callback; a shared flag would let one thread silence the other's diagnostics.
+    if (sInDebugCallback)
+    {
+        return;
+    }
+    DebugCallbackGuard reentry_guard;
+
     /*if (severity != GL_DEBUG_SEVERITY_HIGH &&
         severity != GL_DEBUG_SEVERITY_MEDIUM &&
         severity != GL_DEBUG_SEVERITY_LOW
@@ -148,6 +829,15 @@ void APIENTRY gl_debug_callback(GLenum source,
     LL_WARNS() << "Message: " << message << LL_ENDL;
     LL_WARNS() << "-----------------------" << LL_ENDL;
 
+    // The buffer and texture-unit dump below is a few hundred synchronous glGet round
+    // trips. Worth it for anything that might be a defect; not for the notification-level
+    // chatter some drivers emit constantly (buffer migration notes and the like), which
+    // would turn a debug session into a slideshow and bury the messages that matter.
+    if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+    {
+        return;
+    }
+
     GLint vao = 0;
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
     GLint vbo = 0;
@@ -173,6 +863,19 @@ void APIENTRY gl_debug_callback(GLenum source,
         glGetBufferParameteriv(GL_UNIFORM_BUFFER, GL_BUFFER_SIZE, &ubo_size);
         glGetBufferParameteriv(GL_UNIFORM_BUFFER, GL_BUFFER_IMMUTABLE_STORAGE, &ubo_immutable);
     }
+
+    if (LLGLSLShader::sCurBoundShaderPtr)
+    {
+        LL_WARNS() << "Bound shader: " << LLGLSLShader::sCurBoundShaderPtr->mName << LL_ENDL;
+    }
+
+    LL_WARNS() << "Bound buffers: VAO=" << vao
+               << " ARRAY_BUFFER=" << vbo << " (size " << vbo_size << ")"
+               << " ELEMENT_ARRAY=" << ibo << " (size " << ibo_size << ")"
+               << " UNIFORM_BUFFER=" << ubo << " (size " << ubo_size << ", immutable " << ubo_immutable << ")"
+               << LL_ENDL;
+
+    log_texture_unit_state();
 
     // No needs to halt when is called from LLViewerWindow::stopGL()
     if (severity == GL_DEBUG_SEVERITY_HIGH && !gGLManager.mIsDisabled)
@@ -201,8 +904,6 @@ void ll_fail(std::string msg)
 
         gFailLog << "Stack Trace:" << std::endl;
 
-        ll_get_stack_trace(lines);
-
         for(size_t i = 0; i < lines.size(); ++i)
         {
             gFailLog << lines[i] << std::endl;
@@ -219,9 +920,6 @@ void ll_close_fail_log()
     gFailLog.close();
 }
 
-LLMatrix4 gGLObliqueProjectionInverse;
-
-#define LL_GL_NAME_POOLING 0
 
 std::list<LLGLUpdate*> LLGLUpdate::sGLQ;
 
@@ -250,11 +948,29 @@ PFNWGLBLITCONTEXTFRAMEBUFFERAMDPROC             wglBlitContextFramebufferAMD = n
 // WGL_EXT_swap_control
 PFNWGLSWAPINTERVALEXTPROC    wglSwapIntervalEXT = nullptr;
 PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = nullptr;
+
+// WGL_NV_DX_interop / interop2
+PFNWGLDXOPENDEVICENVPROC       wglDXOpenDeviceNV = nullptr;
+PFNWGLDXCLOSEDEVICENVPROC      wglDXCloseDeviceNV = nullptr;
+PFNWGLDXREGISTEROBJECTNVPROC   wglDXRegisterObjectNV = nullptr;
+PFNWGLDXUNREGISTEROBJECTNVPROC wglDXUnregisterObjectNV = nullptr;
+PFNWGLDXLOCKOBJECTSNVPROC      wglDXLockObjectsNV = nullptr;
+PFNWGLDXUNLOCKOBJECTSNVPROC    wglDXUnlockObjectsNV = nullptr;
 #endif
 
-#if LL_SDL_WINDOW
+#if LL_LINUX
+// EGL_VERSION_1_0
+PFNEGLQUERYSTRINGPROC eglQueryString = nullptr;
 
-// GL_VERSION_1_1
+// EGL_KHR_image
+PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR = nullptr;
+PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR = nullptr;
+
+// GL_OES_EGL_image
+PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES = nullptr;
+#endif
+
+// GL_VERSION_1_0
 PFNGLCLEARCOLORPROC                  glClearColor = nullptr;
 PFNGLCLEARPROC                       glClear = nullptr;
 PFNGLCOLORMASKPROC                   glColorMask = nullptr;
@@ -265,7 +981,6 @@ PFNGLCULLFACEPROC                    glCullFace = nullptr;
 PFNGLPOINTSIZEPROC                   glPointSize = nullptr;
 PFNGLLINEWIDTHPROC                   glLineWidth = nullptr;
 PFNGLPOLYGONMODEPROC                 glPolygonMode = nullptr;
-PFNGLPOLYGONOFFSETPROC               glPolygonOffset = nullptr;
 PFNGLSCISSORPROC                     glScissor = nullptr;
 PFNGLDRAWBUFFERPROC                  glDrawBuffer = nullptr;
 PFNGLREADBUFFERPROC                  glReadBuffer = nullptr;
@@ -286,9 +1001,6 @@ PFNGLDEPTHFUNCPROC                   glDepthFunc = nullptr;
 PFNGLDEPTHMASKPROC                   glDepthMask = nullptr;
 PFNGLDEPTHRANGEPROC                  glDepthRange = nullptr;
 PFNGLVIEWPORTPROC                    glViewport = nullptr;
-PFNGLGETPOINTERVPROC                 glGetPointerv = nullptr;
-PFNGLDRAWARRAYSPROC                  glDrawArrays = nullptr;
-PFNGLDRAWELEMENTSPROC                glDrawElements = nullptr;
 PFNGLPIXELSTOREFPROC                 glPixelStoref = nullptr;
 PFNGLPIXELSTOREIPROC                 glPixelStorei = nullptr;
 PFNGLREADPIXELSPROC                  glReadPixels = nullptr;
@@ -307,24 +1019,29 @@ PFNGLGETTEXLEVELPARAMETERIVPROC      glGetTexLevelParameteriv = nullptr;
 PFNGLTEXIMAGE1DPROC                  glTexImage1D = nullptr;
 PFNGLTEXIMAGE2DPROC                  glTexImage2D = nullptr;
 PFNGLGETTEXIMAGEPROC                 glGetTexImage = nullptr;
-PFNGLGENTEXTURESPROC                 glGenTextures = nullptr;
-PFNGLDELETETEXTURESPROC              glDeleteTextures = nullptr;
-PFNGLBINDTEXTUREPROC                 glBindTexture = nullptr;
-PFNGLARETEXTURESRESIDENTPROC         glAreTexturesResident = nullptr;
-PFNGLISTEXTUREPROC                   glIsTexture = nullptr;
-PFNGLTEXSUBIMAGE1DPROC               glTexSubImage1D = nullptr;
-PFNGLTEXSUBIMAGE2DPROC               glTexSubImage2D = nullptr;
-PFNGLCOPYTEXIMAGE1DPROC              glCopyTexImage1D = nullptr;
-PFNGLCOPYTEXIMAGE2DPROC              glCopyTexImage2D = nullptr;
-PFNGLCOPYTEXSUBIMAGE1DPROC           glCopyTexSubImage1D = nullptr;
-PFNGLCOPYTEXSUBIMAGE2DPROC           glCopyTexSubImage2D = nullptr;
-#endif
+
+// GL_VERSION_1_1
+PFNGLDRAWARRAYSPROC               glDrawArrays        = nullptr;
+PFNGLDRAWELEMENTSPROC             glDrawElements      = nullptr;
+PFNGLGETPOINTERVPROC              glGetPointerv       = nullptr;
+PFNGLPOLYGONOFFSETPROC            glPolygonOffset     = nullptr;
+PFNGLCOPYTEXIMAGE1DPROC           glCopyTexImage1D    = nullptr;
+PFNGLCOPYTEXIMAGE2DPROC           glCopyTexImage2D    = nullptr;
+PFNGLCOPYTEXSUBIMAGE1DPROC        glCopyTexSubImage1D = nullptr;
+PFNGLCOPYTEXSUBIMAGE2DPROC        glCopyTexSubImage2D = nullptr;
+PFNGLTEXSUBIMAGE1DPROC            glTexSubImage1D  = nullptr;
+PFNGLTEXSUBIMAGE2DPROC            glTexSubImage2D  = nullptr;
+PFNGLBINDTEXTUREPROC              glBindTexture = nullptr;
+PFNGLDELETETEXTURESPROC           glDeleteTextures = nullptr;
+PFNGLGENTEXTURESPROC              glGenTextures = nullptr;
+PFNGLISTEXTUREPROC                glIsTexture = nullptr;
+
 
 // GL_VERSION_1_2
-PFNGLDRAWRANGEELEMENTSPROC  glDrawRangeElements = nullptr;
-PFNGLTEXIMAGE3DPROC         glTexImage3D = nullptr;
-PFNGLTEXSUBIMAGE3DPROC      glTexSubImage3D = nullptr;
-PFNGLCOPYTEXSUBIMAGE3DPROC  glCopyTexSubImage3D = nullptr;
+PFNGLDRAWRANGEELEMENTSPROC           glDrawRangeElements = nullptr;
+PFNGLTEXIMAGE3DPROC                  glTexImage3D = nullptr;
+PFNGLTEXSUBIMAGE3DPROC               glTexSubImage3D = nullptr;
+PFNGLCOPYTEXSUBIMAGE3DPROC           glCopyTexSubImage3D = nullptr;
 
 // GL_VERSION_1_3
 PFNGLACTIVETEXTUREPROC               glActiveTexture = nullptr;
@@ -947,6 +1664,28 @@ PFNGLMULTIDRAWARRAYSINDIRECTCOUNTPROC    glMultiDrawArraysIndirectCount = nullpt
 PFNGLMULTIDRAWELEMENTSINDIRECTCOUNTPROC  glMultiDrawElementsIndirectCount = nullptr;
 PFNGLPOLYGONOFFSETCLAMPPROC              glPolygonOffsetClamp = nullptr;
 
+// GL_EXT_memory_object
+PFNGLCREATEMEMORYOBJECTSEXTPROC        glCreateMemoryObjectsEXT        = nullptr;
+PFNGLDELETEMEMORYOBJECTSEXTPROC        glDeleteMemoryObjectsEXT        = nullptr;
+PFNGLMEMORYOBJECTPARAMETERIVEXTPROC    glMemoryObjectParameterivEXT    = nullptr;
+PFNGLTEXSTORAGEMEM2DEXTPROC            glTexStorageMem2DEXT            = nullptr;
+
+// GL_EXT_semaphore
+PFNGLGENSEMAPHORESEXTPROC              glGenSemaphoresEXT              = nullptr;
+PFNGLDELETESEMAPHORESEXTPROC           glDeleteSemaphoresEXT           = nullptr;
+PFNGLSEMAPHOREPARAMETERUI64VEXTPROC    glSemaphoreParameterui64vEXT    = nullptr;
+PFNGLWAITSEMAPHOREEXTPROC              glWaitSemaphoreEXT              = nullptr;
+PFNGLSIGNALSEMAPHOREEXTPROC            glSignalSemaphoreEXT            = nullptr;
+
+// GL_EXT_memory_object_win32
+PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC    glImportMemoryWin32HandleEXT    = nullptr;
+
+// GL_EXT_semaphore_win32
+PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC glImportSemaphoreWin32HandleEXT = nullptr;
+
+// GL_EXT_depth_bounds_test
+PFNGLDEPTHBOUNDSEXTPROC                glDepthBoundsEXT                = nullptr;
+
 #endif
 
 LLGLManager gGLManager;
@@ -963,9 +1702,6 @@ LLGLManager::LLGLManager() :
     mIsAMD(false),
     mIsNVIDIA(false),
     mIsIntel(false),
-#if LL_DARWIN
-    mIsMobileGF(false),
-#endif
     mHasRequirements(true),
     mDriverVersionMajor(1),
     mDriverVersionMinor(0),
@@ -985,7 +1721,7 @@ LLGLManager::LLGLManager() :
 //---------------------------------------------------------------------
 void LLGLManager::initWGL()
 {
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     reloadExtensionsString();
 
     if (mGLExtensions.contains("WGL_ARB_pixel_format"))
@@ -999,6 +1735,7 @@ void LLGLManager::initWGL()
         LL_WARNS("RenderInit") << "No ARB pixel format extensions" << LL_ENDL;
     }
 
+    // WGL_ARB_create_context
     if (mGLExtensions.contains("WGL_ARB_create_context"))
     {
         wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)LL_GET_PROC_ADDRESS("wglCreateContextAttribsARB");
@@ -1015,24 +1752,233 @@ void LLGLManager::initWGL()
     {
         wglGetGPUIDsAMD = (PFNWGLGETGPUIDSAMDPROC)LL_GET_PROC_ADDRESS("wglGetGPUIDsAMD");
         wglGetGPUInfoAMD = (PFNWGLGETGPUINFOAMDPROC)LL_GET_PROC_ADDRESS("wglGetGPUInfoAMD");
+        wglGetContextGPUIDAMD = (PFNWGLGETCONTEXTGPUIDAMDPROC)LL_GET_PROC_ADDRESS("wglGetContextGPUIDAMD");
+        wglCreateAssociatedContextAMD = (PFNWGLCREATEASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglCreateAssociatedContextAMD");
+        wglCreateAssociatedContextAttribsAMD = (PFNWGLCREATEASSOCIATEDCONTEXTATTRIBSAMDPROC)LL_GET_PROC_ADDRESS("wglCreateAssociatedContextAttribsAMD");
+        wglDeleteAssociatedContextAMD = (PFNWGLDELETEASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglDeleteAssociatedContextAMD");
+        wglMakeAssociatedContextCurrentAMD = (PFNWGLMAKEASSOCIATEDCONTEXTCURRENTAMDPROC)LL_GET_PROC_ADDRESS("wglMakeAssociatedContextCurrentAMD");
+        wglGetCurrentAssociatedContextAMD = (PFNWGLGETCURRENTASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglGetCurrentAssociatedContextAMD");
+        wglBlitContextFramebufferAMD = (PFNWGLBLITCONTEXTFRAMEBUFFERAMDPROC)LL_GET_PROC_ADDRESS("wglBlitContextFramebufferAMD");
+
     }
 
+    // WGL_EXT_swap_control
     if (mGLExtensions.contains("WGL_EXT_swap_control"))
     {
         wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglSwapIntervalEXT");
+        wglGetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglGetSwapIntervalEXT");
+    }
+
+    // WGL_NV_DX_interop2 (D3D<->GL sharing for zero-copy CEF media textures)
+    if (mGLExtensions.contains("WGL_NV_DX_interop2") || mGLExtensions.contains("WGL_NV_DX_interop"))
+    {
+        wglDXOpenDeviceNV = (PFNWGLDXOPENDEVICENVPROC)LL_GET_PROC_ADDRESS("wglDXOpenDeviceNV");
+        wglDXCloseDeviceNV = (PFNWGLDXCLOSEDEVICENVPROC)LL_GET_PROC_ADDRESS("wglDXCloseDeviceNV");
+        wglDXRegisterObjectNV = (PFNWGLDXREGISTEROBJECTNVPROC)LL_GET_PROC_ADDRESS("wglDXRegisterObjectNV");
+        wglDXUnregisterObjectNV = (PFNWGLDXUNREGISTEROBJECTNVPROC)LL_GET_PROC_ADDRESS("wglDXUnregisterObjectNV");
+        wglDXLockObjectsNV = (PFNWGLDXLOCKOBJECTSNVPROC)LL_GET_PROC_ADDRESS("wglDXLockObjectsNV");
+        wglDXUnlockObjectsNV = (PFNWGLDXUNLOCKOBJECTSNVPROC)LL_GET_PROC_ADDRESS("wglDXUnlockObjectsNV");
     }
 
     if(!mGLExtensions.contains("WGL_ARB_pbuffer"))
     {
         LL_WARNS("RenderInit") << "No ARB WGL PBuffer extensions" << LL_ENDL;
     }
+#endif
+}
 
-    if(!mGLExtensions.contains("WGL_ARB_render_texture"))
+void LLGLManager::initEGL()
+{
+#if LL_LINUX
+    reloadExtensionsString();
+
+    // EGL_VERSION_1_0
+    eglQueryString = (PFNEGLQUERYSTRINGPROC)SDL_EGL_GetProcAddress("eglQueryString");
+
+    // EGL_KHR_image
+    eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC)SDL_EGL_GetProcAddress("eglCreateImageKHR");
+    eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC)SDL_EGL_GetProcAddress("eglDestroyImageKHR");
+
+    // GL_OES_EGL_image
+    glEGLImageTargetTexture2DOES = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)SDL_EGL_GetProcAddress("glEGLImageTargetTexture2DOES");
+
+    // SDL_EGL_GetProcAddress can return null for core EGL symbols (driver/version
+    // dependent), so guard before calling through the pointer.
+    if (eglQueryString)
     {
-        LL_WARNS("RenderInit") << "No ARB WGL render texture extensions" << LL_ENDL;
+        LL_INFOS("RenderInit") << "EGL_VENDOR     " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VENDOR)) << LL_ENDL;
+        LL_INFOS("RenderInit") << "EGL_VERSION    " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VERSION)) << LL_ENDL;
+    }
+    else
+    {
+        LL_WARNS("RenderInit") << "eglQueryString unavailable; skipping EGL vendor/version log" << LL_ENDL;
     }
 #endif
 }
+
+#if LL_LINUX
+namespace
+{
+    // radeonsi and r600 put the kernel's DRM interface version and release in GL_RENDERER:
+    // "(radeonsi, navi31, ACO, DRM 3.64, 7.2.4-200.fc44.x86_64)", in older Mesa
+    // "(POLARIS10, DRM 3.42.0, 5.15.0-58-generic, LLVM 13.0.1)", and r600
+    // "(DRM 2.50.0 / 6.1.0-13-amd64, LLVM 15.0.6)". Both move with the kernel, not the driver.
+    std::string strip_kernel_from_renderer(std::string renderer)
+    {
+        // With what joins it on, so that a release like "6.1.0" is not found in "LLVM 16.1.0".
+        struct utsname uts;
+        const std::string release = uname(&uts) == 0 ? uts.release : "";
+        for (const std::string separator : { ", ", " / " })
+        {
+            if (size_t pos = renderer.find(separator + release); !release.empty() && pos != std::string::npos)
+            {
+                renderer.erase(pos, separator.size() + release.size());
+                break;
+            }
+        }
+
+        if (size_t pos = renderer.find("DRM "); pos != std::string::npos
+            && pos + 4 < renderer.size() && isdigit((unsigned char)renderer[pos + 4]))
+        {
+            size_t end = pos + 4;
+            while (end < renderer.size() && (isdigit((unsigned char)renderer[end]) || renderer[end] == '.'))
+            {
+                ++end;
+            }
+            if (pos >= 2 && renderer.compare(pos - 2, 2, ", ") == 0)
+            {
+                pos -= 2;   // "navi31, DRM 3.64"
+            }
+            else if (renderer.compare(end, 2, ", ") == 0)
+            {
+                end += 2;   // "(DRM 2.50.0, LLVM"
+            }
+            renderer.erase(pos, end - pos);
+        }
+        return renderer;
+    }
+
+    // Whole names only: EGL_EXT_device_drm is a prefix of EGL_EXT_device_drm_render_node.
+    bool has_egl_extension(const char* extensions, const std::string& name)
+    {
+        return (" " + ll_safe_string(extensions) + " ").find(" " + name + " ") != std::string::npos;
+    }
+
+    // The DRM node of the EGL device behind the current display, e.g. /dev/dri/renderD128,
+    // through EGL_EXT_device_query. Empty when the EGL cannot say, and for a software device,
+    // which has none.
+    std::string egl_device_drm_node()
+    {
+        EGLDisplay display = (EGLDisplay)SDL_EGL_GetCurrentDisplay();
+        PFNEGLQUERYSTRINGPROC query_string = (PFNEGLQUERYSTRINGPROC)SDL_EGL_GetProcAddress("eglQueryString");
+        if (!display || !query_string)
+        {
+            return {};
+        }
+
+        // Client extensions, so asked of no display.
+        const char* client_extensions = query_string(EGL_NO_DISPLAY, EGL_EXTENSIONS);
+        if (!has_egl_extension(client_extensions, "EGL_EXT_device_query")
+            && !has_egl_extension(client_extensions, "EGL_EXT_device_base"))
+        {
+            return {};
+        }
+
+        PFNEGLQUERYDISPLAYATTRIBEXTPROC query_display_attrib =
+            (PFNEGLQUERYDISPLAYATTRIBEXTPROC)SDL_EGL_GetProcAddress("eglQueryDisplayAttribEXT");
+        PFNEGLQUERYDEVICESTRINGEXTPROC query_device_string =
+            (PFNEGLQUERYDEVICESTRINGEXTPROC)SDL_EGL_GetProcAddress("eglQueryDeviceStringEXT");
+        EGLAttrib device = 0;
+        if (!query_display_attrib || !query_device_string
+            || !query_display_attrib(display, EGL_DEVICE_EXT, &device) || !device)
+        {
+            return {};
+        }
+
+        const char* device_extensions = query_device_string((EGLDeviceEXT)device, EGL_EXTENSIONS);
+        const char* node = nullptr;
+        if (has_egl_extension(device_extensions, "EGL_EXT_device_drm_render_node"))
+        {
+            node = query_device_string((EGLDeviceEXT)device, EGL_DRM_RENDER_NODE_FILE_EXT);
+        }
+        if (!node && has_egl_extension(device_extensions, "EGL_EXT_device_drm"))
+        {
+            node = query_device_string((EGLDeviceEXT)device, EGL_DRM_DEVICE_FILE_EXT);
+        }
+        return ll_safe_string(node);
+    }
+
+    // The sysfs directory of the device GL draws with: the one EGL names, else the first
+    // render node of GL's vendor. Empty when neither finds one.
+    std::string drm_device_sysfs_dir(const std::string& vendor_short)
+    {
+        const std::string node = egl_device_drm_node();
+        if (!node.empty())
+        {
+            // /dev/dri/renderD128 -> /sys/class/drm/renderD128/device
+            return "/sys/class/drm/" + node.substr(node.rfind('/') + 1) + "/device";
+        }
+
+        const char* vendor_id = vendor_short == "AMD"    ? "0x1002"
+                              : vendor_short == "INTEL"  ? "0x8086"
+                              : vendor_short == "NVIDIA" ? "0x10de"
+                              : nullptr;
+        // Render nodes are numbered from 128.
+        for (S32 minor = 128; vendor_id && minor < 192; ++minor)
+        {
+            const std::string dir = "/sys/class/drm/renderD" + std::to_string(minor) + "/device";
+            llifstream file(dir + "/vendor");
+            std::string id;
+            if (file >> id && id == vendor_id)
+            {
+                return dir;
+            }
+        }
+        return {};
+    }
+
+    // A size sysfs gives in bytes, in MB. 0 when the attribute is missing.
+    U32 read_sysfs_mb(const std::string& path)
+    {
+        llifstream file(path);
+        U64 bytes = 0;
+        file >> bytes;
+        return (U32)(bytes >> 20);
+    }
+
+    // VRAM for a GPU GL has no real figure for. amdgpu publishes its memory in sysfs. Memory
+    // a GPU shares with the system -- Intel's, a software renderer's -- is a quarter of RAM,
+    // which is what LLDXHardware allows Intel on Windows.
+    U32 fallback_vram_mb(const std::string& vendor_short, bool shares_system_memory, std::string& source)
+    {
+        const U32 ram_share_mb = U32Megabytes(gSysMemory.getPhysicalMemoryKB()).value() / 4;
+
+        const std::string device_dir = drm_device_sysfs_dir(vendor_short);
+        const U32 vram_mb = device_dir.empty() ? 0 : read_sysfs_mb(device_dir + "/mem_info_vram_total");
+        if (vram_mb >= 1024)
+        {
+            // A card's own memory, or a carve-out big enough to stand for it.
+            source = "amdgpu VRAM";
+            return vram_mb;
+        }
+        if (vram_mb > 0)
+        {
+            // An APU: its VRAM is the BIOS carve-out, and the rest it draws from system memory
+            // through the GTT. The carve-out is not counted in system memory, so it comes on
+            // top of the quarter, which the GTT's size bounds.
+            source = "amdgpu carve-out and GTT";
+            return vram_mb + llmin(read_sysfs_mb(device_dir + "/mem_info_gtt_total"), ram_share_mb);
+        }
+        if (shares_system_memory)
+        {
+            source = "system memory";
+            return ram_share_mb;
+        }
+        return 0;
+    }
+}
+#endif
+
 
 // return false if unable (or unwilling due to old drivers) to init GL
 bool LLGLManager::initGL()
@@ -1042,8 +1988,9 @@ bool LLGLManager::initGL()
         LL_ERRS("RenderInit") << "Calling init on LLGLManager after already initialized!" << LL_ENDL;
     }
 
-#if LL_GL_FUNC_POINTER && LL_SDL_WINDOW
-    // Load OpenGL 1.0 Functions when using SDL
+#if LL_GL_FUNC_POINTER
+    // OpenGL 1.0 and 1.1 always exist
+    // GL_VERSION_1_0
     glClearColor = (PFNGLCLEARCOLORPROC)LL_GET_PROC_ADDRESS("glClearColor");
     glClear = (PFNGLCLEARPROC)LL_GET_PROC_ADDRESS("glClear");
     glColorMask = (PFNGLCOLORMASKPROC)LL_GET_PROC_ADDRESS("glColorMask");
@@ -1092,6 +2039,22 @@ bool LLGLManager::initGL()
     glTexImage1D = (PFNGLTEXIMAGE1DPROC)LL_GET_PROC_ADDRESS("glTexImage1D");
     glTexImage2D = (PFNGLTEXIMAGE2DPROC)LL_GET_PROC_ADDRESS("glTexImage2D");
     glGetTexImage = (PFNGLGETTEXIMAGEPROC)LL_GET_PROC_ADDRESS("glGetTexImage");
+
+    // GL_VERSION_1_1
+    glDrawArrays = (PFNGLDRAWARRAYSPROC)LL_GET_PROC_ADDRESS("glDrawArrays");
+    glDrawElements = (PFNGLDRAWELEMENTSPROC)LL_GET_PROC_ADDRESS("glDrawElements");
+    glGetPointerv = (PFNGLGETPOINTERVPROC)LL_GET_PROC_ADDRESS("glGetPointerv");
+    glPolygonOffset = (PFNGLPOLYGONOFFSETPROC)LL_GET_PROC_ADDRESS("glPolygonOffset");
+    glCopyTexImage1D = (PFNGLCOPYTEXIMAGE1DPROC)LL_GET_PROC_ADDRESS("glCopyTexImage1D");
+    glCopyTexImage2D = (PFNGLCOPYTEXIMAGE2DPROC)LL_GET_PROC_ADDRESS("glCopyTexImage2D");
+    glCopyTexSubImage1D = (PFNGLCOPYTEXSUBIMAGE1DPROC)LL_GET_PROC_ADDRESS("glCopyTexSubImage1D");
+    glCopyTexSubImage2D = (PFNGLCOPYTEXSUBIMAGE2DPROC)LL_GET_PROC_ADDRESS("glCopyTexSubImage2D");
+    glTexSubImage1D = (PFNGLTEXSUBIMAGE1DPROC)LL_GET_PROC_ADDRESS("glTexSubImage1D");
+    glTexSubImage2D = (PFNGLTEXSUBIMAGE2DPROC)LL_GET_PROC_ADDRESS("glTexSubImage2D");
+    glBindTexture = (PFNGLBINDTEXTUREPROC)LL_GET_PROC_ADDRESS("glBindTexture");
+    glDeleteTextures = (PFNGLDELETETEXTURESPROC)LL_GET_PROC_ADDRESS("glDeleteTextures");
+    glGenTextures = (PFNGLGENTEXTURESPROC)LL_GET_PROC_ADDRESS("glGenTextures");
+    glIsTexture = (PFNGLISTEXTUREPROC)LL_GET_PROC_ADDRESS("glIsTexture");
 #endif
 
     // Extract video card strings and convert to upper case to
@@ -1110,18 +2073,58 @@ bool LLGLManager::initGL()
 
     mGLVersion = mDriverVersionMajor + mDriverVersionMinor * .1f;
 
+    {
+        std::string renderer = ll_safe_string((const char *)glGetString(GL_RENDERER));
+#if LL_LINUX
+        renderer = strip_kernel_from_renderer(renderer);
+#endif
+        mGLIdentity = ll_safe_string((const char *)glGetString(GL_VENDOR)) + " " + renderer + " " + mGLVersionString;
+    }
+
+    // Every Mesa driver stamps "Mesa" into the GL_VERSION string
+    // (e.g. "4.6 (Core Profile) Mesa 26.1.4"), regardless of the underlying
+    // hardware backend. Detect it here so driver-specific workarounds can key
+    // off mIsMesa. mGLVersionString is the raw (mixed-case) version string.
+    {
+        std::string ver_upper = mGLVersionString;
+        LLStringUtil::toUpper(ver_upper);
+        mIsMesa = ver_upper.find("MESA") != std::string::npos;
+    }
+    mIsD3D12 = mIsMesa && mGLRenderer.rfind("D3D12", 0) == 0;
+
+#if LL_LINUX
+    // When the hardware driver does not load -- NVIDIA's without its EGL platform library,
+    // a missing Mesa driver, a VM or container without the GPU -- Mesa draws on the CPU
+    // instead, offering GL 4.6 and every extension the viewer asks for, so nothing else
+    // would tell. GL_RENDERER names what actually draws, and keeps the name when zink runs
+    // over lavapipe or virgl over a host's llvmpipe.
+    mIsSoftwareRenderer = false;
+    for (const char* software : { "LLVMPIPE", "SOFTPIPE", "SWRAST", "SOFTWARE RASTERIZER",
+                                  "MICROSOFT BASIC RENDER DRIVER" })
+    {
+        mIsSoftwareRenderer = mIsSoftwareRenderer || mGLRenderer.find(software) != std::string::npos;
+    }
+    if (mIsSoftwareRenderer)
+    {
+        LL_WARNS("RenderInit") << "GL renderer " << mGLRenderer << " draws on the CPU" << LL_ENDL;
+    }
+#endif
+
     if (mGLVersion >= 2.f)
     {
         parse_glsl_version(mGLSLVersionMajor, mGLSLVersionMinor);
     }
 
-    if (mGLVersion >= 2.1f && LLImageGL::sCompressTextures)
-    { //use texture compression
-        glHint(GL_TEXTURE_COMPRESSION_HINT, GL_NICEST);
-    }
-    else
-    { //GL version is < 3.0, always disable texture compression
-        LLImageGL::sCompressTextures = false;
+    // The renderer assumes GL 4.1 unconditionally: deprecated formats are re-expressed
+    // via GL_TEXTURE_SWIZZLE_RGBA rather than repacked on the CPU, the texture upload
+    // thread is always enabled, and the shader backend expects GLSL 4.10. Below the
+    // floor those assumptions do not hold and behaviour is undefined rather than
+    // degraded. This is a diagnostic only -- refusing to launch is a separate change.
+    if (mGLVersion < GL_MINIMUM_VERSION)
+    {
+        LL_WARNS("RenderInit") << "OpenGL " << mGLVersionString << " is below the "
+                               << GL_MINIMUM_VERSION << " minimum this viewer requires. "
+                               << "Rendering will misbehave." << LL_ENDL;
     }
 
     // Trailing space necessary to keep "nVidia Corpor_ati_on" cards
@@ -1195,10 +2198,14 @@ bool LLGLManager::initGL()
         }
         if (mVRAM != 0)
         {
-            LL_WARNS("RenderInit") << "VRAM Detected (AMDAssociations):" << mVRAM << LL_ENDL;
+            LL_INFOS("RenderInit") << "VRAM Detected (AMDAssociations):" << mVRAM << LL_ENDL;
         }
     } else
 #endif
+
+    // On Linux these two are what Mesa offers as well as the vendor drivers:
+    // every gallium driver that can report memory exposes both, which is what
+    // GLX_MESA_query_renderer used to be asked for on X11.
 #if LL_WINDOWS || LL_LINUX
     {
         if (mHasNVXGpuMemoryInfo && mVRAM == 0)
@@ -1209,7 +2216,7 @@ bool LLGLManager::initGL()
 
             if (mVRAM != 0)
             {
-                LL_WARNS("RenderInit") << "VRAM Detected (NVXGpuMemoryInfo):" << mVRAM << LL_ENDL;
+                LL_INFOS("RenderInit") << "VRAM Detected (NVXGpuMemoryInfo):" << mVRAM << LL_ENDL;
             }
         }
 
@@ -1220,6 +2227,22 @@ bool LLGLManager::initGL()
 
             mVRAM = meminfo[0] / 1024;
             LL_INFOS("RenderInit") << "VRAM Detected (ATIMemInfo):" << mVRAM << LL_ENDL;
+        }
+    }
+#endif
+
+#if LL_LINUX
+    // Neither extension counts memory a GPU shares with the system: Intel's and a software
+    // renderer's report none, an APU's only its BIOS carve-out, often 512 MB -- so an AMD
+    // figure under 1 GB is checked too. Windows asks DXGI instead.
+    if (mVRAM < 256 || (mIsAMD && mVRAM < 1024))
+    {
+        std::string source;
+        const U32 fallback_mb = fallback_vram_mb(mGLVendorShort, mIsIntel || mIsSoftwareRenderer, source);
+        if (fallback_mb > mVRAM)
+        {
+            mVRAM = fallback_mb;
+            LL_INFOS("RenderInit") << "VRAM Detected (" << source << "):" << mVRAM << LL_ENDL;
         }
     }
 #endif
@@ -1239,6 +2262,9 @@ bool LLGLManager::initGL()
     glGetIntegerv(GL_MAX_VARYING_VECTORS, &mMaxVaryingVectors);
     glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &mMaxUniformBlockSize);
 
+    // If outside the allowed range, glLineWidth fails with "invalid value".
+    glGetFloatv(GL_ALIASED_LINE_WIDTH_RANGE, mAliasedLineRange.mV);
+
     // sanity clamp max uniform block size to 64k just in case
     // there's some implementation that reports a crazy value
     mMaxUniformBlockSize = llmin(mMaxUniformBlockSize, 65536);
@@ -1248,53 +2274,124 @@ bool LLGLManager::initGL()
         glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &mMaxAnisotropy);
     }
 
+    initCompute();
+
+    initQueries();
+
     initGLStates();
 
     return true;
 }
 
-void LLGLManager::getGLInfo(LLSD& info)
+// What the query targets past 4.1's can count, and whether the timestamps count at all. After initExtensions, which
+// loads glGetQueryiv.
+void LLGLManager::initQueries()
 {
-    if (gHeadlessClient)
+    mHasConservativeOcclusion = mGLVersion >= 4.29f || mGLExtensions.contains("GL_ARB_ES3_compatibility");
+    mHasPipelineStatistics    = mGLVersion >= 4.59f || mGLExtensions.contains("GL_ARB_pipeline_statistics_query");
+
+    GLint bits = 0;
+    glGetQueryiv(GL_TIMESTAMP, GL_QUERY_COUNTER_BITS, &bits);
+    mHasTimestampQuery = bits > 0;
+
+    LL_INFOS("RenderInit") << "Queries: conservative occlusion " << (mHasConservativeOcclusion ? "yes" : "no")
+                           << ", timestamps " << bits << " bits, pipeline statistics "
+                           << (mHasPipelineStatistics ? "yes" : "no") << LL_ENDL;
+}
+
+// Here rather than in initExtensions, whose version ladder returns before its end on any context below 4.6: this
+// reads what the 4.3 rung resolved.
+void LLGLManager::initCompute()
+{
+    mHasCompute = mGLVersion >= 4.29f
+               && glDispatchCompute && glDispatchComputeIndirect && glMemoryBarrier && glBindImageTexture
+               && glShaderStorageBlockBinding && glGetProgramResourceIndex && glGetProgramInterfaceiv
+               && glGetProgramResourceName && glGetProgramResourceiv && glClearBufferSubData && glDrawArraysIndirect
+               && glGetIntegeri_v;
+
+    for (U32 i = 0; i < 3; ++i)
     {
-        info["GLInfo"]["GLVendor"] = HEADLESS_VENDOR_STRING;
-        info["GLInfo"]["GLRenderer"] = HEADLESS_RENDERER_STRING;
-        info["GLInfo"]["GLVersion"] = HEADLESS_VERSION_STRING;
+        mMaxComputeWorkGroupCount[i] = 0;
+        mMaxComputeWorkGroupSize[i]  = 0;
+    }
+    mMaxComputeWorkGroupInvocations     = 0;
+    mMaxComputeSharedMemorySize         = 0;
+    mMaxImageUnits                      = 0;
+    mMaxShaderStorageBufferBindings     = 0;
+    mMaxVertexShaderStorageBlocks       = 0;
+    mMaxFragmentShaderStorageBlocks     = 0;
+    mMaxComputeShaderStorageBlocks      = 0;
+    mMaxShaderStorageBlockSize          = 0;
+    mShaderStorageBufferOffsetAlignment = 0;
+
+    if (!mHasCompute)
+    {
+        LL_INFOS("RenderInit") << "Compute unavailable (GL " << mGLVersion
+                               << (mGLVersion >= 4.29f ? ": its entry points did not resolve)" : ", needs 4.3)")
+                               << LL_ENDL;
         return;
+    }
+
+    for (U32 i = 0; i < 3; ++i)
+    {
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, i, &mMaxComputeWorkGroupCount[i]);
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, i, &mMaxComputeWorkGroupSize[i]);
+    }
+    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &mMaxComputeWorkGroupInvocations);
+    glGetIntegerv(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE, &mMaxComputeSharedMemorySize);
+    glGetIntegerv(GL_MAX_IMAGE_UNITS, &mMaxImageUnits);
+    glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &mMaxShaderStorageBufferBindings);
+    glGetIntegerv(GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS, &mMaxVertexShaderStorageBlocks);
+    glGetIntegerv(GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS, &mMaxFragmentShaderStorageBlocks);
+    glGetIntegerv(GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS, &mMaxComputeShaderStorageBlocks);
+    glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &mShaderStorageBufferOffsetAlignment);
+    // A block may be larger than an int can say.
+    if (glGetInteger64v)
+    {
+        GLint64 block_size = 0;
+        glGetInteger64v(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &block_size);
+        mMaxShaderStorageBlockSize = block_size;
     }
     else
     {
-        info["GLInfo"]["GLVendor"] = ll_safe_string((const char *)glGetString(GL_VENDOR));
-        info["GLInfo"]["GLRenderer"] = ll_safe_string((const char *)glGetString(GL_RENDERER));
-        info["GLInfo"]["GLVersion"] = ll_safe_string((const char *)glGetString(GL_VERSION));
+        GLint block_size = 0;
+        glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &block_size);
+        mMaxShaderStorageBlockSize = block_size;
     }
+    mShaderStorageBufferOffsetAlignment = llmax(mShaderStorageBufferOffsetAlignment, 1);
 
-#if !LL_MESA_HEADLESS
+    LL_INFOS("RenderInit") << "Compute available (GL " << mGLVersion << "): work groups up to "
+                           << mMaxComputeWorkGroupCount[0] << "x" << mMaxComputeWorkGroupCount[1] << "x"
+                           << mMaxComputeWorkGroupCount[2] << " of " << mMaxComputeWorkGroupSize[0] << "x"
+                           << mMaxComputeWorkGroupSize[1] << "x" << mMaxComputeWorkGroupSize[2] << ", "
+                           << mMaxComputeWorkGroupInvocations << " invocations, " << mMaxComputeSharedMemorySize
+                           << " bytes shared; " << mMaxImageUnits << " image units; storage blocks "
+                           << mMaxVertexShaderStorageBlocks << " vertex, " << mMaxFragmentShaderStorageBlocks
+                           << " fragment, " << mMaxComputeShaderStorageBlocks << " compute, at "
+                           << mMaxShaderStorageBufferBindings << " bindings, up to " << mMaxShaderStorageBlockSize
+                           << " bytes each, offsets aligned to " << mShaderStorageBufferOffsetAlignment << LL_ENDL;
+}
+
+void LLGLManager::getGLInfo(LLSD& info)
+{
+    info["GLInfo"]["GLVendor"] = ll_safe_string((const char *)glGetString(GL_VENDOR));
+    info["GLInfo"]["GLRenderer"] = ll_safe_string((const char *)glGetString(GL_RENDERER));
+    info["GLInfo"]["GLVersion"] = ll_safe_string((const char *)glGetString(GL_VERSION));
+
     for (const auto& ext : mGLExtensions)
     {
         info["GLInfo"]["GLExtensions"].append(ext);
     }
-#endif
 }
 
 std::string LLGLManager::getGLInfoString()
 {
     std::string info_str;
 
-    if (gHeadlessClient)
-    {
-        info_str += std::string("GL_VENDOR      ") + HEADLESS_VENDOR_STRING + std::string("\n");
-        info_str += std::string("GL_RENDERER    ") + HEADLESS_RENDERER_STRING + std::string("\n");
-        info_str += std::string("GL_VERSION     ") + HEADLESS_VERSION_STRING + std::string("\n");
-    }
-    else
-    {
-        info_str += std::string("GL_VENDOR      ") + ll_safe_string((const char *)glGetString(GL_VENDOR)) + std::string("\n");
-        info_str += std::string("GL_RENDERER    ") + ll_safe_string((const char *)glGetString(GL_RENDERER)) + std::string("\n");
-        info_str += std::string("GL_VERSION     ") + ll_safe_string((const char *)glGetString(GL_VERSION)) + std::string("\n");
-    }
+    info_str += std::string("GL_VENDOR      ") + ll_safe_string((const char *)glGetString(GL_VENDOR)) + std::string("\n");
+    info_str += std::string("GL_RENDERER    ") + ll_safe_string((const char *)glGetString(GL_RENDERER)) + std::string("\n");
+    info_str += std::string("GL_VERSION     ") + ll_safe_string((const char *)glGetString(GL_VERSION)) + std::string("\n");
 
-#if !LL_MESA_HEADLESS
     std::string all_exts;
     for (const auto& ext : mGLExtensions)
     {
@@ -1302,27 +2399,16 @@ std::string LLGLManager::getGLInfoString()
         all_exts += '\n';
     }
     info_str += std::string("GL_EXTENSIONS:\n") + all_exts + std::string("\n");
-#endif
 
     return info_str;
 }
 
 void LLGLManager::printGLInfoString()
 {
-    if (gHeadlessClient)
-    {
-        LL_INFOS("RenderInit") << "GL_VENDOR:     " << HEADLESS_VENDOR_STRING << LL_ENDL;
-        LL_INFOS("RenderInit") << "GL_RENDERER:   " << HEADLESS_RENDERER_STRING << LL_ENDL;
-        LL_INFOS("RenderInit") << "GL_VERSION:    " << HEADLESS_VERSION_STRING << LL_ENDL;
-    }
-    else
-    {
-        LL_INFOS("RenderInit") << "GL_VENDOR:     " << ll_safe_string((const char *)glGetString(GL_VENDOR)) << LL_ENDL;
-        LL_INFOS("RenderInit") << "GL_RENDERER:   " << ll_safe_string((const char *)glGetString(GL_RENDERER)) << LL_ENDL;
-        LL_INFOS("RenderInit") << "GL_VERSION:    " << ll_safe_string((const char *)glGetString(GL_VERSION)) << LL_ENDL;
-    }
+    LL_INFOS("RenderInit") << "GL_VENDOR:     " << ll_safe_string((const char *)glGetString(GL_VENDOR)) << LL_ENDL;
+    LL_INFOS("RenderInit") << "GL_RENDERER:   " << ll_safe_string((const char *)glGetString(GL_RENDERER)) << LL_ENDL;
+    LL_INFOS("RenderInit") << "GL_VERSION:    " << ll_safe_string((const char *)glGetString(GL_VERSION)) << LL_ENDL;
 
-#if !LL_MESA_HEADLESS
     std::string all_exts;
     for (const auto& ext : mGLExtensions)
     {
@@ -1330,20 +2416,12 @@ void LLGLManager::printGLInfoString()
         all_exts += '\n';
     }
     LL_INFOS("RenderInit") << "GL_EXTENSIONS:\n" << all_exts << LL_ENDL;
-#endif
 }
 
 std::string LLGLManager::getRawGLString()
 {
     std::string gl_string;
-    if (gHeadlessClient)
-    {
-        gl_string = HEADLESS_VENDOR_STRING + " " + HEADLESS_RENDERER_STRING;
-    }
-    else
-    {
-        gl_string = ll_safe_string((char*)glGetString(GL_VENDOR)) + " " + ll_safe_string((char*)glGetString(GL_RENDERER));
-    }
+    gl_string = ll_safe_string((char*)glGetString(GL_VENDOR)) + " " + ll_safe_string((char*)glGetString(GL_RENDERER));
     return gl_string;
 }
 
@@ -1366,6 +2444,15 @@ void LLGLManager::asLLSD(LLSD& info)
     info["max_vertex_range"] = mGLMaxVertexRange;
     info["max_index_range"] = mGLMaxIndexRange;
     info["max_texture_size"] = mGLMaxTextureSize;
+
+    // Compute, and the limits a compute feature sizes itself by
+    info["has_compute"] = mHasCompute;
+    info["max_compute_work_group_invocations"] = mMaxComputeWorkGroupInvocations;
+    info["max_compute_shared_memory_size"] = mMaxComputeSharedMemorySize;
+    info["max_image_units"] = mMaxImageUnits;
+    info["max_vertex_shader_storage_blocks"] = mMaxVertexShaderStorageBlocks;
+    info["max_fragment_shader_storage_blocks"] = mMaxFragmentShaderStorageBlocks;
+    info["max_compute_shader_storage_blocks"] = mMaxComputeShaderStorageBlocks;
 
     // Which vendor
     info["is_ati"] = mIsAMD;  // note, do not rename is_ati to is_amd without coordinating with DW
@@ -1394,23 +2481,13 @@ void LLGLManager::reloadExtensionsString()
 
     //reload extensions string
     // I am deeply sorry for how ugly this is. - Rye
-#if LL_SDL_WINDOW
+#if LL_GL_FUNC_POINTER
     PFNGLGETSTRINGIPROC llglGetStringi = (PFNGLGETSTRINGIPROC)LL_GET_PROC_ADDRESS("glGetStringi");
     PFNGLGETINTEGERVPROC llglGetIntegerv = (PFNGLGETINTEGERVPROC)LL_GET_PROC_ADDRESS("glGetIntegerv");
     if (llglGetStringi && llglGetIntegerv)
     {
         GLint num_extensions = 0;
         llglGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
-        for (GLint i = 0; i < num_extensions; ++i) {
-            mGLExtensions.insert(ll_safe_string((char const*)llglGetStringi(GL_EXTENSIONS, i)));
-        }
-    }
-#elif LL_WINDOWS
-    PFNGLGETSTRINGIPROC llglGetStringi = (PFNGLGETSTRINGIPROC)LL_GET_PROC_ADDRESS("glGetStringi");
-    if (llglGetStringi)
-    {
-        GLint num_extensions = 0;
-        glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
         for (GLint i = 0; i < num_extensions; ++i) {
             mGLExtensions.insert(ll_safe_string((char const*)llglGetStringi(GL_EXTENSIONS, i)));
         }
@@ -1433,18 +2510,37 @@ void LLGLManager::reloadExtensionsString()
     }
 #endif
 
-
 #if LL_WINDOWS
     {
         PFNWGLGETEXTENSIONSSTRINGARBPROC wglGetExtensionsStringARB = (PFNWGLGETEXTENSIONSSTRINGARBPROC)LL_GET_PROC_ADDRESS("wglGetExtensionsStringARB");
         if (wglGetExtensionsStringARB)
         {
-            std::string wgl_exts = ll_safe_string((const char*)wglGetExtensionsStringARB(wglGetCurrentDC()));;
+            std::string wgl_exts = ll_safe_string((const char*)wglGetExtensionsStringARB(wglGetCurrentDC()));
             boost::char_separator<char> sep(" ");
             boost::tokenizer<boost::char_separator<char> > tok(wgl_exts, sep);
             for (boost::tokenizer<boost::char_separator<char> >::iterator i = tok.begin(); i != tok.end(); ++i)
             {
                 mGLExtensions.insert(*i);
+            }
+        }
+    }
+#endif
+
+#if LL_SDL_WINDOW && LL_LINUX
+    {
+        SDL_EGLDisplay egl_display = SDL_EGL_GetCurrentDisplay();
+        if (egl_display)
+        {
+            PFNEGLQUERYSTRINGPROC lleglQueryString = (PFNEGLQUERYSTRINGPROC)SDL_EGL_GetProcAddress("eglQueryString");
+            if (lleglQueryString)
+            {
+                std::string egl_exts = ll_safe_string((const char*)lleglQueryString((EGLDisplay)egl_display, EGL_EXTENSIONS));
+                boost::char_separator<char> sep(" ");
+                boost::tokenizer<boost::char_separator<char> > tok(egl_exts, sep);
+                for (boost::tokenizer<boost::char_separator<char> >::iterator i = tok.begin(); i != tok.end(); ++i)
+                {
+                    mGLExtensions.insert(*i);
+                }
             }
         }
     }
@@ -1460,15 +2556,59 @@ void LLGLManager::initExtensions()
     // OpenGL 4.x capabilities
     mHasCubeMapArray = mGLVersion >= 3.99f;
     mHasTransformFeedback = mGLVersion >= 3.99f;
-    mHasDebugOutput = mGLVersion >= 4.29f;
+    // Core in 4.3; also GL_KHR_debug, which names the same entry points without a suffix.
+    // Downgraded below if glDebugMessageCallback doesn't resolve.
+    mHasDebugOutput = mGLVersion >= 4.29f || mGLExtensions.contains("GL_KHR_debug");
     mHasAnisotropic = mGLVersion >= 4.59f;
     if(!mHasAnisotropic)
     {
         mHasAnisotropic = mGLExtensions.contains("GL_EXT_texture_filter_anisotropic");
     }
 
+    // Core in 4.2; on a 4.1 context (macOS) it is still reachable as an ARB extension.
+    // Downgraded below if the entry point turns out not to resolve.
+    //
+    // REQUIRED, alongside GL 4.1 -- not a capability the renderer adapts to. Every texture
+    // is allocated with glTexStorage2D and written by sub-image thereafter, which is the
+    // only model D3D11/12 and Vulkan have: dimensions, format and mip count fixed at
+    // creation. There is no mutable path left to fall back to. Diagnostic only, matching
+    // the GL_MINIMUM_VERSION check -- refusing to launch is a separate change.
+    mHasTextureStorage = mGLVersion >= 4.19f || mGLExtensions.contains("GL_ARB_texture_storage");
+    if (!mHasTextureStorage)
+    {
+        LL_WARNS("RenderInit") << "OpenGL " << mGLVersionString << " exposes neither GL 4.2 nor "
+                               << "GL_ARB_texture_storage, which this viewer requires. Texture "
+                               << "allocation will fail." << LL_ENDL;
+    }
+
+    // REQUIRED, like immutable storage. Never promoted to core, so it is an extension
+    // query at every version. Without it an sRGB-format texture always applies its
+    // transfer function on read and there is no way to say otherwise, which the renderer
+    // relies on being able to do -- see ALSampler::SRGBDecode.
+    mHasTextureSRGBDecode = mGLExtensions.contains("GL_EXT_texture_sRGB_decode");
+    if (!mHasTextureSRGBDecode)
+    {
+        LL_WARNS("RenderInit") << "GL_EXT_texture_sRGB_decode is missing. sRGB-format "
+                               << "textures will decode on every read regardless of what the "
+                               << "sampler asks for." << LL_ENDL;
+    }
+
+    // Core in 4.5; also an ARB extension. Downgraded below if the entry points don't resolve.
+    mHasDirectStateAccess = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_direct_state_access");
+
+    // Core in 4.5; also GL_ARB_clip_control. Gates reverse-Z. Downgraded below if glClipControl
+    // does not resolve. macOS GL 4.1 lacks it entirely and stays forward-Z.
+    mHasClipControl = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_clip_control");
+
+    // Downgraded below if glDepthBoundsEXT does not resolve.
+    mHasDepthBoundsTest = mGLExtensions.contains("GL_EXT_depth_bounds_test");
+
     mHasNVXGpuMemoryInfo = mGLExtensions.contains("GL_NVX_gpu_memory_info");
     mHasATIMemInfo = mGLExtensions.contains("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
+    mHasEXTMemoryObject  = mGLExtensions.contains("GL_EXT_memory_object");
+    mHasEXTSemaphore     = mGLExtensions.contains("GL_EXT_semaphore");
+    mHasEXTMemoryObjectWin32 = mGLExtensions.contains("GL_EXT_memory_object_win32");
+    mHasEXTSemaphoreWin32 = mGLExtensions.contains("GL_EXT_semaphore_win32");
 
     // Misc
     glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
@@ -1479,60 +2619,236 @@ void LLGLManager::initExtensions()
 
 #if LL_GL_FUNC_POINTER
     // Load entire OpenGL API through GetProcAddress, leaving sections beyond mGLVersion unloaded
-
-#if LL_WINDOWS
     LL_DEBUGS("RenderInit") << "GL Probe: Getting symbols" << LL_ENDL;
 
-    // WGL_AMD_gpu_association
-    mHasAMDAssociations = mGLExtensions.contains("WGL_AMD_gpu_association");
-    if(mHasAMDAssociations)
+    // Init EXT and ARB extensions FIRST, because they may be used in later GL versions
+
+    // Immutable texture storage. Resolved here rather than left to the GL_VERSION_4_2
+    // block below: that ladder early-outs before 4.2, so on a 4.1 context exposing
+    // GL_ARB_texture_storage -- macOS -- these would otherwise stay null. On 4.2+ the
+    // ladder resolves the same pointers again, which is harmless.
+    if (mHasTextureStorage)
     {
-        wglGetGPUIDsAMD = (PFNWGLGETGPUIDSAMDPROC)LL_GET_PROC_ADDRESS("wglGetGPUIDsAMD");
-        wglGetGPUInfoAMD = (PFNWGLGETGPUINFOAMDPROC)LL_GET_PROC_ADDRESS("wglGetGPUInfoAMD");
-        wglGetContextGPUIDAMD = (PFNWGLGETCONTEXTGPUIDAMDPROC)LL_GET_PROC_ADDRESS("wglGetContextGPUIDAMD");
-        wglCreateAssociatedContextAMD = (PFNWGLCREATEASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglCreateAssociatedContextAMD");
-        wglCreateAssociatedContextAttribsAMD = (PFNWGLCREATEASSOCIATEDCONTEXTATTRIBSAMDPROC)LL_GET_PROC_ADDRESS("wglCreateAssociatedContextAttribsAMD");
-        wglDeleteAssociatedContextAMD = (PFNWGLDELETEASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglDeleteAssociatedContextAMD");
-        wglMakeAssociatedContextCurrentAMD = (PFNWGLMAKEASSOCIATEDCONTEXTCURRENTAMDPROC)LL_GET_PROC_ADDRESS("wglMakeAssociatedContextCurrentAMD");
-        wglGetCurrentAssociatedContextAMD = (PFNWGLGETCURRENTASSOCIATEDCONTEXTAMDPROC)LL_GET_PROC_ADDRESS("wglGetCurrentAssociatedContextAMD");
-        wglBlitContextFramebufferAMD = (PFNWGLBLITCONTEXTFRAMEBUFFERAMDPROC)LL_GET_PROC_ADDRESS("wglBlitContextFramebufferAMD");
+        glTexStorage1D = (PFNGLTEXSTORAGE1DPROC)LL_GET_PROC_ADDRESS("glTexStorage1D");
+        glTexStorage2D = (PFNGLTEXSTORAGE2DPROC)LL_GET_PROC_ADDRESS("glTexStorage2D");
+        glTexStorage3D = (PFNGLTEXSTORAGE3DPROC)LL_GET_PROC_ADDRESS("glTexStorage3D");
+
+        if (!glTexStorage2D)
+        {
+            // Advertised but not resolvable. Don't let callers trust the flag.
+            mHasTextureStorage = false;
+            LL_WARNS("RenderInit") << "Immutable texture storage advertised (GL " << mGLVersion
+                                   << ") but glTexStorage2D did not resolve; using mutable textures."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Immutable texture storage available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.19f ? ", core)" : ", GL_ARB_texture_storage)")
+                                   << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_INFOS("RenderInit") << "Immutable texture storage unavailable (GL " << mGLVersion
+                               << ", no GL_ARB_texture_storage); using mutable textures." << LL_ENDL;
     }
 
-    // WGL_EXT_swap_control
-    if (mGLExtensions.contains("WGL_EXT_swap_control"))
+    // Immutable buffer storage. Resolved here for the same reason as glTexStorage above: the
+    // GL_VERSION_4_4 ladder early-outs on a lower context, so a 4.1 driver exposing
+    // GL_ARB_buffer_storage -- GLOn12 -- would otherwise leave glBufferStorage null, and every
+    // persistently mapped uniform ring falls back to orphaning without it.
+    if (mGLVersion >= 4.39f || mGLExtensions.contains("GL_ARB_buffer_storage"))
     {
-        wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglSwapIntervalEXT");
-        wglGetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglGetSwapIntervalEXT");
-    }
-    // WGL_ARB_create_context
-    if (mGLExtensions.contains("WGL_ARB_create_context"))
-    {
-        wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)LL_GET_PROC_ADDRESS("wglCreateContextAttribsARB");
-    }
-#endif
+        glBufferStorage = (PFNGLBUFFERSTORAGEPROC)LL_GET_PROC_ADDRESS("glBufferStorage");
 
-#if LL_SDL_WINDOW
-    // GL_VERSION_1_1
-    if (mGLVersion < 1.09f)
-    {
-        return;
+        if (!glBufferStorage)
+        {
+            LL_WARNS("RenderInit") << "Buffer storage advertised (GL " << mGLVersion
+                                   << ") but glBufferStorage did not resolve; uniform rings will orphan."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Buffer storage available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.39f ? ", core)" : ", GL_ARB_buffer_storage)")
+                                   << LL_ENDL;
+        }
     }
-    glDrawArrays = (PFNGLDRAWARRAYSPROC)LL_GET_PROC_ADDRESS("glDrawArrays");
-    glDrawElements = (PFNGLDRAWELEMENTSPROC)LL_GET_PROC_ADDRESS("glDrawElements");
-    glGetPointerv = (PFNGLGETPOINTERVPROC)LL_GET_PROC_ADDRESS("glGetPointerv");
-    glPolygonOffset = (PFNGLPOLYGONOFFSETPROC)LL_GET_PROC_ADDRESS("glPolygonOffset");
-    glCopyTexImage1D = (PFNGLCOPYTEXIMAGE1DPROC)LL_GET_PROC_ADDRESS("glCopyTexImage1D");
-    glCopyTexImage2D = (PFNGLCOPYTEXIMAGE2DPROC)LL_GET_PROC_ADDRESS("glCopyTexImage2D");
-    glCopyTexSubImage1D = (PFNGLCOPYTEXSUBIMAGE1DPROC)LL_GET_PROC_ADDRESS("glCopyTexSubImage1D");
-    glCopyTexSubImage2D = (PFNGLCOPYTEXSUBIMAGE2DPROC)LL_GET_PROC_ADDRESS("glCopyTexSubImage2D");
-    glTexSubImage1D = (PFNGLTEXSUBIMAGE1DPROC)LL_GET_PROC_ADDRESS("glTexSubImage1D");
-    glTexSubImage2D = (PFNGLTEXSUBIMAGE2DPROC)LL_GET_PROC_ADDRESS("glTexSubImage2D");
-    glBindTexture = (PFNGLBINDTEXTUREPROC)LL_GET_PROC_ADDRESS("glBindTexture");
-    glDeleteTextures = (PFNGLDELETETEXTURESPROC)LL_GET_PROC_ADDRESS("glDeleteTextures");
-    glGenTextures = (PFNGLGENTEXTURESPROC)LL_GET_PROC_ADDRESS("glGenTextures");
-    glIsTexture = (PFNGLISTEXTUREPROC)LL_GET_PROC_ADDRESS("glIsTexture");
-    glAreTexturesResident = (PFNGLARETEXTURESRESIDENTPROC)LL_GET_PROC_ADDRESS("glAreTexturesResident");
-#endif
+
+    // Direct state access. Resolved here for the same reason as glTexStorage above: the
+    // GL_VERSION_4_5 ladder early-outs on a lower context, so a 4.1/4.4 driver exposing
+    // GL_ARB_direct_state_access would otherwise leave these null. Only the entry points
+    // actually used are checked -- add to the check when more are adopted.
+    if (mHasDirectStateAccess)
+    {
+        glBindTextureUnit = (PFNGLBINDTEXTUREUNITPROC)LL_GET_PROC_ADDRESS("glBindTextureUnit");
+        glCreateSamplers  = (PFNGLCREATESAMPLERSPROC)LL_GET_PROC_ADDRESS("glCreateSamplers");
+
+        // The named-buffer calls ALUniformBuffer makes. glNamedBufferStorage exists only
+        // alongside buffer storage, so without it the pointer stays null and that class keeps
+        // to the bind-target path.
+        glCreateBuffers               = (PFNGLCREATEBUFFERSPROC)LL_GET_PROC_ADDRESS("glCreateBuffers");
+        glNamedBufferData             = (PFNGLNAMEDBUFFERDATAPROC)LL_GET_PROC_ADDRESS("glNamedBufferData");
+        glNamedBufferSubData          = (PFNGLNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glNamedBufferSubData");
+        glMapNamedBufferRange         = (PFNGLMAPNAMEDBUFFERRANGEPROC)LL_GET_PROC_ADDRESS("glMapNamedBufferRange");
+        glUnmapNamedBuffer            = (PFNGLUNMAPNAMEDBUFFERPROC)LL_GET_PROC_ADDRESS("glUnmapNamedBuffer");
+        glFlushMappedNamedBufferRange = (PFNGLFLUSHMAPPEDNAMEDBUFFERRANGEPROC)LL_GET_PROC_ADDRESS("glFlushMappedNamedBufferRange");
+        if (glBufferStorage)
+        {
+            glNamedBufferStorage = (PFNGLNAMEDBUFFERSTORAGEPROC)LL_GET_PROC_ADDRESS("glNamedBufferStorage");
+        }
+        // And the ones ALGPUBuffer makes. Not part of the check below: glClearNamedBufferSubData exists only beside
+        // GL_ARB_clear_buffer_object, and that class checks each before it uses it.
+        glCopyNamedBufferSubData  = (PFNGLCOPYNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glCopyNamedBufferSubData");
+        glGetNamedBufferSubData   = (PFNGLGETNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glGetNamedBufferSubData");
+        glClearNamedBufferSubData = (PFNGLCLEARNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glClearNamedBufferSubData");
+
+        if (!glBindTextureUnit || !glCreateSamplers || !glCreateBuffers || !glNamedBufferData ||
+            !glNamedBufferSubData || !glMapNamedBufferRange || !glUnmapNamedBuffer ||
+            !glFlushMappedNamedBufferRange)
+        {
+            mHasDirectStateAccess = false;
+            LL_WARNS("RenderInit") << "Direct state access advertised (GL " << mGLVersion
+                                   << ") but its entry points did not resolve; using bind-to-edit."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Direct state access available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.49f ? ", core)" : ", GL_ARB_direct_state_access)")
+                                   << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_INFOS("RenderInit") << "Direct state access unavailable (GL " << mGLVersion
+                               << ", no GL_ARB_direct_state_access); using bind-to-edit." << LL_ENDL;
+    }
+
+    // Clip control. Resolved here for the same reason as glTexStorage/DSA above: the
+    // GL_VERSION_4_5 ladder early-outs on a lower context, so a 4.1/4.4 driver exposing
+    // GL_ARB_clip_control would otherwise leave glClipControl null.
+    if (mHasClipControl)
+    {
+        glClipControl = (PFNGLCLIPCONTROLPROC)LL_GET_PROC_ADDRESS("glClipControl");
+
+        if (!glClipControl)
+        {
+            mHasClipControl = false;
+            LL_WARNS("RenderInit") << "Clip control advertised (GL " << mGLVersion
+                                   << ") but glClipControl did not resolve; reverse-Z unavailable."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Clip control available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.49f ? ", core)" : ", GL_ARB_clip_control)")
+                                   << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_INFOS("RenderInit") << "Clip control unavailable (GL " << mGLVersion
+                               << ", no GL_ARB_clip_control); reverse-Z depth disabled." << LL_ENDL;
+    }
+
+    // Debug output and object labels. Resolved here for the same reason as glTexStorage
+    // above: the GL_VERSION_4_3 ladder early-outs on a lower context, so a 4.1 driver
+    // exposing GL_KHR_debug -- GLOn12 -- would otherwise leave these null.
+    if (mHasDebugOutput)
+    {
+        glDebugMessageControl  = (PFNGLDEBUGMESSAGECONTROLPROC)LL_GET_PROC_ADDRESS("glDebugMessageControl");
+        glDebugMessageInsert   = (PFNGLDEBUGMESSAGEINSERTPROC)LL_GET_PROC_ADDRESS("glDebugMessageInsert");
+        glDebugMessageCallback = (PFNGLDEBUGMESSAGECALLBACKPROC)LL_GET_PROC_ADDRESS("glDebugMessageCallback");
+        glGetDebugMessageLog   = (PFNGLGETDEBUGMESSAGELOGPROC)LL_GET_PROC_ADDRESS("glGetDebugMessageLog");
+        glPushDebugGroup       = (PFNGLPUSHDEBUGGROUPPROC)LL_GET_PROC_ADDRESS("glPushDebugGroup");
+        glPopDebugGroup        = (PFNGLPOPDEBUGGROUPPROC)LL_GET_PROC_ADDRESS("glPopDebugGroup");
+        glObjectLabel          = (PFNGLOBJECTLABELPROC)LL_GET_PROC_ADDRESS("glObjectLabel");
+        glGetObjectLabel       = (PFNGLGETOBJECTLABELPROC)LL_GET_PROC_ADDRESS("glGetObjectLabel");
+        glObjectPtrLabel       = (PFNGLOBJECTPTRLABELPROC)LL_GET_PROC_ADDRESS("glObjectPtrLabel");
+        glGetObjectPtrLabel    = (PFNGLGETOBJECTPTRLABELPROC)LL_GET_PROC_ADDRESS("glGetObjectPtrLabel");
+
+        if (!glDebugMessageCallback)
+        {
+            mHasDebugOutput = false;
+            LL_WARNS("RenderInit") << "Debug output advertised (GL " << mGLVersion
+                                   << ") but glDebugMessageCallback did not resolve; GL debug output is off."
+                                   << LL_ENDL;
+        }
+    }
+
+    // Reset status. Core in 4.5, and GL_KHR_robustness names it without a suffix on a lower
+    // context, so it is resolved here for the GL_VERSION_4_5 ladder's early-out as above.
+    // GL_ARB_robustness alone names it glGetGraphicsResetStatusARB, which the window layer
+    // looks up itself.
+    if (mGLVersion >= 4.49f || mGLExtensions.contains("GL_KHR_robustness"))
+    {
+        glGetGraphicsResetStatus = (PFNGLGETGRAPHICSRESETSTATUSPROC)LL_GET_PROC_ADDRESS("glGetGraphicsResetStatus");
+        glReadnPixels            = (PFNGLREADNPIXELSPROC)LL_GET_PROC_ADDRESS("glReadnPixels");
+        glGetnUniformfv          = (PFNGLGETNUNIFORMFVPROC)LL_GET_PROC_ADDRESS("glGetnUniformfv");
+        glGetnUniformiv          = (PFNGLGETNUNIFORMIVPROC)LL_GET_PROC_ADDRESS("glGetnUniformiv");
+        glGetnUniformuiv         = (PFNGLGETNUNIFORMUIVPROC)LL_GET_PROC_ADDRESS("glGetnUniformuiv");
+    }
+
+    // Texture barrier. Core in 4.5, and GL_ARB_texture_barrier names it without a suffix on a
+    // lower context, so it is resolved here for the GL_VERSION_4_5 ladder's early-out as above.
+    // GL_NV_texture_barrier, which ARB's took over unchanged, names it glTextureBarrierNV.
+    if (mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_texture_barrier"))
+    {
+        glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)LL_GET_PROC_ADDRESS("glTextureBarrier");
+    }
+    if (!glTextureBarrier && mGLExtensions.contains("GL_NV_texture_barrier"))
+    {
+        glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)LL_GET_PROC_ADDRESS("glTextureBarrierNV");
+    }
+
+    // GL_EXT_memory_object
+    if (mHasEXTMemoryObject)
+    {
+        glCreateMemoryObjectsEXT = (PFNGLCREATEMEMORYOBJECTSEXTPROC)LL_GET_PROC_ADDRESS("glCreateMemoryObjectsEXT");
+        glDeleteMemoryObjectsEXT = (PFNGLDELETEMEMORYOBJECTSEXTPROC)LL_GET_PROC_ADDRESS("glDeleteMemoryObjectsEXT");
+        glMemoryObjectParameterivEXT = (PFNGLMEMORYOBJECTPARAMETERIVEXTPROC)LL_GET_PROC_ADDRESS("glMemoryObjectParameterivEXT");
+        glTexStorageMem2DEXT = (PFNGLTEXSTORAGEMEM2DEXTPROC)LL_GET_PROC_ADDRESS("glTexStorageMem2DEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_memory_object symbols loaded" << LL_ENDL;
+    }
+
+    // GL_EXT_semaphore
+    if (mHasEXTSemaphore)
+    {
+        glGenSemaphoresEXT = (PFNGLGENSEMAPHORESEXTPROC)LL_GET_PROC_ADDRESS("glGenSemaphoresEXT");
+        glDeleteSemaphoresEXT = (PFNGLDELETESEMAPHORESEXTPROC)LL_GET_PROC_ADDRESS("glDeleteSemaphoresEXT");
+        glSemaphoreParameterui64vEXT = (PFNGLSEMAPHOREPARAMETERUI64VEXTPROC)LL_GET_PROC_ADDRESS("glSemaphoreParameterui64vEXT");
+        glWaitSemaphoreEXT = (PFNGLWAITSEMAPHOREEXTPROC)LL_GET_PROC_ADDRESS("glWaitSemaphoreEXT");
+        glSignalSemaphoreEXT = (PFNGLSIGNALSEMAPHOREEXTPROC)LL_GET_PROC_ADDRESS("glSignalSemaphoreEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_semaphore symbols loaded" << LL_ENDL;
+    }
+
+    // GL_EXT_memory_object_win32
+    if (mHasEXTMemoryObjectWin32)
+    {
+        glImportMemoryWin32HandleEXT = (PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC)LL_GET_PROC_ADDRESS("glImportMemoryWin32HandleEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_memory_object_win32 symbols loaded" << LL_ENDL;
+    }
+
+    // GL_EXT_semaphore_win32
+    if (mHasEXTSemaphoreWin32)
+    {
+        glImportSemaphoreWin32HandleEXT = (PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC)LL_GET_PROC_ADDRESS("glImportSemaphoreWin32HandleEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_semaphore_win32 symbols loaded" << LL_ENDL;
+    }
+
+    // GL_EXT_depth_bounds_test. Never core; a context has it or it does not.
+    if (mHasDepthBoundsTest)
+    {
+        glDepthBoundsEXT = (PFNGLDEPTHBOUNDSEXTPROC)LL_GET_PROC_ADDRESS("glDepthBoundsEXT");
+        if (!glDepthBoundsEXT)
+        {
+            mHasDepthBoundsTest = false;
+            LL_WARNS("RenderInit") << "GL_EXT_depth_bounds_test advertised but glDepthBoundsEXT did not resolve" << LL_ENDL;
+        }
+    }
+    LL_INFOS("RenderInit") << "Depth bounds test " << (mHasDepthBoundsTest ? "available" : "unavailable") << LL_ENDL;
 
     // GL_VERSION_1_2
     if (mGLVersion < 1.19f)
@@ -2260,10 +3576,14 @@ const std::string getGLErrorString(GLenum error)
         return "Invalid Framebuffer Operation";
     case GL_OUT_OF_MEMORY:
         return "Out of Memory";
+#ifdef GL_STACK_UNDERFLOW
     case GL_STACK_UNDERFLOW:
         return "Stack Underflow";
+#endif
+#ifdef GL_STACK_OVERFLOW
     case GL_STACK_OVERFLOW:
         return "Stack Overflow";
+#endif
 #ifdef GL_TABLE_TOO_LARGE
     case GL_TABLE_TOO_LARGE:
         return "Table too large";
@@ -2276,14 +3596,14 @@ const std::string getGLErrorString(GLenum error)
 //this function outputs gl error to the log file, does not crash the code.
 void log_glerror()
 {
-    if (LL_UNLIKELY(!gGLManager.mInited))
+    if (!gGLManager.mInited) [[unlikely]]
     {
         return ;
     }
     //  Create or update texture to be used with this data
     GLenum error;
     error = glGetError();
-    while (LL_UNLIKELY(error))
+    while (error) [[unlikely]]
     {
         std::string gl_error_msg = getGLErrorString(error);
         LL_WARNS() << "GL Error: 0x" << std::hex << error << std::dec << " GL Error String: " << gl_error_msg << LL_ENDL;
@@ -2297,7 +3617,7 @@ void do_assert_glerror()
     GLenum error;
     error = glGetError();
     bool quit = false;
-    if (LL_UNLIKELY(error))
+    if (error) [[unlikely]]
     {
         quit = true;
         std::string gl_error_msg = getGLErrorString(error);
@@ -2367,12 +3687,21 @@ GLboolean LLGLDepthTest::sWriteEnabled = GL_TRUE; // OpenGL default
 //static
 void LLGLState::initClass()
 {
+    // Runs per context, from initGL: the map and the depth state describe this context, and
+    // GL starts every context at its defaults.
+    sStateMap.clear();
+    LLGLDepthTest::initClass();
+
     sStateMap[GL_DITHER] = GL_TRUE;
     // sStateMap[GL_TEXTURE_2D] = GL_TRUE;
 
     //make sure multisample defaults to disabled
     sStateMap[GL_MULTISAMPLE] = GL_FALSE;
     glDisable(GL_MULTISAMPLE);
+
+    // Ensure SRGB framebuffer is disabled by default
+    sStateMap[GL_FRAMEBUFFER_SRGB] = GL_FALSE;
+    glDisable(GL_FRAMEBUFFER_SRGB);
 }
 
 //static
@@ -2392,8 +3721,9 @@ void LLGLState::resetTextureStates()
     glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
     for (S32 j = maxTextureUnits-1; j >=0; j--)
     {
-        gGL.getTexUnit(j)->activate();
-        j == 0 ? gGL.getTexUnit(j)->enable(LLTexUnit::TT_TEXTURE) : gGL.getTexUnit(j)->disable();
+        // Slot 0 used to be spared and left "enabled for TT_TEXTURE" instead, which reset
+        // nothing -- it only set the target field. A reset releases every slot.
+        gGL.getTextureSlot(j)->unbind();
     }
 }
 
@@ -2664,7 +3994,7 @@ void parse_glsl_version(S32& major, S32& minor)
     LLStringUtil::convertToS32(minor_str, minor);
 }
 
-LLGLUserClipPlane::LLGLUserClipPlane(const LLPlane& p, const glm::mat4& modelview, const glm::mat4& projection, bool apply)
+LLGLUserClipPlane::LLGLUserClipPlane(const LLPlane& p, const LLMatrix4a& modelview, const LLMatrix4a& projection, bool apply)
 {
     mApply = apply;
 
@@ -2689,34 +4019,80 @@ void LLGLUserClipPlane::disable()
     mApply = false;
 }
 
+// NOTE: dead code -- LLGLUserClipPlane is not constructed anywhere in the tree (water/
+// mirror clipping is done by shader discard). The oblique-clip math below hardcodes the
+// [-1,1] NDC convention (cplane[3] -= 1). If this is ever revived it MUST be made
+// reverse-Z aware (the ZERO_TO_ONE near-plane constant differs) before use.
 void LLGLUserClipPlane::setPlane(F32 a, F32 b, F32 c, F32 d)
 {
-    const glm::mat4& P = mProjection;
-    const glm::mat4& M = mModelview;
+    // the plane into clip space: through the inverse transpose of the
+    // modelview then projection
+    LLMatrix4a invtrans_MVP;
+    invtrans_MVP.setMul(mModelview, mProjection);
+    invtrans_MVP.invert();
+    invtrans_MVP.transpose();
+    LLVector4a cplane;
+    invtrans_MVP.transform4(LLVector4a(a, b, c, d), cplane);
 
-    glm::mat4 invtrans_MVP = glm::transpose(glm::inverse(P*M));
-    glm::vec4 oplane(a,b,c,d);
-    glm::vec4 cplane = invtrans_MVP * oplane;
+    cplane.mul(1.f / fabsf(cplane[2])); // normalize such that depth is not scaled
+    cplane.getF32ptr()[3] -= 1.f;
 
-    cplane /= fabs(cplane[2]); // normalize such that depth is not scaled
-    cplane[3] -= 1;
+    if (cplane[2] < 0.f)
+    {
+        cplane.negate();
+    }
 
-    if(cplane[2] < 0)
-        cplane *= -1;
-
-    glm::mat4 suffix = glm::identity<glm::mat4>();
-    suffix = glm::row(suffix, 2, cplane);
-    glm::mat4 newP = suffix * P;
+    // the projection with its depth column replaced by the plane
+    LLMatrix4a suffix;
+    suffix.setIdentity();
+    suffix.setColumn<2>(cplane);
+    LLMatrix4a newP;
+    newP.setMul(mProjection, suffix);
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
-    gGL.loadMatrix(glm::value_ptr(newP));
-    gGLObliqueProjectionInverse = LLMatrix4(glm::value_ptr(glm::transpose(glm::inverse(newP))));
+    gGL.loadMatrix(newP);
     gGL.matrixMode(LLRender::MM_MODELVIEW);
 }
 
 LLGLUserClipPlane::~LLGLUserClipPlane()
 {
     disable();
+}
+
+GLenum LLGLDepthTest::remap(GLenum func)
+{
+    if (!LLRender::sReverseZ)
+    {
+        return func;
+    }
+    switch (func)
+    {
+        case GL_LESS:     return GL_GREATER;
+        case GL_GREATER:  return GL_LESS;
+        case GL_LEQUAL:   return GL_GEQUAL;
+        case GL_GEQUAL:   return GL_LEQUAL;
+        // EQUAL/NOTEQUAL/ALWAYS/NEVER are direction-independent under a monotone
+        // depth remap and must NOT flip.
+        default:          return func;
+    }
+}
+
+//static
+void LLGLDepthTest::initClass()
+{
+    sDepthEnabled = GL_FALSE;
+    sDepthFunc = GL_LESS;
+    sWriteEnabled = GL_TRUE;
+    glDepthFunc(remap(sDepthFunc));
+}
+
+void LLGLDepthTest::rebase()
+{
+    // Force the physical depth func to agree with the current translation of the tracked
+    // (semantic) func. Used by the reverse-Z latch after LLRender::sReverseZ toggles.
+    gGL.flush();
+    glDepthFunc(remap(sDepthFunc));
+    stop_glerror();
 }
 
 LLGLDepthTest::LLGLDepthTest(GLboolean depth_enabled, GLboolean write_enabled, GLenum depth_func)
@@ -2743,7 +4119,7 @@ LLGLDepthTest::LLGLDepthTest(GLboolean depth_enabled, GLboolean write_enabled, G
     if (depth_func != sDepthFunc)
     {
         gGL.flush();
-        glDepthFunc(depth_func);
+        glDepthFunc(remap(depth_func));
         sDepthFunc = depth_func;
     }
     if (write_enabled != sWriteEnabled)
@@ -2768,7 +4144,7 @@ LLGLDepthTest::~LLGLDepthTest()
     if (sDepthFunc != mPrevDepthFunc)
     {
         gGL.flush();
-        glDepthFunc(mPrevDepthFunc);
+        glDepthFunc(remap(mPrevDepthFunc));
         sDepthFunc = mPrevDepthFunc;
     }
     if (sWriteEnabled != mPrevWriteEnabled )
@@ -2791,7 +4167,7 @@ void LLGLDepthTest::checkState()
 
         if (glIsEnabled(GL_DEPTH_TEST) != sDepthEnabled ||
             sWriteEnabled != mask ||
-            sDepthFunc != func)
+            remap(sDepthFunc) != (GLenum)func)
         {
             if (gDebugSession)
             {
@@ -2805,114 +4181,7 @@ void LLGLDepthTest::checkState()
     }
 }
 
-LLGLSquashToFarClip::LLGLSquashToFarClip()
-{
-    glm::mat4 proj = get_current_projection();
-    setProjectionMatrix(proj, 0);
-}
 
-LLGLSquashToFarClip::LLGLSquashToFarClip(const glm::mat4& P, U32 layer)
-{
-    setProjectionMatrix(P, layer);
-}
-
-void LLGLSquashToFarClip::setProjectionMatrix(glm::mat4 projection, U32 layer)
-{
-    F32 depth = 0.99999f - 0.0001f * layer;
-
-    glm::vec4 P_row_3 = glm::row(projection, 3) * depth;
-    projection = glm::row(projection, 2, P_row_3);
-
-    LLRender::eMatrixMode last_matrix_mode = gGL.getMatrixMode();
-
-    gGL.matrixMode(LLRender::MM_PROJECTION);
-    gGL.pushMatrix();
-    gGL.loadMatrix(glm::value_ptr(projection));
-
-    gGL.matrixMode(last_matrix_mode);
-}
-
-LLGLSquashToFarClip::~LLGLSquashToFarClip()
-{
-    LLRender::eMatrixMode last_matrix_mode = gGL.getMatrixMode();
-
-    gGL.matrixMode(LLRender::MM_PROJECTION);
-    gGL.popMatrix();
-
-    gGL.matrixMode(last_matrix_mode);
-}
-
-
-
-LLGLSyncFence::LLGLSyncFence()
-{
-    mSync = 0;
-}
-
-LLGLSyncFence::~LLGLSyncFence()
-{
-    if (mSync)
-    {
-        glDeleteSync(mSync);
-    }
-}
-
-void LLGLSyncFence::placeFence()
-{
-    if (mSync)
-    {
-        glDeleteSync(mSync);
-    }
-    mSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-}
-
-bool LLGLSyncFence::isCompleted()
-{
-    bool ret = true;
-    if (mSync)
-    {
-        GLenum status = glClientWaitSync(mSync, 0, 1);
-        if (status == GL_TIMEOUT_EXPIRED)
-        {
-            ret = false;
-        }
-    }
-    return ret;
-}
-
-void LLGLSyncFence::wait()
-{
-    if (mSync)
-    {
-        while (glClientWaitSync(mSync, 0, FENCE_WAIT_TIME_NANOSECONDS) == GL_TIMEOUT_EXPIRED)
-        { //track the number of times we've waited here
-        }
-    }
-}
-
-LLGLSPipelineSkyBox::LLGLSPipelineSkyBox()
-: mCullFace(GL_CULL_FACE)
-, mSquashClip()
-{
-}
-
-LLGLSPipelineSkyBox::~LLGLSPipelineSkyBox()
-{
-}
-
-LLGLSPipelineDepthTestSkyBox::LLGLSPipelineDepthTestSkyBox(bool depth_test, bool depth_write)
-: LLGLSPipelineSkyBox()
-, mDepth(depth_test ? GL_TRUE : GL_FALSE, depth_write ? GL_TRUE : GL_FALSE, GL_LEQUAL)
-{
-
-}
-
-LLGLSPipelineBlendSkyBox::LLGLSPipelineBlendSkyBox(bool depth_test, bool depth_write)
-: LLGLSPipelineDepthTestSkyBox(depth_test, depth_write)
-, mBlend(GL_BLEND)
-{
-    gGL.setSceneBlendType(LLRender::BT_ALPHA);
-}
 
 #if LL_WINDOWS
 // Expose desired use of high-performance graphics processor to Optimus driver and to AMD driver

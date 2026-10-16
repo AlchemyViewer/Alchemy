@@ -26,15 +26,11 @@
 #include "linden_common.h"
 
 #include "xform.h"
+#include "llsimdmath.h"
 
-LLXform::LLXform()
-{
-    init();
-}
-
-LLXform::~LLXform()
-{
-}
+// LLXform default ctor and destructor are now inline constexpr defaulted in
+// the header (using in-class member initialisers). isRoot/isRootEdit below
+// serve as the vtable key function.
 
 // Link optimization - don't inline these LL_WARNS()
 void LLXform::warn(const char* const msg)
@@ -70,14 +66,32 @@ void LLXformMatrix::update()
 {
     if (mParent)
     {
-        mWorldPosition = mPosition;
+        // Rotating the offset and composing the two rotations were two calls
+        // into llquaternion.cpp, each returning a value the caller then wrote
+        // to memory, and a skeleton runs this once per joint per frame. The
+        // vector forms are inline and read the same operands.
+        const LLQuaternion2 parent_rotation(mParent->getWorldRotation());
+
+        LLVector4a offset;
+        offset.load3(mPosition.mV);
         if (mParent->getScaleChildOffset())
         {
-            mWorldPosition.scaleVec(mParent->getScale());
+            LLVector4a parent_scale;
+            parent_scale.load3(mParent->getScale().mV);
+            offset.mul(parent_scale);
         }
-        mWorldPosition *= mParent->getWorldRotation();
-        mWorldPosition += mParent->getWorldPosition();
-        mWorldRotation = mRotation * mParent->getWorldRotation();
+
+        LLVector4a rotated;
+        parent_rotation.rotate(offset, rotated);
+
+        LLVector4a parent_position;
+        parent_position.load3(mParent->getWorldPosition().mV);
+        rotated.add(parent_position);
+        mWorldPosition.set(rotated.getF32ptr());
+
+        LLQuaternion2 world_rotation;
+        world_rotation.setMul(LLQuaternion2(mRotation), parent_rotation);
+        world_rotation.store(mWorldRotation);
     }
     else
     {
@@ -94,26 +108,25 @@ void LLXformMatrix::updateMatrix(bool update_bounds)
 
     if (update_bounds && (mChanged & MOVED))
     {
-        mMin.mV[0] = mMax.mV[0] = mWorldMatrix.mMatrix[3][0];
-        mMin.mV[1] = mMax.mV[1] = mWorldMatrix.mMatrix[3][1];
-        mMin.mV[2] = mMax.mV[2] = mWorldMatrix.mMatrix[3][2];
+        // Half the sum of the absolute basis rows is the extent the box has to
+        // grow by on each axis; the same three sums the scalar version built a
+        // component at a time.
+        LLVector4a extent, row1, row2;
+        extent.setAbs(mWorldMatrix.getRow<0>());
+        row1.setAbs(mWorldMatrix.getRow<1>());
+        row2.setAbs(mWorldMatrix.getRow<2>());
+        row1.add(row2);
+        extent.add(row1);
+        extent.mul(0.5f);
 
-        F32 f0 = (fabs(mWorldMatrix.mMatrix[0][0])+fabs(mWorldMatrix.mMatrix[1][0])+fabs(mWorldMatrix.mMatrix[2][0])) * 0.5f;
-        F32 f1 = (fabs(mWorldMatrix.mMatrix[0][1])+fabs(mWorldMatrix.mMatrix[1][1])+fabs(mWorldMatrix.mMatrix[2][1])) * 0.5f;
-        F32 f2 = (fabs(mWorldMatrix.mMatrix[0][2])+fabs(mWorldMatrix.mMatrix[1][2])+fabs(mWorldMatrix.mMatrix[2][2])) * 0.5f;
-
-        mMin.mV[0] -= f0;
-        mMin.mV[1] -= f1;
-        mMin.mV[2] -= f2;
-
-        mMax.mV[0] += f0;
-        mMax.mV[1] += f1;
-        mMax.mV[2] += f2;
+        mMin = mMax = mWorldMatrix.getTranslation();
+        mMin.sub(extent);
+        mMax.add(extent);
     }
 }
 
 void LLXformMatrix::getMinMax(LLVector3& min, LLVector3& max) const
 {
-    min = mMin;
-    max = mMax;
+    min.set(mMin.getF32ptr());
+    max.set(mMax.getF32ptr());
 }

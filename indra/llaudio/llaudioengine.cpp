@@ -30,6 +30,8 @@
 #include "llaudioengine.h"
 #include "llstreamingaudio.h"
 
+#include <unordered_set>
+
 #include "llerror.h"
 #include "llmath.h"
 
@@ -60,6 +62,16 @@ LLAudioEngine::LLAudioEngine()
 
 LLAudioEngine::~LLAudioEngine()
 {
+    // Safety net for paths that never call shutdown() explicitly
+    // (init failure between LLAudioEngine::init and the derived
+    // backend's init, or a delete on a half-initialised engine).
+    // shutdown() is idempotent — its iterations no-op on empty
+    // containers — so a normal shutdown-then-destruct flow runs it
+    // twice harmlessly.
+    if (!mAllSources.empty() || !mAllData.empty() || mStreamingAudioImpl)
+    {
+        LLAudioEngine::shutdown();
+    }
 }
 
 LLStreamingAudioInterface* LLAudioEngine::getStreamingAudioImpl()
@@ -122,19 +134,32 @@ void LLAudioEngine::shutdown()
     // Clean up wind source
     cleanupWind();
 
-    // Clean up audio sources
+    // Clean up audio sources. Clear the map after delete so a
+    // re-entered or destructor-driven shutdown doesn't double-delete
+    // and a stray findAudioSource post-shutdown can't return a
+    // dangling pointer.
     for (source_map::value_type& src_pair : mAllSources)
     {
         delete src_pair.second;
     }
-
+    mAllSources.clear();
 
     // Clean up audio data
     for (data_map::value_type& data_pair : mAllData)
     {
         delete data_pair.second;
     }
+    mAllData.clear();
 
+    // Clean up streaming-audio impl. Caller (llappviewer / llstartup)
+    // is supposed to delete this before shutdown, but if the path is
+    // missed we'd otherwise leak. Idempotent: nulling after delete
+    // keeps a second shutdown from double-freeing.
+    if (mStreamingAudioImpl)
+    {
+        delete mStreamingAudioImpl;
+        mStreamingAudioImpl = nullptr;
+    }
 
     // Clean up channels
     S32 i;
@@ -225,6 +250,7 @@ void LLAudioEngine::updateChannels()
 
 void LLAudioEngine::idle()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     // "Update" all of our audio sources, clean up dead ones.
     // Primarily does position updating, cleanup of unused audio sources.
     // Also does regeneration of the current priority of each audio source.
@@ -239,9 +265,8 @@ void LLAudioEngine::idle()
     }
 
     F32 max_priority = -1.f;
-    LLAudioSource *max_sourcep = NULL; // Maximum priority source without a channel
-    source_map::iterator iter;
-    for (iter = mAllSources.begin(); iter != mAllSources.end();)
+    LLAudioSource *max_sourcep = nullptr; // Maximum priority source without a channel
+    for (auto iter = mAllSources.begin(), iter_end = mAllSources.end(); iter != iter_end;)
     {
         LLAudioSource *sourcep = iter->second;
 
@@ -362,10 +387,19 @@ void LLAudioEngine::idle()
                 updateBufferForData(sourcep->mCurrentDatap);
             }
 
-            // Actually play the associated data.
+            // Actually play the associated data. Refresh the local
+            // channel pointer after setupChannel(): today the call is
+            // a no-op when the source already has a channel (which it
+            // does on this branch), but a future change to setup
+            // Channel that ever swaps channels would leave the stale
+            // local pointing at the wrong slot.
             sourcep->setupChannel();
-            channelp->updateBuffer();
-            sourcep->getChannel()->play();
+            channelp = sourcep->getChannel();
+            if (channelp)
+            {
+                channelp->updateBuffer();
+                channelp->play();
+            }
             continue;
         }
 
@@ -541,21 +575,40 @@ LLAudioBuffer * LLAudioEngine::getFreeBuffer()
         }
     }
 
+    // Build a set of buffer pointers actively referenced by a
+    // channel. idle() clears mInUse on every buffer at the top of
+    // the tick and re-asserts it later inside updateChannels(). If
+    // a source's update() pass during that same tick lands here,
+    // every buffer looks "unused" — without this safeguard the LRU
+    // pick below could delete a buffer whose mCurrentBufferp still
+    // aliases a playing voice in some channel. The set+lookup
+    // pattern keeps the work to O(channels + buffers) regardless of
+    // either dimension, so it scales gracefully if either grows.
+    // LLAudioEngine is friended by LLAudioChannel so reaching into
+    // mCurrentBufferp directly is allowed.
+    std::unordered_set<LLAudioBuffer*> held_buffers;
+    held_buffers.reserve(mChannels.size());
+    for (LLAudioChannel* channelp : mChannels)
+    {
+        if (channelp && channelp->mCurrentBufferp)
+        {
+            held_buffers.insert(channelp->mCurrentBufferp);
+        }
+    }
 
     // Grab the oldest unused buffer
     F32 max_age = -1.f;
     S32 buffer_id = -1;
     for (i = 0; i < LL_MAX_AUDIO_BUFFERS; i++)
     {
-        if (mBuffers[i])
+        if (mBuffers[i]
+            && !mBuffers[i]->mInUse
+            && held_buffers.find(mBuffers[i]) == held_buffers.end())
         {
-            if (!mBuffers[i]->mInUse)
+            if (mBuffers[i]->mLastUseTimer.getElapsedTimeF32() > max_age)
             {
-                if (mBuffers[i]->mLastUseTimer.getElapsedTimeF32() > max_age)
-                {
-                    max_age = mBuffers[i]->mLastUseTimer.getElapsedTimeF32();
-                    buffer_id = i;
-                }
+                max_age = mBuffers[i]->mLastUseTimer.getElapsedTimeF32();
+                buffer_id = i;
             }
         }
     }
@@ -607,7 +660,15 @@ LLAudioChannel * LLAudioEngine::getFreeChannel(const F32 priority)
     for (i = 0; i < LL_MAX_AUDIO_CHANNELS; i++)
     {
         LLAudioChannel *channelp = mChannels[i];
+        // Phase-1 above evicts every "free" (not playing, not
+        // waiting) channel before we reach this loop, so any
+        // surviving channel here is supposed to have an associated
+        // source. Implicit invariant — defend it explicitly because
+        // a future change to the eviction order would otherwise
+        // turn a missed wire-up into a null deref.
+        if (!channelp) continue;
         LLAudioSource *sourcep = channelp->getSource();
+        if (!sourcep) continue;
         if (sourcep->getPriority() < min_priority)
         {
             min_channelp = channelp;
@@ -674,6 +735,19 @@ void LLAudioEngine::setMuted(bool muted)
         mMuted = muted;
         setMasterGain(mMasterGain);
     }
+    // setMuted is the *only* call path that ever enables wind in
+    // this codebase — enableWind is otherwise never directly toggled
+    // by a caller, and no UI surfaces an independent wind switch. So
+    // the unconditional enableWind(!mMuted) below is load-bearing:
+    // it's what brings wind up the first time the engine becomes
+    // unmuted, not just a side-effect-of-mute. A previous attempt to
+    // "preserve any independent enableWind(false) across the mute
+    // round-trip" via a snapshot member broke this because the
+    // snapshot was always false at startup (wind hasn't been turned
+    // on yet), so the first unmute restored to false and wind never
+    // came up. If someone later adds an independent wind toggle, the
+    // right fix is to add a separate setWindEnabledPreference()
+    // surface, not to refactor this line.
     enableWind(!mMuted);
 }
 
@@ -721,20 +795,56 @@ void LLAudioEngine::setMaxWindGain(F32 gain)
 
 F64 LLAudioEngine::mapWindVecToGain(LLVector3 wind_vec)
 {
-    F64 gain = 0.0;
-
-    gain = wind_vec.magVec();
+    F64 gain = static_cast<F64>(wind_vec.magVec());
 
     if (gain)
     {
-        if (gain > 20)
+        if (gain > static_cast<F64>(WIND_MAX_VELOCITY_MPS))
         {
-            gain = 20;
+            gain = static_cast<F64>(WIND_MAX_VELOCITY_MPS);
         }
-        gain = gain/20.0;
+        gain = gain / static_cast<F64>(WIND_MAX_VELOCITY_MPS);
     }
 
     return (gain);
+}
+
+LLAudioEngine::WindAltitudeShape
+LLAudioEngine::computeWindAltitudeShape(F32 height_above_water) const
+{
+    WindAltitudeShape shape;
+    if (height_above_water < 0.f)
+    {
+        // Submerged: water muffles + attenuates. Cutoff drops to
+        // ~30 % over the first 2 m of depth (head plus a margin);
+        // gain drops to ~20 % within the first 0.5 m of submersion.
+        // Both clamp to a floor so very-deep camera doesn't go all
+        // the way to silence — at extreme depth you'd expect zero
+        // wind, but ambient sounds + sim audio carry the scene; the
+        // tail keeps the transition from sounding broken.
+        const F32 depth = -height_above_water;
+        const F32 depth_for_freq = llmin(1.f, depth / 2.f);
+        const F32 depth_for_gain = llmin(1.f, depth / 0.5f);
+        shape.freq_mul = lerp(1.f, 0.3f, depth_for_freq);
+        shape.gain_mul = lerp(1.f, 0.2f, depth_for_gain);
+    }
+    else if (mAltitudeBoost > 0.f)
+    {
+        // Above water: subtle gain lift with altitude. SL regions
+        // allow camera altitudes from 0 to 4096 m (skyboxes at 1-3 km
+        // are common; 4 km is the ceiling), so the boost is shaped
+        // over the full range rather than saturating at low hundreds
+        // of metres. A square-root curve gives perceptible lift down
+        // low (where the user notices the transition off the ground)
+        // while still leaving headroom at the higher altitudes where
+        // skyboxes live — linear would feel flat at ground level and
+        // over-eager at the ceiling. Max gain multiplier at 4096 m
+        // and boost=1 is 1.5x; ground level is always 1.0x.
+        constexpr F32 kSimAltitudeMaxM = 4096.f;
+        const F32 alt_norm = sqrtf(llmin(1.f, height_above_water / kSimAltitudeMaxM));
+        shape.gain_mul = 1.f + 0.5f * alt_norm * mAltitudeBoost;
+    }
+    return shape;
 }
 
 
@@ -748,15 +858,19 @@ F64 LLAudioEngine::mapWindVecToPitch(LLVector3 wind_vec)
     norm_wind.normVec();
     listen_right.setVec(1.0,0.0,0.0);
 
-    // measure angle between wind vec and listener right axis (on 0,PI)
-    theta = acos(norm_wind * listen_right);
+    // measure angle between wind vec and listener right axis (on 0,PI).
+    // normVec doesn't guarantee dot ends up in [-1, 1] (floating-point
+    // rounding can land a unit-vector dot at 1.0000001), so clamp
+    // before acos to avoid the occasional NaN tick.
+    const F64 dot = llclamp(static_cast<F64>(norm_wind * listen_right), -1.0, 1.0);
+    theta = acos(dot);
 
     // put it on 0, 1
     theta /= F_PI;
 
     // put it on [0, 0.5, 0]
     if (theta > 0.5) theta = 1.0-theta;
-    if (theta < 0) theta = 0;
+    if (theta < 0.0) theta = 0.0;
 
     return (theta);
 }
@@ -773,31 +887,49 @@ F64 LLAudioEngine::mapWindVecToPan(LLVector3 wind_vec)
     LLVector3 norm_wind = wind_vec;
     norm_wind.normVec();
 
-    // measure angle between wind vec and listener right axis (on 0,PI)
-    theta = acos(norm_wind * listen_right);
+    // measure angle between wind vec and listener right axis (on 0,PI).
+    // Clamp before acos for the same FP-rounding reason as
+    // mapWindVecToPitch — a unit-vector dot can land slightly outside
+    // [-1, 1] and yield NaN.
+    const F64 dot = llclamp(static_cast<F64>(norm_wind * listen_right), -1.0, 1.0);
+    theta = acos(dot);
 
     // put it on 0, 1
     theta /= F_PI;
 
-    return (theta);
+    // Compress the full [0, 1] hard-L / hard-R range into a milder
+    // [0.3, 0.7] so the wind drone keeps both ears active when the
+    // listener rotates. Ambient wind is perceptually "all around
+    // you" — a hard pan that fully empties the opposite ear breaks
+    // that mental model. The compressed range still gives a
+    // perceptible directional cue (the windward ear is louder) but
+    // doesn't make the drone slide audibly from ear to ear as the
+    // camera spins, which was the symptom users hit on the FAudio
+    // backend (and would have hit on OpenAL / FMOD too — same
+    // LLWindGen pan math underneath all three).
+    return 0.3 + theta * 0.4;
 }
 
 
 void LLAudioEngine::triggerSound(const LLUUID &audio_uuid, const LLUUID& owner_id, const F32 gain,
-                                 const S32 type, const LLVector3d &pos_global)
+                                 const S32 type, const LLVector3d &pos_global, const LLUUID& source_object, const LLUUID& audio_source_id)
 {
     // Create a new source (since this can't be associated with an existing source.
     //LL_INFOS() << "Localized: " << audio_uuid << LL_ENDL;
 
+    // Do not load muted or silent sounds.
     if (mMuted || gain <FLT_EPSILON*2)
     {
         return;
     }
 
-    LLUUID source_id;
-    source_id.generate();
+    LLUUID source_id = audio_source_id;
+    if (source_id.isNull())
+    {
+        source_id.generate();
+    }
 
-    LLAudioSource *asp = new LLAudioSource(source_id, owner_id, gain, type);
+    LLAudioSource *asp = new LLAudioSource(source_id, owner_id, gain, type, source_object, true);
     addAudioSource(asp);
     if (pos_global.isExactlyZero())
     {
@@ -812,14 +944,21 @@ void LLAudioEngine::triggerSound(const LLUUID &audio_uuid, const LLUUID& owner_i
     asp->play(audio_uuid);
 }
 
-void LLAudioEngine::triggerSound(SoundData& soundData)
+void LLAudioEngine::triggerSound(const SoundData& soundData)
 {
     triggerSound(soundData.audio_uuid, soundData.owner_id, soundData.gain, soundData.type, soundData.pos_global);
 }
 
+// All listener setters guard mListenerp because allocateListener can
+// fail (out of memory, a future backend with conditional support) and
+// because a mid-session backend swap could briefly leave it null
+// between teardown and re-allocateListener. The viewer's main loop
+// calls setListener() per frame, so an unguarded deref would segfault
+// the moment that window opens.
+
 void LLAudioEngine::setListenerPos(LLVector3 aVec)
 {
-    mListenerp->setPosition(aVec);
+    if (mListenerp) mListenerp->setPosition(aVec);
 }
 
 
@@ -838,25 +977,25 @@ LLVector3 LLAudioEngine::getListenerPos()
 
 void LLAudioEngine::setListenerVelocity(LLVector3 aVec)
 {
-    mListenerp->setVelocity(aVec);
+    if (mListenerp) mListenerp->setVelocity(aVec);
 }
 
 
 void LLAudioEngine::translateListener(LLVector3 aVec)
 {
-    mListenerp->translate(aVec);
+    if (mListenerp) mListenerp->translate(aVec);
 }
 
 
 void LLAudioEngine::orientListener(LLVector3 up, LLVector3 at)
 {
-    mListenerp->orient(up, at);
+    if (mListenerp) mListenerp->orient(up, at);
 }
 
 
 void LLAudioEngine::setListener(LLVector3 pos, LLVector3 vel, LLVector3 up, LLVector3 at)
 {
-    mListenerp->set(pos,vel,up,at);
+    if (mListenerp) mListenerp->set(pos,vel,up,at);
 }
 
 
@@ -906,15 +1045,16 @@ F32 LLAudioEngine::getRolloffFactor()
 
 void LLAudioEngine::commitDeferredChanges()
 {
-    mListenerp->commitDeferredChanges();
+    if (mListenerp)
+    {
+        mListenerp->commitDeferredChanges();
+    }
 }
 
 
 LLAudioSource * LLAudioEngine::findAudioSource(const LLUUID &source_id)
 {
-    source_map::iterator iter;
-    iter = mAllSources.find(source_id);
-
+    auto iter = mAllSources.find(source_id);
     if (iter == mAllSources.end())
     {
         return NULL;
@@ -929,7 +1069,7 @@ LLAudioSource * LLAudioEngine::findAudioSource(const LLUUID &source_id)
 LLAudioData * LLAudioEngine::getAudioData(const LLUUID &audio_uuid)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
-    if(isCorruptSound(audio_uuid))
+    if( isCorruptSound( audio_uuid ) )
         return nullptr;
 
     auto iter = mAllData.find(audio_uuid);
@@ -954,8 +1094,7 @@ void LLAudioEngine::addAudioSource(LLAudioSource *asp)
 
 void LLAudioEngine::cleanupAudioSource(LLAudioSource *asp)
 {
-    source_map::iterator iter;
-    iter = mAllSources.find(asp->getID());
+    auto iter = mAllSources.find(asp->getID());
     if (iter == mAllSources.end())
     {
         LL_WARNS() << "Cleaning up unknown audio source!" << LL_ENDL;
@@ -978,7 +1117,7 @@ bool LLAudioEngine::hasDecodedFile(const LLUUID &uuid)
     wav_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str);
     wav_path += ".dsf";
 
-    if (gDirUtilp->fileExists(wav_path))
+    if (LLFile::isfile(wav_path))
     {
         return true;
     }
@@ -1000,9 +1139,36 @@ bool LLAudioEngine::hasLocalFile(const LLUUID &uuid)
 void LLAudioEngine::startNextTransfer()
 {
     //LL_INFOS() << "LLAudioEngine::startNextTransfer()" << LL_ENDL;
-    if (mCurrentTransfer.notNull() || getMuted())
+    if (mCurrentTransfer.notNull())
     {
-        //LL_INFOS() << "Transfer in progress, aborting" << LL_ENDL;
+        // Stuck-transfer timeout. mCurrentTransfer is cleared when
+        // assetCallback fires; on a normal asset fetch this happens
+        // within seconds. If the callback never fires (asset system
+        // shutdown race, driver bug, dead connection during a long
+        // download), mCurrentTransfer stays non-null forever and no
+        // new sound ever gets queued. mCurrentTransferTimer was set
+        // alongside mCurrentTransfer (line ~1295) precisely to bound
+        // that wait. 90 seconds is well past any healthy asset fetch
+        // and below the threshold where a user would have given up.
+        constexpr F32 kTransferStuckTimeoutSec = 90.f;
+        if (mCurrentTransferTimer.getElapsedTimeF32() > kTransferStuckTimeoutSec)
+        {
+            LL_WARNS("AudioEngine") << "Asset transfer for " << mCurrentTransfer
+                                    << " did not complete after "
+                                    << kTransferStuckTimeoutSec
+                                    << "s; force-clearing and resuming queue."
+                                    << LL_ENDL;
+            mCurrentTransfer.setNull();
+            // Fall through to picking the next candidate.
+        }
+        else
+        {
+            //LL_INFOS() << "Transfer in progress, aborting" << LL_ENDL;
+            return;
+        }
+    }
+    if (getMuted())
+    {
         return;
     }
 
@@ -1012,7 +1178,6 @@ void LLAudioEngine::startNextTransfer()
     S32 i;
     LLAudioSource *asp = NULL;
     LLAudioData *adp = NULL;
-    data_map::iterator data_iter;
 
     // Check all channels for currently playing sounds.
     F32 max_pri = -1.f;
@@ -1133,7 +1298,6 @@ void LLAudioEngine::startNextTransfer()
     if (asset_id.isNull())
     {
         max_pri = -1.f;
-        source_map::iterator source_iter;
         for (source_map::value_type& source_pair : mAllSources)
         {
             asp = source_pair.second;
@@ -1238,13 +1402,87 @@ void LLAudioEngine::assetCallback(const LLUUID &uuid, LLAssetType::EType type, v
     gAudiop->startNextTransfer();
 }
 
+void LLAudioEngine::logSoundPlay(const LLUUID& id, LLVector3d position, S32 type, const LLUUID& assetid, const LLUUID& ownerid, const LLUUID& sourceid, bool is_trigger, bool is_looped)
+{
+    if(isCorruptSound(assetid))
+        return;
+
+    pruneSoundLog();
+    if (mSoundHistory.size() > 2048)
+        return; // Might clear out oldest entries before giving up?
+
+    auto item = std::make_unique<LLSoundHistoryItem>();
+    item->mID = id;
+    item->mPosition = position;
+    item->mType = type;
+    item->mAssetID = assetid;
+    item->mOwnerID = ownerid;
+    item->mSourceID = sourceid;
+    item->mPlaying = true;
+    item->mTimeStarted = LLTimer::getUptimeSeconds();
+    item->mTimeStopped = F64_MAX;
+    item->mIsTrigger = is_trigger;
+    item->mIsLooped = is_looped;
+
+    item->mReviewed = false;
+    item->mReviewedCollision = false;
+
+    mSoundHistory.insert_or_assign(id, std::move(item));
+}
+
+void LLAudioEngine::logSoundStop(const LLUUID& id)
+{
+    auto iter = mSoundHistory.find(id);
+    if (iter != mSoundHistory.end())
+    {
+        LLSoundHistoryItem& hist_item = *iter->second;
+        hist_item.mPlaying = false;
+        hist_item.mTimeStopped = LLTimer::getUptimeSeconds();
+        pruneSoundLog();
+    }
+}
+
+void LLAudioEngine::pruneSoundLog()
+{
+    // Throttle the LRU pass — it's O(N²) over the history map — but
+    // bypass the throttle whenever we're already past the soft cap.
+    // Without the bypass, 63 of every 64 calls would early-return
+    // and the history would grow unbounded toward logSoundPlay's
+    // hard cap (2048), at which point new entries get silently
+    // dropped instead of replacing old ones. The hot path (history
+    // well below cap) still skips the loop 63 of 64 times.
+    constexpr S32 kPruneThrottle = 64;
+    constexpr size_t kSoftCap = 256;
+    if (++mSoundHistoryPruneCounter < kPruneThrottle
+        && mSoundHistory.size() <= kSoftCap)
+    {
+        return;
+    }
+    mSoundHistoryPruneCounter = 0;
+    while (mSoundHistory.size() > kSoftCap)
+    {
+        auto iter = mSoundHistory.begin();
+        auto end = mSoundHistory.end();
+        F64 lowest_time = (*iter).second->mTimeStopped;
+        LLUUID lowest_id = (*iter).first;
+        for (; iter != end; ++iter)
+        {
+            if ((*iter).second->mTimeStopped < lowest_time)
+            {
+                lowest_time = (*iter).second->mTimeStopped;
+                lowest_id = (*iter).first;
+            }
+        }
+        mSoundHistory.erase(lowest_id);
+    }
+}
 
 //
 // LLAudioSource implementation
 //
 
 
-LLAudioSource::LLAudioSource(const LLUUID& id, const LLUUID& owner_id, const F32 gain, const S32 type)
+LLAudioSource::LLAudioSource(const LLUUID& id, const LLUUID& owner_id, const F32 gain, const S32 type, const LLUUID& source_id, const bool is_trigger)
 :   mID(id),
     mOwnerID(owner_id),
     mPriority(0.f),
@@ -1260,8 +1498,11 @@ LLAudioSource::LLAudioSource(const LLUUID& id, const LLUUID& owner_id, const F32
     mType(type),
     mChannelp(NULL),
     mCurrentDatap(NULL),
-    mQueuedDatap(NULL)
+    mQueuedDatap(NULL),
+    mSourceID(source_id),
+    mIsTrigger(is_trigger)
 {
+    mLogID.generate();
 }
 
 
@@ -1272,6 +1513,11 @@ LLAudioSource::~LLAudioSource()
         // Stop playback of this sound
         mChannelp->setSource(NULL);
         mChannelp = NULL;
+    }
+
+    if (mType != LLAudioEngine::AUDIO_TYPE_UI) // && mSourceID.notNull())
+    {
+        gAudiop->logSoundStop(mLogID);
     }
 }
 
@@ -1292,6 +1538,26 @@ void LLAudioSource::update()
     if(mCorrupted)
     {
         return ; //no need to update
+    }
+
+    // Prune preload entries that have finished one way or the other.
+    // hasPendingPreloads() already filters by hasDecodedData /
+    // hasDecodeFailed when it walks the map, but without this prune
+    // the map grows for the source's lifetime — every priority tick
+    // re-walks an ever-larger collection. Erasing finished entries
+    // here (the update path is per-source per-tick) keeps the map
+    // bounded to genuinely-still-pending preloads.
+    for (auto it = mPreloadMap.begin(); it != mPreloadMap.end();)
+    {
+        LLAudioData* adp = it->second;
+        if (adp && (adp->hasDecodedData() || adp->hasDecodeFailed()))
+        {
+            it = mPreloadMap.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
     }
 
     if (!getCurrentBuffer())
@@ -1396,12 +1662,18 @@ void LLAudioSource::stop()
 
 bool LLAudioSource::play(const LLUUID &audio_uuid)
 {
+    if(mType != LLAudioEngine::AUDIO_TYPE_UI) //&& mSourceID.notNull())
+    {
+        gAudiop->logSoundPlay(mLogID, mPositionGlobal, mType, audio_uuid, mOwnerID, mSourceID, mIsTrigger, mLoop);
+    }
+
     // Special abuse of play(); don't play a sound, but kill it.
     if (audio_uuid.isNull())
     {
         if (getChannel())
         {
-            getChannel()->setSource(NULL);
+            if(getChannel()->getSource())
+                getChannel()->setSource(NULL);
             setChannel(NULL);
             if (!isMuted())
             {
@@ -1421,6 +1693,8 @@ bool LLAudioSource::play(const LLUUID &audio_uuid)
     }
 
     LLAudioData *adp = gAudiop->getAudioData(audio_uuid);
+    if( !adp )
+        return false;
     addAudioData(adp);
 
     if (isMuted())
@@ -1677,27 +1951,36 @@ void LLAudioChannel::setSource(LLAudioSource *sourcep)
 
     if (!sourcep)
     {
-        // Clearing the source for this channel, don't need to do anything.
-        //LL_INFOS() << "Clearing source for channel" << LL_ENDL;
+        // Clearing the source for this channel. cleanup() in each
+        // backend nulls mCurrentBufferp as well — null it here too
+        // so the contract is explicit regardless of which derived
+        // cleanup runs. Without this, a future channel re-use with
+        // a buffer that happens to alias the stale mCurrentBufferp
+        // would short-circuit the rebuild path in updateBuffer.
         cleanup();
         mCurrentSourcep = NULL;
+        mCurrentBufferp = NULL;
         mWaiting = false;
+        return;
     }
-    else
+
+    LL_DEBUGS("AudioEngine") << "( id: " << sourcep->getID() << ")" << LL_ENDL;
+
+    if (sourcep == mCurrentSourcep)
     {
-        LL_DEBUGS("AudioEngine") << "( id: " << sourcep->getID() << ")" << LL_ENDL;
-
-        if (sourcep == mCurrentSourcep)
-        {
-            // Don't reallocate the channel, this will make FMOD goofy.
-            //LL_INFOS() << "Calling setSource with same source!" << LL_ENDL;
-        }
-
-        mCurrentSourcep = sourcep;
-
-        updateBuffer();
-        update3DPosition();
+        // Same source — updateBuffer / update3DPosition still run
+        // (intentional: keeps gain + position fresh) but we don't
+        // tear anything down. The comment that used to live here
+        // about "Don't reallocate the channel, this will make FMOD
+        // goofy" was misleading; the no-reallocation behaviour comes
+        // from updateBuffer's bufferp == mCurrentBufferp short-
+        // circuit, not from anything setSource itself does.
     }
+
+    mCurrentSourcep = sourcep;
+
+    updateBuffer();
+    update3DPosition();
 }
 
 bool LLAudioChannel::updateBuffer()
@@ -1816,18 +2099,19 @@ bool LLAudioData::load()
     mBufferp = gAudiop->getFreeBuffer();
     if (!mBufferp)
     {
-        // No free buffers, abort.
-        LL_INFOS() << "Not able to allocate a new audio buffer, aborting." << LL_ENDL;
-        // *TODO: Mark this failure differently so the audio engine could retry loading this buffer in the future
-        mHasWAVLoadFailed = true;
-        return true;
+        // No free buffers, abort. This is transient — the pool can
+        // be momentarily full while other buffers' mInUse flips are
+        // mid-tick — so signal a load failure to the caller (so the
+        // source isn't told to play a null buffer) but DON'T set
+        // mHasWAVLoadFailed. Setting that permanent flag here would
+        // kill the asset for the engine's lifetime over a one-frame
+        // pool-pressure incident; the next idle's update() will
+        // retry naturally.
+        LL_INFOS() << "Not able to allocate a new audio buffer, will retry next idle." << LL_ENDL;
+        return false;
     }
 
-    std::string uuid_str;
-    std::string wav_path;
-    mID.toString(uuid_str);
-    wav_path= gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str) + ".dsf";
-
+    std::string wav_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, mID.asString()) + ".dsf";
     mHasWAVLoadFailed = !mBufferp->loadWAV(wav_path);
     if (mHasWAVLoadFailed)
     {
@@ -1851,14 +2135,14 @@ bool LLAudioData::load()
     return true;
 }
 
-const U32 MAX_SOUND_RETRIES = 25;
+const U32 MAX_SOUND_RETRIES = 5;
 
 void LLAudioEngine::markSoundCorrupt(const LLUUID& sound_id)
 {
     auto itr = mCorruptData.find(sound_id);
     if (mCorruptData.end() == itr)
         mCorruptData[sound_id] = 1;
-    else if (itr->second != MAX_SOUND_RETRIES)
+    else if (itr->second < MAX_SOUND_RETRIES)
         itr->second += 1;
 }
 

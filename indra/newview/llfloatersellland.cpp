@@ -56,9 +56,11 @@ class LLFloaterSellLandUI final
 :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterSellLandUI, LLFloater);
+
     LLFloaterSellLandUI(const LLSD& key);
     virtual ~LLFloaterSellLandUI();
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onClose(bool app_quitting) override;
 
 private:
     class SelectionObserver : public LLParcelObserver
@@ -101,7 +103,7 @@ private:
     void onBuyerNameCache(const LLAvatarName& av_name);
 
 public:
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     bool setParcel(LLViewerRegion* region, LLParcelSelectionHandle parcel);
     static bool callbackHighlightTransferable(const LLSD& notification, const LLSD& response);
@@ -122,13 +124,6 @@ LLFloater* LLFloaterSellLand::buildFloater(const LLSD& key)
     return floater;
 }
 
-#if LL_WINDOWS
-// passing 'this' during construction generates a warning. The callee
-// only uses the pointer to hold a reference to 'this' which is
-// already valid, so this call does the correct thing. Disable the
-// warning so that we can compile without generating a warning.
-#pragma warning(disable : 4355)
-#endif
 LLFloaterSellLandUI::LLFloaterSellLandUI(const LLSD& key)
 :   LLFloater(key),
     mParcelSelectionObserver(this),

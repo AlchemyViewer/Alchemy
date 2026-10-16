@@ -147,7 +147,7 @@ public:
     void setMaxCameraDistantFromSubject ( F32 m ); // this should be determined by llAgent
     bool isZoomedToMinimumDistance();
     LLVector3   getUpVector();
-    void zoom( S32 );
+    void zoom( F32 );
 
     // overrides for setters and getters
     virtual void setPitch( F32 );

@@ -32,9 +32,11 @@
 class LLLandmarksPanel;
 class LLFolderView;
 
-class LLPlacesInventoryPanel : public LLAssetFilteredInventoryPanel
+class LLPlacesInventoryPanel final : public LLAssetFilteredInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLPlacesInventoryPanel, LLAssetFilteredInventoryPanel);
+
     struct Params
         :   public LLInitParam::Block<Params, LLAssetFilteredInventoryPanel::Params>
     {

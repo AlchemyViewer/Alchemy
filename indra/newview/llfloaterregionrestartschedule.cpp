@@ -272,9 +272,9 @@ void LLFloaterRegionRestartSchedule::requestRegionShcheduleCoro(std::string url,
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("RegionShcheduleRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("RegionShcheduleRequest", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     httpOpts->setWantHeaders(true);
 
@@ -283,7 +283,7 @@ void LLFloaterRegionRestartSchedule::requestRegionShcheduleCoro(std::string url,
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
-    LLFloaterRegionRestartSchedule* floater = dynamic_cast<LLFloaterRegionRestartSchedule*>(handle.get());
+    LLFloaterRegionRestartSchedule* floater = ALViewType::as<LLFloaterRegionRestartSchedule>(handle.get());
     if (!floater)
     {
         LL_DEBUGS("Region") << "Region Restart Schedule floater is already dead" << LL_ENDL;
@@ -367,9 +367,9 @@ void LLFloaterRegionRestartSchedule::setRegionShcheduleCoro(std::string url, LLS
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("RegionShcheduleSetter", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("RegionShcheduleSetter", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     httpOpts->setWantHeaders(true);
 
@@ -378,7 +378,7 @@ void LLFloaterRegionRestartSchedule::setRegionShcheduleCoro(std::string url, LLS
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
-    LLFloaterRegionRestartSchedule* floater = dynamic_cast<LLFloaterRegionRestartSchedule*>(handle.get());
+    LLFloaterRegionRestartSchedule* floater = ALViewType::as<LLFloaterRegionRestartSchedule>(handle.get());
     if (floater)
     {
         floater->closeFloater();

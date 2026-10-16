@@ -32,7 +32,6 @@
 #include "llviewerprecompiledheaders.h"
 #include "llviewercontrol.h"
 #include "llglheaders.h"
-#include "llsphere.h"
 #include "llvoicevisualizer.h"
 #include "llviewercamera.h"
 #include "llviewerobject.h"
@@ -97,7 +96,7 @@ F32  LLVoiceVisualizer::sAahPowerTransfersf = 0.0f;
 LLVoiceVisualizer::LLVoiceVisualizer( const U8 type )
     : LLHUDEffect(type)
 {
-    mCurrentTime                    = mTimer.getTotalSeconds();
+    mCurrentTime                    = LLFrameTimer::getTotalSeconds();
     mPreviousTime                   = mCurrentTime;
     mStartTime                      = mCurrentTime;
     mVoiceSourceWorldPosition       = LLVector3( 0.0f, 0.0f, 0.0f );
@@ -108,8 +107,6 @@ LLVoiceVisualizer::LLVoiceVisualizer( const U8 type )
     mMaxGesticulationAmplitude      = DEFAULT_MAXIMUM_GESTICULATION_AMPLITUDE;
     mSoundSymbol.mActive            = true;
     mSoundSymbol.mPosition          = LLVector3( 0.0f, 0.0f, 0.0f );
-
-    mTimer.reset();
 
     const char* sound_level_img[] =
     {
@@ -131,7 +128,6 @@ LLVoiceVisualizer::LLVoiceVisualizer( const U8 type )
         mSoundSymbol.mWaveExpansion         [i] = 1.0f;
     }
 
-    mSoundSymbol.mTexture[0]->setFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
 
     // The first instance loads the initial state from prefs.
     if (!sPrefsInitialized)
@@ -175,7 +171,7 @@ void LLVoiceVisualizer::setVoiceEnabled( bool v )
 //---------------------------------------------------
 void LLVoiceVisualizer::setStartSpeaking()
 {
-    mStartTime              = mTimer.getTotalSeconds();
+    mStartTime              = LLFrameTimer::getTotalSeconds();
     mCurrentlySpeaking      = true;
     mSoundSymbol.mActive    = true;
 
@@ -300,7 +296,7 @@ void LLVoiceVisualizer::lipSyncOohAah( F32& ooh, F32& aah )
         }
         F32 transfer_aah = sAahPowerTransfer[transfer_index];
 
-        F64 current_time   = mTimer.getTotalSeconds();
+        F64 current_time   = LLFrameTimer::getTotalSeconds();
         F64 elapsed_time   = current_time - mStartTime;
         U32 elapsed_frames = (U32) (elapsed_time * sOohAahRate);
         U32 elapsed_oohs   = elapsed_frames % sOohs;
@@ -348,7 +344,7 @@ void LLVoiceVisualizer::render()
     if ( mSoundSymbol.mActive )
     {
         mPreviousTime = mCurrentTime;
-        mCurrentTime = mTimer.getTotalSeconds();
+        mCurrentTime = LLFrameTimer::getTotalSeconds();
 
         //---------------------------------------------------------------
         // set the sound symbol position over the source (avatar's head)
@@ -377,7 +373,7 @@ void LLVoiceVisualizer::render()
         //-----------------------------
         // bind texture 0 (the dot)
         //-----------------------------
-        gGL.getTexUnit(0)->bind(mSoundSymbol.mTexture[0]);
+        gGL.getTextureSlot(0)->bindSampled(mSoundSymbol.mTexture[0], ALSamplers::AnisoWrap);
 
         //-------------------------------------------------------------
         // now render the dot
@@ -502,7 +498,7 @@ void LLVoiceVisualizer::render()
                 LLVector3 topRight      = mSoundSymbol.mPosition - l + u;
 
                 gGL.color4fv( LLColor4( red, green, blue, mSoundSymbol.mWaveOpacity[i] ).mV );
-                gGL.getTexUnit(0)->bind(mSoundSymbol.mTexture[i]);
+                gGL.getTextureSlot(0)->bindSampled(mSoundSymbol.mTexture[i], ALSamplers::AnisoWrap);
 
 
                 //---------------------------------------------------

@@ -28,9 +28,11 @@
 #include "llviewerprecompiledheaders.h"
 #include "llevents.h"
 #include "lleventfilter.h"
-#include "llregex.h"
+#include "alregex.h"
 #include "llversioninfo.h"
 #include "stringize.h"
+
+#include "llversioninfovars.h"
 
 #if ! defined(LL_VIEWER_CHANNEL)       \
  || ! defined(LL_VIEWER_VERSION_MAJOR) \
@@ -52,9 +54,8 @@ LLVersionInfo::LLVersionInfo():
     // macro expands to the string name of the channel, but without quotes. We
     // need to turn it into a quoted string. LL_TO_STRING() does that.
     mWorkingChannelName(LL_TO_STRING(LL_VIEWER_CHANNEL)),
-    build_configuration(LLBUILD_CONFIG), // set in indra/cmake/BuildVersion.cmake
     // instantiate an LLEventMailDrop with canonical name to listen for news
-    // from SLVersionChecker
+    // from the Viewer Version Manager
     mPump{new LLEventMailDrop("relnotes")},
     // immediately listen on mPump, store arriving URL into mReleaseNotes
     mStore{new LLStoreListener<std::string>(*mPump, mReleaseNotes)}
@@ -134,24 +135,24 @@ LLVersionInfo::ViewerMaturity LLVersionInfo::getViewerMaturity() const
 
     std::string channel = getChannel();
 
-    static const boost::regex is_test_channel("\\bTest\\b");
-    static const boost::regex is_beta_channel("\\b(Beta|Develop)\\b");  // Develop is an alias for Beta
-    static const boost::regex is_project_channel("\\bProject\\b");
-    static const boost::regex is_release_channel("\\bRelease\\b");
+    static const ALRegex is_test_channel("\\bTest\\b");
+    static const ALRegex is_beta_channel("\\b(Beta|Develop)\\b");  // Develop is an alias for Beta
+    static const ALRegex is_project_channel("\\bProject\\b");
+    static const ALRegex is_release_channel("\\bRelease\\b");
 
-    if (ll_regex_search(channel, is_release_channel))
+    if (is_release_channel.search(channel))
     {
         maturity = RELEASE_VIEWER;
     }
-    else if (ll_regex_search(channel, is_beta_channel))
+    else if (is_beta_channel.search(channel))
     {
         maturity = BETA_VIEWER;
     }
-    else if (ll_regex_search(channel, is_project_channel))
+    else if (is_project_channel.search(channel))
     {
         maturity = PROJECT_VIEWER;
     }
-    else if (ll_regex_search(channel, is_test_channel))
+    else if (is_test_channel.search(channel))
     {
         maturity = TEST_VIEWER;
     }
@@ -168,7 +169,17 @@ LLVersionInfo::ViewerMaturity LLVersionInfo::getViewerMaturity() const
 
 std::string LLVersionInfo::getBuildConfig() const
 {
-    return build_configuration;
+#if LL_OPTDEBUG
+    return "OptDebug";
+#elif LL_DEBUG
+    return "Debug";
+#elif LL_RELEASE_WITH_DEBUG_INFO
+    return "RelWithDebInfo";
+#elif LL_RELEASE_FOR_DOWNLOAD
+    return "Release";
+#else
+    return "Unknown";
+#endif
 }
 
 std::string LLVersionInfo::getReleaseNotes() const

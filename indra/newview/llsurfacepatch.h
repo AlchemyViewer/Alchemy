@@ -37,26 +37,9 @@ class LLVector2;
 class LLColor4U;
 class LLAgent;
 
-// A patch shouldn't know about its visibility since that really depends on the
-// camera that is looking (or not looking) at it.  So, anything about a patch
-// that is specific to a camera should be in the class below.
-class LLPatchVisibilityInfo
-{
-public:
-    LLPatchVisibilityInfo() :
-        mbIsVisible(false),
-        mDistance(0.f),
-        mRenderLevel(0),
-        mRenderStride(0) { };
-    ~LLPatchVisibilityInfo() { };
-
-    bool mbIsVisible;
-    F32 mDistance;          // Distance from camera
-    S32 mRenderLevel;
-    U32 mRenderStride;
-};
-
-
+// The per-vertex random that dithers the composition alpha ramp, keyed on the
+// world position so neighbouring regions agree along their border.
+F32 terrain_composition_noise(F64 x_global, F64 y_global);
 
 class LLSurfacePatch
 {
@@ -77,51 +60,41 @@ public:
 
     void updateVerticalStats();
     void updateCompositionStats();
-    template<bool PBR>
-    void updateNormals();
 
     void updateEastEdge();
     void updateNorthEdge();
+    // The sample at (grids per patch edge, grids per patch edge) is the meeting
+    // point of the east column and the north row, which neither edge update
+    // writes: from the diagonal region when one is connected, from whichever
+    // of north and east exists and has data, else the patch's own diagonal.
+    void updateNorthEastCorner();
 
-    void updateCameraDistanceRegion( const LLVector3 &pos_region);
-    void updateVisibility();
     void updateGL();
 
     void dirtyZ(); // Dirty the z values of this patch
     void setHasReceivedData();
     bool getHasReceivedData() const;
 
-    F32 getDistance() const;
     F32 getMaxZ() const;
     F32 getMinZ() const;
     F32 getMeanComposition() const;
     F32 getMinComposition() const;
     F32 getMaxComposition() const;
     const LLVector3 &getCenterRegion() const;
-    const U64 &getLastUpdateTime() const;
+    U32 getUpdateCount() const              { return mUpdateCount; }
     LLSurface *getSurface() const { return mSurfacep; }
     LLVector3 getPointAgent(const U32 x, const U32 y) const; // get the point at the offset.
     LLVector2 getTexCoords(const U32 x, const U32 y) const;
 
-    // Per-vertex normals
-    // *TODO: PBR=true is a test implementation solely for proof-of-concept.
-    // Final implementation would likely be very different and may not even use
-    // this function. If we decide to keep calcNormalFlat, remove index as it
-    // is a debug parameter for testing.
-    template<bool PBR>
-    void calcNormal(const U32 x, const U32 y, const U32 stride);
-    const LLVector3 &getNormal(const U32 x, const U32 y) const;
-
-    // Per-triangle normals for flat edges
-    void calcNormalFlat(LLVector3& normal_out, const U32 x, const U32 y, const U32 index /* 0 or 1 */);
-
-    void eval(const U32 x, const U32 y, const U32 stride,
-                LLVector3 *vertex, LLVector3 *normal, LLVector2* tex0, LLVector2 *tex1) const;
-
-
+    // A grid point of the patch: region-local position, and the composition
+    // value with its alpha-ramp noise -- what the heightmap-with-noise paint
+    // mode reads per vertex. The paint-map bake builds its full-resolution
+    // mesh from this.
+    void eval(const U32 x, const U32 y, LLVector3 *vertex, LLVector2 *tex1) const;
 
     LLVector3 getOriginAgent() const;
     const LLVector3d &getOriginGlobal() const;
+    const LLVector3 &getOriginRegion() const        { return mOriginRegion; }
     void setOriginGlobal(const LLVector3d &origin_global);
 
     // connectivity -- each LLPatch points at 5 neighbors (or NULL)
@@ -134,13 +107,8 @@ public:
     // +---+---+---+
 
 
-    bool getVisible() const;
-    U32 getRenderStride() const;
-    S32 getRenderLevel() const;
-
     void setSurface(LLSurface *surfacep);
     void setDataZ(F32 *data_z)                  { mDataZ = data_z; }
-    void setDataNorm(LLVector3 *data_norm)      { mDataNorm = data_norm; }
     F32 *getDataZ() const                       { return mDataZ; }
 
     void dirty();           // Mark this surface patch as dirty...
@@ -156,7 +124,6 @@ public:
 
 protected:
     LLSurfacePatch *mNeighborPatches[8]; // Adjacent patches
-    bool mNormalsInvalid[9];  // Which normals are invalid
 
     bool mDirty;
     bool mDirtyZStats;
@@ -164,13 +131,9 @@ protected:
 
     U32 mDataOffset;
     F32 *mDataZ;
-    LLVector3 *mDataNorm;
 
     // Pointer to the LLVOSurfacePatch object which is used in the new renderer.
     LLPointer<LLVOSurfacePatch> mVObjp;
-
-    // All of the camera-dependent stuff should be in its own class...
-    LLPatchVisibilityInfo mVisInfo;
 
     // pointers to beginnings of patch data fields
     LLVector3d mOriginGlobal;
@@ -188,13 +151,12 @@ protected:
 
     U8 mConnectedEdge;      // This flag is non-zero iff patch is on at least one edge
                             // of LLSurface that is "connected" to another LLSurface
-    U64 mLastUpdateTime;    // Time patch was last updated
+    U32 mUpdateCount;       // Counts dirtyZ() calls: a reader holding an older count knows the
+                            // heights changed, however many changes one frame brings
 
     LLSurface *mSurfacep; // Pointer to "parent" surface
 };
 
-extern template void LLSurfacePatch::updateNormals</*PBR=*/false>();
-extern template void LLSurfacePatch::updateNormals</*PBR=*/true>();
 
 
 #endif // LL_LLSURFACEPATCH_H

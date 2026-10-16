@@ -32,7 +32,7 @@
 
 // This class handles folder types (similar to assettype, except for folders)
 // and operations on those.
-class LL_COMMON_API LLFolderType
+class LLFolderType
 {
 public:
     // ! BACKWARDS COMPATIBILITY ! Folder type enums must match asset type enums.
@@ -94,6 +94,9 @@ public:
         FT_SETTINGS = 56,
 
         FT_MATERIAL = 57,
+
+        FT_ANIM_OVERRIDES = 58,
+        FT_RLV = 60,
 
         FT_COUNT,
 

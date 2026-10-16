@@ -27,11 +27,9 @@
 #define NON_INDEXED 2
 #define NON_INDEXED_NO_COLOR 3
 
-uniform mat3 normal_matrix;
-uniform mat4 texture_matrix0;
-uniform mat4 projection_matrix;
-uniform mat4 modelview_matrix;
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 in vec3 position;
 
@@ -48,7 +46,9 @@ in vec4 diffuse_color;
 in vec2 texcoord0;
 
 #ifdef HAS_SKIN
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec3 skinDirection(mat3x4 b, vec3 dir);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 #ifdef IS_AVATAR_SKIN
 mat4 getSkinnedTransform();
@@ -67,6 +67,10 @@ out vec3 vary_norm;
 
 uniform float near_clip;
 
+// Linearises an sRGB prim tint for a pass that shades in linear. Defined in
+// deferred/textureUtilV.glsl, which every vertex stage attaches.
+vec4 linearizeVertexTint(vec4 tint);
+
 void main()
 {
     vec4 pos;
@@ -74,13 +78,11 @@ void main()
 
     //transform vertex
 #ifdef HAS_SKIN
-    mat4 trans = getObjectSkinnedTransform();
-    trans = modelview_matrix * trans;
+    mat3x4 skin = getSkinBlend();
 
-    pos = trans * vec4(position.xyz, 1.0);
+    pos = skinTransformH(skin, position.xyz, modelview_matrix);
 
-    norm = position.xyz + normal.xyz;
-    norm = normalize((trans * vec4(norm, 1.0)).xyz - pos.xyz);
+    norm = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
     vec4 frag_pos = projection_matrix * pos;
     gl_Position = frag_pos;
 #else
@@ -119,18 +121,43 @@ void main()
     vary_position = pos.xyz;
 
 #ifdef USE_VERTEX_COLOR
+    // Tint arrives sRGB. This pass decodes its diffuse on the sampler and shades in linear,
+    // so the tint has to be linearized to match -- FOR_IMPOSTOR included, since the impostor
+    // bake joined that convention. IS_HUD is the remaining exception: it samples raw and
+    // decodes the tinted product in the fragment stage, staying pixel-exact. Guarded on
+    // exactly the condition that leaves LLGLSLShader::mLinearDiffuse false, so the shader and
+    // the bind cannot disagree about which space the multiply happens in.
+#ifdef LINEAR_DIFFUSE
+    vertex_color = linearizeVertexTint(diffuse_color);
+#else
     vertex_color = diffuse_color;
 #endif
+#endif
 
+// The FS derives a screen UV as vary_fragcoord.xy / vary_fragcoord.z. Forward-Z abuses the
+// view-space z plus near_clip as a stand-in for clip w; under reverse-Z that pseudo-w is
+// meaningless (and clip.z tends to 0 at the far plane), so carry the true clip w instead.
 #ifdef HAS_SKIN
+#ifdef REVERSE_Z
+    vary_fragcoord.xyz = vec3(frag_pos.xy, frag_pos.w);
+#else
     vary_fragcoord.xyz = frag_pos.xyz + vec3(0,0,near_clip);
+#endif
 #else
 
 #ifdef IS_AVATAR_SKIN
+#ifdef REVERSE_Z
+    vary_fragcoord.xyz = vec3(frag_pos.xy, frag_pos.w);
+#else
     vary_fragcoord.xyz = pos.xyz + vec3(0,0,near_clip);
+#endif
 #else
     pos = modelview_projection_matrix * vert;
+#ifdef REVERSE_Z
+    vary_fragcoord.xyz = vec3(pos.xy, pos.w);
+#else
     vary_fragcoord.xyz = pos.xyz + vec3(0,0,near_clip);
+#endif
 #endif
 
 #endif

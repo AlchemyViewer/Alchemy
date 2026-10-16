@@ -34,47 +34,19 @@
 #include "llsdserialize.h"
 #include "message.h"
 
-static const char messageConfigFileName[] = "message.xml";
-static const F32 messageConfigRefreshRate = 5.0; // seconds
+#include <memory>
 
-static std::string sServerName = "";
-static std::string sConfigDir = "";
-
-static std::string sServerDefault;
-static LLSD sMessages;
-
-
-class LLMessageConfigFile : public LLLiveFile
+namespace
 {
-public:
-    LLMessageConfigFile() :
-        LLLiveFile(filename(), messageConfigRefreshRate),
-        mMaxQueuedEvents(0)
-            { }
+    std::string sServerName;
+    std::string sConfigDir;
 
-    static std::string filename();
-
-    LLSD mMessages;
-    std::string mServerDefault;
-
-    static LLMessageConfigFile& instance();
-        // return the singleton configuration file
-
-    /* virtual */ bool loadFile();
-    void loadServerDefaults(const LLSD& data);
-    void loadMaxQueuedEvents(const LLSD& data);
-    void loadMessages(const LLSD& data);
-    void loadCapBans(const LLSD& blacklist);
-    void loadMessageBans(const LLSD& blacklist);
-    bool isCapBanned(const std::string& cap_name) const;
-
-public:
-    LLSD mCapBans;
-    S32 mMaxQueuedEvents;
-
-private:
-    static const S32 DEFAULT_MAX_QUEUED_EVENTS = 100;
-};
+    // The file of the directory initClass last named. An LLLiveFile watches
+    // the one path it was made with, so another directory gets another
+    // file: one that kept watching the first directory's file would reload
+    // only when that changed, and then read the new directory's.
+    std::unique_ptr<LLMessageConfigFile> sConfigFile;
+}
 
 std::string LLMessageConfigFile::filename()
 {
@@ -86,9 +58,12 @@ std::string LLMessageConfigFile::filename()
 
 LLMessageConfigFile& LLMessageConfigFile::instance()
 {
-    static LLMessageConfigFile the_file;
-    the_file.checkAndReload();
-    return the_file;
+    if (!sConfigFile)
+    {
+        sConfigFile = std::make_unique<LLMessageConfigFile>();
+    }
+    sConfigFile->checkAndReload();
+    return *sConfigFile;
 }
 
 // virtual
@@ -195,7 +170,11 @@ void LLMessageConfig::initClass(const std::string& server_name,
                                 const std::string& config_dir)
 {
     sServerName = server_name;
-    sConfigDir = config_dir;
+    if (config_dir != sConfigDir)
+    {
+        sConfigDir = config_dir;
+        sConfigFile.reset();
+    }
     (void) LLMessageConfigFile::instance();
     LL_DEBUGS("AppInit") << "LLMessageConfig::initClass config file "
             << config_dir << "/" << messageConfigFileName << LL_ENDL;

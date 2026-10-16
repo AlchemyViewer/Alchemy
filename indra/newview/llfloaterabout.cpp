@@ -69,15 +69,17 @@
 #include "lldxhardware.h"
 #endif
 
-extern LLMemoryInfo gSysMemory;
 extern U32 gPacketsIn;
 
 ///----------------------------------------------------------------------------
 /// Class LLFloaterAbout
 ///----------------------------------------------------------------------------
-class LLFloaterAbout
+class LLFloaterAbout final
     : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterAbout, LLFloater);
+
     friend class LLFloaterReg;
 private:
     LLFloaterAbout(const LLSD& key);
@@ -106,7 +108,7 @@ private:
     static const std::string sCheckUpdateListenerName;
 
     static void startFetchServerReleaseNotes();
-    static void fetchServerReleaseNotesCoro(const std::string& cap_url);
+    static void fetchServerReleaseNotesCoro(const std::string cap_url);
     static void handleServerReleaseNotes(LLSD results);
 };
 
@@ -185,7 +187,7 @@ bool LLFloaterAbout::postBuild()
     support_widget->startOfDoc();
 
     {
-        // Get the names of contributors, extracted from .../doc/contributions.txt by viewer_manifest.py at build time
+        // The names of contributors, extracted from doc/contributions.txt at build time
         std::string contributors_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"contributors.txt");
         llifstream contrib_file;
         std::string contributors;
@@ -205,7 +207,7 @@ bool LLFloaterAbout::postBuild()
     }
 
     {
-        // Get the names of supporters, extracted from .../doc/supporters.txt by viewer_manifest.py at build time
+        // The names of supporters, extracted from doc/supporters.txt at build time
         std::string supporters_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"supporters.txt");
         llifstream supporters_file;
         std::string supporters;
@@ -224,7 +226,7 @@ bool LLFloaterAbout::postBuild()
         suppoter_names_widget->startOfDoc();
     }
 
-    // Get the Versions and Copyrights, created at build time
+    // The third-party versions and copyrights, generated at build time from the installed ports
     std::string licenses_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"packages-info.txt");
     llifstream licenses_file;
     licenses_file.open(licenses_path.c_str());      /* Flawfinder: ignore */
@@ -241,8 +243,7 @@ bool LLFloaterAbout::postBuild()
     }
     else
     {
-        // this case will use the (out of date) hard coded value from the XUI
-        LL_INFOS("AboutInit") << "Could not read licenses file at " << licenses_path << LL_ENDL;
+        LL_WARNS("AboutInit") << "Could not read licenses file at " << licenses_path << LL_ENDL;
     }
     licenses_widget->setEnabled(false);
     licenses_widget->startOfDoc();
@@ -273,12 +274,12 @@ void LLFloaterAbout::startFetchServerReleaseNotes()
 }
 
 /*static*/
-void LLFloaterAbout::fetchServerReleaseNotesCoro(const std::string& cap_url)
+void LLFloaterAbout::fetchServerReleaseNotesCoro(const std::string cap_url)
 {
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("fetchServerReleaseNotesCoro", LLCore::HttpRequest::DEFAULT_POLICY_ID));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("fetchServerReleaseNotesCoro", LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     httpOpts->setWantHeaders(true);
     httpOpts->setFollowRedirects(false);
@@ -363,7 +364,7 @@ void LLFloaterAbout::onClickCopyToClipboard()
 
 void LLFloaterAbout::onClickUpdateCheck()
 {
-
+    setUpdateListener();
 }
 
 void LLFloaterAbout::setSupportText(const std::string& server_release_notes_url)

@@ -52,8 +52,11 @@ typedef enum e_debug_var_type
     VAR_TYPE_COUNT
 } EDebugVarType;
 
-class LLDebugVarMessageBox : public LLFloater
+class LLDebugVarMessageBox final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLDebugVarMessageBox, LLFloater);
+private:
 protected:
     LLDebugVarMessageBox(const std::string& title, EDebugVarType var_type, void *var);
     ~LLDebugVarMessageBox();
@@ -69,7 +72,7 @@ public:
     static void show(const std::string& title, LLVector3 *var, LLVector3 max_value = LLVector3(100.f, 100.f, 100.f), LLVector3 increment = LLVector3(0.1f, 0.1f, 0.1f));
     //static void show(const std::string& title, LLVector4 *var, LLVector4 max_value = LLVector4(100.f, 100.f, 100.f, 100.f), LLVector4 increment = LLVector4(0.1f, 0.1f, 0.1f, 0.1f));
 
-    virtual void    draw();
+    virtual void    draw() override;
 
 protected:
     EDebugVarType   mVarType;

@@ -31,6 +31,18 @@
 
 #include <atomic>
 
+// NOTE: every operation below is sequentially consistent (the default for std::atomic's
+// operators). That is deliberate and load-bearing: most users of LLAtomicU32/S32/Bool are
+// cross-thread flags in a publish-then-signal pattern -- a worker fills a buffer and then
+// sets the flag, and the reader tests the flag and then reads the buffer
+// (LLViewerTexture::mNeedsCreateTexture, LLTextureCache::mDoPurge,
+// LLHttpService::mExitRequested, LLQueuedThread::mIdleThread, ...). Weakening these to
+// relaxed would let the reader's data access hoist above the flag test and observe a
+// half-published buffer.
+//
+// So do NOT relax the ordering here to speed up some particular caller. If a caller wants
+// cheaper ordering, it should use std::atomic directly with the orderings its own
+// invariants justify, as LLThreadSafeRefCount does.
 template <typename Type, typename AtomicType = std::atomic< Type > > class LLAtomicBase
 {
 public:

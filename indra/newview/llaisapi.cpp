@@ -861,8 +861,8 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
         return;
     }
 
-    LLCore::HttpOptions::ptr_t httpOptions(new LLCore::HttpOptions);
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest());
+    LLCore::HttpOptions::ptr_t httpOptions = std::make_shared<LLCore::HttpOptions>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpHeaders::ptr_t httpHeaders;
 
     httpOptions->setTimeout(HTTP_TIMEOUT);
@@ -950,7 +950,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
     LL_DEBUGS("Inventory", "AIS3") << "Result: " << result << LL_ENDL;
     onUpdateReceived(result, type, body);
 
-    if (callback && !callback.empty())
+    if (callback != nullptr)
     {
         bool needs_callback = true;
         LLUUID id(LLUUID::null);
@@ -979,7 +979,9 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 id = result["linked_id"];
             }
             break;
+// RLVa
         case COPYINVENTORY:
+// RLVa
         case CREATEINVENTORY:
             // CREATEINVENTORY can have multiple callbacks
             if (result.has("_created_categories"))
@@ -1005,6 +1007,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 }
             }
             break;
+// RLVa
         case UPDATECATEGORY:
             if (result.has("_updated_categories"))
             {
@@ -1022,6 +1025,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 id = result["category_id"];
             }
             break;
+// RLVa
         default:
             break;
         }
@@ -1037,6 +1041,9 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
 }
 
 //-------------------------------------------------------------------------
+U32 AISUpdate::sBatchFrameCount = 0;
+LLTimer AISUpdate::sBatchTimer;
+
 AISUpdate::AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& request_body)
 : mType(type)
 {
@@ -1054,8 +1061,29 @@ AISUpdate::AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& 
         mFetchDepth = request_body["depth"].asInteger();
     }
 
-    mTimer.setTimerExpirySec(AIS_EXPIRY_SECONDS);
-    mTimer.start();
+    // Some tasks are time sensitive, don't wait for them.
+    // Like FETCHCOF which happens on load and is needed for outfit
+    // loading.
+    // FETCHCATEGORYLINKS is used for wearing outfits and fetching
+    // a user selected outfit or for following an outfit link in COF.
+    // Other tasks, like FETCHCATEGORYSUBSET are general background
+    // fetches and can safely wait.
+    // Do count 'time sensitive' tasks in batch timer.
+    mUseTimeout =
+        type != AISAPI::UPDATECATEGORY
+        && type != AISAPI::UPDATEITEM
+        && type != AISAPI::FETCHCOF
+        && type != AISAPI::FETCHCATEGORYLINKS;
+    mTaskTimer.start();
+    mTaskTimer.setTimerExpirySec(AIS_TASK_EXPIRY_SECONDS);
+
+    U32 current_frame = LLFrameTimer::getFrameCount();
+    if (sBatchFrameCount != current_frame)
+    {
+        sBatchTimer.start();
+        sBatchTimer.setTimerExpirySec(AIS_BATCH_EXPIRY_SECONDS);
+        sBatchFrameCount = current_frame;
+    }
     parseUpdate(update);
 }
 
@@ -1076,11 +1104,30 @@ void AISUpdate::clearParseResults()
 
 void AISUpdate::checkTimeout()
 {
-    if (mTimer.hasExpired())
+    if (!mUseTimeout)
     {
-        llcoro::suspend();
+        // Priority task, don't wait.
+        return;
+    }
+    if (mTaskTimer.hasExpired() || sBatchTimer.hasExpired())
+    {
+        // If we are taking too long, don't starve other tasks,
+        // yield to mainloop.
+        // If we use normal suspend(), there will be a chance of
+        // waking up from other suspends, before main coro had
+        // a chance, so wait for a frame tick instead.
+        llcoro::suspendUntilNextFrame();
         LLCoros::checkStop();
-        mTimer.setTimerExpirySec(AIS_EXPIRY_SECONDS);
+        mTaskTimer.setTimerExpirySec(AIS_TASK_EXPIRY_SECONDS);
+
+        U32 current_frame = LLFrameTimer::getFrameCount();
+        if (sBatchFrameCount != current_frame)
+        {
+            // To give other tasks a chance batch timer
+            // has a longer delay.
+            sBatchTimer.setTimerExpirySec(AIS_BATCH_EXPIRY_SECONDS);
+            sBatchFrameCount = current_frame;
+        }
     }
 }
 
@@ -1751,35 +1798,41 @@ void AISUpdate::doUpdate()
         const LLUUID id = ucv_it->first;
         S32 version = static_cast<S32>(ucv_it->second);
         LLViewerInventoryCategory *cat = gInventory.getCategory(id);
-        LL_DEBUGS("Inventory") << "cat version update " << cat->getName() << " to version " << cat->getVersion() << LL_ENDL;
-        if (cat->getVersion() != version)
+        // Update can be rather large and take time to process.
+        // By the time update gets to the category, it could
+        // could have been removed by the user
+        if (cat)
         {
-            // the AIS version should be considered the true version. Adjust
-            // our local category model to reflect this version number.  Otherwise
-            // it becomes possible to get stuck with the viewer being out of
-            // sync with the inventory system.  Under normal circumstances
-            // inventory COF is maintained on the viewer through calls to
-            // LLInventoryModel::accountForUpdate when a changing operation
-            // is performed.  This occasionally gets out of sync however.
-            if (version != LLViewerInventoryCategory::VERSION_UNKNOWN)
+            LL_DEBUGS("Inventory") << "cat " << cat->getName() << " version update from " << cat->getVersion() << " to AIS version " << version << LL_ENDL;
+            if (cat->getVersion() != version)
             {
-                LL_WARNS() << "Possible version mismatch for category " << cat->getName()
-                    << ", viewer version " << cat->getVersion()
-                    << " AIS version " << version << " !!!Adjusting local version!!!" << LL_ENDL;
-                cat->setVersion(version);
-            }
-            else
-            {
-                // We do not account for update if version is UNKNOWN, so we shouldn't rise version
-                // either or viewer will get stuck on descendants count -1, try to refetch folder instead
-                //
-                // Todo: proper backoff?
+                // the AIS version should be considered the true version. Adjust
+                // our local category model to reflect this version number.  Otherwise
+                // it becomes possible to get stuck with the viewer being out of
+                // sync with the inventory system.  Under normal circumstances
+                // inventory COF is maintained on the viewer through calls to
+                // LLInventoryModel::accountForUpdate when a changing operation
+                // is performed.  This occasionally gets out of sync however.
+                if (version != LLViewerInventoryCategory::VERSION_UNKNOWN)
+                {
+                    LL_WARNS() << "Possible version mismatch for category " << cat->getName()
+                        << ", viewer version " << cat->getVersion()
+                        << " AIS version " << version << " !!!Adjusting local version!!!" << LL_ENDL;
+                    cat->setVersion(version);
+                }
+                else
+                {
+                    // We do not account for update if version is UNKNOWN, so we shouldn't riase version
+                    // either or viewer will get stuck on descendants count -1, try to refetch folder instead
+                    //
+                    // Todo: proper backoff?
 
-                LL_WARNS() << "Possible version mismatch for category " << cat->getName()
-                    << ", viewer version " << cat->getVersion()
-                    << " AIS version " << version << " !!!Rerequesting category!!!" << LL_ENDL;
-                const S32 LONG_EXPIRY = 360;
-                cat->fetch(LONG_EXPIRY);
+                    LL_WARNS() << "Possible version mismatch for category " << cat->getName()
+                        << ", viewer version " << cat->getVersion()
+                        << " AIS version " << version << " !!!Rerequesting category!!!" << LL_ENDL;
+                    const S32 LONG_EXPIRY = 360;
+                    cat->fetch(LONG_EXPIRY);
+                }
             }
         }
     }

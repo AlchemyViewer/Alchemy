@@ -1,0 +1,167 @@
+/**
+ * @file llhttpdate_tut.cpp
+ * @author Kartic Krishnamurthy
+ * @date Wednesday, 18 Jul 2007 17:00:00 GMT :)
+ *
+ * $LicenseInfo:firstyear=2007&license=viewerlgpl$
+ * Second Life Viewer Source Code
+ * Copyright (C) 2010, Linden Research, Inc.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+#include <catch2/catch_test_macros.hpp>
+#include <string_view>
+
+#include "lldate.h"
+#include "llcommon.h"
+#include "llframetimer.h"
+
+#include <time.h>
+#include <locale.h>
+
+namespace
+{
+    struct httpdate_data
+    {
+        httpdate_data()
+        {
+        }
+        ~httpdate_data()
+        {
+        }
+        LLDate some_date;
+    };
+
+    TEST_CASE_METHOD(httpdate_data, "httpdate: asRFC1123 formats the epoch", "[httpdate]")
+    {
+
+        static std::string epoch_expected = "Thursday, 01 Jan 1970 00:00:00 GMT" ;
+        CHECK(epoch_expected == some_date.asRFC1123());
+    }
+
+    TEST_CASE_METHOD(httpdate_data, "httpdate: asRFC1123 formats a timestamp", "[httpdate]")
+    {
+
+        static std::string expected = "Wednesday, 18 Jul 2007 22:17:24 GMT" ;
+        some_date = LLDate(1184797044.037586);
+        CHECK(expected == some_date.asRFC1123());
+    }
+
+    // This test of course most generic.. runs off current time
+    TEST_CASE_METHOD(httpdate_data, "httpdate: asRFC1123 of the current time matches strftime", "[httpdate]")
+    {
+
+        //F64 sometime = LLFrameTimer::getTotalSeconds();
+        time_t sometime;
+        time(&sometime);
+        some_date = LLDate((F64) sometime);
+        struct tm *result;
+        char expected[255];
+        std::string actual;
+
+        result = gmtime(&sometime);
+        /*
+        std::cout << " seconds: "<< result->tm_sec
+                  << ", minutes: " << result->tm_min
+                  << ", hours: " << result->tm_hour
+                  << ", day of the month: " << result->tm_mday
+                  << ", month: " << result->tm_mon
+                  << ", year: " << result->tm_year
+                  << ", day of the week: " << result->tm_wday
+                  << ", day in the year: " << result->tm_yday
+                  << ", DST: " << result->tm_isdst << std::endl;
+        */
+        strftime(expected, 255, "%A, %d %b %Y %H:%M:%S GMT", result);
+        actual = some_date.asRFC1123();
+        // probably not a good idea to use strcmp but this is just a unit test
+        CHECK(std::string_view(expected) == std::string_view(actual.c_str()));
+    }
+
+    // LC_TIME, LLStringUtil's locale and the one LLDate last set LC_TIME
+    // to, put back as they were however the test ends. LLDate sets LC_TIME
+    // itself when the locale it saw last changes, so one date formatted in
+    // the restored locale brings it up to date before LC_TIME is restored.
+    struct TimeLocaleRestore
+    {
+        std::string mLocale{ LLStringUtil::getLocale() };
+        std::string mTimeLocale{ setlocale(LC_TIME, NULL) };
+
+        ~TimeLocaleRestore()
+        {
+            LLStringUtil::setLocale(mLocale);
+            struct tm any{};
+            LLDate::toHTTPDateString(&any, "%Y");
+            setlocale(LC_TIME, mTimeLocale.c_str());
+        }
+    };
+
+    static void require_http_date_string(const std::string &locale, struct tm *t,
+                                         const std::string &fmt, const std::string &expected)
+    {
+        std::string result = LLDate::toHTTPDateString(t, fmt);
+        LLStringUtil::toLower(result);
+        CAPTURE(locale, fmt);
+        REQUIRE(result == expected);
+    }
+
+    TEST_CASE_METHOD(httpdate_data, "httpdate: toHTTPDateString formats in English and French locales", "[httpdate]")
+    {
+        // test localization of http dates
+        const char *en_locale = "en_US.UTF-8";
+        const char *fr_locale = "fr_FR.UTF-8";
+
+        TimeLocaleRestore restore;
+        time_t test_time = 1252374030;  // 8 Sep 2009 01:40:01
+        struct tm *t = gmtime(&test_time);
+
+        setlocale(LC_TIME, en_locale);
+        if (strcmp(setlocale(LC_TIME, NULL), en_locale) != 0)
+        {
+            SKIP("Cannot set English locale");
+        }
+
+        LLStringUtil::setLocale(en_locale);
+        require_http_date_string(en_locale, t, "%d %B %Y - %H:%M", "08 september 2009 - 01:40");
+        require_http_date_string(en_locale, t, "%H", "01");
+        require_http_date_string(en_locale, t, "%M", "40");
+        require_http_date_string(en_locale, t, "%I", "01");
+        require_http_date_string(en_locale, t, "%d", "08");
+        require_http_date_string(en_locale, t, "%Y", "2009");
+        require_http_date_string(en_locale, t, "%p", "am");
+        require_http_date_string(en_locale, t, "%A", "tuesday");
+        require_http_date_string(en_locale, t, "%B", "september");
+
+        setlocale(LC_TIME, fr_locale);
+        if (strcmp(setlocale(LC_TIME, NULL), fr_locale) != 0)
+        {
+            SKIP("Cannot set French locale");
+        }
+
+        LLStringUtil::setLocale(fr_locale);
+        require_http_date_string(fr_locale, t, "%d %B %Y - %H:%M", "08 septembre 2009 - 01:40");
+        require_http_date_string(fr_locale, t, "%H", "01");
+        require_http_date_string(fr_locale, t, "%M", "40");
+        require_http_date_string(fr_locale, t, "%I", "01");
+        require_http_date_string(fr_locale, t, "%d", "08");
+        require_http_date_string(fr_locale, t, "%Y", "2009");
+        require_http_date_string(fr_locale, t, "%A", "mardi");
+        require_http_date_string(fr_locale, t, "%B", "septembre");
+    }
+}

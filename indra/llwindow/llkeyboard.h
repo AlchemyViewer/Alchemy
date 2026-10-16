@@ -27,10 +27,9 @@
 #ifndef LL_LLKEYBOARD_H
 #define LL_LLKEYBOARD_H
 
+#include <functional>
 #include <map>
-#include <boost/function.hpp>
 
-#include "llstringtable.h"
 #include "lltimer.h"
 #include "indra_constants.h"
 
@@ -41,7 +40,7 @@ enum EKeystate
     KEYSTATE_UP
 };
 
-typedef boost::function<bool(EKeystate keystate)> LLKeyFunc;
+typedef std::function<bool(EKeystate keystate)> LLKeyFunc;
 typedef std::string (LLKeyStringTranslatorFunc)(std::string_view);
 
 enum EKeyboardInsertMode
@@ -56,12 +55,24 @@ class LLKeyboard
 {
 public:
 #ifdef LL_SDL_WINDOW
-    // linux relies on SDL2 which uses U32 for its native key type
+    // linux relies on SDL which uses U32 for its native key type
     typedef U32 NATIVE_KEY_TYPE;
 #else
     // on non-linux platforms we can get by with a smaller native key type
     typedef U16 NATIVE_KEY_TYPE;
 #endif
+
+    // Controls whether the numpad emits distinct KEY_PAD_* codes (so it can
+    // drive avatar/camera independently of the arrow keys and digit row) or
+    // is aliased onto them. Driven by the "NumpadControl" setting; the integer
+    // values line up so the S32 setting casts straight to this enum.
+    typedef enum e_numpad_distinct
+    {
+        ND_NEVER,       // numpad behaves like the normal arrow/digit keys
+        ND_NUMLOCK_OFF, // numpad is distinct when NumLock is off
+        ND_NUMLOCK_ON   // numpad is always distinct (for keyboards with no NumLock)
+    } ENumpadDistinct;
+
     LLKeyboard();
     virtual ~LLKeyboard();
 
@@ -82,18 +93,18 @@ public:
     virtual bool    handleKeyUp(const NATIVE_KEY_TYPE key, MASK mask) = 0;
     virtual bool    handleKeyDown(const NATIVE_KEY_TYPE key, MASK mask) = 0;
 
-#if LL_DARWIN && !LL_SDL_WINDOW
-    // We only actually use this for macOS.
-    virtual void    handleModifier(MASK mask) = 0;
-#endif // LL_DARWIN
-
     // Asynchronously poll the control, alt, and shift keys and set the
     // appropriate internal key masks.
     virtual void    resetMaskKeys() = 0;
     virtual void    scanKeyboard() = 0;                                                         // scans keyboard, calls functions as necessary
     // Mac must differentiate between Command = Control for keyboard events
-    // and Command != Control for mouse events.
+    // and Command != Control for mouse events. A key's mask on the Mac has
+    // Command as MASK_CONTROL and its own Control key as MASK_MAC_CONTROL.
     virtual MASK    currentMask(bool for_mouse_event) = 0;
+    // A mask with the Mac's Control key read as MASK_CONTROL, for whoever
+    // does not tell it from Command: the in-world bindings, which either key
+    // has always worked. The same mask anywhere else.
+    static MASK     foldMacControl(MASK mask) { return (mask & MASK_MAC_CONTROL) ? ((mask & ~MASK_MAC_CONTROL) | MASK_CONTROL) : mask; }
     virtual KEY     currentKey() { return mCurTranslatedKey; }
 
     EKeyboardInsertMode getInsertMode() { return mInsertMode; }
@@ -106,6 +117,9 @@ public:
     static std::string stringFromAccelerator( MASK accel_mask ); // separated for convinience, returns with "+": "Shift+" or "Shift+Alt+"...
     static std::string stringFromAccelerator( MASK accel_mask, KEY key );
     static std::string stringFromAccelerator(MASK accel_mask, EMouseClickType click);
+
+    e_numpad_distinct getNumpadDistinct() { return mNumpadDistinct; }
+    void setNumpadDistinct(e_numpad_distinct val) { mNumpadDistinct = val; }
 
     void setCallbacks(LLWindowCallbacks *cbs) { mCallbacks = cbs; }
     F32             getKeyElapsedTime( KEY key );  // Returns time in seconds since key was pressed.
@@ -131,6 +145,8 @@ protected:
     KEY             mCurScanKey;        // Used during the scanKeyboard()
 
     static LLKeyStringTranslatorFunc*   mStringTranslator;  // Used for l10n + PC/Mac/Linux accelerator labeling
+
+    e_numpad_distinct mNumpadDistinct;
 
     EKeyboardInsertMode mInsertMode;
 

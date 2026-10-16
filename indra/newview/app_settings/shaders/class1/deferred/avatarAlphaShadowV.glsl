@@ -23,8 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 texture_matrix0;
-uniform mat4 projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform float shadow_target_width;
 
 mat4 getSkinnedTransform();

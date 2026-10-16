@@ -30,7 +30,6 @@
 #include "llmodaldialog.h"
 #include "llassetstorage.h"
 #include "llmediactrl.h"
-#include <boost/function.hpp>
 #include "lleventcoro.h"
 #include "llcoros.h"
 
@@ -39,11 +38,13 @@ class LLRadioGroup;
 class LLTextEditor;
 class LLUUID;
 
-class LLFloaterTOS :
+class LLFloaterTOS final :
     public LLModalDialog,
     public LLViewerMediaObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterTOS, LLModalDialog);
+
     LLFloaterTOS(const LLSD& data);
     virtual ~LLFloaterTOS();
 

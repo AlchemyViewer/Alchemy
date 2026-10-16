@@ -34,9 +34,11 @@
 
 #include <string>
 
-class LLSysWellItem : public LLPanel
+class LLSysWellItem final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLSysWellItem, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         LLUUID          notification_id;
@@ -55,12 +57,12 @@ public:
     LLUUID getID() { return mID; }
 
     // handlers
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual void onMouseEnter(S32 x, S32 y, MASK mask);
-    virtual void onMouseLeave(S32 x, S32 y, MASK mask);
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    virtual void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
     //callbacks
-    typedef boost::function<void (LLSysWellItem* item)> syswell_item_callback_t;
+    typedef std::function<void (LLSysWellItem* item)> syswell_item_callback_t;
     typedef boost::signals2::signal<void (LLSysWellItem* item)> syswell_item_signal_t;
     syswell_item_signal_t mOnItemClose;
     syswell_item_signal_t mOnItemClick;

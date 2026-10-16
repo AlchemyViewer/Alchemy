@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -30,15 +30,22 @@
 #include "v4color.h"
 #include "llpointer.h"
 #include "llrefcount.h"
-#include "llrefcount.h"
 #include "llrect.h"
-#include <boost/function.hpp>
-#include <boost/signals2.hpp>
 #include "llinitparam.h"
 #include "lltexture.h"
 #include "llrender2dutils.h"
+#include "llvertexbuffer.h"
+
+#include <boost/signals2.hpp>
+
+#include <bit>
+#include <type_traits>
+#include <unordered_map>
+#include <vector>
 
 extern const LLColor4 UI_VERTEX_COLOR;
+
+namespace ll_test { struct UIImageProbe; }
 
 class LLUIImage : public LLRefCount
 {
@@ -52,26 +59,34 @@ public:
     typedef boost::signals2::signal<void (void)> image_loaded_signal_t;
 
     LLUIImage(const std::string& name, LLPointer<LLTexture> image);
+    LLUIImage(std::string&& name, LLPointer<LLTexture> image);
     virtual ~LLUIImage();
 
     LL_FORCE_INLINE void setClipRegion(const LLRectf& region)
     {
         mClipRegion = region;
+        // This happens when image becomes loaded
+        invalidateDisplayLists();
     }
 
     LL_FORCE_INLINE void setScaleRegion(const LLRectf& region)
     {
         mScaleRegion = region;
+        // This happens when image becomes loaded
+        invalidateDisplayLists();
     }
 
     LL_FORCE_INLINE void setScaleStyle(EScaleStyle style)
     {
         mScaleStyle = style;
+        // This happens when image becomes loaded
+        invalidateDisplayLists();
     }
 
     LL_FORCE_INLINE LLPointer<LLTexture> getImage() { return mImage; }
     LL_FORCE_INLINE const LLPointer<LLTexture>& getImage() const { return mImage; }
 
+    LL_FORCE_INLINE void draw(S32 x, S32 y, S32 width, S32 height, const LLColor4& color, bool solid_color) const;
     LL_FORCE_INLINE void draw(S32 x, S32 y, S32 width, S32 height, const LLColor4& color = UI_VERTEX_COLOR) const;
     LL_FORCE_INLINE void draw(S32 x, S32 y, const LLColor4& color = UI_VERTEX_COLOR) const;
     LL_FORCE_INLINE void draw(const LLRect& rect, const LLColor4& color = UI_VERTEX_COLOR) const { draw(rect.mLeft, rect.mBottom, rect.getWidth(), rect.getHeight(), color); }
@@ -84,6 +99,10 @@ public:
     LL_FORCE_INLINE void drawBorder(const LLRect& rect, const LLColor4& color, S32 border_width) const { drawBorder(rect.mLeft, rect.mBottom, rect.getWidth(), rect.getHeight(), color, border_width); }
     LL_FORCE_INLINE void drawBorder(S32 x, S32 y, const LLColor4& color, S32 border_width) const { drawBorder(x, y, getWidth(), getHeight(), color, border_width); }
 
+    // Note: draw3D is not cached with display lists because it uses world-space rendering
+    // with dynamic transforms (gl_segmented_rect_3d_tex). These calls are infrequent and
+    // highly dynamic, making caching ineffective. The 2D UI methods benefit from caching
+    // because they're called many times per frame with the same dimensions.
     void draw3D(const LLVector3& origin_agent, const LLVector3& x_axis, const LLVector3& y_axis, const LLRect& rect, const LLColor4& color);
 
     LL_FORCE_INLINE const std::string& getName() const { return mName; }
@@ -99,7 +118,111 @@ public:
 
     void onImageLoaded();
 
+    // Global cleanup of unused display lists across all LLUIImage instances
+    // Should be called periodically (e.g., once per frame or when memory pressure is detected)
+    static void updateClass();
+    static void cleanupClass();
+
+    static void enableDisplayListsCollection(bool enable) { sEnableDisplayListsCollection = enable; }
+
 protected:
+    // What a recording depends on. Position is deliberately not part of it: the
+    // geometry is recorded at the origin and placed through the modelview when it
+    // is drawn, so one recording serves an image wherever it appears. A floater
+    // being dragged replays every frame instead of rebuilding every image in it.
+    struct PackedKey
+    {
+        uint64_t color_flags; // RGBA color (8 bits each) + solid_color flag (1 bit)
+        uint64_t dimensions;  // width and height (32 bits each)
+        uint64_t scale;       // UI scale (32 bits each for X and Y)
+        uint64_t tex_name;    // OpenGL texture name (low 32 bits) + sampler generation (high 32 bits)
+
+        constexpr bool operator==(const PackedKey& other) const
+        {
+            return color_flags == other.color_flags &&
+                dimensions == other.dimensions &&
+                scale == other.scale &&
+                tex_name == other.tex_name;
+        }
+
+        struct Hash
+        {
+            std::size_t operator()(const PackedKey& key) const
+            {
+                // Mixed rather than xored: the fields are small integers in the
+                // same bit positions, and xor alone folds them onto each other.
+                uint64_t h = key.color_flags;
+                for (uint64_t field : { key.dimensions, key.scale, key.tex_name })
+                {
+                    h = (h ^ field) * 0x9E3779B97F4A7C15ull;
+                    h ^= h >> 29;
+                }
+                return static_cast<std::size_t>(h);
+            }
+        };
+
+        static constexpr PackedKey create(S32 width, S32 height,
+                                         const LLColor4& color, bool solid_color,
+                                         const LLVector3& scale,
+                                         LLGLuint texture_name,
+                                         U32 sampler_generation)
+        {
+            auto float_to_u8 = [](F32 f) -> uint8_t {
+                return static_cast<uint8_t>(llclamp(f * 255.0f, 0.0f, 255.0f));
+            };
+
+            auto float_to_bits = [](F32 f) -> uint32_t {
+                return std::bit_cast<uint32_t>(f);
+            };
+
+            uint8_t r = float_to_u8(color.mV[VRED]);
+            uint8_t g = float_to_u8(color.mV[VGREEN]);
+            uint8_t b = float_to_u8(color.mV[VBLUE]);
+            uint8_t a = float_to_u8(color.mV[VALPHA]);
+
+            uint64_t col = (static_cast<uint64_t>(r) << 56) |
+                (static_cast<uint64_t>(g) << 48) |
+                (static_cast<uint64_t>(b) << 40) |
+                (static_cast<uint64_t>(a) << 32) |
+                (solid_color ? 1ULL : 0ULL);
+
+            uint64_t dim = (static_cast<uint64_t>(static_cast<uint32_t>(width)) << 32) |
+                static_cast<uint64_t>(static_cast<uint32_t>(height));
+
+            uint64_t scl = (static_cast<uint64_t>(float_to_bits(scale.mV[VX])) << 32) |
+                static_cast<uint64_t>(float_to_bits(scale.mV[VY]));
+
+            // A recording keeps the sampler's GL name, and rebuilding the samplers (an
+            // anisotropy change, a depth convention flip) deletes every name, so a recording
+            // made under an older generation would bind a dead or reused one.
+            uint64_t tex = (static_cast<uint64_t>(sampler_generation) << 32) |
+                static_cast<uint64_t>(texture_name);
+
+            return PackedKey{ col, dim, scl, tex };
+        }
+    };
+
+    // Cached display list for a specific configuration
+    struct CachedDisplayList
+    {
+        buffer_data_list_t list;
+        F64 last_used; // LLFrameTimer::getTotalSeconds() at the last draw
+    };
+
+    // The cached path of draw(): replays the recording for this configuration, or
+    // makes one. Either way the image lands at (x, y) under the current UI transform.
+    void drawCached(S32 x, S32 y, S32 width, S32 height, const LLColor4& color, bool solid_color) const;
+    static void replayDisplayList(buffer_data_list_t& list, const LLColor4& color, bool solid_color);
+    // Records the draw for this configuration, drawing it as it goes.
+    void recordDisplayList(const PackedKey& key, S32 width, S32 height, const LLColor4& color, bool solid_color) const;
+
+    // Invalidate all cached display lists (called when image properties change)
+    void invalidateDisplayLists();
+
+    // Clean up old display lists for this image (called by updateClass)
+    void cleanupDisplayLists();
+    void unregisterFromGlobalCleanup();
+
     image_loaded_signal_t* mImageLoaded;
 
     std::string             mName;
@@ -109,6 +232,16 @@ protected:
     EScaleStyle             mScaleStyle;
     mutable S32             mCachedW;
     mutable S32             mCachedH;
+
+    // Display list cache - now using PackedKey directly
+    mutable std::unordered_map<PackedKey, CachedDisplayList, PackedKey::Hash> mDisplayLists;
+
+    // Track all LLUIImage cache instances for global cleanup
+    static std::vector<LLPointer<LLUIImage> > sImageList;
+    static size_t sCleanupIndex;  // Round-robin cleanup position
+    static bool sEnableDisplayListsCollection;
+
+    friend struct ll_test::UIImageProbe;
 };
 
 #include "lluiimage.inl"
@@ -119,7 +252,7 @@ namespace LLInitParam
     class ParamValue<LLUIImage*>
     :   public CustomParamValue<LLUIImage*>
     {
-        typedef boost::add_reference<boost::add_const<LLUIImage*>::type>::type  T_const_ref;
+        typedef std::add_lvalue_reference<std::add_const<LLUIImage*>::type>::type  T_const_ref;
         typedef CustomParamValue<LLUIImage*> super_t;
     public:
         Optional<std::string> name;

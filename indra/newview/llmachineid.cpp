@@ -34,7 +34,7 @@
 #include <Wbemidl.h>
 #elif LL_DARWIN
 #include <CoreFoundation/CoreFoundation.h>
-#include <IOKit/IOKitLib.h>
+#include "llwindowmacosx_iokit.h"
 #endif
 unsigned char static_unique_id[] =  {0,0,0,0,0,0};
 unsigned char static_legacy_id[] =  {0,0,0,0,0,0};
@@ -113,9 +113,21 @@ void LLWMIMethods::initCOMObjects()
 
     if (FAILED(mHR))
     {
-        LL_WARNS("AppInit") << "Failed to initialize security. Error code = 0x" << std::hex << mHR << LL_ENDL;
-        CoUninitialize();
-        return;               // Program has failed.
+        // RPC_E_TOO_LATE means process-wide COM security was already initialized
+        // before we got here — which is harmless, WMI works with the existing
+        // settings. This happens under the SDL window backend, where SDL brings
+        // COM up during video init (and DXGI/DirectInput marshal interfaces)
+        // before machine-id generation runs. Only a genuine failure is fatal.
+        if (mHR == RPC_E_TOO_LATE)
+        {
+            LL_DEBUGS("AppInit") << "COM security already initialized; continuing with existing settings." << LL_ENDL;
+        }
+        else
+        {
+            LL_WARNS("AppInit") << "Failed to initialize security. Error code = 0x" << std::hex << mHR << LL_ENDL;
+            CoUninitialize();
+            return;               // Program has failed.
+        }
     }
 
     // Step 3: ---------------------------------------------------
@@ -350,7 +362,7 @@ bool LLWMIMethods::getGenericSerialNumber(const BSTR &select, const LPCWSTR &var
 bool getSerialNumber(unsigned char *unique_id, size_t len)
 {
     CFStringRef serial_cf_str = NULL;
-    io_service_t platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,
+    io_service_t platformExpert = IOServiceGetMatchingService(kLLIOMainPort,
                                                                  IOServiceMatching("IOPlatformExpertDevice"));
     if (platformExpert)
     {
@@ -398,6 +410,8 @@ bool getSerialNumber(unsigned char *unique_id, size_t len)
 
 S32 LLMachineID::init()
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     size_t len = sizeof(static_unique_id);
     memset(static_unique_id, 0, len);
     S32 ret_code = 0;
@@ -472,7 +486,7 @@ S32 LLMachineID::init()
     has_static_legacy_id = false;
 #endif
 
-        LL_INFOS("AppInit") << "UniqueID: 0x";
+        LL_DEBUGS("AppInit") << "UniqueID: 0x";
         // Code between here and LL_ENDL is not executed unless the LL_DEBUGS
         // actually produces output
         for (size_t i = 0; i < len; ++i)

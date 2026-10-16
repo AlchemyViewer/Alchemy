@@ -29,10 +29,8 @@
 //-----------------------------------------------------------------------------
 #include "llviewerprecompiledheaders.h"
 
-#include "llfasttimer.h"
 #include "llrender.h"
 
-#include "llapr.h"
 #include "llbox.h"
 #include "lldrawable.h"
 #include "lldrawpoolavatar.h"
@@ -89,10 +87,9 @@ const S32 NUM_AXES = 3;
 // rotation Z 0-n
 // pivot parent 0-n -- child = n+1
 
-static LLMatrix4    gJointMatUnaligned[32];
-static LLMatrix4a   gJointMatAligned[32];
-static LLMatrix3    gJointRotUnaligned[32];
-static LLVector4    gJointPivot[32];
+static LLMatrix4    gJointMatUnaligned[LL_CHARACTER_MAX_JOINTS_PER_MESH];
+static LLMatrix3    gJointRotUnaligned[LL_CHARACTER_MAX_JOINTS_PER_MESH];
+static LLVector4    gJointPivot[LL_CHARACTER_MAX_JOINTS_PER_MESH];
 
 //-----------------------------------------------------------------------------
 // uploadJointMatrices()
@@ -101,20 +98,18 @@ void LLViewerJointMesh::uploadJointMatrices()
 {
     S32 joint_num;
     LLPolyMesh *reference_mesh = mMesh->getReferenceMesh();
-    LLDrawPool *poolp = mFace ? mFace->getPool() : NULL;
-    bool hardware_skinning = (poolp && poolp->getShaderLevel() > 0);
 
     //calculate joint matrices
-    for (joint_num = 0; joint_num < reference_mesh->mJointRenderData.size(); joint_num++)
+    LLMatrix4a model_view;
+    model_view.loadu(&LLDrawPoolAvatar::getModelView().mMatrix[0][0]);
+    size_t num_joints = llmin(reference_mesh->mJointRenderData.size(), LL_CHARACTER_MAX_JOINTS_PER_MESH);
+    for (joint_num = 0; joint_num < num_joints; joint_num++)
     {
-        LLMatrix4 joint_mat = *reference_mesh->mJointRenderData[joint_num]->mWorldMatrix;
-
-        if (hardware_skinning)
-        {
-            joint_mat *= LLDrawPoolAvatar::getModelView();
-        }
-        gJointMatUnaligned[joint_num] = joint_mat;
-        gJointRotUnaligned[joint_num] = joint_mat.getMat3();
+        // joint to world to eye, in registers; only the result is stored
+        LLMatrix4a joint_mat;
+        joint_mat.setMulNoAlias(reference_mesh->mJointRenderData[joint_num]->mJoint->getWorldMatrix(), model_view);
+        gJointMatUnaligned[joint_num] = joint_mat.toMatrix4();
+        gJointRotUnaligned[joint_num] = gJointMatUnaligned[joint_num].getMat3();
     }
 
     bool last_pivot_uploaded{ false };
@@ -131,12 +126,20 @@ void LLViewerJointMesh::uploadJointMatrices()
                 LLVector4 parent_pivot(sj->mRootToParentJointSkinOffset);
                 parent_pivot.mV[VW] = 0.f;
                 gJointPivot[j++] = parent_pivot;
+                if (j >= LL_CHARACTER_MAX_JOINTS_PER_MESH)
+                {
+                    break;
+                }
             }
 
             LLVector4 child_pivot(sj->mRootToJointSkinOffset);
             child_pivot.mV[VW] = 0.f;
 
             gJointPivot[j++] = child_pivot;
+            if (j >= LL_CHARACTER_MAX_JOINTS_PER_MESH)
+            {
+                break;
+            }
 
             last_pivot_uploaded = true;
         }
@@ -156,12 +159,10 @@ void LLViewerJointMesh::uploadJointMatrices()
     }
 
     // upload matrices
-    if (hardware_skinning)
-    {
         GLfloat mat[45*4];
         memset(mat, 0, sizeof(GLfloat)*45*4);
 
-        for (joint_num = 0; joint_num < reference_mesh->mJointRenderData.size(); joint_num++)
+        for (joint_num = 0; joint_num < num_joints; joint_num++)
         {
             gJointMatUnaligned[joint_num].transpose();
 
@@ -178,15 +179,6 @@ void LLViewerJointMesh::uploadJointMatrices()
             LLGLSLShader::sCurBoundShaderPtr->uniform4fv(LLViewerShaderMgr::AVATAR_MATRIX, 45, mat);
         }
         stop_glerror();
-    }
-    else
-    {
-        //load gJointMatUnaligned into gJointMatAligned
-        for (joint_num = 0; joint_num < reference_mesh->mJointRenderData.size(); ++joint_num)
-        {
-            gJointMatAligned[joint_num].loadu(gJointMatUnaligned[joint_num]);
-        }
-    }
 }
 
 //--------------------------------------------------------------------
@@ -215,6 +207,7 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     if (!mValid || !mMesh || !mFace || !mVisible ||
         !mFace->getVertexBuffer() ||
         mMesh->getNumFaces() == 0 ||
+        mMesh->mFaceVertexCount == 0 ||
         LLGLSLShader::sCurBoundShaderPtr == NULL)
     {
         return 0;
@@ -242,9 +235,20 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     llassert( !(mTexture.notNull() && mLayerSet) );  // mutually exclusive
 
     LLViewerTexLayerSet *layerset = dynamic_cast<LLViewerTexLayerSet*>(mLayerSet);
+
+    // The avatar skin composite (and the stand-in diffuse below) is an sRGB texture. Decode
+    // it on the sampler when the bound program shades in linear -- the deferred avatar writer
+    // and the forward avatar-skin alpha both do (mLinearDiffuse), and both had their in-shader
+    // decode removed, so the decode has to happen here or the skin reads too bright. The
+    // deferred writer's gbuffer store re-encodes via FRAMEBUFFER_SRGB (see LLDrawPoolAvatar).
+    const LLGLSLShader* bound = LLGLSLShader::sCurBoundShaderPtr;
+    const ALSampler skin_key = (bound && bound->mLinearDiffuse)
+                             ? ALSamplers::AnisoWrapSRGB
+                             : ALSamplers::AnisoWrap;
+
     if (mTestImageName)
     {
-        gGL.getTexUnit(diffuse_channel)->bindManual(LLTexUnit::TT_TEXTURE, mTestImageName);
+        gGL.getTextureSlot(diffuse_channel)->bindManual(ALTextureSlot::TT_TEXTURE, mTestImageName);
 
         if (mIsTransparent)
         {
@@ -259,20 +263,20 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     {
         if( layerset->hasComposite() )
         {
-            gGL.getTexUnit(diffuse_channel)->bind(layerset->getViewerComposite());
+            gGL.getTextureSlot(diffuse_channel)->bindSampled(layerset->getViewerComposite(), skin_key);
         }
         else
         {
-            gGL.getTexUnit(diffuse_channel)->bind(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT));
+            gGL.getTextureSlot(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), skin_key);
         }
     }
     else if ( !is_dummy && mTexture.notNull() )
     {
-        gGL.getTexUnit(diffuse_channel)->bind(mTexture);
+        gGL.getTextureSlot(diffuse_channel)->bindSampled(mTexture, skin_key);
     }
     else
     {
-        gGL.getTexUnit(diffuse_channel)->bind(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT));
+        gGL.getTextureSlot(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), skin_key);
     }
 
     U32 start = mMesh->mFaceVertexOffset;
@@ -284,12 +288,9 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
 
     if (mMesh->hasWeights())
     {
-        if ((mFace->getPool()->getShaderLevel() > 0))
+        if (first_pass)
         {
-            if (first_pass)
-            {
-                uploadJointMatrices();
-            }
+            uploadJointMatrices();
         }
 
         buff->setBuffer();
@@ -298,7 +299,7 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     else
     {
         gGL.pushMatrix();
-        LLMatrix4 jointToWorld = getWorldMatrix();
+        LLMatrix4 jointToWorld = getWorldMatrix().toMatrix4();
         gGL.multMatrix((GLfloat*)jointToWorld.mMatrix);
         buff->setBuffer();
         buff->drawRange(LLRender::TRIANGLES, start, end, count, offset);
@@ -346,15 +347,6 @@ void LLViewerJointMesh::updateFaceData(LLFace *face, F32 pixel_area, bool damp_w
 
     if (!mFace->getVertexBuffer())
     {
-        return;
-    }
-
-    LLDrawPool *poolp = mFace->getPool();
-    bool hardware_skinning = (poolp && poolp->getShaderLevel() > 0);
-
-    if (!hardware_skinning && terse_update)
-    { //no need to do terse updates if we're doing software vertex skinning
-     // since mMesh is being copied into mVertexBuffer every frame
         return;
     }
 
@@ -441,75 +433,8 @@ bool LLViewerJointMesh::updateLOD(F32 pixel_area, bool activate)
     return (valid != activate);
 }
 
-// static
-void LLViewerJointMesh::updateGeometry(LLFace *mFace, LLPolyMesh *mMesh)
-{
-    LLStrider<LLVector3> o_vertices;
-    LLStrider<LLVector3> o_normals;
-
-    //get vertex and normal striders
-    LLVertexBuffer* buffer = mFace->getVertexBuffer();
-    buffer->getVertexStrider(o_vertices,  0);
-    buffer->getNormalStrider(o_normals,   0);
-
-    F32* __restrict vert = o_vertices[0].mV;
-    F32* __restrict norm = o_normals[0].mV;
-
-    const F32* __restrict weights = mMesh->getWeights();
-    const LLVector4a* __restrict coords = (LLVector4a*) mMesh->getCoords();
-    const LLVector4a* __restrict normals = (LLVector4a*) mMesh->getNormals();
-
-    U32 offset = mMesh->mFaceVertexOffset*4;
-    vert += offset;
-    norm += offset;
-
-    for (U32 index = 0; index < mMesh->getNumVertices(); index++)
-    {
-        // equivalent to joint = floorf(weights[index]);
-        S32 joint = _mm_cvtt_ss2si(_mm_load_ss(weights+index));
-        F32 w = weights[index] - joint;
-
-        LLMatrix4a gBlendMat;
-
-        if (w != 0.f)
-        {
-            // blend between matrices and apply
-            gBlendMat.setLerp(gJointMatAligned[joint+0],
-                              gJointMatAligned[joint+1], w);
-
-            LLVector4a res;
-            gBlendMat.affineTransform(coords[index], res);
-            res.store4a(vert+index*4);
-            gBlendMat.rotate(normals[index], res);
-            res.store4a(norm+index*4);
-        }
-        else
-        {  // No lerp required in this case.
-            LLVector4a res;
-            gJointMatAligned[joint].affineTransform(coords[index], res);
-            res.store4a(vert+index*4);
-            gJointMatAligned[joint].rotate(normals[index], res);
-            res.store4a(norm+index*4);
-        }
-    }
-
-    buffer->unmapBuffer();
-}
-
 void LLViewerJointMesh::updateJointGeometry()
 {
-    if (!(mValid
-          && mMesh
-          && mFace
-          && mMesh->hasWeights()
-          && mFace->getVertexBuffer()
-          && LLViewerShaderMgr::instance()->getShaderLevel(LLViewerShaderMgr::SHADER_AVATAR) == 0))
-    {
-        return;
-    }
-
-    uploadJointMatrices();
-    updateGeometry(mFace, mMesh);
 }
 
 void LLViewerJointMesh::dump()

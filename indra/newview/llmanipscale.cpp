@@ -85,6 +85,8 @@ const LLManip::EManipPart MANIPULATOR_IDS[LLManipScale::NUM_MANIPULATORS] =
     LLManip::LL_FACE_NEGZ
 };
 
+bool LLManipScale::sInvertUniform = false;
+
 F32 get_default_max_prim_scale(bool is_flora)
 {
     // a bit of a hack, but if it's foilage, we don't want to use the
@@ -121,7 +123,7 @@ void LLManipScale::setStretchTextures(bool b)
 // static
 bool LLManipScale::getUniform()
 {
-    return gSavedSettings.getBOOL("ScaleUniform");
+    return (gSavedSettings.getBOOL("ScaleUniform") ^ sInvertUniform);
 }
 
 // static
@@ -209,7 +211,7 @@ LLManipScale::~LLManipScale()
 void LLManipScale::render()
 {
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest gls_depth(GL_TRUE);
     LLGLEnable gl_blend(GL_BLEND);
     LLBBox bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
@@ -294,7 +296,7 @@ void LLManipScale::render()
 
             {
                 LLGLEnable poly_offset(GL_POLYGON_OFFSET_FILL);
-                glPolygonOffset( -2.f, -2.f);
+                gGL.setPolygonOffset( -2.f, -2.f);
 
                 renderCorners( bbox );
                 renderFaces( bbox );
@@ -304,7 +306,7 @@ void LLManipScale::render()
                     renderGuidelinesPart( bbox );
                 }
 
-                glPolygonOffset( 0.f, 0.f);
+                gGL.setPolygonOffset( 0.f, 0.f);
             }
         }
         gGL.popMatrix();
@@ -471,8 +473,8 @@ void LLManipScale::highlightManipulators(S32 x, S32 y)
         }
         else
         {
-            LLMatrix4 projMatrix = LLViewerCamera::getInstance()->getProjection();
-            LLMatrix4 modelView = LLViewerCamera::getInstance()->getModelview();
+            LLMatrix4 projMatrix = LLViewerCamera::getInstance()->getForwardZProjection().toMatrix4();
+            LLMatrix4 modelView = LLViewerCamera::getInstance()->frameModelview().toMatrix4();
             transform.initAll(LLVector3(1.f, 1.f, 1.f), bbox.getRotation(), bbox.getPositionAgent());
 
             transform *= modelView;
@@ -733,7 +735,7 @@ void LLManipScale::renderCorners( const LLBBox& bbox )
 
 void LLManipScale::renderBoxHandle( F32 x, F32 y, F32 z )
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest gls_depth(GL_FALSE);
     //LLGLDisable gls_stencil(GL_STENCIL_TEST);
 
@@ -1309,6 +1311,12 @@ void LLManipScale::updateSnapGuides(const LLBBox& bbox)
     LLVector3 grid_scale;
     LLQuaternion grid_rotation;
     LLSelectMgr::getInstance()->getGrid(grid_origin, grid_rotation, grid_scale);
+    LLViewerCamera* camera = LLViewerCamera::getInstance();
+    if (!camera)
+    {
+        // can be null on shutdown
+        return;
+    }
 
     bool uniform = LLManipScale::getUniform();
 
@@ -1844,10 +1852,10 @@ void LLManipScale::renderSnapGuides(const LLBBox& bbox)
                 std::string help_text = LLTrans::getString("manip_hint1");
                 LLColor4 help_text_color = LLColor4::white;
                 help_text_color.mV[VALPHA] = clamp_rescale(mHelpTextTimer.getElapsedTimeF32(), sHelpTextVisibleTime, sHelpTextVisibleTime + sHelpTextFadeTime, grid_alpha, 0.f);
-                hud_render_utf8text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
+                hud_render_text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
                 help_text = LLTrans::getString("manip_hint2");
                 help_text_pos -= LLViewerCamera::getInstance()->getUpAxis() * mSnapRegimeOffset * 0.4f;
-                hud_render_utf8text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
+                hud_render_text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
             }
         }
     }
@@ -2075,4 +2083,16 @@ bool LLManipScale::canAffectSelection()
         can_scale = mObjectSelection->applyToObjects(&func);
     }
     return can_scale;
+}
+
+bool LLManipScale::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
+{
+    sInvertUniform = true;
+    return handleMouseDown(x,y,mask);
+}
+
+bool LLManipScale::handleMiddleMouseUp(S32 x, S32 y, MASK mask)
+{
+    sInvertUniform = false;
+    return handleMouseUp(x, y, mask);
 }

@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llimview.h"
+#include "alchattimestamp.h"
 
 #include "llavatarnamecache.h"  // IDEVO
 #include "llavataractions.h"
@@ -71,7 +72,6 @@
 #include "message.h"
 #include "llviewerregion.h"
 #include "llcorehttputil.h"
-#include "lluiusage.h"
 #include "llurlregistry.h"
 
 #include <array>
@@ -94,8 +94,7 @@ const S32 XL8_PADDING = 3;  // XL8_START_TAG.size() + XL8_END_TAG.size()
 const static U32 SESSION_INITIALIZATION_TIMEOUT = 30;
 
 // This enum corresponds to the sim's and adds P2P_CHAT_SESSION,
-// as webrtc uses the multiagent chat mechanism for p2p calls,
-// instead of relying on vivox calling.
+// as webrtc uses the multiagent chat mechanism for p2p calls.
 // Don't change this without consulting a server developer.
 enum EMultiAgentChatSessionType
 {
@@ -372,17 +371,23 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
         && !is_session_focused
         && !is_dnd_msg) //prevent flashing FUI button because the conversation floater will have already opened
     {
-        if(!LLMuteList::getInstance()->isMuted(participant_id))
-    {
-            if(!gAgent.isDoNotDisturb())
+        // Prevent flashing for nearby chat when chat bar is active
+        static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+        if (!sChatInWindow
+            || (participant_id.notNull() && session_id.notNull()))
         {
-                gToolBarView->flashCommand(LLCommandId("chat"), true, im_box->isMinimized());
-        }
-            else
+            if (!LLMuteList::getInstance()->isMuted(participant_id))
             {
-                store_dnd_message = true;
+                if (!gAgent.isDoNotDisturb())
+                {
+                    gToolBarView->flashCommand(LLCommandId("chat"), true, im_box->isMinimized());
+                }
+                else
+                {
+                    store_dnd_message = true;
+                }
             }
-    }
+        }
     }
 
     // 4. Toast
@@ -434,8 +439,8 @@ void startConferenceCoro(std::string url,
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ConferenceChatStart", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ConferenceChatStart", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD postData;
     postData["method"] = "start conference";
@@ -483,8 +488,8 @@ void startConferenceCoro(std::string url,
 void startP2PVoiceCoro(std::string url, LLUUID sessionID, LLUUID creatorId, LLUUID otherParticipantId)
 {
     LLCore::HttpRequest::policy_t               httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("StartP2PVoiceCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t                  httpRequest(new LLCore::HttpRequest);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("StartP2PVoiceCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t                  httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD postData;
     postData["method"]     = "start p2p voice";
@@ -523,8 +528,8 @@ void chatterBoxInvitationCoro(std::string url, LLUUID sessionId, LLIMMgr::EInvit
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ConferenceInviteStart", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ConferenceInviteStart", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD postData;
     postData["method"] = "accept invitation";
@@ -641,8 +646,8 @@ void chatterBoxHistoryCoro(std::string url, LLUUID sessionId, std::string from, 
 {   // if parameters from, message and timestamp have values, they are a message that opened chat
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ChatHistory", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ChatHistory", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD postData;
     postData["method"] = "fetch history";
@@ -814,6 +819,10 @@ void LLIMModel::LLIMSession::initVoiceChannel(const LLSD& voiceChannelInfo)
 {
     if (mVoiceChannel)
     {
+        if (!voiceChannelInfo.isMap())
+        {
+            LL_WARNS() << "initVoiceChannel called without voiceChannelInfo" << LL_ENDL;
+        }
         if (mVoiceChannel->isThisVoiceChannel(voiceChannelInfo))
         {
             return;
@@ -1037,21 +1046,6 @@ void LLIMModel::LLIMSession::addMessage(const std::string& from,
     message["is_region_msg"] = is_region_msg;
 
     LL_DEBUGS("UIUsage") << "addMessage " << " from " << from << " from_id " << from_id << " utf8_text " << utf8_text << " time " << time << " is_history " << is_history << " session mType " << mType << LL_ENDL;
-    if (from_id == gAgent.getID())
-    {
-        if (mType == IM_SESSION_GROUP_START)
-        {
-            LLUIUsage::instance().logCommand("Chat.SendGroup");
-        }
-        else if (mType == IM_NOTHING_SPECIAL)
-        {
-            LLUIUsage::instance().logCommand("Chat.SendIM");
-        }
-        else
-        {
-            LLUIUsage::instance().logCommand("Chat.SendOther");
-        }
-    }
 
     mMsgs.push_front(message);          // Add most recent messages to the front of mMsgs
 
@@ -1081,7 +1075,7 @@ void LLIMModel::LLIMSession::addMessagesFromHistoryCache(const chat_message_list
 
         // Save the last minute of messages so we can merge with the chat server history.
         // Really would be nice to have a numeric timestamp in the local cached chat file
-        const std::string & msg_time_str = msg[LL_IM_DATE_TIME].asString();
+        const std::string msg_time_str = ALChatTimestamp::format(msg[LL_IM_DATE_TIME].asString(), false);
         if (mLastHistoryCacheDateTime != msg_time_str)
         {
             mLastHistoryCacheDateTime = msg_time_str;   // Reset to the new time
@@ -1288,7 +1282,7 @@ void LLIMModel::LLIMSession::addMessagesFromServerHistory(const LLSD& history,  
 
             if (add_chat_to_conversation)
             {   // Finally add message to the chat session
-                std::string chat_time_str = LLConversation::createTimestamp((U64Seconds)history_msg_timestamp);
+                std::string chat_time_str = LLLogChat::timestamp2LogString(history_msg_timestamp, true, true);
                 std::string sender_name = cur_server_hist[LL_IM_FROM].asString();
 
                 std::string history_msg_text = cur_server_hist[LL_IM_TEXT].asString();
@@ -1559,8 +1553,8 @@ void LLIMModel::testMessages()
     std::string firstname[] = {"Roflcopter", "Joe"};
     std::string lastname[] = {"Linden", "Tester", "Resident", "Schmoe"};
 
-    S32 rand1 = ll_rand(sizeof firstname)/(sizeof firstname[0]);
-    S32 rand2 = ll_rand(sizeof lastname)/(sizeof lastname[0]);
+    S32 rand1 = ll_rand(static_cast<S32>(std::size(firstname)));
+    S32 rand2 = ll_rand(static_cast<S32>(std::size(lastname)));
 
     from = firstname[rand1] + " " + lastname[rand2];
     bot2_id.generate(from);
@@ -1680,7 +1674,7 @@ bool LLIMModel::addToHistory(const LLUUID& session_id,
     }
 
     // This is where a normal arriving message is added to the session.   Note that the time string created here is without the full date
-    session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp2LogString(timestamp, false), false, is_region_msg, timestamp);
+    session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp2LogString(timestamp, false, true), false, is_region_msg, timestamp);
 
     return true;
 }
@@ -1758,7 +1752,7 @@ void LLIMModel::processAddingMessage(const LLUUID& session_id, const std::string
     arg["message"] = utf8_text;
     arg["from"] = from;
     arg["from_id"] = from_id;
-    arg["time"] = LLLogChat::timestamp2LogString(time_stamp, true);
+    arg["time"] = LLLogChat::timestamp2LogString(time_stamp, true, true);
     arg["session_type"] = session->mSessionType;
     arg["is_region_msg"] = is_region_msg;
 
@@ -1944,12 +1938,6 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
     info = LLAvatarTracker::instance().getBuddyInfo(other_participant_id);
 
     U8 offline = (!info || info->isOnline()) ? IM_ONLINE : IM_OFFLINE;
-    // Old call to send messages to SLim client,  no longer supported.
-    //if((offline == IM_OFFLINE) && (LLVoiceClient::getInstance()->isOnlineSIP(other_participant_id)))
-    //{
-    //  // User is online through the OOW connector, but not with a regular viewer.  Try to send the message via SLVoice.
-    //  sent = LLVoiceClient::getInstance()->sendTextMessage(other_participant_id, utf8_text);
-    //}
 
     if(!sent)
     {
@@ -1963,18 +1951,56 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
         {
             new_dialog = IM_SESSION_SEND;
         }
-        pack_instant_message(
-            gMessageSystem,
-            gAgent.getID(),
-            false,
-            gAgent.getSessionID(),
-            other_participant_id,
-            name.c_str(),
-            utf8_text.c_str(),
-            offline,
-            (EInstantMessage)new_dialog,
-            im_session_id);
-        gAgent.sendReliableMessage();
+// [SL:KB]
+        size_t maxChatLen = MAX_MSG_STR_LEN;
+        if (utf8_text.length() <= maxChatLen)
+        {
+            pack_instant_message(
+                gMessageSystem,
+                gAgent.getID(),
+                false,
+                gAgent.getSessionID(),
+                other_participant_id,
+                name.c_str(),
+                utf8_text.c_str(),
+                offline,
+                (EInstantMessage)new_dialog,
+                im_session_id);
+            gAgent.sendReliableMessage();
+        }
+        else
+        {
+            std::list<std::string> lines;
+            utf8str_split(lines, utf8_text, maxChatLen, ' ');
+            for (const std::string& strLine : lines)
+            {
+                pack_instant_message(
+                    gMessageSystem,
+                    gAgent.getID(),
+                    false,
+                    gAgent.getSessionID(),
+                    other_participant_id,
+                    name.c_str(),
+                    strLine.c_str(),
+                    offline,
+                    (EInstantMessage)new_dialog,
+                    im_session_id);
+                gAgent.sendReliableMessage();
+            }
+        }
+// [/SL:KB]
+        //pack_instant_message(
+        //  gMessageSystem,
+        //  gAgent.getID(),
+        //  false,
+        //  gAgent.getSessionID(),
+        //  other_participant_id,
+        //  name.c_str(),
+        //  utf8_text.c_str(),
+        //  offline,
+        //  (EInstantMessage)new_dialog,
+        //  im_session_id);
+        //gAgent.sendReliableMessage();
     }
 
     bool is_group_chat = false;
@@ -3093,8 +3119,7 @@ void LLIncomingCallDialog::processCallResponse(S32 response, const LLSD &payload
     {
         if (type == IM_SESSION_P2P_INVITE)
         {
-            // decline p2p voice, either via the vivox-style call mechanism
-            // or via the webrtc-style "decline p2p" mechanism.
+            // decline p2p voice, via the webrtc-style "decline p2p" mechanism.
             LLVoiceP2PIncomingCallInterfacePtr call = LLVoiceClient::getInstance()->getIncomingCallInterface(payload["voice_channel_info"]);
             if (call)
             {
@@ -3212,6 +3237,15 @@ void LLIMMgr::addMessage(
             return;
         }
 
+        if (LLMuteList::getInstance()->isGroupMuted(new_session_id))
+        {
+            // Reference LLIMMgr::removeSession on how to correctly remove a session
+            clearPendingInvitation(new_session_id);
+            clearPendingAgentListUpdates(new_session_id);
+            LLIMModel::getInstance()->sendLeaveSession(new_session_id, other_participant_id);
+            return;
+        }
+
         LLAvatarName av_name;
         if (LLAvatarNameCache::get(other_participant_id, &av_name) && !name_is_setted)
         {
@@ -3250,7 +3284,7 @@ void LLIMMgr::addMessage(
 
             // Logically it would make more sense to reject the session sooner, in another area of the
             // code, but the session has to be established inside the server before it can be left.
-            if (LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !from_linden)
+            if ((LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !from_linden))
             {
                 LL_WARNS() << "Leaving IM session from initiating muted resident " << from << LL_ENDL;
                 if (!gIMMgr->leaveSession(new_session_id))
@@ -3260,8 +3294,9 @@ void LLIMMgr::addMessage(
                 return;
             }
 
-            // Fetch group chat history, enabled by default.
-            if (gSavedPerAccountSettings.getBOOL("FetchGroupChatHistory"))
+            // Fetch group chat or ad-hoc history, enabled by default.
+            static LLCachedControl<bool> fetch_chat_history(gSavedPerAccountSettings, "FetchGroupChatHistory", true);
+            if (fetch_chat_history && !session->isP2PSessionType())
             {
                 std::string chat_url = gAgent.getRegionCapability("ChatSessionRequest");
                 if (!chat_url.empty())
@@ -3523,7 +3558,18 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
     LLIMModel::LLIMSession* im_session = LLIMModel::getInstance()->findIMSession(session_id);
     if (!im_session) return false;
 
-    LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+    if (im_session->isGroupSessionType() && im_session->mCloseAction == LLIMModel::LLIMSession::SCloseAction::CLOSE_SNOOZE)
+    {
+        const S32 duration = im_session->mSnoozeDuration;
+        const F64 now = LLTimer::getTotalSeconds();
+        mSnoozedSessions[session_id] = duration < 0 ? -1.0 : now + duration;
+    }
+    else
+    {
+        LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+        mSnoozedSessions.erase(session_id);
+    }
+
     gIMMgr->removeSession(session_id);
     return true;
 }
@@ -3712,6 +3758,45 @@ void LLIMMgr::disconnectAllSessions()
 bool LLIMMgr::hasSession(const LLUUID& session_id)
 {
     return LLIMModel::getInstance()->findIMSession(session_id) != NULL;
+}
+
+bool LLIMMgr::checkSnoozeExpiration(const LLUUID& session_id) const
+{
+    snoozed_sessions_t::const_iterator it = mSnoozedSessions.find(session_id);
+    return it != mSnoozedSessions.end() && it->second >= 0.0 && it->second <= LLTimer::getTotalSeconds();
+}
+
+bool LLIMMgr::isSnoozedSession(const LLUUID& session_id) const
+{
+    return mSnoozedSessions.find(session_id) != mSnoozedSessions.end();
+}
+
+bool LLIMMgr::restoreSnoozedSession(const LLUUID& session_id)
+{
+    snoozed_sessions_t::iterator it = mSnoozedSessions.find(session_id);
+    if (it == mSnoozedSessions.end())
+    {
+        return false;
+    }
+
+    LLGroupData group_data;
+    if (!gAgent.getGroupData(session_id, group_data))
+    {
+        return false;
+    }
+
+    mSnoozedSessions.erase(it);
+
+    gIMMgr->addSession(group_data.mName, IM_SESSION_GROUP_START, session_id);
+
+    uuid_vec_t ids;
+    LLIMModel::sendStartSession(session_id, session_id, ids, IM_SESSION_GROUP_START, false);
+
+    if (!gAgent.isDoNotDisturb())
+    {
+        make_ui_sound("UISndStartIM");
+    }
+    return true;
 }
 
 void LLIMMgr::clearPendingInvitation(const LLUUID& session_id)
@@ -4130,8 +4215,9 @@ public:
                 {
                     im_floater->processSessionUpdate(body["session_info"]);
 
-                    // Send request for chat history, if enabled.
-                    if (gSavedPerAccountSettings.getBOOL("FetchGroupChatHistory"))
+                    // Send request for chat history, if enabled. Skip for peer-to-peer IMs.
+                    static LLCachedControl<bool> fetch_chat_history(gSavedPerAccountSettings, "FetchGroupChatHistory", true);
+                    if (fetch_chat_history && !im_floater->isP2PSessionType())
                     {
                         std::string url = gAgent.getRegionCapability("ChatSessionRequest");
                         if (!url.empty())
@@ -4408,4 +4494,3 @@ LLHTTPRegistration<LLViewerChatterBoxSessionUpdate>
 LLHTTPRegistration<LLViewerChatterBoxInvitation>
     gHTTPRegistrationMessageChatterBoxInvitation(
         "/message/ChatterBoxInvitation");
-

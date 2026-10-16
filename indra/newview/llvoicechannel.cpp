@@ -128,6 +128,12 @@ void LLVoiceChannel::onChange(EStatusType type, const LLSD& channelInfo, bool pr
     {
         mChannelInfo = channelInfo;
     }
+
+    if (!LLVoiceClient::instanceExists())
+    {
+        return;
+    }
+
     if (!LLVoiceClient::getInstance()->compareChannels(mChannelInfo, channelInfo))
     {
         return;
@@ -357,6 +363,8 @@ void LLVoiceChannel::suspend()
     {
         sSuspendedVoiceChannel = sCurrentVoiceChannel;
         sSuspended = true;
+
+        sCurrentVoiceChannelChangedSignal(sSuspendedVoiceChannel->mSessionID);
     }
 }
 
@@ -365,6 +373,7 @@ void LLVoiceChannel::resume()
 {
     if (sSuspended)
     {
+        sSuspended = false; // needs to be before activate() so that observers will be able to read state
         if (LLVoiceClient::getInstance()->voiceEnabled())
         {
             if (sSuspendedVoiceChannel)
@@ -382,7 +391,6 @@ void LLVoiceChannel::resume()
                 LLVoiceChannelProximal::getInstance()->activate();
             }
         }
-        sSuspended = false;
     }
 }
 
@@ -470,10 +478,6 @@ void LLVoiceChannelGroup::activate()
                 }
             }
         }
-
-        // Mic default state is OFF on initiating/joining Ad-Hoc/Group calls.  It's on for P2P using the AdHoc infra.
-
-        LLVoiceClient::getInstance()->setUserPTTState(mIsP2P);
     }
 }
 
@@ -532,6 +536,10 @@ void LLVoiceChannelGroup::handleStatusChange(EStatusType type)
     case STATUS_JOINED:
         mRetries = 3;
         mIsRetrying = false;
+
+        // Mic default state is OFF on initiating/joining Ad-Hoc/Group calls. It's on for P2P using the AdHoc infra.
+        LLVoiceClient::getInstance()->setUserPTTState(mIsP2P);
+        break;
     default:
         break;
     }
@@ -608,8 +616,8 @@ void LLVoiceChannelGroup::voiceCallCapCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("voiceCallCapCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("voiceCallCapCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD postData;
     postData["method"] = "call";

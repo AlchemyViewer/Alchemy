@@ -33,7 +33,11 @@
 
 #include "llapr.h"
 
-static const char MESSAGE_DELIMITER = '\0';
+// Each message on the wire is framed with a 4-byte big-endian length prefix
+// followed by exactly that many payload bytes. A single delimiter byte can't
+// be used because the payload is now binary LLSD, which contains embedded NULs
+// (and every other byte value) in its length/size fields.
+static constexpr size_t MESSAGE_HEADER_SIZE = 4;
 
 LLPluginMessagePipeOwner::LLPluginMessagePipeOwner() :
     mMessagePipe(NULL),
@@ -121,8 +125,16 @@ bool LLPluginMessagePipe::addMessage(const std::string &message)
         mOutputStartIndex = 0;
     }
 
+    // Frame the message with a 4-byte big-endian length prefix.
+    U32 msg_size = static_cast<U32>(message.size());
+    const char header[MESSAGE_HEADER_SIZE] = {
+        static_cast<char>((msg_size >> 24) & 0xFF),
+        static_cast<char>((msg_size >> 16) & 0xFF),
+        static_cast<char>((msg_size >> 8) & 0xFF),
+        static_cast<char>(msg_size & 0xFF)
+    };
+    mOutput.append(header, MESSAGE_HEADER_SIZE);
     mOutput += message;
-    mOutput += MESSAGE_DELIMITER;   // message separator
 
     return true;
 }
@@ -177,9 +189,10 @@ bool LLPluginMessagePipe::pumpOutput()
 
         LLMutexLock lock(&mOutputMutex);
 
-        const char * output_data = &(mOutput.data()[mOutputStartIndex]);
-        if(*output_data != '\0')
+        if(mOutput.size() > mOutputStartIndex)
         {
+            const char * output_data = &(mOutput.data()[mOutputStartIndex]);
+
             // write any outgoing messages
             in_size = (apr_size_t) (mOutput.size() - mOutputStartIndex);
             out_size = in_size;
@@ -370,27 +383,39 @@ bool LLPluginMessagePipe::pumpInput(F64 timeout)
 
 void LLPluginMessagePipe::processInput(void)
 {
-    // Look for input delimiter(s) in the input buffer.
-    size_t delim;
     mInputMutex.lock();
-    while((delim = mInput.find(MESSAGE_DELIMITER)) != std::string::npos)
+    // Each message is a 4-byte big-endian length followed by that many payload
+    // bytes. Dispatch complete messages, leaving any trailing partial message
+    // in the buffer to be completed by a later read.
+    while(mInput.size() >= MESSAGE_HEADER_SIZE)
     {
-        // Let the owner process this message
-        if (mOwner)
+        const U8* buf = reinterpret_cast<const U8*>(mInput.data());
+        size_t msg_size =
+            (static_cast<size_t>(buf[0]) << 24) |
+            (static_cast<size_t>(buf[1]) << 16) |
+            (static_cast<size_t>(buf[2]) << 8) |
+             static_cast<size_t>(buf[3]);
+
+        if(mInput.size() < MESSAGE_HEADER_SIZE + msg_size)
         {
-            // Pull the message out of the input buffer before calling receiveMessageRaw.
-            // It's now possible for this function to get called recursively (in the case where the plugin makes a blocking request)
-            // and this guarantees that the messages will get dequeued correctly.
-            std::string message(mInput, 0, delim);
-            mInput.erase(0, delim + 1);
-            mInputMutex.unlock();
-            mOwner->receiveMessageRaw(message);
-            mInputMutex.lock();
+            // The full message body hasn't arrived yet; wait for more.
+            break;
         }
-        else
+
+        if(!mOwner)
         {
             LL_WARNS("Plugin") << "!mOwner" << LL_ENDL;
+            break;
         }
+
+        // Pull the message out of the input buffer before calling receiveMessageRaw.
+        // It's now possible for this function to get called recursively (in the case where the plugin makes a blocking request)
+        // and this guarantees that the messages will get dequeued correctly.
+        std::string message(mInput, MESSAGE_HEADER_SIZE, msg_size);
+        mInput.erase(0, MESSAGE_HEADER_SIZE + msg_size);
+        mInputMutex.unlock();
+        mOwner->receiveMessageRaw(message);
+        mInputMutex.lock();
     }
     mInputMutex.unlock();
 }

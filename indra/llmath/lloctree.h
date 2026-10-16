@@ -74,6 +74,10 @@ class LLOctreeTraveler
 public:
     virtual void traverse(const LLOctreeNode<T, T_PTR>* node);
     virtual void visit(const LLOctreeNode<T, T_PTR>* branch) = 0;
+
+protected:
+    // As traverse(), with each node's children taken nearest `eye` first.
+    void traverseNearFirst(const LLOctreeNode<T, T_PTR>* node, const LLVector4a& eye);
 };
 
 template <class T, typename T_PTR>
@@ -86,7 +90,6 @@ public:
 template <class T, typename T_PTR>
 class alignas(16) LLOctreeNode : public LLTreeNode<T>
 {
-    LL_ALIGN_NEW
 public:
 
     typedef LLOctreeTraveler<T, T_PTR>                          oct_traveler;
@@ -224,16 +227,15 @@ public:
     {
         const LLVector4a& pos = data->getPositionGroup();
 
-        LLVector4Logical gt = pos.greaterThan(center);
-
-        LLVector4a up;
-        up = _mm_and_ps(size, gt);
+        const LLVector4Logical gt = pos.greaterThan(center);
 
         LLVector4a down;
-        down = _mm_andnot_ps(gt, size);
+        down.setNeg(size);
 
-        center.add(up);
-        center.sub(down);
+        LLVector4a step;
+        step.setSelectWithMask(gt, size, down);
+
+        center.add(step);
     }
 
     void accept(oct_traveler* visitor)              { visitor->visit(this); }
@@ -249,6 +251,8 @@ public:
     U32 getChildCount() const                       { return mChildCount; }
     oct_node* getChild(U32 index)                   { return mChild[index]; }
     const oct_node* getChild(U32 index) const       { return mChild[index]; }
+    /// The index of the child in `octant`, or NO_CHILD_NODES.
+    U8 getChildIndex(U8 octant) const               { return mChildMap[octant]; }
     child_list& getChildren()                       { return mChild; }
     const child_list& getChildren() const           { return mChild; }
 
@@ -842,6 +846,36 @@ void LLOctreeTraveler<T, T_PTR>::traverse(const LLOctreeNode<T, T_PTR>* node)
     for (U32 i = 0; i < node->getChildCount(); i++)
     {
         traverse(node->getChild(i));
+    }
+}
+
+// The children in order of their octant's offset from the eye's, the one the eye is in first. Octant o ^ k lies
+// across the splits k's bits name, and a ray from the eye crosses each split at most once, so a child can only hide
+// one whose offset holds every bit of its own and more: a larger offset, visited later. The child map gives each
+// octant's child directly, so the order needs no sort.
+template <class T, typename T_PTR>
+void LLOctreeTraveler<T, T_PTR>::traverseNearFirst(const LLOctreeNode<T, T_PTR>* node, const LLVector4a& eye)
+{
+    node->accept(this);
+
+    const U32 count = node->getChildCount();
+    if (count < 2)
+    {
+        if (count == 1)
+        {
+            traverse(node->getChild(0));
+        }
+        return;
+    }
+
+    const U8 eye_octant = node->getOctant(eye);
+    for (U8 offset = 0; offset < 8; ++offset)
+    {
+        const U8 index = node->getChildIndex(eye_octant ^ offset);
+        if (index != LLOctreeNode<T, T_PTR>::NO_CHILD_NODES)
+        {
+            traverse(node->getChild(index));
+        }
     }
 }
 

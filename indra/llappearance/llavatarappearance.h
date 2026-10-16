@@ -159,7 +159,7 @@ public:
     const joint_alias_map_t& getJointAliases();
     static joint_alias_map_t buildJointAliases();
     typedef std::map<std::string, std::string> joint_parent_map_t; // matrix plus parent
-    typedef std::map<std::string, glm::mat4> joint_rest_map_t;
+    typedef std::map<std::string, LLMatrix4a> joint_rest_map_t;
     void getJointMatricesAndHierarhy(std::vector<LLJointData> &data) const;
 
 protected:
@@ -342,7 +342,6 @@ protected:
         bool                                mIsLoaded{ false };
         bool                                mIsUsed{ false };
         LLAvatarAppearanceDefines::ETextureIndex    mTextureIndex{ LLAvatarAppearanceDefines::ETextureIndex::TEX_INVALID };
-        U32                                 mMaskTexName{ 0 };
         // Stores pointers to the joint meshes that this baked texture deals with
         avatar_joint_mesh_list_t            mJointMeshes;
         morph_list_t                        mMaskedMorphs;

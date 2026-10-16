@@ -57,7 +57,9 @@ public:
      * | {abc,xyz}  |exactly one entire word in the options given   |
      * --------------------------------------------------------------
      */
+    LLDirIterator(const char* dirname, const std::string& mask);
     LLDirIterator(const std::string &dirname, const std::string &mask);
+    LLDirIterator(const std::filesystem::path& dir_path, const std::string& mask);
 
     ~LLDirIterator();
 

@@ -31,7 +31,6 @@
 
 #include "llhudtext.h"
 #include "llhudicon.h"
-#include "llhudeffectbeam.h"
 #include "llhudeffectblob.h"
 #include "llhudeffecttrail.h"
 #include "llhudeffectlookat.h"
@@ -118,6 +117,14 @@ void LLHUDObject::setPositionAgent(const LLVector3 &position_agent)
 void LLHUDObject::cleanupHUDObjects()
 {
     LLHUDIcon::cleanupDeadIcons();
+
+    // Before anything is marked dead, so that marking it dead is what drops
+    // the last reference to it and the list below is where it is destroyed --
+    // with a GL context still under it, which the captured glyphs its lines
+    // hold need in order to give their vertex buffers back.
+    LLHUDText::releaseTextObjects();
+    LLHUDNameTag::releaseTextObjects();
+
     hud_object_list_t::iterator object_it;
     for (object_it = sHUDObjects.begin(); object_it != sHUDObjects.end(); ++object_it)
     {
@@ -256,12 +263,10 @@ LLHUDEffect *LLHUDObject::addHUDEffect(const U8 type)
     return hud_objectp;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_HUD_UPDATE("Update Hud");
-
 // static
 void LLHUDObject::updateAll()
 {
-    LL_RECORD_BLOCK_TIME(FTM_HUD_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
     LLHUDText::updateAll();
     LLHUDIcon::updateAll();
     LLHUDNameTag::updateAll();

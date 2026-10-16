@@ -29,7 +29,6 @@
 #include "llviewerobjectlist.h"
 
 #include "message.h"
-#include "llfasttimer.h"
 #include "llrender.h"
 #include "llwindow.h"       // decBusyCount()
 
@@ -65,17 +64,15 @@
 #include "lltoolmgr.h"
 #include "lltoolpie.h"
 #include "llkeyboard.h"
+#include "lllocalmesh.h"
+#include "llmeshrepository.h"
 #include "u64.h"
 #include "llviewertexturelist.h"
 #include "lldatapacker.h"
 // [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2.1)
-#include "llderenderlist.h"
+#include "alderenderlist.h"
 // [/SL:KB]
-#ifdef LL_USESYSTEMLIBS
 #include <zlib.h>
-#else
-#include "zlib-ng/zlib.h"
-#endif
 #include "object_flags.h"
 
 #include "llappviewer.h"
@@ -110,6 +107,7 @@ LLViewerObjectList::LLViewerObjectList()
     mNumOrphans = 0;
     mNumNewObjects = 0;
     mWasPaused = false;
+    mAgentPaused = false;
     mNumDeadObjectUpdates = 0;
     mNumUnknownUpdates = 0;
 }
@@ -297,8 +295,6 @@ void LLViewerObjectList::processUpdateCore(LLViewerObject* objectp,
     }
 }
 
-static LLTrace::BlockTimerStatHandle FTM_PROCESS_OBJECTS("Process Objects");
-
 LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry* entry, LLViewerRegion* regionp)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
@@ -356,7 +352,7 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
 
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
     // Don't recreate derendered objects (also kill the cache entry so we don't do this per-frame)
-    if (LLDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, entry))
+    if (ALDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, entry))
     {
         regionp->killCacheEntry(local_id);  // NOTE: this will kill all child entries from the cache as well
         return NULL;
@@ -397,7 +393,7 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
         objectp->setLastUpdateType(OUT_FULL_COMPRESSED); //newly cached
         objectp->setLastUpdateCached(true);
     }
-    LLVOAvatar::cullAvatarsByPixelArea();
+    LLVOAvatar::setCullNeedsUpdate();
 
     return objectp;
 }
@@ -407,7 +403,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                                              const EObjectUpdateType update_type,
                                              bool compressed)
 {
-    LL_RECORD_BLOCK_TIME(FTM_PROCESS_OBJECTS);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     LLViewerObject *objectp;
     S32         num_objects;
@@ -469,8 +465,10 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         return;
     }
 
-    U8 compressed_dpbuffer[2048];
-    LLDataPackerBinaryBuffer compressed_dp(compressed_dpbuffer, 2048);
+    // A variable block can be as large as the packet that carried it, and the
+    // message reader never yields a packet larger than MAX_BUFFER_SIZE.
+    U8 compressed_dpbuffer[MAX_BUFFER_SIZE];
+    LLDataPackerBinaryBuffer compressed_dp(compressed_dpbuffer, sizeof(compressed_dpbuffer));
     LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instance();
 
     for (i = 0; i < num_objects; i++)
@@ -482,9 +480,21 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         {
             compressed_dp.reset();
 
+            // getSizeFast returns a negative sentinel for a missing block or
+            // variable, and getBinaryDataFast silently truncates at max_size.
+            // The packer's bounds checks trust the size it is handed, so a
+            // block we cannot hold whole must not be decoded at all.
             S32 uncompressed_length = mesgsys->getSizeFast(_PREHASH_ObjectData, i, _PREHASH_Data);
+            if (uncompressed_length < 0 || uncompressed_length > (S32)sizeof(compressed_dpbuffer))
+            {
+                LL_WARNS() << "Object data block " << i << " declares " << uncompressed_length
+                    << " bytes against a " << sizeof(compressed_dpbuffer) << " byte buffer"
+                    << " from " << mesgsys->getSender() << ", skipping" << LL_ENDL;
+                recorder.objectUpdateFailure();
+                continue;
+            }
             LL_DEBUGS("ObjectUpdate") << "got binary data from message to compressed_dpbuffer" << LL_ENDL;
-            mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_Data, compressed_dpbuffer, 0, i, 2048);
+            mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_Data, compressed_dpbuffer, 0, i, (S32)sizeof(compressed_dpbuffer));
             compressed_dp.assignBuffer(compressed_dpbuffer, uncompressed_length);
 
             if (update_type != OUT_TERSE_IMPROVED) // OUT_FULL_COMPRESSED only?
@@ -647,11 +657,11 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                 {
                     U32 idRootLocal = 0;
                     mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ParentID, idRootLocal, i);
-                    fBlockObject = LLDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, local_id, idRootLocal);
+                    fBlockObject = ALDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, local_id, idRootLocal);
                 }
                 else if (OUT_FULL_COMPRESSED == update_type)
                 {
-                    fBlockObject = LLDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, local_id, compressed_dp.getBuffer());
+                    fBlockObject = ALDerenderList::instance().processObjectUpdate(regionp->getHandle(), fullid, local_id, compressed_dp.getBuffer());
                 }
 
                 if (fBlockObject)
@@ -715,7 +725,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         objectp->setLastUpdateType(update_type);
     }
 
-    LLVOAvatar::cullAvatarsByPixelArea();
+    LLVOAvatar::setCullNeedsUpdate();
 }
 
 void LLViewerObjectList::processCompressedObjectUpdate(LLMessageSystem *mesgsys,
@@ -805,6 +815,8 @@ void LLViewerObjectList::setAllObjectDefaultTextures(U32 nChannel, bool fShowDef
 
 void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
+
     S32 i;
     LLViewerObject *objectp;
 
@@ -887,55 +899,53 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 void LLViewerObjectList::update(LLAgent &agent)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
-    static LLCachedControl<bool> cc_velocity_interpolate(gSavedSettings, "VelocityInterpolate");
-    static LLCachedControl<bool> cc_ping_interpolate(gSavedSettings, "PingInterpolate");
-    static LLCachedControl<F32> cc_interpolation_time(gSavedSettings, "InterpolationTime");
-    static LLCachedControl<F32> cc_ping_region_cross_interp(gSavedSettings, "RegionCrossingInterpolationTime");
-    static LLCachedControl<F32> cc_interpolation_phase_out(gSavedSettings, "InterpolationPhaseOut");
-    static LLCachedControl<bool> cc_animate_textures(gSavedSettings, "AnimateTextures");
 
-    // Update globals
-    LLViewerObject::setVelocityInterpolate( cc_velocity_interpolate );
-    LLViewerObject::setPingInterpolate( cc_ping_interpolate );
+    // Update globals. These are read every frame for every object, so they come from cached
+    // controls rather than a string lookup per frame per key.
+    static LLCachedControl<bool> velocity_interpolate(gSavedSettings, "VelocityInterpolate", true);
+    static LLCachedControl<bool> ping_interpolate(gSavedSettings, "PingInterpolate", false);
+    static LLCachedControl<F32> interpolation_time(gSavedSettings, "InterpolationTime", 3.f);
+    static LLCachedControl<F32> interpolation_phase_out(gSavedSettings, "InterpolationPhaseOut", 1.f);
+    static LLCachedControl<F32> region_crossing_time(gSavedSettings, "RegionCrossingInterpolationTime", 1.f);
+    static LLCachedControl<bool> cadence_aware(gSavedSettings, "ALInterpolationCadenceAware", false);
+    static LLCachedControl<F32> cadence_factor(gSavedSettings, "ALInterpolationCadenceFactor", 4.f);
+    static LLCachedControl<F32> max_frame_step(gSavedSettings, "ALInterpolationMaxFrameStep", 0.5f);
 
-    F32 interp_time = cc_interpolation_time;
-    F32 phase_out_time = cc_interpolation_phase_out;
-    F32 region_interp_time = llclamp(cc_ping_region_cross_interp(), 0.5f, 5.f);
-    if (interp_time < 0.0f ||
-        phase_out_time < 0.0f ||
+    LLViewerObject::setVelocityInterpolate( velocity_interpolate );
+    LLViewerObject::setPingInterpolate( ping_interpolate );
+
+    F32 interp_time = interpolation_time;
+    F32 phase_out_time = interpolation_phase_out;
+    F32 region_interp_time = llclamp((F32)region_crossing_time, 0.5f, 5.f);
+    if (interp_time < 0.0 ||
+        phase_out_time < 0.0 ||
         phase_out_time > interp_time)
     {
-        LL_WARNS() << "Invalid values for InterpolationTime or InterpolationPhaseOut, resetting to defaults" << LL_ENDL;
+        // Warn once rather than once per frame for as long as the setting stays bad.
+        LL_WARNS_ONCE() << "Invalid values for InterpolationTime or InterpolationPhaseOut, resetting to defaults" << LL_ENDL;
         interp_time = 3.0f;
         phase_out_time = 1.0f;
     }
-    LLViewerObject::setPhaseOutUpdateInterpolationTime( interp_time );
-    LLViewerObject::setMaxUpdateInterpolationTime( phase_out_time );
+
+    LLViewerObject::setPredictionCadenceAware( cadence_aware );
+    LLViewerObject::setPredictionCadenceFactor( llmax((F32)cadence_factor, 1.f) );
+    LLViewerObject::setPredictionMaxFrameStep( llmax((F32)max_frame_step, 0.f) );
+    // InterpolationTime is the outer bound -- how long prediction may run at all -- and
+    // InterpolationPhaseOut is where the taper between the two begins. The setters had these
+    // crossed, which inverted the invariant LLViewerObject asserts on itself and left the taper
+    // unreachable: every phase-out evaluation found itself already past the (smaller) maximum and
+    // stopped the object dead in one frame.
+    LLViewerObject::setMaxUpdateInterpolationTime( interp_time );
+    LLViewerObject::setPhaseOutUpdateInterpolationTime( phase_out_time );
     LLViewerObject::setMaxRegionCrossingInterpolationTime(region_interp_time);
 
-    gAnimateTextures = cc_animate_textures;
-
-    // update global timer
-    F32 last_time = gFrameTimeSeconds;
-    U64Microseconds time = totalTime();              // this will become the new gFrameTime when the update is done
-    // Time _can_ go backwards, for example if the user changes the system clock.
-    // It doesn't cause any fatal problems (just some oddness with stats), so we shouldn't assert here.
-//  llassert(time > gFrameTime);
-    F64Seconds time_diff = time - gFrameTime;
-    gFrameTime  = time;
-    F64Seconds time_since_start = gFrameTime - gStartTime;
-    gFrameTimeSeconds = time_since_start;
-
-    gFrameIntervalSeconds = gFrameTimeSeconds - last_time;
-    if (gFrameIntervalSeconds < 0.f)
-    {
-        gFrameIntervalSeconds = 0.f;
-    }
+    static LLCachedControl<bool> animate_textures(gSavedSettings, "AnimateTextures", true);
+    gAnimateTextures = animate_textures;
 
     //clear avatar LOD change counter
     LLVOAvatar::sNumLODChangesThisFrame = 0;
 
-    const F64 frame_time = LLFrameTimer::getElapsedSeconds();
+    const F64 frame_time = LLFrameTimer::getUptimeSeconds();
 
     LLViewerObject *objectp = NULL;
 
@@ -976,8 +986,8 @@ void LLViewerObjectList::update(LLAgent &agent)
 
     std::vector<LLViewerObject*>::iterator idle_end = idle_list.begin()+idle_count;
 
-    static const LLCachedControl<bool> freezeTime(gSavedSettings, "FreezeTime");
-    if (freezeTime)
+    static LLCachedControl<bool> freeze_time(gSavedSettings, "FreezeTime", false);
+    if (freeze_time)
     {
 
         for (std::vector<LLViewerObject*>::iterator iter = idle_list.begin();
@@ -992,12 +1002,34 @@ void LLViewerObjectList::update(LLAgent &agent)
     }
     else
     {
+        // Objects first, then avatars. A seated avatar pulls its seat's drawable forward from inside
+        // its own idleUpdate (LLPipeline::updateMoveDampedAsync), so that it can pose its skeleton on
+        // the seat's position for this frame -- which only works if the seat has already been
+        // interpolated. Left to list order, it depended on which of the two had rezzed first: when
+        // the rider came first it moved the seat toward last frame's position and stamped it
+        // EARLY_MOVE, the seat's own fresh move was then skipped, and vehicle and rider were drawn a
+        // frame behind -- or not, for the next vehicle over, and it could change when an unrelated
+        // object was removed from the list. No non-avatar idleUpdate reads avatar state, so nothing
+        // needs the reverse order.
         for (std::vector<LLViewerObject*>::iterator idle_iter = idle_list.begin();
             idle_iter != idle_end; idle_iter++)
         {
             objectp = *idle_iter;
             llassert(objectp->isActive());
+            if (!objectp->isAvatar())
+            {
                 objectp->idleUpdate(agent, frame_time);
+            }
+        }
+
+        for (std::vector<LLViewerObject*>::iterator idle_iter = idle_list.begin();
+            idle_iter != idle_end; idle_iter++)
+        {
+            objectp = *idle_iter;
+            if (objectp->isAvatar())
+            {
+                objectp->idleUpdate(agent, frame_time);
+            }
         }
 
         //update flexible objects
@@ -1022,8 +1054,9 @@ void LLViewerObjectList::update(LLAgent &agent)
     // don't factor frames that were paused into the stats
     if (! mWasPaused)
     {
-        LLViewerStats::getInstance()->updateFrameStats(time_diff);
+        LLViewerStats::getInstance()->updateFrameStats(F64Seconds(gFrameIntervalSeconds.value()));
     }
+    mWasPaused = mAgentPaused;
 
     /*
     // Debugging code for viewing orphans, and orphaned parents
@@ -1118,8 +1151,8 @@ void LLViewerObjectList::fetchObjectCostsCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("fetchObjectCostsCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
 
 
@@ -1137,67 +1170,94 @@ void LLViewerObjectList::fetchObjectCostsCoro(std::string url)
         return;
     }
 
-    LLSD idList(LLSD::emptyArray());
-
-    for (uuid_set_t::iterator it = diff.begin(); it != diff.end(); ++it)
-    {
-        idList.append(*it);
-    }
-
     mPendingObjectCost.insert(diff.begin(), diff.end());
 
-    LLSD postData = LLSD::emptyMap();
+    // The GetObjectCost capability rejects requests that ask for too many
+    // objects at once ("Maximum number of resource cost requests allowed is
+    // 500"), so split large requests into chunks issued sequentially. Stay
+    // comfortably under the limit since it is enforced at the boundary.
+    constexpr size_t MAX_OBJECTS_PER_COST_REQUEST = 256;
 
-    postData["object_ids"] = idList;
-
-    LLSD result = httpAdapter->postAndSuspend(httpRequest, url, postData);
-
-    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
-    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
-
-    if (!status || result.has("error"))
+    for (uuid_set_t::iterator chunk_begin = diff.begin(); chunk_begin != diff.end(); )
     {
-        if (result.has("error"))
+        LLSD idList(LLSD::emptyArray());
+        uuid_set_t::iterator it = chunk_begin;
+        for (size_t count = 0; count < MAX_OBJECTS_PER_COST_REQUEST && it != diff.end(); ++count, ++it)
         {
-            LL_WARNS() << "Application level error when fetching object "
-                << "cost.  Message: " << result["error"]["message"].asString()
-                << ", identifier: " << result["error"]["identifier"].asString()
-                << LL_ENDL;
-
-            // TODO*: Adaptively adjust request size if the
-            // service says we've requested too many and retry
+            idList.append(*it);
         }
-        reportObjectCostFailure(idList);
+        chunk_begin = it;
 
-        return;
-    }
+        LLSD postData = LLSD::emptyMap();
+        postData["object_ids"] = idList;
 
-    // Success, grab the resource cost and linked set costs
-    // for an object if one was returned
-    for (LLSD::array_iterator it = idList.beginArray(); it != idList.endArray(); ++it)
-    {
-        LLUUID objectId = it->asUUID();
-
-        // Object could have been added to the mStaleObjectCost after request started
-        mStaleObjectCost.erase(objectId);
-        mPendingObjectCost.erase(objectId);
-
-        // Check to see if the request contains data for the object
-        if (result.has(it->asString()))
+        LLSD result;
+        try
         {
-            LLSD objectData = result[it->asString()];
-
-            F32 linkCost = (F32)objectData["linked_set_resource_cost"].asReal();
-            F32 objectCost = (F32)objectData["resource_cost"].asReal();
-            F32 physicsCost = (F32)objectData["physics_cost"].asReal();
-            F32 linkPhysicsCost = (F32)objectData["linked_set_physics_cost"].asReal();
-
-            gObjectList.updateObjectCost(objectId, objectCost, linkCost, physicsCost, linkPhysicsCost);
+            result = httpAdapter->postAndSuspend(httpRequest, url, postData);
         }
-        else
+        catch (...)
         {
-            // TODO*: Give user feedback about the missing data?
-            gObjectList.onObjectCostFetchFailure(objectId);
+            // Coroutine teardown mid-sequence (e.g. LLCoros::Stop at disconnect).
+            // Retire this run's unresolved ids so they aren't stranded in
+            // mPendingObjectCost, which would exclude them from every future
+            // fetch via the set_difference above.
+            for (LLSD::array_const_iterator cit = idList.beginArray(); cit != idList.endArray(); ++cit)
+            {
+                mPendingObjectCost.erase(cit->asUUID());
+            }
+            for (uuid_set_t::iterator rest = chunk_begin; rest != diff.end(); ++rest)
+            {
+                mPendingObjectCost.erase(*rest);
+            }
+            throw;
+        }
+
+        LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+        LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+        if (!status || result.has("error"))
+        {
+            if (result.has("error"))
+            {
+                LL_WARNS() << "Application level error when fetching object "
+                    << "cost.  Message: " << result["error"]["message"].asString()
+                    << ", identifier: " << result["error"]["identifier"].asString()
+                    << LL_ENDL;
+            }
+            reportObjectCostFailure(idList);
+
+            // A failed chunk shouldn't abort the remaining ones.
+            continue;
+        }
+
+        // Success, grab the resource cost and linked set costs
+        // for an object if one was returned
+        for (LLSD::array_iterator result_it = idList.beginArray(); result_it != idList.endArray(); ++result_it)
+        {
+            LLUUID objectId = result_it->asUUID();
+
+            // Object could have been added to the mStaleObjectCost after request started
+            mStaleObjectCost.erase(objectId);
+            mPendingObjectCost.erase(objectId);
+
+            // Check to see if the request contains data for the object
+            if (result.has(result_it->asString()))
+            {
+                LLSD objectData = result[result_it->asString()];
+
+                F32 linkCost = (F32)objectData["linked_set_resource_cost"].asReal();
+                F32 objectCost = (F32)objectData["resource_cost"].asReal();
+                F32 physicsCost = (F32)objectData["physics_cost"].asReal();
+                F32 linkPhysicsCost = (F32)objectData["linked_set_physics_cost"].asReal();
+
+                gObjectList.updateObjectCost(objectId, objectCost, linkCost, physicsCost, linkPhysicsCost);
+            }
+            else
+            {
+                // TODO*: Give user feedback about the missing data?
+                gObjectList.onObjectCostFetchFailure(objectId);
+            }
         }
     }
 
@@ -1242,8 +1302,8 @@ void LLViewerObjectList::fetchPhisicsFlagsCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("fetchPhisicsFlagsCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD idList;
     U32 objectIndex = 0;
@@ -1362,6 +1422,7 @@ void LLViewerObjectList::cleanupReferences(LLViewerObject *objectp)
     LL_DEBUGS("ObjectUpdate") << " dereferencing id " << objectp->mID << LL_ENDL;
 
     mUUIDObjectMap.erase(objectp->mID);
+    mPresenceSignal(objectp->mID, false);
 
     //if (objectp->getRegion())
     //{
@@ -1422,6 +1483,14 @@ bool LLViewerObjectList::killObject(LLViewerObject *objectp)
 void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
 {
     LL_PROFILE_ZONE_SCOPED;
+
+    // Release our client-only local mesh previews hosted by this region before it
+    // is torn down, so they don't dangle past it (the preview avatar too).
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr::getInstance()->despawnObjectsInRegion(regionp);
+    }
+
     LLViewerObject *objectp;
 
 
@@ -1441,7 +1510,16 @@ void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
 
 void LLViewerObjectList::killAllObjects()
 {
+    LL_PROFILE_ZONE_SCOPED;
     // Used only on global destruction.
+
+    // Destroy local-mesh preview objects (and their preview avatar) first, so
+    // these client-only objects are released while this list is still valid
+    // instead of dangling until the local-mesh singleton is torn down.
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr::getInstance()->cleanup();
+    }
 
     // Mass cleanup to not clear lists one item at a time
     mIndexAndLocalIDToUUID.clear();
@@ -1461,7 +1539,12 @@ void LLViewerObjectList::killAllObjects()
         llassert((objectp == gAgentAvatarp) || objectp->isDead());
     }
 
-    cleanDeadObjects(false);
+    gMeshRepo.unregisterAllMeshes();
+
+    // Direct clear instead of cleanDeadObjects - all objects are already dead
+    mObjects.clear();
+    mDeadObjects.clear();
+    mNumDeadObjects = 0;
 
     if(!mObjects.empty())
     {
@@ -1602,6 +1685,15 @@ void LLViewerObjectList::updateActive(LLViewerObject *objectp)
 
 void LLViewerObjectList::updateObjectCost(LLViewerObject* object)
 {
+    // Client-only (local preview) objects have no sim counterpart, so their fake
+    // UUIDs can't be costed by the GetObjectCost capability: a request would never
+    // resolve and would re-fire every time the cost is read. Skip them -- their
+    // cached cost stays at the 0 default, which is the correct land impact for
+    // something that isn't actually rezzed on the region.
+    if (!object || object->isLocalOnly())
+    {
+        return;
+    }
     if (!object->isRoot())
     { //always fetch cost for the parent when fetching cost for children
         mStaleObjectCost.insert(((LLViewerObject*)object->getParent())->getID());
@@ -1629,6 +1721,13 @@ void LLViewerObjectList::onObjectCostFetchFailure(const LLUUID& object_id)
 
 void LLViewerObjectList::updatePhysicsFlags(const LLViewerObject* object)
 {
+    // Client-only (local preview) objects have no sim counterpart, so the
+    // GetObjectPhysicsData cap can't resolve their fake UUIDs -- skip them, mirroring
+    // updateObjectCost() above.
+    if (!object || object->isLocalOnly())
+    {
+        return;
+    }
     mStalePhysicsFlags.insert(object->getID());
 }
 
@@ -1966,6 +2065,7 @@ LLViewerObject *LLViewerObjectList::createObjectViewer(const LLPCode pcode, LLVi
     }
 
     mUUIDObjectMap[fullid] = objectp;
+    mPresenceSignal(fullid, true);
 
     mObjects.push_back(objectp);
 
@@ -1989,6 +2089,7 @@ LLViewerObject *LLViewerObjectList::createObjectFromCache(const LLPCode pcode, L
 
     objectp->mLocalID = local_id;
     mUUIDObjectMap[uuid] = objectp;
+    mPresenceSignal(uuid, true);
     setUUIDAndLocal(uuid,
                     local_id,
                     regionp->getHost().getAddress(),
@@ -2028,6 +2129,7 @@ LLViewerObject *LLViewerObjectList::createObject(const LLPCode pcode, LLViewerRe
     }
 
     mUUIDObjectMap[fullid] = objectp;
+    mPresenceSignal(fullid, true);
     setUUIDAndLocal(fullid,
                     local_id,
                     gMessageSystem->getSenderIP(),
@@ -2180,7 +2282,7 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
             addDebugBeacon(objectp->getPositionAgent(),"");
 #endif
             gPipeline.markMoved(objectp->mDrawable);
-            objectp->setChanged(LLXform::MOVED | LLXform::SILHOUETTE);
+            objectp->setChanged(LLXform::MOVED);
 
             // Flag the object as no longer orphaned
             childp->mOrphaned = false;

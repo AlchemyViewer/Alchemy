@@ -44,6 +44,7 @@
 #include "llsliderctrl.h"
 #include "lltextbox.h"
 #include "lltrans.h"
+#include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
 #include "llviewerwindow.h"
 #include "llvoavatar.h"
@@ -182,6 +183,11 @@ void LLFloaterPerformance::showSelectedPanel(LLPanel* selected_panel)
     {
         populateObjectList();
     }
+    else if (mSettingsPanel == selected_panel)
+    {
+        LLSliderCtrl* draw_distance = mSettingsPanel->getChild<LLSliderCtrl>("draw_distance");
+        cap_draw_distance_control(draw_distance, draw_distance);
+    }
 }
 
 void LLFloaterPerformance::showAutoadjustmentsPanel()
@@ -319,7 +325,7 @@ void LLFloaterPerformance::populateHUDList()
                 LLScrollListItem* obj = mHUDList->addElement(item);
                 if (obj)
                 {
-                    LLScrollListText* value_text = dynamic_cast<LLScrollListText*>(obj->getColumn(1));
+                    LLScrollListText* value_text = obj->getColumn<LLScrollListText>(1);
                     if (value_text)
                     {
                         value_text->setAlignment(LLFontGL::HCENTER);
@@ -410,7 +416,7 @@ void LLFloaterPerformance::populateObjectList()
                     LLScrollListItem* obj = mObjectList->addElement(item);
                     if (obj)
                     {
-                        LLScrollListText* value_text = dynamic_cast<LLScrollListText*>(obj->getColumn(1));
+                        LLScrollListText* value_text = obj->getColumn<LLScrollListText>(1);
                         if (value_text)
                         {
                             value_text->setAlignment(LLFontGL::HCENTER);
@@ -472,12 +478,12 @@ void LLFloaterPerformance::populateNearbyList()
             LLScrollListItem* av_item = mNearbyList->addElement(item);
             if(av_item)
             {
-                LLScrollListText* value_text = dynamic_cast<LLScrollListText*>(av_item->getColumn(1));
+                LLScrollListText* value_text = av_item->getColumn<LLScrollListText>(1);
                 if (value_text)
                 {
                     value_text->setAlignment(LLFontGL::HCENTER);
                 }
-                LLScrollListText* name_text = dynamic_cast<LLScrollListText*>(av_item->getColumn(2));
+                LLScrollListText* name_text = av_item->getColumn<LLScrollListText>(2);
                 if (name_text)
                 {
                     if (avatar->isSelf())
@@ -490,7 +496,7 @@ void LLFloaterPerformance::populateNearbyList()
                         if (is_slow || LLVOAvatar::AOA_JELLYDOLL == avatar->getOverallAppearance())
                         {
                             color = "LabelDisabledColor";
-                            LLScrollListBar* bar = dynamic_cast<LLScrollListBar*>(av_item->getColumn(0));
+                            LLScrollListBar* bar = av_item->getColumn<LLScrollListBar>(0);
                             if (bar)
                             {
                                 bar->setColor(LLUIColorTable::instance().getColor(color));
@@ -514,7 +520,7 @@ void LLFloaterPerformance::populateNearbyList()
 void LLFloaterPerformance::setFPSText()
 {
     const S32 NUM_PERIODS = 50;
-    S32 current_fps = (S32)llround(LLTrace::get_frame_recording().getPeriodMedianPerSec(LLStatViewer::FPS, NUM_PERIODS));
+    S32 current_fps = (S32)ll_round(LLTrace::get_frame_recording().getPeriodMedianPerSec(LLStatViewer::FPS, NUM_PERIODS));
     mTextFPSValue->setValue(current_fps);
 
     std::string fps_text = getString("fps_text");
@@ -656,7 +662,7 @@ bool LLFloaterPerformance::isActionChecked(const LLSD& userdata, const LLUUID& a
 
 void LLFloaterPerformance::onAvatarListRightClick(LLUICtrl* ctrl, S32 x, S32 y)
 {
-    LLNameListCtrl* list = dynamic_cast<LLNameListCtrl*>(ctrl);
+    LLNameListCtrl* list = ALViewType::as<LLNameListCtrl>(ctrl);
     if (!list) return;
     list->selectItemAt(x, y, MASK_NONE);
     uuid_vec_t selected_uuids;

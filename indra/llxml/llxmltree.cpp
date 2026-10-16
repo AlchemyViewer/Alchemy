@@ -27,6 +27,8 @@
 #include "linden_common.h"
 
 #include "llxmltree.h"
+
+#include "alxmldocument.h"
 #include "v3color.h"
 #include "v4color.h"
 #include "v4coloru.h"
@@ -36,6 +38,10 @@
 #include "llquaternion.h"
 #include "lluuid.h"
 
+#include <algorithm>
+#include <cstring>
+#include <vector>
+
 //////////////////////////////////////////////////////////////
 // LLXmlTree
 
@@ -43,7 +49,7 @@
 LLStdStringTable LLXmlTree::sAttributeKeys(1024);
 
 LLXmlTree::LLXmlTree()
-    : mRoot( NULL ),
+    : mRoot( nullptr ),
       mNodeNames(512)
 {
 }
@@ -53,10 +59,28 @@ LLXmlTree::~LLXmlTree()
     cleanup();
 }
 
+LLXmlTree::LLXmlTree(LLXmlTree&& other) noexcept
+    : mRoot(other.mRoot),
+      mNodeNames(512)
+{
+    other.mRoot = nullptr;
+}
+
+LLXmlTree& LLXmlTree::operator=(LLXmlTree&& other) noexcept
+{
+    if (this != &other)
+    {
+        cleanup();
+        mRoot = other.mRoot;
+        other.mRoot = nullptr;
+    }
+    return *this;
+}
+
 void LLXmlTree::cleanup()
 {
     delete mRoot;
-    mRoot = NULL;
+    mRoot = nullptr;
     mNodeNames.cleanup();
 }
 
@@ -64,15 +88,14 @@ void LLXmlTree::cleanup()
 bool LLXmlTree::parseFile(const std::string &path, bool keep_contents)
 {
     delete mRoot;
-    mRoot = NULL;
+    mRoot = nullptr;
 
     LLXmlTreeParser parser(this);
     bool success = parser.parseFile( path, &mRoot, keep_contents );
     if( !success )
     {
-        S32 line_number = parser.getCurrentLineNumber();
-        const char* error =  parser.getErrorString();
-        LL_WARNS() << "LLXmlTree parse failed.  Line " << line_number << ": " << error << LL_ENDL;
+        LL_WARNS() << "LLXmlTree parse failed.  Line " << parser.getCurrentLineNumber()
+                << ": " << parser.getErrorString() << LL_ENDL;
     }
     return success;
 }
@@ -99,8 +122,8 @@ void LLXmlTree::dumpNode( LLXmlTreeNode* node, const std::string& prefix )
 //////////////////////////////////////////////////////////////
 // LLXmlTreeNode
 
-LLXmlTreeNode::LLXmlTreeNode( const std::string& name, LLXmlTreeNode* parent, LLXmlTree* tree )
-    : mName(name),
+LLXmlTreeNode::LLXmlTreeNode( std::string name, LLXmlTreeNode* parent, LLXmlTree* tree )
+    : mName(std::move(name)),
       mParent(parent),
       mTree(tree)
 {
@@ -128,28 +151,28 @@ void LLXmlTreeNode::dump( const std::string& prefix )
     {
         LL_CONT << " contents = \"" << mContents << "\"";
     }
-    attribute_map_t::iterator iter;
-    for (iter=mAttributes.begin(); iter != mAttributes.end(); iter++)
+    for (const auto& [key, value] : mAttributes)
     {
-        LLStdStringHandle key = iter->first;
-        const std::string* value = iter->second;
         LL_CONT << prefix << " " << key << "=" << (value->empty() ? "NULL" : *value);
     }
     LL_CONT << LL_ENDL;
 }
 
-bool LLXmlTreeNode::hasAttribute(const std::string& name)
+bool LLXmlTreeNode::hasAttribute(std::string_view name)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString(name);
     attribute_map_t::iterator iter = mAttributes.find(canonical_name);
     return iter != mAttributes.end();
 }
 
-void LLXmlTreeNode::addAttribute(const std::string& name, const std::string& value)
+void LLXmlTreeNode::addAttribute(std::string_view name, std::string value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString(name);
-    const std::string *newstr = new std::string(value);
-    mAttributes[canonical_name] = newstr; // insert + copy
+    const std::string*& slot = mAttributes[canonical_name];
+    // The destructor owns whatever is here, so a repeated attribute name has to
+    // free the value it replaces rather than drop the pointer on the floor.
+    delete slot;
+    slot = new std::string(std::move(value));
 }
 
 LLXmlTreeNode*  LLXmlTreeNode::getFirstChild()
@@ -165,7 +188,7 @@ LLXmlTreeNode*  LLXmlTreeNode::getNextChild()
         return *mChildrenIter++;
 }
 
-LLXmlTreeNode* LLXmlTreeNode::getChildByName(const std::string& name)
+LLXmlTreeNode* LLXmlTreeNode::getChildByName(std::string_view name)
 {
     LLStdStringHandle tableptr = mTree->mNodeNames.checkString(name);
     mChildMapIter = mChildMap.lower_bound(tableptr);
@@ -176,14 +199,14 @@ LLXmlTreeNode* LLXmlTreeNode::getChildByName(const std::string& name)
 LLXmlTreeNode* LLXmlTreeNode::getNextNamedChild()
 {
     if (mChildMapIter == mChildMapEndIter)
-        return NULL;
+        return nullptr;
     else
         return (mChildMapIter++)->second;
 }
 
-void LLXmlTreeNode::appendContents(const std::string& str)
+void LLXmlTreeNode::appendContents(const char* str, std::string::size_type len)
 {
-    mContents.append( str );
+    mContents.append( str, len );
 }
 
 void LLXmlTreeNode::addChild(LLXmlTreeNode* child)
@@ -286,12 +309,6 @@ bool LLXmlTreeNode::getFastAttributeVector3d(LLStdStringHandle canonical_name, L
     return s ? LLVector3d::parseVector3d(*s,  &value ) : false;
 }
 
-bool LLXmlTreeNode::getFastAttributeVector4(LLStdStringHandle canonical_name, LLVector4& value)
-{
-    const std::string* s = getAttribute(canonical_name);
-    return s ? LLVector4::parseVector4(*s, &value) : false;
-}
-
 bool LLXmlTreeNode::getFastAttributeQuat(LLStdStringHandle canonical_name, LLQuaternion& value)
 {
     const std::string *s = getAttribute( canonical_name );
@@ -319,109 +336,103 @@ bool LLXmlTreeNode::getFastAttributeString(LLStdStringHandle canonical_name, std
 
 //////////////////////////////////////////////////////////////
 
-bool LLXmlTreeNode::getAttributeBOOL(const std::string& name, bool& value)
+bool LLXmlTreeNode::getAttributeBOOL(std::string_view name, bool& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeBOOL(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeU8(const std::string& name, U8& value)
+bool LLXmlTreeNode::getAttributeU8(std::string_view name, U8& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeU8(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeS8(const std::string& name, S8& value)
+bool LLXmlTreeNode::getAttributeS8(std::string_view name, S8& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeS8(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeS16(const std::string& name, S16& value)
+bool LLXmlTreeNode::getAttributeS16(std::string_view name, S16& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeS16(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeU16(const std::string& name, U16& value)
+bool LLXmlTreeNode::getAttributeU16(std::string_view name, U16& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeU16(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeU32(const std::string& name, U32& value)
+bool LLXmlTreeNode::getAttributeU32(std::string_view name, U32& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeU32(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeS32(const std::string& name, S32& value)
+bool LLXmlTreeNode::getAttributeS32(std::string_view name, S32& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeS32(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeF32(const std::string& name, F32& value)
+bool LLXmlTreeNode::getAttributeF32(std::string_view name, F32& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeF32(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeF64(const std::string& name, F64& value)
+bool LLXmlTreeNode::getAttributeF64(std::string_view name, F64& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeF64(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeColor(const std::string& name, LLColor4& value)
+bool LLXmlTreeNode::getAttributeColor(std::string_view name, LLColor4& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeColor(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeColor4(const std::string& name, LLColor4& value)
+bool LLXmlTreeNode::getAttributeColor4(std::string_view name, LLColor4& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeColor4(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeColor4U(const std::string& name, LLColor4U& value)
+bool LLXmlTreeNode::getAttributeColor4U(std::string_view name, LLColor4U& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeColor4U(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeVector3(const std::string& name, LLVector3& value)
+bool LLXmlTreeNode::getAttributeVector3(std::string_view name, LLVector3& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeVector3(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeVector3d(const std::string& name, LLVector3d& value)
+bool LLXmlTreeNode::getAttributeVector3d(std::string_view name, LLVector3d& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeVector3d(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeVector4(const std::string& name, LLVector4& value)
-{
-    LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString(name);
-    return getFastAttributeVector4(canonical_name, value);
-}
-
-bool LLXmlTreeNode::getAttributeQuat(const std::string& name, LLQuaternion& value)
+bool LLXmlTreeNode::getAttributeQuat(std::string_view name, LLQuaternion& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeQuat(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeUUID(const std::string& name, LLUUID& value)
+bool LLXmlTreeNode::getAttributeUUID(std::string_view name, LLUUID& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeUUID(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeString(const std::string& name, std::string& value)
+bool LLXmlTreeNode::getAttributeString(std::string_view name, std::string& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeString(canonical_name, value);
@@ -519,10 +530,9 @@ std::string LLXmlTreeNode::getTextContents()
 
 LLXmlTreeParser::LLXmlTreeParser(LLXmlTree* tree)
     : mTree(tree),
-      mRoot( NULL ),
-      mCurrent( NULL ),
-      mDump( false ),
-      mKeepContents(false)
+      mRoot( nullptr ),
+      mKeepContents(false),
+      mErrorLine(0)
 {
 }
 
@@ -533,168 +543,92 @@ LLXmlTreeParser::~LLXmlTreeParser()
 bool LLXmlTreeParser::parseFile(const std::string &path, LLXmlTreeNode** root, bool keep_contents)
 {
     llassert( !mRoot );
-    llassert( !mCurrent );
 
     mKeepContents = keep_contents;
+    mErrorLine = 0;
+    mErrorString.clear();
 
-    bool success = LLXmlParser::parseFile(path);
+    ALXmlDocument document;
+    if (!document.loadFile(path))
+    {
+        mErrorLine = document.errorLine();
+        mErrorString = document.errorDescription();
+        *root = nullptr;
+        return false;
+    }
+
+    buildTree(document.document().document_element());
 
     *root = mRoot;
-    mRoot = NULL;
-
-    if( success )
-    {
-        llassert( !mCurrent );
-    }
-    mCurrent = NULL;
-
-    return success;
+    mRoot = nullptr;
+    return true;
 }
 
-
-const std::string& LLXmlTreeParser::tabs()
+void LLXmlTreeParser::buildTree(const pugi::xml_node& root_element)
 {
-    static std::string s;
-    s = "";
-    S32 num_tabs = getDepth() - 1;
-    for( S32 i = 0; i < num_tabs; i++)
-    {
-        s += "    ";
-    }
-    return s;
-}
+    // An explicit stack rather than recursion, since nothing bounds how deeply
+    // a document nests and some of them arrive over the network.
+    std::vector<std::pair<pugi::xml_node, LLXmlTreeNode*>> pending;
+    pending.emplace_back(root_element, nullptr);
 
-void LLXmlTreeParser::startElement(const char* name, const char **atts)
-{
-    if( mDump )
+    while (!pending.empty())
     {
-        LL_INFOS() << tabs() << "startElement " << name << LL_ENDL;
+        const pugi::xml_node element = pending.back().first;
+        LLXmlTreeNode* const parent = pending.back().second;
+        pending.pop_back();
 
-        S32 i = 0;
-        while( atts[i] && atts[i+1] )
+        LLXmlTreeNode* node = CreateXmlTreeNode( element.name(), parent );
+
+        for (pugi::xml_attribute attribute : element.attributes())
         {
-            LL_INFOS() << tabs() << "attribute: " << atts[i] << "=" << atts[i+1] << LL_ENDL;
-            i += 2;
+            node->addAttribute( attribute.name(), attribute.value() );
+        }
+
+        if( parent )
+        {
+            parent->addChild( node );
+        }
+        else
+        {
+            mRoot = node;
+        }
+
+        const size_t first_child = pending.size();
+        for (pugi::xml_node child : element.children())
+        {
+            switch (child.type())
+            {
+            case pugi::node_element:
+                pending.emplace_back(child, node);
+                break;
+
+            case pugi::node_pcdata:
+            case pugi::node_cdata:
+                if (mKeepContents)
+                {
+                    const char* contents = child.value();
+                    node->appendContents( contents, strlen(contents) );
+                }
+                break;
+
+            default:
+                break;
+            }
+        }
+        // Reversed, so that popping reaches the children in document order.
+        std::reverse(pending.begin() + first_child, pending.end());
+
+        if( !node->mContents.empty() )
+        {
+            LLStringUtil::trim(node->mContents);
+            LLStringUtil::removeCRLF(node->mContents);
         }
     }
-
-    LLXmlTreeNode* child = CreateXmlTreeNode( std::string(name), mCurrent );
-
-    S32 i = 0;
-    while( atts[i] && atts[i+1] )
-    {
-        child->addAttribute( atts[i], atts[i+1] );
-        i += 2;
-    }
-
-    if( mCurrent )
-    {
-        mCurrent->addChild( child );
-
-    }
-    else
-    {
-        llassert( !mRoot );
-        mRoot = child;
-    }
-    mCurrent = child;
 }
 
-LLXmlTreeNode* LLXmlTreeParser::CreateXmlTreeNode(const std::string& name, LLXmlTreeNode* parent)
+LLXmlTreeNode* LLXmlTreeParser::CreateXmlTreeNode(std::string name, LLXmlTreeNode* parent)
 {
-    return new LLXmlTreeNode(name, parent, mTree);
-}
-
-
-void LLXmlTreeParser::endElement(const char* name)
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "endElement " << name << LL_ENDL;
-    }
-
-    if( !mCurrent->mContents.empty() )
-    {
-        LLStringUtil::trim(mCurrent->mContents);
-        LLStringUtil::removeCRLF(mCurrent->mContents);
-    }
-
-    mCurrent = mCurrent->getParent();
-}
-
-void LLXmlTreeParser::characterData(const char *s, int len)
-{
-    std::string str;
-    if (s) str = std::string(s, len);
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "CharacterData " << str << LL_ENDL;
-    }
-
-    if (mKeepContents)
-    {
-        mCurrent->appendContents( str );
-    }
-}
-
-void LLXmlTreeParser::processingInstruction(const char *target, const char *data)
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "processingInstruction " << data << LL_ENDL;
-    }
-}
-
-void LLXmlTreeParser::comment(const char *data)
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "comment " << data << LL_ENDL;
-    }
-}
-
-void LLXmlTreeParser::startCdataSection()
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "startCdataSection" << LL_ENDL;
-    }
-}
-
-void LLXmlTreeParser::endCdataSection()
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "endCdataSection" << LL_ENDL;
-    }
-}
-
-void LLXmlTreeParser::defaultData(const char *s, int len)
-{
-    if( mDump )
-    {
-        std::string str;
-        if (s) str = std::string(s, len);
-        LL_INFOS() << tabs() << "defaultData " << str << LL_ENDL;
-    }
-}
-
-void LLXmlTreeParser::unparsedEntityDecl(
-    const char* entity_name,
-    const char* base,
-    const char* system_id,
-    const char* public_id,
-    const char* notation_name)
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "unparsed entity:"          << LL_ENDL;
-        LL_INFOS() << tabs() << "    entityName "           << entity_name  << LL_ENDL;
-        LL_INFOS() << tabs() << "    base "             << base         << LL_ENDL;
-        LL_INFOS() << tabs() << "    systemId "         << system_id    << LL_ENDL;
-        LL_INFOS() << tabs() << "    publicId "         << public_id    << LL_ENDL;
-        LL_INFOS() << tabs() << "    notationName "     << notation_name<< LL_ENDL;
-    }
+    return new LLXmlTreeNode(std::move(name), parent, mTree);
 }
 
 void test_llxmltree()

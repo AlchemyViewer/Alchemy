@@ -46,24 +46,16 @@ void LLMsgVarData::addData(const void *data, S32 size, EMsgVariableType type, S3
     if(size)
     {
         delete[] mData; // Delete it if it already exists
-        mData = new U8[size];
-        htolememcpy(mData, data, mType, size);
-    }
-}
-
-void LLMsgData::addDataFast(char *blockname, char *varname, const void *data, S32 size, EMsgVariableType type, S32 data_size)
-{
-    // remember that if the blocknumber is > 0 then the number is appended to the name
-    char *namep = (char *)blockname;
-    LLMsgBlkData* block_data = mMemberBlocks[namep];
-    if (block_data->mBlockNumber)
-    {
-        namep += block_data->mBlockNumber;
-        block_data->addData(varname, data, size, type, data_size);
-    }
-    else
-    {
-        block_data->addData(varname, data, size, type, data_size);
+        mData = nullptr;
+        U8* dest = mInlineData;
+        if (size > INLINE_DATA_SIZE)
+        {
+            mData = new U8[size];
+            dest = mData;
+        }
+        // swizzle by the caller-declared layout of the incoming data; mType
+        // may still be the default if this entry skipped addVariable()
+        htolememcpy(dest, data, type, size);
     }
 }
 
@@ -117,11 +109,9 @@ std::ostream& operator<<(std::ostream& s, LLMessageBlock &msg)
     }
 
 
-    for (LLMessageBlock::message_variable_map_t::iterator iter = msg.mMemberVariables.begin();
-         iter != msg.mMemberVariables.end(); iter++)
+    for (LLMessageVariable* variable : msg.mMemberVariables)
     {
-        LLMessageVariable& ci = *(*iter);
-        s << ci;
+        s << *variable;
     }
 
     return s;
@@ -161,10 +151,8 @@ std::ostream& operator<<(std::ostream& s, LLMessageTemplate &msg)
         s << ")\n";
     }
 
-    for (LLMessageTemplate::message_block_map_t::iterator iter = msg.mMemberBlocks.begin();
-         iter != msg.mMemberBlocks.end(); iter++)
+    for (LLMessageBlock* ci : msg.mMemberBlocks)
     {
-        LLMessageBlock* ci = *iter;
         s << *ci;
     }
 

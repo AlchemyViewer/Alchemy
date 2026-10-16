@@ -31,9 +31,14 @@ uniform vec2 screen_res;
 
 void main()
 {
-    //transform vertex
-    vec4 pos = vec4(position.xyz, 1.0);
-    gl_Position = pos;
+    // Level with the depth the sky leaves cleared, as the haze's triangle is (hazeV.glsl): the draw passes only in
+    // front of the far plane (LLPipeline::renderDeferredLighting), so no sky pixel is shadowed or occluded, and the
+    // light map keeps the clear's white there. Reverse-Z puts the far plane at ndc z 0.
+#ifdef REVERSE_Z
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+#else
+    gl_Position = vec4(position.xy, 1.0, 1.0);
+#endif
 
-    vary_fragcoord = (pos.xy * 0.5 + 0.5);
+    vary_fragcoord = (position.xy * 0.5 + 0.5);
 }

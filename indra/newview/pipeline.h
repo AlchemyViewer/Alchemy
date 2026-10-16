@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -37,10 +40,18 @@
 #include "lldrawpoolmaterials.h"
 #include "llgl.h"
 #include "lldrawable.h"
+#include "aldepthpyramid.h"
+#include "alprimitiveplot.h"
+#include "alquerypool.h"
+#include "alwatersurface.h"
+#include "altexture3d.h"
+#include "aluniformbuffer.h"
 #include "llrendertarget.h"
 #include "llreflectionmapmanager.h"
 #include "llheroprobemanager.h"
+#include "alscopedata.h"
 
+#include <array>
 #include <stack>
 
 class LLViewerTexture;
@@ -65,34 +76,11 @@ bool LLRayAABB(const LLVector3 &center, const LLVector3 &size, const LLVector3& 
 bool setup_hud_matrices(); // use whole screen to render hud
 bool setup_hud_matrices(const LLRect& screen_region); // specify portion of screen (in pixels) to render hud attachments from (for picking)
 
-
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_GEOMETRY;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_GRASS;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_INVISIBLE;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_SHINY;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_SIMPLE;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_TERRAIN;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_TREES;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_UI;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_WATER;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_WL_SKY;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_ALPHA;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_CHARACTERS;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_BUMP;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_MATERIALS;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_FULLBRIGHT;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_GLOW;
-extern LLTrace::BlockTimerStatHandle FTM_STATESORT;
-extern LLTrace::BlockTimerStatHandle FTM_PIPELINE;
-extern LLTrace::BlockTimerStatHandle FTM_CLIENT_COPY;
-
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_UI_HUD;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_UI_3D;
-extern LLTrace::BlockTimerStatHandle FTM_RENDER_UI_2D;
-
 class LLPipeline
 {
 public:
+    static constexpr U32 BLOOM_MAX_MIPS = 7;
+
     LLPipeline();
     ~LLPipeline();
 
@@ -111,10 +99,21 @@ public:
 
     void createGLBuffers();
     void createLUTBuffers();
+    void setupGradingLUT();
+    void generateLensDirt();
+    /// Re-bake the tone curve lookup row from the four RenderColorGradeCurve*
+    /// settings. Runs from colorCorrect when mToneCurveLutDirty is set: once
+    /// per change, never per frame.
+    void bakeToneCurveLut();
 
     //allocate the largest screen buffer possible up to resX, resY
     //returns true if full size buffer allocated, false if some other size is allocated
     bool allocateScreenBuffer(U32 resX, U32 resY);
+
+    /// The size of the screen targets allocateScreenBuffer() makes for a view of
+    /// @a resX by @a resY: RenderResolutionDivisor applied, or else
+    /// RenderResolutionMultiplier.
+    static void scaleToRenderResolution(U32& resX, U32& resY);
 
     typedef enum {
         FBO_SUCCESS_FULLRES = 0,
@@ -143,6 +142,9 @@ public:
     // perform a profile of the given avatar
     // if profile_attachments is true, run a profile for each attachment
     void profileAvatar(LLVOAvatar* avatar, bool profile_attachments = false);
+    // Gives each attachment a profile timed its GPU time once its frame has been read, waiting for nothing. Once a
+    // frame, after the pool retires.
+    void readAttachmentTimes();
 
     // generate an impostor for the given avatar
     //  preview_avatar - if true, a preview window render is being performed
@@ -150,22 +152,126 @@ public:
     //  specific_attachment - specific attachment to profile, or nullptr to profile entire avatar
     void generateImpostor(LLVOAvatar* avatar, bool preview_avatar = false, bool for_profile = false, LLViewerObject* specific_attachment = nullptr);
 
+    // A full-screen quad at the far plane, depth-tested against the bound
+    // target's depth and never writing it: GL_GREATER reaches every texel that
+    // geometry covers, GL_LEQUAL every texel that nothing does. Drawn with
+    // gDebugProgram in `color`, or in the current diffuse colour where it is
+    // null. Blend and colour mask are the caller's to set.
+    void drawFarPlaneQuad(U32 depth_func, const LLColor4* color = nullptr);
+
+    // A cutout frame's coverage, laid into the scene target's alpha once the
+    // opaque forward pools have drawn and before the blended ones, as an
+    // impostor bake lays its own: nothing over the background, colour and
+    // alpha both, and full coverage wherever opaque geometry sits.
+    void seedCutoutCoverageFromDepth();
+    // After the frame is finished: the scene target's alpha -- the cutout's
+    // coverage -- into the alpha of whatever is bound, colour untouched. The
+    // post chain carries no alpha a cutout could use (glow tags, FXAA luma,
+    // 2-bit ping-pong buffers), so it comes from the scene target directly.
+    void copyCutoutCoverageToAlpha();
+    // The screen-space reflection source emptied: no colour, depth at the far
+    // plane, so a march through it finds nothing.
+    void clearSceneMap();
+
     void bindScreenToTexture();
     void renderFinalize();
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);
+    // The current pack's scene depth (mRT->deferredScreen's, which mRT->screen shares) over the whole of `dst`'s,
+    // stretched as a nearest blit would, through gCopyDepthProgram: mWaterDis and mSceneMap keep depth without the
+    // screen's stencil, which a blit's matching formats would make them carry.
+    void copySceneDepth(LLRenderTarget& dst);
     void generateLuminance(LLRenderTarget* src, LLRenderTarget* dst);
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
-    void tonemap(LLRenderTarget* src, LLRenderTarget* dst, bool gamma_correct);
-    void gammaCorrect(LLRenderTarget* src, LLRenderTarget* dst);
+    void generateLensFlareState(LLRenderTarget* src);
+    void clearLensFlareState();
+    void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade);
     void generateGlow(LLRenderTarget* src);
+    // Whether generateBloomHDR will run this frame: the pyramid is deep
+    // enough and every shader it needs built. renderDoF asks before it
+    // borrows bloomMip[0], because a blur left in there would be composited
+    // as bloom if the extract never overwrote it.
+    bool bloomHDRReady() const;
+    void generateBloomHDR(LLRenderTarget* src);
+    void compositeBloomHDR(LLRenderTarget* scene);
     void applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
     void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
     void generateSMAABuffers(LLRenderTarget* src);
     void applySMAA(LLRenderTarget* src, LLRenderTarget* dst);
-    void renderDoF(LLRenderTarget* src, LLRenderTarget* dst);
+    // Operates in place on mRT->screen: the combine writes colour back under a
+    // mask that leaves the prim-glow alpha untouched, so callers neither pass
+    // buffers nor swap afterwards.
+    void renderDoF();
     void copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst);
     void combineGlow(LLRenderTarget* src, LLRenderTarget* dst);
     void visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex);
+
+    /// Take a point-sampled copy of the presented frame for the scopes floater
+    /// and read it back asynchronously. Does nothing unless sScopeCapture is
+    /// set and the sample interval has elapsed. See alfloaterscopes.h.
+    void captureScopeSample(LLRenderTarget* src);
+    /// Service a pending grab, and drop a still whose resolution no longer
+    /// matches the frame. Called from the same place as captureScopeSample.
+    void captureReferenceStill(LLRenderTarget* src);
+    const ALScopeData& getScopeData() const { return mScopeData; }
+
+    /// Where a point in *scaled* window coordinates -- which is what
+    /// LLViewerWindow::getCurrentMouse and the tool mouse handlers hand you --
+    /// falls inside the world view, as 0..1 across and up. False when it is
+    /// outside the view.
+    ///
+    /// Everything stays in scaled space, which is why this is the only place
+    /// that should do it: measuring a scaled point against the world view's
+    /// *raw* rect mixes two scalings and leaves an error proportional to the
+    /// distance from the origin -- dead on in one corner, adrift in the far
+    /// one, and invisible on a machine where the two spaces happen to match.
+    static bool worldViewUV(S32 scaled_x, S32 scaled_y, F32& u, F32& v);
+
+    /// Colour of the last sampled frame under a point in *scaled* window
+    /// coordinates, false if nothing has been sampled there.
+    ///
+    /// Costs nothing: it reads the copy captureScopeSample already took, so
+    /// there is no second readback and no stall. The price is that it is only
+    /// as fresh and as fine as that sample -- one sample interval old, and one
+    /// cell of a point decimation of the view, which for "what level is this"
+    /// is what you want anyway.
+    bool getScopePixel(S32 scaled_x, S32 scaled_y, LLColor4U& out) const;
+    void releaseScopeBuffers();
+
+    /// @name Reference still
+    /// Resolve's still store, in miniature: freeze the frame, then wipe the
+    /// live image against it. This is how a colourist judges a change that
+    /// took longer to make than hold-to-compare can span -- that one only ever
+    /// shows you *no* grade, whereas this shows you the grade you had.
+    ///
+    /// The still is taken from the same point the scopes sample, so the two
+    /// agree about what a frame is: after every post pass, before the print
+    /// effects the final blit adds. Those are then applied to both sides of
+    /// the seam, which is what makes the comparison about the grade rather
+    /// than about the vignette.
+    /// @{
+
+    /// Grab the next presented frame. Honoured on that frame's blit, so the
+    /// still is of what the user is looking at now, not of a frame already
+    /// gone.
+    void requestReferenceStill() { mReferenceStillWanted = true; }
+    void clearReferenceStill();
+    bool hasReferenceStill() const { return mReferenceStill.getWidth() > 0; }
+    /// @}
+
+    /// Ask for the linear scene colour under a screen pixel.
+    ///
+    /// @a x and @a y are scaled window coordinates, as a mouse handler
+    /// receives them. The answer arrives on the next rendered frame, read out
+    /// of the scene buffer before white balance, grading or tonemapping have
+    /// touched it -- so it describes the light in the scene rather than the
+    /// look currently laid over it, which is what a tool deciding on the look
+    /// needs. Colour components are linear radiance and may exceed 1.
+    ///
+    /// One request is held at a time; asking again replaces it. The callback
+    /// does not fire if the click was outside the 3D view, or under a graphics
+    /// debugger that cannot tolerate a read back.
+    typedef std::function<void(const LLColor3&)> scene_pixel_cb_t;
+    void requestScenePixel(S32 x, S32 y, scene_pixel_cb_t callback);
 
     void init();
     void cleanup();
@@ -214,8 +320,6 @@ public:
                                                 bool pick_unselectable,
                                                 bool pick_reflection_probe,
                                                 S32* face_hit,                          // return the face hit
-                                                S32* gltf_node_hit = nullptr,           // return the gltf node hit
-                                                S32* gltf_primitive_hit = nullptr,      // return the gltf primitive hit
                                                 LLVector4a* intersection = NULL,         // return the intersection point
                                                 LLVector2* tex_coord = NULL,            // return the texture coordinates of the intersection point
                                                 LLVector4a* normal = NULL,               // return the surface normal at the intersection point
@@ -309,11 +413,29 @@ public:
     void renderGeomDeferred(LLCamera& camera, bool do_occlusion = false);
     void renderGeomPostDeferred(LLCamera& camera);
     void renderGeomShadow(LLCamera& camera);
-    void bindLightFunc(LLGLSLShader& shader);
+    void bindBrdfLut(LLGLSLShader& shader);
 
     // bind shadow maps
     // if setup is true, wil lset texture compare mode function and filtering options
     void bindShadowMaps(LLGLSLShader& shader);
+
+    // Unbind the shadow maps from whichever units bindShadowMaps last put them on. Detaches
+    // only -- the render targets themselves are owned elsewhere and outlive this (contrast
+    // releaseShadowBuffers, which frees them).
+    //
+    // Programs do not agree on where DEFERRED_SHADOW0..5 live -- one deferred shader may map
+    // them to units 6-11 and another to 26-31 -- so unbinding "this shader's" shadow channels
+    // leaves the previous layout's units still holding depth textures under the compare
+    // sampler. The next program to use those low units for ordinary material maps then reads
+    // a depth texture through a non-shadow sampler, which is undefined behaviour.
+    void unbindShadowMaps();
+
+    // Rebuild the shared shadow/SSAO constant block from current state (CPU only). Called once
+    // per deferred pass; every value in it is fixed for the whole pass.
+    void packDeferredUBO();
+    // Upload (if dirty) and bind that block at UB_DEFERRED.
+    void bindDeferredUBO();
+
     void bindDeferredShaderFast(LLGLSLShader& shader);
     void bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_target = nullptr, LLRenderTarget* depth_target = nullptr);
     void setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep);
@@ -333,12 +455,17 @@ public:
     // and just before rendering alpha when camera is above water
     void doAtmospherics();
 
+    // Whether this frame's haze pass could converge anything on the sky behind (mSkyBehind): the main view's, with
+    // atmospherics on, the camera above the water, and water among what was sorted to draw.
+    bool skyBehindWanted() const;
+
     // apply water haze based on contents of color and depth buffer
     // should be called just before rendering pre-water alpha objects
     void doWaterHaze();
 
-    // Generate the water exclusion surface mask.
-    void doWaterExclusionMask();
+    // Mark where the PASS_INVISIBLE prims remove the water in the bound screen target's stencil
+    // (ALWaterStencil::EXCLUDE_BIT), against the scene's depth, before the water draws.
+    void doWaterExclusion();
 
     void postDeferredGammaCorrect(LLRenderTarget* screen_target);
 
@@ -348,7 +475,9 @@ public:
 
     void renderHighlight(const LLViewerObject* obj, F32 fade);
 
-    void renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp);
+    // `occlusion` is the sUseOcclusion level the pass culls with: 0 for none, 2 to ask the shadow camera's own
+    // occlusion queries and draw them after the opaque casters.
+    void renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp, bool do_cull = true, S32 occlusion = 0);
     void renderSelectedFaces(const LLColor4& color);
     void renderHighlights();
     void renderDebug();
@@ -398,6 +527,16 @@ public:
     bool hasAnyRenderType(const U32 type, ...) const;
 
     static bool isWaterClip();
+
+    // Depth format for the main scene / non-shadow depth targets: float32 under reverse-Z
+    // (same 4 bytes/px as DEPTH24 on desktop GPUs), fixed 24-bit otherwise.
+    static LLRenderTarget::eDepthFormat mainDepthFormat();
+
+    // Latch reverse-Z on/off to match (setting && clip-control cap): flips LLRender::sReverseZ,
+    // sets glClipControl + clear depth, re-bases the ambient depth func, and clears the sampler
+    // cache. Idempotent; requires a current GL context. Called from setShaders() so the whole
+    // convention flip (clip control, clear depth, RT formats, shader define) is atomic.
+    static void updateReverseZ();
 
     void setRenderTypeMask(U32 type, ...);
     // This is equivalent to 'setRenderTypeMask'
@@ -646,6 +785,12 @@ public:
     bool                     mBackfaceCull;
     S32                      mMatrixOpCount;
     S32                      mTextureMatrixOps;
+    S32                      mTextureMatrixOpsShadow;   // portion of mTextureMatrixOps issued during shadow passes
+    S32                      mTextureMatrixOpsProbe;    // portion issued during reflection/hero probe updates
+    S32                      mTextureMatrixOpsIdentity; // portion whose matrix was exactly identity (degenerate anims)
+    // Classify and count one texture-matrix load; draw pools call this instead of
+    // bumping mTextureMatrixOps directly so the debug display can attribute the total.
+    void countTextureMatrixOp(const LLMatrix4& mat);
     S32                      mNumVisibleNodes;
 
     S32                      mDebugTextureUploadCost;
@@ -670,10 +815,9 @@ public:
     static bool             sShadowRender;
     static bool             sDynamicLOD;
     static bool             sPickAvatar;
-    static bool             sReflectionRender;
-    static bool             sDistortionRender;
     static bool             sImpostorRender;
-    static bool             sImpostorRenderAlphaDepthPass;
+    // Set for the frames of a snapshot cutout (ALRenderIsolation::Scope).
+    static bool             sCutoutRender;
     static bool             sUnderWaterRender;
     static bool             sRenderGlow;
     static bool             sTextureBindTest;
@@ -691,7 +835,54 @@ public:
     static bool             sUseDepthTexture;
 // [/RLVa:KB]
 
-    static LLTrace::EventStatHandle<S64> sStatBatchSize;
+    // Set while a scopes floater is open. Nothing is sampled or read back
+    // while this is false, so the feature costs exactly nothing when closed.
+    static bool             sScopeCapture;
+    /// Hold-to-compare: suppresses colour grading for as long as it is set.
+    /// Render-time only, with nothing persistent behind it -- toggling
+    /// RenderColorGrade instead would mark the active Look dirty, and a key
+    /// released at the wrong moment could save the comparison as the look.
+    static bool             sGradeBypass;
+
+    /// The main camera's pass of a cutout frame: the one pass whose view is
+    /// cut down to the cutout's subject. Shadows, impostor bakes, probes and
+    /// HUDs in the same frame still see the whole world, which is what keeps
+    /// the subject lit where it stands.
+    static bool cullingToCutoutSubject() { return sCutoutRender && isMainWorldPass(); }
+
+    /// Whether the alpha channel accumulates coverage rather than glow: in an
+    /// impostor bake, and in a cutout frame's main pass. Blended geometry adds
+    /// its coverage and glow writes are left out.
+    static bool alphaWritesCoverage() { return sImpostorRender || cullingToCutoutSubject(); }
+
+    /// A frame without the lens and print effects: a "No post-processing"
+    /// snapshot, and every cutout frame, since each of those effects reaches
+    /// past the subject's edge into what is to be left empty. Grading is not
+    /// part of this -- only "No post-processing" drops the grade.
+    static bool suppressesLensAndPrintEffects();
+
+    /// One bit per grading group, for comparing a single section against the
+    /// rest of the grade rather than against nothing at all.
+    enum EGradeBypass : U32
+    {
+        GRADE_BYPASS_BASIC     = 1 << 0, ///< White balance, tone, presence: the Basic section
+        GRADE_BYPASS_PRIMARIES = 1 << 1, ///< Lift / gamma / gain
+        GRADE_BYPASS_SPLIT     = 1 << 2, ///< Split toning
+        GRADE_BYPASS_LUT       = 1 << 3, ///< 3D LUT
+        GRADE_BYPASS_CURVE     = 1 << 4, ///< Tone curve
+    };
+
+    /// A set bit makes colorCorrect upload that group's identity values rather
+    /// than its settings, which lands in the early-out the shader already has
+    /// for that step -- so a bypassed group costs less than an active one, and
+    /// no shader variant is involved.
+    ///
+    /// Render-time only, and deliberately not a setting, for the same reason
+    /// sGradeBypass is not: the Looks whitelist watches every grading control,
+    /// so building a comparison out of one would mark the active Look dirty
+    /// and let the comparison itself be saved as the look. It follows that
+    /// whoever sets a bit owns clearing it -- see ~ALFloaterLightBox.
+    static U32              sGradeBypassMask;
 
     class RenderTargetPack
     {
@@ -704,8 +895,33 @@ public:
         LLRenderTarget          deferredScreen;
         LLRenderTarget          deferredLight;
 
+        // tonemapped and gamma corrected render ready for post
+        LLRenderTarget          postPingMap;
+        LLRenderTarget          postPongMap;
+
+        // Depth of field owns no scratch. It runs pre-tonemap on linear HDR,
+        // so it cannot use postPingMap (GL_RGB10_A2 under HDR), and it does
+        // not widen deferredLight to serve one late pass. It borrows two
+        // full-frame targets that are idle for exactly the stretch of
+        // renderFinalize it runs in: mWaterDis for the sharp copy plus CoF,
+        // bloomMip[0] for the blur. renderDoF says why each is free.
+
         //sun shadow map
         LLRenderTarget          shadow[4];
+
+        // HDR bloom pyramid (RGB = bloom, A = halation intensity).
+        // mBloomMip[0] is full-res extract; subsequent levels are halved.
+        LLRenderTarget              bloomMip[BLOOM_MAX_MIPS];
+        U32                         bloomMipCount = 0;
+
+        // Cross-screen filter state for this frame. The three streak buffers
+        // own no memory: they are quadrants of mWaterDis, which is idle from
+        // the water pass to the next frame -- see generateBloomHDR. What
+        // colorCorrect needs to know is whether streaks were drawn this frame
+        // and at what size, to find the accumulator's quadrant.
+        bool                        crossFilterReady = false;
+        U32                         crossFilterWidth = 0;
+        U32                         crossFilterHeight = 0;
     };
 
     // main full resoltuion render target
@@ -724,30 +940,58 @@ public:
     LLRenderTarget          mSpotShadow[2];
 
     LLRenderTarget          mPbrBrdfLut;
-    LLRenderTarget          mWaterExclusionMask;
 
     // copy of the color/depth buffer just before gamma correction
     // for use by SSR
     LLRenderTarget          mSceneMap;
 
-    // exposure map for getting average color in scene
+    // The auto-exposure: the meter grid (luminanceF.glsl), its 64-bin histogram
+    // (exposureHistogramV.glsl), and the exposure, 1x1: x the scale, y the EV the next
+    // frame adapts from (exposureF.glsl). mLastExposure is last frame's.
     LLRenderTarget          mLuminanceMap;
+    LLRenderTarget          mExposureHistogram;
     LLRenderTarget          mExposureMap;
     LLRenderTarget          mLastExposure;
 
-    // tonemapped and gamma corrected render ready for post
-    LLRenderTarget          mPostPingMap;
-    LLRenderTarget          mPostPongMap;
+    // lens flare sun state, 2x1, swapped each frame: [0] is this frame's, [1]
+    // last frame's. Layout in lensFlareStateF.glsl.
+    LLRenderTarget          mLensFlareState[2];
+    bool                    mLensFlareStateValid = false;
+    bool                    mLensFlareSunUp = true;    // which body the history describes
 
     // FXAA helper target
     LLRenderTarget          mFXAAMap;
     LLRenderTarget          mSMAABlendBuffer;
 
-    // render ui to buffer target
-    LLRenderTarget          mUIScreen;
-
     // downres scratch space for GPU downscaling of textures
     LLRenderTarget          mDownResMap;
+
+    // Scopes floater sample. Point-decimated copy of the presented frame plus
+    // two pixel-pack buffers: the read-back of one capture is collected at the
+    // next one, several frames later, so glReadPixels never stalls the frame.
+    LLRenderTarget          mScopeSample;
+    U32                     mScopePBO[2] = { 0, 0 };
+    S32                     mScopePBOInFlight = -1;
+    LLFrameTimer            mScopeSampleTimer;
+    ALScopeData             mScopeData;
+    std::vector<U8>         mScopeReadback;
+
+    // Reference still: a grabbed copy of a presented frame, for wiping the
+    // live image against. Full resolution, so it is only allocated once
+    // somebody asks for one.
+    LLRenderTarget          mReferenceStill;
+    bool                    mReferenceStillWanted = false;
+
+    // One-shot scene probe, serviced in renderFinalize while the buffer is
+    // still linear. See requestScenePixel.
+    void                    serviceScenePixelProbe(LLRenderTarget* src);
+    scene_pixel_cb_t        mScenePixelCallback;
+    S32                     mScenePixelX = 0;
+    S32                     mScenePixelY = 0;
+    bool                    mScenePixelPending = false;
+
+    // UI previews must not inherit reflection-probe resolution or scene scaling.
+    LLRenderTarget          mPreviewMap;
 
     // 2k bom scratch target
     LLRenderTarget          mBakeMap;
@@ -762,6 +1006,9 @@ public:
     // a single triangle that covers the whole screen
     LLPointer<LLVertexBuffer> mScreenTriangleVB;
 
+    // the exposure meter's points: two per meter grid texel, its non-sky and sky parts
+    LLPointer<LLVertexBuffer> mExposureHistogramVB;
+
     //utility buffer for rendering cubes, 8 vertices are corners of a cube [-1, 1]
     LLPointer<LLVertexBuffer> mCubeVB;
 
@@ -775,10 +1022,10 @@ public:
     LLCamera                mShadowCamera[8];
     LLVector3               mShadowExtents[4][2];
     // TODO : separate Sun Shadow and Spot Shadow matrices
-    glm::mat4               mSunShadowMatrix[6];
-    glm::mat4               mShadowModelview[6];
-    glm::mat4               mShadowProjection[6];
-    glm::mat4               mReflectionModelView;
+    LLMatrix4a              mSunShadowMatrix[6];
+    LLMatrix4a              mShadowModelview[6];
+    LLMatrix4a              mShadowProjection[6];
+    LLMatrix4a              mReflectionModelView;
 
     LLPointer<LLDrawable>   mShadowSpotLight[2];
     F32                     mSpotLightFade[2];
@@ -788,8 +1035,66 @@ public:
     LLVector4               mSunOrthoClipPlanes;
     LLVector2               mScreenScale;
 
+    // ---- Shared deferred uniform block (UB_DEFERRED) --------------------------------------
+    // std140-packed shadow/SSAO constants, uploaded once per deferred pass instead of being
+    // re-pushed by every bindDeferredShader call. Holds only what is constant across a pass:
+    // screen_res is overridden per call and sun_dir/moon_dir are entangled with atmospherics,
+    // so those stay loose.
+    //
+    // shadow_matrix@0, ssao_effect_mat@384, shadow_clip@432, shadow_res@448,
+    // proj_shadow_res@456, scalars @464..492, size 496. Matrices go up as they lie: an
+    // LLMatrix4a's rows are the columns std140 reads by default, and ssao_effect_mat is
+    // symmetric either way. Checked against the driver at shader load by
+    // validateEngineBlockLayouts() in debug builds.
+    struct alignas(16) DeferredUBOData
+    {
+        F32 shadow_matrix[6][16];      // mat4[6]
+        F32 ssao_effect_mat[12];       // mat3 (3 vec4-strided columns)
+        F32 shadow_clip[4];            // vec4
+        F32 shadow_res[2];             // vec2
+        F32 proj_shadow_res[2];        // vec2
+        F32 shadow_bias;
+        F32 shadow_offset;
+        F32 spot_shadow_bias;
+        F32 spot_shadow_offset;
+        F32 ssao_radius;
+        F32 ssao_max_radius;
+        F32 ssao_factor;
+        F32 ssao_factor_inv;
+    };
+
+    DeferredUBOData             mDeferredUBOData{};
+    ALUniformBuffer             mDeferredUBO;
+    bool                        mDeferredUBODirty{ true };
+
     //water distortion texture (refraction)
     LLRenderTarget              mWaterDis;
+
+    // The sky dome behind everything at half resolution: the sky pool draws it again here, with no depth, and the
+    // haze pass converges far water on it (hazeF.glsl). Holds the main view's sky for mSkyBehindFrame only.
+    LLRenderTarget              mSkyBehind;
+    U32                         mSkyBehindFrame = 0;
+    // Whether any water was in front of the sky's depth when the sky pool drew: the sky behind is drawn only then, and
+    // the haze shades the water's pixels only then. An occlusion query of gGL's, asked in mSkyBehindQueryFrame.
+    ALQueryTicket               mSkyBehindQuery;
+    U32                         mSkyBehindQueryFrame = 0;
+
+    // The attachments profileAvatar() timed, with their spans of gGL's pool, until readAttachmentTimes() has them.
+    std::vector<std::pair<LLPointer<LLViewerObject>, ALQuerySpan>> mAttachmentSpans;
+
+    // The water's layout around the main camera and its map of cell heights, laid out at the start of each main frame.
+    ALWaterSurface              mWaterSurface;
+
+    // The farthest depth under each texel of the main view's depth, built where a GPU cull asks for it.
+    ALDepthPyramid              mDepthPyramid;
+
+    // Profiling tracks, plotted at the start of each main frame for a frame a few before: the primitives the main view's
+    // terrain and water passes draw, the water's flat field and its waves' patches apart, and the draws of water
+    // geometry in every view and pass.
+    ALPrimitivePlot             mTerrainPrimitives{ "terrain primitives", true };
+    ALPrimitivePlot             mWaterPrimitives{ "water primitives", false };
+    ALPrimitivePlot             mWaterPatchPrimitives{ "water patch primitives", true };
+    U32                         mWaterDraws = 0;
 
     static const U32 MAX_PREVIEW_WIDTH;
 
@@ -799,12 +1104,82 @@ public:
     //noise map
     U32                 mNoiseMap;
     U32                 mTrueNoiseMap;
-    U32                 mLightFunc;
+    // The units the shadow maps are bound to live in LLGLSLShader::sCompareSamplerUnits --
+    // published there because LLGLSLShader::bind() is what releases them ahead of
+    // non-declaring programs; see bindShadowMaps.
+
 
     //smaa
     U32                 mSMAAAreaMap = 0;
     U32                 mSMAASearchMap = 0;
     U32                 mSMAASampleMap = 0;
+
+    // Lens dirt plate, generated rather than loaded -- see generateLensDirt.
+    // Nothing is allocated until the effect is switched on, and the memory goes
+    // back when it is switched off, so an incomplete target is also the signal
+    // to force the strength uniform to 0 and leave the sampler unread.
+    LLRenderTarget      mLensDirtMap;
+
+    // What the current plate was generated from. Comparing the whole set each
+    // frame is what triggers a rebuild, which covers parameter edits and window
+    // resizes through one test and needs no commit-signal plumbing. It also
+    // records a *failed* attempt, so a plate that could not be allocated is
+    // retried when something changes rather than on every frame.
+    struct LensDirtParams
+    {
+        U32 width      = 0;
+        U32 height     = 0;
+        F32 seed       = -1.f;
+        F32 grime      = -1.f;
+        F32 mote_scale = -1.f;
+        F32 smudge     = -1.f;
+        S32 scratches  = -1;
+        F32 toe        = -1.f;
+        F32 gain       = -1.f;
+
+        bool operator==(const LensDirtParams&) const = default;
+    };
+    LensDirtParams      mLensDirtParams;
+
+    // The lens distortion auto-fit scale, and what it was solved for. The
+    // solve walks the frame edge and an interior grid, and its inputs move
+    // only when a slider or the window does, so it is compared and skipped
+    // each frame the way the dirt plate is.
+    struct LensDistortFit
+    {
+        struct Inputs
+        {
+            F32 k1 = 0.f;
+            F32 k2 = 0.f;
+            F32 p1 = 0.f;
+            F32 p2 = 0.f;
+            F32 cx = 0.f;
+            F32 cy = 0.f;
+            F32 axis_x = 0.f;
+            F32 axis_y = 0.f;
+            F32 sq_x = 0.f;
+            S32 fit_mode = -1;
+
+            bool operator==(const Inputs&) const = default;
+        };
+        Inputs inputs;
+        F32    scale = 1.f;
+    };
+    LensDistortFit      mLensDistortFit;
+
+    // Raised by the Lightbox while one of the generation sliders is being
+    // dragged. The plate is full-resolution, so rebuilding on every frame of a
+    // drag is a stutter rather than a preview -- and worse the slower the
+    // machine, which is backwards. Holding off means the rebuild lands once, on
+    // release, which is also where the user expects to see the result.
+    bool                mLensDirtSliderHeld = false;
+    // Tone curve LUT: a 512x1 RGBA16 row (ALToneCurveSet::LUT_SIZE) whose R, G
+    // and B texels hold master(channel(x)) for each channel. A raw GL name
+    // like the SMAA maps above: created empty in createGLBuffers, filled by
+    // bakeToneCurveLut, released in releaseGLBuffers.
+    U32                 mToneCurveLut = 0;
+    bool                mToneCurveLutDirty = true;   // settings changed, or the texture was recreated, since the last bake
+    bool                mToneCurveIdentity = true;   // the last bake found all four curves on the diagonal
 
     LLColor4            mSunDiffuse;
     LLColor4            mMoonDiffuse;
@@ -815,10 +1190,12 @@ public:
     LLVector4           mTransformedSunDir;
     LLVector4           mTransformedMoonDir;
 
+    // Sun (or moon) on screen this frame in UV, from generateLensFlareState.
+    LLVector2           mLensFlareSunUV = LLVector2(0.5f, 0.5f);
+
     bool                    mInitialized;
     bool                    mShadersLoaded;
 
-    U32                     mTransformFeedbackPrimitives; //number of primitives expected to be generated by transform feedback
 protected:
     bool                    mRenderTypeEnabled[NUM_RENDER_TYPES];
     std::stack<std::string> mRenderTypeEnableStack;
@@ -877,7 +1254,6 @@ protected:
     LLSpatialGroup::sg_vector_t     mGroupSaveQ1; // a place to save mGroupQ1 until it is safe to unref
 
     LLSpatialGroup::sg_vector_t     mMeshDirtyGroup; //groups that need rebuildMesh called
-    U32 mMeshDirtyQueryObject;
 
     LLDrawable::drawable_list_t     mPartitionQ; //drawables that need to update their spatial partition radius
 
@@ -969,6 +1345,10 @@ protected:
 
     // Note: no need to keep an quick-lookup to avatar pools, since there's only one per avatar
 
+    // Color grading lookup texture and size
+    LLPointer<ALTexture3D> mCGLut;
+    LLVector4 mCGLutSize{};
+
 public:
     std::vector<LLFace*>        mHighlightFaces;    // highlight faces on physical objects
 protected:
@@ -1019,7 +1399,6 @@ public:
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
     static F32 RenderResolutionMultiplier;
 // [/SL:KB]
-    static bool RenderUIBuffer;
     static S32 RenderShadowDetail;
     static S32 RenderShadowSplits;
     static bool RenderDeferredSSAO;
@@ -1053,7 +1432,6 @@ public:
     static F32 RenderGlowStrength;
     static bool RenderGlowNoise;
     static bool RenderDepthOfField;
-    static bool RenderDepthOfFieldInEditMode;
     static F32 CameraFocusTransitionTime;
     static F32 CameraFNumber;
     static F32 CameraFocalLength;
@@ -1096,6 +1474,30 @@ public:
     static bool RenderMirrors;
     static S32 RenderHeroProbeUpdateRate;
     static S32 RenderHeroProbeConservativeUpdateMultiplier;
+    static bool RenderAvatarCloth;
+
+private:
+    // The main camera's view of the world: not a shadow map, an impostor
+    // bake, the HUD or a probe's cube face.
+    static bool isMainWorldPass();
+};
+
+// Occlusion culling off for as long as this lives.
+class LLDisableOcclusionCulling
+{
+public:
+    S32 mUseOcclusion;
+
+    LLDisableOcclusionCulling()
+    {
+        mUseOcclusion = LLPipeline::sUseOcclusion;
+        LLPipeline::sUseOcclusion = 0;
+    }
+
+    ~LLDisableOcclusionCulling()
+    {
+        LLPipeline::sUseOcclusion = mUseOcclusion;
+    }
 };
 
 void render_bbox(const LLVector3 &min, const LLVector3 &max);
@@ -1103,6 +1505,6 @@ void render_hud_elements();
 
 extern LLPipeline gPipeline;
 extern bool gDebugPipeline;
-extern const LLMatrix4* gGLLastMatrix;
+extern const LLMatrix4a* gGLLastMatrix;
 
 #endif

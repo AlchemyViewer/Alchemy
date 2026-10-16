@@ -118,11 +118,21 @@ const std::string LLConversation::createTimestamp(const U64Seconds& utc_time)
     LLSD substitution;
     substitution["datetime"] = (S32)utc_time.value();
 
-    timeStr = "["+LLTrans::getString ("TimeMonth")+"]/["
-                 +LLTrans::getString ("TimeDay")+"]/["
-                 +LLTrans::getString ("TimeYear")+"] ["
-                 +LLTrans::getString ("TimeHour")+"]:["
-                 +LLTrans::getString ("TimeMin")+"]";
+    static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+    timeStr = "[" + LLTrans::getString("TimeMonth") + "]/["
+        + LLTrans::getString("TimeDay") + "]/["
+        + LLTrans::getString("TimeYear") + "] [";
+    if (use_24h)
+    {
+        timeStr += LLTrans::getString("TimeHour") + "]:["
+            + LLTrans::getString("TimeMin") + "]";
+    }
+    else
+    {
+        timeStr += LLTrans::getString("TimeHour12") + "]:["
+            + LLTrans::getString("TimeMin") + "] ["
+            + LLTrans::getString("TimeAMPM") + "]";
+    }
 
 
     LLStringUtil::format (timeStr, substitution);
@@ -132,6 +142,12 @@ const std::string LLConversation::createTimestamp(const U64Seconds& utc_time)
 bool LLConversation::isOlderThan(U32Days days) const
 {
     U64Seconds now(time_corrected());
+    if (mTime >= now)
+    {
+        // Stamped ahead of this clock, so no age at all; the unsigned
+        // difference would make it the oldest there is.
+        return false;
+    }
     U32Days age = now - mTime;
 
     return age > days;
@@ -147,7 +163,10 @@ void LLConversation::setListenIMFloaterOpened()
     // if floater is already opened or this conversation doesn't have unread offline messages
     if (mHasOfflineIMs && !offline_ims_visible)
     {
-        mIMFloaterShowedConnection = LLFloaterIMSession::setIMFloaterShowedCallback(boost::bind(&LLConversation::onIMFloaterShown, this, _1));
+        mIMFloaterShowedConnection = LLFloaterIMSession::setIMFloaterShowedCallback([this](const LLUUID& session_id)
+        {
+            onIMFloaterShown(session_id);
+        });
     }
     else
     {
@@ -499,7 +518,7 @@ bool LLConversationLog::saveToFile(const std::string& filename)
         return false;
     }
 
-    LLFILE* fp = LLFile::fopen(filename, "wb");
+    LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("wb"));
     if (!fp)
     {
         LL_WARNS() << "Couldn't open call log list" << filename << LL_ENDL;
@@ -543,7 +562,7 @@ bool LLConversationLog::loadFromFile(const std::string& filename)
         return false;
     }
 
-    LLFILE* fp = LLFile::fopen(filename, "rb");
+    LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("rb"));
     if (!fp)
     {
         LL_WARNS() << "Couldn't open call log list" << filename << LL_ENDL;

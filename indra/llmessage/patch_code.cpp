@@ -255,7 +255,10 @@ void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph)
 #else
     bitpack.bitUnpack((U8 *)&retvalu32, 32);
 #endif
-    ph->dc_offset = *(F32 *)&retvalu32;
+    // The wire format packs the F32 dc_offset as 32 raw bits. Casting
+    // &retvalu32 to F32* and dereferencing it is a strict-aliasing
+    // violation; memcpy is the standard fix and compiles to the same load.
+    std::memcpy(&ph->dc_offset, &retvalu32, sizeof(F32));
 
     U16 retvalu16 = 0;
 #ifdef LL_BIG_ENDIAN

@@ -31,7 +31,6 @@
 	<text name="favorites_check_extra_text">
 		(Inni używający tego komputera również będą je widzieć)
 	</text>
-	<check_box label="Pokaż na ekranie logowania" name="show_location_checkbox" />
 	<text name="name_tags_textbox">
 		Imiona:
 	</text>
@@ -42,7 +41,6 @@
 	</radio_group>
 	<check_box label="Pokaż moje imię" name="show_my_name_checkbox1" />
 	<check_box label="Nazwy użytkowników" name="show_slids" tool_tip="Pokaż nazwy kont użytkowników, np. bobsmith123" />
-	<check_box label="Pokaż tytuły grupowe" name="show_all_title_checkbox1" tool_tip="Pokaż tytuły grupowe, takie jak Officer czy Member" />
 	<check_box label="Podświetl znajomych" name="show_friends" tool_tip="Podświetlaj imiona Twoich znajomych" />
 	<check_box label="Imiona Wyświetlane" name="display_names_check" tool_tip="Pokaż Imiona Wyświetlane (Display Names) w czacie, IM, tagach ponad awatarami itd." />
 	<text name="inworld_typing_rg_label">

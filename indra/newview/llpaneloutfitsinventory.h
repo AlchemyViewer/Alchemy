@@ -41,15 +41,17 @@ class LLMenuGL;
 class LLSidepanelAppearance;
 class LLTabContainer;
 
-class LLPanelOutfitsInventory : public LLPanel
+class LLPanelOutfitsInventory final : public LLPanel
 {
     LOG_CLASS(LLPanelOutfitsInventory);
 public:
+    AL_VIEW_TYPE(LLPanelOutfitsInventory, LLPanel);
+
     LLPanelOutfitsInventory();
     virtual ~LLPanelOutfitsInventory();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
     void onSearchEdit(const std::string& string);
     void onSave();

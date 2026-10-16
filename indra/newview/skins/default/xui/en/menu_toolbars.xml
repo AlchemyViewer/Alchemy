@@ -108,4 +108,37 @@
     <on_visible function="Toolbars.CheckOrientation"
           parameter="vertical" />
   </menu_item_check>
+  <menu_item_separator layout="topleft" />
+  <menu_item_check label="Auto-hide left toolbar"
+                   layout="topleft"
+                   name="auto_hide_left">
+    <on_click function="ToggleControl"
+              parameter="AlchemyToolbarAutoHideLeft" />
+    <on_check function="CheckControl"
+              parameter="AlchemyToolbarAutoHideLeft" />
+  </menu_item_check>
+  <menu_item_check label="Auto-hide right toolbar"
+                   layout="topleft"
+                   name="auto_hide_right">
+    <on_click function="ToggleControl"
+              parameter="AlchemyToolbarAutoHideRight" />
+    <on_check function="CheckControl"
+              parameter="AlchemyToolbarAutoHideRight" />
+  </menu_item_check>
+  <menu_item_check label="Auto-hide bottom toolbar"
+                   layout="topleft"
+                   name="auto_hide_bottom">
+    <on_click function="ToggleControl"
+              parameter="AlchemyToolbarAutoHideBottom" />
+    <on_check function="CheckControl"
+              parameter="AlchemyToolbarAutoHideBottom" />
+  </menu_item_check>
+  <menu_item_check label="Auto-hide top toolbar"
+                   layout="topleft"
+                   name="auto_hide_top">
+    <on_click function="ToggleControl"
+              parameter="AlchemyToolbarAutoHideTop" />
+    <on_check function="CheckControl"
+              parameter="AlchemyToolbarAutoHideTop" />
+  </menu_item_check>
 </context_menu>

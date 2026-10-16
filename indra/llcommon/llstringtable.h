@@ -31,178 +31,184 @@
 #include "lldefs.h"
 #include "llformat.h"
 #include "llstl.h"
-#include <list>
+
+#include <atomic>
+#include <memory>
 #include <set>
+#include <shared_mutex>
+#include <string>
+#include <string_view>
 
-#if LL_WINDOWS
-# if (_MSC_VER >= 1300 && _MSC_VER < 1400)
-#  define STRING_TABLE_HASH_MAP 1
-# endif
-#else
-//# define STRING_TABLE_HASH_MAP 1
-#endif
-
-const U32 MAX_STRINGS_LENGTH = 256;
+#include <boost/unordered/unordered_flat_map.hpp>
 
 class LL_COMMON_API LLStringTableEntry
 {
 public:
-    LLStringTableEntry(const char *str);
-    ~LLStringTableEntry();
+    explicit LLStringTableEntry(std::string_view str);
 
-    void incCount()     { mCount++; }
-    bool decCount()     { return --mCount != 0; }
+    // mString points into mText, so this must neither be copied nor moved:
+    // either would leave the pointer aimed at the old object's buffer. The
+    // table owns entries through unique_ptr and hands out bare pointers, so
+    // nothing needs to.
+    LLStringTableEntry(const LLStringTableEntry&) = delete;
+    LLStringTableEntry& operator=(const LLStringTableEntry&) = delete;
+    LLStringTableEntry(LLStringTableEntry&&) = delete;
+    LLStringTableEntry& operator=(LLStringTableEntry&&) = delete;
 
-    char *mString;
-    S32  mCount;
+    void incCount() { mCount.fetch_add(1, std::memory_order_relaxed); }
+    bool decCount() { return mCount.fetch_sub(1, std::memory_order_acq_rel) != 1; }
+
+    std::string_view view() const { return mText; }
+
+private:
+    // Declared first so that mString can be initialized from it.
+    std::string         mText;
+    std::atomic<S32>    mCount;
+
+public:
+    // The whole string, NUL terminated. Callers read this; none writes it.
+    char*               mString;
 };
 
+// A table of unique strings. Entries are handed out as bare pointers and are
+// stable for as long as the table holds them, so callers may compare two names
+// by comparing their entry pointers.
+//
+// Safe to use from more than one thread: lookups of a string already present
+// take a shared lock, and only adding a new one is exclusive.
 class LL_COMMON_API LLStringTable
 {
 public:
-    LLStringTable(int tablesize);
+    // Whether entries are counted. A counted table hands a string back with
+    // removeString() once the last holder is done with it. An uncounted one
+    // never gives one back -- and so pays no refcount traffic on lookup,
+    // which is the whole cost difference on a path parsing hits per tag and
+    // per attribute.
+    enum ERefCounting
+    {
+        NOT_COUNTED,
+        COUNTED
+    };
+
+    // The size argument is a hint about how many distinct strings to expect.
+    // It no longer fixes a bucket count, and zero means "no idea".
+    explicit LLStringTable(int tablesize = 0, ERefCounting counting = COUNTED);
     ~LLStringTable();
 
-    char *checkString(const char *str);
-    char *checkString(const std::string& str);
-    LLStringTableEntry *checkStringEntry(const char *str);
-    LLStringTableEntry *checkStringEntry(const std::string& str);
+    LLStringTable(const LLStringTable&) = delete;
+    LLStringTable& operator=(const LLStringTable&) = delete;
 
-    char *addString(const char *str);
-    char *addString(const std::string& str);
-    LLStringTableEntry *addStringEntry(const char *str);
-    LLStringTableEntry *addStringEntry(const std::string& str);
-    void  removeString(const char *str);
+    // Find without adding. Returns null when the string is not present.
+    char*               checkString(std::string_view str) const;
+    char*               checkString(const char* str) const;
+    LLStringTableEntry* checkStringEntry(std::string_view str) const;
+    LLStringTableEntry* checkStringEntry(const char* str) const;
 
-    S32 mMaxEntries;
-    S32 mUniqueEntries;
+    // Find, adding when absent. On a counted table the entry's count goes up
+    // by one either way.
+    char*               addString(std::string_view str);
+    char*               addString(const char* str);
+    LLStringTableEntry* addStringEntry(std::string_view str);
+    LLStringTableEntry* addStringEntry(const char* str);
 
-#if STRING_TABLE_HASH_MAP
-#if LL_WINDOWS
-    typedef std::hash_multimap<U32, LLStringTableEntry *> string_hash_t;
-#else
-    typedef __gnu_cxx::hash_multimap<U32, LLStringTableEntry *> string_hash_t;
-#endif
-    string_hash_t mStringHash;
-#else
-    typedef std::list<LLStringTableEntry *> string_list_t;
-    typedef string_list_t * string_list_ptr_t;
-    string_list_ptr_t   *mStringList;
-#endif
+    // Drops one count, and the entry with it when that was the last.
+    // Does nothing on an uncounted table, which cannot know who still holds
+    // the entry; asking is a programming error and asserts.
+    void                removeString(std::string_view str);
+    void                removeString(const char* str);
+
+    S32                 getUniqueEntries() const;
+
+private:
+    // Keyed by a view onto each entry's own text, so a key costs nothing
+    // beyond the entry it names, and lookups compare whole strings.
+    typedef boost::unordered_flat_map<std::string_view,
+                                      std::unique_ptr<LLStringTableEntry>,
+                                      ll::string_hash,
+                                      std::equal_to<>> table_t;
+
+    mutable std::shared_mutex   mMutex;
+    table_t                     mTable;
+    const bool                  mCounted;
 };
 
 extern LL_COMMON_API LLStringTable gStringTable;
 
 //============================================================================
 
-// This class is designed to be used locally,
-// e.g. as a member of an LLXmlTree
-// Strings can be inserted only, then quickly looked up
+// A table of unique strings for a caller that only ever adds to it, meant to
+// be held locally -- LLXmlTree keeps one for node names and a static one for
+// attribute names.
+//
+// A handle is a bare pointer to the stored string and stays valid until the
+// table is cleaned up or destroyed, so callers key containers on the handle
+// and compare two names by comparing pointers. LLXmlTreeNode holds its
+// attributes that way.
+//
+// No lock, unlike LLStringTable: everything reaching this goes through an
+// LLXmlTree, which is built and read on one thread.
 
 typedef const std::string* LLStdStringHandle;
 
 class LL_COMMON_API LLStdStringTable
 {
 public:
-    LLStdStringTable(S32 tablesize = 0)
+    // The size argument is a hint about how many distinct strings to expect.
+    // It no longer fixes a bucket count, and zero means "no idea".
+    explicit LLStdStringTable(S32 tablesize = 0)
     {
-        if (tablesize == 0)
+        if (tablesize > 0)
         {
-            tablesize = 256; // default
-        }
-        // Make sure tablesize is power of 2
-        for (S32 i = 31; i>0; i--)
-        {
-            if (tablesize & (1<<i))
-            {
-                if (tablesize >= (3<<(i-1)))
-                    tablesize = (1<<(i+1));
-                else
-                    tablesize = (1<<i);
-                break;
-            }
-        }
-        mTableSize = tablesize;
-        mStringList = new string_set_t[tablesize];
-    }
-    ~LLStdStringTable()
-    {
-        cleanup();
-        delete[] mStringList;
-    }
-    void cleanup()
-    {
-        // remove strings
-        for (S32 i = 0; i<mTableSize; i++)
-        {
-            string_set_t& stringset = mStringList[i];
-            for (LLStdStringHandle str : stringset)
-            {
-                delete str;
-            }
-            stringset.clear();
+            mTable.reserve(tablesize);
         }
     }
 
-    LLStdStringHandle lookup(const std::string& s)
-    {
-        U32 hashval = makehash(s);
-        return lookup(hashval, s);
-    }
+    ~LLStdStringTable() = default;
 
-    LLStdStringHandle checkString(const std::string& s)
-    {
-        U32 hashval = makehash(s);
-        return lookup(hashval, s);
-    }
+    LLStdStringTable(const LLStdStringTable&) = delete;
+    LLStdStringTable& operator=(const LLStdStringTable&) = delete;
 
-    LLStdStringHandle insert(const std::string& s)
+    // Drops every string, and with them every handle this table gave out.
+    void cleanup() { mTable.clear(); }
+
+    // Find, adding when absent.
+    LLStdStringHandle insert(std::string_view str)
     {
-        U32 hashval = makehash(s);
-        LLStdStringHandle result = lookup(hashval, s);
-        if (result == NULL)
+        table_t::iterator found = mTable.find(str);
+        if (found != mTable.end())
         {
-            result = new std::string(s);
-            mStringList[hashval].insert(result);
+            return found->second.get();
         }
-        return result;
+
+        // The key views the stored string's own characters. Growing the table
+        // moves the pointer, never the string it points at, so both the key
+        // and the handle survive a rehash.
+        std::unique_ptr<std::string> owned = std::make_unique<std::string>(str);
+        LLStdStringHandle handle = owned.get();
+        mTable.emplace(std::string_view(*handle), std::move(owned));
+        return handle;
     }
-    LLStdStringHandle addString(const std::string& s)
+
+    LLStdStringHandle addString(std::string_view str) { return insert(str); }
+
+    // Find without adding. Null when the string is not present.
+    LLStdStringHandle checkString(std::string_view str) const
     {
-        return insert(s);
+        table_t::const_iterator found = mTable.find(str);
+        return (found == mTable.end()) ? nullptr : found->second.get();
     }
+
+    LLStdStringHandle lookup(std::string_view str) const { return checkString(str); }
+
+    size_t getUniqueEntries() const { return mTable.size(); }
 
 private:
-    U32 makehash(const std::string& s)
-    {
-        S32 len = (S32)s.size();
-        const char* c = s.c_str();
-        U32 hashval = 0;
-        for (S32 i=0; i<len; i++)
-        {
-            hashval = ((hashval<<5) + hashval) + *c++;
-        }
-        return hashval & (mTableSize-1);
-    }
-    LLStdStringHandle lookup(U32 hashval, const std::string& s)
-    {
-        string_set_t& stringset = mStringList[hashval];
-        LLStdStringHandle handle = &s;
-        string_set_t::iterator iter = stringset.find(handle); // compares actual strings
-        if (iter != stringset.end())
-        {
-            return *iter;
-        }
-        else
-        {
-            return NULL;
-        }
-    }
+    typedef boost::unordered_flat_map<std::string_view,
+                                      std::unique_ptr<std::string>,
+                                      ll::string_hash,
+                                      std::equal_to<>> table_t;
 
-private:
-    S32 mTableSize;
-    typedef std::set<LLStdStringHandle, compare_pointer_contents<std::string> > string_set_t;
-    string_set_t* mStringList; // [mTableSize]
+    table_t mTable;
 };
 
 

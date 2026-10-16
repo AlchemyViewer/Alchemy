@@ -12,9 +12,10 @@
 #if ! defined(LL_LLHETEROMAP_H)
 #define LL_LLHETEROMAP_H
 
+#include <typeindex>
 #include <typeinfo>
 #include <utility>                  // std::pair
-#include <map>
+#include <boost/unordered_map.hpp>
 
 /**
  * LLHeteroMap addresses an odd requirement. Usually when you want to put
@@ -31,7 +32,7 @@
  * LLHeteroMap collects objects WITHOUT a common base class, retrieves them by
  * object type and destroys them when the LLHeteroMap is destroyed.
  */
-class LLHeteroMap
+class LL_COMMON_API LLHeteroMap
 {
 public:
     ~LLHeteroMap();
@@ -43,7 +44,7 @@ public:
         // Look up map entry by typeid(T). We don't simply use mMap[typeid(T)]
         // because that requires default-constructing T on every lookup. For
         // some kinds of T, that could be expensive.
-        TypeMap::iterator found = mMap.find(&typeid(T));
+        TypeMap::iterator found = mMap.find(typeid(T));
         if (found == mMap.end())
         {
             // Didn't find typeid(T). Create an entry. Because we're storing
@@ -52,8 +53,8 @@ public:
             void* ptr = new T();
             void (*dlfn)(void*) = &deleter<T>;
             std::pair<TypeMap::iterator, bool> inserted =
-                mMap.insert(TypeMap::value_type(&typeid(T),
-                    TypeMap::mapped_type(ptr, dlfn)));
+                mMap.emplace(typeid(T),
+                    TypeMap::mapped_type(ptr, dlfn));
             // Okay, now that we have an entry, claim we found it.
             found = inserted.first;
         }
@@ -63,6 +64,9 @@ public:
         return *(static_cast<T*>(found->second.first));
     }
 
+    /// destroy every object; the next obtain() of each type creates it afresh
+    void clear();
+
 private:
     template <class T>
     static
@@ -71,23 +75,9 @@ private:
         delete static_cast<T*>(p);
     }
 
-    // Comparing two std::type_info* values is tricky, because the standard
-    // does not guarantee that there will be only one type_info instance for a
-    // given type. In other words, &typeid(A) in one part of the program may
-    // not always equal &typeid(A) in some other part. Use special comparator.
-    struct type_info_ptr_comp
-    {
-        bool operator()(const std::type_info* lhs, const std::type_info* rhs) const
-        {
-            return lhs->before(*rhs);
-        }
-    };
-
-    // What we actually store is a map from std::type_info (permitting lookup
+    // What we actually store is a map from std::type_index (permitting lookup
     // by object type) to a void* pointer to the object PLUS its deleter.
-    typedef std::map<
-        const std::type_info*, std::pair<void*, void (*)(void*)>,
-        type_info_ptr_comp>
+    typedef boost::unordered_map<std::type_index, std::pair<void*, void (*)(void*)>>
     TypeMap;
     TypeMap mMap;
 };

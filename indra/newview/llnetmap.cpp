@@ -44,9 +44,11 @@
 #include "llglheaders.h"
 
 // Viewer includes
+#include "alavatargroups.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h" // for gDisconnected
+#include "llavataractions.h"
 #include "llcallingcard.h" // LLAvatarTracker
 #include "llfloaterland.h"
 #include "llfloaterworldmap.h"
@@ -72,7 +74,6 @@
 #include "rlvactions.h"
 #include "rlvcommon.h"
 // [/RLVa:KB]
-#include "alavatargroups.h"
 
 static LLDefaultChildRegistry::Register<LLNetMap> r1("net_map");
 
@@ -278,7 +279,7 @@ void LLNetMap::draw()
     {
         LLLocalClipRect clip(getLocalRect());
         {
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
 
             gGL.matrixMode(LLRender::MM_MODELVIEW);
 
@@ -337,7 +338,7 @@ void LLNetMap::draw()
             }
 
             // Draw using texture.
-            gGL.getTexUnit(0)->bind(regionp->getLand().getSTexture());
+            gGL.getTextureSlot(0)->bindSampled(regionp->getLand().getSTexture(), ALSamplers::AnisoWrap);
             gGL.begin(LLRender::TRIANGLES);
             {
                 gGL.texCoord2f(0.f, 1.f);
@@ -402,7 +403,7 @@ void LLNetMap::draw()
                 map_center_agent.mV[VX] *= scale_pixels_per_meter;
                 map_center_agent.mV[VY] *= scale_pixels_per_meter;
 
-                gGL.getTexUnit(0)->bind(mObjectImagep);
+                gGL.getTextureSlot(0)->bindSampled(mObjectImagep, ALSamplers::AnisoWrap);
 
                 gGL.begin(LLRender::TRIANGLES);
                 {
@@ -452,7 +453,7 @@ void LLNetMap::draw()
                 map_center_agent.mV[VX] *= scale_pixels_per_meter;
                 map_center_agent.mV[VY] *= scale_pixels_per_meter;
 
-                gGL.getTexUnit(0)->bind(mParcelImagep);
+                gGL.getTextureSlot(0)->bindSampled(mParcelImagep, ALSamplers::AnisoWrap);
                 gGL.begin(LLRender::TRIANGLES);
                 {
                     gGL.texCoord2f(0.f, 1.f);
@@ -491,22 +492,45 @@ void LLNetMap::draw()
 
         LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgentCamera.getCameraPositionGlobal());
 
-        // Draw avatars
+        std::vector<std::pair<U32, bool>> indexed_avatars;
+        indexed_avatars.reserve(avatar_ids.size());
         for (U32 i = 0; i < avatar_ids.size(); i++)
         {
-            LLUUID uuid = avatar_ids[i];
+            indexed_avatars.emplace_back(i, LLAvatarActions::isFriend(avatar_ids[i]));
+        }
+
+        // Sort avatars so non-friends are drawn first and friend dots will appear on top
+        std::sort(indexed_avatars.begin(), indexed_avatars.end(),
+                    [](const auto& a, const auto& b) { return a.second < b.second; });
+
+        uuid_vec_t sorted_avatar_ids;
+        std::vector<LLVector3d> sorted_positions;
+        sorted_avatar_ids.reserve(avatar_ids.size());
+        sorted_positions.reserve(positions.size());
+
+        // Reorder avatar_ids and positions based on sorted indices
+        for (const auto& indexed_avatar : indexed_avatars)
+        {
+            sorted_avatar_ids.push_back(avatar_ids[indexed_avatar.first]);
+            sorted_positions.push_back(positions[indexed_avatar.first]);
+        }
+
+        // Draw avatars
+        for (U32 i = 0; i < sorted_avatar_ids.size(); i++)
+        {
+            LLUUID uuid = sorted_avatar_ids[i];
             // Skip self, we'll draw it later
             if (uuid == gAgent.getID()) continue;
 
-            pos_map = globalPosToView(positions[i]);
+            pos_map = globalPosToView(sorted_positions[i]);
 
 // [RLVa:KB] - Checked: RLVa-1.2.0
 //            bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, uuid));
 // [/RLVa:KB]
 //          bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL);
+            LLColor4 color = ALAvatarGroups::instance().getAvatarColor(uuid, map_avatar_color, ALAvatarGroups::COLOR_MINIMAP);
 
-            const LLColor4 color = ALAvatarGroups::instance().getAvatarColor(uuid, map_avatar_color, ALAvatarGroups::COLOR_MINIMAP);
-            unknown_relative_z = positions[i].mdV[VZ] >= COARSEUPDATE_MAX_Z &&
+            unknown_relative_z = sorted_positions[i].mdV[VZ] >= COARSEUPDATE_MAX_Z &&
                     camera_position.mV[VZ] >= COARSEUPDATE_MAX_Z;
 
             LLWorldMapView::drawAvatar(
@@ -518,9 +542,10 @@ void LLNetMap::draw()
             if(uuid.notNull())
             {
                 bool selected = false;
-                for (const LLUUID& sel_uuid : gmSelected)
+                uuid_vec_t::iterator sel_iter = gmSelected.begin();
+                for (; sel_iter != gmSelected.end(); sel_iter++)
                 {
-                    if(sel_uuid == uuid)
+                    if(*sel_iter == uuid)
                     {
                         selected = true;
                         break;
@@ -592,7 +617,7 @@ void LLNetMap::draw()
             }
         }
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         // Draw frustum
         F32 meters_to_pixels = mScale/ LLWorld::getInstance()->getRegionWidthInMeters();
@@ -668,6 +693,7 @@ void LLNetMap::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLUICtrl::reshape(width, height, called_from_parent);
     createObjectImage();
+    createParcelImage();
 }
 
 LLVector3 LLNetMap::globalPosToView(const LLVector3d& global_pos)
@@ -808,10 +834,10 @@ LLVector3d LLNetMap::viewPosToGlobal( S32 x, S32 y )
     return pos_global;
 }
 
-bool LLNetMap::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLNetMap::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     // note that clicks are reversed from what you'd think: i.e. > 0  means zoom out, < 0 means zoom in
-    F32 new_scale = mScale * (F32)pow(MAP_SCALE_ZOOM_FACTOR, -clicks);
+    F32 new_scale = mScale * (F32)pow(MAP_SCALE_ZOOM_FACTOR, -delta.mPrecise);
     F32 old_scale = mScale;
 
     setScale(new_scale);
@@ -1120,7 +1146,17 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
     const S32 origin_y = ll_round(origin_local.mV[VY] * mObjectMapTPM + img_height / 2);
 
     LLImageDataLock lock(mParcelRawImagep);
-    U32* texture_data = reinterpret_cast<U32*>(mParcelRawImagep->getData());
+    // The raw image buffer is U8*; storing 32-bit pixels through a U32*
+    // aliased pointer is strict-aliasing UB (and Clang on AArch64 is
+    // happy to vectorize loops like the ones below into NEON stores that
+    // assume that aliasing assumption). Route every per-pixel write
+    // through memcpy on the byte cursor instead -- the optimizer folds
+    // memcpy(&buf, &rgba, 4) into a single 32-bit store.
+    U8* const texture_data = mParcelRawImagep->getData();
+    auto write_pixel = [texture_data](S32 pixel_idx, U32 rgba)
+    {
+        std::memcpy(texture_data + pixel_idx * sizeof(U32), &rgba, sizeof(U32));
+    };
 
     //
     // Draw the north and east region borders
@@ -1132,7 +1168,7 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
         S32 cur_x = llclamp(origin_x, 0, img_width);
         S32 end_x = llclamp(origin_x + ll_round(real_width * mObjectMapTPM), 0, img_width - 1);
         for (; cur_x <= end_x; cur_x++)
-            texture_data[border_y * img_width + cur_x] = overlay_color.asRGBA();
+            write_pixel(border_y * img_width + cur_x, overlay_color.asRGBA());
     }
     const S32 border_x = origin_x + ll_round(real_width * mObjectMapTPM);
     if ( (border_x >= 0) && (border_x < img_width) )
@@ -1140,7 +1176,7 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
         S32 cur_y = llclamp(origin_y, 0, img_height);
         S32 end_y = llclamp(origin_y + ll_round(real_width * mObjectMapTPM), 0, img_height - 1);
         for (; cur_y <= end_y; cur_y++)
-            texture_data[cur_y * img_width + border_x] = overlay_color.asRGBA();
+            write_pixel(cur_y * img_width + border_x, overlay_color.asRGBA());
     }
 
     //
@@ -1188,7 +1224,7 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
                             texcolor = LLColor4U(128, 0, 255, 102).asRGBA();
                         }
 
-                        texture_data[cur_y * img_width + cur_x] = texcolor;
+                        write_pixel(cur_y * img_width + cur_x, texcolor);
                     }
                 }
             }
@@ -1199,7 +1235,7 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
                     S32 cur_x = llclamp(pos_x, 0, img_width);
                     S32 end_x = llclamp(pos_x + ll_round(GRID_STEP * mObjectMapTPM), 0, img_width - 1);
                     for (; cur_x <= end_x; cur_x++)
-                        texture_data[pos_y * img_width + cur_x] = overlay_color.asRGBA();
+                        write_pixel(pos_y * img_width + cur_x, overlay_color.asRGBA());
                 }
             }
             if (overlay & PARCEL_WEST_LINE)
@@ -1209,7 +1245,7 @@ void LLNetMap::renderPropertyLinesForRegion(LLViewerRegion* region, const LLColo
                     S32 cur_y = llclamp(pos_y, 0, img_height);
                     S32 end_y = llclamp(pos_y + ll_round(GRID_STEP * mObjectMapTPM), 0, img_height - 1);
                     for (; cur_y <= end_y; cur_y++)
-                        texture_data[cur_y * img_width + pos_x] = overlay_color.asRGBA();
+                        write_pixel(cur_y * img_width + pos_x, overlay_color.asRGBA());
                 }
             }
         }

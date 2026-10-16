@@ -15,9 +15,6 @@ Birlikte takılacak kişiler mi arıyorsunuz? [secondlife:///app/worldmap Dünya
 		Aradığınızı bulamadınız mı? [secondlife:///app/search/people/[SEARCH_TERM] Ara] deneyin.
 	</string>
 	<string name="no_filtered_groups_msg" value="Aradığınızı bulamadınız mı? [secondlife:///app/search/groups/[SEARCH_TERM] Ara] deneyin."/>
-	<string name="no_groups_msg" value="Katılacak Gruplar mı arıyorsunuz? [secondlife:///app/search/groups Ara] deneyin."/>
-	<string name="MiniMapToolTipMsg" value="[REGION](Haritayı açmak için çift tıkla, yatay hareket için shift çek)"/>
-	<string name="AltMiniMapToolTipMsg" value="[REGION](Işınlamak için çift tıkla, yatay hareket için shift çek)"/>
 	<string name="GroupCountWithInfo" value="[COUNT] gruba üyesin ve [REMAINING] daha gruba üye olabilirsin. [secondlife:/// Limitini arttır]"/>
 	<tab_container name="tabs">
 		<panel label="YAKIN" name="nearby_panel">
@@ -40,7 +37,6 @@ Birlikte takılacak kişiler mi arıyorsunuz? [secondlife:///app/worldmap Dünya
 			<accordion name="friends_accordion">
 				<accordion_tab name="tab_online" title="Çevrimiçi"/>
 				<accordion_tab name="tab_all" title="Tümü"/>
-				<accordion_tab name="tab_suggested_friends" title="Arkadaş olmak isteyebileceğiniz kişiler"/>
 			</accordion>
 		</panel>
 		<panel label="GRUPLAR" name="groups_panel">
@@ -63,9 +59,6 @@ Birlikte takılacak kişiler mi arıyorsunuz? [secondlife:///app/worldmap Dünya
 				<button name="add_friend_btn" tool_tip="Bir sakine arkadaşlık öner"/>
 				<dnd_button name="recent_del_btn" tool_tip="Seçilen kişiyi arkadaş olarak kaldır"/>
 			</panel>
-		</panel>
-		<panel label="ENGELLENMİŞ" name="blocked_panel">
-			<panel label="Engellenmiş Sakinler ve Nesneler" name="panel_block_list_sidetray"/>
 		</panel>
 	</tab_container>
 </panel>

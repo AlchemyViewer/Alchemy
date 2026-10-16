@@ -42,6 +42,10 @@
 // Map of pool sizes for known pools
 static const std::map<std::string, U32> DefaultPoolSizes{
     {std::string("Upload"),  1},
+    // Script Studio's saves of scripts and notecards, several at once: Save
+    // All and a recompile of an object go up side by side rather than one
+    // after another behind every texture and mesh upload.
+    {std::string("ScriptUpload"), 4},
     {std::string("AIS"),     1},
     // *TODO: Rider for the moment keep AIS calls serialized otherwise the COF will tend to get out of sync.
 };
@@ -53,13 +57,17 @@ static const U32 DEFAULT_POOL_SIZE = 5;
 const U32 LLCoprocedureManager::DEFAULT_QUEUE_SIZE = 1024*512;
 
 //=========================================================================
-class LLCoprocedurePool: private boost::noncopyable
+class LLCoprocedurePool
 {
 public:
     typedef LLCoprocedureManager::CoProcedure_t CoProcedure_t;
 
     LLCoprocedurePool(const std::string &name, size_t size, size_t queue_size);
     ~LLCoprocedurePool();
+
+    // Non-copyable
+    LLCoprocedurePool(const LLCoprocedurePool&) = delete;
+    LLCoprocedurePool& operator=(const LLCoprocedurePool&) = delete;
 
     /// Places the coprocedure on the queue for processing.
     ///
@@ -138,7 +146,22 @@ LLCoprocedureManager::LLCoprocedureManager()
 
 LLCoprocedureManager::~LLCoprocedureManager()
 {
-    close();
+    try
+    {
+        close();
+    }
+    catch (const boost::fibers::fiber_error&)
+    {
+        LL_WARNS() << "Fiber error during ~LLCoprocedureManager()" << LL_ENDL;
+    }
+    catch (const std::exception& e)
+    {
+        // Shutting down, just log it
+        LL_WARNS() << "Exception during ~LLCoprocedureManager(): " << e.what() << LL_ENDL;
+    }
+    mPropertyQueryFn = nullptr;
+    mPropertyDefineFn = nullptr;
+    mPoolMap.clear();
 }
 
 void LLCoprocedureManager::initializePool(const std::string &poolName, size_t queue_size)
@@ -180,7 +203,7 @@ void LLCoprocedureManager::initializePool(const std::string &poolName, size_t qu
         LL_WARNS("CoProcMgr") << "LLCoprocedureManager: No setting for \"" << keyName << "\" setting pool size to default of " << size << LL_ENDL;
     }
 
-    poolPtr_t pool(new LLCoprocedurePool(poolName, size, queue_size));
+    poolPtr_t pool = std::make_shared<LLCoprocedurePool>(poolName, size, queue_size);
     LL_ERRS_IF(!pool, "CoprocedureManager") << "Unable to create pool named \"" << poolName << "\" FATAL!" << LL_ENDL;
 
     bool inserted = mPoolMap.emplace(poolName, pool).second;
@@ -214,6 +237,7 @@ void LLCoprocedureManager::setPropertyMethods(SettingQuery_t queryfn, SettingUpd
 
     constexpr size_t UPLOAD_QUEUE_SIZE = 2048;
     initializePool("Upload", UPLOAD_QUEUE_SIZE);
+    initializePool("ScriptUpload", UPLOAD_QUEUE_SIZE);
     initializePool("AIS"); // it might be better to have some kind of on-demand initialization for AIS
     // "ExpCache" pool gets initialized in LLExperienceCache
     // asset storage pool gets initialized in LLViewerAssetStorage
@@ -350,7 +374,7 @@ LLCoprocedurePool::LLCoprocedurePool(const std::string &poolName, size_t size, s
 
     for (size_t count = 0; count < mPoolSize; ++count)
     {
-        LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter( mPoolName + "Adapter", mHTTPPolicy));
+        LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>(mPoolName + "Adapter", mHTTPPolicy);
 
         std::string pooledCoro = LLCoros::instance().launch(
             "LLCoprocedurePool("+mPoolName+")::coprocedureInvokerCoro",
@@ -365,6 +389,22 @@ LLCoprocedurePool::LLCoprocedurePool(const std::string &poolName, size_t size, s
 
 LLCoprocedurePool::~LLCoprocedurePool()
 {
+    try
+    {
+        close(); // should have been closed already, but shouldn't hurt
+        mStatusListener.disconnect();
+        mPendingCoprocs.reset();
+        mCoroMapping.clear();
+    }
+    catch (const boost::fibers::fiber_error&)
+    {
+        LL_WARNS() << "Fiber error during ~LLCoprocedurePool() " << mPoolName << LL_ENDL;
+    }
+    catch (const std::exception& e)
+    {
+        // Shutting down, just log it
+        LL_WARNS() << "Exception " << e.what() << " during ~LLCoprocedurePool() in " << mPoolName << LL_ENDL;
+    }
 }
 
 //-------------------------------------------------------------------------

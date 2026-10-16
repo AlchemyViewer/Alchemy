@@ -39,9 +39,11 @@
 class LLMenuItemCallGL;
 class LLToggleableMenu;
 
-class LLFavoritesBarCtrl : public LLUICtrl, public LLInventoryObserver
+class LLFavoritesBarCtrl final : public LLUICtrl, public LLInventoryObserver
 {
 public:
+    AL_VIEW_TYPE(LLFavoritesBarCtrl, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<LLUIImage*> image_drag_indication;

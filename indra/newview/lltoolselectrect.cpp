@@ -71,7 +71,7 @@ void dialog_refresh_all(void);
 
 bool LLToolSelectRect::handleMouseDown(S32 x, S32 y, MASK mask)
 {
-    bool pick_rigged = false; //gSavedSettings.getBOOL("AnimatedObjectsAllowLeftClick");
+    bool pick_rigged = gSavedSettings.getBOOL("AnimatedObjectsAllowLeftClick");
     handlePick(gViewerWindow->pickImmediate(x, y, true /* pick_transparent */, pick_rigged));
 
     LLTool::handleMouseDown(x, y, mask);
@@ -169,7 +169,7 @@ void LLToolSelectRect::draw()
         {
             gGL.color4f(1.f, 1.f, 0.f, 1.f);
         }
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         gl_rect_2d(
             llmin(mDragStartX, mDragEndX),
             llmax(mDragStartY, mDragEndY),

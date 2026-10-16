@@ -42,6 +42,8 @@
 #include "llviewerparcelmgr.h"
 #include "llviewerpartsim.h"
 
+#include <optional>
+
 LLSceneMonitorView* gSceneMonitorView = NULL;
 
 //
@@ -63,7 +65,6 @@ LLSceneMonitor::LLSceneMonitor() :
     mDiffTolerance(0.1f),
     mDiffState(WAITING_FOR_NEXT_DIFF),
     mDebugViewerVisible(false),
-    mQueryObject(0),
     mDiffPixelRatio(0.5f)
 {
     mFrames[0] = NULL;
@@ -94,11 +95,7 @@ void LLSceneMonitor::reset()
 
     unfreezeScene();
 
-    if(mQueryObject > 0)
-    {
-        LLOcclusionCullingGroup::releaseOcclusionQueryObjectName(mQueryObject);
-        mQueryObject = 0;
-    }
+    mQuery = {};
 }
 
 void LLSceneMonitor::generateDitheringTexture(S32 width, S32 height)
@@ -155,8 +152,6 @@ void LLSceneMonitor::generateDitheringTexture(S32 width, S32 height)
     }
 
     mDitheringTexture = LLViewerTextureManager::getLocalTexture(image_raw.get(), false) ;
-    mDitheringTexture->setAddressMode(LLTexUnit::TAM_WRAP);
-    mDitheringTexture->setFilteringOption(LLTexUnit::TFO_POINT);
 
     mDitherScaleS = (F32)width / mDitherMatrixWidth;
     mDitherScaleT = (F32)height / mDitherMatrixWidth;
@@ -177,20 +172,14 @@ LLRenderTarget& LLSceneMonitor::getCaptureTarget()
     if(!mFrames[0])
     {
         mFrames[0] = new LLRenderTarget();
-        mFrames[0]->allocate(width, height, GL_RGB);
-        gGL.getTexUnit(0)->bind(mFrames[0]);
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        mFrames[0]->allocate(width, height, GL_RGB8);
 
         cur_target = mFrames[0];
     }
     else if(!mFrames[1])
     {
         mFrames[1] = new LLRenderTarget();
-        mFrames[1]->allocate(width, height, GL_RGB);
-        gGL.getTexUnit(0)->bind(mFrames[1]);
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        mFrames[1]->allocate(width, height, GL_RGB8);
 
         cur_target = mFrames[1];
     }
@@ -297,10 +286,13 @@ void LLSceneMonitor::capture()
         force_capture = true;
     }
 
+    // Not while the last capture's difference is still being counted: a capture starts another, whose query would
+    // replace that one before it is read.
     if(mEnabled
         && (mRecordingTimer.getElapsedTimeF32() > scene_load_sample_time()
             || force_capture)
-        && last_capture_frame != gFrameCount)
+        && last_capture_frame != gFrameCount
+        && mDiffState != WAIT_ON_RESULT)
     {
         force_capture = false;
 
@@ -313,7 +305,7 @@ void LLSceneMonitor::capture()
 
         U32 old_FBO = LLRenderTarget::sCurFBO;
 
-        gGL.getTexUnit(0)->bind(&cur_target);
+        gGL.getTextureSlot(0)->bind(&cur_target);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, 0); //point to the main frame buffer.
 
         glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, cur_target.getWidth(), cur_target.getHeight()); //copy the content
@@ -330,10 +322,6 @@ bool LLSceneMonitor::needsUpdate() const
 {
     return mDiffState == NEED_DIFF;
 }
-
-static LLStaticHashedString sDitherScale("dither_scale");
-static LLStaticHashedString sDitherScaleS("dither_scale_s");
-static LLStaticHashedString sDitherScaleT("dither_scale_t");
 
 void LLSceneMonitor::compare()
 {
@@ -359,7 +347,7 @@ void LLSceneMonitor::compare()
     if(!mDiff)
     {
         mDiff = new LLRenderTarget();
-        mDiff->allocate(width, height, GL_RGBA);
+        mDiff->allocate(width, height, GL_RGBA8);
 
         generateDitheringTexture(width, height);
     }
@@ -374,24 +362,19 @@ void LLSceneMonitor::compare()
 
     gTwoTextureCompareProgram.bind();
 
-    gTwoTextureCompareProgram.uniform1f(sDitherScale, mDitherScale);
-    gTwoTextureCompareProgram.uniform1f(sDitherScaleS, mDitherScaleS);
-    gTwoTextureCompareProgram.uniform1f(sDitherScaleT, mDitherScaleT);
+    gTwoTextureCompareProgram.uniform1f(LLShaderMgr::DITHER_SCALE, mDitherScale);
+    gTwoTextureCompareProgram.uniform1f(LLShaderMgr::DITHER_SCALE_S, mDitherScaleS);
+    gTwoTextureCompareProgram.uniform1f(LLShaderMgr::DITHER_SCALE_T, mDitherScaleT);
 
-    gGL.getTexUnit(0)->activate();
-    gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(0)->bind(mFrames[0]);
-    gGL.getTexUnit(0)->activate();
+    // Point sampling: this is a per-pixel frame difference, so interpolation would blur
+    // exactly the discrepancies it exists to measure.
+    gGL.getTextureSlot(0)->bind(mFrames[0], false,
+                            gGL.getSampler(ALSamplers::PointClamp));
 
-    gGL.getTexUnit(1)->activate();
-    gGL.getTexUnit(1)->enable(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(1)->bind(mFrames[1]);
-    gGL.getTexUnit(1)->activate();
+    gGL.getTextureSlot(1)->bind(mFrames[1], false,
+                            gGL.getSampler(ALSamplers::PointClamp));
 
-    gGL.getTexUnit(2)->activate();
-    gGL.getTexUnit(2)->enable(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(2)->bind(mDitheringTexture);
-    gGL.getTexUnit(2)->activate();
+    gGL.getTextureSlot(2)->bindSampled(mDitheringTexture, ALSamplers::PointWrap);
 
     gl_rect_2d_simple_tex(width, height);
 
@@ -399,12 +382,9 @@ void LLSceneMonitor::compare()
 
     gTwoTextureCompareProgram.unbind();
 
-    gGL.getTexUnit(0)->disable();
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(1)->disable();
-    gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(2)->disable();
-    gGL.getTexUnit(2)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
+    gGL.getTextureSlot(1)->unbind();
+    gGL.getTextureSlot(2)->unbind();
 
     if (!mDebugViewerVisible)
     {
@@ -412,8 +392,6 @@ void LLSceneMonitor::compare()
     }
 #endif
 }
-
-static LLStaticHashedString sTolerance("tolerance");
 
 //calculate Diff aggregate information in GPU, and enable gl occlusion query to capture it.
 void LLSceneMonitor::calcDiffAggregate()
@@ -425,34 +403,34 @@ void LLSceneMonitor::calcDiffAggregate()
         return;
     }
 
-    if(!mQueryObject)
-    {
-        mQueryObject = LLOcclusionCullingGroup::getNewOcclusionQueryObjectName();
-    }
-
     LLGLDepthTest depth(true, false, GL_ALWAYS);
+    std::optional<LLGLSColorMask> no_color;
     if(!mDebugViewerVisible)
     {
-        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+        no_color.emplace(false, false);
     }
 
     LLGLSLShader* cur_shader = NULL;
 
     cur_shader = LLGLSLShader::sCurBoundShaderPtr;
     gOneTextureFilterProgram.bind();
-    gOneTextureFilterProgram.uniform1f(sTolerance, mDiffTolerance);
+    gOneTextureFilterProgram.uniform1f(LLShaderMgr::TOLERANCE, mDiffTolerance);
 
+    ALQueryTicket query;
     if(mDiffState == EXECUTE_DIFF)
     {
-        glBeginQuery(GL_SAMPLES_PASSED, mQueryObject);
+        query = gGL.queries().begin(ALQueryKind::Samples);
     }
 
     gl_draw_scaled_target(0, 0, S32(mDiff->getWidth() * mDiffPixelRatio), S32(mDiff->getHeight() * mDiffPixelRatio), mDiff);
 
     if(mDiffState == EXECUTE_DIFF)
     {
-        glEndQuery(GL_SAMPLES_PASSED);
-        mDiffState = WAIT_ON_RESULT;
+        // end() draws the quad still batched in gGL first, so the query counts it. One the pool refused, its
+        // target held, leaves nothing to wait on.
+        gGL.queries().end(query);
+        mQuery = query;
+        mDiffState = query.isValid() ? WAIT_ON_RESULT : WAITING_FOR_NEXT_DIFF;
     }
 
     gOneTextureFilterProgram.unbind();
@@ -460,11 +438,6 @@ void LLSceneMonitor::calcDiffAggregate()
     if(cur_shader != NULL)
     {
         cur_shader->bind();
-    }
-
-    if(!mDebugViewerVisible)
-    {
-        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     }
 #endif
 }
@@ -479,16 +452,18 @@ void LLSceneMonitor::fetchQueryResult()
     if(mDiffState == WAIT_ON_RESULT
         && !LLAppViewer::instance()->quitRequested())
     {
+        // In once the pool has read the frame the diff was drawn in, a frame or two on; one expired unread is dropped.
+        U64 count = 0;
+        const ALQueryPool::Status status = gGL.queries().result(mQuery, count);
+        if (status == ALQueryPool::Status::Pending)
+        {
+            return;
+        }
         mDiffState = WAITING_FOR_NEXT_DIFF;
 
-        GLuint available = 0;
-        glGetQueryObjectuiv(mQueryObject, GL_QUERY_RESULT_AVAILABLE, &available);
-        if(available)
+        if (status == ALQueryPool::Status::Ready)
         {
-            GLuint count = 0;
-            glGetQueryObjectuiv(mQueryObject, GL_QUERY_RESULT, &count);
-
-            mDiffResult = sqrtf(count * 0.5f / (mDiff->getWidth() * mDiff->getHeight() * mDiffPixelRatio * mDiffPixelRatio)); //0.5 -> (front face + back face)
+            mDiffResult = sqrtf((F32)count * 0.5f / (mDiff->getWidth() * mDiff->getHeight() * mDiffPixelRatio * mDiffPixelRatio)); //0.5 -> (front face + back face)
 
             LL_DEBUGS("SceneMonitor") << "Frame difference: " << mDiffResult << LL_ENDL;
             record(sFramePixelDiff, mDiffResult);
@@ -726,7 +701,7 @@ void LLSceneMonitorView::draw()
     setRect(new_rect);
 
     //draw background
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gl_rect_2d(0, getRect().getHeight(), getRect().getWidth(), 0, LLColor4(0.f, 0.f, 0.f, 0.25f));
 
     LLSceneMonitor::getInstance()->calcDiffAggregate();

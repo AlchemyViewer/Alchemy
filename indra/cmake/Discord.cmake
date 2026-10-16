@@ -1,28 +1,20 @@
-include(Prebuilt)
-
+# -*- cmake -*-
+#
+# The Discord Social SDK is downloaded per application from Discord's
+# developer portal under its own licence, so its port, discord-social-sdk,
+# lives in AlchemyViewer's private vcpkg registry: AL_USE_DISCORD asks for it
+# through the manifest's discord feature, and the build needs read access to
+# that registry.
 include_guard()
+add_library(ll::discord_sdk INTERFACE IMPORTED)
 
-if (INSTALL_PROPRIETARY)
-   set(USE_DISCORD ON CACHE BOOL "Enable Discord SDK")
-endif (INSTALL_PROPRIETARY)
+if(AL_USE_DISCORD)
+  find_package(unofficial-discord-social-sdk CONFIG REQUIRED)
 
-option(USE_DISCORD "Enable Discord SDK" OFF)
-
-if(USE_DISCORD)
-    add_library(ll::discord_sdk INTERFACE IMPORTED)
-
-    target_compile_definitions(ll::discord_sdk INTERFACE LL_DISCORD=1)
-
-    use_prebuilt_binary(discord_sdk)
-
-    find_library(DISCORD_SDK_LIBRARY
-        NAMES
-        discord_partner_sdk
-        discord_partner_sdk.lib
-        libdiscord_partner_sdk.so
-        libdiscord_partner_sdk.dylib
-        PATHS "${ARCH_PREBUILT_DIRS_ARCH_RELEASE}" "${ARCH_PREBUILT_DIRS_RELEASE}" REQUIRED NO_DEFAULT_PATH)
-
-    target_include_directories(ll::discord_sdk SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/discord_sdk)
-    target_link_libraries(ll::discord_sdk INTERFACE ${DISCORD_SDK_LIBRARY})
+  target_compile_definitions(ll::discord_sdk INTERFACE LL_DISCORD=1)
+  # A shared library on every platform; ViewerInstall.cmake ships it.
+  target_link_libraries(
+    ll::discord_sdk
+    INTERFACE unofficial::discord-social-sdk::discord-social-sdk
+  )
 endif()

@@ -30,7 +30,7 @@ import os
 
 def convert_tabs_to_spaces(file_path, tab_stop):
     """Convert tabs in a file to spaces, considering tab stops."""
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', encoding='utf-8') as file:
         lines = file.readlines()
 
     # Skip files with no tabs

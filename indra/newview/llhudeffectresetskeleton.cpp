@@ -208,6 +208,9 @@ void LLHUDEffectResetSkeleton::update()
         {
             LLVOAvatar* avatar = mTargetObject->asAvatar();
             avatar->resetSkeleton(mResetAnimations);
+// [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
+            avatar->rebuildAttachments();
+// [/SL:KB]
         }
     }
     else

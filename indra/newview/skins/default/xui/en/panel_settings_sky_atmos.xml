@@ -35,7 +35,7 @@
                     layout="topleft"
                     left_delta="15"
                     top_pad="15"
-                    width="80">
+                    width="86">
                 Ambient Color:
             </text>
             <color_swatch
@@ -53,9 +53,9 @@
                     follows="left"
                     height="10"
                     layout="topleft"
-                    left_delta="90"
+                    left_delta="110"
                     top_delta="-15"
-                    width="80">
+                    width="86">
                 Blue Horizon:
             </text>
             <color_swatch
@@ -73,9 +73,9 @@
                     follows="left"
                     height="10"
                     layout="topleft"
-                    left_delta="90"
+                    left_delta="110"
                     top_delta="-15"
-                    width="80">
+                    width="86">
                 Blue Density:
             </text>
             <color_swatch
@@ -102,7 +102,7 @@
                     right="-5"
                     bottom="-5"
                     follows="left|top|right|bottom"
-                    orientation="hoizontal">
+                    orientation="horizontal">
                 <layout_panel
                         name="left_lp"
                         border="false"
@@ -166,7 +166,7 @@
                             layout="topleft"
                             left_delta="-5"
                             top_delta="25"
-                            width="80">
+                            width="90">
                         Moisture Level:
                     </text>
                      <slider
@@ -190,7 +190,7 @@
                             layout="topleft"
                             left_delta="-5"
                             top_delta="25"
-                            width="80">
+                            width="90">
                         Droplet Radius:
                     </text>
                     <slider
@@ -319,9 +319,9 @@
                             left_delta="-5"
                             top_delta="25"
                             name="probe_ambiance_label"
-                            tool_tip="Intensity of environment based indirect lighting. At zero HDR scale becomes Brightness"
+                            tool_tip="Irradiance control. When not zero, enables HDR lighting model."
                             width="200">
-                    Reflection Probe Ambiance:
+                    Reflection Probe Ambiance (HDR):
                   </text>
                   <slider
                           decimal_digits="2"

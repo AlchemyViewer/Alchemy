@@ -187,7 +187,7 @@ void    LLNameListCtrl::mouseOverHighlightNthItem( S32 target_index )
             LLScrollListItem* item = getItemList()[cur_index];
             if (item)
             {
-                LLScrollListText* cell = dynamic_cast<LLScrollListText*>(item->getColumn(mNameColumnIndex));
+                LLScrollListText* cell = item->getColumn<LLScrollListText>(mNameColumnIndex);
                 if (cell)
                     cell->setTextWidth(cell->getTextWidth() + info_icon_size);
             }
@@ -199,7 +199,7 @@ void    LLNameListCtrl::mouseOverHighlightNthItem( S32 target_index )
         if(target_index != -1)
         {
             LLScrollListItem* item = getItemList()[target_index];
-            LLScrollListText* cell = dynamic_cast<LLScrollListText*>(item->getColumn(mNameColumnIndex));
+            LLScrollListText* cell = item->getColumn<LLScrollListText>(mNameColumnIndex);
             if (item)
             {
                 if (cell)
@@ -333,16 +333,6 @@ LLScrollListItem* LLNameListCtrl::addElement(const LLSD& element, EAddPosition p
     return addNameItemRow(item_params, pos);
 }
 
-// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
-LLScrollListItem* LLNameListCtrl::addElement(const LLSD& element, const LLScrollListItem::commit_signal_t::slot_type& cb, EAddPosition pos)
-{
-    LLNameListCtrl::NameItem item_params;
-    LLParamSDParser parser;
-    parser.readSD(element, item_params);
-    item_params.commit_callback = cb;
-    return addNameItemRow(item_params, pos);
-}
-// [/SL:KB]
 
 LLScrollListItem* LLNameListCtrl::addNameItemRow(
     const LLNameListCtrl::NameItem& name_item,

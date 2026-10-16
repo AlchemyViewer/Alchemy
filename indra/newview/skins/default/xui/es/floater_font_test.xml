@@ -1,6 +1,3 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="contents" title="PRUEBA DE FUENTES">
-	<text name="linea">
-		OverrideTest, debería de aparecer aquí en Times. (Desde default/xui/en-us)
-	</text>
 </floater>

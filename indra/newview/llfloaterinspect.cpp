@@ -28,6 +28,7 @@
 
 #include "llfloaterinspect.h"
 
+#include "alobjectproperties.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
 #include "llavataractions.h"
@@ -47,26 +48,85 @@
 #include "rlvcommon.h"
 #include "rlvui.h"
 // [/RLVa:KB]
+#include "llresmgr.h"
+#include "lltexturectrl.h"
+#include "llviewerobjectlist.h" //gObjectList
+#include "llviewertexturelist.h"
+#include "llvovolume.h"
+#include "llmenugl.h"
+#include "llmenubutton.h"
+#include "lltoggleablemenu.h"
+#include "llviewermenu.h"           // for gMenuHolder
 
 //LLFloaterInspect* LLFloaterInspect::sInstance = NULL;
+
+// Opt-in scene-builder metric column bits. Defined once here and reused both in
+// mColumnBits and METRIC_COLUMNS_MASK so the two cannot silently drift apart.
+namespace
+{
+    constexpr U32 COL_LAND_IMPACT = 1u << 10;
+    constexpr U32 COL_RENDERCOST  = 1u << 11;
+    constexpr U32 COL_PHYSICSCOST = 1u << 12;
+    constexpr U32 COL_STREAMCOST  = 1u << 13;
+    constexpr U32 COL_PRIMCOUNT   = 1u << 14;
+    constexpr U32 COL_DISTANCE    = 1u << 15;
+    constexpr U32 COL_SCRIPTS     = 1u << 16;
+    constexpr U32 COL_LIGHTGLOW   = 1u << 17;
+    constexpr U32 COL_MEDIA       = 1u << 18;
+    constexpr U32 COL_ALPHAPBR    = 1u << 19;
+}
+
+// Union of the opt-in scene-builder metric column bits (see mColumnBits).
+static constexpr U32 METRIC_COLUMNS_MASK =
+    COL_LAND_IMPACT | COL_RENDERCOST | COL_PHYSICSCOST | COL_STREAMCOST | COL_PRIMCOUNT |
+    COL_DISTANCE | COL_SCRIPTS | COL_LIGHTGLOW | COL_MEDIA | COL_ALPHAPBR;
 
 LLFloaterInspect::LLFloaterInspect(const LLSD& key)
   : LLFloater(key),
     mDirty(false),
     mOwnerNameCacheConnection(),
-    mCreatorNameCacheConnection()
+    mCreatorNameCacheConnection(),
+    mOptionsButton(NULL),
+    mInspectColumnConfigConnection(),
+    mLastResizeDelta(0)
 {
     mCommitCallbackRegistrar.add("Inspect.OwnerProfile",    boost::bind(&LLFloaterInspect::onClickOwnerProfile, this));
     mCommitCallbackRegistrar.add("Inspect.CreatorProfile",  boost::bind(&LLFloaterInspect::onClickCreatorProfile, this));
     mCommitCallbackRegistrar.add("Inspect.SelectObject",    boost::bind(&LLFloaterInspect::onSelectObject, this));
+
+    mCommitCallbackRegistrar.add("Inspect.ToggleColumn",            boost::bind(&LLFloaterInspect::onColumnVisibilityChecked, this, _2));
+    mEnableCallbackRegistrar.add("Inspect.EnableColumn",    boost::bind(&LLFloaterInspect::onEnableColumnVisibilityChecked, this, _2));
+
+    mColumnBits["object_name"] = 1;
+    mColumnBits["description"] = 2;
+    mColumnBits["owner_name"] = 4;
+    mColumnBits["creator_name"] = 8;
+    mColumnBits["facecount"] = 16;
+    mColumnBits["vertexcount"] = 32;
+    mColumnBits["trianglecount"] = 64;
+    mColumnBits["tramcount"] = 128;
+    mColumnBits["vramcount"] = 256;
+    mColumnBits["creation_date"] = 512;
+    // Scene-builder metrics, sourced from ALObjectProperties so this floater
+    // and the Scene Explorer always report the same numbers.
+    mColumnBits["land_impact"] = COL_LAND_IMPACT;
+    mColumnBits["rendercost"] = COL_RENDERCOST;
+    mColumnBits["physicscost"] = COL_PHYSICSCOST;
+    mColumnBits["streamingcost"] = COL_STREAMCOST;
+    mColumnBits["primcount"] = COL_PRIMCOUNT;
+    mColumnBits["distance"] = COL_DISTANCE;
+    mColumnBits["scripts"] = COL_SCRIPTS;
+    mColumnBits["lightglow"] = COL_LIGHTGLOW;
+    mColumnBits["media"] = COL_MEDIA;
+    mColumnBits["alphapbr"] = COL_ALPHAPBR;
 }
 
 bool LLFloaterInspect::postBuild()
 {
     mObjectList = getChild<LLScrollListCtrl>("object_list");
-//  childSetAction("button owner",onClickOwnerProfile, this);
-//  childSetAction("button creator",onClickCreatorProfile, this);
-//  childSetCommitCallback("object_list", onSelectObject, NULL);
+
+    mInspectColumnConfigConnection = gSavedSettings.getControl("ALInspectColumnConfig")->getSignal()->connect(boost::bind(&LLFloaterInspect::onColumnDisplayModeChanged, this));
+    onColumnDisplayModeChanged();
 
     refresh();
 
@@ -83,18 +143,25 @@ LLFloaterInspect::~LLFloaterInspect(void)
     {
         mCreatorNameCacheConnection.disconnect();
     }
-    if(!LLFloaterReg::instanceVisible("build"))
+    if (mInspectColumnConfigConnection.connected())
     {
-        if(LLToolMgr::getInstance()->getBaseTool() == LLToolCompInspect::getInstance())
-        {
-            LLToolMgr::getInstance()->clearTransientTool();
-        }
-        // Switch back to basic toolset
-        LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
+        mInspectColumnConfigConnection.disconnect();
     }
-    else
+    if (!LLApp::isExiting())
     {
-        LLFloaterReg::showInstance("build", LLSD(), true);
+        if (!LLFloaterReg::instanceVisible("build"))
+        {
+            if (LLToolMgr::getInstance()->getBaseTool() == LLToolCompInspect::getInstance())
+            {
+                LLToolMgr::getInstance()->clearTransientTool();
+            }
+            // Switch back to basic toolset
+            LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
+        }
+        else
+        {
+            LLFloaterReg::showInstance("build", LLSD(), true);
+        }
     }
 }
 
@@ -105,6 +172,7 @@ void LLFloaterInspect::onOpen(const LLSD& key)
     LLSelectMgr::getInstance()->setForceSelection(forcesel);    // restore previouis value
     mObjectSelection = LLSelectMgr::getInstance()->getSelection();
     refresh();
+    mDirty = false;
 }
 
 // [RLVa:KB] - Checked: RLVa-2.0.1
@@ -112,7 +180,7 @@ const LLSelectNode* LLFloaterInspect::getSelectedNode() /*const*/
 {
     if(mObjectList->getAllSelected().size() == 0)
     {
-        return nullptr;
+        return NULL;
     }
     LLScrollListItem* first_selected =mObjectList->getFirstSelected();
 
@@ -134,43 +202,43 @@ const LLSelectNode* LLFloaterInspect::getSelectedNode() /*const*/
 
 void LLFloaterInspect::onClickCreatorProfile()
 {
-        const LLSelectNode* node = getSelectedNode();
-        if(node)
+    const LLSelectNode* node = getSelectedNode();
+    if(node)
+    {
+        // Only anonymize the creator if they're also the owner or if they're a nearby avie
+        const LLUUID& idCreator = node->mPermissions->getCreator();
+        if ( (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, idCreator)) && ((node->mPermissions->getOwner() == idCreator) || (RlvUtil::isNearbyAgent(idCreator))) )
         {
-            // Only anonymize the creator if they're also the owner or if they're a nearby avie
-            const LLUUID& idCreator = node->mPermissions->getCreator();
-            if ( (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, idCreator)) && ((node->mPermissions->getOwner() == idCreator) || (RlvUtil::isNearbyAgent(idCreator))) )
-            {
-                return;
-            }
-            LLAvatarActions::showProfile(idCreator);
+            return;
         }
+        LLAvatarActions::showProfile(idCreator);
+    }
 }
 
 void LLFloaterInspect::onClickOwnerProfile()
 {
-        const LLSelectNode* node = getSelectedNode();
-        if(node)
+    const LLSelectNode* node = getSelectedNode();
+    if(node)
+    {
+        if(node->mPermissions->isGroupOwned())
         {
-            if(node->mPermissions->isGroupOwned())
-            {
-                const LLUUID& idGroup = node->mPermissions->getGroup();
-                LLGroupActions::show(idGroup);
-            }
-            else
-            {
-                const LLUUID& owner_id = node->mPermissions->getOwner();
-                if (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, owner_id))
-                    return;
-                LLAvatarActions::showProfile(owner_id);
-            }
-
+            const LLUUID& idGroup = node->mPermissions->getGroup();
+            LLGroupActions::show(idGroup);
         }
+        else
+        {
+            const LLUUID& owner_id = node->mPermissions->getOwner();
+            if (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, owner_id))
+                return;
+            LLAvatarActions::showProfile(owner_id);
+        }
+
+    }
 }
 
 void LLFloaterInspect::onSelectObject()
 {
-    if(LLFloaterInspect::getSelectedUUID() != LLUUID::null)
+    if(LLFloaterInspect::getSelectedUUID().notNull())
     {
         if (!RlvActions::isRlvEnabled())
         {
@@ -256,7 +324,7 @@ void LLFloaterInspect::onSelectObject()
 
 //void LLFloaterInspect::onSelectObject()
 //{
-//  if(LLFloaterInspect::getSelectedUUID() != LLUUID::null)
+//  if(LLFloaterInspect::getSelectedUUID().notNull())
 //  {
 //      getChildView("button owner")->setEnabled(true);
 //      getChildView("button creator")->setEnabled(true);
@@ -279,9 +347,26 @@ LLUUID LLFloaterInspect::getSelectedUUID()
 
 void LLFloaterInspect::refresh()
 {
-    LLUUID creator_id;
     std::string creator_name;
     S32 pos = mObjectList->getScrollPos();
+    LLLocale locale("");
+    LLResMgr& res_mgr = LLResMgr::instance();
+    LLSelectMgr& sel_mgr = LLSelectMgr::instance();
+    S32 fcount = 0;
+    S32 fcount_visible = 0;
+    S32 tcount = 0;
+    S32 vcount = 0;
+    S32 objcount = 0;
+    S32 primcount = 0;
+    U32 complexity = 0;
+    mTextureList.clear();
+    mTextureMemory = 0;
+    mTextureVRAMMemory = 0;
+    std::string format_res_string;
+    const U32 column_config = gSavedSettings.getU32("ALInspectColumnConfig");
+    static LLCachedControl<F32> max_complexity_setting(gSavedSettings, "MaxAttachmentComplexity");
+    F32 max_attachment_complexity = max_complexity_setting;
+    max_attachment_complexity = llmax(max_attachment_complexity, 1.0e6f);
     getChildView("button owner")->setEnabled(false);
     getChildView("button creator")->setEnabled(false);
     LLUUID selected_uuid;
@@ -304,6 +389,7 @@ void LLFloaterInspect::refresh()
         LLSelectNode* obj = *iter;
         LLSD row;
         std::string owner_name, creator_name;
+        auto vobj = obj->getObject();
 
         if (obj->mCreationDate == 0)
         {   // Don't have valid information from the server, so skip this one
@@ -311,7 +397,8 @@ void LLFloaterInspect::refresh()
         }
 
         time_t timestamp = (time_t) (obj->mCreationDate/1000000);
-        std::string timeStr = getString("timeStamp");
+        static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+        std::string timeStr = use_24h ? getString("timeStamp") : getString("timeStampAMPM");
         LLSD substitution;
         substitution["datetime"] = (S32) timestamp;
         LLStringUtil::format (timeStr, substitution);
@@ -326,7 +413,7 @@ void LLFloaterInspect::refresh()
             const LLUUID& idGroup = obj->mPermissions->getGroup();
             if(gCacheName->getGroupName(idGroup, group_name))
             {
-                owner_name = "[" + group_name + "] (group)";
+                owner_name = "[" + group_name + "] " + getString("Group");
             }
             else
             {
@@ -381,12 +468,12 @@ void LLFloaterInspect::refresh()
             mCreatorNameCacheConnection = LLAvatarNameCache::get(idCreator, boost::bind(&LLFloaterInspect::onGetCreatorNameCallback, this));
         }
 
-        row["id"] = obj->getObject()->getID();
+        row["id"] = vobj->getID();
         row["columns"][0]["column"] = "object_name";
         row["columns"][0]["type"] = "text";
         // make sure we're either at the top of the link chain
         // or top of the editable chain, for attachments
-        if(!(obj->getObject()->isRoot() || obj->getObject()->isRootEdit()))
+        if(!(vobj->isRoot() || vobj->isRootEdit()))
         {
             row["columns"][0]["value"] = std::string("   ") + obj->mName;
         }
@@ -403,8 +490,172 @@ void LLFloaterInspect::refresh()
         row["columns"][3]["column"] = "creation_date";
         row["columns"][3]["type"] = "text";
         row["columns"][3]["value"] = timeStr;
+        row["columns"][4]["column"] = "description";
+        row["columns"][4]["type"] = "text";
+        row["columns"][4]["value"] = obj->mDescription;
+        row["columns"][5]["column"] = "creation_date_sort";
+        row["columns"][5]["type"] = "text";
+        row["columns"][5]["value"] = llformat("%d", timestamp);
+
+        res_mgr.getIntegerString(format_res_string, vobj->getNumFaces());
+        row["columns"][6]["column"] = "facecount";
+        row["columns"][6]["type"] = "text";
+        row["columns"][6]["value"] = format_res_string;
+
+        res_mgr.getIntegerString(format_res_string, vobj->getNumVertices());
+        row["columns"][7]["column"] = "vertexcount";
+        row["columns"][7]["type"] = "text";
+        row["columns"][7]["value"] = format_res_string;
+
+        res_mgr.getIntegerString(format_res_string, vobj->getNumIndices() / 3);
+        row["columns"][8]["column"] = "trianglecount";
+        row["columns"][8]["type"] = "text";
+        row["columns"][8]["value"] = format_res_string;
+
+        // Poundlife - Get VRAM
+        U32 texture_memory = 0;
+        U32 vram_memory = 0;
+        getObjectTextureMemory(vobj, texture_memory, vram_memory);
+        res_mgr.getIntegerString(format_res_string, texture_memory / 1024);
+        row["columns"][9]["column"] = "tramcount";
+        row["columns"][9]["type"] = "text";
+        row["columns"][9]["value"] = format_res_string;
+
+        res_mgr.getIntegerString(format_res_string, vram_memory / 1024);
+        row["columns"][10]["column"] = "vramcount";
+        row["columns"][10]["type"] = "text";
+        row["columns"][10]["value"] = format_res_string;
+
+        row["columns"][11]["column"] = "facecount_sort";
+        row["columns"][11]["type"] = "text";
+        row["columns"][11]["value"] = LLSD::Integer(vobj->getNumFaces());
+
+        row["columns"][12]["column"] = "vertexcount_sort";
+        row["columns"][12]["type"] = "text";
+        row["columns"][12]["value"] = LLSD::Integer(vobj->getNumVertices());
+
+        row["columns"][13]["column"] = "trianglecount_sort";
+        row["columns"][13]["type"] = "text";
+        row["columns"][13]["value"] = LLSD::Integer(vobj->getNumIndices() / 3);
+
+        row["columns"][14]["column"] = "tramcount_sort";
+        row["columns"][14]["type"] = "text";
+        row["columns"][14]["value"] = LLSD::Integer(texture_memory / 1024);
+
+        row["columns"][15]["column"] = "vramcount_sort";
+        row["columns"][15]["type"] = "text";
+        row["columns"][15]["value"] = LLSD::Integer(vram_memory / 1024);
+
+        // Scene-builder metric columns (opt-in). Only computed while one is
+        // visible: fromObject() walks faces and triggers the async cost fetch,
+        // which must stay demand-driven.
+        if (column_config & METRIC_COLUMNS_MASK)
+        {
+            const ALObjectProperties::Record metrics = ALObjectProperties::fromObject(vobj);
+            const bool is_link_root = vobj->isRoot() || vobj->isRootEdit();
+
+            S32 col = 16;
+            auto add_cell = [&row, &col](const char* name, const LLSD& value)
+            {
+                row["columns"][col]["column"] = name;
+                row["columns"][col]["type"] = "text";
+                row["columns"][col]["value"] = value;
+                ++col;
+            };
+
+            // Roots show the linkset total; child rows show their own
+            // contribution, so the heavy prim in a linkset stands out.
+            const F32 li = is_link_root ? metrics.mLandImpact : metrics.mObjectCost;
+            add_cell("land_impact", li > 0.f ? llformat("%.0f", li) : std::string("-"));
+            add_cell("land_impact_sort", LLSD::Integer(ll_round(li)));
+
+            add_cell("rendercost", llformat("%.0f", metrics.mRenderCost));
+            add_cell("rendercost_sort", LLSD::Integer(ll_round(metrics.mRenderCost)));
+
+            add_cell("physicscost", metrics.mPhysicsCost > 0.f ? llformat("%.1f", metrics.mPhysicsCost) : std::string("-"));
+            // One-decimal floats sort wrong as strings ("9.5" vs "9.12"), so
+            // sort companions carry the value scaled to an integer.
+            add_cell("physicscost_sort", LLSD::Integer(ll_round(metrics.mPhysicsCost * 10.f)));
+
+            add_cell("streamingcost", metrics.mStreamingCost > 0.f ? llformat("%.1f", metrics.mStreamingCost) : std::string("-"));
+            add_cell("streamingcost_sort", LLSD::Integer(ll_round(metrics.mStreamingCost * 10.f)));
+
+            add_cell("primcount", is_link_root ? llformat("%d", metrics.mPrimCount) : std::string());
+            add_cell("primcount_sort", LLSD::Integer(is_link_root ? metrics.mPrimCount : 0));
+
+            add_cell("distance", llformat("%.1f", metrics.mDistance));
+            add_cell("distance_sort", LLSD::Integer(ll_round(metrics.mDistance * 10.f)));
+
+            add_cell("scripts", metrics.hasFlag(ALObjectProperties::FLAG_SCRIPTED) ? std::string("Yes") : std::string());
+
+            std::string light_glow;
+            if (metrics.hasFlag(ALObjectProperties::FLAG_LIGHT))
+                light_glow = "Light";
+            if (metrics.hasFlag(ALObjectProperties::FLAG_GLOW))
+                light_glow += light_glow.empty() ? "Glow" : "+Glow";
+            add_cell("lightglow", light_glow);
+
+            add_cell("media", metrics.hasFlag(ALObjectProperties::FLAG_MEDIA) ? std::string("Yes") : std::string());
+
+            std::string alpha_pbr;
+            if (metrics.hasFlag(ALObjectProperties::FLAG_ALPHA))
+                alpha_pbr = "Alpha";
+            if (metrics.hasFlag(ALObjectProperties::FLAG_PBR_MATERIAL))
+                alpha_pbr += alpha_pbr.empty() ? "PBR" : "+PBR";
+            add_cell("alphapbr", alpha_pbr);
+        }
+
+        primcount = sel_mgr.getSelection()->getObjectCount();
+        objcount = sel_mgr.getSelection()->getRootObjectCount();
+        fcount += vobj->getNumFaces();
+        fcount_visible += vobj->getNumVisibleFaces();
+        tcount += vobj->getNumIndices() / 3;
+        vcount += vobj->getNumVertices();
+
         mObjectList->addElement(row, ADD_TOP);
     }
+
+    for (LLObjectSelection::valid_root_iterator root_it = mObjectSelection->valid_root_begin(); root_it != mObjectSelection->valid_root_end(); ++root_it)
+    {
+        LLSelectNode* obj = *root_it;
+        LLVOVolume* volume = dynamic_cast<LLVOVolume*>(obj->getObject());
+        if (volume)
+        {
+            LLVOVolume::texture_cost_t textures;
+            F32 attachment_total_cost = 0;
+            F32 attachment_volume_cost = 0;
+            F32 attachment_texture_cost = 0;
+            F32 attachment_children_cost = 0;
+
+            attachment_volume_cost += volume->getRenderCost(textures);
+
+            LLViewerObject::const_child_list_t children = volume->getChildren();
+            for (LLViewerObject::const_child_list_t::const_iterator child_iter = children.begin();
+                child_iter != children.end();
+                ++child_iter)
+            {
+                LLViewerObject* child_obj = *child_iter;
+                LLVOVolume *child = dynamic_cast<LLVOVolume*>(child_obj);
+                if (child)
+                {
+                    attachment_children_cost += child->getRenderCost(textures);
+                }
+            }
+
+            for (LLVOVolume::texture_cost_t::iterator volume_texture = textures.begin();
+                volume_texture != textures.end();
+                ++volume_texture)
+            {
+                // add the cost of each individual texture in the linkset
+                attachment_texture_cost += LLVOVolume::getTextureCost(*volume_texture);
+            }
+            attachment_total_cost = attachment_volume_cost + attachment_texture_cost + attachment_children_cost;
+
+            // Limit attachment complexity to avoid signed integer flipping of the wearer's ACI
+            complexity += (U32)llclamp(attachment_total_cost, 0.f, max_attachment_complexity);
+        }
+    }
+
     if(selected_index > -1 && mObjectList->getItemIndex(selected_uuid) == selected_index)
     {
         mObjectList->selectNthItem(selected_index);
@@ -415,6 +666,111 @@ void LLFloaterInspect::refresh()
     }
     onSelectObject();
     mObjectList->setScrollPos(pos);
+
+    LLStringUtil::format_map_t args;
+    res_mgr.getIntegerString(format_res_string, objcount);
+    args["NUM_OBJECTS"] = format_res_string;
+    res_mgr.getIntegerString(format_res_string, primcount);
+    args["NUM_PRIMS"] = format_res_string;
+    res_mgr.getIntegerString(format_res_string, fcount_visible);
+    args["NUM_VISIBLE_FACES"] = format_res_string;
+    res_mgr.getIntegerString(format_res_string, fcount);
+    args["NUM_FACES"] = format_res_string;
+    res_mgr.getIntegerString(format_res_string, vcount);
+    args["NUM_VERTICES"] = format_res_string;
+    res_mgr.getIntegerString(format_res_string, tcount);
+    args["NUM_TRIANGLES"] = format_res_string;
+    res_mgr.getIntegerString(format_res_string, narrow(mTextureList.size()));
+    args["NUM_TEXTURES"] = format_res_string;
+    res_mgr.getIntegerString(format_res_string, mTextureMemory / 1024);
+    args["TEXTURE_MEMORY"] = format_res_string;
+    res_mgr.getIntegerString(format_res_string, mTextureVRAMMemory / 1024);
+    args["VRAM_USAGE"] = format_res_string;
+    res_mgr.getIntegerString(format_res_string, complexity);
+    args["COMPLEXITY"] = format_res_string;
+    getChild<LLTextBase>("linksetstats_text")->setText(getString("stats_list", args));
+}
+
+void LLFloaterInspect::getObjectTextureMemory(LLViewerObject* object, U32& object_texture_memory, U32& object_vram_memory)
+{
+    uuid_vec_t object_texture_list;
+
+    if (!object)
+    {
+        return;
+    }
+
+    LLUUID uuid;
+    U8 te_count = object->getNumTEs();
+
+    for (U8 j = 0; j < te_count; j++)
+    {
+        LLViewerTexture* img = object->getTEImage(j);
+        if (img)
+        {
+            calculateTextureMemory(img, object_texture_list, object_texture_memory, object_vram_memory);
+        }
+
+        // materials per face
+        if (object->getTE(j)->getMaterialParams().notNull())
+        {
+            uuid = object->getTE(j)->getMaterialParams()->getNormalID();
+            if (uuid.notNull())
+            {
+                LLViewerTexture* img = gTextureList.findImage(uuid, TEX_LIST_STANDARD);
+                if (img)
+                {
+                    calculateTextureMemory(img, object_texture_list, object_texture_memory, object_vram_memory);
+                }
+            }
+
+            uuid = object->getTE(j)->getMaterialParams()->getSpecularID();
+            if (uuid.notNull())
+            {
+                LLViewerTexture* img = gTextureList.findImage(uuid, TEX_LIST_STANDARD);
+                if (img)
+                {
+                    calculateTextureMemory(img, object_texture_list, object_texture_memory, object_vram_memory);
+                }
+            }
+        }
+    }
+
+    // sculpt map
+    if (object->isSculpted() && !object->isMesh())
+    {
+        const LLSculptParams* sculpt_params = object->getSculptParams();
+        if (sculpt_params)
+        {
+            uuid = sculpt_params->getSculptTexture();
+            LLViewerTexture* img = gTextureList.findImage(uuid, TEX_LIST_STANDARD);
+            if (img)
+            {
+                calculateTextureMemory(img, object_texture_list, object_texture_memory, object_vram_memory);
+            }
+        }
+    }
+}
+
+void LLFloaterInspect::calculateTextureMemory(LLViewerTexture* texture, uuid_vec_t& object_texture_list, U32& object_texture_memory, U32& object_vram_memory)
+{
+    const LLUUID uuid = texture->getID();
+    U32 vram_memory = (texture->getFullHeight() * texture->getFullWidth() * 32 / 8);
+    U32 texture_memory = (texture->getFullHeight() * texture->getFullWidth() * texture->getComponents());
+
+    if (std::find(mTextureList.begin(), mTextureList.end(), uuid) == mTextureList.end())
+    {
+        mTextureList.push_back(uuid);
+        mTextureMemory += texture_memory;
+        mTextureVRAMMemory += vram_memory;
+    }
+
+    if (std::find(object_texture_list.begin(), object_texture_list.end(), uuid) == object_texture_list.end())
+    {
+        object_texture_list.push_back(uuid);
+        object_texture_memory += texture_memory;
+        object_vram_memory += vram_memory;
+    }
 }
 
 void LLFloaterInspect::onFocusReceived()
@@ -449,4 +805,102 @@ void LLFloaterInspect::draw()
     }
 
     LLFloater::draw();
+}
+
+void LLFloaterInspect::onColumnDisplayModeChanged()
+{
+    U32 column_config = gSavedSettings.getU32("ALInspectColumnConfig");
+    std::vector<LLScrollListColumn::Params> column_params = mObjectList->getColumnInitParams();
+    S32 column_padding = mObjectList->getColumnPadding();
+
+    S32 default_width = 0;
+    S32 new_width = 0;
+    S32 min_width, min_height;
+    getResizeLimits(&min_width, &min_height);
+
+    std::string current_sort_col = mObjectList->getSortColumnName();
+    bool current_sort_asc = mObjectList->getSortAscending();
+
+    mObjectList->clearRows();
+    mObjectList->clearColumns();
+    mObjectList->updateLayout();
+
+    std::vector<LLScrollListColumn::Params>::iterator param_it;
+    for (param_it = column_params.begin(); param_it != column_params.end(); ++param_it)
+    {
+        LLScrollListColumn::Params p = *param_it;
+        default_width += (p.width.pixel_width.getValue() + column_padding);
+
+        LLScrollListColumn::Params params;
+        params.header = p.header;
+        params.name = p.name;
+        params.halign = p.halign;
+        params.sort_direction = p.sort_direction;
+        params.sort_column = p.sort_column;
+        params.tool_tip = p.tool_tip;
+
+        if (column_config & mColumnBits[p.name.getValue()])
+        {
+            params.width = p.width;
+            new_width += (params.width.pixel_width.getValue() + column_padding);
+        }
+        else
+        {
+            params.width.pixel_width.set(-1, true);
+        }
+
+        mObjectList->addColumn(params);
+    }
+
+    min_width -= (default_width - new_width - mLastResizeDelta);
+    mLastResizeDelta = default_width - new_width;
+    setResizeLimits(min_width, min_height);
+
+    if (getRect().getWidth() < min_width)
+    {
+        reshape(min_width, getRect().getHeight());
+    }
+
+    if (!current_sort_col.empty())
+    {
+        if ((current_sort_col == "creation_date_sort" && mObjectList->getColumn("creation_date")->getWidth() == -1) ||
+            mObjectList->getColumn(current_sort_col)->getWidth() == -1)
+        {
+            mObjectList->clearSortOrder();
+        }
+        else
+        {
+            mObjectList->sortByColumn(current_sort_col, current_sort_asc);
+        }
+    }
+    mObjectList->setFilterColumn(0);
+    mObjectList->dirtyColumns();
+    setDirty();
+}
+
+void LLFloaterInspect::onColumnVisibilityChecked(const LLSD& userdata)
+{
+    std::string column = userdata.asString();
+    U32 column_config = gSavedSettings.getU32("ALInspectColumnConfig");
+
+    U32 new_value;
+    U32 enabled = (mColumnBits[column] & column_config);
+    if (enabled)
+    {
+        new_value = (column_config & ~mColumnBits[column]);
+    }
+    else
+    {
+        new_value = (column_config | mColumnBits[column]);
+    }
+
+    gSavedSettings.setU32("ALInspectColumnConfig", new_value);
+}
+
+bool LLFloaterInspect::onEnableColumnVisibilityChecked(const LLSD& userdata)
+{
+    std::string column = userdata.asString();
+    U32 column_config = gSavedSettings.getU32("ALInspectColumnConfig");
+
+    return (mColumnBits[column] & column_config);
 }

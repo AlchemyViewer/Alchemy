@@ -131,7 +131,9 @@ void LLAssetInfo::setName( const std::string& name )
 {
     if( !name.empty() )
     {
-        mName.assign( name, 0, llmin((U32)name.size(), (U32)DB_INV_ITEM_NAME_STR_LEN) );
+        // The database field bounds bytes, so the cut has to as well -- but it
+        // has to land between characters, not through one.
+        mName = utf8str_truncate( name, DB_INV_ITEM_NAME_STR_LEN );
         mName.erase( std::remove(mName.begin(), mName.end(), '|'),
                      mName.end() );
     }
@@ -143,8 +145,7 @@ void LLAssetInfo::setDescription( const std::string& desc )
 {
     if( !desc.empty() )
     {
-        mDescription.assign( desc, 0, llmin((U32)desc.size(),
-                                            (U32)DB_INV_ITEM_DESC_STR_LEN) );
+        mDescription = utf8str_truncate( desc, DB_INV_ITEM_DESC_STR_LEN );
         mDescription.erase( std::remove(mDescription.begin(),
                                         mDescription.end(), '|'),
                             mDescription.end() );
@@ -453,6 +454,7 @@ bool LLAssetStorage::findInCacheAndInvokeCallback(const LLUUID& uuid, LLAssetTyp
     bool exists = LLFileSystem::getExists(uuid, type);
     if (exists)
     {
+        LL_PROFILE_ZONE_SCOPED;
         LLFileSystem file(uuid, type);
         U32 size = file.getSize();
         if (size > 0)
@@ -467,7 +469,7 @@ bool LLAssetStorage::findInCacheAndInvokeCallback(const LLUUID& uuid, LLAssetTyp
         else
         {
             LL_WARNS("AssetStorage") << "Asset vfile " << uuid << ":" << type
-                                     << " found in static cache with bad size " << file.getSize() << ", ignoring" << LL_ENDL;
+                                     << " found in static cache with bad size " << size << ", ignoring" << LL_ENDL;
         }
     }
     return false;
@@ -562,7 +564,7 @@ void LLAssetStorage::getAssetData(const LLUUID uuid,
                 if (callback == tmp->mDownCallback && user_data == tmp->mUserData)
                 {
                     // this is a duplicate from the same subsystem - throw it away
-                    LL_WARNS("AssetStorage") << "Discarding duplicate request for asset " << uuid
+                    LL_DEBUGS("AssetStorage") << "Discarding duplicate request for asset " << uuid
                                              << "." << LLAssetType::lookup(type) << LL_ENDL;
                     return;
                 }
@@ -1316,6 +1318,9 @@ const char* LLAssetStorage::getErrorString(S32 status)
         case LL_ERR_ASSET_REQUEST_NOT_IN_DATABASE:
             return "Asset request: asset not found in database";
 
+        case LL_ERR_NO_CAP:
+            return "Asset request: region or asset capability not available";
+
         case LL_ERR_EOF:
             return "End of file";
 
@@ -1402,7 +1407,7 @@ void LLAssetStorage::legacyGetDataCallback(const LLUUID &uuid,
         uuid.toString(uuid_str);
         filename = llformat("%s.%s",gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str).c_str(),LLAssetType::lookup(type));
 
-        LLFILE* fp = LLFile::fopen(filename, "wb");     /* Flawfinder: ignore */
+        LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("wb")); /* Flawfinder: ignore */
         if (fp)
         {
             const S32 buf_size = 65536;

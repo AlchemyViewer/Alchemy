@@ -1,0 +1,67 @@
+/**
+ * @file llappviewersdl.h
+ * @brief The LLAppViewerSDL class declaration
+ *
+ * $LicenseInfo:firstyear=2007&license=viewerlgpl$
+ * Second Life Viewer Source Code
+ * Copyright (C) 2010, Linden Research, Inc.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
+ * $/LicenseInfo$
+ */
+
+#ifndef LL_LLAPPVIEWERSDL_H
+#define LL_LLAPPVIEWERSDL_H
+
+#ifndef LL_LLAPPVIEWER_H
+#include "llappviewer.h"
+#endif
+
+class LLCommandLineParser;
+
+class LLAppViewerSDL final : public LLAppViewer
+{
+public:
+    LLAppViewerSDL() = default;
+    ~LLAppViewerSDL() override = default;
+
+    //
+    // Main application logic
+    //
+    bool init() override;            // Override to do application initialization
+    std::string generateSerialNumber() override;
+
+#if LL_DARWIN
+    void forceErrorOSSpecificException() override;
+#endif
+protected:
+    bool beingDebugged() override;
+
+    bool restoreErrorTrap() override;
+
+#if LL_LINUX
+    bool initHardwareTest() override; // Chooses the GPU before the window loads EGL.
+#endif
+
+    bool initParseCommandLine(LLCommandLineParser& clp) override;
+
+    bool initSLURLHandler() override;
+    bool sendURLToOtherInstance(const std::string& url) override;
+
+};
+
+#endif // LL_LLAPPVIEWERSDL_H

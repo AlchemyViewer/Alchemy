@@ -34,12 +34,6 @@
 #include "llresmgr.h"
 #include "lltextbox.h"
 #include "llfloaterreg.h"
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-3.0)
-#include "llfloatersearchreplace.h"
-#include "llpreviewnotecard.h"
-#include "llpreviewscript.h"
-#include "llscripteditor.h"
-// [/SL:KB]
 #include "llfocusmgr.h"
 #include "lltooldraganddrop.h"
 #include "llradiogroup.h"
@@ -90,6 +84,7 @@ LLPreview::~LLPreview()
 {
     gFocusMgr.releaseFocusIfNeeded( this ); // calls onCommit()
     gInventory.removeObserver(this);
+
 }
 
 void LLPreview::setObjectID(const LLUUID& object_id)
@@ -242,6 +237,7 @@ void LLPreview::refreshFromItem()
     getChild<LLUICtrl>("desc")->setValue(item->getDescription());
 
     getChildView("desc")->setEnabled(canModify(mObjectUUID, item));
+
 }
 
 // static
@@ -288,7 +284,7 @@ void LLPreview::hide(const LLUUID& item_uuid, bool no_saving /* = false */ )
     LLFloater* floater = LLFloaterReg::findInstance("preview", LLSD(item_uuid));
     if (!floater) floater = LLFloaterReg::findInstance("preview_avatar", LLSD(item_uuid));
 
-    LLPreview* preview = dynamic_cast<LLPreview*>(floater);
+    LLPreview* preview = ALViewType::as<LLPreview>(floater);
     if (preview)
     {
         if ( no_saving )
@@ -305,7 +301,7 @@ void LLPreview::dirty(const LLUUID& item_uuid)
     LLFloater* floater = LLFloaterReg::findInstance("preview", LLSD(item_uuid));
     if (!floater) floater = LLFloaterReg::findInstance("preview_avatar", LLSD(item_uuid));
 
-    LLPreview* preview = dynamic_cast<LLPreview*>(floater);
+    LLPreview* preview = ALViewType::as<LLPreview>(floater);
     if(preview)
     {
         preview->mDirty = true;
@@ -482,6 +478,7 @@ void LLPreview::handleReshape(const LLRect& new_rect, bool by_user)
     LLFloater::handleReshape(new_rect, by_user);
 }
 
+
 //
 // LLMultiPreview
 //
@@ -507,7 +504,7 @@ LLMultiPreview::LLMultiPreview()
 void LLMultiPreview::onOpen(const LLSD& key)
 {
     // Floater could be something else than LLPreview, eg LLFloaterProfile.
-    LLPreview* frontmost_preview = dynamic_cast<LLPreview*>(mTabContainer->getCurrentPanel());
+    LLPreview* frontmost_preview = ALViewType::as<LLPreview>(mTabContainer->getCurrentPanel());
 
     if (frontmost_preview && frontmost_preview->getAssetStatus() == LLPreview::PREVIEW_ASSET_UNLOADED)
     {
@@ -522,7 +519,7 @@ void LLMultiPreview::handleReshape(const LLRect& new_rect, bool by_user)
     if(new_rect.getWidth() != getRect().getWidth() || new_rect.getHeight() != getRect().getHeight())
     {
         // Floater could be something else than LLPreview, eg LLFloaterProfile.
-        LLPreview* frontmost_preview = dynamic_cast<LLPreview*>(mTabContainer->getCurrentPanel());
+        LLPreview* frontmost_preview = ALViewType::as<LLPreview>(mTabContainer->getCurrentPanel());
 
         if (frontmost_preview)
         {
@@ -536,36 +533,12 @@ void LLMultiPreview::handleReshape(const LLRect& new_rect, bool by_user)
 void LLMultiPreview::tabOpen(LLFloater* opened_floater, bool from_click)
 {
     // Floater could be something else than LLPreview, eg LLFloaterProfile.
-    LLPreview* opened_preview = dynamic_cast<LLPreview*>(opened_floater);
+    LLPreview* opened_preview = ALViewType::as<LLPreview>(opened_floater);
 
     if (opened_preview && opened_preview->getAssetStatus() == LLPreview::PREVIEW_ASSET_UNLOADED)
     {
         opened_preview->loadAsset();
     }
-
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
-    LLFloaterSearchReplace* pSearchFloater = LLFloaterReg::getTypedInstance<LLFloaterSearchReplace>("search_replace");
-    if ( (pSearchFloater) && (pSearchFloater->getDependee() == this) )
-    {
-        LLPreviewNotecard* pPreviewNotecard = NULL; LLPreviewLSL* pPreviewScript = NULL; LLLiveLSLEditor* pPreviewScriptLive = NULL;
-        if ((pPreviewNotecard = dynamic_cast<LLPreviewNotecard*>(opened_preview)) != NULL)
-        {
-            LLFloaterSearchReplace::show(pPreviewNotecard->getEditor());
-        }
-        else if ((pPreviewScript = dynamic_cast<LLPreviewLSL*>(opened_preview)) != NULL)
-        {
-            LLFloaterSearchReplace::show(pPreviewScript->getEditor());
-        }
-        else if ((pPreviewScriptLive = dynamic_cast<LLLiveLSLEditor*>(opened_preview)) != NULL)
-        {
-            LLFloaterSearchReplace::show(pPreviewScriptLive->getEditor());
-        }
-        else
-        {
-            pSearchFloater->setVisible(FALSE);
-        }
-    }
-// [/SL:KB]
 }
 
 

@@ -38,7 +38,6 @@
 #include "llagentdata.h"            // for gAgentID
 #include "llavataractions.h"
 #include "llcallingcard.h"          // for LLAvatarTracker
-#include "llfloaterreporter.h"
 #include "lllogchat.h"
 #include "llparcel.h"
 #include "llviewermenu.h"           // for gMenuHolder
@@ -86,9 +85,9 @@ LLContextMenu* PeopleContextMenu::createMenu()
         registrar.add("Avatar.InviteToGroup",   boost::bind(&LLAvatarActions::inviteToGroup,            id));
         registrar.add("Avatar.TeleportRequest", boost::bind(&PeopleContextMenu::requestTeleport,        this));
         registrar.add("Avatar.Calllog",         boost::bind(&LLAvatarActions::viewChatHistory,          id));
-        registrar.add("Avatar.Freeze",          [&](LLUICtrl*, const LLSD& param) { ALAvatarActions::parcelFreeze(id);});
-        registrar.add("Avatar.Eject",           [&](LLUICtrl*, const LLSD&) { ALAvatarActions::parcelEject(id); });
-        registrar.add("Avatar.CopyData",        [&](LLUICtrl*, const LLSD& param) { ALAvatarActions::copyData(id, param);});
+        registrar.add("Avatar.Freeze",          boost::bind(&ALAvatarActions::parcelFreeze,             id));
+        registrar.add("Avatar.Eject",           boost::bind(&ALAvatarActions::parcelEject,              id));
+        registrar.add("Avatar.CopyData",        boost::bind(&ALAvatarActions::copyDataUI,               id, _2));
         registrar.add("Avatar.ManageEstate", [&](LLUICtrl*, const LLSD& param) {
             switch (param.asInteger())
             {
@@ -96,8 +95,8 @@ LLContextMenu* PeopleContextMenu::createMenu()
             case 1: ALAvatarActions::estateKick(id); break;
             case 2: ALAvatarActions::estateBan(id); break;
             } });
-        registrar.add("Avatar.TeleportTo", [&](LLUICtrl*, const LLSD&) { ALAvatarActions::teleportTo(id); });
-        registrar.add("Avatar.ReportAbuse", [&](LLUICtrl*, const LLSD&) { ALAvatarActions::reportAbuse(id); });
+        registrar.add("Avatar.TeleportTo",  boost::bind(&ALAvatarActions::teleportTo,                  id));
+        registrar.add("Avatar.ReportAbuse", boost::bind(&ALAvatarActions::reportAbuse,                 id));
 
         enable_registrar.add("Avatar.EnableItem", boost::bind(&PeopleContextMenu::enableContextMenuItem, this, _2));
         enable_registrar.add("Avatar.CheckItem",  boost::bind(&PeopleContextMenu::checkContextMenuItem, this, _2));
@@ -117,15 +116,15 @@ LLContextMenu* PeopleContextMenu::createMenu()
         registrar.add("Avatar.RemoveFriend",    boost::bind(&LLAvatarActions::removeFriendsDialog,      mUUIDs));
         // registrar.add("Avatar.Share",        boost::bind(&LLAvatarActions::startIM,                  mUUIDs)); // *TODO: unimplemented
         // registrar.add("Avatar.Pay",          boost::bind(&LLAvatarActions::pay,                      mUUIDs)); // *TODO: unimplemented
-        registrar.add("Avatar.CopyData",        [&](LLUICtrl*, const LLSD& param) { ALAvatarActions::copyData(mUUIDs, param); });
-        registrar.add("Avatar.Freeze",          [&](LLUICtrl*, const LLSD&) { ALAvatarActions::parcelFreeze(mUUIDs); });
-        registrar.add("Avatar.Eject",           [&](LLUICtrl*, const LLSD&) { ALAvatarActions::parcelEject(mUUIDs); });
+        registrar.add("Avatar.CopyData",        boost::bind(&ALAvatarActions::copyDataMultipleUI,       mUUIDs, _2));
+        registrar.add("Avatar.Freeze",          boost::bind(&ALAvatarActions::parcelFreezeMultiple,     mUUIDs));
+        registrar.add("Avatar.Eject",           boost::bind(&ALAvatarActions::parcelEjectMultiple,      mUUIDs));
         registrar.add("Avatar.ManageEstate", [&](LLUICtrl*, const LLSD& param) {
             switch (param.asInteger())
             {
-            case 0: ALAvatarActions::estateTeleportHome(mUUIDs); break;
-            case 1: ALAvatarActions::estateKick(mUUIDs); break;
-            case 2: ALAvatarActions::estateBan(mUUIDs); break;
+            case 0: ALAvatarActions::estateTeleportHomeMultiple(mUUIDs); break;
+            case 1: ALAvatarActions::estateKickMultiple(mUUIDs); break;
+            case 2: ALAvatarActions::estateBanMultiple(mUUIDs); break;
             } });
 
         enable_registrar.add("Avatar.EnableItem",   boost::bind(&PeopleContextMenu::enableContextMenuItem, this, _2));
@@ -283,7 +282,7 @@ bool PeopleContextMenu::enableContextMenuItem(const LLSD& userdata)
     {
         const LLUUID& id = mUUIDs.front();
 
-        return (LLAvatarTracker::instance().isBuddyOnline(id) && LLAvatarActions::isAgentMappable(id))
+        return (LLAvatarTracker::instance().isBuddyOnline(id) && ALAvatarActions::isAgentMappable(id))
                     || gAgent.isGodlike();
     }
     else if(item == std::string("can_offer_teleport"))
@@ -304,7 +303,7 @@ bool PeopleContextMenu::enableContextMenuItem(const LLSD& userdata)
     {
         return true;
     }
-    else if (item == std::string("can_share") || item == std::string("can_pay"))
+    else if (item == std::string("can_share") || item == std::string("can_pay") || item == std::string("can_report"))
     {
         return mUUIDs.size() == 1;
     }
@@ -314,11 +313,25 @@ bool PeopleContextMenu::enableContextMenuItem(const LLSD& userdata)
     }
     else if (item == std::string("can_freeze_eject"))
     {
-        return ALAvatarActions::canFreezeEject(mUUIDs);
+        if (mUUIDs.size() > 1)
+        {
+            return ALAvatarActions::canFreezeEjectMultiple(mUUIDs);
+        }
+        else
+        {
+            return ALAvatarActions::canFreezeEject(mUUIDs.front());
+        }
     }
     else if (item == std::string("can_manage_estate"))
     {
-        return ALAvatarActions::canManageAvatarsEstate(mUUIDs);
+        if (mUUIDs.size() > 1)
+        {
+            return ALAvatarActions::canManageAvatarsEstateMultiple(mUUIDs);
+        }
+        else
+        {
+            return ALAvatarActions::canManageAvatarsEstate(mUUIDs.front());
+        }
     }
     return false;
 }
@@ -420,8 +433,8 @@ void NearbyPeopleContextMenu::buildContextMenu(class LLMenuGL& menu, U32 flags)
         items.push_back(std::string("pay"));
         items.push_back(std::string("offer_teleport"));
         items.push_back(std::string("separator_utils"));
-        bool can_freeze = ALAvatarActions::canFreezeEject(mUUIDs);
-        bool can_em = ALAvatarActions::canManageAvatarsEstate(mUUIDs);
+        bool can_freeze = ALAvatarActions::canFreezeEjectMultiple(mUUIDs);
+        bool can_em = ALAvatarActions::canManageAvatarsEstateMultiple(mUUIDs);
         if (can_freeze || can_em)
         {
             items.push_back(std::string("manage_menu"));
@@ -466,8 +479,8 @@ void NearbyPeopleContextMenu::buildContextMenu(class LLMenuGL& menu, U32 flags)
         items.push_back(std::string("manage_menu"));
         items.push_back(std::string("block_unblock"));
         items.push_back(std::string("report_abuse"));
-        bool can_freeze = ALAvatarActions::canFreezeEject(mUUIDs);
-        bool can_em = ALAvatarActions::canManageAvatarsEstate(mUUIDs);
+        bool can_freeze = ALAvatarActions::canFreezeEject(mUUIDs.front());
+        bool can_em = ALAvatarActions::canManageAvatarsEstate(mUUIDs.front());
         if (can_freeze || can_em)
         {
             if (can_freeze)

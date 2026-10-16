@@ -65,18 +65,20 @@ bool LLFloaterCamera::sFreeCamera = false;
 bool LLFloaterCamera::sAppearanceEditing = false;
 
 // Zoom the camera in and out
-class LLPanelCameraZoom
+class LLPanelCameraZoom final
 :   public LLPanel
 {
     LOG_CLASS(LLPanelCameraZoom);
 
 public:
+    AL_VIEW_TYPE(LLPanelCameraZoom, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params> {};
 
     LLPanelCameraZoom() { onCreate(); }
 
-    /* virtual */ bool  postBuild();
-    /* virtual */ void  draw();
+    /* virtual */ bool  postBuild() override;
+    /* virtual */ void  draw() override;
 
 protected:
     LLPanelCameraZoom(const Params& p) { onCreate(); }
@@ -271,9 +273,10 @@ void activate_camera_tool()
     LLToolMgr::getInstance()->setTransientTool(LLToolCamera::getInstance());
 };
 
-class LLCameraInfoPanel : public LLPanel
+class LLCameraInfoPanel final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLCameraInfoPanel, LLPanel);
     typedef std::function<LLVector3()> get_vector_t;
 
     LLCameraInfoPanel(
@@ -487,7 +490,7 @@ LLFloaterCamera::LLFloaterCamera(const LLSD& val)
 {
     LLHints::getInstance()->registerHintTarget("view_popup", getHandle());
     mCommitCallbackRegistrar.add("CameraPresets.ChangeView", boost::bind(&LLFloaterCamera::onClickCameraItem, _2));
-    mCommitCallbackRegistrar.add("CameraPresets.Save", boost::bind(&LLFloaterCamera::onSavePreset, this));
+    mCommitCallbackRegistrar.add("CameraPresets.Save", boost::bind(&LLFloaterCamera::onSavePreset));
     mCommitCallbackRegistrar.add("CameraPresets.ShowPresetsList", boost::bind(&LLFloaterReg::showInstance, "camera_presets", LLSD(), false));
 }
 
@@ -507,7 +510,7 @@ bool LLFloaterCamera::postBuild()
 
 //  mPreciseCtrls->setShowCursorHand(false);
 //  mPreciseCtrls->setSoundFlags(LLView::MOUSE_UP);
-//  mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), FALSE));
+//  mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), false));
 
     mPresetCombo->setCommitCallback(boost::bind(&LLFloaterCamera::onCustomPresetSelected, this));
     LLPresetsManager::getInstance()->setPresetListChangeCameraCallback(boost::bind(&LLFloaterCamera::populatePresetCombo, this));
@@ -543,7 +546,7 @@ void LLFloaterCamera::fillFlatlistFromPanel (LLFlatListView* list, LLPanel* pane
     for ( ; iter != end; ++iter)
     {
         LLView* view = *iter;
-        LLPanel* item = dynamic_cast<LLPanel*>(view);
+        LLPanel* item = view->as<LLPanel>();
         if (panel)
             list->addItem(item);
     }
@@ -756,6 +759,7 @@ void LLFloaterCamera::populatePresetCombo()
     updateItemsSelection();
 }
 
+// static
 void LLFloaterCamera::onSavePreset()
 {
     LLFloaterReg::hideInstance("delete_pref_preset", PRESETS_CAMERA);
@@ -775,15 +779,15 @@ void LLFloaterCamera::onCustomPresetSelected()
 
 void LLFloaterCamera::toggleCollapse()
 {
-    BOOL setting = !gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
+    bool setting = !gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
     gSavedSettings.setBOOL("AlchemyCameraFloaterExpanded", setting);
     collapse();
 }
 
 void LLFloaterCamera::collapse()
 {
-    BOOL collapse = gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
+    bool collapse = gSavedSettings.getBOOL("AlchemyCameraFloaterExpanded");
     mBtnCollapse->setImageOverlay(collapse ? "Conv_toolbar_collapse" : "Conv_toolbar_expand");
     getChild<LLPanel>("buttons_panel")->setVisible(collapse);
-    reshape(collapse ? 370 : 210, getRect().getHeight(), FALSE);
+    reshape(collapse ? 370 : 210, getRect().getHeight(), false);
 }

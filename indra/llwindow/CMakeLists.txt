@@ -1,212 +1,105 @@
 # -*- cmake -*-
-#
-# Compared to other libraries, compiling this one is a mess.  The
-# reason is that we have several source files that have two different
-# sets of behaviour, depending on whether they're intended to be part
-# of the viewer or the map server.
-#
-# Unfortunately, the affected code is a rat's nest of #ifdefs, so it's
-# easier to play compilation tricks than to actually fix the problem.
 
-project(llwindow)
-
-include(00-Common)
-include(DragDrop)
-include(Linking)
-include(LLCommon)
-include(LLImage)
-include(LLWindow)
 include(UI)
-include(ViewerMiscLibs)
-include(GLM)
-include(SDL3)
 
-set(llwindow_SOURCE_FILES
-    llcursortypes.cpp
-    llkeyboard.cpp
-    llkeyboardheadless.cpp
-    llwindowheadless.cpp
-    llwindowcallbacks.cpp
-    llwindow.cpp
-    )
+set(
+  llwindow_BASE_SOURCES
+  alwindowsdlheadless.cpp
+  llcursortypes.cpp
+  llkeyboard.cpp
+  llkeyboardheadless.cpp
+  llmousehandler.cpp
+  llsdl.cpp
+  llwindow.cpp
+  llwindowheadless.cpp
+  llwindowcallbacks.cpp
+)
 
-set(llwindow_HEADER_FILES
-    CMakeLists.txt
+set(
+  llwindow_BASE_HEADERS
+  alwindowsdlheadless.h
+  llcursortypes.h
+  llkeyboard.h
+  llkeyboardheadless.h
+  llmousehandler.h
+  llscrolldelta.h
+  llsdl.h
+  llwindow.h
+  llwindowheadless.h
+  llwindowcallbacks.h
+)
 
-    llcursortypes.h
-    llkeyboard.h
-    llkeyboardheadless.h
-    llwindowheadless.h
-    llwindowcallbacks.h
-    )
-
-set(viewer_SOURCE_FILES
-    llmousehandler.cpp
-    )
-
-set(viewer_HEADER_FILES
-    llwindow.h
-    llpreeditor.h
-    llmousehandler.h
-    )
-
-set(llwindow_LINK_LIBRARIES
-        llcommon
-        llimage
-        llmath
-        llrender
-        llfilesystem
-        llxml
-        ll::glm
-        ll::glext
-        ll::uilibraries
-        )
-
-if (USE_SDL_WINDOW)
-  list(APPEND viewer_SOURCE_FILES
-       llsdl.cpp
-       llkeyboardsdl.cpp
-       llwindowsdl.cpp
-       )
-  list(APPEND viewer_HEADER_FILES
-       llsdl.h
-       llkeyboardsdl.h
-       llwindowsdl.h
-       )
-
-  list(APPEND llwindow_LINK_LIBRARIES
-       ll::SDL3
-       )
-endif ()
-
-if (DARWIN)
-  list(APPEND llwindow_SOURCE_FILES
-    llkeyboardmacosx.cpp
-    llwindowmacosx.cpp
-    llwindowmacosx-objc.mm
-    llopenglview-objc.mm
-    )
-  list(APPEND llwindow_HEADER_FILES
-    llkeyboardmacosx.h
-    llwindowmacosx.h
-    llwindowmacosx-objc.h
-    llopenglview-objc.h
-    llappdelegate-objc.h
-    )
-
-  # We use a bunch of deprecated system APIs.
-  set_source_files_properties(
-      llkeyboardmacosx.cpp
-      llwindowmacosx.cpp
-      PROPERTIES
-      COMPILE_FLAGS "-fpascal-strings"
-      )
-
-  set_source_files_properties(
-    llwindowmacosx-objc.mm
-    llopenglview-objc.mm
-    PROPERTIES
-    SKIP_PRECOMPILE_HEADERS TRUE
-  )
-endif (DARWIN)
-
-if (WINDOWS)
-  list(APPEND llwindow_SOURCE_FILES
-       lldxhardware.cpp
-       )
-  list(APPEND llwindow_HEADER_FILES
-       lldxhardware.h
-       )
-  list(APPEND llwindow_LINK_LIBRARIES
-       wbemuuid
-       comdlg32     # Common Dialogs for ChooseColor
-       ole32
-       dxgi
-       d3d9
-       )
-endif ()
-
-if (WINDOWS AND NOT USE_SDL_WINDOW)
-  list(APPEND llwindow_SOURCE_FILES
-       llwindowwin32.cpp
-       llkeyboardwin32.cpp
-       lldragdropwin32.cpp
-       )
-  list(APPEND llwindow_HEADER_FILES
-       llwindowwin32.h
-       llkeyboardwin32.h
-       lldragdropwin32.h
-       )
-endif ()
-
-if (BUILD_HEADLESS)
-  set(llwindowheadless_SOURCE_FILES
-      llcursortypes.cpp
-      llkeyboard.cpp
-      llkeyboardheadless.cpp
-      llwindowheadless.cpp
-      llwindowcallbacks.cpp
-      llwindow.cpp
-      llwindowmesaheadless.cpp
-      llmousehandler.cpp
-      )
-
-  set(llwindowheadless_HEADER_FILES
-      llcursortypes.h
-      llkeyboard.h
-      llkeyboardheadless.h
-      llwindowheadless.h
-      llwindowcallbacks.h
-      llwindowmesaheadless.h
-      llmousehandler.h
-      )
-
-  add_library (llwindowheadless
-    ${llwindowheadless_SOURCE_FILES}
-    ${llwindowheadless_HEADER_FILES}
-    )
-
-  target_compile_definitions( llwindowheadless PUBLIC LL_MESA=1 LL_MESA_HEADLESS=1 )
-
-  target_link_libraries (llwindowheadless
+set(
+  llwindow_BASE_LINK_LIBRARIES
   llcommon
   llimage
   llmath
-  llrenderheadless
   llfilesystem
   llxml
-  ll::glm
-  ll::glext
-  ll::zlib-ng
-  PkgConfig::OSMESA
-  fontconfig
-  dl
+)
+
+add_library(llwindow STATIC)
+
+target_sources(
+  llwindow
+  PRIVATE ${llwindow_BASE_SOURCES}
+  PUBLIC FILE_SET HEADERS FILES ${llwindow_BASE_HEADERS} llpreeditor.h
+)
+
+# SDL's video and GL bring-up (llsdl) is part of every build: the worker
+# threads' shared contexts are made through it, and so is the hidden window a
+# headless run renders on. The SDL window backend below is the part that is
+# optional.
+target_link_libraries(
+  llwindow
+  PRIVATE al::flags
+  PUBLIC llrender ${llwindow_BASE_LINK_LIBRARIES} ll::uilibraries ll::SDL3core
+)
+target_precompile_headers(llwindow REUSE_FROM llprecompiled)
+
+if(AL_USE_SDL_WINDOW)
+  target_sources(
+    llwindow
+    PRIVATE llkeyboardsdl.cpp llwindowsdl.cpp
+    PUBLIC FILE_SET HEADERS FILES llkeyboardsdl.h llwindowsdl.h
   )
-  target_include_directories(llwindowheadless INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-endif (BUILD_HEADLESS)
 
-if (llwindow_HEADER_FILES)
-  list(APPEND llwindow_SOURCE_FILES ${llwindow_HEADER_FILES})
-endif (llwindow_HEADER_FILES)
+  target_compile_definitions(llwindow PUBLIC LL_SDL_WINDOW=1)
 
-  list(APPEND viewer_SOURCE_FILES ${viewer_HEADER_FILES})
-
-  add_library (llwindow
-    ${llwindow_SOURCE_FILES}
-    ${viewer_SOURCE_FILES}
-    )
-
-target_link_libraries (llwindow ${llwindow_LINK_LIBRARIES})
-target_include_directories(llwindow INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-
-if (USE_SDL_WINDOW)
-  target_compile_definitions( llwindow PUBLIC LL_SDL_WINDOW=1 )
+  target_link_libraries(llwindow PUBLIC ll::SDL3)
 endif()
 
-if (USE_PRECOMPILED_HEADERS)
-  target_precompile_headers(llwindow REUSE_FROM llprecompiled)
-endif ()
+if(DARWIN)
+  # Objective-C++ helper that fixes up SDL's auto-created Cocoa menu bar
+  # (strips the Cmd+W shortcut off its default Window > Close item); init_sdl
+  # calls it.
+  target_sources(llwindow PRIVATE llsdl_macos.mm PUBLIC FILE_SET HEADERS FILES llsdl_macos.h)
 
-if (DARWIN)
-  target_link_libraries(llwindow ${CARBON_LIBRARY})
-endif (DARWIN)
+  # llwindow reuses llprecompiled's C++ PCH; that PCH has no Objective-C++
+  # variant, so skip it for the .mm or CMake fails to resolve a cmake_pch.objcxx
+  # header it expects this target to provide.
+  set_source_files_properties(llsdl_macos.mm PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+
+  # IOKit deployment-target shim, consumed by newview's llmachineid.cpp.
+  target_sources(llwindow PUBLIC FILE_SET HEADERS FILES llwindowmacosx_iokit.h)
+endif()
+
+if(WINDOWS)
+  # lldxhardware (GPU/driver/VRAM queries) is used regardless of window
+  # backend — the SDL backend calls LLDXHardware::updateVRAMBudgetFromDXGI()
+  # and llappviewer queries WMI driver versions.
+  target_sources(llwindow PRIVATE lldxhardware.cpp PUBLIC FILE_SET HEADERS FILES lldxhardware.h)
+
+  # The native Win32 backend is only built when SDL isn't driving the window.
+  # llkeyboardwin32 in particular can't compile under LL_SDL_WINDOW (the
+  # NATIVE_KEY_TYPE typedef switches to the SDL flavor), and the factory never
+  # instantiates LLWindowWin32 on an SDL build anyway. Headers stay listed so
+  # llviewerwindow.cpp's (guarded) include still resolves.
+  if(NOT AL_USE_SDL_WINDOW)
+    target_sources(llwindow PRIVATE llwindowwin32.cpp llkeyboardwin32.cpp lldragdropwin32.cpp)
+  endif()
+  target_sources(
+    llwindow
+    PUBLIC FILE_SET HEADERS FILES llwindowwin32.h llkeyboardwin32.h lldragdropwin32.h
+  )
+endif()

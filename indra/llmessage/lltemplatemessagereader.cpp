@@ -27,13 +27,11 @@
 #include "linden_common.h"
 #include "lltemplatemessagereader.h"
 
-#include "llfasttimer.h"
 #include "llmessagebuilder.h"
 #include "llmessagetemplate.h"
 #include "llmath.h"
 #include "llquaternion.h"
 #include "message.h"
-#include "u64.h"
 #include "v3dmath.h"
 #include "v3math.h"
 #include "v4math.h"
@@ -41,8 +39,8 @@
 LLTemplateMessageReader::LLTemplateMessageReader(message_template_number_map_t&
                                                  number_template_map) :
     mReceiveSize(0),
-    mCurrentRMessageTemplate(NULL),
-    mCurrentRMessageData(NULL),
+    mCurrentRMessageTemplate(nullptr),
+    mCurrentRMessageData(nullptr),
     mMessageNumbers(number_template_map)
 {
 }
@@ -51,56 +49,60 @@ LLTemplateMessageReader::LLTemplateMessageReader(message_template_number_map_t&
 LLTemplateMessageReader::~LLTemplateMessageReader()
 {
     delete mCurrentRMessageData;
-    mCurrentRMessageData = NULL;
+    mCurrentRMessageData = nullptr;
 }
 
 //virtual
 void LLTemplateMessageReader::clearMessage()
 {
     mReceiveSize = -1;
-    mCurrentRMessageTemplate = NULL;
-    delete mCurrentRMessageData;
-    mCurrentRMessageData = NULL;
+    mCurrentRMessageTemplate = nullptr;
+    // Keep mCurrentRMessageData (and its block pool) alive for reuse; just
+    // recycle its blocks so nothing stale remains. mReceiveSize == -1 makes
+    // every getter bail until the next decode repopulates it.
+    if (mCurrentRMessageData)
+    {
+        mCurrentRMessageData->reset();
+    }
 }
 
-void LLTemplateMessageReader::getData(const char *blockname, const char *varname, void *datap, S32 size, S32 blocknum, S32 max_size)
+S32 LLTemplateMessageReader::getData(const char *blockname, const char *varname, void *datap, S32 size, S32 blocknum, S32 max_size)
 {
     // is there a message ready to go?
     if (mReceiveSize == -1)
     {
         LL_ERRS() << "No message waiting for decode 2!" << LL_ENDL;
-        return;
+        return 0;
     }
 
     if (!mCurrentRMessageData)
     {
         LL_ERRS() << "Invalid mCurrentMessageData in getData!" << LL_ENDL;
-        return;
+        return 0;
     }
 
-    char *bnamep = (char *)blockname + blocknum; // this works because it's just a hash.  The bnamep is never derefference
     char *vnamep = (char *)varname;
 
-    LLMsgData::msg_blk_data_map_t::const_iterator iter = mCurrentRMessageData->mMemberBlocks.find(bnamep);
+    LLMsgBlkData *msg_block_data = mCurrentRMessageData->getBlock(blockname, blocknum);
 
-    if (iter == mCurrentRMessageData->mMemberBlocks.end())
+    if (!msg_block_data)
     {
         LL_ERRS() << "Block " << blockname << " #" << blocknum
             << " not in message " << mCurrentRMessageData->mName << LL_ENDL;
-        return;
+        return 0;
     }
 
-    LLMsgBlkData *msg_block_data = iter->second;
     LLMsgBlkData::msg_var_data_map_t &var_data_map = msg_block_data->mMemberVarData;
 
-    if (var_data_map.find(vnamep) == var_data_map.end())
+    LLMsgBlkData::msg_var_data_map_t::iterator vit = var_data_map.find(vnamep);
+    if (vit == var_data_map.end())
     {
         LL_ERRS() << "Variable "<< vnamep << " not in message "
-            << mCurrentRMessageData->mName<< " block " << bnamep << LL_ENDL;
-        return;
+            << mCurrentRMessageData->mName<< " block " << blockname << LL_ENDL;
+        return 0;
     }
 
-    LLMsgVarData& vardata = msg_block_data->mMemberVarData[vnamep];
+    LLMsgVarData& vardata = *vit;
 
     if (size && size != vardata.getSize())
     {
@@ -109,32 +111,24 @@ void LLTemplateMessageReader::getData(const char *blockname, const char *varname
             << " is size " << vardata.getSize()
             << " but copying into buffer of size " << size
             << LL_ENDL;
-        return;
+        return 0;
     }
 
 
     const S32 vardata_size = vardata.getSize();
     if( max_size >= vardata_size )
     {
-        switch( vardata_size )
+        // The size-1/2/4/8 cases used to be unrolled with U16/U32 punning
+        // for speed, but reading the U8 mData buffer through those pointer
+        // types is strict-aliasing UB. Modern GCC lowers a fixed-size
+        // memcpy to a single load/store, so the unrolling is no longer
+        // worth the UB. The size==0 guard stays because the standard
+        // requires memcpy's source pointer to be valid even with n=0.
+        if (vardata_size > 0)
         {
-        case 1:
-            *((U8*)datap) = *((U8*)vardata.getData());
-            break;
-        case 2:
-            *((U16*)datap) = *((U16*)vardata.getData());
-            break;
-        case 4:
-            *((U32*)datap) = *((U32*)vardata.getData());
-            break;
-        case 8:
-            ((U32*)datap)[0] = ((U32*)vardata.getData())[0];
-            ((U32*)datap)[1] = ((U32*)vardata.getData())[1];
-            break;
-        default:
             memcpy(datap, vardata.getData(), vardata_size);
-            break;
         }
+        return llmax(vardata_size, 0); // -1 means the variable was never filled
     }
     else
     {
@@ -145,6 +139,7 @@ void LLTemplateMessageReader::getData(const char *blockname, const char *varname
             << LL_ENDL;
 
         memcpy(datap, vardata.getData(), max_size);
+        return max_size;
     }
 }
 
@@ -163,16 +158,8 @@ S32 LLTemplateMessageReader::getNumberOfBlocks(const char *blockname)
         return -1;
     }
 
-    char *bnamep = (char *)blockname;
-
-    LLMsgData::msg_blk_data_map_t::const_iterator iter = mCurrentRMessageData->mMemberBlocks.find(bnamep);
-
-    if (iter == mCurrentRMessageData->mMemberBlocks.end())
-    {
-        return 0;
-    }
-
-    return (iter->second)->mBlockNumber;
+    LLMsgBlkData* msg_data = mCurrentRMessageData->getBlock(blockname, 0);
+    return msg_data ? msg_data->mBlockNumber : 0;
 }
 
 S32 LLTemplateMessageReader::getSize(const char *blockname, const char *varname)
@@ -190,32 +177,35 @@ S32 LLTemplateMessageReader::getSize(const char *blockname, const char *varname)
         return LL_MESSAGE_ERROR;
     }
 
-    char *bnamep = (char *)blockname;
+    LLMsgBlkData* msg_data = mCurrentRMessageData->getBlock(blockname, 0);
 
-    LLMsgData::msg_blk_data_map_t::const_iterator iter = mCurrentRMessageData->mMemberBlocks.find(bnamep);
-
-    if (iter == mCurrentRMessageData->mMemberBlocks.end())
+    if (!msg_data)
     {   // don't crash
-        LL_INFOS() << "Block " << bnamep << " not in message "
+        LL_INFOS() << "Block " << blockname << " not in message "
             << mCurrentRMessageData->mName << LL_ENDL;
         return LL_BLOCK_NOT_IN_MESSAGE;
     }
 
     char *vnamep = (char *)varname;
 
-    LLMsgBlkData* msg_data = iter->second;
-    LLMsgVarData& vardata = msg_data->mMemberVarData[vnamep];
+    LLMsgBlkData::msg_var_data_map_t::iterator vit = msg_data->mMemberVarData.find(vnamep);
 
-    if (!vardata.getName())
+    if (vit == msg_data->mMemberVarData.end())
     {   // don't crash
         LL_INFOS() << "Variable " << varname << " not in message "
-            << mCurrentRMessageData->mName << " block " << bnamep << LL_ENDL;
+            << mCurrentRMessageData->mName << " block " << blockname << LL_ENDL;
         return LL_VARIABLE_NOT_IN_BLOCK;
     }
 
-    if (mCurrentRMessageTemplate->mMemberBlocks[bnamep]->mType != MBT_SINGLE)
+    LLMsgVarData& vardata = *vit;
+
+    // const pointer so the find-based getBlock() overload is chosen rather
+    // than the one that inserts into the template on a miss
+    const LLMessageTemplate* template_data = mCurrentRMessageTemplate;
+    const LLMessageBlock* template_block = template_data->getBlock((char*)blockname);
+    if (template_block && template_block->mType != MBT_SINGLE)
     {   // This is a serious error - crash
-        LL_ERRS() << "Block " << bnamep << " isn't type MBT_SINGLE,"
+        LL_ERRS() << "Block " << blockname << " isn't type MBT_SINGLE,"
             " use getSize with blocknum argument!" << LL_ENDL;
         return LL_MESSAGE_ERROR;
     }
@@ -238,27 +228,27 @@ S32 LLTemplateMessageReader::getSize(const char *blockname, S32 blocknum, const 
         return LL_MESSAGE_ERROR;
     }
 
-    char *bnamep = (char *)blockname + blocknum;
     char *vnamep = (char *)varname;
 
-    LLMsgData::msg_blk_data_map_t::const_iterator iter = mCurrentRMessageData->mMemberBlocks.find(bnamep);
+    LLMsgBlkData* msg_data = mCurrentRMessageData->getBlock(blockname, blocknum);
 
-    if (iter == mCurrentRMessageData->mMemberBlocks.end())
+    if (!msg_data)
     {   // don't crash
-        LL_INFOS() << "Block " << bnamep << " not in message "
+        LL_INFOS() << "Block " << blockname << " #" << blocknum << " not in message "
             << mCurrentRMessageData->mName << LL_ENDL;
         return LL_BLOCK_NOT_IN_MESSAGE;
     }
 
-    LLMsgBlkData* msg_data = iter->second;
-    LLMsgVarData& vardata = msg_data->mMemberVarData[vnamep];
+    LLMsgBlkData::msg_var_data_map_t::iterator vit = msg_data->mMemberVarData.find(vnamep);
 
-    if (!vardata.getName())
+    if (vit == msg_data->mMemberVarData.end())
     {   // don't crash
         LL_INFOS() << "Variable " << vnamep << " not in message "
-            <<  mCurrentRMessageData->mName << " block " << bnamep << LL_ENDL;
+            <<  mCurrentRMessageData->mName << " block " << blockname << LL_ENDL;
         return LL_VARIABLE_NOT_IN_BLOCK;
     }
+
+    LLMsgVarData& vardata = *vit;
 
     return vardata.getSize();
 }
@@ -424,15 +414,19 @@ inline void LLTemplateMessageReader::getIPPort(const char *block, const char *va
 inline void LLTemplateMessageReader::getString(const char *block, const char *var, S32 buffer_size, char *s, S32 blocknum )
 {
     s[0] = '\0';
-    getData(block, var, s, 0, blocknum, buffer_size);
-    s[buffer_size - 1] = '\0';
+    S32 data_size = getData(block, var, s, 0, blocknum, buffer_size);
+    // terminate at the copied length so an unterminated wire string can't
+    // expose whatever follows it in the caller's buffer
+    s[llclamp(data_size, 0, buffer_size - 1)] = '\0';
 }
 
 inline void LLTemplateMessageReader::getString(const char *block, const char *var, std::string& outstr, S32 blocknum )
 {
-    char s[MTUBYTES + 1]= {0}; // every element is initialized with 0
-    getData(block, var, s, 0, blocknum, MTUBYTES);
-    s[MTUBYTES] = '\0';
+    // wire strings normally carry their own NUL; terminating at the copied
+    // length covers the ones that don't, without zero-filling 1.5KB per call
+    char s[MTUBYTES + 1];
+    S32 data_size = getData(block, var, s, 0, blocknum, MTUBYTES);
+    s[llclamp(data_size, 0, MTUBYTES)] = '\0';
     outstr = s;
 }
 
@@ -445,7 +439,7 @@ S32 LLTemplateMessageReader::getMessageSize() const
 // Returns template for the message contained in buffer
 bool LLTemplateMessageReader::decodeTemplate(
         const U8* buffer, S32 buffer_size,  // inputs
-        LLMessageTemplate** msg_template ) // outputs
+        LLMessageTemplate** msg_template, bool custom ) // outputs
 {
     const U8* header = buffer + LL_PACKET_ID_SIZE;
 
@@ -487,6 +481,7 @@ bool LLTemplateMessageReader::decodeTemplate(
     }
     else // bogus packet received (too short)
     {
+        if (!custom)
         LL_WARNS() << "Packet with unusable length received (too short): "
                 << buffer_size << LL_ENDL;
         return(false);
@@ -499,10 +494,11 @@ bool LLTemplateMessageReader::decodeTemplate(
     }
     else
     {
-        // MAINT-7482 - make viewer more tolerant of unknown messages.
+        if (!custom)
+        {
         LL_WARNS_ONCE() << "Message #" << std::hex << num << std::dec
                         << " received but not registered!" << LL_ENDL;
-        //gMessageSystem->callExceptionFunc(MX_UNREGISTERED_MESSAGE);
+        }
         return(false);
     }
 
@@ -528,25 +524,30 @@ void LLTemplateMessageReader::logRanOffEndOfPacket( const LLHost& host, const S3
     gMessageSystem->callExceptionFunc(MX_RAN_OFF_END_OF_PACKET);
 }
 
-static LLTrace::BlockTimerStatHandle FTM_PROCESS_MESSAGES("Process Messages");
-
 // decode a given message
-bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender )
+bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender, bool custom )
 {
-    LL_RECORD_BLOCK_TIME(FTM_PROCESS_MESSAGES);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     llassert( mReceiveSize >= 0 );
     llassert( mCurrentRMessageTemplate);
-    llassert( !mCurrentRMessageData );
-    delete mCurrentRMessageData; // just to make sure
 
     // The offset tells us how may bytes to skip after the end of the
     // message name.
     U8 offset = buffer[PHL_OFFSET];
     S32 decode_pos = LL_PACKET_ID_SIZE + (S32)(mCurrentRMessageTemplate->mFrequency) + offset;
 
-    // create base working data set
-    mCurrentRMessageData = new LLMsgData(mCurrentRMessageTemplate->mName);
+    // Reuse the working data set across packets: it's reset (blocks recycled
+    // into its pool) rather than freed, so a steady-state decode does no heap
+    // allocation.
+    if (!mCurrentRMessageData)
+    {
+        mCurrentRMessageData = new LLMsgData(mCurrentRMessageTemplate->mName);
+    }
+    else
+    {
+        mCurrentRMessageData->reset(mCurrentRMessageTemplate->mName);
+    }
 
     // loop through the template building the data structure as we go
     LLMessageTemplate::message_block_map_t::const_iterator iter;
@@ -591,6 +592,7 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
         }
         else
         {
+            if (!custom)
             LL_ERRS() << "Unknown block type" << LL_ENDL;
             return false;
         }
@@ -600,20 +602,12 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
         // now loop through the block
         for (i = 0; i < repeat_number; i++)
         {
-            if (i)
-            {
-                // build new name to prevent collisions
-                // TODO: This should really change to a vector
-                cur_data_block = new LLMsgBlkData(mbci->mName, repeat_number);
-                cur_data_block->mName = mbci->mName + i;
-            }
-            else
-            {
-                cur_data_block = new LLMsgBlkData(mbci->mName, repeat_number);
-            }
-
-            // add the block to the message
-            mCurrentRMessageData->addBlock(cur_data_block);
+            // Every repeat keeps the canonical block name; allocBlock groups
+            // them by name and preserves order, so getBlock(name, i) recovers
+            // repeat i. mBlockNumber carries the total repeat count (read by
+            // getNumberOfBlocks from repeat 0). Blocks come from the message's
+            // pool, so repeated decodes reuse them.
+            cur_data_block = mCurrentRMessageData->allocBlock(mbci->mName, repeat_number);
 
             // now read the variables
             for (LLMessageBlock::message_variable_map_t::const_iterator iter =
@@ -624,7 +618,8 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
 
                 // ok, build out the variables
                 // add variable block
-                cur_data_block->addVariable(mvci.getName(), mvci.getType());
+                LLMsgVarData& vardata =
+                    cur_data_block->addVariable(mvci.getName(), mvci.getType());
 
                 // what type of variable?
                 if (mvci.getType() == MVT_VARIABLE)
@@ -637,6 +632,7 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
 
                     if ((decode_pos + data_size) > mReceiveSize)
                     {
+                        if (!custom)
                         logRanOffEndOfPacket(sender, decode_pos, data_size);
 
                         // default to 0 length variable blocks
@@ -664,7 +660,22 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
                     }
                     decode_pos += data_size;
 
-                    cur_data_block->addData(mvci.getName(), &buffer[decode_pos], tsize, mvci.getType());
+                    // Bound the wire-claimed length by the bytes actually
+                    // remaining in the packet, so a malformed length field
+                    // can't drive an out-of-bounds read.
+                    if (tsize > (U32)llmax(mReceiveSize - decode_pos, 0))
+                    {
+                        if (!custom)
+                        logRanOffEndOfPacket(sender, decode_pos, (S32)tsize);
+
+                        // consume the rest of the packet so later fields
+                        // zero-fill (like the other ran-off-end paths)
+                        // instead of parsing the malformed field's payload
+                        decode_pos = mReceiveSize;
+                        tsize = 0;
+                    }
+
+                    vardata.addData(&buffer[decode_pos], tsize, mvci.getType());
                     decode_pos += tsize;
                 }
                 else
@@ -673,20 +684,19 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
                     // so, copy data pointer and set data size to fixed size
                     if ((decode_pos + mvci.getSize()) > mReceiveSize)
                     {
+                        if (!custom)
                         logRanOffEndOfPacket(sender, decode_pos, mvci.getSize());
 
                         // default to 0s.
                         U32 size = mvci.getSize();
                         std::vector<U8> data(size, 0);
-                        cur_data_block->addData(mvci.getName(), &(data[0]),
-                                                size, mvci.getType());
+                        vardata.addData(&(data[0]), size, mvci.getType());
                     }
                     else
                     {
-                        cur_data_block->addData(mvci.getName(),
-                                                &buffer[decode_pos],
-                                                mvci.getSize(),
-                                                mvci.getType());
+                        vardata.addData(&buffer[decode_pos],
+                                        mvci.getSize(),
+                                        mvci.getType());
                     }
                     decode_pos += mvci.getSize();
                 }
@@ -694,13 +704,14 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
         }
     }
 
-    if (mCurrentRMessageData->mMemberBlocks.empty()
+    if (mCurrentRMessageData->empty()
         && !mCurrentRMessageTemplate->mMemberBlocks.empty())
     {
         LL_DEBUGS() << "Empty message '" << mCurrentRMessageTemplate->mName << "' (no blocks)" << LL_ENDL;
         return false;
     }
 
+    if (!custom)
     {
         static LLTimer decode_timer;
 
@@ -753,11 +764,12 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
 bool LLTemplateMessageReader::validateMessage(const U8* buffer,
                                               S32 buffer_size,
                                               const LLHost& sender,
-                                              bool trusted)
+                                              bool trusted,
+                                              bool custom)
 {
     mReceiveSize = buffer_size;
-    bool valid = decodeTemplate(buffer, buffer_size, &mCurrentRMessageTemplate );
-    if(valid)
+    bool valid = decodeTemplate(buffer, buffer_size, &mCurrentRMessageTemplate, custom );
+    if(valid && !custom)
     {
         mCurrentRMessageTemplate->mReceiveCount++;
         //LL_DEBUGS() << "MessageRecvd:"
@@ -822,9 +834,15 @@ bool LLTemplateMessageReader::isUdpBanned() const
 //virtual
 void LLTemplateMessageReader::copyToBuilder(LLMessageBuilder& builder) const
 {
-    if(NULL == mCurrentRMessageTemplate)
+    if(nullptr == mCurrentRMessageTemplate)
     {
         return;
     }
     builder.copyFromMessageData(*mCurrentRMessageData);
 }
+
+LLMessageTemplate* LLTemplateMessageReader::getTemplate()
+{
+    return mCurrentRMessageTemplate;
+}
+

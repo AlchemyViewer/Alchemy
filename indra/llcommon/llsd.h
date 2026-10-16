@@ -34,6 +34,7 @@
 #include "stdtypes.h"
 
 #include "lldate.h"
+#include "llstl.h"
 #include "lluri.h"
 #include "lluuid.h"
 
@@ -286,8 +287,9 @@ public:
         // asStringRef on any non-string type will return a ref to an empty string.
         const String& asStringRef() const;
 
-        // Return "<value><((type))>((scalar value or recursive calls))</((type))></value>"
+        // Write/return "<value><((type))>((scalar value or recursive calls))</((type))></value>"
         // See http://xmlrpc.com/spec.md
+        void   asXMLRPCValue(std::ostream& os) const;
         String asXMLRPCValue() const;
 
         operator Boolean() const    { return asBoolean(); }
@@ -305,13 +307,17 @@ public:
     //@}
 
     /** @name Character Pointer Helpers
-        These are helper routines to make working with char* as easy as
+        These are helper routines to make working with string_view and char* as easy as
         working with strings.
      */
     //@{
         LLSD(const char*);
         void assign(const char*);
         LLSD& operator=(const char* v) { assign(v); return *this; }
+
+        LLSD(std::string_view);
+        void assign(std::string_view);
+        LLSD& operator=(std::string_view v) { assign(v); return *this; }
     //@}
 
     /** @name Map Values */
@@ -321,11 +327,34 @@ public:
         bool has(const std::string_view) const;
         LLSD get(const std::string_view) const;
         LLSD getKeys() const;               // Return an LLSD array with keys as strings
+        void insert(const char* k, const LLSD& v)
+        {
+            return insert(std::string_view(k), v);
+        }
+        void insert(const char* k , LLSD&& v)
+        {
+            return insert(std::string_view(k), std::move(v));
+        }
+        void insert(std::string&&, const LLSD&);
+        void insert(std::string&&, LLSD&&);
         void insert(std::string_view, const LLSD&);
+        void insert(std::string_view, LLSD&&);
         void erase(const String&);
+        LLSD& with(const char* k, const LLSD& v)
+        {
+            return with(std::string_view(k), v);
+        }
+        LLSD& with(const char* k, LLSD&& v)
+        {
+            return with(std::string_view(k), std::move(v));
+        }
+        LLSD& with(std::string&&, const LLSD&);
+        LLSD& with(std::string&&, LLSD&&);
         LLSD& with(std::string_view, const LLSD&);
+        LLSD& with(std::string_view, LLSD&&);
 
         LLSD& operator[](const std::string_view);
+        LLSD& operator[](std::string&&);
         LLSD& operator[](const char* c)
         {
             return c ? (*this)[std::string_view(c)] : *this;
@@ -339,14 +368,22 @@ public:
 
     /** @name Array Values */
     //@{
+        // Allocate an empty array
         static LLSD emptyArray();
+
+        // Allocate an array with internal storage reserved but not initialized like a std::vector
+        static LLSD emptyReservedArray(size_t size);
 
         LLSD get(Integer) const;
         void set(Integer, const LLSD&);
+        void set(Integer, LLSD&&);
         void insert(Integer, const LLSD&);
+        void insert(Integer, LLSD&&);
         LLSD& append(const LLSD&);
+        LLSD& append(LLSD&&);
         void erase(Integer);
         LLSD& with(Integer, const LLSD&);
+        LLSD& with(Integer, LLSD&&);
 
         // accept size_t so we can index relative to size()
         const LLSD& operator[](size_t) const;
@@ -366,8 +403,9 @@ public:
     //@{
         size_t size() const;
 
-        typedef std::map<String, LLSD>::iterator        map_iterator;
-        typedef std::map<String, LLSD>::const_iterator  map_const_iterator;
+        using llsd_map_t = std::map<String, LLSD, std::less<>>;
+        typedef llsd_map_t::iterator       map_iterator;
+        typedef llsd_map_t::const_iterator map_const_iterator;
 
         map_iterator        beginMap();
         map_iterator        endMap();
@@ -406,7 +444,7 @@ public:
             TypeLLSDNumTypes = (TypeLLSDTypeEnd - TypeLLSDTypeBegin)
         };
 
-        Type type() const;
+        Type type() const   { return mType; }
 
         bool isUndefined() const    { return type() == TypeUndefined; }
         bool isDefined() const      { return type() != TypeUndefined; }
@@ -446,7 +484,21 @@ public:
 public:
         class Impl;
 private:
-        Impl* impl;
+        // Boolean, Integer, Real and Date values are stored inline; the
+        // remaining defined types hold a reference-counted heap impl.
+        union Data
+        {
+            Impl*   impl;
+            Boolean b;
+            Integer i;
+            Real    r;      // TypeReal and TypeDate (seconds since epoch)
+        };
+        Data mData;
+        Type mType;
+
+        static bool isHeapType(Type type) { return type >= TypeString && type != TypeDate; }
+        bool isHeap() const { return isHeapType(mType); }
+        void releaseValue();    ///< drop any heap reference; mData/mType left stale
         friend class LLSD::Impl;
     //@}
 
@@ -512,20 +564,30 @@ LL_COMMON_API std::ostream& operator<<(std::ostream& s, const LLSD& llsd);
 
 namespace llsd
 {
+    // Used by LLSD::ImplString to convert string type to real
+    LLSD::Real string_to_real(std::string_view in_string);
 
-#ifdef LLSD_DEBUG_INFO
 /** @name Unit Testing Interface */
 //@{
     LL_COMMON_API void dumpStats(const LLSD&);  ///< Output information on object and usage
 
-    /// @warn THE FOLLOWING COUNTS WILL NOT BE ACCURATE IN A MULTI-THREADED
-    /// ENVIRONMENT.
-    ///
-    /// These counts track LLSD::Impl (hidden) objects.
+    /// These counts track LLSD::Impl (hidden) objects, made and freed on any
+    /// thread. They cost two atomic writes to shared globals per Impl, so a
+    /// release for download leaves them out, and both are 0 there:
+    /// COUNTS_IMPLS says whether they are kept. Every other build keeps them,
+    /// so a test, a benchmark or a leak hunt can read them without
+    /// rebuilding.
+#ifdef LL_RELEASE_FOR_DOWNLOAD
+    inline constexpr bool COUNTS_IMPLS = false;
+#else
+    inline constexpr bool COUNTS_IMPLS = true;
+#endif
     LL_COMMON_API U32 allocationCount();    ///< how many Impls have been made
     LL_COMMON_API U32 outstandingCount();   ///< how many Impls are still alive
 
-    /// These counts track LLSD (public) objects.
+#ifdef LLSD_DEBUG_INFO
+    /// These counts track LLSD (public) objects, and cost two writes to shared
+    /// globals per construction, so they exist only when asked for.
     LL_COMMON_API extern S32 sLLSDAllocationCount;  ///< Number of LLSD objects ever created
     LL_COMMON_API extern S32 sLLSDNetObjects;       ///< Number of LLSD objects that exist
 #endif

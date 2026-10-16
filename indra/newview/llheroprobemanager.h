@@ -49,7 +49,6 @@ struct HeroProbeData
 
 class alignas(16) LLHeroProbeManager
 {
-    LL_ALIGN_NEW
 public:
     enum class DetailLevel
     {

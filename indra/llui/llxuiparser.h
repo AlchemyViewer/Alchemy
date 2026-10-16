@@ -31,65 +31,34 @@
 #include "llregistry.h"
 #include "llxmlnode.h"
 
-#include <boost/function.hpp>
+#include <functional>
 #include <iosfwd>
 #include <stack>
-#include <set>
 
 class LLView;
 
 // lookup widget type by name
 class LLWidgetTypeRegistry
-:   public LLRegistrySingleton<std::string, const std::type_info*, LLWidgetTypeRegistry>
+:   public LLRegistrySingleton<std::string, std::type_index, LLWidgetTypeRegistry>
 {
     LLSINGLETON_EMPTY_CTOR(LLWidgetTypeRegistry);
 };
 
 
 // global static instance for registering all widget types
-typedef boost::function<LLView* (LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node)> LLWidgetCreatorFunc;
+typedef std::function<LLView* (LLXMLNodePtr node, LLView *parent)> LLWidgetCreatorFunc;
 
 typedef LLRegistry<std::string, LLWidgetCreatorFunc> widget_registry_t;
 
+// lookup the registry of tags valid below a widget, by that widget's tag.
+// Held by pointer: a registry fills as its widgets' static registrars run,
+// and a copy taken at registration time would be a snapshot of whatever had
+// run so far.
 class LLChildRegistryRegistry
-: public LLRegistrySingleton<const std::type_info*, widget_registry_t, LLChildRegistryRegistry>
+: public LLRegistrySingleton<std::string, const widget_registry_t*, LLChildRegistryRegistry>
 {
     LLSINGLETON_EMPTY_CTOR(LLChildRegistryRegistry);
 };
-
-class LLXSDWriter : public LLInitParam::Parser
-{
-    LOG_CLASS(LLXSDWriter);
-public:
-    void writeXSD(const std::string& name, LLXMLNodePtr node, const LLInitParam::BaseBlock& block, const std::string& xml_namespace);
-
-    /*virtual*/ std::string getCurrentElementName() { return LLStringUtil::null; }
-    /*virtual*/ std::string getCurrentFileName() { return LLStringUtil::null; }
-    LLXSDWriter();
-    ~LLXSDWriter();
-
-protected:
-    void writeAttribute(const std::string& type, const Parser::name_stack_t&, S32 min_count, S32 max_count, const std::vector<std::string>* possible_values);
-    void addAttributeToSchema(LLXMLNodePtr nodep, const std::string& attribute_name, const std::string& type, bool mandatory, const std::vector<std::string>* possible_values);
-    LLXMLNodePtr mAttributeNode;
-    LLXMLNodePtr mElementNode;
-    LLXMLNodePtr mSchemaNode;
-
-    typedef std::set<std::string> string_set_t;
-    typedef std::map<LLXMLNodePtr, string_set_t> attributes_map_t;
-    attributes_map_t    mAttributesWritten;
-};
-
-
-
-// NOTE: DOES NOT WORK YET
-// should support child widgets for XUI
-class LLXUIXSDWriter : public LLXSDWriter
-{
-public:
-    void writeXSD(const std::string& name, const std::string& path, const LLInitParam::BaseBlock& block);
-};
-
 
 class LLXUIParserImpl;
 
@@ -129,6 +98,7 @@ private:
         const LLInitParam::BaseBlock* diff_block);
     bool readXUIImpl(LLXMLNodePtr node, LLInitParam::BaseBlock& block);
     bool readAttributes(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block);
+    S32  pushNameTokens(const char* name);
 
     //reader helper functions
     static bool readFlag(Parser& parser, void* val_ptr);
@@ -192,6 +162,8 @@ private:
 // ordering of child elements from base file to localized diff file.  Then we can use a pair
 // of coroutines to perform matching of xml nodes during parsing.  Not sure if the overhead
 // of coroutines would offset the gain from SAX parsing
+namespace pugi { class xml_node; }
+
 class LLSimpleXUIParserImpl;
 
 class LLSimpleXUIParser : public LLInitParam::Parser
@@ -231,23 +203,18 @@ private:
     static bool readSDValue(Parser&, void* val_ptr);
 
 private:
-    static void startElementHandler(void *userData, const char *name, const char **atts);
-    static void endElementHandler(void *userData, const char *name);
-    static void characterDataHandler(void *userData, const char *s, int len);
-
-    void startElement(const char *name, const char **atts);
-    void endElement(const char *name);
-    void characterData(const char *s, int len);
-    bool readAttributes(const char **atts);
+    void startElement(const pugi::xml_node& element);
+    void endElement();
+    bool readAttributes(const pugi::xml_node& element);
+    S32  pushNameTokens(const char* name);
     bool processText();
 
     Parser::name_stack_t            mNameStack;
-    struct XML_ParserStruct*        mParser;
     LLXMLNodePtr                    mLastWrittenChild;
     S32                             mCurReadDepth;
     std::string                     mCurFileName;
     std::string                     mTextContents;
-    const char*                     mCurAttributeValueBegin;
+    std::string                     mCurAttributeValueBegin;
     std::vector<S32>                mTokenSizeStack;
     std::vector<std::string>        mScope;
     std::vector<bool>               mEmptyLeafNode;

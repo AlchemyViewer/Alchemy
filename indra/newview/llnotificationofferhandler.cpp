@@ -36,11 +36,11 @@
 #include "llscriptfloater.h"
 #include "llimview.h"
 #include "llnotificationsutil.h"
+#include "llchannelmanager.h"
 // [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
 #include "rlvactions.h"
 // [/RLVa:KB]
-
-#include <boost/regex.hpp>
+#include "alregex.h"
 
 using namespace LLNotificationsUI;
 
@@ -148,9 +148,15 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
             p.force_show = notification->getOfferFromAgent();
             p.can_fade = notification->canFadeToast();
 
-            LLScreenChannel* channel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+            LLScreenChannel* channel = ALViewType::as<LLScreenChannel>(mChannel.get());
             if(channel)
+            {
+                if (LLChannelManager::getInstance()->getStartUpToastInited() && notification->getOfferFromAgent())
+                {
+                    LLChannelManager::getInstance()->onStartUpToastClose();
+                }
                 channel->addToast(p);
+            }
 
         }
 
@@ -162,9 +168,9 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
                 || notification->getName() == "TeleportOffered_MaturityExceeded"
                 || notification->getName() == "TeleportOffered_MaturityBlocked"))
             {
-                boost::regex r("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>( - )?",
-                    boost::regex::perl|boost::regex::icase);
-                std::string stripped_msg = boost::regex_replace(notification->getMessage(), r, "");
+                static const ALRegex icon("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>( - )?", ALRegex::ICASE);
+                std::string stripped_msg = notification->getMessage();
+                icon.replaceAll(stripped_msg, "");
                 LLHandlerUtil::logToIMP2P(notification->getPayload()["from_id"], stripped_msg,file_only);
             }
             else
@@ -186,7 +192,7 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
         // HACK: if we're dealing with a notification embedded in IM, update it
         // otherwise remove its toast
         //
-        if (dynamic_cast<LLIMToastNotifyPanel*>(panelp.get()))
+        if (ALViewType::as<LLIMToastNotifyPanel>(panelp.get()))
         {
             panelp->updateNotification();
         }
@@ -217,7 +223,7 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
         //   -> the one and only time we need to decrease the unread IM count is when we've clicked any of the buttons on the *toast*
         //   -> since LLIMFloater::updateMessages() hides the toast when we open the IM (which resets the unread count to 0) we should
         //      *only* decrease the unread IM count if there's a visible toast since the unread count will be at 0 otherwise anyway
-        LLScreenChannel* pChannel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+        LLScreenChannel* pChannel = ALViewType::as<LLScreenChannel>(mChannel.get());
         LLToast* pToast = (pChannel) ? pChannel->getToastByNotificationID(notification->getID()) : NULL;
         if ( (pToast) && (!pToast->getCanBeStored()) )
 // [/SL:KB]

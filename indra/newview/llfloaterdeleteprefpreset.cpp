@@ -44,7 +44,7 @@ LLFloaterDeletePrefPreset::LLFloaterDeletePrefPreset(const LLSD &key)
 // virtual
 bool LLFloaterDeletePrefPreset::postBuild()
 {
-    LLFloaterPreference* preferences = LLFloaterReg::getTypedInstance<LLFloaterPreference>("preferences");
+    LLFloaterPreference* preferences = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
     if (preferences)
     {
         preferences->addDependentFloater(this);
@@ -52,6 +52,7 @@ bool LLFloaterDeletePrefPreset::postBuild()
     getChild<LLButton>("delete")->setCommitCallback(boost::bind(&LLFloaterDeletePrefPreset::onBtnDelete, this));
     getChild<LLButton>("cancel")->setCommitCallback(boost::bind(&LLFloaterDeletePrefPreset::onBtnCancel, this));
     LLPresetsManager::instance().setPresetListChangeCallback(boost::bind(&LLFloaterDeletePrefPreset::onPresetsListChange, this));
+    LLPresetsManager::instance().setPresetListChangeLooksCallback(boost::bind(&LLFloaterDeletePrefPreset::onPresetsListChange, this));
 
     return true;
 }
@@ -90,13 +91,6 @@ void LLFloaterDeletePrefPreset::onBtnDelete()
         LLSD args;
         args["NAME"] = name;
         LLNotificationsUtil::add("PresetNotDeleted", args);
-    }
-    else if (mSubdirectory == PRESETS_CAMERA)
-    {
-        if (gSavedSettings.getString("PresetCameraActive") == name)
-        {
-            gSavedSettings.setString("PresetCameraActive", "");
-        }
     }
 
     closeFloater();

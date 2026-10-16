@@ -27,10 +27,11 @@ uniform sampler2D sceneMap;
 uniform sampler2D sceneDepth;
 
 uniform vec2 screen_res;
-uniform mat4 projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 //uniform float zNear;
 //uniform float zFar;
-uniform mat4 inv_proj;
 uniform mat4 modelview_delta;  // should be transform from last camera space to current camera space
 uniform mat4 inv_modelview_delta;
 
@@ -56,12 +57,9 @@ bool isAdaptiveStepEnabled = true;
 bool isExponentialStepEnabled = true;
 bool debugDraw = false;
 
-uniform float iterationCount;
-uniform float rayStep;
-uniform float distanceBias;
-uniform float depthRejectBias;
-uniform float glossySampleCount;
-uniform float adaptiveStepMultiplier;
+// Shared reflection-probe + SSR constants, spliced from
+// class1/deferred/reflectionProbesBlock.glsl and bound at UB_REFLECTION_PROBES.
+//[ENGINE_BLOCK ReflectionProbes]
 uniform float noiseSine;
 
 float epsilon = 0.1;
@@ -319,18 +317,35 @@ vec3 getPoissonSample(int i) {
     return POISSON3D_SAMPLES[i] * 2 - 1;
 }
 
-float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, inout vec4 collectedColor, sampler2D source, float glossiness)
+// Roughness fade for the ray march, and the glossiness at which it reaches zero.
+//
+// The caller that decides whether to march at all lives in another compilation unit and cannot
+// see a constant declared here, so it asks for the threshold through a function. It used to
+// carry its own literal instead, and the two disagreed: this fade ramped up from 0.567 while the
+// gate rejected everything below 0.9, so the whole ramp was unreachable and screen-space
+// reflections switched on at full strength in a single step -- a hard visible edge across any
+// surface whose roughness crossed 0.1.
+#define SSR_GLOSS_FADE_SLOPE 3.0
+#define SSR_GLOSS_FADE_BIAS  1.7
+
+float ssrMinGlossiness()
 {
-#ifdef TRANSPARENT_SURFACE
-collectedColor = vec4(1, 0, 1, 1);
-    return 0;
-#endif
+    return SSR_GLOSS_FADE_BIAS / SSR_GLOSS_FADE_SLOPE;
+}
+
+// rayDir - the direction to march, supplied by the caller rather than derived here. The probe
+//          tap bends its lookup toward the normal as the surface roughens (the GGX dominant
+//          direction), and a mirror reflect() computed here pointed somewhere else, so the two
+//          reflections being mixed together came from measurably different directions on every
+//          rough surface. n is still wanted separately, for the grazing-angle fade below.
+float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, vec3 rayDir, inout vec4 collectedColor, sampler2D source, float glossiness)
+{
     collectedColor = vec4(0);
     int hits = 0;
 
     float depth = -viewPos.z;
 
-    vec3 rayDirection = normalize(reflect(viewPos, normalize(n)));
+    vec3 rayDirection = normalize(rayDir);
 
     vec2 uv2 = tc * screen_res;
     float c = (uv2.x + uv2.y) * 0.125;
@@ -343,16 +358,25 @@ collectedColor = vec4(1, 0, 1, 1);
     float zFar = 128.0;
     vignette *= clamp(1.0+(viewPos.z/zFar), 0.0, 1.0);
 
-    vignette *= clamp(glossiness * 3 - 1.7, 0, 1);
+    vignette *= clamp(glossiness * SSR_GLOSS_FADE_SLOPE - SSR_GLOSS_FADE_BIAS, 0, 1);
 
     vec4 hitpoint;
 
     glossiness = 1 - glossiness;
 
-    totalSamples = int(max(glossySampleCount, glossySampleCount * glossiness * vignette));
+    // Taps in proportion to the width of the cone they are sampling. A mirror reflection has a
+    // zero-width cone, so every extra tap lands on the same texel; a rough one genuinely needs
+    // the spread. This used to read max(count, count * ...), and since the scale factor is in
+    // [0,1] that always returned the full count -- the scaling was dead and every fragment paid
+    // for all of it. Deliberately NOT scaled by vignette as well: vignette is lowest on the
+    // roughest surfaces the march still runs for, which are the ones least able to spare taps.
+    totalSamples = clamp(int(ceil(glossySampleCount * glossiness)), 1, max(1, int(glossySampleCount)));
 
-    totalSamples = max(totalSamples, 1);
-    if (glossiness < 0.35)
+    // Gated on the fade alone. There used to be a second roughness cutoff here at 0.35 while
+    // the fade above does not reach zero until 0.4333, so screen-space reflections dropped from
+    // a quarter strength to nothing in one step -- a hard edge across any surface whose
+    // roughness crossed 0.35, and the far end of the ramp was unreachable. One threshold, and
+    // it lives with the constants that define it.
     {
         if (vignette > 0)
         {

@@ -25,26 +25,6 @@
 	<check_box label="Voice-Chat erlauben" name="voice_chat_check"/>
 	<check_box label="Direktteleport zulassen" name="allow_direct_teleport"/>
 	<button label="Übernehmen" name="apply_btn"/>
-	<text name="estate_manager_label">
-		Grundbesitzsverwalter:
-	</text>
-	<text name="allow_resident_label">
-		Immer zugelassen:
-	</text>
-	<button label="Hinzufügen..." name="add_estate_manager_btn"/>
-	<button label="Entfernen..." name="remove_estate_manager_btn"/>
-	<button label="Hinzufügen..." name="add_allowed_avatar_btn"/>
-	<button label="Entfernen..." name="remove_allowed_avatar_btn"/>
-	<text name="allow_group_label">
-		Immer zugelassene Gruppen:
-	</text>
-	<text name="ban_resident_label">
-		Immer verbannt:
-	</text>
-	<button label="Hinzufügen..." name="add_allowed_group_btn"/>
-	<button label="Entfernen..." name="remove_allowed_group_btn"/>
-	<button label="Hinzufügen..." name="add_banned_avatar_btn"/>
-	<button label="Entfernen..." name="remove_banned_avatar_btn"/>
 	<button label="Nachricht an Grundbesitz" name="message_estate_btn"/>
 	<button label="Einwohner hinauswerfen" name="kick_user_from_estate_btn"/>
 </panel>

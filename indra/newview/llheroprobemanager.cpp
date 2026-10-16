@@ -191,6 +191,18 @@ void LLHeroProbeManager::update()
 
             probe_pos.load3(point.mV);
 
+            // Detect visible faces of a cube based on camera direction and distance
+
+            // Define the cube faces
+            static LLVector3 cubeFaces[6] = {
+                LLVector3(1, 0, 0),
+                LLVector3(-1, 0, 0),
+                LLVector3(0, 1, 0),
+                LLVector3(0, -1, 0),
+                LLVector3(0, 0, 1),
+                LLVector3(0, 0, -1)
+            };
+
             mProbes[0]->mOrigin = probe_pos;
             mProbes[0]->mRadius = mNearestHero->getScale().magVec() * 0.5f;
         }
@@ -231,6 +243,9 @@ void LLHeroProbeManager::renderProbes()
 
         gPipeline.mReflectionMapManager.mRadiancePass = true;
         mRenderingMirror = true;
+        // Mirrors isMirrorPass() down into llrender, which cannot reach gPipeline. This is
+        // the window in which the mirror-clip shader variants apply.
+        LLRender::sMirrorPass = true;
 
         S32 rate = sUpdateRate;
 
@@ -243,6 +258,8 @@ void LLHeroProbeManager::renderProbes()
         {
             rate = 6;
         }
+
+        S32 face = gFrameCount % 6;
 
         if (!mProbes.empty() && !mProbes[0].isNull() && !mProbes[0]->mOccluded)
         {
@@ -262,6 +279,7 @@ void LLHeroProbeManager::renderProbes()
         }
 
         mRenderingMirror = false;
+        LLRender::sMirrorPass = false;
 
         gPipeline.mReflectionMapManager.mRadiancePass = radiance_pass;
 
@@ -313,31 +331,26 @@ void LLHeroProbeManager::updateProbeFace(LLReflectionMap* probe, U32 face, bool 
         gGL.flush();
         U32 res = mProbeResolution * 2;
 
-        static LLStaticHashedString resScale("resScale");
-        static LLStaticHashedString direction("direction");
-        static LLStaticHashedString znear("znear");
-        static LLStaticHashedString zfar("zfar");
-
         LLRenderTarget *screen_rt = &gPipeline.mHeroProbeRT.screen;
         LLRenderTarget *depth_rt  = &gPipeline.mHeroProbeRT.deferredScreen;
 
         // perform a gaussian blur on the super sampled render before downsampling
         {
             gGaussianProgram.bind();
-            gGaussianProgram.uniform1f(resScale, 1.f / (mProbeResolution * 2));
-            S32 diffuseChannel = gGaussianProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, LLTexUnit::TT_TEXTURE);
+            gGaussianProgram.uniform1f(LLShaderMgr::RES_SCALE, 1.f / (mProbeResolution * 2));
+            S32 diffuseChannel = gGaussianProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
 
             // horizontal
-            gGaussianProgram.uniform2f(direction, 1.f, 0.f);
-            gGL.getTexUnit(diffuseChannel)->bind(screen_rt);
+            gGaussianProgram.uniform2f(LLShaderMgr::DIRECTION, 1.f, 0.f);
+            gGL.getTextureSlot(diffuseChannel)->bind(screen_rt);
             mRenderTarget.bindTarget();
             gPipeline.mScreenTriangleVB->setBuffer();
             gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             mRenderTarget.flush();
 
             // vertical
-            gGaussianProgram.uniform2f(direction, 0.f, 1.f);
-            gGL.getTexUnit(diffuseChannel)->bind(&mRenderTarget);
+            gGaussianProgram.uniform2f(LLShaderMgr::DIRECTION, 0.f, 1.f);
+            gGL.getTextureSlot(diffuseChannel)->bind(&mRenderTarget);
             screen_rt->bindTarget();
             gPipeline.mScreenTriangleVB->setBuffer();
             gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -348,8 +361,8 @@ void LLHeroProbeManager::updateProbeFace(LLReflectionMap* probe, U32 face, bool 
         S32 mips = (S32)(log2((F32)mProbeResolution) + 0.5f);
 
         gReflectionMipProgram.bind();
-        S32 diffuseChannel = gReflectionMipProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, LLTexUnit::TT_TEXTURE);
-        S32 depthChannel   = gReflectionMipProgram.enableTexture(LLShaderMgr::DEFERRED_DEPTH, LLTexUnit::TT_TEXTURE);
+        S32 diffuseChannel = gReflectionMipProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
+        S32 depthChannel   = gReflectionMipProgram.enableTexture(LLShaderMgr::DEFERRED_DEPTH);
 
         for (int i = 0; i < mMipChain.size(); ++i)
         {
@@ -357,18 +370,16 @@ void LLHeroProbeManager::updateProbeFace(LLReflectionMap* probe, U32 face, bool 
             mMipChain[i].bindTarget();
             if (i == 0)
             {
-                gGL.getTexUnit(diffuseChannel)->bind(screen_rt);
+                gGL.getTextureSlot(diffuseChannel)->bind(screen_rt);
             }
             else
             {
-                gGL.getTexUnit(diffuseChannel)->bind(&(mMipChain[i - 1]));
+                gGL.getTextureSlot(diffuseChannel)->bind(&(mMipChain[i - 1]));
             }
 
-            gGL.getTexUnit(depthChannel)->bind(depth_rt, true);
+            gGL.getTextureSlot(depthChannel)->bind(depth_rt, true);
 
-            gReflectionMipProgram.uniform1f(resScale, 1.f / (mProbeResolution * 2));
-            gReflectionMipProgram.uniform1f(znear, probe->getNearClip());
-            gReflectionMipProgram.uniform1f(zfar, MAX_FAR_CLIP);
+            gReflectionMipProgram.uniform1f(LLShaderMgr::RES_SCALE, 1.f / (mProbeResolution * 2));
 
             gPipeline.mScreenTriangleVB->setBuffer();
             gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -383,7 +394,7 @@ void LLHeroProbeManager::updateProbeFace(LLReflectionMap* probe, U32 face, bool 
                 LL_PROFILE_GPU_ZONE("hero probe mip copy");
                 mTexture->bind(0);
 
-                glCopyTexSubImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, mip, 0, 0, sourceIdx * 6 + face, 0, 0, res, res);
+                mTexture->copyFaceFromFramebuffer(mip, sourceIdx, face, res);
 
                 mTexture->unbind();
             }
@@ -394,7 +405,7 @@ void LLHeroProbeManager::updateProbeFace(LLReflectionMap* probe, U32 face, bool 
         gGL.matrixMode(gGL.MM_MODELVIEW);
         gGL.popMatrix();
 
-        gGL.getTexUnit(diffuseChannel)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(diffuseChannel)->unbind();
         gReflectionMipProgram.unbind();
     }
 }
@@ -411,16 +422,15 @@ void LLHeroProbeManager::generateRadiance(LLReflectionMap* probe)
     sourceIdx += 1;
     {
         mMipChain[0].bindTarget();
-        static LLStaticHashedString sSourceIdx("sourceIdx");
 
         {
             // generate radiance map (even if this is not the irradiance map, we need the mip chain for the irradiance map)
             gHeroRadianceGenProgram.bind();
             mVertexBuffer->setBuffer();
 
-            S32 channel = gHeroRadianceGenProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES, LLTexUnit::TT_CUBE_MAP_ARRAY);
+            S32 channel = gHeroRadianceGenProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
             mTexture->bind(channel);
-            gHeroRadianceGenProgram.uniform1i(sSourceIdx, sourceIdx);
+            gHeroRadianceGenProgram.uniform1i(LLShaderMgr::SOURCE_IDX, sourceIdx);
             gHeroRadianceGenProgram.uniform1f(LLShaderMgr::REFLECTION_PROBE_MAX_LOD, mMaxProbeLOD);
             gHeroRadianceGenProgram.uniform1f(LLShaderMgr::REFLECTION_PROBE_STRENGTH, mHeroProbeStrength);
 
@@ -429,15 +439,9 @@ void LLHeroProbeManager::generateRadiance(LLReflectionMap* probe)
             for (int i = 0; i < mMipChain.size() / 4; ++i)
             {
                 LL_PROFILE_GPU_ZONE("hero probe radiance gen");
-                static LLStaticHashedString sMipLevel("mipLevel");
-                static LLStaticHashedString sRoughness("roughness");
-                static LLStaticHashedString sWidth("u_width");
-                static LLStaticHashedString sStrength("probe_strength");
-
-                gHeroRadianceGenProgram.uniform1f(sRoughness, (F32) i / (F32) (mMipChain.size() - 1));
-                gHeroRadianceGenProgram.uniform1f(sMipLevel, (GLfloat)i);
-                gHeroRadianceGenProgram.uniform1i(sWidth, mProbeResolution);
-                gHeroRadianceGenProgram.uniform1f(sStrength, 1);
+                gHeroRadianceGenProgram.uniform1f(LLShaderMgr::ROUGHNESS, (F32) i / (F32) (mMipChain.size() - 1));
+                gHeroRadianceGenProgram.uniform1f(LLShaderMgr::MIP_LEVEL, (GLfloat)i);
+                gHeroRadianceGenProgram.uniform1i(LLShaderMgr::U_WIDTH, mProbeResolution);
 
                 for (int cf = 0; cf < 6; ++cf)
                 {  // for each cube face
@@ -450,7 +454,7 @@ void LLHeroProbeManager::generateRadiance(LLReflectionMap* probe)
 
                     mVertexBuffer->drawArrays(gGL.TRIANGLE_STRIP, 0, 4);
 
-                    glCopyTexSubImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, i, 0, 0, probe->mCubeIndex * 6 + cf, 0, 0, res, res);
+                    mTexture->copyFaceFromFramebuffer(i, probe->mCubeIndex, cf, res);
                 }
 
                 if (i != mMipChain.size() - 1)
@@ -477,8 +481,7 @@ void LLHeroProbeManager::updateUniforms()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     LL_PROFILE_GPU_ZONE("hpmu - uniforms")
 
-    LLMatrix4a modelview;
-    modelview.loadu(gGLModelView);
+    const LLMatrix4a& modelview = LLViewerCamera::getCurrent().getModelview();
     LLVector4a oa; // scratch space for transformed origin
     oa.set(0, 0, 0, 0);
     mHeroData.heroProbeCount = 1;
@@ -578,6 +581,10 @@ void LLHeroProbeManager::initReflectionMaps()
 
         buff->getVertexStrider(v);
 
+        // NOTE: z=-1 is load-bearing -- radianceGenV uses this position as BOTH clip-space
+        // gl_Position AND (rotated) the cubemap sample direction. The reverse-Z clip-volume
+        // conflict is resolved in the shader (remaps only the output clip z), not here.
+        // Mirrors LLReflectionMapManager::initReflectionMaps.
         v[0] = LLVector3(-1, -1, -1);
         v[1] = LLVector3(1, -1, -1);
         v[2] = LLVector3(-1, 1, -1);

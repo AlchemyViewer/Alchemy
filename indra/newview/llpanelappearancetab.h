@@ -34,6 +34,8 @@ class LLToggleableMenu;
 class LLPanelAppearanceTab : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelAppearanceTab, LLPanel);
+
     LLPanelAppearanceTab() : LLPanel() {}
     virtual ~LLPanelAppearanceTab() {}
 
@@ -48,6 +50,7 @@ public:
     virtual void getSelectedItemsUUIDs(uuid_vec_t& selected_uuids) const {}
 
     const std::string& getFilterSubString() { return mFilterSubString; }
+    U32 getFilterGeneration() { return mFilterGeneration; }
 
     virtual void updateMenuItemsVisibility() = 0;
     virtual LLToggleableMenu* getGearMenu() = 0;
@@ -63,6 +66,7 @@ protected:
 
 private:
     std::string mFilterSubString;
+    U32         mFilterGeneration = 0;
 
     static std::string sRecentFilterSubString;
 };

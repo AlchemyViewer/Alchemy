@@ -31,13 +31,16 @@
 #include "llpanel.h"
 #include "llresizebar.h"
 
+#include <boost/signals2.hpp>
+
 
 class LLLayoutPanel;
 
 
-class LLLayoutStack : public LLView, public LLInstanceTracker<LLLayoutStack>
+class LLLayoutStack final : public LLView, public LLInstanceTracker<LLLayoutStack>
 {
 public:
+    AL_VIEW_TYPE(LLLayoutStack, LLView);
 
     struct LayoutStackRegistry : public LLChildRegistry<LayoutStackRegistry>
     {
@@ -54,8 +57,19 @@ public:
                                 close_time_constant;
         Optional<S32>           resize_bar_overlap;
         Optional<bool>          show_drag_handle;
+        // A handle drawn only while the mouse is near the bar it belongs
+        // to. A pane divider is furniture: it is worth finding when a
+        // hand is going for it and worth nothing the rest of the time,
+        // and a window of four panes has three of them saying so at once.
+        Optional<bool>          drag_handle_on_hover;
+        Optional<S32>           drag_handle_reach;
         Optional<S32>           drag_handle_first_indent;
         Optional<S32>           drag_handle_second_indent;
+        // A handle of this thickness, sitting this far past the panel it
+        // follows, needs a gap wider than itself to sit in: border_size (which
+        // drag_handle_gap also names) is that gap. In a gap it does not fit,
+        // the resize bar takes the whole of it instead and these two do
+        // nothing -- the handle is still drawn, filling the bar.
         Optional<S32>           drag_handle_thickness;
         Optional<S32>           drag_handle_shift;
 
@@ -66,14 +80,21 @@ public:
 
     typedef LayoutStackRegistry child_registry_t;
 
-    virtual ~LLLayoutStack();
 
-    /*virtual*/ void draw();
-    /*virtual*/ void deleteAllChildren();
-    /*virtual*/ void removeChild(LLView*);
-    /*virtual*/ bool postBuild();
-    /*virtual*/ bool addChild(LLView* child, S32 tab_group = 0);
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
+    ~LLLayoutStack() override;
+
+    void draw() override;
+
+    // Which handles a hand at this point is going for, in this stack's
+    // own coordinates. Called with the mouse while drawing; a caller
+    // with a point of its own may say so instead. Does nothing on a
+    // stack whose handles are always drawn.
+    void showDragHandlesNear(S32 x, S32 y);
+    void deleteAllChildren() override;
+    void removeChild(LLView*) override;
+    bool postBuild() override;
+    bool addChild(LLView* child, S32 tab_group = 0) override;
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     typedef enum e_animate
     {
@@ -89,6 +110,15 @@ public:
 
     S32 getPanelSpacing() const { return mPanelSpacing; }
     void setPanelSpacing(S32 val);
+
+    // The axis the panels run along, which is the one dimension of a
+    // panel that the stack reads from the file.
+    EOrientation getOrientation() const { return mOrientation; }
+
+    // A drag on one of the stack's bars ended: whoever keeps the panels'
+    // sizes may take them now rather than at the window's close.
+    typedef boost::signals2::signal<void()> resize_done_signal_t;
+    boost::signals2::connection onResizeDone(const resize_done_signal_t::slot_type& cb) { return mResizeDone.connect(cb); }
 
     static void updateClass();
 
@@ -115,8 +145,11 @@ private:
 
     S32 mPanelSpacing;
 
-    // true if we already applied animation this frame
-    bool mAnimatedThisFrame;
+    // The frame whose worth of animation the panels have already had. Layout
+    // runs several times in a frame -- from updateClass, from draw, and from
+    // any panel that reshapes -- while the interpolant is computed once per
+    // frame, so a second pass would move every panel twice as far.
+    U32  mAnimatedFrame;
     bool mAnimate;
     bool mClip;
     F32  mOpenTimeConstant;
@@ -124,11 +157,14 @@ private:
     bool mNeedsLayout;
     S32  mResizeBarOverlap;
     bool mShowDragHandle;
+    bool mDragHandleOnHover;
+    S32  mDragHandleReach;
     S32  mDragHandleFirstIndent;
     S32  mDragHandleSecondIndent;
     S32  mDragHandleThickness;
     S32  mDragHandleShift;
     LLUIColor mDragHandleColor;
+    resize_done_signal_t mResizeDone;
 }; // end class LLLayoutStack
 
 
@@ -137,26 +173,30 @@ class LLLayoutPanel : public LLPanel
 friend class LLLayoutStack;
 friend class LLUICtrlFactory;
 public:
+    AL_VIEW_TYPE(LLLayoutPanel, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         Optional<S32>           expanded_min_dim,
-                                min_dim;
+                                min_dim,
+                                max_dim;
         Optional<bool>          user_resize,
                                 auto_resize;
 
         Params();
     };
 
-    ~LLLayoutPanel();
+    ~LLLayoutPanel() override;
 
+    // Hides LLPanel's, rather than overriding it: the parameters a layout
+    // panel is built from are its own block, not a panel's.
     void initFromParams(const Params& p);
 
-    void handleReshape(const LLRect& new_rect, bool by_user);
+    void handleReshape(const LLRect& new_rect, bool by_user) override;
 
-    void reshape(S32 width, S32 height, bool called_from_parent = true);
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
-
-    void setVisible(bool visible);
+    void setVisible(bool visible) override;
 
     S32 getLayoutDim() const;
     S32 getTargetDim() const;
@@ -164,19 +204,17 @@ public:
     S32 getMinDim() const { return llmax(0, mMinDim); }
     void setMinDim(S32 value) { mMinDim = value; }
 
+    void setMaxDim(S32 value) { mMaxDim = value < 0 ? S32_MAX : value; }
+
     S32 getExpandedMinDim() const { return mExpandedMinDim >= 0 ? mExpandedMinDim : getMinDim(); }
     void setExpandedMinDim(S32 value) { mExpandedMinDim = value; }
 
+    // Never negative: -1 is how min_dim says it was never given, and a
+    // negative dimension travels through the stack's space arithmetic and out
+    // into a clip rect.
     S32 getRelevantMinDim() const
     {
-        S32 min_dim = mMinDim;
-
-        if (!mCollapsed)
-        {
-            min_dim = getExpandedMinDim();
-        }
-
-        return min_dim;
+        return mCollapsed ? getMinDim() : getExpandedMinDim();
     }
 
     F32 getAutoResizeFactor() const;
@@ -185,6 +223,9 @@ public:
     LLResizeBar* getResizeBar() { return mResizeBar; }
 
     bool isCollapsed() const { return mCollapsed;}
+
+    bool getAutoResize() const { return mAutoResize; }
+    bool getUserResize() const { return mUserResize; }
 
     void setOrientation(LLView::EOrientation orientation);
 
@@ -198,6 +239,7 @@ protected:
 
     S32     mExpandedMinDim;
     S32     mMinDim;
+    S32     mMaxDim;
     bool    mCollapsed;
     F32     mVisibleAmt;
     F32     mCollapseAmt;

@@ -35,7 +35,6 @@
 #include "llinventorytype.h"
 #include "llnotificationsutil.h"
 #include "llpermissions.h"
-#include "llpreviewscript.h"
 #include "llsd.h"
 #include "lltexturectrl.h"
 #include "lltoolmgr.h"
@@ -483,7 +482,7 @@ default\n\
     LLStringUtil::replaceString(script, "[SOURCE_MAX_AGE]", mSourceMaxAgeCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[PART_MAX_AGE]", mParticlesMaxAgeCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[BURST_RATE]", mBurstRateCtrl->getValue().asString());
-    LLStringUtil::replaceString(script, "[BURST_COUNT]", mBurstCountCtrl->getValue());
+    LLStringUtil::replaceString(script, "[BURST_COUNT]", mBurstCountCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[ACCELERATION]", lslVector((F32)mAcellerationXCtrl->getValue().asReal(),
         (F32)mAcellerationYCtrl->getValue().asReal(),
         (F32)mAcellerationZCtrl->getValue().asReal()));
@@ -531,7 +530,7 @@ void ALFloaterParticleEditor::onClickCopy()
     const std::string script = createScript();
     if (!script.empty())
     {
-        getWindow()->copyTextToClipboard(utf8str_to_wstring(script));
+        getWindow()->copyTextToClipboard(script);
         LLNotificationsUtil::add("ParticleScriptCopiedToClipboard");
     }
 }
@@ -604,8 +603,7 @@ void ALFloaterParticleEditor::callbackReturned(const LLUUID& inventoryItemID)
 
     LLBufferedAssetUploadInfo::taskUploadFinish_f proc =
         boost::bind(&ALFloaterParticleEditor::finishUpload, _1, _2, _3, _4, true, mObject->getID());
-    LLResourceUploadInfo::ptr_t uploadInfo(new LLScriptAssetUpload(mObject->getID(), inventoryItemID,
-        "mono", true, LLUUID::null, script, proc, nullptr));
+    LLResourceUploadInfo::ptr_t uploadInfo(new LLScriptAssetUpload(mObject->getID(), inventoryItemID, "mono", true, LLUUID::null, script, proc, nullptr));
     LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
 
     if (mCloseAfterSave) closeFloater();
@@ -639,7 +637,7 @@ void ALFloaterParticleEditor::finishUpload(LLUUID itemId, LLUUID taskId, LLUUID 
         return;
     }
     auto* script = gInventory.getItem(itemId);
-    object->saveScript(script, true, false);
+    object->saveScript(script, true, false, LLUUID::null);
 
     LLNotificationsUtil::add("ParticleScriptInjected");
 }

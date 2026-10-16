@@ -40,9 +40,11 @@ class LLPanelMainInventory;
 class LLSidepanelItemInfo;
 class LLSidepanelTaskInfo;
 
-class LLSidepanelInventory : public LLPanel
+class LLSidepanelInventory final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLSidepanelInventory, LLPanel);
+
     LLSidepanelInventory();
     virtual ~LLSidepanelInventory();
 
@@ -53,8 +55,8 @@ public:
     void observeInboxCreation();
     void observeInboxModifications(const LLUUID& inboxID);
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
     LLInventoryPanel* getActivePanel(); // Returns an active inventory panel, if any.
     void selectAllItemsPanel();

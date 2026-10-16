@@ -1,0 +1,347 @@
+{
+  "builtin-baseline": "da2be01c400dd3ed102c1198752ef44c76aabe37",
+  "dependencies": [
+    "alchemy-branding",
+    "alchemy-dictionaries",
+    "alchemy-fonts",
+    "apr",
+    "boost-asio",
+    "boost-beast",
+    "boost-circular-buffer",
+    "boost-dll",
+    "boost-fiber",
+    "boost-graph",
+    "boost-iostreams",
+    "boost-process",
+    "boost-program-options",
+    {
+      "name": "boost-regex",
+      "features": [
+        "icu"
+      ]
+    },
+    "boost-signals2",
+    "boost-spirit",
+    "boost-stacktrace",
+    "boost-url",
+    "cef-bin",
+    "collada-dom",
+    {
+      "name": "curl",
+      "features": [
+        "http2",
+        "openssl"
+      ]
+    },
+    {
+      "name": "dbus",
+      "platform": "linux"
+    },
+    "fast-float",
+    "fmt",
+    {
+      "name": "fontconfig",
+      "platform": "linux"
+    },
+    {
+      "name": "freetype",
+      "features": [
+        "brotli",
+        "error-strings",
+        "png",
+        "subpixel-rendering",
+        "zlib"
+      ]
+    },
+    "harfbuzz",
+    "icu",
+    {
+      "name": "libavif",
+      "features": [
+        "aom",
+        "dav1d"
+      ]
+    },
+    {
+      "name": "libjpeg-turbo",
+      "features": [
+        "jpeg8"
+      ]
+    },
+    {
+      "name": "libndofdev",
+      "platform": "windows | osx"
+    },
+    "libpng",
+    "libvorbis",
+    "libwebp",
+    "lsl-definitions",
+    "meshoptimizer",
+    "minizip",
+    {
+      "name": "nvapi",
+      "platform": "windows"
+    },
+    {
+      "name": "open-libndofdev",
+      "platform": "linux"
+    },
+    "opengl-registry",
+    "openjpeg",
+    {
+      "name": "openssl",
+      "features": [
+        "weak-ssl-ciphers"
+      ]
+    },
+    {
+      "name": "pkgconf",
+      "platform": "windows | osx"
+    },
+    {
+      "name": "plutosvg",
+      "features": [
+        "freetype"
+      ]
+    },
+    "pocketfft",
+    "pugixml",
+    "re2",
+    {
+      "name": "sdl3",
+      "features": [
+        {
+          "name": "alsa",
+          "platform": "linux"
+        },
+        {
+          "name": "dbus",
+          "platform": "linux"
+        },
+        {
+          "name": "ibus",
+          "platform": "linux"
+        },
+        {
+          "name": "wayland",
+          "platform": "linux"
+        },
+        {
+          "name": "x11",
+          "platform": "linux"
+        }
+      ]
+    },
+    {
+      "name": "sdl3-image",
+      "features": [
+        "png",
+        {
+          "name": "tiff",
+          "platform": "osx"
+        }
+      ]
+    },
+    "sdl3-ttf",
+    "secondlife-emoji-shortcodes",
+    "simdjson",
+    "simdutf",
+    "slua",
+    "tinyexr",
+    "tinygltf",
+    "v-hacd",
+    {
+      "name": "vlc-bin",
+      "platform": "windows | osx"
+    },
+    "xxhash",
+    "zlib"
+  ],
+  "overrides": [
+    {
+      "$comment": "HarfBuzz 14.5 is Unicode 18 and ICU 78 is Unicode 17; alfontshaping test 35 holds the two to one Unicode. Lift this with ICU's move to Unicode 18.",
+      "name": "harfbuzz",
+      "version": "14.4.0"
+    }
+  ],
+  "features": {
+    "discord": {
+      "description": "Enable Discord rich presence through the Discord Social SDK",
+      "dependencies": [
+        "discord-social-sdk"
+      ]
+    },
+    "dullahan-example": {
+      "description": "Build with support for Dullahan OpenGL example application",
+      "dependencies": [
+        {
+          "name": "glad",
+          "features": [
+            "gl-api-41",
+            "loader"
+          ],
+          "platform": "windows | linux"
+        },
+        {
+          "name": "imgui",
+          "features": [
+            "opengl2-binding",
+            "opengl3-binding",
+            "sdl3-binding",
+            "sdlgpu3-binding"
+          ]
+        }
+      ]
+    },
+    "faudio": {
+      "description": "Build with support for the FAudio audio engine",
+      "dependencies": [
+        "faudio"
+      ]
+    },
+    "fmodstudio": {
+      "description": "Build with support for the FMOD Studio audio engine",
+      "dependencies": [
+        "fmodstudio"
+      ]
+    },
+    "hunspell": {
+      "description": "Build with support for Hunspell spell-check engine",
+      "dependencies": [
+        "hunspell"
+      ]
+    },
+    "kdu": {
+      "description": "Build with support for Kakadu JPEG2000",
+      "dependencies": [
+        "kdu"
+      ]
+    },
+    "openal": {
+      "description": "Build with support for the OpenAL Soft audio engine",
+      "dependencies": [
+        {
+          "name": "openal-soft",
+          "features": [
+            {
+              "name": "pipewire",
+              "platform": "linux"
+            },
+            {
+              "name": "pulseaudio",
+              "platform": "linux"
+            }
+          ]
+        }
+      ]
+    },
+    "openxr": {
+      "description": "Build with support for OpenXR(experimental)",
+      "dependencies": [
+        "openxr-loader"
+      ]
+    },
+    "sentry": {
+      "description": "Build with support for Sentry crash reporting",
+      "dependencies": [
+        {
+          "name": "sentry-cocoa",
+          "platform": "osx"
+        },
+        {
+          "name": "sentry-native",
+          "features": [
+            "backend",
+            "compression",
+            "transport"
+          ],
+          "platform": "linux"
+        },
+        {
+          "name": "sentry-native",
+          "features": [
+            "backend",
+            "compression",
+            "transport",
+            "wer"
+          ],
+          "platform": "windows"
+        }
+      ]
+    },
+    "tests": {
+      "description": "Build the unit tests, on Catch2",
+      "dependencies": [
+        {
+          "name": "catch2",
+          "features": [
+            "thread-safe-assertions"
+          ]
+        }
+      ]
+    },
+    "tracy": {
+      "description": "Build with Tracy profiler support",
+      "dependencies": [
+        "tracy"
+      ]
+    },
+    "tracy-gui": {
+      "description": "Build with Tracy profiler GUI support",
+      "dependencies": [
+        {
+          "name": "tracy",
+          "features": [
+            "gui-tools"
+          ]
+        }
+      ]
+    },
+    "tracy-local": {
+      "description": "Build with Tracy profiler with localhost only",
+      "dependencies": [
+        {
+          "name": "tracy",
+          "features": [
+            "localhost"
+          ]
+        }
+      ]
+    },
+    "tracy-on-demand": {
+      "description": "Build with Tracy profiler support",
+      "dependencies": [
+        {
+          "name": "tracy",
+          "features": [
+            "on-demand"
+          ]
+        }
+      ]
+    },
+    "velopack": {
+      "description": "Build with support for the Velopack install and update framework",
+      "dependencies": [
+        "corrosion"
+      ]
+    },
+    "webrtc": {
+      "description": "Build with WebRTC voice",
+      "dependencies": [
+        {
+          "name": "webrtc",
+          "features": [
+            {
+              "name": "alsa",
+              "platform": "linux"
+            },
+            {
+              "name": "pulseaudio",
+              "platform": "linux"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

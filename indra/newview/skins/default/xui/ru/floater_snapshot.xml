@@ -6,9 +6,6 @@
 	<string name="postcard_progress_str">
 		Отправка письма
 	</string>
-	<string name="facebook_progress_str">
-		Публикация в Facebook
-	</string>
 	<string name="profile_progress_str">
 		Публикация
 	</string>
@@ -17,9 +14,6 @@
 	</string>
 	<string name="local_progress_str">
 		Сохранение на компьютере
-	</string>
-	<string name="facebook_succeeded_str">
-		Изображение загружено
 	</string>
 	<string name="profile_succeeded_str">
 		Изображение отправлено
@@ -32,9 +26,6 @@
 	</string>
 	<string name="local_succeeded_str">
 		Сохранено на компьютере!
-	</string>
-	<string name="facebook_failed_str">
-		Не удалось передать изображение на вашу хронику Facebook.
 	</string>
 	<string name="profile_failed_str">
 		Не удалось передать изображение в ваш профиль.

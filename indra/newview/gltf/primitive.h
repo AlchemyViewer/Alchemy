@@ -28,14 +28,13 @@
 
 #include "llvertexbuffer.h"
 #include "llvolumeoctree.h"
-#include "boost/json.hpp"
+#include "common.h"
 
 // LL GLTF Implementation
 namespace LL
 {
     namespace GLTF
     {
-        using Value = boost::json::value;
         class Asset;
 
         class Primitive
@@ -74,8 +73,6 @@ namespace LL
             LLRender::eGeomModes mGLMode = LLRender::TRIANGLES; // for use with LLRender
             S32 mIndices = -1;
 
-            // shader variant according to LLGLSLShader::GLTFVariant flags
-            U8 mShaderVariant = 0;
 
             // vertex attribute mask
             U32 mAttributeMask = 0;
@@ -88,7 +85,7 @@ namespace LL
             U32 getVertexCount() const { return (U32) mPositions.size(); }
             U32 getIndexCount() const { return (U32) mIndexArray.size(); }
 
-            boost::unordered_map<std::string, S32> mAttributes;
+            std::unordered_map<std::string, S32> mAttributes;
 
             // create octree based on vertex buffer
             // must be called before buffer is unmapped and after buffer is populated with good data
@@ -104,7 +101,7 @@ namespace LL
                 LLVector4a* tangent = NULL             // return the surface tangent at the intersection point
             );
 
-            void serialize(boost::json::object& obj) const;
+            void serialize(JsonWriter& obj) const;
             const Primitive& operator=(const Value& src);
 
             bool prep(Asset& asset);

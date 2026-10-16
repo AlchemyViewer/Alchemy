@@ -29,7 +29,6 @@
 // viewer includes
 #include "llagent.h"
 #include "llviewercontrol.h"
-#include "llviewerobject.h"
 #include "llviewerregion.h"
 // library includes
 #include "llui.h"                   // getLanguage()

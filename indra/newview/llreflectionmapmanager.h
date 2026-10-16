@@ -30,6 +30,7 @@
 #include "llrendertarget.h"
 #include "llcubemaparray.h"
 #include "llcubemap.h"
+#include "aluniformbuffer.h"
 
 class LLSpatialGroup;
 class LLViewerObject;
@@ -37,8 +38,8 @@ class LLViewerObject;
 // number of reflection probes to keep in vram
 #define LL_MAX_REFLECTION_PROBE_COUNT 256
 
-// reflection probe resolution
-#define LL_IRRADIANCE_MAP_RESOLUTION 64
+// Second-order SH: one DC term, three linear, five quadratic.
+#define LL_SH_COEFF_COUNT 9
 
 // reflection probe mininum scale
 #define LL_REFLECTION_PROBE_MINIMUM_SCALE 1.f;
@@ -47,7 +48,6 @@ void renderReflectionProbe(LLReflectionMap* probe);
 
 class alignas(16) LLReflectionMapManager
 {
-    LL_ALIGN_NEW
 public:
     enum class DetailLevel
     {
@@ -77,7 +77,7 @@ public:
         //  x - irradiance scale
         //  y - radiance scale
         //  z - fade in
-        //  w - znear
+        //  w - unused (std140 keeps this a vec4)
         LLVector4 refParams[LL_MAX_REFLECTION_PROBE_COUNT];
 
         LLVector4 heroSphere;
@@ -99,6 +99,18 @@ public:
         GLint heroShape;
         GLint heroMipCount;
         GLint heroProbeCount;
+
+        // Screen-space reflection march parameters. Frame-constant, and every SSR consumer is
+        // already reading this block, so they ride along here instead of being re-pushed as
+        // loose uniforms on every bindReflectionProbes. (noiseSine is NOT here: it advances
+        // per bind.)
+        F32 iterationCount;
+        F32 rayStep;
+        F32 distanceBias;
+        F32 depthRejectBias;
+        F32 glossySampleCount;
+        F32 adaptiveStepMultiplier;
+        F32 _ssrTailPad[2]; // round the block to a 16-byte multiple (std140)
     };
 
     // allocate an environment map of the given resolution
@@ -177,6 +189,9 @@ private:
     // delete the probe with the given index in mProbes
     void deleteProbe(U32 i);
 
+    // stop generating mUpdatingProbe partway through, so the next probe starts from its first pass
+    void abandonProbeUpdate();
+
     // get a free cube index
     // returns -1 if allocation failed
     S32 allocateCubeIndex();
@@ -203,7 +218,14 @@ private:
     LLPointer<LLVertexBuffer> mVertexBuffer;
 
     // storage for reflection probe irradiance maps
-    LLPointer<LLCubeMapArray> mIrradianceMaps;
+    // Nine RGB SH coefficients per probe, laid out 9 wide with one row per cubemap layer.
+    // Signed, so RGBA16F rather than the unsigned float the radiance chain uses.
+    LLRenderTarget mSHCoeffs;
+
+    // Scratch for the row-parallel form of the SH projection: the same nine columns, one row of
+    // partial sums per face row of the mip being integrated (6 x ALProbeSHProjectionRes rows).
+    // Sized in update(), consumed by the reduce pass, never kept between probes.
+    LLRenderTarget mSHPartial;
 
     // list of free cubemap indices
     std::list<S32> mCubeFree;
@@ -214,6 +236,10 @@ private:
     // update the specified face of the specified probe
     void updateProbeFace(LLReflectionMap* probe, U32 face);
 
+    // face edge length of the probe mip the SH irradiance projection integrates over, from
+    // ALProbeSHProjectionRes, and in `mip` the level of mTexture that holds it
+    U32 shProjectionRes(S32& mip) const;
+
     // list of active reflection maps
     std::vector<LLPointer<LLReflectionMap> > mProbes;
 
@@ -223,8 +249,8 @@ private:
     // list of reflection maps to create
     std::vector<LLPointer<LLReflectionMap> > mCreateList;
 
-    // handle to UBO
-    U32 mUBO = 0;
+    // reflection-probe constant block (bound to LLGLSLShader::UB_REFLECTION_PROBES)
+    ALUniformBuffer mUBO;
 
     // list of maps being used for rendering
     std::vector<LLReflectionMap*> mReflectionMaps;
@@ -259,6 +285,12 @@ private:
     // resolution of reflection probes
     U32 mProbeResolution = 128;
 
+    // Linear supersample factor of a capture: faces render at mProbeResolution times this,
+    // are Gaussian blurred and downsampled to the probe. ALProbeSuperSample, applied by
+    // initReflectionMaps like the resolution (the aux render target pack follows it).
+    U32 mSuperSample = 4;
+    U32 superSample() const { return mSuperSample; }
+
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;
 
@@ -272,7 +304,7 @@ private:
 
     // if true, only update the default probe
     bool mPaused = false;
-    F32 mResumeTime = 0.f;
+    F64 mResumeTime = 0.0;
 
     ReflectionProbeData mProbeData;
 };

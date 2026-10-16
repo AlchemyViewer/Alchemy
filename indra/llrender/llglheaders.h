@@ -27,80 +27,29 @@
 #ifndef LL_LLGLHEADERS_H
 #define LL_LLGLHEADERS_H
 
-#if LL_MESA
-//----------------------------------------------------------------------------
-// MESA headers
-// quotes so we get libraries/.../GL/ version
-#define GL_GLEXT_PROTOTYPES 1
-#include "GL/gl.h"
-#include "GL/glext.h"
-
-#elif LL_SDL_WINDOW
- //----------------------------------------------------------------------------
- // LL_SDL_WINDOW
-
 #define LL_GL_FUNC_POINTER 1
 
  // windows gl headers depend on things like APIENTRY, so include windows.
 #include "llwin32headers.h"
 
-#include "GL/glcorearb.h"
+// quotes so we get libraries/.../GL/ version
+#include <GL/glcorearb.h>
 
 #if LL_WINDOWS
-#include "GL/wglext.h"
+#include <GL/wglext.h>
 #endif
 
-#define GL_COLOR_INDEX                    0x1900
-#define GL_ALPHA                          0x1906
-#define GL_ALPHA8                         0x803C
-#define GL_LUMINANCE                      0x1909
-#define GL_LUMINANCE_ALPHA                0x190A
-#define GL_LUMINANCE8                     0x8040
-#define GL_LUMINANCE8_ALPHA8              0x8045
-#define GL_COMPRESSED_ALPHA               0x84E9
-#define GL_COMPRESSED_LUMINANCE           0x84EA
-#define GL_COMPRESSED_LUMINANCE_ALPHA     0x84EB
+// Linux GL is EGL on Wayland and X11 alike (SDL creates the context with
+// EGL on both), so there is no GLX and no X11 header anywhere in the tree.
+#if LL_LINUX
+#define EGL_EGL_PROTOTYPES 0
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2platform.h>
+#include <GLES2/gl2ext.h>   // glEGLImageTargetTexture2DOES
+#endif
 
-typedef GLboolean(APIENTRYP PFNGLARETEXTURESRESIDENTPROC) (GLsizei n,
-    const GLuint* textures,
-    GLboolean* residences);
-
-#elif LL_LINUX
-#define GL_GLEXT_PROTOTYPES
-
-#include "GL/gl.h"
-#include "GL/glext.h"
-
-#elif LL_WINDOWS
-//----------------------------------------------------------------------------
-// LL_WINDOWS
-
-#define LL_GL_FUNC_POINTER 1
-
-// windows gl headers depend on things like APIENTRY, so include windows.
-#include "llwin32headers.h"
-
-//----------------------------------------------------------------------------
-#include <GL/gl.h>
-
-// quotes so we get libraries/.../GL/ version
-#include "GL/glext.h"
-#include "GL/wglext.h"
-
-#elif LL_DARWIN
-//----------------------------------------------------------------------------
-// LL_DARWIN
-
-#define GL_GLEXT_LEGACY
-#include <OpenGL/gl.h>
-
-#define GL_EXT_separate_specular_color 1
-#define GL_GLEXT_PROTOTYPES
-#include "GL/glext.h"
-
-#endif // LL_MESA / LL_SDL_WINDOW // LL_LINUX / LL_WINDOWS / LL_DARWIN
-
-//GL_NVX_gpu_memory_info constants
+// GL_NVX_gpu_memory_info constants
 #ifndef GL_NVX_gpu_memory_info
 #define GL_NVX_gpu_memory_info
 #define GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX          0x9047
@@ -110,7 +59,7 @@ typedef GLboolean(APIENTRYP PFNGLARETEXTURESRESIDENTPROC) (GLsizei n,
 #define GL_GPU_MEMORY_INFO_EVICTED_MEMORY_NVX            0x904B
 #endif
 
-//GL_ATI_meminfo constants
+// GL_ATI_meminfo constants
 #ifndef GL_ATI_meminfo
 #define GL_ATI_meminfo
 #define GL_VBO_FREE_MEMORY_ATI                     0x87FB
@@ -118,7 +67,138 @@ typedef GLboolean(APIENTRYP PFNGLARETEXTURESRESIDENTPROC) (GLsizei n,
 #define GL_RENDERBUFFER_FREE_MEMORY_ATI            0x87FD
 #endif
 
-//GL_EXT_texture_sRGB constants
+#ifndef GL_EXT_texture_sRGB_decode
+#define GL_EXT_texture_sRGB_decode 1
+#define GL_TEXTURE_SRGB_DECODE_EXT        0x8A48
+#define GL_DECODE_EXT                     0x8A49
+#define GL_SKIP_DECODE_EXT                0x8A4A
+#endif
+
+// Not in glcorearb.h, though core contexts expose it where the hardware has it.
+#ifndef GL_EXT_depth_bounds_test
+#define GL_EXT_depth_bounds_test 1
+#define GL_DEPTH_BOUNDS_TEST_EXT          0x8890
+#define GL_DEPTH_BOUNDS_EXT               0x8891
+typedef void (APIENTRYP PFNGLDEPTHBOUNDSEXTPROC) (GLdouble zmin, GLdouble zmax);
+#endif
+
+#ifndef GL_EXT_memory_object
+#define GL_EXT_memory_object 1
+#define GL_TEXTURE_TILING_EXT             0x9580
+#define GL_DEDICATED_MEMORY_OBJECT_EXT    0x9581
+#define GL_PROTECTED_MEMORY_OBJECT_EXT    0x959B
+#define GL_NUM_TILING_TYPES_EXT           0x9582
+#define GL_TILING_TYPES_EXT               0x9583
+#define GL_OPTIMAL_TILING_EXT             0x9584
+#define GL_LINEAR_TILING_EXT              0x9585
+#define GL_NUM_DEVICE_UUIDS_EXT           0x9596
+#define GL_DEVICE_UUID_EXT                0x9597
+#define GL_DRIVER_UUID_EXT                0x9598
+#define GL_UUID_SIZE_EXT                  16
+typedef void (APIENTRYP PFNGLGETUNSIGNEDBYTEVEXTPROC) (GLenum pname, GLubyte *data);
+typedef void (APIENTRYP PFNGLGETUNSIGNEDBYTEI_VEXTPROC) (GLenum target, GLuint index, GLubyte *data);
+typedef void (APIENTRYP PFNGLDELETEMEMORYOBJECTSEXTPROC) (GLsizei n, const GLuint *memoryObjects);
+typedef GLboolean (APIENTRYP PFNGLISMEMORYOBJECTEXTPROC) (GLuint memoryObject);
+typedef void (APIENTRYP PFNGLCREATEMEMORYOBJECTSEXTPROC) (GLsizei n, GLuint *memoryObjects);
+typedef void (APIENTRYP PFNGLMEMORYOBJECTPARAMETERIVEXTPROC) (GLuint memoryObject, GLenum pname, const GLint *params);
+typedef void (APIENTRYP PFNGLGETMEMORYOBJECTPARAMETERIVEXTPROC) (GLuint memoryObject, GLenum pname, GLint *params);
+typedef void (APIENTRYP PFNGLTEXSTORAGEMEM2DEXTPROC) (GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLTEXSTORAGEMEM2DMULTISAMPLEEXTPROC) (GLenum target, GLsizei samples, GLenum internalFormat, GLsizei width, GLsizei height, GLboolean fixedSampleLocations, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLTEXSTORAGEMEM3DEXTPROC) (GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLTEXSTORAGEMEM3DMULTISAMPLEEXTPROC) (GLenum target, GLsizei samples, GLenum internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedSampleLocations, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLBUFFERSTORAGEMEMEXTPROC) (GLenum target, GLsizeiptr size, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLTEXTURESTORAGEMEM2DEXTPROC) (GLuint texture, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLTEXTURESTORAGEMEM2DMULTISAMPLEEXTPROC) (GLuint texture, GLsizei samples, GLenum internalFormat, GLsizei width, GLsizei height, GLboolean fixedSampleLocations, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLTEXTURESTORAGEMEM3DEXTPROC) (GLuint texture, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLTEXTURESTORAGEMEM3DMULTISAMPLEEXTPROC) (GLuint texture, GLsizei samples, GLenum internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedSampleLocations, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLNAMEDBUFFERSTORAGEMEMEXTPROC) (GLuint buffer, GLsizeiptr size, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLTEXSTORAGEMEM1DEXTPROC) (GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLuint memory, GLuint64 offset);
+typedef void (APIENTRYP PFNGLTEXTURESTORAGEMEM1DEXTPROC) (GLuint texture, GLsizei levels, GLenum internalFormat, GLsizei width, GLuint memory, GLuint64 offset);
+#ifdef GL_GLEXT_PROTOTYPES
+GLAPI void APIENTRY glGetUnsignedBytevEXT (GLenum pname, GLubyte *data);
+GLAPI void APIENTRY glGetUnsignedBytei_vEXT (GLenum target, GLuint index, GLubyte *data);
+GLAPI void APIENTRY glDeleteMemoryObjectsEXT (GLsizei n, const GLuint *memoryObjects);
+GLAPI GLboolean APIENTRY glIsMemoryObjectEXT (GLuint memoryObject);
+GLAPI void APIENTRY glCreateMemoryObjectsEXT (GLsizei n, GLuint *memoryObjects);
+GLAPI void APIENTRY glMemoryObjectParameterivEXT (GLuint memoryObject, GLenum pname, const GLint *params);
+GLAPI void APIENTRY glGetMemoryObjectParameterivEXT (GLuint memoryObject, GLenum pname, GLint *params);
+GLAPI void APIENTRY glTexStorageMem2DEXT (GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glTexStorageMem2DMultisampleEXT (GLenum target, GLsizei samples, GLenum internalFormat, GLsizei width, GLsizei height, GLboolean fixedSampleLocations, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glTexStorageMem3DEXT (GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glTexStorageMem3DMultisampleEXT (GLenum target, GLsizei samples, GLenum internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedSampleLocations, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glBufferStorageMemEXT (GLenum target, GLsizeiptr size, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glTextureStorageMem2DEXT (GLuint texture, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glTextureStorageMem2DMultisampleEXT (GLuint texture, GLsizei samples, GLenum internalFormat, GLsizei width, GLsizei height, GLboolean fixedSampleLocations, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glTextureStorageMem3DEXT (GLuint texture, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glTextureStorageMem3DMultisampleEXT (GLuint texture, GLsizei samples, GLenum internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedSampleLocations, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glNamedBufferStorageMemEXT (GLuint buffer, GLsizeiptr size, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glTexStorageMem1DEXT (GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLuint memory, GLuint64 offset);
+GLAPI void APIENTRY glTextureStorageMem1DEXT (GLuint texture, GLsizei levels, GLenum internalFormat, GLsizei width, GLuint memory, GLuint64 offset);
+#endif
+#endif /* GL_EXT_memory_object */
+
+#ifndef GL_EXT_semaphore
+#define GL_EXT_semaphore 1
+#define GL_LAYOUT_GENERAL_EXT             0x958D
+#define GL_LAYOUT_COLOR_ATTACHMENT_EXT    0x958E
+#define GL_LAYOUT_DEPTH_STENCIL_ATTACHMENT_EXT 0x958F
+#define GL_LAYOUT_DEPTH_STENCIL_READ_ONLY_EXT 0x9590
+#define GL_LAYOUT_SHADER_READ_ONLY_EXT    0x9591
+#define GL_LAYOUT_TRANSFER_SRC_EXT        0x9592
+#define GL_LAYOUT_TRANSFER_DST_EXT        0x9593
+#define GL_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_EXT 0x9530
+#define GL_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_EXT 0x9531
+typedef void (APIENTRYP PFNGLGENSEMAPHORESEXTPROC) (GLsizei n, GLuint *semaphores);
+typedef void (APIENTRYP PFNGLDELETESEMAPHORESEXTPROC) (GLsizei n, const GLuint *semaphores);
+typedef GLboolean (APIENTRYP PFNGLISSEMAPHOREEXTPROC) (GLuint semaphore);
+typedef void (APIENTRYP PFNGLSEMAPHOREPARAMETERUI64VEXTPROC) (GLuint semaphore, GLenum pname, const GLuint64 *params);
+typedef void (APIENTRYP PFNGLGETSEMAPHOREPARAMETERUI64VEXTPROC) (GLuint semaphore, GLenum pname, GLuint64 *params);
+typedef void (APIENTRYP PFNGLWAITSEMAPHOREEXTPROC) (GLuint semaphore, GLuint numBufferBarriers, const GLuint *buffers, GLuint numTextureBarriers, const GLuint *textures, const GLenum *srcLayouts);
+typedef void (APIENTRYP PFNGLSIGNALSEMAPHOREEXTPROC) (GLuint semaphore, GLuint numBufferBarriers, const GLuint *buffers, GLuint numTextureBarriers, const GLuint *textures, const GLenum *dstLayouts);
+#ifdef GL_GLEXT_PROTOTYPES
+GLAPI void APIENTRY glGenSemaphoresEXT (GLsizei n, GLuint *semaphores);
+GLAPI void APIENTRY glDeleteSemaphoresEXT (GLsizei n, const GLuint *semaphores);
+GLAPI GLboolean APIENTRY glIsSemaphoreEXT (GLuint semaphore);
+GLAPI void APIENTRY glSemaphoreParameterui64vEXT (GLuint semaphore, GLenum pname, const GLuint64 *params);
+GLAPI void APIENTRY glGetSemaphoreParameterui64vEXT (GLuint semaphore, GLenum pname, GLuint64 *params);
+GLAPI void APIENTRY glWaitSemaphoreEXT (GLuint semaphore, GLuint numBufferBarriers, const GLuint *buffers, GLuint numTextureBarriers, const GLuint *textures, const GLenum *srcLayouts);
+GLAPI void APIENTRY glSignalSemaphoreEXT (GLuint semaphore, GLuint numBufferBarriers, const GLuint *buffers, GLuint numTextureBarriers, const GLuint *textures, const GLenum *dstLayouts);
+#endif
+#endif /* GL_EXT_semaphore */
+
+// GL_EXT_memory_object_win32
+#ifndef GL_EXT_memory_object_win32
+#define GL_EXT_memory_object_win32          1
+#define GL_HANDLE_TYPE_OPAQUE_WIN32_EXT     0x9587
+#define GL_HANDLE_TYPE_OPAQUE_WIN32_KMT_EXT 0x9588
+#define GL_DEVICE_LUID_EXT                  0x9599
+#define GL_DEVICE_NODE_MASK_EXT             0x959A
+#define GL_LUID_SIZE_EXT                    8
+#define GL_HANDLE_TYPE_D3D12_TILEPOOL_EXT   0x9589
+#define GL_HANDLE_TYPE_D3D12_RESOURCE_EXT   0x958A
+#define GL_HANDLE_TYPE_D3D11_IMAGE_EXT      0x958B
+#define GL_HANDLE_TYPE_D3D11_IMAGE_KMT_EXT  0x958C
+typedef void(APIENTRYP PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC)(GLuint memory, GLuint64 size, GLenum handleType, void* handle);
+typedef void(APIENTRYP PFNGLIMPORTMEMORYWIN32NAMEEXTPROC)(GLuint memory, GLuint64 size, GLenum handleType, const void* name);
+#ifdef GL_GLEXT_PROTOTYPES
+GLAPI void APIENTRY glImportMemoryWin32HandleEXT(GLuint memory, GLuint64 size, GLenum handleType, void* handle);
+GLAPI void APIENTRY glImportMemoryWin32NameEXT(GLuint memory, GLuint64 size, GLenum handleType, const void* name);
+#endif
+#endif /* GL_EXT_memory_object_win32 */
+
+#ifndef GL_EXT_semaphore_win32
+#define GL_EXT_semaphore_win32         1
+#define GL_HANDLE_TYPE_D3D12_FENCE_EXT 0x9594
+#define GL_D3D12_FENCE_VALUE_EXT       0x9595
+typedef void(APIENTRYP PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC)(GLuint semaphore, GLenum handleType, void* handle);
+typedef void(APIENTRYP PFNGLIMPORTSEMAPHOREWIN32NAMEEXTPROC)(GLuint semaphore, GLenum handleType, const void* name);
+#ifdef GL_GLEXT_PROTOTYPES
+GLAPI void APIENTRY glImportSemaphoreWin32HandleEXT(GLuint semaphore, GLenum handleType, void* handle);
+GLAPI void APIENTRY glImportSemaphoreWin32NameEXT(GLuint semaphore, GLenum handleType, const void* name);
+#endif
+#endif /* GL_EXT_semaphore_win32 */
+
+// GL_EXT_texture_sRGB constants
 #ifndef GL_EXT_texture_sRGB
 #define GL_EXT_texture_sRGB 1
 #define GL_SRGB_EXT                       0x8C40
@@ -138,6 +218,32 @@ typedef GLboolean(APIENTRYP PFNGLARETEXTURESRESIDENTPROC) (GLsizei n,
 #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT 0x8C4E
 #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT 0x8C4F
 #endif /* GL_EXT_texture_sRGB */
+
+// GL_ARB_vertex_buffer_object constants
+#ifndef GL_ARB_vertex_buffer_object
+#define GL_ARB_vertex_buffer_object 1
+#define GL_STREAM_DRAW_ARB  0x88E0
+#define GL_STREAM_READ_ARB  0x88E1
+#define GL_STREAM_COPY_ARB  0x88E2
+#define GL_STATIC_DRAW_ARB  0x88E4
+#define GL_STATIC_READ_ARB  0x88E5
+#define GL_STATIC_COPY_ARB  0x88E6
+#define GL_DYNAMIC_DRAW_ARB 0x88E8
+#define GL_DYNAMIC_READ_ARB 0x88E9
+#define GL_DYNAMIC_COPY_ARB 0x88EA
+#endif
+
+// Deprecated OpenGL defines we still use
+#define GL_COLOR_INDEX                    0x1900
+#define GL_ALPHA                          0x1906
+#define GL_ALPHA8                         0x803C
+#define GL_LUMINANCE                      0x1909
+#define GL_LUMINANCE_ALPHA                0x190A
+#define GL_LUMINANCE8                     0x8040
+#define GL_LUMINANCE8_ALPHA8              0x8045
+#define GL_COMPRESSED_ALPHA               0x84E9
+#define GL_COMPRESSED_LUMINANCE           0x84EA
+#define GL_COMPRESSED_LUMINANCE_ALPHA     0x84EB
 
 #if LL_GL_FUNC_POINTER
 
@@ -165,10 +271,29 @@ extern PFNWGLGETPIXELFORMATATTRIBIVARBPROC wglGetPixelFormatAttribivARB;
 extern PFNWGLGETPIXELFORMATATTRIBFVARBPROC wglGetPixelFormatAttribfvARB;
 extern PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
 
+// WGL_NV_DX_interop / interop2 (D3D<->GL sharing; used for zero-copy CEF media)
+extern PFNWGLDXOPENDEVICENVPROC       wglDXOpenDeviceNV;
+extern PFNWGLDXCLOSEDEVICENVPROC      wglDXCloseDeviceNV;
+extern PFNWGLDXREGISTEROBJECTNVPROC   wglDXRegisterObjectNV;
+extern PFNWGLDXUNREGISTEROBJECTNVPROC wglDXUnregisterObjectNV;
+extern PFNWGLDXLOCKOBJECTSNVPROC      wglDXLockObjectsNV;
+extern PFNWGLDXUNLOCKOBJECTSNVPROC    wglDXUnlockObjectsNV;
+
 #endif // LL_WINDOWS
 
+#if LL_LINUX
+// EGL_VERSION_1_0
+extern PFNEGLQUERYSTRINGPROC eglQueryString;
+
+// EGL_KHR_image
+extern PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR;
+extern PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR;
+
+// GL_OES_EGL_image
+extern PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
+#endif
+
 // We get all functions via getProcAddress when using SDL
-#if LL_SDL_WINDOW
 // GL_VERSION_1_0
 extern PFNGLCULLFACEPROC                    glCullFace;
 extern PFNGLFRONTFACEPROC                   glFrontFace;
@@ -218,8 +343,6 @@ extern PFNGLGETTEXLEVELPARAMETERIVPROC      glGetTexLevelParameteriv;
 extern PFNGLISENABLEDPROC                   glIsEnabled;
 extern PFNGLDEPTHRANGEPROC                  glDepthRange;
 extern PFNGLVIEWPORTPROC                    glViewport;
-//extern PFNGLPRIORITIZETEXTURESPROC          glPrioritizeTextures;
-extern PFNGLARETEXTURESRESIDENTPROC         glAreTexturesResident;
 
 // GL_VERSION_1_1
 extern PFNGLDRAWARRAYSPROC                  glDrawArrays;
@@ -236,7 +359,6 @@ extern PFNGLBINDTEXTUREPROC                 glBindTexture;
 extern PFNGLDELETETEXTURESPROC              glDeleteTextures;
 extern PFNGLGENTEXTURESPROC                 glGenTextures;
 extern PFNGLISTEXTUREPROC                   glIsTexture;
-#endif
 
 // GL_VERSION_1_2
 extern PFNGLDRAWRANGEELEMENTSPROC           glDrawRangeElements;
@@ -864,6 +986,28 @@ extern PFNGLSPECIALIZESHADERPROC                glSpecializeShader;
 extern PFNGLMULTIDRAWARRAYSINDIRECTCOUNTPROC    glMultiDrawArraysIndirectCount;
 extern PFNGLMULTIDRAWELEMENTSINDIRECTCOUNTPROC  glMultiDrawElementsIndirectCount;
 extern PFNGLPOLYGONOFFSETCLAMPPROC              glPolygonOffsetClamp;
+
+// GL_EXT_memory_object
+extern PFNGLCREATEMEMORYOBJECTSEXTPROC        glCreateMemoryObjectsEXT;
+extern PFNGLDELETEMEMORYOBJECTSEXTPROC        glDeleteMemoryObjectsEXT;
+extern PFNGLMEMORYOBJECTPARAMETERIVEXTPROC    glMemoryObjectParameterivEXT;
+extern PFNGLTEXSTORAGEMEM2DEXTPROC            glTexStorageMem2DEXT;
+
+// GL_EXT_semaphore
+extern PFNGLGENSEMAPHORESEXTPROC              glGenSemaphoresEXT;
+extern PFNGLDELETESEMAPHORESEXTPROC           glDeleteSemaphoresEXT;
+extern PFNGLSEMAPHOREPARAMETERUI64VEXTPROC    glSemaphoreParameterui64vEXT;
+extern PFNGLWAITSEMAPHOREEXTPROC              glWaitSemaphoreEXT;
+extern PFNGLSIGNALSEMAPHOREEXTPROC            glSignalSemaphoreEXT;
+
+// GL_EXT_memory_object_win32
+extern PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC    glImportMemoryWin32HandleEXT;
+
+// GL_EXT_semaphore_win32
+extern PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC glImportSemaphoreWin32HandleEXT;
+
+// GL_EXT_depth_bounds_test
+extern PFNGLDEPTHBOUNDSEXTPROC                glDepthBoundsEXT;
 
 #endif
 

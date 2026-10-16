@@ -33,7 +33,7 @@
 // Use ancient do { ... } while (0) macro trick to permit a block of
 // statements with the same syntax as a single statement.
 
-void log_subsystem_cleanup(LLError::ELevel level,
+LL_COMMON_API void log_subsystem_cleanup(LLError::ELevel level,
                            const char* file,
                            int line,
                            const char* function,

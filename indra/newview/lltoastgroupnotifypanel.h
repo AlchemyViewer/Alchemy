@@ -40,10 +40,12 @@ class LLButton;
  *
  * Replaces class LLGroupNotifyBox.
  */
-class LLToastGroupNotifyPanel
+class LLToastGroupNotifyPanel final
 :   public LLToastPanel
 {
 public:
+    AL_VIEW_TYPE(LLToastGroupNotifyPanel, LLToastPanel);
+
     void close();
 
     // Non-transient messages.  You can specify non-default button

@@ -24,10 +24,83 @@
  * $/LicenseInfo$
  */
 
+//
+// LOGIN AND CONNECTION SEQUENCE OVERVIEW
+// ======================================
+// The Viewer connects to the SL service in two phases: HTTP authentication
+// followed by UDP "Circuit" establishment to the first Simulator.
+//
+// PHASE 1: HTTP LOGIN (see lllogin.cpp, process_login_success_response())
+// -----------------------------------------------------------------------
+// Viewer sends an XMLRPC HTTP POST to LoginServer containing:
+//   - Credentials (first name, last name, password)
+//   - Client version, channel, MAC address, machine ID
+//   - Start location preferences
+//
+// Login-server responds with critical connection data:
+//   - agent_id, session_id, secure_session_id (authentication tokens)
+//   - Circuit_code (used to establish UDP Circuit with Simulator)
+//   - sim_ip, sim_port (Simulator address to connect to)
+//   - seed_capability (base URL for HTTP capability requests)
+//   - region_x, region_y (region grid coordinates)
+//
+// PHASE 2: UDP CIRCUIT ESTABLISHMENT (see idle_startup() state machine below)
+// ---------------------------------------------------------------------------
+// After HTTP login succeeds, Viewer establishes a UDP Circuit with the
+// simulator. This also happens whenever the Viewer connects to new Simulators
+// in the same session. The following UDP messages are exchanged:
+//
+//   1. UseCircuitCode (Viewer -> Simulator)
+//      - Sent in STATE_WORLD_INIT
+//      - Contains: Circuit_code, session_id, agent_id
+//      - Establishes the UDP Circuit with the Simulator
+//
+//   2. RegionHandshake (Simulator -> Viewer)
+//      - Handled by process_region_handshake() in llworld.cpp
+//      - Contains: region name, terrain textures, water height, region flags
+//      - Viewer responds with RegionHandshakeReply
+//
+//   3. CompleteAgentMovement (Viewer -> Simulator)
+//      - Sent in STATE_AGENT_SEND via send_complete_agent_movement()
+//      - Signals the Viewer is ready to enter the world
+//
+//   4. AgentMovementComplete (Simulator -> Viewer)
+//      - Handled by process_agent_movement_complete() in llviewermessage.cpp
+//      - Contains: final agent position, look_at direction, region handle
+//      - Sets gAgentMovementCompleted = true
+//      - Agent is now fully connected to the region
+//
+// STARTUP STATE MACHINE
+// ---------------------
+// The connection sequence is managed by idle_startup() which progresses
+// through these key states:
+//
+//   STATE_LOGIN_WAIT             - Waiting for HTTP login response
+//   STATE_LOGIN_PROCESS_RESPONSE - Processing login response data
+//   STATE_WORLD_INIT             - Send UseCircuitCode, enable UDP Circuit
+//   STATE_WORLD_WAIT             - Wait for Circuit acknowledgment
+//   STATE_AGENT_SEND             - Send CompleteAgentMovement
+//   STATE_AGENT_WAIT             - Wait for AgentMovementComplete
+//   STATE_INVENTORY_SEND         - Agent connected, begin loading inventory
+//
+// HTTP CAPABILITIES
+// -----------------
+// After UDP connection, Viewer fetches "capability" URLs from the
+// seed_capability endpoint. These provide HTTP endpoints for various
+// services (inventory, textures, etc.) that supplement the UDP protocol.
+//
+
 #include "llviewerprecompiledheaders.h"
 
+#include "alcrashreporter.h"
+#include "alfeedback.h"
 #include "llappviewer.h"
 #include "llstartup.h"
+
+#if 0
+#include "llvelopack.h"
+#include <shellapi.h>
+#endif
 
 #if LL_WINDOWS
 #   include <process.h>     // _spawnl()
@@ -38,9 +111,16 @@
 
 #include "llviewermedia_streamingaudio.h"
 #include "llaudioengine.h"
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-17 (Catznip-3.3)
+#include "lltextparser.h"
+// [/SL:KB]
 
 #ifdef LL_FMODSTUDIO
 # include "llaudioengine_fmodstudio.h"
+#endif
+
+#ifdef LL_FAUDIO
+#include "llaudioengine_faudio.h"
 #endif
 
 #ifdef LL_OPENAL
@@ -58,10 +138,11 @@
 #include "llfocusmgr.h"
 #include "llfloatergridstatus.h"
 #include "llfloaterimsession.h"
+#include "lllocalassetpaths.h"
 #include "lllocationhistory.h"
 #include "llgltfmateriallist.h"
 #include "llimageworker.h"
-#include "llregex.h"
+#include "alregex.h"
 
 #include "llloginflags.h"
 #include "llmd5.h"
@@ -89,6 +170,7 @@
 #include "message.h"
 #include "v3math.h"
 
+#include "alfloaterdirectory.h"
 #include "alstreaminfo.h"
 #include "llagent.h"
 #include "llagentbenefits.h"
@@ -127,26 +209,31 @@
 #include "llpanellogin.h"
 #include "llmutelist.h"
 #include "llavatarpropertiesprocessor.h"
+#include "llpaneldirbrowser.h"
 #include "llpanelgrouplandmoney.h"
 #include "llpanelgroupnotices.h"
 #include "llparcel.h"
 #include "llpreview.h"
-#include "llpreviewscript.h"
+#include "alscriptdiskmasters.h"
+#include "alscriptstudio.h"
+#include "alscripttempfiles.h"
+#include "alscriptworkspace.h"
 #include "llproxy.h"
 #include "llproductinforequest.h"
 #include "llqueryflags.h"
 #include "llsecapi.h"
+#include "alobjectproperties.h"
 #include "llselectmgr.h"
 #include "llsky.h"
 #include "llstatview.h"
 #include "llstatusbar.h"        // sendMoneyBalanceRequest(), owns L$ balance
+#include "llbuycurrencyhtml.h"
 #include "llsurface.h"
 #include "lltexturecache.h"
 #include "lltexturefetch.h"
 #include "lltoolmgr.h"
 #include "lltrans.h"
 #include "llui.h"
-#include "lluiusage.h"
 #include "llurldispatcher.h"
 #include "llurlentry.h"
 #include "llslurl.h"
@@ -180,8 +267,6 @@
 #include "llxfermanager.h"
 #include "pipeline.h"
 #include "llappviewer.h"
-#include "llfasttimerview.h"
-#include "llfloaterdirectory.h"
 #include "llfloatermap.h"
 #include "llweb.h"
 #include "llvoiceclient.h"
@@ -196,6 +281,7 @@
 #include "llvoicechannel.h"
 #include "llpathfindingmanager.h"
 #include "llremoteparcelrequest.h"
+#include "llfloatersidepanelcontainer.h"
 // [RLVa:KB] - Checked: RLVa-1.2.0
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -209,12 +295,9 @@
 
 #include "llenvironment.h"
 
-#include "llstacktrace.h"
-
 #include "threadpool.h"
 #include "llperfstats.h"
 
-#include "llfloatersidepanelcontainer.h"
 
 #if LL_WINDOWS
 #include "lldxhardware.h"
@@ -274,12 +357,13 @@ std::unique_ptr<LLViewerStats::PhaseMap> LLStartUp::sPhases(new LLViewerStats::P
 
 void login_show();
 void login_callback(S32 option, void* userdata);
+void uninstall_nsis_if_required();
 void show_release_notes_if_required();
 void show_first_run_dialog();
 bool first_run_dialog_callback(const LLSD& notification, const LLSD& response);
+bool crash_report_consent_callback(const LLSD& notification, const LLSD& response);
 void set_startup_status(const F32 frac, const std::string& string, const std::string& msg);
 bool login_alert_status(const LLSD& notification, const LLSD& response);
-void use_circuit_callback(void**, S32 result);
 void register_viewer_callbacks(LLMessageSystem* msg);
 void asset_callback_nothing(const LLUUID&, LLAssetType::EType, void*, S32);
 bool callback_choose_gender(const LLSD& notification, const LLSD& response);
@@ -292,6 +376,9 @@ void apply_udp_blacklist(const std::string& csv);
 bool process_login_success_response();
 void on_benefits_failed_callback(const LLSD& notification, const LLSD& response);
 void transition_back_to_login_panel(const std::string& emsg);
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-09-22 (Catznip-3.3)
+void handleLoadChatAlertSounds();
+// [/SL:KB]
 
 void callback_cache_name(const LLUUID& id, const std::string& full_name, bool is_group)
 {
@@ -338,7 +425,7 @@ void do_startup_frame()
                 break;
             }
         }
-        if (needs_drain || gMessageSystem->mPacketRing.getNumBufferedPackets() > 0)
+        if (needs_drain || gMessageSystem->getNumBufferedPackets() > 0)
         {
              gMessageSystem->drainUdpSocket();
         }
@@ -350,6 +437,8 @@ void do_startup_frame()
 
 void pump_idle_startup_network(void)
 {
+    // while there are message to process:
+    //     process one then call display_startup()
     {
         LockMessageChecker lmc(gMessageSystem);
         while (lmc.checkAllMessages(gFrameCount, gServicePump))
@@ -358,6 +447,7 @@ void pump_idle_startup_network(void)
         }
         lmc.processAcks();
     }
+    // finally call one last display_startup()
     display_startup();
 }
 
@@ -435,17 +525,65 @@ bool idle_startup()
 
     LLMortician::updateClass();
 
-    const std::string delims (" ");
     std::string system;
+#if LL_LINUX
+    // The simple OS string names the distribution, whose first word is no
+    // key of language_settings.xml
+    system = "Linux";
+#else
+    const std::string delims (" ");
     size_t begIdx, endIdx;
     std::string osString = LLOSInfo::instance().getOSStringSimple();
 
     begIdx = osString.find_first_not_of (delims);
     endIdx = osString.find_first_of (delims, begIdx);
     system = osString.substr (begIdx, endIdx - begIdx);
+#endif
     system += "Locale";
 
-    LLStringUtil::setLocale (LLTrans::getString(system));
+    std::string locale = LLTrans::getString(system);
+    if (locale != LLStringUtil::getLocale()) // is there a reason to do this on repeat?
+    {
+        LLStringUtil::setLocale(locale);
+
+        // Not all locales have AMPM, test it
+        if (LLStringOps::sAM.empty()) // Might already be overriden from LLAppViewer::init()
+        {
+            LLDate datetime(0.0);
+            std::string val = datetime.toHTTPDateString("%p");
+            if (val.empty())
+            {
+                LL_DEBUGS("InitInfo") << "Current locale \"" << locale << "\" "
+                    << "doesn't support AM/PM time format" << LL_ENDL;
+                // fallback to declarations in strings.xml
+                LLStringOps::sAM = LLTrans::getString("dateTimeAM");
+                LLStringOps::sPM = LLTrans::getString("dateTimePM");
+            }
+            else
+            {
+                if (utf8str_codepoint_count(val) > 4)
+                {
+                    LL_DEBUGS("InitInfo") << "Current locale \"" << locale << "\" "
+                        << "has impracitcally long AM/PM time format" << LL_ENDL;
+                    // fallback to declarations in strings.xml
+                    LLStringOps::sAM = LLTrans::getString("dateTimeAM");
+                    LLStringOps::sPM = LLTrans::getString("dateTimePM");
+                }
+            }
+        }
+
+        // Some locales (as well some of our own dateTimeAM/PM) return long
+        // strings for AM/PM which aren't practical to display in the UI.
+        // Hardcode to "AM"/"PM" in those cases.
+        if (utf8str_codepoint_count(LLStringOps::sAM) > 4)
+        {
+            LLStringOps::sAM = "AM";
+        }
+        if (utf8str_codepoint_count(LLStringOps::sPM) > 4)
+        {
+            LLStringOps::sPM = "PM";
+        }
+    }
 
     //note: Removing this line will cause incorrect button size in the login screen. -- bao.
     gTextureList.updateImages(0.01f) ;
@@ -514,7 +652,7 @@ bool idle_startup()
                 std::string value = root->getValue();
                 F32 version = 0.0f;
                 LLStringUtil::convertToF32(value, version);
-                if (version >= 1.0f)
+                if (version >= 2.0f)
                 {
                     xml_ok = true;
                 }
@@ -548,7 +686,7 @@ bool idle_startup()
         std::string message_template_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"message_template.msg");
 
         LLFILE* found_template = NULL;
-        found_template = LLFile::fopen(message_template_path, "r");     /* Flawfinder: ignore */
+        found_template = LLFile::fopen(message_template_path, LLFILE_MODE("r"));     /* Flawfinder: ignore */
 
         #if LL_WINDOWS
             // On the windows dev builds, unpackaged, the message_template.msg
@@ -557,7 +695,7 @@ bool idle_startup()
             if (!found_template)
             {
                 message_template_path = gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "app_settings", "message_template.msg");
-                found_template = LLFile::fopen(message_template_path.c_str(), "r");     /* Flawfinder: ignore */
+                found_template = LLFile::fopen(message_template_path.c_str(), LLFILE_MODE("r"));     /* Flawfinder: ignore */
             }
         #elif LL_DARWIN
             // On Mac dev builds, message_template.msg lives in:
@@ -567,7 +705,7 @@ bool idle_startup()
                 message_template_path =
                     gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,
                                                    "message_template.msg");
-                found_template = LLFile::fopen(message_template_path.c_str(), "r");     /* Flawfinder: ignore */
+                found_template = LLFile::fopen(message_template_path.c_str(), LLFILE_MODE("r"));     /* Flawfinder: ignore */
             }
         #endif
 
@@ -674,7 +812,7 @@ bool idle_startup()
 
 
             F32 dropPercent = gSavedSettings.getF32("PacketDropPercentage");
-            msg->mPacketRing.setDropPercentage(dropPercent);
+            msg->setDropPercentage(dropPercent);
         }
 
         LL_INFOS("AppInit") << "Message System Initialized." << LL_ENDL;
@@ -696,7 +834,35 @@ bool idle_startup()
 #endif // !LL_WINDOWS
                 )
             {
-                gAudiop = (LLAudioEngine *) new LLAudioEngine_FMODSTUDIO(gSavedSettings.getBOOL("FMODExProfilerEnable"));
+                gAudiop = (LLAudioEngine *) new LLAudioEngine_FMODSTUDIO(
+                    gSavedSettings.getBOOL("FMODExProfilerEnable"),
+                    gSavedSettings.getU32("FMODResampleMethod"),
+                    gSavedSettings.getString("AudioFMODOutputDevice"));
+            }
+#endif
+
+#ifdef LL_FAUDIO
+            if (!gAudiop
+#if !LL_WINDOWS
+            && NULL == getenv("LL_BAD_FAUDIO_DRIVER")
+#endif // !LL_WINDOWS
+                )
+            {
+                LLAudioEngineFAudioConfig faudio_cfg;
+                faudio_cfg.preferred_device_id = gSavedSettings.getString("AudioFAudioOutputDevice");
+                faudio_cfg.inner_radius        = gSavedSettings.getF32("AudioFAudioInnerRadius");
+                faudio_cfg.reverb_preset       = gSavedSettings.getString("AudioReverbPreset");
+                faudio_cfg.reverb_send_scale   = gSavedSettings.getF32("AudioFAudioReverbSendScale");
+                faudio_cfg.limiter_enable      = gSavedSettings.getBOOL("AudioFAudioMasterLimiterEnable");
+                faudio_cfg.limiter_release     = gSavedSettings.getU32("AudioFAudioMasterLimiterRelease");
+                faudio_cfg.limiter_loudness    = gSavedSettings.getU32("AudioFAudioMasterLimiterLoudness");
+                gAudiop = (LLAudioEngine *) new LLAudioEngine_FAudio(std::move(faudio_cfg));
+                // Live tunables (AudioFAudioAudibleRange, InnerRadius,
+                // ReverbPreset, ReverbSendScale, WindGustiness,
+                // WindAltitudeBoost) are wired via
+                // settings_setup_listeners in llviewercontrol.cpp —
+                // same place every other global setting's signal
+                // listener lives.
             }
 #endif
 
@@ -707,7 +873,8 @@ bool idle_startup()
 #endif // !LL_WINDOWS
                 )
             {
-                gAudiop = (LLAudioEngine *) new LLAudioEngine_OpenAL();
+                gAudiop = (LLAudioEngine *) new LLAudioEngine_OpenAL(
+                    gSavedSettings.getString("AudioOpenALOutputDevice"));
             }
 #endif
 
@@ -736,6 +903,41 @@ bool idle_startup()
                         gAudiop->setStreamingAudioImpl(new LLStreamingAudio_MediaPlugins());
                     }
 
+                    // Push the user's saved reverb tunables onto the live
+                    // engine. FAudio already consumed these via its
+                    // construction config, so this is a redundant write
+                    // for that backend (and a cheap one); for OpenAL EFX
+                    // this is how the engine first picks up the
+                    // user-chosen preset / wet level. Send-scale comes
+                    // from the engine-reported per-backend key.
+                    if (gAudiop->supportsReverb())
+                    {
+                        gAudiop->setReverbPreset(
+                            gSavedSettings.getString("AudioReverbPreset"));
+                        const std::string scale_key =
+                            gAudiop->getReverbSendScaleSettingName();
+                        if (!scale_key.empty())
+                        {
+                            gAudiop->setReverbSendScale(
+                                gSavedSettings.getF32(scale_key));
+                        }
+                    }
+
+                    // Push the saved wind tunables onto the live engine
+                    // once. setWindGustiness only takes effect after
+                    // initWind has allocated the LLWindGen (the first
+                    // time wind is enabled — typically once flight is
+                    // toggled on), so for cold-start sessions where the
+                    // user has saved a non-zero gustiness the value
+                    // will only audibly apply once wind comes up; the
+                    // setter is null-guarded inside the engine override
+                    // for that case. setWindAltitudeBoost is base-class
+                    // state and applies immediately.
+                    gAudiop->setWindGustiness(
+                        gSavedSettings.getF32("AudioWindGustiness"));
+                    gAudiop->setWindAltitudeBoost(
+                        gSavedSettings.getF32("AudioWindAltitudeBoost"));
+
                     gAudiop->setMuted(true);
                 }
                 else
@@ -753,10 +955,6 @@ bool idle_startup()
         {
             LL_WARNS("AppInit") << "Unreliable timers detected (may be bad PCI chipset)!!" << LL_ENDL;
         }
-
-#ifdef LL_DISCORD
-        LLAppViewer::initDiscordSocial();
-#endif
 
         //
         // Log on to system
@@ -817,6 +1015,7 @@ bool idle_startup()
         set_startup_status(0.03f, msg.c_str(), gAgent.mMOTD.c_str());
         do_startup_frame();
         // LLViewerMedia::initBrowser();
+        LLAppViewer::instance()->createInitedMarker();
         LLStartUp::setStartupState( STATE_LOGIN_SHOW );
         return false;
     }
@@ -867,6 +1066,19 @@ bool idle_startup()
             LLPanelLogin::populateFields( gUserCredential, gRememberUser, gRememberPassword);
             LLPanelLogin::giveFocus();
 
+            // The first launch asks before any crash report is sent. After a
+            // crash or a freeze the user is asked what happened: once that
+            // question is answered, when it is asked, so the two never stack.
+            if (ALCrashReporter::available() && gSavedSettings.getS32("AlchemyCrashReportConsent") == 0)
+            {
+                LLNotificationsUtil::add("AlchemyCrashReportConsent", LLSD(), LLSD().with("ask_about_last_run", true),
+                                         crash_report_consent_callback);
+            }
+            else
+            {
+                ALFeedback::askAboutLastRun();
+            }
+
             // MAINT-3231 Show first run dialog only for Desura viewer
             if (gSavedSettings.getString("sourceid") == "1208_desura")
             {
@@ -889,6 +1101,9 @@ bool idle_startup()
             // skip directly to message template verification
             LLStartUp::setStartupState( STATE_LOGIN_CLEANUP );
         }
+        // Feedback that could not be sent before goes now, and then whenever
+        // it is due, however the login goes.
+        ALFeedback::startQueue();
 
         gViewerWindow->setNormalControlsVisible( false );
         gLoginMenuBarView->setVisible( true );
@@ -912,6 +1127,7 @@ bool idle_startup()
         LL_DEBUGS("AppInit") << "PeekMessage processed" << LL_ENDL;
 #endif
         do_startup_frame();
+        uninstall_nsis_if_required();
         timeout.reset();
         return false;
     }
@@ -1048,7 +1264,15 @@ bool idle_startup()
         }
         else
         {
-            gDirUtilp->setChatLogsDir(gSavedPerAccountSettings.getString("InstantMessageLogPath"));
+            // A path saved before the user dir moved follows it.
+            const std::string saved_path = gSavedPerAccountSettings.getString("InstantMessageLogPath");
+            const std::string log_path = gDirUtilp->relocateLegacyPath(saved_path);
+            if (log_path != saved_path)
+            {
+                LL_INFOS("AppInit") << "Chat logs moved from " << saved_path << " to " << log_path << LL_ENDL;
+                gSavedPerAccountSettings.setString("InstantMessageLogPath", log_path);
+            }
+            gDirUtilp->setChatLogsDir(log_path);
         }
         gDirUtilp->setPerAccountChatLogsDir(userid);
 
@@ -1071,6 +1295,19 @@ bool idle_startup()
         LLAvatarIconIDCache::getInstance()->load();
 
         LLRenderMuteList::getInstance()->loadFromFile();
+
+        // List the artist's saved local-asset file paths (mesh/anim/texture/material)
+        // for the Local Assets floater. This only reads the paths -- the files are
+        // decoded lazily when first used -- so it's fine to do here, and it starts
+        // watching the managers to keep the saved set current.
+        LLLocalAssetPaths::getInstance()->loadAndWatch();
+
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-09-22 (Catznip-3.3)
+        if (LLTextParser::instance().loadKeywords() && LLTextParser::instance().getHighlightCount() > 0)
+        {
+            LLAppViewer::instance()->setOnLoginCompletedCallback(boost::bind(&handleLoadChatAlertSounds));
+        }
+// [/SL:KB]
 
         //-------------------------------------------------
         // Handle startup progress screen
@@ -1352,6 +1589,10 @@ bool idle_startup()
     {
         set_startup_status(0.30f, LLTrans::getString("LoginInitializingWorld"), gAgent.mMOTD);
         do_startup_frame();
+
+        // close login UI before world UI is initialized, if it is still visible
+        LLPanelLogin::closePanel();
+
         // We should have an agent id by this point.
         llassert(!(gAgentID == LLUUID::null));
 
@@ -1619,11 +1860,9 @@ bool idle_startup()
         }
 
         gAgent.addRegionChangedCallback(boost::bind(&LLPerfStats::StatsRecorder::clearStats));
+
         // Create people views early enough to register with avatar tracker
         LLFloaterSidePanelContainer::getPanel("people", "panel_people");
-
-        // Create search early enough to not cause stutter
-        LLFloaterReg::getInstance("search");
 
         // *Note: this is where gWorldMap used to be initialized.
 
@@ -1644,15 +1883,6 @@ bool idle_startup()
         // Sets up the parameters for the first simulator
 
         LL_DEBUGS("AppInit") << "Initializing camera..." << LL_ENDL;
-        gFrameTime    = totalTime();
-        F32Seconds last_time = gFrameTimeSeconds;
-        gFrameTimeSeconds = (gFrameTime - gStartTime);
-
-        gFrameIntervalSeconds = gFrameTimeSeconds - last_time;
-        if (gFrameIntervalSeconds < 0.f)
-        {
-            gFrameIntervalSeconds = 0.f;
-        }
 
         // Make sure agent knows correct aspect ratio
         // FOV limits depend upon aspect ratio so this needs to happen before initializing the FOV below
@@ -1714,13 +1944,48 @@ bool idle_startup()
         gUseCircuitCallbackCalled = false;
 
         msg->enableCircuit(gFirstSim, true);
-        // now, use the circuit info to tell simulator about us!
+
+        // UDP CONNECTION STEP 1: Send UseCircuitCode
+        // This is the first UDP message sent to Simulator after HTTP login.
+        // It establishes the UDP circuit using the circuit_code received from
+        // LoginServer. Simulator will respond with an ACK, then send
+        // RegionHandshake message with region details.
         LL_INFOS("AppInit") << "viewer: UserLoginLocationReply() Enabling " << gFirstSim << " with code " << msg->mOurCircuitCode << LL_ENDL;
         msg->newMessageFast(_PREHASH_UseCircuitCode);
         msg->nextBlockFast(_PREHASH_CircuitCode);
         msg->addU32Fast(_PREHASH_Code, msg->mOurCircuitCode);
         msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
         msg->addUUIDFast(_PREHASH_ID, gAgent.getID());
+
+        // build a lambda to be used as callback on ACK or timeout
+        void (*use_circuit_callback)(void**, S32) = [](void**, S32 result)
+        {
+            // bail if we're quitting.
+            if(LLApp::isExiting()) return;
+            if( !gUseCircuitCallbackCalled )
+            {
+                gUseCircuitCallbackCalled = true;
+                if (result != LL_ERR_NOERR)
+                {
+                    // Make sure user knows something bad happened. JC
+                    LL_WARNS("AppInit") << "Backing up to login screen!" << LL_ENDL;
+                    if (gRememberPassword)
+                    {
+                        LLNotificationsUtil::add("LoginPacketNeverReceived", LLSD(), LLSD(), login_alert_status);
+                    }
+                    else
+                    {
+                        LLNotificationsUtil::add("LoginPacketNeverReceivedNoTP", LLSD(), LLSD(), login_alert_status);
+                    }
+                    reset_login();
+                }
+                else
+                {
+                    gGotUseCircuitCodeAck = true;
+                }
+            }
+        };
+
         msg->sendReliable(
             gFirstSim,
             gSavedSettings.getS32("UseCircuitCodeMaxRetries"),
@@ -1738,6 +2003,9 @@ bool idle_startup()
     //---------------------------------------------------------------------
     // World Wait
     //---------------------------------------------------------------------
+    // UDP CONNECTION STEP 2: Wait for UseCircuitCode acknowledgment
+    // While waiting, Simulator also sends RegionHandshake (handled by
+    // process_region_handshake() in llworld.cpp) containing region info.
     if(STATE_WORLD_WAIT == LLStartUp::getStartupState())
     {
         LL_DEBUGS("AppInit") << "Waiting for simulator ack...." << LL_ENDL;
@@ -1753,13 +2021,16 @@ bool idle_startup()
     //---------------------------------------------------------------------
     // Agent Send
     //---------------------------------------------------------------------
+    // UDP CONNECTION STEP 3: Send CompleteAgentMovement
+    // After the circuit is established and RegionHandshake received, we signal
+    // to Simulator the Viewer is ready to enter the world.
     if (STATE_AGENT_SEND == LLStartUp::getStartupState())
     {
         LL_DEBUGS("AppInit") << "Connecting to region..." << LL_ENDL;
         set_startup_status(0.60f, LLTrans::getString("LoginConnectingToRegion"), gAgent.mMOTD);
         do_startup_frame();
-        // register with the message system so it knows we're
-        // expecting this message
+        // Register handler process_agent_movement_complete for AgentMovementComplete -
+        // the final UDP message confirming the agent is connected.
         LLMessageSystem* msg = gMessageSystem;
         msg->setHandlerFuncFast(
             _PREHASH_AgentMovementComplete,
@@ -1802,12 +2073,17 @@ bool idle_startup()
     //---------------------------------------------------------------------
     // Agent Wait
     //---------------------------------------------------------------------
+    // UDP CONNECTION STEP 4: Wait for AgentMovementComplete
+    // Simulator responds with the agent's confirmed position and look_at
+    // direction. Once received, gAgentMovementCompleted is set true and the
+    // agent is fully connected to the region.
     if (STATE_AGENT_WAIT == LLStartUp::getStartupState())
     {
         do_startup_frame();
 
         if (gAgentMovementCompleted)
         {
+            // Connection complete - agent is now in-world
             LLStartUp::setStartupState( STATE_INVENTORY_SEND );
         }
         do_startup_frame();
@@ -1852,6 +2128,7 @@ bool idle_startup()
         // Get L$ and ownership credit information
         LL_INFOS() << "Requesting Money Balance" << LL_ENDL;
         LLStatusBar::sendMoneyBalanceRequest();
+        LLBuyCurrencyHTML::checkFeatureFlag();
 
         do_startup_frame();
 
@@ -2051,6 +2328,15 @@ bool idle_startup()
             return false;
         }
 
+        // set up callbacks
+        LL_INFOS() << "Registering Callbacks" << LL_ENDL;
+        LLMessageSystem* msg = gMessageSystem;
+        LL_INFOS() << " Inventory" << LL_ENDL;
+        LLInventoryModel::registerCallbacks(msg);
+        LL_INFOS() << " Landmark" << LL_ENDL;
+        LLLandmark::registerCallbacks(msg);
+        do_startup_frame();
+
         LLInventoryModelBackgroundFetch::instance().start();
         LLAppearanceMgr::instance().initCOFID();
         LLUUID cof_id = LLAppearanceMgr::instance().getCOF();
@@ -2072,15 +2358,6 @@ bool idle_startup()
         gInventory.addChangedMask(LLInventoryObserver::ALL, LLUUID::null);
         gInventory.notifyObservers();
 
-        do_startup_frame();
-
-        // set up callbacks
-        LL_INFOS() << "Registering Callbacks" << LL_ENDL;
-        LLMessageSystem* msg = gMessageSystem;
-        LL_INFOS() << " Inventory" << LL_ENDL;
-        LLInventoryModel::registerCallbacks(msg);
-        LL_INFOS() << " Landmark" << LL_ENDL;
-        LLLandmark::registerCallbacks(msg);
         do_startup_frame();
 
         // request all group information
@@ -2227,7 +2504,10 @@ bool idle_startup()
 
         LL_DEBUGS("SceneLoadTiming", "Start") << "Scene Load Started " << LL_ENDL;
         gRenderStartTime.reset();
+        gSimLastTime = 0.f;
+        gSimFrames = (F32)gFrameCount;
         gForegroundTime.reset();
+        gForegroundFrameCount = 0;
 
         // HACK: Inform simulator of window size.
         // Do this here so it's less likely to race with RegisterNewAgent.
@@ -2480,6 +2760,9 @@ bool idle_startup()
         LLStartUp::setStartupState( STATE_STARTED );
         do_startup_frame();
 
+        // A login that skipped the login screen asks about the last run here.
+        ALFeedback::askAboutLastRun();
+
         // Unmute audio if desired and setup volumes.
         // This is a not-uncommon crash site, so surround it with
         // LL_INFOS() output to aid diagnosis.
@@ -2491,6 +2774,16 @@ bool idle_startup()
         gFocusMgr.setKeyboardFocus(NULL);
 
         LLAppViewer::instance()->handleLoginComplete();
+
+        // What Script Studio kept of a session that ended before its scripts
+        // were saved, offered back now the world is in; and the copies such
+        // a session gave an editor outside, taken out of the temp folder.
+        ALScriptStudio::offerRecovery();
+        ALScriptWorkspace::instance().tempFiles().sweep();
+        // Scripts whose master is a file on disk: live while logged in, a
+        // save of the file made outside the studio sending them, whether or
+        // not a studio window is open.
+        ALScriptDiskMasters::instance().start();
 
         LLAgentPicksInfo::getInstance()->requestNumberOfPicks();
 
@@ -2508,8 +2801,6 @@ bool idle_startup()
             DFQ_AGENT_OWNED,
             LLParcel::C_ANY,
             "");
-
-        LLUIUsage::instance().clear();
 
         LLPerfStats::StatsRecorder::setAutotuneInit();
 
@@ -2601,9 +2892,10 @@ void release_notes_coro(const std::string url)
 
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("releaseNotesCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("releaseNotesCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     httpOpts->setHeadersOnly(true); // only making sure it isn't 404 or something like that
 
@@ -2620,13 +2912,75 @@ void release_notes_coro(const std::string url)
     LLWeb::loadURLInternal(url);
 }
 
+/**
+* Check if this is a fresh velopack install and
+* if uninstallation of old viewer is needed.
+*/
+void uninstall_nsis_if_required()
+{
+#if 0 // Alchemy UNUSED
+    bool checked_for_legacy_install = gSavedSettings.getBOOL("PreviousInstallChecked");
+    if (checked_for_legacy_install)
+    {
+        return;
+    }
+    gSavedSettings.setBOOL("PreviousInstallChecked", true);
+
+    LL_INFOS() << "Looking for previous NSIS installs" << LL_ENDL;
+
+    S32 found_major = 0;
+    S32 found_minor = 0;
+    S32 found_patch = 0;
+    U64 found_build = 0;
+    std::string nsis_path;
+
+    if (!get_nsis_version(found_major, found_minor, found_patch, found_build, nsis_path))
+    {
+        return;
+    }
+
+    LLVersionInfo* ver_inst = LLVersionInfo::getInstance();
+
+    if (found_major > ver_inst->getMajor())
+    {
+        LL_INFOS() << "Found installed nsis version that is newer" << found_major << "." << found_minor << "." << found_patch << "." << found_build << LL_ENDL;
+        return;
+    }
+
+    if (found_major == ver_inst->getMajor()
+        && found_minor > ver_inst->getMinor())
+    {
+        LL_INFOS() << "Found installed nsis version that is newer" << found_major << "." << found_minor << "." << found_patch << "." << found_build << LL_ENDL;
+        return;
+    }
+
+    if (found_major == ver_inst->getMajor()
+        && found_minor == ver_inst->getMinor()
+        && found_patch > ver_inst->getPatch())
+    {
+        LL_INFOS() << "Found installed nsis version that is newer" << found_major << "." << found_minor << "." << found_patch << "." << found_build << LL_ENDL;
+        return;
+    }
+
+    // Assume that nsis is going to be something like x.x.x, while velopack is x.x.(x+1),
+    // so there is no point to check build.
+    LL_INFOS() << "Found NSIS install " << found_major << "." << found_minor << "." << found_patch << "." << found_build << LL_ENDL;
+
+    clear_nsis_links(nsis_path);
+
+    LLSD args;
+    args["VERSION"] = llformat("%d.%d.%d", found_major, found_minor, found_patch);
+    LLNotificationsUtil::add("FoundLegacyNsisInstallation", args);
+#endif
+}
+
 void validate_release_notes_coro(const std::string url)
 {
     LLVersionInfo& versionInfo(LLVersionInfo::instance());
-    const boost::regex version_regex(R"(\b\d+\.\d+\.\d+\.\d+\b)");
+    static const ALRegex version_regex(R"(\b\d+\.\d+\.\d+\.\d+\b)");
 
     if (url.find(versionInfo.getVersion()) == std::string::npos // has no our build version
-        && ll_regex_search(url, version_regex)) // has any version
+        && version_regex.search(url)) // has any version
     {
         LL_INFOS() << "Received release notes url \"" << url << "\" wwith mismatching build, falling back to locally generated url" << LL_ENDL;
         // Updater only provides notes for a most recent version, if it is not
@@ -2653,15 +3007,24 @@ void show_release_notes_if_required()
     // below. If viewer release notes stop working, might be because that
     // LLEventMailDrop got moved out of LLVersionInfo and hasn't yet been
     // instantiated.
-    if (!release_notes_shown && (LLVersionInfo::instance().getChannelAndVersion() != gLastRunVersion)
-        && LLVersionInfo::instance().getViewerMaturity() != LLVersionInfo::TEST_VIEWER // don't show Release Notes for the test builds
-        && gSavedSettings.getBOOL("UpdaterShowReleaseNotes")
-        && !gSavedSettings.getBOOL("FirstLoginThisInstall"))
+    if (release_notes_shown
+        || LLVersionInfo::instance().getChannelAndVersion() == gLastRunVersion
+        || gSavedSettings.getBOOL("FirstLoginThisInstall")) // New users don't need to see release notes
+    {
+        return;
+    }
+    S32 mode = gSavedSettings.getS32("UpdaterShowReleaseNotes");
+    if (mode == 0)
+    {
+        return;
+    }
+    if (mode == 2 // Show even for test builds
+        || LLVersionInfo::instance().getViewerMaturity() != LLVersionInfo::TEST_VIEWER) // don't show Release Notes for the test builds
+
     {
 
 #if LL_RELEASE_FOR_DOWNLOAD
-        if (!gSavedSettings.getBOOL("CmdLineSkipUpdater")
-            && !LLAppViewer::instance()->isUpdaterMissing())
+        if (!gSavedSettings.getBOOL("CmdLineSkipUpdater"))
         {
             // Instantiate a "relnotes" listener which assumes any arriving event
             // is the release notes URL string. Since "relnotes" is an
@@ -2688,6 +3051,17 @@ void show_release_notes_if_required()
         }
         release_notes_shown = true;
     }
+}
+
+bool crash_report_consent_callback(const LLSD& notification, const LLSD& response)
+{
+    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    gSavedSettings.setS32("AlchemyCrashReportConsent", option == 0 ? 1 : 2);
+    if (notification["payload"]["ask_about_last_run"].asBoolean())
+    {
+        ALFeedback::askAboutLastRun();
+    }
+    return false;
 }
 
 void show_first_run_dialog()
@@ -2743,34 +3117,6 @@ bool login_alert_status(const LLSD& notification, const LLSD& response)
 }
 
 
-void use_circuit_callback(void**, S32 result)
-{
-    // bail if we're quitting.
-    if(LLApp::isExiting()) return;
-    if( !gUseCircuitCallbackCalled )
-    {
-        gUseCircuitCallbackCalled = true;
-        if (result)
-        {
-            // Make sure user knows something bad happened. JC
-            LL_WARNS("AppInit") << "Backing up to login screen!" << LL_ENDL;
-            if (gRememberPassword)
-            {
-                LLNotificationsUtil::add("LoginPacketNeverReceived", LLSD(), LLSD(), login_alert_status);
-            }
-            else
-            {
-                LLNotificationsUtil::add("LoginPacketNeverReceivedNoTP", LLSD(), LLSD(), login_alert_status);
-            }
-            reset_login();
-        }
-        else
-        {
-            gGotUseCircuitCodeAck = true;
-        }
-    }
-}
-
 void register_viewer_callbacks(LLMessageSystem* msg)
 {
     msg->setHandlerFuncFast(_PREHASH_LayerData,                 process_layer_data);
@@ -2810,15 +3156,17 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 
     msg->setHandlerFuncFast(_PREHASH_ImprovedInstantMessage,    process_improved_im);
     msg->setHandlerFuncFast(_PREHASH_ScriptQuestion,            process_script_question);
-    msg->setHandlerFuncFast(_PREHASH_ObjectProperties,          LLSelectMgr::processObjectProperties);
-    msg->setHandlerFuncFast(_PREHASH_ObjectPropertiesFamily,    LLSelectMgr::processObjectPropertiesFamily);
+    // ALObjectPropertiesCache caches object properties for the Scene Explorer
+    // (and other non-selection consumers), then forwards to LLSelectMgr.
+    msg->setHandlerFuncFast(_PREHASH_ObjectProperties,          ALObjectPropertiesCache::processObjectProperties);
+    msg->setHandlerFuncFast(_PREHASH_ObjectPropertiesFamily,    ALObjectPropertiesCache::processObjectPropertiesFamily);
     msg->setHandlerFuncFast(_PREHASH_ForceObjectSelect,         LLSelectMgr::processForceObjectSelect);
 
     msg->setHandlerFuncFast(_PREHASH_MoneyBalanceReply,         process_money_balance_reply);
     msg->setHandlerFuncFast(_PREHASH_CoarseLocationUpdate,      LLWorld::processCoarseUpdate);
     msg->setHandlerFuncFast(_PREHASH_ReplyTaskInventory,        LLViewerObject::processTaskInv);
     msg->setHandlerFuncFast(_PREHASH_DerezContainer,            process_derez_container);
-    msg->setHandlerFuncFast(_PREHASH_ScriptRunningReply,        LLLiveLSLEditor::processScriptRunningReply);
+    msg->setHandlerFuncFast(_PREHASH_ScriptRunningReply,        ALScriptWorkspace::processScriptRunningReply);
 
     msg->setHandlerFuncFast(_PREHASH_DeRezAck,                  process_derez_ack);
 
@@ -2877,15 +3225,26 @@ void register_viewer_callbacks(LLMessageSystem* msg)
     msg->setHandlerFuncFast(_PREHASH_PlacesReply,                   process_places_reply);
     msg->setHandlerFuncFast(_PREHASH_GroupNoticesListReply,         LLPanelGroupNotices::processGroupNoticesListReply);
 
-    // directory search
-    msg->setHandlerFunc("DirPeopleReply", LLFloaterDirectory::processSearchPeopleReply);
-    msg->setHandlerFunc("DirGroupsReply", LLFloaterDirectory::processSearchGroupsReply);
-    msg->setHandlerFunc("DirPlacesReply", LLFloaterDirectory::processSearchPlacesReply);
-    msg->setHandlerFunc("DirEventsReply", LLFloaterDirectory::processSearchEventsReply);
-    msg->setHandlerFunc("DirLandReply",   LLFloaterDirectory::processSearchLandReply);
-    msg->setHandlerFunc("DirClassifiedReply",  LLFloaterDirectory::processSearchClassifiedsReply);
-
     msg->setHandlerFuncFast(_PREHASH_AvatarPickerReply,             LLFloaterAvatarPicker::processAvatarPickerReply);
+
+    if (gSkinSettings.getBOOL("AlchemyLegacySearch"))
+    {
+        msg->setHandlerFuncFast(_PREHASH_DirPlacesReply,            ALFloaterDirectory::processSearchPlacesReply);
+        msg->setHandlerFuncFast(_PREHASH_DirPeopleReply,            ALFloaterDirectory::processSearchPeopleReply);
+        msg->setHandlerFuncFast(_PREHASH_DirEventsReply,            ALFloaterDirectory::processSearchEventsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirGroupsReply,            ALFloaterDirectory::processSearchGroupsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirClassifiedReply,        ALFloaterDirectory::processSearchClassifiedsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirLandReply,              ALFloaterDirectory::processSearchLandReply);
+    }
+    else
+    {
+        msg->setHandlerFuncFast(_PREHASH_DirPlacesReply,            LLPanelDirBrowser::processDirPlacesReply);
+        msg->setHandlerFuncFast(_PREHASH_DirPeopleReply,            LLPanelDirBrowser::processDirPeopleReply);
+        msg->setHandlerFuncFast(_PREHASH_DirEventsReply,            LLPanelDirBrowser::processDirEventsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirGroupsReply,            LLPanelDirBrowser::processDirGroupsReply);
+        msg->setHandlerFuncFast(_PREHASH_DirClassifiedReply,        LLPanelDirBrowser::processDirClassifiedReply);
+        msg->setHandlerFuncFast(_PREHASH_DirLandReply,              LLPanelDirBrowser::processDirLandReply);
+    }
 
     msg->setHandlerFuncFast(_PREHASH_MapBlockReply,                 LLWorldMapMessage::processMapBlockReply);
     msg->setHandlerFuncFast(_PREHASH_MapItemReply,                  LLWorldMapMessage::processMapItemReply);
@@ -2907,7 +3266,7 @@ void register_viewer_callbacks(LLMessageSystem* msg)
     msg->setHandlerFuncFast(_PREHASH_ParcelObjectOwnersReply,       LLPanelLandObjects::processParcelObjectOwnersReply);
 
     msg->setHandlerFuncFast(_PREHASH_InitiateDownload,              process_initiate_download);
-    msg->setHandlerFuncFast(_PREHASH_LandStatReply,                 LLFloaterTopObjects::handle_land_reply);
+    msg->setHandlerFuncFast(_PREHASH_LandStatReply,                 ALScriptWorkspace::processLandStatReply);
     msg->setHandlerFuncFast(_PREHASH_GenericMessage,                process_generic_message);
     msg->setHandlerFuncFast(_PREHASH_GenericStreamingMessage,       process_generic_streaming_message);
     msg->setHandlerFuncFast(_PREHASH_LargeGenericMessage,           process_large_generic_message);
@@ -3120,6 +3479,7 @@ void LLStartUp::setStartupState( EStartupState state )
     getPhases().stopPhase(getStartupStateString());
     gStartupState = state;
     getPhases().startPhase(getStartupStateString());
+    ALCrashReporter::setTag("app_state", startupStateToString(state));
 
     postStartupState();
 }
@@ -3146,17 +3506,25 @@ void reset_login()
     if ( gViewerWindow )
     {   // Hide menus and normal buttons
         gViewerWindow->setNormalControlsVisible( false );
-        gLoginMenuBarView->setVisible( true );
-        gLoginMenuBarView->setEnabled( true );
+
+        if (gLoginMenuBarView)
+        {
+            gLoginMenuBarView->setVisible(true);
+            gLoginMenuBarView->setEnabled(true);
+        }
+        else
+        {
+            LL_WARNS("AppInit") << "gLoginMenuBarView not initialized" << LL_ENDL;
+        }
     }
 
     // Hide any other stuff
     LLFloaterReg::hideVisibleInstances();
 
-    if (LLStartUp::getStartupState() > STATE_WORLD_INIT)
-    {
-        gViewerWindow->resetStatusBarContainer();
-    }
+    //if (LLStartUp::getStartupState() > STATE_WORLD_INIT && gViewerWindow)
+    //{
+    //    gViewerWindow->resetStatusBarContainer();
+    //}
     LLStartUp::setStartupState( STATE_BROWSER_INIT );
 
     if (LLVoiceClient::instanceExists())
@@ -3181,7 +3549,7 @@ void LLStartUp::multimediaInit()
     set_startup_status(0.42f, msg.c_str(), gAgent.mMOTD.c_str());
     do_startup_frame();
 
-    ALStreamInfo::createInstance();
+    ALStreamInfo::getInstance();
 }
 
 void LLStartUp::fontInit()
@@ -3624,6 +3992,14 @@ bool init_benefits(LLSD& response)
     return succ;
 }
 
+// HTTP LOGIN RESPONSE PROCESSING
+// Called after successful HTTP XMLRPC authentication. Extracts critical data
+// from LoginServer response needed to establish the UDP connection:
+//   - agent_id, session_id, secure_session_id (authentication tokens)
+//   - circuit_code (used in UseCircuitCode UDP message)
+//   - sim_ip, sim_port (simulator address for UDP circuit)
+//   - seed_capability (URL for fetching HTTP capability endpoints)
+//
 bool process_login_success_response()
 {
     LLSD response = LLLoginInstance::getInstance()->getResponse();
@@ -3746,6 +4122,8 @@ bool process_login_success_response()
         gAgentStartLocation.assign(text);
     }
 
+    // Extract UDP circuit parameters from login response.
+    // These are used in STATE_WORLD_INIT to establish the UDP circuit.
     text = response["circuit_code"].asString();
     if(!text.empty())
     {
@@ -3988,4 +4366,29 @@ void transition_back_to_login_panel(const std::string& emsg)
     reset_login(); // calls LLStartUp::setStartupState( STATE_LOGIN_SHOW );
     gSavedSettings.setBOOL("AutoLogin", false);
 }
+
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-09-22 (Catznip-3.3)
+void handleLoadChatAlertSounds()
+{
+    const LLTextParser::highlight_list_t& highlights = LLTextParser::instance().getHighlights();
+
+    uuid_vec_t assetIDs;
+    for (const LLHighlightEntry& entry : highlights)
+    {
+        if (entry.mSoundAsset.notNull() &&
+            std::find(assetIDs.begin(), assetIDs.end(), entry.mSoundAsset) == assetIDs.end())
+        {
+            assetIDs.push_back(entry.mSoundAsset);
+        }
+    }
+
+    for (const LLUUID& assetID : assetIDs)
+    {
+        if (gAssetStorage && !gAssetStorage->hasLocalAsset(assetID, LLAssetType::AT_SOUND) && gAudiop)
+        {
+            gAssetStorage->getAssetData(assetID, LLAssetType::AT_SOUND, LLAudioEngine::assetCallback, nullptr);
+        }
+    }
+}
+// [/SL:KB]
 

@@ -27,7 +27,7 @@
 #ifndef LL_LLVIEWERMENU_H
 #define LL_LLVIEWERMENU_H
 
-#include "llmenugl.h"
+#include "../llui/llmenugl.h"
 #include "llsafehandle.h"
 
 class LLMessageSystem;
@@ -37,8 +37,8 @@ class LLView;
 class LLParcelSelection;
 class LLObjectSelection;
 class LLSelectNode;
+class LLControlAvatar;
 class LLViewerObject;
-class LLVOAvatar;
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
 void set_use_wireframe(bool useWireframe);
@@ -55,6 +55,8 @@ void show_navbar_context_menu(LLView* ctrl, S32 x, S32 y);
 void show_topinfobar_context_menu(LLView* ctrl, S32 x, S32 y);
 void handle_reset_view();
 void process_grant_godlike_powers(LLMessageSystem* msg, void**);
+
+bool is_agent_mappable(const LLUUID& agent_id);
 
 bool enable_god_full();
 bool enable_god_liaison();
@@ -78,10 +80,16 @@ void handle_take(bool take_separate = false);
 void handle_take_copy();
 void handle_look_at_selection(const LLSD& param);
 bool handle_zoom_to_object(const LLUUID& object_id);
+bool save_object_back_to_contents(LLViewerObject* object, const LLUUID& source_task_id);
 void handle_object_return();
 void handle_object_delete();
 void handle_object_edit();
 void handle_object_edit_gltf_material();
+
+// Resolve the control avatar of the currently-selected animesh (any animesh, local
+// preview or not), or null. Shared by the in-world right-click menu and the Local
+// Assets floater so a local anim can be previewed on any animesh.
+LLControlAvatar* get_selected_animesh_control_avatar();
 
 void handle_attachment_edit(const LLUUID& inv_item_id);
 void handle_attachment_touch(const LLUUID& inv_item_id);
@@ -114,29 +122,27 @@ bool enable_pay_object();
 bool enable_buy_object();
 bool handle_go_to();
 
-// find avatar from object methods
-LLVOAvatar* find_avatar_from_object(LLViewerObject* object);
-LLVOAvatar* find_avatar_from_object(const LLUUID& object_id);
-
 // Convert strings to internal types
 U32 render_type_from_string(std::string_view render_type);
 U32 feature_from_string(std::string_view feature);
 U64 info_display_from_string(std::string_view info_display);
 
-class LLViewerMenuHolderGL : public LLMenuHolderGL
+class LLViewerMenuHolderGL final : public LLMenuHolderGL
 {
 public:
+    AL_VIEW_TYPE(LLViewerMenuHolderGL, LLMenuHolderGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuHolderGL::Params>
     {};
 
     LLViewerMenuHolderGL(const Params& p);
 
-    virtual bool hideMenus();
+    virtual bool hideMenus() override;
 
     void setParcelSelection(LLSafeHandle<LLParcelSelection> selection);
     void setObjectSelection(LLSafeHandle<LLObjectSelection> selection);
 
-    virtual const LLRect getMenuRect() const;
+    virtual const LLRect getMenuRect() const override;
 
 protected:
     LLSafeHandle<LLParcelSelection> mParcelSelection;

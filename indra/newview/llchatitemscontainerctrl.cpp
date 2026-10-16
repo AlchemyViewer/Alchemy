@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2016, Kitty Barnett
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -30,13 +31,14 @@
 #include "llchatmsgbox.h"
 #include "lltextbox.h"
 
-#include "llavataractions.h"
 #include "llavatariconctrl.h"
 #include "llcommandhandler.h"
 #include "llfloaterreg.h"
 #include "lllocalcliprect.h"
+#include "alfloaterblocked.h"
 #include "lltrans.h"
 #include "llfloaterimnearbychat.h"
+#include "llfloaterreporter.h"
 #include "llfloaterworldmap.h"
 #include "llviewermenu.h"
 
@@ -44,6 +46,9 @@
 #include "llagentdata.h"
 
 #include "llslurl.h"
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+#include "lltextparser.h"
+// [/SL:KB]
 
 // [RLVa:KB] - Checked: 2010-04-21 (RLVa-1.2.0f)
 #include "rlvhandler.h"
@@ -95,6 +100,32 @@ public:
                 LLFloaterWorldMap::getInstance()->trackURL(region_name, x, y, z);
                 LLFloaterReg::showInstance("world_map", "center");
             }
+            return true;
+        }
+        if (verb == "block")
+        {
+            if (params.size() > 2)
+            {
+                const std::string object_name = LLURI::unescape(params[2].asString());
+                LLMute mute(object_id, object_name, LLMute::OBJECT);
+                LLMuteList::getInstance()->add(mute);
+                ALFloaterBlocked::showMuteAndSelect(mute.mID);
+            }
+            return true;
+        }
+        if (verb == "unblock")
+        {
+            if (params.size() > 2)
+            {
+                const std::string object_name = params[2].asString();
+                LLMute mute(object_id, object_name, LLMute::OBJECT);
+                LLMuteList::getInstance()->remove(mute);
+            }
+            return true;
+        }
+        if (verb == "reportAbuse" && web == NULL)
+        {
+            LLFloaterReporter::showFromObject(object_id, LLUUID::null);
             return true;
         }
 
@@ -160,16 +191,7 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
     LLUIColor textColor = LLUIColorTable::instance().getColor(color_name);
     F32 textAlpha = (F32)notification["color_alpha"].asReal();
 
-    S32 font_size = notification["font_size"].asInteger();
-
-    LLFontGL*       messageFont;
-    switch(font_size)
-    {
-        case 0: messageFont = LLFontGL::getFontSansSerifSmall(); break;
-        default:
-        case 1: messageFont = LLFontGL::getFontSansSerif();     break;
-        case 2: messageFont = LLFontGL::getFontSansSerifBig();  break;
-    }
+    LLFontGL* messageFont = LLViewerChat::getChatFont();
 
     //append text
     {
@@ -185,7 +207,7 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
 
         if(notification["chat_style"].asInteger()== CHAT_STYLE_IRC)
         {
-            style_params.font.style = "ITALIC";
+            style_params.font.style = chat_type == CHAT_TYPE_SHOUT ? "BOLD|ITALIC" : "ITALIC";
         }
         else if( chat_type == CHAT_TYPE_SHOUT)
         {
@@ -195,7 +217,20 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
         {
             style_params.font.style = "ITALIC";
         }
-        mMsgText->appendText(messageText, true, style_params);
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+        static LLCachedControl<bool> sEnableChatAlerts(gSavedSettings, "ChatAlerts", false);
+        if (sEnableChatAlerts && gAgentID != mFromID)
+        {
+            const S32 nHighlightMask = mMsgText->getHighlightsMask();
+            mMsgText->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_NEARBYCHAT);
+            mMsgText->appendText(messageText, true, style_params);
+            mMsgText->setHighlightsMask(nHighlightMask);
+        }
+        else
+        {
+            mMsgText->appendText(messageText, true, style_params);
+        }
+// [/SL:KB]
     }
 
     snapToMessageHeight();
@@ -221,20 +256,10 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
     LLUIColor textColor = LLUIColorTable::instance().getColor(color_name);
     F32 textAlpha = (F32)notification["color_alpha"].asReal();
 
-    S32 font_size = notification["font_size"].asInteger();
-
-    LLFontGL*       messageFont;
-    switch(font_size)
-    {
-        case 0: messageFont = LLFontGL::getFontSansSerifSmall(); break;
-        default:
-        case 1: messageFont = LLFontGL::getFontSansSerif();     break;
-        case 2: messageFont = LLFontGL::getFontSansSerifBig();  break;
-    }
+    LLFontGL* messageFont = LLViewerChat::getChatFont();
 
     mMsgText = getChild<LLChatMsgBox>("msg_text", false);
     mMsgText->setContentTrusted(false);
-    mMsgText->setIsFriendCallback(LLAvatarActions::isFriend);
 
     mMsgText->setText(std::string(""));
 
@@ -324,7 +349,20 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
         {
             style_params.font.style = "ITALIC";
         }
-        mMsgText->appendText(messageText, false, style_params);
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+        static LLCachedControl<bool> sEnableChatAlerts(gSavedSettings, "ChatAlerts", false);
+        if (sEnableChatAlerts && gAgentID != mFromID)
+        {
+            const S32 nHighlightMask = mMsgText->getHighlightsMask();
+            mMsgText->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_NEARBYCHAT);
+            mMsgText->appendText(messageText, false, style_params);
+            mMsgText->setHighlightsMask(nHighlightMask);
+        }
+        else
+        {
+            mMsgText->appendText(messageText, false, style_params);
+        }
+// [/SL:KB]
     }
 
 
@@ -341,7 +379,10 @@ void    LLFloaterIMNearbyChatToastPanel::snapToMessageHeight    ()
 
     panel_rect.setLeftTopAndSize( panel_rect.mLeft, panel_rect.mTop, panel_rect.getWidth(), new_height);
 
-    reshape( getRect().getWidth(), getRect().getHeight(), 1);
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-08-27 (Catznip-2.1)
+    reshape( panel_rect.getWidth(), panel_rect.getHeight(), 1);
+// [/SL:KB]
+//  reshape( getRect().getWidth(), getRect().getHeight(), 1);
 
     setRect(panel_rect);
 

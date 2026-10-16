@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ height="590"
+ can_resize="true"
+ help_topic="event_details"
+ label="Event"
+ layout="topleft"
+ name="Event"
+ save_visibility="false"
+ title="EVENT DETAILS"
+ max_width="320"
+ width="313">
+  <panel
+   follows="all"
+   name="event_panel"
+   top="0"
+   bottom="590"
+   left="0"
+   right="313"
+   class="panel_al_event_info"
+   filename="panel_al_event_info.xml" />
+</floater>
+

@@ -638,35 +638,5 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
              right="-2"
              top_pad="4" />
         </panel>
-
-<!-- ================================= BLOCKED tab ========================== -->
-
-        <!--<panel
-         background_opaque="true"
-         background_visible="true"
-         bg_alpha_color="DkGray"
-         bg_opaque_color="DkGray"
-         follows="all"
-         height="383"
-         label="BLOCKED"
-         layout="topleft"
-         left="0"
-         help_topic="people_blocked_tab"
-         name="blocked_panel"
-         right="-1"
-         top="0">
-          <panel
-           class="panel_block_list_sidetray"
-           height="383"
-           name="panel_block_list_sidetray"
-           filename="panel_block_list_sidetray.xml"
-           follows="all"
-           label="Blocked Residents &amp; Objects"
-           layout="topleft"
-           left="0"
-           font="SansSerifBold"
-           top="0"
-           right="-1" />
-        </panel>-->
     </tab_container>
 </panel>

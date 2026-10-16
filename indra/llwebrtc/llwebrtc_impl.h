@@ -39,6 +39,15 @@
 #endif
 
 #include "llwebrtc.h"
+#include "alaudiodevicenotifier.h"
+#include "alaudioechobuffer.h"
+#include <cstdint>
+#include <memory>
+
+// Work around webrtc on gcc 16 libstdc++ headers
+#include <cstddef>
+using std::nullptr_t;
+
 // WebRTC Includes
 #ifdef WEBRTC_WIN
 #pragma warning(push)
@@ -54,12 +63,12 @@
 #include "rtc_base/ref_counted_object.h"
 #include "rtc_base/ssl_adapter.h"
 #include "rtc_base/thread.h"
+#include "rtc_base/logging.h"
 #include "api/peer_connection_interface.h"
 #include "api/media_stream_interface.h"
 #include "api/create_peerconnection_factory.h"
 #include "modules/audio_device/include/audio_device.h"
 #include "modules/audio_device/include/audio_device_data_observer.h"
-#include "rtc_base/task_queue.h"
 #include "api/task_queue/task_queue_factory.h"
 #include "api/task_queue/default_task_queue_factory.h"
 #include "modules/audio_device/include/audio_device_defines.h"
@@ -69,36 +78,40 @@ namespace llwebrtc
 
 class LLWebRTCPeerConnectionImpl;
 
-class LLWebRTCLogSink : public rtc::LogSink {
+class LLWebRTCLogSink : public webrtc::LogSink
+{
 public:
-    LLWebRTCLogSink(LLWebRTCLogCallback* callback) :
-    mCallback(callback)
-    {
-    }
+    LLWebRTCLogSink(LLWebRTCLogCallback* callback) : mCallback(callback) {}
 
     // Destructor: close the log file
-    ~LLWebRTCLogSink() override
-    {
-    }
+    ~LLWebRTCLogSink() override { mCallback = nullptr; }
 
-    void OnLogMessage(const std::string& msg,
-                      rtc::LoggingSeverity severity) override
+    void OnLogMessage(const std::string& msg, webrtc::LoggingSeverity severity) override
     {
         if (mCallback)
         {
-            switch(severity)
+            // RTC_LOG prefixes each message with its "(file:line): " origin. Use it to demote
+            // libwebrtc's own chatty INFO/WARNING logging to verbose, keeping ours as-is.
+            static const std::string file_prefix("(llwebrtc.cpp:");
+            switch (severity)
             {
-                case rtc::LS_VERBOSE:
+                case webrtc::LS_VERBOSE:
                     mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
                     break;
-                case rtc::LS_INFO:
-                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
+                case webrtc::LS_INFO:
+                    mCallback->LogMessage(msg.rfind(file_prefix, 0) == 0
+                                               ? LLWebRTCLogCallback::LOG_LEVEL_INFO
+                                               : LLWebRTCLogCallback::LOG_LEVEL_VERBOSE,
+                                           msg);
                     break;
-                case rtc::LS_WARNING:
-                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
+                case webrtc::LS_WARNING:
+                    mCallback->LogMessage(msg.rfind(file_prefix, 0) == 0
+                                               ? LLWebRTCLogCallback::LOG_LEVEL_WARNING
+                                               : LLWebRTCLogCallback::LOG_LEVEL_VERBOSE,
+                                           msg);
                     break;
-                case rtc::LS_ERROR:
-                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
+                case webrtc::LS_ERROR:
+                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_ERROR, msg);
                     break;
                 default:
                     break;
@@ -118,90 +131,340 @@ private:
     LLWebRTCLogCallback* mCallback;
 };
 
-// Implements a class allowing capture of audio data
-// to determine audio level of the microphone.
-class LLAudioDeviceObserver : public webrtc::AudioDeviceDataObserver
+// -----------------------------------------------------------------------------
+// A proxy transport that forwards capture data to two AudioTransport sinks:
+//  - the "engine" (libwebrtc's VoiceEngine)
+//  - the "user" (your app's listener)
+//
+// Playout (NeedMorePlayData) goes only to the engine by default to avoid
+// double-writing into the output buffer. See notes below if you want a tap.
+// -----------------------------------------------------------------------------
+class LLWebRTCAudioTransport : public webrtc::AudioTransport
 {
-  public:
-    LLAudioDeviceObserver();
+public:
+    LLWebRTCAudioTransport();
 
-    // Retrieve the RMS audio loudness
-    float getMicrophoneEnergy();
+    void SetEngineTransport(webrtc::AudioTransport* t);
 
-    // Data retrieved from the caputure device is
-    // passed in here for processing.
-    void OnCaptureData(const void    *audio_samples,
-                       const size_t   num_samples,
-                       const size_t   bytes_per_sample,
-                       const size_t   num_channels,
-                       const uint32_t samples_per_sec) override;
+    // -------- Capture path: fan out to both sinks --------
+    int32_t RecordedDataIsAvailable(const void* audio_data,
+                                    size_t      number_of_samples,
+                                    size_t      bytes_per_sample,
+                                    size_t      number_of_channels,
+                                    uint32_t    samples_per_sec,
+                                    uint32_t    total_delay_ms,
+                                    int32_t     clock_drift,
+                                    uint32_t    current_mic_level,
+                                    bool        key_pressed,
+                                    uint32_t&   new_mic_level) override;
 
-    // This is for data destined for the render device.
-    // not currently used.
-    void OnRenderData(const void    *audio_samples,
-                      const size_t   num_samples,
-                      const size_t   bytes_per_sample,
-                      const size_t   num_channels,
-                      const uint32_t samples_per_sec) override;
+    // -------- Playout path: delegate to engine only --------
+    int32_t NeedMorePlayData(size_t   number_of_samples,
+                             size_t   bytes_per_sample,
+                             size_t   number_of_channels,
+                             uint32_t samples_per_sec,
+                             void*    audio_data,
+                             size_t&  number_of_samples_out,
+                             int64_t* elapsed_time_ms,
+                             int64_t* ntp_time_ms) override;
 
-  protected:
-    static const int NUM_PACKETS_TO_FILTER = 30;  // 300 ms of smoothing (30 frames)
-    float mSumVector[NUM_PACKETS_TO_FILTER];
-    float mMicrophoneEnergy;
+    // Method to pull mixed render audio data from all active VoE channels.
+    // The data will not be passed as reference for audio processing internally.
+    void PullRenderData(int      bits_per_sample,
+                        int      sample_rate,
+                        size_t   number_of_channels,
+                        size_t   number_of_frames,
+                        void*    audio_data,
+                        int64_t* elapsed_time_ms,
+                        int64_t* ntp_time_ms) override;
+
+    float GetMicrophoneEnergy() { return mMicrophoneEnergy.load(std::memory_order_relaxed); }
+    void  SetGain(float gain) { mGain.store(gain, std::memory_order_relaxed); }
+
+    // Rendered in place of engine audio while devices are being previewed.
+    // Set during startup, before any audio thread is running.
+    void SetEchoBuffer(std::shared_ptr<ALAudioEchoBuffer> buffer) { mEchoBuffer = std::move(buffer); }
+
+private:
+    std::atomic<webrtc::AudioTransport*> engine_{ nullptr };
+    static const int                     NUM_PACKETS_TO_FILTER = 30; // 300 ms of smoothing (30 frames)
+    float                                mSumVector[NUM_PACKETS_TO_FILTER];
+    std::atomic<float>                   mMicrophoneEnergy;
+    std::atomic<float>                   mGain{ 1.0f };
+    std::vector<int16_t>                 mTrimmed; // capture thread only
+    std::shared_ptr<ALAudioEchoBuffer>   mEchoBuffer;
 };
+
+
+// -----------------------------------------------------------------------------
+// LLWebRTCAudioDeviceModule
+// - Wraps a real ADM to provide microphone energy for tuning
+// -----------------------------------------------------------------------------
+class LLWebRTCAudioDeviceModule : public webrtc::AudioDeviceModule
+{
+public:
+    explicit LLWebRTCAudioDeviceModule(webrtc::scoped_refptr<webrtc::AudioDeviceModule> inner) :
+        inner_(inner),
+        playout_device_(kPlayoutDeviceUnset),
+        tuning_(false)
+    {
+        RTC_CHECK(inner_);
+    }
+
+    // ----- AudioDeviceModule interface: we mostly forward to |inner_| -----
+    int32_t ActiveAudioLayer(AudioLayer* audioLayer) const override { return inner_->ActiveAudioLayer(audioLayer); }
+
+    int32_t RegisterAudioCallback(webrtc::AudioTransport* engine_transport) override
+    {
+        // The engine registers its transport here. We put our audio transport between engine and ADM.
+        audio_transport_.SetEngineTransport(engine_transport);
+        // Register our proxy with the real ADM.
+        return inner_->RegisterAudioCallback(&audio_transport_);
+    }
+
+    int32_t Init() override { return inner_->Init(); }
+    int32_t Terminate() override {
+        // libwebrtc attempts to terminate the adm when peer connections go to zero, but we don't want that,
+        // now that we're keeping the adm active throughout the session.
+        return 0;
+    }
+    bool    Initialized() const override { return inner_->Initialized(); }
+
+    int32_t ForceTerminate()
+    {
+        playout_device_ = kPlayoutDeviceUnset;
+        return inner_->Terminate();
+    }
+
+    // --- Device enumeration/selection (forward) ---
+    int16_t PlayoutDevices() override { return inner_->PlayoutDevices(); }
+    int16_t RecordingDevices() override { return inner_->RecordingDevices(); }
+    int32_t PlayoutDeviceName(uint16_t index, char name[webrtc::kAdmMaxDeviceNameSize], char guid[webrtc::kAdmMaxGuidSize]) override
+    {
+        return inner_->PlayoutDeviceName(index, name, guid);
+    }
+    int32_t RecordingDeviceName(uint16_t index, char name[webrtc::kAdmMaxDeviceNameSize], char guid[webrtc::kAdmMaxGuidSize]) override
+    {
+        return inner_->RecordingDeviceName(index, name, guid);
+    }
+    int32_t SetPlayoutDevice(uint16_t index) override
+    {
+        playout_device_ = index;
+        return inner_->SetPlayoutDevice(index);
+    }
+    int32_t SetRecordingDevice(uint16_t index) override { return inner_->SetRecordingDevice(index); }
+
+    // Windows default/communications selectors, if your branch exposes them:
+    int32_t SetPlayoutDevice(WindowsDeviceType type) override
+    {
+        playout_device_ = type;
+        return inner_->SetPlayoutDevice(type);
+    }
+    int32_t SetRecordingDevice(WindowsDeviceType type) override { return inner_->SetRecordingDevice(type); }
+
+    // The playout selection last handed to the module -- an index or a
+    // WindowsDeviceType -- or kPlayoutDeviceUnset when none has been since it
+    // was last terminated.  libwebrtc's module never reports its selection
+    // back, so this record is what workerStartPlayout() compares against.
+    static constexpr int32_t kPlayoutDeviceUnset = INT32_MIN;
+    int32_t GetPlayoutDevice() const { return playout_device_; }
+
+    // --- Init/start/stop (forward) ---
+    int32_t InitPlayout() override { return inner_->InitPlayout(); }
+    bool    PlayoutIsInitialized() const override { return inner_->PlayoutIsInitialized(); }
+    int32_t StartPlayout() override { return inner_->StartPlayout(); }
+    int32_t StopPlayout() override { return inner_->StopPlayout(); }
+    bool    Playing() const override { return inner_->Playing(); }
+
+    int32_t InitRecording() override { return inner_->InitRecording(); }
+    bool    RecordingIsInitialized() const override { return inner_->RecordingIsInitialized(); }
+    int32_t StartRecording() override {
+        // ignore start recording as webrtc.lib will
+        // send one when streams first connect, resulting
+        // in an inadvertant 'recording' when mute is on.
+        // We take full control of StartRecording via
+        // ForceStartRecording below.
+        return 0;
+    }
+    int32_t StopRecording() override {
+        // ignore stop recording as webrtc.lib will send one when streams shut down,
+        // even if there are other streams in place.  Start/Stop recording are entirely
+        // controlled by the app
+        return 0;
+    }
+    int32_t ForceStartRecording() { return inner_->StartRecording(); }
+    int32_t ForceStopRecording() { return inner_->StopRecording(); }
+    bool    Recording() const override { return inner_->Recording(); }
+
+    // --- Stereo opts (forward if available on your branch) ---
+    int32_t SetStereoPlayout(bool enable) override { return inner_->SetStereoPlayout(enable); }
+    int32_t SetStereoRecording(bool enable) override { return inner_->SetStereoRecording(enable); }
+    int32_t PlayoutIsAvailable(bool* available) override { return inner_->PlayoutIsAvailable(available); }
+    int32_t RecordingIsAvailable(bool* available) override { return inner_->RecordingIsAvailable(available); }
+
+    // --- AGC/Volume/Mute/etc. (forward) ---
+    int32_t SetMicrophoneVolume(uint32_t volume) override { return inner_->SetMicrophoneVolume(volume); }
+    int32_t MicrophoneVolume(uint32_t* volume) const override { return inner_->MicrophoneVolume(volume); }
+
+    // --- Speaker/Microphone init (forward) ---
+    int32_t InitSpeaker() override { return inner_->InitSpeaker(); }
+    bool    SpeakerIsInitialized() const override { return inner_->SpeakerIsInitialized(); }
+    int32_t InitMicrophone() override { return inner_->InitMicrophone(); }
+    bool    MicrophoneIsInitialized() const override { return inner_->MicrophoneIsInitialized(); }
+
+    // --- Speaker Volume (forward) ---
+    int32_t SpeakerVolumeIsAvailable(bool* available) override { return inner_->SpeakerVolumeIsAvailable(available); }
+    int32_t SetSpeakerVolume(uint32_t volume) override { return inner_->SetSpeakerVolume(volume); }
+    int32_t SpeakerVolume(uint32_t* volume) const override { return inner_->SpeakerVolume(volume); }
+    int32_t MaxSpeakerVolume(uint32_t* maxVolume) const override { return inner_->MaxSpeakerVolume(maxVolume); }
+    int32_t MinSpeakerVolume(uint32_t* minVolume) const override { return inner_->MinSpeakerVolume(minVolume); }
+
+    // --- Microphone Volume (forward) ---
+    int32_t MicrophoneVolumeIsAvailable(bool* available) override { return inner_->MicrophoneVolumeIsAvailable(available); }
+    int32_t MaxMicrophoneVolume(uint32_t* maxVolume) const override { return inner_->MaxMicrophoneVolume(maxVolume); }
+    int32_t MinMicrophoneVolume(uint32_t* minVolume) const override { return inner_->MinMicrophoneVolume(minVolume); }
+
+    // --- Speaker Mute (forward) ---
+    int32_t SpeakerMuteIsAvailable(bool* available) override { return inner_->SpeakerMuteIsAvailable(available); }
+    int32_t SetSpeakerMute(bool enable) override { return inner_->SetSpeakerMute(enable); }
+    int32_t SpeakerMute(bool* enabled) const override { return inner_->SpeakerMute(enabled); }
+
+    // --- Microphone Mute (forward) ---
+    int32_t MicrophoneMuteIsAvailable(bool* available) override { return inner_->MicrophoneMuteIsAvailable(available); }
+    int32_t SetMicrophoneMute(bool enable) override { return inner_->SetMicrophoneMute(enable); }
+    int32_t MicrophoneMute(bool* enabled) const override { return inner_->MicrophoneMute(enabled); }
+
+    // --- Stereo Support (forward) ---
+    int32_t StereoPlayoutIsAvailable(bool* available) const override { return inner_->StereoPlayoutIsAvailable(available); }
+    int32_t StereoPlayout(bool* enabled) const override { return inner_->StereoPlayout(enabled); }
+    int32_t StereoRecordingIsAvailable(bool* available) const override { return inner_->StereoRecordingIsAvailable(available); }
+    int32_t StereoRecording(bool* enabled) const override { return inner_->StereoRecording(enabled); }
+
+    // --- Delay/Timing (forward) ---
+    int32_t PlayoutDelay(uint16_t* delayMS) const override { return inner_->PlayoutDelay(delayMS); }
+
+    // --- Built-in Audio Processing (forward) ---
+    bool    BuiltInAECIsAvailable() const override { return inner_->BuiltInAECIsAvailable(); }
+    bool    BuiltInAGCIsAvailable() const override { return inner_->BuiltInAGCIsAvailable(); }
+    bool    BuiltInNSIsAvailable() const override { return inner_->BuiltInNSIsAvailable(); }
+    int32_t EnableBuiltInAEC(bool enable) override { return inner_->EnableBuiltInAEC(enable); }
+    int32_t EnableBuiltInAGC(bool enable) override { return inner_->EnableBuiltInAGC(enable); }
+    int32_t EnableBuiltInNS(bool enable) override { return inner_->EnableBuiltInNS(enable); }
+
+    // --- Additional AudioDeviceModule methods (forward) ---
+    int32_t GetPlayoutUnderrunCount() const override { return inner_->GetPlayoutUnderrunCount(); }
+
+    // Used to generate RTC stats. If not implemented, RTCAudioPlayoutStats will
+    // not be present in the stats.
+    std::optional<Stats> GetStats() const override { return inner_->GetStats(); }
+
+// Only supported on iOS.
+#if defined(WEBRTC_IOS)
+    virtual int GetPlayoutAudioParameters(AudioParameters* params) const override { return inner_->GetPlayoutAudioParameters(params); }
+    virtual int GetRecordAudioParameters(AudioParameters* params) override { return inner_->GetRecordAudioParameters(params); }
+#endif // WEBRTC_IOS
+
+    // tuning microphone energy calculations
+    float GetMicrophoneEnergy() { return audio_transport_.GetMicrophoneEnergy(); }
+    void SetMicGain(float gain) { audio_transport_.SetGain(gain); }
+    void SetEchoBuffer(std::shared_ptr<ALAudioEchoBuffer> buffer) { audio_transport_.SetEchoBuffer(std::move(buffer)); }
+
+    void  SetTuning(bool tuning, bool mute);
+
+protected:
+    ~LLWebRTCAudioDeviceModule() override = default;
+
+private:
+    webrtc::scoped_refptr<webrtc::AudioDeviceModule> inner_;
+    LLWebRTCAudioTransport                        audio_transport_;
+    int32_t                                       playout_device_;
+
+    bool tuning_;
+};
+
+class LLCustomProcessorState
+{
+
+public:
+    float getMicrophoneEnergy() { return mMicrophoneEnergy.load(std::memory_order_relaxed); }
+    void setMicrophoneEnergy(float energy) { mMicrophoneEnergy.store(energy, std::memory_order_relaxed); }
+
+    void setGain(float gain)
+    {
+        mGain.store(gain, std::memory_order_relaxed);
+        mDirty.store(true, std::memory_order_relaxed);
+    }
+
+    float getGain() { return mGain.load(std::memory_order_relaxed); }
+
+    bool getDirty() { return mDirty.exchange(false, std::memory_order_relaxed); }
+
+ protected:
+    std::atomic<bool>  mDirty{ true };
+    std::atomic<float> mMicrophoneEnergy{ 0.0f };
+    std::atomic<float> mGain{ 0.0f };
+};
+
+using LLCustomProcessorStatePtr = std::shared_ptr<LLCustomProcessorState>;
 
 // Used to process/retrieve audio levels after
 // all of the processing (AGC, AEC, etc.) for display in-world to the user.
 class LLCustomProcessor : public webrtc::CustomProcessing
 {
-  public:
-    LLCustomProcessor();
+public:
+    LLCustomProcessor(LLCustomProcessorStatePtr state, std::shared_ptr<ALAudioEchoBuffer> echo);
     ~LLCustomProcessor() override {}
 
     // (Re-) Initializes the submodule.
     void Initialize(int sample_rate_hz, int num_channels) override;
 
     // Analyzes the given capture or render signal.
-    void Process(webrtc::AudioBuffer *audio) override;
+    void Process(webrtc::AudioBuffer* audio) override;
 
     // Returns a string representation of the module state.
     std::string ToString() const override { return ""; }
 
-    float getMicrophoneEnergy() { return mMicrophoneEnergy; }
-
-    void setGain(float gain) { mGain = gain; }
-
-  protected:
-    static const int NUM_PACKETS_TO_FILTER = 30;  // 300 ms of smoothing
-    int              mSampleRateHz;
-    int              mNumChannels;
+protected:
+    static const int NUM_PACKETS_TO_FILTER = 30; // 300 ms of smoothing
+    int              mSampleRateHz{ 48000 };
+    int              mNumChannels{ 2 };
+    int              mRampFrames{ 2 };
+    float            mCurrentGain{ 0.0f };
+    float            mGainStep{ 0.0f };
 
     float mSumVector[NUM_PACKETS_TO_FILTER];
-    float mMicrophoneEnergy;
-    float mGain;
+    friend LLCustomProcessorState;
+    LLCustomProcessorStatePtr mState;
+    std::shared_ptr<ALAudioEchoBuffer> mEchoBuffer;
 };
 
 
 // Primary singleton implementation for interfacing
 // with the native webrtc library.
-class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceSink
+class LLWebRTCImpl : public LLWebRTCDeviceInterface, public ALAudioDeviceNotifier::Observer
 {
   public:
     LLWebRTCImpl(LLWebRTCLogCallback* logCallback);
     ~LLWebRTCImpl()
     {
         delete mLogSink;
+
+        // Explicit cleanup for the sake of debugging and crash stacks
+        mPeerCustomProcessor = nullptr;
     }
 
     void init();
-    void terminate();
+    // Returns true if shutdown completed cleanly and this object may be
+    // destroyed.  Returns false if it timed out: a detached thread is still
+    // using this object and its webrtc threads, so it must be leaked, not
+    // deleted.
+    bool terminate();
 
     //
     // LLWebRTCDeviceInterface
     //
 
     void setAudioConfig(LLWebRTCDeviceInterface::AudioConfig config = LLWebRTCDeviceInterface::AudioConfig()) override;
-
     void refreshDevices() override;
 
     void setDevicesObserver(LLWebRTCDevicesObserver *observer) override;
@@ -210,14 +473,21 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceS
     void setCaptureDevice(const std::string& id) override;
     void setRenderDevice(const std::string& id) override;
 
+    void setVoiceEnabled(bool enable) override;
+
     void setTuningMode(bool enable) override;
     float getTuningAudioLevel() override;
     float getPeerConnectionAudioLevel() override;
 
-    void setPeerConnectionGain(float gain) override;
+    void setMicGain(float gain) override;
+    void setTuningMicGain(float gain) override;
+
+    void setMute(bool mute, int delay_ms = 20) override;
+
+    void intSetMute(bool mute, int delay_ms = 20);
 
     //
-    // AudioDeviceSink
+    // ALAudioDeviceNotifier::Observer
     //
     void OnDevicesUpdated() override;
 
@@ -240,25 +510,32 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceS
         mSignalingThread->PostTask(std::move(task), location);
     }
 
+    void PostDelayedSignalingTask(absl::AnyInvocable<void() &&> task,
+                  webrtc::TimeDelta delay,
+                  const webrtc::Location& location = webrtc::Location::Current())
+    {
+        mSignalingThread->PostDelayedTask(std::move(task), delay, location);
+    }
+
     void PostNetworkTask(absl::AnyInvocable<void() &&> task,
                   const webrtc::Location& location = webrtc::Location::Current())
     {
         mNetworkThread->PostTask(std::move(task), location);
     }
 
-    void WorkerBlockingCall(rtc::FunctionView<void()> functor,
+    void WorkerBlockingCall(webrtc::FunctionView<void()> functor,
                   const webrtc::Location& location = webrtc::Location::Current())
     {
         mWorkerThread->BlockingCall(std::move(functor), location);
     }
 
-    void SignalingBlockingCall(rtc::FunctionView<void()> functor,
+    void SignalingBlockingCall(webrtc::FunctionView<void()> functor,
                   const webrtc::Location& location = webrtc::Location::Current())
     {
         mSignalingThread->BlockingCall(std::move(functor), location);
     }
 
-    void NetworkBlockingCall(rtc::FunctionView<void()> functor,
+    void NetworkBlockingCall(webrtc::FunctionView<void()> functor,
                   const webrtc::Location& location = webrtc::Location::Current())
     {
         mNetworkThread->BlockingCall(std::move(functor), location);
@@ -266,7 +543,7 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceS
 
     // Allows the LLWebRTCPeerConnectionImpl class to retrieve the
     // native webrtc PeerConnectionFactory.
-    rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> getPeerConnectionFactory()
+    webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> getPeerConnectionFactory()
     {
         return mPeerConnectionFactory;
     }
@@ -275,49 +552,66 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceS
     LLWebRTCPeerConnectionInterface* newPeerConnection();
     void freePeerConnection(LLWebRTCPeerConnectionInterface* peer_connection);
 
-    // enables/disables capture via the capture device
-    void setRecording(bool recording);
-
-    void setPlayout(bool playing);
+    // Start playout once a connection's audio is established (playout is gated
+    // on there being a connection to render).  Capture is not touched here --
+    // it follows voice-enabled state, not connection state.  Safe to call from
+    // any thread (work is posted to the worker thread).
+    void startPlayout();
 
   protected:
+
+    const webrtc::Environment                                  mEnv;
+    void workerStartRecording();
+    void workerStartPlayout();
+    void workerDeployDevices();
+    // We always rely on WebRTC's internal (software APM) audio processing, so
+    // any platform/hardware AEC/AGC/NS must be kept disabled.
+    void workerDisableBuiltInAudioProcessing();
+
+
     LLWebRTCLogSink*                                           mLogSink;
 
     // The native webrtc threads
-    std::unique_ptr<rtc::Thread>                               mNetworkThread;
-    std::unique_ptr<rtc::Thread>                               mWorkerThread;
-    std::unique_ptr<rtc::Thread>                               mSignalingThread;
+    std::unique_ptr<webrtc::Thread>                            mNetworkThread;
+    std::unique_ptr<webrtc::Thread>                            mWorkerThread;
+    std::unique_ptr<webrtc::Thread>                            mSignalingThread;
 
     // The factory that allows creation of native webrtc PeerConnections.
-    rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> mPeerConnectionFactory;
+    webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> mPeerConnectionFactory;
 
-    rtc::scoped_refptr<webrtc::AudioProcessing>                mAudioProcessingModule;
-
-    // more native webrtc stuff
-    std::unique_ptr<webrtc::TaskQueueFactory>                  mTaskQueueFactory;
-
+    webrtc::scoped_refptr<webrtc::AudioProcessing>                mAudioProcessingModule;
 
     // Devices
     void updateDevices();
-    rtc::scoped_refptr<webrtc::AudioDeviceModule>              mTuningDeviceModule;
-    rtc::scoped_refptr<webrtc::AudioDeviceModule>              mPeerDeviceModule;
+    void deployDevices();
+    std::atomic<int>                                           mDevicesDeploying;
+    webrtc::scoped_refptr<LLWebRTCAudioDeviceModule>           mDeviceModule;
+    std::unique_ptr<ALAudioDeviceNotifier>                     mDeviceNotifier;
     std::vector<LLWebRTCDevicesObserver *>                     mVoiceDevicesObserverList;
+
+    bool mBuiltinNS;
+    bool mBuiltinAGC;
+    bool mBuiltinAEC;
 
     // accessors in native webrtc for devices aren't apparently implemented yet.
     bool                                                       mTuningMode;
-    int32_t                                                    mRecordingDevice;
+    std::string                                                mRecordingDevice;
     LLWebRTCVoiceDeviceList                                    mRecordingDeviceList;
 
-    int32_t                                                    mPlayoutDevice;
+    std::string                                                mPlayoutDevice;
     LLWebRTCVoiceDeviceList                                    mPlayoutDeviceList;
 
     bool                                                       mMute;
+    // Whether voice is enabled; gates whether the capture/playout devices run.
+    bool                                                       mVoiceEnabled;
+    float                                                      mGain;
+    float                                                      mTuningGain{ 0.0f };
 
-    LLAudioDeviceObserver *                                    mTuningAudioDeviceObserver;
-    LLCustomProcessor *                                        mPeerCustomProcessor;
+    LLCustomProcessorStatePtr                                  mPeerCustomProcessor;
+    std::shared_ptr<ALAudioEchoBuffer>                         mEchoBuffer;
 
     // peer connections
-    std::vector<rtc::scoped_refptr<LLWebRTCPeerConnectionImpl>>     mPeerConnections;
+    std::vector<webrtc::scoped_refptr<LLWebRTCPeerConnectionImpl>> mPeerConnections;
 };
 
 
@@ -335,14 +629,22 @@ class LLWebRTCPeerConnectionImpl : public LLWebRTCPeerConnectionInterface,
 
 {
   public:
-    LLWebRTCPeerConnectionImpl();
+    LLWebRTCPeerConnectionImpl(const webrtc::Environment& env);
     ~LLWebRTCPeerConnectionImpl();
 
     void init(LLWebRTCImpl * webrtc_impl);
+    // Posts closeOnSignalingThread() and returns immediately.
     void terminate();
 
+    // The actual close.  Signaling thread only.  Callable directly (via a
+    // BlockingCall) when the caller needs the connection to be fully closed
+    // before it continues -- see LLWebRTCImpl::terminate().
+    // webrtc_terminate indicates we're shutting down the webrtc library,
+    // if not, we'll be reusing the peer connection for a reconnection
+    void closeOnSignalingThread(bool webrtc_terminate);
+
     virtual void AddRef() const override = 0;
-    virtual rtc::RefCountReleaseStatus Release() const override = 0;
+    virtual webrtc::RefCountReleaseStatus Release() const override = 0;
 
     //
     // LLWebRTCPeerConnection
@@ -373,10 +675,10 @@ class LLWebRTCPeerConnectionImpl : public LLWebRTCPeerConnectionInterface,
     //
 
     void OnSignalingChange(webrtc::PeerConnectionInterface::SignalingState new_state) override {}
-    void OnAddTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver,
-                    const std::vector<rtc::scoped_refptr<webrtc::MediaStreamInterface>> &streams) override;
-    void OnRemoveTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override;
-    void OnDataChannel(rtc::scoped_refptr<webrtc::DataChannelInterface> channel) override;
+    void OnAddTrack(webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver,
+                    const std::vector<webrtc::scoped_refptr<webrtc::MediaStreamInterface>> &streams) override;
+    void OnRemoveTrack(webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override;
+    void OnDataChannel(webrtc::scoped_refptr<webrtc::DataChannelInterface> channel) override;
     void OnRenegotiationNeeded() override {}
     void OnIceConnectionChange(webrtc::PeerConnectionInterface::IceConnectionState new_state) override {};
     void OnIceGatheringChange(webrtc::PeerConnectionInterface::IceGatheringState new_state) override;
@@ -411,11 +713,13 @@ class LLWebRTCPeerConnectionImpl : public LLWebRTCPeerConnectionInterface,
     void enableSenderTracks(bool enable);
     void enableReceiverTracks(bool enable);
 
-  protected:
+    void gatherConnectionStats() override;
 
+  protected:
+    const webrtc::Environment mEnv;
     LLWebRTCImpl * mWebRTCImpl;
 
-    rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> mPeerConnectionFactory;
+    webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> mPeerConnectionFactory;
 
     typedef enum {
         MUTE_INITIAL,
@@ -429,12 +733,26 @@ class LLWebRTCPeerConnectionImpl : public LLWebRTCPeerConnectionInterface,
     std::vector<std::unique_ptr<webrtc::IceCandidateInterface>>  mCachedIceCandidates;
     bool mAnswerReceived;
 
-    rtc::scoped_refptr<webrtc::PeerConnectionInterface> mPeerConnection;
-    rtc::scoped_refptr<webrtc::MediaStreamInterface> mLocalStream;
+    webrtc::scoped_refptr<webrtc::PeerConnectionInterface> mPeerConnection;
+    webrtc::scoped_refptr<webrtc::MediaStreamInterface> mLocalStream;
 
     // data
     std::vector<LLWebRTCDataObserver *> mDataObserverList;
-    rtc::scoped_refptr<webrtc::DataChannelInterface> mDataChannel;
+    webrtc::scoped_refptr<webrtc::DataChannelInterface> mDataChannel;
+
+    // connection state tracking for delayed renegotiation on disconnect
+    webrtc::PeerConnectionInterface::PeerConnectionState mPeerConnectionState;
+    uint32_t mDisconnectCount;
+
+    // Accessed only on the WebRTC signaling thread.
+    bool mStatsRequestPending;
+
+    // Set by closeOnSignalingThread() so that no new stats request (or other
+    // callback into the viewer) is issued while we're tearing down.
+    // Accessed only on the WebRTC signaling thread.
+    bool mShuttingDown;
+
+    std::atomic<int> mPendingJobs;
 };
 
 }

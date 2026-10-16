@@ -46,7 +46,7 @@
  * description.
  *
  * The variable LOGTEST is used because that's the environment variable
- * checked by test.cpp, our TUT main() program, to turn on LLError logging. It
+ * checked by altestmain.cpp, the tests' main program, to turn on LLError logging. It
  * is expected that Debug is solely for use in test programs.
  */
 class Debug

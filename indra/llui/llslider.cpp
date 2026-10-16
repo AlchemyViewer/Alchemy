@@ -71,7 +71,7 @@ LLSlider::LLSlider(const LLSlider::Params& p)
     mMouseDownSignal(NULL),
     mMouseUpSignal(NULL)
 {
-    mViewModel->setValue(p.initial_value);
+    viewModel()->setValue(p.initial_value);
     updateThumbRect();
     mDragStartThumbRect = mThumbRect;
     setControlName(p.control_name, NULL);
@@ -277,15 +277,26 @@ bool LLSlider::handleKeyHere(KEY key, MASK mask)
     return handled;
 }
 
-bool LLSlider::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLSlider::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if ( mOrientation == VERTICAL )
     {
-        F32 new_val = getValueF32() - clicks * getIncrement();
+        F32 new_val = getValueF32() - delta.mClicks * getIncrement();
         setValueAndCommit(new_val);
         return true;
     }
-    return LLF32UICtrl::handleScrollWheel(x,y,clicks);
+    return LLF32UICtrl::handleScrollWheel(x,y,delta);
+}
+
+bool LLSlider::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    if (mOrientation == HORIZONTAL)
+    {
+        F32 new_val = getValueF32() - delta.mClicks * getIncrement();
+        setValueAndCommit(new_val);
+        return true;
+    }
+    return LLF32UICtrl::handleScrollHWheel(x, y, delta);
 }
 
 void LLSlider::draw()
@@ -298,7 +309,7 @@ void LLSlider::draw()
     // Draw background and thumb.
 
     // drawing solids requires texturing be disabled
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     // Track
     LLPointer<LLUIImage>& trackImage = ( mOrientation == HORIZONTAL )

@@ -1,75 +1,51 @@
 # -*- cmake -*-
 
-project(llaudio)
+add_library(llaudio STATIC)
 
-include(00-Common)
-include(LLAudio)
-include(FMODSTUDIO)
-include(OPENAL)
-include(LLCommon)
+target_sources(
+  llaudio
+  PRIVATE llaudioengine.cpp lllistener.cpp llaudiodecodemgr.cpp llvorbisencode.cpp llwavfile.cpp
+)
 
-set(llaudio_SOURCE_FILES
-    llaudioengine.cpp
-    lllistener.cpp
-    llaudiodecodemgr.cpp
-    llvorbisencode.cpp
-    )
+target_sources(
+  llaudio
+  PUBLIC
+    FILE_SET HEADERS
+      FILES llaudioengine.h lllistener.h llaudiodecodemgr.h llvorbisencode.h llwavfile.h llwindgen.h
+)
 
-set(llaudio_HEADER_FILES
-    CMakeLists.txt
+target_link_libraries(
+  llaudio
+  PRIVATE al::flags
+  PUBLIC llcommon llmath llmessage llfilesystem ll::vorbis ll::openal ll::fmodstudio ll::faudio
+)
 
-    llaudioengine.h
-    lllistener.h
-    llaudiodecodemgr.h
-    llvorbisencode.h
-    llwindgen.h
-    )
+target_precompile_headers(llaudio REUSE_FROM llprecompiled)
 
-if (TARGET ll::fmodstudio)
-    list(APPEND llaudio_SOURCE_FILES
-         llaudioengine_fmodstudio.cpp
-         lllistener_fmodstudio.cpp
-         llstreamingaudio_fmodstudio.cpp
-         )
-
-    list(APPEND llaudio_HEADER_FILES
-         llaudioengine_fmodstudio.h
-         lllistener_fmodstudio.h
-         llstreamingaudio_fmodstudio.h
-         )
-endif ()
-
-if (TARGET ll::openal)
-  list(APPEND llaudio_SOURCE_FILES
-    llaudioengine_openal.cpp
-    lllistener_openal.cpp
-    )
-  
-  list(APPEND llaudio_HEADER_FILES
-    llaudioengine_openal.h
-    lllistener_openal.h
-    )
-endif ()
-
-list(APPEND llaudio_SOURCE_FILES ${llaudio_HEADER_FILES})
-
-add_library (llaudio ${llaudio_SOURCE_FILES})
-target_include_directories( llaudio  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries( llaudio
-        llcommon
-        llmath
-        llmessage
-        llfilesystem
-        ll::vorbis
-    )
-
-if( TARGET ll::openal )
-    target_link_libraries( llaudio ll::openal )
-endif()
-if( TARGET ll::fmodstudio )
-    target_link_libraries( llaudio ll::fmodstudio )
+# The audio engines. Each ll:: target is empty when its option is off, so
+# only the sources are gated.
+if(AL_USE_OPENAL)
+  target_sources(
+    llaudio
+    PRIVATE llaudioengine_openal.cpp lllistener_openal.cpp
+    PUBLIC FILE_SET HEADERS FILES llaudioengine_openal.h lllistener_openal.h
+  )
 endif()
 
-if (USE_PRECOMPILED_HEADERS)
-    target_precompile_headers(llaudio REUSE_FROM llprecompiled)
-endif ()
+if(AL_USE_FMODSTUDIO)
+  target_sources(
+    llaudio
+    PRIVATE llaudioengine_fmodstudio.cpp lllistener_fmodstudio.cpp llstreamingaudio_fmodstudio.cpp
+    PUBLIC
+      FILE_SET HEADERS
+        FILES llaudioengine_fmodstudio.h lllistener_fmodstudio.h llstreamingaudio_fmodstudio.h
+  )
+endif()
+
+if(AL_USE_FAUDIO)
+  target_sources(
+    llaudio
+    PRIVATE llaudioengine_faudio.cpp lllistener_faudio.cpp
+    PUBLIC FILE_SET HEADERS FILES llaudioengine_faudio.h lllistener_faudio.h
+  )
+endif()

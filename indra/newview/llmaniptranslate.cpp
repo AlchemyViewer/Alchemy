@@ -174,8 +174,15 @@ void LLManipTranslate::restoreGL()
 
     GLuint* d = new GLuint[rez*rez];
 
-    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, sGridTex->getTexName(), true);
-    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_TRILINEAR);
+    // Trilinear + mips: the grid recedes to the horizon, so it needs the mip chain. Sampler
+    // rather than texture state, matching the render-time binds in renderGrid's callers.
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, sGridTex->getTexName(),
+                                  gGL.getSampler(ALSamplers::TrilinearWrap));
+
+    // Allocate the whole mip chain up front: immutable storage is allocated once for the
+    // texture, before any level is written, so it cannot happen inside the loop below.
+    LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, rez, rez, GL_RGBA, GL_UNSIGNED_BYTE,
+                                 nullptr, LLImageGL::calcMipLevelCount(rez, rez));
 
     while (rez >= 1)
     {
@@ -270,7 +277,7 @@ void LLManipTranslate::restoreGL()
                 }
             }
         }
-        LLImageGL::setManualImage(GL_TEXTURE_2D, mip, GL_RGBA, rez, rez, GL_RGBA, GL_UNSIGNED_BYTE, d);
+        LLImageGL::setManualSubImage(GL_TEXTURE_2D, mip, rez, rez, GL_RGBA, GL_UNSIGNED_BYTE, d);
         rez = rez >> 1;
         mip++;
     }
@@ -425,7 +432,7 @@ bool LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
     LLRect world_rect = gViewerWindow->getWorldViewRectScaled();
     const F32 ROTATE_ANGLE_PER_SECOND = 30.f * DEG_TO_RAD;
     const S32 ROTATE_H_MARGIN = world_rect.getWidth() / 20;
-    const F32 rotate_angle = ROTATE_ANGLE_PER_SECOND / gFPSClamped;
+    const F32 rotate_angle = ROTATE_ANGLE_PER_SECOND * gFrameDTClamped;
     bool rotated = false;
 
     // ...build mode moves camera about focus point
@@ -664,14 +671,6 @@ bool LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
         LLSelectNode* selectNode = *iter;
         LLViewerObject* object = selectNode->getObject();
 
-        if (selectNode->mSelectedGLTFNode != -1)
-        {
-            // manipulating a GLTF node
-            clamped_relative_move_f -= selectNode->mLastMoveLocal;
-            object->moveGLTFNode(selectNode->mSelectedGLTFNode, clamped_relative_move_f);
-            selectNode->mLastMoveLocal += clamped_relative_move_f;
-        }
-        else
         {
             // Only apply motion to root objects and objects selected
             // as "individual".
@@ -698,24 +697,28 @@ bool LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
                 // handle attachments in local space
                 if (object->isAttachment() && object->mDrawable.notNull())
                 {
-                    // calculate local version of relative move
-                    LLQuaternion objWorldRotation = object->mDrawable->mXform.getParent()->getWorldRotation();
-                    objWorldRotation.transQuat();
-
-                    LLVector3 old_position_local = object->getPosition();
-                    LLVector3 new_position_local = selectNode->mSavedPositionLocal + (clamped_relative_move_f * objWorldRotation);
-
-                    //RN: I forget, but we need to do this because of snapping which doesn't often result
-                    // in position changes even when the mouse moves
-                    object->setPosition(new_position_local);
-                    rebuild(object);
-                    gAgentAvatarp->clampAttachmentPositions();
-                    new_position_local = object->getPosition();
-
-                    if (selectNode->mIndividualSelection)
+                    LLXform* object_xform_parent = object->mDrawable->mXform.getParent();
+                    if (object_xform_parent)
                     {
-                        // counter-translate child objects if we are moving the root as an individual
-                        object->resetChildrenPosition(old_position_local - new_position_local, true);
+                        // calculate local version of relative move
+                        LLQuaternion objWorldRotation = object_xform_parent->getWorldRotation();
+                        objWorldRotation.transQuat();
+
+                        LLVector3 old_position_local = object->getPosition();
+                        LLVector3 new_position_local = selectNode->mSavedPositionLocal + (clamped_relative_move_f * objWorldRotation);
+
+                        //RN: I forget, but we need to do this because of snapping which doesn't often result
+                        // in position changes even when the mouse moves
+                        object->setPosition(new_position_local);
+                        rebuild(object);
+                        gAgentAvatarp->clampAttachmentPositions();
+                        new_position_local = object->getPosition();
+
+                        if (selectNode->mIndividualSelection)
+                        {
+                            // counter-translate child objects if we are moving the root as an individual
+                            object->resetChildrenPosition(old_position_local - new_position_local, true);
+                        }
                     }
                 }
                 else
@@ -740,7 +743,7 @@ bool LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
                     // Grass is always drawn on the ground, so clamp its position to the ground
                     if (object->getPCode() == LL_PCODE_LEGACY_GRASS)
                     {
-                        new_position_global.mdV[VZ] = LLWorld::getInstance()->resolveLandHeightGlobal(new_position_global) + 1.f;
+                        new_position_global.mdV[VZ] = LLWorld::getInstance()->resolveLandHeightGlobal(new_position_global, object->getRegion()) + 1.f;
                     }
 
                     if (object->isRootEdit())
@@ -797,8 +800,8 @@ void LLManipTranslate::highlightManipulators(S32 x, S32 y)
     }
 
     //LLBBox bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
-    LLMatrix4 projMatrix = LLViewerCamera::getInstance()->getProjection();
-    LLMatrix4 modelView = LLViewerCamera::getInstance()->getModelview();
+    LLMatrix4 projMatrix = LLViewerCamera::getInstance()->getForwardZProjection().toMatrix4();
+    LLMatrix4 modelView = LLViewerCamera::getInstance()->frameModelview().toMatrix4();
 
     LLVector3 object_position = getPivotPoint();
 
@@ -1092,7 +1095,7 @@ void LLManipTranslate::renderSnapGuides()
     F32 max_subdivisions = sGridMaxSubdivisionLevel;//(F32)gSavedSettings.getS32("GridSubdivision");
     F32 line_alpha = gSavedSettings.getF32("GridOpacity");
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest gls_depth(GL_TRUE);
     LLGLDisable gls_cull(GL_CULL_FACE);
     LLVector3 translate_axis;
@@ -1452,10 +1455,10 @@ void LLManipTranslate::renderSnapGuides()
                 std::string help_text = LLTrans::getString("manip_hint1");
                 LLColor4 help_text_color = LLColor4::white;
                 help_text_color.mV[VALPHA] = clamp_rescale(mHelpTextTimer.getElapsedTimeF32(), sHelpTextVisibleTime, sHelpTextVisibleTime + sHelpTextFadeTime, line_alpha, 0.f);
-                hud_render_utf8text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
+                hud_render_text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
                 help_text = LLTrans::getString("manip_hint2");
                 help_text_pos -= LLViewerCamera::getInstance()->getUpAxis() * mSnapOffsetMeters * 0.2f;
-                hud_render_utf8text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
+                hud_render_text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
             }
         }
     }
@@ -1502,7 +1505,7 @@ void LLManipTranslate::renderSnapGuides()
             break;
         }
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         highlightIntersection(normal, selection_center, grid_rotation, inner_color);
 
         gGL.pushMatrix();
@@ -1515,7 +1518,7 @@ void LLManipTranslate::renderSnapGuides()
         F32 sz = mGridSizeMeters;
         F32 tiles = sz;
 
-        gGL.matrixMode(LLRender::MM_TEXTURE);
+        gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.pushMatrix();
         usc = 1.0f/usc;
         vsc = 1.0f/vsc;
@@ -1542,7 +1545,8 @@ void LLManipTranslate::renderSnapGuides()
                 //LLGLDisable stencil(GL_STENCIL_TEST);
                 {
                     LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE, GL_GREATER);
-                    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, getGridTexName());
+                    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, getGridTexName(),
+                                                  gGL.getSampler(ALSamplers::TrilinearWrap));
                     gGL.flush();
                     gGL.blendFunc(LLRender::BF_ZERO, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
                     renderGrid(u,v,tiles,0.9f, 0.9f, 0.9f,a*0.15f);
@@ -1552,11 +1556,12 @@ void LLManipTranslate::renderSnapGuides()
 
                 {
                     //draw black overlay
-                    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                    gGL.getTextureSlot(0)->unbind();
                     renderGrid(u,v,tiles,0.0f, 0.0f, 0.0f,a*0.16f);
 
                     //draw grid top
-                    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, getGridTexName());
+                    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, getGridTexName(),
+                                                  gGL.getSampler(ALSamplers::TrilinearWrap));
                     renderGrid(u,v,tiles,1,1,1,a);
 
                     gGL.popMatrix();
@@ -1668,7 +1673,7 @@ void LLManipTranslate::highlightIntersection(LLVector3 normal,
         LLGLDepthTest depth (GL_TRUE, GL_FALSE, GL_ALWAYS);
         //glStencilFunc(GL_ALWAYS, 0, stencil_mask);
         gGL.setColorMask(false, false);
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         gGL.diffuseColor4f(1,1,1,1);
 
@@ -1679,12 +1684,12 @@ void LLManipTranslate::highlightIntersection(LLVector3 normal,
             normal = -normal;
         }
         F32 d = -(selection_center * normal);
-        glm::vec4 plane(normal.mV[0], normal.mV[1], normal.mV[2], d );
+        LLMatrix4a inverse;
+        inverse.setInverse(gGL.getModelviewMatrix());
+        LLVector4a plane;
+        inverse.transform4(LLVector4a(normal.mV[0], normal.mV[1], normal.mV[2], d), plane);
 
-        plane = glm::inverse(gGL.getModelviewMatrix()) * plane;
-
-        static LLStaticHashedString sClipPlane("clip_plane");
-        gClipProgram.uniform4fv(sClipPlane, 1, plane.v);
+        gClipProgram.uniform4fv(sClipPlane, 1, plane.getF32ptr());
 
         bool particles = gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_PARTICLES);
         bool clouds = gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_CLOUDS);
@@ -1743,7 +1748,7 @@ void LLManipTranslate::highlightIntersection(LLVector3 normal,
 
     //draw volume/plane intersections
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         LLGLDepthTest depth(GL_FALSE);
         //LLGLEnable stencil(GL_STENCIL_TEST);
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
@@ -1895,7 +1900,7 @@ void LLManipTranslate::renderTranslationHandles()
         relative_camera_dir.normVec();
 
         {
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
             LLGLDisable cull_face(GL_CULL_FACE);
 
             LLColor4 color1;
@@ -2113,7 +2118,7 @@ void LLManipTranslate::renderTranslationHandles()
             }
         }
         {
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
 
             // Since we draw handles with depth testing off, we need to draw them in the
             // proper depth order.
@@ -2187,7 +2192,7 @@ void LLManipTranslate::renderTranslationHandles()
 
 void LLManipTranslate::renderArrow(S32 which_arrow, S32 selected_arrow, F32 box_size, F32 arrow_size, F32 handle_size, bool reverse_direction)
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLEnable gls_blend(GL_BLEND);
 
     for (S32 pass = 1; pass <= 2; pass++)

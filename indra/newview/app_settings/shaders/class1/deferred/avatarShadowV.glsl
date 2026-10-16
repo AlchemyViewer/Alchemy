@@ -23,7 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 mat4 getSkinnedTransform();
 

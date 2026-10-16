@@ -1,0 +1,1512 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+Lightbox "Look" tab: color science / tone.
+Full guide for adding sections: doc/LIGHTBOX.md. Quick reference:
+Row conventions:
+  scalar  = <setting_row label=... control_name=.../> (18px tall, reset glyph built in)
+  vector  = <setting_row components="R G B" label_width="110" .../> (a box per part, lettered;
+            drag the letter to change it); one part of one = <setting_row part="0" .../>
+  color   = <color_swatch control_name=.../> (0-1 tints only)
+  section = <accordion_tab> "sec_<id>"; long tail in sibling "sec_<id>_adv"; "Reset All" resets
+            every bound control in the section (essential sections include their Advanced tab)
+  heights = (the floater re-fits every section when it opens, but keep these right for XUI Studio)
+            accordion_tab height MUST be its inner panel height + 29 (25 header + 2+2 padding);
+            the tab's rect is the expand height and fit_panel squeezes the panel into what is
+            left after the header, so an undersized tab clips the bottom rows. Compute panel
+            height from the LAST widget's bottom: top_pad chains from the previous widget,
+            and setting rows (18px, top_pad 8) pitch 26px
+-->
+<panel
+ name="panel_lightbox_look"
+ layout="topleft"
+ width="450"
+ height="490"
+ follows="all">
+	<accordion
+	 follows="all"
+	 layout="topleft"
+	 left="2"
+	 top="2"
+	 right="-2"
+	 height="484"
+	 single_expansion="false"
+	 name="look_accordion">
+		<accordion_tab
+		 expanded="true"
+		 layout="topleft"
+		 height="142"
+		 name="atab_sec_tone"
+		 title="Exposure &amp; Tone"
+		 header_tool_tip="How bright the image is and how the scene's brightness is fitted to your display: exposure, the tonemapper, and how much of it is applied."
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="113"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_tone">
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="7"
+				 right="-8"
+				 height="18"
+				 label="Exposure"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0.5"
+				 max_val="4"
+				 name="tone_exposure"
+				 tool_tip="Overall image brightness applied by the tonemapper"
+				 control_name="RenderExposure" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="tone_type_label"
+				 value="Tone mapping" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="tone_type_combo"
+				 tool_tip="Which tonemapping operator maps scene brightness to your display"
+				 control_name="AlchemyRenderTonemapType">
+					<combo_box.item
+					 label="Khronos Neutral"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="ACES"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="ACES Boosted"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Reinhard"
+					 name="3"
+					 value="3" />
+					<combo_box.item
+					 label="Filmic"
+					 name="4"
+					 value="4" />
+					<combo_box.item
+					 label="GT"
+					 name="5"
+					 value="5" />
+					<combo_box.item
+					 label="AgX"
+					 name="6"
+					 value="6" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_type_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="AlchemyRenderTonemapType" />
+				</button>
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Tonemap mix"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="tone_mix"
+				 tool_tip="Blend between linear (0) and tonemapped (1) color. Classic/legacy skies force this to 0."
+				 control_name="RenderTonemapMix" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_tone_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_tone" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="194"
+		 name="atab_sec_tone_adv"
+		 title="Exposure &amp; Tone - Advanced"
+		 header_tool_tip="Each tonemapper's own shaping: the white point for ACES Boosted, Reinhard and Filmic, and contrast and white point for AgX. Only the selected tonemapper's rows have any effect."
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="165"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_tone_adv">
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="7"
+				 right="-8"
+				 height="18"
+				 label="ACES white point"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="1"
+				 max_val="16"
+				 name="tone_aces_white"
+				 tool_tip="White point for the ACES Boosted operator (no effect on other operators)"
+				 control_name="RenderTonemapACESWhite" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Reinhard white point"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="1"
+				 max_val="16"
+				 name="tone_reinhard_white"
+				 tool_tip="White point for the Reinhard operator (no effect on other operators)"
+				 control_name="RenderTonemapReinhardWhite" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Filmic white point"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="1"
+				 max_val="16"
+				 name="tone_filmic_white"
+				 tool_tip="White point for the Filmic operator (no effect on other operators)"
+				 control_name="RenderTonemapFilmicWhite" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="AgX contrast"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="2.5"
+				 name="tone_agx_contrast"
+				 tool_tip="Contrast for the AgX operator (no effect on other operators)"
+				 control_name="RenderTonemapAgxContrast" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="AgX white point"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="1"
+				 max_val="32"
+				 name="tone_agx_white"
+				 tool_tip="White point for the AgX operator (no effect on other operators)"
+				 control_name="RenderTonemapAgxWhite" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_tone_adv_reset"
+				 tool_tip="Reset the advanced tone settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_tone_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="168"
+		 name="atab_sec_autoexp"
+		 title="Auto Exposure"
+		 header_tool_tip="Meter the frame and set the exposure automatically, adapting as the scene gets brighter or darker. The checkbox on the right switches it on."
+		 fit_panel="true">
+			<!-- A real setting on the header, like the grading master: it can be read
+			     and thrown with the section shut, and it is saved with the Look. -->
+			<accordion_tab.header_check_box
+			 name="autoexp_enable"
+			 control_name="RenderDynamicExposureEnabled"
+			 tool_tip="Automatic exposure: meters the frame and sets the exposure so its middle tones sit at middle grey. Classic skies keep a fixed exposure. This one is a setting and is saved with the Look." />
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="139"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_autoexp">
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="7"
+				 right="-8"
+				 height="18"
+				 label="Compensation"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="-4"
+				 max_val="4"
+				 name="autoexp_compensation"
+				 tool_tip="Brightens (+) or darkens (-) the metered exposure, in stops: +1 doubles the image's brightness"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureCompensation" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="autoexp_metering_label"
+				 value="Metering" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="autoexp_metering_combo"
+				 tool_tip="Which part of the frame the exposure is metered on"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureMeteringMode">
+					<combo_box.item
+					 label="Average"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Center-weighted"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Spot"
+					 name="2"
+					 value="2" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="autoexp_metering_rst"
+				 tool_tip="Reset to default"
+				 enabled_control="RenderDynamicExposureEnabled">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="AlchemyExposureMeteringMode" />
+				</button>
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Darkest scene (EV)"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="-8"
+				 max_val="0"
+				 name="autoexp_min_ev"
+				 tool_tip="How far a dark scene is opened up, in stops: -3 brightens it by at most 8x"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureMinEV" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Brightest scene (EV)"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0"
+				 max_val="8"
+				 name="autoexp_max_ev"
+				 tool_tip="How far a bright scene is stopped down, in stops: 4 darkens it by at most 16x"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureMaxEV" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_autoexp_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_autoexp" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="194"
+		 name="atab_sec_autoexp_adv"
+		 title="Auto Exposure - Advanced"
+		 header_tool_tip="How quickly auto exposure adapts in each direction, how much of the darkest and brightest parts of the frame the meter ignores, and how much the sky counts."
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="165"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_autoexp_adv">
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="7"
+				 right="-8"
+				 height="18"
+				 label="Adapt to brighter"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0.1"
+				 max_val="10"
+				 name="autoexp_speed_up"
+				 tool_tip="How fast the exposure follows a scene that gets brighter, per second: 3 covers 95% of the change in one second"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureSpeedUp" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Adapt to darker"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0.1"
+				 max_val="10"
+				 name="autoexp_speed_down"
+				 tool_tip="How fast the exposure follows a scene that gets darker, per second: 1 covers 63% of the change in one second"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureSpeedDown" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Shadow cutoff %"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="0"
+				 max_val="50"
+				 name="autoexp_low_percent"
+				 tool_tip="The darkest part of the frame the meter ignores, as a percentage, so deep shadow does not move the exposure"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureLowPercent" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Highlight cutoff %"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="50"
+				 max_val="100"
+				 name="autoexp_high_percent"
+				 tool_tip="The meter ignores the frame above this percentage of it, so the sun and glints do not move the exposure"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureHighPercent" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Sky weight"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="1"
+				 name="autoexp_sky_weight"
+				 tool_tip="How much the sky counts toward the exposure: 0 ignores it, 1 counts it like the rest of the frame"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureSkyWeight" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_autoexp_adv_reset"
+				 tool_tip="Reset the advanced auto exposure settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_autoexp_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="true"
+		 layout="topleft"
+		 height="155"
+		 name="atab_sec_grading"
+		 title="Color Grading"
+		 header_tool_tip="Color grading as a whole. The checkbox on the right is the master switch for every grading section; below it, grab a still of the frame to compare your grade against."
+		 fit_panel="true">
+			<!-- The master switch rides the header rather than sitting in the body,
+			     so it can be read and thrown with the section shut, and so it reads
+			     the same way as the five section switches below it: ticked is
+			     applied. Unlike those, this one is a real setting and says so with
+			     control_name; they are a viewing state and deliberately have none.
+			     No enabled_control either, for the obvious reason. -->
+			<accordion_tab.header_check_box
+			 name="grading_enable"
+			 control_name="RenderColorGrade"
+			 tool_tip="Master switch for ALL color grading: the 3D LUT plus every Basic, White Balance, Split Toning, Lift / Gamma / Gain and Tone Curve control. This one is a setting and is saved with the Look, unlike the per-section switches." />
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="126"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_grading">
+				<!-- This section opens by default, so what is in it is paid for on
+				     every look at the tab. All that is left is the one line that
+				     says the header checkboxes exist, since a control nobody
+				     finds may as well not. Which order the renderer applies the
+				     sections in is a maintainer's question, not a grader's, and
+				     it lives in doc/LIGHTBOX.md where the answer is useful. -->
+				<text
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-8"
+				 height="16"
+				 font="SansSerifSmall"
+				 name="grading_compare_note"
+				 tool_tip="Switching a section off saves nothing and does not mark the Look as changed, and every section comes back when the Lightbox closes."
+				 value="Untick a section's header checkbox to switch it off while you look." />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="32"
+				 width="330"
+				 height="16"
+				 font="SansSerifSmallBold"
+				 name="reference_label"
+				 value="Reference still: freeze a frame and compare against it" />
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 height="18"
+				 width="64"
+				 left="8"
+				 top="52"
+				 label="Grab"
+				 name="reference_grab"
+				 tool_tip="Freeze the frame as it is now and compare against it while you keep grading. The still is taken where the scopes measure: after every post pass, before the vignette and grain, which are then applied to both sides so the comparison is about the grade. Cleared when the Lightbox closes or the window is resized.">
+					<button.commit_callback
+					 function="LightBox.ReferenceGrab" />
+				</button>
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 height="18"
+				 width="64"
+				 left="76"
+				 top="52"
+				 label="Clear"
+				 name="reference_clear"
+				 tool_tip="Discard the reference still and return to the live image">
+					<button.commit_callback
+					 function="LightBox.ReferenceClear" />
+				</button>
+				<combo_box
+				 follows="left|top"
+				 layout="topleft"
+				 left="148"
+				 top="51"
+				 width="130"
+				 height="20"
+				 name="reference_mode"
+				 tool_tip="How the still is shown against the live image"
+				 control_name="RenderReferenceWipeMode">
+					<combo_box.item
+					 label="Off"
+					 name="ref_off"
+					 value="0" />
+					<combo_box.item
+					 label="Wipe"
+					 name="ref_wipe"
+					 value="1" />
+					<combo_box.item
+					 label="Side by side"
+					 name="ref_side"
+					 value="2" />
+				</combo_box>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="76"
+				 right="-8"
+				 height="16"
+				 label="Wipe position"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 text_width="56"
+				 name="reference_position"
+				 tool_tip="Where the seam sits across the frame: the still to its left, the live image to its right"
+				 control_name="RenderReferenceWipePosition" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top="100"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_grading_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_grading" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="466"
+		 name="atab_sec_basic"
+		 title="Basic"
+		 header_tool_tip="White balance and the everyday adjustments: contrast, highlights and shadows, white and black point, vibrance, saturation, brightness and hue."
+		 fit_panel="true">
+			<!-- Ticked is the section switched on, which is the only way a box
+			     beside a section title reads. -->
+			<accordion_tab.header_check_box
+			 name="section_basic"
+			 initial_value="true"
+			 enabled_control="RenderColorGrade"
+			 tool_tip="Whether Basic is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+				<commit_callback
+				 function="LightBox.ToggleSection"
+				 parameter="basic" />
+			</accordion_tab.header_check_box>
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="437"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_basic">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="basic_hdr_wb"
+				 value="White Balance" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
+				 label="Temperature (K)"
+				 decimal_digits="0"
+				 increment="50"
+				 min_val="-5000"
+				 max_val="5000"
+				 name="basic_temp"
+				 tool_tip="Temperature shift in Kelvin from neutral daylight. Negative warms, positive cools. Try -2500 tungsten, -1000 golden hour, 1500 blue hour."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeWhiteBalanceCCT" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Tint"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="basic_tint"
+				 tool_tip="Green/magenta tint, perpendicular to temperature. Negative pushes magenta, positive pushes green."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeWhiteBalanceDuv" />
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 height="20"
+				 width="140"
+				 label="Pick neutral..."
+				 name="basic_wb_pick"
+				 tool_tip="Click something in world that should look white or grey, and both sliders above are solved to make it so. Pick a well lit spot: a surface in deep shadow carries too little colour to read."
+				 enabled_control="RenderColorGrade">
+					<button.commit_callback
+					 function="LightBox.PickWhiteBalance" />
+				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="basic_hdr_tone_div" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="basic_hdr_tone"
+				 value="Tone" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
+				 label="Contrast"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="basic_contrast"
+				 tool_tip="S-curve around mid grey. 1 is identity; below flattens, above punches. Past 1.3 starts clipping."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeContrast" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Highlights"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="basic_highlights"
+				 tool_tip="Recovers (negative) or boosts (positive) the brightest tones without touching midtones. Use -0.3 to pull a blown sky back."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeHighlights" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Shadows"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="basic_shadows"
+				 tool_tip="Lifts (positive) or crushes (negative) the darkest tones without touching midtones. Use +0.2 to open up a dark scene."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeShadows" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="White point"
+				 text_width="56"
+				 decimal_digits="3"
+				 increment="0.005"
+				 min_val="0.5"
+				 max_val="1"
+				 name="basic_whites"
+				 tool_tip="The input level that becomes pure white. 1 is identity; lowering it blooms highlights and, further down, gives a bleach-bypass look."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeWhitePoint" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Black point"
+				 text_width="56"
+				 decimal_digits="3"
+				 increment="0.005"
+				 min_val="0"
+				 max_val="0.5"
+				 name="basic_blacks"
+				 tool_tip="The input level that becomes pure black. 0 is identity; 0.05 deepens blacks cinematically, beyond 0.1 starts losing shadow detail."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeBlackPoint" />
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="basic_hdr_presence_div" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="basic_hdr_presence"
+				 value="Presence" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
+				 label="Vibrance"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="basic_vibrance"
+				 tool_tip="Saturation that pushes muted colours harder than already-saturated ones. Kinder to skin than Saturation; 0.3 is a subtle lift."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeVibrance" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Saturation"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="basic_saturation"
+				 tool_tip="Uniform saturation. 1 is identity, 0 is black and white, 1.2 is punchy."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeSaturation" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Brightness"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="basic_brightness"
+				 tool_tip="Shifts the whole image lighter or darker in display space, after the tonemap. For overall exposure, use Exposure &amp; Tone instead."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeBrightness" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Hue shift"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="-180"
+				 max_val="180"
+				 name="basic_hue_shift"
+				 tool_tip="Rotates every hue around the colour wheel, in degrees. 30 warms everything; 180 is a full complement."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeHueShift" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_basic_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_basic" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="248"
+		 name="atab_sec_primaries"
+		 title="Primaries"
+		 header_tool_tip="Lift, gamma and gain: color wheels that tint and level the shadows, midtones and highlights separately."
+		 fit_panel="true">
+			<accordion_tab.header_check_box
+			 name="section_primaries"
+			 initial_value="true"
+			 enabled_control="RenderColorGrade"
+			 tool_tip="Whether Lift / Gamma / Gain is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+				<commit_callback
+				 function="LightBox.ToggleSection"
+				 parameter="primaries" />
+			</accordion_tab.header_check_box>
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="219"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_primaries">
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Lift"
+				 centre="0"
+				 min_value="-0.5"
+				 max_value="0.5"
+				 name="wheel_lift"
+				 tool_tip="Adds to every tone, which shows most in the shadows. Drag the puck to tint, the slider to raise or crush the black floor. Double-click the face to neutralise."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeLift" />
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="132"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Gamma"
+				 centre="1"
+				 min_value="0.5"
+				 max_value="1.5"
+				 name="wheel_gamma"
+				 tool_tip="Bends the middle of the range without moving black or white. Above 1 opens the midtones, below 1 closes them."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeGamma" />
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="256"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Gain"
+				 centre="1"
+				 min_value="0.5"
+				 max_value="1.5"
+				 name="wheel_gain"
+				 tool_tip="Multiplies every tone, which shows most in the highlights. Drag the puck to tint whites, the slider to boost or tame them."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeGain" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_primaries_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_primaries" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="461"
+		 name="atab_sec_split"
+		 title="Split Toning"
+		 header_tool_tip="Push one color into the shadows, another into the highlights and a third into the midtones, and choose where the shadows end and the highlights begin."
+		 fit_panel="true">
+			<accordion_tab.header_check_box
+			 name="section_split"
+			 initial_value="true"
+			 enabled_control="RenderColorGrade"
+			 tool_tip="Whether Split Toning is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+				<commit_callback
+				 function="LightBox.ToggleSection"
+				 parameter="split" />
+			</accordion_tab.header_check_box>
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="432"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_split">
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Shadows"
+				 centre="0.5"
+				 min_value="0"
+				 max_value="1"
+				 lock_master="true"
+				 name="wheel_split_shadow"
+				 tool_tip="Colour pushed into the darker tones. Try a cool teal against warm highlights. There is no master here: the renderer normalises tint brightness away."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneShadowTint" />
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="132"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Midtones"
+				 centre="0.5"
+				 min_value="0"
+				 max_value="1"
+				 lock_master="true"
+				 name="wheel_split_midtone"
+				 tool_tip="Colour pushed into the middle tones. Warm tints flatter skin."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneMidtoneTint" />
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="256"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Highlights"
+				 centre="0.5"
+				 min_value="0"
+				 max_value="1"
+				 lock_master="true"
+				 name="wheel_split_highlight"
+				 tool_tip="Colour pushed into the brighter tones. Try warm amber against teal shadows."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneHighlightTint" />
+				<curve_editor
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 right="-8"
+				 height="72"
+				 grid_divisions="4"
+				 draw_diagonal="false"
+				 name="split_tone_graph"
+				 tool_tip="Which tones each tint reaches. Drag the middle handle to slide the split point (the Balance slider); drag the left and right handles to set how far the shadow and highlight tints reach (the Width sliders). Each band is drawn in the colour it applies and fades as its amount drops. A handle held at the edge of the graph is locked; use its Width slider."
+				 enabled_control="RenderColorGrade">
+					<curve_editor.commit_callback
+					 function="LightBox.CommitSplitToneGraph" />
+				</curve_editor>
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-8"
+				 height="18"
+				 label="Amount"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="split_amount"
+				 tool_tip="Strength of the shadow and highlight tints. The midtone tint has its own amount below and works on its own."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneAmount" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Midtone amount"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="split_midtone_amount"
+				 tool_tip="Strength of the midtone tint, separate from the shadow and highlight amount."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneMidtoneAmount" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Balance"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="split_balance"
+				 tool_tip="Slides the split point between shadows and highlights. Negative widens the shadow range, positive widens the highlight range."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneBalance" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Shadow width"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.02"
+				 max_val="0.5"
+				 name="split_shadow_width"
+				 tool_tip="How far below the split point the shadow tint reaches full strength. 0.02 is a hard edge, 0.5 a very soft one. The left handle on the graph."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneShadowWidth" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Highlight width"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.02"
+				 max_val="0.5"
+				 name="split_highlight_width"
+				 tool_tip="How far above the split point the highlight tint reaches full strength. 0.02 is a hard edge, 0.5 a very soft one. The right handle on the graph."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneHighlightWidth" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_split_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_split" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="116"
+		 name="atab_sec_lut"
+		 title="3D LUT"
+		 header_tool_tip="Grade with a color look-up table, a .cube or image LUT from your colorlut folder, at the strength you choose."
+		 fit_panel="true">
+			<accordion_tab.header_check_box
+			 name="section_lut"
+			 initial_value="true"
+			 enabled_control="RenderColorGrade"
+			 tool_tip="Whether the 3D LUT is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+				<commit_callback
+				 function="LightBox.ToggleSection"
+				 parameter="lut" />
+			</accordion_tab.header_check_box>
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="87"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_lut">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="140"
+				 height="15"
+				 name="lut_label"
+				 value="LUT" />
+				<combo_box
+				 allow_text_entry="true"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 max_chars="200"
+				 name="colorlut_combo"
+				 tool_tip="Which color look-up table to grade with. Files dropped into the user 'colorlut' folder appear here."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeLUT">
+					<combo_box.item
+					 label="None"
+					 name="lut_none"
+					 value="" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lut_combo_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeLUT" />
+				</button>
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Strength"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="lut_strength"
+				 tool_tip="How strongly the LUT grades the image"
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeLUTStrength" />
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 left="8"
+				 top_pad="10"
+				 label="Open Folder"
+				 name="lut_open_folder"
+				 tool_tip="Open your LUT folder in the file browser. Drop .cube or image LUTs there; new files are listed the next time the Lightbox opens.">
+					<button.commit_callback
+					 function="LightBox.OpenLUTFolder" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_delta="0"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_lut_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_lut" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="285"
+		 name="atab_sec_curve"
+		 title="Tone Curve"
+		 header_tool_tip="Reshape the tones with curves, on all channels together or on red, green and blue separately."
+		 fit_panel="true">
+			<accordion_tab.header_check_box
+			 name="section_curve"
+			 initial_value="true"
+			 enabled_control="RenderColorGrade"
+			 tool_tip="Whether the Tone Curve is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+				<commit_callback
+				 function="LightBox.ToggleSection"
+				 parameter="curve" />
+			</accordion_tab.header_check_box>
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="256"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_curve">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="110"
+				 height="15"
+				 name="tone_curve_channel_label"
+				 value="Channel" />
+				<combo_box
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="110"
+				 top_pad="-16"
+				 width="120"
+				 height="18"
+				 name="tone_curve_channel"
+				 tool_tip="Which curve the graph edits. Master applies to all three channels after their own curves; a channel shows its combined result and any other shaped channel behind it."
+				 enabled_control="RenderColorGrade">
+					<combo_box.item
+					 label="Master"
+					 name="master"
+					 value="-1" />
+					<combo_box.item
+					 label="Red"
+					 name="red"
+					 value="0" />
+					<combo_box.item
+					 label="Green"
+					 name="green"
+					 value="1" />
+					<combo_box.item
+					 label="Blue"
+					 name="blue"
+					 value="2" />
+					<combo_box.commit_callback
+					 function="LightBox.RefreshToneCurve" />
+				</combo_box>
+				<menu_button
+				 follows="left|top"
+				 layout="topleft"
+				 left_pad="6"
+				 top_delta="0"
+				 width="84"
+				 height="18"
+				 label="Presets"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Arrow_Small_Down"
+				 image_overlay_alignment="right"
+				 menu_filename="menu_lightbox_curve_presets.xml"
+				 menu_position="bottomleft"
+				 name="tone_curve_presets"
+				 tool_tip="Replace the selected curve with a starting shape"
+				 enabled_control="RenderColorGrade" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_delta="0"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_curve_channel_rst"
+				 tool_tip="Reset the selected curve to a straight line">
+					<button.commit_callback
+					 function="LightBox.ResetToneCurveChannel" />
+				</button>
+				<curve_editor
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="160"
+				 curve_samples="192"
+				 points_editable="true"
+				 edited_settings="RenderColorGradeCurveMaster,RenderColorGradeCurveRed,RenderColorGradeCurveGreen,RenderColorGradeCurveBlue"
+				 name="tone_curve_graph"
+				 tool_tip="Drag a point to shape the selected curve. Double-click empty space to add a point (up to 16), double-click a point to remove it; the two end points move only up and down. The straight line is no change. Behind the curve: what the channel gets once Master is applied, and any other channel that is not straight."
+				 enabled_control="RenderColorGrade">
+					<curve_editor.commit_callback
+					 function="LightBox.CommitToneCurve" />
+				</curve_editor>
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-8"
+				 height="18"
+				 label="Amount"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="curve_amount"
+				 tool_tip="How much of the curves is applied. 0 leaves the image untouched, 1 applies them fully."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeCurveAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_curve_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_curve" />
+				</button>
+			</panel>
+		</accordion_tab>
+	</accordion>
+</panel>

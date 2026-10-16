@@ -34,6 +34,11 @@
 #include "llframetimer.h"
 #include "lltrans.h"
 #include "llwindow.h"   // beforeDialog()
+
+#if LL_SDL_WINDOW
+#include "llwindowsdl.h"  // LLWindowSDL::getMainSDLWindow()
+#include "llsdlfiledialog.h"
+#endif
 #include "llviewercontrol.h"
 #include "llwin32headers.h"
 
@@ -86,14 +91,61 @@ void LLDirPicker::reset()
 {
 }
 
+namespace
+{
+    struct BlockingDirContext
+    {
+        bool mDone = false;
+        bool mOk = false;
+        std::string mDir;
+    };
+
+    void blocking_dir_callback(bool ok, std::string& dir, void* userdata)
+    {
+        auto* ctx = static_cast<BlockingDirContext*>(userdata);
+        ctx->mOk = ok;
+        ctx->mDir = dir;
+        ctx->mDone = true;
+    }
+}
+
 bool LLDirPicker::getDir(std::string* filename, bool blocking)
 {
+    if (!blocking)
+    {
+        // Use getDirModeless for the async API.
+        return false;
+    }
+
+    BlockingDirContext ctx;
+    if (!getDirModeless(filename, &blocking_dir_callback, &ctx))
+    {
+        return false;
+    }
+    // Spin SDL events until the async dialog completes — same pattern as
+    // LLFilePicker's blocking variants; see the comment there for the
+    // rationale (legacy callers want blocking semantics that the Win32 and
+    // macOS backends get from their native dialog APIs).
+    while (!ctx.mDone)
+    {
+        SDL_PumpEvents();
+        SDL_Delay(16);
+    }
+    if (ctx.mOk && !ctx.mDir.empty())
+    {
+        mDir = ctx.mDir;
+        if (filename)
+        {
+            *filename = ctx.mDir;
+        }
+        return true;
+    }
     return false;
 }
 
 std::string LLDirPicker::getDirName()
 {
-    return {};
+    return mDir;
 }
 
 bool LLDirPicker::getDirModeless(std::string* filename,
@@ -111,55 +163,17 @@ bool LLDirPicker::getDirModeless(std::string* filename,
         return false;
     }
 
+    // Caller can seed the starting folder via *filename — matches what the
+    // Win32 IFileDialog and Cocoa NSOpenPanel paths do on the non-SDL
+    // backends.
+    std::string start_dir;
+    if (filename && !filename->empty())
     {
-        struct LLSDLFileUserdata
-        {
-            LLSDLFileUserdata(void (*callback_func)(bool, std::string&, void*), void* callback_userdata)
-                : mCallback(callback_func), mUserdata(callback_userdata)
-            {
-            }
-            void (*mCallback)(bool, std::string&, void*);
-            void* mUserdata;
-        };
-
-        auto sdl_callback = [](void* userdata, const char* const* filelist, int filter)
-            {
-                LLSDLFileUserdata* callback_struct = (LLSDLFileUserdata*)userdata;
-
-                auto* callback_func = callback_struct->mCallback;
-                auto* callback_data = callback_struct->mUserdata;
-                delete callback_struct; // delete callback container
-
-                std::string rtn;
-                if (!filelist)
-                {
-                    LL_WARNS() << "Error during SDL folder picking: " << SDL_GetError() << LL_ENDL;
-                    callback_func(false, rtn, callback_data);
-                    return;
-                }
-                else if (!*filelist)
-                {
-                    LL_INFOS() << "User did not select any folders. Dialog likely cancelled." << LL_ENDL;
-                    callback_func(false, rtn, callback_data);
-                    return;
-                }
-
-                while (*filelist) {
-                    rtn = std::string(*filelist);
-                    break;
-                }
-                callback_func(true, rtn, callback_data);
-
-            };
-
-        LLSDLFileUserdata* llfilecallback = new LLSDLFileUserdata(callback, userdata);
-
-        SDL_PropertiesID props = SDL_CreateProperties();
-        SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, SDL_GL_GetCurrentWindow());
-        SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFOLDER, sdl_callback, llfilecallback, props);
-
-        SDL_DestroyProperties(props);
+        start_dir = *filename;
     }
+
+    auto* ctx = new LLSDLFileDialogContext<std::string>(callback, userdata);
+    LLSDLFileDialog::show(SDL_FILEDIALOG_OPENFOLDER, ctx, /*allow_many=*/false, start_dir);
 
     return true;
 }
@@ -260,10 +274,10 @@ bool LLDirPicker::getDir(std::string* filename, bool blocking)
     if (blocking)
     {
         send_agent_resume();
+        // Account for the fact that the app has been stalled.
+        LLFrameTimer::updateFrameTime();
     }
 
-    // Account for the fact that the app has been stalled.
-    LLFrameTimer::updateFrameTime();
     return success;
 }
 
@@ -280,7 +294,7 @@ std::string LLDirPicker::getDirName()
 }
 
 /////////////////////////////////////////////DARWIN
-#elif LL_DARWIN
+#elif LL_DARWIN && !LL_SDL_WINDOW
 
 LLDirPicker::LLDirPicker() :
 mFileName(NULL),

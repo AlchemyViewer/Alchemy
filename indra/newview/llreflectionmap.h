@@ -26,17 +26,15 @@
 
 #pragma once
 
+#include "alquerypool.h"
 #include "llcubemaparray.h"
 #include "llmemory.h"
-
-#include "llviewerobject.h"
 
 class LLSpatialGroup;
 class LLViewerObject;
 
 class alignas(16) LLReflectionMap : public LLRefCount
 {
-    LL_ALIGN_NEW
 public:
 
     enum class ProbeType
@@ -62,6 +60,26 @@ public:
     // return true if given Reflection Map's influence volume intersect's with this one's
     bool intersects(LLReflectionMap* other) const;
 
+    // True if this probe's influence volume completely swallows other's, to the point where
+    // other cannot change any pixel this one already covers. Stricter than plain containment
+    // for sphere volumes -- see the implementation.
+    //  margin - metres of slack added to this probe's volume, for hysteresis
+    bool eclipses(const LLReflectionMap* other, F32 margin) const;
+
+    // Refresh origin and radius from the viewer object this probe is attached to, if any.
+    // Manual probes ride on objects that move and resize, and several passes derive depths,
+    // sort order and influence volumes from these two values.
+    void syncToViewerObject();
+
+    // Called by the spatial group, viewer object or region this probe was registered for when it
+    // lets go of the probe. Clears any pointer back to it, and takes the probe out of relevance for
+    // the time the manager keeps it before deleting it.
+    void orphan();
+
+    // True if this probe's influence volume has moved or resized enough since its neighbour
+    // list was built that the list may no longer describe it.
+    bool neighborsAreStale() const;
+
     // Get the ambiance value to use for this probe
     F32 getAmbiance() const;
 
@@ -83,6 +101,13 @@ public:
     // perform occlusion query/readback
     void doOcclusion(const LLVector4a& eye);
 
+    // In view, and the query out forgotten unread: what it says was asked of a view this state no longer follows.
+    void clearOcclusion()
+    {
+        mOccluded       = false;
+        mOcclusionQuery = {};
+    }
+
     // return false if this probe isn't currently relevant (for example, disabled due to graphics preferences)
     bool isRelevant() const;
 
@@ -100,10 +125,7 @@ public:
     F32 mRadius = 16.f;
 
     // last time this probe was updated (or when its update timer got reset)
-    F32 mLastUpdateTime = 0.f;
-
-    // last time this probe was bound for rendering
-    F32 mLastBindTime = 0.f;
+    F64 mLastUpdateTime = 0.0;
 
     // cube map used to sample this environment map
     LLPointer<LLCubeMapArray> mCubeArray;
@@ -111,6 +133,15 @@ public:
 
     // probe has had at least one full update and is ready to render
     bool mComplete = false;
+
+    // automatic probe whose influence volume a manual probe completely swallows, so it can no
+    // longer affect any pixel (maintained by LLReflectionMapManager, consulted by isRelevant)
+    bool mInsideManualProbe = false;
+
+    // whatever registered this probe has let go of it (see orphan). Without this a probe with
+    // neither a group nor a viewer object is indistinguishable from a live terrain probe, and
+    // would be treated as one until the manager deletes it.
+    bool mOrphaned = false;
 
     // fade in parameter for this probe
     F32 mFadeIn = 0.f;
@@ -122,6 +153,11 @@ public:
     // set of any LLReflectionMaps that intersect this map (maintained by LLReflectionMapManager
     std::vector<LLReflectionMap*> mNeighbors;
 
+    // the influence volume mNeighbors was built against, so drift away from it can be detected
+    // (negative radius means the list has never been built)
+    LLVector4a mNeighborOrigin;
+    F32 mNeighborRadius = -1.f;
+
     // spatial group this probe is tracking (if any)
     LLSpatialGroup* mGroup = nullptr;
 
@@ -132,12 +168,15 @@ public:
     // currently only 0 or 1
     // 0 - automatic probe
     // 1 - manual probe
+    //
+    // Set once, by whichever registration created the probe, and never derived again: it says
+    // what kind of probe this is, which is fixed the moment it exists. The one exception is
+    // orphan(), which drops it to 0 so a probe on its way out sorts behind every live one.
     U32 mPriority = 0;
 
-    // occlusion culling state
-    GLuint mOcclusionQuery = 0;
+    // occlusion culling state: the last query of gGL's pool, and what the last one read said
+    ALQueryTicket mOcclusionQuery;
     bool mOccluded = false;
-    U32 mOcclusionPendingFrames = 0;
 
     ProbeType mType;
 };

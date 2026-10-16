@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2016, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -102,6 +103,7 @@ class RlvBehaviourDictionary : public LLSingleton<RlvBehaviourDictionary>
     friend class RlvFloaterBehaviours;
 
     LLSINGLETON(RlvBehaviourDictionary);
+protected:
     ~RlvBehaviourDictionary();
 public:
     void addEntry(const RlvBehaviourInfo* pBhvrEntry);
@@ -410,7 +412,7 @@ protected:
 
 struct RlvCommandOptionGetPath : public RlvCommandOption
 {
-    typedef boost::function<void(const uuid_vec_t&)> getpath_callback_t;
+    typedef std::function<void(const uuid_vec_t&)> getpath_callback_t;
     RlvCommandOptionGetPath(const RlvCommand& rlvCmd, getpath_callback_t cb = NULL);
 
     bool              isCallback() const { return m_fCallback; }
@@ -598,6 +600,7 @@ protected:
 class RlvBehaviourNotifyHandler : public LLSingleton<RlvBehaviourNotifyHandler>
 {
     LLSINGLETON(RlvBehaviourNotifyHandler);
+protected:
     virtual ~RlvBehaviourNotifyHandler() { if (m_ConnCommand.connected()) m_ConnCommand.disconnect(); }
 
 public:
@@ -662,7 +665,7 @@ public:
 class RlvCallbackTimerOnce : public LLEventTimer
 {
 public:
-    typedef boost::function<void ()> nullary_func_t;
+    typedef std::function<void()> nullary_func_t;
 public:
     RlvCallbackTimerOnce(F32 nPeriod, nullary_func_t cb) : LLEventTimer(nPeriod), m_Callback(cb) {}
     /*virtual*/ bool tick()

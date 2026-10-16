@@ -51,7 +51,7 @@ namespace ll
 
         struct SearchableItem
         {
-            LLWString mLabel;
+            std::string mLabel;
             LLView const *mView;
             ll::ui::SearchableControl const *mCtrl;
 
@@ -60,7 +60,7 @@ namespace ll
             virtual ~SearchableItem();
 
             void setNotHighlighted();
-            virtual bool hightlightAndHide( LLWString const &aFilter );
+            virtual bool hightlightAndHide( std::string_view aFilter );
         };
 
         struct PanelData
@@ -74,19 +74,19 @@ namespace ll
             virtual ~PanelData();
 
             void setNotHighlighted();
-            virtual bool hightlightAndHide( LLWString const &aFilter );
+            virtual bool hightlightAndHide( std::string_view aFilter );
         };
 
         struct TabContainerData: public PanelData
         {
             LLTabContainer *mTabContainer;
-            virtual bool hightlightAndHide( LLWString const &aFilter );
+            virtual bool hightlightAndHide( std::string_view aFilter );
         };
 
         struct SearchData
         {
             TabContainerDataPtr mRootTab;
-            LLWString mLastFilter;
+            std::string mLastFilter;
         };
     }
     namespace statusbar
@@ -99,7 +99,7 @@ namespace ll
 
         struct SearchableItem
         {
-            LLWString mLabel;
+            std::string mLabel;
             LLMenuItemGL *mMenu;
             tSearchableItemList mChildren;
             ll::ui::SearchableControl const *mCtrl;
@@ -108,13 +108,13 @@ namespace ll
             SearchableItem();
 
             void setNotHighlighted( );
-            bool hightlightAndHide( LLWString const &aFilter, bool hide = true );
+            bool hightlightAndHide( std::string_view aFilter, bool hide = true );
         };
 
         struct SearchData
         {
             SearchableItemPtr mRootMenu;
-            LLWString mLastFilter;
+            std::string mLastFilter;
         };
     }
 }

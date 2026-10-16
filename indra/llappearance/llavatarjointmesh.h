@@ -37,13 +37,6 @@ class LLFace;
 class LLCharacter;
 class LLTexLayerSet;
 
-typedef enum e_avatar_render_pass
-{
-    AVATAR_RENDER_PASS_SINGLE,
-    AVATAR_RENDER_PASS_CLOTHING_INNER,
-    AVATAR_RENDER_PASS_CLOTHING_OUTER
-} EAvatarRenderPass;
-
 class LLSkinJoint
 {
 public:
@@ -59,7 +52,7 @@ public:
 //-----------------------------------------------------------------------------
 // class LLViewerJointMesh
 //-----------------------------------------------------------------------------
-class LLAvatarJointMesh : public virtual LLAvatarJoint
+class alignas(16) LLAvatarJointMesh : public virtual LLAvatarJoint
 {
 protected:
     LLColor4                    mColor;         // color value
@@ -77,12 +70,6 @@ protected:
     U32                         mNumSkinJoints;
     LLSkinJoint*                mSkinJoints;
     S32                         mMeshID;
-
-public:
-    static bool                 sPipelineRender;
-    //RN: this is here for testing purposes
-    static U32                  sClothingMaskImageName;
-    static LLColor4             sClothingInnerColor;
 
 public:
     // Constructor

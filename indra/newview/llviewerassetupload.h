@@ -94,6 +94,12 @@ public:
     static bool         findAssetTypeOfExtension(const std::string& exten, LLAssetType::EType& asset_type);
     static bool         findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec);
 
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: Catznip-4.0
+    typedef std::function<void(LLUUID itemId)> upload_error_f;
+    // Should add this as a parameter to the constructor but this requires less code changes
+    void callUploadErrorCb() { if (mUploadErrorFn != nullptr) { mUploadErrorFn(mItemId); } }
+    void setUploadErrorCb(upload_error_f fnUploadError) { mUploadErrorFn = fnUploadError; }
+// [/SL:KLB]
 protected:
     LLResourceUploadInfo(
         std::string name,
@@ -124,6 +130,9 @@ protected:
     void                setAssetId(LLUUID assetId) { mAssetId = assetId; }
 
 private:
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: Catznip-4.0
+    upload_error_f      mUploadErrorFn;
+// [/SL:KLB]
     LLTransactionID     mTransactionId;
     LLAssetType::EType  mAssetType;
     std::string         mName;
@@ -277,7 +286,9 @@ private:
 class LLViewerAssetUpload
 {
 public:
-    static LLUUID EnqueueInventoryUpload(const std::string &url, const LLResourceUploadInfo::ptr_t &uploadInfo);
+    // Into the coprocedure pool named: the shared "Upload" one, or one of
+    // its own for uploads that should not wait behind it.
+    static LLUUID EnqueueInventoryUpload(const std::string &url, const LLResourceUploadInfo::ptr_t &uploadInfo, const std::string& pool = "Upload");
 
     static void AssetInventoryUploadCoproc(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter, const LLUUID &id, std::string url, LLResourceUploadInfo::ptr_t uploadInfo);
 

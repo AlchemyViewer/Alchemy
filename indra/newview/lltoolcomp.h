@@ -51,7 +51,7 @@ public:
 
     // Map virtual functions to the currently active internal tool
     virtual bool            handleHover(S32 x, S32 y, MASK mask)            { return mCur->handleHover( x, y, mask ); }
-    virtual bool            handleScrollWheel(S32 x, S32 y, S32 clicks)     { return mCur->handleScrollWheel( x, y, clicks ); }
+    virtual bool            handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)     { return mCur->handleScrollWheel( x, y, delta ); }
     virtual bool            handleRightMouseDown(S32 x, S32 y, MASK mask)   { return mCur->handleRightMouseDown( x, y, mask ); }
     virtual bool            handleRightMouseUp(S32 x, S32 y, MASK mask)     { return mCur->handleRightMouseUp( x, y, mask ); }
 
@@ -164,6 +164,9 @@ public:
     virtual LLTool*     getOverrideTool(MASK mask) override;
 
     static void pickCallback(const LLPickInfo& pick_info);
+
+    virtual bool        handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool        handleMiddleMouseUp(S32 x, S32 y, MASK mask) override;
 };
 
 
@@ -233,7 +236,7 @@ public:
     virtual bool            handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     virtual bool            handleRightMouseUp(S32 x, S32 y, MASK mask) override;
     virtual bool            handleMouseUp(S32 x, S32 y, MASK mask) override;
-    virtual bool            handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    virtual bool            handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
     virtual void            onMouseCaptureLost() override;
     virtual void            handleSelect() override;
     virtual void            handleDeselect() override;
@@ -249,6 +252,83 @@ protected:
     F32                 mOriginalFOV,
                         mStartFOV,
                         mTargetFOV;
+};
+
+
+// Subclass of LLToolComposite
+#include "fsmaniprotatejoint.h"   // For FSManipRotateJoint
+#include "fsmaniptranslatejoint.h"
+#include "fsfloaterposer.h"
+class FSToolCompPose : public LLToolComposite
+{
+public:
+    // Typical pattern: pass a name like "Pose"
+    FSToolCompPose();
+    virtual ~FSToolCompPose();
+
+    // For some viewer patterns, we create a static singleton:
+    static FSToolCompPose* getInstance();
+
+    // Overriding base events:
+    virtual bool handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    virtual void render() override;
+    void setAvatar(LLVOAvatar* avatar) { mManip->setAvatar(avatar); };
+    void setJoint(LLJoint* joint) { mManip->setJoint(joint); };
+    void setReferenceFrame(E_PoserReferenceFrame frame) { mManip->setReferenceFrame(frame); };
+
+    // Optional override if you have SHIFT/CTRL combos
+    virtual LLTool* getOverrideTool(MASK mask) override;
+
+    // The pick callback invoked on async pick
+    static void pickCallback(const LLPickInfo& pick_info);
+    void setPoserFloater(FSFloaterPoser* poser){ mPoser = poser; };
+    FSFloaterPoser* getPoserFloater(){ return mPoser; };
+protected:
+    // Tools within this composite
+    FSManipRotateJoint* mManip     = nullptr;
+    LLToolSelectRect*   mSelectRect= nullptr;
+    FSFloaterPoser*     mPoser     = nullptr;
+
+    // Track mouse state similarly to LLToolCompRotate
+    bool                mMouseDown = false;
+};
+
+class FSToolCompPoseTranslate : public LLToolComposite
+{
+public:
+    // Typical pattern: pass a name like "Pose"
+    FSToolCompPoseTranslate();
+    virtual ~FSToolCompPoseTranslate();
+
+    // For some viewer patterns, we create a static singleton:
+    static FSToolCompPoseTranslate* getInstance();
+
+    // Overriding base events:
+    virtual bool handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    virtual void render() override;
+    void setAvatar(LLVOAvatar* avatar) { mManip->setAvatar(avatar); };
+    void setJoint(LLJoint* joint) { mManip->setJoint(joint); };
+    void setReferenceFrame(E_PoserReferenceFrame frame) { mManip->setReferenceFrame(frame); };
+
+    // Optional override if you have SHIFT/CTRL combos
+    virtual LLTool* getOverrideTool(MASK mask) override;
+
+    // The pick callback invoked on async pick
+    static void pickCallback(const LLPickInfo& pick_info);
+    void setPoserFloater(FSFloaterPoser* poser){ mPoser = poser; };
+    FSFloaterPoser* getPoserFloater(){ return mPoser; };
+protected:
+    // Tools within this composite
+    FSManipTranslateJoint* mManip      = nullptr;
+    LLToolSelectRect*      mSelectRect = nullptr;
+    FSFloaterPoser*        mPoser      = nullptr;
+    bool                   mMouseDown  = false;
 };
 
 

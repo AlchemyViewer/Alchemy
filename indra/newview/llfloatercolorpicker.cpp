@@ -58,7 +58,6 @@
 #include "lldraghandle.h"
 #include "llwindow.h"
 #include "llclipboard.h"
-#include "llregex.h"
 #include "llstring.h"
 
 // System includes
@@ -154,8 +153,6 @@ void LLFloaterColorPicker::createUI ()
         }
     }
     mRGBImage = LLViewerTextureManager::getLocalTexture( (LLImageRaw*)raw, false );
-    gGL.getTexUnit(0)->bind(mRGBImage);
-    mRGBImage->setAddressMode(LLTexUnit::TAM_CLAMP);
 
     // create palette
     for ( S32 each = 0; each < numPaletteColumns * numPaletteRows; ++each )
@@ -173,7 +170,7 @@ void LLFloaterColorPicker::showUI ()
     setFocus ( true );
 
     // HACK: if system color picker is required - close the SL one we made and use default system dialog
-    if ( gSavedSettings.getBOOL( "UseDefaultColorPicker" ) )
+    if ( gSavedSettings.getBOOL ( "UseDefaultColorPicker" ) )
     {
         LLColorSwatchCtrl* swatch = getSwatch ();
 
@@ -242,8 +239,6 @@ bool LLFloaterColorPicker::postBuild()
     childSetCommitCallback("sspin", onTextCommit, (void*)this );
     childSetCommitCallback("lspin", onTextCommit, (void*)this );
     childSetCommitCallback("hex_value", onTextCommit, (void*)this );
-
-    LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _1));
 
     return true;
 }
@@ -430,6 +425,8 @@ void LLFloaterColorPicker::onClickPipette( )
     pipette_active = !pipette_active;
     if (pipette_active)
     {
+        LLToolMgr::getInstance()->clearTransientTool();
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _1, _4));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
     }
     else
@@ -465,10 +462,13 @@ void LLFloaterColorPicker::onImmediateCheck( LLUICtrl* ctrl, void* data)
     }
 }
 
-void LLFloaterColorPicker::onColorSelect( const LLTextureEntry& te )
+void LLFloaterColorPicker::onColorSelect(bool success, const LLTextureEntry& te)
 {
     // Pipete
-    selectCurRgb(te.getColor().mV[VRED], te.getColor().mV[VGREEN], te.getColor().mV[VBLUE]);
+    if (success)
+    {
+        selectCurRgb(te.getColor().mV[VRED], te.getColor().mV[VGREEN], te.getColor().mV[VBLUE]);
+    }
 }
 
 void LLFloaterColorPicker::onMouseCaptureLost()
@@ -675,6 +675,44 @@ void LLFloaterColorPicker::drawPalette ()
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// Boolean test if input string is a valid hex color string
+bool LLFloaterColorPicker::isValidHexColor(std::string& hex_color, F32& hr, F32& hg, F32& hb)
+{
+    // Strip any whitespace and a leading # character if present
+    // (Often included in hex color strings from other places)
+    LLStringUtil::trim(hex_color);
+    if (!hex_color.empty() && hex_color.front() == '#')
+    {
+        hex_color = hex_color.substr(1);
+    }
+
+    // Make sure it's a real string and valid hex - we can't use the
+    // hex to dec code because that coerces invalid hex into decimal 0
+    if (hex_color.length() ==0 || hex_color.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos)
+    {
+        return false;
+    }
+
+    // Convert the hex string to a decimal number
+    std::stringstream oss;
+    oss << std::hex << hex_color;
+    unsigned int dec_val;
+    oss >> dec_val;
+
+    // Break out the RGB values in 0..1.0 range and pass back
+    // (They will only be used if this function returns true.)
+    hr = F32(((dec_val >> 16) & 0xff)) / 255.0f;
+    hg = F32(((dec_val >> 8) & 0xff)) / 255.0f;
+    hb = F32(((dec_val >> 0) & 0xff)) / 255.0f;
+
+    // The max chars in the field is more than 6 now so we can paste in
+    // poorly formatted color strings and reformat them on commit.
+    // TODO: there must be a way to to the preformat when the string
+    // is pasted into the line editor control.
+    return dec_val > 0xffffff ? false : true;
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // update text entry values for RGB/HSL (can't be done in ::draw () since this overwrites input
 void LLFloaterColorPicker::updateTextEntry ()
 {
@@ -755,28 +793,16 @@ void LLFloaterColorPicker::onTextEntryChanged ( LLUICtrl* ctrl )
     }
     else if ( name == "hex_value" )
     {
-        // get current RGB
-        S32 r, g, b;
         F32 rVal, gVal, bVal;
-        getCurRgb ( rVal, gVal, bVal );
-
         std::string hex_string = ctrl->getValue().asString();
-
-        static const boost::regex pattern("[[:xdigit:]]{6}");
-        if (!ll_regex_match(hex_string, pattern))
+        if (isValidHexColor(hex_string, rVal, gVal, bVal))
         {
-            return;
+            // update current RGB (and implicitly HSL)
+            selectCurRgb ( rVal, gVal, bVal );
         }
 
-        sscanf(hex_string.c_str(), "%02x%02x%02x", &r, &g, &b);
-
-        rVal = F32(r) / 255.f;
-        gVal = F32(g) / 255.f;
-        bVal = F32(b) / 255.f;
-
-        // update current RGB (and implicitly HSL)
-        selectCurRgb ( rVal, gVal, bVal );
-
+        // Either way: on a good entry this reformats it, on a bad one it puts
+        // the current colour back.
         updateTextEntry ();
     }
     // value in HSL boxes changed
@@ -1158,22 +1184,22 @@ void LLFloaterColorPicker::menuDoToSelected(const LLSD& userdata)
     F32 rVal, gVal, bVal;
     getCurRgb(rVal, gVal, bVal);
 
-    LLWString colorstr;
+    std::string colorstr;
     if (command == "color_copy_lsl")
     {
-        colorstr = utf8str_to_wstring(llformat("<%.3f, %.3f, %.3f>", rVal, gVal, bVal));
+        colorstr = llformat("<%.3f, %.3f, %.3f>", rVal, gVal, bVal);
     }
     else if (command == "color_copy_hex")
     {
-        colorstr = utf8str_to_wstring(llformat("%02x%02x%02x", (S32)(rVal * 255.f), (S32)(gVal * 255.f), (S32)(bVal * 255.f)));
+        colorstr = llformat("%02x%02x%02x", (S32)(rVal * 255.f), (S32)(gVal * 255.f), (S32)(bVal * 255.f));
     }
     else if (command == "color_copy_vec4")
     {
-        colorstr = utf8str_to_wstring(llformat("%.3f, %.3f, %.3f, 1.0", rVal, gVal, bVal));
+        colorstr = llformat("%.3f, %.3f, %.3f, 1.0", rVal, gVal, bVal);
     }
     else if (command == "color_copy_vec4u")
     {
-        colorstr = utf8str_to_wstring(llformat("%d, %d, %d, 1", (S32)(rVal * 255.f), (S32)(gVal * 255.f), (S32)(bVal * 255.f)));
+        colorstr = llformat("%d, %d, %d, 1", (S32)(rVal * 255.f), (S32)(gVal * 255.f), (S32)(bVal * 255.f));
     }
     LLClipboard::instance().copyToClipboard(colorstr, 0, S32(colorstr.size()));
 }

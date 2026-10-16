@@ -23,6 +23,11 @@
  * $/LicenseInfo$
  */
 
+// NOTE: base colour and emissive are NOT converted here. Their samplers ask the hardware
+// to decode (GLTF_COLOR_SAMPLER, pushGLTFBatchIndexed), which converts each texel before
+// filtering rather than after -- converting a blend taken in sRGB space is what made
+// minified albedo read too dark. Doing it here as well would convert twice.
+
 /*[EXTRA_CODE_HERE]*/
 
 // forward fullbright implementation for HUDs
@@ -43,7 +48,6 @@ in vec2 emissive_texcoord;
 uniform float minimum_alpha; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
 
 vec3 linear_to_srgb(vec3 c);
-vec3 srgb_to_linear(vec3 c);
 
 void main()
 {
@@ -55,7 +59,7 @@ void main()
     }
 
     vec3 emissive = emissiveColor;
-    emissive *= srgb_to_linear(texture(emissiveMap, emissive_texcoord.xy).rgb);
+    emissive *= texture(emissiveMap, emissive_texcoord.xy).rgb;
 
     float lum = max(max(emissive.r, emissive.g), emissive.b);
     lum *= vertex_emissive.a;

@@ -50,23 +50,24 @@ class LLAvatarName;
 // Avatar Inspector, a small information window used when clicking
 // on avatar names in the 2D UI and in the ambient inspector widget for
 // the 3D world.
-class LLFloaterVoiceVolume : public LLInspect, LLTransientFloater
+class LLFloaterVoiceVolume final : public LLInspect, LLTransientFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterVoiceVolume, LLInspect);
     // avatar_id - Avatar ID for which to show information
     // Inspector will be positioned relative to current mouse position
     LLFloaterVoiceVolume(const LLSD& avatar_id);
     virtual ~LLFloaterVoiceVolume();
 
-    /*virtual*/ bool postBuild(void);
+    /*virtual*/ bool postBuild(void) override;
 
     // Because floater is single instance, need to re-parse data on each spawn
     // (for example, inspector about same avatar but in different position)
-    /*virtual*/ void onOpen(const LLSD& avatar_id);
+    /*virtual*/ void onOpen(const LLSD& avatar_id) override;
 
-    /*virtual*/ LLTransientFloaterMgr::ETransientGroup getGroup() { return LLTransientFloaterMgr::GLOBAL; }
+    /*virtual*/ LLTransientFloaterMgr::ETransientGroup getGroup() override { return LLTransientFloaterMgr::GLOBAL; }
 
 private:
     // Set the volume slider to this user's current client-side volume setting,

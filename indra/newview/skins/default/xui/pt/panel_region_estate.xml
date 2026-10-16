@@ -25,26 +25,6 @@
 	<check_box label="Permitir conversa de voz" name="voice_chat_check"/>
 	<check_box label="Permitir Tele-transporte direto" name="allow_direct_teleport"/>
 	<button label="Aplicar" name="apply_btn"/>
-	<text name="estate_manager_label">
-		Gerentes da propriedade:
-	</text>
-	<text name="allow_resident_label">
-		Sempre permitido:
-	</text>
-	<button label="Adicionar..." name="add_estate_manager_btn"/>
-	<button label="Remover..." name="remove_estate_manager_btn"/>
-	<button label="Adicionar..." name="add_allowed_avatar_btn"/>
-	<button label="Remover..." name="remove_allowed_avatar_btn"/>
-	<text name="allow_group_label">
-		Grupos sempre permitidos:
-	</text>
-	<text name="ban_resident_label">
-		Sempre banido:
-	</text>
-	<button label="Adicionar..." name="add_allowed_group_btn"/>
-	<button label="Remover..." name="remove_allowed_group_btn"/>
-	<button label="Adicionar..." name="add_banned_avatar_btn"/>
-	<button label="Remover..." name="remove_banned_avatar_btn"/>
 	<button label="Enviar mensagem à Propriedade" name="message_estate_btn"/>
 	<button label="Expulsar da propriedade..." name="kick_user_from_estate_btn"/>
 </panel>

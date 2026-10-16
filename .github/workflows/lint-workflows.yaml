@@ -1,0 +1,38 @@
+name: Lint workflows
+
+on:
+  pull_request:
+    paths: [".github/**"]
+  push:
+    branches: ["develop"]
+    paths: [".github/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install actionlint
+        run: pip install actionlint-py==1.7.12.25
+
+      # Syntax, expressions, matrix and runner labels, the inputs of the
+      # actions called, and the run scripts through shellcheck.
+      - name: Run actionlint
+        env:
+          # shellcheck's errors and warnings fail the check; its info and
+          # style notes do not.
+          SHELLCHECK_OPTS: --severity=warning
+        run: actionlint -color

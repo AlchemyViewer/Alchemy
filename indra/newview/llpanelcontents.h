@@ -34,6 +34,7 @@
 #include "llviewerobject.h"
 #include "llvoinventorylistener.h"
 #include "v3math.h"
+#include <boost/signals2/connection.hpp>
 
 class LLButton;
 class LLPanelObjectInventory;
@@ -41,19 +42,31 @@ class LLViewerObject;
 class LLCheckBoxCtrl;
 class LLSpinCtrl;
 
-class LLPanelContents : public LLPanel
+class LLPanelContents final : public LLPanel
 {
 public:
-    virtual bool postBuild();
+    AL_VIEW_TYPE(LLPanelContents, LLPanel);
+
+    virtual bool postBuild() override;
     LLPanelContents();
     virtual ~LLPanelContents();
 
-    void            refresh();
+    void            refresh() override;
     void            clearContents();
 
 
-    static void     onClickNewScript(void*);
+    void            onNewScriptFlyoutCommit(LLUICtrl* ctrl);
+    void            onNewNotecardCommit();
     static void     onClickPermissions(void*);
+    void            onClickPublish();
+
+    void            createTaskInventoryItemHelper(LLViewerObject* object,
+                        LLAssetType::EType asset_type,
+                        LLInventoryType::EType inventory_type,
+                        U8 sub_type,
+                        const std::string& name,
+                        const LLSD& params,
+                        const LLUUID& template_id = LLUUID::null);
 
     // Key suffix for "tentative" fields
     static const char* TENTATIVE_SUFFIX;
@@ -69,13 +82,22 @@ public:
 protected:
     void getState(LLViewerObject *object);
     void onFilterEdit();
+    void onSimulatorFeaturesReceived(const LLUUID& region_id);
 
     bool mDirtyFilter { false };
+    LLUUID mLastScriptObjectID;
+    bool mLastLuaRegion { false };
+    bool mNewScriptIsLua { false };
+    boost::signals2::connection mSimulatorFeaturesConnection;
+
+private:
+    bool isLuaEnabledForObjectRegion(LLViewerObject *objectp);
 
 public:
     class LLFilterEditor* mFilterEditor;
     LLSaveFolderState mSavedFolderState;
     LLPanelObjectInventory* mPanelInventoryObject;
+    LLButton* mPublishButton { nullptr };
 };
 
 #endif // LL_LLPANELCONTENTS_H

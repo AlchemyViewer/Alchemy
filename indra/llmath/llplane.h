@@ -36,9 +36,7 @@
 // The plane normal = [A, B, C]
 // The closest approach = D / sqrt(A*A + B*B + C*C)
 
-
-LL_ALIGN_PREFIX(16)
-class LLPlane
+class alignas(16) LLPlane
 {
 public:
 
@@ -102,9 +100,9 @@ public:
 
 private:
     LLVector4a mV;
-} LL_ALIGN_POSTFIX(16);
+};
 
-static_assert(std::is_trivial<LLPlane>::value, "LLPlane must be a trivial type");
+static_assert(std::is_trivially_copyable<LLPlane>::value && std::is_standard_layout<LLPlane>::value, "LLPlane is plain data");
 
 
 #endif // LL_LLPLANE_H

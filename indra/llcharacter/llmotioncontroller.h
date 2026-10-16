@@ -33,11 +33,11 @@
 #include <string>
 #include <map>
 #include <deque>
+#include <vector>
 
 #include "llmotion.h"
 #include "llpose.h"
 #include "llframetimer.h"
-#include "llstatemachine.h"
 #include "llstring.h"
 
 //-----------------------------------------------------------------------------
@@ -83,7 +83,7 @@ protected:
 class LLMotionController
 {
 public:
-    typedef std::list<LLMotion*> motion_list_t;
+    typedef std::vector<LLMotion*> motion_list_t;
     typedef std::set<LLMotion*> motion_set_t;
     bool mIsSelf;
 
@@ -123,6 +123,15 @@ public:
     // returns true if successful
     bool stopMotionLocally( const LLUUID &id, bool stop_immediate );
 
+    // immediately deactivates and deletes EVERY instance of a motion id --
+    // the canonical instance and any deprecated duplicates still easing out.
+    // For use when the motion's backing data is about to be destroyed (e.g. a
+    // locally previewed animation whose globally cached keyframe data is purged
+    // on live reload/removal): removeMotion() only reaches the canonical
+    // instance, and a deprecated instance left easing out keeps dereferencing
+    // the freed data every frame.
+    void purgeMotionInstances( const LLUUID& id );
+
     // Move motions from loading to loaded
     void updateLoadingMotions();
 
@@ -150,15 +159,38 @@ public:
     bool isPaused() const { return mPaused; }
     S32 getPausedFrame() const { return mPausedFrame; }
 
+    // Changes the quantum the animation clock runs on; zero is continuous.
+    // Only a real change does anything, so it is safe to call every frame.
     void setTimeStep(F32 step);
     F32 getTimeStep() const { return mTimeStep; }
+    // Snaps a requested quantum onto the ladder setTimeStep is meant to be
+    // fed from: sixteenths of a second up to a quarter, and nothing finer
+    // than a sixteenth, which is not worth quantizing for.
+    static F32 quantizeTimeStep(F32 requested_step);
+
+    // The quantized clock's arithmetic, kept apart from the controller so it
+    // can be driven without a character or a frame timer.
+    struct QuantumStep
+    {
+        S32  count;     // the quantum whose boundary the pose is heading for
+        F32  interp;    // how far through the current quantum real time is, [0,1)
+        bool advanced;  // count differs from the last one handed in
+    };
+    static QuantumStep computeQuantumStep(F64 continuous_time, F32 time_step, S32 last_count);
+    // the fraction to lerp the pose by so that it tracks real time within a
+    // quantum, given how far it was last moved
+    static F32 quantumInterpolant(F32 interp, F32 last_interp);
 
     void setTimeFactor(F32 time_factor);
     F32 getTimeFactor() const { return mTimeFactor; }
 
-    F32 getAnimTime() const { return mAnimTime; }
+    F64 getAnimTime() const { return mAnimTime; }
 
-    motion_list_t& getActiveMotions() { return mActiveMotions; }
+    // The motions playing, newest first, of one blend type. The update walks
+    // the additive list and then the normal one, so nothing asks each motion
+    // its type on the way past.
+    const motion_list_t& getActiveMotions(LLMotion::LLMotionBlendType blend_type) const { return mActiveMotions[blend_type]; }
+    size_t getNumActiveMotions() const { return mActiveMotions[LLMotion::NORMAL_BLEND].size() + mActiveMotions[LLMotion::ADDITIVE_BLEND].size(); }
 
     void incMotionCounts(S32& num_motions, S32& num_loading_motions, S32& num_loaded_motions, S32& num_active_motions, S32& num_deprecated_motions);
 
@@ -178,11 +210,12 @@ protected:
     // internal operations act on motion instances directly
     // as there can be duplicate motions per id during blending overlap
     void deleteAllMotions();
-    bool activateMotionInstance(LLMotion *motion, F32 time);
+    bool activateMotionInstance(LLMotion *motion, F64 time);
     bool deactivateMotionInstance(LLMotion *motion);
     void deprecateMotionInstance(LLMotion* motion);
     bool stopMotionInstance(LLMotion *motion, bool stop_imemdiate);
     void removeMotionInstance(LLMotion* motion);
+    void removeActiveMotion(LLMotion* motion);
     void updateRegularMotions();
     void updateAdditiveMotions();
     void resetJointSignatures();
@@ -206,20 +239,24 @@ protected:
 //  If the animations depend on any asset data, the appropriate data is fetched from the data server,
 //  and the animation is put on the mLoadingMotions list.
 //  Once an animations is loaded, it will be initialized and put on the mLoadedMotions list.
-//  Any animation that is currently playing also sits in the mActiveMotions list.
+//  Any animation that is currently playing also sits in the mActiveMotions list for its blend type.
 
     typedef std::map<LLUUID, LLMotion*> motion_map_t;
     motion_map_t    mAllMotions;
 
     motion_set_t        mLoadingMotions;
     motion_set_t        mLoadedMotions;
-    motion_list_t       mActiveMotions;
+    motion_list_t       mActiveMotions[LLMotion::NUM_BLEND_TYPES];
     motion_set_t        mDeprecatedMotions;
 
+    // The clock is F64 throughout, as are the motions' timestamps: it runs as long as the
+    // character does, the whole session for one's own, and an F32 of hours holds it only
+    // to milliseconds, which every step and every motion's time would be rounded to.
     LLFrameTimer        mTimer;
-    F32                 mPrevTimerElapsed;
-    F32                 mAnimTime;
-    F32                 mLastTime;
+    F64                 mPrevTimerElapsed;
+    F64                 mContinuousTime;        // real animation time, the only accumulator
+    F64                 mAnimTime;              // what the motions see; quantized when mTimeStep is set
+    F64                 mLastTime;
     bool                mHasRunOnce;
     bool                mPaused;
     S32                 mPausedFrame;
@@ -228,6 +265,15 @@ protected:
     F32                 mLastInterp;
 
     U8                  mJointSignature[2][LL_CHARACTER_MAX_ANIMATED_JOINTS];
+
+    // Which joints are already spoken for, and at what priority, by a motion
+    // that is playing at full weight. A motion further down the list cannot
+    // reach one of these: the blend takes the first contribution it is given
+    // and, once that has claimed the whole weight, interpolates every later
+    // one to nothing. The plain signature above says who owns a joint whatever
+    // weight they own it at, which is not the same question -- a motion still
+    // easing in owns nothing yet.
+    U8                  mJointSaturated[LL_CHARACTER_MAX_ANIMATED_JOINTS];
 private:
     U32                 mLastCountAfterPurge; //for logging and debugging purposes
 };

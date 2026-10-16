@@ -79,9 +79,8 @@ public:
      */
     S32 parse(std::istream& istr, LLSD& data, llssize max_bytes, S32 max_depth = -1);
 
-    /** Like parse(), but uses a different call (istream.getline()) to read by lines
-     *  This API is better suited for XML, where the parse cannot tell
-     *  where the document actually ends.
+    /** Like parse(), but with no byte budget to enforce, for a stream that
+     *  holds one document and nothing after it.
      */
     S32 parseLines(std::istream& istr, LLSD& data);
 
@@ -207,10 +206,6 @@ protected:
      */
     mutable llssize mMaxBytesLeft;
 
-    /**
-     * @brief Use line-based reading to get text
-     */
-    bool mParseLines;
 };
 
 /**
@@ -482,6 +477,49 @@ public:
 
 protected:
     /**
+     * @brief A block-buffered destination for one format pass.
+     *
+     * A formatter emits a handful of very short pieces per value, and
+     * operator<< builds a sentry for each one. Appending to a buffer and
+     * handing the stream whole blocks costs about a tenth as much per piece,
+     * and keeps integers away from the locale's num_put.
+     */
+    class LL_COMMON_API Sink
+    {
+    public:
+        explicit Sink(std::ostream& ostr);
+        ~Sink();
+
+        Sink(const Sink&) = delete;
+        Sink& operator=(const Sink&) = delete;
+
+        void put(char c)                    { mBuf.push_back(c); checkFlush(); }
+        void put(const char* s, size_t n)   { mBuf.append(s, n); checkFlush(); }
+        void put(const std::string& s)      { mBuf.append(s); checkFlush(); }
+
+        /// Only a string literal binds here, so the length is known and no
+        /// partially filled local buffer can be passed by accident.
+        template <size_t N> void put(const char (&literal)[N]) { put(literal, N - 1); }
+
+        void putInteger(LLSD::Integer value);
+        void putCount(size_t value);
+        void putReal(LLSD::Real value);         ///< shortest round-tripping form
+        void putUUID(const LLSD::UUID& value);
+
+        /// For helpers that append their own escaped output; call checkFlush()
+        /// once they are done.
+        std::string& buffer() { return mBuf; }
+        void checkFlush();
+        void flush();
+
+        std::ios::fmtflags streamFlags() const { return mOstr.flags(); }
+
+    private:
+        std::ostream& mOstr;
+        std::string   mBuf;
+    };
+
+    /**
      * @brief Implementation to format the data. This is called recursively.
      *
      * @param data The data to write.
@@ -498,6 +536,7 @@ protected:
      * @param ostr The destination stream for the data.
      */
     void formatReal(LLSD::Real real, std::ostream& ostr) const;
+    void formatReal(LLSD::Real real, std::string& out) const;
 
     bool mBoolAlpha;
     std::string mRealFormat;
@@ -546,6 +585,12 @@ protected:
      */
     S32 format_impl(const LLSD& data, std::ostream& ostr, EFormatterOptions options,
                     U32 level) const override;
+
+private:
+    /// The recursion proper. The ostream overload above exists to satisfy the
+    /// base class and wraps a Sink of its own.
+    S32 format_impl(const LLSD& data, Sink& sink, EFormatterOptions options,
+                    U32 level) const;
 };
 
 
@@ -598,6 +643,14 @@ protected:
      */
     S32 format_impl(const LLSD& data, std::ostream& ostr, EFormatterOptions options,
                     U32 level) const override;
+
+private:
+    /// The recursion proper. The ostream overload above exists to satisfy the
+    /// base class and wraps a Sink of its own.
+    S32 format_impl(const LLSD& data, Sink& sink, EFormatterOptions options,
+                    U32 level) const;
+
+    static void escapeStringTo(std::string& out, const std::string& in);
 };
 
 
@@ -660,6 +713,13 @@ protected:
      * @param ostr The destination stream for the data.
      */
     void formatString(const std::string& string, std::ostream& ostr) const;
+
+private:
+    /// The recursion proper. The ostream overload above exists to satisfy the
+    /// base class and wraps a Sink of its own.
+    S32 format_impl(const LLSD& data, Sink& sink, EFormatterOptions options,
+                    U32 level) const;
+    void formatString(const std::string& string, Sink& sink) const;
 };
 
 
@@ -812,9 +872,9 @@ public:
         LLPointer<LLSDXMLParser> p = new LLSDXMLParser(emit_errors);
         return p->parse(str, sd, LLSDSerialize::SIZE_UNLIMITED);
     }
-    // Line oriented parser, 30% faster than fromXML(), but can
-    // only be used when you know you have the complete XML
-    // document available in the stream.
+    // Reads the whole document. Equivalent to fromXMLEmbedded() except that it
+    // clears sd before parsing, and it makes no promise about where the stream
+    // is left, so use it when nothing follows the document.
     static S32 fromXMLDocument(LLSD& sd, std::istream& str, bool emit_errors=true)
     {
         LLPointer<LLSDXMLParser> p = new LLSDXMLParser(emit_errors);
@@ -823,7 +883,6 @@ public:
     static S32 fromXML(LLSD& sd, std::istream& str, bool emit_errors=true)
     {
         return fromXMLEmbedded(sd, str, emit_errors);
-//      return fromXMLDocument(sd, str, emit_errors);
     }
 
     /*

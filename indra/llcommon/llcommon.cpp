@@ -32,8 +32,9 @@
 #include "lltrace.h"
 #include "lltracethreadrecorder.h"
 #include "llcleanup.h"
+#include "llapr.h"
 
-#if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY && TRACY_ENABLE && !LL_LINUX
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
 // Override new/delete for tracy memory profiling
 
 void* ll_tracy_new(size_t size)
@@ -47,28 +48,13 @@ void* ll_tracy_new(size_t size)
     return ptr;
 }
 
-void* ll_tracy_aligned_new(size_t size, size_t alignment)
-{
-    void* ptr = ll_aligned_malloc_fallback(size, alignment);
-    if (!ptr)
-    {
-        throw std::bad_alloc();
-    }
-    return ptr;
-}
-
 void ll_tracy_delete(void* ptr)
 {
     LL_PROFILE_FREE(ptr);
     (free)(ptr);
 }
 
-void ll_tracy_aligned_delete(void* ptr)
-{
-    ll_aligned_free_fallback(ptr);
-}
-
-void* operator new(size_t size)
+void* operator new(std::size_t size)
 {
     return ll_tracy_new(size);
 }
@@ -76,16 +62,6 @@ void* operator new(size_t size)
 void* operator new[](std::size_t count)
 {
     return ll_tracy_new(count);
-}
-
-void* operator new(size_t size, std::align_val_t align)
-{
-    return ll_tracy_aligned_new(size, (size_t)align);
-}
-
-void* operator new[](std::size_t count, std::align_val_t align)
-{
-    return ll_tracy_aligned_new(count, (size_t)align);
 }
 
 void operator delete(void *ptr) noexcept
@@ -98,6 +74,33 @@ void operator delete[](void* ptr) noexcept
     ll_tracy_delete(ptr);
 }
 
+#if !defined(LL_LINUX)
+
+void* ll_tracy_aligned_new(size_t size, size_t alignment)
+{
+    void* ptr = ll_aligned_malloc_fallback(size, alignment);
+    if (!ptr)
+    {
+        throw std::bad_alloc();
+    }
+    return ptr;
+}
+
+void ll_tracy_aligned_delete(void* ptr)
+{
+    ll_aligned_free_fallback(ptr);
+}
+
+void* operator new(size_t size, std::align_val_t align)
+{
+    return ll_tracy_aligned_new(size, (size_t)align);
+}
+
+void* operator new[](std::size_t count, std::align_val_t align)
+{
+    return ll_tracy_aligned_new(count, (size_t)align);
+}
+
 void operator delete(void *ptr, std::align_val_t align) noexcept
 {
     ll_tracy_aligned_delete(ptr);
@@ -107,6 +110,8 @@ void operator delete[](void* ptr, std::align_val_t align) noexcept
 {
     ll_tracy_aligned_delete(ptr);
 }
+
+#endif
 
 #endif // TRACY_ENABLE && !LL_PROFILER_ENABLE_TRACY_OPENGL
 

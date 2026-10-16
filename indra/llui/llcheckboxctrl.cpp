@@ -70,8 +70,8 @@ LLCheckBoxCtrl::LLCheckBoxCtrl(const LLCheckBoxCtrl::Params& p)
     mFont(p.font()),
     mWordWrap(p.word_wrap)
 {
-    mViewModel->setValue(LLSD(p.initial_value));
-    mViewModel->resetDirty();
+    viewModel()->setValue(LLSD(p.initial_value));
+    viewModel()->resetDirty();
     static LLUICachedControl<S32> llcheckboxctrl_spacing ("UICheckboxctrlSpacing", 0);
     static LLUICachedControl<S32> llcheckboxctrl_hpad ("UICheckboxctrlHPad", 0);
     static LLUICachedControl<S32> llcheckboxctrl_vpad ("UICheckboxctrlVPad", 0);

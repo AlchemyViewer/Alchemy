@@ -45,11 +45,13 @@ class LLSearchComboBox;
  * *TODO: move to llui?
  */
 
-class LLPullButton: public LLButton
+class LLPullButton final: public LLButton
 {
     LOG_CLASS(LLPullButton);
 
 public:
+    AL_VIEW_TYPE(LLPullButton, LLButton);
+
     struct Params: public LLInitParam::Block<Params, LLButton::Params>
     {
         Optional<std::string> direction; // left, right, down, up
@@ -60,11 +62,11 @@ public:
         }
     };
 
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
-    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask) override;
 
-    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask);
+    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
     boost::signals2::connection setClickDraggingCallback(const commit_signal_t::slot_type& cb);
 
@@ -82,7 +84,7 @@ protected:
 /**
  * Web browser-like navigation bar.
  */
-class LLNavigationBar
+class LLNavigationBar final
     :   public LLPanel, public LLSingleton<LLNavigationBar>, private LLDestroyClass<LLNavigationBar>
 {
     LLSINGLETON(LLNavigationBar);
@@ -91,6 +93,7 @@ class LLNavigationBar
     friend class LLDestroyClass<LLNavigationBar>;
 
 public:
+    AL_VIEW_TYPE(LLNavigationBar, LLPanel);
 
     /*virtual*/ void    draw() override;
     /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;

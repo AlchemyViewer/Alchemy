@@ -37,7 +37,7 @@
 #include "lluuid.h"
 #include "message.h"
 
-#include <boost/regex.hpp>
+#include <boost/unordered_map.hpp>
 
 // llsd serialization constants
 static const std::string AGENTS("agents");
@@ -179,12 +179,11 @@ void ReplySender::flush()
     }
 }
 
-
-typedef std::set<LLUUID>                    AskQueue;
-typedef std::list<PendingReply*>            ReplyQueue;
-typedef std::map<LLUUID,U32>                PendingQueue;
-typedef std::map<LLUUID, LLCacheNameEntry*> Cache;
-typedef std::map<std::string, LLUUID>       ReverseCache;
+using AskQueue     = std::set<LLUUID>;
+using ReplyQueue   = std::list<PendingReply*>;
+using PendingQueue = boost::unordered_map<LLUUID, F64>; // LLFrameTimer::getTotalSeconds() of the ask
+using Cache        = boost::unordered_map<LLUUID, LLCacheNameEntry*>;
+using ReverseCache = boost::unordered_map<std::string, LLUUID>;
 
 class LLCacheName::Impl
 {
@@ -214,7 +213,7 @@ public:
     Impl(LLMessageSystem* msg);
     ~Impl();
 
-    bool getName(const LLUUID& id, std::string& first, std::string& last, std::map<std::string, std::string>& default_names);
+    bool getName(const LLUUID& id, std::string& first, std::string& last, cache_map_t& default_names);
 
     boost::signals2::connection addPending(const LLUUID& id, const LLCacheNameCallback& callback);
     void addPending(const LLUUID& id, const LLHost& host);
@@ -401,7 +400,7 @@ void LLCacheName::exportFile(std::ostream& ostr)
 }
 
 
-bool LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::string& last, std::map<std::string, std::string>& default_names)
+bool LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::string& last, cache_map_t &default_names)
 {
     if(id.isNull())
     {
@@ -600,7 +599,7 @@ std::string LLCacheName::buildLegacyName(const std::string& complete_name)
 
 // This is a little bit kludgy. LLCacheNameCallback is a slot instead of a function pointer.
 //  The reason it is a slot is so that the legacy get() function below can bind an old callback
-//  and pass it as a slot. The reason it isn't a boost::function is so that trackable behavior
+//  and pass it as a slot. The reason it isn't a std::function is so that trackable behavior
 //  doesn't get lost. As a result, we have to bind the slot to a signal to call it, even when
 //  we call it immediately. -Steve
 // NOTE: Even though passing first and last name is a bit of extra overhead, it eliminates the
@@ -699,7 +698,7 @@ void LLCacheName::deleteEntriesOlderThan(S32 secs)
     }
 
     // These are pending requests that we never heard back from.
-    U32 pending_expire_time = now - PENDING_TIMEOUT_SECS;
+    F64 pending_expire_time = LLFrameTimer::getTotalSeconds() - PENDING_TIMEOUT_SECS;
     for(PendingQueue::iterator p_iter = impl.mPendingQueue.begin();
         p_iter != impl.mPendingQueue.end(); )
     {
@@ -780,6 +779,7 @@ void LLCacheName::Impl::processPendingAsks()
 void LLCacheName::Impl::processPendingReplies()
 {
     // First call all the callbacks, because they might send messages.
+    // Todo: needs cleanup logic, otherwise invalid ids might stay here indefinitely
     for(ReplyQueue::iterator it = mReplyQueue.begin(); it != mReplyQueue.end(); ++it)
     {
         PendingReply* reply = *it;
@@ -863,8 +863,10 @@ void LLCacheName::Impl::sendRequest(
 
 bool LLCacheName::Impl::isRequestPending(const LLUUID& id)
 {
-    U32 now = (U32)time(NULL);
-    U32 expire_time = now - PENDING_TIMEOUT_SECS;
+    // A window inside this session, so the monotonic clock: on the calendar a
+    // clock set back would hold every request pending for as long as it moved.
+    F64 now = LLFrameTimer::getTotalSeconds();
+    F64 expire_time = now - PENDING_TIMEOUT_SECS;
 
     PendingQueue::iterator iter = mPendingQueue.find(id);
 

@@ -29,48 +29,19 @@
 #include "llmemory.h"
 #include "llmath.h"
 #include "llquantize.h"
+#include "llthread.h"
 
-extern const LLQuad F_ZERO_4A       = { 0, 0, 0, 0 };
-extern const LLQuad F_APPROXIMATELY_ZERO_4A = {
-    F_APPROXIMATELY_ZERO,
-    F_APPROXIMATELY_ZERO,
-    F_APPROXIMATELY_ZERO,
-    F_APPROXIMATELY_ZERO
-};
+extern const LLVector4a LL_V4A_ZERO(0.f, 0.f, 0.f, 0.f);
+extern const LLVector4a LL_V4A_EPSILON(F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO);
 
-extern const LLVector4a LL_V4A_ZERO = reinterpret_cast<const LLVector4a&> ( F_ZERO_4A );
-extern const LLVector4a LL_V4A_EPSILON = reinterpret_cast<const LLVector4a&> ( F_APPROXIMATELY_ZERO_4A );
+/*static */void LLVector4a::initClass()
+{
+    set_thread_fp_mode();
+}
 
 /*static */void LLVector4a::memcpyNonAliased16(F32* __restrict dst, const F32* __restrict src, size_t bytes)
 {
         ll_memcpy_nonaliased_aligned_16((char*)dst, (char*)src, bytes);
-}
-
-void LLVector4a::setRotated( const LLRotation& rot, const LLVector4a& vec )
-{
-    const LLVector4a col0 = rot.getColumn(0);
-    const LLVector4a col1 = rot.getColumn(1);
-    const LLVector4a col2 = rot.getColumn(2);
-
-    LLVector4a result = _mm_load_ss( vec.getF32ptr() );
-    result.splat<0>( result );
-    result.mul( col0 );
-
-    {
-        LLVector4a yyyy = _mm_load_ss( vec.getF32ptr() +  1 );
-        yyyy.splat<0>( yyyy );
-        yyyy.mul( col1 );
-        result.add( yyyy );
-    }
-
-    {
-        LLVector4a zzzz = _mm_load_ss( vec.getF32ptr() +  2 );
-        zzzz.splat<0>( zzzz );
-        zzzz.mul( col2 );
-        result.add( zzzz );
-    }
-
-    *this = result;
 }
 
 void LLVector4a::setRotated( const LLQuaternion2& quat, const LLVector4a& vec )
@@ -89,48 +60,45 @@ void LLVector4a::setRotated( const LLQuaternion2& quat, const LLVector4a& vec )
     add(imagCrossTemp);
 }
 
+// Both quantizers map [low, high] onto the integers 0..max and back, so the
+// result is the value the stored integer will read back as. A channel with
+// low == high has nothing to quantize: its reciprocal is taken of 1 instead
+// of 0, and the multiply by the real, zero delta lands it on low.
 void LLVector4a::quantize8( const LLVector4a& low, const LLVector4a& high )
 {
     LLVector4a val(mQ);
     LLVector4a delta; delta.setSub( high, low );
 
+    const LLVector4Logical zeroDelta = delta.equal(LLVector4a::getZero());
+    LLVector4a safeDelta;
+    safeDelta.setSelectWithMask(zeroDelta, LLVector4a(1.f), delta);
+
+    const LLVector4a vU8Max(255.f);
+    const LLVector4a vOOU8Max(OOU8MAX);
+
     {
         val.clamp(low, high);
         val.sub(low);
 
-        // 8-bit quantization means we can do with just 12 bits of reciprocal accuracy
-        const LLVector4a oneOverDelta = _mm_rcp_ps(delta.mQ);
-//      {
-//          static LL_ALIGN_16( const F32 F_TWO_4A[4] ) = { 2.f, 2.f, 2.f, 2.f };
-//          LLVector4a two; two.load4a( F_TWO_4A );
-//
-//          // Here we use _mm_rcp_ps plus one round of newton-raphson
-//          // We wish to find 'x' such that x = 1/delta
-//          // As a first approximation, we take x0 = _mm_rcp_ps(delta)
-//          // Then x1 = 2 * x0 - a * x0^2 or x1 = x0 * ( 2 - a * x0 )
-//          // See Intel AP-803 http://ompf.org/!/Intel_application_note_AP-803.pdf
-//          const LLVector4a recipApprox = _mm_rcp_ps(delta.mQ);
-//          oneOverDelta.setMul( delta, recipApprox );
-//          oneOverDelta.setSub( two, oneOverDelta );
-//          oneOverDelta.mul( recipApprox );
-//      }
+        // Eight bits of result need eleven of reciprocal
+        const LLVector4a oneOverDelta(alsimd::rcp_fast(safeDelta.mQ));
 
         val.mul(oneOverDelta);
-        val.mul(*reinterpret_cast<const LLVector4a*>(F_U8MAX_4A));
+        val.mul(vU8Max);
     }
 
-    val = _mm_cvtepi32_ps(_mm_cvtps_epi32( val.mQ ));
+    val = alsimd::round(val.mQ);
 
     {
-        val.mul(*reinterpret_cast<const LLVector4a*>(F_OOU8MAX_4A));
+        val.mul(vOOU8Max);
         val.mul(delta);
         val.add(low);
     }
 
     {
-        LLVector4a maxError; maxError.setMul(delta, *reinterpret_cast<const LLVector4a*>(F_OOU8MAX_4A));
+        LLVector4a maxError; maxError.setMul(delta, vOOU8Max);
         LLVector4a absVal; absVal.setAbs( val );
-        setSelectWithMask( absVal.lessThan( maxError ), F_ZERO_4A, val );
+        setSelectWithMask( absVal.lessThan( maxError ), LLVector4a::getZero(), val );
     }
 }
 
@@ -139,44 +107,35 @@ void LLVector4a::quantize16( const LLVector4a& low, const LLVector4a& high )
     LLVector4a val(mQ);
     LLVector4a delta; delta.setSub( high, low );
 
+    const LLVector4Logical zeroDelta = delta.equal(LLVector4a::getZero());
+    LLVector4a safeDelta;
+    safeDelta.setSelectWithMask(zeroDelta, LLVector4a(1.f), delta);
+
+    const LLVector4a vU16Max(65535.f);
+    const LLVector4a vOOU16Max(OOU16MAX);
+
     {
         val.clamp(low, high);
         val.sub(low);
 
-        // 16-bit quantization means we need a round of Newton-Raphson
-        LLVector4a oneOverDelta;
-        {
-            static LL_ALIGN_16( const F32 F_TWO_4A[4] ) = { 2.f, 2.f, 2.f, 2.f };
-            ll_assert_aligned(F_TWO_4A,16);
-
-            LLVector4a two; two.load4a( F_TWO_4A );
-
-            // Here we use _mm_rcp_ps plus one round of newton-raphson
-            // We wish to find 'x' such that x = 1/delta
-            // As a first approximation, we take x0 = _mm_rcp_ps(delta)
-            // Then x1 = 2 * x0 - a * x0^2 or x1 = x0 * ( 2 - a * x0 )
-            // See Intel AP-803 http://ompf.org/!/Intel_application_note_AP-803.pdf
-            const LLVector4a recipApprox = _mm_rcp_ps(delta.mQ);
-            oneOverDelta.setMul( delta, recipApprox );
-            oneOverDelta.setSub( two, oneOverDelta );
-            oneOverDelta.mul( recipApprox );
-        }
+        // Sixteen bits of result need the refined reciprocal
+        const LLVector4a oneOverDelta(alsimd::rcp(safeDelta.mQ));
 
         val.mul(oneOverDelta);
-        val.mul(*reinterpret_cast<const LLVector4a*>(F_U16MAX_4A));
+        val.mul(vU16Max);
     }
 
-    val = _mm_cvtepi32_ps(_mm_cvtps_epi32( val.mQ ));
+    val = alsimd::round(val.mQ);
 
     {
-        val.mul(*reinterpret_cast<const LLVector4a*>(F_OOU16MAX_4A));
+        val.mul(vOOU16Max);
         val.mul(delta);
         val.add(low);
     }
 
     {
-        LLVector4a maxError; maxError.setMul(delta, *reinterpret_cast<const LLVector4a*>(F_OOU16MAX_4A));
+        LLVector4a maxError; maxError.setMul(delta, vOOU16Max);
         LLVector4a absVal; absVal.setAbs( val );
-        setSelectWithMask( absVal.lessThan( maxError ), F_ZERO_4A, val );
+        setSelectWithMask( absVal.lessThan( maxError ), LLVector4a::getZero(), val );
     }
 }

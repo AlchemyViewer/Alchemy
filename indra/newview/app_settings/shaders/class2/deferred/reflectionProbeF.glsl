@@ -25,7 +25,9 @@
 
 // Implementation for when reflection probes are disabled
 
-uniform float reflection_probe_ambiance;
+// Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
+// and bound at UB_ENVIRONMENT. Members are read by bare name.
+//[ENGINE_BLOCK Environment]
 
 uniform samplerCube environmentMap;
 

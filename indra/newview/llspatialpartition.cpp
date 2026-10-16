@@ -28,6 +28,7 @@
 
 #include "llspatialpartition.h"
 
+#include "alfarplane.h"
 #include "llappviewer.h"
 #include "lltexturecache.h"
 #include "lltexturefetch.h"
@@ -53,6 +54,7 @@
 #include "llvolumemgr.h"
 #include "llviewershadermgr.h"
 #include "llcontrolavatar.h"
+#include "lltoolmgr.h"
 
 extern bool gShiftFrame;
 
@@ -127,6 +129,13 @@ LLSpatialGroup::~LLSpatialGroup()
 
     sNodeCount--;
 
+    // unhook from the reflection probe, which the manager keeps until its next update
+    // notices nothing else holds it -- and autoAdjustOrigin dereferences mGroup until then
+    if (mReflectionProbe.notNull())
+    {
+        mReflectionProbe->orphan();
+    }
+
     clearDrawMap();
 }
 
@@ -135,9 +144,13 @@ void LLSpatialGroup::clearDrawMap()
     mDrawMap.clear();
 }
 
-bool LLSpatialGroup::isHUDGroup()
+bool LLSpatialGroup::isHUDGroup() const
 {
-    return getSpatialPartition() && getSpatialPartition()->isHUDPartition() ;
+    if (hasState(DEAD))
+        return false;
+
+    LLSpatialPartition* part = (LLSpatialPartition*)mSpatialPartition;
+    return part && part->isHUDPartition();
 }
 
 void LLSpatialGroup::validate()
@@ -721,7 +734,7 @@ F32 LLSpatialGroup::getUpdateUrgency() const
     }
     else
     {
-        F32 time = gFrameTimeSeconds-mLastUpdateTime+4.f;
+        F32 time = (F32)(gFrameTimeSeconds-mLastUpdateTime)+4.f;
         return time + (mObjectBounds[1].dot3(mObjectBounds[1]).getF32()+1.f)/mDistance;
     }
 }
@@ -861,45 +874,6 @@ void LLSpatialGroup::rebound()
     }
 }
 
-void LLSpatialGroup::destroyGLState(bool keep_occlusion)
-{
-    setState(LLSpatialGroup::GEOM_DIRTY | LLSpatialGroup::IMAGE_DIRTY);
-
-    if (!keep_occlusion)
-    { //going to need a rebuild
-        gPipeline.markRebuild(this);
-    }
-
-    mLastUpdateTime = gFrameTimeSeconds;
-    mVertexBuffer = NULL;
-    mBufferMap.clear();
-
-    clearDrawMap();
-
-    if (!keep_occlusion)
-    {
-        releaseOcclusionQueryObjectNames();
-    }
-
-
-    for (LLSpatialGroup::element_iter i = getDataBegin(); i != getDataEnd(); ++i)
-    {
-        LLDrawable* drawable = (LLDrawable*)(*i)->getDrawable();
-        if(!drawable)
-        {
-            continue;
-        }
-        for (S32 j = 0; j < drawable->getNumFaces(); j++)
-        {
-            LLFace* facep = drawable->getFace(j);
-            if (facep)
-            {
-                facep->clearVertexBuffer();
-            }
-        }
-    }
-}
-
 //==============================================
 
 LLSpatialPartition::LLSpatialPartition(U32 data_mask, bool render_by_group, LLViewerRegion* regionp)
@@ -1034,11 +1008,6 @@ public:
 
     virtual bool earlyFail(LLViewerOctreeGroup* base_group)
     {
-        if (LLPipeline::sReflectionRender)
-        {
-            return false;
-        }
-
         LLSpatialGroup* group = (LLSpatialGroup*)base_group;
         group->checkOcclusion();
 
@@ -1104,6 +1073,38 @@ public:
     }
 };
 
+// LLOctreeCullNoFarClip held to a sphere, for terrain once the projection no longer bounds it
+// (ALFarPlane::terrainReach).
+class ALOctreeCullReach : public LLOctreeCullNoFarClip
+{
+public:
+    ALOctreeCullReach(LLCamera* camera, F32 reach)
+        : LLOctreeCullNoFarClip(camera), mReach(reach) { }
+
+    S32 frustumCheck(const LLViewerOctreeGroup* group) override
+    {
+        S32 res = AABBInFrustumNoFarClipGroupBounds(group);
+        if (res != 0)
+        {
+            res = llmin(res, AABBSphereIntersect(group->getExtents()[0], group->getExtents()[1], mCamera->getOrigin(), mReach));
+        }
+        return res;
+    }
+
+    S32 frustumCheckObjects(const LLViewerOctreeGroup* group) override
+    {
+        S32 res = AABBInFrustumNoFarClipObjectBounds(group);
+        if (res != 0)
+        {
+            res = llmin(res, AABBSphereIntersect(group->getObjectExtents()[0], group->getObjectExtents()[1], mCamera->getOrigin(), mReach));
+        }
+        return res;
+    }
+
+private:
+    F32 mReach;
+};
+
 class LLOctreeCullShadow : public LLOctreeCull
 {
 public:
@@ -1131,7 +1132,8 @@ public:
     {
         LLSpatialGroup* group = (LLSpatialGroup*)base_group;
 
-        if (group->getOctreeNode()->getParent() &&  //never occlusion cull the root node
+        if (group->getOctreeNode() &&
+            group->getOctreeNode()->getParent() &&  //never occlusion cull the root node
             LLPipeline::sUseOcclusion &&            //ignore occlusion if disabled
             group->isOcclusionState(LLSpatialGroup::OCCLUDED))
         {
@@ -1208,8 +1210,9 @@ public:
     {
         LLSpatialGroup* group = (LLSpatialGroup*)base_group;
 
-        if (mResult || //already found a node, don't check any more
-            (group->getOctreeNode()->getParent() && //never occlusion cull the root node
+        if (mResult ||                              //already found a node, don't check any more
+            (group->getOctreeNode() &&
+             group->getOctreeNode()->getParent() && //never occlusion cull the root node
              LLPipeline::sUseOcclusion &&           //ignore occlusion if disabled
              group->isOcclusionState(LLSpatialGroup::OCCLUDED)))
         {
@@ -1234,7 +1237,10 @@ class LLOctreeSelect : public LLOctreeCull
 {
 public:
     LLOctreeSelect(LLCamera* camera, std::vector<LLDrawable*>* results)
-        : LLOctreeCull(camera), mResults(results) { }
+        : LLOctreeCull(camera), mResults(results)
+    {
+        mNearFirst = false; // the selection is a set of drawables, in no order
+    }
 
     virtual bool earlyFail(LLViewerOctreeGroup* group) { return false; }
     virtual void preprocess(LLViewerOctreeGroup* group) { }
@@ -1309,7 +1315,7 @@ void drawBox(const LLVector3& c, const LLVector3& r)
 
 void drawBox(const LLVector4a& c, const LLVector4a& r)
 {
-    drawBox(reinterpret_cast<const LLVector3&>(c), reinterpret_cast<const LLVector3&>(r));
+    drawBox(LLVector3(c), LLVector3(r));
 }
 
 void drawBoxOutline(const LLVector3& pos, const LLVector3& size)
@@ -1363,7 +1369,7 @@ void drawBoxOutline(const LLVector3& pos, const LLVector3& size)
 
 void drawBoxOutline(const LLVector4a& pos, const LLVector4a& size)
 {
-    drawBoxOutline(reinterpret_cast<const LLVector3&>(pos), reinterpret_cast<const LLVector3&>(size));
+    drawBoxOutline(LLVector3(pos), LLVector3(size));
 }
 
 
@@ -1437,6 +1443,13 @@ S32 LLSpatialPartition::cull(LLCamera &camera, bool do_occlusion)
     if (LLPipeline::sShadowRender)
     {
         LLOctreeCullShadow culler(&camera);
+        culler.traverse(mOctree);
+    }
+    // Terrain in the main view, when an infinite projection no longer bounds it.
+    else if (const F32 reach = ALFarPlane::terrainReach(LLViewerCamera::getInstance()->getProjectionFar());
+             mInfiniteFarClip && reach > 0.f && !gCubeSnapshot && &camera == LLViewerCamera::getInstance())
+    {
+        ALOctreeCullReach culler(&camera, reach);
         culler.traverse(mOctree);
     }
     else if (mInfiniteFarClip || (!LLPipeline::sUseFarClip && !gCubeSnapshot))
@@ -1655,15 +1668,14 @@ void renderOctree(LLSpatialGroup* group)
 
         {
             LLGLDepthTest gl_depth(false, false);
+            gGL.flush();
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
             gGL.diffuseColor4f(1,0,0,group->mBuilt);
-            gGL.flush();
             gGL.setLineWidth(5.f);
 
             const LLVector4a* bounds = group->getObjectBounds();
             drawBoxOutline(bounds[0], bounds[1]);
-            gGL.flush();
             gGL.setLineWidth(1.f);
             gGL.flush();
 
@@ -1697,9 +1709,15 @@ void renderOctree(LLSpatialGroup* group)
                 if (rigged)
                 {
                     gGL.pushMatrix();
-                    gGL.loadMatrix(gGLModelView);
+                    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
                     if (!LLRenderPass::uploadMatrixPalette(face->mAvatar, face->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
                     {
+                        // Both pushes above are popped at the end of the iteration this skips.
+                        gGL.popMatrix();
+                        if (!group->getSpatialPartition()->isBridge())
+                        {
+                            gGL.popMatrix();
+                        }
                         continue;
                     }
                 }
@@ -1873,6 +1891,10 @@ void renderUpdateType(LLDrawable* drawablep)
 
 void renderBoundingBox(LLDrawable* drawable, bool set_color = true)
 {
+    // The colour is a uniform, so the last drawable's outlines go out under their own colour
+    // before it changes.
+    gGL.flush();
+
     if (set_color)
     {
         if (drawable->isSpatialBridge())
@@ -1903,10 +1925,6 @@ void renderBoundingBox(LLDrawable* drawable, bool set_color = true)
                 case LLViewerObject::LL_VO_PART_GROUP:
                 case LLViewerObject::LL_VO_HUD_PART_GROUP:
                         gGL.diffuseColor4f(0,0,1,1); // blue
-                        break;
-                case LLViewerObject::LL_VO_VOID_WATER:
-                case LLViewerObject::LL_VO_WATER:
-                        gGL.diffuseColor4f(0,0.5f,1,1); // medium blue
                         break;
                 case LL_PCODE_LEGACY_TREE:
                         gGL.diffuseColor4f(0,0.5f,0,1); // dark green
@@ -1973,12 +1991,10 @@ void renderBoundingBox(LLDrawable* drawable, bool set_color = true)
     LLViewerObject* vobj = drawable->getVObj();
     if (vobj && vobj->onActiveList())
     {
-        gGL.flush();
-        gGL.setLineWidth(llmax(4.f*sinf(gFrameTimeSeconds*2.f)+1.f, 1.f));
+        gGL.setLineWidth(llmax(4.f*sinf((F32)fmod(gFrameTimeSeconds.value()*2.0, (F64)F_TWO_PI))+1.f, 1.f));
         //gGL.setLineWidth(4.f*(sinf(gFrameTimeSeconds*2.f)*0.25f+0.75f));
         stop_glerror();
         drawBoxOutline(pos,size);
-        gGL.flush();
         gGL.setLineWidth(1.f);
     }
     else
@@ -2040,7 +2056,7 @@ void renderNormals(LLDrawable *drawablep)
             gGL.multMatrix((F32 *) vol->getRelativeXform().mMatrix);
         }
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         // Normals &tangent line segments get scaled along with the object. Divide by scale length
         // to keep the as-viewed lengths (relatively) constant with the debug setting length
@@ -2071,7 +2087,7 @@ void renderNormals(LLDrawable *drawablep)
                 {
                     LLVector4a n, p;
 
-                    n.setMul(face.mNormals[j], 1.0);
+                    n = face.mNormals[j];
                     n.mul(inv_scale);  // Pre-scale normal, so it's left with an inverse-transpose xform after MVP
                     n.normalize3fast();
                     n.mul(draw_length);
@@ -2092,7 +2108,7 @@ void renderNormals(LLDrawable *drawablep)
                     {
                         LLVector4a t, p;
 
-                        t.setMul(face.mTangents[j], 1.0f);
+                        t = face.mTangents[j];
                         t.normalize3fast();
                         t.mul(draw_length);
                         p.setAdd(face.mPositions[j], t);
@@ -2135,7 +2151,6 @@ void renderNormals(LLDrawable *drawablep)
 
                 buf->setBuffer();
                 // *NOTE: The render type in the vertex shader is TRIANGLES, but gets converted to LINES in the geometry shader
-                // *NOTE: For terrain normal debug, this seems to also include vertices for water, which is technically not part of the terrain. Should fix that at some point.
                 buf->drawRange(LLRender::TRIANGLES, face.getGeomIndex(), face.getGeomIndex() + face.getGeomCount()-1, face.getIndicesCount(), face.getIndicesStart());
             }
             if (prev_shader)
@@ -2266,7 +2281,7 @@ void renderPhysicsShape(LLDrawable* drawable, LLVOVolume* volume, bool wireframe
         if (decomp)
         { //render a physics based mesh
 
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
 
             if (!decomp->mHull.empty())
             { //decomposition exists, use that
@@ -2534,7 +2549,7 @@ void renderPhysicsShapes(LLSpatialGroup* group, bool wireframe)
             if (bridge)
             {
                 gGL.pushMatrix();
-                gGL.multMatrix((F32*)bridge->mDrawable->getRenderMatrix().mMatrix);
+                gGL.multMatrix(bridge->mDrawable->getRenderMatrix().getF32ptr());
                 bridge->renderPhysicsShapes(wireframe);
                 gGL.popMatrix();
             }
@@ -2564,7 +2579,7 @@ void renderPhysicsShapes(LLSpatialGroup* group, bool wireframe)
                 if (object && object->getPCode() == LLViewerObject::LL_VO_SURFACE_PATCH)
                 {
                     gGL.pushMatrix();
-                    gGL.multMatrix((F32*) object->getRegion()->mRenderMatrix.mMatrix);
+                    gGL.multMatrix(object->getRegion()->mRenderMatrix.getF32ptr());
                     //push face vertices for terrain
                     for (S32 i = 0; i < drawable->getNumFaces(); ++i)
                     {
@@ -2672,13 +2687,13 @@ void renderTextureAnim(LLDrawInfo* params)
 void renderBatchSize(LLDrawInfo* params)
 {
     LLGLEnable offset(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-1.f, 1.f);
+    gGL.setPolygonOffset(-1.f, 1.f);
     LLGLSLShader* old_shader = LLGLSLShader::sCurBoundShaderPtr;
     bool bind = false;
     if (params->mAvatar)
     {
         gGL.pushMatrix();
-        gGL.loadMatrix(gGLModelView);
+        gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
         bind = true;
         old_shader->mRiggedVariant->bind();
         LLRenderPass::uploadMatrixPalette(*params);
@@ -2735,8 +2750,8 @@ void renderTexelDensity(LLDrawable* drawable)
 
         checkerboard_matrix.initScale(LLVector3((F32)texturep->getWidth(discard_level) / 8.f, (F32)texturep->getHeight(discard_level) / 8.f, 1.f));
 
-        gGL.getTexUnit(0)->bind(LLViewerTexture::sCheckerBoardImagep, true);
-        gGL.matrixMode(LLRender::MM_TEXTURE);
+        gGL.getTextureSlot(0)->bindSampled(LLViewerTexture::sCheckerBoardImagep, ALSamplers::AnisoWrap, true);
+        gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.loadMatrix((GLfloat*)&checkerboard_matrix.mMatrix);
 
         if (buffer && (facep->getGeomCount() >= 3))
@@ -2780,15 +2795,15 @@ void renderTexelDensity(LLDrawable* drawable)
     //  }
 
     //  checkboard_matrix.initScale(LLVector3(texturep->getWidth(discard_level) / 8, texturep->getHeight(discard_level) / 8, 1.f));
-    //  gGL.getTexUnit(i)->activate();
+    //  gGL.getTextureSlot(i)->activate();
 
     //  glMatrixMode(GL_TEXTURE);
     //  glPushMatrix();
     //  glLoadIdentity();
-    //  //gGL.matrixMode(LLRender::MM_TEXTURE);
+    //  //gGL.matrixMode(LLRender::MM_TEXTURE0);
     //  glLoadMatrixf((GLfloat*) checkboard_matrix.mMatrix);
 
-    //  gGL.getTexUnit(i)->bind(LLViewerTexture::sCheckerBoardImagep, true);
+    //  gGL.getTextureSlot(i)->bindSampled(LLViewerTexture::sCheckerBoardImagep, ALSamplers::AnisoWrap, true);
 
     //  pushVerts(params, LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_NORMAL );
 
@@ -2887,7 +2902,6 @@ public:
 
             if (i == 1)
             {
-                gGL.flush();
                 gGL.setLineWidth(3.f);
             }
 
@@ -2903,10 +2917,11 @@ public:
                 gGL.vertex3fv(tri->mV[2]->getF32ptr());
             }
             gGL.end();
+            // Drawn under this pass's depth func and colour, which the next pass changes.
+            gGL.flush();
 
             if (i == 1)
             {
-                gGL.flush();
                 gGL.setLineWidth(1.f);
             }
         }
@@ -3014,7 +3029,7 @@ void renderRaycast(LLDrawable* drawablep)
         {
             // draw intersection point
             gGL.pushMatrix();
-            gGL.loadMatrix(gGLModelView);
+            gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
             LLVector3 translate(gDebugRaycastIntersection.getF32ptr());
             gGL.translatef(translate.mV[0], translate.mV[1], translate.mV[2]);
             LLCoordFrame orient;
@@ -3336,7 +3351,7 @@ public:
                 gGL.flush();
                 gGL.pushMatrix();
                 gGLLastMatrix = NULL;
-                gGL.loadMatrix(gGLModelView);
+                gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
                 renderXRay(group, mCamera);
                 stop_glerror();
                 gGLLastMatrix = NULL;
@@ -3520,7 +3535,7 @@ void LLSpatialPartition::renderPhysicsShapes(bool wireframe)
     }
 
     gGL.flush();
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLOctreeRenderPhysicsShapes render_physics(camera, wireframe);
     render_physics.traverse(mOctree);
     gGL.flush();
@@ -3560,7 +3575,7 @@ void LLSpatialPartition::renderDebug()
     LLGLDisable cullface(GL_CULL_FACE);
     LLGLEnable blend(GL_BLEND);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gPipeline.disableLights();
 
     LLSpatialBridge* bridge = asBridge();
@@ -3588,7 +3603,7 @@ void LLSpatialPartition::renderDebug()
             gGL.diffuseColor4f(0.5f, 0.0f, 0, 0.25f);
 
             LLGLEnable offset(GL_POLYGON_OFFSET_LINE);
-            glPolygonOffset(-1.f, -1.f);
+            gGL.setPolygonOffset(-1.f, -1.f);
 
             LLOctreeRenderXRay xray(camera);
             xray.traverse(mOctree);
@@ -3624,12 +3639,11 @@ bool LLSpatialPartition::isVisible(const LLVector3& v)
     return true;
 }
 
-LL_ALIGN_PREFIX(16)
-class LLOctreeIntersect : public LLOctreeTraveler<LLViewerOctreeEntry, LLPointer<LLViewerOctreeEntry>>
+class alignas(16) LLOctreeIntersect : public LLOctreeTraveler<LLViewerOctreeEntry, LLPointer<LLViewerOctreeEntry>>
 {
 public:
-    LL_ALIGN_16(LLVector4a mStart);
-    LL_ALIGN_16(LLVector4a mEnd);
+    LLVector4a mStart;
+    LLVector4a mEnd;
 
     S32       *mFaceHit;
     LLVector4a *mIntersection;
@@ -3690,11 +3704,11 @@ public:
 
             if (group->getSpatialPartition()->isBridge())
             {
-                LLMatrix4 local_matrix = group->getSpatialPartition()->asBridge()->mDrawable->getRenderMatrix();
+                LLMatrix4 local_matrix = group->getSpatialPartition()->asBridge()->mDrawable->getRenderMatrix().toMatrix4();
                 local_matrix.invert();
 
                 LLMatrix4a local_matrix4a;
-                local_matrix4a.loadu(local_matrix);
+                local_matrix4a.set(local_matrix);
 
                 local_matrix4a.affineTransform(mStart, local_start);
                 local_matrix4a.affineTransform(mEnd, local_end);
@@ -3744,7 +3758,7 @@ public:
                 if (vobj->isAvatar())
                 {
                     LLVOAvatar* avatar = (LLVOAvatar*) vobj;
-                    if ((mPickRigged) || ((avatar->isSelf()) && (LLFloater::isVisible(gFloaterTools))))
+                    if ((mPickRigged) || LLToolMgr::getInstance()->inBuildMode())
                     {
                         LLViewerObject* hit = avatar->lineSegmentIntersectRiggedAttachments(mStart, mEnd, -1, mPickTransparent, mPickRigged, mPickUnselectable, mFaceHit, &intersection, mTexCoord, mNormal, mTangent);
                         if (hit)
@@ -3779,7 +3793,7 @@ public:
 
         return false;
     }
-} LL_ALIGN_POSTFIX(16);
+};
 
 LLDrawable* LLSpatialPartition::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
                                                      bool pick_transparent,

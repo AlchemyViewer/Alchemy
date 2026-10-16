@@ -45,11 +45,9 @@
 	<text name="title" value="地點檔案"/>
 	<scroll_container name="place_scroll">
 		<panel name="scrolling_panel">
-			<text name="region_title" value="SampleRegion"/>
 			<text name="parcel_title" value="SampleParcel, Name Long (145, 228, 26)"/>
 			<expandable_text name="description" value="Du waltz die spritz"/>
 			<text name="owner_label" value="所有人："/>
-			<text name="owner_value" value="Alex Superduperlongenamenton"/>
 			<text name="maturity_value" value="未知"/>
 			<accordion name="advanced_info_accordion">
 				<accordion_tab name="parcel_characteristics_tab" title="地段">

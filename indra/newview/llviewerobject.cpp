@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llviewerobject.h"
+#include "llscripteditorws.h"
 
 #include "llaudioengine.h"
 #include "indra_constants.h"
@@ -34,7 +35,6 @@
 #include "llflexibleobject.h"
 #include "llviewercontrol.h"
 #include "lldatapacker.h"
-#include "llfasttimer.h"
 #include "llfloaterreg.h"
 #include "llfontgl.h"
 #include "llframetimer.h"
@@ -53,6 +53,7 @@
 #include "message.h"
 #include "object_flags.h"
 
+#include "alassetblocklist.h"
 #include "llaudiosourcevo.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -63,6 +64,7 @@
 #include "llcontrolavatar.h"
 #include "lldrawable.h"
 #include "llface.h"
+#include "llfloaterinspect.h"
 #include "llfloatertools.h"
 #include "llfollowcam.h"
 #include "llhudtext.h"
@@ -90,7 +92,6 @@
 #include "llvosurfacepatch.h"
 #include "llvotree.h"
 #include "llvovolume.h"
-#include "llvowater.h"
 #include "llworld.h"
 #include "llui.h"
 #include "pipeline.h"
@@ -129,12 +130,13 @@ S32         LLViewerObject::sAxisArrowLength(50);
 bool        LLViewerObject::sPulseEnabled(false);
 bool        LLViewerObject::sUseSharedDrawables(false); // true
 
-// sMaxUpdateInterpolationTime must be greater than sPhaseOutUpdateInterpolationTime
-F64Seconds  LLViewerObject::sMaxUpdateInterpolationTime(3.0);       // For motion interpolation: after X seconds with no updates, don't predict object motion
-F64Seconds  LLViewerObject::sPhaseOutUpdateInterpolationTime(2.0);  // For motion interpolation: after Y seconds with no updates, taper off motion prediction
+// Defaults only: LLViewerObjectList::update overwrites these from settings. mMaxTime must stay
+// greater than mPhaseOutTime, or there is no room for the taper between them.
+ALMotionPredictor::Tuning LLViewerObject::sPredictionTuning;
 F64Seconds  LLViewerObject::sMaxRegionCrossingInterpolationTime(1.0);// For motion interpolation: don't interpolate over this time on region crossing
 
 std::map<std::string, U32> LLViewerObject::sObjectDataMap;
+boost::unordered_map<LLUUID, std::vector<LLViewerObject*>> LLViewerObject::sPendingUpdatesByOwner;
 
 // The maximum size of an object extra parameters binary (packed) block
 #define MAX_OBJECT_PARAMS_SIZE 1024
@@ -143,7 +145,6 @@ std::map<std::string, U32> LLViewerObject::sObjectDataMap;
 // to settle down at a reasonable rate.
 // JC 3/18/2003
 
-const F32 PHYSICS_TIMESTEP = 1.f / 45.f;
 const U32 MAX_INV_FILE_READ_FAILS = 25;
 const S32 MAX_OBJECT_BINARY_DATA_SIZE = 60 + 16;
 
@@ -161,8 +162,6 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
     if (gNonInteractive
         && pcode != LL_PCODE_LEGACY_AVATAR
         && pcode != LL_VO_SURFACE_PATCH
-        && pcode != LL_VO_WATER
-        && pcode != LL_VO_VOID_WATER
         && pcode != LL_VO_WL_SKY
         && pcode != LL_VO_SKY
         && pcode != LL_VO_PART_GROUP
@@ -232,10 +231,6 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
       res = new LLVOSurfacePatch(id, pcode, regionp); break;
     case LL_VO_SKY:
       res = new LLVOSky(id, pcode, regionp); break;
-    case LL_VO_VOID_WATER:
-        res = new LLVOVoidWater(id, pcode, regionp); break;
-    case LL_VO_WATER:
-        res = new LLVOWater(id, pcode, regionp); break;
     case LL_VO_PART_GROUP:
       res = new LLVOPartGroup(id, pcode, regionp); break;
     case LL_VO_HUD_PART_GROUP:
@@ -261,6 +256,7 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
     mTENormalMaps(NULL),
     mTESpecularMaps(NULL),
     mbCanSelect(true),
+    mIsLocalOnly(false),
     mFlags(0),
     mPhysicsShapeType(0),
     mPhysicsGravity(0),
@@ -315,6 +311,7 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
     mAttachmentItemID(LLUUID::null),
     mLastUpdateType(OUT_UNKNOWN),
     mLastUpdateCached(false),
+    mExtraParameterList(LLNetworkData::PARAMS_MAX >> 4),
     mCachedMuteListUpdateTime(0),
     mCachedOwnerInMuteList(false),
     mRiggedAttachedWarned(false)
@@ -327,7 +324,11 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
     LLPrimitive::init_primitive(pcode);
 
     // CP: added 12/2/2005 - this was being initialised to 0, not the current frame time
-    mLastInterpUpdateSecs = LLFrameTimer::getElapsedSeconds();
+    // Both clocks need it: an object whose first update is rejected before the timestamps are
+    // stamped otherwise measures its update age from the start of the session, which is instantly
+    // past every phase-out threshold.
+    mLastInterpUpdateSecs = LLFrameTimer::getUptimeSeconds();
+    mLastMessageUpdateSecs = mLastInterpUpdateSecs;
 
     mPositionRegion = LLVector3(0.f, 0.f, 0.f);
 
@@ -347,7 +348,7 @@ LLViewerObject::~LLViewerObject()
     // unhook from reflection probe manager
     if (mReflectionProbe.notNull())
     {
-        mReflectionProbe->mViewerObject = nullptr;
+        mReflectionProbe->orphan();
         mReflectionProbe = nullptr;
     }
 
@@ -372,15 +373,6 @@ LLViewerObject::~LLViewerObject()
     }
 
     // Delete memory associated with extra parameters.
-    boost::unordered_map<U16, ExtraParameter*>::iterator iter;
-    for (iter = mExtraParameterList.begin(); iter != mExtraParameterList.end(); ++iter)
-    {
-        if(iter->second != NULL)
-        {
-            delete iter->second->data;
-            delete iter->second;
-        }
-    }
     mExtraParameterList.clear();
 
     for_each(mNameValuePairs.begin(), mNameValuePairs.end(), DeletePairedPointer()) ;
@@ -430,6 +422,13 @@ void LLViewerObject::markDead()
     {
         LL_PROFILE_ZONE_SCOPED;
         //LL_INFOS() << "Marking self " << mLocalID << " as dead." << LL_ENDL;
+
+        // If this is a published root prim, notify the WS extension before teardown.
+        auto ws_server = LLScriptEditorWSServer::getServer();
+        if (ws_server && ws_server->isObjectPublished(mID))
+        {
+            ws_server->unpublishObject(mID, "deleted");
+        }
 
         // Root object of this hierarchy unlinks itself.
         if (getParent())
@@ -530,19 +529,38 @@ void LLViewerObject::markDead()
 
         if (mReflectionProbe.notNull())
         {
-            mReflectionProbe->mViewerObject = nullptr;
+            mReflectionProbe->orphan();
             mReflectionProbe = nullptr;
         }
+
+        removeObjectFromPendingUpdate(this);
 
         sNumZombieObjects++;
     }
 }
 
+S32 LLViewerObject::getNumVisibleFaces() const
+{
+    int v{0};
+    if(mDrawable.notNull())
+    {
+        for (int i = 0;i < mDrawable->getNumFaces();i++)
+        {
+            const LLFace* f = mDrawable->getFace(i);
+            if (f && f->getTextureEntry() && f->getTextureEntry()->getAlpha() != 0.0f)
+            {
+                v++;
+            }
+        }
+    }
+    return v;
+};
+
 void LLViewerObject::dump() const
 {
     LL_INFOS() << "Type: " << pCodeToString(mPrimitiveCode) << LL_ENDL;
     LL_INFOS() << "Drawable: " << (LLDrawable *)mDrawable << LL_ENDL;
-    LL_INFOS() << "Update Age: " << LLFrameTimer::getElapsedSeconds() - mLastMessageUpdateSecs << LL_ENDL;
+    LL_INFOS() << "Update Age: " << LLFrameTimer::getUptimeSeconds() - mLastMessageUpdateSecs << LL_ENDL;
 
     LL_INFOS() << "Parent: " << getParent() << LL_ENDL;
     LL_INFOS() << "ID: " << mID << LL_ENDL;
@@ -604,7 +622,6 @@ void LLViewerObject::initVOClasses()
     LLVOTree::initClass();
     LL_INFOS() << "Viewer Object size: " << sizeof(LLViewerObject) << LL_ENDL;
     LLVOGrass::initClass();
-    LLVOWater::initClass();
     LLVOVolume::initClass();
 
     initObjectDataMap();
@@ -613,7 +630,6 @@ void LLViewerObject::initVOClasses()
 void LLViewerObject::cleanupVOClasses()
 {
     SUBSYSTEM_CLEANUP(LLVOGrass);
-    SUBSYSTEM_CLEANUP(LLVOWater);
     SUBSYSTEM_CLEANUP(LLVOTree);
     SUBSYSTEM_CLEANUP(LLVOAvatar);
     SUBSYSTEM_CLEANUP(LLVOVolume);
@@ -752,6 +768,18 @@ void LLViewerObject::setNameValueList(const std::string& name_value_list)
             addNVPair(tok);
         }
         start = end+1;
+    }
+
+    if (auto ws_server = LLScriptEditorWSServer::getServer())
+    {
+        LLNameValue* nv_name = getNVPair("Name");
+        LLNameValue* nv_desc = getNVPair("Desc");
+        if (nv_name || nv_desc)
+        {
+            std::string obj_name = nv_name ? nv_name->getString() : "";
+            std::string obj_desc = nv_desc ? nv_desc->getString() : "";
+            ws_server->onObjectPropertyChanged(mID, obj_name, obj_desc);
+        }
     }
 }
 
@@ -951,6 +979,24 @@ void LLViewerObject::addChild(LLViewerObject *childp)
         {
             mSeatCount++;
         }
+        else
+        {
+            if (auto ws_server = LLScriptEditorWSServer::getServer())
+            {
+                // If the child was itself a published root, unpublish it — it is now a child prim
+                if (ws_server->isObjectPublished(childp->getID()))
+                {
+                    ws_server->unpublishObject(childp->getID(), "linked");
+                }
+
+                // If our root is a published object, notify of the structural change
+                LLUUID root_id = getRootEdit()->getID();
+                if (ws_server->isObjectPublished(root_id))
+                {
+                    ws_server->onLinksetChildAdded(root_id, childp);
+                }
+            }
+        }
     }
 }
 
@@ -993,6 +1039,18 @@ void LLViewerObject::removeChild(LLViewerObject *childp)
         LLSelectMgr::getInstance()->deselectObjectAndFamily(childp);
         bool add_to_end = true;
         LLSelectMgr::getInstance()->selectObjectAndFamily(childp, add_to_end);
+    }
+
+    // Notify WS server of linkset structure change
+    if (!isDead() && !childp->isDead() && !childp->isAvatar())
+    {
+        if (auto ws_server = LLScriptEditorWSServer::getServer())
+        {
+            if (ws_server->isObjectPublished(getID()))
+            {
+                ws_server->onLinksetChildRemoved(getID(), childp->getID());
+            }
+        }
     }
 }
 
@@ -1201,6 +1259,43 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
         return retval;
     }
 
+    // Has this message been overtaken by one already applied? Decided here, before the decode can
+    // run setRegion() and zero the counter, and against the sender rather than the counter alone:
+    // packet ids are per circuit, so they only order messages from the sim that issued them, and
+    // the first message after a handoff must not be measured against the old sim's sequence.
+    //
+    // What a stale message loses depends on what it carries. A terse update is nothing but motion,
+    // and a newer packet has already said where this object is and how it moves, so the whole
+    // thing is dropped -- and dropped now, before any of it is read. A full update also carries the
+    // state the simulator only sends on change (parenting, textures, scale, flags, extra params),
+    // which no later packet repeats; that part is still applied below, and only the motion and the
+    // position are withheld. The full decode also has to run to the end for a subclass's sake:
+    // LLVOVolume reads its volume parameters and texture entries from the same data packer,
+    // starting wherever this function leaves it.
+    bool stale_update = false;
+    if (mesgsys != NULL)
+    {
+        U32 packet_id = mesgsys->getCurrentRecvPacketID();
+        if (mesgsys->getSender() != mRegionp->getHost())
+        {
+            mLatestRecvPacketID = packet_id;
+        }
+        else if (packet_id < mLatestRecvPacketID &&
+                 mLatestRecvPacketID - packet_id < 65536)
+        {
+            stale_update = true;
+        }
+        else
+        {
+            mLatestRecvPacketID = packet_id;
+        }
+
+        if (stale_update && update_type == OUT_TERSE_IMPROVED)
+        {
+            return retval;
+        }
+    }
+
     // Coordinates of objects on simulators are region-local.
     U64 region_handle = 0;
 
@@ -1256,12 +1351,15 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     // Use getPosition, not getPositionRegion, since this is what we're comparing directly against.
     LLVector3 test_pos_parent = getPosition();
 
+    // Where prediction had got to. test_pos_parent is the same value but gets quantized in the
+    // terse path to make the "did it move" comparison fair, so keep an unrounded copy for the
+    // prediction residual logged at the end of this function.
+    const LLVector3 predicted_pos_parent = test_pos_parent;
+
     // This needs to match the largest size below. See switch(length)
     U8  data[MAX_OBJECT_BINARY_DATA_SIZE];
 
-#ifdef LL_BIG_ENDIAN
     U16 valswizzle[4];
-#endif
     U16 *val;
     const F32 size = LLWorld::getInstance()->getRegionWidthInMeters();
     const F32 MAX_HEIGHT = LLWorld::getInstance()->getRegionMaxHeight();
@@ -1278,6 +1376,11 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     LLVector3 old_angv = getAngularVelocity();
     LLQuaternion new_rot;
     LLVector3 new_scale = getScale();
+
+    // The decode writes velocity and acceleration straight into the object. These are what a stale
+    // full update hands back once it has been decoded for everything else.
+    const LLVector3 old_vel = getVelocity();
+    const LLVector3 old_acc = getAcceleration();
 
     U32 parent_id = 0;
     U8  material = 0;
@@ -1389,13 +1492,6 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     }
                     setAngularVelocity(new_angv);
                     count += sizeof(LLVector3);
-#if LL_DARWIN
-                    if (length == OBJECTDATA_FIELD_SIZE_76 ||
-                        length == OBJECTDATA_FIELD_SIZE_140)
-                    {
-                        setAngularVelocity(LLVector3::zero);
-                    }
-#endif
                     break;
 
                 // length values 48, 32 and 16 were once in viewer code but
@@ -1506,7 +1602,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     mHudText = temp_string;
                     mHudTextColor = LLColor4(coloru);
 
-                    setChanged(MOVED | SILHOUETTE);
+                    setChanged(MOVED);
                 }
                 else
                 {
@@ -1528,10 +1624,9 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                 unpackParticleSource(block_num, owner_id);
 
                 // Mark all extra parameters not used
-                boost::unordered_map<U16, ExtraParameter*>::iterator iter;
-                for (iter = mExtraParameterList.begin(); iter != mExtraParameterList.end(); ++iter)
+                for (auto& entry : mExtraParameterList)
                 {
-                    iter->second->in_use = false;
+                    if (entry.in_use) *entry.in_use = false;
                 }
 
                 // Unpack extra parameters
@@ -1555,7 +1650,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                         U16 param_type;
                         S32 param_size;
                         dp.unpackU16(param_type, "param_type");
-                        dp.unpackBinaryData(param_block, param_size, "param_data");
+                        dp.unpackBinaryData(param_block, MAX_OBJECT_PARAMS_SIZE, param_size, "param_data");
                         //LL_INFOS() << "Param type: " << param_type << ", Size: " << param_size << LL_ENDL;
                         LLDataPackerBinaryBuffer dp2(param_block, param_size);
                         unpackParameterEntry(param_type, &dp2);
@@ -1563,12 +1658,13 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     delete[] buffer;
                 }
 
-                for (iter = mExtraParameterList.begin(); iter != mExtraParameterList.end(); ++iter)
+                for (size_t i = 0; i < mExtraParameterList.size(); ++i)
                 {
-                    if (!iter->second->in_use)
+                    auto& entry = mExtraParameterList[i];
+                    if (entry.in_use && !*entry.in_use)
                     {
                         // Send an update message in case it was formerly in use
-                        parameterChanged(iter->first, iter->second->data, false, false);
+                        parameterChanged(((U16)i + 1) << 4, entry.data, false, false);
                     }
                 }
 
@@ -1601,57 +1697,37 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     this_update_precision = 16;
                     test_pos_parent.quantize16(-0.5f*size, 1.5f*size, MIN_HEIGHT, MAX_HEIGHT);
 
-#ifdef LL_BIG_ENDIAN
                     htolememcpy(valswizzle, &data[count], MVT_U16Vec3, 6);
                     val = valswizzle;
-#else
-                    val = (U16 *) &data[count];
-#endif
                     count += sizeof(U16)*3;
                     new_pos_parent.mV[VX] = U16_to_F32(val[VX], -0.5f*size, 1.5f*size);
                     new_pos_parent.mV[VY] = U16_to_F32(val[VY], -0.5f*size, 1.5f*size);
                     new_pos_parent.mV[VZ] = U16_to_F32(val[VZ], MIN_HEIGHT, MAX_HEIGHT);
 
-#ifdef LL_BIG_ENDIAN
                     htolememcpy(valswizzle, &data[count], MVT_U16Vec3, 6);
                     val = valswizzle;
-#else
-                    val = (U16 *) &data[count];
-#endif
                     count += sizeof(U16)*3;
                     setVelocity(U16_to_F32(val[VX], -size, size),
                                 U16_to_F32(val[VY], -size, size),
                                 U16_to_F32(val[VZ], -size, size));
 
-#ifdef LL_BIG_ENDIAN
                     htolememcpy(valswizzle, &data[count], MVT_U16Vec3, 6);
                     val = valswizzle;
-#else
-                    val = (U16 *) &data[count];
-#endif
                     count += sizeof(U16)*3;
                     setAcceleration(U16_to_F32(val[VX], -size, size),
                                     U16_to_F32(val[VY], -size, size),
                                     U16_to_F32(val[VZ], -size, size));
 
-#ifdef LL_BIG_ENDIAN
                     htolememcpy(valswizzle, &data[count], MVT_U16Quat, 8);
                     val = valswizzle;
-#else
-                    val = (U16 *) &data[count];
-#endif
                     count += sizeof(U16)*4;
                     new_rot.mQ[VX] = U16_to_F32(val[VX], -1.f, 1.f);
                     new_rot.mQ[VY] = U16_to_F32(val[VY], -1.f, 1.f);
                     new_rot.mQ[VZ] = U16_to_F32(val[VZ], -1.f, 1.f);
                     new_rot.mQ[VW] = U16_to_F32(val[VW], -1.f, 1.f);
 
-#ifdef LL_BIG_ENDIAN
                     htolememcpy(valswizzle, &data[count], MVT_U16Vec3, 6);
                     val = valswizzle;
-#else
-                    val = (U16 *) &data[count];
-#endif
                     new_angv.set(U16_to_F32(val[VX], -size, size),
                                         U16_to_F32(val[VY], -size, size),
                                         U16_to_F32(val[VZ], -size, size));
@@ -1811,7 +1887,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     dp->unpackU32(size, "ScratchPadSize");
                     delete [] mData;
                     mData = new U8[size];
-                    dp->unpackBinaryData((U8 *)mData, sp_size, "PartData");
+                    dp->unpackBinaryData((U8 *)mData, size, sp_size, "PartData");
                 }
                 else
                 {
@@ -1876,10 +1952,9 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                 }
 
                 // Mark all extra parameters not used
-                boost::unordered_map<U16, ExtraParameter*>::iterator iter;
-                for (iter = mExtraParameterList.begin(); iter != mExtraParameterList.end(); ++iter)
+                for (auto& entry : mExtraParameterList)
                 {
-                    iter->second->in_use = false;
+                    if (entry.in_use) *entry.in_use = false;
                 }
 
                 // Unpack extra params
@@ -1891,18 +1966,19 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     U16 param_type;
                     S32 param_size;
                     dp->unpackU16(param_type, "param_type");
-                    dp->unpackBinaryData(param_block, param_size, "param_data");
+                    dp->unpackBinaryData(param_block, MAX_OBJECT_PARAMS_SIZE, param_size, "param_data");
                     //LL_INFOS() << "Param type: " << param_type << ", Size: " << param_size << LL_ENDL;
                     LLDataPackerBinaryBuffer dp2(param_block, param_size);
                     unpackParameterEntry(param_type, &dp2);
                 }
 
-                for (iter = mExtraParameterList.begin(); iter != mExtraParameterList.end(); ++iter)
+                for (size_t i = 0; i < mExtraParameterList.size(); ++i)
                 {
-                    if (!iter->second->in_use)
+                    auto& entry = mExtraParameterList[i];
+                    if (entry.in_use && !*entry.in_use)
                     {
                         // Send an update message in case it was formerly in use
-                        parameterChanged(iter->first, iter->second->data, false, false);
+                        parameterChanged(((U16)i + 1) << 4, entry.data, false, false);
                     }
                 }
 
@@ -2070,7 +2146,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     // Show particles, icon and HUD
                     hideExtraDisplayItems( false );
 
-                    setChanged(MOVED | SILHOUETTE);
+                    setChanged(MOVED);
                 }
                 else
                 {
@@ -2209,8 +2285,8 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     }
                     cur_parentp->removeChild(this);
                     sent_parentp->addChild(this);
-                    setChanged(MOVED | SILHOUETTE);
-                    sent_parentp->setChanged(MOVED | SILHOUETTE);
+                    setChanged(MOVED);
+                    sent_parentp->setChanged(MOVED);
                     if (sent_parentp->mDrawable.notNull())
                     {
                         gPipeline.markMoved(sent_parentp->mDrawable, false); // undamped
@@ -2244,7 +2320,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
                         cur_parentp->removeChild(this);
 
-                        setChanged(MOVED | SILHOUETTE);
+                        setChanged(MOVED);
 
                         if (mDrawable.notNull())
                         {
@@ -2282,24 +2358,22 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     //
     //
 
-    // If we're going to skip this message, why are we
-    // doing all the parenting, etc above?
-    if(mesgsys != NULL)
+    // A stale full update stops here, with its parenting, textures, flags and extra params applied
+    // and its motion handed back. A newer packet has already reported this object's velocity, and
+    // that is what prediction continues from; the scale, position and rotation below are likewise
+    // older than what the object already holds.
+    if (stale_update)
     {
-    U32 packet_id = mesgsys->getCurrentRecvPacketID();
-    if (packet_id < mLatestRecvPacketID &&
-        mLatestRecvPacketID - packet_id < 65536)
-    {
-        //skip application of this message, it's old
+        setVelocity(old_vel);
+        setAcceleration(old_acc);
+        setAngularVelocity(old_angv);
         return retval;
-    }
-    mLatestRecvPacketID = packet_id;
     }
 
     // Set the change flags for scale
     if (new_scale != getScale())
     {
-        setChanged(SCALED | SILHOUETTE);
+        setChanged(SCALED);
         setScale(new_scale);  // Must follow setting permYouOwner()
     }
 
@@ -2376,7 +2450,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
             gAgent.rotate(new_rot);
             gAgentCamera.resetView();
         }
-        setChanged(ROTATED | SILHOUETTE);
+        setChanged(ROTATED);
     }
 
     if ( gShowObjectUpdates )
@@ -2451,7 +2525,29 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     // much jumping and hopping around...
 
 //  U32 ping_delay = mesgsys->mCircuitInfo.getPingDelay();
-    mLastInterpUpdateSecs = LLFrameTimer::getElapsedSeconds();
+    const F64 update_time = LLFrameTimer::getUptimeSeconds();
+
+    // Before the clocks move: how far the prediction had drifted by the time the real answer
+    // arrived. This is the reading that settles the direction of the timestep correction in
+    // ALMotionPredictor::finalVelocity -- under gravity the two candidate signs are about 44 mm
+    // apart over a 0.2 s update interval, which is far larger than the noise here.
+    if (mMotionPredictor.hasCadence() && !getAcceleration().isExactlyZero())
+    {
+        LL_DEBUGS("Interpolate") << "Prediction residual for " << getID()
+                                 << ": " << (predicted_pos_parent - getPosition())
+                                 << " after " << (update_time - mLastMessageUpdateSecs.value())
+                                 << "s, accel " << getAcceleration() << LL_ENDL;
+    }
+
+    // Record the arrival before the velocity is converted, so the observed rate is a property of
+    // the stream and not of what we then do with it.
+    mMotionPredictor.noteUpdate(update_time);
+
+    // The simulator reports velocity averaged over its own timestep. Convert once, here, rather
+    // than inside the per-frame integration where the correction picks up the viewer's frame rate.
+    setVelocity(ALMotionPredictor::finalVelocity(getVelocity(), getAcceleration()));
+
+    mLastInterpUpdateSecs = (F64Seconds)update_time;
     mLastMessageUpdateSecs = mLastInterpUpdateSecs;
     if (mDrawable.notNull())
     {
@@ -2510,9 +2606,11 @@ void LLViewerObject::idleUpdate(LLAgent &agent, const F64 &frame_time)
             applyAngularVelocity(dt);
 
             if (isAttachment())
-            {
+            {   // An attachment rides its joint, so there is no linear motion to predict -- but it
+                // still needs the drawable pass below. Returning here skipped clearChanged(SHIFTED),
+                // and a still attachment present at a region shift has no other route back into
+                // updateDrawable, so the flag latched and forced undamped motion from then on.
                 mLastInterpUpdateSecs = (F64Seconds)frame_time;
-                return;
             }
             else
             {   // Move object based on it's velocity and rotation
@@ -2529,92 +2627,122 @@ void LLViewerObject::idleUpdate(LLAgent &agent, const F64 &frame_time)
 void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_time, const F32SecondsImplicit& dt_seconds)
 {
     // linear motion
-    // PHYSICS_TIMESTEP is used below to correct for the fact that the velocity in object
-    // updates represents the average velocity of the last timestep, rather than the final velocity.
-    // the time dilation above should guarantee that dt is never less than PHYSICS_TIMESTEP, theoretically
+    //
+    // The correction for update velocities being the average over the simulator's timestep rather
+    // than the velocity at its end is applied once, when the update lands -- see
+    // ALMotionPredictor::finalVelocity. It used to be folded into every frame here, on the stated
+    // assumption that time dilation keeps dt at or above the simulator timestep. Dilation only ever
+    // makes dt smaller, and any viewer running faster than the simulator's 45 Hz is already below
+    // it, so the correction term went negative and on the first frame of a fall -- where velocity
+    // is still near zero -- it was larger than the step it was correcting. Dropped objects moved
+    // upward before they moved down, at 60 fps and above and never at 45.
     //
     // *TODO: should also wrap linear accel/velocity in check
     // to see if object is selected, instead of explicitly
     // zeroing it out
 
-    F32 dt = dt_seconds;
+    // An update carrying a region handle the viewer does not know yet leaves mRegionp null without
+    // killing the object, and the clamps below read the region for every predicted position. The
+    // caller already guards this for the time dilation; do the same before predicting anything.
+    if (!mRegionp)
+    {
+        mLastInterpUpdateSecs = frame_time;
+        return;
+    }
+
+    const ALMotionPredictor::Tuning& tuning = sPredictionTuning;
+
+    // A frame that spans a stall -- a paused viewer, a snapshot floater holding FreezeTime, a long
+    // hitch -- would otherwise carry every moving object forward by the whole of it in one step.
+    F32 dt = ALMotionPredictor::clampFrameStep(dt_seconds, tuning);
     F64Seconds time_since_last_update = frame_time - mLastMessageUpdateSecs;
     if (time_since_last_update <= (F64Seconds)0.0 || dt <= 0.f)
     {
+        // Nothing to integrate this frame, but the clock still has to move: leaving it behind
+        // stores up the whole idle span as one huge dt the moment motion resumes.
+        mLastInterpUpdateSecs = frame_time;
         return;
     }
 
     LLVector3 accel = getAcceleration();
     LLVector3 vel   = getVelocity();
 
-    if (sMaxUpdateInterpolationTime <= (F64Seconds)0.0)
+    if (tuning.mMaxTime <= 0.f)
     {   // Old code path ... unbounded, simple interpolation
         if (!(accel.isExactlyZero() && vel.isExactlyZero()))
         {
-            LLVector3 pos   = (vel + (0.5f * (dt-PHYSICS_TIMESTEP)) * accel) * dt;
-
             // region local
-            setPositionRegion(pos + getPositionRegion());
+            setPositionRegion(ALMotionPredictor::positionDelta(vel, accel, dt) + getPositionRegion());
             setVelocity(vel + accel*dt);
 
             // for objects that are spinning but not translating, make sure to flag them as having moved
-            setChanged(MOVED | SILHOUETTE);
+            setChanged(MOVED);
         }
     }
     else if (!accel.isExactlyZero() || !vel.isExactlyZero())        // object is moving
     {   // Object is moving, and hasn't been too long since we got an update from the server
 
         // Calculate predicted position and velocity
-        LLVector3 new_pos = (vel + (0.5f * (dt-PHYSICS_TIMESTEP)) * accel) * dt;
+        LLVector3 new_pos = ALMotionPredictor::positionDelta(vel, accel, dt);
         LLVector3 new_v = accel * dt;
 
-        if (time_since_last_update > sPhaseOutUpdateInterpolationTime &&
-            sPhaseOutUpdateInterpolationTime > (F64Seconds)0.0)
-        {   // Haven't seen a viewer update in a while, check to see if the circuit is still active
-            if (mRegionp)
-            {   // The simulator will NOT send updates if the object continues normally on the path
-                // predicted by the velocity and the acceleration (often gravity) sent to the viewer
-                // So check to see if the circuit is blocked, which means the sim is likely in a long lag
-                LLCircuitData *cdp = gMessageSystem->mCircuitInfo.findCircuit( mRegionp->getHost() );
-                if (cdp)
+        // How much of that step to keep. No window can open before the configured phase-out time,
+        // so until then the answer is always "all of it" -- which also keeps the circuit lookup
+        // off the common path.
+        const F32 age = (F32)time_since_last_update.value();
+        if (tuning.mPhaseOutTime > 0.f && age > tuning.mPhaseOutTime)
+        {
+            // The simulator will NOT send updates if the object continues normally on the path
+            // predicted by the velocity and the acceleration (often gravity) sent to the viewer,
+            // so silence on its own is not a fault. What distinguishes the two is this object's
+            // own history: one that had been updating steadily and has now stopped is in trouble,
+            // one that has never established a rate is not evidence of anything.
+            ALMotionPredictor::Window window = mMotionPredictor.phaseOutWindow(tuning);
+
+            // The circuit is a second, independent signal -- if it is dead or blocked then nothing
+            // is arriving for any object on it, whatever this one's history says.
+            bool circuit_lost = true;
+            F64Seconds time_since_last_packet(0.0);
+            if (LLCircuitData* cdp = gMessageSystem->mCircuitInfo.findCircuit(mRegionp->getHost()))
+            {
+                time_since_last_packet = LLMessageSystem::getMessageTimeSeconds() - cdp->getLastPacketInTime();
+                circuit_lost = !cdp->isAlive() || cdp->isBlocked();
+            }
+
+            if (!tuning.mCadenceAware)
+            {   // The default: the taper engages only when the whole circuit looks broken. Any
+                // packet at all -- terrain, a ping, someone's chat -- refreshes that clock, so on
+                // a healthy connection prediction runs unbounded, which is what the simulator
+                // expects of an object it has stopped correcting. (ALInterpolationCadenceAware
+                // trades that for the object's own history, above.)
+                if (!circuit_lost && time_since_last_packet <= (F64Seconds)tuning.mPhaseOutTime)
                 {
-                    // Find out how many seconds since last packet arrived on the circuit
-                    F64Seconds time_since_last_packet = LLMessageSystem::getMessageTimeSeconds() - cdp->getLastPacketInTime();
-
-                    if (!cdp->isAlive() ||      // Circuit is dead or blocked
-                         cdp->isBlocked() ||    // or doesn't seem to be getting any packets
-                         (time_since_last_packet > sPhaseOutUpdateInterpolationTime))
-                    {
-                        // Start to reduce motion interpolation since we haven't seen a server update in a while
-                        F64Seconds time_since_last_interpolation = frame_time - mLastInterpUpdateSecs;
-                        F64 phase_out = 1.0;
-                        if (time_since_last_update > sMaxUpdateInterpolationTime)
-                        {   // Past the time limit, so stop the object
-                            phase_out = 0.0;
-                            //LL_INFOS() << "Motion phase out to zero" << LL_ENDL;
-
-                            // Kill angular motion as well.  Note - not adding this due to paranoia
-                            // about stopping rotation for llTargetOmega objects and not having it restart
-                            // setAngularVelocity(LLVector3::zero);
-                        }
-                        else if (mLastInterpUpdateSecs - mLastMessageUpdateSecs > sPhaseOutUpdateInterpolationTime)
-                        {   // Last update was already phased out a bit
-                            phase_out = (sMaxUpdateInterpolationTime - time_since_last_update) /
-                                        (sMaxUpdateInterpolationTime - time_since_last_interpolation);
-                            //LL_INFOS() << "Continuing motion phase out of " << (F32) phase_out << LL_ENDL;
-                        }
-                        else
-                        {   // Phase out from full value
-                            phase_out = (sMaxUpdateInterpolationTime - time_since_last_update) /
-                                        (sMaxUpdateInterpolationTime - sPhaseOutUpdateInterpolationTime);
-                            //LL_INFOS() << "Starting motion phase out of " << (F32) phase_out << LL_ENDL;
-                        }
-                        phase_out = llclamp(phase_out, 0.0, 1.0);
-
-                        new_pos = new_pos * ((F32) phase_out);
-                        new_v = new_v * ((F32) phase_out);
-                    }
+                    window = ALMotionPredictor::Window();
                 }
+            }
+            else if (circuit_lost && !window.isTapering())
+            {   // No rate established for this object, but its simulator has stopped talking
+                // altogether. Fall back to the configured window rather than coasting forever.
+                window.mStart = tuning.mPhaseOutTime;
+                window.mEnd   = llmax(tuning.mMaxTime, tuning.mPhaseOutTime);
+            }
+
+            // Note - not killing angular motion here, out of paranoia about stopping rotation for
+            // llTargetOmega objects and not having it restart.
+            const F32 phase_out = ALMotionPredictor::phaseOutFactor(age, window);
+            if (phase_out <= 0.f)
+            {
+                // Prediction has been given up on entirely, so hold where we are. Falling through
+                // would spend the terrain and region-edge clamps below on a zero-length step, and
+                // could still shift the object -- which is not what "stop predicting" should mean.
+                mLastInterpUpdateSecs = frame_time;
+                return;
+            }
+
+            if (phase_out < 1.f)
+            {
+                new_pos = new_pos * phase_out;
+                new_v = new_v * phase_out;
             }
         }
 
@@ -2627,7 +2755,7 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
         F32 min_height;
         if (isAvatar())
         {   // Make a better guess about AVs not going underground
-            min_height = LLWorld::getInstance()->resolveLandHeightGlobal(new_pos_global);
+            min_height = LLWorld::getInstance()->resolveLandHeightGlobal(new_pos_global, mRegionp);
             min_height += (0.5f * getScale().mV[VZ]);
         }
         else
@@ -2672,7 +2800,7 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
                 {
                     // Workaround: we can't accurately figure out time when we cross border
                     // so just write down time 'after the fact', it is far from optimal in
-                    // case of lags, but for lags sMaxUpdateInterpolationTime will kick in first
+                    // case of lags, but for lags the prediction phase-out kicks in first
                     LL_DEBUGS("Interpolate") << "Predicted region crossing, new position " << new_pos << LL_ENDL;
                     mRegionCrossExpire = frame_time + sMaxRegionCrossingInterpolationTime;
                 }
@@ -2692,12 +2820,37 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
             mRegionCrossExpire = 0;
         }
 
-        // Set new position and velocity
+        // Set new position and velocity. The message path already refuses a non-finite position;
+        // the predicted one can pick one up from the region clipping above, and a NaN here reaches
+        // the drawable and the octree, where it is far harder to trace back.
+        if (!new_pos.isFinite() || !new_v.isFinite())
+        {
+            LL_WARNS_ONCE("Interpolate") << "Non-finite predicted motion for " << getID()
+                                         << ", pos " << new_pos << " vel " << new_v
+                                         << " -- holding position" << LL_ENDL;
+            mLastInterpUpdateSecs = frame_time;
+            return;
+        }
+
         setPositionRegion(new_pos);
         setVelocity(new_v);
 
+        // Prediction can bring an object to rest on its own -- the region-edge clamps above clear
+        // velocity and acceleration outright. mStatic is otherwise only recomputed when a message
+        // arrives, and if the simulator believes this object already crossed, none ever does: it
+        // stays on the active list and in the more expensive active partition for the rest of the
+        // session, walked every frame to do nothing. Retire it here instead.
+        if (!mStatic
+            && new_v.isExactlyZero()
+            && getAcceleration().isExactlyZero()
+            && getAngularVelocity().isExactlyZero())
+        {
+            mStatic = true;
+            gObjectList.updateActive(this);
+        }
+
         // for objects that are spinning but not translating, make sure to flag them as having moved
-        setChanged(MOVED | SILHOUETTE);
+        setChanged(MOVED);
     }
 
     // Update the last time we did anything
@@ -2815,15 +2968,22 @@ void LLViewerObject::doUpdateInventory(
 // save a script, which involves removing the old one, and rezzing
 // in the new one. This method should be called with the asset id
 // of the new and old script AFTER the bytecode has been saved.
-void LLViewerObject::saveScript(
-    const LLViewerInventoryItem* item,
-    bool active,
-    bool is_new)
+// When creating a new script, the asset should be null.  The server
+// will create the new script based on the script_language (LSL or Lua)
+// If a template_id is provided, the new script will be a copy of that item.
+//
+// *IMPORTANT* If template_id is provided, it must be the ITEM ID of a
+// copy/mod-able script in the user's inventory. The simulator will verify
+// permissions.
+void LLViewerObject::saveScript(const LLViewerInventoryItem* item,
+    bool active, bool is_new, const LLUUID& template_id)
 {
     /*
      * XXXPAM Investigate not making this copy.  Seems unecessary, but I'm unsure about the
      * interaction with doUpdateInventory() called below.
      */
+    if (isLocalOnly()) return; // client-only object: no task inventory on a sim
+
     LL_DEBUGS() << "LLViewerObject::saveScript() " << item->getUUID() << " " << item->getAssetUUID() << LL_ENDL;
 
     LLPointer<LLViewerInventoryItem> task_item =
@@ -2847,15 +3007,109 @@ void LLViewerObject::saveScript(
     msg->addBOOLFast(_PREHASH_Enabled, enabled);
     msg->nextBlockFast(_PREHASH_InventoryBlock);
     task_item->packMessage(msg);
+
+    // This is a completely new script (no asset id) and we've provided a template.
+    // Note that the script subtype on the template will override any subtype on the item.
+    if (task_item->getAssetUUID().isNull() && template_id.notNull())
+    {
+        msg->nextBlock("NewScriptInfo");
+        msg->addUUID("TemplateID", template_id);
+    }
+
     msg->sendReliable(mRegionp->getHost());
 
     // do the internal logic
     doUpdateInventory(task_item, TASK_INVENTORY_ITEM_KEY, is_new);
 }
 
+void LLViewerObject::createInventoryItem(
+    LLAssetType::EType asset_type,
+    LLInventoryType::EType inventory_type,
+    U8 sub_type,
+    const std::string& name,
+    const std::string& description,
+    const LLPermissions& permissions,
+    const LLSD& params,
+    std::function<void(bool, const LLSD&)> callback)
+{
+    if (!mRegionp)
+    {
+        if (callback) callback(false, LLSD().with("message", "No region"));
+        return;
+    }
+
+    std::string cap_url = mRegionp->getCapability("CreateTaskInventoryItem");
+    if (cap_url.empty())
+    {
+        if (callback) callback(false, LLSD().with("message", "Capability not available"));
+        return;
+    }
+
+    LLSD body;
+    body["object_id"]      = mID;
+    body["inventory_type"] = (S32)inventory_type;
+    body["asset_type"]     = (S32)asset_type;
+    body["sub_type"]       = (S32)sub_type;
+    body["name"]           = name;
+    body["description"]    = description;
+
+    LLSD perm_llsd;
+    perm_llsd["base"]       = (S32)permissions.getMaskBase();
+    perm_llsd["owner"]      = (S32)permissions.getMaskOwner();
+    perm_llsd["everyone"]   = (S32)permissions.getMaskEveryone();
+    perm_llsd["group"]      = (S32)permissions.getMaskGroup();
+    perm_llsd["next_owner"] = (S32)permissions.getMaskNextOwner();
+    body["permissions"]     = perm_llsd;
+
+    if (params.isDefined())
+    {
+        body["params"] = params;
+    }
+
+    LLCoros::instance().launch("LLViewerObject::createInventoryItemCoro",
+        boost::bind(&LLViewerObject::createInventoryItemCoro, cap_url, body, callback));
+}
+
+// static
+void LLViewerObject::createInventoryItemCoro(
+    const std::string cap_url, const LLSD body,
+    std::function<void(bool, const LLSD&)> callback)
+{
+    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter =
+        std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("CreateTaskInventoryItem", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+
+    LLSD result = httpAdapter->postAndSuspend(httpRequest, cap_url, body);
+
+    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+    bool success = static_cast<bool>(status) && result["success"].asBoolean();
+
+    if (success)
+    {
+        LLUUID object_id = body["object_id"].asUUID();
+        LLViewerObject* obj = gObjectList.findObject(object_id);
+        if (obj)
+        {
+            ++obj->mExpectedInventorySerialNum;
+            obj->dirtyInventory();
+            obj->requestInventory();
+        }
+    }
+
+    if (callback)
+    {
+        callback(success, result);
+    }
+}
+
 void LLViewerObject::moveInventory(const LLUUID& folder_id,
                                    const LLUUID& item_id)
 {
+    if (isLocalOnly()) return; // client-only object: no task inventory on a sim
+
     LL_DEBUGS() << "LLViewerObject::moveInventory " << item_id << LL_ENDL;
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_MoveTaskInventory);
@@ -2963,6 +3217,20 @@ void LLViewerObject::requestInventory()
 
 void LLViewerObject::fetchInventoryFromServer()
 {
+    if (isLocalOnly())
+    {
+        // Client-only object (e.g. local mesh preview): no task inventory exists
+        // on any sim, and mLocalID is client-side -- a request could even hit an
+        // unrelated region object. Present an empty, loaded inventory instead.
+        if (!mInventory)
+        {
+            mInventory = new LLInventoryObject::object_list_t();
+        }
+        mInventoryDirty = false;
+        doInventoryCallback(); // resets mInvRequestState to STOPPED
+        return;
+    }
+
     if (!isInventoryPending())
     {
         delete mInventory;
@@ -2970,6 +3238,7 @@ void LLViewerObject::fetchInventoryFromServer()
 
         // This will get reset by doInventoryCallback or processTaskInv
         mInvRequestState = INVENTORY_REQUEST_PENDING;
+        mInvRequestFailed = false;
 
         if (mRegionp && !mRegionp->getCapability("RequestTaskInventory").empty())
         {
@@ -2979,15 +3248,15 @@ void LLViewerObject::fetchInventoryFromServer()
         else
         {
             LL_WARNS() << "Using old task inventory path!" << LL_ENDL;
-            // Results in processTaskInv
-            LLMessageSystem *msg = gMessageSystem;
-            msg->newMessageFast(_PREHASH_RequestTaskInventory);
-            msg->nextBlockFast(_PREHASH_AgentData);
-            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
-            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-            msg->nextBlockFast(_PREHASH_InventoryData);
-            msg->addU32Fast(_PREHASH_LocalID, mLocalID);
-            msg->sendReliable(mRegionp->getHost());
+        // Results in processTaskInv
+        LLMessageSystem* msg = gMessageSystem;
+        msg->newMessageFast(_PREHASH_RequestTaskInventory);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        msg->nextBlockFast(_PREHASH_InventoryData);
+        msg->addU32Fast(_PREHASH_LocalID, mLocalID);
+        msg->sendReliable(mRegionp->getHost());
         }
     }
 }
@@ -3033,8 +3302,8 @@ void LLViewerObject::fetchInventoryFromCapCoro(const LLUUID task_inv)
     {
         LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
         LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-                                   httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("TaskInventoryRequest", httpPolicy));
-        LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+                                   httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("TaskInventoryRequest", httpPolicy);
+        LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
         std::string url = obj->mRegionp->getCapability("RequestTaskInventory") + "?task_id=" + obj->mID.asString();
         // If we already have a copy of the inventory then add it so the server won't re-send something we already have.
         // We expect this case to crop up in the case of failed inventory mutations, but it might happen otherwise as well.
@@ -3076,18 +3345,26 @@ void LLViewerObject::fetchInventoryFromCapCoro(const LLUUID task_inv)
         else if (status.getType() == 304)
         {
             LL_INFOS() << "Inventory wasn't changed on server!" << LL_ENDL;
-            obj->mInvRequestState = INVENTORY_REQUEST_STOPPED;
             // Even though it wasn't necessary to send a response, we still may have mutated
             // the inventory since we kicked off the request, check for that case.
             potentially_stale = obj->mInventorySerialNum < obj->mExpectedInventorySerialNum;
             // Set this to what we already have so that we don't re-request a second time.
             obj->mExpectedInventorySerialNum = obj->mInventorySerialNum;
+            // What we already have is the answer, and whoever asked is
+            // waiting for one. Also stops the request.
+            obj->doInventoryCallback();
         }
         else
         {
             // Not sure that there's anything sensible we can do to recover here, retrying in a loop would be bad.
             LL_WARNS() << "Error status while requesting task inventory: " << status.toString() << LL_ENDL;
-            obj->mInvRequestState = INVENTORY_REQUEST_STOPPED;
+            // But whoever asked is told that nothing came, rather than
+            // nothing at all: a listener waiting on the answer -- the
+            // build floater's contents, a script's includes looked up in
+            // its object -- would otherwise wait for the rest of the
+            // session. Also stops the request.
+            obj->mInvRequestFailed = true;
+            obj->doInventoryCallback();
         }
 
         if (potentially_stale)
@@ -3260,6 +3537,7 @@ S32 LLFilenameAndTask::sCount = 0;
 // static
 void LLViewerObject::processTaskInv(LLMessageSystem* msg, void** user_data)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     LLUUID task_id;
     msg->getUUIDFast(_PREHASH_InventoryData, _PREHASH_TaskID, task_id);
     LLViewerObject* object = gObjectList.findObject(task_id);
@@ -3400,7 +3678,7 @@ void LLViewerObject::processTaskInvFile(void** user_data, S32 error_code, LLExtS
                 LLViewerInventoryItem* item = dynamic_cast<LLViewerInventoryItem*>(it->get());
                 if(item && item->getType() != LLAssetType::AT_CATEGORY)
                 {
-                    std::list<LLUUID>::iterator id_it = std::find(pending_lst.begin(), pending_lst.end(), item->getAssetUUID());
+                    std::list<LLUUID>::iterator id_it = std::find(pending_lst.begin(), pending_lst.begin(), item->getAssetUUID());
                     if (id_it != pending_lst.end())
                     {
                         pending_lst.erase(id_it);
@@ -3565,6 +3843,8 @@ void LLViewerObject::doInventoryCallback()
 
 void LLViewerObject::removeInventory(const LLUUID& item_id)
 {
+    if (isLocalOnly()) return; // client-only object: no task inventory on a sim
+
     // close associated floater properties
     LLSD params;
     params["id"] = item_id;
@@ -3615,6 +3895,13 @@ void LLViewerObject::updateMaterialInventory(LLViewerInventoryItem* item, U8 key
     {
         return;
     }
+    if (isLocalOnly())
+    {
+        // Client-only object: no server-side task inventory, so don't queue the
+        // asset as pending -- updateInventory() would early-out and never clear
+        // it, wedging later isAssetInInventory() short-circuits for that asset.
+        return;
+    }
     if (LLAssetType::AT_TEXTURE != item->getType()
         && LLAssetType::AT_MATERIAL != item->getType())
     {
@@ -3637,6 +3924,8 @@ void LLViewerObject::updateInventory(
     U8 key,
     bool is_new)
 {
+    if (isLocalOnly()) return; // client-only object: no task inventory on a sim
+
     // This slices the object into what we're concerned about on the
     // viewer. The simulator will take the permissions and transfer
     // ownership.
@@ -3931,14 +4220,29 @@ void LLViewerObject::setObjectCostStale()
     getRootEdit()->mCostStale = true;
 }
 
+// The async GetObjectCost replies land here; the Inspect floater's opt-in
+// cost columns (and the build floater) read them off the selection, so both
+// need a refresh poke when a cost arrives for a selected object.
+static void dirty_cost_floaters()
+{
+    if (gFloaterTools)
+    {
+        gFloaterTools->dirty();
+    }
+    if (LLFloaterInspect* inspect = LLFloaterReg::findTypedInstance<LLFloaterInspect>("inspect"))
+    {
+        inspect->dirty();
+    }
+}
+
 void LLViewerObject::setObjectCost(F32 cost)
 {
     mObjectCost = cost;
     mCostStale = false;
 
-    if (isSelected() && gFloaterTools)
+    if (isSelected())
     {
-        gFloaterTools->dirty();
+        dirty_cost_floaters();
     }
 }
 
@@ -3956,9 +4260,9 @@ void LLViewerObject::setLinksetCost(F32 cost)
         iter++;
     }
 
-    if (needs_refresh && gFloaterTools)
+    if (needs_refresh)
     {
-        gFloaterTools->dirty();
+        dirty_cost_floaters();
     }
 }
 
@@ -3967,9 +4271,9 @@ void LLViewerObject::setPhysicsCost(F32 cost)
     mPhysicsCost = cost;
     mCostStale = false;
 
-    if (isSelected() && gFloaterTools)
+    if (isSelected())
     {
-        gFloaterTools->dirty();
+        dirty_cost_floaters();
     }
 }
 
@@ -3978,9 +4282,9 @@ void LLViewerObject::setLinksetPhysicsCost(F32 cost)
     mLinksetPhysicsCost = cost;
     mCostStale = false;
 
-    if (isSelected() && gFloaterTools)
+    if (isSelected())
     {
-        gFloaterTools->dirty();
+        dirty_cost_floaters();
     }
 }
 
@@ -4083,6 +4387,11 @@ U32 LLViewerObject::getTriangleCount(S32* vcount) const
     return 0;
 }
 
+U32 LLViewerObject::getLODTriangleCount(S32 lod)
+{
+    return 0;
+}
+
 U32 LLViewerObject::getHighLODTriangleCount()
 {
     return 0;
@@ -4092,16 +4401,35 @@ U32 LLViewerObject::recursiveGetTriangleCount(S32* vcount) const
 {
     S32 total_tris = getTriangleCount(vcount);
     LLViewerObject::const_child_list_t& child_list = getChildren();
-    for (LLViewerObject::const_child_list_t::const_iterator iter = child_list.begin();
-         iter != child_list.end(); ++iter)
+    for (LLViewerObject* childp : child_list)
     {
-        LLViewerObject* childp = *iter;
         if (childp)
         {
             total_tris += childp->getTriangleCount(vcount);
         }
     }
     return total_tris;
+}
+
+void LLViewerObject::recursiveGetLODTriangleCount(S32& high_lod, S32& medium_lod, S32& low_lod, S32& lowest_lod)
+{
+    high_lod = (S32)getLODTriangleCount(LLModel::LOD_HIGH);
+    medium_lod = (S32)getLODTriangleCount(LLModel::LOD_MEDIUM);
+    low_lod = (S32)getLODTriangleCount(LLModel::LOD_LOW);
+    lowest_lod = (S32)getLODTriangleCount(LLModel::LOD_IMPOSTOR);
+    LLViewerObject::const_child_list_t& child_list = getChildren();
+    for (LLViewerObject::const_child_list_t::const_iterator iter = child_list.begin();
+        iter != child_list.end(); ++iter)
+    {
+        LLViewerObject* childp = *iter;
+        if (childp)
+        {
+            high_lod += (S32)childp->getLODTriangleCount(LLModel::LOD_HIGH);
+            medium_lod += (S32)childp->getLODTriangleCount(LLModel::LOD_MEDIUM);
+            low_lod += (S32)childp->getLODTriangleCount(LLModel::LOD_LOW);
+            lowest_lod += (S32)childp->getLODTriangleCount(LLModel::LOD_IMPOSTOR);
+        }
+    }
 }
 
 // This is using the stored surface area for each volume (which
@@ -4123,17 +4451,17 @@ F32 LLViewerObject::recursiveGetScaledSurfaceArea() const
                 const LLVector3& scale = volume->getScale();
                 area += volume->getVolume()->getSurfaceArea() * llmax(llmax(scale.mV[0], scale.mV[1]), scale.mV[2]);
             }
-            LLViewerObject::const_child_list_t children = volume->getChildren();
-            for (LLViewerObject::const_child_list_t::const_iterator child_iter = children.begin();
-                 child_iter != children.end();
-                 ++child_iter)
+
+            for (LLViewerObject* child_obj : volume->getChildren())
             {
-                LLViewerObject* child_obj = *child_iter;
-                LLVOVolume *child = dynamic_cast<LLVOVolume*>( child_obj );
-                if (child && child->getVolume())
+                if (child_obj && child_obj->getPCode() == LL_PCODE_VOLUME)
                 {
-                    const LLVector3& scale = child->getScale();
-                    area += child->getVolume()->getSurfaceArea() * llmax(llmax(scale.mV[0], scale.mV[1]), scale.mV[2]);
+                    LLVOVolume *child = static_cast<LLVOVolume*>( child_obj );
+                    if (child->getVolume())
+                    {
+                        const LLVector3& scale = child->getScale();
+                        area += child->getVolume()->getSurfaceArea() * llmax(llmax(scale.mV[0], scale.mV[1]), scale.mV[2]);
+                    }
                 }
             }
         }
@@ -4228,7 +4556,7 @@ void LLViewerObject::boostTexturePriority(bool boost_children /* = true */)
 
     if (isSculpted() && !isMesh())
     {
-        LLSculptParams *sculpt_params = (LLSculptParams *)getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+        LLSculptParams *sculpt_params = getSculptParams();
         if (sculpt_params)
         {
             LLUUID sculpt_id = sculpt_params->getSculptTexture();
@@ -4440,185 +4768,6 @@ const LLVector3 &LLViewerObject::getPositionAgent() const
     return mPositionAgent;
 }
 
-LLMatrix4a LLViewerObject::getGLTFAssetToAgentTransform() const
-{
-    LLMatrix4 root;
-    root.initScale(getScale());
-    root.rotate(getRenderRotation());
-    root.translate(getRenderPosition());
-
-    LLMatrix4a mat;
-    mat.loadu((F32*)root.mMatrix);
-
-    return mat;
-}
-
-LLVector3 LLViewerObject::getGLTFNodePositionAgent(S32 node_index) const
-{
-    LLVector3 ret;
-    getGLTFNodeTransformAgent(node_index, &ret, nullptr, nullptr);
-    return ret;
-
-}
-
-LLMatrix4a LLViewerObject::getAgentToGLTFAssetTransform() const
-{
-    LLMatrix4 root;
-    LLVector3 scale = getScale();
-    scale.mV[0] = 1.f / scale.mV[0];
-    scale.mV[1] = 1.f / scale.mV[1];
-    scale.mV[2] = 1.f / scale.mV[2];
-
-    root.translate(-getRenderPosition());
-    root.rotate(~getRenderRotation());
-
-    LLMatrix4 scale_mat;
-    scale_mat.initScale(scale);
-
-    root *= scale_mat;
-    LLMatrix4a mat;
-    mat.loadu((F32*)root.mMatrix);
-
-    return mat;
-}
-
-LLMatrix4a LLViewerObject::getGLTFNodeTransformAgent(S32 node_index) const
-{
-    LLMatrix4a mat;
-
-    if (mGLTFAsset && node_index >= 0 && node_index < mGLTFAsset->mNodes.size())
-    {
-        auto& node = mGLTFAsset->mNodes[node_index];
-
-        LLMatrix4a asset_to_agent = getGLTFAssetToAgentTransform();
-        LLMatrix4a node_to_agent;
-        LLMatrix4a am;
-        am.loadu(glm::value_ptr(node.mAssetMatrix));
-        matMul(am, asset_to_agent, node_to_agent);
-
-        mat = node_to_agent;
-    }
-    else
-    {
-        mat.setIdentity();
-    }
-
-    return mat;
-}
-
-void LLViewerObject::getGLTFNodeTransformAgent(S32 node_index, LLVector3* position, LLQuaternion* rotation, LLVector3* scale) const
-{
-    LLMatrix4a node_to_agent = getGLTFNodeTransformAgent(node_index);
-
-    if (position)
-    {
-        LLVector4a p = node_to_agent.getTranslation();
-        position->set(p.getF32ptr());
-    }
-
-    if (rotation)
-    {
-        rotation->set(node_to_agent.asMatrix4());
-    }
-
-    if (scale)
-    {
-        scale->mV[0] = node_to_agent.mMatrix[0].getLength3().getF32();
-        scale->mV[1] = node_to_agent.mMatrix[1].getLength3().getF32();
-        scale->mV[2] = node_to_agent.mMatrix[2].getLength3().getF32();
-    }
-}
-
-void decomposeMatrix(const LLMatrix4a& mat, LLVector3& position, LLQuaternion& rotation, LLVector3& scale)
-{
-    LLVector4a p = mat.getTranslation();
-    position.set(p.getF32ptr());
-
-    rotation.set(mat.asMatrix4());
-
-    scale.mV[0] = mat.mMatrix[0].getLength3().getF32();
-    scale.mV[1] = mat.mMatrix[1].getLength3().getF32();
-    scale.mV[2] = mat.mMatrix[2].getLength3().getF32();
-}
-
-void LLViewerObject::setGLTFNodeRotationAgent(S32 node_index, const LLQuaternion& rotation)
-{
-    if (mGLTFAsset && node_index >= 0 && node_index < mGLTFAsset->mNodes.size())
-    {
-        auto& node = mGLTFAsset->mNodes[node_index];
-
-        LLMatrix4a agent_to_asset = getAgentToGLTFAssetTransform();
-        LLMatrix4a agent_to_node = agent_to_asset;
-
-        if (node.mParent != -1)
-        {
-            auto& parent = mGLTFAsset->mNodes[node.mParent];
-            LLMatrix4a ami;
-            ami.loadu(glm::value_ptr(parent.mAssetMatrixInv));
-            matMul(agent_to_asset, ami, agent_to_node);
-        }
-
-        LLQuaternion agent_to_node_rot(agent_to_node.asMatrix4());
-        LLQuaternion new_rot;
-
-        new_rot = rotation * agent_to_node_rot;
-        new_rot.normalize();
-
-        LLVector3 pos;
-        LLQuaternion rot;
-        LLVector3 scale;
-        LLMatrix4a mat;
-        mat.loadu(glm::value_ptr(node.mMatrix));
-        decomposeMatrix(mat, pos, rot, scale);
-
-        mat.asMatrix4().initAll(scale, new_rot, pos);
-
-        node.mMatrix = glm::make_mat4(mat.getF32ptr());
-
-        mGLTFAsset->updateTransforms();
-    }
-}
-
-void LLViewerObject::moveGLTFNode(S32 node_index, const LLVector3& offset)
-{
-    if (mGLTFAsset && node_index >= 0 && node_index < mGLTFAsset->mNodes.size())
-    {
-        auto& node = mGLTFAsset->mNodes[node_index];
-
-        LLMatrix4a agent_to_asset = getAgentToGLTFAssetTransform();
-        LLMatrix4a agent_to_node;
-        LLMatrix4a ami;
-        ami.loadu(glm::value_ptr(node.mAssetMatrixInv));
-        matMul(agent_to_asset, ami, agent_to_node);
-
-        LLVector4a origin = LLVector4a::getZero();
-        LLVector4a offset_v;
-        offset_v.load3(offset.mV);
-
-
-        agent_to_node.affineTransform(offset_v, offset_v);
-        agent_to_node.affineTransform(origin, origin);
-
-        offset_v.sub(origin);
-        offset_v.getF32ptr()[3] = 1.f;
-
-        LLMatrix4a trans;
-        trans.setIdentity();
-        trans.mMatrix[3] = offset_v;
-
-        LLMatrix4a mat;
-        mat.loadu(glm::value_ptr(node.mMatrix));
-
-        matMul(trans, mat, mat);
-
-        node.mMatrix = glm::make_mat4(mat.getF32ptr());
-        node.mTRSValid = false;
-
-        // TODO -- only update transforms for this node and its children (or use a dirty flag)
-        mGLTFAsset->updateTransforms();
-    }
-}
-
 const LLVector3 &LLViewerObject::getPositionRegion() const
 {
     if (!isRoot())
@@ -4700,20 +4849,21 @@ const LLQuaternion LLViewerObject::getRenderRotation() const
     }
     else
     {
-        if (!mDrawable->isRoot())
+        LLDrawable* parent = mDrawable->getParent();
+        if (!mDrawable->isRoot() && parent)
         {
-            ret = getRotation() * LLQuaternion(mDrawable->getParent()->getWorldMatrix());
+            ret = getRotation() * LLQuaternion(parent->getWorldMatrix().toMatrix4());
         }
         else
         {
-            ret = LLQuaternion(mDrawable->getWorldMatrix());
+            ret = LLQuaternion(mDrawable->getWorldMatrix().toMatrix4());
         }
     }
 
     return ret;
 }
 
-const LLMatrix4 LLViewerObject::getRenderMatrix() const
+const LLMatrix4a& LLViewerObject::getRenderMatrix() const
 {
     return mDrawable->getWorldMatrix();
 }
@@ -4791,7 +4941,7 @@ void LLViewerObject::setPosition(const LLVector3 &pos, bool damped)
 {
     if (getPosition() != pos)
     {
-        setChanged(TRANSLATED | SILHOUETTE);
+        setChanged(TRANSLATED);
     }
 
     LLXform::setPosition(pos);
@@ -4834,7 +4984,7 @@ void LLViewerObject::setPositionGlobal(const LLVector3d &pos_global, bool damped
             // LLViewerObject version of setPosition?
             LLVector3 old_pos = mDrawable->mXform.getParent()->getPosition();
             mDrawable->mXform.getParent()->setPosition(old_pos + delta_pos);
-            setChanged(TRANSLATED | SILHOUETTE);
+            setChanged(TRANSLATED);
         }
         if (mParent && ((LLViewerObject*)mParent)->isAvatar())
         {
@@ -5135,11 +5285,10 @@ void LLViewerObject::setNumTEs(const U8 num_tes)
                     if (base_material && override_material)
                     {
                         tep->setGLTFMaterialOverride(new LLGLTFMaterial(*override_material));
-
-                        LLGLTFMaterial* render_material = new LLFetchedGLTFMaterial();
-                        *render_material = *base_material;
-                        render_material->applyOverride(*override_material);
-                        tep->setGLTFRenderMaterial(render_material);
+                    }
+                    if (base_material)
+                    {
+                        initRenderMaterial(i);
                     }
                 }
             }
@@ -5154,6 +5303,7 @@ void LLViewerObject::setNumTEs(const U8 num_tes)
 
 void LLViewerObject::sendMaterialUpdate() const
 {
+    if (isLocalOnly()) return; // client-only object: no sim counterpart
     LLViewerRegion* regionp = getRegion();
     if(!regionp) return;
     gMessageSystem->newMessageFast(_PREHASH_ObjectMaterial);
@@ -5170,6 +5320,7 @@ void LLViewerObject::sendMaterialUpdate() const
 //formerly send_object_shape(LLViewerObject *object)
 void LLViewerObject::sendShapeUpdate()
 {
+    if (isLocalOnly()) return; // client-only object: no sim counterpart
     gMessageSystem->newMessageFast(_PREHASH_ObjectShape);
     gMessageSystem->nextBlockFast(_PREHASH_AgentData);
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
@@ -5186,6 +5337,7 @@ void LLViewerObject::sendShapeUpdate()
 
 void LLViewerObject::sendTEUpdate() const
 {
+    if (isLocalOnly()) return; // client-only object: no sim counterpart
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_ObjectImage);
 
@@ -5197,11 +5349,11 @@ void LLViewerObject::sendTEUpdate() const
     msg->addU32Fast(_PREHASH_ObjectLocalID, mLocalID );
     if (mMedia)
     {
-        msg->addString("MediaURL", mMedia->mMediaURL);
+        msg->addStringFast(_PREHASH_MediaURL, mMedia->mMediaURL);
     }
     else
     {
-        msg->addString("MediaURL", NULL);
+        msg->addStringFast(_PREHASH_MediaURL, nullptr);
     }
 
     // TODO send media type
@@ -5315,6 +5467,9 @@ void LLViewerObject::updateTEMaterialTextures(U8 te)
                 });
         }
         getTE(te)->setGLTFMaterial(mat);
+        initRenderMaterial(te);
+        mat = (LLFetchedGLTFMaterial*) getTE(te)->getGLTFRenderMaterial();
+        llassert(mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(getTE(te)->getGLTFRenderMaterial()) != nullptr);
     }
     else if (mat_id.isNull() && mat != nullptr)
     {
@@ -5704,6 +5859,42 @@ S32 LLViewerObject::setTEMaterialParams(const U8 te, const LLMaterialPtr pMateri
     return retval;
 }
 
+// Set render material if there are overrides or if the base material is has a
+// baked texture. Otherwise, set it to null.
+// If you are setting the material override and not sending an update message,
+// you should probably call this function.
+S32 LLViewerObject::initRenderMaterial(U8 te)
+{
+    LL_PROFILE_ZONE_SCOPED;
+
+    LLTextureEntry* tep = getTE(te);
+    if (!tep) { return 0; }
+    const LLFetchedGLTFMaterial* base_material = static_cast<LLFetchedGLTFMaterial*>(tep->getGLTFMaterial());
+    llassert(base_material);
+    if (!base_material) { return 0; }
+    const LLGLTFMaterial* override_material = tep->getGLTFMaterialOverride();
+    LLFetchedGLTFMaterial* render_material = nullptr;
+    bool need_render_material = override_material;
+    if (!need_render_material)
+    {
+        for (const LLUUID& texture_id : base_material->mTextureId)
+        {
+            if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(texture_id))
+            {
+                need_render_material = true;
+                break;
+            }
+        }
+    }
+    if (need_render_material)
+    {
+        render_material = new LLFetchedGLTFMaterial(*base_material);
+        if (override_material) { render_material->applyOverride(*override_material); }
+        render_material->clearFetchedTextures();
+    }
+    return tep->setGLTFRenderMaterial(render_material);
+}
+
 S32 LLViewerObject::setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* override_mat)
 {
     LL_PROFILE_ZONE_SCOPED;
@@ -5737,22 +5928,13 @@ S32 LLViewerObject::setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* override_ma
 
     if (retval)
     {
+        retval = initRenderMaterial(te) | retval;
         if (override_mat)
         {
-            LLFetchedGLTFMaterial* render_mat = new LLFetchedGLTFMaterial(*src_mat);
-            render_mat->applyOverride(*override_mat);
-            tep->setGLTFRenderMaterial(render_mat);
-            retval = TEM_CHANGE_TEXTURE;
-
             for (LLGLTFMaterial::local_tex_map_t::value_type &val : override_mat->mTrackingIdToLocalTexture)
             {
                 LLLocalBitmapMgr::getInstance()->associateGLTFMaterial(val.first, override_mat);
             }
-
-        }
-        else if (tep->setGLTFRenderMaterial(nullptr))
-        {
-            retval = TEM_CHANGE_TEXTURE;
         }
     }
 
@@ -5872,17 +6054,22 @@ LLViewerTexture *LLViewerObject::getTEImage(const U8 face) const
 bool LLViewerObject::isImageAlphaBlended(const U8 te) const
 {
     LLViewerTexture* image = getTEImage(te);
+    if (image && image->isAlphaOnly())
+    {
+        return true;
+    }
     LLGLenum format = image ? image->getPrimaryFormat() : GL_RGB;
     switch (format)
     {
         case GL_RGBA:
-        case GL_ALPHA:
         {
             return true;
         }
         break;
 
-        case GL_RGB: break;
+        // a luminance source is R8 too, and has no alpha
+        case GL_RGB:
+        case GL_RED: break;
         default:
         {
             LL_WARNS() << "Unexpected tex format in LLViewerObject::isImageAlphaBlended...returning no alpha." << LL_ENDL;
@@ -6366,8 +6553,7 @@ void LLViewerObject::updateDrawable(bool force_damped)
     if (!isChanged(MOVED))
     { //most common case, having an empty if case here makes for better branch prediction
     }
-    else if (mDrawable.notNull() &&
-        !mDrawable->isState(LLDrawable::ON_MOVE_LIST))
+    else if (mDrawable.notNull())
     {
         bool damped_motion =
             !isChanged(SHIFTED) &&                                      // not shifted between regions this frame and...
@@ -6381,7 +6567,27 @@ void LLViewerObject::updateDrawable(bool force_damped)
                     mDrawable->getGeneration() != -1                    // ...was not created this frame.
                 )
             );
-        gPipeline.markMoved(mDrawable, damped_motion);
+
+        if (!mDrawable->isState(LLDrawable::ON_MOVE_LIST))
+        {
+            gPipeline.markMoved(mDrawable, damped_motion);
+        }
+        else if (!damped_motion && !isSelected() && !getVelocity().isExactlyZero())
+        {
+            // Already queued, but the object is now moving under physics, which is never damped.
+            // A drawable that was mid-lerp when that motion began used to keep easing, because a
+            // queued drawable was never re-marked: extrapolated forward, then lagged back behind
+            // that by the damping, for as long as it moved. Upgrade it to a snap, never the
+            // reverse -- a snap asked for earlier this frame (a parent change, a region cross) must
+            // not be turned back into a lerp by a later, ordinary update.
+            //
+            // Only for that case. Any other move that comes out undamped here still leaves a
+            // queued lerp alone, as it always has: a selected object is undamped by the formula
+            // above, and while a joystick edit is easing it (LLSelectMgr::selectionMove) the
+            // simulator's echo of the edit arrives through here -- snapping to each echo would
+            // put back the jitter the damping is there to hide.
+            gPipeline.markMoved(mDrawable, false);
+        }
     }
     clearChanged(SHIFTED);
 }
@@ -6422,6 +6628,10 @@ void LLViewerObject::setAttachedSound(const LLUUID &audio_uuid, const LLUUID& ow
         }
         return;
     }
+
+    if (gAudiop->isCorruptSound(audio_uuid) || ALAssetBlocklist::instance().isBlocked(audio_uuid))
+        return;
+
     if (flags & LL_SOUND_FLAG_LOOP
         && mAudioSourcep && mAudioSourcep->isLoop() && mAudioSourcep->getCurrentData()
         && mAudioSourcep->getCurrentData()->getID() == audio_uuid)
@@ -6510,7 +6720,7 @@ bool LLViewerObject::unpackParameterEntry(U16 param_type, LLDataPacker *dp)
     if (param)
     {
         param->data->unpack(*dp);
-        param->in_use = true;
+        *param->in_use = true;
         parameterChanged(param_type, param->data, true, false);
         return true;
     }
@@ -6522,108 +6732,79 @@ bool LLViewerObject::unpackParameterEntry(U16 param_type, LLDataPacker *dp)
 
 LLViewerObject::ExtraParameter* LLViewerObject::createNewParameterEntry(U16 param_type)
 {
-    LLNetworkData* new_block = NULL;
+    LLNetworkData* new_block = nullptr;
+    bool* in_use = NULL;
     switch (param_type)
     {
       case LLNetworkData::PARAMS_FLEXIBLE:
       {
-          new_block = new LLFlexibleObjectData();
+          mFlexibleObjectData = std::make_unique<LLFlexibleObjectData>();
+          new_block = mFlexibleObjectData.get();
+          in_use = &mFlexibleObjectDataInUse;
           break;
       }
       case LLNetworkData::PARAMS_LIGHT:
       {
-          new_block = new LLLightParams();
+          mLightParams = std::make_unique<LLLightParams>();
+          new_block = mLightParams.get();
+          in_use = &mLightParamsInUse;
           break;
       }
       case LLNetworkData::PARAMS_SCULPT:
       {
-          new_block = new LLSculptParams();
+          mSculptParams = std::make_unique<LLSculptParams>();
+          new_block = mSculptParams.get();
+          in_use = &mSculptParamsInUse;
           break;
       }
       case LLNetworkData::PARAMS_LIGHT_IMAGE:
       {
-          new_block = new LLLightImageParams();
+          mLightImageParams = std::make_unique<LLLightImageParams>();
+          new_block = mLightImageParams.get();
+          in_use = &mLightImageParamsInUse;
           break;
       }
       case LLNetworkData::PARAMS_EXTENDED_MESH:
       {
-          new_block = new LLExtendedMeshParams();
+          mExtendedMeshParams = std::make_unique<LLExtendedMeshParams>();
+          new_block = mExtendedMeshParams.get();
+          in_use = &mExtendedMeshParamsInUse;
           break;
       }
       case LLNetworkData::PARAMS_RENDER_MATERIAL:
       {
-          new_block = new LLRenderMaterialParams();
+          mRenderMaterialParams = std::make_unique<LLRenderMaterialParams>();
+          new_block = mRenderMaterialParams.get();
+          in_use = &mRenderMaterialParamsInUse;
           break;
       }
       case LLNetworkData::PARAMS_REFLECTION_PROBE:
       {
-          new_block = new LLReflectionProbeParams();
+          mReflectionProbeParams = std::make_unique<LLReflectionProbeParams>();
+          new_block = mReflectionProbeParams.get();
+          in_use = &mReflectionProbeParamsInUse;
           break;
       }
       default:
       {
-          LL_INFOS_ONCE() << "Unknown param type: " << param_type << LL_ENDL;
+          LL_INFOS_ONCE() << "Unknown param type. (" << llformat("0x%2x", param_type) << ")" << LL_ENDL;
           break;
       }
     };
 
+    ExtraParameter& entry = mExtraParameterList[U32(param_type >> 4) - 1];
     if (new_block)
     {
-        ExtraParameter* new_entry = new ExtraParameter;
-        new_entry->data = new_block;
-        new_entry->in_use = false; // not in use yet
-        llassert(mExtraParameterList[param_type] == nullptr); // leak -- redundantly allocated parameter entry
-        mExtraParameterList[param_type] = new_entry;
-        return new_entry;
-    }
-    return NULL;
-}
-
-LLViewerObject::ExtraParameter* LLViewerObject::getExtraParameterEntry(U16 param_type) const
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_VIEWER;
-    boost::unordered_map<U16, ExtraParameter*>::const_iterator itor = mExtraParameterList.find(param_type);
-    if (itor != mExtraParameterList.end())
-    {
-        return itor->second;
-    }
-    return NULL;
-}
-
-LLViewerObject::ExtraParameter* LLViewerObject::getExtraParameterEntryCreate(U16 param_type)
-{
-    ExtraParameter* param = getExtraParameterEntry(param_type);
-    if (!param)
-    {
-        param = createNewParameterEntry(param_type);
-    }
-    return param;
-}
-
-LLNetworkData* LLViewerObject::getParameterEntry(U16 param_type) const
-{
-    ExtraParameter* param = getExtraParameterEntry(param_type);
-    if (param)
-    {
-        return param->data;
+        entry.in_use = in_use;
+        *entry.in_use = false; // not in use yet
+        entry.data = new_block;
+        return &entry;
     }
     else
     {
-        return NULL;
+        entry.is_invalid = true;
     }
-}
-
-bool LLViewerObject::getParameterEntryInUse(U16 param_type) const
-{
-    ExtraParameter* param = getExtraParameterEntry(param_type);
-    if (param)
-    {
-        return param->in_use;
-    }
-    else
-    {
-        return false;
-    }
+    return nullptr;
 }
 
 bool LLViewerObject::setParameterEntry(U16 param_type, const LLNetworkData& new_value, bool local_origin)
@@ -6631,11 +6812,11 @@ bool LLViewerObject::setParameterEntry(U16 param_type, const LLNetworkData& new_
     ExtraParameter* param = getExtraParameterEntryCreate(param_type);
     if (param)
     {
-        if (param->in_use && new_value == *(param->data))
+        if (*(param->in_use) && new_value == *(param->data))
         {
             return false;
         }
-        param->in_use = true;
+        *param->in_use = true;
         param->data->copy(new_value);
         parameterChanged(param_type, param->data, true, local_origin);
         return true;
@@ -6651,28 +6832,35 @@ bool LLViewerObject::setParameterEntry(U16 param_type, const LLNetworkData& new_
 // Should always return true.
 bool LLViewerObject::setParameterEntryInUse(U16 param_type, bool in_use, bool local_origin)
 {
-    ExtraParameter* param = getExtraParameterEntryCreate(param_type);
-    if (param && param->in_use != in_use)
+    if (param_type <= LLNetworkData::PARAMS_MAX)
     {
-        param->in_use = in_use;
-        parameterChanged(param_type, param->data, in_use, local_origin);
-        return true;
+        ExtraParameter* param = (in_use ? getExtraParameterEntryCreate(param_type) : &getExtraParameterEntry(param_type));
+        if (param && param->data && *param->in_use != in_use)
+        {
+            *param->in_use = in_use;
+            parameterChanged(param_type, param->data, in_use, local_origin);
+            return true;
+        }
     }
     return false;
 }
 
 void LLViewerObject::parameterChanged(U16 param_type, bool local_origin)
 {
-    ExtraParameter* param = getExtraParameterEntry(param_type);
-    if (param)
+    if (param_type <= LLNetworkData::PARAMS_MAX)
     {
-        parameterChanged(param_type, param->data, param->in_use, local_origin);
+        const ExtraParameter& param = getExtraParameterEntry(param_type);
+        if (param.data)
+        {
+            parameterChanged(param_type, param.data, *param.in_use, local_origin);
+        }
     }
 }
 
 void LLViewerObject::parameterChanged(U16 param_type, LLNetworkData* data, bool in_use, bool local_origin)
 {
-    if (local_origin)
+    // Client-only objects have no sim counterpart -- never send param changes up.
+    if (local_origin && !isLocalOnly())
     {
         // *NOTE: Do not send the render material ID in this way as it will get
         // out-of-sync with other sent client data.
@@ -6714,7 +6902,7 @@ void LLViewerObject::parameterChanged(U16 param_type, LLNetworkData* data, bool 
     {
         if (param_type == LLNetworkData::PARAMS_RENDER_MATERIAL)
         {
-            const LLRenderMaterialParams* params = in_use ? (LLRenderMaterialParams*)getParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL) : nullptr;
+            const LLRenderMaterialParams* params = in_use ? getRenderMaterialParams() : nullptr;
             setRenderMaterialIDs(params, local_origin);
         }
     }
@@ -7033,6 +7221,10 @@ void LLViewerObject::setRegion(LLViewerRegion *regionp)
     mLatestRecvPacketID = 0;
     mRegionp = regionp;
 
+    // A different simulator is sending this object now, at whatever rate it chooses. The rate the
+    // old one used says nothing about when the new one is late.
+    mMotionPredictor.forgetCadence();
+
     for (child_list_t::iterator i = mChildList.begin(); i != mChildList.end(); ++i)
     {
         LLViewerObject* child = *i;
@@ -7044,7 +7236,7 @@ void LLViewerObject::setRegion(LLViewerRegion *regionp)
         mControlAvatar->setRegion(regionp);
     }
 
-    setChanged(MOVED | SILHOUETTE);
+    setChanged(MOVED);
     updateDrawable(false);
 }
 
@@ -7053,7 +7245,7 @@ void    LLViewerObject::updateRegion(LLViewerRegion *regionp)
 {
 //  if (regionp)
 //  {
-//      F64 now = LLFrameTimer::getElapsedSeconds();
+//      F64 now = LLFrameTimer::getUptimeSeconds();
 //      LL_INFOS() << "Updating to region " << regionp->getName()
 //          << ", ms since last update message: " << (F32)((now - mLastMessageUpdateSecs) * 1000.0)
 //          << ", ms since last interpolation: " << (F32)((now - mLastInterpUpdateSecs) * 1000.0)
@@ -7071,30 +7263,31 @@ bool LLViewerObject::specialHoverCursor() const
 
 void LLViewerObject::updateFlags(bool physics_changed)
 {
+    if (isLocalOnly()) return; // client-only object: no sim counterpart
     LLViewerRegion* regionp = getRegion();
     if(!regionp) return;
-    gMessageSystem->newMessage("ObjectFlagUpdate");
+    gMessageSystem->newMessageFast(_PREHASH_ObjectFlagUpdate);
     gMessageSystem->nextBlockFast(_PREHASH_AgentData);
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
     gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, getLocalID() );
     gMessageSystem->addBOOLFast(_PREHASH_UsePhysics, flagUsePhysics() );
-    gMessageSystem->addBOOL("IsTemporary", flagTemporaryOnRez() );
-    gMessageSystem->addBOOL("IsPhantom", flagPhantom() );
+    gMessageSystem->addBOOLFast(_PREHASH_IsTemporary, flagTemporaryOnRez() );
+    gMessageSystem->addBOOLFast(_PREHASH_IsPhantom, flagPhantom() );
 
     // stinson 02/28/2012 : This CastsShadows bool is no longer used in either the viewer or the simulator
     // The simulator code does not even unpack this value when the message is received.
     // This could be potentially hijacked in the future for another use should the urgent need arise.
-    gMessageSystem->addBOOL("CastsShadows", false );
+    gMessageSystem->addBOOLFast(_PREHASH_CastsShadows, false );
 
     if (physics_changed)
     {
-        gMessageSystem->nextBlock("ExtraPhysics");
-        gMessageSystem->addU8("PhysicsShapeType", getPhysicsShapeType() );
-        gMessageSystem->addF32("Density", getPhysicsDensity() );
-        gMessageSystem->addF32("Friction", getPhysicsFriction() );
-        gMessageSystem->addF32("Restitution", getPhysicsRestitution() );
-        gMessageSystem->addF32("GravityMultiplier", getPhysicsGravity() );
+        gMessageSystem->nextBlockFast(_PREHASH_ExtraPhysics);
+        gMessageSystem->addU8Fast(_PREHASH_PhysicsShapeType, getPhysicsShapeType() );
+        gMessageSystem->addF32Fast(_PREHASH_Density, getPhysicsDensity() );
+        gMessageSystem->addF32Fast(_PREHASH_Friction, getPhysicsFriction() );
+        gMessageSystem->addF32Fast(_PREHASH_Restitution, getPhysicsRestitution() );
+        gMessageSystem->addF32Fast(_PREHASH_GravityMultiplier, getPhysicsGravity() );
     }
     gMessageSystem->sendReliable( regionp->getHost() );
 }
@@ -7192,12 +7385,22 @@ void LLViewerObject::applyAngularVelocity(F32 dt)
         // calculate the delta increment based on the object's angular velocity
         dQ.setQuat(angle, ang_vel);
 
+        // Quaternion multiplication does not renormalise, and both of these accumulate one product
+        // per frame for as long as the object spins. An llTargetOmega object that never receives a
+        // rotation update -- the common case, since the simulator has nothing to correct -- drifts
+        // off the unit sphere, and a rotation built from a quaternion of magnitude m scales the
+        // object by m*m. Measured at 8 h and 300 fps that is a fifth of the object's size.
+
         // accumulate the angular velocity rotations to re-apply in the case of an object update
         mAngularVelocityRot *= dQ;
+        mAngularVelocityRot.normalize();
 
         // Just apply the delta increment to the current rotation
-        setRotation(getRotation()*dQ);
-        setChanged(MOVED | SILHOUETTE);
+        LLQuaternion new_rot = getRotation() * dQ;
+        new_rot.normalize();
+        setRotation(new_rot);
+
+        setChanged(MOVED);
     }
 }
 
@@ -7254,7 +7457,7 @@ void LLAlphaObject::getBlendFunc(S32 face, LLRender::eBlendFactor& src, LLRender
 void LLStaticViewerObject::updateDrawable(bool force_damped)
 {
     // Force an immediate rebuild on any update
-    if (mDrawable.notNull())
+    if (mDrawable.notNull() && mDrawable->getVObj())
     {
         mDrawable->updateXform(true);
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
@@ -7488,9 +7691,10 @@ const std::string& LLViewerObject::getAttachmentItemName() const
 LLVOAvatar* LLViewerObject::getAvatar() const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
-    if (getControlAvatar())
+    LLControlAvatar* ca = getControlAvatar();
+    if (ca)
     {
-        return getControlAvatar();
+        return ca;
     }
     if (isAttachment())
     {
@@ -7509,7 +7713,7 @@ LLVOAvatar* LLViewerObject::getAvatar() const
 
 bool LLViewerObject::hasRenderMaterialParams() const
 {
-    return getParameterEntryInUse(LLNetworkData::PARAMS_RENDER_MATERIAL);
+    return mRenderMaterialParamsInUse;
 }
 
 void LLViewerObject::setHasRenderMaterialParams(bool has_materials)
@@ -7531,7 +7735,7 @@ void LLViewerObject::setHasRenderMaterialParams(bool has_materials)
 
 const LLUUID& LLViewerObject::getRenderMaterialID(U8 te) const
 {
-    LLRenderMaterialParams* param_block = (LLRenderMaterialParams*)getParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL);
+    const LLRenderMaterialParams* param_block = getRenderMaterialParams();
     if (param_block)
     {
         return param_block->getMaterial(te);
@@ -7572,7 +7776,7 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
     start_idx = llmax(start_idx, 0);
     end_idx = llmin(end_idx, (S32) getNumTEs());
 
-    LLRenderMaterialParams* param_block = (LLRenderMaterialParams*)getParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL);
+    LLRenderMaterialParams* param_block = getRenderMaterialParams();
     if (!param_block && id.notNull())
     { // block doesn't exist, but it will need to
         param_block = (LLRenderMaterialParams*)createNewParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL)->data;
@@ -7625,25 +7829,15 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
             // the overrides have not changed due to being only texture
             // transforms. Re-apply the overrides to the render material here,
             // if present.
-            const LLGLTFMaterial* override_material = tep->getGLTFMaterialOverride();
-            if (override_material)
+            // Also, sometimes, the material has baked textures, which requires
+            // a copy unique to this object.
+            // Currently, we do not deduplicate render materials.
+            new_material->onMaterialComplete([obj_id = getID(), te]()
             {
-                new_material->onMaterialComplete([obj_id = getID(), te]()
-                    {
-                        LLViewerObject* obj = gObjectList.findObject(obj_id);
-                        if (!obj) { return; }
-                        LLTextureEntry* tep = obj->getTE(te);
-                        if (!tep) { return; }
-                        const LLGLTFMaterial* new_material = tep->getGLTFMaterial();
-                        if (!new_material) { return; }
-                        const LLGLTFMaterial* override_material = tep->getGLTFMaterialOverride();
-                        if (!override_material) { return; }
-                        LLGLTFMaterial* render_material = new LLFetchedGLTFMaterial();
-                        *render_material = *new_material;
-                        render_material->applyOverride(*override_material);
-                        tep->setGLTFRenderMaterial(render_material);
-                    });
-            }
+                LLViewerObject* obj = gObjectList.findObject(obj_id);
+                if (!obj) { return; }
+                obj->initRenderMaterial(te);
+            });
         }
     }
 
@@ -7673,9 +7867,11 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
         }
     }
 
-    if (update_server)
+    if (update_server && !isLocalOnly())
     {
-        // update via ModifyMaterialParams cap (server will echo back changes)
+        // update via ModifyMaterialParams cap (server will echo back changes).
+        // Client-only objects have no sim counterpart, so the local render
+        // material above is the end of it.
         for (S32 te = start_idx; te < end_idx; ++te)
         {
             // This sends a cleared version of this object's current material
@@ -7723,22 +7919,6 @@ void LLViewerObject::shrinkWrap()
     }
 }
 
-void LLViewerObject::setGLTFAsset(const LLUUID& id)
-{
-    //get the sculpt params and set the sculpt type and id
-    auto* param = getExtraParameterEntryCreate(LLNetworkData::PARAMS_SCULPT);
-
-    LLSculptParams* sculpt_params = (LLSculptParams*)param->data;
-    sculpt_params->setSculptTexture(id, LL_SCULPT_TYPE_GLTF);
-
-    setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, true, true);
-
-    // Update the volume
-    LLVolumeParams volume_params;
-    volume_params.setSculptID(id, LL_SCULPT_TYPE_GLTF);
-    updateVolume(volume_params);
-}
-
 void LLViewerObject::clearTEWaterExclusion(const U8 te)
 {
     if (permModify())
@@ -7762,6 +7942,107 @@ void LLViewerObject::clearTEWaterExclusion(const U8 te)
             setTEScale(te, new_s, new_t);
             sendTEUpdate();
         }
+    }
+}
+
+bool LLViewerObject::isReachable()
+{
+    LLViewerRegion* agent_region = gAgent.getRegion();
+    LLViewerRegion* object_region = getRegion();
+
+    if (!agent_region || !object_region)
+    {
+        return false;
+    }
+    if (agent_region == object_region)
+    {
+        return true;
+    }
+
+    boost::unordered_set<LLViewerRegion*> visited;
+    std::queue<LLViewerRegion*> pending;
+    visited.insert(agent_region);
+    pending.push(agent_region);
+
+    while (!pending.empty())
+    {
+        LLViewerRegion* current = pending.front();
+        pending.pop();
+
+        std::vector<LLViewerRegion*> neighbors;
+        current->getNeighboringRegions(neighbors);
+
+        for (LLViewerRegion* neighbor : neighbors)
+        {
+            if (!neighbor) continue;
+
+            if (neighbor == object_region)
+            {
+                return true;
+            }
+            // region's neighbors were not checked
+            if (visited.insert(neighbor).second)
+            {
+                pending.push(neighbor);
+            }
+        }
+    }
+    return false;
+}
+
+void LLViewerObject::markObjectsForUpdate(const LLUUID& owner_id)
+{
+    sPendingUpdatesByOwner.erase(owner_id);
+    for (S32 i = 0; i < gObjectList.getNumObjects(); ++i)
+    {
+        LLViewerObject* obj = gObjectList.getObject(i);
+        if (!obj || obj->isDead() || obj->isAvatar() || obj->permYouOwner())
+        {
+            continue;
+        }
+        sPendingUpdatesByOwner[owner_id].push_back(obj);
+    }
+}
+
+void LLViewerObject::removeObjectFromPendingUpdate(LLViewerObject* obj)
+{
+    for (auto& [owner_id, objects] : sPendingUpdatesByOwner)
+    {
+        objects.erase(std::remove(objects.begin(), objects.end(), obj), objects.end());
+    }
+}
+
+bool LLViewerObject::isObjectInPendingUpdate(const LLUUID& owner_id, LLViewerObject* obj)
+{
+    if (!obj)
+    {
+        return false;
+    }
+    auto it = sPendingUpdatesByOwner.find(owner_id);
+    if (it != sPendingUpdatesByOwner.end())
+    {
+        const auto& objects = it->second;
+        return std::find(objects.begin(), objects.end(), obj) != objects.end();
+    }
+    return false;
+}
+
+void LLViewerObject::requestObjectUpdate()
+{
+    if (isLocalOnly()) return; // client-only object: nothing to request from a sim
+    if (LLViewerRegion* regionp = getRegion())
+    {
+        LLMessageSystem* msg = gMessageSystem;
+        msg->newMessageFast(_PREHASH_RequestMultipleObjects);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        msg->nextBlockFast(_PREHASH_ObjectData);
+        msg->addU8Fast(_PREHASH_CacheMissType, 0);
+        msg->addU32Fast(_PREHASH_ID, getLocalID());
+        msg->sendReliable(regionp->getHost());
+
+        removeObjectFromPendingUpdate(this);
     }
 }
 

@@ -43,8 +43,7 @@
 #include "llvoavatar.h"
 #include "llfetchedgltfmaterial.h"
 
-#include <queue>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 #define SG_STATE_INHERIT_MASK (OCCLUDED)
 #define SG_INITIAL_STATE_MASK (static_cast<U32>(DIRTY) | static_cast<U32>(GEOM_DIRTY))
@@ -64,23 +63,14 @@ void pushVerts(LLFace* face);
     Make every effort to keep size minimal.
     Member ordering is important for cache coherency
 */
-class LLDrawInfo final : public LLRefCount
+class alignas(16) LLDrawInfo final : public LLRefCount
 {
-    LL_ALIGN_NEW;
 protected:
     ~LLDrawInfo();
 
 public:
-    LLDrawInfo(const LLDrawInfo& rhs)
-    {
-        *this = rhs;
-    }
-
-    const LLDrawInfo& operator=(const LLDrawInfo& rhs)
-    {
-        LL_ERRS() << "Illegal operation!" << LL_ENDL;
-        return *this;
-    }
+    LLDrawInfo(const LLDrawInfo& rhs) = delete;
+    const LLDrawInfo& operator=(const LLDrawInfo& rhs) = delete;
 
     // return a hash of this LLDrawInfo as a debug color
     LLColor4U getDebugColor() const;
@@ -108,16 +98,45 @@ public:
     const LLMatrix4* mSpecularMapMatrix = nullptr;
     const LLMatrix4* mNormalMapMatrix = nullptr;
     const LLMatrix4* mTextureMatrix = nullptr;
-    const LLMatrix4* mModelMatrix = nullptr;
+    const LLMatrix4a* mModelMatrix = nullptr;
 
     LLPointer<LLVOAvatar> mAvatar = nullptr;
-    LLMeshSkinInfo* mSkinInfo = nullptr;
+    // Owning, like mAvatar above: the mesh repo culls skins whose only
+    // remaining reference is its own map (and a local-mesh reload drops the
+    // unit/volume references mid-frame), so the draw call must hold its skin
+    // alive itself for the per-frame matrix-palette upload. LLFace::mSkinInfo
+    // stays a raw mirror (like its mAvatar): faces and their group's draw
+    // infos are (re)built together, so a face's skin is always pinned by its
+    // volume or by the co-generated draw-info references here.
+    LLPointer<LLMeshSkinInfo> mSkinInfo;
 
     // Material pointer here is likely for debugging only and are immaterial (zing!)
     LLPointer<LLMaterial> mMaterial;
 
     // PBR material parameters
     LLPointer<LLFetchedGLTFMaterial> mGLTFMaterial;
+
+    // Indexed (multi-material) GLTF PBR batching: when size() > 1 this draw call
+    // covers several materials, selected per-vertex by the texture_index attribute
+    // (the material slot). Slot s binds its four maps to texture units
+    // [s, N+s, 2N+s, 3N+s] where N == mGLTFMaterialList.size(). Empty for the
+    // single-material path (which uses mGLTFMaterial above).
+    std::vector<LLPointer<LLFetchedGLTFMaterial> > mGLTFMaterialList;
+
+    // Indexed (multi-material) legacy Blinn-Phong batching: one entry per material
+    // slot (the texture_index attribute), parallel to the GLTF list above but for
+    // the POOL_MATERIALS path. Empty unless this is a multi-material legacy batch.
+    struct MaterialSlot
+    {
+        LLPointer<LLViewerTexture> mDiffuse;
+        LLPointer<LLViewerTexture> mNormalMap;
+        LLPointer<LLViewerTexture> mSpecularMap;
+        LLVector4 mSpecColor = LLVector4(1.f, 1.f, 1.f, 0.5f); // XYZ = specular RGB, W = glossiness
+        F32 mEnvIntensity = 0.f;
+        F32 mAlphaMaskCutoff = 0.5f;
+        F32 mFullbright = 0.f;
+    };
+    std::vector<MaterialSlot> mMaterialSlotList;
 
     LLVector4 mSpecColor = LLVector4(1.f, 1.f, 1.f, 0.5f); // XYZ = Specular RGB, W = Specular Exponent
 
@@ -198,24 +217,16 @@ public:
     };
 };
 
-LL_ALIGN_PREFIX(16)
-class LLSpatialGroup : public LLOcclusionCullingGroup
+class alignas(16) LLSpatialGroup : public LLOcclusionCullingGroup
 {
     using super = LLOcclusionCullingGroup;
     friend class LLSpatialPartition;
     friend class LLOctreeStateCheck;
+
 public:
 
-    LLSpatialGroup(const LLSpatialGroup& rhs) : LLOcclusionCullingGroup(rhs)
-    {
-        *this = rhs;
-    }
-
-    const LLSpatialGroup& operator=(const LLSpatialGroup& rhs)
-    {
-        LL_ERRS() << "Illegal operation!" << LL_ENDL;
-        return *this;
-    }
+    LLSpatialGroup(const LLSpatialGroup& rhs) = delete;
+    const LLSpatialGroup& operator=(const LLSpatialGroup& rhs) = delete;
 
     static U32 sNodeCount;
     static bool sNoDelete; //deletion of spatial groups and draw info not allowed if true
@@ -280,7 +291,7 @@ public:
 
     LLSpatialGroup(OctreeNode* node, LLSpatialPartition* part);
 
-    bool isHUDGroup() ;
+    bool isHUDGroup() const;
 
     void clearDrawMap();
     void validate();
@@ -297,9 +308,6 @@ public:
     bool updateInGroup(LLDrawable *drawablep, bool immediate = false); // Update position if it's in the group
     void expandExtents(const LLVector4a* addingExtents, const LLXformMatrix& currentTransform);
     void shift(const LLVector4a &offset);
-
-    // TODO: this no longer appears to be called, figure out if it's important and if not remove it
-    void destroyGLState(bool keep_occlusion = false);
 
     void updateDistance(LLCamera& camera);
     F32 getUpdateUrgency() const;
@@ -338,8 +346,8 @@ public:
     virtual void rebound();
 
 public:
-    LL_ALIGN_16(LLVector4a mViewAngle);
-    LL_ALIGN_16(LLVector4a mLastUpdateViewAngle);
+    LLVector4a mViewAngle;
+    LLVector4a mLastUpdateViewAngle;
 
 protected:
     virtual ~LLSpatialGroup();
@@ -359,7 +367,7 @@ public:
     F32 mDistance;
     F32 mDepth;
     F32 mLastUpdateDistance;
-    F32 mLastUpdateTime;
+    F64 mLastUpdateTime;
 
     F32 mPixelArea;
     F32 mRadius;
@@ -369,7 +377,7 @@ public:
     U32 mRenderOrder = 0;
     // Reflection Probe associated with this node (if any)
     LLPointer<LLReflectionMap> mReflectionProbe = nullptr;
-} LL_ALIGN_POSTFIX(16);
+};
 
 class LLGeometryManager
 {
@@ -491,19 +499,19 @@ public:
     typedef LLDrawInfo** drawinfo_iterator;
     typedef LLDrawable** drawable_iterator;
 
-    // Helper function for taking advantage of _mm_prefetch when iterating over cull results
+    // Prefetches the vertex buffers of the draw infos about to be walked
     static inline void increment_iterator(LLCullResult::drawinfo_iterator& i, const LLCullResult::drawinfo_iterator& end)
     {
         ++i;
 
         if (i != end)
         {
-            _mm_prefetch((char*)(*i)->mVertexBuffer.get(), _MM_HINT_NTA);
+            alsimd::prefetch_nta((*i)->mVertexBuffer.get());
 
             auto* ni = i + 1;
             if (ni != end)
             {
-                _mm_prefetch((char*)*ni, _MM_HINT_NTA);
+                alsimd::prefetch_nta(*ni);
             }
         }
     }
@@ -597,22 +605,6 @@ private:
 };
 
 
-//spatial partition for water (implemented in LLVOWater.cpp)
-class LLWaterPartition : public LLSpatialPartition
-{
-public:
-    LLWaterPartition(LLViewerRegion* regionp);
-    virtual void getGeometry(LLSpatialGroup* group) {  }
-    virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) { }
-};
-
-//spatial partition for hole and edge water (implemented in LLVOWater.cpp)
-class LLVoidWaterPartition : public LLWaterPartition
-{
-public:
-    LLVoidWaterPartition(LLViewerRegion* regionp);
-};
-
 //spatial partition for terrain (impelmented in LLVOSurfacePatch.cpp)
 class LLTerrainPartition : public LLSpatialPartition
 {
@@ -678,8 +670,10 @@ class LLVolumeGeometryManager: public LLGeometryManager
     virtual void rebuildMesh(LLSpatialGroup* group);
     virtual void getGeometry(LLSpatialGroup* group);
     virtual void addGeometryCount(LLSpatialGroup* group, U32& vertex_count, U32& index_count);
-    U32 genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort = false, bool batch_textures = false, bool rigged = false);
-    void registerFace(LLSpatialGroup* group, LLFace* facep, U32 type);
+    U32 genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort = false, bool batch_textures = false, bool rigged = false, bool batch_gltf = false, bool batch_legacy = false);
+    // material_slot: the face's texture index is a material slot from the indexed
+    // accumulation in genDrawInfo, not a texture index
+    void registerFace(LLSpatialGroup* group, LLFace* facep, U32 type, bool material_slot);
 
 private:
     void allocateFaces(U32 pMaxFaceCount);

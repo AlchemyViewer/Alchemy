@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """\
-@file   test_llsdmessage_peer.py
+@file   test_llcorehttp_peer.py
 @author Nat Goodspeed
 @date   2008-10-09
 @brief  This script asynchronously runs the executable (with args) specified on
@@ -63,7 +63,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
     -- '/bug2295/1/'       "Content-Range: bytes 0-75/*"
     -- '/bug2295/2/'       "Content-Range: bytes 0-75/2983",
                            "Content-Length: 0"
-    -- '/bug2295/00000018/0/'  Generates PARTIAL_FILE (18) error in libcurl.
+    -- '/bug2295/00000012/0/'  Generates PARTIAL_FILE (18, 0x12) error in libcurl.
                            "Content-Range: bytes 0-75/2983",
                            "Content-Length: 76"
     -- '/bug2295/inv_cont_range/0/'  Generates HE_INVALID_CONTENT_RANGE error in llcorehttp.
@@ -183,7 +183,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/plain")
             self.end_headers()
             if body:
-                self.wfile.write(body)
+                self.wfile.write(body.encode("utf-8"))
         elif "/bug2295/" in self.path:
             # Test for https://jira.secondlife.com/browse/BUG-2295
             #
@@ -274,6 +274,13 @@ class Server(HTTPServer):
     # operation of freeport() absolutely depends on it being off.
     allow_reuse_address = False
 
+    # The listen backlog. The server answers one request at a time, and a
+    # test fires half a dozen at once, some of which retry; the default
+    # of five is fewer than that, and where the kernel refuses a SYN the
+    # backlog cannot hold rather than dropping it -- macOS -- the client
+    # sees a connection refused and the test a failure that is nobody's.
+    request_queue_size = 128
+
     # Override of BaseServer.handle_error().  Not too interested
     # in errors and the default handler emits a scary traceback
     # to stderr which annoys some.  Disable this override to get
@@ -308,8 +315,8 @@ if __name__ == "__main__":
 
     # Pass the selected port number to the subject test program via the
     # environment. We don't want to impose requirements on the test program's
-    # command-line parsing -- and anyway, for C++ integration tests, that's
-    # performed in TUT code rather than our own.
+    # command-line parsing -- and anyway, for C++ tests, that's performed in
+    # Catch2's code rather than our own.
     os.environ["LL_TEST_PORT"] = str(httpd.server_port)
     debug("$LL_TEST_PORT = %s", httpd.server_port)
     if do_valgrind:

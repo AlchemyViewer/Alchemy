@@ -31,6 +31,8 @@
 #define LLPANEL_CPP
 #include "llpanel.h"
 
+#include "alxuishellbuild.h"
+
 #include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "llrect.h"
@@ -57,9 +59,22 @@ LLPanel::factory_stack_t    LLPanel::sFactoryStack;
 template class LLPanel* LLView::getChild<class LLPanel>(
     std::string_view name, bool recurse) const;
 
+namespace
+{
+    // QAMode turns a missing string from a warning into a crash. Asked of the
+    // group by name: indexing the map inserts a null under a name nobody
+    // registered and then hands it back to be dereferenced.
+    bool qaMode()
+    {
+        LLControlGroup* config = LLUI::getInstance()->getSettingGroup("config");
+        return config && config->getBOOL("QAMode");
+    }
+}
+
 LLPanel::LocalizedString::LocalizedString()
 :   name("name"),
-    value("value")
+    value("value"),
+    needs_translate("translate")
 {}
 
 const LLPanel::Params& LLPanel::getDefaultParams()
@@ -270,7 +285,7 @@ bool LLPanel::handleKeyHere( KEY key, MASK mask )
 {
     bool handled = false;
 
-    LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl* cur_focus = gFocusMgr.getKeyboardFocusCtrl();
 
     // handle user hitting ESC to defocus
     if (key == KEY_ESCAPE)
@@ -306,7 +321,7 @@ bool LLPanel::handleKeyHere( KEY key, MASK mask )
     // If RETURN was pressed and something has focus, call onCommit()
     if (!handled && cur_focus && key == KEY_RETURN && mask == MASK_NONE)
     {
-        LLButton* focused_button = dynamic_cast<LLButton*>(cur_focus);
+        LLButton* focused_button = cur_focus->as<LLButton>();
         if (focused_button && focused_button->getCommitOnReturn())
         {
             // current focus is a return-capturing button,
@@ -360,10 +375,10 @@ void LLPanel::setBorderVisible(bool b)
     }
 }
 
-LLTrace::BlockTimerStatHandle FTM_PANEL_CONSTRUCTION("Panel Construction");
-
-LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent, LLXMLNodePtr output_node)
+LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     std::string name("panel");
     node->getAttributeString("name", name);
 
@@ -372,9 +387,8 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent, LLXMLNodePtr output_
 
     LLPanel* panelp = NULL;
 
-    {   LL_RECORD_BLOCK_TIME(FTM_PANEL_CONSTRUCTION);
-
-        if(!class_attr.empty())
+    {
+        if(!class_attr.empty() && !ALXUIShellBuild::active())
         {
             panelp = LLRegisterPanelClass::instance().createPanelClass(class_attr);
             if (!panelp)
@@ -404,7 +418,7 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent, LLXMLNodePtr output_
     panelp->mCommitCallbackRegistrar.pushScope();
     panelp->mEnableCallbackRegistrar.pushScope();
 
-    panelp->initPanelXML(node, parent, output_node, LLUICtrlFactory::getDefaultParams<LLPanel>());
+    const bool built = panelp->initPanelXML(node, parent, LLUICtrlFactory::getDefaultParams<LLPanel>());
 
     panelp->mCommitCallbackRegistrar.popScope();
     panelp->mEnableCallbackRegistrar.popScope();
@@ -412,6 +426,15 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent, LLXMLNodePtr output_
     if (!panelp->getFactoryMap().empty())
     {
         sFactoryStack.pop_back();
+    }
+
+    if (!built)
+    {
+        // Never parented -- initPanelXML adds the panel to its parent on the
+        // way out, and it did not get there. Handing it back leaves it in the
+        // tree of nobody, holding whatever it built.
+        delete panelp;
+        return NULL;
     }
 
     return panelp;
@@ -439,7 +462,7 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
         it != p.strings.end();
         ++it)
     {
-        mUIStrings[it->name] = it->value;
+        mUIStrings[it->name()] = it->value;
     }
 
     setLabel(p.label());
@@ -450,11 +473,20 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
     setToolTip(p.tool_tip());
     setFromXUI(p.from_xui);
 
-    mHoverCursor = getCursorFromString(p.hover_cursor);
+    mHoverCursor = getCursorFromString(p.hover_cursor());
 
     if (p.has_border)
     {
-        addBorder(p.border);
+        // The constructor built one from this same block, before the rect
+        // above was settled; all it needs is that rect.
+        if (mBorder)
+        {
+            mBorder->setShape(getLocalRect());
+        }
+        else
+        {
+            addBorder(p.border);
+        }
     }
     // let constructors set this value if not provided
     if (p.use_bounding_rect.isProvided())
@@ -476,81 +508,70 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
     setAcceptsBadge(p.accepts_badge);
 }
 
-static LLTrace::BlockTimerStatHandle FTM_PANEL_SETUP("Panel Setup");
-static LLTrace::BlockTimerStatHandle FTM_EXTERNAL_PANEL_LOAD("Load Extern Panel Reference");
-static LLTrace::BlockTimerStatHandle FTM_PANEL_POSTBUILD("Panel PostBuild");
-
-bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node, const LLPanel::Params& default_params)
+bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, const LLPanel::Params& default_params)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     Params params(default_params);
     {
-        LL_RECORD_BLOCK_TIME(FTM_PANEL_SETUP);
-
         LLXMLNodePtr referenced_xml;
-        std::string xml_filename = mXMLFilename;
 
         // if the panel didn't provide a filename, check the node
-        if (xml_filename.empty())
+        if (mXMLFilename.empty())
         {
-            node->getAttributeString("filename", xml_filename);
-            setXMLFilename(xml_filename);
+            std::string temp_filename;
+            node->getAttributeString("filename", temp_filename);
+            setXMLFilename(temp_filename);
         }
+
+        // Cache singleton and filename to avoid repeated calls
+        LLUICtrlFactory* factory = LLUICtrlFactory::getInstance();
+
+        // Cache registry to avoid repeated singleton access
+        const child_registry_t& registry = child_registry_t::instance();
 
         LLXUIParser parser;
 
-        if (!xml_filename.empty())
+        if (!mXMLFilename.empty())
         {
-            if (output_node)
+            factory->pushFileName(mXMLFilename);
+
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Load Extern Panel Reference");
+            const bool parsed = LLUICtrlFactory::getLayeredXMLNode(mXMLFilename, referenced_xml);
+            if (parsed)
             {
-                //if we are exporting, we want to export the current xml
-                //not the referenced xml
-                parser.readXUI(node, params, LLUICtrlFactory::getInstance()->getCurFileName());
-                Params output_params(params);
-                setupParamsForExport(output_params, parent);
-                output_node->setName(node->getName()->mString);
-                parser.writeXUI(output_node, output_params, LLInitParam::default_parse_rules(), &default_params);
-                return true;
+                // Get filename after pushFileName
+                const std::string& updated_filename = factory->getCurFileName();
+                parser.readXUI(referenced_xml, params, updated_filename);
+
+                // add children using dimensions from referenced xml for consistent layout
+                setShape(params.rect);
+                LLUICtrlFactory::createChildren(this, referenced_xml, registry);
             }
 
-            LLUICtrlFactory::instance().pushFileName(xml_filename);
+            // Popped on the way out whichever way that is. The name left on the
+            // stack is the one every widget built after this reports as its
+            // own, and the source map and the lint read it.
+            factory->popFileName();
 
-            LL_RECORD_BLOCK_TIME(FTM_EXTERNAL_PANEL_LOAD);
-            if (!LLUICtrlFactory::getLayeredXMLNode(xml_filename, referenced_xml))
+            if (!parsed)
             {
-                LL_WARNS() << "Couldn't parse panel from: " << xml_filename << LL_ENDL;
-
+                LL_WARNS() << "Couldn't parse panel from: " << mXMLFilename << LL_ENDL;
                 return false;
             }
-
-            parser.readXUI(referenced_xml, params, LLUICtrlFactory::getInstance()->getCurFileName());
-
-            // add children using dimensions from referenced xml for consistent layout
-            setShape(params.rect);
-            LLUICtrlFactory::createChildren(this, referenced_xml, child_registry_t::instance());
-
-            LLUICtrlFactory::instance().popFileName();
         }
 
         // ask LLUICtrlFactory for filename, since xml_filename might be empty
-        parser.readXUI(node, params, LLUICtrlFactory::getInstance()->getCurFileName());
-
-        if (output_node)
-        {
-            Params output_params(params);
-            setupParamsForExport(output_params, parent);
-            output_node->setName(node->getName()->mString);
-            parser.writeXUI(output_node, output_params, LLInitParam::default_parse_rules(), &default_params);
-        }
+        parser.readXUI(node, params, factory->getCurFileName());
 
         params.from_xui = true;
         applyXUILayout(params, parent);
         {
-            LL_RECORD_BLOCK_TIME(FTM_PANEL_CONSTRUCTION);
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Panel Construction");
             initFromParams(params);
         }
 
         // add children
-        LLUICtrlFactory::createChildren(this, node, child_registry_t::instance(), output_node);
+        LLUICtrlFactory::createChildren(this, node, registry);
 
         // Connect to parent after children are built, because tab containers
         // do a reshape() on their child panels, which requires that the children
@@ -562,14 +583,14 @@ bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
         }
 
         {
-            LL_RECORD_BLOCK_TIME(FTM_PANEL_POSTBUILD);
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Panel PostBuild");
             postBuild();
         }
     }
     return true;
 }
 
-bool LLPanel::hasString(std::string_view name)
+bool LLPanel::hasString(std::string_view name) const
 {
     return mUIStrings.find(name) != mUIStrings.end();
 }
@@ -585,7 +606,7 @@ std::string LLPanel::getString(std::string_view name, const LLStringUtil::format
         return formatted_string.getString();
     }
     std::string err_str("Failed to find string " + std::string(name) + " in panel " + getName()); //*TODO: Translate
-    if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
+    if(qaMode())
     {
         LL_ERRS() << err_str << LL_ENDL;
     }
@@ -604,7 +625,7 @@ std::string LLPanel::getString(std::string_view name) const
         return found_it->second;
     }
     std::string err_str("Failed to find string " + std::string(name) +" in panel " + getName()); //*TODO: Translate
-    if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
+    if(qaMode())
     {
         LL_ERRS() << err_str << LL_ENDL;
     }
@@ -660,7 +681,7 @@ bool LLPanel::childHasFocus(std::string_view id)
 // Prefer getChild<LLUICtrl>("foo")->setCommitCallback(boost:bind(...)),
 // which takes a generic slot.  Or use mCommitCallbackRegistrar.add() with
 // a named callback and reference it in XML.
-void LLPanel::childSetCommitCallback(std::string_view id, boost::function<void (LLUICtrl*,void*)> cb, void* data)
+void LLPanel::childSetCommitCallback(std::string_view id, std::function<void (LLUICtrl*,void*)> cb, void* data)
 {
     LLUICtrl* child = findChild<LLUICtrl>(id);
     if (child)
@@ -757,7 +778,7 @@ void LLPanel::childSetAction(std::string_view id, const commit_signal_t::slot_ty
     }
 }
 
-void LLPanel::childSetAction(std::string_view id, boost::function<void(void*)> function, void* value)
+void LLPanel::childSetAction(std::string_view id, std::function<void(void*)> function, void* value)
 {
     LLButton* button = findChild<LLButton>(id);
     if (button)
@@ -811,7 +832,7 @@ bool LLPanel::buildFromFile(const std::string& filename, const LLPanel::Params& 
         getCommitCallbackRegistrar().pushScope();
         getEnableCallbackRegistrar().pushScope();
 
-        didPost = initPanelXML(root, NULL, NULL, default_params);
+        didPost = initPanelXML(root, NULL, default_params);
 
         getCommitCallbackRegistrar().popScope();
         getEnableCallbackRegistrar().popScope();

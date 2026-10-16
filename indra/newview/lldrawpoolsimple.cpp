@@ -36,35 +36,72 @@
 #include "llspatialpartition.h"
 #include "llviewershadermgr.h"
 #include "llrender.h"
-#include "gltfscenemanager.h"
-
-static LLTrace::BlockTimerStatHandle FTM_RENDER_SIMPLE_DEFERRED("Deferred Simple");
-static LLTrace::BlockTimerStatHandle FTM_RENDER_GRASS_DEFERRED("Deferred Grass");
-
 
 void LLDrawPoolGlow::renderPostDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+
+    // This pass writes only glow, into the alpha channel. In a cutout frame
+    // that channel is the subject's coverage, and the coverage seeded after
+    // the opaque pools (LLPipeline::seedCutoutCoverageFromDepth) writes over
+    // whatever this put there, so it would be work for nothing.
+    if (LLPipeline::cullingToCutoutSubject())
+    {
+        return;
+    }
     LLGLSLShader* shader = &gDeferredEmissiveProgram;
 
     LLGLEnable blend(GL_BLEND);
     gGL.flush();
     /// Get rid of z-fighting with non-glow pass.
     LLGLEnable polyOffset(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-1.0f, -1.0f);
+    gGL.setPolygonOffset(-1.0f, -1.0f);
     gGL.setSceneBlendType(LLRender::BT_ADD);
 
     LLGLDepthTest depth(GL_TRUE, GL_FALSE);
     gGL.setColorMask(false, true);
 
+    // Multi-material (indexed) legacy glow batches carry a per-slot diffuse list and
+    // must be drawn with the indexed program; the scalar sweep skips them. Require
+    // both the static and rigged indexed glow programs to be complete; otherwise fall
+    // back to scalar for everything (slot-0 diffuse alpha, the pre-batching behavior).
+    bool glow_indexed = LLGLSLShader::sIndexedLegacyMaterials &&
+                        gDeferredEmissiveIndexedProgram.isComplete() &&
+                        gDeferredEmissiveIndexedProgram.mRiggedVariant &&
+                        gDeferredEmissiveIndexedProgram.mRiggedVariant->isComplete();
+
     //first pass -- static objects
     shader->bind();
-    pushBatches(LLRenderPass::PASS_GLOW, true, true);
+    if (glow_indexed)
+    {
+        pushEmissiveBatchesScalar(LLRenderPass::PASS_GLOW, false);
+    }
+    else
+    {
+        pushBatches(LLRenderPass::PASS_GLOW, true, true);
+    }
 
     // second pass -- rigged objects
     shader = shader->mRiggedVariant;
     shader->bind();
-    pushRiggedBatches(LLRenderPass::PASS_GLOW_RIGGED, true, true);
+    if (glow_indexed)
+    {
+        pushEmissiveBatchesScalar(LLRenderPass::PASS_GLOW_RIGGED, true);
+    }
+    else
+    {
+        pushRiggedBatches(LLRenderPass::PASS_GLOW_RIGGED, true, true);
+    }
+
+    // indexed (multi-material) passes
+    if (glow_indexed)
+    {
+        gDeferredEmissiveIndexedProgram.bind();
+        pushEmissiveBatchesIndexed(LLRenderPass::PASS_GLOW, false);
+
+        gDeferredEmissiveIndexedProgram.bind(true); // rigged variant
+        pushEmissiveBatchesIndexed(LLRenderPass::PASS_GLOW_RIGGED, true);
+    }
 
     gGL.setColorMask(true, false);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -74,8 +111,6 @@ LLDrawPoolSimple::LLDrawPoolSimple() :
     LLRenderPass(POOL_SIMPLE)
 {
 }
-
-static LLTrace::BlockTimerStatHandle FTM_RENDER_ALPHA_MASK("Alpha Mask");
 
 LLDrawPoolAlphaMask::LLDrawPoolAlphaMask() :
     LLRenderPass(POOL_ALPHA_MASK)
@@ -98,25 +133,28 @@ S32 LLDrawPoolSimple::getNumDeferredPasses()
 
 void LLDrawPoolSimple::renderDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_SIMPLE_DEFERRED);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LLGLDisable blend(GL_BLEND);
 
+    // The diffuse sampler decodes and the deferred pass's hoisted GL_FRAMEBUFFER_SRGB
+    // (renderGeomDeferred) re-encodes on store, so this pass shades in linear throughout
+    // while the G-buffer keeps its sRGB storage.
+    LLGLSLShader* shader = gDeferredDiffuseProgram.selectVariant();
+
     //render static
-    gDeferredDiffuseProgram.bind();
+    shader->bind();
     pushBatches(LLRenderPass::PASS_SIMPLE, true, true);
 
     //render rigged
-    gDeferredDiffuseProgram.bind(true);
+    shader->bind(true);
     pushRiggedBatches(LLRenderPass::PASS_SIMPLE_RIGGED, true, true);
 }
 
-static LLTrace::BlockTimerStatHandle FTM_RENDER_ALPHA_MASK_DEFERRED("Deferred Alpha Mask");
-
-
 void LLDrawPoolAlphaMask::renderDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_MASK_DEFERRED);
-    LLGLSLShader* shader = &gDeferredDiffuseAlphaMaskProgram;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    // Sampler decodes, the hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes.
+    LLGLSLShader* shader = gDeferredDiffuseAlphaMaskProgram.selectVariant();
 
     //render static
     shader->bind();
@@ -138,11 +176,15 @@ void LLDrawPoolGrass::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     {
-        gDeferredNonIndexedDiffuseAlphaMaskProgram.bind();
-        gDeferredNonIndexedDiffuseAlphaMaskProgram.setMinimumAlpha(0.5f);
+        // Shades in linear like its diffusealphamask siblings: the program's mLinearDiffuse
+        // makes pushBatch decode the diffuse on the sampler, and the hoisted
+        // GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes the store.
+        LLGLSLShader* shader = gDeferredNonIndexedDiffuseAlphaMaskProgram.selectVariant();
+        shader->bind();
+        shader->setMinimumAlpha(0.5f);
 
         //render grass
-        LLRenderPass::pushBatches(LLRenderPass::PASS_GRASS, getVertexDataMask());
+        LLRenderPass::pushBatches(LLRenderPass::PASS_GRASS);
     }
 }
 
@@ -155,7 +197,7 @@ LLDrawPoolFullbright::LLDrawPoolFullbright() :
 
 void LLDrawPoolFullbright::renderPostDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_FULLBRIGHT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     LLGLSLShader* shader = nullptr;
     if (LLPipeline::sRenderingHUDs)
@@ -164,7 +206,7 @@ void LLDrawPoolFullbright::renderPostDeferred(S32 pass)
     }
     else
     {
-        shader = &gDeferredFullbrightProgram;
+        shader = gDeferredFullbrightProgram.selectVariant();
     }
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -183,11 +225,7 @@ void LLDrawPoolFullbright::renderPostDeferred(S32 pass)
 
 void LLDrawPoolFullbrightAlphaMask::renderPostDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_FULLBRIGHT);
-
-    // render unrigged unlit GLTF
-    LL::GLTFSceneManager::instance().render(true, false, true);
-    LL::GLTFSceneManager::instance().render(true, true, true);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     LLGLSLShader* shader = nullptr;
     if (LLPipeline::sRenderingHUDs)
@@ -196,7 +234,7 @@ void LLDrawPoolFullbrightAlphaMask::renderPostDeferred(S32 pass)
     }
     else
     {
-        shader = &gDeferredFullbrightAlphaMaskProgram;
+        shader = gDeferredFullbrightAlphaMaskProgram.selectVariant();
     }
 
     LLGLDisable blend(GL_BLEND);

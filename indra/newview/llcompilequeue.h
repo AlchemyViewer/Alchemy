@@ -35,6 +35,8 @@
 
 #include "llevents.h"
 
+#include <map>
+
 class LLScrollListCtrl;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -51,13 +53,14 @@ class LLScrollListCtrl;
 class LLFloaterScriptQueue : public LLFloater/*, public LLVOInventoryListener*/
 {
 public:
+    AL_VIEW_TYPE(LLFloaterScriptQueue, LLFloater);
+
     LLFloaterScriptQueue(const LLSD& key);
     virtual ~LLFloaterScriptQueue();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     void setCompileTarget(std::string target) { mCompileTarget = target; }
-
     // addObject() accepts an object id.
     void addObject(const LLUUID& id, std::string name);
 
@@ -99,7 +102,7 @@ protected:
     std::string mStartString;
     std::string mCompileTarget { "lsl2" };
 
-    typedef boost::function<bool(const LLPointer<LLViewerObject> &, LLInventoryObject*, LLEventPump &)>   fnQueueAction_t;
+    typedef std::function<bool(const LLPointer<LLViewerObject> &, LLInventoryObject*, LLEventPump &)>   fnQueueAction_t;
     static void objectScriptProcessingQueueCoro(std::string action, LLHandle<LLFloaterScriptQueue> hfloater, object_data_list_t objectList, fnQueueAction_t func);
 };
 
@@ -121,6 +124,7 @@ class LLFloaterCompileQueue final : public LLFloaterScriptQueue
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterCompileQueue, LLFloaterScriptQueue);
 
     void experienceIdsReceived( const LLSD& content );
     bool hasExperience(const LLUUID& id)const;
@@ -151,6 +155,9 @@ private:
 
 class LLFloaterResetQueue final : public LLFloaterScriptQueue
 {
+public:
+    AL_VIEW_TYPE(LLFloaterResetQueue, LLFloaterScriptQueue);
+private:
     friend class LLFloaterReg;
 protected:
     LLFloaterResetQueue(const LLSD& key);
@@ -169,6 +176,9 @@ protected:
 
 class LLFloaterRunQueue final : public LLFloaterScriptQueue
 {
+public:
+    AL_VIEW_TYPE(LLFloaterRunQueue, LLFloaterScriptQueue);
+private:
     friend class LLFloaterReg;
 protected:
     LLFloaterRunQueue(const LLSD& key);
@@ -187,6 +197,9 @@ protected:
 
 class LLFloaterNotRunQueue final : public LLFloaterScriptQueue
 {
+public:
+    AL_VIEW_TYPE(LLFloaterNotRunQueue, LLFloaterScriptQueue);
+private:
     friend class LLFloaterReg;
 protected:
     LLFloaterNotRunQueue(const LLSD& key);
@@ -205,10 +218,13 @@ protected:
 
 class LLFloaterDeleteQueue final : public LLFloaterScriptQueue
 {
+public:
+    AL_VIEW_TYPE(LLFloaterDeleteQueue, LLFloaterScriptQueue);
+private:
     friend class LLFloaterReg;
 protected:
     LLFloaterDeleteQueue(const LLSD& key);
-    virtual ~LLFloaterDeleteQueue();
+    ~LLFloaterDeleteQueue() override = default;
 
     static bool deleteObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
 

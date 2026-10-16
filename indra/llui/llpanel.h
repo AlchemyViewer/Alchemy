@@ -55,10 +55,18 @@ class LLUIImage;
 class LLPanel : public LLUICtrl, public LLBadgeHolder
 {
 public:
+    AL_VIEW_TYPE(LLPanel, LLUICtrl);
+
     struct LocalizedString : public LLInitParam::Block<LocalizedString>
     {
         Mandatory<std::string>  name;
         Mandatory<std::string>  value;
+
+        // Swallowed for the same reason LLView swallows it: translate="false"
+        // is a cue for translation tools, and 642 strings in the default
+        // skin's English carry it. LLView's copy does not reach here, since
+        // a string is not a view.
+        Ignored                 needs_translate;
 
         LocalizedString();
     };
@@ -114,13 +122,15 @@ public:
     /*virtual*/ ~LLPanel();
 
     // LLView interface
-    /*virtual*/ bool    isPanel() const;
-    /*virtual*/ void    draw();
-    /*virtual*/ bool    handleKeyHere( KEY key, MASK mask );
-    /*virtual*/ void    onVisibilityChange ( bool new_visibility );
+    /*virtual*/ bool    isPanel() const override;
+    LLView*             badgeHolderView() override { return this; }
+    LLBadgeHolder*      asBadgeHolder() override { return this; }
+    /*virtual*/ void    draw() override;
+    /*virtual*/ bool    handleKeyHere( KEY key, MASK mask ) override;
+    /*virtual*/ void    onVisibilityChange ( bool new_visibility ) override;
 
     // From LLFocusableElement
-    /*virtual*/ void    setFocus( bool b );
+    /*virtual*/ void    setFocus( bool b ) override;
 
     // New virtuals
     virtual     void    refresh();  // called in setFocus()
@@ -167,9 +177,9 @@ public:
     EnableCallbackRegistry::ScopedRegistrar& getEnableCallbackRegistrar() { return mEnableCallbackRegistrar; }
 
     void initFromParams(const Params& p);
-    bool initPanelXML(  LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node, const LLPanel::Params& default_params);
+    bool initPanelXML(  LLXMLNodePtr node, LLView *parent, const LLPanel::Params& default_params);
 
-    bool hasString(std::string_view name);
+    bool hasString(std::string_view name) const;
     std::string getString(std::string_view name, const LLStringUtil::format_map_t& args) const;
     std::string getString(std::string_view name) const;
 
@@ -191,7 +201,7 @@ public:
     // Prefer getChild<LLUICtrl>("foo")->setCommitCallback(boost:bind(...)),
     // which takes a generic slot.  Or use mCommitCallbackRegistrar.add() with
     // a named callback and reference it in XML.
-    void childSetCommitCallback(std::string_view id, boost::function<void (LLUICtrl*,void*)> cb, void* data);
+    void childSetCommitCallback(std::string_view id, std::function<void (LLUICtrl*,void*)> cb, void* data);
     void childSetColor(std::string_view id, const LLUIColor& color);
 
     LLCtrlSelectionInterface* childGetSelectionInterface(std::string_view id) const;
@@ -208,10 +218,10 @@ public:
     bool childSetLabelArg(std::string_view id, const std::string& key, const LLStringExplicit& text);
 
     // LLButton
-    void childSetAction(std::string_view id, boost::function<void(void*)> function, void* value);
+    void childSetAction(std::string_view id, std::function<void(void*)> function, void* value);
     void childSetAction(std::string_view id, const commit_signal_t::slot_type& function);
 
-    static LLView*  fromXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node = NULL);
+    static LLView*  fromXML(LLXMLNodePtr node, LLView *parent);
 
     //call onOpen to let panel know when it's about to be shown or activated
     virtual void    onOpen(const LLSD& key) {}
@@ -250,7 +260,7 @@ private:
     LLButton*       mDefaultBtn;
     LLUIString      mLabel;
 
-    typedef std::map<std::string, std::string, std::less<>> ui_string_map_t;
+    typedef boost::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> ui_string_map_t;
     ui_string_map_t mUIStrings;
 
 
@@ -262,7 +272,7 @@ extern template class LLPanel* LLView::getChild<class LLPanel>(
     std::string_view name, bool recurse) const;
 #endif
 
-typedef boost::function<LLPanel* (void)> LLPanelClassCreatorFunc;
+typedef std::function<LLPanel* (void)> LLPanelClassCreatorFunc;
 
 // local static instance for registering a particular panel class
 
@@ -292,7 +302,7 @@ public:
     }
 
 private:
-    typedef std::map< std::string, LLPanelClassCreatorFunc, std::less<>> param_name_map_t;
+    typedef boost::unordered_map<std::string, LLPanelClassCreatorFunc, ll::string_hash, std::equal_to<>> param_name_map_t;
 
     param_name_map_t mPanelClassesNames;
 };

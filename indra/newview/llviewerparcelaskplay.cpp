@@ -284,7 +284,7 @@ void LLViewerParcelAskPlay::saveSettings()
         for (parcel_data_map_t::iterator iter_parcel = iter_region->second.begin();
             iter_parcel != iter_region->second.end(); ++iter_parcel)
         {
-            if ((iter_parcel->second.mDate.secondsSinceEpoch() + (F64SecondsImplicit)U32Days(30)) > LLTimer::getTotalSeconds())
+            if ((iter_parcel->second.mDate.secondsSinceEpoch() + (F64SecondsImplicit)U32Days(30)) > LLDate::now().secondsSinceEpoch())
             {
                 // write unexpired parcels
                 std::string parcel_id = std::to_string(iter_parcel->first);

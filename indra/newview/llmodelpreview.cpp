@@ -102,7 +102,7 @@ LLViewerFetchedTexture* bindMaterialDiffuseTexture(const LLImportMaterial& mater
     {
         if (texture->getDiscardLevel() > -1)
         {
-            gGL.getTexUnit(0)->bind(texture, true);
+            gGL.getTextureSlot(0)->bindSampled(texture, ALSamplers::AnisoWrap, true);
             return texture;
         }
     }
@@ -112,7 +112,7 @@ LLViewerFetchedTexture* bindMaterialDiffuseTexture(const LLImportMaterial& mater
 
 std::string stripSuffix(std::string name)
 {
-    if ((name.find("_LOD") != -1) || (name.find("_PHYS") != -1))
+    if ((name.find("_LOD") != std::string::npos) || (name.find("_PHYS") != std::string::npos))
     {
         return name.substr(0, name.rfind('_'));
     }
@@ -155,7 +155,7 @@ static bool FindModel(const LLModelLoader::scene& scene, const std::string& name
 //-----------------------------------------------------------------------------
 
 LLModelPreview::LLModelPreview(S32 width, S32 height, LLFloater* fmp)
-    : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE, false), LLMutex()
+    : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE), LLMutex()
     , mLodsQuery()
     , mLodsWithParsingError()
     , mPelvisZOffset(0.0f)
@@ -363,7 +363,7 @@ void LLModelPreview::rebuildUploadData()
 
                     std::string toAdd = getLodSuffix(extensionLOD);
 
-                    if (name_to_match.find(toAdd) == -1)
+                    if (name_to_match.find(toAdd) == std::string::npos)
                     {
                         name_to_match += toAdd;
                     }
@@ -390,7 +390,7 @@ void LLModelPreview::rebuildUploadData()
 
                             std::string toAdd = getLodSuffix(searchLOD);
 
-                            if (name_to_match.find(toAdd) == -1)
+                            if (name_to_match.find(toAdd) == std::string::npos)
                             {
                                 name_to_match += toAdd;
                             }
@@ -525,7 +525,7 @@ void LLModelPreview::rebuildUploadData()
                 {
                     LLQuaternion bind_rot = LLSkinningUtil::getUnscaledQuaternion(LLMatrix4(high_lod_model->mSkinInfo.mBindShapeMatrix));
                     LLQuaternion identity;
-                    if (!bind_rot.isEqualEps(identity, 0.01))
+                    if (!bind_rot.isEqualEps(identity, 0.01f))
                     {
                         // Bind shape matrix is not in standard X-forward orientation.
                         // Might be good idea to only show this once. It can be spammy.
@@ -576,7 +576,7 @@ void LLModelPreview::rebuildUploadData()
         for (U32 model_ind = 0; model_ind < mModel[lod].size(); ++model_ind)
         {
             bool found_model = false;
-            for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
+            for (LLMeshUploadThread::instance_list_t::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
             {
                 LLModelInstance& instance = *iter;
                 if (instance.mLOD[lod] == mModel[lod][model_ind])
@@ -2209,7 +2209,7 @@ void LLModelPreview::updateStatusMessages()
         total_submeshes[i] = 0;
     }
 
-    for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
+    for (LLMeshUploadThread::instance_list_t::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
     {
         LLModelInstance& instance = *iter;
 
@@ -2543,8 +2543,7 @@ void LLModelPreview::updateStatusMessages()
     S32 phys_tris = 0;
     S32 phys_hulls = 0;
     S32 phys_points = 0;
-    S32 which_mode = 0;
-    S32 file_mode = 1;
+    bool physics_from_file = false;
 
     //get the triangle count for the whole scene
     for (LLModelLoader::scene::iterator iter = mScene[LLModel::LOD_PHYSICS].begin(), endIter = mScene[LLModel::LOD_PHYSICS].end(); iter != endIter; ++iter)
@@ -2679,16 +2678,11 @@ void LLModelPreview::updateStatusMessages()
             fmp->childEnable("decompose_cancel");
         }
 
-        LLCtrlSelectionInterface* iface = fmp->childGetSelectionInterface("physics_lod_combo");
-        if (iface)
-        {
-            which_mode = iface->getFirstSelectedIndex();
-            file_mode = iface->getItemCount() - 1;
-        }
+        physics_from_file = fmp->childGetValue("physics_lod_combo").asString() == "file";
     }
 
 
-    if (which_mode == file_mode)
+    if (physics_from_file)
     {
         mFMP->childEnable("physics_file");
         mFMP->childEnable("physics_browse");
@@ -2890,10 +2884,14 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
         LLMatrix4a mat_normal;
         if (skinned)
         {
-            glm::mat4 m = glm::make_mat4((F32*)mdl->mSkinInfo.mBindShapeMatrix.getF32ptr());
-            m = glm::transpose(glm::inverse(m));
-            mat_normal.loadu(glm::value_ptr(m));
+            mat_normal.setNormalMatrix(mdl->mSkinInfo.mBindShapeMatrix);
         }
+
+        // O(1) per-vertex weight lookup for the skin-weight buffer fill below;
+        // without it the per-vertex getJointInfluences() scan is O(V^2) and stalls
+        // the preview on dense rigged meshes. Built once per model (empty/cheap
+        // when unskinned).
+        LLModel::JointWeightCache weight_cache(*mdl);
 
         S32 num_faces = mdl->getNumVolumeFaces();
         for (S32 i = 0; i < num_faces; ++i)
@@ -2994,7 +2992,7 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
                     //find closest weight to vf.mVertices[i].mPosition
                     LLVector3 pos(vf.mPositions[i].getF32ptr());
 
-                    const LLModel::weight_list& weight_list = mdl->getJointInfluences(pos);
+                    const LLModel::weight_list& weight_list = weight_cache.influences(pos);
                     llassert(weight_list.size()>0 && weight_list.size() <= 4); // LLModel::loadModel() should guarantee this
 
                     LLVector4 w(0, 0, 0, 0);
@@ -3171,9 +3169,13 @@ void LLModelPreview::lookupLODModelFiles(S32 lod)
 
     if (ext_pos != std::string::npos)
     {
-        // Replace extension with LOD suffix + original extension
+        // Replace extension with LOD suffix + original extension. The offset
+        // was found in the lowercased copy, and lowercasing is not
+        // length-preserving, so carry it back before it indexes the name the
+        // file is actually called.
+        const size_t ext_at = utf8str_bytes_from_cased_bytes(lod_filename, ext_pos, false);
         std::string lod_file_to_check = lod_filename;
-        lod_file_to_check.replace(ext_pos, found_ext.size(), getLodSuffix(next_lod) + found_ext);
+        lod_file_to_check.replace(ext_at, found_ext.size(), getLodSuffix(next_lod) + found_ext);
 
         if (gDirUtilp->fileExists(lod_file_to_check))
         {
@@ -3461,7 +3463,7 @@ bool LLModelPreview::render()
 
     LLViewerCamera::getInstance()->setAspect(aspect);
 
-    LLViewerCamera::getInstance()->setView(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
+    LLViewerCamera::getInstance()->setViewNoBroadcast(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
 
     LLVector3 offset = mCameraOffset;
     LLVector3 target_pos = mPreviewTarget + offset;
@@ -3489,10 +3491,10 @@ bool LLModelPreview::render()
 
     LLQuaternion av_rot = camera_rot;
     F32 camera_distance = show_skin_weight ? SKIN_WEIGHT_CAMERA_DISTANCE : mCameraDistance;
-    LLViewerCamera::getInstance()->setOriginAndLookAt(
+    LLViewerCamera::getInstance()->lookAt(
         target_pos + ((LLVector3(camera_distance, 0.f, 0.f) + offset) * av_rot),        // camera
-        LLVector3::z_axis,                                                                  // up
-        target_pos);                                            // point of interest
+        target_pos,                                                                         // point of interest
+        LLVector3::z_axis);                                                                 // up
 
 
     z_near = llclamp(z_far * 0.001f, 0.001f, 0.1f);
@@ -3542,7 +3544,7 @@ bool LLModelPreview::render()
 
         if (!show_skin_weight)
         {
-            for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
+            for (LLMeshUploadThread::instance_list_t::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
             {
                 LLModelInstance& instance = *iter;
 
@@ -3593,7 +3595,7 @@ bool LLModelPreview::render()
                     buffer->setBuffer();
                     buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0);
 
-                    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                    gGL.getTextureSlot(0)->unbind();
                     gGL.diffuseColor4fv(PREVIEW_EDGE_COL.mV);
                     if (show_edges)
                     {
@@ -3628,7 +3630,7 @@ bool LLModelPreview::render()
 
                     gGL.blendFunc(LLRender::BF_SOURCE_ALPHA, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
 
-                    for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
+                    for (LLMeshUploadThread::instance_list_t::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
                     {
                         LLModelInstance& instance = *iter;
 
@@ -3688,7 +3690,7 @@ bool LLModelPreview::render()
 
                                         if (i + 1 >= hull_colors.size())
                                         {
-                                            hull_colors.push_back(LLColor4U(rand() % 128 + 127, rand() % 128 + 127, rand() % 128 + 127, 128));
+                                            hull_colors.push_back(LLColor4U(ll_rand(128) + 127, ll_rand(128) + 127, ll_rand(128) + 127, 128));
                                         }
 
                                         gGL.diffuseColor4ubv(hull_colors[i].mV);
@@ -3713,7 +3715,7 @@ bool LLModelPreview::render()
                             {
                                 for (size_t i = 0; i < num_models; ++i)
                                 {
-                                    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                                    gGL.getTextureSlot(0)->unbind();
                                     gGL.diffuseColor4fv(PREVIEW_PSYH_FILL_COL.mV);
 
                                     // Zero this variable for an obligatory buffer initialization
@@ -3750,7 +3752,7 @@ bool LLModelPreview::render()
                         gGL.diffuseColor4f(1.f, 0.f, 0.f, 1.f);
                         const LLVector4a scale(0.5f);
 
-                        for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
+                        for (LLMeshUploadThread::instance_list_t::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
                         {
                             LLModelInstance& instance = *iter;
 
@@ -3828,10 +3830,10 @@ bool LLModelPreview::render()
             getPreviewAvatar()->addPelvisFixup(mPelvisZOffset, fake_mesh_id);
             bool pelvis_recalc = false;
 
-            LLViewerCamera::getInstance()->setOriginAndLookAt(
+            LLViewerCamera::getInstance()->lookAt(
                 target_pos + ((LLVector3(camera_distance, 0.f, 0.f) + offset) * av_rot),        // camera
-                LLVector3::z_axis,                                                                  // up
-                target_pos);                                            // point of interest
+                target_pos,                                                                         // point of interest
+                LLVector3::z_axis);                                                                 // up
 
             for (LLModelLoader::scene::iterator iter = mScene[mPreviewLOD].begin(); iter != mScene[mPreviewLOD].end(); ++iter)
             {
@@ -3896,7 +3898,7 @@ bool LLModelPreview::render()
                             model->mSkinInfo.updateHash();
                             LLRenderPass::uploadMatrixPalette(mPreviewAvatar, &model->mSkinInfo);
 
-                            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                            gGL.getTextureSlot(0)->unbind();
 
                             if (show_textures)
                             {
@@ -3931,7 +3933,7 @@ bool LLModelPreview::render()
 
                             if (show_edges)
                             {
-                                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                                gGL.getTextureSlot(0)->unbind();
                                 gGL.diffuseColor4fv(PREVIEW_EDGE_COL.mV);
                                 gGL.setLineWidth(PREVIEW_EDGE_WIDTH);
                                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

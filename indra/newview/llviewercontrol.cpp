@@ -7,6 +7,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -30,19 +33,27 @@
 #include "llviewercontrol.h"
 
 // Library includes
+#include "alfarplane.h"
+#include "aluniformbuffer.h"
 #include "llwindow.h"   // getGamma()
 
 // For Listeners
 #include "llaudioengine.h"
+#ifdef LL_FAUDIO
+#include "llaudioengine_faudio.h"
+#endif
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llconsole.h"
+#include "llf32uictrl.h"
 #include "lldrawpoolbump.h"
+#include "llfontgl.h"
 #include "lldrawpoolterrain.h"
 #include "llflexibleobject.h"
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
 
+#include "llhudtext.h"
 #include "llsky.h"
 #include "llvieweraudio.h"
 #include "llviewermenu.h"
@@ -63,11 +74,14 @@
 #include "llkeyboard.h"
 #include "llerrorcontrol.h"
 #include "llappviewer.h"
-#include "llvosurfacepatch.h"
+#include "llmemory.h"
 #include "llvowlsky.h"
+#include "alsamplerstate.h"
 #include "llrender.h"
 #include "llnavigationbar.h"
 #include "llnotificationsutil.h"
+#include "llfloaterpreference.h"
+#include "llfloaterreg.h"
 #include "llfloatertools.h"
 #include "llpaneloutfitsinventory.h"
 #include "llpanellogin.h"
@@ -82,12 +96,8 @@
 #include "rlvcommon.h"
 // [/RLVa:KB]
 
-#if LL_DARWIN
-#if LL_WINDOW_SDL
-    #include "llwindowsdl.h "
-#else
-    #include "llwindowmacosx.h"
-#endif
+#if LL_DARWIN && LL_SDL_WINDOW
+#include "llwindowsdl.h"
 #endif
 
 // Third party library includes
@@ -120,16 +130,65 @@ static bool handleRenderAvatarMouselookChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleMemoryDrawDistanceLimitChanged(const LLSD& newvalue)
+{
+    LLMemory::setSystemMemoryBudgetEnabled(newvalue.asBoolean());
+    return true;
+}
+
 static bool handleRenderFarClipChanged(const LLSD& newvalue)
 {
     if (LLStartUp::getStartupState() >= STATE_STARTED)
     {
-        F32 draw_distance = (F32)newvalue.asReal();
+        F32 draw_distance = ALFarPlane::clampDrawDistance((F32)newvalue.asReal(), LLRender::sReverseZ);
     gAgentCamera.mDrawDistance = draw_distance;
     LLWorld::getInstance()->setLandFarClip(draw_distance);
     return true;
     }
     return false;
+}
+
+namespace
+{
+    // Every draw distance control capped so far, so that a change of depth convention caps them again.
+    std::vector<std::pair<LLHandle<LLF32UICtrl>, LLHandle<LLUICtrl>>> sDrawDistanceControls;
+
+    void apply_draw_distance_cap(LLF32UICtrl* range, LLUICtrl* bound)
+    {
+        const F32 ceiling = ALFarPlane::drawDistanceCeiling(LLRender::sReverseZ);
+        range->setMaxValue(ceiling);
+        // A slider does not take a lower maximum back into the value it shows, and a spinner never
+        // clamps: given the setting held to the ceiling, both show what the draw distance is.
+        if (LLControlVariable* control = bound->getControlVariable())
+        {
+            bound->setValue(llmin((F32)control->getValue().asReal(), ceiling));
+        }
+    }
+
+    // Caps again every draw distance control still alive, for the depth convention now in force.
+    void recap_draw_distance_controls()
+    {
+        std::erase_if(sDrawDistanceControls, [](const auto& c) { return c.first.isDead() || c.second.isDead(); });
+        for (const auto& [range, bound] : sDrawDistanceControls)
+        {
+            apply_draw_distance_cap(range.get(), bound.get());
+        }
+    }
+}
+
+void cap_draw_distance_control(LLF32UICtrl* range, LLUICtrl* bound)
+{
+    apply_draw_distance_cap(range, bound);
+
+    std::erase_if(sDrawDistanceControls, [](const auto& c) { return c.first.isDead() || c.second.isDead(); });
+    for (const auto& [known_range, known_bound] : sDrawDistanceControls)
+    {
+        if (known_range.get() == range)
+        {
+            return;
+        }
+    }
+    sDrawDistanceControls.emplace_back(range->getDerivedHandle<LLF32UICtrl>(), bound->getHandle());
 }
 
 static bool handleTerrainScaleChanged(const LLSD& newvalue)
@@ -159,6 +218,21 @@ static bool handleDebugAvatarJointsChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleDebugQualityPerformanceChanged(const LLSD& newvalue)
+{
+    // control was set directly or after adjusting Preference setting, no need to update
+    if (gSavedSettings.getU32("RenderQualityPerformance") != gSavedSettings.getU32("DebugQualityPerformance"))
+    {
+        LLFloaterPreference* instance = LLFloaterReg::getTypedInstance<LLFloaterPreference>("preferences");
+        if (instance)
+        {
+            gSavedSettings.setU32("RenderQualityPerformance", newvalue.asInteger());
+            instance->onChangeQuality(newvalue);
+        }
+    }
+    return true;
+}
+
 static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
 {
     if (isAgentAvatarValid())
@@ -168,18 +242,21 @@ static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleNumpadControlChanged(const LLSD& newvalue)
+{
+    if (gKeyboard)
+    {
+        // Clamp persisted/out-of-range values to the valid enum range so an
+        // edited settings file can't push the keyboard into an undefined mode.
+        S32 mode = llclamp(newvalue.asInteger(), (S32)LLKeyboard::ND_NEVER, (S32)LLKeyboard::ND_NUMLOCK_ON);
+        gKeyboard->setNumpadDistinct(static_cast<LLKeyboard::e_numpad_distinct>(mode));
+    }
+    return true;
+}
+
 
 static bool handleSetShaderChanged(const LLSD& newvalue)
 {
-// [RLVa:KB] - @setenv and @setsphere
-    if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canChangeEnvironment() || (LLVfxManager::instance().hasEffect(EVisualEffect::RlvSphere))) &&
-         (LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))&& (!gSavedSettings.getBOOL("WindLightUseAtmosShaders")) )
-    {
-        gSavedSettings.setBOOL("WindLightUseAtmosShaders", true);
-        return true;
-    }
-// [/RLVa:KB]
-
     // changing shader level may invalidate existing cached bump maps, as the shader type determines the format of the bump map it expects - clear and repopulate the bump cache
     gBumpImageList.destroyGL();
     gBumpImageList.restoreGL();
@@ -239,7 +316,6 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
         gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
     }
-    LLWorld::getInstance()->updateWaterObjects();
     return true;
 }
 
@@ -247,12 +323,6 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
 static bool handleShadowsResized(const LLSD& newvalue)
 {
     gPipeline.requestResizeShadowTexture();
-    return true;
-}
-
-static bool handleWindowResized(const LLSD& newvalue)
-{
-    gPipeline.requestResizeScreenTexture();
     return true;
 }
 
@@ -271,6 +341,23 @@ static bool handleEnableEmissiveChanged(const LLSD& newvalue)
     return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
 }
 
+static bool handleReverseZChanged(const LLSD& newvalue)
+{
+    // setShaders() latches the reverse-Z state (LLPipeline::updateReverseZ) and then
+    // releases + recreates the GL buffers at the new depth format itself, so -- unlike the
+    // emissive case -- do NOT release buffers up front (that would rebuild them at the old
+    // format only to have setShaders rebuild them again).
+    const bool handled = handleSetShaderChanged(newvalue);
+    // The draw distance ceiling follows the convention setShaders latched; controls already shown take it now.
+    recap_draw_distance_controls();
+    return handled;
+}
+
+static bool handleHalationChanged(const LLSD& newvalue)
+{
+    return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
+}
+
 static bool handleDisableVintageMode(const LLSD& newvalue)
 {
     gSavedSettings.setBOOL("RenderEnableEmissiveBuffer", newvalue.asBoolean());
@@ -285,16 +372,6 @@ static bool handleEnableHDR(const LLSD& newvalue)
     return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
 }
 
-static bool handleLUTBufferChanged(const LLSD& newvalue)
-{
-    if (gPipeline.isInit())
-    {
-        gPipeline.releaseLUTBuffers();
-        gPipeline.createLUTBuffers();
-    }
-    return true;
-}
-
 static bool handleAnisotropicFilteringChanged(const LLSD& newval)
 {
     F32 val = static_cast<F32>(newval.asReal());
@@ -303,7 +380,17 @@ static bool handleAnisotropicFilteringChanged(const LLSD& newval)
         val = llclamp(val, 0.f, gGLManager.mMaxAnisotropy);
     }
     LLRender::sAnisotropicFilteringLevel = val;
-    LLImageGL::dirtyTexOptions();
+    // Sampler objects are immutable, so the anisotropy baked into existing ones can't be
+    // edited -- drop them and let the next bind rebuild at the new level. This is the whole
+    // update now: since LLImageGL sampling resolves through the cache, there is no
+    // per-texture state left to dirty.
+    //
+    // Clears the main thread's set only, since the cache is per-context. That is complete
+    // rather than lucky: the texture upload thread binds with sampler 0 throughout, so its
+    // set is never populated. Should an upload path ever select a real sampler, this would
+    // need to reach that context too.
+    gGL.clearSamplers();
+    gGL.warmupSamplers();
     return true;
 }
 
@@ -351,11 +438,11 @@ static bool handleAvatarPhysicsLODChanged(const LLSD& newvalue)
 
 static bool handleTerrainLODChanged(const LLSD& newvalue)
 {
-    LLVOSurfacePatch::sLODFactor = (F32)newvalue.asReal();
+    LLDrawPoolTerrain::sLODFactor = (F32)newvalue.asReal();
     //sqaure lod factor to get exponential range of [0,4] and keep
     //a value of 1 in the middle of the detail slider for consistency
     //with other detail sliders (see panel_preferences_graphics1.xml)
-    LLVOSurfacePatch::sLODFactor *= LLVOSurfacePatch::sLODFactor;
+    LLDrawPoolTerrain::sLODFactor *= LLDrawPoolTerrain::sLODFactor;
     return true;
 }
 
@@ -415,6 +502,38 @@ static bool handleChatFontSizeChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleUIFontOverridesChanged(const LLSD& newvalue)
+{
+    // Defer the actual reload to the next idle tick — setValue() can fire
+    // mid-frame, and tearing down LLFontFreetype state during a render
+    // would dangle the cached glyph atlas pointers active draw calls hold.
+    LLFontGL::schedulePendingReload();
+    return true;
+}
+
+static bool handleEmojiUseDarkPaletteChanged(const LLSD& newvalue)
+{
+    // Push the new value into LLFontGL's static so ALFontFace::load picks
+    // it up during the upcoming reload. A bare schedulePendingReload would
+    // just re-init the font system with the same statics — without updating
+    // sUseDarkEmojiPalette here the reload would stay on palette 0.
+    LLFontGL::sUseDarkEmojiPalette = newvalue.asBoolean();
+    LLFontGL::schedulePendingReload();
+    return true;
+}
+
+static bool handleForceMonochromeEmojiChanged(const LLSD& newvalue)
+{
+    // Toggling force-mono changes the bitmap_type LLFontGL::render asks for
+    // (Grayscale instead of Color for COLRv1 faces), which means the atlas
+    // sheets it would re-use no longer match the requested format. The
+    // pending reload tears the cache down so the next render repopulates
+    // through the new path.
+    LLFontGL::sForceMonochromeEmoji = newvalue.asBoolean();
+    LLFontGL::schedulePendingReload();
+    return true;
+}
+
 static bool handleConsoleMaxLinesChanged(const LLSD& newvalue)
 {
     if(gConsole)
@@ -428,6 +547,85 @@ static void handleAudioVolumeChanged(const LLSD& newvalue)
 {
     audio_update_volume(true);
 }
+
+// Audio backend live-tuning. Each handler looks up gAudiop fresh on
+// every fire so a future backend swap doesn't leave us calling into
+// a stale engine pointer. All routes through the LLAudioEngine base
+// virtuals; backends that don't surface the relevant tunable inherit
+// the base no-op override.
+
+static void handleAudioReverbPresetChanged(const LLSD& newvalue)
+{
+    if (gAudiop)
+        gAudiop->setReverbPreset(newvalue.asString());
+}
+
+// Reverb send-scale is split into per-backend keys because the same
+// numeric value drives three different DSP scales (FAudio matrix
+// coefficient vs OpenAL EFX slot gain vs FMOD wet). Each handler
+// only dispatches when its key matches the active backend's reported
+// key, so a value edited in the "wrong" backend's key sits inert
+// until that engine becomes active — no re-wiring needed on swap.
+static void handleAudioFAudioReverbSendScaleChanged(const LLSD& newvalue)
+{
+    if (gAudiop && gAudiop->getReverbSendScaleSettingName() == "AudioFAudioReverbSendScale")
+        gAudiop->setReverbSendScale(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioOpenALReverbSendScaleChanged(const LLSD& newvalue)
+{
+    if (gAudiop && gAudiop->getReverbSendScaleSettingName() == "AudioOpenALReverbSendScale")
+        gAudiop->setReverbSendScale(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioFMODReverbSendScaleChanged(const LLSD& newvalue)
+{
+    if (gAudiop && gAudiop->getReverbSendScaleSettingName() == "AudioFMODReverbSendScale")
+        gAudiop->setReverbSendScale(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioWindGustinessChanged(const LLSD& newvalue)
+{
+    if (gAudiop)
+        gAudiop->setWindGustiness(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioWindAltitudeBoostChanged(const LLSD& newvalue)
+{
+    if (gAudiop)
+        gAudiop->setWindAltitudeBoost(static_cast<F32>(newvalue.asReal()));
+}
+
+#ifdef LL_FAUDIO
+// FAudio-specific tunables: InnerRadius controls the F3DAudio emitter's
+// near-field diffusion radius, MasterLimiter* drives the FAPOFX
+// FXMasteringLimiter on the mastering voice. dynamic_cast keeps each
+// dispatch safe when a non-FAudio engine is live (cast returns null,
+// no-op).
+static void handleAudioFAudioInnerRadiusChanged(const LLSD& newvalue)
+{
+    if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+        fa->setInnerRadius(static_cast<F32>(newvalue.asReal()));
+}
+
+static void handleAudioFAudioMasterLimiterEnableChanged(const LLSD& newvalue)
+{
+    if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+        fa->setMasterLimiterEnable(newvalue.asBoolean());
+}
+
+static void handleAudioFAudioMasterLimiterReleaseChanged(const LLSD& newvalue)
+{
+    if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+        fa->setMasterLimiterRelease(static_cast<uint32_t>(newvalue.asInteger()));
+}
+
+static void handleAudioFAudioMasterLimiterLoudnessChanged(const LLSD& newvalue)
+{
+    if (auto* fa = dynamic_cast<LLAudioEngine_FAudio*>(gAudiop))
+        fa->setMasterLimiterLoudness(static_cast<uint32_t>(newvalue.asInteger()));
+}
+#endif
 
 static bool handleJoystickChanged(const LLSD& newvalue)
 {
@@ -445,16 +643,6 @@ static bool handleUseOcclusionChanged(const LLSD& newvalue)
 static bool handleUploadBakedTexOldChanged(const LLSD& newvalue)
 {
     LLPipeline::sForceOldBakedUpload = newvalue.asBoolean();
-    return true;
-}
-
-
-static bool handleWLSkyDetailChanged(const LLSD&)
-{
-    if (gSky.mVOWLSkyp.notNull())
-    {
-        gSky.mVOWLSkyp->updateGeometry(gSky.mVOWLSkyp->mDrawable);
-    }
     return true;
 }
 
@@ -501,10 +689,8 @@ static bool handleAppleUseMultGLChanged(const LLSD& newvalue)
 {
     if (gGLManager.mInited)
     {
-#if LL_WINDOW_SDL
+#if LL_SDL_WINDOW
         LLWindowSDL::setUseMultGL(newvalue.asBoolean());
-#else
-        LLWindowMacOSX::setUseMultGL(newvalue.asBoolean());
 #endif
     }
     return true;
@@ -532,6 +718,14 @@ static bool handleRenderDebugPipelineChanged(const LLSD& newvalue)
 static bool handleRenderResolutionDivisorChanged(const LLSD&)
 {
     gResizeScreenTexture = true;
+    return true;
+}
+
+static bool handleRenderUBOUpdateModeChanged(const LLSD& newvalue)
+{
+    // Applies live: the shadow always holds current contents, so the next
+    // flush/bind under the new mode uploads correctly in any direction.
+    ALUniformBuffer::sUpdateMode = ALUniformBuffer::clampUpdateMode(newvalue.asInteger());
     return true;
 }
 
@@ -657,25 +851,34 @@ bool toggle_agent_pause(const LLSD& newvalue)
     return true;
 }
 
-bool toggle_show_navigation_panel(const LLSD& newvalue)
+bool navigation_panel_change(const LLSD& newvalue)
 {
-    bool value = newvalue.asBoolean();
-
-    LLNavigationBar::getInstance()->setVisible(value);
-    gSavedSettings.setBOOL("ShowMiniLocationPanel", !value);
+    const U32 style = newvalue.asInteger();
+    LLPanelTopInfoBar::getInstance()->setVisible(style == 1);
+    LLNavigationBar::getInstance()->setVisible(style == 2);
     gViewerWindow->reshapeStatusBarContainer();
     return true;
 }
 
-bool toggle_show_mini_location_panel(const LLSD& newvalue)
-{
-    bool value = newvalue.asBoolean();
-
-    LLPanelTopInfoBar::getInstance()->setVisible(value);
-    gSavedSettings.setBOOL("ShowNavbarNavigationPanel", !value);
-
-    return true;
-}
+//bool toggle_show_navigation_panel(const LLSD& newvalue)
+//{
+//    bool value = newvalue.asBoolean();
+//
+//    LLNavigationBar::getInstance()->setVisible(value);
+//    gSavedSettings.setBOOL("ShowMiniLocationPanel", !value);
+//    gViewerWindow->reshapeStatusBarContainer();
+//    return true;
+//}
+//
+//bool toggle_show_mini_location_panel(const LLSD& newvalue)
+//{
+//    bool value = newvalue.asBoolean();
+//
+//    LLPanelTopInfoBar::getInstance()->setVisible(value);
+//    gSavedSettings.setBOOL("ShowNavbarNavigationPanel", !value);
+//
+//    return true;
+//}
 
 bool toggle_show_object_render_cost(const LLSD& newvalue)
 {
@@ -830,34 +1033,49 @@ void setting_setup_signal_listener(LLControlGroup& group, const std::string& set
 
 void settings_setup_listeners()
 {
+    LL_PROFILE_ZONE_SCOPED;
     setting_setup_signal_listener(gSavedSettings, "FirstPersonAvatarVisible", handleRenderAvatarMouselookChanged);
+    setting_setup_signal_listener(gSavedSettings, "NumpadControl", handleNumpadControlChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFarClip", handleRenderFarClipChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderMemoryDrawDistanceLimit", handleMemoryDrawDistanceLimitChanged);
+    // Listeners only fire on change, so hand LLMemory the starting value.
+    LLMemory::setSystemMemoryBudgetEnabled(gSavedSettings.getBOOL("AlchemyRenderMemoryDrawDistanceLimit"));
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainScale", handleTerrainScaleChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRScale", handlePBRTerrainScaleChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRPlanarSampleCount", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRNormalsEnabled", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderTerrainHexTiling", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterHextile", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterWaves", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderDisableCompute", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "OctreeStaticObjectSizeFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeMaxNodeCapacity", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAlphaDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAttachmentSizeFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "RenderMaxTextureIndex", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderUIBuffer", handleWindowResized);
     setting_setup_signal_listener(gSavedSettings, "RenderDepthOfField", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularResX", handleLUTBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularResY", handleLUTBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleLUTBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSMAAUseStencil", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredication", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationThreshold", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationScale", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationStrength", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
-    setting_setup_signal_listener(gSavedSettings, "RenderShadowHighPrecision", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleShadowsResized);
     setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowResolutionPow", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowHDR", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderBloomMipCount", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderBloomResolutionScale", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderBloomHalation", handleHalationChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderEnableEmissiveBuffer", handleEnableEmissiveChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderReverseZ", handleReverseZChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDisableVintageMode", handleDisableVintageMode);
     setting_setup_signal_listener(gSavedSettings, "RenderHDREnabled", handleEnableHDR);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowNoise", handleSetShaderChanged);
@@ -877,9 +1095,11 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredNoise", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResolutionDivisorChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderUBOUpdateMode", handleRenderUBOUpdateModeChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeCount", handleReflectionProbeCountChanged);
+    setting_setup_signal_listener(gSavedSettings, "ALProbeSuperSample", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbeDetailChanged);
 #if LL_DARWIN
     setting_setup_signal_listener(gSavedSettings, "RenderAppleUseMultGL", handleAppleUseMultGLChanged);
@@ -888,12 +1108,19 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleHeroProbeResolutionChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowFilterQuality", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowPCSSScale", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowDepth32F", handleShadowsResized);
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleSetShaderChanged);
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResolutionDivisorChanged);
 // [/SL:KB]
     setting_setup_signal_listener(gSavedSettings, "RenderPerformanceTest", handleRenderPerfTestChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderAvatarCloth", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "ChatFontSize", handleChatFontSizeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyUIFontOverrides", handleUIFontOverridesChanged);
+    setting_setup_signal_listener(gSavedSettings, "EmojiUseDarkPalette", handleEmojiUseDarkPaletteChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyForceMonochromeEmoji", handleForceMonochromeEmojiChanged);
     setting_setup_signal_listener(gSavedSettings, "ConsoleMaxLines", handleConsoleMaxLinesChanged);
     setting_setup_signal_listener(gSavedSettings, "UploadBakedTexOld", handleUploadBakedTexOldChanged);
     setting_setup_signal_listener(gSavedSettings, "UseOcclusion", handleUseOcclusionChanged);
@@ -910,7 +1137,20 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "MuteVoice", handleAudioVolumeChanged);
     setting_setup_signal_listener(gSavedSettings, "MuteAmbient", handleAudioVolumeChanged);
     setting_setup_signal_listener(gSavedSettings, "MuteUI", handleAudioVolumeChanged);
-    setting_setup_signal_listener(gSavedSettings, "WLSkyDetail", handleWLSkyDetailChanged);
+    // Audio backend live tunables — dispatch through the LLAudioEngine
+    // base virtuals so backend swaps don't require re-wiring.
+    setting_setup_signal_listener(gSavedSettings, "AudioReverbPreset", handleAudioReverbPresetChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioReverbSendScale", handleAudioFAudioReverbSendScaleChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioOpenALReverbSendScale", handleAudioOpenALReverbSendScaleChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFMODReverbSendScale", handleAudioFMODReverbSendScaleChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioWindGustiness", handleAudioWindGustinessChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioWindAltitudeBoost", handleAudioWindAltitudeBoostChanged);
+#ifdef LL_FAUDIO
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioInnerRadius", handleAudioFAudioInnerRadiusChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioMasterLimiterEnable", handleAudioFAudioMasterLimiterEnableChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioMasterLimiterRelease", handleAudioFAudioMasterLimiterReleaseChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioFAudioMasterLimiterLoudness", handleAudioFAudioMasterLimiterLoudnessChanged);
+#endif
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis0", handleJoystickChanged);
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis1", handleJoystickChanged);
     setting_setup_signal_listener(gSavedSettings, "JoystickAxis2", handleJoystickChanged);
@@ -976,8 +1216,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "QAMode", show_debug_menus);
     setting_setup_signal_listener(gSavedSettings, "UseDebugMenus", show_debug_menus);
     setting_setup_signal_listener(gSavedSettings, "AgentPause", toggle_agent_pause);
-    setting_setup_signal_listener(gSavedSettings, "ShowNavbarNavigationPanel", toggle_show_navigation_panel);
-    setting_setup_signal_listener(gSavedSettings, "ShowMiniLocationPanel", toggle_show_mini_location_panel);
+    setting_setup_signal_listener(gSavedSettings, "NavigationBarStyle", navigation_panel_change);
+    //setting_setup_signal_listener(gSavedSettings, "ShowNavbarNavigationPanel", toggle_show_navigation_panel);
+    //setting_setup_signal_listener(gSavedSettings, "ShowMiniLocationPanel", toggle_show_mini_location_panel);
     setting_setup_signal_listener(gSavedSettings, "ShowObjectRenderingCost", toggle_show_object_render_cost);
     setting_setup_signal_listener(gSavedSettings, "ForceShowGrid", handleForceShowGrid);
     setting_setup_signal_listener(gSavedSettings, "RenderTransparentWater", handleRenderTransparentWaterChanged);
@@ -985,6 +1226,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "SpellCheckDictionary", handleSpellCheckChanged);
     setting_setup_signal_listener(gSavedSettings, "LoginLocation", handleLoginLocationChanged);
     setting_setup_signal_listener(gSavedSettings, "DebugAvatarJoints", handleDebugAvatarJointsChanged);
+    setting_setup_signal_listener(gSavedSettings, "DebugQualityPerformance", handleDebugQualityPerformanceChanged);
 
     setting_setup_signal_listener(gSavedSettings, "TargetFPS", handleTargetFPSChanged);
     setting_setup_signal_listener(gSavedSettings, "AutoTuneFPS", handleAutoTuneFPSChanged);
@@ -1022,6 +1264,8 @@ void settings_setup_listeners()
 // [RLVa:KB] - Checked: 2015-12-27 (RLVa-1.5.0)
     gSavedSettings.getControl(RlvSettingNames::Main)->getSignal()->connect(boost::bind(&RlvSettings::onChangedSettingMain, _2));
 // [/RLVa:KB]
+    setting_setup_signal_listener(gSavedSettings, "AlchemyHudTextFadeDistance", LLHUDText::onFadeSettingsChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyHudTextFadeRange", LLHUDText::onFadeSettingsChanged);
 }
 
 #if TEST_CACHED_CONTROL

@@ -49,29 +49,24 @@
 #define LL_FORCE_INLINE __forceinline
 #endif
 
-// Mark-up expressions with branch prediction hints.  Do NOT use
-// this with reckless abandon - it's an obfuscating micro-optimization
-// outside of inner loops or other places where you are OVERWHELMINGLY
-// sure which way an expression almost-always evaluates.
-#if __GNUC__ >= 3
-# define LL_LIKELY(EXPR) __builtin_expect (!!(EXPR), true)
-# define LL_UNLIKELY(EXPR) __builtin_expect (!!(EXPR), false)
-#else
-# define LL_LIKELY(EXPR) (EXPR)
-# define LL_UNLIKELY(EXPR) (EXPR)
-#endif
-
-
 // Figure out differences between compilers
-#if defined(__clang__)
-    #define GCC_VERSION (__GNUC__ * 10000 \
-                        + __GNUC_MINOR__ * 100 \
-                        + __GNUC_PATCHLEVEL__)
+#if defined(__MSVC_VER__) || defined(_MSC_VER)
+    #ifndef LL_MSVC
+        #define LL_MSVC 1
+    #endif
+
+    // Clang CL is MSVC-like but also supports its own macros
+    #if defined(__clang__)
+        #ifndef LL_CLANG
+            #define LL_CLANG 1
+        #endif
+    #endif
+#elif defined(__clang__)
+    #define CLANG_VERSION (__clang_major__ * 10000 \
+                        + __clang_minor__ * 100 \
+                        + __clang_patchlevel__)
     #ifndef LL_CLANG
         #define LL_CLANG 1
-    #endif
-    #ifndef LL_GNUC
-        #define LL_GNUC 1
     #endif
 #elif defined(__GNUC__)
     #define GCC_VERSION (__GNUC__ * 10000 \
@@ -80,26 +75,22 @@
     #ifndef LL_GNUC
         #define LL_GNUC 1
     #endif
-#elif defined(__MSVC_VER__) || defined(_MSC_VER)
-    #ifndef LL_MSVC
-        #define LL_MSVC 1
-    #endif
 #endif
 
 // Set up CPU architecture defines
 #if LL_MSVC && defined(_M_ARM64)
 #      define LL_ARM64 1
-#elif LL_GNUC && (defined(__arm64__) || defined(__aarch64__))
+#elif (LL_GNUC || LL_CLANG) && (defined(__arm64__) || defined(__aarch64__))
 #      define LL_ARM64 1
 #elif LL_MSVC && _M_X64
 #      define LL_X86_64 1
 #      define LL_X86 1
 #elif LL_MSVC && _M_IX86
 #      define LL_X86 1
-#elif LL_GNUC && ( defined(__amd64__) || defined(__x86_64__) )
+#elif (LL_GNUC || LL_CLANG) && ( defined(__amd64__) || defined(__x86_64__) )
 #      define LL_X86_64 1
 #      define LL_X86 1
-#elif LL_GNUC && ( defined(__i386__) )
+#elif (LL_GNUC || LL_CLANG) && ( defined(__i386__) )
 #      define LL_X86 1
 #endif
 
@@ -116,25 +107,6 @@
 
 #endif
 
-// Although thread_local is now a standard storage class, we can't just
-// #define LL_THREAD_LOCAL as thread_local because the *usage* is different.
-// We'll have to take the time to change LL_THREAD_LOCAL declarations by hand.
-#if LL_WINDOWS
-# define LL_THREAD_LOCAL __declspec(thread)
-#else
-# define LL_THREAD_LOCAL __thread
-#endif
-
-
-#if defined(LL_WINDOWS)
-#define BOOST_REGEX_NO_LIB 1
-#define CURL_STATICLIB 1
-#ifndef XML_STATIC
-#define XML_STATIC
-#endif
-#endif  //  LL_WINDOWS
-
-
 // Deal with VC++ problems
 #if LL_MSVC
 // level 4 warnings that we need to disable:
@@ -150,7 +122,7 @@
 #define LL_DLLIMPORT
 #endif // LL_WINDOWS
 
-#if __clang__ || ! defined(LL_WINDOWS)
+#if LL_CLANG || ! defined(LL_WINDOWS)
 // Only on Windows, and only with the Microsoft compiler (vs. clang) is
 // wchar_t potentially not a distinct type.
 #define LL_WCHAR_T_NATIVE 1
@@ -211,20 +183,18 @@
 #define LL_PRETTY_FUNCTION __PRETTY_FUNCTION__
 #endif
 
-#if LL_ARM64
-#define GLM_FORCE_NEON 1
+// vptr warning supression funtionality for undefined behavior sanitizer
+#if LL_CLANG || LL_GNUC
+#   define LL_UBSAN_SUPRESS_VPTR __attribute__((no_sanitize("vptr")))
 #else
-#if defined(__AVX2__)
-#define GLM_FORCE_AVX2 1
-#else
-#define GLM_FORCE_SSE42 1
-#endif
+#   define LL_UBSAN_SUPRESS_VPTR
 #endif
 
 #if LL_ARM64
 #define KDU_NEON_INTRINSICS 1
 #else
 #define KDU_X86_INTRINSICS 1
+
 #endif
 
 #endif  //  not LL_LINDEN_PREPROCESSOR_H

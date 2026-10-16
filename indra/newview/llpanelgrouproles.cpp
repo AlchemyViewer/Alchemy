@@ -141,7 +141,7 @@ bool LLPanelGroupRoles::postBuild()
     for (S32 i = 0; i < mSubTabContainer->getTabCount(); ++i)
     {
         LLPanel* panel = mSubTabContainer->getPanelByIndex(i);
-        LLPanelGroupSubTab* subtabp = dynamic_cast<LLPanelGroupSubTab*>(panel);
+        LLPanelGroupSubTab* subtabp = ALViewType::as<LLPanelGroupSubTab>(panel);
         if (!subtabp)
         {
             LL_WARNS() << "Invalid subtab panel: " << panel->getName() << LL_ENDL;
@@ -611,7 +611,7 @@ void LLPanelGroupSubTab::buildActionCategory(LLScrollListCtrl* ctrl,
 
         LLScrollListItem* title_row = ctrl->addElement(row, ADD_BOTTOM, action_set->mActionSetData);
 
-        LLScrollListText* name_textp = dynamic_cast<LLScrollListText*>(title_row->getColumn(2)); //?? I have no idea fix getColumn(1) return column spacer...
+        LLScrollListText* name_textp = title_row->getColumn<LLScrollListText>(2); //?? I have no idea fix getColumn(1) return column spacer...
         if (name_textp)
             name_textp->setFontStyle(LLFontGL::BOLD);
 
@@ -836,7 +836,6 @@ bool LLPanelGroupMembersSubTab::postBuildSubTab(LLView* root)
     // Show the member's profile on double click.
     mMembersList->setDoubleClickCallback(onMemberDoubleClick, this);
     mMembersList->setContextMenu(LLScrollListCtrl::MENU_AVATAR);
-    mMembersList->setIsFriendCallback(LLAvatarActions::isFriend);
 
     LLSD row;
     row["columns"][0]["column"] = "name";
@@ -1963,12 +1962,12 @@ void LLPanelGroupMembersSubTab::exportMembersToCSVCallback(const std::vector<std
     }
     std::string fullpath = filenames[0];
 
-    LLAPRFile outfile;
-    outfile.open(fullpath, LL_APR_WB );
-    apr_file_t* file = outfile.getFileHandle();
-    if (!file) return;
+    std::error_code ec;
+    LLFile outfile(fullpath, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+    if (!outfile)
+        return;
 
-    apr_file_printf(file, "Group membership record for %s", gdatap->mName.c_str());
+    outfile.printf("Group membership record for %s", gdatap->mName.c_str());
 
     LLSD memberlist;
     LLAvatarName av_name;
@@ -1977,12 +1976,12 @@ void LLPanelGroupMembersSubTab::exportMembersToCSVCallback(const std::vector<std
          ++member_itr)
     {
         LLAvatarNameCache::get(member_itr->first, &av_name);
-        apr_file_printf(file, "\n%s,%s,%s",
+        outfile.printf("\n%s,%s,%s",
                         member_itr->first.asString().c_str(),
                         av_name.getLegacyName().c_str(),
                         member_itr->second->getOnlineStatus().c_str());
     }
-    apr_file_printf(file, "\n");
+    outfile.printf("\n");
 }
 
 // LLPanelGroupRolesSubTab ///////////////////////////////////////////////
@@ -1993,9 +1992,11 @@ LLPanelGroupRolesSubTab::LLPanelGroupRolesSubTab()
     mRolesList(NULL),
     mAssignedMembersList(NULL),
     mAllowedActionsList(NULL),
+    mActionDescription(NULL),
     mRoleName(NULL),
     mRoleTitle(NULL),
     mRoleDescription(NULL),
+    mMembersNotLoadedLbl(NULL),
     mMemberVisibleCheck(NULL),
     mDeleteRoleButton(NULL),
     mCopyRoleButton(NULL),
@@ -2024,6 +2025,7 @@ bool LLPanelGroupRolesSubTab::postBuildSubTab(LLView* root)
     mAssignedMembersList = parent->getChild<LLNameListCtrl>("role_assigned_members");
     mAllowedActionsList = parent->getChild<LLScrollListCtrl>("role_allowed_actions");
     mActionDescription  = parent->getChild<LLTextEditor>("role_action_description");
+    mMembersNotLoadedLbl = parent->getChild<LLUICtrl>("members_not_loaded");
 
     mRoleName = parent->getChild<LLLineEditor>("role_name");
     mRoleTitle = parent->getChild<LLLineEditor>("role_title");
@@ -2254,12 +2256,18 @@ void LLPanelGroupRolesSubTab::update(LLGroupChange gc)
         }
     }
 
-    if ((GC_ROLE_MEMBER_DATA == gc || GC_MEMBER_DATA == gc)
-        && gdatap
-        && gdatap->isMemberDataComplete()
-        && gdatap->isRoleMemberDataComplete())
+    if (gdatap && gdatap->isMemberDataComplete())
     {
-        buildMembersList();
+        if ((GC_ROLE_MEMBER_DATA == gc || GC_MEMBER_DATA == gc)
+            && gdatap->isRoleMemberDataComplete())
+        {
+            buildMembersList();
+        }
+        mMembersNotLoadedLbl->setVisible(false);
+    }
+    else
+    {
+        mMembersNotLoadedLbl->setVisible(true);
     }
 }
 
@@ -2420,7 +2428,7 @@ struct ActionCBData
 
 void LLPanelGroupRolesSubTab::handleActionCheck(LLUICtrl* ctrl, bool force)
 {
-    LLCheckBoxCtrl* check = dynamic_cast<LLCheckBoxCtrl*>(ctrl);
+    LLCheckBoxCtrl* check = ALViewType::as<LLCheckBoxCtrl>(ctrl);
     if (!check)
         return;
 
@@ -3279,6 +3287,12 @@ void LLPanelGroupBanListSubTab::setBanCount(U32 ban_count)
 
 void LLPanelGroupBanListSubTab::populateBanList()
 {
+    if (mGroupID.isNull())
+    {
+        mBanList->deleteAllItems();
+        return;
+    }
+
     LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mGroupID);
     if(!gdatap)
     {

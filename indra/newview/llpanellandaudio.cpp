@@ -244,7 +244,7 @@ void LLPanelLandAudio::onCommitMusicUrl()
         bool found = false;
         for (LLSD::array_const_iterator s_itr = streams.beginArray(), s_end = streams.endArray(); s_itr != s_end; ++s_itr)
         {
-            if (LLStringUtil::compareInsensitive((LLSD(*s_itr)).asString(), music_url) == 0)
+            if (LLStringUtil::isEqualInsensitiveASCII((LLSD(*s_itr)).asString(), music_url))
                 found = true;
         }
         if (!found)

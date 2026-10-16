@@ -50,6 +50,8 @@ class LLJoystick
 :   public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLJoystick, LLButton);
+
     struct Params
     :   public LLInitParam::Block<Params, LLButton::Params>
     {
@@ -63,9 +65,9 @@ public:
     };
     LLJoystick(const Params&);
 
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleHover(S32 x, S32 y, MASK mask);
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleHover(S32 x, S32 y, MASK mask) override;
 
     virtual void    onMouseUp() {}
     virtual void    onHeldDown() = 0;
@@ -106,26 +108,30 @@ protected:
 
 
 // Turn agent left and right, move forward and back
-class LLJoystickAgentTurn
+class LLJoystickAgentTurn final
 :   public LLJoystick
 {
 public:
+    AL_VIEW_TYPE(LLJoystickAgentTurn, LLJoystick);
+
     struct Params : public LLJoystick::Params {};
     LLJoystickAgentTurn(const Params& p) : LLJoystick(p) {}
-    virtual void    onHeldDown();
+    virtual void    onHeldDown() override;
 };
 
 
 // Slide left and right, move forward and back
-class LLJoystickAgentSlide
+class LLJoystickAgentSlide final
 :   public LLJoystick
 {
 public:
+    AL_VIEW_TYPE(LLJoystickAgentSlide, LLJoystick);
+
     struct Params : public LLJoystick::Params {};
     LLJoystickAgentSlide(const Params& p) : LLJoystick(p) {}
 
-    virtual void    onHeldDown();
-    virtual void    onMouseUp();
+    virtual void    onHeldDown() override;
+    virtual void    onMouseUp() override;
 };
 
 
@@ -134,6 +140,8 @@ class LLJoystickCameraRotate
 :   public LLJoystick
 {
 public:
+    AL_VIEW_TYPE(LLJoystickCameraRotate, LLJoystick);
+
     struct Params
     :   public LLInitParam::Block<Params, LLJoystick::Params>
     {
@@ -147,16 +155,16 @@ public:
 
     virtual void    setToggleState( bool left, bool top, bool right, bool bottom );
 
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual void    onHeldDown();
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleHover(S32 x, S32 y, MASK mask) override;
+    virtual void    onHeldDown() override;
     virtual void    resetJoystickCamera();
-    virtual void    draw();
+    virtual void    draw() override;
 
 protected:
     F32             getOrbitRate();
-    virtual void    updateSlop();
+    virtual void    updateSlop() override;
     void            drawRotatedImage( LLPointer<LLUIImage> image, S32 rotations );
 
 protected:
@@ -171,10 +179,12 @@ protected:
 
 
 // Track the camera focus point forward/backward and side to side
-class LLJoystickCameraTrack
+class LLJoystickCameraTrack final
 :   public LLJoystickCameraRotate
 {
 public:
+    AL_VIEW_TYPE(LLJoystickCameraTrack, LLJoystickCameraRotate);
+
     struct Params
     :   public LLInitParam::Block<Params, LLJoystickCameraRotate::Params>
     {
@@ -182,15 +192,17 @@ public:
     };
 
     LLJoystickCameraTrack(const LLJoystickCameraTrack::Params&);
-    virtual void    onHeldDown();
-    virtual void    resetJoystickCamera();
+    virtual void    onHeldDown() override;
+    virtual void    resetJoystickCamera() override;
 };
 
 //
-class LLJoystickQuaternion :
+class LLJoystickQuaternion final :
     public LLJoystick
 {
 public:
+    AL_VIEW_TYPE(LLJoystickQuaternion, LLJoystick);
+
     struct Params :
         public LLInitParam::Block<Params, LLJoystick::Params>
     {
@@ -201,17 +213,17 @@ public:
 
     virtual void    setToggleState(bool left, bool top, bool right, bool bottom);
 
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual void    onHeldDown();
-    virtual void    draw();
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual void    onHeldDown() override;
+    virtual void    draw() override;
 
     void            setRotation(const LLQuaternion &value);
     LLQuaternion    getRotation() const;
 
 protected:
     F32             getOrbitRate();
-    virtual void    updateSlop();
+    virtual void    updateSlop() override;
     void            drawRotatedImage(LLPointer<LLUIImage> image, S32 rotations);
 
     bool            mInLeft;

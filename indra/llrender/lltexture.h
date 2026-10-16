@@ -36,7 +36,7 @@
 #include "lltrace.h"
 
 class LLImageGL ;
-class LLTexUnit ;
+class ALTextureSlot ;
 class LLFontGL ;
 
 //
@@ -44,7 +44,7 @@ class LLFontGL ;
 //
 class LLTexture : public virtual LLRefCount
 {
-    friend class LLTexUnit ;
+    friend class ALTextureSlot ;
     friend class LLFontGL ;
 
 protected:
@@ -67,9 +67,6 @@ public:
     virtual S32        getHeight(S32 discard_level = -1) const;
     virtual bool       isActiveFetching();
     virtual LLImageGL* getGLTexture() const;
-
-private:
-    virtual void updateBindStatsForTester();
 };
 #endif
 

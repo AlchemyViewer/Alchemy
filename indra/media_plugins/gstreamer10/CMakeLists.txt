@@ -1,40 +1,32 @@
 # -*- cmake -*-
 
-project(media_plugin_gstreamer10)
-
-include(00-Common)
-include(LLCommon)
-include(LLImage)
-include(LLMath)
-include(LLWindow)
-include(Linking)
 include(PluginAPI)
-include(OpenGL)
 include(GLIB)
 
 include(GStreamer10Plugin)
 
-### media_plugin_gstreamer10
+### media_plugin_gstreamer10 - dedicated host executable that statically links the
+### GStreamer media plugin together with the slplugin host driver (no dlopen). This
+### plugin is only built on UNIX-but-not-Apple (see AL_BUILD_GSTREAMER_PLUGIN).
 
-set(media_plugin_gstreamer10_SOURCE_FILES
+add_executable(media_plugin_gstreamer10)
+
+target_sources(
+  media_plugin_gstreamer10
+  PRIVATE
+    ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
+    ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_static.cpp
     media_plugin_gstreamer10.cpp
-    )
-
-set(media_plugin_gstreamer10_HEADER_FILES
-    llmediaimplgstreamer_syms.h
-    )
-
-add_library(media_plugin_gstreamer10
-    SHARED
-    ${media_plugin_gstreamer10_SOURCE_FILES}
 )
 
-target_link_libraries(media_plugin_gstreamer10 media_plugin_base ll::gstreamer10 )
-
-if (WINDOWS)
-  set_target_properties(
-    media_plugin_gstreamer10
-    PROPERTIES
-    LINK_FLAGS "/MANIFEST:NO /SAFESEH:NO /NODEFAULTLIB:LIBCMT"
-    )
-endif (WINDOWS)
+target_link_libraries(
+  media_plugin_gstreamer10
+  PRIVATE
+    al::flags
+    media_plugin_base
+    ll::gstreamer10
+    llplugin
+    llmessage
+    llcommon
+    ll::pluginlibraries
+)

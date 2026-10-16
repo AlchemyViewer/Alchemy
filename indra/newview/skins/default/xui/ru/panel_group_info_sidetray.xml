@@ -36,7 +36,6 @@
 		</layout_panel>
 		<layout_panel name="btn_apply_lp">
 			<button label="Сохранить" label_selected="Сохранить" name="btn_apply"/>
-			<button label="Создать группу" name="btn_create" tool_tip="Создать новую группу"/>
 		</layout_panel>
 	</layout_stack>
 </panel>

@@ -23,7 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 modelview_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 in vec3 position;
 
@@ -31,7 +33,14 @@ out vec3 vary_dir;
 
 void main()
 {
+    // position.z is -1 (the forward axis of the cube face), used below for vary_dir. That is
+    // outside the ZERO_TO_ONE clip volume, so under reverse-Z emit a valid clip z for
+    // rasterization (no depth test here) while vary_dir keeps the raw z=-1 direction.
+#ifdef REVERSE_Z
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+#else
     gl_Position = vec4(position, 1.0);
+#endif
 
     vary_dir = vec3(modelview_matrix * vec4(position, 1.0)).xyz;
 }

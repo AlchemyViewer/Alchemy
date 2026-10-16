@@ -208,7 +208,6 @@ public:
         FACE_SUN, // was 6
         FACE_MOON, // was 7
         FACE_BLOOM, // was 8
-        FACE_REFLECTION, // was 10
         FACE_COUNT
     };
 
@@ -244,7 +243,6 @@ public:
     void setMoonDirectionCFR(const LLVector3 &moon_direction);
 
     bool updateHeavenlyBodyGeometry(LLDrawable *drawable, F32 scale, const S32 side, LLHeavenBody& hb, const LLVector3 &up, const LLVector3 &right);
-    void updateReflectionGeometry(LLDrawable *drawable, F32 H, const LLHeavenBody& HB);
 
     F32 getWorldScale() const                           { return mWorldScale; }
     void setWorldScale(const F32 s)                     { mWorldScale = s; }
@@ -263,10 +261,6 @@ public:
     LLVector3 getEarthCenter() const                    { return mEarthCenter; }
 
     LLCubeMap *getCubeMap() const                       { return mCubeMap; }
-    S32 getDrawRefl() const                             { return mDrawRefl; }
-    void setDrawRefl(const S32 r)                       { mDrawRefl = r; }
-    bool isReflFace(const LLFace* face) const           { return face == mFace[FACE_REFLECTION]; }
-    LLFace* getReflFace() const                         { return mFace[FACE_REFLECTION]; }
 
     LLViewerTexture*    getSunTex() const               { return mSunTexturep[0]; }
     LLViewerTexture*    getMoonTex() const              { return mMoonTexturep[0]; }
@@ -348,7 +342,6 @@ protected:
     F32                 mWorldScale;
 
     LLPointer<LLCubeMap> mCubeMap;                  // Cube map for the environment
-    S32                  mDrawRefl;
 
     LLFrameTimer        mUpdateTimer;
     LLTimer             mForceUpdateThrottle;

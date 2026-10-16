@@ -48,7 +48,6 @@
 #include "llglheaders.h"
 
 extern LLPipeline gPipeline;
-constexpr F32 MAX_ATTACHMENT_DIST = 3.5f; // meters
 
 //-----------------------------------------------------------------------------
 // LLViewerJointAttachment()
@@ -60,7 +59,7 @@ LLViewerJointAttachment::LLViewerJointAttachment() :
     mPieSlice(-1)
 {
     mValid = false;
-    mUpdateXform = false;
+    setUpdateXform(false);
     mAttachedObjects.clear();
 }
 
@@ -171,38 +170,33 @@ void LLViewerJointAttachment::setupDrawable(LLViewerObject *object)
 //-----------------------------------------------------------------------------
 bool LLViewerJointAttachment::addObject(LLViewerObject* object)
 {
-//  object->extractAttachmentItemID();
 
     // Same object reattached
     if (isObjectAttached(object))
     {
         LL_INFOS() << "(same object re-attached)" << LL_ENDL;
-//// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
-//      if ( (object->permYouOwner()) && (gAgentAvatarp) )
-//      {
-//          gAgentAvatarp->removePendingDetach(object->getID());
-//      }
-//// [/SL:KB]
         removeObject(object);
         // Pass through anyway to let setupDrawable()
         // re-connect object to the joint correctly
     }
 
-// [SL:KB] - Patch: Appearance-Misc | Checked: 2011-01-13 (Catznip-2.4)
-    // LLViewerJointAttachment::removeObject() sets the object's item to the NULL UUID so we need to extract it *after* the block above
     object->extractAttachmentItemID();
-// [/SL:KB]
 
     // Two instances of the same inventory item attached --
     // Request detach, and kill the object in the meantime.
+    // (Skip when EITHER side is a client-only object: a local mesh preview has
+    // no inventory item, so its null id would cross-match a real null-item-id
+    // attachment -- e.g. a temporary attachment -- in both directions, killing
+    // an unrelated object and sending an ObjectDetach the sim can't act on.)
 // [SL:KB] - Patch: Appearance-PhantomAttach | Checked: Catznip-5.0
-    if (LLViewerObject* pAttachObj = getAttachedObject(object->getAttachmentItemID()))
+    LLViewerObject* pAttachObj = (!object->isLocalOnly()) ? getAttachedObject(object->getAttachmentItemID()) : nullptr;
+    if (pAttachObj && !pAttachObj->isLocalOnly())
     {
         LL_INFOS() << "(same object re-attached)" << LL_ENDL;
         pAttachObj->markDead();
         if (pAttachObj->permYouOwner())
         {
-            gMessageSystem->newMessage("ObjectDetach");
+            gMessageSystem->newMessageFast(_PREHASH_ObjectDetach);
             gMessageSystem->nextBlockFast(_PREHASH_AgentData);
             gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
             gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
@@ -243,7 +237,7 @@ bool LLViewerJointAttachment::addObject(LLViewerObject* object)
         }
     }
     calcLOD();
-    mUpdateXform = true;
+    setUpdateXform(true);
 
     return true;
 }
@@ -344,7 +338,7 @@ void LLViewerJointAttachment::removeObject(LLViewerObject *object)
     }
     if (mAttachedObjects.size() == 0)
     {
-        mUpdateXform = false;
+        setUpdateXform(false);
     }
     object->setAttachmentItemID(LLUUID::null);
 }

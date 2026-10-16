@@ -60,6 +60,8 @@ const F32 HUD_TEXT_MAX_WIDTH_NO_BUBBLE = 1000.f;
 const F32 MAX_DRAW_DISTANCE = 300.f;
 
 std::set<LLPointer<LLHUDText> > LLHUDText::sTextObjects;
+std::vector<LLPointer<LLHUDText> > LLHUDText::sAllTextObjects;
+bool LLHUDText::sAllTextObjectsDirty = true;
 std::vector<LLPointer<LLHUDText> > LLHUDText::sVisibleTextObjects;
 std::vector<LLPointer<LLHUDText> > LLHUDText::sVisibleHUDTextObjects;
 bool LLHUDText::sDisplayText = true ;
@@ -88,13 +90,35 @@ LLHUDText::LLHUDText(const U8 type) :
 {
     mColor = LLColor4(1.f, 1.f, 1.f, 1.f);
     mDoFade = true;
-    mFadeDistance = 8.f;
-    mFadeRange = 4.f;
+    mFadeDistance = gSavedSettings.getF32("AlchemyHudTextFadeDistance");
+    mFadeRange = gSavedSettings.getF32("AlchemyHudTextFadeRange");
     mZCompare = true;
     mOffscreen = false;
     mRadius = 0.1f;
     LLPointer<LLHUDText> ptr(this);
     sTextObjects.insert(ptr);
+    sAllTextObjectsDirty = true;
+}
+
+void LLHUDText::releaseTextObjects()
+{
+    // The set stays: it is the authority on what exists, and each object text
+    // drops its own place in it as it is marked dead. These are derived from
+    // it and are only held between frames to save rebuilding them.
+    sAllTextObjects.clear();
+    sAllTextObjectsDirty = true;
+    sVisibleTextObjects.clear();
+    sVisibleHUDTextObjects.clear();
+}
+
+const std::vector<LLPointer<LLHUDText> >& LLHUDText::getAllTextObjects()
+{
+    if (sAllTextObjectsDirty)
+    {
+        sAllTextObjects.assign(sTextObjects.begin(), sTextObjects.end());
+        sAllTextObjectsDirty = false;
+    }
+    return sAllTextObjects;
 }
 
 LLHUDText::~LLHUDText()
@@ -118,7 +142,8 @@ void LLHUDText::renderText()
         return;
     }
 
-    gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(mTextSegments.size());
 
     LLGLState gls_blend(GL_BLEND, true);
 
@@ -127,7 +152,7 @@ void LLHUDText::renderText()
     LLColor4 text_color = mColor;
     if (mDoFade)
     {
-        if (mLastDistance > mFadeDistance)
+        if (mLastDistance > mFadeDistance && mFadeRange > 0.f)
         {
             alpha_factor = llmax(0.f, 1.f - (mLastDistance - mFadeDistance)/mFadeRange);
             text_color.mV[3] = text_color.mV[3]*alpha_factor;
@@ -140,27 +165,6 @@ void LLHUDText::renderText()
     shadow_color.mV[3] = text_color.mV[3];
 
     mOffsetY = lltrunc(mHeight * ((mVertAlignment == ALIGN_VERT_CENTER) ? 0.5f : 1.f));
-
-    // *TODO: make this a per-text setting
-    static LLCachedControl<F32> bubble_opacity(gSavedSettings, "ChatBubbleOpacity");
-    static LLUIColor nametag_bg_color = LLUIColorTable::instance().getColor("ObjectBubbleColor");
-    LLColor4 bg_color = nametag_bg_color;
-    bg_color.setAlpha(bubble_opacity * alpha_factor);
-
-    const S32 border_height = 16;
-    const S32 border_width = 16;
-
-    // *TODO move this into helper function
-    F32 border_scale = 1.f;
-
-    if (border_height * 2 > mHeight)
-    {
-        border_scale = (F32)mHeight / ((F32)border_height * 2.f);
-    }
-    if (border_width * 2 > mWidth)
-    {
-        border_scale = llmin(border_scale, (F32)mWidth / ((F32)border_width * 2.f));
-    }
 
     // scale screen size of borders down
     //RN: for now, text on hud objects is never occluded
@@ -209,6 +213,7 @@ void LLHUDText::renderText()
             start_segment = llmax((S32)0, (S32)mTextSegments.size() - max_lines);
         }
 
+        LLHUDTextScope scope(render_position, mOnHUDAttachment);
         for (std::vector<LLHUDTextSegment>::iterator segment_iter = mTextSegments.begin() + start_segment;
              segment_iter != mTextSegments.end(); ++segment_iter )
         {
@@ -231,7 +236,7 @@ void LLHUDText::renderText()
             text_color = segment_iter->mColor;
             text_color.mV[VALPHA] *= alpha_factor;
 
-            hud_render_text(segment_iter->getText(), render_position, *fontp, style, shadow, x_offset, y_offset, text_color, mOnHUDAttachment);
+            segment_iter->draw(scope, *fontp, style, shadow, x_offset, y_offset, text_color);
         }
     }
     /// Reset the default color to white.  The renderer expects this to be the default.
@@ -280,19 +285,21 @@ void LLHUDText::addLine(const std::string &text_utf8,
                         const LLFontGL::StyleFlags style,
                         const LLFontGL* font)
 {
-    LLWString wline = utf8str_to_wstring(text_utf8);
-    if (!wline.empty())
+    if (!text_utf8.empty())
     {
+        // Wrapping shapes the text to find where it breaks, and every segment
+        // it produces is a fresh cache.
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+        LL_PROFILE_ZONE_NUM(text_utf8.size());
         // use default font for segment if custom font not specified
         if (!font)
         {
             font = mFontp;
         }
-        typedef boost::tokenizer<boost::char_separator<llwchar>, LLWString::const_iterator, LLWString > tokenizer;
-        LLWString seps(utf8str_to_wstring("\r\n"));
-        boost::char_separator<llwchar> sep(seps.c_str());
+        typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+        boost::char_separator<char> sep("\r\n");
 
-        tokenizer tokens(wline, sep);
+        tokenizer tokens(text_utf8, sep);
         tokenizer::iterator iter = tokens.begin();
 
         while (iter != tokens.end())
@@ -301,9 +308,9 @@ void LLHUDText::addLine(const std::string &text_utf8,
             do
             {
                 F32 max_pixels = HUD_TEXT_MAX_WIDTH_NO_BUBBLE;
-                S32 segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, static_cast<S32>(wline.length()), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                S32 segment_length = font->maxDrawableBytes(std::string_view(*iter).substr(line_length), max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                 LLHUDTextSegment segment(iter->substr(line_length, segment_length), style, color, font);
-                mTextSegments.push_back(segment);
+                mTextSegments.push_back(std::move(segment));
                 line_length += segment_length;
             }
             while (line_length != iter->size());
@@ -510,6 +517,8 @@ LLVector2 LLHUDText::updateScreenPos(LLVector2 &offset)
 
 void LLHUDText::updateSize()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(mTextSegments.size());
     F32 height = 0.f;
     F32 width = 0.f;
 
@@ -544,18 +553,38 @@ void LLHUDText::updateSize()
 
 void LLHUDText::updateAll()
 {
+    // Every object text in the scene, whether or not any of it is on screen.
+    // Object text is per-prim and there is no bound on how many carry it, so
+    // the count is what says whether this is worth anything.
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(sTextObjects.size());
     // iterate over all text objects, calculate their restoration forces,
     // and add them to the visible set if they are on screen and close enough
     sVisibleTextObjects.clear();
     sVisibleHUDTextObjects.clear();
 
-    TextObjectIterator text_it;
-    for (text_it = sTextObjects.begin(); text_it != sTextObjects.end(); ++text_it)
+    for (const LLPointer<LLHUDText>& text_ptr : getAllTextObjects())
     {
-        LLHUDText* textp = (*text_it);
+        LLHUDText* textp = text_ptr;
         textp->mTargetPositionOffset.clearVec();
-        textp->updateSize();
+        // Visibility first, and a size only for what survives it. Deciding
+        // visibility does not read the size -- it works from the distance,
+        // the draw-distance limit and the radius the last draw left behind --
+        // while measuring walks every segment of every object text in the
+        // scene, most of which is behind the camera or past the limit.
+        const bool was_visible = textp->getVisible();
         textp->updateVisibility();
+        if (textp->getVisible())
+        {
+            textp->updateSize();
+        }
+        else if (was_visible)
+        {
+            // Going out of sight is worth the shaped glyphs; staying out of
+            // sight is not worth asking again, which is why this reads the
+            // change rather than the state.
+            textp->releaseTextGeometry();
+        }
     }
 
     // sort back to front for rendering purposes
@@ -594,11 +623,14 @@ void LLHUDText::markDead()
     // till the end of the function
     LLPointer<LLHUDText> ptr(this);
     sTextObjects.erase(ptr);
+    sAllTextObjectsDirty = true;
     LLHUDObject::markDead();
 }
 
 void LLHUDText::renderAllHUD()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(sVisibleHUDTextObjects.size());
     LLGLState::checkStates();
 
     {
@@ -633,37 +665,38 @@ void LLHUDText::shift(const LLVector3& offset)
 }
 
 //static
-// called when UI scale changes, to flush font width caches
 void LLHUDText::reshape()
 {
-    TextObjectIterator text_it;
-    for (text_it = sTextObjects.begin(); text_it != sTextObjects.end(); ++text_it)
-    {
-        LLHUDText* textp = (*text_it);
-        std::vector<LLHUDTextSegment>::iterator segment_iter;
-        for (segment_iter = textp->mTextSegments.begin();
-             segment_iter != textp->mTextSegments.end(); ++segment_iter )
-        {
-            segment_iter->clearFontWidthMap();
-        }
-    }
+    // Nothing to flush: a segment's cache compares the scale and DPI it
+    // measured at against the current ones, so a UI scale change invalidates
+    // it wherever it is, without a sweep over every object in the world.
 }
 
 //============================================================================
 
 F32 LLHUDText::LLHUDTextSegment::getWidth(const LLFontGL* font)
 {
-    std::map<const LLFontGL*, F32>::iterator iter = mFontWidthMap.find(font);
-    if (iter != mFontWidthMap.end())
+    mFontCache.setSource(this, 0);
+    return mFontCache.getWidthBytes(font, mText, 0, S32_MAX, false);
+}
+
+void LLHUDText::releaseTextGeometry()
+{
+    for (const LLHUDTextSegment& segment : mTextSegments)
     {
-        return iter->second;
+        segment.releaseGeometry();
     }
-    else
-    {
-        F32 width = font->getWidthF32(mText.c_str());
-        mFontWidthMap[font] = width;
-        return width;
-    }
+}
+
+void LLHUDText::LLHUDTextSegment::draw(LLHUDTextScope& scope, const LLFontGL& font, U8 style,
+                                       LLFontGL::ShadowType shadow, F32 x_offset, F32 y_offset,
+                                       const LLColor4& color) const
+{
+    // Named the same way the measurement names it, and about the same text.
+    // A segment holds one string for as long as it exists, so the version
+    // never moves; segments are replaced rather than edited.
+    mFontCache.setSource(this, 0);
+    scope.draw(mText, font, style, shadow, x_offset, y_offset, color, &mFontCache);
 }
 
 // [RLVa:KB] - Checked: RLVa-2.0.3
@@ -679,3 +712,15 @@ void LLHUDText::refreshAllObjectText(EObjectTextFilter eObjFilter)
     }
 }
 // [/RLVa:KB]
+
+void LLHUDText::onFadeSettingsChanged()
+{
+    for (LLHUDText* text : sTextObjects)
+    {
+        if (text)
+        {
+            text->mFadeDistance = gSavedSettings.getF32("AlchemyHudTextFadeDistance");
+            text->mFadeRange = gSavedSettings.getF32("AlchemyHudTextFadeRange");
+        }
+    }
+}

@@ -29,11 +29,13 @@
 
 #include "llfloater.h"
 
-class LLFloaterHoverHeight: public LLFloater
+class LLFloaterHoverHeight final: public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterHoverHeight, LLFloater);
+
     LLFloaterHoverHeight(const LLSD& key);
-    bool postBuild();
+    bool postBuild() override;
 
     static void onSliderMoved(LLUICtrl* ctrl, void* userData);
 
@@ -45,7 +47,7 @@ public:
     void onSimulatorFeaturesReceived(const LLUUID &region_id);
     void updateEditEnabled();
 
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onClose(bool app_quitting) override;
     boost::signals2::connection mRegionChangedSlot;
 };
 

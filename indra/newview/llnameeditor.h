@@ -36,10 +36,12 @@
 #include "lllineeditor.h"
 
 
-class LLNameEditor
+class LLNameEditor final
 :   public LLLineEditor
 {
 public:
+    AL_VIEW_TYPE(LLNameEditor, LLLineEditor);
+
     struct Params : public LLInitParam::Block<Params, LLLineEditor::Params>
     {
         Optional<bool>      is_group;
@@ -65,8 +67,8 @@ public:
 
 
     // Take/return agent UUIDs
-    virtual void    setValue( const LLSD& value );
-    virtual LLSD    getValue() const;
+    virtual void    setValue( const LLSD& value ) override;
+    virtual LLSD    getValue() const override;
 
 private:
     static std::set<LLNameEditor*> sInstances;

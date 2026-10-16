@@ -35,9 +35,10 @@
  * with recent queries. Supports text auto-complete and filtering of drop down list
  * according to typed text.
  */
-class LLSearchComboBox : public LLComboBox
+class LLSearchComboBox final : public LLComboBox
 {
 public:
+    AL_VIEW_TYPE(LLSearchComboBox, LLComboBox);
 
     struct Params : public LLInitParam::Block<Params, LLComboBox::Params>
     {
@@ -57,7 +58,7 @@ public:
      */
     void clearHistory();
 
-    /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
+    /*virtual*/ bool handleKeyHere(KEY key, MASK mask) override;
 
     ~LLSearchComboBox();
 
@@ -69,12 +70,12 @@ protected:
     /**
      * Handles typing in text box
      */
-    void onTextEntry(LLLineEditor* line_editor);
+    void onTextEntry(LLLineEditor* line_editor) override;
 
     /**
      * Hides drop down list and focuses text box
      */
-    void hideList();
+    void hideList() override;
 
     /**
      * Rebuilds search history, case insensitive

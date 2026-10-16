@@ -31,10 +31,12 @@
 
 class LLAvatarName;
 
-class LLPanelGroupInvite
+class LLPanelGroupInvite final
 : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupInvite, LLPanel);
+
     LLPanelGroupInvite(const LLUUID& group_id);
     ~LLPanelGroupInvite();
 

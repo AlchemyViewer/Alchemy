@@ -30,14 +30,12 @@
 #include "llsd.h"
 #include "mean_collision_data.h"
 
-#include "alavataractions.h"
 #include "llavataractions.h"
 #include "llfloaterbump.h"
 #include "llfloaterreg.h"
 #include "llfloaterreporter.h"
 #include "llmutelist.h"
-#include "llfloaterblocked.h"
-//#include "llpanelblockedlist.h"
+#include "alfloaterblocked.h"
 #include "llscrolllistctrl.h"
 #include "lltrans.h"
 #include "lluictrlfactory.h"
@@ -246,8 +244,7 @@ void LLFloaterBump::muteAvatar()
     else
     {
         LLMuteList::getInstance()->add(mute);
-        LLFloaterBlocked::showMuteAndSelect(mute.mID);
-        //LLPanelBlockedList::showPanelAndSelect(mute.mID);
+        ALFloaterBlocked::showMuteAndSelect(mute.mID);
     }
 }
 
@@ -258,7 +255,7 @@ void LLFloaterBump::payAvatar()
 
 void LLFloaterBump::zoomInAvatar()
 {
-    ALAvatarActions::zoomIn(mItemUUID);
+    handle_zoom_to_object(mItemUUID);
 }
 
 bool LLFloaterBump::enableMute()

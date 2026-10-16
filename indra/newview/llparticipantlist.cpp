@@ -41,7 +41,7 @@
 LLParticipantList::LLParticipantList(LLSpeakerMgr* data_source, LLFolderViewModelInterface& root_view_model) :
     LLConversationItemSession(data_source->getSessionID(), root_view_model),
     mSpeakerMgr(data_source),
-    mValidateSpeakerCallback(NULL)
+    mValidateSpeakerCallback(nullptr)
 {
     mSpeakerAddListener = new SpeakerAddListener(*this);
     mSpeakerRemoveListener = new SpeakerRemoveListener(*this);
@@ -244,8 +244,6 @@ void LLParticipantList::addAvatarIDExceptAgent(const LLUUID& avatar_id)
 
     adjustParticipant(avatar_id);
 }
-
-static LLFastTimer::DeclareTimer FTM_FOLDERVIEW_TEST("add test avatar agents");
 
 void LLParticipantList::adjustParticipant(const LLUUID& speaker_id)
 {

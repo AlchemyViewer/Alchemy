@@ -34,9 +34,10 @@ class LLTextBox :
     public LLTextBase
 {
 public:
+    AL_VIEW_TYPE(LLTextBox, LLTextBase);
 
     // *TODO: Add callback to Params
-    typedef boost::function<void (void)> callback_t;
+    typedef std::function<void (void)> callback_t;
 
     struct Params : public LLInitParam::Block<Params, LLTextBase::Params>
     {};
@@ -48,17 +49,18 @@ protected:
 public:
     ~LLTextBox() override;
 
+
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
 
     void setEnabled(bool enabled) override;
 
-    void setText(const LLStringExplicit& text, const LLStyle::Params& input_params = LLStyle::Params()) override;
+    void setText(ALStringViewExplicit text, const LLStyle::Params& input_params = LLStyle::defaultParams()) override;
 
     void setRightAlign() { mHAlign = LLFontGL::RIGHT; }
     void setHAlign(LLFontGL::HAlign align) { mHAlign = align; }
-    void setClickedCallback(boost::function<void(void*)> cb, void* userdata = NULL);
+    void setClickedCallback(std::function<void(void*)> cb, void* userdata = nullptr);
     void clearClickedCallback();
 
     void reshapeToFitText(bool called_from_parent = false);
@@ -75,6 +77,9 @@ protected:
     void onUrlLabelUpdated(const std::string& url, const std::string& label);
 
     LLUIString          mText;
+
+    // Whether the document currently carries a style someone asked for.
+    bool                mLastSetTextStyled = false;
     callback_t          mClickedCallback;
     bool                mShowCursorHand;
 

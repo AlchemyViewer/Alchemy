@@ -31,6 +31,7 @@
 #include "llpanel.h"
 #include "llpointer.h"
 #include "llvolume.h"
+#include "lltextureentry.h"
 
 class LLSpinCtrl;
 class LLCheckBoxCtrl;
@@ -41,20 +42,23 @@ class LLMenuButton;
 class LLViewerObject;
 class LLComboBox;
 class LLColorSwatchCtrl;
+class LLTextureCtrl;
 class LLVOVolume;
 
-class LLPanelVolume : public LLPanel
+class LLPanelVolume final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelVolume, LLPanel);
+
     LLPanelVolume();
     virtual ~LLPanelVolume();
 
-    virtual void    draw();
-    virtual void    clearCtrls();
+    virtual void    draw() override;
+    virtual void    clearCtrls() override;
 
-    virtual bool    postBuild();
+    virtual bool    postBuild() override;
 
-    void            refresh();
+    void            refresh() override;
 
     void            sendIsLight();
 
@@ -91,6 +95,11 @@ public:
     void            onPasteFeatures();
     void            onCopyLight();
     void            onPasteLight();
+    void            onClickPipetteFeatures();
+    void            onClickPipetteLight();
+
+    void onFeaturesSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+    void onLightSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
 
     void        menuDoToSelected(const LLSD& userdata);
     bool        menuEnableItem(const LLSD& userdata);
@@ -108,42 +117,55 @@ protected:
 
     void            handleResponseChangeToFlexible(const LLSD &pNotification, const LLSD &pResponse);
 
-/*
-    LLTextBox*      mLabelSelectSingleMessage;
+    //Animesh
+    LLCheckBoxCtrl* mCheckAnimesh = nullptr;
+
+    LLTextBox* mLabelEditObject = nullptr;
+    LLTextBox* mLabelSelectSingle = nullptr;
+
     // Light
-    LLCheckBoxCtrl* mCheckLight;
-    LLCheckBoxCtrl* mCheckFlexible1D;
-    LLTextBox*      mLabelColor;
-    LLColorSwatchCtrl* mLightColorSwatch;
-    LLSpinCtrl*     mLightIntensity;
-    LLSpinCtrl*     mLightRadius;
-    LLSpinCtrl*     mLightFalloff;
-    LLSpinCtrl*     mLightCutoff;
+    LLCheckBoxCtrl*    mCheckLight       = nullptr;
+    LLTextBox*         mLabelColor       = nullptr;
+    LLTextureCtrl*     mLightTextureCtrl = nullptr;
+    LLColorSwatchCtrl* mLightColorSwatch = nullptr;
+    LLSpinCtrl*        mLightIntensity   = nullptr;
+    LLSpinCtrl*        mLightRadius      = nullptr;
+    LLSpinCtrl*        mLightFalloff     = nullptr;
+    LLSpinCtrl*        mLightFOV         = nullptr;
+    LLSpinCtrl*        mLightFocus       = nullptr;
+    LLSpinCtrl*        mLightAmbiance    = nullptr;
+
     // Flexibile
-    LLSpinCtrl*     mSpinSections;
-    LLSpinCtrl*     mSpinGravity;
-    LLSpinCtrl*     mSpinTension;
-    LLSpinCtrl*     mSpinFriction;
-    LLSpinCtrl*     mSpinWind;
-    LLSpinCtrl*     mSpinForce[3];
-*/
+    LLCheckBoxCtrl* mCheckFlexible1D = nullptr;
+    LLSpinCtrl*     mSpinSections = nullptr;
+    LLSpinCtrl*     mSpinGravity  = nullptr;
+    LLSpinCtrl*     mSpinTension  = nullptr;
+    LLSpinCtrl*     mSpinFriction = nullptr;
+    LLSpinCtrl*     mSpinWind     = nullptr;
+    LLSpinCtrl*     mSpinForceX   = nullptr;
+    LLSpinCtrl*     mSpinForceY   = nullptr;
+    LLSpinCtrl*     mSpinForceZ   = nullptr;
 
-    S32         mComboMaterialItemCount;
-    LLComboBox*     mComboMaterial;
-
+    S32             mComboMaterialItemCount;
+    LLComboBox*     mComboMaterial = nullptr;
 
     LLColor4        mLightSavedColor;
     LLPointer<LLViewerObject> mObject;
     LLPointer<LLViewerObject> mRootObject;
 
-    LLComboBox*     mComboPhysicsShapeType;
-    LLSpinCtrl*     mSpinPhysicsGravity;
-    LLSpinCtrl*     mSpinPhysicsFriction;
-    LLSpinCtrl*     mSpinPhysicsDensity;
-    LLSpinCtrl*     mSpinPhysicsRestitution;
+    LLTextBox*      mLabelPhysicsShapeType = nullptr;
+    LLComboBox*     mComboPhysicsShapeType = nullptr;
+    LLSpinCtrl*     mSpinPhysicsGravity    = nullptr;
+    LLSpinCtrl*     mSpinPhysicsFriction   = nullptr;
+    LLSpinCtrl*     mSpinPhysicsDensity    = nullptr;
+    LLSpinCtrl*     mSpinPhysicsRestitution = nullptr;
 
-    LLMenuButton*   mMenuClipboardFeatures;
-    LLMenuButton*   mMenuClipboardLight;
+    LLButton* mBtnCopyFeatures = nullptr;
+    LLButton* mBtnPasteFeatures = nullptr;
+    LLButton* mBtnPipetteFeatures = nullptr;
+    LLButton* mBtnCopyLight = nullptr;
+    LLButton* mBtnPasteLight = nullptr;
+    LLButton* mBtnPipetteLight = nullptr;
 
     LLSD            mClipboardParams;
 };

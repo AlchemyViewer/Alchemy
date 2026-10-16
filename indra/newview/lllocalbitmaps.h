@@ -32,6 +32,7 @@
 #include "lleventtimer.h"
 #include "llpointer.h"
 #include "llwearabletype.h"
+#include <filesystem>
 
 class LLScrollListCtrl;
 class LLImageRaw;
@@ -50,6 +51,10 @@ class LLLocalBitmap
         LLUUID      getTrackingID() const;
         LLUUID      getWorldID() const;
         bool        getValid() const;
+        // Imported by a local mesh for its own materials: hidden from the Textures
+        // tab + cross-session persistence (it reappears when the mesh re-decodes).
+        bool        isMeshOwned() const { return mIsMeshOwned; }
+        void        setMeshOwned(bool b) { mIsMeshOwned = b; }
 
     public: /* self update public section */
         enum EUpdateType
@@ -90,7 +95,9 @@ class LLLocalBitmap
             ET_IMG_TGA,
             ET_IMG_JPG,
             ET_IMG_J2C,
-            ET_IMG_PNG
+            ET_IMG_PNG,
+            ET_IMG_WEBP,
+            ET_IMG_AVIF
         };
 
     private: /* members */
@@ -99,10 +106,11 @@ class LLLocalBitmap
         LLUUID      mTrackingID;
         LLUUID      mWorldID;
         bool        mValid;
-        LLSD        mLastModified;
+        std::filesystem::file_time_type        mLastModified;
         EExtension  mExtension;
         ELinkStatus mLinkStatus;
         S32         mUpdateRetries;
+        bool        mIsMeshOwned = false; // imported by a local mesh (see isMeshOwned)
         LLLocalTextureChangedSignal mChangedSignal;
 
         // Store a list of accosiated materials
@@ -133,21 +141,32 @@ class LLLocalBitmapMgr : public LLSingleton<LLLocalBitmapMgr>
 public:
     bool         addUnit(const std::vector<std::string>& filenames);
 protected:
-    LLUUID       addUnitInternal(const std::string& filename);
+    LLUUID       addUnitInternal(const std::string& filename, bool mesh_owned = false);
 public:
     LLUUID       addUnit(const std::string& filename);
-    LLUUID       getUnitID(const std::string& filename);
+    // Add a unit imported by a local mesh: hidden from the Textures tab + persistence.
+    LLUUID       addUnit(const std::string& filename, bool mesh_owned);
+    // Resolve a file to its unit of ONE ownership class. A user texture and a
+    // mesh-owned import of the same file are distinct units (see addUnitInternal);
+    // an ownership-blind first-match could hand the Textures tab a mesh's hidden
+    // import to delete (or vice versa), so callers must say which side they want.
+    LLUUID       getUnitID(const std::string& filename, bool mesh_owned);
     void         delUnit(LLUUID tracking_id);
     bool        checkTextureDimensions(std::string filename);
 
     LLUUID       getTrackingID(const LLUUID& world_id) const;
     LLUUID       getWorldID(const LLUUID &tracking_id) const;
+    bool         isMeshOwned(const LLUUID& tracking_id) const; // imported by a local mesh
     bool         isLocal(const LLUUID& world_id) const;
     std::string  getFilename(const LLUUID &tracking_id) const;
+    std::vector<std::string> getFilenames() const; // every loaded path (persistence)
     boost::signals2::connection setOnChangedCallback(const LLUUID tracking_id, const LLLocalBitmap::LLLocalTextureCallback& cb);
     void associateGLTFMaterial(const LLUUID tracking_id, LLGLTFMaterial* mat);
 
     void         feedScrollList(LLScrollListCtrl* ctrl);
+    // Fired when the unit list changes (add/remove) so the Local Assets floater
+    // refreshes reactively. Distinct from the per-unit setOnChangedCallback above.
+    boost::signals2::connection setUnitsChangedCallback(const std::function<void()>& cb);
     void         doUpdates();
     void         setNeedsRebake();
     void         doRebake();
@@ -156,6 +175,7 @@ private:
     std::list<LLLocalBitmap*>    mBitmapList;
     LLLocalBitmapTimer           mTimer;
     bool                         mNeedsRebake;
+    boost::signals2::signal<void()> mUnitsChangedSignal; // add/remove
     typedef std::list<LLLocalBitmap*>::iterator local_list_iter;
     typedef std::list<LLLocalBitmap*>::const_iterator local_list_citer;
 };

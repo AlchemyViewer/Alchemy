@@ -50,24 +50,24 @@ class LLStreamingAudio_FMODSTUDIO final : public LLStreamingAudioInterface
 {
 public:
     LLStreamingAudio_FMODSTUDIO(FMOD::System *system);
-    /*virtual*/ ~LLStreamingAudio_FMODSTUDIO();
+    ~LLStreamingAudio_FMODSTUDIO() override;
 
-    /*virtual*/ void start(const std::string& url) override;
-    /*virtual*/ void stop() override;
-    /*virtual*/ void pause(S32 pause) override;
-    /*virtual*/ void update() override;
-    /*virtual*/ S32 isPlaying() override;
-    /*virtual*/ void setGain(F32 vol) override;
-    /*virtual*/ F32 getGain() override;
-    /*virtual*/ std::string getURL() override;
+    void start(const std::string& url) override;
+    void stop() override;
+    void pause(S32 pause) override;
+    void update() override;
+    S32 isPlaying() override;
+    void setGain(F32 vol) override;
+    F32 getGain() override;
+    std::string getURL() override;
 
-    /*virtual*/ bool supportsAdjustableBufferSizes() override {return true;}
-    /*virtual*/ void setBufferSizes(U32 streambuffertime, U32 decodebuffertime) override;
+    bool supportsAdjustableBufferSizes() override {return true;}
+    void setBufferSizes(U32 streambuffertime, U32 decodebuffertime) override;
 
-    /*virtual*/ bool supportsMetaData() override {return true;}
-    /*virtual*/ LLSD getMetadata() const override { return mMetadata; } //return NULL if not playing.
-    /*virtual*/ bool supportsWaveData() override {return true;}
-    /*virtual*/ bool getWaveData(float* arr, S32 count, S32 stride = 1) override;
+    bool supportsMetaData() override {return true;}
+    LLSD getMetadata() const override { return mMetadata; } //return NULL if not playing.
+    bool supportsWaveData() override {return true;}
+    bool getWaveData(float* arr, S32 count, S32 stride = 1) override;
 private:
     void killDeadStreams();
     void cleanupWaveData();

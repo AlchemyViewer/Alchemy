@@ -32,11 +32,10 @@
 
 #include "mikktspace/mikktspace.hh"
 
-#include "meshoptimizer.h"
+#include <meshoptimizer.h>
 
 
 using namespace LL::GLTF;
-using namespace boost::json;
 
 
 // Mesh data useful for Mikktspace tangent generation (and flat normal generation)
@@ -391,11 +390,8 @@ bool Primitive::prep(Asset& asset)
 
     U32 mask = LLVertexBuffer::MAP_VERTEX;
 
-    mShaderVariant = 0;
-
     if (!mWeights.empty())
     {
-        mShaderVariant |= LLGLSLShader::GLTFVariant::RIGGED;
         mask |= LLVertexBuffer::MAP_WEIGHT4;
         mask |= LLVertexBuffer::MAP_JOINT;
     }
@@ -425,7 +421,7 @@ bool Primitive::prep(Asset& asset)
     if (mMaterial != INVALID_INDEX)
     {
         const Material& material = asset.mMaterials[mMaterial];
-        LLColor4 baseColor(glm::value_ptr(material.mPbrMetallicRoughness.mBaseColorFactor));
+        LLColor4 baseColor(material.mPbrMetallicRoughness.mBaseColorFactor.getF32ptr());
         for (auto& dst : mColors)
         {
             dst = LLColor4U(baseColor * LLColor4(dst));
@@ -433,13 +429,7 @@ bool Primitive::prep(Asset& asset)
 
         if (material.mUnlit.mPresent)
         { // material uses KHR_materials_unlit
-            mShaderVariant |= LLGLSLShader::GLTFVariant::UNLIT;
             unlit = true;
-        }
-
-        if (material.isMultiUV())
-        {
-            mShaderVariant |= LLGLSLShader::GLTFVariant::MULTI_UV;
         }
     }
 
@@ -450,7 +440,6 @@ bool Primitive::prep(Asset& asset)
         if (mMode == Mode::POINTS || mMode == Mode::LINES || mMode == Mode::LINE_LOOP || mMode == Mode::LINE_STRIP)
         { //no normals and no surfaces, this primitive is unlit
             mTangents.clear();
-            mShaderVariant |= LLGLSLShader::GLTFVariant::UNLIT;
             unlit = true;
         }
         else
@@ -515,15 +504,6 @@ bool Primitive::prep(Asset& asset)
     }
 
     mAttributeMask = mask;
-
-    if (mMaterial != INVALID_INDEX)
-    {
-        Material& material = asset.mMaterials[mMaterial];
-        if (material.mAlphaMode == Material::AlphaMode::BLEND)
-        {
-            mShaderVariant |= LLGLSLShader::GLTFVariant::ALPHA_BLEND;
-        }
-    }
 
     createOctree();
 
@@ -788,7 +768,7 @@ LLRender::eGeomModes gltf_mode_to_gl_mode(Primitive::Mode mode)
     }
 }
 
-void Primitive::serialize(boost::json::object& dst) const
+void Primitive::serialize(JsonWriter& dst) const
 {
     write(mMaterial, "material", dst, -1);
     write(mMode, "mode", dst, Primitive::Mode::TRIANGLES);

@@ -12,25 +12,16 @@
 	<floater.string name="done_text">
 		Afsluttet forespørgsel på rettighedsændringer.
 	</floater.string>
-	<check_box label="Animationer" name="check_animation"/>
 	<icon name="icon_animation" tool_tip="Animation"/>
-	<check_box label="Kropsdele" name="check_bodypart"/>
 	<icon name="icon_bodypart" tool_tip="Kropsdele"/>
-	<check_box label="Tøj" name="check_clothing"/>
 	<icon name="icon_clothing" tool_tip="Tøj"/>
-	<check_box label="Bevægelser" name="check_gesture"/>
 	<icon name="icon_gesture" tool_tip="Bevægelser"/>
-	<check_box label="Noter" name="check_notecard"/>
 	<icon name="icon_notecard" tool_tip="Noter"/>
-	<check_box label="Objekter" name="check_object"/>
 	<icon name="icon_object" tool_tip="Objekter"/>
-	<check_box label="Scripts" name="check_script"/>
 	<icon name="icon_script" tool_tip="Scripts"/>
-	<check_box label="Lyde" name="check_sound"/>
 	<icon name="icon_sound" tool_tip="Lyde"/>
-	<check_box label="Teksturer" name="check_texture"/>
 	<icon name="icon_texture" tool_tip="Teksturer"/>
-	<button label="√ Alle" label_selected="Alle" name="check_all"/>
+	<button label="√ Alle" name="check_all"/>
 	<button label="Fjern" label_selected="Ingen" name="check_none"/>
 	<text name="newperms">
 		Nye indholdsrettigheder

@@ -33,21 +33,23 @@ class LLScrollListCtrl;
 class LLLineEditor;
 
 
-class LLPanelExperiencePicker : public LLPanel
+class LLPanelExperiencePicker final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelExperiencePicker, LLPanel);
+
     friend class LLExperienceSearchResponder;
     friend class LLFloaterExperiencePicker;
 
-    typedef boost::function<void (const uuid_vec_t&)> select_callback_t;
+    typedef std::function<void(const uuid_vec_t&)> select_callback_t;
     // filter function for experiences, return true if the experience should be hidden.
-    typedef boost::function<bool (const LLSD&)> filter_function;
+    typedef std::function<bool(const LLSD&)> filter_function;
     typedef std::vector<filter_function> filter_list;
 
     LLPanelExperiencePicker();
     virtual ~LLPanelExperiencePicker();
 
-    bool postBuild();
+    bool postBuild() override;
 
     void addFilter(filter_function func){mFilters.push_back(func);}
     template <class IT>

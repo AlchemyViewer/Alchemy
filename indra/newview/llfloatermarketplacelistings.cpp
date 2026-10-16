@@ -29,6 +29,7 @@
 
 #include "llfloatermarketplacelistings.h"
 
+#include "llcallbacklist.h"
 #include "llfloaterreg.h"
 #include "llfiltereditor.h"
 #include "llfolderview.h"
@@ -231,7 +232,7 @@ void LLPanelMarketplaceListings::onTabChange()
 
 void LLPanelMarketplaceListings::onAddButtonClicked()
 {
-    LLUUID marketplacelistings_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+    LLUUID marketplacelistings_id = gInventory.getMarketplaceListingsUUID();
     llassert(marketplacelistings_id.notNull());
     LLFolderType::EType preferred_type = LLFolderType::lookup("category");
     LLHandle<LLPanel> handle = getHandle();
@@ -351,7 +352,15 @@ public:
 
             if (added_category_type == LLFolderType::FT_MARKETPLACE_LISTINGS)
             {
-                mMarketplaceListingsFloater->initializeMarketPlace();
+                LLHandle<LLFloater> handle = mMarketplaceListingsFloater->getHandle();
+                doOnIdleOneTime([handle]()
+                {
+                    LLFloaterMarketplaceListings* floater = (LLFloaterMarketplaceListings*)handle.get();
+                    if (floater)
+                    {
+                        floater->initializeMarketPlace();
+                    }
+                });
             }
         }
     }
@@ -415,7 +424,7 @@ bool LLFloaterMarketplaceListings::postBuild()
     // Fetch aggressively so we can interact with listings as soon as possible
     if (!fetchContents())
     {
-        const LLUUID& marketplacelistings_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+        const LLUUID& marketplacelistings_id = gInventory.getMarketplaceListingsUUID();
         LLInventoryModelBackgroundFetch::instance().start(marketplacelistings_id, true);
     }
 
@@ -513,8 +522,6 @@ void LLFloaterMarketplaceListings::setRootFolder()
         return;
     }
 
-    mRootFolderCreating = false;
-
     // No longer need to observe new category creation
     if (mCategoryAddedObserver && gInventory.containsObserver(mCategoryAddedObserver))
     {
@@ -523,6 +530,8 @@ void LLFloaterMarketplaceListings::setRootFolder()
         mCategoryAddedObserver = NULL;
     }
     llassert(!mCategoryAddedObserver);
+
+    mRootFolderCreating = false;
 
     if (marketplacelistings_id == mRootFolderId)
     {
@@ -566,7 +575,8 @@ void LLFloaterMarketplaceListings::setPanels()
 
 void LLFloaterMarketplaceListings::initializeMarketPlace()
 {
-    LLMarketplaceData::instance().initializeSLM(boost::bind(&LLFloaterMarketplaceListings::updateView, this));
+    if (!mRootFolderCreating)
+        LLMarketplaceData::instance().initializeSLM(boost::bind(&LLFloaterMarketplaceListings::updateView, this));
 }
 
 S32 LLFloaterMarketplaceListings::getFolderCount()
@@ -909,7 +919,7 @@ void LLFloaterMarketplaceValidation::onOpen(const LLSD& key)
     LLUUID cat_id(key.asUUID());
     if (cat_id.isNull())
     {
-        cat_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
+        cat_id = gInventory.getMarketplaceListingsUUID();
     }
 
     // Validates the folder
@@ -1031,7 +1041,7 @@ void LLFloaterItemProperties::onOpen(const LLSD& key)
     // Tell the panel which item it needs to visualize
     LLPanel* panel = findChild<LLPanel>("sidepanel");
 
-    LLSidepanelItemInfo* item_panel = dynamic_cast<LLSidepanelItemInfo*>(panel);
+    LLSidepanelItemInfo* item_panel = ALViewType::as<LLSidepanelItemInfo>(panel);
     if (item_panel)
     {
         item_panel->setItemID(key["id"].asUUID());
@@ -1042,7 +1052,7 @@ void LLFloaterItemProperties::onOpen(const LLSD& key)
         item_panel->setParentFloater(this);
     }
 
-    LLSidepanelTaskInfo* task_panel = dynamic_cast<LLSidepanelTaskInfo*>(panel);
+    LLSidepanelTaskInfo* task_panel = ALViewType::as<LLSidepanelTaskInfo>(panel);
     if (task_panel)
     {
         task_panel->setObjectSelection(LLSelectMgr::getInstance()->getSelection());

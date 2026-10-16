@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater
+ positioning="specified"
+ left="5"
+ bottom="-1"
+ follows="left|bottom"
+ legacy_header_height="20"
+ height="27"
+ can_minimize="false"
+ can_collapse="false"
+ can_resize="true"
+ can_resize_height="false"
+ can_close="false"
+ layout="topleft"
+ min_width="12"
+ min_height="27"
+ name="chatbar"
+ chrome="true"
+ title=""
+ width="450"
+ single_instance="true"
+ save_rect="true">
+   <chat_editor
+    follows="left|bottom|right"
+    font="SansSerifLarge"
+    height="25"
+    layout="topleft"
+    top="0"
+    left="1"
+    right="-35"
+    name="Chat Editor"
+    spellcheck="true" />
+   <menu_button
+    follows="right"
+    height="25"
+    image_overlay="OptionsMenu_Off"
+    layout="topleft"
+    left_pad="2"
+    name="chatbar_gear_menu"
+    menu_filename="menu_al_chatbar_gear.xml"
+    tool_tip="Chatbar options"
+    top="0"
+    width="25" />
+   <icon
+    follows="right"
+    layout="topleft"
+    left_pad="0"
+    width="6"
+    name="drag"
+    image_name="Dragbar"
+    top="0"
+    bottom="-1" />
+</floater>

@@ -90,6 +90,7 @@
      layout="topleft"
      left="10"
      name="message"
+     parse_highlights="true"
      text_color="White"
      top="33"
      use_ellipses="true"

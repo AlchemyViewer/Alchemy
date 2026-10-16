@@ -1,40 +1,14 @@
 # -*- cmake -*-
-include(Linking)
-include(Prebuilt)
-
 include_guard()
-add_library( ll::cef INTERFACE IMPORTED )
 
-use_prebuilt_binary(dullahan)
-target_include_directories( ll::cef SYSTEM INTERFACE  ${LIBS_PREBUILT_DIR}/include/cef)
+# Defines unofficial::cef::cef along with CEF_INCLUDE_DIR, CEF_RESOURCE_DIR,
+# CEF_BINARY_DIR_RELEASE/_DEBUG and CEF_FRAMEWORK_DIR.
+find_package(unofficial-cef CONFIG REQUIRED)
 
-if (WINDOWS)
-    target_link_libraries( ll::cef INTERFACE
-        ${ARCH_PREBUILT_DIRS_RELEASE}/libcef.lib
-        ${ARCH_PREBUILT_DIRS_RELEASE}/libcef_dll_wrapper.lib
-        ${ARCH_PREBUILT_DIRS_RELEASE}/dullahan.lib
-    )
-elseif (DARWIN)
-    FIND_LIBRARY(APPKIT_LIBRARY AppKit)
-    if (NOT APPKIT_LIBRARY)
-        message(FATAL_ERROR "AppKit not found")
-    endif()
+add_library(ll::cef INTERFACE IMPORTED)
+target_link_libraries(ll::cef INTERFACE unofficial::cef::cef)
 
-    set(CEF_LIBRARY "'${ARCH_PREBUILT_DIRS_RELEASE}/Chromium\ Embedded\ Framework.framework'")
-    if (NOT CEF_LIBRARY)
-        message(FATAL_ERROR "CEF not found")
-    endif()
-
-    target_link_libraries( ll::cef INTERFACE
-        ${ARCH_PREBUILT_DIRS_RELEASE}/libcef_dll_wrapper.a
-        ${ARCH_PREBUILT_DIRS_RELEASE}/libdullahan.a
-        ${APPKIT_LIBRARY}
-       )
-
-elseif (LINUX)
-    target_link_libraries( ll::cef INTERFACE
-            ${ARCH_PREBUILT_DIRS_RELEASE}/libdullahan.a
-            ${ARCH_PREBUILT_DIRS_RELEASE}/libcef.so
-            ${ARCH_PREBUILT_DIRS_RELEASE}/libcef_dll_wrapper.a
-    )
-endif (WINDOWS)
+if(DARWIN)
+  find_library(APPKIT_LIBRARY AppKit REQUIRED)
+  target_link_libraries(ll::cef INTERFACE ${APPKIT_LIBRARY})
+endif()

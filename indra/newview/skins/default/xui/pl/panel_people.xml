@@ -14,9 +14,6 @@ Chcesz spotkać ludzi? Spróbuj użyć [secondlife:///app/worldmap Mapy Świata]
 		Nie znalazłeś/aś tego czego szukasz? Spróbuj użyć [secondlife:///app/search/people/[SEARCH_TERM] Wyszukiwarki].
 	</string>
 	<string name="no_filtered_groups_msg" value="Nie znalazłeś/aś tego czego szukasz? Spróbuj użyć [secondlife:///app/search/groups/[SEARCH_TERM] Wyszukiwarki]." />
-	<string name="no_groups_msg" value="Chcesz dołączyć do jakiejś grupy? Spróbuj użyć [secondlife:///app/search/groups Wyszukiwarki]." />
-	<string name="MiniMapToolTipMsg" value="[REGION] (Podwójne kliknięcie otwiera mapę, przeciąganie z Shiftem przesuwa)" />
-	<string name="AltMiniMapToolTipMsg" value="[REGION] (Podwójne kliknięcie teleportuje, przeciąganie z Shiftem przesuwa)" />
 	<tab_container name="tabs">
 		<panel label="W POBLIŻU" name="nearby_panel">
 			<panel name="nearby_buttons_panel">
@@ -38,7 +35,6 @@ Chcesz spotkać ludzi? Spróbuj użyć [secondlife:///app/worldmap Mapy Świata]
 			<accordion name="friends_accordion">
 				<accordion_tab name="tab_online" title="Dostępni" />
 				<accordion_tab name="tab_all" title="Wszyscy" />
-				<accordion_tab name="tab_suggested_friends" title="Sugerowani" />
 			</accordion>
 		</panel>
 		<panel label="GRUPY" name="groups_panel">
@@ -61,9 +57,6 @@ Chcesz spotkać ludzi? Spróbuj użyć [secondlife:///app/worldmap Mapy Świata]
 				<button name="add_friend_btn" tool_tip="Dodaj wybranego Rezydenta do znajomych" />
 				<dnd_button name="recent_del_btn" tool_tip="Usuń zaznaczoną osobę ze swojej listy znajomych" />
 			</panel>
-		</panel>
-		<panel label="ZABLOKOWANI" name="blocked_panel">
-			<panel name="panel_block_list_sidetray" label="Zablokowani Rezydenci i obiekty" />
 		</panel>
 	</tab_container>
 </panel>

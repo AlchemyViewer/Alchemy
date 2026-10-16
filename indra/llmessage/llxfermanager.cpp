@@ -358,11 +358,11 @@ void LLXferManager::registerCallbacks(LLMessageSystem *msgsystem)
 U64 LLXferManager::getNextID ()
 {
     LLUUID a_guid;
-
     a_guid.generate();
 
-
-    return(*((U64*)(a_guid.mData)));
+    U64 result;
+    memcpy(&result, a_guid.mData, sizeof(result));
+    return result;
 }
 
 ///////////////////////////////////////////////////////////

@@ -33,9 +33,12 @@
 #include "llexception.h"
 #include "llcoros.h"
 #include <algorithm>
+#include <atomic>
 #include <iostream>                 // std::cerr in dire emergency
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <unordered_map>
 
 // Our master list of all LLSingletons is itself an LLSingleton. We used to
 // store it in a function-local static, but that could get destroyed before
@@ -115,11 +118,18 @@ public:
     struct LockedInitializing: public Lock
     {
     public:
+        // The running coroutine's list, made where it has none, or with
+        // ExistingOnly, null where it has none: see exists().
+        struct ExistingOnly {};
         LockedInitializing():
             // only do the lookup once, cache the result
             // note that the lock is already locked during this lookup
             mList(&mMasterList.get_initializing_())
         {}
+        explicit LockedInitializing(ExistingOnly):
+            mList(mMasterList.mInitializing.get())
+        {}
+        bool exists() const { return mList != nullptr; }
         list_t& get() const
         {
             if (! mList)
@@ -165,6 +175,35 @@ private:
     }
 };
 
+// Process-wide count of LLSingletons currently between push_initializing() and
+// pop_initializing(). See the declaration in llsingleton.h and getInstance().
+std::atomic<unsigned> LLSingletonBase::sInitializingDepth{0};
+
+//static
+LLSingletonBase::SingletonSlot& LLSingletonBase::getSlot(const char* type_name)
+{
+    // The canonical per-type slots live here, in a single translation unit --
+    // hence a single module even in a multi-DLL build -- so every module that
+    // instantiates LLSingleton<T> resolves the SAME slot for a given type.
+    //
+    // Keyed by the mangled name STRING (typeid(T).name()), NOT std::type_index.
+    // We build with -fvisibility=hidden, so each module has its own type_info
+    // object for T; comparing those by identity (which is what type_index does)
+    // would treat the same T as a different key in each module and duplicate the
+    // slot. The mangled name string is identical across modules for one ABI, so
+    // a value (string) compare collapses them to a single slot.
+    //
+    // The registry is heap-allocated and intentionally never freed so it
+    // outlives every LLSingleton (which are themselves leaked unless
+    // deleteAll()'d, and whose destructors re-lock their slot). unordered_map
+    // node addresses are stable across rehash, so the returned reference is
+    // valid for the life of the process.
+    static std::mutex* sRegistryMutex = new std::mutex();
+    static auto* sRegistry = new std::unordered_map<std::string, SingletonSlot>();
+    std::lock_guard<std::mutex> lk(*sRegistryMutex);
+    return (*sRegistry)[type_name];
+}
+
 void LLSingletonBase::add_master()
 {
     // As each new LLSingleton is constructed, add to the master list.
@@ -201,6 +240,10 @@ void LLSingletonBase::push_initializing(const char* name)
     // log BEFORE pushing so logging singletons don't cry circularity
     locked_list.log("Pushing", name);
     locked_list.get().push_back(this);
+    // A singleton is now mid-initialization: force getInstance() everywhere off
+    // its lock-free fast path so dependencies are still captured. Balanced by
+    // pop_initializing() / reset_initializing().
+    sInitializingDepth.fetch_add(1, std::memory_order_release);
 }
 
 void LLSingletonBase::pop_initializing()
@@ -219,6 +262,7 @@ void LLSingletonBase::pop_initializing()
     LLSingletonBase* back(list.back());
     // and pop it
     list.pop_back();
+    sInitializingDepth.fetch_sub(1, std::memory_order_release);
 
     // The viewer launches an open-ended number of coroutines. While we don't
     // expect most of them to initialize LLSingleton instances, our present
@@ -259,6 +303,7 @@ void LLSingletonBase::reset_initializing(list_t::size_type size)
     while (list.size() > size)
     {
         list.pop_back();
+        sInitializingDepth.fetch_sub(1, std::memory_order_release);
     }
 
     // as in pop_initializing()
@@ -285,7 +330,15 @@ void LLSingletonBase::MasterList::LockedInitializing::log(const char* verb, cons
 
 void LLSingletonBase::capture_dependency()
 {
-    MasterList::LockedInitializing locked_list;
+    // Without making the coroutine a list where it has none: a coroutine with
+    // none is initializing nothing, so there is no dependency to record, and
+    // a list made here would be left behind, since only popping one back to
+    // empty deletes it. One was, for every coroutine that made a singleton.
+    MasterList::LockedInitializing locked_list{MasterList::LockedInitializing::ExistingOnly()};
+    if (! locked_list.exists())
+    {
+        return;
+    }
     list_t& initializing(locked_list.get());
     // Did this getInstance() call come from another LLSingleton, or from
     // vanilla application code? Note that although this is a nontrivial

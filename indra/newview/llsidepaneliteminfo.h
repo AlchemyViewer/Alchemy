@@ -47,10 +47,13 @@ class LLViewerObject;
 class LLPermissions;
 class LLTextBox;
 class LLTextEditor;
+class LLLineEditor;
 
-class LLSidepanelItemInfo : public LLPanel, public LLInventoryObserver
+class LLSidepanelItemInfo final : public LLPanel, public LLInventoryObserver
 {
 public:
+    AL_VIEW_TYPE(LLSidepanelItemInfo, LLPanel);
+
     LLSidepanelItemInfo(const LLPanel::Params& p = getDefaultParams());
     virtual ~LLSidepanelItemInfo();
 
@@ -80,7 +83,6 @@ public:
 
 protected:
     void refresh() override;
-    void save();
 
     LLViewerInventoryItem* findItem() const;
     LLViewerObject*  findObject() const;
@@ -110,7 +112,8 @@ private:
     LLIconCtrl* mItemTypeIcon;
     LLTextBox* mLabelOwnerName;
     LLTextBox* mLabelCreatorName;
-    LLTextEditor* mLabelItemDesc;
+    LLTextEditor* mLabelItemDescMultiLine;
+    LLLineEditor* mLabelItemDescSingleLine;
 
     //
     // UI Elements

@@ -28,6 +28,7 @@
 #define _LLCORE_HTTP_SERVICE_H_
 
 
+#include <atomic>
 #include <vector>
 
 #include "linden_common.h"
@@ -86,8 +87,8 @@ protected:
     virtual ~HttpService();
 
 private:
-    HttpService(const HttpService &);           // Not defined
-    void operator=(const HttpService &);        // Not defined
+    HttpService(const HttpService&) = delete;
+    void operator=(const HttpService&) = delete;
 
 public:
     enum EState
@@ -121,8 +122,10 @@ public:
     /// transition from RUNNING to STOPPED is performed by the
     /// worker thread itself.  This has two weaknesses:
     /// - race where the thread hasn't really stopped but will
-    /// - data ordering between threads where a non-worker thread
-    ///   may see a stale RUNNING status.
+    /// - a non-worker thread may see RUNNING a little after the
+    ///   worker has stopped.  Once it sees STOPPED, everything the
+    ///   worker did before stopping is visible to it, so it may
+    ///   delete what the worker used.
     ///
     /// This transition is generally of interest only to unit tests
     /// and these weaknesses shouldn't be any real burden.
@@ -215,10 +218,10 @@ protected:
     static HttpService *                sInstance;
 
     // === shared data ===
-    static volatile EState              sState;
+    static std::atomic<EState>          sState;
     HttpRequestQueue *                  mRequestQueue;  // Refcounted
     LLAtomicU32                         mExitRequested;
-    LLCoreInt::HttpThread *             mThread;
+    std::unique_ptr<LLCoreInt::HttpThread>      mThread;
 
     // === working-thread-only data ===
     HttpPolicy *                        mPolicy;        // Simple pointer, has ownership

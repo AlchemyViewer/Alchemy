@@ -149,7 +149,7 @@ void LLPanelVoiceDeviceSettings::draw()
                 LLColor4 color;
                 if (power_bar_idx < discrete_power)
                 {
-                    color = (power_bar_idx >= 3) ? LLUIColorTable::instance().getColor("OverdrivenColor") : LLUIColorTable::instance().getColor("SpeakingColor");
+                    color = (power_bar_idx >= 3) ? LLUIColorTable::instance().getColor("OverdrivenColor") : LLUIColorTable::instance().getColor("OutfitGalleryItemSelected");
                 }
                 else
                 {
@@ -240,18 +240,45 @@ void LLPanelVoiceDeviceSettings::refresh()
         if(mCtrlInputDevices)
         {
             mCtrlInputDevices->removeall();
-            mCtrlInputDevices->add(getLocalizedDeviceName(mInputDevice), mInputDevice, ADD_BOTTOM);
+            auto it = mLocalizedDeviceNames.find(mInputDevice);
+            if (it != mLocalizedDeviceNames.end())
+            {
+                mCtrlInputDevices->add(getLocalizedDeviceName(mInputDevice), mInputDevice, ADD_BOTTOM);
+            }
+            else
+            {
+                // Display name generaly doesn't match value.
+                // Value is an id so it's not nessesary readable,
+                // might not even be valid (disconnected usb).
+                // Until we get the data, don't change the device,
+                // otherwise box might override the control.
+                // But show a readable placeholder.
+                // Combo is disabled so it's safe to show
+                // a placeholder.
+                mCtrlInputDevices->add(getString("device_not_loaded"), mInputDevice, ADD_BOTTOM);
+            }
             mCtrlInputDevices->setValue(mInputDevice);
         }
         if(mCtrlOutputDevices)
         {
             mCtrlOutputDevices->removeall();
-            mCtrlOutputDevices->add(getLocalizedDeviceName(mOutputDevice), mOutputDevice, ADD_BOTTOM);
+            auto it = mLocalizedDeviceNames.find(mOutputDevice);
+            if (it != mLocalizedDeviceNames.end())
+            {
+                mCtrlOutputDevices->add(getLocalizedDeviceName(mOutputDevice), mOutputDevice, ADD_BOTTOM);
+            }
+            else
+            {
+                // Don't change the device, only the label
+                mCtrlOutputDevices->add(getString("device_not_loaded"), mOutputDevice, ADD_BOTTOM);
+            }
             mCtrlOutputDevices->setValue(mOutputDevice);
         }
     }
     else if (LLVoiceClient::getInstance()->deviceSettingsUpdated())
     {
+        LLVoiceDeviceList::const_iterator device;
+
         if(mCtrlInputDevices)
         {
             LLVoiceDeviceList devices = LLVoiceClient::getInstance()->getCaptureDevices();
@@ -311,8 +338,12 @@ void LLPanelVoiceDeviceSettings::initialize()
     // put voice client in "tuning" mode
     if (mUseTuningMode)
     {
+        // WebRTC tuning only affects the local audio device (mic-level
+        // monitoring and device selection); the peer connection stays up and
+        // its send/receive tracks are disabled for the duration.  Unlike Vivox,
+        // there's no need to suspend (and tear down) the voice channel, which
+        // previously dropped the call and failed to reconnect on resume.
         LLVoiceClient::getInstance()->tuningStart();
-        LLVoiceChannel::suspend();
     }
 }
 
@@ -321,7 +352,6 @@ void LLPanelVoiceDeviceSettings::cleanup()
     if (mUseTuningMode)
     {
         LLVoiceClient::getInstance()->tuningStop();
-        LLVoiceChannel::resume();
     }
 }
 

@@ -61,8 +61,6 @@ LLSearchEditor::LLSearchEditor(const LLSearchEditor::Params& p)
     // Set up line editor.
     LLLineEditor::Params line_editor_params(p);
     line_editor_params.name("filter edit box");
-    line_editor_params.background_image(p.background_image);
-    line_editor_params.background_image_focused(p.background_image_focused);
     line_editor_params.rect(getLocalRect());
     line_editor_params.follows.flags(FOLLOWS_ALL);
     line_editor_params.text_pad_left(text_pad_left);
@@ -106,12 +104,12 @@ LLSearchEditor::LLSearchEditor(const LLSearchEditor::Params& p)
 
 LLSearchEditor::~LLSearchEditor()
 {
-    mKeystrokeCallback = NULL;
-    mTextChangedCallback = NULL;
+    mKeystrokeCallback   = nullptr;
+    mTextChangedCallback = nullptr;
     setCommitOnFocusLost(false);
 
-    mSearchButton = NULL;
-    mClearButton = NULL;
+    mSearchButton = nullptr;
+    mClearButton  = nullptr;
     mSearchEditor->deleteAllChildren();
     deleteAllChildren();
 }
@@ -120,11 +118,11 @@ LLSearchEditor::~LLSearchEditor()
 void LLSearchEditor::draw()
 {
     if (mClearButton)
-        mClearButton->setVisible(!mSearchEditor->getWText().empty());
+        mClearButton->setVisible(!mSearchEditor->getText().empty());
 
     if (mHighlightTextField)
     {
-        if (!mSearchEditor->getWText().empty())
+        if (!mSearchEditor->getText().empty())
         {
             mSearchEditor->setBgImage(mEditorSearchImage);
             mSearchEditor->setBgImageFocused(mEditorSearchImage);

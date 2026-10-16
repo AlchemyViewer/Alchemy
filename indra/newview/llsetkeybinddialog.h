@@ -53,16 +53,18 @@ public:
     virtual bool onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes) = 0;
 };
 
-class LLSetKeyBindDialog : public LLModalDialog
+class LLSetKeyBindDialog final : public LLModalDialog
 {
 public:
+    AL_VIEW_TYPE(LLSetKeyBindDialog, LLModalDialog);
+
     LLSetKeyBindDialog(const LLSD& key);
     ~LLSetKeyBindDialog();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& data);
-    /*virtual*/ void onClose(bool app_quiting);
-    /*virtual*/ void draw();
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& data) override;
+    /*virtual*/ void onClose(bool app_quiting) override;
+    /*virtual*/ void draw() override;
 
     void setParent(LLKeyBindResponderInterface* parent, LLView* frustum_origin, U32 key_mask = DEFAULT_KEY_FILTER);
 
@@ -70,7 +72,7 @@ public:
     // It does not record, it handles, but handleKey function is already in use
     static bool recordKey(KEY key, MASK mask, bool down);
 
-    bool handleAnyMouseClick(S32 x, S32 y, MASK mask, EMouseClickType clicktype, bool down);
+    bool handleAnyMouseClick(S32 x, S32 y, MASK mask, EMouseClickType clicktype, bool down) override;
     static void onCancel(void* user_data);
     static void onBlank(void* user_data);
     static void onDefault(void* user_data);

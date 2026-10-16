@@ -194,7 +194,7 @@ auto apply_impl(CALLABLE&& func, const std::vector<T>& args, std::index_sequence
 }
 
 // produce suitable error if apply(func, vector) is the wrong size for func()
-void apply_validate_size(size_t size, size_t arity);
+LL_COMMON_API void apply_validate_size(size_t size, size_t arity);
 
 /// possible exception from apply() validation
 struct apply_error: public LLException

@@ -34,8 +34,11 @@
  * Represents tip toast panel that contains only one child element - message text.
  * This panel can be used for different cases of tip notifications.
  */
-class LLPanelGenericTip: public LLPanelTipToast
+class LLPanelGenericTip final: public LLPanelTipToast
 {
+public:
+    AL_VIEW_TYPE(LLPanelGenericTip, LLPanelTipToast);
+private:
     // disallow instantiation of this class
 private:
     // grant privileges to instantiate this class to LLToastPanel

@@ -151,7 +151,7 @@ void LLFloaterAuction::draw()
         {
             LLRect rect = snapshot_icon->getRect();
             {
-                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(0)->unbind();
                 gl_rect_2d(rect, LLColor4(0.f, 0.f, 0.f, 1.f));
                 rect.stretch(-1);
             }
@@ -217,8 +217,6 @@ void LLFloaterAuction::onClickSnapshot(void* data)
         j2c_file.write(j2c->getData(), j2c->getDataSize());
 
         self->mImage = LLViewerTextureManager::getLocalTexture((LLImageRaw*)raw, false);
-        gGL.getTexUnit(0)->bind(self->mImage);
-        self->mImage->setAddressMode(LLTexUnit::TAM_CLAMP);
     }
     else
     {
@@ -255,14 +253,14 @@ void LLFloaterAuction::onClickStartAuction(void* data)
     }
     LLMessageSystem* msg = gMessageSystem;
 
-    msg->newMessage("ViewerStartAuction");
+    msg->newMessageFast(_PREHASH_ViewerStartAuction);
 
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
-    msg->nextBlock("ParcelData");
-    msg->addS32("LocalID", self->mParcelID);
-    msg->addUUID("SnapshotID", self->mImageID);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_ParcelData);
+    msg->addS32Fast(_PREHASH_LocalID, self->mParcelID);
+    msg->addUUIDFast(_PREHASH_SnapshotID, self->mImageID);
     msg->sendReliable(self->mParcelHost);
 
     // clean up floater, and get out
@@ -411,7 +409,7 @@ void LLFloaterAuction::clearParcelAccessList(LLParcel* parcel, LLViewerRegion* r
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
     msg->nextBlockFast(_PREHASH_Data);
     msg->addU32Fast(_PREHASH_Flags, list);
-    msg->addS32(_PREHASH_LocalID, parcel->getLocalID() );
+    msg->addS32Fast(_PREHASH_LocalID, parcel->getLocalID() );
     msg->addUUIDFast(_PREHASH_TransactionID, transactionUUID);
     msg->addS32Fast(_PREHASH_SequenceID, 1);            // sequence_id
     msg->addS32Fast(_PREHASH_Sections, 0);              // num_sections

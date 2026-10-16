@@ -38,9 +38,10 @@ class LLFloaterIMSession;
 /**
  * Class for displaying amount of messages/notifications(unread).
  */
-class LLChicletNotificationCounterCtrl : public LLTextBox
+class LLChicletNotificationCounterCtrl final : public LLTextBox
 {
 public:
+    AL_VIEW_TYPE(LLChicletNotificationCounterCtrl, LLTextBox);
 
     struct Params : public LLInitParam::Block<Params, LLTextBox::Params>
     {
@@ -69,17 +70,17 @@ public:
      * Returns width, required to display amount of notifications in text form.
      * Width is the only valid value.
      */
-    /*virtual*/ LLRect getRequiredRect();
+    /*virtual*/ LLRect getRequiredRect() override;
 
     /**
      * Sets number of notifications using LLSD
      */
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
 
     /**
      * Returns number of notifications wrapped in LLSD
      */
-    /*virtual*/ LLSD getValue() const;
+    /*virtual*/ LLSD getValue() const override;
 
 protected:
 
@@ -99,6 +100,7 @@ private:
 class LLChicletAvatarIconCtrl : public LLAvatarIconCtrl
 {
 public:
+    AL_VIEW_TYPE(LLChicletAvatarIconCtrl, LLAvatarIconCtrl);
 
     struct Params : public LLInitParam::Block<Params, LLAvatarIconCtrl::Params>
     {
@@ -119,9 +121,10 @@ protected:
 /**
  * Class for displaying icon in inventory offer chiclet.
  */
-class LLChicletInvOfferIconCtrl : public LLChicletAvatarIconCtrl
+class LLChicletInvOfferIconCtrl final : public LLChicletAvatarIconCtrl
 {
 public:
+    AL_VIEW_TYPE(LLChicletInvOfferIconCtrl, LLChicletAvatarIconCtrl);
 
     struct Params :
         public LLInitParam::Block<Params, LLChicletAvatarIconCtrl::Params>
@@ -138,7 +141,7 @@ public:
     /**
      * Sets icon, if value is LLUUID::null - default icon will be set.
      */
-    virtual void setValue(const LLSD& value );
+    virtual void setValue(const LLSD& value ) override;
 
 protected:
 
@@ -155,6 +158,7 @@ private:
 class LLChiclet : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLChiclet, LLUICtrl);
 
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
@@ -187,7 +191,7 @@ public:
     /*virtual*/ boost::signals2::connection setLeftButtonClickCallback(
         const commit_callback_t& cb);
 
-    typedef boost::function<void (LLChiclet* ctrl, const LLSD& param)>
+    typedef std::function<void(LLChiclet* ctrl, const LLSD& param)>
         chiclet_size_changed_callback_t;
 
     /**
@@ -199,12 +203,12 @@ public:
     /**
      * Sets IM Session id using LLSD
      */
-    /*virtual*/ LLSD getValue() const;
+    /*virtual*/ LLSD getValue() const override;
 
     /**
      * Returns IM Session id using LLSD
      */
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
 
 protected:
 
@@ -214,7 +218,7 @@ protected:
     /**
      * Notifies subscribers about click on chiclet.
      */
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
     /**
      * Notifies subscribers about chiclet size changed event.
@@ -242,6 +246,8 @@ private:
 class LLIMChiclet : public LLChiclet
 {
 public:
+    AL_VIEW_TYPE(LLIMChiclet, LLChiclet);
+
     enum EType {
         TYPE_UNKNOWN,
         TYPE_IM,
@@ -257,7 +263,7 @@ public:
     /**
      * It is used for default setting up of chicklet:click handler, etc.
      */
-    bool postBuild();
+    bool postBuild() override;
 
     /**
      * Sets IM session name. This name will be displayed in chiclet tooltip.
@@ -303,7 +309,7 @@ public:
     /**
      * Displays popup menu.
      */
-    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
 
     void hidePopupMenu();
 
@@ -364,9 +370,10 @@ public:
 /**
  * Chiclet for script floaters.
  */
-class LLScriptChiclet : public LLIMChiclet
+class LLScriptChiclet final : public LLIMChiclet
 {
 public:
+    AL_VIEW_TYPE(LLScriptChiclet, LLIMChiclet);
 
     struct Params : public LLInitParam::Block<Params, LLIMChiclet::Params>
     {
@@ -379,12 +386,12 @@ public:
         Params();
     };
 
-    /*virtual*/ void setSessionId(const LLUUID& session_id);
+    /*virtual*/ void setSessionId(const LLUUID& session_id) override;
 
     /**
      * Toggle script floater
      */
-    /*virtual*/ void onMouseDown();
+    /*virtual*/ void onMouseDown() override;
 
 protected:
 
@@ -394,7 +401,7 @@ protected:
     /**
      * Creates chiclet popup menu.
      */
-    virtual void createPopupMenu();
+    virtual void createPopupMenu() override;
 
     /**
      * Processes clicks on chiclet popup menu.
@@ -409,9 +416,10 @@ private:
 /**
  * Chiclet for inventory offer script floaters.
  */
-class LLInvOfferChiclet: public LLIMChiclet
+class LLInvOfferChiclet final: public LLIMChiclet
 {
 public:
+    AL_VIEW_TYPE(LLInvOfferChiclet, LLIMChiclet);
 
     struct Params : public LLInitParam::Block<Params, LLIMChiclet::Params>
     {
@@ -424,12 +432,12 @@ public:
         Params();
     };
 
-    /*virtual*/ void setSessionId(const LLUUID& session_id);
+    /*virtual*/ void setSessionId(const LLUUID& session_id) override;
 
     /**
      * Toggle script floater
      */
-    /*virtual*/ void onMouseDown();
+    /*virtual*/ void onMouseDown() override;
 
 protected:
     LLInvOfferChiclet(const Params&);
@@ -438,7 +446,7 @@ protected:
     /**
      * Creates chiclet popup menu.
      */
-    virtual void createPopupMenu();
+    virtual void createPopupMenu() override;
 
     /**
      * Processes clicks on chiclet popup menu.
@@ -456,6 +464,7 @@ private:
 class LLSysWellChiclet : public LLChiclet
 {
 public:
+    AL_VIEW_TYPE(LLSysWellChiclet, LLChiclet);
 
     struct Params : public LLInitParam::Block<Params, LLChiclet::Params>
     {
@@ -507,7 +516,7 @@ protected:
     /**
      * Displays menu.
      */
-    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
 
     virtual void createMenu() = 0;
 
@@ -522,12 +531,14 @@ protected:
     LLHandle<LLContextMenu> mContextMenuHandle;
 };
 
-class LLNotificationChiclet : public LLSysWellChiclet
+class LLNotificationChiclet final : public LLSysWellChiclet
 {
     LOG_CLASS(LLNotificationChiclet);
 
     friend class LLUICtrlFactory;
 public:
+    AL_VIEW_TYPE(LLNotificationChiclet, LLSysWellChiclet);
+
     struct Params : public LLInitParam::Block<Params, LLSysWellChiclet::Params>{};
 
 protected:
@@ -572,7 +583,7 @@ protected:
     /**
      * Creates menu.
      */
-    /*virtual*/ void createMenu();
+    /*virtual*/ void createMenu() override;
 
     /*virtual*/ void setCounter(S32 counter);
     S32 mUreadSystemNotifications;
@@ -582,9 +593,10 @@ protected:
  * Storage class for all IM chiclets. Provides mechanism to display,
  * scroll, create, remove chiclets.
  */
-class LLChicletPanel : public LLPanel
+class LLChicletPanel final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLChicletPanel, LLPanel);
 
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
@@ -663,7 +675,7 @@ public:
     boost::signals2::connection setChicletClickedCallback(
         const commit_callback_t& cb);
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     /**
      * Handler for the Voice Client's signal. Finds a corresponding chiclet and toggles its SpeakerControl
@@ -673,13 +685,13 @@ public:
     /**
      * Reshapes controls and rearranges chiclets if needed.
      */
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true );
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true ) override;
 
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
 
     S32 getMinWidth() const { return mMinWidth; }
 
-    /*virtual*/ S32 notifyParent(const LLSD& info);
+    /*virtual*/ S32 notifyParent(const LLSD& info) override;
 
     /**
      * Toggle chiclet by session id ON and toggle OFF all other chiclets.
@@ -778,7 +790,7 @@ protected:
     /**
      * Callback for mouse wheel scrolled, calls scrollRight() or scrollLeft()
      */
-    bool handleScrollWheel(S32 x, S32 y, S32 clicks);
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
     /**
      * Notifies subscribers about click on chiclet.
@@ -876,7 +888,7 @@ T* LLChicletPanel::findChiclet(const LLUUID& im_session_id)
         if (!chiclet) continue;
         if(chiclet->getSessionId() == im_session_id)
         {
-            T* result = dynamic_cast<T*>(chiclet);
+            T* result = chiclet->as<T>();
             if(!result)
             {
                 LL_WARNS() << "Found chiclet but of wrong type " << LL_ENDL;
@@ -896,7 +908,7 @@ template<class T> T* LLChicletPanel::getChiclet(S32 index)
     }
 
     LLChiclet* chiclet = mChicletList[index];
-    T*result = dynamic_cast<T*>(chiclet);
+    T*result = ALViewType::as<T>(chiclet);
     if(!result && chiclet)
     {
         LL_WARNS() << "Found chiclet but of wrong type " << LL_ENDL;

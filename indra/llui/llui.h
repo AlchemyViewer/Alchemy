@@ -114,7 +114,7 @@ class LLUI : public LLSimpleton<LLUI>
 {
     LOG_CLASS(LLUI);
 public:
-    typedef std::map<std::string, LLControlGroup*, std::less<> > settings_map_t;
+    typedef boost::unordered_map<std::string, LLControlGroup*, ll::string_hash, std::equal_to<>> settings_map_t;
 
     LLUI(const settings_map_t &settings,
                            LLImageProviderInterface* image_provider,
@@ -241,9 +241,9 @@ public:
     //
     // Methods
     //
-    typedef boost::function<void(LLView*)> add_popup_t;
-    typedef boost::function<void(LLView*)> remove_popup_t;
-    typedef boost::function<void(void)> clear_popups_t;
+    typedef std::function<void(LLView*)> add_popup_t;
+    typedef std::function<void(LLView*)> remove_popup_t;
+    typedef std::function<void(void)> clear_popups_t;
 
     void setPopupFuncs(const add_popup_t& add_popup, const remove_popup_t&, const clear_popups_t& );
 
@@ -294,6 +294,10 @@ public:
     void glRectToScreen(const LLRect& gl, LLRect *screen);
     // Returns the control group containing the control name, or the default group
     LLControlGroup& getControlControlGroup (std::string_view controlname);
+    // The group registered under this name, or null. Indexing mSettingGroups
+    // instead inserts a null under a name nobody registered and then hands it
+    // back to be dereferenced.
+    LLControlGroup* getSettingGroup(std::string_view name) const;
     F32 getMouseIdleTime() { return mMouseIdleTimer.getElapsedTimeF32(); }
     void resetMouseIdleTimer() { mMouseIdleTimer.reset(); }
     LLWindow* getWindow() const { return mWindow; }
@@ -321,8 +325,10 @@ public:
     static void setLineWidth(F32 width) { LLRender2D::setLineWidth(width); }
     static LLPointer<LLUIImage> getUIImageByID(const LLUUID& image_id, S32 priority = 0)
         { return LLRender2D::getInstance()->getUIImageByID(image_id, priority); }
-    static LLPointer<LLUIImage> getUIImage(const std::string& name, S32 priority = 0)
+    static LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority = 0)
         { return LLRender2D::getInstance()->getUIImage(name, priority); }
+    static bool hasUIImage(std::string_view name)
+        { return LLRender2D::getInstance()->hasUIImage(name); }
 
     //
     // Data
@@ -334,7 +340,6 @@ public:
     LLView*         mRootView;
     LLHelp*         mHelpImpl;
 private:
-    std::vector<std::string> mXUIPaths;
     LLFrameTimer        mMouseIdleTimer;
     add_popup_t     mAddPopupFunc;
     remove_popup_t  mRemovePopupFunc;

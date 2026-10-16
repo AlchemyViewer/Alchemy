@@ -69,9 +69,11 @@ static LLPanelInjector<LLPanelGroupNotices> t_panel_group_notices("panel_group_n
 // view. It handles drop events, always setting itself to the size of
 // its parent.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLGroupDropTarget : public LLView
+class LLGroupDropTarget final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLGroupDropTarget, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         // *NOTE: These parameters logically Mandatory, but are not
@@ -95,7 +97,7 @@ public:
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
-                                   std::string& tooltip_msg);
+                                   std::string& tooltip_msg) override;
     void setPanel (LLPanelGroupNotices* panel) {mGroupNoticesPanel = panel;};
     void setGroup (LLUUID group) {mGroupID = group;};
 
@@ -459,12 +461,12 @@ void LLPanelGroupNotices::onClickRefreshNotices(void* data)
     self->clearNoticeList();
 
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("GroupNoticesListRequest");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID",gAgent.getID());
-    msg->addUUID("SessionID",gAgent.getSessionID());
-    msg->nextBlock("Data");
-    msg->addUUID("GroupID",self->mGroupID);
+    msg->newMessageFast(_PREHASH_GroupNoticesListRequest);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_Data);
+    msg->addUUIDFast(_PREHASH_GroupID, self->mGroupID);
     gAgent.sendReliableMessage();
 }
 
@@ -475,7 +477,7 @@ std::map<LLUUID,LLPanelGroupNotices*> LLPanelGroupNotices::sInstances;
 void LLPanelGroupNotices::processGroupNoticesListReply(LLMessageSystem* msg, void** data)
 {
     LLUUID group_id;
-    msg->getUUID("AgentData", "GroupID", group_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_GroupID, group_id);
 
     std::map<LLUUID,LLPanelGroupNotices*>::iterator it = sInstances.find(group_id);
     if (it == sInstances.end())
@@ -506,7 +508,7 @@ void LLPanelGroupNotices::processNotices(LLMessageSystem* msg)
     U8 asset_type;
 
     S32 i=0;
-    S32 count = msg->getNumberOfBlocks("Data");
+    S32 count = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
     mNoticesList->setEnabled(true);
 
@@ -517,7 +519,7 @@ void LLPanelGroupNotices::processNotices(LLMessageSystem* msg)
 
     for (;i<count;++i)
     {
-        msg->getUUID("Data","NoticeID",id,i);
+        msg->getUUIDFast(_PREHASH_Data, _PREHASH_NoticeID, id, i);
         if (1 == count && id.isNull())
         {
             // Only one entry, the dummy entry.
@@ -534,11 +536,11 @@ void LLPanelGroupNotices::processNotices(LLMessageSystem* msg)
             continue;
         }
 
-        msg->getString("Data","Subject",subj,i);
-        msg->getString("Data","FromName",name,i);
-        msg->getBOOL("Data","HasAttachment",has_attachment,i);
-        msg->getU8("Data","AssetType",asset_type,i);
-        msg->getU32("Data","Timestamp",timestamp,i);
+        msg->getStringFast(_PREHASH_Data, _PREHASH_Subject, subj, i);
+        msg->getStringFast(_PREHASH_Data, _PREHASH_FromName, name, i);
+        msg->getBOOLFast(_PREHASH_Data, _PREHASH_HasAttachment, has_attachment, i);
+        msg->getU8Fast(_PREHASH_Data, _PREHASH_AssetType, asset_type, i);
+        msg->getU32Fast(_PREHASH_Data, _PREHASH_Timestamp, timestamp, i);
 
         // we only have the legacy name here, convert it to a username
         name = LLCacheName::buildUsername(name);
@@ -591,12 +593,12 @@ void LLPanelGroupNotices::onSelectNotice(LLUICtrl* ctrl, void* data)
     if (!item) return;
 
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("GroupNoticeRequest");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID",gAgent.getID());
-    msg->addUUID("SessionID",gAgent.getSessionID());
-    msg->nextBlock("Data");
-    msg->addUUID("GroupNoticeID",item->getUUID());
+    msg->newMessageFast(_PREHASH_GroupNoticeRequest);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_Data);
+    msg->addUUIDFast(_PREHASH_GroupNoticeID, item->getUUID());
     gAgent.sendReliableMessage();
 
     LL_DEBUGS() << "Item " << item->getUUID() << " selected." << LL_ENDL;

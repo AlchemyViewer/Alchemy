@@ -26,14 +26,16 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "alfloaterblocked.h"
 #include "llavataractions.h"
 #include "llcommandhandler.h"
 #include "llfloaterreg.h"
 #include "llfloaterreporter.h"
 #include "llmutelist.h"
 #include "llnotificationsutil.h"
-//#include "llpanelblockedlist.h"
-#include "llfloaterblocked.h"
+
+//////////////////////////////////////////////////////////////////////////
+// LLAgentHandler
 
 class LLAgentHandler : public LLCommandHandler
 {
@@ -152,8 +154,7 @@ public:
                 const std::string object_name = LLURI::unescape(params[2].asString());
                 LLMute mute(avatar_id, object_name, LLMute::OBJECT);
                 LLMuteList::getInstance()->add(mute);
-                LLFloaterBlocked::showMuteAndSelect(mute.mID);
-                //LLPanelBlockedList::showPanelAndSelect(mute.mID);
+                ALFloaterBlocked::showMuteAndSelect(mute.mID);
             }
             return true;
         }

@@ -40,7 +40,7 @@
 #pragma warning(disable : 4244) // possible loss of data on conversions
 #endif
 
-class LLStopWatchControlsMixinCommon
+class LL_COMMON_API LLStopWatchControlsMixinCommon
 {
 public:
     virtual ~LLStopWatchControlsMixinCommon() {}
@@ -112,6 +112,7 @@ private:
     self_t& operator = (const self_t& other)
     {
         // don't do anything, derived class must implement logic
+        return *this;
     }
 
     // atomically stop this object while starting the other
@@ -154,7 +155,7 @@ namespace LLTrace
         typedef S32 sum_t;
     };
 
-    class Recording
+    class LL_COMMON_API Recording
     :   public LLStopWatchControlsMixin<Recording>
     {
     public:
@@ -173,16 +174,6 @@ namespace LLTrace
 
         // ensure that buffers are exclusively owned by this recording
         void makeUnique() { mBuffers.makeUnique(); }
-
-        // Timer accessors
-        bool hasValue(const StatType<TimeBlockAccumulator>& stat);
-        F64Seconds getSum(const StatType<TimeBlockAccumulator>& stat);
-        F64Seconds getSum(const StatType<TimeBlockAccumulator::SelfTimeFacet>& stat);
-        S32 getSum(const StatType<TimeBlockAccumulator::CallCountFacet>& stat);
-
-        F64Seconds getPerSec(const StatType<TimeBlockAccumulator>& stat);
-        F64Seconds getPerSec(const StatType<TimeBlockAccumulator::SelfTimeFacet>& stat);
-        F32 getPerSec(const StatType<TimeBlockAccumulator::CallCountFacet>& stat);
 
         // CountStatHandle accessors
         bool hasValue(const StatType<CountAccumulator>& stat);
@@ -583,7 +574,9 @@ namespace LLTrace
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
             num_periods = llmin(num_periods, getNumRecordedPeriods());
 
-            std::vector <typename RelatedTypes<typename T::value_t>::fractional_t> buf;
+            typedef typename RelatedTypes<typename T::value_t>::fractional_t fractional_t;
+
+            std::vector<fractional_t> buf;
             for (size_t i = 1; i <= num_periods; i++)
             {
                 Recording& recording = getPrevRecording(i);
@@ -592,9 +585,15 @@ namespace LLTrace
                     buf.push_back(recording.getPerSec(stat));
                 }
             }
+            // No period contributed a sample, so there is no middle element to
+            // index. Matches the SampleAccumulator overload.
+            if (buf.empty())
+            {
+                return fractional_t(0);
+            }
             std::sort(buf.begin(), buf.end());
 
-            return typename RelatedTypes<T>::fractional_t((buf.size() % 2 == 0) ? (buf[buf.size() / 2 - 1] + buf[buf.size() / 2]) / 2 : buf[buf.size() / 2]);
+            return fractional_t((buf.size() % 2 == 0) ? (buf[buf.size() / 2 - 1] + buf[buf.size() / 2]) / 2 : buf[buf.size() / 2]);
         }
 
         template<typename T>
@@ -668,9 +667,9 @@ namespace LLTrace
         size_t                  mNumRecordedPeriods;
     };
 
-    PeriodicRecording& get_frame_recording();
+    LL_COMMON_API PeriodicRecording& get_frame_recording();
 
-    class ExtendableRecording
+    class LL_COMMON_API ExtendableRecording
     :   public LLStopWatchControlsMixin<ExtendableRecording>
     {
     public:
@@ -694,7 +693,7 @@ namespace LLTrace
         Recording mPotentialRecording;
     };
 
-    class ExtendablePeriodicRecording
+    class LL_COMMON_API ExtendablePeriodicRecording
     :   public LLStopWatchControlsMixin<ExtendablePeriodicRecording>
     {
     public:

@@ -778,7 +778,7 @@
     layout="topleft"
     left_pad="5"
     mouse_opaque="false"
-    name="text_box10"
+    name="objects_text"
     top_delta="5"
     width="95">
      Objects
@@ -809,7 +809,7 @@
     layout="topleft"
     left_pad="5"
     mouse_opaque="false"
-    name="text_box7"
+    name="lindens_text"
     top_delta="5"
     width="95">
      Lindens

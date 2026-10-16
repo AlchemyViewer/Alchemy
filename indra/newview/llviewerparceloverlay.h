@@ -94,6 +94,10 @@ private:
 
     U8      parcelFlags(S32 row, S32 col, U8 flags) const;
 
+    // The grid row or column a region-local coordinate falls in, clamped to the overlay.
+    // A box's far edge can sit exactly on the region's edge, one past the last cell.
+    S32     gridIndex(F32 meters) const;
+
     void    addPropertyLine(F32 start_x, F32 start_y, F32 dx, F32 dy, F32 tick_dx, F32 tick_dy, const LLColor4U& color);
 
     void    updateOverlayTexture();

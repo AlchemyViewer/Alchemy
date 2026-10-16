@@ -33,6 +33,7 @@
 
 #include "llmotion.h"
 #include "llmath.h"
+#include "llsimdmath.h"
 #include "llstl.h"
 
 //-----------------------------------------------------------------------------
@@ -47,45 +48,21 @@ LLPose::~LLPose()
 }
 
 //-----------------------------------------------------------------------------
-// getFirstJointState()
-//-----------------------------------------------------------------------------
-LLJointState* LLPose::getFirstJointState()
-{
-    mListIter = mJointMap.begin();
-    if (mListIter == mJointMap.end())
-    {
-        return NULL;
-    }
-    else
-    {
-        return mListIter->second;
-    }
-}
-
-//-----------------------------------------------------------------------------
-// getNextJointState()
-//-----------------------------------------------------------------------------
-LLJointState *LLPose::getNextJointState()
-{
-    mListIter++;
-    if (mListIter == mJointMap.end())
-    {
-        return NULL;
-    }
-    else
-    {
-        return mListIter->second;
-    }
-}
-
-//-----------------------------------------------------------------------------
 // addJointState()
 //-----------------------------------------------------------------------------
 bool LLPose::addJointState(const LLPointer<LLJointState>& jointState)
 {
-    if (mJointMap.find(jointState->getJoint()->getName()) == mJointMap.end())
+    // One state per joint, first one in wins. The physics motion relies on
+    // this: its six sub-motions share two joints, and each blender slot
+    // they would otherwise take is one the animation cannot have.
+    if (!findJointState(jointState->getJoint()))
     {
-        mJointMap[jointState->getJoint()->getName()] = jointState;
+        // Every state in a pose carries the pose's weight -- setWeight can
+        // then skip the walk when nothing changed -- so one that arrives
+        // late is brought up to it rather than sitting at zero until the
+        // next change.
+        jointState->setWeight(mWeight);
+        mJointStates.push_back(jointState);
     }
     return true;
 }
@@ -95,7 +72,15 @@ bool LLPose::addJointState(const LLPointer<LLJointState>& jointState)
 //-----------------------------------------------------------------------------
 bool LLPose::removeJointState(const LLPointer<LLJointState>& jointState)
 {
-    mJointMap.erase(jointState->getJoint()->getName());
+    LLJoint* joint = jointState->getJoint();
+    for (joint_state_list_t::iterator iter = mJointStates.begin(); iter != mJointStates.end(); ++iter)
+    {
+        if ((*iter)->getJoint() == joint)
+        {
+            mJointStates.erase(iter);
+            break;
+        }
+    }
     return true;
 }
 
@@ -104,7 +89,7 @@ bool LLPose::removeJointState(const LLPointer<LLJointState>& jointState)
 //-----------------------------------------------------------------------------
 bool LLPose::removeAllJointStates()
 {
-    mJointMap.clear();
+    mJointStates.clear();
     return true;
 }
 
@@ -113,33 +98,29 @@ bool LLPose::removeAllJointStates()
 //-----------------------------------------------------------------------------
 LLJointState* LLPose::findJointState(LLJoint *joint)
 {
-    joint_map_iterator iter = mJointMap.find(joint->getName());
-
-    if (iter == mJointMap.end())
+    for (const LLPointer<LLJointState>& state : mJointStates)
     {
-        return NULL;
+        if (state->getJoint() == joint)
+        {
+            return state;
+        }
     }
-    else
-    {
-        return iter->second;
-    }
+    return NULL;
 }
 
 //-----------------------------------------------------------------------------
 // findJointState()
 //-----------------------------------------------------------------------------
-LLJointState* LLPose::findJointState(const std::string &name)
+LLJointState* LLPose::findJointState(std::string_view name)
 {
-    joint_map_iterator iter = mJointMap.find(name);
-
-    if (iter == mJointMap.end())
+    for (const LLPointer<LLJointState>& state : mJointStates)
     {
-        return NULL;
+        if (state->getJoint()->getName() == name)
+        {
+            return state;
+        }
     }
-    else
-    {
-        return iter->second;
-    }
+    return NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -147,10 +128,17 @@ LLJointState* LLPose::findJointState(const std::string &name)
 //-----------------------------------------------------------------------------
 void LLPose::setWeight(F32 weight)
 {
-    joint_map_iterator iter;
-    for (joint_map_value_type& joint_pair : mJointMap)
+    // Every state already carries mWeight, so an unchanged weight has
+    // nothing to write. The controller sets this once per motion per frame,
+    // and for a motion that is simply playing it is the same 1.0 each time.
+    if (weight == mWeight)
     {
-        joint_pair.second->setWeight(weight);
+        return;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    for (const LLPointer<LLJointState>& state : mJointStates)
+    {
+        state->setWeight(weight);
     }
     mWeight = weight;
 }
@@ -168,7 +156,7 @@ F32 LLPose::getWeight() const
 //-----------------------------------------------------------------------------
 S32 LLPose::getNumJointStates() const
 {
-    return (S32)mJointMap.size();
+    return (S32)mJointStates.size();
 }
 
 //-----------------------------------------------------------------------------
@@ -176,10 +164,17 @@ S32 LLPose::getNumJointStates() const
 //-----------------------------------------------------------------------------
 
 LLJointStateBlender::LLJointStateBlender()
+    : mNumStates(0),
+      mCachedUsage(0),
+      mQueued(false)
 {
+    // The vector types do not zero themselves.
+    mCachedPosition.clear();
+    mCachedRotation = LLQuaternion2::identity();
+    mCachedScale.set(1.f, 1.f, 1.f, 0.f);
+
     for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
     {
-        mJointStates[i] = NULL;
         mPriorities[i] = S32_MIN;
         mAdditiveBlends[i] = false;
     }
@@ -201,35 +196,36 @@ bool LLJointStateBlender::addJointState(const LLPointer<LLJointState>& joint_sta
         // this joint state doesn't point to an actual joint, so we don't care about applying it
         return false;
 
-    for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
+    // The first slot holding a lower priority, or the first empty one.
+    // Previous joint states (newer motions) with the same priority stay in
+    // place.
+    S32 slot = 0;
+    while (slot < mNumStates && priority <= mPriorities[slot])
     {
-        if (mJointStates[i].isNull())
-        {
-            mJointStates[i] = joint_state;
-            mPriorities[i] = priority;
-            mAdditiveBlends[i] = additive_blend;
-            return true;
-        }
-        else if (priority > mPriorities[i])
-        {
-            // we're at a higher priority than the current joint state in this slot
-            // so shift everyone over
-            // previous joint states (newer motions) with same priority should stay in place
-            for (S32 j = JSB_NUM_JOINT_STATES - 1; j > i; j--)
-            {
-                mJointStates[j] = mJointStates[j - 1];
-                mPriorities[j] = mPriorities[j - 1];
-                mAdditiveBlends[j] = mAdditiveBlends[j - 1];
-            }
-            // now store ourselves in this slot
-            mJointStates[i] = joint_state;
-            mPriorities[i] = priority;
-            mAdditiveBlends[i] = additive_blend;
-            return true;
-        }
+        ++slot;
     }
 
-    return false;
+    if (slot >= JSB_NUM_JOINT_STATES)
+    {
+        // every slot is taken by a higher priority
+        return false;
+    }
+
+    // Shift the states below down one, dropping the last when full. Only the
+    // occupied slots move: assigning an empty slot to an empty slot is six
+    // refcounted no-ops per joint per frame.
+    for (S32 j = llmin(mNumStates, (S32)JSB_NUM_JOINT_STATES - 1); j > slot; j--)
+    {
+        mJointStates[j] = mJointStates[j - 1];
+        mPriorities[j] = mPriorities[j - 1];
+        mAdditiveBlends[j] = mAdditiveBlends[j - 1];
+    }
+
+    mJointStates[slot] = joint_state;
+    mPriorities[slot] = priority;
+    mAdditiveBlends[slot] = additive_blend;
+    mNumStates = llmin(mNumStates + 1, (S32)JSB_NUM_JOINT_STATES);
+    return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -240,12 +236,12 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     // we need at least one joint to blend
     // if there is one, it will be in slot zero according to insertion logic
     // instead of resetting joint state to default, just leave it unchanged from last frame
-    if (mJointStates[0].isNull())
+    if (mNumStates == 0)
     {
         return;
     }
 
-    LLJoint* target_joint = apply_now ? mJointStates[0]->getJoint() : &mJointCache;
+    LLJoint* target_joint = mJointStates[0]->getJoint();
 
     const S32 POS_WEIGHT = 0;
     const S32 ROT_WEIGHT = 1;
@@ -254,23 +250,50 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     F32             sum_weights[3];
     U32             sum_usage = 0;
 
-    LLVector3       blended_pos = target_joint->getPosition();
-    LLQuaternion    blended_rot = target_joint->getRotation();
-    LLVector3       blended_scale = target_joint->getScale();
+    // Every channel below is seeded from the joint, so a channel no joint
+    // state contributes to ends up holding the value it started with. Writing
+    // that back is a no-op that still dirties the joint and, through touch(),
+    // its entire subtree. Track which channels actually received a
+    // contribution so the untouched ones can be left alone.
+    U32             contributed_usage = 0;
 
-    LLVector3       added_pos;
-    LLQuaternion    added_rot;
-    LLVector3       added_scale;
+    // The whole blend is done in vector registers and written out once at the
+    // end. Every value it touches is three or four floats wide, and the
+    // rotation interpolation in particular was a call into llquaternion.cpp
+    // that ran a square root in the good case and an arc cosine and three
+    // sines in the case where the two rotations were more than half a turn
+    // apart -- which, blending two animations that disagree about a joint, is
+    // a third of the time.
+    //
+    // Seeded from wherever the result is going: the joint, or the cache the
+    // coarse clock is interpolating the joint toward.
+    LLVector4a      blended_pos;
+    LLVector4a      blended_scale;
+    LLQuaternion2   blended_rot;
+    if (apply_now)
+    {
+        blended_pos.load3(target_joint->getPosition().mV);
+        blended_scale.load3(target_joint->getScale().mV);
+        blended_rot = target_joint->getRotation();
+    }
+    else
+    {
+        blended_pos = mCachedPosition;
+        blended_scale = mCachedScale;
+        blended_rot = mCachedRotation;
+    }
 
-    //S32               joint_state_index;
+    LLVector4a      added_pos;
+    LLVector4a      added_scale;
+    added_pos.clear();
+    added_scale.clear();
+    LLQuaternion2   added_rot = LLQuaternion2::identity();
 
     sum_weights[POS_WEIGHT] = 0.f;
     sum_weights[ROT_WEIGHT] = 0.f;
     sum_weights[SCALE_WEIGHT] = 0.f;
 
-    for(S32 joint_state_index = 0;
-        joint_state_index < JSB_NUM_JOINT_STATES && mJointStates[joint_state_index].notNull();
-        joint_state_index++)
+    for(S32 joint_state_index = 0; joint_state_index < mNumStates; joint_state_index++)
     {
         LLJointState* jsp = mJointStates[joint_state_index];
         U32 current_usage = jsp->getUsage();
@@ -281,6 +304,8 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
             continue;
         }
 
+        contributed_usage |= current_usage;
+
         if (mAdditiveBlends[joint_state_index])
         {
             if(current_usage & LLJointState::POS)
@@ -288,7 +313,9 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
                 F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[POS_WEIGHT]);
 
                 // add in pos for this jointstate modulated by weight
-                added_pos += jsp->getPosition() * (new_weight_sum - sum_weights[POS_WEIGHT]);
+                LLVector4a state_pos = jsp->getPositionV();
+                state_pos.mul(new_weight_sum - sum_weights[POS_WEIGHT]);
+                added_pos.add(state_pos);
             }
 
             if(current_usage & LLJointState::SCALE)
@@ -296,7 +323,9 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
                 F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[SCALE_WEIGHT]);
 
                 // add in scale for this jointstate modulated by weight
-                added_scale += jsp->getScale() * (new_weight_sum - sum_weights[SCALE_WEIGHT]);
+                LLVector4a state_scale = jsp->getScaleV();
+                state_scale.mul(new_weight_sum - sum_weights[SCALE_WEIGHT]);
+                added_scale.add(state_scale);
             }
 
             if (current_usage & LLJointState::ROT)
@@ -304,7 +333,11 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
                 F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[ROT_WEIGHT]);
 
                 // add in rotation for this jointstate modulated by weight
-                added_rot = nlerp((new_weight_sum - sum_weights[ROT_WEIGHT]), added_rot, jsp->getRotation()) * added_rot;
+                LLQuaternion2 partial;
+                partial.setSlerp(added_rot, jsp->getRotationQ(), new_weight_sum - sum_weights[ROT_WEIGHT]);
+                LLQuaternion2 composed;
+                composed.setMul(partial, added_rot);
+                added_rot = composed;
             }
         }
         else
@@ -314,18 +347,19 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
             // blend position
             if(current_usage & LLJointState::POS)
             {
+                const LLVector4a& state_pos = jsp->getPositionV();
                 if(sum_usage & LLJointState::POS)
                 {
                     F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[POS_WEIGHT]);
 
                     // blend positions from both
-                    blended_pos = lerp(jsp->getPosition(), blended_pos, sum_weights[POS_WEIGHT] / new_weight_sum);
+                    blended_pos.setLerp(state_pos, blended_pos, sum_weights[POS_WEIGHT] / new_weight_sum);
                     sum_weights[POS_WEIGHT] = new_weight_sum;
                 }
                 else
                 {
                     // copy position from current
-                    blended_pos = jsp->getPosition();
+                    blended_pos = state_pos;
                     sum_weights[POS_WEIGHT] = current_weight;
                 }
             }
@@ -333,18 +367,19 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
             // now do scale
             if(current_usage & LLJointState::SCALE)
             {
+                const LLVector4a& state_scale = jsp->getScaleV();
                 if(sum_usage & LLJointState::SCALE)
                 {
                     F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[SCALE_WEIGHT]);
 
                     // blend scales from both
-                    blended_scale = lerp(jsp->getScale(), blended_scale, sum_weights[SCALE_WEIGHT] / new_weight_sum);
+                    blended_scale.setLerp(state_scale, blended_scale, sum_weights[SCALE_WEIGHT] / new_weight_sum);
                     sum_weights[SCALE_WEIGHT] = new_weight_sum;
                 }
                 else
                 {
                     // copy scale from current
-                    blended_scale = jsp->getScale();
+                    blended_scale = state_scale;
                     sum_weights[SCALE_WEIGHT] = current_weight;
                 }
             }
@@ -352,18 +387,19 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
             // rotation
             if (current_usage & LLJointState::ROT)
             {
+                const LLQuaternion2& state_rot = jsp->getRotationQ();
                 if(sum_usage & LLJointState::ROT)
                 {
                     F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[ROT_WEIGHT]);
 
                     // blend rotations from both
-                    blended_rot = nlerp(sum_weights[ROT_WEIGHT] / new_weight_sum, jsp->getRotation(), blended_rot);
+                    blended_rot.setSlerp(state_rot, blended_rot, sum_weights[ROT_WEIGHT] / new_weight_sum);
                     sum_weights[ROT_WEIGHT] = new_weight_sum;
                 }
                 else
                 {
                     // copy rotation from current
-                    blended_rot = jsp->getRotation();
+                    blended_rot = state_rot;
                     sum_weights[ROT_WEIGHT] = current_weight;
                 }
             }
@@ -373,29 +409,56 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
         }
     }
 
-    if (!added_scale.isFinite())
+    if (!added_scale.isFinite3())
     {
-        added_scale.clearVec();
+        added_scale.clear();
     }
 
-    if (!blended_scale.isFinite())
+    if (!blended_scale.isFinite3())
     {
-        blended_scale.setVec(1,1,1);
+        blended_scale.set(1.f, 1.f, 1.f, 0.f);
     }
 
-    // apply transforms
-    // SL-315
-    target_joint->setPosition(blended_pos + added_pos);
-    target_joint->setScale(blended_scale + added_scale);
-    target_joint->setRotation(added_rot * blended_rot);
+    LLVector4a final_pos;
+    final_pos.setAdd(blended_pos, added_pos);
+    LLQuaternion2 final_rot;
+    final_rot.setMul(added_rot, blended_rot);
 
     if (apply_now)
     {
+        // apply transforms
+        // SL-315
+        target_joint->setPosition(LLVector3(final_pos.getF32ptr()));
+        // blended_scale was seeded from the joint, which LLXform::setScale keeps
+        // finite, and only a joint state carrying SCALE can move it off that
+        // value. So the reset above is unreachable without a scale contribution,
+        // and skipping the write here cannot strand a non-finite scale.
+        if (contributed_usage & LLJointState::SCALE)
+        {
+            LLVector4a final_scale;
+            final_scale.setAdd(blended_scale, added_scale);
+            target_joint->setScale(LLVector3(final_scale.getF32ptr()));
+        }
+        LLQuaternion rot;
+        final_rot.store(rot);
+        target_joint->setRotation(rot);
+
         // now clear joint states
-        for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
+        for(S32 i = 0; i < mNumStates; i++)
         {
             mJointStates[i] = NULL;
         }
+        mNumStates = 0;
+    }
+    else
+    {
+        // The cache is not a joint: nothing below it to dirty, so every
+        // channel is simply stored, along with which of them this blend had
+        // anything to say about.
+        mCachedPosition = final_pos;
+        mCachedScale.setAdd(blended_scale, added_scale);
+        mCachedRotation = final_rot;
+        mCachedUsage = contributed_usage;
     }
 }
 
@@ -405,7 +468,7 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
 void LLJointStateBlender::interpolate(F32 u)
 {
     // only interpolate if we have a joint state
-    if (!mJointStates[0])
+    if (mNumStates == 0)
     {
         return;
     }
@@ -416,10 +479,41 @@ void LLJointStateBlender::interpolate(F32 u)
         return;
     }
 
-    // SL-315
-    target_joint->setPosition(lerp(target_joint->getPosition(), mJointCache.getPosition(), u));
-    target_joint->setScale(lerp(target_joint->getScale(), mJointCache.getScale(), u));
-    target_joint->setRotation(nlerp(u, target_joint->getRotation(), mJointCache.getRotation()));
+    // Only the channels the blend wrote. A channel it did not write holds
+    // whatever the joint had when the cache was seeded, and leading the joint
+    // back to that undoes anything that moved it since -- a constraint, the
+    // foot solver, an attachment override -- a little more with every frame
+    // of the quantum.
+    if (mCachedUsage & LLJointState::POS)
+    {
+        LLVector4a current;
+        current.load3(target_joint->getPosition().mV);
+        LLVector4a blended;
+        blended.setLerp(current, mCachedPosition, u);
+        // SL-315
+        target_joint->setPosition(LLVector3(blended.getF32ptr()));
+    }
+
+    if (mCachedUsage & LLJointState::SCALE)
+    {
+        LLVector4a current;
+        current.load3(target_joint->getScale().mV);
+        LLVector4a blended;
+        blended.setLerp(current, mCachedScale, u);
+        target_joint->setScale(LLVector3(blended.getF32ptr()));
+    }
+
+    if (mCachedUsage & LLJointState::ROT)
+    {
+        // Along the arc. A quantum is up to a quarter second, which is as far
+        // apart as two poses of one joint ever get, and the chord cuts most
+        // where they are furthest apart.
+        LLQuaternion2 blended;
+        blended.setSlerp(LLQuaternion2(target_joint->getRotation()), mCachedRotation, u);
+        LLQuaternion rot;
+        blended.store(rot);
+        target_joint->setRotation(rot);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -428,10 +522,12 @@ void LLJointStateBlender::interpolate(F32 u)
 void LLJointStateBlender::clear()
 {
     // now clear joint states
-    for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
+    for(S32 i = 0; i < mNumStates; i++)
     {
         mJointStates[i] = NULL;
     }
+    mNumStates = 0;
+    mCachedUsage = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -439,15 +535,17 @@ void LLJointStateBlender::clear()
 //-----------------------------------------------------------------------------
 void LLJointStateBlender::resetCachedJoint()
 {
-    if (!mJointStates[0])
+    if (mNumStates == 0)
     {
         return;
     }
     LLJoint* source_joint = mJointStates[0]->getJoint();
     // SL-315
-    mJointCache.setPosition(source_joint->getPosition());
-    mJointCache.setScale(source_joint->getScale());
-    mJointCache.setRotation(source_joint->getRotation());
+    mCachedPosition.load3(source_joint->getPosition().mV);
+    mCachedScale.load3(source_joint->getScale().mV);
+    mCachedRotation = source_joint->getRotation();
+    // and nothing has been blended into it yet
+    mCachedUsage = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -455,52 +553,88 @@ void LLJointStateBlender::resetCachedJoint()
 //-----------------------------------------------------------------------------
 
 LLPoseBlender::LLPoseBlender()
-    : mNextPoseSlot(0)
+    : mJointStateBlenderPool{},
+      mNextPoseSlot(0)
 {
 }
 
 LLPoseBlender::~LLPoseBlender()
 {
-    for_each(mJointStateBlenderPool.begin(), mJointStateBlenderPool.end(), DeletePairedPointer());
-    mJointStateBlenderPool.clear();
 }
 
 //-----------------------------------------------------------------------------
 // addMotion()
 //-----------------------------------------------------------------------------
-bool LLPoseBlender::addMotion(LLMotion* motion)
+bool LLPoseBlender::addMotion(LLMotion* motion, const U8* saturated_joints)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLPose* pose = motion->getPose();
 
-    for(LLJointState* jsp = pose->getFirstJointState(); jsp; jsp = pose->getNextJointState())
+    // A pose at zero weight contributes nothing to any joint it touches:
+    // every one of its states carries the pose weight, and blendJointStates
+    // passes over a state weighing nothing. Adding them anyway cost a walk of
+    // the pose, and worse, each state took one of a joint's six blend slots
+    // away from a motion that did have something to say. A motion easing in
+    // or out crosses zero weight, and a stopped one sits there until it is
+    // deactivated.
+    if (pose->getWeight() == 0.f)
     {
+        return true;
+    }
+
+    // Neither changes across the motion's joint states, and both are
+    // virtual calls.
+    const S32 motion_priority = motion->getPriority();
+    const bool additive_blend = (motion->getBlendType() == LLMotion::ADDITIVE_BLEND);
+
+    for (const LLPointer<LLJointState>& state : pose->getJointStates())
+    {
+        LLJointState* jsp = state;
         LLJoint *jointp = jsp->getJoint();
-        LLJointStateBlender* joint_blender;
-        if (mJointStateBlenderPool.find(jointp) == mJointStateBlenderPool.end())
+        if (!jointp)
+        {
+            continue;
+        }
+
+        // A joint that never received a number is in the pose -- LLMotion
+        // inserts before it checks the range -- but never made the joint
+        // signature, so nothing scheduled an update for it. It has no slot
+        // here either.
+        const S32 joint_num = jointp->getJointNum();
+        if (joint_num < 0 || joint_num >= (S32)LL_CHARACTER_MAX_ANIMATED_JOINTS)
+        {
+            continue;
+        }
+
+        LLJointStateBlender* joint_blender = mJointStateBlenderPool[joint_num];
+        if (!joint_blender)
         {
             // this is the first time we are animating this joint
             // so create new jointblender and add it to our pool
-            joint_blender = new LLJointStateBlender();
-            mJointStateBlenderPool[jointp] = joint_blender;
-        }
-        else
-        {
-            joint_blender = mJointStateBlenderPool[jointp];
+            joint_blender = &mBlenderStorage.emplace_back();
+            mJointStateBlenderPool[joint_num] = joint_blender;
         }
 
-        if (jsp->getPriority() == LLJoint::USE_MOTION_PRIORITY)
+        const S32 priority = (jsp->getPriority() == LLJoint::USE_MOTION_PRIORITY) ? motion_priority : jsp->getPriority();
+
+        // A rotation onto a joint already turned by a motion at full weight is
+        // a contribution the blend interpolates away to nothing. Anything else
+        // this state carries -- a position, a scale -- is summed on its own
+        // account, so only a rotation-only state can be left out.
+        if (!additive_blend
+            && (jsp->getUsage() & (LLJointState::POS | LLJointState::SCALE)) == 0
+            && saturated_joints[joint_num] >= (0xff >> (7 - priority)))
         {
-            joint_blender->addJointState(jsp, motion->getPriority(), motion->getBlendType() == LLMotion::ADDITIVE_BLEND);
+            continue;
         }
-        else
-        {
-            joint_blender->addJointState(jsp, jsp->getPriority(), motion->getBlendType() == LLMotion::ADDITIVE_BLEND);
-        }
+
+        joint_blender->addJointState(jsp, priority, additive_blend);
 
         // add it to our list of active blenders
-        if (std::find(mActiveBlenders.begin(), mActiveBlenders.end(), joint_blender) == mActiveBlenders.end())
+        if (!joint_blender->isQueued())
         {
-            mActiveBlenders.push_front(joint_blender);
+            joint_blender->setQueued(true);
+            mActiveBlenders.push_back(joint_blender);
         }
     }
     return true;
@@ -511,11 +645,14 @@ bool LLPoseBlender::addMotion(LLMotion* motion)
 //-----------------------------------------------------------------------------
 void LLPoseBlender::blendAndApply()
 {
-    for (blender_list_t::iterator iter = mActiveBlenders.begin();
-         iter != mActiveBlenders.end(); )
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    LL_PROFILE_ZONE_NUM(mActiveBlenders.size());
+    // Order does not matter: each blender owns one joint and reads only
+    // that joint's local transform.
+    for (LLJointStateBlender* jsbp : mActiveBlenders)
     {
-        LLJointStateBlender* jsbp = *iter++;
         jsbp->blendJointStates();
+        jsbp->setQueued(false);
     }
 
     // we're done now so there are no more active blenders for this frame
@@ -527,10 +664,8 @@ void LLPoseBlender::blendAndApply()
 //-----------------------------------------------------------------------------
 void LLPoseBlender::blendAndCache(bool reset_cached_joints)
 {
-    for (blender_list_t::iterator iter = mActiveBlenders.begin();
-         iter != mActiveBlenders.end(); ++iter)
+    for (LLJointStateBlender* jsbp : mActiveBlenders)
     {
-        LLJointStateBlender* jsbp = *iter;
         if (reset_cached_joints)
         {
             jsbp->resetCachedJoint();
@@ -544,10 +679,8 @@ void LLPoseBlender::blendAndCache(bool reset_cached_joints)
 //-----------------------------------------------------------------------------
 void LLPoseBlender::interpolate(F32 u)
 {
-    for (blender_list_t::iterator iter = mActiveBlenders.begin();
-         iter != mActiveBlenders.end(); ++iter)
+    for (LLJointStateBlender* jsbp : mActiveBlenders)
     {
-        LLJointStateBlender* jsbp = *iter;
         jsbp->interpolate(u);
     }
 }
@@ -557,11 +690,10 @@ void LLPoseBlender::interpolate(F32 u)
 //-----------------------------------------------------------------------------
 void LLPoseBlender::clearBlenders()
 {
-    for (blender_list_t::iterator iter = mActiveBlenders.begin();
-         iter != mActiveBlenders.end(); ++iter)
+    for (LLJointStateBlender* jsbp : mActiveBlenders)
     {
-        LLJointStateBlender* jsbp = *iter;
         jsbp->clear();
+        jsbp->setQueued(false);
     }
 
     mActiveBlenders.clear();

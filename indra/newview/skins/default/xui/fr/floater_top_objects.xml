@@ -59,6 +59,4 @@
 	<button label="Rafraîchir" name="refresh_btn"/>
 	<button label="Renvoyer" name="return_selected_btn"/>
 	<button label="Tout renvoyer" name="return_all_btn"/>
-	<button label="Désactiver" name="disable_selected_btn"/>
-	<button label="Tout désactiver" name="disable_all_btn"/>
 </floater>

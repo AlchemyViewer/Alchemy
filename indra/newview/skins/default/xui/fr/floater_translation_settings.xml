@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="floater_translation_settings" title="TRADUCTION AUTOMATIQUE">
-	<string name="bing_api_key_not_verified">
-		ID d&apos;application Bing non vérifié. Veuillez réessayer.
-	</string>
 	<string name="google_api_key_not_verified">
 		Clé d&apos;API Google non vérifiée. Veuillez réessayer.
-	</string>
-	<string name="bing_api_key_verified">
-		ID d&apos;application Bing vérifié.
 	</string>
 	<string name="google_api_key_verified">
 		Clé d&apos;API Google vérifiée.
@@ -39,13 +33,8 @@
 		Choisir le service à utiliser :
 	</text>
 	<radio_group name="translation_service_rg">
-		<radio_item initial_value="bing" label="Bing Translator" name="bing"/>
 		<radio_item initial_value="google" label="Google Translate" name="google"/>
 	</radio_group>
-	<text name="bing_api_key_label">
-		[http://www.bing.com/developers/createapp.aspx ID d&apos;application] Bing :
-	</text>
-	<button label="Vérifier" name="verify_bing_api_key_btn"/>
 	<text name="google_api_key_label">
 		[http://code.google.com/apis/language/translate/v2/getting_started.html#auth Clé d&apos;API] Google :
 	</text>

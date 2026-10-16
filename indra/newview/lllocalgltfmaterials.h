@@ -30,6 +30,9 @@
 #include "lleventtimer.h"
 #include "llpointer.h"
 #include "llgltfmateriallist.h"
+#include <boost/signals2/signal.hpp>
+#include <filesystem>
+#include <map>
 
 class LLScrollListCtrl;
 class LLGLTFMaterial;
@@ -48,12 +51,26 @@ public: /* accessors */
     LLUUID      getTrackingID() const;
     LLUUID      getWorldID() const;
     S32         getIndexInFile() const;
+    std::string getMaterialName() const { return mMaterialName; } // glTF material name (face binding)
+    // Other glTF material names (face bindings) that deduplicated onto this unit:
+    // a mesh import collapses content-identical materials to one, but every
+    // original face still binds by its own name, so we keep them for the name->id
+    // map (see LLLocalGLTFMaterialMgr::getWorldIDsByName).
+    const std::vector<std::string>& getAliasNames() const { return mAliasNames; }
+    void        addAliasName(const std::string& name) { mAliasNames.push_back(name); }
+    void        clearAliasNames() { mAliasNames.clear(); } // rebuilt by a live-edit regroup
+    // Imported by a local mesh for its own faces: hidden from the Materials tab +
+    // cross-session persistence (it reappears when the mesh re-decodes).
+    bool        isMeshOwned() const { return mIsMeshOwned; }
+    void        setMeshOwned(bool b) { mIsMeshOwned = b; }
 
 public:
     bool updateSelf();
 
 private:
     bool loadMaterial();
+    // Rebuilds every object a face of which wears this material.
+    void rebuildObjectsUsing();
 
 private: /* private enums */
     enum ELinkStatus
@@ -73,11 +90,14 @@ private: /* members */
     std::string mShortName;
     LLUUID      mTrackingID;
     LLUUID      mWorldID;
-    LLSD        mLastModified;
+    std::filesystem::file_time_type mLastModified;
     EExtension  mExtension;
     ELinkStatus mLinkStatus;
     S32         mUpdateRetries;
     S32         mMaterialIndex; // Single file can have more than one
+    std::string mMaterialName;  // glTF material name, for matching a mesh face's binding
+    std::vector<std::string> mAliasNames; // other face bindings deduplicated onto this unit
+    bool        mIsMeshOwned = false; // imported by a local mesh (see isMeshOwned)
 };
 
 class LLLocalGLTFMaterialTimer : public LLEventTimer
@@ -101,22 +121,49 @@ public:
     S32          addUnit(const std::vector<std::string>& filenames);
     S32          addUnit(const std::string& filename); // file can hold multiple materials
     S32          addUnit(const std::string& filename, LLUUID& outID); // returns first material id as outID
+    // Add a file's materials as mesh-owned: hidden from the Materials tab + persistence.
+    S32          addUnit(const std::string& filename, bool mesh_owned);
 protected:
-    S32          addUnitInternal(const std::string& filename, LLUUID& outID); // file can hold multiple materials
+    S32          addUnitInternal(const std::string& filename, LLUUID& outID, bool mesh_owned = false); // file can hold multiple materials
+    // Re-derive a file's unit/alias structure after a live edit: import-time dedup
+    // collapses content-identical materials onto one unit (the other binding names
+    // become aliases), and an edit can split such a group, merge one, or add/remove
+    // materials outright. Surviving units keep their tracking/world ids; diverged or
+    // new indices get fresh units; removed indices drop theirs; every alias is
+    // rebuilt. Returns true when the file's name -> world id mapping changed (the
+    // caller re-binds local-mesh faces off that).
+    bool         regroupFileMaterials(const std::string& filename, bool mesh_owned);
 public:
     void         delUnit(LLUUID tracking_id);
-    LLUUID       getUnitID(const std::string& filename, S32 index = 0);
+    // The lookups below resolve within ONE ownership class: a user-loaded set and a
+    // mesh-owned import of the same file are distinct units (see addUnitInternal),
+    // and an ownership-blind match could hand the Materials tab a mesh's hidden
+    // imports to delete (or bind a mesh's faces to the user's deletable copies).
+    LLUUID       getUnitID(const std::string& filename, S32 index, bool mesh_owned);
+    // Tracking ids of every unit of the class loaded from a file, in list order.
+    // Unlike walking getUnitID(file, 0..N), this is safe across the index gaps
+    // that import-time deduplication leaves in getIndexInFile().
+    void         getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out, bool mesh_owned);
 
     LLUUID       getWorldID(LLUUID tracking_id);
+    bool         isMeshOwned(const LLUUID& tracking_id) const; // imported by a local mesh
     bool         isLocal(LLUUID world_id);
     void         getFilenameAndIndex(LLUUID tracking_id, std::string &filename, S32 &index);
+    // Map each of a file's materials by name (empty name -> "mat<index>", matching the
+    // model loader's face bindings) to its world id, for texturing a local mesh.
+    void         getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out, bool mesh_owned);
+    std::vector<std::string> getFilenames() const; // distinct loaded files (persistence)
 
     void         feedScrollList(LLScrollListCtrl* ctrl);
+    // Fired when the unit list changes (add/remove) so the Local Assets floater
+    // refreshes reactively.
+    boost::signals2::connection setUnitsChangedCallback(const std::function<void()>& cb);
     void         doUpdates();
 
 private:
     std::list<LLPointer<LLLocalGLTFMaterial> >    mMaterialList;
     LLLocalGLTFMaterialTimer           mTimer;
+    boost::signals2::signal<void()>    mUnitsChangedSignal; // add/remove
     typedef std::list<LLPointer<LLLocalGLTFMaterial> >::iterator local_list_iter;
 };
 

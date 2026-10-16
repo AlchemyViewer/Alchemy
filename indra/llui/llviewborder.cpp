@@ -123,7 +123,7 @@ void LLViewBorder::draw()
 
 void LLViewBorder::drawOnePixelLines()
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     LLColor4 top_color = mHighlightLight.get();
     LLColor4 bottom_color = mHighlightLight.get();
@@ -149,7 +149,7 @@ void LLViewBorder::drawOnePixelLines()
         top_color = gFocusMgr.getFocusColor();
         bottom_color = top_color;
 
-        LLUI::setLineWidth(lerp(1.f, 3.f, gFocusMgr.getFocusFlashAmt()));
+        LLUI::setLineWidth(lerp(1.f, 2.f, gFocusMgr.getFocusFlashAmt()));
     }
 
     S32 left    = 0;
@@ -170,7 +170,7 @@ void LLViewBorder::drawOnePixelLines()
 
 void LLViewBorder::drawTwoPixelLines()
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     LLColor4 focus_color = gFocusMgr.getFocusColor();
 

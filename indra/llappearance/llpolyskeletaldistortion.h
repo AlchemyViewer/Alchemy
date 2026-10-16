@@ -64,7 +64,6 @@ struct LLPolySkeletalBoneInfo
 
 class alignas(16) LLPolySkeletalDistortionInfo : public LLViewerVisualParamInfo
 {
-    LL_ALIGN_NEW
     friend class LLPolySkeletalDistortion;
 public:
 
@@ -84,7 +83,6 @@ protected:
 //-----------------------------------------------------------------------------
 class alignas(16) LLPolySkeletalDistortion : public LLViewerVisualParam
 {
-    LL_ALIGN_NEW
 public:
     LLPolySkeletalDistortion(LLAvatarAppearance *avatarp);
     ~LLPolySkeletalDistortion();
@@ -111,13 +109,13 @@ public:
 protected:
     LLPolySkeletalDistortion(const LLPolySkeletalDistortion& pOther);
 
-    LL_ALIGN_16(LLVector4a mDefaultVec);
+    LLVector4a mDefaultVec;
     typedef std::map<LLJoint*, LLVector3> joint_vec_map_t;
     joint_vec_map_t mJointScales;
     joint_vec_map_t mJointOffsets;
     // Backlink only; don't make this an LLPointer.
     LLAvatarAppearance *mAvatar;
-} LL_ALIGN_POSTFIX(16);
+};
 
 #endif // LL_LLPOLYSKELETALDISTORTION_H
 

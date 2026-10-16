@@ -27,25 +27,17 @@
 #ifndef LL_LLMATRIX3A_H
 #define LL_LLMATRIX3A_H
 
-/////////////////////////////
-// LLMatrix3a, LLRotation
-/////////////////////////////
-// This class stores a 3x3 (technically 4x3) matrix in column-major order
-/////////////////////////////
-/////////////////////////////
-// These classes are intentionally minimal right now. If you need additional
-// functionality, please contact someone with SSE experience (e.g., Falcon or
-// Huseby).
-/////////////////////////////
-
-// LLMatrix3a is the base class for LLRotation, which should be used instead any time you're dealing with a
-// rotation matrix.
-class LLMatrix3a
+// A 3x3 matrix in three row vectors, each a register; the fourth lane of
+// each row is carried, not meant. Vectors are rows, as they are for
+// LLMatrix3 and LLMatrix4a: rotate(v) is v * M, and setMul(a, b) is a then
+// b. LLRotation is the same storage with the promise that it holds a
+// rotation, and is what a rotation matrix should be held in.
+class alignas(16) LLMatrix3a
 {
 public:
 
     // Utility function for quickly transforming an array of LLVector4a's
-    // For transforming a single LLVector4a, see LLVector4a::setRotated
+    // For transforming a single LLVector4a, see rotate and LLVector4a::setRotated
     static void batchTransform( const LLMatrix3a& xform, const LLVector4a* src, int numVectors, LLVector4a* dst );
 
     // Utility function to obtain the identity matrix
@@ -55,17 +47,16 @@ public:
     // Ctors
     //////////////////////////
 
-    // Ctor
     LLMatrix3a() = default;
 
-    // Ctor for setting by columns
-    inline LLMatrix3a( const LLVector4a& c0, const LLVector4a& c1, const LLVector4a& c2 );
+    // Ctor for setting by rows
+    inline LLMatrix3a( const LLVector4a& r0, const LLVector4a& r1, const LLVector4a& r2 );
 
     //////////////////////////
     // Get/Set
     //////////////////////////
 
-    // Loads from an LLMatrix3
+    // Loads the rows of an LLMatrix3; the fourth lanes are zero
     inline void loadu(const LLMatrix3& src);
 
     // Set rows
@@ -74,16 +65,25 @@ public:
     // Set columns
     inline void setColumns(const LLVector4a& c0, const LLVector4a& c1, const LLVector4a& c2);
 
-    // Get the read-only access to a specified column. Valid columns are 0-2, but the
-    // function is unchecked. You've been warned.
-    inline const LLVector4a& getColumn(const U32 column) const;
+    // Read-only access to a row. Valid rows are 0-2, but the run-time form
+    // is unchecked. You've been warned.
+    template<int N> inline const LLVector4a& getRow() const;
+    inline const LLVector4a& getRow(const U32 row) const;
+
+    /////////////////////////
+    // Transformation
+    /////////////////////////
+
+    // res = v * this; the fourth lane of v is ignored
+    inline void rotate(const LLVector4a& v, LLVector4a& res) const;
 
     /////////////////////////
     // Matrix modification
     /////////////////////////
 
-    // Set this matrix to the product of lhs and rhs ( this = lhs * rhs )
-    void setMul( const LLMatrix3a& lhs, const LLMatrix3a& rhs );
+    // Set this matrix to a then b: rotating by the product is rotating by a
+    // and then by b. Either operand may be this matrix.
+    inline void setMul( const LLMatrix3a& a, const LLMatrix3a& b );
 
     // Set this matrix to the transpose of src
     inline void setTranspose(const LLMatrix3a& src);
@@ -103,19 +103,19 @@ public:
     // primary for scalar operations.
     inline LLSimdScalar getDeterminant() const;
 
-    // Returns nonzero if rows 0-2 and colums 0-2 contain no NaN or INF values. Row 3 is ignored
-    inline LLBool32 isFinite() const;
+    // Returns true if rows 0-2 and colums 0-2 contain no NaN or INF values. The fourth lanes are ignored
+    inline bool isFinite() const;
 
     // Returns true if this matrix is equal to 'rhs' up to 'tolerance'
     inline bool isApproximatelyEqual( const LLMatrix3a& rhs, F32 tolerance = F_APPROXIMATELY_ZERO ) const;
 
 protected:
 
-    LL_ALIGN_16(LLVector4a mColumns[3]);
+    LLVector4a mRows[3];
 
 };
 
-static_assert(std::is_trivial<LLMatrix3a>::value, "LLMatrix3a must be a trivial type");
+static_assert(std::is_trivially_copyable<LLMatrix3a>::value && std::is_standard_layout<LLMatrix3a>::value, "LLMatrix3a is plain data");
 
 class LLRotation : public LLMatrix3a
 {
@@ -127,6 +127,6 @@ public:
     inline bool isOkRotation() const;
 };
 
-static_assert(std::is_trivial<LLRotation>::value, "LLRotation must be a trivial type");
+static_assert(std::is_trivially_copyable<LLRotation>::value && std::is_standard_layout<LLRotation>::value, "LLRotation is plain data");
 
 #endif

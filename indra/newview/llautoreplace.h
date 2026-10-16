@@ -117,7 +117,7 @@ class LLAutoReplaceSettings
     std::string replacementFor(std::string keyword, std::string listName);
 
     /// Adds a keywword/replacement pair to the named list
-    bool addEntryToList(LLWString keyword, LLWString replacement, std::string listName);
+    bool addEntryToList(std::string_view keyword, std::string_view replacement, std::string listName);
 
     /// Removes the keywword and its replacement from the named list
     bool removeEntryFromList(std::string keyword, std::string listName);
@@ -194,7 +194,7 @@ class LLAutoReplace : public LLSingleton<LLAutoReplace>
     LLSINGLETON(LLAutoReplace);
 public:
     /// Callback that provides the hook for use in text entry methods
-    void autoreplaceCallback(S32& replacement_start, S32& replacement_length, LLWString& replacement_string, S32& cursor_pos, const LLWString& input_text);
+    void autoreplaceCallback(S32& replacement_start, S32& replacement_length, std::string& replacement_string, S32& cursor_pos, const std::string& input_text);
 
     /// Get a copy of the current settings
     LLAutoReplaceSettings getSettings();

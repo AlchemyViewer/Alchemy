@@ -35,8 +35,11 @@
 #include "lljoint.h"
 #include "llpointer.h"
 
+#include <deque>
 #include <map>
 #include <string>
+#include <string_view>
+#include <vector>
 
 
 //-----------------------------------------------------------------------------
@@ -45,20 +48,18 @@
 class LLPose
 {
     friend class LLPoseBlender;
-protected:
-    typedef std::map<std::string, LLPointer<LLJointState> > joint_map;
-    typedef joint_map::iterator joint_map_iterator;
-    typedef joint_map::value_type joint_map_value_type;
-
-    joint_map                   mJointMap;
-    F32                         mWeight;
-    joint_map_iterator          mListIter;
 public:
-    // Iterate through jointStates
-    LLJointState* getFirstJointState();
-    LLJointState* getNextJointState();
+    typedef std::vector<LLPointer<LLJointState> > joint_state_list_t;
+protected:
+    // A few dozen states at most, added and removed at setup or by the
+    // poser, and walked by the blender every frame: contiguous, with a
+    // linear find. One state per joint; addJointState keeps it that way.
+    joint_state_list_t          mJointStates;
+    F32                         mWeight;
+public:
+    const joint_state_list_t& getJointStates() const { return mJointStates; }
     LLJointState* findJointState(LLJoint *joint);
-    LLJointState* findJointState(const std::string &name);
+    LLJointState* findJointState(std::string_view name);
 public:
     // Constructor
     LLPose() : mWeight(0.f) {}
@@ -78,16 +79,43 @@ public:
     S32 getNumJointStates() const;
 };
 
-const S32 JSB_NUM_JOINT_STATES = 6;
+// How many motions may write one joint in a frame. The pelvis of a moving
+// avatar is the most crowded joint there is: the pelvis fix, the walk servo
+// and the fly servo -- both of those on the frame one hands over to the other
+// -- whatever rotation a jump has on it, and the animation easing in over the
+// one easing out. That is seven, and at six the one left over was refused in
+// silence, since addJointState says so in a return value nothing reads. What
+// loses is the lowest priority, and that is the pelvis fix, whose whole job is
+// to take up the weight the animations have not claimed. Without it a pose at
+// an eighth of its weight arrives whole.
+const S32 JSB_NUM_JOINT_STATES = 8;
 
-LL_ALIGN_PREFIX(16)
 class LLJointStateBlender
 {
-    LL_ALIGN_NEW
 protected:
+    // Sorted by priority, highest first, and packed: the first mNumStates
+    // slots hold something and the rest are empty. One joint is written by
+    // one or two motions almost always, so nothing here walks six slots to
+    // find that out.
     LLPointer<LLJointState> mJointStates[JSB_NUM_JOINT_STATES];
     S32             mPriorities[JSB_NUM_JOINT_STATES];
     bool            mAdditiveBlends[JSB_NUM_JOINT_STATES];
+    S32             mNumStates;
+
+    // Where the coarse clock's blend goes instead of the joint, for the
+    // frames in between to interpolate the joint toward. Held in the forms
+    // the blend writes them in and the interpolation reads them in, which is
+    // the same pair of forms the joint states carry.
+    LLVector4a      mCachedPosition;
+    LLQuaternion2   mCachedRotation;
+    LLVector4a      mCachedScale;
+
+    // Which of those three the blend actually wrote. The rest hold the
+    // joint's own value and are not interpolated toward anything.
+    U32             mCachedUsage;
+
+    // on the pose blender's list of blenders to run this frame
+    bool            mQueued;
 public:
     LLJointStateBlender();
     ~LLJointStateBlender();
@@ -97,18 +125,24 @@ public:
     void clear();
     void resetCachedJoint();
 
-public:
-    LL_ALIGN_16(LLJoint mJointCache);
-} LL_ALIGN_POSTFIX(16);
+    bool isQueued() const { return mQueued; }
+    void setQueued(bool queued) { mQueued = queued; }
+};
 
 class LLMotion;
 
 class LLPoseBlender
 {
 protected:
-    typedef std::list<LLJointStateBlender*> blender_list_t;
-    typedef std::map<LLJoint*,LLJointStateBlender*> blender_map_t;
-    blender_map_t mJointStateBlenderPool;
+    typedef std::vector<LLJointStateBlender*> blender_list_t;
+    // The blenders themselves, in the order the joints were first animated,
+    // which for a skeleton driven by one animation is joint order. A deque
+    // keeps addresses stable while still handing out neighbours in the same
+    // block: the per-frame walk is over pointers, and one blender per heap
+    // allocation made it a walk across the heap.
+    std::deque<LLJointStateBlender> mBlenderStorage;
+    // one slot per joint number, filled the first time that joint is animated
+    LLJointStateBlender* mJointStateBlenderPool[LL_CHARACTER_MAX_ANIMATED_JOINTS];
     blender_list_t mActiveBlenders;
 
     S32         mNextPoseSlot;
@@ -119,8 +153,12 @@ public:
     // Destructor
     ~LLPoseBlender();
 
-    // request motion joint states to be added to pose blender joint state records
-    bool addMotion(LLMotion* motion);
+    // Request motion joint states to be added to pose blender joint state
+    // records. `saturated_joints` carries the priority at which each joint is
+    // already claimed by a motion at full weight; a state that only rotates
+    // such a joint is left out, since the blend would interpolate it to
+    // nothing and it would take one of the joint's six slots to do it.
+    bool addMotion(LLMotion* motion, const U8* saturated_joints);
 
     // blend all joint states and apply to skeleton
     void blendAndApply();

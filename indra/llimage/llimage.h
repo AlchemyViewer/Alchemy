@@ -27,10 +27,15 @@
 #ifndef LL_LLIMAGE_H
 #define LL_LLIMAGE_H
 
-#include "lluuid.h"
-#include "llstring.h"
+#include "llmutex.h"
 #include "llpointer.h"
+#include "llstring.h"
 #include "lltrace.h"
+#include "lluuid.h"
+
+#include <atomic>
+#include <functional>
+#include <utility>
 
 constexpr S32 MIN_IMAGE_MIP =  2; // 4x4, only used for expand/contract power of 2
 constexpr S32 MAX_IMAGE_MIP = 12; // 4096x4096
@@ -83,7 +88,9 @@ typedef enum e_image_codec
     IMG_CODEC_JPEG = 5,
     IMG_CODEC_DXT  = 6,
     IMG_CODEC_PNG  = 7,
-    IMG_CODEC_EOF  = 8
+    IMG_CODEC_WEBP = 8,
+    IMG_CODEC_AVIF = 9,
+    IMG_CODEC_EOF  = 10
 } EImageCodec;
 
 //============================================================================
@@ -158,7 +165,8 @@ public:
     // <= 0 priority means that there's no need for more data.
     static F32 calc_download_priority(F32 virtual_size, F32 visible_area, S32 bytes_sent);
 
-    static EImageCodec getCodecFromExtension(const std::string& exten);
+    static EImageCodec getCodecFromExtension(std::string_view exten);
+    static EImageCodec getCodecFromExtension(std::wstring_view exten);
 
     //static LLTrace::MemStatHandle sMemStat;
 
@@ -187,10 +195,89 @@ public:
         {
         }
     };
+
+    // Two images locked together, in address order rather than argument order, so two
+    // threads locking the same pair from opposite sides take turns instead of waiting on
+    // each other. An image passed as both is locked once, exclusively if either side asks.
+    // The order is only this pair's: a caller already holding one of the images has
+    // taken that one first, whatever its address.
+    template<bool SHARED_FIRST, bool SHARED_SECOND>
+    class DataLockPair
+    {
+    public:
+        DataLockPair(const LLImageBase* first, const LLImageBase* second)
+        : mLow{ first ? &first->mDataMutex : nullptr, SHARED_FIRST }
+        , mHigh{ second ? &second->mDataMutex : nullptr, SHARED_SECOND }
+        {
+            if (mLow.mMutex == mHigh.mMutex)
+            {
+                mLow.mShared = SHARED_FIRST && SHARED_SECOND;
+                mHigh.mMutex = nullptr;
+            }
+            else if (std::less<const LLSharedMutex*>()(mHigh.mMutex, mLow.mMutex))
+            {
+                std::swap(mLow, mHigh);
+            }
+            mLow.lock();
+            try
+            {
+                mHigh.lock();
+            }
+            catch (...)
+            {
+                // No destructor runs for a constructor that throws.
+                mLow.unlock();
+                throw;
+            }
+        }
+
+        DataLockPair(const DataLockPair&) = delete;
+        DataLockPair& operator=(const DataLockPair&) = delete;
+
+        ~DataLockPair()
+        {
+            mHigh.unlock();
+            mLow.unlock();
+        }
+
+    private:
+        struct Hold
+        {
+            LLSharedMutex* mMutex;
+            bool mShared;
+
+            void lock() const
+            {
+                if (!mMutex)
+                    return;
+                if (mShared)
+                    mMutex->lockShared();
+                else
+                    mMutex->lockExclusive();
+            }
+
+            void unlock() const
+            {
+                if (!mMutex)
+                    return;
+                if (mShared)
+                    mMutex->unlockShared();
+                else
+                    mMutex->unlockExclusive();
+            }
+        };
+
+        Hold mLow;
+        Hold mHigh;
+    };
 };
 
 using LLImageDataLock = LLImageBase::DataLock<false>;
 using LLImageDataSharedLock = LLImageBase::DataLock<true>;
+// One image read and another written, as a copy from one into the other needs.
+using LLImageDataCopyLock = LLImageBase::DataLockPair<true, false>;
+// Two images written.
+using LLImageDataLockPair = LLImageBase::DataLockPair<false, false>;
 
 // Raw representation of an image (used for textures, and other uncompressed formats
 class LLImageRaw : public LLImageBase
@@ -280,7 +367,6 @@ public:
     // Src and dst can be any size.  Src and dst can each have 3 or 4 components.
     void composite( const LLImageRaw* src );
 
-
     std::string getComment() const { return mComment; }
     std::string mComment;
 
@@ -314,7 +400,9 @@ protected:
     void setDataAndSize(U8 *data, S32 width, S32 height, S8 components) ;
 
 public:
-    static S32 sRawImageCount;
+    // Counted on whichever thread makes or frees an image, the decode threads
+    // among them; read for the statistics only.
+    static std::atomic<S32> sRawImageCount;
 
 private:
     static bool validateSrcAndDst(std::string func, const LLImageRaw* src, const LLImageRaw* dst);
@@ -395,7 +483,8 @@ protected:
     S8 mLevels;         // Number of resolution levels in that image. Min is 1. 0 means unknown.
 
 public:
-    static S32 sGlobalFormattedMemory;
+    // As sRawImageCount.
+    static std::atomic<S32> sGlobalFormattedMemory;
 };
 
 #endif

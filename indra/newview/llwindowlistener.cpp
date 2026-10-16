@@ -41,9 +41,11 @@
 #include "llrootview.h"
 #include "llsdutil.h"
 #include "stringize.h"
+#include "llclipboard.h"
+#include "lleditmenuhandler.h"
+#include <functional>
 #include <typeinfo>
 #include <map>
-#include <boost/bind.hpp>
 
 LLWindowListener::LLWindowListener(LLViewerWindow *window, const KeyboardGetter& kbgetter)
     : LLEventAPI("LLWindow", "Inject input events into the LLWindow instance"),
@@ -54,7 +56,7 @@ LLWindowListener::LLWindowListener(LLViewerWindow *window, const KeyboardGetter&
         "Given [\"keysym\"], [\"keycode\"] or [\"char\"], inject the specified ";
     std::string keyExplain =
         "(integer keycode values, or keysym string from any addKeyName() call in\n"
-        "http://bitbucket.org/lindenlab/viewer-release/src/tip/indra/llwindow/llkeyboard.cpp )\n";
+        "https://github.com/secondlife/viewer/blob/develop/indra/llwindow/llkeyboard.cpp )\n";
     std::string mask =
         "Specify optional [\"mask\"] as an array containing any of \"CTL\", \"ALT\",\n"
         "\"SHIFT\" or \"MAC_CONTROL\"; the corresponding modifier bits will be combined\n"
@@ -69,7 +71,7 @@ LLWindowListener::LLWindowListener(LLViewerWindow *window, const KeyboardGetter&
         "(button values \"LEFT\", \"MIDDLE\", \"RIGHT\")\n";
     std::string paramsExplain =
         "[\"path\"] is as for LLUI::getInstance()->resolvePath(), described in\n"
-        "http://bitbucket.org/lindenlab/viewer-release/src/tip/indra/llui/llui.h\n"
+        "https://github.com/secondlife/viewer/blob/develop/indra/llui/llui.h\n"
         "If you omit [\"path\"], you must specify both [\"x\"] and [\"y\"].\n"
         "If you specify [\"path\"] without both [\"x\"] and [\"y\"], will synthesize (x, y)\n"
         "in the center of the LLView selected by [\"path\"].\n"
@@ -88,8 +90,15 @@ LLWindowListener::LLWindowListener(LLViewerWindow *window, const KeyboardGetter&
         "to list; all nodes from root if no [\"under\"].",
         &LLWindowListener::getPaths,
         LLSDMap("reply", LLSD()));
+    add("getSubtree",
+        "Send on [\"reply\"] a nested tree of info maps for all descendants of\n"
+        "optional [\"under\"] path (default: root). Each node contains the same\n"
+        "fields as getInfo plus a [\"children\"] array of child nodes.",
+        &LLWindowListener::getSubtree,
+        LLSDMap("reply", LLSD()));
     add("keyDown",
-        keySomething + "keypress event.\n" + keyExplain + mask,
+        keySomething + "keypress event.\n" + keyExplain +
+        "The [\"char\"] parameter detects and handles non-ASCII characters seperately\n" + mask,
         &LLWindowListener::keyDown);
     add("keyUp",
         keySomething + "key release event.\n" + keyExplain + mask,
@@ -107,6 +116,26 @@ LLWindowListener::LLWindowListener(LLViewerWindow *window, const KeyboardGetter&
         "Given an integer number of [\"clicks\"], inject the requested mouse scroll event.\n"
         "(positive clicks moves downward through typical content)",
         &LLWindowListener::mouseScroll);
+    add("pasteText",
+        "Paste specified [\"text\"] into the current edit field\n"
+        "Optional [\"path\"] specifies target UI element (must be focusable).",
+        &LLWindowListener::pasteText);
+    add("cut",
+        "Cut selected content from the focused edit field.\n"
+        "Optional [\"path\"] specifies target UI element (must be focusable).",
+        &LLWindowListener::cut);
+    add("copy",
+        "Copy selected content from the focused edit field.\n"
+        "Optional [\"path\"] specifies target UI element (must be focusable).",
+        &LLWindowListener::copy);
+    add("paste",
+        "Paste clipboard contents into the focused edit field.\n"
+        "Optional [\"path\"] specifies target UI element (must be focusable).",
+        &LLWindowListener::paste);
+    add("selectAll",
+        "Select all content in the focused edit field.\n"
+        "Optional [\"path\"] specifies target UI element (must be focusable).",
+        &LLWindowListener::selectAll);
 }
 
 template <typename MAPPED>
@@ -258,11 +287,60 @@ void LLWindowListener::getPaths(LLSD const & request)
     }
 }
 
+static LLSD buildSubtree(LLView* view)
+{
+    LLSD children;
+    LLSD node = view->getInfo();
+    for (LLView::child_list_const_iter_t it = view->beginChild(); it != view->endChild(); ++it)
+    {
+        children.append(buildSubtree(*it));
+    }
+    node["children"] = children;
+    return node;
+}
+
+void LLWindowListener::getSubtree(LLSD const & request)
+{
+    Response response(LLSD(), request);
+    LLView* root = LLUI::getInstance()->getRootView();
+    LLView* base = nullptr;
+    std::string under(request["under"]);
+
+    if (under.empty())
+    {
+        base = root;
+    }
+    else
+    {
+        base = LLUI::getInstance()->resolvePath(root, under);
+        if (!base)
+        {
+            return response.error(STRINGIZE(request["op"].asString() << " request specified invalid \"under\" path: '" << under << "'"));
+        }
+    }
+
+    response.setResponse(buildSubtree(base));
+}
+
 void LLWindowListener::keyDown(LLSD const & evt)
 {
     Response response(LLSD(), evt);
     KEY key = getKEY(evt);
     MASK mask = getMask(evt);
+
+    bool is_non_ascii = false;
+    llwchar uni_char = 0;
+
+    if (evt.has("char"))
+    {
+        const std::string str = evt["char"].asString();
+        if (!str.empty())
+        {
+            uni_char = utf8str_decode_at(str, 0).cp;
+            // If the Unicode code point is outside ASCII range, use Unicode-only handling
+            is_non_ascii = (uni_char >= 0x80);
+        }
+     }
 
     if (evt.has("path"))
     {
@@ -278,8 +356,17 @@ void LLWindowListener::keyDown(LLSD const & evt)
             response.setResponse(target_view->getInfo());
 
             gFocusMgr.setKeyboardFocus(target_view);
-            gViewerInput.handleKey(key, mask, false);
-            if(key < 0x80) mWindow->handleUnicodeChar(key, mask);
+
+            if (is_non_ascii)
+            {
+                // For non-ASCII characters, only send the Unicode event
+                mWindow->handleUnicodeChar(uni_char, mask);
+            }
+            else
+            {
+                gViewerInput.handleKey(key, mask, false);
+                if(key < 0x80) mWindow->handleUnicodeChar(key, mask);
+            }
         }
         else
         {
@@ -290,8 +377,16 @@ void LLWindowListener::keyDown(LLSD const & evt)
     }
     else
     {
-        gViewerInput.handleKey(key, mask, false);
-        if(key < 0x80) mWindow->handleUnicodeChar(key, mask);
+        if (is_non_ascii)
+        {
+            // For non-ASCII characters, only send the Unicode event
+            mWindow->handleUnicodeChar(uni_char, mask);
+        }
+        else
+        {
+            gViewerInput.handleKey(key, mask, false);
+            if(key < 0x80) mWindow->handleUnicodeChar(key, mask);
+        }
     }
 }
 
@@ -352,7 +447,7 @@ struct WhichButton: public StringLookup<Actions>
 };
 static WhichButton buttons;
 
-typedef boost::function<bool(LLCoordGL, MASK)> MouseFunc;
+typedef std::function<bool(LLCoordGL, MASK)> MouseFunc;
 
 // Wrap a function returning 'void' to return 'true' instead. I'm sure there's
 // a more generic way to accomplish this, but generically handling the
@@ -363,7 +458,7 @@ typedef boost::function<bool(LLCoordGL, MASK)> MouseFunc;
 // seem to overload comma the same way; or at least not with bind().)
 class MouseFuncTrue
 {
-    typedef boost::function<void(LLCoordGL, MASK)> MouseFuncVoid;
+    typedef std::function<void(LLCoordGL, MASK)> MouseFuncVoid;
     MouseFuncVoid mFunc;
 
 public:
@@ -463,9 +558,9 @@ static void mouseEvent(const MouseFunc& func, const LLSD& request)
 
         // Instantiate a TemporaryDrilldownFunc to route incoming mouse events
         // to the target LLView*. But put it on the heap since "path" is
-        // optional. Nonetheless, manage it with a boost::scoped_ptr so it
+        // optional. Nonetheless, manage it with a std::unique_ptr so it
         // will be destroyed when we leave.
-        tempfunc.reset(new LLView::TemporaryDrilldownFunc(llview::TargetEvent(target)));
+        tempfunc = std::make_unique<LLView::TemporaryDrilldownFunc>(llview::TargetEvent(target));
     }
 
     // The question of whether the requested LLView actually handled the
@@ -484,11 +579,11 @@ void LLWindowListener::mouseDown(LLSD const & request)
     if (actions.valid)
     {
         // Normally you can pass NULL to an LLWindow* without compiler
-        // complaint, but going through boost::bind() evidently
+        // complaint, but going through std::bind() evidently
         // bypasses that special case: it only knows you're trying to pass an
         // int to a pointer. Explicitly cast NULL to the desired pointer type.
         mouseEvent(boost::bind(actions.down, mWindow,
-                             static_cast<LLWindow*>(NULL), _1, _2),
+                             static_cast<LLWindow*>(NULL), boost::placeholders::_1, boost::placeholders::_2),
                    request);
     }
 }
@@ -498,8 +593,7 @@ void LLWindowListener::mouseUp(LLSD const & request)
     Actions actions(buttons.lookup(request["button"]));
     if (actions.valid)
     {
-        mouseEvent(boost::bind(actions.up, mWindow,
-                             static_cast<LLWindow*>(NULL), _1, _2),
+        mouseEvent(boost::bind(actions.up, mWindow, static_cast<LLWindow*>(NULL), boost::placeholders::_1, boost::placeholders::_2),
                    request);
     }
 }
@@ -511,8 +605,8 @@ void LLWindowListener::mouseMove(LLSD const & request)
     // void, whereas mouseEvent() accepts a function returning bool -- and
     // uses that bool return. Use MouseFuncTrue to construct a callable that
     // returns bool anyway.
-    mouseEvent(MouseFuncTrue(boost::bind(&LLWindowCallbacks::handleMouseMove, mWindow,
-                          static_cast<LLWindow*>(NULL), _1, _2)),
+    mouseEvent(MouseFuncTrue(boost::bind(&LLWindowCallbacks::handleMouseMove, mWindow, static_cast<LLWindow*>(NULL), boost::placeholders::_1,
+                                       boost::placeholders::_2)),
                request);
 }
 
@@ -520,5 +614,136 @@ void LLWindowListener::mouseScroll(LLSD const & request)
 {
     S32 clicks = request["clicks"].asInteger();
 
-    mWindow->handleScrollWheel(NULL, clicks);
+    mWindow->handleScrollWheel(NULL, LLScrollDelta(clicks, (F32)clicks));
+}
+
+void LLWindowListener::pasteText(LLSD const & evt)
+{
+    Response response(LLSD(), evt);
+
+    if (!evt.has("text"))
+    {
+        response.error(STRINGIZE(evt["op"].asString() << " request did not provide required \"text\" parameter"));
+        return;
+    }
+
+    std::string text_to_paste = evt["text"].asString();
+    if (evt.has("path"))
+    {
+        std::string path(evt["path"]);
+        LLView* target_view = LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), path);
+        if (!target_view)
+        {
+            response.error(STRINGIZE(evt["op"].asString() << " request specified invalid \"path\": " << path));
+            return;
+        }
+        else if(!target_view->isAvailable())
+        {
+            response.error(STRINGIZE("Target view specified by \"path\": " << path << " is not visible"));
+            return;
+        }
+        else
+        {
+            // Focus the target view
+            gFocusMgr.setKeyboardFocus(target_view);
+        }
+    }
+
+    // Check if edit menu handler is available
+    if (!LLEditMenuHandler::gEditMenuHandler)
+    {
+        response.error(STRINGIZE(evt["op"].asString() << " request failed: no edit menu handler available"));
+        return;
+    }
+
+    // Save current clipboard contents
+    std::string saved_clipboard;
+    LLClipboard::instance().pasteFromClipboard(saved_clipboard);
+
+    LLClipboard::instance().copyToClipboard(text_to_paste, 0, static_cast<S32>(text_to_paste.size()));
+    LLEditMenuHandler::gEditMenuHandler->paste();
+
+    // Restore original clipboard contents if there were any
+    if (!saved_clipboard.empty())
+    {
+        LLClipboard::instance().copyToClipboard(saved_clipboard, 0, static_cast<S32>(saved_clipboard.size()));
+    }
+    else
+    {
+        LLClipboard::instance().reset();
+    }
+}
+
+// Helper: optionally focus a view by path; returns false and sets response error on failure.
+static bool focusViewByPath(const LLSD& evt, LLEventAPI::Response& response)
+{
+    if (!evt.has("path"))
+        return true;
+
+    std::string path(evt["path"]);
+    LLView* target_view = LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), path);
+    if (!target_view)
+    {
+        response.error(STRINGIZE(evt["op"].asString() << " request specified invalid \"path\": " << path));
+        return false;
+    }
+    if (!target_view->isAvailable())
+    {
+        response.error(STRINGIZE("Target view specified by \"path\": " << path << " is not visible"));
+        return false;
+    }
+    gFocusMgr.setKeyboardFocus(target_view);
+    return true;
+}
+
+void LLWindowListener::cut(LLSD const & evt)
+{
+    Response response(LLSD(), evt);
+    if (!focusViewByPath(evt, response))
+        return;
+    if (!LLEditMenuHandler::gEditMenuHandler)
+    {
+        response.error(STRINGIZE(evt["op"].asString() << " request failed: no edit menu handler available"));
+        return;
+    }
+    LLEditMenuHandler::gEditMenuHandler->cut();
+}
+
+void LLWindowListener::copy(LLSD const & evt)
+{
+    Response response(LLSD(), evt);
+    if (!focusViewByPath(evt, response))
+        return;
+    if (!LLEditMenuHandler::gEditMenuHandler)
+    {
+        response.error(STRINGIZE(evt["op"].asString() << " request failed: no edit menu handler available"));
+        return;
+    }
+    LLEditMenuHandler::gEditMenuHandler->copy();
+}
+
+void LLWindowListener::paste(LLSD const & evt)
+{
+    Response response(LLSD(), evt);
+    if (!focusViewByPath(evt, response))
+        return;
+    if (!LLEditMenuHandler::gEditMenuHandler)
+    {
+        response.error(STRINGIZE(evt["op"].asString() << " request failed: no edit menu handler available"));
+        return;
+    }
+    LLEditMenuHandler::gEditMenuHandler->paste();
+}
+
+void LLWindowListener::selectAll(LLSD const & evt)
+{
+    Response response(LLSD(), evt);
+    if (!focusViewByPath(evt, response))
+        return;
+    if (!LLEditMenuHandler::gEditMenuHandler)
+    {
+        response.error(STRINGIZE(evt["op"].asString() << " request failed: no edit menu handler available"));
+        return;
+    }
+    LLEditMenuHandler::gEditMenuHandler->selectAll();
 }

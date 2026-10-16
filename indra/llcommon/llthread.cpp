@@ -24,9 +24,6 @@
  */
 
 #include "linden_common.h"
-#include "llapr.h"
-
-#include "apr_portable.h"
 
 #include "llapp.h"
 #include "llthread.h"
@@ -37,10 +34,20 @@
 #include "lltracethreadrecorder.h"
 #include "llexception.h"
 #include "workqueue.h"
+#include "lockstatic.h"
+
+#include <string>
+#include <unordered_map>
 
 #if LL_LINUX
 #include <sched.h>
 #endif
+
+#if LL_DARWIN || LL_LINUX
+#include <pthread.h>
+#endif
+
+#include "alsimd.h"
 
 
 #ifdef LL_WINDOWS
@@ -56,25 +63,57 @@ typedef struct tagTHREADNAME_INFO
     DWORD dwFlags; // Reserved for future use, must be zero.
 } THREADNAME_INFO;
 #pragma pack(pop)
+#endif
 
-void set_thread_name( DWORD dwThreadID, const char* threadName)
+void set_thread_name(const char* threadName)
 {
+#if LL_WINDOWS
     THREADNAME_INFO info;
-    info.dwType = 0x1000;
-    info.szName = threadName;
-    info.dwThreadID = dwThreadID;
-    info.dwFlags = 0;
+    info.dwType     = 0x1000;
+    info.szName     = threadName;
+    info.dwThreadID = GetCurrentThreadId();
+    info.dwFlags    = 0;
 
     __try
     {
-        ::RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(DWORD), (ULONG_PTR*)&info );
+        ::RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(DWORD), (ULONG_PTR*)&info);
     }
-    __except(EXCEPTION_CONTINUE_EXECUTION)
+    __except (EXCEPTION_CONTINUE_EXECUTION)
     {
     }
-}
+#elif LL_DARWIN
+    std::string truncated_name(std::string_view(threadName).substr(0, 15));
+    pthread_setname_np(truncated_name.c_str());
+#elif LL_LINUX
+    std::string truncated_name(std::string_view(threadName).substr(0, 15));
+    pthread_setname_np(pthread_self(), truncated_name.c_str());
 #endif
+}
 
+// Denormals flushed to zero on the way in and out, rounding to nearest. On
+// x86-64 those are three fields of MXCSR; on aarch64 the FZ bit of FPCR
+// covers both directions and RMode of zero is nearest.
+void set_thread_fp_mode()
+{
+#if AL_SIMD_X86
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+    _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+    _MM_SET_ROUNDING_MODE(_MM_ROUND_NEAREST);
+#else
+    constexpr uint64_t FPCR_FZ = 1ull << 24;
+    constexpr uint64_t FPCR_RMODE = 3ull << 22;
+    #if defined(_MSC_VER)
+    uint64_t fpcr = static_cast<uint64_t>(_ReadStatusReg(ARM64_FPCR));
+    fpcr = (fpcr | FPCR_FZ) & ~FPCR_RMODE;
+    _WriteStatusReg(ARM64_FPCR, static_cast<__int64>(fpcr));
+    #else
+    uint64_t fpcr;
+    __asm__ volatile("mrs %0, fpcr" : "=r"(fpcr));
+    fpcr = (fpcr | FPCR_FZ) & ~FPCR_RMODE;
+    __asm__ volatile("msr fpcr, %0" : : "r"(fpcr));
+    #endif
+#endif
+}
 
 //----------------------------------------------------------------------------
 // Usage:
@@ -114,7 +153,7 @@ namespace
 
     U32 exception_filter(U32 code, struct _EXCEPTION_POINTERS* exception_infop)
     {
-        if (LLApp::instance()->reportCrashToBugsplat((void*)exception_infop))
+        if (LLApp::instance()->reportCrash((void*)exception_infop))
         {
             // Handled
             return EXCEPTION_CONTINUE_SEARCH;
@@ -148,27 +187,81 @@ LL_COMMON_API bool assert_main_thread()
     return false;
 }
 
-// this function has become moot
-void LLThread::registerThreadID() {}
+namespace llthread
+{
+void* getCanonicalStatic(const char* name, void* (*factory)())
+{
+    // The canonical per-type statics live here, in a single translation unit --
+    // hence a single module even in a multi-DLL build -- so every module that
+    // instantiates LockStatic<Static> for a given Static resolves the SAME
+    // instance. Keyed by the mangled name string (typeid(Static).name()) rather
+    // than std::type_index: under -fvisibility=hidden each module has its own
+    // type_info object, so identity comparison would treat the same type as a
+    // different key per module and re-introduce the duplication we are removing.
+    // The mangled name string is identical across modules for one ABI.
+    //
+    // Heap-allocated and intentionally never freed so the statics outlive every
+    // user (LockStatic consumers' own statics may be torn down at process exit).
+    static std::mutex* sMutex = new std::mutex();
+    static auto* sRegistry = new std::unordered_map<std::string, void*>();
+    std::lock_guard<std::mutex> lk(*sMutex);
+    void*& slot = (*sRegistry)[name];
+    if (! slot)
+    {
+        slot = factory();
+    }
+    return slot;
+}
+
+// ---- DLL-safe thread-local slots (see lockstatic.h) ----
+namespace
+{
+    constexpr size_t MAX_THREAD_LOCAL_SLOTS = 256;
+    // The one and only thread_local store, owned by this module. Reached from
+    // every module through the exported accessors below, so all modules share a
+    // single per-thread value per slot.
+    thread_local void* sThreadLocalSlots[MAX_THREAD_LOCAL_SLOTS] = {};
+}
+
+size_t allocThreadLocalSlot(const char* name)
+{
+    // Assign a stable slot index per type name, once, shared across all modules.
+    // (The mangled name string is identical across modules for one ABI -- see
+    // getCanonicalStatic() above for the hidden-visibility rationale.)
+    static std::mutex* sMutex = new std::mutex();
+    static auto* sIndices = new std::unordered_map<std::string, size_t>();
+    std::lock_guard<std::mutex> lk(*sMutex);
+    auto it = sIndices->find(name);
+    if (it != sIndices->end())
+        return it->second;
+    size_t index = sIndices->size();
+    if (index >= MAX_THREAD_LOCAL_SLOTS)
+    {
+        LL_ERRS() << "Exceeded MAX_THREAD_LOCAL_SLOTS (" << MAX_THREAD_LOCAL_SLOTS
+                  << ") allocating thread-local slot for " << name << LL_ENDL;
+    }
+    (*sIndices)[name] = index;
+    return index;
+}
+
+void* getThreadLocalSlot(size_t slot)
+{
+    return sThreadLocalSlots[slot];
+}
+
+void setThreadLocalSlot(size_t slot, void* value)
+{
+    sThreadLocalSlots[slot] = value;
+}
+} // namespace llthread
 
 //
 // Handed to the APR thread creation function
 //
 void LLThread::threadRun()
 {
-#ifdef LL_WINDOWS
-    set_thread_name(-1, mName.c_str());
-
-#if 0 // probably a bad idea, see usage of SetThreadIdealProcessor in LLWindowWin32)
-    HANDLE hThread = GetCurrentThread();
-    if (hThread)
-    {
-        SetThreadAffinityMask(hThread, (DWORD_PTR) 0xFFFFFFFFFFFFFFFE);
-    }
-#endif
-
-#endif
-
+    set_thread_name(mName.c_str());
+    set_thread_fp_mode();
     LL_PROFILER_SET_THREAD_NAME( mName.c_str() );
 
     // this is the first point at which we're actually running in the new thread
@@ -196,9 +289,9 @@ void LLThread::threadRun()
     mRecorder = NULL;
 
     // We're done with the run function, this thread is done executing now.
-    //NB: we are using this flag to sync across threads...we really need memory barriers here
-    // Todo: add LLMutex per thread instead of flag?
-    // We are using "while (mStatus != STOPPED) {ms_sleep();}" everywhere.
+    // mStatus is atomic: a thread that reads it stopped, as shutdown() and
+    // "while (mStatus != STOPPED) {ms_sleep();}" do, sees all this one did
+    // before it.
     mStatus = STOPPED;
 }
 
@@ -212,7 +305,6 @@ void LLThread::tryRun()
     {
         LL_WARNS("THREAD") << "ContinueException on thread '" << mName <<
             "'. Error what is: '" << e.what() << "'" << LL_ENDL;
-        LLError::LLCallStacks::print();
 
         LOG_UNHANDLED_EXCEPTION("LLThread");
     }
@@ -240,7 +332,11 @@ void LLThread::tryRun()
         LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
         main_queue->post(
             // Bind the current exception, rethrow it in main loop.
-            [exc = std::current_exception()]() { std::rethrow_exception(exc); });
+            [exc = std::current_exception(), name = mName]()
+        {
+            LL_INFOS("THREAD") << "Rethrowing exception from thread " << name << LL_ENDL;
+            std::rethrow_exception(exc);
+        });
     }
 #endif // else LL_WINDOWS
 }
@@ -265,7 +361,7 @@ void LLThread::sehHandle()
 }
 #endif
 
-LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
+LLThread::LLThread(const std::string& name) :
     mPaused(false),
     mName(name),
     mThreadp(NULL),
@@ -273,8 +369,6 @@ LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
     mRecorder(NULL)
 {
     mRunCondition = new LLCondition();
-    mDataLock = new LLMutex();
-    mLocalAPRFilePoolp = NULL ;
 }
 
 
@@ -285,12 +379,6 @@ LLThread::~LLThread()
     if (isCrashed())
     {
         LL_WARNS("THREAD") << "Destroying crashed thread named '" << mName << "'" << LL_ENDL;
-    }
-
-    if(mLocalAPRFilePoolp)
-    {
-        delete mLocalAPRFilePoolp ;
-        mLocalAPRFilePoolp = NULL ;
     }
 }
 
@@ -310,11 +398,13 @@ void LLThread::shutdown()
             // The thread isn't already stopped
             // First, set the flag that indicates that we're ready to die
             setQuitting();
+            if (!isStopped())
+            {
+                // Give the thread a chance to update status.
+                yield();
+            }
 
             //LL_INFOS() << "LLThread::~LLThread() Killing thread " << mName << " Status: " << mStatus << LL_ENDL;
-            // Now wait a bit for the thread to exit
-            // It's unclear whether I should even bother doing this - this destructor
-            // should never get called unless we're already stopped, really...
             S32 counter = 0;
             const S32 MAX_WAIT = 600;
             while (counter < MAX_WAIT)
@@ -323,9 +413,9 @@ void LLThread::shutdown()
                 {
                     break;
                 }
-                // Sleep for a tenth of a second
-                ms_sleep(100);
-                yield();
+                // Sleep for 10ms, 6 seconds total, then give up and kill the thread
+                // Warning: This can be called from the main thread
+                ms_sleep(10);
                 counter++;
             }
         }
@@ -352,9 +442,6 @@ void LLThread::shutdown()
 
     delete mRunCondition;
     mRunCondition = NULL;
-
-    delete mDataLock;
-    mDataLock = NULL;
 
     if (mRecorder)
     {
@@ -394,21 +481,16 @@ void LLThread::start()
 // The thread will pause when (and if) it calls checkPause()
 void LLThread::pause()
 {
-    if (!mPaused)
-    {
-        // this will cause the thread to stop execution as soon as checkPause() is called
-        mPaused = 1;        // Does not need to be atomic since this is only set/unset from the main thread
-    }
+    // this will cause the thread to stop execution as soon as checkPause() is called
+    LLMutexLock lock(mRunCondition);
+    mPaused = true;
 }
 
 void LLThread::unpause()
 {
-    if (mPaused)
-    {
-        mPaused = 0;
-    }
-
-    wake(); // wake up the thread if necessary
+    LLMutexLock lock(mRunCondition);
+    mPaused = false;
+    wakeLocked(); // wake up the thread if necessary
 }
 
 // virtual predicate function -- returns true if the thread should wake up, false if it should sleep.
@@ -424,38 +506,37 @@ bool LLThread::runCondition(void)
 void LLThread::checkPause()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    mDataLock->lock();
-
-    // This is in a while loop because the pthread API allows for spurious wakeups.
-    while(shouldSleep())
-    {
-        mDataLock->unlock();
-        mRunCondition->wait(); // unlocks mRunCondition
-        mDataLock->lock();
-        // mRunCondition is locked when the thread wakes up
-    }
-
-    mDataLock->unlock();
+    // shouldSleep() is answered under the lock that wake() and unpause() change its
+    // answer under, and the wait gives that lock up only once asleep, so a wake cannot
+    // land between the check and the sleep.
+    mRunCondition->wait([this]() { return !shouldSleep(); });
 }
 
 //============================================================================
 
 void LLThread::setQuitting()
 {
-    mDataLock->lock();
-    if (mStatus == RUNNING)
+    // shutdown() frees mRunCondition once the worker is joined. A later
+    // setQuitting() has nothing left to signal, and dereferencing it here
+    // would fault rather than report the double call.
+    if (!mRunCondition)
     {
-        mStatus = QUITTING;
+        return;
     }
+
+    LLMutexLock lock(mRunCondition);
+    // Only a running thread is told to quit. The thread marks itself stopped
+    // without this lock as it ends, and a check then a store could mark it
+    // quitting after that, which shutdown() would wait out.
+    EThreadStatus running = RUNNING;
+    mStatus.compare_exchange_strong(running, QUITTING);
     // It's only safe to remove mRunCondition if all locked threads were notified
     mRunCondition->broadcast();
-    mDataLock->unlock();
 }
 
 // static
 LLThread::id_t LLThread::currentID()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     return std::this_thread::get_id();
 }
 
@@ -469,12 +550,8 @@ void LLThread::yield()
 void LLThread::wake()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    mDataLock->lock();
-    if(!shouldSleep())
-    {
-        mRunCondition->signal();
-    }
-    mDataLock->unlock();
+    LLMutexLock lock(mRunCondition);
+    wakeLocked();
 }
 
 void LLThread::wakeLocked()
@@ -488,14 +565,12 @@ void LLThread::wakeLocked()
 
 void LLThread::lockData()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    mDataLock->lock();
+    mRunCondition->lock();
 }
 
 void LLThread::unlockData()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    mDataLock->unlock();
+    mRunCondition->unlock();
 }
 
 //============================================================================
@@ -507,14 +582,15 @@ LLThreadSafeRefCount::LLThreadSafeRefCount() :
 
 LLThreadSafeRefCount::LLThreadSafeRefCount(const LLThreadSafeRefCount& src)
 {
-    mRef = 0;
+    mRef.store(0, std::memory_order_relaxed);
 }
 
 LLThreadSafeRefCount::~LLThreadSafeRefCount()
 {
-    if (mRef != 0)
+    const S32 refs = getNumRefs();
+    if (refs != 0)
     {
-        LL_ERRS() << "deleting referenced object mRef = " << mRef << LL_ENDL;
+        LL_ERRS() << "deleting referenced object mRef = " << refs << LL_ENDL;
     }
 }
 

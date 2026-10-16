@@ -15,7 +15,7 @@
 	<text name="help_text">
 		Vous pouvez inviter plusieurs résidents à la fois. Cliquez d&apos;abord sur Choisir un résident.
 	</text>
-	<button label="Choisir un résident" name="add_button" tool_tip=""/>
+	<button label="Choisir un résident" name="add_button"/>
 	<name_list name="invitee_list" tool_tip="Pour sélectionner plusieurs résidents, maintenez la touche Ctrl enfoncée et cliquez sur leurs noms"/>
 	<button label="Supprimer de la liste" name="remove_button" tool_tip="Supprime les résidents sélectionnés ci-dessus de la liste des invités"/>
 	<text name="role_text">

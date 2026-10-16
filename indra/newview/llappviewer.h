@@ -17,7 +17,7 @@
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -44,7 +44,7 @@
 #define LL_LLAPPVIEWER_H
 
 #include "llapp.h"
-#include "llapr.h"
+#include "llfile.h"
 #include "llcontrol.h"
 #include "llsys.h"          // for LLOSInfo
 #include "lltimer.h"
@@ -64,8 +64,6 @@ class LLViewerJoystick;
 class LLPurgeDiskCacheThread;
 class LLViewerRegion;
 
-extern LLTrace::BlockTimerStatHandle FTM_FRAME;
-
 typedef enum
 {
     LAST_EXEC_NORMAL = 0,
@@ -76,7 +74,10 @@ typedef enum
     LAST_EXEC_LOGOUT_CRASH,
     LAST_EXEC_BAD_ALLOC,
     LAST_EXEC_MISSING_FILES,
-    LAST_EXEC_GRAPHICS_INIT,
+    LAST_EXEC_INIT,
+    LAST_EXEC_UNKNOWN,
+    LAST_EXEC_LOGOUT_UNKNOWN,
+    LAST_EXEC_OS_EVENT,
     LAST_EXEC_COUNT
 } eLastExecEvent;
 
@@ -97,9 +98,9 @@ public:
     //
     // Main application logic
     //
-    virtual bool init();            // Override to do application initialization
-    virtual bool cleanup();         // Override to do application cleanup
-    virtual bool frame(); // Override for application body logic
+    bool init() override;            // Override to do application initialization
+    bool cleanup() override;         // Override to do application cleanup
+    bool frame() override; // Override for application body logic
 
     // Application control
     void flushLFSIO(); // waits for lfs transfers to complete
@@ -111,14 +112,31 @@ public:
                    const LLSD& substitutions = LLSD()); // Display an error dialog and forcibly quit.
     void earlyExitNoNotify(); // Do not display error dialog then forcibly quit.
     void abortQuit();  // Called to abort a quit request.
+    void sendViewerStatistics(bool include_preferences);
+
+    // Hand the process's argv to the viewer. Must be called from the entry
+    // point BEFORE LLAppViewer is constructed: the startup log file name is
+    // decided in the constructor, long before gSavedSettings has any controls,
+    // so --logfile can only be read from the raw command line.
+    static void setStartupCommandLine(int argc, char** argv);
+
+    // std::terminate becomes a crash report with the exception on it. Called
+    // from the entry point, before anything can throw.
+    static void installTerminateHandler();
+
+    // The log the previous run wrote, or empty when there is none. Known
+    // once the viewer is constructed, which moves the logs into place.
+    static std::string previousLogFile();
 
     bool quitRequested() { return mQuitRequested; }
     bool logoutRequestSent() { return mLogoutRequestSent; }
     bool isSecondInstance() { return mSecondInstance; }
-    bool isUpdaterMissing(); // In use by tests
-    bool waitForUpdater();
-
     void writeDebugInfo(bool isStatic=true);
+
+#if LL_WINDOWS
+    bool reportCrash(void* exception_pointers) override;
+#endif
+    bool reportFreeze(const std::string& description) override;
 
     void setServerReleaseNotesURL(const std::string& url) { mServerReleaseNotesURL = url; }
     LLSD getViewerInfo() const;
@@ -149,6 +167,12 @@ public:
     std::string getWindowTitle() const; // The window display name.
 
     void forceDisconnect(const std::string& msg); // Force disconnection, with a message to the user.
+
+    // sendSimpleLogoutRequest does not create a marker file.
+    // Meant for lost network case, and for forced shutdowns,
+    // to at least attempt to remove the ghost from the world.
+    void sendSimpleLogoutRequest();
+
     void badNetworkHandler(); // Cause a crash state due to bad network packet.
 
     bool hasSavedFinalSnapshot() { return mSavedFinalSnapshot; }
@@ -176,6 +200,9 @@ public:
     virtual void forceErrorWorkQueueCrash();
     virtual void forceErrorThreadCrash();
     virtual void forceExceptionThreadCrash();
+    virtual void forceErrorAbort();
+    virtual void forceErrorStackOverflow();
+    virtual void forceErrorTerminate();
 
     // The list is found in app_settings/settings_files.xml
     // but since they are used explicitly in code,
@@ -198,11 +225,17 @@ public:
     // For thread debugging.
     // llstartup needs to control init.
     // llworld, send_agent_pause() also controls pause/resume.
-    void initMainloopTimeout(std::string_view state, F32 secs = -1.0f);
+    void initMainloopTimeout(std::string_view state);
     void destroyMainloopTimeout();
     void pauseMainloopTimeout();
-    void resumeMainloopTimeout(std::string_view state = "", F32 secs = -1.0f);
-    void pingMainloopTimeout(std::string_view state, F32 secs = -1.0f);
+    void resumeMainloopTimeout(std::string_view state = "");
+    void pingMainloopTimeout(std::string_view state);
+
+    F32 getMainloopTimeoutSec() const;
+    std::string getMainloopWatchdogState() const;
+    // The same in its two parts, "Expired at " or "Paused at " and the
+    // state, which a crash handler can copy out without allocating.
+    std::pair<std::string_view, std::string_view> getMainloopWatchdogStateParts() const;
 
     // Handle the 'login completed' event.
     // *NOTE:Mani Fix this for login abstraction!!
@@ -216,7 +249,7 @@ public:
         return mOnLoginCompleted.connect(cb);
     }
 
-    void addOnIdleCallback(const boost::function<void()>& cb); // add a callback to fire (once) when idle
+    void addOnIdleCallback(const std::function<void()>& cb); // add a callback to fire (once) when idle
 
     void initGeneralThread();
     void purgeUserDataOnExit() { mPurgeUserDataOnExit = true; }
@@ -245,6 +278,19 @@ public:
 
     // Writes an error code into the error_marker file for use on next startup.
     void createErrorMarker(eLastExecEvent error_code) const;
+    bool errorMarkerExists() const;
+    // The error marker a crash handler leaves, unless one is there already.
+    // Async-signal-safe: it opens, writes and closes a file whose path and
+    // contents prepareCrashMarker() composed while the viewer ran.
+    void prepareCrashMarker();
+    void createCrashMarker(eLastExecEvent error_code) const;
+
+    void createCloseRequestMarker() const;
+    void removeCloseRequestMarker() const;
+    void createInitedMarker() const;
+    void removeInitedMarker() const;
+    void createWatchdogMarker() const;
+    void removeWatchdogMarker() const;
 
     // Attempt a 'soft' quit with disconnect and saving of settings/cache.
     // Intended to be thread safe.
@@ -252,17 +298,11 @@ public:
     // Note: mQuitRequested can be aborted by user.
     void outOfMemorySoftQuit();
 
-#ifdef LL_DISCORD
-    static void initDiscordSocial();
-    static void updateDiscordActivity();
-    static void updateDiscordPartyCurrentSize(int32_t size);
-    static void updateDiscordPartyMaxSize(int32_t size);
-#endif
-
 protected:
     virtual bool initWindow(); // Initialize the viewer's window.
     virtual void initLoggingAndGetLastDuration(); // Initialize log files, logging system
     virtual void initConsole() {}; // Initialize OS level debugging console.
+    virtual void cleanupConsole() {}; // Cleanup OS level debugging console.
     virtual bool initHardwareTest() { return true; } // A false result indicates the app should quit.
     virtual bool initSLURLHandler();
     virtual bool sendURLToOtherInstance(const std::string& url);
@@ -274,7 +314,15 @@ protected:
 
     virtual bool meetsRequirementsForMaximizedStart(); // Used on first login to decide to launch maximized
 
-    virtual void sendOutOfDiskSpaceNotification();
+    void sendOutOfDiskSpaceNotification() override;
+
+protected:
+
+    // NSIS relies on this to detect if viewer is up.
+    // NSIS's method is somewhat unreliable since window
+    // can close long before cleanup is done.
+    // sendURLToOtherInstance also relies on this to detect if viewer is up.
+    static constexpr const char* sWindowClass = "Alchemy";
 
 private:
 
@@ -284,6 +332,7 @@ private:
     bool initThreads(); // Initialize viewer threads, return false on failure.
     bool initConfiguration(); // Initialize settings from the command line/config file.
     void initStrings();       // Initialize LLTrans machinery
+    void loadLocalizedSettingsComments(); // Override Debug Settings comments for current locale
     bool initCache(); // Initialize local client cache.
 
     // We have switched locations of both Mac and Windows cache, make sure
@@ -293,10 +342,11 @@ private:
     void cleanupSavedSettings(); // Sets some config data to current or default values during cleanup.
     void removeCacheFiles(const std::string& filemask); // Deletes cached files the match the given wildcard.
 
+    void startDebugInfo(); // Write this run's id and log to "static_debug_info.log", ahead of the rest
     void writeSystemInfo(); // Write system info to "debug_info.log"
 
     void processMarkerFiles();
-    static void recordMarkerVersion(LLAPRFile& marker_file);
+    static void recordMarkerVersion(LLFile& marker_file);
     bool markerIsSameVersion(const std::string& marker_name) const;
     LLUUID getMarkerSessionId(const std::string& marker_name) const;
     S32 getMarkerErrorCode(const std::string& marker_name) const;
@@ -311,22 +361,28 @@ private:
     void sendLogoutRequest();
     void disconnectViewer();
 
-    // Does not create a marker file. For lost network case,
-    // to at least attempt to remove the ghost from the world.
-    void sendSimpleLogoutRequest();
-
     // *FIX: the app viewer class should be some sort of singleton, no?
     // Perhaps its child class is the singleton and this should be an abstract base.
     static LLAppViewer* sInstance;
 
     bool mSecondInstance; // Is this a second instance of the app?
-    bool mUpdaterNotFound; // True when attempt to start updater failed
+
+    // Where the previous run's log was moved as this run started.
+    std::string mPreviousLogFile;
 
     std::string mMarkerFileName;
-    LLAPRFile mMarkerFile; // A file created to indicate the app is running.
+    LLFile mMarkerFile; // A file created to indicate the app is running.
 
     std::string mLogoutMarkerFileName;
-    LLAPRFile mLogoutMarkerFile; // A file created to indicate the app is running.
+    LLFile mLogoutMarkerFile; // A file created to indicate the app is running.
+
+    // Where createCrashMarker() writes, and the version line it starts with.
+#if LL_WINDOWS
+    std::wstring mCrashMarkerPath;
+#else
+    std::string mCrashMarkerPath;
+#endif
+    std::string mCrashMarkerVersion;
 
     bool mReportedCrash;
 
@@ -359,9 +415,6 @@ private:
 
     LLWatchdogTimeout* mMainloopTimeout;
 
-    // For performance and metric gathering
-    class LLThread* mFastTimerLogThread;
-
     // for tracking viewer<->region circuit death
     bool mAgentRegionLastAlive;
     LLUUID mAgentRegionLastID;
@@ -386,17 +439,20 @@ extern LLUUID gLastAgentSessionId; // will be set if agent logged in
 
 extern const char* gPlatform;
 
+// Frames drawn: display() counts them. LLFrameTimer::getFrameCount() counts frames of
+// idle(), which go on while nothing is drawn; a wait for a rendered frame uses this one.
 extern U32 gFrameCount;
 extern U32 gForegroundFrameCount;
 
 extern LLPumpIO* gServicePump;
 
-extern U64MicrosecondsImplicit  gStartTime;
-extern U64MicrosecondsImplicit   gFrameTime;                    // The timestamp of the most-recently-processed frame
-extern F32SecondsImplicit       gFrameTimeSeconds;          // Loses msec precision after ~4.5 hours...
-extern F32SecondsImplicit       gFrameIntervalSeconds;      // Elapsed time between current and previous gFrameTimeSeconds
-extern F32      gFPSClamped;                // Frames per second, smoothed, weighted toward last frame
-extern F32      gFrameDTClamped;
+// The frame's time, sampled once at the top of LLAppViewer::idle() from the
+// same reading as LLFrameTimer, and updated every frame, teleports included.
+extern U64MicrosecondsImplicit   gFrameTime;                    // Microseconds since the epoch, as totalTime()
+extern F64SecondsImplicit       gFrameTimeSeconds;          // Seconds since startup, as LLFrameTimer::getUptimeSeconds()
+extern F32SecondsImplicit       gFrameIntervalSeconds;      // This frame's length, as LLFrameTimer::getFrameDeltaTimeF32()
+extern F32      gFPSClamped;                // Frames per second, smoothed, weighted toward last frame: a rate to show or test, not a dt
+extern F32      gFrameDTClamped;            // gFrameIntervalSeconds clamped to 0.1 ms..1 s: the dt for anything that integrates a rate
 
 extern LLTimer gRenderStartTime;
 extern LLFrameTimer gForegroundTime;
@@ -410,13 +466,10 @@ extern S32 gPendingMetricsUploads;
 extern F32 gSimLastTime;
 extern F32 gSimFrames;
 
-extern bool     gDisconnected;
-
 extern LLFrameTimer gRestoreGLTimer;
 extern bool         gRestoreGL;
 extern bool     gUseWireframe;
 
-extern LLMemoryInfo gSysMemory;
 extern U64Bytes gMemoryAllocated;
 
 extern std::string gLastVersionChannel;

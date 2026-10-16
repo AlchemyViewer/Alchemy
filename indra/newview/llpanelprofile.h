@@ -33,8 +33,6 @@
 #include "llpanel.h"
 #include "llpanelavatar.h"
 #include "llmediactrl.h"
-#include "llprofileimagectrl.h"
-#include "llprofileimagepicker.h"
 #include "llvoiceclient.h"
 
 // class LLPanelProfileClassifieds;
@@ -69,12 +67,14 @@ class LLViewerFetchedTexture;
 /**
 * Panel for displaying Avatar's second life related info.
 */
-class LLPanelProfileSecondLife
+class LLPanelProfileSecondLife final
     : public LLPanelProfilePropertiesProcessorTab
     , public LLFriendObserver
     , public LLVoiceClientStatusObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileSecondLife, LLPanelProfilePropertiesProcessorTab);
+
     LLPanelProfileSecondLife();
     /*virtual*/ ~LLPanelProfileSecondLife();
 
@@ -112,6 +112,8 @@ public:
     void commitUnsavedChanges() override;
 
     void processProperties(void* data, EAvatarProcessorType type) override;
+
+    void setAllowEdit(bool allow_edit) { mAllowEdit = allow_edit; }
 
 protected:
     /**
@@ -209,19 +211,23 @@ private:
     bool                mWaitingForImageUpload;
     bool                mAllowPublish;
     bool                mHideAge;
+    bool                mAllowEdit;
     std::string         mDescriptionText;
     boost::signals2::connection mAvatarNameCacheConnection;
+    boost::signals2::connection mMenuNameCacheConnection;
 };
 
 
 /**
 * Panel for displaying Avatar's web profile and home page.
 */
-class LLPanelProfileWeb
+class LLPanelProfileWeb final
     : public LLPanelProfileTab
     , public LLViewerMediaObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileWeb, LLPanelProfileTab);
+
     LLPanelProfileWeb();
     /*virtual*/ ~LLPanelProfileWeb();
 
@@ -257,10 +263,12 @@ private:
 /**
 * Panel for displaying Avatar's first life related info.
 */
-class LLPanelProfileFirstLife
+class LLPanelProfileFirstLife final
     : public LLPanelProfilePropertiesProcessorTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileFirstLife, LLPanelProfilePropertiesProcessorTab);
+
     LLPanelProfileFirstLife();
     /*virtual*/ ~LLPanelProfileFirstLife();
 
@@ -310,10 +318,12 @@ protected:
 /**
  * Panel for displaying Avatar's notes and modifying friend's rights.
  */
-class LLPanelProfileNotes
+class LLPanelProfileNotes final
     : public LLPanelProfilePropertiesProcessorTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileNotes, LLPanelProfilePropertiesProcessorTab);
+
     LLPanelProfileNotes();
     /*virtual*/ ~LLPanelProfileNotes();
 
@@ -347,10 +357,12 @@ protected:
 /**
 * Container panel for the profile tabs
 */
-class LLPanelProfile
+class LLPanelProfile final
     : public LLPanelProfileTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfile, LLPanelProfileTab);
+
     LLPanelProfile();
     /*virtual*/ ~LLPanelProfile();
 

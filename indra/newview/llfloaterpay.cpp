@@ -52,6 +52,9 @@
 #include "llselectmgr.h"
 #include "lltransactiontypes.h"
 #include "lluictrlfactory.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+// [/RLVa:KB]
 
 ///----------------------------------------------------------------------------
 /// Local function declarations, constants, enums, and typedefs
@@ -78,13 +81,15 @@ typedef std::shared_ptr<LLGiveMoneyInfo> give_money_ptr;
 /// Class LLFloaterPay
 ///----------------------------------------------------------------------------
 
-class LLFloaterPay : public LLFloater
+class LLFloaterPay final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPay, LLFloater);
+
     LLFloaterPay(const LLSD& key);
     virtual ~LLFloaterPay();
-    /*virtual*/ bool    postBuild();
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ bool    postBuild() override;
+    /*virtual*/ void onClose(bool app_quitting) override;
 
     void setCallback(money_callback callback) { mCallback = callback; }
 
@@ -127,8 +132,8 @@ const S32 PAY_AMOUNT_NOTIFICATION = 200;
 LLFloaterPay::LLFloaterPay(const LLSD& key)
     : LLFloater(key),
       mCallbackData(),
-      mCallback(NULL),
-      mObjectNameText(NULL),
+      mCallback(nullptr),
+      mObjectNameText(nullptr),
       mTargetUUID(key.asUUID()),
       mTargetIsGroup(false),
       mHaveName(false)
@@ -154,7 +159,7 @@ bool LLFloaterPay::postBuild()
 {
     S32 i = 0;
 
-    give_money_ptr info = give_money_ptr(new LLGiveMoneyInfo(this, PAY_BUTTON_DEFAULT_0));
+    give_money_ptr info = std::make_shared<LLGiveMoneyInfo>(this, PAY_BUTTON_DEFAULT_0);
     mCallbackData.push_back(info);
 
     childSetAction("fastpay 1", boost::bind(LLFloaterPay::onGive, info));
@@ -164,7 +169,7 @@ bool LLFloaterPay::postBuild()
     mQuickPayInfo[i] = info;
     ++i;
 
-    info = give_money_ptr(new LLGiveMoneyInfo(this, PAY_BUTTON_DEFAULT_1));
+    info = std::make_shared<LLGiveMoneyInfo>(this, PAY_BUTTON_DEFAULT_1);
     mCallbackData.push_back(info);
 
     childSetAction("fastpay 5", boost::bind(LLFloaterPay::onGive, info));
@@ -174,7 +179,7 @@ bool LLFloaterPay::postBuild()
     mQuickPayInfo[i] = info;
     ++i;
 
-    info = give_money_ptr(new LLGiveMoneyInfo(this, PAY_BUTTON_DEFAULT_2));
+    info = std::make_shared<LLGiveMoneyInfo>(this, PAY_BUTTON_DEFAULT_2);
     mCallbackData.push_back(info);
 
     childSetAction("fastpay 10", boost::bind(LLFloaterPay::onGive, info));
@@ -184,7 +189,7 @@ bool LLFloaterPay::postBuild()
     mQuickPayInfo[i] = info;
     ++i;
 
-    info = give_money_ptr(new LLGiveMoneyInfo(this, PAY_BUTTON_DEFAULT_3));
+    info = std::make_shared<LLGiveMoneyInfo>(this, PAY_BUTTON_DEFAULT_3);
     mCallbackData.push_back(info);
 
     childSetAction("fastpay 20", boost::bind(LLFloaterPay::onGive, info));
@@ -300,7 +305,7 @@ void LLFloaterPay::processPayPriceReply(LLMessageSystem* msg, void **userdata)
         std::string balance_str = "L$";
         balance_str += LLResMgr::getInstance()->getMonetaryString( max_pay_amount );
         const LLFontGL* font = LLFontGL::getFontSansSerif();
-        S32 new_button_width = font->getWidth( std::string(balance_str));
+        S32 new_button_width = font->getWidth(balance_str);
         new_button_width += ( 12 + 12 );    // padding
 
         // dialong is sized for 2 digit pay amounts - larger pay values need to be scaled
@@ -311,7 +316,7 @@ void LLFloaterPay::processPayPriceReply(LLMessageSystem* msg, void **userdata)
             S32 num_digits_max = (S32)log10((double)max_pay_amount) + 1;
 
             // calculate the extra width required by 2 buttons with max amount and some commas
-            padding_required = ( num_digits_max - num_digits_threshold + ( num_digits_max / 3 ) ) * font->getWidth( std::string("0") );
+            padding_required = ( num_digits_max - num_digits_threshold + ( num_digits_max / 3 ) ) * font->getWidth("0");
         };
 
         // change in button width
@@ -410,6 +415,9 @@ void LLFloaterPay::payDirectly(money_callback callback,
     floater->getChildView("amount")->setVisible(true);
     floater->getChildView("pay btn")->setVisible(true);
     floater->getChildView("amount text")->setVisible(true);
+// [RLVa:KB]
+    floater->getChildView("payment_message")->setEnabled(RlvActions::canSendIM(target_id));
+// [/RLVa:KB]
 
     for(S32 i=0;i<MAX_PAY_BUTTONS;++i)
     {
@@ -502,7 +510,7 @@ void LLFloaterPay::onGive(give_money_ptr info)
         amount = atoi(text_field->getValue().asString().c_str());
     }
 
-    if (amount > PAY_AMOUNT_NOTIFICATION && gStatusBar && gStatusBar->getBalance() > amount)
+    if (amount > PAY_AMOUNT_NOTIFICATION)
     {
         LLUUID payee_id = LLUUID::null;
         bool is_group = false;

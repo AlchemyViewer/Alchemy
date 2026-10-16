@@ -33,6 +33,7 @@
 
 #include "llpluginprocesschild.h"
 #include "llpluginmessage.h"
+#include "llplugininstance.h"
 #include "llerrorcontrol.h"
 #include "llapr.h"
 #include "llstring.h"
@@ -40,6 +41,29 @@
 #include <iostream>
 #include <fstream>
 using namespace std;
+
+// Returns the statically-linked plugin init entry point for this host. Each
+// per-plugin host executable links exactly one definition: slplugin_static.cpp
+// for a plain plugin, or slplugin_cef.cpp for the CEF host - both return
+// &LLPluginInitEntryPoint (there is no dlopen path any more).
+LLPluginInstance::pluginInitFunction ll_get_static_plugin_init();
+
+// The host driver: register the statically-linked plugin, then pump the
+// plugin<->parent message loop until the plugin is done. Factored out of the
+// platform entry points so the CEF bootstrap host (slplugin_cef_bootstrap.cpp)
+// can reuse it after setting up the sandbox. Defined below.
+int slplugin_run(U32 port);
+
+// Host-provided entry the platform main() hands control to. Serves connection
+// `port`; if `daemon_rendezvous` is non-empty the host runs as the shared
+// multi-tab CEF daemon (publishing its control port to that path), otherwise it
+// serves the single connection. The plain hosts' definition (slplugin_static.cpp)
+// just calls slplugin_run(); the CEF host's (slplugin_cef.cpp) adds the
+// persistent-runtime / daemon behaviour, keeping dullahan out of the other
+// hosts. The Windows CEF DLL uses its own bootstrap entry
+// (slplugin_cef_bootstrap.cpp) instead of this. Mirrors the per-host
+// ll_get_static_plugin_init() hook above.
+int ll_run_slplugin_host(U32 port, const std::string& daemon_rendezvous);
 
 
 #if LL_DARWIN
@@ -147,6 +171,11 @@ int main(int argc, char **argv)
 //      LLError::logToFile("slplugin.log");
     }
 
+    // Non-empty only for a CEF daemon launch (parsed from argv below); empty for
+    // the generic host and on Windows (where the bootstrap entry handles daemon
+    // mode instead).
+    std::string daemon_rendezvous;
+
 #if LL_WINDOWS
     if( strlen( lpCmdLine ) == 0 )
     {
@@ -175,6 +204,18 @@ int main(int argc, char **argv)
         LL_ERRS("slplugin") << "port number must be numeric" << LL_ENDL;
     }
 
+    // Optional "--daemon <rendezvous-path>" tells a CEF host to run as the shared
+    // multi-tab daemon (on Windows this is handled by the bootstrap entry). The
+    // rendezvous path is taken as a single argument.
+    for (int i = 2; i + 1 < argc; ++i)
+    {
+        if (std::string(argv[i]) == "--daemon")
+        {
+            daemon_rendezvous = argv[i + 1];
+            break;
+        }
+    }
+
     // Catch signals that most kinds of crashes will generate, and exit cleanly so the system crash dialog isn't shown.
     signal(SIGILL, &crash_handler);     // illegal instruction
     signal(SIGFPE, &crash_handler);     // floating-point exception
@@ -184,11 +225,29 @@ int main(int argc, char **argv)
 #endif
 # if LL_DARWIN
     signal(SIGEMT, &crash_handler);     // emulate instruction executed
+#endif //LL_DARWIN
 
+    // Hand off to the per-host entry (generic: single connection; CEF: persistent
+    // runtime, and the shared daemon when a rendezvous path was supplied).
+    int rc = ll_run_slplugin_host(port, daemon_rendezvous);
+
+    ll_cleanup_apr();
+
+    return rc;
+}
+
+int slplugin_run(U32 port)
+{
+#if LL_DARWIN
     LLCocoaPlugin cocoa_interface;
     cocoa_interface.setupCocoa();
     cocoa_interface.createAutoReleasePool();
 #endif //LL_DARWIN
+
+    // If this is a dedicated single-plugin host (e.g. SLPluginCEF), register the
+    // statically-linked plugin entry point so LLPluginInstance::load() calls it
+    // directly instead of dlopen()ing a plugin library.
+    LLPluginInstance::setStaticInitFunction(ll_get_static_plugin_init());
 
     LLPluginProcessChild *plugin = new LLPluginProcessChild();
 
@@ -260,9 +319,6 @@ int main(int argc, char **argv)
 #endif
     }
     delete plugin;
-
-    ll_cleanup_apr();
-
 
     return 0;
 }

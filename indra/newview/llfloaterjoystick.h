@@ -33,17 +33,18 @@
 class LLCheckBoxCtrl;
 class LLComboBox;
 
-class LLFloaterJoystick : public LLFloater
+class LLFloaterJoystick final : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterJoystick, LLFloater);
 
-    virtual bool postBuild();
-    virtual void refresh();
+    virtual bool postBuild() override;
+    virtual void refresh() override;
     virtual void apply();   // Apply the changed values.
     virtual void cancel();  // Cancel the changed values.
-    virtual void draw();
+    virtual void draw() override;
     static  void setSNDefaults();
 
     static bool addDeviceCallback(std::string &name, LLSD& value, void* userdata);
@@ -52,8 +53,8 @@ public:
 protected:
 
     void refreshListOfDevices();
-    void onClose(bool app_quitting);
-    void onClickCloseBtn(bool app_quitting);
+    void onClose(bool app_quitting) override;
+    void onClickCloseBtn(bool app_quitting) override;
 
 private:
 

@@ -16,7 +16,6 @@
 		</layout_panel>
 		<layout_panel name="external_controls">
 			<button label="Użyj mojej przeglądarki" name="open_browser" />
-			<check_box label="Zawsze w mojej przeglądarce" name="open_always" />
 			<button label="Zamknij" name="close" />
 		</layout_panel>
 	</layout_stack>

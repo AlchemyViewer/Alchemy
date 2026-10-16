@@ -37,7 +37,7 @@
 #define LL_LLINITDESTROYCLASS_H
 
 #include "llsingleton.h"
-#include <boost/function.hpp>
+#include <functional>
 #include <typeinfo>
 #include <vector>
 #include <utility>                  // std::pair
@@ -47,10 +47,10 @@
  * LLInitClassList and LLDestroyClassList. It accumulates the initClass() or
  * destroyClass() callbacks for registered classes.
  */
-class LLCallbackRegistry
+class LL_COMMON_API LLCallbackRegistry
 {
 public:
-    typedef boost::function<void()> func_t;
+    typedef std::function<void()> func_t;
 
     void registerCallback(const std::string& name, const func_t& func)
     {

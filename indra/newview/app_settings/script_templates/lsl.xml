@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  Script Studio's templates for new LSL scripts: what New Script offers
+  besides your own (the preferences' Templates), each a name, a line
+  about it, and the script. A file of the same name under the settings
+  folder's script_templates/ adds a person's own.
+-->
+<llsd>
+  <array>
+    <map>
+      <key>name</key>
+      <string>Touch</string>
+      <key>detail</key>
+      <string>Says who touched it</string>
+      <key>body</key>
+      <string>default
+{
+    touch_start(integer total_number)
+    {
+        llSay(0, "Touched by " + llDetectedName(0) + ".");
+    }
+}
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>Listener</string>
+      <key>detail</key>
+      <string>Hears a channel, and says what it heard to its owner</string>
+      <key>body</key>
+      <string>integer CHANNEL = 7;
+
+default
+{
+    state_entry()
+    {
+        llListen(CHANNEL, "", NULL_KEY, "");
+    }
+
+    listen(integer channel, string name, key id, string message)
+    {
+        llOwnerSay(name + " said: " + message);
+    }
+}
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>Timer</string>
+      <key>detail</key>
+      <string>Does something every second</string>
+      <key>body</key>
+      <string>default
+{
+    state_entry()
+    {
+        llSetTimerEvent(1.0);
+    }
+
+    timer()
+    {
+        llSetText((string)llGetUnixTime(), &lt;1.0, 1.0, 1.0&gt;, 1.0);
+    }
+}
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>Dialog menu</string>
+      <key>detail</key>
+      <string>A menu for whoever touches it, answered on a channel of its own</string>
+      <key>body</key>
+      <string>list BUTTONS = ["Red", "Green", "Blue"];
+integer gListen;
+
+stopListening()
+{
+    llListenRemove(gListen);
+    llSetTimerEvent(0.0);
+}
+
+default
+{
+    touch_start(integer total_number)
+    {
+        key toucher = llDetectedKey(0);
+        stopListening();
+        integer channel = -1 - (integer)llFrand(1000000.0);
+        gListen = llListen(channel, "", toucher, "");
+        llDialog(toucher, "Choose a colour.", BUTTONS, channel);
+        llSetTimerEvent(30.0);
+    }
+
+    listen(integer channel, string name, key id, string message)
+    {
+        stopListening();
+        if (message == "Red") llSetColor(&lt;1.0, 0.0, 0.0&gt;, ALL_SIDES);
+        else if (message == "Green") llSetColor(&lt;0.0, 1.0, 0.0&gt;, ALL_SIDES);
+        else if (message == "Blue") llSetColor(&lt;0.0, 0.0, 1.0&gt;, ALL_SIDES);
+    }
+
+    timer()
+    {
+        stopListening();
+    }
+}
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>Sensor</string>
+      <key>detail</key>
+      <string>Tells its owner who is near, every few seconds</string>
+      <key>body</key>
+      <string>default
+{
+    state_entry()
+    {
+        llSensorRepeat("", NULL_KEY, AGENT, 20.0, PI, 5.0);
+    }
+
+    sensor(integer detected)
+    {
+        integer i;
+        for (i = 0; i &lt; detected; ++i)
+        {
+            float away = llVecDist(llGetPos(), llDetectedPos(i));
+            llOwnerSay(llDetectedName(i) + " is " + (string)llRound(away) + " m away.");
+        }
+    }
+
+    no_sensor()
+    {
+        llOwnerSay("Nobody near.");
+    }
+}
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>HTTP request</string>
+      <key>detail</key>
+      <string>Asks a web address when touched, and says what came back</string>
+      <key>body</key>
+      <string>key gRequest;
+
+default
+{
+    touch_start(integer total_number)
+    {
+        gRequest = llHTTPRequest("https://example.com/", [HTTP_METHOD, "GET"], "");
+    }
+
+    http_response(key request_id, integer status, list metadata, string body)
+    {
+        if (request_id == gRequest)
+        {
+            llOwnerSay("HTTP " + (string)status + ": " + llGetSubString(body, 0, 200));
+        }
+    }
+}
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>Notecard reader</string>
+      <key>detail</key>
+      <string>Reads a notecard in the object a line at a time</string>
+      <key>body</key>
+      <string>string NOTECARD = "config";
+integer gLine;
+key gQuery;
+
+default
+{
+    state_entry()
+    {
+        if (llGetInventoryType(NOTECARD) == INVENTORY_NOTECARD)
+        {
+            gQuery = llGetNotecardLine(NOTECARD, gLine);
+        }
+        else
+        {
+            llOwnerSay("No notecard called " + NOTECARD + " in this object.");
+        }
+    }
+
+    dataserver(key query_id, string data)
+    {
+        if (query_id != gQuery)
+        {
+            return;
+        }
+        if (data == EOF)
+        {
+            llOwnerSay("Read " + (string)gLine + " lines.");
+            return;
+        }
+        llOwnerSay(data);
+        ++gLine;
+        gQuery = llGetNotecardLine(NOTECARD, gLine);
+    }
+
+    changed(integer change)
+    {
+        if (change &amp; CHANGED_INVENTORY)
+        {
+            llResetScript();
+        }
+    }
+}
+</string>
+    </map>
+  </array>
+</llsd>

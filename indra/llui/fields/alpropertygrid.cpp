@@ -1,0 +1,994 @@
+/**
+ * @file alpropertygrid.cpp
+ * @brief One row per field of a widget, with the editor its type asks for.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "alpropertygrid.h"
+
+#include "alsurface.h"
+#include "alstringmatch.h"
+
+#include "llui.h"
+#include "llaccordionctrl.h"
+#include "llaccordionctrltab.h"
+#include "alangledial.h"
+#include "alcolorfield.h"
+#include "alcornerfield.h"
+#include "aloffsetpad.h"
+#include "alemptystate.h"
+#include "alfollowscontrol.h"
+#include "llbutton.h"
+#include "llcheckboxctrl.h"
+#include "llcombobox.h"
+#include "lllineeditor.h"
+#include "llspinctrl.h"
+#include "lltextbox.h"
+#include "lluicolortable.h"
+#include "lluictrlfactory.h"
+#include "llfocusmgr.h"
+
+#include <fmt/format.h>
+
+#include <algorithm>
+
+static LLDefaultChildRegistry::Register<ALPropertyGrid> r("property_grid");
+
+namespace
+{
+    // The metrics, in one place, because a pane where each editor decided
+    // its own inset is a pane whose columns do not line up. Everything
+    // between the left edge and the right is one of these; the row height
+    // and the label column are the caller's, since only the caller knows
+    // what its labels say.
+    //
+    // The left margin of the whole grid. A label written hard against the
+    // edge of a scrolling container loses its first letter to the border,
+    // which is what the container is drawn with.
+    constexpr S32 MARGIN = 8;
+    // The way back sits in the right margin of every row that has one.
+    constexpr S32 REMOVE_WIDTH = 16;
+    constexpr S32 GUTTER = 10;      // between the label and its editor
+    // A row that carries a picture rather than a value is as tall as the
+    // picture, and its label sits in the ordinary row at the top of it.
+    constexpr S32 PICTURE_HEIGHT = 84;
+    // The gutter mark, in the margin the labels already leave.
+    constexpr S32 MARK_WIDTH = 3;
+    constexpr S32 MARK_INSET = 2;
+
+    // A field nothing writes is shown in the quieter ink, and so is one
+    // that is written and does nothing: what is on the row is what the
+    // widget is doing, not what the file says.
+    const LLUIColor& inkFor(const ALPropertyGrid::Field& field)
+    {
+        const LLUIColor& written = ALSurface::text();
+        const LLUIColor& unwritten = ALSurface::quiet();
+        return (field.authored && !field.ignored) ? written : unwritten;
+    }
+
+    // A row's own words, out of the pattern the caller gave. A caller who
+    // gave none gets the name of the field, which is the one thing this
+    // library knows how to say about it.
+    std::string say(const std::string& pattern, const ALPropertyGrid::Field& field)
+    {
+        if (pattern.empty())
+        {
+            return field.name;
+        }
+        std::string text = pattern;
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = field.name;
+        args["[TYPE]"] = field.type;
+        args["[SOURCE]"] = field.source;
+        args["[INSTEAD]"] = field.instead;
+        LLStringUtil::format(text, args);
+        return text;
+    }
+
+}
+
+// The strip beside a label that says this value is written somewhere else
+// as well. It lives in the margin the labels already leave, so marking a row
+// costs the columns nothing; it is drawn rather than imaged because it is
+// one rectangle; and it takes a click, because seeing where else is the
+// point of noticing it.
+class ALPropertyGrid::Mark final : public LLUICtrl
+{
+public:
+    AL_VIEW_TYPE(Mark, LLUICtrl);
+
+    explicit Mark(const LLUICtrl::Params& p) : LLUICtrl(p) {}
+
+    void draw() override
+    {
+        const LLUIColor& ink = ALSurface::handle();
+        gl_rect_2d(getLocalRect(), ink.get(), true);
+        LLUICtrl::draw();
+    }
+
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override
+    {
+        onCommit();
+        return true;
+    }
+};
+
+// Every row is a panel of its own, and this stacks them from its top: one
+// row height each, full width, in the order they were added. Whatever the
+// accordion decides this panel's height is, the rows begin at the top of it.
+class ALPropertyGrid::Rows final : public LLPanel
+{
+public:
+    AL_VIEW_TYPE(Rows, LLPanel);
+
+    explicit Rows(const LLPanel::Params& p)
+    :   LLPanel(p)
+    {
+    }
+
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override
+    {
+        LLPanel::reshape(width, height, called_from_parent);
+        stack();
+    }
+
+    // The rows, oldest first: a view list is filled from the front. A row
+    // keeps the height it was made at -- a row carrying a picture is taller
+    // than one carrying a value -- so what is stacked here is heights and
+    // not a count.
+    void stack()
+    {
+        const S32 width = getRect().getWidth();
+        S32 top = getRect().getHeight();
+        for (auto it = getChildList()->rbegin(); it != getChildList()->rend(); ++it)
+        {
+            LLView* row = *it;
+            const S32 height = row->getRect().getHeight();
+            row->reshape(width, height);
+            row->setOrigin(0, top - height);
+            top -= height;
+        }
+    }
+};
+
+ALPropertyGrid::Params::Params()
+:   row_height("row_height", 22),
+    label_width("label_width", 150),
+    remove_label("remove_label", "x")
+{
+}
+
+ALPropertyGrid::ALPropertyGrid(const Params& p)
+:   LLPanel(p),
+    mRowHeight(p.row_height),
+    mLabelWidth(p.label_width),
+    mRemoveLabel(p.remove_label),
+    // As wide as its word, and never narrower than the letter it was.
+    mRemoveWidth(llmax(REMOVE_WIDTH,
+                       LLFontGL::getFontSansSerifSmall()->getWidth(p.remove_label()) + 10)),
+    mRebuild([this]() { rebuild(); })
+{
+    LLAccordionCtrl::Params ap(LLUICtrlFactory::getDefaultParams<LLAccordionCtrl>());
+    ap.name = "sections";
+    ap.rect = getLocalRect();
+    ap.follows.flags = FOLLOWS_ALL;
+    ap.single_expansion = false;
+    mAccordion = LLUICtrlFactory::create<LLAccordionCtrl>(ap);
+    addChild(mAccordion);
+
+    // An empty grid and a broken one look the same, so it says which -- and
+    // says what to do about it, since every one of the three reasons a grid
+    // is empty has something the reader can do next. Over the accordion
+    // rather than in it, because what it is saying is that there are no
+    // sections at all.
+    ALEmptyState::Params ep(LLUICtrlFactory::getDefaultParams<ALEmptyState>());
+    ep.name = "empty";
+    ep.rect = getLocalRect();
+    ep.follows.flags = FOLLOWS_ALL;
+    ep.background_visible = false;
+    mEmpty = LLUICtrlFactory::create<ALEmptyState>(ep);
+    addChild(mEmpty);
+}
+
+ALPropertyGrid::~ALPropertyGrid() = default;
+
+void ALPropertyGrid::setGroups(std::vector<std::string> groups)
+{
+    for (Section& section : mSections)
+    {
+        mAccordion->removeCollapsibleCtrl(section.tab);
+        section.tab->die();
+    }
+    mSections.clear();
+    mGroups = std::move(groups);
+
+    for (const std::string& name : mGroups)
+    {
+        LLAccordionCtrlTab::Params tp(LLUICtrlFactory::getDefaultParams<LLAccordionCtrlTab>());
+        tp.name = name;
+        tp.title = name;
+        tp.display_children = true;
+        // A grid of one section has nothing to fold it away from, so the
+        // heading is a bar with no job: it names the only thing there and
+        // offers to hide the only thing there. Sections are how a long list
+        // of fields is read, and one field is not a long list.
+        tp.header_visible = mGroups.size() > 1;
+        tp.rect = LLRect(0, mRowHeight, getRect().getWidth(), 0);
+
+        LLAccordionCtrlTab* tab = LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);
+
+        LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        rp.name = name + "_rows";
+        rp.rect = LLRect(0, mRowHeight, getRect().getWidth(), 0);
+        rp.background_visible = false;
+        rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
+        Rows* rows = new Rows(rp);
+        rows->initFromParams(rp);
+        tab->setAccordionView(rows);
+
+        mAccordion->addCollapsibleCtrl(tab);
+        mSections.push_back({ tab, rows });
+    }
+    mRebuild.request();
+}
+
+void ALPropertyGrid::order(std::vector<Field>& fields) const
+{
+    // A heading the caller never named is the last one: a row has to be
+    // somewhere, and a field filed past the end was not shown at all.
+    const S32 last = (S32)mSections.size() - 1;
+    for (Field& field : fields)
+    {
+        field.group = last < 0 ? 0 : llclamp(field.group, 0, last);
+    }
+    if (mKeepsOrder)
+    {
+        std::stable_sort(fields.begin(), fields.end(), [](const Field& a, const Field& b) { return a.group < b.group; });
+        return;
+    }
+    std::sort(fields.begin(), fields.end(), [](const Field& a, const Field& b)
+    {
+        // The headings first, in the order they were named; what the file
+        // writes at the top of each, since that is what is being worked
+        // on; and the rest alphabetically under it.
+        if (a.group != b.group)
+        {
+            return a.group < b.group;
+        }
+        if (a.authored != b.authored)
+        {
+            return a.authored;
+        }
+        return a.name < b.name;
+    });
+}
+
+// Everything a row is built from, and nothing a row is refreshed with: the
+// value, who wrote it, what the tip says and where a subject sits change
+// under a kept row, and updateFields puts each of those right in place.
+bool ALPropertyGrid::sameRow(const Field& a, const Field& b)
+{
+    return a.name == b.name && a.group == b.group && a.kind == b.kind && a.type == b.type && a.label == b.label
+        && a.values == b.values && a.valueLabels == b.valueLabels && a.components == b.components
+        && a.corners == b.corners && a.pad == b.pad && a.dial == b.dial && a.slider == b.slider
+        && a.bounded == b.bounded && a.minimum == b.minimum && a.maximum == b.maximum
+        && a.step == b.step && a.decimals == b.decimals
+        && a.edges == b.edges && a.flags == b.flags && a.allWord == b.allWord && a.noneWord == b.noneWord
+        && a.pairWith == b.pairWith && a.ignored == b.ignored && a.alsoWritten == b.alsoWritten;
+}
+
+bool ALPropertyGrid::updateFields(std::vector<Field> fields)
+{
+    order(fields);
+    if (fields.size() != mFields.size())
+    {
+        return false;
+    }
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        if (!sameRow(fields[i], mFields[i]))
+        {
+            return false;
+        }
+    }
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        Field& current = mFields[i];
+        const Field& next = fields[i];
+        const bool value_changed = current.value != next.value;
+        const bool authored_changed = current.authored != next.authored || current.source != next.source;
+        // The tip is made from these as well as from who wrote the value.
+        const bool said_changed = current.unknown != next.unknown || current.deprecated != next.deprecated
+                               || current.instead != next.instead || current.description != next.description;
+        // Where the thing a follows row is about sits, which moves with
+        // every edit of its rect and is drawn rather than built.
+        const bool subject_changed = current.subject != next.subject || current.subjectParent != next.subjectParent;
+        current = std::move(fields[i]);
+        if (authored_changed || said_changed)
+        {
+            refreshAuthored(current);
+        }
+        if (value_changed || authored_changed)
+        {
+            ALFieldEditors::refresh(this, current);
+        }
+        if (subject_changed && !current.subjectParent.isEmpty())
+        {
+            if (ALFollowsControl* follows = findChild<ALFollowsControl>(current.name, true))
+            {
+                follows->setSubject(current.subject, current.subjectParent);
+            }
+        }
+    }
+    return true;
+}
+
+void ALPropertyGrid::setFields(std::vector<Field> fields)
+{
+    mFields = std::move(fields);
+    order(mFields);
+
+    // A section the file writes nothing in is every field the tag will take
+    // and none that anyone chose, which is a page of grey to scroll past to
+    // reach the next heading. So it arrives folded: everything is still
+    // here, and what is in the file is what is in front of you. Choosing
+    // another widget is a fresh view of a different thing, which is why
+    // this is done here and not on every rebuild.
+    //
+    // Unless there is only one. Folding the only section is hiding the
+    // grid, and a grid of one section draws no heading, so there would be
+    // nothing to unfold it with: a setting at its default showed a blank
+    // strip and nothing else. Folding and headings are one decision.
+    const bool folds = mFoldsUnwritten && mSections.size() > 1;
+    for (size_t group = 0; group < mSections.size(); ++group)
+    {
+        const bool written = std::any_of(mFields.begin(), mFields.end(),
+                                         [group](const Field& field)
+                                         { return field.group == (S32)group && field.authored; });
+        mSections[group].tab->setDisplayChildren(!folds || written);
+    }
+    mRebuild.request();
+}
+
+void ALPropertyGrid::clearFields()
+{
+    mFields.clear();
+    mRebuild.request();
+}
+
+// The mark is a child of the row, named for the field it marks: a caller
+// putting a popover beside it needs the view and not the name.
+LLView* ALPropertyGrid::gutterFor(const std::string& name) const
+{
+    return findChild<LLView>(name + "_gutter", true);
+}
+
+void ALPropertyGrid::setAuthoredOnly(bool only)
+{
+    if (mAuthoredOnly != only)
+    {
+        mAuthoredOnly = only;
+        mRebuild.request();
+    }
+}
+
+void ALPropertyGrid::setFoldsUnwritten(bool folds)
+{
+    mFoldsUnwritten = folds;
+}
+
+void ALPropertyGrid::setKeepsOrder(bool keeps)
+{
+    mKeepsOrder = keeps;
+}
+
+void ALPropertyGrid::setNested(bool nested)
+{
+    if (mNested != nested)
+    {
+        mNested = nested;
+        mRebuild.request();
+    }
+}
+
+void ALPropertyGrid::setNotices(Notice nothing_selected, Notice nothing_written, Notice no_match)
+{
+    mNothingSelected = std::move(nothing_selected);
+    mNothingWritten = std::move(nothing_written);
+    mNoMatch = std::move(no_match);
+    mRebuild.request();
+}
+
+boost::signals2::connection ALPropertyGrid::onNoticeAction(const notice_signal_t::slot_type& cb)
+{
+    return mEmpty->onAction(cb);
+}
+
+void ALPropertyGrid::setTips(Tips tips)
+{
+    mTips = std::move(tips);
+    mRebuild.request();
+}
+
+void ALPropertyGrid::setColorResolver(color_resolver_t resolver)
+{
+    mEditors.setColorResolver(std::move(resolver));
+    mRebuild.request();
+}
+
+void ALPropertyGrid::setColorChoices(ALColorField::choices_t choices)
+{
+    mEditors.setColorChoices(std::move(choices));
+    mRebuild.request();
+}
+
+void ALPropertyGrid::setImageChoices(ALImageField::choices_t choices)
+{
+    mEditors.setImageChoices(std::move(choices));
+    mRebuild.request();
+}
+
+void ALPropertyGrid::setImageEditor(ALImageField::edit_t editor, std::string label)
+{
+    mEditors.setImageEditor(std::move(editor), std::move(label));
+    mRebuild.request();
+}
+
+void ALPropertyGrid::setEdgeTips(std::vector<std::string> tips)
+{
+    mEditors.setEdgeTips(std::move(tips));
+    mRebuild.request();
+}
+
+void ALPropertyGrid::setFilter(const std::string& text)
+{
+    if (mFilter != text)
+    {
+        mFilter = text;
+        mRebuild.request();
+    }
+}
+
+// What another field of this same widget is in force at. A composite
+// editor -- a font is three attributes -- needs the ones that are not the
+// row it is on, and the grid is what has them.
+std::string ALPropertyGrid::valueOf(const std::string& name) const
+{
+    const Field* field = fieldNamed(name);
+    return field ? field->value : std::string();
+}
+
+bool ALPropertyGrid::shows(const Field& field) const
+{
+    if (mAuthoredOnly && !field.authored)
+    {
+        return false;
+    }
+    // A leaf of a block the widget carries. Hidden by default because it
+    // multiplies the list several times over -- but never hidden when the
+    // file writes it, since the tool must not be quiet about what is there.
+    if (!mNested && !field.authored && field.name.find('.') != std::string::npos)
+    {
+        return false;
+    }
+    // By the name a file writes or the words the row is called by: a
+    // person looking for the fill colour types either.
+    return ALStringMatch::containsNoCase(field.name, mFilter)
+        || (!field.label.empty() && ALStringMatch::containsNoCase(field.label, mFilter));
+}
+
+// What the row is, then where what is in force came from, then -- where
+// nobody wrote it -- that nobody did. Three lines at most, and the second
+// and third are the two things about this pane that have to be said rather
+// than shown.
+std::string ALPropertyGrid::tipFor(const Field& field) const
+{
+    std::string text = say(field.ignored      ? mTips.ignored
+                         : field.unknown      ? mTips.unknown
+                         : field.type.empty() ? mTips.field
+                                              : mTips.fieldTyped, field);
+    if (!field.source.empty() && !mTips.source.empty())
+    {
+        text += "\n" + say(mTips.source, field);
+    }
+    if (!field.authored && !mTips.unwritten.empty())
+    {
+        text += "\n" + say(mTips.unwritten, field);
+    }
+    // A name that works and should not be used says so on the row that
+    // uses it, and says what to write where the vocabulary has a word.
+    if (field.deprecated)
+    {
+        const std::string& pattern = field.instead.empty() || mTips.deprecatedFor.empty()
+                                   ? mTips.deprecated : mTips.deprecatedFor;
+        if (!pattern.empty())
+        {
+            text += "\n" + say(pattern, field);
+        }
+    }
+    // And what the caller has to say about this one, which no pattern
+    // over the vocabulary can know.
+    if (!field.description.empty())
+    {
+        text += "\n" + field.description;
+    }
+    return text;
+}
+
+S32 ALPropertyGrid::rowHeight(const Field& field) const
+{
+    if (field.edges.size() == 4)
+    {
+        return llmax(mRowHeight, PICTURE_HEIGHT);
+    }
+    if (field.corners)
+    {
+        return llmax(mRowHeight, ALCornerField::HEIGHT);
+    }
+    if (field.pad)
+    {
+        return llmax(mRowHeight, ALOffsetPad::HEIGHT);
+    }
+    if (field.dial)
+    {
+        return llmax(mRowHeight, ALAngleDial::HEIGHT);
+    }
+    // A row whose parts are captioned is a caption taller than one whose
+    // value needs no saying which part it is -- and a colour is never
+    // captioned, however its caller named its parts.
+    return field.components.empty() || ALFieldEditors::isColorType(field.type)
+         ? mRowHeight : mRowHeight + ALFieldEditors::CAPTION_HEIGHT;
+}
+
+S32 ALPropertyGrid::sectionHeight(S32 group) const
+{
+    S32 height = 0;
+    for (const Field& field : mFields)
+    {
+        if (field.group == group && shows(field) && !isPartnered(field))
+        {
+            height += rowHeight(field);
+        }
+    }
+    return height;
+}
+
+S32 ALPropertyGrid::countShown(S32 group) const
+{
+    S32 count = 0;
+    for (const Field& field : mFields)
+    {
+        // A pair is one row, and it is counted where the first of them is:
+        // the section is as tall as the rows it will hold, not as the fields
+        // it was given.
+        count += (field.group == group && shows(field) && !isPartnered(field)) ? 1 : 0;
+    }
+    return count;
+}
+
+// An accordion does not reserve room for its scrollbar: it lays its tabs
+// out to its whole width and draws the scrollbar over the right edge of
+// them. So a row laid out to the width its panel reports is a row with its
+// last inch under a scrollbar, whenever there is one -- and whether there
+// is one changes every time a section is folded, which is why it looked
+// like a thing that happened at random.
+//
+// The width is taken from the accordion instead, with everything between
+// it and the row subtracted: the margin a tab is inset by, the padding a
+// tab keeps inside that, and the scrollbar's column whether or not the
+// scrollbar is in it.
+S32 ALPropertyGrid::rowWidth() const
+{
+    static LLUICachedControl<S32> scrollbar_size("UIScrollbarSize", 16);
+    constexpr S32 TAB_MARGIN = 4;       // LLAccordionCtrl::arrangeMultiple
+    const S32 padding = mSections.empty()
+        ? 4
+        : mSections.front().tab->getPaddingLeft() + mSections.front().tab->getPaddingRight();
+    return llmax(120, mAccordion->getRect().getWidth() - TAB_MARGIN - padding - scrollbar_size);
+}
+
+S32 ALPropertyGrid::editorLeft() const
+{
+    return MARGIN + mLabelWidth + GUTTER;
+}
+
+S32 ALPropertyGrid::editorWidth(S32 width) const
+{
+    // The right column ends short of the way back, where a row has one.
+    // Every row leaves the room whether it has the button or not, so the
+    // editors down the pane keep one right edge.
+    const S32 right = width - MARGIN - mRemoveWidth - GUTTER;
+    return llmax(60, right - editorLeft());
+}
+
+// A row is anchored to the two edges its parts belong to, so a change of
+// width widens the row rather than replacing it. Rebuilding here instead --
+// which is what this did -- deleted and remade every widget in the grid on
+// every frame of a drag, including the one under the pointer and any whose
+// image was still arriving, which is what made a resize look like a fault.
+void ALPropertyGrid::reshape(S32 width, S32 height, bool called_from_parent)
+{
+    LLPanel::reshape(width, height, called_from_parent);
+}
+
+// Each section is filled and then sized to what it holds; the accordion
+// arranges them, folds them and scrolls them. A section with nothing under
+// it is hidden rather than shown empty, since a heading over nothing is
+// worse than no heading.
+void ALPropertyGrid::rebuild()
+{
+    if (!mAccordion)
+    {
+        return;
+    }
+    const S32 width = rowWidth();
+    S32 shown = 0;
+    for (size_t group = 0; group < mSections.size(); ++group)
+    {
+        Rows* rows = mSections[group].rows;
+        rows->deleteAllChildren();
+
+        const S32 count = countShown((S32)group);
+        mSections[group].tab->setVisible(count > 0);
+        if (!count)
+        {
+            continue;
+        }
+        shown += count;
+
+        const S32 height = sectionHeight((S32)group);
+        rows->reshape(width, height, false);
+
+        S32 within = 0;
+        for (const Field& field : mFields)
+        {
+            if (field.group != (S32)group || !shows(field))
+            {
+                continue;
+            }
+            // A field on somebody else's row is not a row.
+            if (isPartnered(field))
+            {
+                continue;
+            }
+            // Alternate rows are banded, because a name and the value
+            // across from it are a hundred and fifty pixels apart.
+            addRow(rows, field, partnerOf(field), (within++ & 1) != 0);
+        }
+        rows->stack();
+
+        // A tab is as tall as it was told its panel is, once, when the panel
+        // was put in it. Reshaping the panel afterwards says nothing: this
+        // is what says it, and it is what every other growing thing inside
+        // an accordion sends.
+        rows->notifyParent(LLSD().with("action", "size_changes").with("height", height));
+    }
+
+    mAccordion->arrange();
+    mAccordion->setVisible(shown > 0);
+    mEmpty->setVisible(shown == 0);
+    if (!shown)
+    {
+        const Notice& says = mFields.empty()  ? mNothingSelected
+                           : !mFilter.empty() ? mNoMatch
+                                              : mNothingWritten;
+        mEmpty->say(says.headline, says.sentence, says.action);
+    }
+}
+
+// The editor a field's type asks for, in the box it is given, wired to say
+// which field it is when it commits. A row holds one of these, or two where
+// A value that is several numbers, edited as several numbers.
+//
+// A vector or a rectangle written into one box is four numbers a reader has
+// to count and a writer has to keep in order. One box each, captioned with
+// what the part is called, is the same value said so that both are obvious.
+//
+// Every box commits the whole value, because the field is one field: what
+// the caller is told is the parts joined the way a file writes them.
+// two fields are the same thought: left and top are a position, and reading
+// them on one line is how anybody says it.
+LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPanel* row)
+{
+    return mEditors.make(field, box, row, tipFor(field), commit(), [this](const std::string& name) { return valueOf(name); });
+}
+
+ALFieldEditors::commit_t ALPropertyGrid::commit()
+{
+    return [this](const std::string& name, const std::string& text)
+    {
+        // Held: the caller may fill the grid again in answer, and the
+        // editor this came from is still inside its own commit.
+        mRebuild.around([&]() { mFieldCommit(name, text); });
+    };
+}
+
+const ALPropertyGrid::Field* ALPropertyGrid::partnerOf(const Field& field) const
+{
+    if (field.pairWith.empty())
+    {
+        return nullptr;
+    }
+    for (const Field& other : mFields)
+    {
+        // The same section and shown by the same rules: a filter that matches
+        // one half of a pair does not drag the other half in with it.
+        if (other.name == field.pairWith && other.group == field.group && shows(other))
+        {
+            return &other;
+        }
+    }
+    return nullptr;
+}
+
+bool ALPropertyGrid::isPartnered(const Field& field) const
+{
+    for (const Field& other : mFields)
+    {
+        if (other.pairWith == field.name && other.group == field.group
+            && shows(other) && !other.name.empty())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The label, the editor its type asks for, and where the value came from.
+// A field the file does not write is shown with what is in force anyway:
+// an author changing it is writing it here for the first time, and the
+// value to start from is the one on the screen.
+// One panel per row, so a section can stack them and a row is a thing rather
+// than four views that happen to share a Y.
+void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner, bool shaded)
+{
+    // The band behind alternate rows is a colour of its own rather than the
+    // background at a quarter alpha: a skin that wants a different band has
+    // one to set.
+    static const LLUIColor stripe = LLUIColorTable::instance().getColor(
+        "PropertyGridBandColor", LLColor4(0.169f, 0.169f, 0.169f, 0.25f));
+
+    const S32 width = host->getRect().getWidth();
+    // Row-local: the section says where the row is, the row says where its
+    // parts are. A row carrying a picture is taller than one carrying a
+    // value, and everything but the picture sits in the ordinary row at the
+    // top of it, so the columns still line up down the pane.
+    const S32 height = rowHeight(field);
+    const S32 top = height;
+    const S32 bottom = height - mRowHeight;
+
+    LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+    rp.name = field.name + "_row";
+    rp.rect = LLRect(0, height, width, 0);
+    rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
+    rp.mouse_opaque = false;
+    // Alternate rows are banded, because a name and the value across from it
+    // are a hundred and fifty pixels apart. The row is its own band.
+    rp.background_visible = shaded;
+    if (shaded)
+    {
+        rp.bg_alpha_color = stripe;
+    }
+    LLPanel* row = LLUICtrlFactory::create<LLPanel>(rp);
+    host->addChild(row);
+
+    // What this row is, in the caller's words, said the same way wherever
+    // the pointer is along it. Which layer wrote what is in force was a
+    // column of its own, saying one word on almost every row; it is part of
+    // this sentence now, and the rows that disagree are the marked ones.
+    const std::string tip = tipFor(field);
+
+    {
+        LLTextBox::Params p;
+        p.name = field.name + "_label";
+        p.rect = LLRect(MARGIN, top - 2, MARGIN + mLabelWidth, bottom);
+        const std::string& own = field.label.empty() ? field.name : field.label;
+        p.initial_value = partner
+            ? own + ", " + (partner->label.empty() ? partner->name : partner->label)
+            : own;
+        p.tool_tip = tip;
+        p.font_valign = LLFontGL::VCENTER;
+        p.text_color = inkFor(field);
+        p.use_ellipses = true;
+        p.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        row->addChild(LLUICtrlFactory::create<LLTextBox>(p));
+    }
+
+    // The editor, or two of them where this field carries a partner. A
+    // picture takes the whole of the row it made tall.
+    const S32 left = editorLeft();
+    const S32 editor_width = editorWidth(width);
+    if (field.edges.size() == 4)
+    {
+        makeEditor(field, LLRect(left, top, left + editor_width, 0), row);
+    }
+    else if (field.corners || field.pad || field.dial)
+    {
+        // A picture of the value, as tall as the row was made for it.
+        makeEditor(field, LLRect(left, top, left + editor_width, bottom), row);
+    }
+    else if (!field.components.empty() && !ALFieldEditors::isColorType(field.type))
+    {
+        // Several numbers, as the numbers they are. The row was made a
+        // caption taller for them, and the boxes sit above that.
+        //
+        // A colour is several numbers too and is not one of these: it has a
+        // swatch and a picker, and a caller who names its parts as well gets
+        // the better editor rather than the more literal one.
+        mEditors.makeComponents(field, LLRect(left, top, left + editor_width, bottom - ALFieldEditors::CAPTION_HEIGHT), row, commit());
+    }
+    else if (partner)
+    {
+        const S32 half = (editor_width - GUTTER) / 2;
+        makeEditor(field, LLRect(left, top, left + half, bottom), row);
+        makeEditor(*partner, LLRect(left + half + GUTTER, top, left + editor_width, bottom), row);
+    }
+    else
+    {
+        makeEditor(field, LLRect(left, top, left + editor_width, bottom), row);
+    }
+
+    // The way back, on the rows that have one. A field this file writes can
+    // be taken out again, and what was in force before is in force after --
+    // which the document has always been able to do and this pane has never
+    // had a way to ask for. A paired row has one button for its two fields,
+    // and it takes out whichever of them the file writes.
+    addRemove(row, field, partner);
+
+    // The gutter: a value some other skin or language disagrees about, said
+    // once beside the row rather than as a column repeating the same word
+    // all the way down the pane.
+    if (!field.alsoWritten.empty())
+    {
+        LLUICtrl::Params p;
+        p.name = field.name + "_gutter";
+        p.rect = LLRect(MARK_INSET, top - 4, MARK_INSET + MARK_WIDTH, bottom + 4);
+        p.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        std::string says;
+        for (const std::string& line : field.alsoWritten)
+        {
+            says += says.empty() ? line : "\n" + line;
+        }
+        p.tool_tip = says;
+        Mark* mark = new Mark(p);
+        mark->initFromParams(p);
+        const std::string marked = field.name;
+        mark->setCommitCallback([this, marked](LLUICtrl*, const LLSD&)
+        {
+            mRebuild.around([&]() { mFieldGutter(marked); });
+        });
+        row->addChild(mark);
+    }
+}
+
+// Every row has the button, and the rows the file writes show it: a row
+// the file comes to write is the same row with the button shown, rather
+// than a new row under whoever was typing into the old one. A field that
+// is written and thrown away has nothing worth taking out.
+void ALPropertyGrid::addRemove(LLPanel* row, const Field& field, const Field* partner)
+{
+    const S32 width = row->getRect().getWidth();
+    const S32 top = row->getRect().getHeight();
+    LLButton::Params p(LLUICtrlFactory::getDefaultParams<LLButton>());
+    p.name = field.name + "_remove";
+    p.label = mRemoveLabel;
+    p.rect = LLRect(width - MARGIN - mRemoveWidth, top - 2, width - MARGIN, top - mRowHeight);
+    p.tool_tip = say(mTips.remove, field);
+    p.follows.flags = FOLLOWS_RIGHT | FOLLOWS_TOP;
+    p.visible = (field.authored && !field.ignored) || (partner && partner->authored && !partner->ignored);
+    LLButton* remove = LLUICtrlFactory::create<LLButton>(p);
+    const std::string removed = field.name;
+    const std::string other = partner ? partner->name : std::string();
+    remove->setCommitCallback([this, removed, other](LLUICtrl*, const LLSD&)
+    {
+        // Read as the fields stand when pressed, since either half may have
+        // been written or taken out since the row was made.
+        mRebuild.around([&]()
+        {
+            for (const std::string& name : { removed, other })
+            {
+                if (const Field* f = fieldNamed(name); f && f->authored && !f->ignored)
+                {
+                    mFieldRemove(name);
+                }
+            }
+        });
+    });
+    row->addChild(remove);
+}
+
+const ALPropertyGrid::Field* ALPropertyGrid::fieldNamed(const std::string& name) const
+{
+    const auto it = std::find_if(mFields.begin(), mFields.end(),
+                                 [&name](const Field& field) { return field.name == name; });
+    return it == mFields.end() ? nullptr : &*it;
+}
+
+LLPanel* ALPropertyGrid::rowOf(const std::string& name) const
+{
+    if (LLPanel* own = findChild<LLPanel>(name + "_row", true))
+    {
+        return own;
+    }
+    for (const Field& field : mFields)
+    {
+        if (field.pairWith == name)
+        {
+            return findChild<LLPanel>(field.name + "_row", true);
+        }
+    }
+    return nullptr;
+}
+
+void ALPropertyGrid::setAuthored(const std::string& name, bool authored, const std::string& source)
+{
+    Field* field = const_cast<Field*>(fieldNamed(name));
+    if (!field || (field->authored == authored && field->source == source))
+    {
+        return;
+    }
+    field->authored = authored;
+    field->source = source;
+
+    // Whether the row is there at all is not the row's to decide: a grid
+    // showing only what the file writes has a row fewer or a row more.
+    if (mAuthoredOnly)
+    {
+        mRebuild.request();
+        return;
+    }
+    refreshAuthored(*field);
+}
+
+// The row is this field's own, or the one it shares with the field it
+// partners -- where the label is the other field's, the way back is
+// both of theirs, and only the editor is this one's to tell.
+void ALPropertyGrid::refreshAuthored(const Field& field)
+{
+    const std::string& name = field.name;
+    const std::string tip = tipFor(field);
+    if (LLPanel* row = rowOf(name))
+    {
+        if (LLTextBox* label = row->findChild<LLTextBox>(name + "_label"))
+        {
+            label->setColor(inkFor(field));
+            label->setToolTip(tip);
+        }
+        for (LLView* child : *row->getChildList())
+        {
+            const std::string& child_name = child->getName();
+            if (!child_name.ends_with("_remove"))
+            {
+                continue;
+            }
+            const Field* first = fieldNamed(child_name.substr(0, child_name.size() - 7));
+            const Field* partner = first ? partnerOf(*first) : nullptr;
+            const auto stands = [](const Field* f) { return f && f->authored && !f->ignored; };
+            child->setVisible(stands(first) || stands(partner));
+        }
+    }
+    if (LLView* editor = findChild<LLView>(name, true))
+    {
+        editor->setToolTip(tip);
+    }
+}

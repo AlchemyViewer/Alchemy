@@ -36,10 +36,12 @@ class LLScrollbar;
 // LLPanelEmojiComplete
 //
 
-class LLPanelEmojiComplete : public LLUICtrl
+class LLPanelEmojiComplete final : public LLUICtrl
 {
     friend class LLUICtrlFactory;
 public:
+    AL_VIEW_TYPE(LLPanelEmojiComplete, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<bool>       autosize;
@@ -64,13 +66,13 @@ public:
     bool handleKey(KEY key, MASK mask, bool called_from_parent) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
-    bool handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
     void onCommit() override;
     void reshape(S32 width, S32 height, bool called_from_parent) override;
 
 public:
     size_t getEmojiCount() const { return mEmojis.size(); }
-    void setEmojis(const LLWString& emojis);
+    void setEmojis(const std::vector<std::string>& emojis);
     void setEmojiHint(const std::string& hint);
     bool isAutoSize() const { return mAutoSize; }
     U32 getMaxShortCodeWidth() const;
@@ -112,9 +114,11 @@ protected:
 // LLFloaterEmojiComplete
 //
 
-class LLFloaterEmojiComplete : public LLFloater
+class LLFloaterEmojiComplete final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterEmojiComplete, LLFloater);
+
     LLFloaterEmojiComplete(const LLSD& sdKey);
 
 public:

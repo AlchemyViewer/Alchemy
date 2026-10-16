@@ -106,7 +106,7 @@ protected:
         {
             LLPanelDummyClothingListItem* item;
 
-            item = dynamic_cast<LLPanelDummyClothingListItem*>(mCOFWearables->getSelectedItem());
+            item = ALViewType::as<LLPanelDummyClothingListItem>(mCOFWearables->getSelectedItem());
             if (item)
             {
                 return item->getWearableType();
@@ -181,8 +181,7 @@ protected:
     static void replaceWearable(const LLUUID& item_id)
     {
         LLPanelOutfitEdit   * panel_outfit_edit =
-                        dynamic_cast<LLPanelOutfitEdit*> (LLFloaterSidePanelContainer::getPanel("appearance",
-                                "panel_outfit_edit"));
+                        LLFloaterSidePanelContainer::getPanel<LLPanelOutfitEdit>("appearance", "panel_outfit_edit");
         if (panel_outfit_edit != NULL)
         {
             panel_outfit_edit->onReplaceMenuItemClicked(item_id);
@@ -250,7 +249,7 @@ protected:
         LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable_registrar;
         LLUUID selected_id = mUUIDs.back();
 
-        LLPanelOutfitEdit* panel_oe = dynamic_cast<LLPanelOutfitEdit*>(LLFloaterSidePanelContainer::getPanel("appearance", "panel_outfit_edit"));
+        LLPanelOutfitEdit* panel_oe = LLFloaterSidePanelContainer::getPanel<LLPanelOutfitEdit>("appearance", "panel_outfit_edit");
         registrar.add("BodyPart.Replace", boost::bind(&LLPanelOutfitEdit::onReplaceMenuItemClicked, panel_oe, selected_id));
         registrar.add("BodyPart.Edit", boost::bind(LLAgentWearables::editWearable, selected_id));
         registrar.add("BodyPart.Create", boost::bind(&CofBodyPartContextMenu::createNew, this, selected_id));
@@ -292,7 +291,8 @@ LLCOFWearables::LLCOFWearables() : LLPanel(),
     mBodyPartsTab(NULL),
     mLastSelectedTab(NULL),
     mAccordionCtrl(NULL),
-    mCOFVersion(-1)
+    mCOFVersion(-1),
+    mRefreshPending(false)
 {
     mClothingMenu = new CofClothingContextMenu(this);
     mAttachmentMenu = new CofAttachmentContextMenu(this);
@@ -325,6 +325,10 @@ bool LLCOFWearables::postBuild()
     mAttachments->setCommitOnSelectionChange(true);
     mClothing->setCommitOnSelectionChange(true);
     mBodyParts->setCommitOnSelectionChange(true);
+
+    mClothing->setReorderValidateCallback(boost::bind(&LLCOFWearables::canReorderClothing, this, _1, _2));
+    mClothing->setReorderCallback(boost::bind(&LLCOFWearables::onClothingReordered, this, _1, _2));
+    mClothing->setReorderEndedCallback(boost::bind(&LLCOFWearables::onReorderEnded, this));
 
     //clothing is sorted according to its position relatively to the body
     mAttachments->setComparator(&WEARABLE_NAME_COMPARATOR);
@@ -377,6 +381,50 @@ void LLCOFWearables::onSelectionChange(LLFlatListView* selected_list)
     onCommit();
 }
 
+bool LLCOFWearables::canReorderClothing(const LLSD& dragged_value, const LLSD& neighbour_value)
+{
+    LLViewerInventoryItem* dragged = gInventory.getItem(dragged_value.asUUID());
+    LLViewerInventoryItem* neighbour = gInventory.getItem(neighbour_value.asUUID());
+    if (!dragged || !neighbour) return false; // reject placeholder/dummy rows
+    if (!dragged->isWearableType() || !neighbour->isWearableType()) return false;
+
+    return dragged->getWearableType() == neighbour->getWearableType();
+}
+
+void LLCOFWearables::onClothingReordered(const LLSD& dragged_value, S32 /*new_index*/)
+{
+    LLViewerInventoryItem* item = gInventory.getItem(dragged_value.asUUID());
+    if (!item || !item->isWearableType()) return;
+
+    LLWearableType::EType type = item->getWearableType();
+
+    // Persist the affected type group's full order from the list's current order
+    // (furthest-to-closest), which covers both single- and multi-row drags.
+    uuid_vec_t ordered_link_ids;
+    std::vector<LLSD> values;
+    mClothing->getValues(values);
+    for (const LLSD& value : values)
+    {
+        LLViewerInventoryItem* other = gInventory.getItem(value.asUUID());
+        if (!other || !other->isWearableType() || other->getWearableType() != type) continue;
+
+        ordered_link_ids.push_back(value.asUUID());
+    }
+
+    if (ordered_link_ids.size() < 2) return;
+
+    LLAppearanceMgr::getInstance()->reorderWearableGroup(type, ordered_link_ids);
+}
+
+void LLCOFWearables::onReorderEnded()
+{
+    // Run a refresh that arrived (and was skipped) while the drag was active.
+    if (mRefreshPending)
+    {
+        refresh();
+    }
+}
+
 void LLCOFWearables::onAccordionTabStateChanged(LLUICtrl* ctrl, const LLSD& expanded)
 {
     bool had_selected_items = mClothing->numSelected() || mAttachments->numSelected() || mBodyParts->numSelected();
@@ -385,7 +433,7 @@ void LLCOFWearables::onAccordionTabStateChanged(LLUICtrl* ctrl, const LLSD& expa
     mBodyParts->resetSelection(true);
 
     bool tab_selection_changed = false;
-    LLAccordionCtrlTab* tab = dynamic_cast<LLAccordionCtrlTab*>(ctrl);
+    LLAccordionCtrlTab* tab = ALViewType::as<LLAccordionCtrlTab>(ctrl);
     if (tab && tab != mLastSelectedTab)
     {
         mLastSelectedTab = tab;
@@ -401,6 +449,15 @@ void LLCOFWearables::onAccordionTabStateChanged(LLUICtrl* ctrl, const LLSD& expa
 
 void LLCOFWearables::refresh()
 {
+    // Don't rebuild mid-drag, clearing the list would cancel the active reorder.
+    // Remember it so onReorderEnded() can re-run the skipped refresh on release.
+    if (mClothing && mClothing->isReorderActive())
+    {
+        mRefreshPending = true;
+        return;
+    }
+    mRefreshPending = false;
+
     const LLUUID cof_id = LLAppearanceMgr::instance().getCOF();
     if (cof_id.isNull())
     {
@@ -560,6 +617,12 @@ LLPanelClothingListItem* LLCOFWearables::buildClothingListItem(LLViewerInventory
     item_panel->setShowMoveUpButton(!first);
     item_panel->setShowMoveDownButton(!last);
 
+    // hint that rows in a multi-layer group can be dragged to reorder
+    if (!(first && last))
+    {
+        item_panel->setToolTip(LLTrans::getString("ReorderClothingTooltip"));
+    }
+
     //setting callbacks
     //*TODO move that item panel's inner structure disclosing stuff into the panels
     item_panel->childSetAction("btn_delete", boost::bind(mCOFCallbacks.mDeleteWearable));
@@ -647,7 +710,7 @@ void LLCOFWearables::addClothingTypesDummies(const LLAppearanceMgr::wearables_by
 
     for (U32 type = LLWearableType::WT_SHIRT; type < LLWearableType::WT_COUNT; type++)
     {
-        if (clothing_by_type[type].empty())
+        if (!clothing_by_type[type].empty())
             continue;
 
         LLWearableType::EType w_type = static_cast<LLWearableType::EType>(type);
@@ -766,7 +829,7 @@ void LLCOFWearables::selectClothing(LLWearableType::EType clothing_type)
 
     for (it = clothing_items.begin(); it != clothing_items.end(); ++it )
     {
-        LLPanelClothingListItem* clothing_item = dynamic_cast<LLPanelClothingListItem*>(*it);
+        LLPanelClothingListItem* clothing_item = (*it)->as<LLPanelClothingListItem>();
 
         if (clothing_item && clothing_item->getWearableType() == clothing_type)
         { // clothing item has specified LLWearableType::EType. Select it and exit.

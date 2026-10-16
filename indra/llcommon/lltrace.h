@@ -53,7 +53,7 @@ STORAGE_TYPE storage_value(LLUnit<STORAGE_TYPE, UNIT_TYPE> val) { return val.val
 template<typename UNIT_TYPE, typename STORAGE_TYPE>
 STORAGE_TYPE storage_value(LLUnitImplicit<STORAGE_TYPE, UNIT_TYPE> val) { return val.value(); }
 
-class StatBase
+class LL_COMMON_API StatBase
 {
 public:
     StatBase(const char* name, const char* description);
@@ -92,29 +92,6 @@ public:
 
 protected:
     const size_t        mAccumulatorIndex;
-};
-
-
-template<>
-class StatType<TimeBlockAccumulator::CallCountFacet>
-:   public StatType<TimeBlockAccumulator>
-{
-public:
-
-    StatType(const char* name, const char* description = "")
-    :   StatType<TimeBlockAccumulator>(name, description)
-    {}
-};
-
-template<>
-class StatType<TimeBlockAccumulator::SelfTimeFacet>
-    :   public StatType<TimeBlockAccumulator>
-{
-public:
-
-    StatType(const char* name, const char* description = "")
-        :   StatType<TimeBlockAccumulator>(name, description)
-    {}
 };
 
 template <typename T = F64>

@@ -70,7 +70,7 @@ LLToastAlertPanel::LLToastAlertPanel( LLNotificationPtr notification, bool modal
     // EXP-1822
     // save currently focused view, so that return focus to it
     // on destroying this toast.
-    LLView* current_selection = dynamic_cast<LLView*>(gFocusMgr.getKeyboardFocus());
+    LLView* current_selection = gFocusMgr.getKeyboardFocusView();
     while(current_selection)
     {
         if (current_selection->isFocusRoot())
@@ -165,7 +165,7 @@ LLToastAlertPanel::LLToastAlertPanel( LLNotificationPtr notification, bool modal
 
     // Calc total width of buttons
     S32 button_width = 0;
-    S32 sp = font->getWidth(std::string("OO"));
+    S32 sp = font->getWidth("OO");
     S32 btn_total_width = 0;
     S32 default_size_btns = 0;
     for (size_t i = 0; i < num_options; i++)
@@ -419,7 +419,7 @@ LLToastAlertPanel::~LLToastAlertPanel()
     // return focus to the previously focused view if the viewer is not exiting
     if (mPreviouslyFocusedView.get() && !LLApp::isExiting())
     {
-        LLView* current_selection = dynamic_cast<LLView*>(gFocusMgr.getKeyboardFocus());
+        LLView* current_selection = gFocusMgr.getKeyboardFocusView();
         while(current_selection)
         {
             if (current_selection->isFocusRoot())
@@ -460,6 +460,22 @@ bool LLToastAlertPanel::handleKeyHere(KEY key, MASK mask )
         {
             // If we have a default button, click it when return is pressed
             defaultBtn->onCommit();
+        }
+        return true;
+    }
+    else if (KEY_ESCAPE == key && mask == MASK_NONE)
+    {
+        // Escape answers as Cancel does, where the alert has one -- its
+        // own, or a template's -- as a dialog does anywhere else; an alert
+        // with none has nothing that means "no" for it to press.
+        for (const ButtonData& data : mButtonData)
+        {
+            const std::string& name = data.mButton ? data.mButton->getName() : LLStringUtil::null;
+            if ((name == "Cancel" || name.starts_with("Cancel_")) && data.mButton->getVisible() && data.mButton->getEnabled())
+            {
+                data.mButton->onCommit();
+                break;
+            }
         }
         return true;
     }

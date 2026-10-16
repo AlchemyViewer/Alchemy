@@ -39,9 +39,11 @@ class LLUICtrl;
 class LLViewerInventoryItem;
 class LLViewerFetchedTexture;
 
-class LLFloaterChangeItemThumbnail : public LLFloater, public LLInventoryObserver, public LLVOInventoryListener
+class LLFloaterChangeItemThumbnail final : public LLFloater, public LLInventoryObserver, public LLVOInventoryListener
 {
 public:
+    AL_VIEW_TYPE(LLFloaterChangeItemThumbnail, LLFloater);
+
     LLFloaterChangeItemThumbnail(const LLSD& key);
     ~LLFloaterChangeItemThumbnail();
 
@@ -82,7 +84,11 @@ private:
     static void onRemove(void*);
     static void onRemovalConfirmation(const LLSD& notification, const LLSD& response, LLHandle<LLFloater> handle);
 
+    // As needed, attempts to load image then validates and assigns, does no converting.
     void assignAndValidateAsset(const LLUUID &asset_id, bool silent = false);
+    // As needed, attempts to load and convert(upload) image then validates and assigns.
+    void assignAndValidateTexture(const LLUUID& asset_id, LLPointer<LLViewerFetchedTexture> texturep);
+
     static void onImageDataLoaded(bool success,
         LLViewerFetchedTexture *src_vi,
         LLImageRaw* src,

@@ -32,9 +32,11 @@
 
 class LLTextBox;
 
-class LLFloaterBulkUpload : public LLModalDialog
+class LLFloaterBulkUpload final : public LLModalDialog
 {
 public:
+    AL_VIEW_TYPE(LLFloaterBulkUpload, LLModalDialog);
+
     LLFloaterBulkUpload(const LLSD& key);
     ~LLFloaterBulkUpload();
 
@@ -59,6 +61,7 @@ private:
     std::vector<std::string> mFiles;
     bool mAllow2kTextures = true;
     bool mHas2kTextures = false;
+    LLUUID mDestinationFolderId;
     S32 mUploadCost = 0;
     S32 mUploadCount = 0;
 };

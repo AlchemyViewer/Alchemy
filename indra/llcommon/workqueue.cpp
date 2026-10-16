@@ -38,7 +38,8 @@ LL::WorkQueueBase::WorkQueueBase(const std::string& name, bool auto_shutdown)
     {
         // Register for "LLApp" events so we can implicitly close() on viewer shutdown
         std::string listener_name = "WorkQueue:" + getKey();
-        LLEventPumps::instance().obtain("LLApp").listen(
+        LLEventPumps* pump = LLEventPumps::getInstance();
+        pump->obtain("LLApp").listen(
             listener_name,
             [this](const LLSD& stat)
             {
@@ -54,14 +55,25 @@ LL::WorkQueueBase::WorkQueueBase(const std::string& name, bool auto_shutdown)
 
         // Store the listener name so we can unregister in the destructor
         mListenerName = listener_name;
+        mPumpHandle = pump->getHandle();
     }
 }
 
 LL::WorkQueueBase::~WorkQueueBase()
 {
-    if (!mListenerName.empty() && !LLEventPumps::wasDeleted())
+    if (!mListenerName.empty() && !mPumpHandle.isDead())
     {
-        LLEventPumps::instance().obtain("LLApp").stopListening(mListenerName);
+        // Due to shutdown order issues, use handle, not a singleton
+        // and ignore fiber issue.
+        try
+        {
+            LLEventPumps* pump = mPumpHandle.get();
+            pump->obtain("LLApp").stopListening(mListenerName);
+        }
+        catch (const boost::fibers::lock_error&)
+        {
+            // Likely mutex is down, ignore
+        }
     }
 }
 
@@ -139,7 +151,7 @@ namespace
 
     U32 exception_filter(U32 code, struct _EXCEPTION_POINTERS* exception_infop)
     {
-        if (LLApp::instance()->reportCrashToBugsplat((void*)exception_infop))
+        if (LLApp::instance()->reportCrash((void*)exception_infop))
         {
             // Handled
             return EXCEPTION_CONTINUE_SEARCH;
@@ -216,10 +228,15 @@ void LL::WorkQueueBase::callWork(const Work& work)
             LL_WARNS("LLCoros") << "Capturing and rethrowing uncaught exception in WorkQueueBase "
                                 << getKey() << LL_ENDL;
 
+            std::string name = getKey();
             LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
             main_queue->post(
                              // Bind the current exception, rethrow it in main loop.
-                             [exc = std::current_exception()]() { std::rethrow_exception(exc); });
+                             [exc = std::current_exception(), name]()
+            {
+                LL_INFOS("LLCoros") << "Rethrowing exception from WorkQueueBase::callWork " << name << LL_ENDL;
+                std::rethrow_exception(exc);
+            });
         }
         else
         {
@@ -276,12 +293,44 @@ bool LL::WorkQueue::done()
 
 bool LL::WorkQueue::post(const Work& callable)
 {
-    return mQueue.pushIfOpen(callable);
+    try
+    {
+        return mQueue.pushIfOpen(callable);
+    }
+    catch (std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS("LLCoros") << "Bad memory allocation in WorkQueue::post" << LL_ENDL;
+        return false;
+    }
 }
 
 bool LL::WorkQueue::tryPost(const Work& callable)
 {
-    return mQueue.tryPush(callable);
+    try
+    {
+        return mQueue.tryPush(callable);
+    }
+    catch (std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS("LLCoros") << "Bad memory allocation in WorkQueue::tryPost" << LL_ENDL;
+        return false;
+    }
+}
+
+bool LL::WorkQueue::tryPostFor(const std::chrono::milliseconds& timeout, const Work& callable)
+{
+    try
+    {
+        return mQueue.tryPushFor(timeout, Work(callable));
+    }
+    catch (std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS("LLCoros") << "Bad memory allocation in WorkQueue::tryPostFor" << LL_ENDL;
+        return false;
+    }
 }
 
 LL::WorkQueue::Work LL::WorkQueue::pop_()

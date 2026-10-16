@@ -40,8 +40,11 @@
  * drag an inventory item from My Inventory window to a docked IM window,
  * i.e. share the item (see VWR-22891).
  */
-class LLFloaterSidePanelContainer : public LLFloater
+class LLFloaterSidePanelContainer final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterSidePanelContainer, LLFloater);
+private:
 private:
     static const std::string sMainPanelName;
 
@@ -61,12 +64,12 @@ public:
 
     LLPanel* openChildPanel(std::string_view panel_name, const LLSD& params);
 
+    static LLFloater* getTopmostInventoryFloater();
+
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
     static bool canShowPanel(const std::string& floater_name, const LLSD& key);
     static bool canShowPanel(const std::string& floater_name, const std::string& panel_name, const LLSD& key);
 // [/RLVa:KB]
-
-    static LLFloater* getTopmostInventoryFloater();
 
     static void showPanel(std::string_view floater_name, const LLSD& key);
 
@@ -86,12 +89,12 @@ public:
     template <typename T>
     static T* findPanel(std::string_view floater_name, std::string_view panel_name = sMainPanelName)
     {
-        return dynamic_cast<T*>(findPanel(floater_name, panel_name));
+        return ALViewType::as<T>(findPanel(floater_name, panel_name));
     }
     template <typename T>
     static T* getPanel(std::string_view floater_name, std::string_view panel_name = sMainPanelName)
     {
-        T* panel = dynamic_cast<T*>(getPanel(floater_name, panel_name));
+        T* panel = ALViewType::as<T>(getPanel(floater_name, panel_name));
         if (!panel)
         {
             LL_WARNS() << "Child named \"" << panel_name << "\" of type " << typeid(T*).name() << " not found" << LL_ENDL;

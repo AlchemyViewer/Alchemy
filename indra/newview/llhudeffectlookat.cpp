@@ -27,7 +27,6 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llhudeffectlookat.h"
-#include <utility>
 
 #include "llrender.h"
 
@@ -35,10 +34,10 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llvoavatar.h"
-#include "llvoavatarself.h" // for gAgentAvatarp
 #include "lldrawable.h"
 #include "llviewerobjectlist.h"
 #include "llviewercontrol.h"
+#include "llvoavatarself.h"
 #include "llrendersphere.h"
 #include "llselectmgr.h"
 #include "llglheaders.h"
@@ -299,7 +298,7 @@ void LLHUDEffectLookAt::packData(LLMessageSystem *mesgsys)
 
     mesgsys->addBinaryDataFast(_PREHASH_TypeData, packed_data, PKT_SIZE);
 
-    mLastSendTime = mTimer.getElapsedTimeF32();
+    mLastSendTime = mTimer.getElapsedTimeF64();
 }
 
 //-----------------------------------------------------------------------------
@@ -419,7 +418,7 @@ bool LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
         return false;
     }
 
-    F32 current_time  = mTimer.getElapsedTimeF32();
+    const F64 current_time  = mTimer.getElapsedTimeF64();
 
     bool looking_at_self = false;
     if (object && object->isAvatar())
@@ -514,7 +513,7 @@ bool LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
                 setNeedsSendToSim(true);
             }
         }
-        mKillTime = mTimer.getElapsedTimeF32() + mDuration;
+        mKillTime = mTimer.getElapsedTimeF64() + mDuration;
 
         update();
     }
@@ -542,7 +541,7 @@ void LLHUDEffectLookAt::markDead()
 {
     if (mSourceObject.notNull())
     {
-        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData("LookAtPoint");
+        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT);
     }
 
     mSourceObject = NULL;
@@ -573,7 +572,7 @@ void LLHUDEffectLookAt::render()
         if ((isOwnHidden || isPrivate || gAgentCamera.cameraMouselook()) && static_cast<LLVOAvatar*>(mSourceObject.get())->isSelf())
             return;
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
 
@@ -635,18 +634,16 @@ void LLHUDEffectLookAt::render()
             const LLFontGL* fontp = LLFontGL::getFontSansSerif();
             gGL.pushMatrix();
 
-            LLWString wstr(utf8str_to_wstring(text));
-
             hud_render_text(
-                wstr,
+                text,
                 target + LLVector3(0.f, 0.f, 0.15f),
                 *fontp,
                 LLFontGL::NORMAL,
                 LLFontGL::NO_SHADOW,
-                -0.5f * fontp->getWidthF32(wstr.c_str()),
+                -0.5f * fontp->getWidthF32(text),
                 0.0f,
                 (*mAttentions)[mTargetType].mColor,
-                FALSE
+                false
             );
             gGL.popMatrix();
         }
@@ -678,7 +675,7 @@ void LLHUDEffectLookAt::update()
     mAttentions = (source_avatar->getSex() == SEX_MALE) ? &gBoyAttentions : &gGirlAttentions;
     //printf("updated to %s\n", (source_avatar->getSex() == SEX_MALE) ? "male" : "female");
 
-    F32 time = mTimer.getElapsedTimeF32();
+    const F64 time = mTimer.getElapsedTimeF64();
 
     // clear out the effect if time is up
     if (mKillTime != 0.f && time > mKillTime)
@@ -723,7 +720,7 @@ void LLHUDEffectLookAt::update()
  * (and possibly mTargetOffsetGlobal).
  * When mTargetObject is another avatar, it sets mTargetPos to be their eyes.
  *
- * Has the side-effect of also calling setAnimationData("LookAtPoint") with the new
+ * Has the side-effect of also setting the look-at channel to the new
  * mTargetPos on the source object which is assumed to be an avatar.
  *
  * Returns whether we successfully calculated a finite target position.
@@ -811,11 +808,11 @@ bool LLHUDEffectLookAt::calcTargetPosition()
     static LLCachedControl<bool> disable_look_at(gSavedSettings, "DisableLookAtAnimation", true);
     if (disable_look_at())
     {
-        source_avatar->removeAnimationData("LookAtPoint");
+        source_avatar->removeAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT);
     }
     else
     {
-        source_avatar->setAnimationData("LookAtPoint", (void*)&mTargetPos);
+        source_avatar->setAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT, (void*)&mTargetPos);
     }
 
     return true;

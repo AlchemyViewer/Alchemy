@@ -33,11 +33,7 @@
 #include "llvector4a.h"
 #include "hbxxh.h"
 
-#ifdef LL_USESYSTEMLIBS
-# include <zlib.h>
-#else
-# include "zlib-ng/zlib.h"
-#endif
+#include <zlib.h>
 
 std::string model_names[] =
 {
@@ -508,7 +504,7 @@ LLVector3 LLModel::getTransformedCenter(const LLMatrix4& mat)
     if (!mVolumeFaces.empty())
     {
         LLMatrix4a m;
-        m.loadu(mat);
+        m.set(mat);
 
         LLVector4a minv,maxv;
 
@@ -890,6 +886,12 @@ LLSD LLModel::writeModel(
 
             LLVector3 pos_range = max_pos - min_pos;
 
+            // O(1) per-vertex weight lookup for the skinning block below; without
+            // it the per-vertex getJointInfluences() scan makes this loop O(V^2)
+            // and freezes the uploader on dense rigged meshes. Built once per
+            // model (empty/cheap when unskinned).
+            JointWeightCache weight_cache(*model[idx]);
+
             for (S32 i = 0; i < model[idx]->getNumVolumeFaces(); ++i)
             { //for each face
                 const LLVolumeFace& face = model[idx]->getVolumeFace(i);
@@ -1048,10 +1050,10 @@ LLSD LLModel::writeModel(
                         {
                             LLVector3 pos(face.mPositions[j].getF32ptr());
 
-                            weight_list& weights = model[idx]->getJointInfluences(pos);
+                            const weight_list& weights = weight_cache.influences(pos);
 
                             S32 count = 0;
-                            for (weight_list::iterator iter = weights.begin(); iter != weights.end(); ++iter)
+                            for (weight_list::const_iterator iter = weights.begin(); iter != weights.end(); ++iter)
                             {
                                 // Note joint index cannot exceed 255.
                                 if (iter->mJointIdx < 255 && iter->mJointIdx >= 0)
@@ -1293,6 +1295,66 @@ LLModel::weight_list& LLModel::getJointInfluences(const LLVector3& pos)
 
         return best->second;
     }
+}
+
+LLModel::JointWeightCache::JointWeightCache(LLModel& model)
+    : mModel(model)
+{
+    mCells.reserve(model.mSkinWeights.size());
+    for (const weight_map::value_type& entry : model.mSkinWeights)
+    {
+        mCells[cellKey(entry.first)].push_back(&entry);
+    }
+}
+
+LLModel::JointWeightCache::CellKey LLModel::JointWeightCache::cellKey(const LLVector3& p)
+{
+    return { llfloor(p.mV[VX] / WELD_EPSILON),
+             llfloor(p.mV[VY] / WELD_EPSILON),
+             llfloor(p.mV[VZ] / WELD_EPSILON) };
+}
+
+const LLModel::weight_list& LLModel::JointWeightCache::influences(const LLVector3& pos) const
+{
+    // Match radius == cell size == the weld epsilon, so a key within epsilon of
+    // pos is in pos's cell or an immediate neighbour. Scan the 3x3x3 block,
+    // counting in-epsilon candidates and tracking the closest.
+    const CellKey base = cellKey(pos);
+    const weight_list* best = nullptr;
+    F32 best_dist = WELD_EPSILON;
+    S32 in_epsilon = 0;
+    for (S32 dx = -1; dx <= 1; ++dx)
+    {
+        for (S32 dy = -1; dy <= 1; ++dy)
+        {
+            for (S32 dz = -1; dz <= 1; ++dz)
+            {
+                auto it = mCells.find({ base.x + dx, base.y + dy, base.z + dz });
+                if (it == mCells.end())
+                {
+                    continue;
+                }
+                for (const weight_map::value_type* e : it->second)
+                {
+                    const F32 d = (e->first - pos).length();
+                    if (d < WELD_EPSILON)
+                    {
+                        ++in_epsilon;
+                        if (d < best_dist)
+                        {
+                            best_dist = d;
+                            best = &e->second;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Defer to the full search unless we found exactly one in-epsilon match.
+    // getJointInfluences() returns the FIRST weld-epsilon match in map order, so
+    // on a miss (closest-point fallback) or an ambiguous tie (multiple keys
+    // within epsilon) we mirror it exactly instead of guessing the closest.
+    return (best && in_epsilon == 1) ? *best : mModel.getJointInfluences(pos);
 }
 
 void LLModel::setConvexHullDecomposition(
@@ -1674,7 +1736,7 @@ void LLMeshSkinInfo::fromLLSD(LLSD& skin)
                 mat.mMatrix[j][k] = (F32)skin["bind_shape_matrix"][j*4+k].asReal();
             }
         }
-        mBindShapeMatrix.loadu(mat);
+        mBindShapeMatrix.set(mat);
     }
 
     if (skin.has("alt_inverse_bind_matrix"))
@@ -1712,7 +1774,7 @@ void LLMeshSkinInfo::fromLLSD(LLSD& skin)
     mBindPoseMatrix.resize(mInvBindMatrix.size());
     for (U32 i = 0; i < mInvBindMatrix.size(); ++i)
     {
-        matMul(mBindShapeMatrix, mInvBindMatrix[i], mBindPoseMatrix[i]);
+        mBindPoseMatrix[i].setMul(mBindShapeMatrix, mInvBindMatrix[i]);
     }
 
     updateHash();
@@ -1846,7 +1908,12 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
         const LLSD::Binary& hulls = decomp["HullList"].asBinary();
         const LLSD::Binary& position = decomp["Positions"].asBinary();
 
-        U16* p = (U16*) &position[0];
+        // The on-disk Positions blob is a `std::vector<U8>` packed as
+        // 3-U16 little-endian tuples. The earlier `(U16*) &position[0]`
+        // alias was strict-aliasing UB; cursor through the bytes and
+        // memcpy each point into a U16 triple instead.
+        const U8* p_bytes = position.data();
+        const size_t point_bytes = 3 * sizeof(U16);
 
         mHull.resize(hulls.size());
 
@@ -1878,6 +1945,9 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
 
             for (U32 j = 0; j < count; ++j)
             {
+                U16 p[3];
+                std::memcpy(p, p_bytes, point_bytes);
+
                 U64 test = (U64) p[0] | ((U64) p[1] << 16) | ((U64) p[2] << 32);
                 //point must be unique
                 //llassert(valid.find(test) == valid.end());
@@ -1887,9 +1957,7 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
                     (F32) p[0]/65535.f*range.mV[0]+min.mV[0],
                     (F32) p[1]/65535.f*range.mV[1]+min.mV[1],
                     (F32) p[2]/65535.f*range.mV[2]+min.mV[2]));
-                p += 3;
-
-
+                p_bytes += point_bytes;
             }
 
             //each hull must contain at least 4 unique points
@@ -1901,7 +1969,9 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
     {
         const LLSD::Binary& position = decomp["BoundingVerts"].asBinary();
 
-        U16* p = (U16*) &position[0];
+        // Same packing as the HullList Positions blob above.
+        const U8* p_bytes = position.data();
+        const size_t point_bytes = 3 * sizeof(U16);
 
         LLVector3 min;
         LLVector3 max;
@@ -1924,11 +1994,14 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
 
         for (U32 j = 0; j < count; ++j)
         {
+            U16 p[3];
+            std::memcpy(p, p_bytes, point_bytes);
+
             mBaseHull.push_back(LLVector3(
                 (F32) p[0]/65535.f*range.mV[0]+min.mV[0],
                 (F32) p[1]/65535.f*range.mV[1]+min.mV[1],
                 (F32) p[2]/65535.f*range.mV[2]+min.mV[2]));
-            p += 3;
+            p_bytes += point_bytes;
         }
     }
     else

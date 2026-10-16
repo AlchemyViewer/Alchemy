@@ -36,7 +36,7 @@
 #include "llwlhandlers.h"
 #include "lltrans.h"
 #include "lltrace.h"
-#include "llfasttimer.h"
+#include "alfarplane.h"
 #include "llviewercamera.h"
 #include "pipeline.h"
 #include "llsky.h"
@@ -54,7 +54,6 @@
 
 #include "llregioninfomodel.h"
 
-#include "llatmosphere.h"
 #include "llagent.h"
 #include "roles_constants.h"
 #include "llestateinfomodel.h"
@@ -106,8 +105,6 @@ namespace
     const std::string LOCAL_ENV_STORAGE_FILE("local_environment_data.bin");
 
     //---------------------------------------------------------------------
-    LLTrace::BlockTimerStatHandle   FTM_ENVIRONMENT_UPDATE("Update Environment Tick");
-
     LLSettingsBase::Seconds         DEFAULT_UPDATE_THRESHOLD(10.0);
     const LLSettingsBase::Seconds   MINIMUM_SPANLENGTH(0.01f);
 
@@ -281,7 +278,7 @@ namespace
 
         LLSettingsBase::Seconds getAdjustedNow() const
         {
-            LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch());
+            LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch() + gUTCOffset);
 
             return (now + mCycleOffset);
         }
@@ -969,54 +966,6 @@ LLSettingsWater::ptr_t LLEnvironment::getCurrentWater() const
     return pwater;
 }
 
-void LayerConfigToDensityLayer(const LLSD& layerConfig, DensityLayer& layerOut)
-{
-    layerOut.constant_term  = (F32)layerConfig[LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM].asReal();
-    layerOut.exp_scale      = (F32)layerConfig[LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_SCALE_FACTOR].asReal();
-    layerOut.exp_term       = (F32)layerConfig[LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_TERM].asReal();
-    layerOut.linear_term    = (F32)layerConfig[LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM].asReal();
-    layerOut.width          = (F32)layerConfig[LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH].asReal();
-}
-
-void LLEnvironment::getAtmosphericModelSettings(AtmosphericModelSettings& settingsOut, const LLSettingsSky::ptr_t &psky)
-{
-    settingsOut.m_skyBottomRadius   = psky->getSkyBottomRadius();
-    settingsOut.m_skyTopRadius      = psky->getSkyTopRadius();
-    settingsOut.m_sunArcRadians     = psky->getSunArcRadians();
-    settingsOut.m_mieAnisotropy     = psky->getMieAnisotropy();
-
-    LLSD rayleigh = psky->getRayleighConfigs();
-    settingsOut.m_rayleighProfile.clear();
-    for (LLSD::array_iterator itf = rayleigh.beginArray(); itf != rayleigh.endArray(); ++itf)
-    {
-        DensityLayer layer;
-        LLSD& layerConfig = (*itf);
-        LayerConfigToDensityLayer(layerConfig, layer);
-        settingsOut.m_rayleighProfile.push_back(layer);
-    }
-
-    LLSD mie = psky->getMieConfigs();
-    settingsOut.m_mieProfile.clear();
-    for (LLSD::array_iterator itf = mie.beginArray(); itf != mie.endArray(); ++itf)
-    {
-        DensityLayer layer;
-        LLSD& layerConfig = (*itf);
-        LayerConfigToDensityLayer(layerConfig, layer);
-        settingsOut.m_mieProfile.push_back(layer);
-    }
-    settingsOut.m_mieAnisotropy = psky->getMieAnisotropy();
-
-    LLSD absorption = psky->getAbsorptionConfigs();
-    settingsOut.m_absorptionProfile.clear();
-    for (LLSD::array_iterator itf = absorption.beginArray(); itf != absorption.endArray(); ++itf)
-    {
-        DensityLayer layer;
-        LLSD& layerConfig = (*itf);
-        LayerConfigToDensityLayer(layerConfig, layer);
-        settingsOut.m_absorptionProfile.push_back(layer);
-    }
-}
-
 bool LLEnvironment::canAgentUpdateParcelEnvironment() const
 {
     LLParcel *parcel(LLViewerParcelMgr::instance().getAgentOrSelectedParcel());
@@ -1638,14 +1587,19 @@ LLVector4 LLEnvironment::getMoonDirectionCFR() const
     return light_direction_cfr;
 }
 
-LLVector4 LLEnvironment::getClampedLightNorm() const
+LLVector3 LLEnvironment::getClampedLightDirection() const
 {
     LLVector3 light_direction = getLightDirection();
     if (light_direction.mV[2] < -0.1f)
     {
         light_direction.mV[2] = -0.1f;
     }
-    return toLightNorm(light_direction);
+    return light_direction;
+}
+
+LLVector4 LLEnvironment::getClampedLightNorm() const
+{
+    return toLightNorm(getClampedLightDirection());
 }
 
 LLVector4 LLEnvironment::getClampedSunNorm() const
@@ -1680,7 +1634,7 @@ extern bool gCubeSnapshot;
 //-------------------------------------------------------------------------
 void LLEnvironment::update(const LLViewerCamera * cam)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT; //LL_RECORD_BLOCK_TIME(FTM_ENVIRONMENT_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     //F32Seconds now(LLDate::now().secondsSinceEpoch());
     if (!gCubeSnapshot)
     {
@@ -1701,32 +1655,23 @@ void LLEnvironment::update(const LLViewerCamera * cam)
         mLastCamYaw = cam->getYaw() + SUN_DELTA_YAW;
     }
 
+    mEyeToSky = ALFarPlane::eyeToSkyFrame(cam->frameModelview());
+
     updateSettingsUniforms();
 
-    LLViewerShaderMgr::shader_iter shaders_iter, end_shaders;
-    end_shaders = LLViewerShaderMgr::instance()->endShaders();
-    for (shaders_iter = LLViewerShaderMgr::instance()->beginShaders(); shaders_iter != end_shaders; ++shaders_iter)
-    {
-        shaders_iter->mUniformsDirty = true;
-        if (shaders_iter->mRiggedVariant)
-        {
-            shaders_iter->mRiggedVariant->mUniformsDirty = true;
-        }
-
-        for (auto& variant : shaders_iter->mGLTFVariants)
-        {
-            variant.mUniformsDirty = true;
-        }
-    }
+    LLGLSLShader::dirtyEnvironmentUniforms();
 }
 
 void LLEnvironment::updateCloudScroll()
 {
     // This is a function of the environment rather than the sky, since it should
     // persist through sky transitions.
-    static LLTimer s_cloud_timer;
+    // On the frame clock, as update()'s day-cycle delta is, so the clouds and the sky move by
+    // the same time.
+    static LLFrameTimer s_cloud_timer;
 
-    F64 delta_t = s_cloud_timer.getElapsedTimeAndResetF64();
+    const F64 delta_t = s_cloud_timer.getElapsedTimeF64();
+    s_cloud_timer.reset();
 
     if (mCurrentEnvironment->getSky() && !mCloudScrollPaused)
     {
@@ -1739,9 +1684,90 @@ void LLEnvironment::updateCloudScroll()
         {
             LLVector2 cloud_delta = static_cast<F32>(delta_t) * (mCurrentEnvironment->getSky()->getCloudScrollRate()) / 100.0;
             mCloudScrollDelta += cloud_delta;
+            // It offsets coordinates the noise repeats over every whole unit, so only its
+            // fraction shows; kept to that, it does not lose the frame's step to its own size.
+            mCloudScrollDelta.mV[VX] -= floorf(mCloudScrollDelta.mV[VX]);
+            mCloudScrollDelta.mV[VY] -= floorf(mCloudScrollDelta.mV[VY]);
         }
     }
 
+}
+
+namespace
+{
+    // The CPU block must exactly match the std140 layout the shaders declare. Each vec3 is
+    // paired with a trailing scalar (fills the vec3's std140 tail), so the C++ float[3]+float
+    // packing reproduces std140 with no manual padding; only the round to 16 bytes before
+    // eyeToSky needs it, a mat3's columns being vec4-aligned.
+    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 208,
+                  "Environment UBO layout must match std140 (208 bytes)");
+    static_assert(offsetof(LLEnvironment::EnvironmentUBOData, eyeToSky) == 160,
+                  "eyeToSky must start on a 16-byte boundary, as a std140 mat3 does");
+
+    // LLShaderMgr uniform enum -> (byte offset in the block, float component count). The pack
+    // walks the per-frame LLShaderUniforms buckets and writes any setting whose enum appears
+    // here; settings NOT listed (the loose/entangled uniforms) are left for the apply() path.
+    struct EnvBlockField { S32 uniform; U32 offset; U32 ncomp; };
+#define LL_ENV_FIELD(u, m) \
+    { LLShaderMgr::u, (U32)offsetof(LLEnvironment::EnvironmentUBOData, m), \
+      (U32)(sizeof(LLEnvironment::EnvironmentUBOData::m) / sizeof(F32)) }
+
+    const EnvBlockField sEnvBlockFields[] =
+    {
+        LL_ENV_FIELD(WATER_FOGCOLOR,            waterFogColor),
+        LL_ENV_FIELD(BLUE_DENSITY,              blue_density),
+        LL_ENV_FIELD(HAZE_DENSITY,              haze_density),
+        LL_ENV_FIELD(BLUE_HORIZON,              blue_horizon),
+        LL_ENV_FIELD(HAZE_HORIZON,              haze_horizon),
+        LL_ENV_FIELD(CLOUD_POS_DENSITY1,        cloud_pos_density1),
+        LL_ENV_FIELD(DISTANCE_MULTIPLIER,       distance_multiplier),
+        LL_ENV_FIELD(CLOUD_POS_DENSITY2,        cloud_pos_density2),
+        LL_ENV_FIELD(CLOUD_SCALE,               cloud_scale),
+        LL_ENV_FIELD(CLOUD_COLOR,               cloud_color),
+        LL_ENV_FIELD(CLOUD_SHADOW,              cloud_shadow),
+        LL_ENV_FIELD(GLOW,                      glow),
+        LL_ENV_FIELD(MAX_Y,                     max_y),
+        LL_ENV_FIELD(WATER_FOGCOLOR_LINEAR,     waterFogColorLinear),
+        LL_ENV_FIELD(REFLECTION_PROBE_AMBIANCE, reflection_probe_ambiance),
+        LL_ENV_FIELD(SCENE_LIGHT_STRENGTH,      scene_light_strength),
+        LL_ENV_FIELD(SKY_SUNLIGHT_SCALE,        sky_sunlight_scale),
+        LL_ENV_FIELD(SKY_AMBIENT_SCALE,         sky_ambient_scale),
+        LL_ENV_FIELD(GAMMA,                     gamma),
+        LL_ENV_FIELD(WATER_FOGKS,               waterFogKS),
+        LL_ENV_FIELD(WATER_FOGDENSITY,          waterFogDensity),
+    };
+#undef LL_ENV_FIELD
+
+    const EnvBlockField* findEnvField(S32 uniform)
+    {
+        for (const auto& f : sEnvBlockFields)
+        {
+            if (f.uniform == uniform)
+            {
+                return &f;
+            }
+        }
+        return nullptr;
+    }
+
+    // Register the block's expected std140 layout for debug validation at shader load, derived
+    // from the SAME offsetof()-based table packEnvironmentUBO writes through -- llrender carries
+    // no hand-copied offset table that can drift from this struct. (Member names resolve from
+    // the reserved-uniform table at validation time; every Environment member is a reserved
+    // uniform.)
+#if !LL_RELEASE_FOR_DOWNLOAD
+    const bool s_env_layout_registered = []
+    {
+        std::vector<LLGLSLShader::EngineBlockLayoutMember> members;
+        for (const auto& f : sEnvBlockFields)
+        {
+            members.push_back({ f.uniform, nullptr, f.offset, false });
+        }
+        members.push_back({ LLShaderMgr::EYE_TO_SKY, nullptr, (U32)offsetof(LLEnvironment::EnvironmentUBOData, eyeToSky), true });
+        LLGLSLShader::registerEngineBlockLayout("Environment", std::move(members));
+        return true;
+    }();
+#endif // !LL_RELEASE_FOR_DOWNLOAD
 }
 
 // static
@@ -1791,6 +1817,120 @@ void LLEnvironment::updateSettingsUniforms()
     {
         LL_WARNS("ENVIRONMENT") << "Failed to update GL variable for sky settings, environment is not properly set" << LL_ENDL;
     }
+
+    // Re-pack the shared Environment block from the freshly computed uniforms (CPU only; the
+    // GL upload/bind happens in bindEnvironmentUBO() on the render thread). MUST run before
+    // the compaction below, which removes exactly the entries this reads.
+    packEnvironmentUBO();
+
+    // Drop every entry the Environment UBO now owns. The collections have two consumers with
+    // different needs: packEnvironmentUBO() above wants the FULL set (it is how those values
+    // reach the GPU at all), while LLShaderUniforms::apply() only ever wants what a program
+    // can actually read as a loose uniform. Once a constant moved into the shared block, no
+    // shader declares it loose, yet every syncing program still walked them to no-op.
+    //
+    // Compacting here rather than deleting the pushes in applySpecial()/applyToUniforms()
+    // keeps the packer's input intact; removing them at the source would zero-fill those
+    // block fields and break sky/water outright. Keyed off findEnvField(), the same table the
+    // packer uses, so migrating another constant into the block removes it from the apply
+    // path automatically.
+    {
+        auto compact = [](LLShaderUniforms& u)
+        {
+            auto owned_by_block = [](auto& setting) { return findEnvField(setting.mUniform) != nullptr; };
+            auto strip = [&](auto& vec)
+            {
+                vec.erase(std::remove_if(vec.begin(), vec.end(), owned_by_block), vec.end());
+            };
+            strip(u.mIntegers);
+            strip(u.mFloats);
+            strip(u.mVectors);
+            strip(u.mVector3s);
+        };
+        for (int i = 0; i < LLGLSLShader::SG_COUNT; ++i)
+        {
+            compact(mSkyUniforms[i]);
+            compact(mWaterUniforms[i]);
+        }
+    }
+}
+
+void LLEnvironment::packEnvironmentUBO()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    // Rebuild the whole block each time: zero first so a member that ever stops being emitted
+    // reads as 0 rather than a stale value. The moved uniforms are always emitted, so in
+    // practice every field is overwritten below.
+    EnvironmentUBOData& d = mEnvUBOData;
+    memset(&d, 0, sizeof(d));
+
+    U8* base = reinterpret_cast<U8*>(&d);
+
+    // Walk every SG bucket of both settings. A moved uniform lives in exactly one bucket
+    // (sky-only members in SG_SKY, everything else in SG_ANY; water fog in mWaterUniforms),
+    // and where one appears twice within a bucket (e.g. an auto-adjust override) the later
+    // push wins -- matching the loose apply() semantics, since we write in the same order.
+    auto pack_group = [&](const LLShaderUniforms* groups)
+    {
+        for (int g = 0; g < LLGLSLShader::SG_COUNT; ++g)
+        {
+            const LLShaderUniforms& u = groups[g];
+            for (const auto& s : u.mFloats)
+            {
+                if (const EnvBlockField* f = findEnvField(s.mUniform))
+                {
+                    memcpy(base + f->offset, &s.mValue, sizeof(F32));
+                }
+            }
+            for (const auto& s : u.mVector3s)
+            {
+                if (const EnvBlockField* f = findEnvField(s.mUniform))
+                {
+                    // Clamp to the destination field's width: never write past a field into the
+                    // std140-paired scalar that fills a vec3's .w tail (e.g. haze_density, max_y).
+                    memcpy(base + f->offset, s.mValue.mV, llmin(3u, f->ncomp) * sizeof(F32));
+                }
+            }
+            for (const auto& s : u.mVectors)
+            {
+                if (const EnvBlockField* f = findEnvField(s.mUniform))
+                {
+                    memcpy(base + f->offset, s.mValue.mV, llmin(4u, f->ncomp) * sizeof(F32));
+                }
+            }
+            // mIntegers: none of the moved members are integers, so nothing to pack.
+        }
+    };
+
+    pack_group(mSkyUniforms);
+    pack_group(mWaterUniforms);
+
+    for (U32 column = 0; column < 3; ++column)
+    {
+        memcpy(&d.eyeToSky[column * 4], &mEyeToSky[column * 3], 3 * sizeof(F32));
+    }
+
+    mEnvUBODirty = true;
+}
+
+void LLEnvironment::bindEnvironmentUBO()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    if (mEnvUBODirty || !mEnvUBO.allocated())
+    {
+        mEnvUBO.update(&mEnvUBOData, sizeof(EnvironmentUBOData));
+        mEnvUBODirty = false;
+    }
+
+    mEnvUBO.bind(LLGLSLShader::UB_ENVIRONMENT);
+}
+
+void LLEnvironment::releaseGLBuffers()
+{
+    mEnvUBO.release();
+    mEnvUBODirty = true; // force a re-upload before the next bind
 }
 
 void LLEnvironment::recordEnvironment(S32 parcel_id, LLEnvironment::EnvironmentInfo::ptr_t envinfo, LLSettingsBase::Seconds transition)
@@ -2033,8 +2173,8 @@ void LLEnvironment::coroRequestEnvironment(S32 parcel_id, LLEnvironment::environ
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ResetEnvironment", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ResetEnvironment", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     std::string url = gAgent.getRegionCapability("ExtEnvironment");
     if (url.empty())
@@ -2081,8 +2221,8 @@ void LLEnvironment::coroUpdateEnvironment(S32 parcel_id, S32 track_no, UpdateInf
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ResetEnvironment", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ResetEnvironment", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     std::string url = gAgent.getRegionCapability("ExtEnvironment");
     if (url.empty())
@@ -2197,8 +2337,8 @@ void LLEnvironment::coroResetEnvironment(S32 parcel_id, S32 track_no, environmen
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ResetEnvironment", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ResetEnvironment", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     std::string url = gAgent.getRegionCapability("ExtEnvironment");
     if (url.empty())
@@ -2754,13 +2894,6 @@ bool LLEnvironment::DayInstance::setSky(const LLSettingsSky::ptr_t &psky)
     mSky->update();
     mBlenderSky.reset();
 
-    if (gAtmosphere)
-    {
-        AtmosphericModelSettings settings;
-        LLEnvironment::getAtmosphericModelSettings(settings, psky);
-        gAtmosphere->configureAtmosphericModel(settings);
-    }
-
     return changed;
 }
 
@@ -2814,7 +2947,8 @@ void LLEnvironment::DayInstance::setBlenders(const LLSettingsBlender::ptr_t &sky
 
 LLSettingsBase::TrackPosition LLEnvironment::DayInstance::getProgress() const
 {
-    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch());
+    // The region's day runs on the server's clock, not this machine's.
+    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch() + gUTCOffset);
     now += mDayOffset;
 
     if ((mDayLength <= 0) || !mDayCycle)
@@ -2830,7 +2964,7 @@ LLSettingsBase::TrackPosition LLEnvironment::DayInstance::secondsToKeyframe(LLSe
 
 void LLEnvironment::DayInstance::animate()
 {
-    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch());
+    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch() + gUTCOffset);
 
     now += mDayOffset;
 
@@ -3429,8 +3563,8 @@ namespace
     {
         LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
         LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-            httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("testExperiencesOnParcelCoro", httpPolicy));
-        LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+            httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("testExperiencesOnParcelCoro", httpPolicy);
+        LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
         std::string url = gAgent.getRegionCapability("ExperienceQuery");
 
         if (url.empty())

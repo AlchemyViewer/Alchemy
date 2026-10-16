@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Joystick" title="搖桿設置">
-	<floater.string name="NoDevice">
-		未偵測到設備
-	</floater.string>
-	<check_box label="啟用搖桿：" name="enable_joystick"/>
 	<spinner label="X 軸映射" name="JoystickAxis1"/>
 	<spinner label="Y 軸映射" name="JoystickAxis2"/>
 	<spinner label="Z 軸映射" name="JoystickAxis0"/>

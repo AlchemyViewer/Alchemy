@@ -18,13 +18,11 @@
 	<button label="Hiçbiri" label_selected="Hiçbiri" name="None"/>
 	<text name="preview_disabled" value="Önizleme Devre Dışı"/>
 	<filter_editor label="Dokuları Filtrele" name="inventory search editor"/>
-	<check_box initial_value="false" label="Klasörleri göster" name="show_folders_check"/>
 	<button label="Ekle" label_selected="Ekle" name="l_add_btn"/>
 	<button label="Kaldır" label_selected="Kaldır" name="l_rem_btn"/>
 	<button label="Karşıya Yükle" label_selected="Karşıya Yükle" name="l_upl_btn"/>
 	<scroll_list name="l_name_list">
 		<column label="Ad" name="unit_name"/>
-		<column label="Kimlik" name="unit_id_HIDDEN"/>
 	</scroll_list>
 	<combo_box name="l_bake_use_texture_combo_box" tool_tip="Kurutma dokusunu seçin">
 		<combo_box.item label="Yok" name="None"/>
@@ -40,7 +38,6 @@
 		<combo_box.item label="BAKED_AUX2" name="BAKED_AUX2"/>
 		<combo_box.item label="BAKED_AUX3" name="BAKED_AUX3"/>
 	</combo_box>
-	<check_box initial_value="false" label="Temel Ağ Bölgesini Gizle" name="hide_base_mesh_region"/>
 	<button label="Tamam" label_selected="Tamam" name="Select"/>
 	<button label="İptal" label_selected="İptal" name="Cancel"/>
 	<check_box initial_value="true" label="Şimdi uygula" name="apply_immediate_check"/>

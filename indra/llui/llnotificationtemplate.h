@@ -277,10 +277,6 @@ struct LLNotificationTemplate
     // will be valid (a teleport offer, for example, might be valid for
     // 300 seconds).
     U32 mExpireSeconds;
-    // if the offer expires, one of the options is chosen automatically
-    // based on its "value" parameter. This controls which one.
-    // If expireSeconds is specified, expireOption should also be specified.
-    U32 mExpireOption;
     // if the notification contains a url, it's stored here (and replaced
     // into the message where [_URL] is found)
     std::string mURL;
@@ -301,10 +297,6 @@ struct LLNotificationTemplate
     // does this notification persist across sessions? if so, it will be
     // serialized to disk on first receipt and read on startup
     bool mPersist;
-    // This is the name of the default functor, if present, to be
-    // used for the notification's callback. It is optional, and used only if
-    // the notification is constructed without an identified functor.
-    std::string mDefaultFunctor;
     // The form data associated with a given notification (buttons, text boxes, etc)
     LLNotificationFormPtr mForm;
     // default priority for notifications of this type

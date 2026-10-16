@@ -35,7 +35,9 @@
 #include "llrefcount.h"
 #include "llthreadlocalstorage.h"
 #include "llmemory.h"
+#include "lockstatic.h"             // llthread::getCanonicalStatic (DLL-safe statics)
 #include <limits>
+#include <typeinfo>
 
 namespace LLTrace
 {
@@ -67,8 +69,8 @@ namespace LLTrace
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
             const AccumulatorBuffer& other = *getDefaultBuffer();
-            resize(sNextStorageSlot);
-            for (S32 i = 0; i < sNextStorageSlot; i++)
+            resize(statics().mNextStorageSlot);
+            for (S32 i = 0; i < statics().mNextStorageSlot; i++)
             {
                 mStorage[i] = other.mStorage[i];
             }
@@ -100,8 +102,8 @@ namespace LLTrace
             mStorage(NULL)
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
-            resize(sNextStorageSlot);
-            for (S32 i = 0; i < sNextStorageSlot; i++)
+            resize(statics().mNextStorageSlot);
+            for (S32 i = 0; i < statics().mNextStorageSlot; i++)
             {
                 mStorage[i] = other.mStorage[i];
             }
@@ -110,8 +112,8 @@ namespace LLTrace
         void addSamples(const AccumulatorBuffer<ACCUMULATOR>& other, EBufferAppendType append_type)
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
-            llassert(mStorageSize >= sNextStorageSlot && other.mStorageSize >= sNextStorageSlot);
-            for (size_t i = 0; i < sNextStorageSlot; i++)
+            llassert(mStorageSize >= statics().mNextStorageSlot && other.mStorageSize >= statics().mNextStorageSlot);
+            for (size_t i = 0; i < statics().mNextStorageSlot; i++)
             {
                 mStorage[i].addSamples(other.mStorage[i], append_type);
             }
@@ -120,8 +122,8 @@ namespace LLTrace
         void copyFrom(const AccumulatorBuffer<ACCUMULATOR>& other)
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
-            llassert(mStorageSize >= sNextStorageSlot && other.mStorageSize >= sNextStorageSlot);
-            for (size_t i = 0; i < sNextStorageSlot; i++)
+            llassert(mStorageSize >= statics().mNextStorageSlot && other.mStorageSize >= statics().mNextStorageSlot);
+            for (size_t i = 0; i < statics().mNextStorageSlot; i++)
             {
                 mStorage[i] = other.mStorage[i];
             }
@@ -130,8 +132,8 @@ namespace LLTrace
         void reset(const AccumulatorBuffer<ACCUMULATOR>* other = NULL)
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
-            llassert(mStorageSize >= sNextStorageSlot);
-            for (size_t i = 0; i < sNextStorageSlot; i++)
+            llassert(mStorageSize >= statics().mNextStorageSlot);
+            for (size_t i = 0; i < statics().mNextStorageSlot; i++)
             {
                 mStorage[i].reset(other ? &other->mStorage[i] : NULL);
             }
@@ -140,8 +142,8 @@ namespace LLTrace
         void sync(F64SecondsImplicit time_stamp)
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
-            llassert(mStorageSize >= sNextStorageSlot);
-            for (size_t i = 0; i < sNextStorageSlot; i++)
+            llassert(mStorageSize >= statics().mNextStorageSlot);
+            for (size_t i = 0; i < statics().mNextStorageSlot; i++)
             {
                 mStorage[i].sync(time_stamp);
             }
@@ -166,7 +168,7 @@ namespace LLTrace
         size_t reserveSlot()
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
-            size_t next_slot = sNextStorageSlot++;
+            size_t next_slot = statics().mNextStorageSlot++;
             if (next_slot >= mStorageSize)
             {
                 // don't perform doubling, as this should only happen during startup
@@ -215,35 +217,51 @@ namespace LLTrace
 
         static size_t getNumIndices()
         {
-            return sNextStorageSlot;
+            return statics().mNextStorageSlot;
         }
 
         static self_t* getDefaultBuffer()
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
-            static bool sInitialized = false;
-            if (!sInitialized)
+            // (Previously gated on a function-local `static bool sInitialized`,
+            // which is per-module and would re-init the shared buffer from a
+            // second module. Gate on the shared pointer itself instead.)
+            Statics& s = statics();
+            if (!s.mDefaultBuffer)
             {
                 // this buffer is allowed to leak so that trace calls from global destructors have somewhere to put their data
                 // so as not to trigger an access violation
-                sDefaultBuffer = new AccumulatorBuffer(StaticAllocationMarker());
-                sInitialized = true;
-                sDefaultBuffer->resize(DEFAULT_ACCUMULATOR_BUFFER_SIZE);
+                s.mDefaultBuffer = new AccumulatorBuffer(StaticAllocationMarker());
+                s.mDefaultBuffer->resize(DEFAULT_ACCUMULATOR_BUFFER_SIZE);
             }
-            return sDefaultBuffer;
+            return s.mDefaultBuffer;
         }
 
     private:
         ACCUMULATOR*    mStorage;
         size_t          mStorageSize;
-        static size_t   sNextStorageSlot;
-        static self_t*  sDefaultBuffer;
+
+        // Per-ACCUMULATOR statics, kept as ONE canonical instance shared across
+        // all modules (DLLs). A plain template static member duplicates per
+        // module in a shared-library build, which splits slot numbering and
+        // buffer sizing across modules and crashes (out-of-bounds accumulator
+        // access). getCanonicalStatic() lives in a single TU, so every module
+        // resolves the same instance. Keyed by typeid(self_t).name().
+        struct Statics
+        {
+            size_t  mNextStorageSlot = 0;
+            self_t* mDefaultBuffer = nullptr;
+        };
+        static Statics& statics()
+        {
+            static Statics* s = static_cast<Statics*>(
+                llthread::getCanonicalStatic(typeid(self_t).name(),
+                                             []() -> void* { return new Statics(); }));
+            return *s;
+        }
     };
 
-    template<typename ACCUMULATOR> size_t AccumulatorBuffer<ACCUMULATOR>::sNextStorageSlot = 0;
-    template<typename ACCUMULATOR> AccumulatorBuffer<ACCUMULATOR>* AccumulatorBuffer<ACCUMULATOR>::sDefaultBuffer = NULL;
-
-    class EventAccumulator
+    class LL_COMMON_API EventAccumulator
     {
     public:
         typedef F64 value_t;
@@ -314,7 +332,7 @@ namespace LLTrace
     };
 
 
-    class SampleAccumulator
+    class LL_COMMON_API SampleAccumulator
     {
     public:
         typedef F64 value_t;
@@ -411,7 +429,7 @@ namespace LLTrace
         bool    mHasValue;
     };
 
-    class CountAccumulator
+    class LL_COMMON_API CountAccumulator
     {
     public:
         typedef F64 value_t;
@@ -454,79 +472,6 @@ namespace LLTrace
         S32 mNumSamples;
     };
 
-    class alignas(32) TimeBlockAccumulator
-    {
-    public:
-        typedef F64Seconds value_t;
-        static F64Seconds getDefaultValue() { return F64Seconds(0); }
-
-        typedef TimeBlockAccumulator self_t;
-
-        // fake classes that allows us to view different facets of underlying statistic
-        struct CallCountFacet
-        {
-            typedef S32 value_t;
-        };
-
-        struct SelfTimeFacet
-        {
-            typedef F64Seconds value_t;
-        };
-
-        // arrays are allocated with 32 byte alignment
-        void *operator new [](size_t size)
-        {
-            return ll_aligned_malloc<32>(size);
-        }
-
-        void operator delete[](void* ptr, size_t size)
-        {
-            ll_aligned_free<32>(ptr);
-        }
-
-        TimeBlockAccumulator();
-        void addSamples(const self_t& other, EBufferAppendType append_type);
-        void reset(const self_t* other);
-        void sync(F64SecondsImplicit) {}
-        bool hasValue() const { return true; }
-
-        //
-        // members
-        //
-        U64                         mTotalTimeCounter,
-                                    mSelfTimeCounter;
-        S32                         mCalls;
-        class BlockTimerStatHandle* mParent;        // last acknowledged parent of this time block
-        class BlockTimerStatHandle* mLastCaller;    // used to bootstrap tree construction
-        U16                         mActiveCount;   // number of timers with this ID active on stack
-        bool                        mMoveUpTree;    // needs to be moved up the tree of timers at the end of frame
-
-    };
-
-    class BlockTimerStatHandle;
-
-    class TimeBlockTreeNode
-    {
-    public:
-        TimeBlockTreeNode();
-
-        void setParent(BlockTimerStatHandle* parent);
-        BlockTimerStatHandle* getParent() { return mParent; }
-
-        BlockTimerStatHandle*                   mBlock;
-        BlockTimerStatHandle*                   mParent;
-        std::vector<BlockTimerStatHandle*>      mChildren;
-        bool                        mCollapsed;
-        bool                        mNeedsSorting;
-    };
-
-    struct BlockTimerStackRecord
-    {
-        class BlockTimer*   mActiveTimer{ nullptr };
-        class BlockTimerStatHandle* mTimeBlock{ nullptr };
-        U64                 mChildTime{ 0 };
-    };
-
     struct AccumulatorBufferGroup : public LLRefCount
     {
         AccumulatorBufferGroup();
@@ -546,7 +491,6 @@ namespace LLTrace
         AccumulatorBuffer<CountAccumulator>     mCounts;
         AccumulatorBuffer<SampleAccumulator>    mSamples;
         AccumulatorBuffer<EventAccumulator>     mEvents;
-        AccumulatorBuffer<TimeBlockAccumulator> mStackTimers;
     };
 }
 

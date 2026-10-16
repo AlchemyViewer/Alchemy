@@ -498,6 +498,8 @@ static apr_status_t tcp_blocking_handshake(LLSocket::ptr_t handle, char * dataou
         rv = -1;
     }
 
+    ms_sleep(1);
+
     if (APR_SUCCESS == rv)
     {
         expected_len = maxinlen;

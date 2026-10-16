@@ -34,11 +34,18 @@
 
 #if LL_LINUX
 
+// SymbolToGrab stores a pointer to a function-pointer slot so dlsym() can
+// fill it in. The slot is typed as `RETURN(*)(...)` at the call site, but
+// the grabber needs a uniform handle, so we cast it to a void* slot. That
+// punning trips -Wstrict-aliasing=2 unless we tell GCC the void* may alias
+// anything -- the same trick the kernel uses for hot-path pointer casts.
+typedef void* __attribute__((__may_alias__)) gnu_void_p_alias;
+
 struct SymbolToGrab
 {
     bool mRequired;
     char const *mName;
-    void **mPPFunc;
+    gnu_void_p_alias *mPPFunc;
 };
 
 class SymbolGrabber
@@ -62,7 +69,7 @@ extern SymbolGrabber gSymbolGrabber;
 #define LL_GRAB_SYM(SYMBOL_GRABBER, REQUIRED, SYMBOL_NAME, RETURN, ...) \
     RETURN (*ll##SYMBOL_NAME)(__VA_ARGS__) = nullptr; \
     size_t gRegistered##SYMBOL_NAME = SYMBOL_GRABBER.registerSymbol( \
-        { REQUIRED, #SYMBOL_NAME , (void**)&ll##SYMBOL_NAME} \
+        { REQUIRED, #SYMBOL_NAME , reinterpret_cast<gnu_void_p_alias*>(&ll##SYMBOL_NAME)} \
     );
 
 #endif
@@ -75,9 +82,9 @@ public:
     virtual ~MediaPluginBase() {}
 
    /** Handle received message from plugin loader shell. */
-    virtual void receiveMessage(const char *message_string) = 0;
+    virtual void receiveMessage(const std::string &message_string) = 0;
 
-    static void staticReceiveMessage(const char *message_string, void **user_data);
+    static void staticReceiveMessage(const char *message_string, size_t message_size, void **user_data);
 
 protected:
 

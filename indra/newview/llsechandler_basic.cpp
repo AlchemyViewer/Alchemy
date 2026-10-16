@@ -57,6 +57,7 @@
 static const std::string DEFAULT_CREDENTIAL_STORAGE = "credential";
 
 // compat
+#define LEGACY_PASSWORD_STORAGE 1
 #define COMPAT_STORE_SALT_SIZE 16
 
 // 256 bits of salt data...
@@ -705,7 +706,7 @@ LLBasicCertificateChain::LLBasicCertificateChain(X509_STORE_CTX* store)
 
     // we're passed in a context, which contains a cert, and a blob of untrusted
     // certificates which compose the chain.
-    if((store == NULL) || (X509_STORE_CTX_get0_cert(store) == NULL))
+    if((store == NULL) || X509_STORE_CTX_get0_cert(store) == NULL)
     {
         LL_WARNS("SECAPI") << "An invalid store context was passed in when trying to create a certificate chain" << LL_ENDL;
         return;

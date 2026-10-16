@@ -3,7 +3,7 @@
 	<button label="Deneyim" name="Expand Experience"/>
 	<check_box label="Deneyimi Kullanır" name="enable_xp"/>
 	<layout_stack name="xp_details">
-		<layout_panel>
+		<layout_panel name="xp_choose_panel">
 			<combo_box label="Deneyimi Seç..." name="Experiences..."/>
 		</layout_panel>
 	</layout_stack>

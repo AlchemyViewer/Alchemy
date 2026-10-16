@@ -30,11 +30,13 @@
 #ifndef LLTOASTSCRIPTQUESTION_H_
 #define LLTOASTSCRIPTQUESTION_H_
 
-class LLToastScriptQuestion : public LLToastPanel
+class LLToastScriptQuestion final : public LLToastPanel
 {
     LOG_CLASS(LLToastScriptQuestion);
 
 public:
+    AL_VIEW_TYPE(LLToastScriptQuestion, LLToastPanel);
+
     LLToastScriptQuestion(const LLNotificationPtr& notification);
     bool postBuild() override;
     virtual ~LLToastScriptQuestion(){};

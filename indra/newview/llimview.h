@@ -79,6 +79,13 @@ public:
             NONE_SESSION,
         } SType;
 
+        enum class SCloseAction
+        {
+            CLOSE_DEFAULT,
+            CLOSE_LEAVE,
+            CLOSE_SNOOZE
+        };
+
         LLIMSession(const LLUUID& session_id, const std::string& name,
             const EInstantMessage& type, const LLUUID& other_participant_id, const LLSD& voiceChannelInfo, const uuid_vec_t& ids, bool has_offline_msg);
         virtual ~LLIMSession();
@@ -122,6 +129,8 @@ public:
         std::string mName;
         EInstantMessage mType;
         SType mSessionType;
+        SCloseAction mCloseAction = SCloseAction::CLOSE_DEFAULT;
+        S32 mSnoozeDuration = -1;
         LLUUID mOtherParticipantID;
         uuid_vec_t mInitialTargetIDs;
         std::string mHistoryFileName;
@@ -444,6 +453,9 @@ public:
     void disconnectAllSessions();
 
     bool hasSession(const LLUUID& session_id);
+    bool checkSnoozeExpiration(const LLUUID& session_id) const;
+    bool isSnoozedSession(const LLUUID& session_id) const;
+    bool restoreSnoozedSession(const LLUUID& session_id);
 
     static LLUUID computeSessionID(EInstantMessage dialog, const LLUUID& other_participant_id);
 
@@ -529,6 +541,9 @@ private:
 
     LLSD mPendingInvitations;
     LLSD mPendingAgentListUpdates;
+
+    typedef std::map<LLUUID, F64> snoozed_sessions_t;
+    snoozed_sessions_t mSnoozedSessions;
 };
 
 class LLCallDialogManager : public LLSingleton<LLCallDialogManager>
@@ -557,16 +572,18 @@ protected:
 class LLCallDialog : public LLDockableFloater
 {
 public:
+    AL_VIEW_TYPE(LLCallDialog, LLDockableFloater);
+
     LLCallDialog(const LLSD& payload);
     virtual ~LLCallDialog();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void dockToToolbarButton(const std::string& toolbarButtonName);
 
     // check timer state
-    /*virtual*/ void draw();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ void draw() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
 protected:
     // lifetime timer for a notification
@@ -593,9 +610,11 @@ private:
     LLDockControl::DocAt getDockControlPos(const std::string& toolbarButtonName);
 };
 
-class LLIncomingCallDialog : public LLCallDialog
+class LLIncomingCallDialog final : public LLCallDialog
 {
 public:
+    AL_VIEW_TYPE(LLIncomingCallDialog, LLCallDialog);
+
     LLIncomingCallDialog(const LLSD& payload);
     ~LLIncomingCallDialog()
     {
@@ -605,8 +624,8 @@ public:
         }
     }
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
     static void onAccept(void* user_data);
     static void onReject(void* user_data);
@@ -623,15 +642,17 @@ private:
 
     boost::signals2::connection mAvatarNameCacheConnection;
 
-    /*virtual*/ void onLifetimeExpired();
+    /*virtual*/ void onLifetimeExpired() override;
 };
 
-class LLOutgoingCallDialog : public LLCallDialog
+class LLOutgoingCallDialog final : public LLCallDialog
 {
 public:
+    AL_VIEW_TYPE(LLOutgoingCallDialog, LLCallDialog);
+
     LLOutgoingCallDialog(const LLSD& payload);
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
     void show(const LLSD& key);
 
     static void onCancel(void* user_data);

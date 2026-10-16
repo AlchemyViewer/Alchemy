@@ -39,7 +39,7 @@ class LLContextMenu;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-class LLMediaCtrl :
+class LLMediaCtrl final :
     public LLPanel,
     public LLViewerMediaObserver,
     public LLViewerMediaEventEmitter,
@@ -47,6 +47,7 @@ class LLMediaCtrl :
 {
     LOG_CLASS(LLMediaCtrl);
 public:
+    AL_VIEW_TYPE(LLMediaCtrl, LLPanel);
 
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
@@ -77,6 +78,14 @@ protected:
 public:
         virtual ~LLMediaCtrl();
 
+        enum ELoadingState
+        {
+            LOADING_STATE_INITIALIZING = 0,
+            LOADING_STATE_LOADING = 1,
+            LOADING_STATE_LOADED = 2,
+            LOADING_STATE_ERROR = 3
+        };
+
         void setBorderVisible( bool border_visible );
 
         // For the tutorial window, we don't want to take focus on clicks,
@@ -86,15 +95,17 @@ public:
         void setTakeFocusOnClick( bool take_focus );
 
         // handle mouse related methods
-        virtual bool handleHover( S32 x, S32 y, MASK mask );
-        virtual bool handleMouseUp( S32 x, S32 y, MASK mask );
-        virtual bool handleMouseDown( S32 x, S32 y, MASK mask );
-        virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
-        virtual bool handleRightMouseUp(S32 x, S32 y, MASK mask);
-        virtual bool handleDoubleClick( S32 x, S32 y, MASK mask );
-        virtual bool handleScrollWheel( S32 x, S32 y, S32 clicks );
-        virtual bool handleScrollHWheel( S32 x, S32 y, S32 clicks );
-        virtual bool handleToolTip(S32 x, S32 y, MASK mask);
+        virtual bool handleHover( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleMouseUp( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+        virtual bool handleRightMouseUp(S32 x, S32 y, MASK mask) override;
+        virtual bool handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
+        virtual bool handleMiddleMouseUp(S32 x, S32 y, MASK mask) override;
+        virtual bool handleDoubleClick( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta ) override;
+        virtual bool handleScrollHWheel( S32 x, S32 y, LLScrollDelta delta ) override;
+        virtual bool handleToolTip(S32 x, S32 y, MASK mask) override;
 
         // navigation
         void navigateTo( std::string url_in, std::string mime_type = "", bool clean_browser = false);
@@ -154,32 +165,41 @@ public:
         void setAllowFileDownload(bool allow) { mAllowFileDownload = allow; }
 
         // over-rides
-        virtual bool handleKeyHere( KEY key, MASK mask);
-        virtual bool handleKeyUpHere(KEY key, MASK mask);
-        virtual void onVisibilityChange ( bool new_visibility );
-        virtual bool handleUnicodeCharHere(llwchar uni_char);
-        virtual void reshape( S32 width, S32 height, bool called_from_parent = true);
-        virtual void draw();
-        virtual bool postBuild();
+        virtual bool handleKeyHere( KEY key, MASK mask) override;
+        virtual bool handleKeyUpHere(KEY key, MASK mask) override;
+        virtual void onVisibilityChange ( bool new_visibility ) override;
+        virtual bool handleUnicodeCharHere(llwchar uni_char) override;
+        virtual void reshape( S32 width, S32 height, bool called_from_parent = true) override;
+        virtual void draw() override;
+        virtual bool postBuild() override;
 
         // focus overrides
-        void onFocusLost();
-        void onFocusReceived();
+        void onFocusLost() override;
+        void onFocusReceived() override;
 
         // Incoming media event dispatcher
-        virtual void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event);
+        virtual void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
 
         // right click debugging item
         void onOpenWebInspector();
         void onShowSource();
 
+        // show the page context menu (in response to MEDIA_EVENT_CONTEXT_MENU),
+        // at the given control-local coordinate
+        void showContextMenu(S32 x, S32 y);
+
         LLUUID getTextureID() {return mMediaTextureID;}
 
         // The Browser windows want keyup and keydown events. Overridden from LLFocusableElement to return true.
-        virtual bool    wantsKeyUpKeyDown() const;
-        virtual bool    wantsReturnKey() const;
+        virtual bool    wantsKeyUpKeyDown() const override;
+        virtual bool    wantsReturnKey() const override;
 
-        virtual bool    acceptsTextInput() const { return true; }
+        virtual bool    acceptsTextInput() const override { return true; }
+
+        std::string getMediaMimeType();
+        std::string getMediaLoadingStatus();
+        std::string getMediaTitle();
+        bool executeJavaScript(const std::string& script);
 
     protected:
         void convertInputCoords(S32& x, S32& y);
@@ -216,9 +236,15 @@ public:
         viewer_media_t mMediaSource;
         S32 mTextureWidth,
             mTextureHeight;
+        ELoadingState mLoadingState;
 
         class LLWindowShade* mWindowShade;
         LLHandle<LLContextMenu> mContextMenuHandle;
+
+        // control-local position of the last right-click, used to place the
+        // context menu when CEF asks us to show it (MEDIA_EVENT_CONTEXT_MENU)
+        S32 mContextMenuLocalX = 0;
+        S32 mContextMenuLocalY = 0;
 };
 
 #endif // LL_LLMediaCtrl_H

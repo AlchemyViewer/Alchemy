@@ -28,6 +28,7 @@
 
 #include "llviewerinput.h"
 
+#include "alchatbar.h"
 #include "llappviewer.h"
 #include "llfloaterreg.h"
 #include "llmath.h"
@@ -47,7 +48,12 @@
 #include "llfloatercamera.h"
 #include "llinitparam.h"
 #include "llselectmgr.h"
-#include "llfloaterwebcontent.h"
+#include "pipeline.h"
+// [RLVa:KB] - Checked: 2021-07-29 (RLVa-1.4.4a)
+#include "rlvactions.h"
+#include "rlvhandler.h"
+#include "rlvhelper.h"
+// [/RLVa:KB]
 
 //
 // Constants
@@ -64,13 +70,13 @@ const LLKeyData agent_control_lbutton(CLICK_LEFT, KEY_NONE, MASK_NONE, true);
 
 struct LLKeybindFunctionData
 {
-    LLKeybindFunctionData(boost::function<bool(EKeystate keystate)> function, bool global)
+    LLKeybindFunctionData(std::function<bool(EKeystate keystate)> function, bool global)
         :
         mFunction(function),
         mIsGlobal(global)
     {
     }
-    boost::function<bool(EKeystate keystate)> mFunction;
+    std::function<bool(EKeystate keystate)> mFunction;
     // todo: might be good idea to make this into enum, like: global/inworld/menu
     bool mIsGlobal;
 };
@@ -686,31 +692,48 @@ bool start_chat( EKeystate s )
     if (KEYSTATE_DOWN != s) return true;
 
     // start chat
-    LLFloaterIMNearbyChat::startChat(NULL);
+    static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+    if (!sChatInWindow)
+    {
+        LLFloaterIMNearbyChat::startChat(nullptr);
+    }
+    else
+    {
+        ALChatBar::startChat(nullptr);
+    }
     return true;
 }
 
 bool start_gesture( EKeystate s )
 {
-    LLFloater* focused_floater = gFloaterView->getFocusedFloater();
-    if (focused_floater && dynamic_cast<LLFloaterWebContent*>(focused_floater))
-    {
-        return true;
-    }
-
-    LLUICtrl* focus_ctrlp = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl* focus_ctrlp = gFocusMgr.getKeyboardFocusCtrl();
     if (KEYSTATE_UP == s &&
         ! (focus_ctrlp && focus_ctrlp->acceptsTextInput()))
     {
-        if ((LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))->getCurrentChat().empty())
+        static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+        if (!sChatInWindow)
         {
-            // No existing chat in chat editor, insert '/'
-            LLFloaterIMNearbyChat::startChat("/");
+            if ((LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))->getCurrentChat().empty())
+            {
+                // No existing chat in chat editor, insert '/'
+                LLFloaterIMNearbyChat::startChat("/");
+            }
+            else
+            {
+                // Don't overwrite existing text in chat editor
+                LLFloaterIMNearbyChat::startChat(nullptr);
+            }
         }
         else
         {
-            // Don't overwrite existing text in chat editor
-            LLFloaterIMNearbyChat::startChat(NULL);
+            if ((LLFloaterReg::getTypedInstance<ALChatBar>("chatbar"))->getCurrentChat().empty())
+            {
+                ALChatBar::startChat("/");
+            }
+            else
+            {
+                ALChatBar::startChat(nullptr);
+            }
         }
     }
     return true;
@@ -875,13 +898,17 @@ bool toggle_run(EKeystate s)
 bool toggle_sit(EKeystate s)
 {
     if (KEYSTATE_DOWN != s) return true;
-    if (gAgent.isSitting())
+    if (isAgentAvatarValid())
     {
-        gAgent.standUp();
-    }
-    else
-    {
-        gAgent.sitDown();
+        if (gAgent.isSitting() && RlvActions::canStand())
+        {
+            gAgent.standUp();
+        }
+        else if(!gAgentAvatarp->isSitting() && !gAgentAvatarp->isEditingAppearance() &&
+                !gAgent.getFlying() && !gRlvHandler.hasBehaviour(RLV_BHVR_SIT))
+        {
+            gAgent.sitDown();
+        }
     }
     return true;
 }
@@ -940,6 +967,26 @@ bool voice_follow_key(EKeystate s)
     else if (KEYSTATE_UP == s && LLVoiceClient::getInstance()->getUserPTTState())
     {
         LLVoiceClient::getInstance()->setUserPTTState(false);
+        return true;
+    }
+    return false;
+}
+
+bool grade_bypass_key(EKeystate s)
+{
+    // Hold to see the ungraded frame. Deliberately not a toggle of
+    // RenderColorGrade: that setting is on the Looks whitelist, so flipping it
+    // would mark the current Look dirty and, released at the wrong moment,
+    // save the comparison as the look. This is a render-time bypass with no
+    // persistent state behind it at all.
+    if (KEYSTATE_DOWN == s)
+    {
+        LLPipeline::sGradeBypass = true;
+        return true;
+    }
+    else if (KEYSTATE_UP == s)
+    {
+        LLPipeline::sGradeBypass = false;
         return true;
     }
     return false;
@@ -1058,6 +1105,10 @@ REGISTER_KEYBOARD_ACTION("teleport_to", teleport_to);
 REGISTER_KEYBOARD_ACTION("walk_to", walk_to);
 REGISTER_KEYBOARD_GLOBAL_ACTION("toggle_voice", toggle_voice);
 REGISTER_KEYBOARD_GLOBAL_ACTION("voice_follow_key", voice_follow_key);
+// Global, because the hand is on the keyboard and the eye is on the scene
+// while the Lightbox itself has focus -- which is precisely when a before and
+// after is worth having.
+REGISTER_KEYBOARD_GLOBAL_ACTION("grade_bypass_key", grade_bypass_key);
 REGISTER_KEYBOARD_ACTION(script_mouse_handler_name, script_trigger_lbutton);
 REGISTER_KEYBOARD_ACTION("roll_left", camera_roll_left);
 REGISTER_KEYBOARD_ACTION("roll_right", camera_roll_right);
@@ -1257,8 +1308,8 @@ bool LLViewerInput::handleGlobalBindsMouse(EMouseClickType clicktype, MASK mask,
 bool LLViewerInput::bindKey(const S32 mode, const KEY key, const MASK mask, const std::string& function_name)
 {
     size_t index;
-    typedef boost::function<bool(EKeystate)> function_t;
-    function_t function = NULL;
+    typedef std::function<bool(EKeystate)> function_t;
+    function_t function = nullptr;
     std::string name;
 
     // Allow remapping of F2-F12
@@ -1347,8 +1398,8 @@ bool LLViewerInput::bindKey(const S32 mode, const KEY key, const MASK mask, cons
 bool LLViewerInput::bindMouse(const S32 mode, const EMouseClickType mouse, const MASK mask, const std::string& function_name)
 {
     size_t index;
-    typedef boost::function<bool(EKeystate)> function_t;
-    function_t function = NULL;
+    typedef std::function<bool(EKeystate)> function_t;
+    function_t function = nullptr;
 
     if (mouse == CLICK_LEFT
         && mask == MASK_NONE
@@ -1522,7 +1573,7 @@ S32 LLViewerInput::loadBindingsXML(const std::string& filename)
                 // file in app_settings is supposed to be up to date
                 // this is only for the file from user_settings
                 LL_INFOS("ViewerInput") << "Updating file " << filename << " to a newer version" << LL_ENDL;
-                LLFILE *fp = LLFile::fopen(filename, "w");
+                LLFILE *fp = LLFile::fopen(filename, LLFILE_MODE("w"));
                 if (fp != NULL)
                 {
                     LLXMLNode::writeHeaderToFile(fp);
@@ -1648,6 +1699,9 @@ bool LLViewerInput::scanKey(const std::vector<LLKeyboardBinding> &binding,
                                bool key_level,
                                bool repeat) const
 {
+    // In world either Control is Control on the Mac, as it always was: the
+    // Mac's own key is told apart from Command for the UI's sake alone.
+    mask = LLKeyboard::foldMacControl(mask);
     for (S32 i = 0; i < binding_count; i++)
     {
         if (binding[i].mKey == key)

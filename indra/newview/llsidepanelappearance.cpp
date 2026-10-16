@@ -50,6 +50,7 @@
 #include "llviewerregion.h"
 #include "llvoavatarself.h"
 #include "llviewerwearable.h"
+#include "llappviewer.h"
 
 static LLPanelInjector<LLSidepanelAppearance> t_appearance("sidepanel_appearance");
 
@@ -110,9 +111,9 @@ bool LLSidepanelAppearance::postBuild()
         mFilterEditor->setCommitCallback(boost::bind(&LLSidepanelAppearance::onFilterEdit, this, _2));
     }
 
-    mPanelOutfitsInventory = dynamic_cast<LLPanelOutfitsInventory *>(getChild<LLPanel>("panel_outfits_inventory"));
+    mPanelOutfitsInventory = getChild<LLPanel>("panel_outfits_inventory")->as<LLPanelOutfitsInventory>();
 
-    mOutfitEdit = dynamic_cast<LLPanelOutfitEdit*>(getChild<LLPanel>("panel_outfit_edit"));
+    mOutfitEdit = getChild<LLPanel>("panel_outfit_edit")->as<LLPanelOutfitEdit>();
     if (mOutfitEdit)
     {
         LLButton* back_btn = mOutfitEdit->getChild<LLButton>("back_btn");
@@ -123,7 +124,7 @@ bool LLSidepanelAppearance::postBuild()
 
     }
 
-    mEditWearable = dynamic_cast<LLPanelEditWearable*>(getChild<LLPanel>("panel_edit_wearable"));
+    mEditWearable = getChild<LLPanel>("panel_edit_wearable")->as<LLPanelEditWearable>();
     if (mEditWearable)
     {
         LLButton* edit_wearable_back_btn = mEditWearable->getChild<LLButton>("back_btn");
@@ -458,6 +459,24 @@ void LLSidepanelAppearance::toggleWearableEditPanel(bool visible, LLViewerWearab
 
 void LLSidepanelAppearance::refreshCurrentOutfitName(const std::string& name)
 {
+    // May be invoked from a background coroutine (e.g. an AIS inventory
+    // update). Text layout here can rasterize new glyphs / create GL
+    // textures, which is only safe on the main coroutine, so hop there.
+    LLHandle<LLPanel> handle = getHandle();
+    std::string name_copy = name;
+    LLAppViewer::instance()->postToMainCoro(
+        [handle, name_copy]()
+        {
+            LLSidepanelAppearance* self = ALViewType::as<LLSidepanelAppearance>(handle.get());
+            if (self)
+            {
+                self->refreshCurrentOutfitNameImpl(name_copy);
+            }
+        });
+}
+
+void LLSidepanelAppearance::refreshCurrentOutfitNameImpl(const std::string& name)
+{
     // Set current outfit status (wearing/unsaved).
     bool dirty = LLAppearanceMgr::getInstance()->isOutfitDirty();
     std::string cof_status_str = getString(dirty ? "Unsaved Changes" : "Now Wearing");
@@ -488,7 +507,7 @@ void LLSidepanelAppearance::refreshCurrentOutfitName(const std::string& name)
 void LLSidepanelAppearance::editWearable(LLViewerWearable *wearable, LLView *data, bool disable_camera_switch)
 {
     LLFloaterSidePanelContainer::showPanel("appearance", LLSD());
-    LLSidepanelAppearance *panel = dynamic_cast<LLSidepanelAppearance*>(data);
+    LLSidepanelAppearance *panel = ALViewType::as<LLSidepanelAppearance>(data);
     if (panel)
     {
         panel->showWearableEditPanel(wearable, disable_camera_switch);

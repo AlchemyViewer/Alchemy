@@ -27,7 +27,7 @@
 #ifndef LL_LLFIXEDBUFFER_H
 #define LL_LLFIXEDBUFFER_H
 
-#include "timer.h"
+#include "lltimer.h"
 #include <deque>
 #include <string>
 #include "llstring.h"
@@ -44,9 +44,8 @@ public:
 
     LLTimer mTimer;
     U32     mMaxLines;
-    std::deque<LLWString>   mLines;
+    std::deque<std::string> mLines;
     std::deque<F32>         mAddTimes;
-    std::deque<S32>         mLineLengths;
 
     /*virtual*/ void clear(); // Clear the buffer, and reset it.
 
@@ -56,7 +55,6 @@ public:
 
 protected:
     void removeExtraLines();
-    void addWLine(const LLWString& line);
 
 protected:
     LLCoros::Mutex mMutex ;

@@ -20,7 +20,6 @@
 		<button label="Lire" name="all_nearby_media_enable_btn" tool_tip="Activer tous les médias près de vous"/>
 		<button name="open_prefs_btn" tool_tip="Ouvrir les préférences de média"/>
 		<button label="Plus &gt;&gt;" label_selected="&lt;&lt; Moins" name="more_btn" tool_tip="Options avancées"/>
-		<button label="Plus &gt;&gt;" label_selected="Moins &lt;&lt;" name="less_btn" tool_tip="Options avancées"/>
 	</panel>
 	<panel name="nearby_media_panel">
 		<text name="nearby_media_title">

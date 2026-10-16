@@ -50,7 +50,6 @@
 #include "llversioninfo.h"
 #include "llfloatertools.h"
 #include "lldebugview.h"
-#include "llfasttimerview.h"
 #include "llviewerregion.h"
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
@@ -62,10 +61,11 @@
 #include "llsdserialize.h"
 #include "llsdutil.h"
 #include "llcorehttputil.h"
-#include "llvoicevivox.h"
 #include "llinventorymodel.h"
-#include "lluiusage.h"
 #include "lltranslate.h"
+#if LL_VELOPACK
+#include "llvelopack.h"
+#endif
 
 // "Minimal Vulkan" to get max API Version
 
@@ -233,6 +233,8 @@ LLTrace::SampleStatHandle<U32> FRAMETIME_JITTER_EVENTS("frametimeevents", "Numbe
                                 FRAMETIME_JITTER_EVENTS_PER_MINUTE("frametimeeventspm", "Average number of frametime events per minute."),
                                 FRAMETIME_JITTER_EVENTS_LAST_MINUTE("frametimeeventslastmin", "Number of frametime events in the last minute.");
 
+LLTrace::SampleStatHandle<U64> DOFRAME_TIME_US("doframetimeus", "doFrame wall time in microseconds.");
+
 LLTrace::SampleStatHandle<F64> NOTRMALIZED_FRAMETIME_JITTER_SESSION("normalizedframetimejitter", "Normalized frametime jitter over the session.");
 LLTrace::SampleStatHandle<F64> NFTV("nftv", "Normalized frametime variation.");
 LLTrace::SampleStatHandle<F64> NORMALIZED_FRAMTIME_JITTER_PERIOD("normalizedframetimejitterperiod", "Normalized frametime jitter over the last 5 seconds.");
@@ -242,7 +244,6 @@ LLTrace::EventStatHandle<LLUnit<F64, LLUnits::Meters> > AGENT_POSITION_SNAP("age
 LLTrace::EventStatHandle<>  LOADING_WEARABLES_LONG_DELAY("loadingwearableslongdelay", "Wearables took too long to load");
 
 LLTrace::EventStatHandle<F64Milliseconds >  REGION_CROSSING_TIME("regioncrossingtime", "CROSSING_AVG"),
-                                                                FRAME_STACKTIME("framestacktime", "FRAME_SECS"),
                                                                 UPDATE_STACKTIME("updatestacktime", "UPDATE_SECS"),
                                                                 NETWORK_STACKTIME("networkstacktime", "NETWORK_SECS"),
                                                                 IMAGE_STACKTIME("imagestacktime", "IMAGE_SECS"),
@@ -263,6 +264,20 @@ LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  HUDS_FRAME_PCT("huds_
 LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  UI_FRAME_PCT("ui_frame_pct");
 LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  SWAP_FRAME_PCT("swap_frame_pct");
 LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  IDLE_FRAME_PCT("idle_frame_pct");
+
+
+
+LLTrace::SampleStatHandle<U32> WEBRTC_PACKETS_IN_LOST("webrtc_packets_in_lost", "Lost incoming packets"),
+    WEBRTC_PACKETS_IN_RECEIVED("webrtc_packets_in_recv", "Incoming packets received"),
+    WEBRTC_PACKETS_OUT_SENT("webrtc_packets_out_sent", "Outgoing packets sent"),
+    WEBRTC_PACKETS_OUT_LOST("webrtc_packets_out_lost", "Lost outgoing packets");
+
+LLTrace::SampleStatHandle<F32> WEBRTC_JITTER_OUT("webrtc_jitter_out", "Timing variation of outgoing audio"),
+    WEBRTC_JITTER_IN("webrtc_jitter_in", "Timing variation of incoming audio"),
+    WEBRTC_LATENCY("webrtc_latency", "Round-trip audio delay"),
+    WEBRTC_UPLOAD_BANDWIDTH("webrtc_upload_bandwidth", "Estimated upload bandwidth"),
+    WEBRTC_JITTER_BUFFER("webrtc_jitter_buffer", "Average delay added to smooth incoming audio");
+
 }
 
 LLViewerStats::LLViewerStats()
@@ -475,10 +490,6 @@ void update_statistics()
     sample(LLStatViewer::DRAW_DISTANCE,   (F64)gSavedSettings.getF32("RenderFarClip"));
     sample(LLStatViewer::CHAT_BUBBLES,    gSavedSettings.getBOOL("UseChatBubbles"));
 
-    typedef LLTrace::StatType<LLTrace::TimeBlockAccumulator>::instance_tracker_t stat_type_t;
-
-    record(LLStatViewer::FRAME_STACKTIME, last_frame_recording.getSum(*stat_type_t::getInstance("Frame")));
-
     if (gAgent.getRegion() && isAgentAvatarValid())
     {
         LLCircuitData *cdp = gMessageSystem->mCircuitInfo.findCircuit(gAgent.getRegion()->getHost());
@@ -541,7 +552,7 @@ void update_statistics()
 
             auto tot_frame_time_raw = LLPerfStats::StatsRecorder::getSceneStat(LLPerfStats::StatType_t::RENDER_FRAME);
             // cumulative avatar time (includes idle processing, attachments and base av)
-            auto tot_avatar_time_raw = LLPerfStats::us_to_raw(LLVOAvatar::getTotalGPURenderTime());
+            auto tot_avatar_time_raw = LLPerfStats::ms_to_raw(LLVOAvatar::getTotalGPURenderTime());
             // cumulative avatar render specific time (a bit arbitrary as the processing is too.)
             // auto tot_av_idle_time_raw = LLPerfStats::StatsRecorder::getSum(AvType, LLPerfStats::StatType_t::RENDER_IDLE);
             // auto tot_avatar_render_time_raw = tot_avatar_time_raw - tot_av_idle_time_raw;
@@ -597,12 +608,12 @@ void update_statistics()
                 pct_scene_render_time = llclamp(pct_scene_render_time, 0., 100.);
                 if (tot_sleep_time_raw == 0)
                 {
-                    sample(LLStatViewer::SCENERY_FRAME_PCT, (U32)llround(pct_scene_render_time));
-                    sample(LLStatViewer::AVATAR_FRAME_PCT, (U32)llround(pct_avatar_time));
-                    sample(LLStatViewer::HUDS_FRAME_PCT, (U32)llround(pct_huds_time));
-                    sample(LLStatViewer::UI_FRAME_PCT, (U32)llround(pct_ui_time));
-                    sample(LLStatViewer::SWAP_FRAME_PCT, (U32)llround(pct_swap_time));
-                    sample(LLStatViewer::IDLE_FRAME_PCT, (U32)llround(pct_idle_time));
+                    sample(LLStatViewer::SCENERY_FRAME_PCT, (U32)ll_round(pct_scene_render_time));
+                    sample(LLStatViewer::AVATAR_FRAME_PCT, (U32)ll_round(pct_avatar_time));
+                    sample(LLStatViewer::HUDS_FRAME_PCT, (U32)ll_round(pct_huds_time));
+                    sample(LLStatViewer::UI_FRAME_PCT, (U32)ll_round(pct_ui_time));
+                    sample(LLStatViewer::SWAP_FRAME_PCT, (U32)ll_round(pct_swap_time));
+                    sample(LLStatViewer::IDLE_FRAME_PCT, (U32)ll_round(pct_idle_time));
                 }
             }
             else
@@ -650,7 +661,7 @@ void send_viewer_stats(bool include_preferences)
 
     time_t ltime;
     time(&ltime);
-    F32 run_time = F32(LLFrameTimer::getElapsedSeconds());
+    F32 run_time = F32(LLFrameTimer::getUptimeSeconds());
 
     agent["start_time"] = S32(ltime - S32(run_time));
 
@@ -669,10 +680,12 @@ void send_viewer_stats(bool include_preferences)
     }
 
     // report time the viewer has spent in the foreground
-    agent["foreground_time"] = gForegroundTime.getElapsedTimeF32();
+    const F32 foreground_time = gForegroundTime.getElapsedTimeF32();
+    agent["foreground_time"] = foreground_time;
 
-    // send fps only for time app spends in foreground
-    agent["fps"] = (F32)gForegroundFrameCount / gForegroundTime.getElapsedTimeF32();
+    // send fps only for time app spends in foreground. There is none yet if the window has not had
+    // focus since the scene load started, and the division would send 0/0.
+    agent["fps"] = foreground_time > 0.f ? (F32)gForegroundFrameCount / foreground_time : 0.f;
 
     agent["normalized_session_jitter"] = LLViewerStats::instance().getLastNormalizedSessionJitter();
     agent["normalized_frametime_variance"] = LLViewerStats::instance().getLastNormalizedFrametimeVariance();
@@ -701,6 +714,8 @@ void send_viewer_stats(bool include_preferences)
     system["os"] = LLOSInfo::instance().getOSStringSimple();
     system["cpu"] = gSysCPU.getCPUString();
     system["cpu_sse"] = gSysCPU.getSSEVersions();
+    system["cpu_simd"] = gSysCPU.getSIMDVersions();
+    system["cpu_mhz"] = gSysCPU.getMHz();
     system["address_size"] = ADDRESS_SIZE;
     system["os_bitness"] = LLOSInfo::instance().getOSBitness();
     system["hardware_concurrency"] = (LLSD::Integer) std::thread::hardware_concurrency();
@@ -723,6 +738,19 @@ void send_viewer_stats(bool include_preferences)
     system["gpu_vendor"] = gGLManager.mGLVendorShort;
     system["gpu_version"] = gGLManager.mDriverVersionVendorString;
     system["opengl_version"] = gGLManager.mGLVersionString;
+    system["gpu_vram_mb"] = (S32)gGLManager.mVRAM;
+    system["glsl_version"] = llformat("%d.%d", gGLManager.mGLSLVersionMajor, gGLManager.mGLSLVersionMinor);
+
+    // Resource usage
+    // getAvailableMemKB might be a bit stale, but that's fine, this is statistics,
+    // not a debug tool.
+    // TODO: 26.3 branch introduced getAvailableCommitMemMB, use that on windows
+    system["ram_avail_mb"] = (S32Megabytes)(LLMemory::getAvailableMemKB()).value();
+    system["ram_allocated_mb"] = (S32Megabytes)(LLMemory::getAllocatedMemKB()).value();
+    static constexpr F64 BYTES_TO_MB = 1024.0 * 1024.0;
+    F64 texture_bytes_alloc = LLImageGL::getTextureBytesAllocated() / BYTES_TO_MB;
+    F64 vertex_bytes_alloc = LLVertexBuffer::getBytesAllocated() / BYTES_TO_MB;
+    system["gpu_vram_tracked_mb"] = (F32)(texture_bytes_alloc + vertex_bytes_alloc);
 
     gGLManager.asLLSD(system["gl"]);
 
@@ -778,21 +806,23 @@ void send_viewer_stats(bool include_preferences)
     LLSD &fail = body["stats"]["failures"];
 
     fail["send_packet"] = (S32) gMessageSystem->mSendPacketFailureCount;
-    fail["dropped"] = (S32) gMessageSystem->mDroppedPackets;
+    fail["dropped"] = (S32) gMessageSystem->getTotalNumDroppedPackets();
     fail["resent"] = (S32) gMessageSystem->mResentPackets;
     fail["failed_resends"] = (S32) gMessageSystem->mFailedResendPackets;
     fail["off_circuit"] = (S32) gMessageSystem->mOffCircuitPackets;
     fail["invalid"] = (S32) gMessageSystem->mInvalidOnCircuitPackets;
-    fail["missing_updater"] = (S32) LLAppViewer::instance()->isUpdaterMissing();
+#if LL_VELOPACK
+    fail["missing_updater"] = !velopack_is_installed();
+#else
+    fail["missing_updater"] = true;
+#endif
 
     LLSD &inventory = body["inventory"];
     inventory["usable"] = gInventory.isInventoryUsable();
     LLSD& validation_info = inventory["validation_info"];
     gInventory.mValidationInfo->asLLSD(validation_info);
 
-    body["ui"] = LLUIUsage::instance().asLLSD();
-
-    body["stats"]["voice"] = LLVoiceVivoxStats::getInstance()->read();
+    body["ui"] = LLSD();
 
     // Misc stats, two strings and two ints
     // These are not expecticed to persist across multiple releases

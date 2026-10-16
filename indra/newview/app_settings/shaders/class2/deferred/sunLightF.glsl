@@ -33,7 +33,6 @@ out vec4 frag_color;
 in vec2 vary_fragcoord;
 
 uniform vec3 sun_dir;
-uniform float shadow_bias;
 
 vec4 getNorm(vec2 pos_screen);
 vec4 getPosition(vec2 pos_screen);

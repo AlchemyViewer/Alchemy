@@ -23,7 +23,6 @@ Proprietario [OWNER]
 	<string name="Sit">
 		Siediti
 	</string>
-	<text name="object_name" value="Nome oggetto di prova che si trova su due righe ed è molto lungo"/>
 	<text name="price_text">
 		L$ 30.000
 	</text>

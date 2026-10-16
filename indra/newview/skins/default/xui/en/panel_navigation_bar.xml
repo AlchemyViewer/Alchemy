@@ -89,7 +89,7 @@
 	         image_hover_unselected="PushButton_Over"
 	         image_bottom_pad="1"
 	         layout="topleft"
-	         left="10"
+	         left="9"
 	         name="back_btn"
 	         tool_tip="Go back to previous location"
 	         top="2"
@@ -102,7 +102,7 @@
 	         image_hover_unselected="PushButton_Over"
 	         image_bottom_pad="1"
 	         layout="topleft"
-	         left_pad="0"
+	         left_pad="1"
 	         name="forward_btn"
 	         tool_tip="Go forward one location"
 	         top_delta="0"
@@ -131,29 +131,29 @@
 	         tool_tip="Opens the About Land window"
 	         top_delta="0"
 	         width="32" >
-             <button.init_callback
-              function="Button.SetFloaterToggle"
+	         <button.init_callback
+	          function="Button.SetFloaterToggle"
 	          parameter="about_land" />
-		     </button>
-			<button
-			follows="left|top"
-			height="23"
-			image_bottom_pad="1"
-			image_overlay="Command_PersonalLighting_Icon"
-			image_hover_unselected="PushButton_Over"
-			layout="topleft"
-			left_pad="5"
-			name="personal_lighting"
-			tool_tip="Opens the Personal Lighting editor"
-			top_delta="0"
-			width="32" >
-			<button.init_callback
-			function="Button.SetFloaterToggle"
-			parameter="env_adjust_snapshot" />
-			<button.validate_callback
-			function="RLV.EnableIfNot"
-			parameter="setenv" />
-			</button>
+	        </button>
+	        <button
+	         follows="left|top"
+	         height="23"
+	         image_bottom_pad="1"
+	         image_overlay="Command_PersonalLighting_Icon"
+	         image_hover_unselected="PushButton_Over"
+	         layout="topleft"
+	         left_pad="5"
+	         name="personal_lighting"
+	         tool_tip="Opens the Personal Lighting editor"
+	         top_delta="0"
+	         width="32" >
+	         <button.init_callback
+	          function="Button.SetFloaterToggle"
+	          parameter="env_adjust_snapshot" />
+	         <button.validate_callback
+	          function="RLV.EnableIfNot"
+	          parameter="setenv" />
+	        </button>
 	        <location_input
                        follows="all"
 	         halign="right"
@@ -231,8 +231,8 @@
              text_color="LtGray"
              tool_tip="Drag Landmarks here for quick access to your favorite places in Second Life!"
              top="13"
-	     valign="bottom"
-             width="290">
+             valign="bottom"
+             width="310">
               Places you save to your favorites bar will appear here.
             </label>
               <!-- More button actually is a text box. -->

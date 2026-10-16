@@ -132,7 +132,7 @@ void LLHUDEffectPointAt::packData(LLMessageSystem *mesgsys)
 
     mesgsys->addBinaryDataFast(_PREHASH_TypeData, packed_data, PKT_SIZE);
 
-    mLastSendTime = mTimer.getElapsedTimeF32();
+    mLastSendTime = mTimer.getElapsedTimeF64();
 }
 
 //-----------------------------------------------------------------------------
@@ -238,7 +238,7 @@ bool LLHUDEffectPointAt::setPointAt(EPointAtType target_type, LLViewerObject *ob
         return false;
     }
 
-    F32 current_time  = mTimer.getElapsedTimeF32();
+    const F64 current_time  = mTimer.getElapsedTimeF64();
 
     // type of pointat behavior or target object has changed
     bool targetTypeChanged = (target_type != mTargetType) ||
@@ -272,7 +272,7 @@ bool LLHUDEffectPointAt::setPointAt(EPointAtType target_type, LLViewerObject *ob
             mTargetOffsetGlobal = gAgent.getPosGlobalFromAgent(position);
         }
 
-        mKillTime = mTimer.getElapsedTimeF32() + mDuration;
+        mKillTime = mTimer.getElapsedTimeF64() + mDuration;
 
         //set up requisite animation data
         update();
@@ -298,7 +298,7 @@ void LLHUDEffectPointAt::markDead()
 {
     if (!mSourceObject.isNull() && mSourceObject->isAvatar())
     {
-        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData("PointAtPoint");
+        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT);
     }
 
     clearPointAtTarget();
@@ -323,7 +323,7 @@ void LLHUDEffectPointAt::render()
     if (sDebugPointAt && mTargetType != POINTAT_TARGET_NONE)
     {
         //LLGLDisable gls_stencil(GL_STENCIL_TEST);
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         LLVector3 target = mTargetPos + mSourceObject->getRenderPosition();
         gGL.pushMatrix();
@@ -362,7 +362,7 @@ void LLHUDEffectPointAt::update()
         return;
     }
 
-    F32 time = mTimer.getElapsedTimeF32();
+    const F64 time = mTimer.getElapsedTimeF64();
 
     // clear out the effect if time is up
     if (mKillTime != 0.f && time > mKillTime)
@@ -374,7 +374,7 @@ void LLHUDEffectPointAt::update()
     {
         if (mTargetType == POINTAT_TARGET_NONE)
         {
-            ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData("PointAtPoint");
+            ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT);
         }
         else
         {
@@ -443,7 +443,7 @@ bool LLHUDEffectPointAt::calcTargetPosition()
 
     if (mSourceObject->isAvatar())
     {
-        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->setAnimationData("PointAtPoint", (void *)&mTargetPos);
+        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->setAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT, (void *)&mTargetPos);
     }
 
     return true;

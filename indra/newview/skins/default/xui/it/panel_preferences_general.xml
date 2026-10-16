@@ -23,7 +23,6 @@
 	<text name="maturity_desired_prompt">
 		Voglio accedere ai contenuti di tipo:
 	</text>
-	<text name="maturity_desired_textbox"/>
 	<combo_box name="maturity_desired_combobox">
 		<combo_box.item label="Generale, Moderato e Adulti" name="Desired_Adult"/>
 		<combo_box.item label="Generale e Moderato" name="Desired_Mature"/>
@@ -43,7 +42,6 @@
 	</radio_group>
 	<check_box label="Il mio nome" name="show_my_name_checkbox1"/>
 	<check_box label="Nomi utente" name="show_slids" tool_tip="Mostra il nome utente, come bobsmith123"/>
-	<check_box label="TItoli gruppo" name="show_all_title_checkbox1" tool_tip="Mostra titoli di gruppo, come Funzionario o Membro"/>
 	<check_box label="Evidenzia amici" name="show_friends" tool_tip="Evidenzia le etichette dei nomi dei tuoi amici"/>
 	<check_box label="Mostra nomi visualizzati" name="display_names_check" tool_tip="Seleziona per visualizzare i nomi in chat, IM, etichette, ecc."/>
 	<text name="inworld_typing_rg_label">

@@ -58,7 +58,6 @@
 #include "lldefs.h"
 #include "lldepthstack.h"
 #include "llerror.h"
-#include "llfasttimer.h"
 #include "llframetimer.h"
 #include "llinstancetracker.h"
 #include "llpointer.h"
@@ -125,38 +124,7 @@
 #include "llpanel.h"
 #include "llfloater.h"
 
-#include <boost/function.hpp>
 #include <boost/signals2.hpp>
-#include <boost/unordered_set.hpp>
-#include <boost/unordered_map.hpp>
-#include <boost/json.hpp>
-
-#include "glm/glm.hpp"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/ext/quaternion_float.hpp"
-#include "glm/gtx/quaternion.hpp"
-#include "glm/gtx/matrix_decompose.hpp"
-
-// Library includes from llrender project
-#include "llcharacter.h"
-
-// Library includes from llui project
-#include "llnotifications.h"
-#include "llpanel.h"
-#include "llfloater.h"
-#include "llview.h"
-#include "lluictrl.h"
-
-#include <boost/function.hpp>
-#include <boost/signals2.hpp>
-#include <boost/unordered_set.hpp>
-#include <boost/unordered_map.hpp>
-#include <boost/json.hpp>
-
-#include "glm/glm.hpp"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/ext/quaternion_float.hpp"
-#include "glm/gtx/quaternion.hpp"
-#include "glm/gtx/matrix_decompose.hpp"
+#include <simdjson.h>
 
 #endif

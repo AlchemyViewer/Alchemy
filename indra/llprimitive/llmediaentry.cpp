@@ -27,7 +27,7 @@
 #include "linden_common.h"
 #include "llmediaentry.h"
 #include "lllslconstants.h"
-#include "llregex.h"
+#include "alregex.h"
 
 // LLSD key defines
 // DO NOT REORDER OR REMOVE THESE!
@@ -74,7 +74,7 @@ const char* LLMediaEntry::WHITELIST_KEY         = MEDIA_WHITELIST_KEY_STR;
 const char* LLMediaEntry::PERMS_INTERACT_KEY    = MEDIA_PERMS_INTERACT_KEY_STR;
 const char* LLMediaEntry::PERMS_CONTROL_KEY     = MEDIA_PERMS_CONTROL_KEY_STR;
 
-#define DEFAULT_URL_PREFIX  "http://"
+#define DEFAULT_URL_PREFIX  "https://"
 
 // Constructor(s)
 LLMediaEntry::LLMediaEntry() :
@@ -454,8 +454,7 @@ static bool pattern_match(const std::string &candidate_str, const std::string &p
     prefix_with(expression, "*", ".");
 
     // case-insensitive matching:
-    boost::regex regexp(expression, boost::regex::perl|boost::regex::icase);
-    return ll_regex_match(candidate_str, regexp);
+    return ALRegex(expression, ALRegex::ICASE).match(candidate_str);
 }
 
 bool LLMediaEntry::checkCandidateUrl(const std::string& url) const

@@ -31,6 +31,8 @@
 #include "llaudioengine.h"
 #include "llwindgen.h"
 
+#include <memory>
+
 //Stubs
 class LLAudioStreamManagerFMODSTUDIO;
 namespace FMOD
@@ -47,42 +49,102 @@ typedef struct FMOD_DSP_DESCRIPTION FMOD_DSP_DESCRIPTION;
 class LLAudioEngine_FMODSTUDIO : public LLAudioEngine
 {
 public:
-    LLAudioEngine_FMODSTUDIO(bool enable_profiler);
-    virtual ~LLAudioEngine_FMODSTUDIO();
+    // resample_method is the FMODResampleMethod setting: 0 linear, 1 cubic,
+    // 2 spline. preferred_device_id is a FMOD driver GUID serialised as
+    // "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" — see guid_to_string in
+    // the cpp. Empty string uses driver 0 (FMOD's system default).
+    LLAudioEngine_FMODSTUDIO(bool enable_profiler,
+                              U32 resample_method,
+                              std::string preferred_device_id = std::string());
+    ~LLAudioEngine_FMODSTUDIO() override;
 
     // initialization/startup/shutdown
-    virtual bool init(void *user_data, const std::string &app_title);
-    virtual std::string getDriverName(bool verbose);
-    virtual LLStreamingAudioInterface* createDefaultStreamingAudioImpl() const;
-    virtual void allocateListener();
+    bool init(void *user_data, const std::string &app_title) override;
+    std::string getDriverName(bool verbose) override;
+    LLStreamingAudioInterface* createDefaultStreamingAudioImpl() const override;
+    void allocateListener() override;
 
-    virtual void shutdown();
+    void shutdown() override;
 
-    /*virtual*/ bool initWind();
-    /*virtual*/ void cleanupWind();
+    // Device selection (override base API). The id is the FMOD_GUID
+    // string format; the name is the driver display name from
+    // getDriverInfo. setOutputDevice persists the preference but
+    // applies on next launch — runtime setDriver() in FMOD requires
+    // a full System reinit which the existing channel pool isn't
+    // structured to drive.
+    std::vector<LLAudioOutputDevice> enumerateOutputDevices() const override;
+    std::string getActiveOutputDevice()   const override { return mActiveDeviceName; }
+    std::string getActiveOutputDeviceId() const override { return mActiveDeviceId; }
+    std::string getOutputDeviceSettingName() const override { return "AudioFMODOutputDevice"; }
+    void setOutputDevice(const std::string& id) override;
 
-    /*virtual*/void updateWind(LLVector3 direction, F32 camera_height_above_water);
+    // FMOD's report that devices came or went, or that the system default
+    // changed: the preferred device again if it is back, else the default.
+    void onDeviceListChanged();
+
+    // Reverb via FMOD's built-in DSP reverb on instance 0. setReverb
+    // Properties on the system configures the I3DL2-style preset (FMOD
+    // preset names mirror the I3DL2 set, with CARPETTEDHALLWAY spelt
+    // with two T's); per-channel wet level is set in play() from the
+    // cached static sReverbSendScale. supportsReverb returns true once
+    // init() succeeds — reverb is always available on FMOD, no
+    // extension check needed.
+    bool supportsReverb() const override { return mReverbActive; }
+    void setReverbPreset(const std::string& preset_name) override;
+    void setReverbSendScale(float scale) override;
+    std::string getReverbSendScaleSettingName() const override
+    {
+        return "AudioFMODReverbSendScale";
+    }
+
+    void setWindGustiness(F32 depth) override
+    {
+        if (mWindGen) mWindGen->setGustinessDepth(depth);
+    }
+
+    bool initWind() override;
+    void cleanupWind() override;
+
+    void updateWind(LLVector3 direction, F32 camera_height_above_water) override;
 
     typedef F32 MIXBUFFERFORMAT;
 
     FMOD::System *getSystem()               const {return mSystem;}
 protected:
-    /*virtual*/ LLAudioBuffer *createBuffer(); // Get a free buffer, or flush an existing one if you have to.
-    /*virtual*/ LLAudioChannel *createChannel(); // Create a new audio channel.
+    // Selects the preferred device while it is present, else the system
+    // default, and records it as the active one.
+    void selectOutputDriver();
+    // A driver's id, in guid_to_string's form, and display name.
+    bool describeDriver(int index, std::string& id, std::string& name) const;
 
-    /*virtual*/ void setInternalGain(F32 gain);
+    LLAudioBuffer *createBuffer() override; // Get a free buffer, or flush an existing one if you have to.
+    LLAudioChannel *createChannel() override; // Create a new audio channel.
+
+    void setInternalGain(F32 gain) override;
 
     bool mInited;
 
-    LLWindGen<MIXBUFFERFORMAT> *mWindGen;
+    std::unique_ptr<LLWindGen<MIXBUFFERFORMAT>> mWindGen;
 
     FMOD_DSP_DESCRIPTION *mWindDSPDesc;
     FMOD::DSP *mWindDSP;
     FMOD::System *mSystem;
     bool mEnableProfiler;
+    U32 mResampleMethod;
+
+    std::string mPreferredDeviceId;
+    std::string mActiveDeviceId;
+    std::string mActiveDeviceName;
+
+    bool mReverbActive = false;
 
 public:
     static FMOD::ChannelGroup *mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT];
+    // Cached wet-send level applied to every new channel in play().
+    // Static so the channel class can reach it without an engine back-
+    // pointer (matches the existing mChannelGroups[] pattern). Updated
+    // by setReverbSendScale, which also iterates live channels.
+    static float sReverbSendScale;
 };
 
 
@@ -90,17 +152,25 @@ class LLAudioChannelFMODSTUDIO : public LLAudioChannel
 {
 public:
     LLAudioChannelFMODSTUDIO(FMOD::System *audioengine);
-    virtual ~LLAudioChannelFMODSTUDIO();
+    ~LLAudioChannelFMODSTUDIO() override;
+
+    // Apply a wet-send level for the engine's instance-0 reverb slot.
+    // Called by LLAudioEngine_FMODSTUDIO::setReverbSendScale to push a
+    // live slider change to all active channels, and by play() on
+    // first start so a freshly-created channel matches the current
+    // scale. No-op when the channel hasn't been bound to an FMOD::
+    // Channel yet (sReverbSendScale will be picked up in play()).
+    void setReverbWet(float wet);
 
 protected:
-    /*virtual*/ void play();
-    /*virtual*/ void playSynced(LLAudioChannel *channelp);
-    /*virtual*/ void cleanup();
-    /*virtual*/ bool isPlaying();
+    void play() override;
+    void playSynced(LLAudioChannel *channelp) override;
+    void cleanup() override;
+    bool isPlaying() override;
 
-    /*virtual*/ bool updateBuffer();
-    /*virtual*/ void update3DPosition();
-    /*virtual*/ void updateLoop();
+    bool updateBuffer() override;
+    void update3DPosition() override;
+    void updateLoop() override;
 
     void set3DMode(bool use3d);
 protected:
@@ -115,10 +185,10 @@ class LLAudioBufferFMODSTUDIO : public LLAudioBuffer
 {
 public:
     LLAudioBufferFMODSTUDIO(FMOD::System *audioengine);
-    virtual ~LLAudioBufferFMODSTUDIO();
+    ~LLAudioBufferFMODSTUDIO() override;
 
-    /*virtual*/ bool loadWAV(const std::string& filename);
-    /*virtual*/ U32 getLength();
+    bool loadWAV(const std::string& filename) override;
+    U32 getLength() override;
     friend class LLAudioChannelFMODSTUDIO;
 protected:
     FMOD::System *getSystem()   const {return mSystemp;}

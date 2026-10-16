@@ -58,11 +58,11 @@
 		Flyv
 	</string>
 	<panel name="panel_actions">
-		<button label="" label_selected="" name="move up btn" tool_tip="Flyv op (tryk E)"/>
-		<button label="" label_selected="" name="turn left btn" tool_tip="xxx     Drej til venstre (Tryk på venstre piletast eller A)"/>
+		<button name="move up btn" tool_tip="Flyv op (tryk E)"/>
+		<button name="turn left btn" tool_tip="xxx     Drej til venstre (Tryk på venstre piletast eller A)"/>
 		<joystick_slide name="move left btn" tool_tip="Gå til venstre (tryk Shift + venstre pil eller A)"/>
-		<button label="" label_selected="" name="move down btn" tool_tip="Flyv ned (tryk C)"/>
-		<button label="" label_selected="" name="turn right btn" tool_tip="Drej til højre (Tryk på højre piletast eller D)"/>
+		<button name="move down btn" tool_tip="Flyv ned (tryk C)"/>
+		<button name="turn right btn" tool_tip="Drej til højre (Tryk på højre piletast eller D)"/>
 		<joystick_slide name="move right btn" tool_tip="Gå til højre (tryk Shift + højre pil eller D)"/>
 		<joystick_turn name="forward btn" tool_tip="Gå frem (Tryk på Op piletast eller W)"/>
 		<joystick_turn name="backward btn" tool_tip="Gå tilbage (Tryk på Ned piletast eller S)"/>

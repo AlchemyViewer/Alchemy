@@ -62,8 +62,14 @@
 #include "lllineeditor.h"
 #include "llfloaterwebcontent.h"
 #include "llwindowshade.h"
+#include "lleventapi.h"
+#include "llui.h"
 
 extern bool gRestoreGL;
+
+const std::string PAGE_TEXT_EXTRACT_MARKER = "PAGE_TEXT_EXTRACT:";
+
+class LLMediaCtrlListener;
 
 static LLDefaultChildRegistry::Register<LLMediaCtrl> r("web_browser");
 
@@ -100,6 +106,7 @@ LLMediaCtrl::LLMediaCtrl( const Params& p) :
     mUpdateScrolls( false ),
     mTextureWidth ( 1024 ),
     mTextureHeight ( 1024 ),
+    mLoadingState( LOADING_STATE_INITIALIZING ),
     mClearCache(false),
     mHomePageMimeType(p.initial_mime_type),
     mErrorPageURL(p.error_page_url),
@@ -206,13 +213,13 @@ bool LLMediaCtrl::handleHover( S32 x, S32 y, MASK mask )
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-bool LLMediaCtrl::handleScrollWheel( S32 x, S32 y, S32 clicks )
+bool LLMediaCtrl::handleScrollWheel( S32 x, S32 y, LLScrollDelta delta )
 {
-    if (LLPanel::handleScrollWheel(x, y, clicks)) return true;
+    if (LLPanel::handleScrollWheel(x, y, delta)) return true;
     if (mMediaSource && mMediaSource->hasMedia())
     {
         convertInputCoords(x, y);
-        mMediaSource->scrollWheel(x, y, 0, clicks, gKeyboard->currentMask(true));
+        mMediaSource->scrollWheel(x, y, 0, delta.mClicks, gKeyboard->currentMask(true));
     }
 
     return true;
@@ -220,13 +227,13 @@ bool LLMediaCtrl::handleScrollWheel( S32 x, S32 y, S32 clicks )
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-bool LLMediaCtrl::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLMediaCtrl::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    if (LLPanel::handleScrollHWheel(x, y, clicks)) return true;
+    if (LLPanel::handleScrollHWheel(x, y, delta)) return true;
     if (mMediaSource && mMediaSource->hasMedia())
     {
         convertInputCoords(x, y);
-        mMediaSource->scrollWheel(x, y, clicks, 0, gKeyboard->currentMask(true));
+        mMediaSource->scrollWheel(x, y, delta.mClicks, 0, gKeyboard->currentMask(true));
     }
 
     return true;
@@ -329,9 +336,19 @@ bool LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
 {
     if (LLPanel::handleRightMouseDown(x, y, mask)) return true;
 
+    // remember where (in control-local coords) the menu should appear; CEF
+    // reports back a page coordinate but the menu is placed in our own space
+    mContextMenuLocalX = x;
+    mContextMenuLocalY = y;
+
     S32 media_x = x, media_y = y;
     convertInputCoords(media_x, media_y);
 
+    // Forward the right-click to the media (CEF) but do NOT show the context
+    // menu here. CEF responds with a context-menu request (MEDIA_EVENT_CONTEXT_MENU)
+    // after it has computed the current edit-state, and we show the menu then -
+    // otherwise the menu's Undo/Cut/Copy/... enable state would be read from a
+    // stale cross-process cache (it updates a frame or more after this click).
     if (mMediaSource)
         mMediaSource->mouseDown(media_x, media_y, mask, 1);
 
@@ -342,6 +359,15 @@ bool LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
         setFocus( true );
     }
 
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Show the page context menu. Called in response to MEDIA_EVENT_CONTEXT_MENU
+// (i.e. after CEF has reported fresh edit-state), at the control-relative
+// coordinate the right-click occurred.
+void LLMediaCtrl::showContextMenu(S32 x, S32 y)
+{
     auto menu = mContextMenuHandle.get();
     if (!menu)
     {
@@ -351,7 +377,7 @@ bool LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
 
         // stinson 05/05/2014 : use this as the parent of the context menu if the static menu
         // container has yet to be created
-        LLPanel* menuParent = (LLMenuGL::sMenuContainer != NULL) ? dynamic_cast<LLPanel*>(LLMenuGL::sMenuContainer) : dynamic_cast<LLPanel*>(this);
+        LLPanel* menuParent = (LLMenuGL::sMenuContainer != NULL) ? static_cast<LLPanel*>(LLMenuGL::sMenuContainer) : this;
         llassert(menuParent != NULL);
         menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
             "menu_media_ctrl.xml", menuParent, LLViewerMenuHolderGL::child_registry_t::instance());
@@ -371,6 +397,44 @@ bool LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
 
         menu->show(x, y);
         LLMenuGL::showPopup(this, menu, x, y);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+bool LLMediaCtrl::handleMiddleMouseUp( S32 x, S32 y, MASK mask )
+{
+    if (LLPanel::handleMiddleMouseUp(x, y, mask)) return true;
+    convertInputCoords(x, y);
+
+    if (mMediaSource)
+    {
+        // button 2 == middle (see media_plugin_cef mouse_event handling)
+        mMediaSource->mouseUp(x, y, mask, 2);
+    }
+
+    gFocusMgr.setMouseCapture( NULL );
+
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+bool LLMediaCtrl::handleMiddleMouseDown( S32 x, S32 y, MASK mask )
+{
+    if (LLPanel::handleMiddleMouseDown(x, y, mask)) return true;
+    convertInputCoords(x, y);
+
+    if (mMediaSource)
+    {
+        mMediaSource->mouseDown(x, y, mask, 2);
+    }
+
+    gFocusMgr.setMouseCapture( this );
+
+    if (mTakeFocusOnClick)
+    {
+        setFocus( true );
     }
 
     return true;
@@ -620,8 +684,8 @@ void LLMediaCtrl::navigateTo( std::string url_in, std::string mime_type, bool cl
     // don't browse to anything that starts with secondlife:// or sl://
     const std::string protocol1 = "secondlife://";
     const std::string protocol2 = "sl://";
-    if ((LLStringUtil::compareInsensitive(url_in.substr(0, protocol1.length()), protocol1) == 0) ||
-        (LLStringUtil::compareInsensitive(url_in.substr(0, protocol2.length()), protocol2) == 0))
+    if (LLStringUtil::isEqualInsensitiveASCII(url_in.substr(0, protocol1.length()), protocol1) ||
+        LLStringUtil::isEqualInsensitiveASCII(url_in.substr(0, protocol2.length()), protocol2))
     {
         // TODO: Print out/log this attempt?
         // LL_INFOS() << "Rejecting attempt to load restricted website :" << urlIn << LL_ENDL;
@@ -739,7 +803,7 @@ bool LLMediaCtrl::ensureMediaSourceExists()
             mMediaSource->setUsedInUI(true);
             mMediaSource->setHomeURL(mHomePageUrl, mHomePageMimeType);
             mMediaSource->setTarget(mTarget);
-            mMediaSource->setVisible( getVisible() );
+            mMediaSource->setVisible( isInVisibleChain() );
             mMediaSource->addObserver( this );
             mMediaSource->setBackgroundColor( getBackgroundColor() );
             mMediaSource->setTrustedBrowser(mTrusted);
@@ -841,7 +905,7 @@ void LLMediaCtrl::draw()
             }
 
             // scale texture to fit the space using texture coords
-            gGL.getTexUnit(0)->bind(media_texture);
+            gGL.getTextureSlot(0)->bindSampled(media_texture, ALSamplers::AnisoWrap);
             LLColor4 media_color = LLColor4::white % alpha;
             gGL.color4fv( media_color.mV );
             F32 max_u = ( F32 )media_plugin->getWidth() / ( F32 )media_plugin->getTextureWidth();
@@ -1024,12 +1088,14 @@ void LLMediaCtrl::handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event)
         {
             LL_DEBUGS("Media") <<  "Media event:  MEDIA_EVENT_NAVIGATE_BEGIN, url is " << self->getNavigateURI() << LL_ENDL;
             hideNotification();
+            mLoadingState = LOADING_STATE_LOADING;
         };
         break;
 
         case MEDIA_EVENT_NAVIGATE_COMPLETE:
         {
             LL_DEBUGS("Media") <<  "Media event:  MEDIA_EVENT_NAVIGATE_COMPLETE, result string is: " << self->getNavigateResultString() << LL_ENDL;
+            mLoadingState = LOADING_STATE_LOADED;
         };
         break;
 
@@ -1058,6 +1124,7 @@ void LLMediaCtrl::handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event)
             {
                 navigateTo(mErrorPageURL, HTTP_CONTENT_TEXT_HTML);
             };
+            mLoadingState = LOADING_STATE_ERROR;
         };
         break;
 
@@ -1102,12 +1169,14 @@ void LLMediaCtrl::handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event)
         case MEDIA_EVENT_PLUGIN_FAILED:
         {
             LL_DEBUGS("Media") <<  "Media event:  MEDIA_EVENT_PLUGIN_FAILED" << LL_ENDL;
+            mLoadingState = LOADING_STATE_ERROR;
         };
         break;
 
         case MEDIA_EVENT_PLUGIN_FAILED_LAUNCH:
         {
             LL_DEBUGS("Media") <<  "Media event:  MEDIA_EVENT_PLUGIN_FAILED_LAUNCH" << LL_ENDL;
+            mLoadingState = LOADING_STATE_ERROR;
         };
         break;
 
@@ -1190,6 +1259,43 @@ void LLMediaCtrl::handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event)
         case MEDIA_EVENT_DEBUG_MESSAGE:
         {
             LL_INFOS("media") << self->getDebugMessageText() << LL_ENDL;
+
+            // Handle text extraction responses
+            std::string debug_text = self->getDebugMessageText();
+            if (debug_text.find(PAGE_TEXT_EXTRACT_MARKER) != std::string::npos)
+            {
+                if (LLPluginClassMedia* plugin = getMediaPlugin())
+                {
+                    // Disable plugin debugging if it was used just for text extraction
+                    static LLCachedControl<bool> media_debugging(gSavedSettings, "MediaPluginDebugging", false);
+                    plugin->enableMediaPluginDebugging(media_debugging);
+                }
+                // Extract the pump name and page text
+                size_t marker_pos = debug_text.find(PAGE_TEXT_EXTRACT_MARKER);
+                if (marker_pos != std::string::npos)
+                {
+                    std::string remaining = debug_text.substr(marker_pos + PAGE_TEXT_EXTRACT_MARKER.length());
+                    size_t colon_pos = remaining.find(':');
+                    if (colon_pos != std::string::npos)
+                    {
+                        std::string pump_name = remaining.substr(0, colon_pos);
+                        std::string page_text = remaining.substr(colon_pos + 1);
+
+                        // Send the response directly to the specified pump
+                        LLEventPumps::instance().obtain(pump_name).post(LLSD().with("text", page_text));
+                    }
+                }
+            }
+        };
+        break;
+
+        case MEDIA_EVENT_CONTEXT_MENU:
+        {
+            // CEF asked us to show a context menu and has just pushed fresh
+            // edit-state, so the menu's enable flags are now correct. Show it at
+            // the control-local position recorded on the triggering right-click.
+            LL_DEBUGS("Media") << "Media event:  MEDIA_EVENT_CONTEXT_MENU" << LL_ENDL;
+            showContextMenu(mContextMenuLocalX, mContextMenuLocalY);
         };
         break;
     };
@@ -1270,3 +1376,182 @@ bool LLMediaCtrl::wantsReturnKey() const
 {
     return true;
 }
+
+std::string LLMediaCtrl::getMediaMimeType()
+{
+    return mMediaSource ? mMediaSource->getMimeType() : "unknown";
+}
+
+std::string LLMediaCtrl::getMediaLoadingStatus()
+{
+    if (!mMediaSource)
+    {
+        return "error";
+    }
+
+    switch (mLoadingState)
+    {
+        case LOADING_STATE_INITIALIZING:
+            return "initializing";
+        case LOADING_STATE_LOADING:
+            return "loading";
+        case LOADING_STATE_LOADED:
+            return "loaded";
+        case LOADING_STATE_ERROR:
+        default:
+            return "error";
+    }
+}
+
+std::string LLMediaCtrl::getMediaTitle()
+{
+    if (mMediaSource)
+    {
+        if (LLPluginClassMedia* plugin = mMediaSource->getMediaPlugin())
+        {
+            return plugin->getMediaName();
+        }
+    }
+    return "unknown";
+}
+
+bool LLMediaCtrl::executeJavaScript(const std::string& script)
+{
+    if (mMediaSource && mMediaSource->hasMedia())
+    {
+        mMediaSource->executeJavaScript(script);
+        return true;
+    }
+    return false;
+}
+
+class LLMediaCtrlListener: public LLEventAPI
+{
+public:
+    LLMediaCtrlListener();
+
+private:
+    void getMediaInfo(const LLSD& request);
+    void getMediaText(const LLSD& request);
+    void getPluginsList(const LLSD& request);
+    void replyError(const LLSD& request, const std::string& error);
+    LLMediaCtrl* findMediaCtrl(const std::string& path);
+};
+
+LLMediaCtrlListener::LLMediaCtrlListener():
+    LLEventAPI("LLMediaAPI", "Acces to LLMediaCtrl(web_browse widget) info")
+{
+    add("getMediaInfo",
+        "Get information about the web_browser widget specified by [\"path\"].\n"
+        "Returns URL, MIME type, and loading status of the widget.",
+        &LLMediaCtrlListener::getMediaInfo,
+        llsd::map("path", LLSD(), "reply", LLSD()));
+
+    add("getMediaText",
+        "Get text content from the web_browser widget specified by [\"path\"].\n"
+        "Returns the text content of the page or a portion of it.",
+        &LLMediaCtrlListener::getMediaText,
+        llsd::map("path", LLSD(), "reply", LLSD()));
+
+    add("getPluginsList",
+        "Enumerate the active media plugin (SLPlugin) instances.\n"
+        "Reply contains [\"plugins\"] an array of { pid, url, mime_type, remote_debugging_port } entries.",
+        &LLMediaCtrlListener::getPluginsList,
+        llsd::map("reply", LLSD()));
+}
+
+LLMediaCtrl* LLMediaCtrlListener::findMediaCtrl(const std::string& path)
+{
+    LLView* view = LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), path);
+    if (!view)
+    {
+        return nullptr;
+    }
+    return view->as<LLMediaCtrl>();
+}
+
+void LLMediaCtrlListener::getMediaInfo(const LLSD& request)
+{
+    Response reply(LLSD(), request);
+    std::string path = request["path"];
+
+    LLMediaCtrl* media_ctrl = findMediaCtrl(path);
+    if (!media_ctrl)
+    {
+        reply["error"] = "Could not find web_browser widget at path: " + path;
+        return;
+    }
+
+    reply["url"] = media_ctrl->getCurrentNavUrl();
+    reply["mime_type"] = media_ctrl->getMediaMimeType();
+    reply["status"] = media_ctrl->getMediaLoadingStatus();
+    reply["title"] = media_ctrl->getMediaTitle();
+}
+
+void LLMediaCtrlListener::replyError(const LLSD& request, const std::string& error)
+{
+    Response reply(LLSD(), request);
+    reply["error"] = error;
+}
+
+void LLMediaCtrlListener::getMediaText(const LLSD& request)
+{
+    std::string path = request["path"];
+
+    LLMediaCtrl* media_ctrl = findMediaCtrl(path);
+    if (!media_ctrl)
+    {
+        replyError(request, "Could not find web_browser widget at path: " + path);
+        return;
+    }
+
+    LLPluginClassMedia* plugin = media_ctrl->getMediaPlugin();
+    if (!plugin)
+    {
+        replyError(request, "Media plugin is not available for widget at path: " + path);
+        return;
+    }
+
+    // Enable plugin debugging to capture console messages
+    plugin->enableMediaPluginDebugging(true);
+    std::string pump_name = request["reply"].asString();
+
+    // Execute JavaScript to extract page text, embedding pump name in the marker
+    const std::string text_extract_script = "console.log('" + PAGE_TEXT_EXTRACT_MARKER + pump_name + ":' + "
+                          "(document.body ? (document.body.innerText ? document.body.innerText.substring(0, 1000).replace(/\\s+/g, ' ').trim() : "
+                          "'No text content') : 'Document body not ready'));";
+
+    if (!media_ctrl->executeJavaScript(text_extract_script))
+    {
+        replyError(request, "Failed to execute JavaScript for text extraction");
+    }
+}
+
+void LLMediaCtrlListener::getPluginsList(const LLSD& request)
+{
+    Response reply(LLSD(), request);
+
+    LLSD plugins;
+
+    LLViewerMedia::impl_list& impls = LLViewerMedia::getInstance()->getPriorityList();
+    for (LLViewerMedia::impl_list::iterator it = impls.begin(); it != impls.end(); ++it)
+    {
+        LLViewerMediaImpl* impl = *it;
+        if (!impl)
+        {
+            continue;
+        }
+        LLPluginClassMedia* plugin = impl->getMediaPlugin();
+
+        LLSD entry;
+        entry["url"] = impl->getCurrentMediaURL();
+        entry["mime_type"] = impl->getMimeType();
+        entry["pid"] = plugin ? plugin->getProcessID() : 0;
+        entry["remote_debugging_port"] = plugin ? (S32)plugin->getCefRemoteDebuggingPort() : 0;
+
+        plugins.append(entry);
+    }
+    reply["plugins"] = plugins;
+}
+
+static LLMediaCtrlListener sMediaCtrlListener;

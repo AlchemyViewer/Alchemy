@@ -29,10 +29,12 @@
 
 class LLSD;
 
-class LLFloaterTestInspectors : public LLFloater
+class LLFloaterTestInspectors final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterTestInspectors, LLFloater);
+
     // nothing yet
 
 private:

@@ -42,10 +42,12 @@ LLF32UICtrl::LLF32UICtrl(const Params& p)
     mMaxValue(p.max_value),
     mIncrement(p.increment)
 {
-    mViewModel->setValue(p.initial_value);
+    viewModel()->setValue(p.initial_value);
 }
 
 F32 LLF32UICtrl::getValueF32() const
 {
-    return (F32)mViewModel->getValue().asReal();
+    // Not getValue(): this class overrides it to return getValueF32(), so
+    // asking it here is asking this function.
+    return (F32)viewModel()->getValue().asReal();
 }

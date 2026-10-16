@@ -28,6 +28,7 @@
 
 #include "llchannelmanager.h"
 
+#include "allegacynotificationwellwindow.h"
 #include "llappviewer.h"
 #include "lldonotdisturbnotificationstorage.h"
 #include "llpersistentnotificationstorage.h"
@@ -36,7 +37,6 @@
 #include "llrootview.h"
 #include "llsyswellwindow.h"
 #include "llfloaternotificationstabbed.h"
-#include "lllegacynotificationwellwindow.h"
 #include "llfloaterreg.h"
 
 #include <algorithm>
@@ -94,7 +94,7 @@ LLScreenChannel* LLChannelManager::createNotificationChannel()
     p.toast_align = NA_TOP;
 
     // Getting a Channel for our notifications
-    return dynamic_cast<LLScreenChannel*> (LLChannelManager::getInstance()->getChannel(p));
+    return ALViewType::as<LLScreenChannel>(LLChannelManager::getInstance()->getChannel(p));
 }
 
 //--------------------------------------------------------------------------
@@ -141,6 +141,7 @@ void LLChannelManager::onLoginCompleted()
         }
         else
         {
+            mStartUpToastInited = true;
             gViewerWindow->getRootView()->addChild(mStartUpChannel);
 
             // init channel's position and size
@@ -148,8 +149,8 @@ void LLChannelManager::onLoginCompleted()
             mStartUpChannel->init(channel_right_bound - NOTIFY_BOX_WIDTH, channel_right_bound);
             if (gSkinSettings.getBOOL("LegacyNotificationWell"))
             {
-                mStartUpChannel->setMouseDownCallback(boost::bind(&LLLegacyNotificationWellWindow::onStartUpToastClick,
-                    LLLegacyNotificationWellWindow::getInstance(), _2, _3, _4));
+                mStartUpChannel->setMouseDownCallback(boost::bind(&ALLegacyNotificationWellWindow::onStartUpToastClick,
+                    ALLegacyNotificationWellWindow::getInstance(), _2, _3, _4));
             }
             else
             {
@@ -252,9 +253,7 @@ void LLChannelManager::muteAllChannels(bool mute)
 
 void LLChannelManager::killToastsFromChannel(const LLUUID& channel_id, const LLScreenChannel::Matcher& matcher)
 {
-    LLScreenChannel
-            * screen_channel =
-                    dynamic_cast<LLScreenChannel*> (findChannelByID(channel_id));
+    LLScreenChannel* screen_channel = ALViewType::as<LLScreenChannel>(findChannelByID(channel_id));
     if (screen_channel != NULL)
     {
         screen_channel->killMatchedToasts(matcher);

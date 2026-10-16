@@ -23,9 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 texture_matrix0;
-uniform mat4 modelview_matrix;
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 in vec3 position;
 in vec2 texcoord0;
@@ -38,9 +38,13 @@ void main()
     vec4 vert = vec4(position.xyz, 1.0);
     vec4 pos = (modelview_projection_matrix * vert);
 
-    // smash to *almost* far clip plane -- stars are still behind
-    // SL-19283 - finagle the moon position to be between clouds and stars.
-    pos.z = pos.w*0.999991;
+    // On the far plane with the rest of the sky, which layers by draw order: after the stars,
+    // before the clouds (SL-19283). Reverse-Z puts the far plane at ndc z 0.
+#ifdef REVERSE_Z
+    pos.z = 0.0;
+#else
+    pos.z = pos.w;
+#endif
     gl_Position = pos;
 
     vary_texcoord0 = (texture_matrix0 * vec4(texcoord0,0,1)).xy;

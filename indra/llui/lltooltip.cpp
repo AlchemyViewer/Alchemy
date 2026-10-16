@@ -117,7 +117,13 @@ bool LLToolTipView::handleRightMouseDown(S32 x, S32 y, MASK mask)
 }
 
 
-bool LLToolTipView::handleScrollWheel( S32 x, S32 y, S32 clicks )
+bool LLToolTipView::handleScrollWheel( S32 x, S32 y, LLScrollDelta delta )
+{
+    LLToolTipMgr::instance().blockToolTips();
+    return false;
+}
+
+bool LLToolTipView::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     LLToolTipMgr::instance().blockToolTips();
     return false;
@@ -129,7 +135,7 @@ void LLToolTipView::drawStickyRect()
 }
 
 // defaults for floater param block pulled from widgets/floater.xml
-static LLWidgetNameRegistry::StaticRegistrar sRegisterInspectorParams(&typeid(LLInspector::Params), "inspector");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterInspectorParams(typeid(LLInspector::Params), "inspector");
 
 //
 // LLToolTip
@@ -354,7 +360,10 @@ bool LLToolTip::handleHover(S32 x, S32 y, MASK mask)
     LLPanel::handleHover(x, y, mask);
     if (mHasClickCallback)
     {
-        getWindow()->setCursor(UI_CURSOR_HAND);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_HAND);
+        }
     }
     return true;
 }

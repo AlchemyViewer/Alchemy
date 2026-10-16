@@ -1,18 +1,10 @@
 # -*- cmake -*-
 
-project(llimage)
+add_library(llimage STATIC)
 
-include(00-Common)
-include(LLCommon)
-include(LLImage)
-include(JPEG)
-include(LLKDU)
-include(ZLIBNG)
-include(LLAddBuildTest)
-include(bugsplat)
-include(Tut)
-
-set(llimage_SOURCE_FILES
+target_sources(
+  llimage
+  PRIVATE
     llimagebmp.cpp
     llimage.cpp
     llimagedimensionsinfo.cpp
@@ -22,58 +14,59 @@ set(llimage_SOURCE_FILES
     llimagejpeg.cpp
     llimagepng.cpp
     llimagetga.cpp
+    llimagewebp.cpp
+    llimageavif.cpp
     llimageworker.cpp
     llpngwrapper.cpp
-    )
+)
 
-set(llimage_HEADER_FILES
-    CMakeLists.txt
+target_sources(
+  llimage
+  PUBLIC
+    FILE_SET HEADERS
+      FILES
+        llimage.h
+        llimagebmp.h
+        llimagedimensionsinfo.h
+        llimagedxt.h
+        llimagefilter.h
+        llimagej2c.h
+        llimagejpeg.h
+        llimagepng.h
+        llimagetga.h
+        llimagewebp.h
+        llimageavif.h
+        llimageworker.h
+        llmapimagetype.h
+        llpngwrapper.h
+)
 
-    llimage.h
-    llimagebmp.h
-    llimagedimensionsinfo.h
-    llimagedxt.h
-    llimagefilter.h
-    llimagej2c.h
-    llimagejpeg.h
-    llimagepng.h
-    llimagetga.h
-    llimageworker.h
-    llmapimagetype.h
-    llpngwrapper.h
-    )
+target_link_libraries(llimage PRIVATE al::flags)
+if(AL_USE_KDU)
+  target_link_libraries(llimage PUBLIC llkdu)
+else()
+  target_link_libraries(llimage PUBLIC llimagej2coj)
+endif()
 
-list(APPEND llimage_SOURCE_FILES ${llimage_HEADER_FILES})
+target_link_libraries(
+  llimage
+  PUBLIC llfilesystem llmath llcommon ll::libwebp ll::libavif ll::libpng ll::libjpeg
+)
 
-add_library (llimage ${llimage_SOURCE_FILES})
-target_include_directories( llimage  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
-# Libraries on which this library depends, needed for Linux builds
-# Sort by high-level to low-level
-if (USE_KDU)
-    target_link_libraries(llimage llkdu)
-else (USE_KDU)
-    target_link_libraries(llimage llimagej2coj)
-endif (USE_KDU)
-
-target_link_libraries(llimage
-        llfilesystem
-        llmath
-        llcommon
-        ll::libpng
-        ll::libjpeg
-    )
-
-if (USE_PRECOMPILED_HEADERS)
-  target_precompile_headers(llimage REUSE_FROM llprecompiled)
-endif ()
+target_precompile_headers(llimage REUSE_FROM llprecompiled)
 
 # Add tests
-if (LL_TESTS)
-  SET(llimage_TEST_SOURCE_FILES
-    llimageworker.cpp
-    )
-  LL_ADD_PROJECT_UNIT_TESTS(llimage "${llimage_TEST_SOURCE_FILES}")
-endif (LL_TESTS)
+if(AL_BUILD_TESTS)
+  # It stubs the image classes the library defines, so it compiles the one
+  # file it tests instead of linking the library.
+  al_add_test_binary(
+    llimageworker_test
+    PROJECT llimage
+    SOURCES tests/llimageworker_test.cpp
+    UNIT llimageworker.cpp
+    LIBRARIES llmath llcommon
+  )
 
-
-
+  # The locks images are read and written under, over the library itself.
+  al_add_test_binary(llimage_tests PROJECT llimage SOURCES tests/llimage_test.cpp LIBRARIES llimage)
+endif()

@@ -27,36 +27,34 @@
 // Display of a classified used both for the global view in the
 // Find directory, and also for each individual user's classified in their
 // profile.
-
 #ifndef LL_LLPANELCLASSIFIED_H
 #define LL_LLPANELCLASSIFIED_H
 
 #include "llavatarpropertiesprocessor.h"
-#include "llfloaterpublishclassified.h"
+#include "llclassifiedinfo.h"
+#include "llfloater.h"
 #include "llpanel.h"
 #include "llrect.h"
 
 class LLScrollContainer;
 class LLTextureCtrl;
-class LLUICtrl;
 
-class LLPanelClassifiedInfo : public LLPanel, public LLAvatarPropertiesObserver
+class LLPanelClassifiedInfo final : public LLPanel, public LLAvatarPropertiesObserver
 {
     LOG_CLASS(LLPanelClassifiedInfo);
 public:
-
-    static LLPanelClassifiedInfo* create();
+    AL_VIEW_TYPE(LLPanelClassifiedInfo, LLPanel);
 
     LLPanelClassifiedInfo();
     virtual ~LLPanelClassifiedInfo();
 
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    /*virtual*/ void processProperties(void* data, EAvatarProcessorType type);
+    /*virtual*/ void processProperties(void* data, EAvatarProcessorType type) override;
 
-    void setAvatarId(const LLUUID& avatar_id) { mAvatarId = avatar_id; }
+    void setAvatarId(const LLUUID& avatar_id);
 
     LLUUID& getAvatarId() { return mAvatarId; }
 
@@ -115,13 +113,9 @@ public:
             const LLVector3d& global_pos,
             const std::string& sim_name);
 
-    void setExitCallback(const commit_callback_t& cb);
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
-    void setEditClassifiedCallback(const commit_callback_t& cb);
-
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
-
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
 
 protected:
 
@@ -143,7 +137,6 @@ protected:
 
     void onMapClick();
     void onTeleportClick();
-    void onExit();
 
     bool mSnapshotStreched;
     LLRect mSnapshotRect;

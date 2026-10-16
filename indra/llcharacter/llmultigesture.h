@@ -54,11 +54,10 @@ public:
     void reset();
 
     const std::string& getTrigger() const { return mTrigger; }
-protected:
-    LLMultiGesture(const LLMultiGesture& gest);
-    const LLMultiGesture& operator=(const LLMultiGesture& rhs);
 
-public:
+    LLMultiGesture(const LLMultiGesture& gest) = delete;
+    const LLMultiGesture& operator=(const LLMultiGesture& rhs) = delete;
+
     KEY mKey { 0 };
     MASK mMask { 0 };
 
@@ -115,7 +114,10 @@ public:
 
 // Order must match the library_list in floater_preview_gesture.xml!
 
-enum EStepType
+// Of a fixed type: a step's type comes from the gesture asset, and one that
+// is none of these must still be a value of the type for deserialize() to
+// turn it away.
+enum EStepType : S32
 {
     STEP_ANIMATION = 0,
     STEP_SOUND = 1,

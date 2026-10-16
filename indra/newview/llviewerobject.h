@@ -25,12 +25,12 @@
  * $/LicenseInfo$
  */
 
-#ifndef LL_LLVIEWEROBJECT_H
-#define LL_LLVIEWEROBJECT_H
+#pragma once
 
 #include <map>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
+#include "almotionpredictor.h"
 #include "llassetstorage.h"
 //#include "llhudicon.h"
 #include "llinventory.h"
@@ -69,7 +69,6 @@ class LLMessageSystem;
 class LLNameValue;
 class LLPartSysData;
 class LLPipeline;
-class LLReflectionMap;
 class LLTextureEntry;
 class LLVOAvatar;
 class LLVOInventoryListener;
@@ -127,13 +126,15 @@ class LLViewerObject
 protected:
     virtual ~LLViewerObject(); // use unref()
 
+private:
     // TomY: Provide for a list of extra parameter structures, mapped by structure name
     struct ExtraParameter
     {
-        bool in_use;
-        LLNetworkData *data;
+        bool is_invalid = false;
+        bool* in_use = nullptr;
+        LLNetworkData* data = nullptr;
     };
-    boost::unordered_map<U16, ExtraParameter*> mExtraParameterList;
+    std::vector<ExtraParameter> mExtraParameterList;
 
 public:
     typedef std::list<LLPointer<LLViewerObject> > child_list_t;
@@ -221,6 +222,7 @@ public:
     virtual U32 getNumVertices() const;
     virtual U32 getNumIndices() const;
     S32 getNumFaces() const { return mNumFaces; }
+    S32 getNumVisibleFaces() const;
 
     // Graphical stuff for objects - maybe broken out into render class later?
     virtual void updateTextures();
@@ -249,6 +251,9 @@ public:
 
     // Accessor functions
     LLViewerRegion* getRegion() const               { return mRegionp; }
+
+    // Check if object is reachable from agent region by traversing loaded neighboring regions
+    bool isReachable();
 
     bool isSelected() const                         { return mUserSelected; }
     // Check whole linkset
@@ -332,18 +337,6 @@ public:
     virtual const LLVector3 &getPositionAgent() const;
     virtual const LLVector3 getRenderPosition() const;
 
-    LLMatrix4a getAgentToGLTFAssetTransform() const;
-    LLMatrix4a getGLTFAssetToAgentTransform() const;
-    LLVector3 getGLTFNodePositionAgent(S32 node_index) const;
-    LLMatrix4a getGLTFNodeTransformAgent(S32 node_index) const;
-    void getGLTFNodeTransformAgent(S32 node_index, LLVector3* position, LLQuaternion* rotation, LLVector3* scale) const;
-
-    // move the node at the given index by the given offset in agent space
-    void moveGLTFNode(S32 node_index, const LLVector3& offset);
-
-    // set the rotation in agent space of the given node
-    void setGLTFNodeRotationAgent(S32 node_index, const LLQuaternion& rotation);
-
     virtual const LLVector3 getPivotPositionAgent() const; // Usually = to getPositionAgent, unless like flex objects it's not
 
     LLViewerObject* getRootEdit() const;
@@ -351,7 +344,7 @@ public:
     const LLQuaternion getRotationRegion() const;
     const LLQuaternion getRotationEdit() const;
     const LLQuaternion getRenderRotation() const;
-    virtual const LLMatrix4 getRenderMatrix() const;
+    virtual const LLMatrix4a& getRenderMatrix() const;
 
     void setPosition(const LLVector3 &pos, bool damped = false);
     void setPositionGlobal(const LLVector3d &position, bool damped = false);
@@ -361,7 +354,7 @@ public:
     void setPositionParent(const LLVector3 &pos_parent, bool damped = false);
     void setPositionAbsoluteGlobal( const LLVector3d &pos_global, bool damped = false );
 
-    virtual const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const     { return xform->getWorldMatrix(); }
+    virtual const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const    { return xform->getWorldMatrix(); }
 
     inline void setRotation(const F32 x, const F32 y, const F32 z, bool damped = false);
     inline void setRotation(const LLQuaternion& quat, bool damped = false);
@@ -393,6 +386,7 @@ public:
     /*virtual*/ S32     setTEGlow(const U8 te, const F32 glow);
     /*virtual*/ S32     setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID);
     /*virtual*/ S32     setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialParams);
+    S32 initRenderMaterial(const U8 te);
     virtual     S32     setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* mat);
 
     // Used by Materials update functions to properly kick off rebuilds
@@ -425,10 +419,12 @@ public:
     virtual F32 getStreamingCost() const;
     virtual bool getCostData(LLMeshCostData& costs) const;
     virtual U32 getTriangleCount(S32* vcount = NULL) const;
+    virtual U32 getLODTriangleCount(S32 lod);
     virtual U32 getHighLODTriangleCount();
     F32 recursiveGetScaledSurfaceArea() const;
 
     U32 recursiveGetTriangleCount(S32* vcount = NULL) const;
+    void recursiveGetLODTriangleCount(S32 &high_lod, S32 &medium_lod, S32 &low_lod, S32 &lowest_lod);
 
     void setObjectCost(F32 cost);
     F32 getObjectCost();
@@ -442,11 +438,24 @@ public:
     void setLinksetPhysicsCost(F32 cost);
     F32 getLinksetPhysicsCost();
 
+    // Read the last cached accounting values WITHOUT triggering a fetch. The
+    // get* variants above queue a GetObjectCost capability request whenever the
+    // cost is stale — and a failed fetch leaves it stale — so periodic readers
+    // (e.g. the Scene Explorer's reconcile pass) must use these to avoid
+    // re-requesting failed/uncosted objects forever.
+    F32 peekObjectCost() const  { return mObjectCost; }
+    F32 peekLinksetCost() const { return mLinksetCost; }
+    F32 peekPhysicsCost() const { return mPhysicsCost; }
+
     void sendShapeUpdate();
 
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
     U8 getAttachmentState() const                   { return mAttachmentState; }
 // [/RLVa:KB]
+    // Set the encoded attachment-point state. Normally written from the server's
+    // object update; exposed so a client-only object (local mesh preview) can be
+    // attached to the agent avatar without a round-trip.
+    void setAttachmentState(U8 state)               { mAttachmentState = state; }
 //  U8 getAttachmentState()                         { return mAttachmentState; }
 
     F32 getAppAngle() const                 { return mAppAngle; }
@@ -516,6 +525,10 @@ public:
     void registerInventoryListener(LLVOInventoryListener* listener, void* user_data);
     void removeInventoryListener(LLVOInventoryListener* listener);
     bool isInventoryPending();
+    // The last request for the inventory came back with an error, and
+    // what the listeners were told was nothing: not an object with
+    // nothing in it. Cleared by the next request.
+    bool isInventoryRequestFailed() const { return mInvRequestFailed; }
     void clearInventoryListeners();
     bool hasInventoryListeners();
     void requestInventory();
@@ -550,7 +563,20 @@ public:
     // save a script, which involves removing the old one, and rezzing
     // in the new one. This method should be called with the asset id
     // of the new and old script AFTER the bytecode has been saved.
-    void saveScript(const LLViewerInventoryItem* item, bool active, bool is_new);
+    // The simulator treats the script as new when item->getAssetUUID().isNull() is true; in that case
+    // template_id will be used (if non-null) to copy an existing script asset, otherwise the
+    // script subtype in the item will be used to select the correct template.
+    void saveScript(const LLViewerInventoryItem* item, bool active, bool is_new, const LLUUID& template_id);
+
+    void createInventoryItem(
+        LLAssetType::EType asset_type,
+        LLInventoryType::EType inventory_type,
+        U8 sub_type,
+        const std::string& name,
+        const std::string& description,
+        const LLPermissions& permissions,
+        const LLSD& params,
+        std::function<void(bool, const LLSD&)> callback);
 
     // move an inventory item out of the task and into agent
     // inventory. This operation is based on messaging. No permissions
@@ -623,6 +649,11 @@ public:
     void setPhysicsDensity(F32 density);
     void setPhysicsRestitution(F32 restitution);
 
+    static void markObjectsForUpdate(const LLUUID& owner_id);
+    static void removeObjectFromPendingUpdate(LLViewerObject* obj);
+    static bool isObjectInPendingUpdate(const LLUUID& owner_id, LLViewerObject* obj);
+    void requestObjectUpdate();
+
     virtual void dump() const;
     static U32      getNumZombieObjects()           { return sNumZombieObjects; }
 
@@ -633,10 +664,16 @@ public:
     void dirtySpatialGroup() const;
     virtual void dirtyMesh();
 
-    virtual LLNetworkData* getParameterEntry(U16 param_type) const;
-    virtual bool setParameterEntry(U16 param_type, const LLNetworkData& new_value, bool local_origin);
-    virtual bool getParameterEntryInUse(U16 param_type) const;
-    virtual bool setParameterEntryInUse(U16 param_type, bool in_use, bool local_origin);
+    LLFlexibleObjectData* getFlexibleObjectData() const { return mFlexibleObjectDataInUse ? mFlexibleObjectData.get() : nullptr; }
+    LLLightParams* getLightParams() const { return mLightParamsInUse ? mLightParams.get() : nullptr; }
+    LLSculptParams* getSculptParams() const { return mSculptParamsInUse ? mSculptParams.get() : nullptr; }
+    LLLightImageParams* getLightImageParams() const { return mLightImageParamsInUse ? mLightImageParams.get() : nullptr; }
+    LLExtendedMeshParams* getExtendedMeshParams() const { return mExtendedMeshParamsInUse ? mExtendedMeshParams.get() : nullptr; }
+    LLRenderMaterialParams* getRenderMaterialParams() const { return mRenderMaterialParamsInUse ? mRenderMaterialParams.get() : nullptr; }
+    LLReflectionProbeParams* getReflectionProbeParams() const { return mReflectionProbeParamsInUse ? mReflectionProbeParams.get() : nullptr; }
+
+    bool setParameterEntry(U16 param_type, const LLNetworkData& new_value, bool local_origin);
+    bool setParameterEntryInUse(U16 param_type, bool in_use, bool local_origin);
     // Called when a parameter is changed
     virtual void parameterChanged(U16 param_type, bool local_origin);
     virtual void parameterChanged(U16 param_type, LLNetworkData* data, bool in_use, bool local_origin);
@@ -678,8 +715,31 @@ private:
     bool isAssetInInventory(LLViewerInventoryItem* item, LLAssetType::EType type);
 
     ExtraParameter* createNewParameterEntry(U16 param_type);
-    ExtraParameter* getExtraParameterEntry(U16 param_type) const;
-    ExtraParameter* getExtraParameterEntryCreate(U16 param_type);
+    const ExtraParameter& getExtraParameterEntry(U16 param_type) const
+    {
+        return mExtraParameterList[U32(param_type >> 4) - 1];
+    }
+    ExtraParameter& getExtraParameterEntry(U16 param_type)
+    {
+        return mExtraParameterList[U32(param_type >> 4) - 1];
+    }
+    ExtraParameter* getExtraParameterEntryCreate(U16 param_type)
+    {
+        if (param_type <= LLNetworkData::PARAMS_MAX)
+        {
+            ExtraParameter& param = getExtraParameterEntry(param_type);
+            if (!param.is_invalid)
+            {
+                if (!param.data)
+                {
+                    ExtraParameter* new_entry = createNewParameterEntry(param_type);
+                    return new_entry;
+                }
+                return &param;
+            }
+        }
+        return nullptr;
+    }
     bool unpackParameterEntry(U16 param_type, LLDataPacker *dp);
 
     // This function checks to see if the given media URL has changed its version
@@ -698,6 +758,8 @@ private:
     void fetchInventoryDelayed(const F64 &time_seconds);
     static void fetchInventoryDelayedCoro(const LLUUID task_inv, const F64 time_seconds);
     static void fetchInventoryFromCapCoro(const LLUUID task_inv);
+    static void createInventoryItemCoro(const std::string cap_url, const LLSD body,
+                                        std::function<void(bool, const LLSD&)> callback);
 
 public:
     //
@@ -710,8 +772,6 @@ public:
         LL_VO_WL_SKY =              LL_PCODE_APP | 0x40,
         LL_VO_SQUARE_TORUS =        LL_PCODE_APP | 0x50,
         LL_VO_SKY =                 LL_PCODE_APP | 0x60,
-        LL_VO_VOID_WATER =          LL_PCODE_APP | 0x70,
-        LL_VO_WATER =               LL_PCODE_APP | 0x80,
         LL_VO_PART_GROUP =          LL_PCODE_APP | 0xa0,
         LL_VO_TRIANGLE_TORUS =      LL_PCODE_APP | 0xb0,
         LL_VO_HUD_PART_GROUP =      LL_PCODE_APP | 0xc0,
@@ -748,11 +808,35 @@ public:
     // can likely be factored out
     bool            mbCanSelect;
 
+    // Client-only object with no simulator counterpart (e.g. a local mesh
+    // preview). Build/select code reads this to skip all server traffic for the
+    // object and to delete it locally instead of asking the sim. O(1) -- avoids
+    // having to ask the owning manager whether an object is client-only.
+    bool            mIsLocalOnly;
+    bool            isLocalOnly() const { return mIsLocalOnly; }
+
 private:
     // Grabbed from UPDATE_FLAGS
     U32             mFlags;
 
+    bool mFlexibleObjectDataInUse = false,
+        mLightParamsInUse = false,
+        mSculptParamsInUse = false,
+        mLightImageParamsInUse = false,
+        mExtendedMeshParamsInUse = false,
+        mRenderMaterialParamsInUse = false,
+        mReflectionProbeParamsInUse = false;
+    std::unique_ptr<LLFlexibleObjectData> mFlexibleObjectData;
+    std::unique_ptr<LLLightParams> mLightParams;
+    std::unique_ptr<LLSculptParams> mSculptParams;
+    std::unique_ptr<LLLightImageParams> mLightImageParams;
+    std::unique_ptr<LLExtendedMeshParams> mExtendedMeshParams;
+    std::unique_ptr<LLRenderMaterialParams> mRenderMaterialParams;
+    std::unique_ptr<LLReflectionProbeParams> mReflectionProbeParams;
+
     static std::map<std::string, U32> sObjectDataMap;
+    static boost::unordered_map<LLUUID, std::vector<LLViewerObject*>> sPendingUpdatesByOwner;
+
 public:
     // Sent to sim in UPDATE_FLAGS, received in ObjectPhysicsProperties
     U8              mPhysicsShapeType;
@@ -760,15 +844,6 @@ public:
     F32             mPhysicsFriction;
     F32             mPhysicsDensity;
     F32             mPhysicsRestitution;
-
-    // set the GLTF asset for this LLViewerObject  to the specified asset id
-    // id MUST be for a GLTF asset (LLAssetType::AT_GLTF)
-    // will relesae any currently held references to a GLTF asset on id change
-    void setGLTFAsset(const LLUUID& id);
-
-    // Associated GLTF Asset
-    std::shared_ptr<LL::GLTF::Asset> mGLTFAsset;
-    bool mIsGLTFAssetMissing = false;
 
     // Pipeline classes
     LLPointer<LLDrawable> mDrawable;
@@ -861,6 +936,7 @@ protected:
     F64Seconds      mLastMessageUpdateSecs;         // Last update from a message from the simulator
     TPACKETID       mLatestRecvPacketID;            // Latest time stamp on message from simulator
     F64SecondsImplicit mRegionCrossExpire;      // frame time we detected region crossing in + wait time
+    ALMotionPredictor mMotionPredictor;         // this object's own update rate, and what to do with it
 
     // extra data sent from the sim...currently only used for tree species info
     U8* mData;
@@ -901,6 +977,7 @@ protected:
     EInventoryRequestState  mInvRequestState;
     U64                     mInvRequestXFerId;
     bool                    mInventoryDirty;
+    bool                    mInvRequestFailed = false;
 
     LLViewerRegion  *mRegionp;                  // Region that this object belongs to.
     bool            mDead;
@@ -945,9 +1022,13 @@ protected:
     mutable LLVector3       mPositionRegion;
     mutable LLVector3       mPositionAgent;
 
-    static void setPhaseOutUpdateInterpolationTime(F32 value)   { sPhaseOutUpdateInterpolationTime = (F64Seconds) value;    }
-    static void setMaxUpdateInterpolationTime(F32 value)        { sMaxUpdateInterpolationTime = (F64Seconds) value; }
+    static void setPhaseOutUpdateInterpolationTime(F32 value)   { sPredictionTuning.mPhaseOutTime = value;  }
+    static void setMaxUpdateInterpolationTime(F32 value)        { sPredictionTuning.mMaxTime = value;      }
     static void setMaxRegionCrossingInterpolationTime(F32 value)        { sMaxRegionCrossingInterpolationTime = (F64Seconds) value; }
+
+    static void setPredictionCadenceAware(bool value)   { sPredictionTuning.mCadenceAware = value;  }
+    static void setPredictionCadenceFactor(F32 value)   { sPredictionTuning.mCadenceFactor = value; }
+    static void setPredictionMaxFrameStep(F32 value)    { sPredictionTuning.mMaxFrameStep = value;  }
 
     static void setVelocityInterpolate(bool value)      { sVelocityInterpolate = value; }
     static void setPingInterpolate(bool value)          { sPingInterpolate = value; }
@@ -955,8 +1036,9 @@ protected:
 private:
     static S32 sNumObjects;
 
-    static F64Seconds sPhaseOutUpdateInterpolationTime; // For motion interpolation
-    static F64Seconds sMaxUpdateInterpolationTime;          // For motion interpolation
+    // How prediction behaves, shared by every object. The per-object half of the decision -- how
+    // often this particular object actually sends updates -- lives in mMotionPredictor.
+    static ALMotionPredictor::Tuning sPredictionTuning;
     static F64Seconds sMaxRegionCrossingInterpolationTime;          // For motion interpolation
 
     static bool sVelocityInterpolate;
@@ -1006,14 +1088,14 @@ public:
 inline void LLViewerObject::setRotation(const LLQuaternion& quat, bool damped)
 {
     LLPrimitive::setRotation(quat);
-    setChanged(ROTATED | SILHOUETTE);
+    setChanged(ROTATED);
     updateDrawable(damped);
 }
 
 inline void LLViewerObject::setRotation(const F32 x, const F32 y, const F32 z, bool damped)
 {
     LLPrimitive::setRotation(x, y, z);
-    setChanged(ROTATED | SILHOUETTE);
+    setChanged(ROTATED);
     updateDrawable(damped);
 }
 
@@ -1059,5 +1141,3 @@ public:
     virtual void updateDrawable(bool force_damped);
 };
 
-
-#endif

@@ -1,0 +1,1590 @@
+/**
+ * @file alscriptformatter.cpp
+ * @brief A script's layout put right: indentation from its structure, spaces where the language reads better with them.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "alscriptformatter.h"
+
+#include "alpreprocessor.h"
+#include "alscriptlexicon.h"
+
+#include <algorithm>
+#include <optional>
+#include <set>
+#include <string>
+#include <vector>
+
+namespace
+{
+    typedef ALPreprocessor::Token Token;
+    typedef Token::Kind           Kind;
+
+    // A line of the text: its tokens as written, without the newline
+    // that ended it, and the lines it covers, since a string or a
+    // comment may run over several.
+    struct Line
+    {
+        std::vector<Token> tokens;
+        S32                first = 0;
+        S32                last  = 0;
+        // What the formatter decided.
+        S32                indent    = 0;
+        bool               directive = false;
+        bool               blank     = true;
+    };
+
+    // Something open at a line's end: a block or a bracket, and how far
+    // in the line that opened it was, which is what the line closing it
+    // goes back to.
+    struct Open
+    {
+        S32  indent  = 0;
+        bool bracket = false;
+        // A bracket after `if`, `while` or `for`, whose closing ends the
+        // condition of a statement that may hang without braces.
+        bool control = false;
+        // How many blocks were open when a bracket was: a bracket opened
+        // inside a block that is still open is what continues a line;
+        // one that a block opened inside does not.
+        size_t blocks = 0;
+        // Luau: what kind of block, for the `end` that closes it -- an
+        // `if`'s, a function's, or another's.
+        enum What : U8
+        {
+            Other,
+            If,
+            Function
+        };
+        What what = Other;
+    };
+
+    // The brackets and blocks open, innermost last, and where each block is
+    // among them. What block is innermost, and how many are open, is asked
+    // at every line and every bracket, and finding it by scanning the
+    // whole made formatting a script a hundred thousand brackets deep take
+    // most of a minute.
+    struct OpenStack
+    {
+        std::vector<Open>   entries;
+        std::vector<size_t> blocks;
+
+        bool  empty() const { return entries.empty(); }
+        Open& back() { return entries.back(); }
+        void  push_back(const Open& o)
+        {
+            if (!o.bracket)
+            {
+                blocks.push_back(entries.size());
+            }
+            entries.push_back(o);
+        }
+        void pop_back()
+        {
+            if (!entries.back().bracket)
+            {
+                blocks.pop_back();
+            }
+            entries.pop_back();
+        }
+        size_t      blocksOpen() const { return blocks.size(); }
+        const Open* innermostBlock() const { return blocks.empty() ? nullptr : &entries[blocks.back()]; }
+    };
+
+    bool significant(const Token& t) { return t.kind != Kind::Space && t.kind != Kind::Comment; }
+
+    // LSL's words that shape the code -- not its types, nor print, which
+    // are laid out as names are -- and Luau's keywords.
+    bool isKeyword(bool lua, const Token& t)
+    {
+        return t.kind == Kind::Ident && (lua ? ALScriptLexicon::isLuauKeyword(t.text) : ALScriptLexicon::lslWord(t.text) == ALScriptLexicon::LSL_CONTROL);
+    }
+
+    bool isOperator(bool lua, std::string_view op)
+    {
+        // The unary signs are among them, told apart by what stands
+        // before; Luau's `<` and `>` are not, since generics write them
+        // without spaces and a comparison with.
+        static const std::set<std::string_view> lsl = { "=",  "+=", "-=", "*=", "/=", "%=", "==", "!=", "<", ">", "<=", ">=", "&&",
+                                                        "||", "&",  "|",  "^",  "<<", ">>", "+",  "-",  "*", "/", "%",  "!",  "~" };
+        static const std::set<std::string_view> luau = { "=", "==", "~=", "<=", ">=", "+",  "-",  "*",  "/",   "//", "%",
+                                                         "^", "..", "#",  "+=", "-=", "*=", "/=", "//=", "%=", "^=", "..=" };
+        return (lua ? luau : lsl).count(op) > 0;
+    }
+
+    bool isUnary(bool lua, std::string_view op) { return op == "-" || (lua ? (op == "#") : (op == "!" || op == "~")); }
+
+    bool opens(const Token& t) { return t.kind == Kind::Punct && (t.text == "(" || t.text == "["); }
+    bool closes(const Token& t) { return t.kind == Kind::Punct && (t.text == ")" || t.text == "]"); }
+
+    // Whether the token starts an operand: what a binary operator may
+    // follow, and what a unary one may not.
+    bool operand(bool lua, const Token& t)
+    {
+        switch (t.kind)
+        {
+            case Kind::Ident:  return !isKeyword(lua, t) || t.text == "true" || t.text == "false" || t.text == "nil" || t.text == "end";
+            case Kind::Number:
+            case Kind::String: return true;
+            case Kind::Punct:  return t.text == ")" || t.text == "]" || t.text == "}" || t.text == "..." || t.text == "++" || t.text == "--";
+            default:           return false;
+        }
+    }
+
+    // How deep a line's indentation goes at most. A level is written for
+    // each block and bracket open, and a script nested a hundred thousand
+    // deep, a block a line, wrote gigabytes of blanks, on the main thread,
+    // which formats. A line deeper stands where this many levels put it.
+    constexpr S32 MAX_INDENT_LEVELS = 32;
+
+    // A line is broken at the width only where it has no more tokens than
+    // this, and no bracket deeper in than the indentation goes: breaking
+    // recurses a level for each bracket it goes into and measures the line
+    // afresh at each, which a long enough line, on the main thread's
+    // stack, does not come back from. A longer or deeper line is left as
+    // it is.
+    constexpr size_t WRAP_MAX_TOKENS = 2048;
+
+    // The options as given, kept to what the formatter can do: an indent of
+    // no more than sixteen columns and no less than none -- a negative one,
+    // times the levels, was the size of a string the length of the address
+    // space -- and no fewer blank lines in a row than none.
+    ALScriptFormatter::Options sanitized(ALScriptFormatter::Options options)
+    {
+        options.indent        = llclamp(options.indent, 0, 16);
+        options.maxBlankLines = llmax(options.maxBlankLines, 0);
+        return options;
+    }
+
+    std::string indentText(const ALScriptFormatter::Options& options, S32 levels)
+    {
+        levels = std::min(levels, MAX_INDENT_LEVELS);
+        if (levels <= 0)
+        {
+            return std::string();
+        }
+        return options.tabs ? std::string(static_cast<size_t>(levels), '\t') : std::string(static_cast<size_t>(levels * options.indent), ' ');
+    }
+
+    std::string asWritten(const Line& line)
+    {
+        std::string text;
+        for (const Token& t : line.tokens)
+        {
+            text += t.text;
+        }
+        return text;
+    }
+
+    // The line's tokens spaced afresh, after its indentation: one space
+    // around a binary operator, none around a unary one or inside
+    // brackets, one after a comma and none before; inside Luau's braces
+    // as Options::braceSpaces asks, whatever stands next to them; a
+    // trailing comment, and anything the rules do not name, spaced as
+    // written.
+    std::string spaced(const Line& line, const ALScriptFormatter::Options& options)
+    {
+        const bool   lua       = options.lua;
+        std::string  out;
+        const Token* prev      = nullptr;
+        // The last token before prev that is neither blank nor a comment:
+        // what a sign after prev has to operate on, kept as the line goes
+        // rather than looked for from its start at every sign.
+        const Token* earlier   = nullptr;
+        std::string  gap;       // the whitespace written between prev and the next token
+        S32          vector    = 0;
+        // The brackets open on the line, and whether each is a
+        // condition's: what follows a condition's closing bracket is a
+        // statement, spaced from it; what follows a cast's is its operand.
+        std::vector<bool> brackets;
+        bool              conditionClosed = false;
+        // Whether the token before is a < that opened an LSL vector, not
+        // a comparison: a sign after it is the first part's.
+        bool              vectorOpened    = false;
+        for (const Token& t : line.tokens)
+        {
+            if (t.kind == Kind::Space)
+            {
+                gap += t.text;
+                continue;
+            }
+            const bool closedCondition = conditionClosed;
+            conditionClosed            = false;
+            const bool openedVector    = vectorOpened;
+            vectorOpened               = false;
+            if (t.kind == Kind::Punct && t.text == "(")
+            {
+                brackets.push_back(prev && prev->kind == Kind::Ident && (prev->text == "if" || prev->text == "while" || prev->text == "for"));
+            }
+            else if (t.kind == Kind::Punct && t.text == ")" && !brackets.empty())
+            {
+                conditionClosed = brackets.back();
+                brackets.pop_back();
+            }
+            if (!prev)
+            {
+                // A vector or rotation opens where nothing stands before
+                // it: a line of a list may begin with one.
+                if (!lua && t.kind == Kind::Punct && t.text == "<")
+                {
+                    ++vector;
+                    vectorOpened = true;
+                }
+                out += t.text;
+                prev = &t;
+                gap.clear();
+                continue;
+            }
+            const Token& a = *prev;
+            std::string  between = gap.empty() ? std::string() : std::string(" ");
+            bool         decided = false;
+            auto         say     = [&](bool space) {
+                between = space ? " " : "";
+                decided = true;
+            };
+            const bool aOperand = operand(lua, a);
+            if (t.kind == Kind::Comment || a.kind == Kind::Comment)
+            {
+                // Spaced as written: aligned by hand, most likely.
+                between = gap;
+                decided = true;
+            }
+            else if (t.kind == Kind::Punct)
+            {
+                const std::string& p = t.text;
+                if (lua && a.kind == Kind::Punct && a.text == "{" && p != "}")
+                {
+                    // A table's first part, or a table type's, whatever
+                    // begins it: { { 1 } }, { [k] = v }, { -1 }.
+                    say(options.braceSpaces);
+                }
+                else if (p == "," || p == ";")
+                {
+                    say(false);
+                }
+                else if (p == ")" || p == "]")
+                {
+                    say(false);
+                }
+                else if (p == "(")
+                {
+                    if (a.kind == Kind::Ident)
+                    {
+                        say(isKeyword(lua, a) && !(lua && a.text == "function"));
+                    }
+                    else if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == ")" || a.text == "]" || a.text == "."))
+                    {
+                        say(false);
+                    }
+                    else if (a.kind == Kind::Punct && isOperator(lua, a.text))
+                    {
+                        // After a sign, nothing: -(a), #(t), !(b).
+                        say(!(isUnary(lua, a.text) && (!earlier || !operand(lua, *earlier))));
+                    }
+                }
+                else if (p == "[")
+                {
+                    say(!(aOperand || (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == "{"))));
+                }
+                else if (p == "{")
+                {
+                    if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == "{"))
+                    {
+                        say(false);
+                    }
+                    else if (lua && a.kind == Kind::Ident && !isKeyword(lua, a))
+                    {
+                        say(false);
+                    }
+                    else if (a.kind == Kind::Punct && isUnary(lua, a.text) && (!earlier || !operand(lua, *earlier)))
+                    {
+                        // A length of a table written out: #{1, 2}.
+                        say(false);
+                    }
+                    else
+                    {
+                        say(true);
+                    }
+                }
+                else if (p == "}")
+                {
+                    say(!(a.kind == Kind::Punct && a.text == "{") && (!lua || options.braceSpaces));
+                }
+                else if (p == "." || p == "++" || p == "--")
+                {
+                    say(false);
+                }
+                else if (p == "<" && !lua)
+                {
+                    // A vector or rotation opens where no operand stands
+                    // before it; a comparison follows one.
+                    if (!aOperand)
+                    {
+                        ++vector;
+                        vectorOpened = true;
+                        say(!(a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == "<" || a.text == "{")));
+                    }
+                    else
+                    {
+                        say(true);
+                    }
+                }
+                else if (p == ">" && !lua && vector > 0)
+                {
+                    --vector;
+                    say(false);
+                }
+                else if (isOperator(lua, p))
+                {
+                    if (isUnary(lua, p) && !aOperand)
+                    {
+                        // A sign or a not: spaced before as its neighbour
+                        // asks, and nothing after, which the next token's
+                        // turn will see to.
+                        // Not after a < that compares: LSL's where an operand
+                        // stood before it, and Luau's everywhere.
+                        if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || (a.text == "<" && openedVector) || a.text == "{" || a.text == "!" || a.text == "~" || a.text == "#"))
+                        {
+                            say(false);
+                        }
+                        else if (a.kind == Kind::Punct && a.text == "-" && p == "-")
+                        {
+                            say(true);
+                        }
+                        else if (a.kind == Kind::Punct && isUnary(lua, a.text) && (!earlier || !operand(lua, *earlier)))
+                        {
+                            // A sign after a sign: -#t. Not after a minus
+                            // that subtracts, x - #t.
+                            say(false);
+                        }
+                        else
+                        {
+                            say(true);
+                        }
+                    }
+                    else
+                    {
+                        say(true);
+                    }
+                }
+            }
+            else if (a.kind == Kind::Punct)
+            {
+                const std::string& p = a.text;
+                if (p == "(" || p == "[" || p == "." || p == "@" || p == "++" || p == "--")
+                {
+                    say(false);
+                }
+                else if (p == "<" && !lua && vector > 0 && t.kind != Kind::Punct)
+                {
+                    say(false);
+                }
+                else if (p == "{")
+                {
+                    say(!lua || options.braceSpaces);
+                }
+                else if (p == "," || p == ";")
+                {
+                    say(true);
+                }
+                else if (isOperator(lua, p))
+                {
+                    // After a unary sign, nothing; after a binary one, a
+                    // space. Unary where nothing to operate on stood
+                    // before the sign.
+                    say(!(isUnary(lua, p) && (!earlier || !operand(lua, *earlier))));
+                }
+                else if (p == ")" || p == "]")
+                {
+                    if ((t.kind == Kind::Ident && isKeyword(lua, t)) || closedCondition)
+                    {
+                        say(true);
+                    }
+                }
+            }
+            else if ((a.kind == Kind::Ident || a.kind == Kind::Number || a.kind == Kind::String) &&
+                     (t.kind == Kind::Ident || t.kind == Kind::Number || t.kind == Kind::String))
+            {
+                say(true);
+            }
+            if (!decided)
+            {
+                // A space where the author put one.
+                between = gap.empty() ? std::string() : std::string(" ");
+            }
+            out += between;
+            out += t.text;
+            if (significant(*prev))
+            {
+                earlier = prev;
+            }
+            prev = &t;
+            gap.clear();
+        }
+        return out;
+    }
+
+    std::vector<Line> linesOf(std::string_view text, bool lua, bool& endsWithNewline)
+    {
+        std::vector<Line> lines;
+        Line              current;
+        S32               at = 0;
+        for (Token& t : ALPreprocessor::tokenize(text, lua))
+        {
+            if (t.kind == Kind::Newline)
+            {
+                current.first = at;
+                current.last  = t.line;
+                lines.push_back(std::move(current));
+                current = Line();
+                at      = t.line + static_cast<S32>(t.text.size());
+                continue;
+            }
+            // A comment is something on the line, though nothing of the
+            // structure: a line of one is kept, not emptied as a blank.
+            if (t.kind != Kind::Space)
+            {
+                current.blank = false;
+            }
+            current.tokens.push_back(std::move(t));
+        }
+        endsWithNewline = current.tokens.empty();
+        if (!endsWithNewline)
+        {
+            current.first = at;
+            current.last  = at;
+            for (const Token& t : current.tokens)
+            {
+                current.last = t.line + static_cast<S32>(std::count(t.text.begin(), t.text.end(), '\n'));
+            }
+            lines.push_back(std::move(current));
+        }
+        return lines;
+    }
+
+    // Luau: whether an `if` after this token is an expression -- `x = if
+    // c then a else b` -- rather than a statement. Nothing before it, or
+    // a statement's end, makes it a statement; an assignment, an opening
+    // bracket, a comma, an operator or a word that wants a value makes
+    // it an expression.
+    bool wantsValue(const Token* before)
+    {
+        if (!before)
+        {
+            return false;
+        }
+        if (before->kind == Kind::Punct)
+        {
+            return before->text != ")" && before->text != "]" && before->text != "}" && before->text != ";" && before->text != ":" &&
+                   before->text != "::";
+        }
+        if (before->kind == Kind::Ident)
+        {
+            return before->text == "return" || before->text == "and" || before->text == "or" || before->text == "not" || before->text == "in";
+        }
+        return false;
+    }
+
+    // Each line's indentation from what is open at its start.
+    void decide(std::vector<Line>& lines, bool lua)
+    {
+        OpenStack         open;
+        bool              hang = false;
+        // Luau: each `if` met and not yet done with, statement or
+        // expression -- an expression's `then` and `else` open no block,
+        // and its `else` is its end -- with a function's body marked so
+        // that an `if` inside one starts afresh.
+        enum IfKind : U8
+        {
+            IfStatement,
+            IfExpression,
+            FunctionBody
+        };
+        std::vector<U8> ifs;
+        auto            ifExpression = [&ifs]() { return !ifs.empty() && ifs.back() == IfExpression; };
+        // The line before's last token, which is what an `if` at a
+        // line's start follows.
+        const Token* previousLast = nullptr;
+        // Whether the token before was the `else` of an if-expression,
+        // after which another `if` is the same expression going on.
+        bool afterElseExpression = false;
+        auto              blocksOpen     = [&open]() { return open.blocksOpen(); };
+        auto              innermostBlock = [&open]() { return open.innermostBlock(); };
+        auto isBlockCloser = [lua](const Token& t) {
+            if (t.kind == Kind::Punct)
+            {
+                return t.text == "}";
+            }
+            return lua && t.kind == Kind::Ident && (t.text == "end" || t.text == "until" || t.text == "else" || t.text == "elseif");
+        };
+        // A directive's line continued by a backslash at its end: the
+        // lines it runs on to are the directive's too -- a macro's body,
+        // whose braces open and close nothing of the script's.
+        bool continued = false;
+        for (Line& line : lines)
+        {
+            const Token* first = nullptr;
+            const Token* last  = nullptr;
+            for (const Token& t : line.tokens)
+            {
+                if (significant(t))
+                {
+                    first = first ? first : &t;
+                    last  = &t;
+                }
+            }
+            if (continued || (first && first->kind == Kind::Punct && first->text == (lua ? "--#" : "#")))
+            {
+                // A preprocessor line: as written, and no part of the
+                // structure.
+                line.directive = true;
+                line.indent    = 0;
+                continued      = last && last->text == "\\";
+                continue;
+            }
+            // Where the line starts: one further in than the line that
+            // opened the innermost block, or the bracket still open
+            // inside it; back to the opener's own line for its closer.
+            S32 indent = 0;
+            if (first && isBlockCloser(*first))
+            {
+                if (const Open* block = innermostBlock())
+                {
+                    indent = block->indent;
+                }
+            }
+            else if (first && closes(*first) && !open.empty() && open.back().bracket)
+            {
+                indent = open.back().indent;
+            }
+            else
+            {
+                if (const Open* block = innermostBlock())
+                {
+                    indent = block->indent + 1;
+                }
+                if (!open.empty() && open.back().bracket && open.back().blocks == blocksOpen())
+                {
+                    indent = open.back().indent + 1;
+                }
+                if (hang && !(first && first->kind == Kind::Punct && first->text == "{"))
+                {
+                    ++indent;
+                }
+            }
+            line.indent = indent;
+            if (!first)
+            {
+                continue;
+            }
+            // What the line opens and closes.
+            bool controlClosedLast = false;
+            const Token* before    = nullptr;
+            for (const Token& t : line.tokens)
+            {
+                if (!significant(t))
+                {
+                    continue;
+                }
+                controlClosedLast          = false;
+                const bool wasAfterElse    = afterElseExpression;
+                afterElseExpression        = false;
+                if (t.kind == Kind::Punct)
+                {
+                    if (t.text == "{")
+                    {
+                        open.push_back(Open{ indent, false, false, 0 });
+                        hang = false;
+                    }
+                    else if (t.text == "}")
+                    {
+                        while (!open.empty() && open.back().bracket)
+                        {
+                            open.pop_back();
+                        }
+                        if (!open.empty())
+                        {
+                            open.pop_back();
+                        }
+                    }
+                    else if (opens(t))
+                    {
+                        const bool control = !lua && t.text == "(" && before && before->kind == Kind::Ident &&
+                                             (before->text == "if" || before->text == "while" || before->text == "for");
+                        open.push_back(Open{ indent, true, control, blocksOpen() });
+                    }
+                    else if (closes(t))
+                    {
+                        if (!open.empty() && open.back().bracket)
+                        {
+                            controlClosedLast = open.back().control;
+                            open.pop_back();
+                        }
+                    }
+                }
+                else if (lua && t.kind == Kind::Ident)
+                {
+                    if (t.text == "if")
+                    {
+                        ifs.push_back(wantsValue(before ? before : previousLast) || wasAfterElse ? IfExpression : IfStatement);
+                    }
+                    else if (t.text == "then")
+                    {
+                        if (!ifExpression())
+                        {
+                            open.push_back(Open{ indent, false, false, 0, Open::If });
+                        }
+                    }
+                    else if (t.text == "function")
+                    {
+                        ifs.push_back(FunctionBody);
+                        open.push_back(Open{ indent, false, false, 0, Open::Function });
+                    }
+                    else if (t.text == "do" || t.text == "repeat")
+                    {
+                        open.push_back(Open{ indent, false, false, 0 });
+                    }
+                    else if (t.text == "elseif")
+                    {
+                        if (!ifExpression())
+                        {
+                            while (!open.empty() && open.back().bracket)
+                            {
+                                open.pop_back();
+                            }
+                            if (!open.empty())
+                            {
+                                open.pop_back();
+                            }
+                        }
+                    }
+                    else if (t.text == "end" || t.text == "until")
+                    {
+                        while (!open.empty() && open.back().bracket)
+                        {
+                            open.pop_back();
+                        }
+                        if (!open.empty())
+                        {
+                            const Open::What what = open.back().what;
+                            open.pop_back();
+                            if (what == Open::If && !ifs.empty() && ifs.back() == IfStatement)
+                            {
+                                ifs.pop_back();
+                            }
+                            else if (what == Open::Function)
+                            {
+                                // Whatever the body left unfinished goes with it.
+                                while (!ifs.empty() && ifs.back() != FunctionBody)
+                                {
+                                    ifs.pop_back();
+                                }
+                                if (!ifs.empty())
+                                {
+                                    ifs.pop_back();
+                                }
+                            }
+                        }
+                    }
+                    else if (t.text == "else")
+                    {
+                        if (ifExpression())
+                        {
+                            // The expression's last part; an `if` right after
+                            // it goes on with the same expression.
+                            ifs.pop_back();
+                            afterElseExpression = true;
+                        }
+                        else
+                        {
+                            while (!open.empty() && open.back().bracket)
+                            {
+                                open.pop_back();
+                            }
+                            if (!open.empty())
+                            {
+                                open.pop_back();
+                            }
+                            open.push_back(Open{ indent, false, false, 0, Open::If });
+                        }
+                    }
+                }
+                before = &t;
+            }
+            previousLast = last;
+            // A statement may hang off a condition or an else on the line
+            // before, without braces; the next line goes in one, and any
+            // after it does not.
+            if (!lua)
+            {
+                hang = controlClosedLast || (last->kind == Kind::Ident && (last->text == "else" || last->text == "do"));
+            }
+        }
+    }
+
+    // How many columns text takes: a tab a level's width, a character of
+    // several bytes one.
+    S32 columns(std::string_view text, S32 tab)
+    {
+        S32 n = 0;
+        for (const char c : text)
+        {
+            n += c == '\t' ? tab : (static_cast<unsigned char>(c) & 0xC0) != 0x80 ? 1 : 0;
+        }
+        return n;
+    }
+
+    // A bracket of a line that closes on it, by its tokens' indexes: the
+    // commas directly in it, and the bracket it is in. An LSL vector or
+    // rotation is one too, which nothing breaks.
+    struct Group
+    {
+        size_t              open   = 0;
+        size_t              close  = 0;
+        size_t              parent = std::string::npos;
+        size_t              width  = 0;
+        bool                vector = false;
+        std::vector<size_t> commas;
+        // The groups directly inside it that may be broken -- closed, and
+        // no vector -- widest first.
+        std::vector<size_t> breakable;
+    };
+
+    // The groups of a line's tokens, and those at its top that may be
+    // broken, widest first.
+    struct Groups
+    {
+        std::vector<Group>  all;
+        std::vector<size_t> top;
+        // How deep its brackets go.
+        size_t              depth = 0;
+    };
+
+    // What the tokens' brackets are; none where they do not match, or one
+    // is left open: a line that runs on over the next is not broken.
+    Groups groupsOf(const std::vector<Token>& tokens, bool lua)
+    {
+        Groups              found;
+        std::vector<Group>& groups = found.all;
+        std::vector<size_t> open;
+        const Token*        before = nullptr;
+        for (size_t i = 0; i < tokens.size(); ++i)
+        {
+            const Token& t = tokens[i];
+            if (!significant(t))
+            {
+                continue;
+            }
+            if (t.kind == Kind::Punct)
+            {
+                // A vector where no operand stands before its <, as spaced
+                // reads one; one that never closes was a comparison.
+                const bool vector = !lua && t.text == "<" && !(before && operand(lua, *before));
+                if (t.text == "(" || t.text == "[" || t.text == "{" || vector)
+                {
+                    Group group;
+                    group.open   = i;
+                    group.close  = std::string::npos;
+                    group.parent = open.empty() ? std::string::npos : open.back();
+                    group.vector = vector;
+                    open.push_back(groups.size());
+                    groups.push_back(std::move(group));
+                    found.depth = std::max(found.depth, open.size());
+                }
+                else if (t.text == ")" || t.text == "]" || t.text == "}")
+                {
+                    while (!open.empty() && groups[open.back()].vector)
+                    {
+                        open.pop_back();
+                    }
+                    const std::string_view opener = t.text == ")" ? "(" : t.text == "]" ? "[" : "{";
+                    if (open.empty() || tokens[groups[open.back()].open].text != opener)
+                    {
+                        return Groups();
+                    }
+                    groups[open.back()].close = i;
+                    open.pop_back();
+                }
+                else if (t.text == ">" && !lua && !open.empty() && groups[open.back()].vector)
+                {
+                    groups[open.back()].close = i;
+                    open.pop_back();
+                }
+                else if (t.text == "," && !open.empty() && !groups[open.back()].vector)
+                {
+                    groups[open.back()].commas.push_back(i);
+                }
+            }
+            before = &t;
+        }
+        if (!open.empty() && std::any_of(open.begin(), open.end(), [&groups](size_t g) { return !groups[g].vector; }))
+        {
+            return Groups();
+        }
+        // Each group's width from the tokens' running sizes, and where it
+        // stands in its parent's breakable ones: once, rather than a scan
+        // of every token in it and of every group for each parent.
+        std::vector<size_t> upTo(tokens.size() + 1, 0);
+        for (size_t i = 0; i < tokens.size(); ++i)
+        {
+            upTo[i + 1] = upTo[i] + tokens[i].text.size();
+        }
+        for (size_t g = 0; g < groups.size(); ++g)
+        {
+            Group& group = groups[g];
+            if (group.close == std::string::npos)
+            {
+                continue;
+            }
+            group.width = upTo[group.close + 1] - upTo[group.open];
+            if (!group.vector)
+            {
+                (group.parent == std::string::npos ? found.top : groups[group.parent].breakable).push_back(g);
+            }
+        }
+        const auto widestFirst = [&groups](std::vector<size_t>& in) {
+            std::stable_sort(in.begin(), in.end(), [&groups](size_t a, size_t b) { return groups[a].width > groups[b].width; });
+        };
+        widestFirst(found.top);
+        for (Group& group : groups)
+        {
+            widestFirst(group.breakable);
+        }
+        return found;
+    }
+
+    // A line's tokens as lines of their own, each with how far in it is.
+    struct Piece
+    {
+        std::vector<Token> tokens;
+        S32                indent = 0;
+    };
+
+    // The tokens from `from` to `to`, the blanks at either end left off.
+    std::vector<Token> slice(const std::vector<Token>& tokens, size_t from, size_t to)
+    {
+        while (from < to && tokens[from].kind == Kind::Space)
+        {
+            ++from;
+        }
+        while (to > from && tokens[to - 1].kind == Kind::Space)
+        {
+            --to;
+        }
+        return std::vector<Token>(tokens.begin() + static_cast<std::ptrdiff_t>(from), tokens.begin() + static_cast<std::ptrdiff_t>(to));
+    }
+
+    std::string written(const std::vector<Token>& tokens, S32 indent, const ALScriptFormatter::Options& options)
+    {
+        Line line;
+        line.tokens = tokens;
+        return indentText(options, indent) + spaced(line, options);
+    }
+
+    // The tokens as pieces no wider than the width where a bracket's commas
+    // let them be: the bracket broken is the widest with commas, looked
+    // for in the widest without, down; or, where its last part is a table
+    // or a list with commas of its own, that, which stays on the line
+    // that opens the bracket where that fits.
+    void wrap(const std::vector<Token>& tokens, S32 indent, const ALScriptFormatter::Options& options, std::vector<Piece>& out)
+    {
+        const S32 tab = options.tabs ? options.indent : 1;
+        if (columns(written(tokens, indent, options), tab) <= options.width)
+        {
+            out.push_back({ tokens, indent });
+            return;
+        }
+        const Groups              found  = groupsOf(tokens, options.lua);
+        const std::vector<Group>& groups = found.all;
+        // Recursing no deeper than the line's brackets, which wrapped()
+        // has held to the indentation's depth.
+        const auto pick = [&groups](const std::vector<size_t>& in, auto&& self) -> std::optional<size_t> {
+            for (size_t g : in)
+            {
+                if (!groups[g].commas.empty())
+                {
+                    return g;
+                }
+                if (const std::optional<size_t> inner = self(groups[g].breakable, self))
+                {
+                    return inner;
+                }
+            }
+            return std::nullopt;
+        };
+        std::optional<size_t> chosen = pick(found.top, pick);
+        if (!chosen)
+        {
+            out.push_back({ tokens, indent });
+            return;
+        }
+        // Its last part, where that is a table or a list of its own with
+        // commas, and the line to its opening fits.
+        const Group& group = groups[*chosen];
+        size_t       last  = group.commas.back() + 1;
+        while (last < group.close && !significant(tokens[last]))
+        {
+            ++last;
+        }
+        for (size_t g = 0; g < groups.size(); ++g)
+        {
+            const Group& inner = groups[g];
+            if (inner.parent == *chosen && inner.open == last && !inner.commas.empty() && tokens[inner.open].text != "(")
+            {
+                size_t end = inner.close + 1;
+                while (end < group.close && !significant(tokens[end]))
+                {
+                    ++end;
+                }
+                if (end == group.close && columns(written(slice(tokens, 0, inner.open + 1), indent, options), tab) <= options.width)
+                {
+                    chosen = g;
+                }
+                break;
+            }
+        }
+        const Group& broken = groups[*chosen];
+        wrap(slice(tokens, 0, broken.open + 1), indent, options, out);
+        size_t from = broken.open + 1;
+        for (size_t comma : broken.commas)
+        {
+            wrap(slice(tokens, from, comma + 1), indent + 1, options, out);
+            from = comma + 1;
+        }
+        const std::vector<Token> rest = slice(tokens, from, broken.close);
+        if (!rest.empty())
+        {
+            wrap(rest, indent + 1, options, out);
+        }
+        wrap(slice(tokens, broken.close, tokens.size()), indent, options, out);
+    }
+
+    // A line past the width broken where it can be: its comment after its
+    // code, where it has one, after the last piece. As it is where it has
+    // a comment inside it, or a string or comment runs on past it.
+    std::string wrapped(const Line& line, const ALScriptFormatter::Options& options, const std::string& text)
+    {
+        const S32 tab = options.tabs ? options.indent : 1;
+        if (options.width <= 0 || line.first != line.last || columns(text, tab) <= options.width)
+        {
+            return text;
+        }
+        std::vector<Token> tokens = slice(line.tokens, 0, line.tokens.size());
+        std::vector<Token> after;
+        if (!tokens.empty() && tokens.back().kind == Kind::Comment)
+        {
+            after.push_back(tokens.back());
+            tokens = slice(tokens, 0, tokens.size() - 1);
+        }
+        if (std::any_of(tokens.begin(), tokens.end(), [](const Token& t) { return t.kind == Kind::Comment; }))
+        {
+            return text;
+        }
+        if (tokens.size() > WRAP_MAX_TOKENS || groupsOf(tokens, options.lua).depth > static_cast<size_t>(MAX_INDENT_LEVELS))
+        {
+            return text;
+        }
+        std::vector<Piece> pieces;
+        wrap(tokens, line.indent, options, pieces);
+        if (pieces.size() < 2)
+        {
+            return text;
+        }
+        if (!after.empty())
+        {
+            Token gap;
+            gap.kind = Kind::Space;
+            gap.text = " ";
+            pieces.back().tokens.push_back(gap);
+            pieces.back().tokens.push_back(after.front());
+        }
+        std::string out;
+        for (const Piece& piece : pieces)
+        {
+            std::string one = options.spacing ? written(piece.tokens, piece.indent, options) : indentText(options, piece.indent) + asWritten(Line{ piece.tokens });
+            while (!one.empty() && (one.back() == ' ' || one.back() == '\t'))
+            {
+                one.pop_back();
+            }
+            out += (out.empty() ? "" : "\n") + one;
+        }
+        return out;
+    }
+
+    // How far in the author wrote a line, tabs to their stops.
+    S32 writtenIndent(const Line& line, S32 tab)
+    {
+        S32 column = 0;
+        if (!line.tokens.empty() && line.tokens.front().kind == Kind::Space)
+        {
+            for (const char c : line.tokens.front().text)
+            {
+                column = c == '\t' ? (column / tab + 1) * tab : column + 1;
+            }
+        }
+        return column;
+    }
+
+    // Whether a line holds a comment and nothing else.
+    bool commentOnly(const Line& line)
+    {
+        bool comment = false;
+        for (const Token& t : line.tokens)
+        {
+            if (t.kind == Kind::Comment)
+            {
+                comment = true;
+            }
+            else if (t.kind != Kind::Space)
+            {
+                return false;
+            }
+        }
+        return comment && !line.directive && line.first == line.last;
+    }
+
+    // A comment over a line that goes back out -- `elseif`, `else`,
+    // `until`, `end`, `}` -- is about that line where the author wrote it
+    // out of the block: no further in than that line, and less far than
+    // the code over it in the block, or, in a block with none, in text
+    // the author indented. It goes in as far as the line. One written as
+    // far in as the block, or in text with no indentation to tell, is the
+    // end of the block, and stays in it.
+    void overWhatFollows(std::vector<Line>& lines, const ALScriptFormatter::Options& options)
+    {
+        const S32  tab      = options.indent > 0 ? options.indent : 4;
+        const auto code     = [&](const Line& line) { return !line.blank && !line.directive && !commentOnly(line); };
+        const bool indented = std::any_of(lines.begin(), lines.end(),
+                                          [&](const Line& line) { return code(line) && line.indent > 0 && writtenIndent(line, tab) > 0; });
+        for (size_t i = 1; i < lines.size(); ++i)
+        {
+            const Line& next = lines[i];
+            if (!code(next))
+            {
+                continue;
+            }
+            size_t top = i;
+            while (top > 0 && commentOnly(lines[top - 1]))
+            {
+                --top;
+            }
+            if (top == i)
+            {
+                continue;
+            }
+            size_t over = top;
+            while (over > 0 && !code(lines[over - 1]))
+            {
+                --over;
+            }
+            if (over == 0)
+            {
+                continue;
+            }
+            // The code over them, in the block or the line that opens it.
+            const Line& above   = lines[over - 1];
+            const S32   written = writtenIndent(next, tab);
+            const auto  out     = [&](const Line& comment) {
+                const S32 at = writtenIndent(comment, tab);
+                return at <= written && (above.indent < comment.indent ? indented : at < writtenIndent(above, tab));
+            };
+            for (size_t j = i; j > top && lines[j - 1].indent > next.indent && out(lines[j - 1]); --j)
+            {
+                lines[j - 1].indent = next.indent;
+            }
+        }
+    }
+
+    // Where the author put a line's `=` -- its first outside brackets --
+    // or its trailing comment: the token, and its column from where the
+    // line's code starts, tabs to their stops; and whether the blank
+    // before it is wider than one space, which is what says it was put
+    // there.
+    struct Mark
+    {
+        size_t token  = std::string::npos;
+        S32    column = 0;
+        bool   padded = false;
+    };
+
+    struct Marks
+    {
+        Mark equals;
+        Mark comment;
+        // A comment and nothing else, which a run goes on past.
+        bool through = false;
+    };
+
+    Marks marksOf(const Line& line, S32 tab)
+    {
+        Marks marks;
+        marks.through = commentOnly(line);
+        if (line.blank || line.directive || line.first != line.last || marks.through)
+        {
+            return marks;
+        }
+        S32  column = 0;
+        S32  start  = -1;
+        S32  depth  = 0;
+        bool code   = false;
+        for (size_t i = 0; i < line.tokens.size(); ++i)
+        {
+            const Token& t = line.tokens[i];
+            if (t.kind != Kind::Space && start < 0)
+            {
+                start = column;
+            }
+            const bool padded = i > 0 && line.tokens[i - 1].kind == Kind::Space && line.tokens[i - 1].text != " ";
+            if (t.kind == Kind::Punct)
+            {
+                if (t.text == "(" || t.text == "[" || t.text == "{")
+                {
+                    ++depth;
+                }
+                else if (t.text == ")" || t.text == "]" || t.text == "}")
+                {
+                    // Closing what an earlier line opened: no statement's =.
+                    depth = depth > 0 ? depth - 1 : -1000;
+                }
+                else if (t.text == "=" && depth == 0 && code && marks.equals.token == std::string::npos)
+                {
+                    marks.equals = { i, column - start, padded };
+                }
+            }
+            if (t.kind == Kind::Comment && code)
+            {
+                marks.comment = { i, column - start, padded };
+            }
+            else if (t.kind != Kind::Space)
+            {
+                // Anything after a comment is no trailing one.
+                marks.comment = Mark();
+                code          = true;
+            }
+            for (const char c : t.text)
+            {
+                column = c == '\t' ? (column / tab + 1) * tab : column + ((static_cast<unsigned char>(c) & 0xC0) != 0x80 ? 1 : 0);
+            }
+        }
+        if (marks.comment.token != std::string::npos && marks.equals.token > marks.comment.token)
+        {
+            marks.equals = Mark();
+        }
+        return marks;
+    }
+
+    // What the author lined up, lined up again once each line is spaced
+    // afresh: a run of lines one after another, as deep as each other,
+    // whose `=`, or whose trailing comments, the author put at one column
+    // and spaced wider than one somewhere to get there. Each goes to that
+    // column again, or just past the longest line where it no longer
+    // fits. A run of comments none of whose lines' code changed is left
+    // as it was, its blanks as written. `code` holds each line written
+    // out where it is the formatter's to write.
+    void lineUp(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, std::vector<std::optional<std::string>>& code)
+    {
+        const S32          tab = options.indent > 0 ? options.indent : 4;
+        std::vector<Marks> marks;
+        marks.reserve(lines.size());
+        for (const Line& line : lines)
+        {
+            marks.push_back(marksOf(line, tab));
+        }
+        // Each run of the marks `of` picks, from `from` to `to`, one past,
+        // a comment as far in on a line of its own going on past; each
+        // line of it given `each` has its mark.
+        const auto runs = [&](auto of, auto&& each) {
+            for (size_t from = 0; from < lines.size();)
+            {
+                const Mark first = of(marks[from]);
+                if (first.token == std::string::npos)
+                {
+                    ++from;
+                    continue;
+                }
+                size_t to     = from;
+                size_t marked = 0;
+                bool   padded = false;
+                for (size_t at = from; at < lines.size() && lines[at].indent == lines[from].indent; ++at)
+                {
+                    if (marks[at].through)
+                    {
+                        continue;
+                    }
+                    if (of(marks[at]).token == std::string::npos || of(marks[at]).column != first.column)
+                    {
+                        break;
+                    }
+                    padded = padded || of(marks[at]).padded;
+                    ++marked;
+                    to = at + 1;
+                }
+                if (marked >= 2 && padded)
+                {
+                    each(from, to, first.column);
+                }
+                from = to;
+            }
+        };
+        const auto lead = [&](size_t i) { return indentText(options, lines[i].indent).size(); };
+        runs([](const Marks& m) { return m.equals; },
+             [&](size_t from, size_t to, S32 column) {
+                 // Where each = is now: past its code as spaced, which is
+                 // what the line written out begins with, and one space.
+                 std::vector<std::pair<size_t, S32>> at(to - from, { std::string::npos, 0 });
+                 S32                                 most = column;
+                 for (size_t i = from; i < to; ++i)
+                 {
+                     if (!code[i] || marks[i].through)
+                     {
+                         continue;
+                     }
+                     Line before;
+                     before.tokens.assign(lines[i].tokens.begin(), lines[i].tokens.begin() + static_cast<std::ptrdiff_t>(marks[i].equals.token));
+                     std::string prefix = spaced(before, options);
+                     while (!prefix.empty() && (prefix.back() == ' ' || prefix.back() == '\t'))
+                     {
+                         prefix.pop_back();
+                     }
+                     const size_t equals = lead(i) + prefix.size() + 1;
+                     if (equals < code[i]->size() && (*code[i])[equals] == '=' && (*code[i])[equals - 1] == ' ')
+                     {
+                         at[i - from] = { equals, columns(prefix, 1) + 1 };
+                         most         = std::max(most, at[i - from].second);
+                     }
+                 }
+                 for (size_t i = from; i < to; ++i)
+                 {
+                     if (at[i - from].first != std::string::npos)
+                     {
+                         code[i]->insert(at[i - from].first, static_cast<size_t>(most - at[i - from].second), ' ');
+                     }
+                 }
+             });
+        runs([](const Marks& m) { return m.comment; },
+             [&](size_t from, size_t to, S32 column) {
+                 // Each line's code, as written out now, and its comment.
+                 struct Split
+                 {
+                     size_t end     = std::string::npos;
+                     S32    columns = 0;
+                 };
+                 std::vector<Split> at(to - from);
+                 S32                most    = column;
+                 bool               changed = false;
+                 for (size_t i = from; i < to; ++i)
+                 {
+                     if (!code[i] || marks[i].through)
+                     {
+                         continue;
+                     }
+                     std::string comment = lines[i].tokens[marks[i].comment.token].text;
+                     while (!comment.empty() && (comment.back() == ' ' || comment.back() == '\t' || comment.back() == '\r'))
+                     {
+                         comment.pop_back();
+                     }
+                     const std::string& text = *code[i];
+                     if (comment.empty() || text.size() < comment.size() + lead(i) ||
+                         text.compare(text.size() - comment.size(), comment.size(), comment) != 0)
+                     {
+                         continue;
+                     }
+                     size_t end = text.size() - comment.size();
+                     while (end > lead(i) && (text[end - 1] == ' ' || text[end - 1] == '\t'))
+                     {
+                         --end;
+                     }
+                     const std::string_view now = std::string_view(text).substr(lead(i), end - lead(i));
+                     std::string            was;
+                     for (size_t t = 0; t < marks[i].comment.token; ++t)
+                     {
+                         was += was.empty() && lines[i].tokens[t].kind == Kind::Space ? std::string() : lines[i].tokens[t].text;
+                     }
+                     while (!was.empty() && (was.back() == ' ' || was.back() == '\t'))
+                     {
+                         was.pop_back();
+                     }
+                     changed      = changed || now != was;
+                     at[i - from] = { end, columns(now, 1) };
+                     most         = std::max(most, at[i - from].columns + 1);
+                 }
+                 if (!changed)
+                 {
+                     return;
+                 }
+                 for (size_t i = from; i < to; ++i)
+                 {
+                     if (at[i - from].end != std::string::npos)
+                     {
+                         std::string& text    = *code[i];
+                         const size_t comment = text.find_first_not_of(" \t", at[i - from].end);
+                         text                 = text.substr(0, at[i - from].end) +
+                                std::string(static_cast<size_t>(most - at[i - from].columns), ' ') + text.substr(comment);
+                     }
+                 }
+             });
+    }
+
+    // Each line as written out, or none for a blank line past a run's
+    // length where the whole text is asked for; past the width broken
+    // where `wrap`.
+    std::vector<std::optional<std::string>> writtenLines(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, S32 first,
+                                                         S32 last, bool wrap)
+    {
+        std::vector<std::optional<std::string>> out;
+        S32                                     blanks = 0;
+        size_t                                  kept   = 0;
+        const bool                              whole  = first < 0;
+        const auto ours = [&](const Line& line) { return whole || (line.first >= first && line.last <= last); };
+        // Each line of code the formatter writes, spaced, and lined up
+        // where the author lined them up, before any is broken.
+        std::vector<std::optional<std::string>> code(lines.size());
+        for (size_t i = 0; i < lines.size(); ++i)
+        {
+            const Line& line = lines[i];
+            if (!ours(line) || line.directive || line.blank)
+            {
+                continue;
+            }
+            std::string text = indentText(options, line.indent);
+            if (options.spacing)
+            {
+                text += spaced(line, options);
+            }
+            else
+            {
+                std::string body = asWritten(line);
+                size_t      at   = body.find_first_not_of(" \t");
+                text += at == std::string::npos ? std::string() : body.substr(at);
+            }
+            while (!text.empty() && (text.back() == ' ' || text.back() == '\t'))
+            {
+                text.pop_back();
+            }
+            code[i] = std::move(text);
+        }
+        if (options.spacing)
+        {
+            lineUp(lines, options, code);
+        }
+        for (size_t i = 0; i < lines.size(); ++i)
+        {
+            const Line& line = lines[i];
+            std::string text;
+            if (!ours(line) || line.directive)
+            {
+                text = asWritten(line);
+                if (ours(line))
+                {
+                    while (!text.empty() && (text.back() == ' ' || text.back() == '\t'))
+                    {
+                        text.pop_back();
+                    }
+                }
+            }
+            else if (line.blank)
+            {
+                // Nothing on it: nothing, and beyond a few in a row,
+                // not even a line -- when the whole is asked for; a few
+                // lines asked for keep their numbers.
+                if (whole)
+                {
+                    ++blanks;
+                    if (blanks > options.maxBlankLines || kept == 0)
+                    {
+                        out.emplace_back();
+                        continue;
+                    }
+                }
+                text.clear();
+            }
+            else
+            {
+                text = std::move(*code[i]);
+                if (wrap)
+                {
+                    text = wrapped(line, options, text);
+                }
+            }
+            if (!line.blank)
+            {
+                blanks = 0;
+            }
+            ++kept;
+            out.push_back(std::move(text));
+        }
+        return out;
+    }
+
+    std::string emit(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, bool endsWithNewline, S32 first, S32 last,
+                     bool wrap)
+    {
+        const std::vector<std::optional<std::string>> each = writtenLines(lines, options, first, last, wrap);
+        const bool                                    whole = first < 0;
+        std::string                                   out;
+        for (size_t i = 0; i < each.size(); ++i)
+        {
+            if (!each[i])
+            {
+                continue;
+            }
+            out += *each[i];
+            if (i + 1 < each.size() || endsWithNewline)
+            {
+                out += '\n';
+            }
+        }
+        if (whole)
+        {
+            // Ending with one newline, and no blank line before it.
+            while (out.size() >= 2 && out[out.size() - 1] == '\n' && out[out.size() - 2] == '\n')
+            {
+                out.pop_back();
+            }
+            if (!out.empty() && out.back() != '\n')
+            {
+                out += '\n';
+            }
+        }
+        return out;
+    }
+}
+
+// static
+std::string ALScriptFormatter::format(std::string_view text, const Options& asked)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const Options     options         = sanitized(asked);
+    bool              endsWithNewline = false;
+    std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
+    decide(lines, options.lua);
+    overWhatFollows(lines, options);
+    return emit(lines, options, endsWithNewline, -1, -1, true);
+}
+
+// static
+std::string ALScriptFormatter::formatLines(std::string_view text, const Options& asked, S32 first, S32 last)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const Options     options         = sanitized(asked);
+    bool              endsWithNewline = false;
+    std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
+    decide(lines, options.lua);
+    overWhatFollows(lines, options);
+    return emit(lines, options, endsWithNewline, first, last, false);
+}
+
+// static
+std::vector<std::string> ALScriptFormatter::formatEach(std::string_view text, const Options& asked, S32 first, S32 last)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const Options     options         = sanitized(asked);
+    bool              endsWithNewline = false;
+    std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
+    decide(lines, options.lua);
+    overWhatFollows(lines, options);
+    // Every line kept, blank or not: from the first where `first` is
+    // below it, which would otherwise ask for the whole text's runs.
+    const std::vector<std::optional<std::string>> each = writtenLines(lines, options, llmax(first, 0), last, true);
+    // A line a string or a comment runs on over is as many of the text's;
+    // a line broken at the width is still one.
+    std::vector<std::string> out;
+    for (size_t i = 0; i < each.size(); ++i)
+    {
+        const std::string& one = *each[i];
+        if (lines[i].first == lines[i].last)
+        {
+            out.push_back(one);
+            continue;
+        }
+        for (size_t at = 0;;)
+        {
+            const size_t nl = one.find('\n', at);
+            out.push_back(one.substr(at, nl == std::string::npos ? std::string::npos : nl - at));
+            if (nl == std::string::npos)
+            {
+                break;
+            }
+            at = nl + 1;
+        }
+    }
+    if (endsWithNewline)
+    {
+        out.emplace_back();
+    }
+    return out;
+}
+
+// static
+std::vector<bool> ALScriptFormatter::breaksInStrings(std::string_view text, bool lua)
+{
+    std::vector<bool> out(static_cast<size_t>(std::count(text.begin(), text.end(), '\n')) + 1, false);
+    const auto        mark = [&out](S32 line) {
+        if (line >= 0 && static_cast<size_t>(line) < out.size())
+        {
+            out[static_cast<size_t>(line)] = true;
+        }
+    };
+    if (lua)
+    {
+        // Luau's strings are the tokens' own: a quoted one ends at its line
+        // but for a backslash before the break, a long one runs on.
+        for (const Token& t : ALPreprocessor::tokenize(text, true))
+        {
+            if (t.kind != Kind::String)
+            {
+                continue;
+            }
+            S32 line = t.line;
+            for (const char c : t.text)
+            {
+                if (c == '\n')
+                {
+                    mark(line++);
+                }
+            }
+        }
+        return out;
+    }
+    // An LSL string may hold a break as written, which the tokens -- read
+    // as a preprocessor reads C -- end at; so the text is read as LSL
+    // reads it, past comments, a quote to its closing quote.
+    S32 line = 0;
+    for (size_t i = 0; i < text.size();)
+    {
+        const ALScriptLexicon::Stretch run = ALScriptLexicon::stretchAt(text, i, false);
+        for (size_t k = i; k < run.end; ++k)
+        {
+            if (text[k] == '\n')
+            {
+                if (run.kind == ALScriptLexicon::Kind::String)
+                {
+                    mark(line);
+                }
+                ++line;
+            }
+        }
+        i = run.end;
+    }
+    return out;
+}

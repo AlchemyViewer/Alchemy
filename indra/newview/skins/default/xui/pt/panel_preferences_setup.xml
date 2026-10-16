@@ -19,8 +19,6 @@
 		<radio_item label="Usar o navegador incorporado somente para links do SecondLife" name="external" tool_tip="Use osistema padrão de navegador para ajudar, abrir links da web etc. O navegador incorporado somente será usado para os links LindenLab/Second Life." value="1"/>
 		<radio_item label="Usar navegador incorporado para todos os links" name="external_all" tool_tip="Use este navegador para consultar a ajuda, abrir links da web, etc. A nova janela é aberta dentro do [APP_NAME]." value="2"/>
 	</radio_group>
-	<check_box initial_value="true" label="Habilitar plugins" name="browser_plugins_enabled"/>
-	<check_box initial_value="true" label="Aceitar cookies" name="cookies_enabled"/>
 	<check_box initial_value="true" label="Habilitar Javascript" name="browser_javascript_enabled"/>
 	<text name="Software updates:">
 		Atualizações de software:

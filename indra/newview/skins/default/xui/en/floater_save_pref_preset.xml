@@ -9,6 +9,10 @@
  title="Save Graphic Preset"
  width="300">
 
+    <string name="title_graphic">Save Graphic Preset</string>
+    <string name="title_camera">Save Camera Preset</string>
+    <string name="title_looks">Save Look</string>
+
     <text
      follows="top|left|right"
      height="32"

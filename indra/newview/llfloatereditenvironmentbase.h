@@ -47,6 +47,8 @@ class LLFloaterEditEnvironmentBase : public LLFloater
     friend class LLFixedSettingCopiedCallback;
 
 public:
+    AL_VIEW_TYPE(LLFloaterEditEnvironmentBase, LLFloater);
+
     static const std::string    KEY_INVENTORY_ID;
 
                             LLFloaterEditEnvironmentBase(const LLSD &key);
@@ -114,6 +116,8 @@ protected:
 class LLSettingsEditPanel : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLSettingsEditPanel, LLPanel);
+
     virtual void setSettings(const LLSettingsBase::ptr_t &) = 0;
 
     typedef boost::signals2::signal<void(LLPanel *, bool)> on_dirty_charged_sg;

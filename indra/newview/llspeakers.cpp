@@ -76,7 +76,7 @@ void LLSpeaker::lookupName()
 {
     if (mDisplayName.empty())
     {
-        LLAvatarNameCache::get(mID, boost::bind(&LLSpeaker::onNameCache, this, _1, _2)); // todo: can be group???
+        mAvatarNameCacheConnection = LLAvatarNameCache::get(mID, boost::bind(&LLSpeaker::onNameCache, this, _1, _2)); // todo: can be group???
     }
 }
 
@@ -404,7 +404,7 @@ void LLSpeakerMgr::update(bool resort_ok)
                 // reset inactivity expiration
                 if (speakerp->mStatus != LLSpeaker::STATUS_SPEAKING)
                 {
-                    speakerp->mLastSpokeTime = mSpeechTimer.getElapsedTimeF32();
+                    speakerp->mLastSpokeTime = mSpeechTimer.getElapsedTimeF64();
                     speakerp->mHasSpoken = true;
                     fireEvent(new LLSpeakerUpdateSpeakerEvent(speakerp), "update_speaker");
                 }
@@ -438,7 +438,7 @@ void LLSpeakerMgr::update(bool resort_ok)
         {
             if(speakerp->mType == LLSpeaker::SPEAKER_EXTERNAL)
             {
-                // external speakers should be timed out when they leave the voice channel (since they only exist via SLVoice)
+                // external speakers should be timed out when they leave the voice channel
                 speakerp->mStatus = LLSpeaker::STATUS_NOT_IN_CHANNEL;
             }
             else
@@ -647,7 +647,7 @@ void LLSpeakerMgr::speakerChatted(const LLUUID& speaker_id)
     LLPointer<LLSpeaker> speakerp = findSpeaker(speaker_id);
     if (speakerp.notNull())
     {
-        speakerp->mLastSpokeTime = mSpeechTimer.getElapsedTimeF32();
+        speakerp->mLastSpokeTime = mSpeechTimer.getElapsedTimeF64();
         speakerp->mHasSpoken = true;
         fireEvent(new LLSpeakerUpdateSpeakerEvent(speakerp), "update_speaker");
     }
@@ -867,9 +867,9 @@ void LLIMSpeakerMgr::moderationActionCoro(std::string url, LLSD action)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("moderationActionCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("moderationActionCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     httpOpts->setWantHeaders(true);
 
@@ -1026,10 +1026,6 @@ void LLLocalSpeakerMgr::updateSpeakerList()
     uuid_vec_t avatar_ids;
     std::vector<LLVector3d> positions;
     LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), CHAT_NORMAL_RADIUS);
-#ifdef LL_DISCORD
-    if (gSavedSettings.getBOOL("EnableDiscord"))
-        LLAppViewer::updateDiscordPartyCurrentSize((S32)avatar_ids.size());
-#endif
     for(U32 i=0; i<avatar_ids.size(); i++)
     {
         setSpeaker(avatar_ids[i]);

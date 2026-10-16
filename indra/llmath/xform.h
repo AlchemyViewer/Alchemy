@@ -28,6 +28,7 @@
 
 #include "v3math.h"
 #include "m4math.h"
+#include "llmatrix4a.h"
 #include "llquaternion.h"
 
 constexpr F32 MAX_OBJECT_Z      = 4096.f; // should match REGION_HEIGHT_METERS, Pre-havok4: 768.f
@@ -39,21 +40,6 @@ constexpr F32 MAX_PRIM_SCALE = 65536.f; // something very high but not near FLT_
 
 class LLXform
 {
-protected:
-    LLVector3     mPosition;
-    LLQuaternion  mRotation;
-    LLVector3     mScale;
-
-    //RN: TODO: move these world transform members to LLXformMatrix
-    // as they are *never* updated or accessed in the base class
-    LLVector3     mWorldPosition;
-    LLQuaternion  mWorldRotation;
-
-    LLXform*      mParent;
-    U32           mChanged;
-
-    bool          mScaleChildOffset;
-
 public:
     typedef enum e_changed_flags
     {
@@ -65,13 +51,28 @@ public:
         GEOMETRY    = 0x10,
         TEXTURE     = 0x20,
         MOVED       = TRANSLATED|ROTATED|SCALED,
-        SILHOUETTE  = 0x40,
-        ALL_CHANGED = 0x7f
+        ALL_CHANGED = 0x3f
     }EChangedFlags;
 
-    void init()
+protected:
+    LLVector3     mPosition {};
+    LLQuaternion  mRotation {};
+    LLVector3     mScale { 1.f, 1.f, 1.f };
+
+    //RN: TODO: move these world transform members to LLXformMatrix
+    // as they are *never* updated or accessed in the base class
+    LLVector3     mWorldPosition {};
+    LLQuaternion  mWorldRotation {};
+
+    LLXform*      mParent { nullptr };
+    U32           mChanged { UNCHANGED };
+
+    bool          mScaleChildOffset { false };
+
+public:
+    constexpr void init() noexcept
     {
-        mParent  = NULL;
+        mParent  = nullptr;
         mChanged = UNCHANGED;
         mPosition.setVec(0,0,0);
         mRotation.loadIdentity();
@@ -81,8 +82,8 @@ public:
         mScaleChildOffset = false;
     }
 
-     LLXform();
-    virtual ~LLXform();
+    constexpr LLXform() noexcept = default;
+    virtual constexpr ~LLXform() = default;
 
     void getLocalMat4(LLMatrix4 &mat) const { mat.initAll(mScale, mRotation, mPosition); }
 
@@ -130,20 +131,20 @@ public:
     const LLVector3&    getWorldPosition() const    { return mWorldPosition; }
 };
 
-class LLXformMatrix : public LLXform
+class alignas(16) LLXformMatrix : public LLXform
 {
 public:
     LLXformMatrix() : LLXform() {};
     virtual ~LLXformMatrix();
 
-    const LLMatrix4&    getWorldMatrix() const      { return mWorldMatrix; }
-    void setWorldMatrix (const LLMatrix4& mat)   { mWorldMatrix = mat; }
+    const LLMatrix4a&   getWorldMatrix() const      { return mWorldMatrix; }
+    void setWorldMatrix (const LLMatrix4a& mat)  { mWorldMatrix = mat; }
 
     void init()
     {
         mWorldMatrix.setIdentity();
-        mMin.clearVec();
-        mMax.clearVec();
+        mMin.clear();
+        mMax.clear();
 
         LLXform::init();
     }
@@ -153,9 +154,9 @@ public:
     void getMinMax(LLVector3& min,LLVector3& max) const;
 
 protected:
-    LLMatrix4   mWorldMatrix;
-    LLVector3   mMin;
-    LLVector3   mMax;
+    LLMatrix4a  mWorldMatrix;
+    LLVector4a  mMin;
+    LLVector4a  mMax;
 
 };
 

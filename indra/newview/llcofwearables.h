@@ -41,9 +41,10 @@ class LLPanelClothingListItem;
 class LLPanelBodyPartsListItem;
 class LLPanelDeletableWearableListItem;
 
-class LLCOFWearables : public LLPanel
+class LLCOFWearables final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLCOFWearables, LLPanel);
 
     /**
      * Represents a collection of callbacks assigned to inventory panel item's buttons
@@ -54,7 +55,7 @@ public:
         LLCOFCallbacks() {};
         virtual ~LLCOFCallbacks() {};
 
-        typedef boost::function<void ()> cof_callback_t;
+        typedef std::function<void()> cof_callback_t;
 
         cof_callback_t mAddWearable;
         cof_callback_t mMoveWearableCloser;
@@ -68,7 +69,7 @@ public:
     LLCOFWearables();
     virtual ~LLCOFWearables();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     LLUUID getSelectedUUID();
     bool getSelectedUUIDs(uuid_vec_t& selected_ids);
@@ -77,8 +78,8 @@ public:
     void getSelectedItems(std::vector<LLPanel*>& selected_items) const;
 
     /* Repopulate the COF wearables list if the COF category has been changed since the last refresh */
-    void refresh();
-    void clear();
+    void refresh() override;
+    void clear() override;
 
     LLAssetType::EType getExpandedAccordionAssetType();
     LLAssetType::EType getSelectedAccordionAssetType();
@@ -101,6 +102,12 @@ protected:
     void addClothingTypesDummies(const LLAppearanceMgr::wearables_by_type_t& clothing_by_type);
     void onSelectionChange(LLFlatListView* selected_list);
     void onAccordionTabStateChanged(LLUICtrl* ctrl, const LLSD& expanded);
+
+    // Clothing drag-to-reorder: only allow moves within the same wearable type,
+    // and translate a drop into a layer-order change.
+    bool canReorderClothing(const LLSD& dragged_value, const LLSD& neighbour_value);
+    void onClothingReordered(const LLSD& dragged_value, S32 new_index);
+    void onReorderEnded();
 
     LLPanelClothingListItem* buildClothingListItem(LLViewerInventoryItem* item, bool first, bool last);
     LLPanelBodyPartsListItem* buildBodypartListItem(LLViewerInventoryItem* item);
@@ -132,6 +139,9 @@ protected:
 
     /* COF category version since last refresh */
     S32 mCOFVersion;
+
+    /* a refresh arrived mid-drag and was skipped; re-run it when the drag ends */
+    bool mRefreshPending;
 };
 
 

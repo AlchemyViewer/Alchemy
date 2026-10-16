@@ -59,7 +59,9 @@ LLDragHandle::LLDragHandle(const LLDragHandle::Params& p)
     mMaxTitleWidth( 0 ),
     mForeground( true ),
     mDragHighlightColor(p.drag_highlight_color()),
-    mDragShadowColor(p.drag_shadow_color())
+    mDragShadowColor(p.drag_shadow_color()),
+    mFont(p.font),
+    mLabelVPad(p.label_vpad())
 
 {
     static LLUICachedControl<S32> snap_margin ("SnapMargin", 0);
@@ -77,6 +79,15 @@ void LLDragHandle::initFromParams(const LLDragHandle::Params& p)
 {
     LLView::initFromParams(p);
     setTitle( p.label );
+}
+
+void LLDragHandle::setForeground(bool b)
+{
+    mForeground = b;
+    if (mTitleBox)
+    {
+        mTitleBox->setEnabled(b);
+    }
 }
 
 void LLDragHandle::setTitleVisible(bool visible)
@@ -98,17 +109,17 @@ void LLDragHandleTop::setTitle(const std::string& title)
     }
     else
     {
-        const LLFontGL* font = LLFontGL::getFontSansSerif();
         LLTextBox::Params params;
         params.name("Drag Handle Title");
         params.rect(getRect());
         params.initial_value(trimmed_title);
-        params.font(font);
+        params.font(mFont);
         params.follows.flags(FOLLOWS_TOP | FOLLOWS_LEFT | FOLLOWS_RIGHT);
-        params.font_shadow(LLFontGL::DROP_SHADOW_SOFT);
+        params.font_shadow(LLFontGL::NO_SHADOW);
         params.use_ellipses = true;
         params.parse_urls = false; //cancel URL replacement in floater title
         mTitleBox = LLUICtrlFactory::create<LLTextBox> (params);
+        mTitleBox->setEnabled(getForeground());
         addChild( mTitleBox );
     }
 
@@ -180,12 +191,6 @@ void LLDragHandleTop::draw()
     }
     */
 
-    // Colorize the text to match the frontmost state
-    if (mTitleBox)
-    {
-        mTitleBox->setEnabled(getForeground());
-    }
-
     LLView::draw();
 }
 
@@ -225,18 +230,11 @@ void LLDragHandleLeft::draw()
     }
     */
 
-    // Colorize the text to match the frontmost state
-    if (mTitleBox)
-    {
-        mTitleBox->setEnabled(getForeground());
-    }
-
     LLView::draw();
 }
 
 void LLDragHandleTop::reshapeTitleBox()
 {
-    static LLUICachedControl<S32> title_vpad("UIFloaterTitleVPad", 0);
     if( ! mTitleBox)
     {
         return;
@@ -248,7 +246,7 @@ void LLDragHandleTop::reshapeTitleBox()
     LLRect title_rect;
     title_rect.setLeftTopAndSize(
         LEFT_PAD,
-        getRect().getHeight() - title_vpad,
+        getRect().getHeight() - mLabelVPad,
         title_width,
         title_height);
 
@@ -260,11 +258,6 @@ void LLDragHandleTop::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLView::reshape(width, height, called_from_parent);
     reshapeTitleBox();
-}
-
-void LLDragHandleLeft::reshape(S32 width, S32 height, bool called_from_parent)
-{
-    LLView::reshape(width, height, called_from_parent);
 }
 
 //-------------------------------------------------------------
@@ -315,7 +308,7 @@ bool LLDragHandle::handleHover(S32 x, S32 y, MASK mask)
         S32 delta_y = screen_y - mDragLastScreenY;
 
         // if dragging a docked floater we want to undock
-        LLFloater * parent = dynamic_cast<LLFloater *>(getParent());
+        LLFloater * parent = getParentAs<LLFloater>();
         if (parent && parent->isDocked())
         {
             const S32 SLOP = 12;
@@ -365,13 +358,19 @@ bool LLDragHandle::handleHover(S32 x, S32 y, MASK mask)
         mDragLastScreenX += delta_x;
         mDragLastScreenY += delta_y;
 
-        getWindow()->setCursor(UI_CURSOR_ARROW);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_ARROW);
+        }
         LL_DEBUGS("UserInput") << "hover handled by " << getName() << " (active)" <<LL_ENDL;
         handled = true;
     }
     else
     {
-        getWindow()->setCursor(UI_CURSOR_ARROW);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_ARROW);
+        }
         LL_DEBUGS("UserInput") << "hover handled by " << getName() << " (inactive)" << LL_ENDL;
         handled = true;
     }

@@ -329,6 +329,10 @@ void LLAvatarIconCtrl::processProperties(void* data, EAvatarProcessorType type)
                 return;
             }
 
+// [SL:KB] - Patch: Control-AvatarIconCtrl | Checked: 2014-02-20 (Catznip-3.7)
+            LLAvatarPropertiesProcessor::getInstance()->removeObserver(mAvatarId, this);
+// [/SL:KB]
+
             LLAvatarIconIDCache::getInstance()->add(mAvatarId, avatar_data->image_id);
             updateFromCache();
         }

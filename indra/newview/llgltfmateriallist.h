@@ -32,11 +32,10 @@
 #include "llgltfmaterial.h"
 #include "llpointer.h"
 
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 class LLFetchedGLTFMaterial;
 class LLGLTFOverrideCacheEntry;
-class LLViewerObject;
 
 class LLGLTFMaterialList
 {
@@ -135,11 +134,11 @@ protected:
         S32 status,
         LLExtStat ext_status);
 
-    typedef boost::unordered_map<LLUUID, LLPointer<LLFetchedGLTFMaterial > > uuid_mat_map_t;
+    typedef boost::unordered_map<LLUUID, LLPointer<LLFetchedGLTFMaterial>> uuid_mat_map_t;
     uuid_mat_map_t mList;
 
     typedef std::vector<LLPointer<LLGLTFMaterial> > override_list_t;
-    typedef boost::unordered_map<LLUUID, override_list_t > queued_override_map_t;
+    typedef boost::unordered_map<LLUUID, override_list_t> queued_override_map_t;
     queued_override_map_t mQueuedOverrides;
 
     LLUUID mLastUpdateKey;

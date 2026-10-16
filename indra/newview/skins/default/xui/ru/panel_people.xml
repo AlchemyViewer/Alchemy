@@ -15,9 +15,6 @@
 		Не нашли того, что вам нужно? Воспользуйтесь [secondlife:///app/search/people/[SEARCH_TERM] поиском].
 	</string>
 	<string name="no_filtered_groups_msg" value="Не нашли того, что вам нужно? Воспользуйтесь [secondlife:///app/search/groups/[SEARCH_TERM] поиском]."/>
-	<string name="no_groups_msg" value="Ищете группу, чтобы присоединиться к ней? Воспользуйтесь [secondlife:///app/search/groups поиском]."/>
-	<string name="MiniMapToolTipMsg" value="[REGION](Двойной щелчок открывает карту, shift+перетягивание – обзор)"/>
-	<string name="AltMiniMapToolTipMsg" value="[REGION](Двойной щелчок – телепортация, shift+перетягивание – обзор)"/>
 	<string name="GroupCountWithInfo" value="Вы состоите в [COUNT] группах, и можете присоединиться еще к [REMAINING]. [secondlife:/// Расширить свои лимиты]"/>
 	<tab_container name="tabs">
 		<panel label="РЯДОМ" name="nearby_panel">
@@ -40,7 +37,6 @@
 			<accordion name="friends_accordion">
 				<accordion_tab name="tab_online" title="Онлайн"/>
 				<accordion_tab name="tab_all" title="Все"/>
-				<accordion_tab name="tab_suggested_friends" title="С кем вы можете подружиться"/>
 			</accordion>
 		</panel>
 		<panel label="ГРУППЫ" name="groups_panel">
@@ -63,9 +59,6 @@
 				<button name="add_friend_btn" tool_tip="Предложить жителю дружбу"/>
 				<dnd_button name="recent_del_btn" tool_tip="Удалить выбранного пользователя из друзей"/>
 			</panel>
-		</panel>
-		<panel label="БЛОКИРОВАН" name="blocked_panel">
-			<panel label="Черный список жителей и объектов" name="panel_block_list_sidetray"/>
 		</panel>
 	</tab_container>
 </panel>

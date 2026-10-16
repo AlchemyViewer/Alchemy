@@ -40,20 +40,22 @@ class LLCheckBoxCtrl;
 
 //////////////////////////////////////////////////////////////////////////////
 // floater class
-class LLFloaterColorPicker
+class LLFloaterColorPicker final
     : public LLFloater
 {
     public:
+    AL_VIEW_TYPE(LLFloaterColorPicker, LLFloater);
+
         LLFloaterColorPicker (LLColorSwatchCtrl* swatch, bool show_apply_immediate = false);
         virtual ~LLFloaterColorPicker ();
 
         // overrides
-        virtual bool postBuild ();
-        virtual void draw ();
-        virtual bool handleMouseDown ( S32 x, S32 y, MASK mask );
-        virtual bool handleMouseUp ( S32 x, S32 y, MASK mask );
-        virtual bool handleHover ( S32 x, S32 y, MASK mask );
-        virtual void onMouseCaptureLost();
+        virtual bool postBuild () override;
+        virtual void draw () override;
+        virtual bool handleMouseDown ( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleMouseUp ( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleHover ( S32 x, S32 y, MASK mask ) override;
+        virtual void onMouseCaptureLost() override;
         virtual F32  getSwatchTransparency();
 
         // implicit methods
@@ -122,12 +124,16 @@ class LLFloaterColorPicker
                void onClickPipette ( );
         static void onTextCommit ( LLUICtrl* ctrl, void* data );
         static void onImmediateCheck ( LLUICtrl* ctrl, void* data );
-               void onColorSelect( const class LLTextureEntry& te );
+               void onColorSelect(bool success, const class LLTextureEntry& te);
         void menuDoToSelected(const LLSD& userdata);
     private:
         // mutators for color values, can raise event to preview changes at object
         void selectCurRgb ( F32 curRIn, F32 curGIn, F32 curBIn );
         void selectCurHsl ( F32 curHIn, F32 curSIn, F32 curLIn );
+
+        // utility functions for manipulating hex colors
+        bool isValidHexColor(std::string& hex_color, F32& hr, F32& hg, F32& hb);
+
         // draws color selection palette
         void drawPalette ();
 
@@ -193,11 +199,11 @@ class LLFloaterColorPicker
 
         LLButton* mPipetteBtn;
 
+
         F32       mContextConeOpacity;
         F32       mContextConeInAlpha;
         F32       mContextConeOutAlpha;
         F32       mContextConeFadeTime;
-
 };
 
 #endif // LL_LLFLOATERCOLORPICKER_H

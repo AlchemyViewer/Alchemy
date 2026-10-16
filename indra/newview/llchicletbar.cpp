@@ -32,7 +32,7 @@
 #include "llpaneltopinfobar.h"
 #include "llsyswellwindow.h"
 #include "llfloaternotificationstabbed.h"
-#include "lllegacynotificationwellwindow.h"
+#include "allegacynotificationwellwindow.h"
 
 namespace
 {
@@ -53,7 +53,7 @@ bool LLChicletBar::postBuild()
 
     if (gSkinSettings.getBOOL("LegacyNotificationWell"))
     {
-        showWellButton("notification_well", !LLLegacyNotificationWellWindow::getInstance()->isWindowEmpty());
+        showWellButton("notification_well", !ALLegacyNotificationWellWindow::getInstance()->isWindowEmpty());
     }
     else
     {

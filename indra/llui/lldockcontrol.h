@@ -32,9 +32,10 @@
 #include "llfloater.h"
 #include "lluiimage.h"
 
+class LLDockableFloater;
+
 /**
  * Provides services for docking of specified floater.
- * This class should be used in case impossibility deriving from LLDockableFloater.
  */
 class LLDockControl
 {
@@ -49,11 +50,11 @@ public:
 
 public:
     // callback for a function getting a rect valid for control's position
-    typedef boost::function<void (LLRect& )> get_allowed_rect_callback_t;
+    typedef std::function<void (LLRect& )> get_allowed_rect_callback_t;
 
     LOG_CLASS(LLDockControl);
-    LLDockControl(LLView* dockWidget, LLFloater* dockableFloater,
-            const LLUIImagePtr& dockTongue, DocAt dockAt, get_allowed_rect_callback_t get_rect_callback = NULL);
+    LLDockControl(LLView* dockWidget, LLDockableFloater* dockableFloater,
+            const LLUIImagePtr& dockTongue, DocAt dockAt, get_allowed_rect_callback_t get_rect_callback = nullptr);
     virtual ~LLDockControl();
 
 public:
@@ -88,7 +89,7 @@ private:
     LLRect mPrevDockRect;
     LLRect mRootRect;
     LLRect mFloaterRect;
-    LLFloater* mDockableFloater;
+    LLDockableFloater* mDockableFloater;
     LLUIImagePtr mDockTongue;
     S32 mDockTongueX;
     S32 mDockTongueY;

@@ -48,6 +48,7 @@ LLBlockList::LLBlockList(const Params& p)
 
     LLMuteList::getInstance()->addObserver(this);
     mMuteListSize = static_cast<U32>(LLMuteList::getInstance()->getMutes().size());
+    updateNoItemsCommentText();
 
     // Set up context menu.
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registrar;
@@ -101,8 +102,35 @@ BlockListActionType LLBlockList::getCurrentMuteListActionType()
     return type;
 }
 
+void LLBlockList::updateNoItemsCommentText()
+{
+    const LLMuteList* mute_list = LLMuteList::getInstance();
+    if (!mute_list->isLoaded() && !mute_list->isFailed())
+    {
+        setNoItemsCommentText(mLoadingItemsMsg);
+    }
+    else if (mute_list->isFailed())
+    {
+        setNoItemsCommentText(mFailedItemsMsg);
+    }
+    else
+    {
+        updateNoItemsMessage(mNameFilter);
+    }
+}
+
+void LLBlockList::onChange()
+{
+    // Something changed, not sure what so force a refresh.
+    mShouldAddAll = true;
+    mActionType = NONE;
+    updateNoItemsCommentText();
+    setDirty();
+}
+
 void LLBlockList::onChangeDetailed(const LLMute &mute)
 {
+    updateNoItemsCommentText();
     mActionType = getCurrentMuteListActionType();
 
     mCurItemId = mute.mID;
@@ -197,6 +225,7 @@ void LLBlockList::addNewItem(const LLMute* mute)
 
 void LLBlockList::refresh()
 {
+    updateNoItemsCommentText();
     bool have_filter = !mNameFilter.empty();
 
     // save selection to restore it after list rebuilt
@@ -208,6 +237,8 @@ void LLBlockList::refresh()
         clear();
         createList();
         mShouldAddAll = false;
+        // Full rebuild supersedes any queued incremental action. This ensures list consistency.
+        mActionType = NONE;
     }
     else
     {
@@ -244,9 +275,11 @@ void LLBlockList::refresh()
 
         for(; it != allItems.end() ; ++it)
         {
-            LLBlockedListItem * curItem = dynamic_cast<LLBlockedListItem *> (*it);
+            LLBlockedListItem * curItem = (*it)->as<LLBlockedListItem>();
             if(curItem)
-    {
+            {
+                // Refresh item text styling each pass so filtering keeps highlight in sync.
+                curItem->highlightName(mNameFilter);
                 hideListItem(curItem, findInsensitive(curItem->getName(), mNameFilter));
             }
         }
@@ -283,7 +316,7 @@ bool LLBlockList::findInsensitive(std::string haystack, const std::string& needl
 LLBlockedListItem* LLBlockList::getBlockedItem() const
 {
     LLPanel* panel = LLFlatListView::getSelectedItem();
-    LLBlockedListItem* item = dynamic_cast<LLBlockedListItem*>(panel);
+    LLBlockedListItem* item = ALViewType::as<LLBlockedListItem>(panel);
     return item;
 }
 
@@ -420,8 +453,8 @@ void LLBlockList::toggleMute(U32 flags)
 
 bool LLBlockListItemComparator::compare(const LLPanel* item1, const LLPanel* item2) const
 {
-    const LLBlockedListItem* blocked_item1 = dynamic_cast<const LLBlockedListItem*>(item1);
-    const LLBlockedListItem* blocked_item2 = dynamic_cast<const LLBlockedListItem*>(item2);
+    const LLBlockedListItem* blocked_item1 = ALViewType::as<LLBlockedListItem>(item1);
+    const LLBlockedListItem* blocked_item2 = ALViewType::as<LLBlockedListItem>(item2);
 
     if (!blocked_item1 || !blocked_item2)
     {

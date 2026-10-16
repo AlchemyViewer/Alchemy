@@ -73,8 +73,20 @@ public:
 
     virtual bool                showAllResults() const = 0;
 
-    virtual std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const = 0;
-    virtual std::string::size_type getFilterStringSize() const = 0;
+    // Where a filter's match falls within an item's label, as BYTE offsets into
+    // that label -- the same offsets LLFolderViewItem hands to the font's
+    // getWidthBytes / renderBytes. A filter searches a cased copy of the name
+    // and casing UTF-8 is not length-preserving, so an offset found in that copy
+    // has to come back through utf8str_bytes_from_cased_bytes before it can be
+    // reported here. Both halves depend on the item and on each other, so they
+    // are answered together rather than as two queries that would repeat the
+    // same search and the same walk of the label.
+    struct Match
+    {
+        std::string::size_type mOffset = std::string::npos;
+        std::string::size_type mLength = 0;
+    };
+    virtual Match getFilterMatch(LLFolderViewModelItem* item) const = 0;
     // +-------------------------------------------------------------------+
     // + Status
     // +-------------------------------------------------------------------+
@@ -293,6 +305,16 @@ public:
 
     virtual void addChild(LLFolderViewModelItem* child) override
     {
+        // Nothing contains itself. Taken as a child it would become its own
+        // parent, and every walk up the parents from anywhere under it --
+        // dirtyFilter is one, and it starts here -- would never end. The
+        // caller has confused two items for one; hanging is a poor way to
+        // say so.
+        if (child == this)
+        {
+            LL_WARNS() << "a folder view item was told to contain itself" << LL_ENDL;
+            return;
+        }
         mChildren.push_back(child);
         child->setParent(this);
         dirtyFilter();
@@ -432,11 +454,11 @@ public:
 
     virtual SortType& getSorter()                    { return *mSorter; }
     virtual const SortType& getSorter() const        { return *mSorter; }
-    virtual void setSorter(const SortType& sorter)   { mSorter.reset(new SortType(sorter)); requestSortAll(); }
+    virtual void setSorter(const SortType& sorter)   { mSorter = std::make_unique<SortType>(sorter); requestSortAll(); }
 
     virtual FilterType& getFilter() override                  { return *mFilter; }
     virtual const FilterType& getFilter() const override      { return *mFilter; }
-    virtual void setFilter(const FilterType& filter) { mFilter.reset(new FilterType(filter)); }
+    virtual void setFilter(const FilterType& filter) { mFilter = std::make_unique<FilterType>(filter); }
 
     // By default, we assume the content is available. If a network fetch mechanism is implemented for the model,
     // this method needs to be overloaded and return the relevant fetch status.

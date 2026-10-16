@@ -50,10 +50,21 @@ public:
         Optional<LLUIImage*>            image;
         Optional<std::string>           link_href;
         Optional<bool>                  is_link;
+        Optional<bool>                  use_default_link_style;
         Optional<bool>                  draw_highlight_bg;
         Params();
     };
-    LLStyle(const Params& p = Params());
+
+    // The instance that means "the caller supplied no style of its own".
+    //
+    // A callee that wants to skip work when nothing changed has to tell that
+    // apart from a style whose fields all happen to hold their defaults, and
+    // LLInitParam blocks cannot be compared for equality. So it is told by
+    // identity: this is what the default arguments below resolve to, and a
+    // callee compares the address it was handed against this one.
+    static const Params& defaultParams();
+
+    LLStyle(const Params& p = defaultParams());
 
     enum EUnderlineLink
     {
@@ -122,7 +133,6 @@ protected:
     ~LLStyle() = default;
 
 private:
-    std::string         mFontName;
     std::string         mLink;
     LLUIColor           mColor;
     LLUIColor           mReadOnlyColor;

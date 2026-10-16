@@ -121,6 +121,14 @@ const std::string alt_prefixes[] = {
     "water",
 };
 
+const std::string alt_panels[] = {
+    "pnl_alt1",
+    "pnl_alt2",
+    "pnl_alt3",
+    "pnl_ground",
+    "pnl_water",
+};
+
 static LLDefaultChildRegistry::Register<LLSettingsDropTarget> r("settings_drop_target");
 
 //=========================================================================
@@ -924,7 +932,7 @@ void LLPanelEnvironmentInfo::udpateApparentTimeOfDay()
     }
     mLabelApparentTime->setVisible(true);
 
-    S32Seconds now((S32)LLDate::now().secondsSinceEpoch());
+    S32Seconds now((S32)time_corrected());
 
     now += mCurrentEnvironment->mDayOffset;
 
@@ -1092,7 +1100,7 @@ void LLPanelEnvironmentInfo::onEnvironmentChanged(LLEnvironment::EnvSelection_t 
     else if ((env == LLEnvironment::ENV_PARCEL)
              && (getParcelId() == LLViewerParcelMgr::instance().getAgentParcelId()))
     {
-        if (getParcel())
+        if (LLParcel* parcel = getParcel())
         {
             // first for parcel own settings, second is for case when parcel uses region settings
             if (mCurEnvVersion < new_version

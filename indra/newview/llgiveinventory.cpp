@@ -453,14 +453,11 @@ bool LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
     gAgent.sendReliableMessage();
 
     // VEFFECT: giveInventory
-    if (!gSavedSettings.getBOOL("EnableSelectionHints"))
-    {
-        LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
-        effectp->setSourceObject(gAgentAvatarp);
-        effectp->setTargetObject(gObjectList.findObject(to_agent));
-        effectp->setDuration(LL_HUD_DUR_SHORT);
-        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-    }
+    LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+    effectp->setSourceObject(gAgentAvatarp);
+    effectp->setTargetObject(gObjectList.findObject(to_agent));
+    effectp->setDuration(LL_HUD_DUR_SHORT);
+    effectp->setColor(LLColor4U(gAgent.getEffectColor()));
 
     if (gFloaterTools)
     {
@@ -478,8 +475,8 @@ bool LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
     if ( (!RlvActions::isRlvEnabled()) ||
          (RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) || (im_session_id.notNull()) || (!RlvUtil::isNearbyAgent(to_agent)) || (RlvUIEnabler::hasOpenProfile(to_agent)) )
     {
-        LLRecentPeople::instance().add(to_agent);
-    }
+    LLRecentPeople::instance().add(to_agent);
+}
     return true;
 // [/RLVa:KB]
 }
@@ -568,7 +565,7 @@ bool LLGiveInventory::commitGiveInventoryCategory(const LLUUID& to_agent,
     if ( (!RlvActions::isRlvEnabled()) ||
          (RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) || (im_session_id.notNull()) || (!RlvUtil::isNearbyAgent(to_agent)) || (RlvUIEnabler::hasOpenProfile(to_agent)) )
     {
-        LLRecentPeople::instance().add(to_agent);
+    LLRecentPeople::instance().add(to_agent);
     }
 // [/RLVa:KB]
 
@@ -650,14 +647,11 @@ bool LLGiveInventory::commitGiveInventoryCategory(const LLUUID& to_agent,
         delete[] bucket;
 
         // VEFFECT: giveInventoryCategory
-        if (!gSavedSettings.getBOOL("EnableSelectionHints"))
-        {
-            LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
-            effectp->setSourceObject(gAgentAvatarp);
-            effectp->setTargetObject(gObjectList.findObject(to_agent));
-            effectp->setDuration(LL_HUD_DUR_SHORT);
-            effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-        }
+        LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+        effectp->setSourceObject(gAgentAvatarp);
+        effectp->setTargetObject(gObjectList.findObject(to_agent));
+        effectp->setDuration(LL_HUD_DUR_SHORT);
+        effectp->setColor(LLColor4U(gAgent.getEffectColor()));
 
         if (gFloaterTools)
         {

@@ -32,18 +32,17 @@
 #include "v4math.h"
 #include "m4math.h"
 #include <queue>
-
-#include <boost/align/aligned_allocator.hpp>
+#include <unordered_map>
 
 class daeElement;
 class domMesh;
 
 #define MAX_MODEL_FACES 8
 
-LL_ALIGN_PREFIX(16)
-class LLMeshSkinInfo : public LLRefCount
+// Thread-safe refcount because the mesh repository shares one instance between the main
+// thread and the mesh worker threads rather than mirroring it -- see mFrozen below.
+class alignas(16) LLMeshSkinInfo : public LLThreadSafeRefCount
 {
-    LL_ALIGN_NEW
 public:
     LLMeshSkinInfo();
     LLMeshSkinInfo(LLSD& data);
@@ -65,19 +64,27 @@ public:
     // cached multiply of mBindShapeMatrix and mInvBindMatrix
     matrix_list_t mBindPoseMatrix;
 
-    LL_ALIGN_16(LLMatrix4a mBindShapeMatrix);
+    LLMatrix4a mBindShapeMatrix;
 
     float mPelvisOffset;
     bool mLockScaleIfJointPosition;
     bool mInvalidJointsScrubbed;
     bool mJointNumsInitialized;
     U64 mHash = 0;
-} LL_ALIGN_POSTFIX(16);
 
-LL_ALIGN_PREFIX(16)
-class LLModel : public LLVolume
+    // Set before this skin is handed to more than one thread. mJointNums and
+    // mJointNumsInitialized are the only fields written after construction, by
+    // LLSkinningUtil::initJointNums(); freezing resolves them once against the skeleton
+    // and makes that function a no-op, so a frozen skin has no mutable state left and
+    // the same instance can be shared instead of copied.
+    //
+    // It says nothing about who currently holds the skin. Do not read it as a proxy for
+    // membership of any cache.
+    bool mFrozen = false;
+};
+
+class alignas(16) LLModel : public LLVolume
 {
-    LL_ALIGN_NEW
 public:
 
     enum
@@ -292,6 +299,42 @@ public:
     //get list of weight influences closest to given position
     weight_list& getJointInfluences(const LLVector3& pos);
 
+    // O(1) accelerator for getJointInfluences(). That function linearly scans
+    // mSkinWeights, so calling it once per vertex (writeModel, LOD vertex-buffer
+    // fill, local-mesh preview) is O(V^2) and stalls the main thread for seconds
+    // on a dense rigged mesh. Build one of these once before a per-vertex loop,
+    // then call influences() per vertex for an O(1) lookup -- making the weight
+    // pass O(V). It snapshots pointers into the model's current mSkinWeights, so
+    // construct it after the weights are final and do not mutate mSkinWeights
+    // while it is alive. A position with no key within the weld epsilon falls
+    // back to getJointInfluences() (preserving its exact-find / closest-point
+    // path), so results are identical to calling that function directly.
+    class JointWeightCache
+    {
+    public:
+        explicit JointWeightCache(LLModel& model);
+        const weight_list& influences(const LLVector3& pos) const;
+
+    private:
+        static constexpr F32 WELD_EPSILON = 1e-5f; // == jointPositionalLookup()'s tolerance
+        struct CellKey
+        {
+            S32 x, y, z;
+            bool operator==(const CellKey& o) const { return x == o.x && y == o.y && z == o.z; }
+        };
+        struct CellHash
+        {
+            size_t operator()(const CellKey& k) const
+            {
+                return (size_t)(((U32)k.x * 73856093u) ^ ((U32)k.y * 19349663u) ^ ((U32)k.z * 83492791u));
+            }
+        };
+        static CellKey cellKey(const LLVector3& p);
+
+        LLModel& mModel;
+        std::unordered_map<CellKey, std::vector<const weight_map::value_type*>, CellHash> mCells;
+    };
+
     LLMeshSkinInfo mSkinInfo;
 
     std::string mRequestedLabel; // name requested in UI, if any.
@@ -323,7 +366,7 @@ public:
     // A model/object can only have 8 faces, spillover faces will
     // be moved to new model/object and assigned a submodel id.
     int mSubmodelID;
-} LL_ALIGN_POSTFIX(16);
+};
 
 typedef std::vector<LLPointer<LLModel> >    model_list;
 typedef std::queue<LLPointer<LLModel> > model_queue;

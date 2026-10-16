@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -26,20 +29,24 @@
 
 #include "linden_common.h"
 
+#include <unordered_set>
+
 #include "llfontfreetype.h"
 #include "llfontgl.h"
 
 // Freetype stuff
+#include <plutosvg-ft.h>
 #include <ft2build.h>
-#ifdef LL_WINDOWS
-#include <freetype2\freetype\ftsystem.h>
-#endif
-#include "llfontfreetypesvg.h"
-
-// For some reason, this won't work if it's not wrapped in the ifdef
-#ifdef FT_FREETYPE_H
 #include FT_FREETYPE_H
-#endif
+#include FT_MODULE_H
+#include FT_MULTIPLE_MASTERS_H
+
+// Harfbuzz
+#include <hb.h>
+#include <hb-ft.h>
+
+#include "alfontcolrv1.h"
+#include "alfontshaping.h"
 
 #include "lldir.h"
 #include "llerror.h"
@@ -51,10 +58,9 @@
 //#include "imdebug.h"
 #include "llfontbitmapcache.h"
 #include "llgl.h"
+#include "llwindow.h"
 
 #define ENABLE_OT_SVG_SUPPORT
-
-FT_Render_Mode gFontRenderMode = FT_RENDER_MODE_NORMAL;
 
 LLFontManager *gFontManagerp = nullptr;
 
@@ -78,30 +84,49 @@ void LLFontManager::cleanupClass()
 
 LLFontManager::LLFontManager()
 {
+    LL_INFOS() << "Harfbuzz version: " << hb_version_string() << LL_ENDL;
+
     int error;
     error = FT_Init_FreeType(&gFTLibrary);
     if (error)
     {
-        // Clean up freetype libs.
+        // LL_ERRS aborts; FT_Done_FreeType on a failed init is UB anyway.
         LL_ERRS() << "Freetype initialization failure!" << LL_ENDL;
-        FT_Done_FreeType(gFTLibrary);
     }
 
+    FT_Int major, minor, patch;
+    FT_Library_Version(gFTLibrary, &major, &minor, &patch);
+    LL_INFOS() << "Freetype version: " << major << "." << minor << "." << patch << LL_ENDL;
+
 #ifdef ENABLE_OT_SVG_SUPPORT
-    SVG_RendererHooks hooks = {
-        LLFontFreeTypeSvgRenderer::OnInit,
-        LLFontFreeTypeSvgRenderer::OnFree,
-        LLFontFreeTypeSvgRenderer::OnRender,
-        LLFontFreeTypeSvgRenderer::OnPresetGlypthSlot,
-    };
-    FT_Property_Set(gFTLibrary, "ot-svg", "svg-hooks", &hooks);
+    FT_Property_Set(gFTLibrary, "ot-svg", "svg-hooks", &plutosvg_ft_hooks);
 #endif
+
+    // Disable FT's stem darkening on every hinter module. Stem darkening
+    // assumes gamma-correct (linear-space) compositing — the renderer here
+    // blends fonts in sRGB space (no linearization in the UI font shaders),
+    // so darkened stems would over-thicken against our blend curve. The
+    // autofitter is off by default in FT 2.7+, but cff/type1/t1cid all
+    // default ON; a CFF font loaded with EFontHinting::DEFAULT would pick
+    // up unwanted darkening without these explicit overrides.
+    {
+        FT_Bool no_darken = 1;
+        FT_Property_Set(gFTLibrary, "autofitter", "no-stem-darkening", &no_darken);
+        FT_Property_Set(gFTLibrary, "cff",        "no-stem-darkening", &no_darken);
+        FT_Property_Set(gFTLibrary, "type1",      "no-stem-darkening", &no_darken);
+        FT_Property_Set(gFTLibrary, "t1cid",      "no-stem-darkening", &no_darken);
+    }
 }
 
 LLFontManager::~LLFontManager()
 {
-    FT_Done_FreeType(gFTLibrary);
+    // Order matters: cached ALFontFace instances hold FT_Face pointers
+    // owned by gFTLibrary. Tearing those down (FT_Done_Face) requires the
+    // library to still be alive, so drop the face cache (and bytes) first
+    // and only then destroy the library.
     unloadAllFonts();
+    FT_Done_FreeType(gFTLibrary);
+    gFTLibrary = nullptr;
 }
 
 
@@ -112,36 +137,39 @@ LLFontGlyphInfo::LLFontGlyphInfo(U32 index, EFontGlyphType glyph_type)
     mHeight(0),         // In pixels
     mXAdvance(0.f),     // In pixels
     mYAdvance(0.f),     // In pixels
-    mXBitmapOffset(0),  // Offset to the origin in the bitmap
-    mYBitmapOffset(0),  // Offset to the origin in the bitmap
     mXBearing(0),       // Distance from baseline to left in pixels
     mYBearing(0),       // Distance from baseline to top in pixels
-    mBitmapEntry(std::make_pair(EFontGlyphType::Unspecified, -1)) // Which bitmap in the bitmap cache contains this glyph
+    mPhaseCount(1)
 {
+    // mPhaseSlots default-construct (zeroed PhaseSlot per element).
 }
 
 LLFontGlyphInfo::LLFontGlyphInfo(const LLFontGlyphInfo& fgi)
     : mGlyphIndex(fgi.mGlyphIndex)
     , mGlyphType(fgi.mGlyphType)
+    , mSourceFace(fgi.mSourceFace)
     , mWidth(fgi.mWidth)
     , mHeight(fgi.mHeight)
     , mXAdvance(fgi.mXAdvance)
     , mYAdvance(fgi.mYAdvance)
-    , mXBitmapOffset(fgi.mXBitmapOffset)
-    , mYBitmapOffset(fgi.mYBitmapOffset)
     , mXBearing(fgi.mXBearing)
     , mYBearing(fgi.mYBearing)
+    , mPhaseSlots(fgi.mPhaseSlots)
+    , mPhaseCount(fgi.mPhaseCount)
 {
-    mBitmapEntry = fgi.mBitmapEntry;
+    // mSourceFace MUST propagate: the secondary-publish path in
+    // addShapedGlyphFromFont copies an existing entry and republishes it
+    // under the actual bitmap_glyph_type, and the renderer reads
+    // sfgi->mSourceFace to pick the atlas. A null here produces a silent
+    // no-op render for typed lookups that hit the dup.
 }
 
 LLFontFreetype::LLFontFreetype()
-:   mFontBitmapCachep(new LLFontBitmapCache),
-    mAscender(0.f),
+:   mAscender(0.f),
     mDescender(0.f),
     mLineHeight(0.f),
     mIsFallback(false),
-    mFTFace(nullptr),
+    mHinting(EFontHinting::FORCE_AUTOHINT),
     mRenderGlyphCount(0),
     mStyle(0),
     mPointSize(0)
@@ -151,101 +179,258 @@ LLFontFreetype::LLFontFreetype()
 
 LLFontFreetype::~LLFontFreetype()
 {
-    // Clean up freetype libs.
-    if (mFTFace)
-        FT_Done_Face(mFTFace);
-    mFTFace = nullptr;
+    // The shape cache holds ALShapedGlyph entries keyed on
+    // (LLFontFreetype*, glyph_index); ours are about to dangle. Other
+    // faces' entries stay valid, so only drop ours.
+    ALFontShaping::clearCacheForFace(this);
 
-    // Delete glyph info
-    std::for_each(mCharGlyphInfoMap.begin(), mCharGlyphInfoMap.end(), DeletePairedPointer());
-    mCharGlyphInfoMap.clear();
+    // mFace's FT_Face, hb_font_t, and atlas lifetime is owned by the
+    // ALFontFace wrapper — releasing the LLPointer here lets the wrapper
+    // drop its refcount; FT_Done_Face and atlas teardown fire when the
+    // last LLFontFreetype that referenced it is destroyed.
+    mFace = nullptr;
 
-    delete mFontBitmapCachep;
-    // mFallbackFonts cleaned up by LLPointer destructor
+    // mFallbackFonts cleaned up by LLPointer destructor.
 }
 
-bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n)
+hb_font_t* LLFontFreetype::getHbFont() const
 {
-    // Don't leak face objects.  This is also needed to deal with
-    // changed font file names.
-    if (mFTFace)
+    return mFace ? mFace->getHbFont() : nullptr;
+}
+
+bool LLFontFreetype::isFixedWidth() const
+{
+    return mFace && mFace->isFixedWidth();
+}
+
+bool LLFontFreetype::wghtAxisSet() const
+{
+    return mFace && mFace->wghtAxisSet();
+}
+
+namespace
+{
+    // Walk a fallback list and return the (face, glyph_index) for the first
+    // entry where `keep(functor)` returns true AND the face's charmap has
+    // `wch`. Returns (nullptr, 0) when no entry hits.
+    //
+    // This is the iteration mechanic shared between the codepoint-path
+    // (getGlyphInfo) and shape-path (selectShapingFace) chain walks. The
+    // two policies still differ — see each call site for which passes run
+    // and why — but the per-pass loop is identical and lives here.
+    template <typename Keep>
+    std::pair<const LLFontFreetype*, U32>
+    find_fallback_hit(const LLFontFreetype::fallback_font_vector_t& fallbacks,
+                      llwchar wch, Keep keep)
     {
-        FT_Done_Face(mFTFace);
-        mFTFace = nullptr;
+        for (const auto& pair : fallbacks)
+        {
+            if (!keep(pair.second))
+                continue;
+            U32 gi = pair.first->getCharGlyphIndex(wch);
+            if (gi)
+                return { pair.first.get(), gi };
+        }
+        return { nullptr, 0u };
+    }
+}
+
+const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_glyph_index) const
+{
+    out_glyph_index = 0;
+    if (!getFTFace())
+        return this;
+
+    // mIsFallback is intentionally NOT asserted here. The mIsFallback flag
+    // primarily controls load-time behavior (the head pre-warms a notdef
+    // glyph through the atlas, which a fallback skips) — it doesn't change
+    // whether the chain walk below is well-defined. Unit tests load faces
+    // with is_fallback=true to bypass the gGL-touching pre-warm, then
+    // attach their own fallbacks via addFallbackFont and call this method
+    // to drive the shape-itemizer; the walk below handles that case
+    // correctly. A genuinely-empty chain (production fallback face) just
+    // resolves to {this, getCharGlyphIndex(base)} and returns harmlessly.
+    if (auto it = mShapingFaceResolution.find(base); it != mShapingFaceResolution.end())
+    {
+        out_glyph_index = it->second.second;
+        return it->second.first;
     }
 
-    FT_Open_Args openArgs;
-    memset( &openArgs, 0, sizeof( openArgs ) );
-    openArgs.memory_base = gFontManagerp->loadFont( filename, openArgs.memory_size );
+    // Shape-path priority:
+    //   1. Emoji-functor fallbacks (functor must accept `base`).
+    //   2. Root face.
+    //   3. Monochrome fallbacks (no functor).
+    //
+    // The functor gates entry into the emoji bypass: shape ranges can cover
+    // whole strings (not just emoji clusters), so plain non-pictographic
+    // chars also pass through here. Color emoji fonts like Twemoji carry
+    // ASCII outlines for safety, and routing 'e' through Twemoji means
+    // rasterizing a color SVG glyph as Grayscale — FreeType produces a 0×0
+    // bitmap and the glyph renders invisible while HarfBuzz's advance still
+    // moves the pen, leaving gaps in plain text.
+    //
+    // For chars the functor accepts (genuine emoji range, plus whatever BMP
+    // pictographs / keycap markers the unicode_ranges entry covers), the
+    // bypass still kicks in so HarfBuzz can compose ZWJ sequences and
+    // keycaps via the emoji face's GSUB tables.
+    //
+    // No "ignoring-functor" retry like the codepoint path has — by the
+    // time the shape path is reached, the functor's answer is the policy
+    // we want to honor.
+    auto resolve = [&]() -> std::pair<const LLFontFreetype*, U32>
+    {
+        if (auto hit = find_fallback_hit(mFallbackFonts, base,
+                [&](const char_functor_t& f) { return f && f(base); });
+            hit.first)
+        {
+            return hit;
+        }
+        if (U32 gi = getCharGlyphIndex(base); gi != 0)
+            return { this, gi };
+        if (auto hit = find_fallback_hit(mFallbackFonts, base,
+                [](const char_functor_t& f) { return !f; });
+            hit.first)
+        {
+            return hit;
+        }
+        if (auto hit = attachOsFallbackFor(base); hit.first)
+        {
+            return hit;
+        }
+        // No face has a glyph; caller will end up rendering a tofu via `this`.
+        return { this, 0u };
+    };
 
-    if( !openArgs.memory_base )
+    const auto result = resolve();
+    // Bound per-face memory: a long-running client with CJK-heavy chat
+    // can otherwise accumulate one entry per unique codepoint forever.
+    // Clear-and-rebuild rather than LRU-evict — entries are cheap to
+    // recompute and the map is only an optimization. Limit chosen well
+    // above realistic working sets (CJK common-use is ~7k chars).
+    constexpr size_t SHAPING_RESOLUTION_LIMIT = 16384;
+    if (mShapingFaceResolution.size() >= SHAPING_RESOLUTION_LIMIT)
+        mShapingFaceResolution.clear();
+    mShapingFaceResolution.emplace(base, result);
+    out_glyph_index = result.second;
+    return result.first;
+}
+
+bool LLFontFreetype::faceHasGlyph(llwchar wch) const
+{
+    if (!getFTFace())
         return false;
+    return getCharGlyphIndex(wch) != 0;
+}
 
-    openArgs.flags = FT_OPEN_MEMORY;
-    int error = FT_Open_Face( gFTLibrary, &openArgs, 0, &mFTFace );
+U32 LLFontFreetype::getCharGlyphIndex(llwchar wch) const
+{
+    return mFace ? mFace->getCharGlyphIndex(wch) : 0;
+}
 
-    if (error)
+bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags, const ALFontVarAxes& var_axes)
+{
+    if (mFace)
+    {
+        // Reload: cached shape entries depend on the previous face state.
+        // Only this face's entries become stale here — siblings keep theirs.
+        ALFontShaping::clearCacheForFace(this);
+    }
+    // Drop the per-head shaping-face resolution cache: a fresh fallback chain
+    // is about to be wired up and any cached (codepoint -> winning face)
+    // mappings would resolve through the wrong faces.
+    mShapingFaceResolution.clear();
+
+    // Resolve the (file, sized + variable axis) state via the manager's
+    // shared face cache. Heads and fallbacks alike consult the cache; same
+    // params yield the same wrapper.
+    ALFontFaceKey key{filename, face_n, point_size, vert_dpi, horz_dpi, hinting, flags, var_axes};
+    mFace = gFontManagerp->getOrCreateFace(key);
+    if (!mFace || !mFace->isValid())
+    {
+        mFace = nullptr;
         return false;
+    }
+
+    ALFT_Face ft = mFace->face();
 
     mIsFallback = is_fallback;
-    F32 pixels_per_em = (point_size / 72.f)*vert_dpi; // Size in inches * dpi
+    mHinting    = hinting;
+    mFontFlags  = flags;
+    mVarAxes    = var_axes;
+    mUseSubpixelPen = mFace->useSubpixelPen();
+    mFaceIndex  = face_n;
+    mVertDPI    = vert_dpi;
+    mHorzDPI    = horz_dpi;
 
-    error = FT_Set_Char_Size(mFTFace,    /* handle to face object           */
-                            0,       /* char_width in 1/64th of points  */
-                            (S32)(point_size*64),   /* char_height in 1/64th of points */
-                            (U32)horz_dpi,     /* horizontal device resolution    */
-                            (U32)vert_dpi);   /* vertical device resolution      */
+    // FreeType's size->metrics is populated by FT_Set_Char_Size (run inside
+    // ALFontFace::load) with scaled, 26.6 fractional-pixel ascender /
+    // descender / height values. Reading them directly matches FT's own
+    // accounting exactly — re-deriving from design units would diverge by
+    // sub-pixel due to FreeType's internal 16.16 y_scale rounding.
+    constexpr F32 INV_64 = 1.f / 64.f;
+    const FT_Size_Metrics& metrics = ft->size->metrics;
+    mAscender   =  metrics.ascender  * INV_64;
+    mDescender  = -metrics.descender * INV_64;  // FT descender is negative; flip to positive depth.
+    mLineHeight =  metrics.height    * INV_64;
 
-    if (error)
-    {
-        // Clean up freetype libs.
-        FT_Done_Face(mFTFace);
-
-        mFTFace = nullptr;
-        return false;
-    }
-
-    F32 y_max, y_min, x_max, x_min;
-    F32 ems_per_unit = 1.f/ mFTFace->units_per_EM;
-    F32 pixels_per_unit = pixels_per_em * ems_per_unit;
-
-    // Get size of bbox in pixels
-    y_max = mFTFace->bbox.yMax * pixels_per_unit;
-    y_min = mFTFace->bbox.yMin * pixels_per_unit;
-    x_max = mFTFace->bbox.xMax * pixels_per_unit;
-    x_min = mFTFace->bbox.xMin * pixels_per_unit;
-    mAscender = mFTFace->ascender * pixels_per_unit;
-    mDescender = -mFTFace->descender * pixels_per_unit;
-    mLineHeight = mFTFace->height * pixels_per_unit;
-
-    S32 max_char_width = ll_round(0.5f + (x_max - x_min));
-    S32 max_char_height = ll_round(0.5f + (y_max - y_min));
-
-    mFontBitmapCachep->init(max_char_width, max_char_height);
-
-    if (!mFTFace->charmap)
-    {
-        //LL_INFOS() << " no unicode encoding, set whatever encoding there is..." << LL_ENDL;
-        FT_Set_Charmap(mFTFace, mFTFace->charmaps[0]);
-    }
+    // The atlas (LLFontBitmapCache) is owned by mFace and was initialized
+    // inside ALFontFace::load; nothing to do here for atlas setup.
 
     if (!mIsFallback)
     {
-        // Add the default glyph
-        addGlyphFromFont(this, 0, 0, EFontGlyphType::Grayscale);
+        // Pre-warm the default glyph (notdef, glyph_index=0) so misses on
+        // this head route through it without an extra rasterize on first
+        // miss. Goes into mFace's atlas; subsequent faces wrapping the
+        // same ALFontFace as a fallback won't re-pre-warm — atlas already
+        // has notdef.
+        if (!mFace->findGlyphInfo(0, EFontGlyphType::Grayscale))
+        {
+            addShapedGlyphFromFont(this, 0, EFontGlyphType::Grayscale);
+        }
     }
 
     mName = filename;
     mPointSize = point_size;
 
     mStyle = LLFontGL::NORMAL;
-    if(mFTFace->style_flags & FT_STYLE_FLAG_BOLD)
+    if (ft->style_flags & FT_STYLE_FLAG_BOLD)
     {
         mStyle |= LLFontGL::BOLD;
     }
-
-    if(mFTFace->style_flags & FT_STYLE_FLAG_ITALIC)
+    else if (flags & LLFontGL::BOLD)
     {
+        // Programmatic bolding for fonts in a 'bold' descriptor that don't
+        // have the bold style flag set (e.g. Inter SemiBold).
+        mStyle |= LLFontGL::BOLD;
+    }
+    else if (mFace->wghtAxisSet() && var_axes.wght >= 600.f)
+    {
+        // Variable face whose wght axis we set to 600+ already produced a
+        // heavy face; skip the programmatic bolding pass. wghtAxisSet()
+        // implies var_axes.wght_set was true at load time (ALFontFace::load
+        // only flips mWghtAxisSet inside the `if (var_axes.wght_set)`
+        // branch), so the value comparison alone discriminates regular
+        // from bold once we know the axis fired.
+        mStyle |= LLFontGL::BOLD;
+    }
+
+    if (ft->style_flags & FT_STYLE_FLAG_ITALIC)
+    {
+        mStyle |= LLFontGL::ITALIC;
+    }
+    else if (flags & LLFontGL::ITALIC)
+    {
+        // Programmatic italic flag from the descriptor; the renderer
+        // synthesises a slant if no real italic axis is in effect.
+        mStyle |= LLFontGL::ITALIC;
+    }
+    else if ((mFace->italAxisSet() && var_axes.ital >= 0.5f)
+          || (mFace->slntAxisSet() && var_axes.slnt <= -1.f))
+    {
+        // Variable face whose ital axis we set to ≥0.5, or whose slnt
+        // axis we set to a negative angle, already produced a slanted
+        // face — flag the head as italic so consumers branch correctly
+        // and the synthesised slant pass is skipped.
         mStyle |= LLFontGL::ITALIC;
     }
 
@@ -254,37 +439,109 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
 
 S32 LLFontFreetype::getNumFaces(const std::string& filename)
 {
-    if (mFTFace)
-    {
-        FT_Done_Face(mFTFace);
-        mFTFace = nullptr;
-    }
-
-    S32 num_faces = 1;
+    // Probe-only: open a temporary face to read num_faces and immediately
+    // close it. Read the file into a local buffer instead of going through
+    // gFontManagerp->loadFont — the manager caches by filename and would
+    // hold the bytes alive forever for any probe of a font we never end up
+    // loading as a real face.
+    auto contents = LLFile::getContents(filename);
+    if (contents.empty())
+        return 0;
 
     FT_Open_Args openArgs;
-    memset( &openArgs, 0, sizeof( openArgs ) );
-    openArgs.memory_base = gFontManagerp->loadFont( filename, openArgs.memory_size );
-    if( !openArgs.memory_base )
-        return 0;
+    memset(&openArgs, 0, sizeof(openArgs));
+    openArgs.memory_base = reinterpret_cast<const FT_Byte*>(contents.data());
+    openArgs.memory_size = static_cast<FT_Long>(contents.size());
     openArgs.flags = FT_OPEN_MEMORY;
-    int error = FT_Open_Face( gFTLibrary, &openArgs, 0, &mFTFace );
 
-    if (error)
+    FT_Face probe = nullptr;
+    if (FT_Open_Face(gFTLibrary, &openArgs, 0, &probe) != 0)
         return 0;
-    else
-        num_faces = mFTFace->num_faces;
-
-    FT_Done_Face(mFTFace);
-    mFTFace = nullptr;
-
+    S32 num_faces = probe->num_faces;
+    FT_Done_Face(probe);
     return num_faces;
 }
 
 void LLFontFreetype::addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font,
-                                     const char_functor_t& functor)
+                                     const char_functor_t& functor) const
 {
     mFallbackFonts.emplace_back(fallback_font, functor);
+    // Both caches encode the previous fallback list; the new fallback may win
+    // for codepoints that previously resolved to a later face or to notdef on
+    // this face. Clear both:
+    //  - mShapingFaceResolution caches per-codepoint (winning face, glyph_id)
+    //    decisions made by selectShapingFace.
+    //  - ALFontShaping's global cache stores already-shaped runs keyed on
+    //    (codepoints, root_face). Entries with root_face == this still reflect
+    //    the OLD itemization (e.g. CJK codepoints rendered as the head's
+    //    notdef before the CJK fallback was attached) and must be discarded
+    //    so the next shape() re-itemizes through the new chain.
+    // LLFontRegistry::createFont attaches the configured chain before any
+    // shaping happens, so neither cache holds entries on that path — but
+    // attachOsFallbackFor mutates the chain mid-run, after both caches are
+    // warm, and relies on this clearing to avoid stale shape results.
+    mShapingFaceResolution.clear();
+    ALFontShaping::clearCacheForFace(this);
+}
+
+bool LLFontFreetype::hasFallbackPath(const std::string& path) const
+{
+    for (const fallback_font_t& pair : mFallbackFonts)
+    {
+        if (pair.first->getName() == path)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::pair<const LLFontFreetype*, U32> LLFontFreetype::attachOsFallbackFor(llwchar wch) const
+{
+    // Only the head grows a fallback chain. Fallback faces are reached
+    // through their head's chain and must not sprout chains of their own;
+    // selectShapingFace is also driven directly against fallback-flagged
+    // faces by the unit tests, which pin the "nothing covers this, expect
+    // notdef" outcome.
+    if (mIsFallback)
+        return { nullptr, 0u };
+
+    // One OS query per codepoint, hit or miss. A miss is the common case
+    // (genuinely uncovered codepoints, and every char on platforms with no
+    // implementation) and costs as much to re-derive as a hit, so the
+    // attempted-set is recorded before the outcome is known.
+    if (!mAttemptedFallbackChars.insert(wch).second)
+        return { nullptr, 0u };
+
+    LLFontFallbackMatch match = LLWindow::findFallbackFontForChar(wch);
+    if (match.mPath.empty() || hasFallbackPath(match.mPath))
+        return { nullptr, 0u };
+
+    // Open at this font's size and DPI so the lazily-discovered face lines
+    // up with the head's metrics.
+    LLPointer<LLFontFreetype> fallback = new LLFontFreetype;
+    if (!fallback->loadFace(match.mPath, mPointSize, mVertDPI, mHorzDPI,
+                            /*is_fallback*/ true, match.mFaceIndex,
+                            mHinting, mFontFlags))
+    {
+        return { nullptr, 0u };
+    }
+
+    U32 glyph_index = fallback->getCharGlyphIndex(wch);
+    if (!glyph_index)
+    {
+        // The OS matched a font that doesn't actually cover wch: discard it
+        // rather than lengthening the chain with a face that can never hit.
+        return { nullptr, 0u };
+    }
+
+    LL_DEBUGS("Font") << "Lazy OS fallback for U+" << std::hex << (U32)wch << std::dec
+                      << ": " << match.mPath << " (face " << match.mFaceIndex << ")" << LL_ENDL;
+    // Note: this clears mShapingFaceResolution, so callers must not hold a
+    // cached resolution across this point.
+    addFallbackFont(fallback, nullptr);
+    mLazyFallbacks.push_back(fallback);
+    return { fallback.get(), glyph_index };
 }
 
 F32 LLFontFreetype::getLineHeight() const
@@ -302,293 +559,266 @@ F32 LLFontFreetype::getDescenderHeight() const
     return mDescender;
 }
 
+F32 LLFontFreetype::getUnderlinePosition() const
+{
+    ALFT_Face ft = getFTFace();
+    if (!ft || ft->units_per_EM <= 0)
+        return -mDescender;
+    const F32 scale = (F32)ft->size->metrics.y_ppem / (F32)ft->units_per_EM;
+    return (F32)ft->underline_position * scale;
+}
+
+F32 LLFontFreetype::getUnderlineThickness() const
+{
+    ALFT_Face ft = getFTFace();
+    if (!ft || ft->units_per_EM <= 0)
+        return 1.f;
+    const F32 scale = (F32)ft->size->metrics.y_ppem / (F32)ft->units_per_EM;
+    return llmax(1.f, (F32)ft->underline_thickness * scale);
+}
+
 F32 LLFontFreetype::getXAdvance(llwchar wch) const
 {
-    if (mFTFace == nullptr)
+    if (getFTFace() == nullptr)
         return 0.0;
 
-    // Return existing info only if it is current
+    // getGlyphInfo always returns a non-null entry once the face is loaded
+    // (chain-walk misses route through the shared notdef pre-warmed at
+    // load time), so the `gi != nullptr` guard plus a getMaxCharWidth
+    // fallback that used to live here are dead in practice. Defensive
+    // null check kept since a notdef render failure could theoretically
+    // surface here.
     LLFontGlyphInfo* gi = getGlyphInfo(wch, EFontGlyphType::Unspecified);
-    if (gi)
-    {
-        return gi->mXAdvance;
-    }
-    else
-    {
-        char_glyph_info_map_t::iterator found_it = mCharGlyphInfoMap.find((llwchar)0);
-        if (found_it != mCharGlyphInfoMap.end())
-        {
-            return found_it->second->mXAdvance;
-        }
-    }
-
-    // Last ditch fallback - no glyphs defined at all.
-    return (F32)mFontBitmapCachep->getMaxCharWidth();
+    return gi ? gi->mXAdvance : 0.f;
 }
 
 F32 LLFontFreetype::getXAdvance(const LLFontGlyphInfo* glyph) const
 {
-    if (mFTFace == nullptr)
+    if (getFTFace() == nullptr)
         return 0.0;
 
     return glyph->mXAdvance;
 }
 
-F32 LLFontFreetype::getXKerning(llwchar char_left, llwchar char_right) const
-{
-    if (mFTFace == nullptr)
-        return 0.0;
 
-    //llassert(!mIsFallback);
-    LLFontGlyphInfo* left_glyph_info = getGlyphInfo(char_left, EFontGlyphType::Unspecified);;
-    U32 left_glyph = left_glyph_info ? left_glyph_info->mGlyphIndex : 0;
-    // Kern this puppy.
-    LLFontGlyphInfo* right_glyph_info = getGlyphInfo(char_right, EFontGlyphType::Unspecified);
-    U32 right_glyph = right_glyph_info ? right_glyph_info->mGlyphIndex : 0;
-
-    FT_Vector  delta;
-
-    llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, ft_kerning_unfitted, &delta));
-
-    return delta.x*(1.f/64.f);
-}
-
-F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LLFontGlyphInfo* right_glyph_info) const
-{
-    if (mFTFace == nullptr)
-        return 0.0;
-
-    U32 left_glyph = left_glyph_info ? left_glyph_info->mGlyphIndex : 0;
-    U32 right_glyph = right_glyph_info ? right_glyph_info->mGlyphIndex : 0;
-
-    FT_Vector  delta;
-
-    llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, ft_kerning_unfitted, &delta));
-
-    return delta.x*(1.f/64.f);
-}
-
-bool LLFontFreetype::hasGlyph(llwchar wch) const
-{
-    llassert(!mIsFallback);
-    return(mCharGlyphInfoMap.find(wch) != mCharGlyphInfoMap.end());
-}
-
-LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch, EFontGlyphType glyph_type) const
-{
-    if (!mFTFace)
-    {
-        return nullptr;
-    }
-
-    llassert(!mIsFallback);
-    llassert(glyph_type < EFontGlyphType::Count);
-    //LL_DEBUGS() << "Adding new glyph for " << wch << " to font" << LL_ENDL;
-
-    // Initialize char to glyph map
-    FT_UInt glyph_index = FT_Get_Char_Index(mFTFace, wch);
-    if (glyph_index == 0)
-    {
-        // No corresponding glyph in this font: look for a glyph in fallback
-        // fonts.
-        size_t count = mFallbackFonts.size();
-        if (LLStringOps::isEmoji(wch))
-        {
-            // This is a "genuine" emoji (in the range 0x1f000-0x20000): print
-            // it using the emoji font(s) if possible. HB
-            for (size_t i = 0; i < count; ++i)
-            {
-                const fallback_font_t& pair = mFallbackFonts[i];
-                if (!pair.second || !pair.second(wch))
-                {
-                    // If this font does not have a functor, or the character
-                    // does not pass the functor, reject it. Note: we keep the
-                    // functor test (despite the fact we already tested for
-                    // LLStringOps::isEmoji(wch) above), in case we would use
-                    // different, more restrictive or partionned functors in
-                    // the future with several different emoji fonts. HB
-                    continue;
-                }
-                glyph_index = FT_Get_Char_Index(pair.first->mFTFace, wch);
-                if (glyph_index)
-                {
-                    return addGlyphFromFont(pair.first, wch, glyph_index,
-                                            glyph_type);
-                }
-            }
-        }
-        // Then try and find a monochrome fallback font that could print this
-        // glyph: such fonts do *not* have a functor. We give priority to
-        // monochrome fonts for non-genuine emojis so that UI elements which
-        // used to render with them before the emojis font introduction (e.g.
-        // check marks in menus, or LSL dialogs text and buttons) do render the
-        // same way as they always did. HB
-        std::vector<size_t> emoji_fonts_idx;
-        for (size_t i = 0; i < count; ++i)
-        {
-            const fallback_font_t& pair = mFallbackFonts[i];
-            if (pair.second)
-            {
-                // If this font got a functor, remember the index for later and
-                // try the next fallback font. HB
-                emoji_fonts_idx.push_back(i);
-                continue;
-            }
-            glyph_index = FT_Get_Char_Index(pair.first->mFTFace, wch);
-            if (glyph_index)
-            {
-                return addGlyphFromFont(pair.first, wch, glyph_index,
-                                        glyph_type);
-            }
-        }
-        // Everything failed so far: this character is not a genuine emoji,
-        // neither a special character known from our monochrome fallback
-        // fonts: make a last try, using the emoji font(s), but ignoring the
-        // functor to render using whatever (colorful) glyph that might be
-        // available in such fonts for this character. HB
-        for (size_t j = 0, count2 = emoji_fonts_idx.size(); j < count2; ++j)
-        {
-            const fallback_font_t& pair = mFallbackFonts[emoji_fonts_idx[j]];
-            glyph_index = FT_Get_Char_Index(pair.first->mFTFace, wch);
-            if (glyph_index)
-            {
-                return addGlyphFromFont(pair.first, wch, glyph_index,
-                                        glyph_type);
-            }
-        }
-    }
-
-    auto range_it = mCharGlyphInfoMap.equal_range(wch);
-    char_glyph_info_map_t::iterator iter =
-        std::find_if(range_it.first, range_it.second,
-                     [&glyph_type](const char_glyph_info_map_t::value_type& entry)
-                     {
-                        return entry.second->mGlyphType == glyph_type;
-                     });
-    if (iter == range_it.second)
-    {
-        return addGlyphFromFont(this, wch, glyph_index, glyph_type);
-    }
-    return nullptr;
-}
-
-LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, llwchar wch, U32 glyph_index, EFontGlyphType requested_glyph_type) const
+LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type, EFontGlyphType& out_bitmap_glyph_type) const
 {
     LL_PROFILE_ZONE_SCOPED;
-    if (mFTFace == nullptr)
+    if (getFTFace() == nullptr)
         return nullptr;
 
     llassert(!mIsFallback);
-    fontp->renderGlyph(requested_glyph_type, glyph_index, wch);
 
-    EFontGlyphType bitmap_glyph_type = EFontGlyphType::Unspecified;
-    switch (fontp->mFTFace->glyph->bitmap.pixel_mode)
-    {
-        case FT_PIXEL_MODE_MONO:
-        case FT_PIXEL_MODE_GRAY:
-            bitmap_glyph_type = EFontGlyphType::Grayscale;
-            break;
-        case FT_PIXEL_MODE_BGRA:
-            bitmap_glyph_type = EFontGlyphType::Color;
-            break;
-        default:
-            llassert_always(true);
-            break;
-    }
-    S32 width = fontp->mFTFace->glyph->bitmap.width;
-    S32 height = fontp->mFTFace->glyph->bitmap.rows;
-
-    S32 pos_x, pos_y;
-    U32 bitmap_num;
-    mFontBitmapCachep->nextOpenPos(width, pos_x, pos_y, bitmap_glyph_type, bitmap_num);
+    // Render N subpixel-x phases for fonts that use the subpixel pen
+    // accumulator, otherwise just one. Each phase shifts the outline by
+    // (k / kNumPhases) px before rasterization via FT_Set_Transform; the
+    // resulting bitmaps go to separate atlas slots and the renderer picks
+    // one matching the fractional pen position at draw time.
+    const U8 num_phases = fontp->mUseSubpixelPen ? LLFontGlyphInfo::kNumPhases : 1;
 
     LLFontGlyphInfo* gi = new LLFontGlyphInfo(glyph_index, requested_glyph_type);
-    gi->mXBitmapOffset = pos_x;
-    gi->mYBitmapOffset = pos_y;
-    gi->mBitmapEntry = std::make_pair(bitmap_glyph_type, bitmap_num);
-    gi->mWidth = width;
-    gi->mHeight = height;
-    gi->mXBearing = fontp->mFTFace->glyph->bitmap_left;
-    gi->mYBearing = fontp->mFTFace->glyph->bitmap_top;
-    // Convert these from 26.6 units to float pixels.
-    gi->mXAdvance = fontp->mFTFace->glyph->advance.x / 64.f;
-    gi->mYAdvance = fontp->mFTFace->glyph->advance.y / 64.f;
+    gi->mPhaseCount = num_phases;
+    // Atlas owner: the renderer follows this to bind the right texture.
+    gi->mSourceFace = fontp->mFace.get();
 
-    insertGlyphInfo(wch, gi);
+    EFontGlyphType bitmap_glyph_type = EFontGlyphType::Unspecified;
 
-    if (requested_glyph_type != bitmap_glyph_type)
+    for (U8 phase = 0; phase < num_phases; ++phase)
+    {
+        // FT_Set_Transform delta in 26.6 fixed-point. 64 == 1 px, so each
+        // phase shifts by (phase * 64 / kNumPhases) units.
+        FT_Vector delta = { (FT_Pos)((phase * 64) / LLFontGlyphInfo::kNumPhases), 0 };
+        FT_Set_Transform(fontp->getFTFace(), nullptr, &delta);
+
+        // wch is only meaningful for the SVG glyph hook's debug output; shaped
+        // lookups don't have a single source codepoint to pass here.
+        fontp->renderGlyph(requested_glyph_type, glyph_index, 0);
+
+        EFontGlyphType phase_type = EFontGlyphType::Unspecified;
+        switch (fontp->getFTFace()->glyph->bitmap.pixel_mode)
+        {
+            case FT_PIXEL_MODE_MONO:
+            case FT_PIXEL_MODE_GRAY:
+                phase_type = EFontGlyphType::Grayscale;
+                break;
+            case FT_PIXEL_MODE_BGRA:
+                phase_type = EFontGlyphType::Color;
+                break;
+            default:
+                // Unusual modes (LCD / LCD_V / GRAY2 / GRAY4) shouldn't
+                // arrive here — our render configuration only requests
+                // NORMAL/LIGHT/COLOR — but a single misbehaving system
+                // font is enough to surface them. Warn and treat as
+                // Grayscale; the bitmap-copy block below only handles
+                // MONO/GRAY/BGRA so we'll skip the data copy too, which
+                // means the slot stays zero (notdef-shaped quad with no
+                // alpha). Better than aborting startup.
+                LL_WARNS_ONCE("Font") << "Unsupported FT pixel_mode "
+                    << (S32)fontp->getFTFace()->glyph->bitmap.pixel_mode
+                    << " for glyph " << glyph_index
+                    << "; treating as Grayscale" << LL_ENDL;
+                phase_type = EFontGlyphType::Grayscale;
+                break;
+        }
+        // All phases must produce the same pixel format — they're the same
+        // glyph rasterized at slightly different x-offsets.
+        if (phase == 0)
+        {
+            bitmap_glyph_type = phase_type;
+        }
+        else
+        {
+            llassert(phase_type == bitmap_glyph_type);
+        }
+
+        S32 width = fontp->getFTFace()->glyph->bitmap.width;
+        S32 height = fontp->getFTFace()->glyph->bitmap.rows;
+
+        S32 pos_x, pos_y;
+        U32 bitmap_num;
+        // Allocate the slot in the *source* face's atlas. Today's call site
+        // wrote to the head's atlas; after the move every glyph rasterized
+        // through fontp lives in fontp->mFace's shared atlas, so heads with
+        // a common fallback face share these slots. Pass height so the
+        // allocator can advance Y past tall color-emoji bitmaps even when
+        // mMaxCharHeight (derived from the outline bbox) underestimates them.
+        fontp->getBitmapCache()->nextOpenPos(width, height, pos_x, pos_y, bitmap_glyph_type, bitmap_num);
+
+        LLFontGlyphInfo::PhaseSlot& slot = gi->mPhaseSlots[phase];
+        slot.mXBitmapOffset = pos_x;
+        slot.mYBitmapOffset = pos_y;
+        slot.mWidth = width;
+        slot.mHeight = height;
+        slot.mXBearing = fontp->getFTFace()->glyph->bitmap_left;
+        slot.mYBearing = fontp->getFTFace()->glyph->bitmap_top;
+        slot.mBitmapEntry = std::make_pair(bitmap_glyph_type, bitmap_num);
+
+        // Glyph-level metrics come from phase 0. They're invariant across
+        // phases (FT_Set_Transform shifts the outline before rasterization —
+        // advance, lsb/rsb deltas, and overall metrics are unchanged) modulo
+        // 1 px AA boundary effects. Measurement paths use these.
+        if (phase == 0)
+        {
+            gi->mWidth = width;
+            gi->mHeight = height;
+            gi->mXBearing = slot.mXBearing;
+            gi->mYBearing = slot.mYBearing;
+            // Convert these from 26.6 units to float pixels.
+            gi->mXAdvance = fontp->getFTFace()->glyph->advance.x / 64.f;
+            gi->mYAdvance = fontp->getFTFace()->glyph->advance.y / 64.f;
+        }
+
+        // Copy the rasterized bitmap into the per-phase atlas slot.
+        if (fontp->getFTFace()->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_MONO
+            || fontp->getFTFace()->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_GRAY)
+        {
+            U8 *buffer_data = fontp->getFTFace()->glyph->bitmap.buffer;
+            S32 buffer_row_stride = fontp->getFTFace()->glyph->bitmap.pitch;
+            U8 *tmp_graydata = nullptr;
+
+            if (fontp->getFTFace()->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_MONO)
+            {
+                // need to expand 1-bit bitmap to 8-bit graymap.
+                tmp_graydata = new U8[width * height];
+                S32 xpos, ypos;
+                for (ypos = 0; ypos < height; ++ypos)
+                {
+                    S32 bm_row_offset = buffer_row_stride * ypos;
+                    for (xpos = 0; xpos < width; ++xpos)
+                    {
+                        U32 bm_col_offsetbyte = xpos / 8;
+                        U32 bm_col_offsetbit = 7 - (xpos % 8);
+                        U32 bit =
+                            !!(buffer_data[bm_row_offset + bm_col_offsetbyte] & (1 << bm_col_offsetbit));
+                        tmp_graydata[width * ypos + xpos] = 255 * bit;
+                    }
+                }
+                // use newly-built graymap.
+                buffer_data = tmp_graydata;
+                buffer_row_stride = width;
+            }
+
+            fontp->mFace->setSubImageLuminanceAlpha(pos_x, pos_y, bitmap_num, width, height,
+                                                    buffer_data, buffer_row_stride);
+
+            if (tmp_graydata)
+                delete[] tmp_graydata;
+        }
+        else if (fontp->getFTFace()->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA)
+        {
+            // Pass the signed pitch through — setSubImageBGRA walks rows
+            // with signed arithmetic so a negative-pitch (bottom-up) source
+            // lands on the right bytes.
+            fontp->mFace->setSubImageBGRA(pos_x, pos_y, bitmap_num,
+                            fontp->getFTFace()->glyph->bitmap.width,
+                            fontp->getFTFace()->glyph->bitmap.rows,
+                            fontp->getFTFace()->glyph->bitmap.buffer,
+                            fontp->getFTFace()->glyph->bitmap.pitch);
+        }
+        else
+        {
+            // Mirrors the soft fallback in the pixel_mode switch above:
+            // unusual modes (LCD / LCD_V / GRAY2 / GRAY4) leave the slot
+            // zero rather than crashing debug builds.
+        }
+
+        LLImageGL *image_gl = fontp->getBitmapCache()->getImageGL(bitmap_glyph_type, bitmap_num);
+        LLImageRaw *image_raw = fontp->getBitmapCache()->getImageRaw(bitmap_glyph_type, bitmap_num);
+        if (image_gl && image_raw)
+        {
+            // Upload only the dirty glyph rect — passing full atlas dimensions
+            // routes through setImage() and re-uploads the entire 1024×1024 page
+            // (2 MB grayscale / 4 MB BGRA) for every new glyph.
+            image_gl->setSubImage(image_raw, pos_x, pos_y, width, height, /*force_fast_update=*/true, 0, true);
+        }
+        else if (!image_raw || LLFontBitmapCache::usesGL())
+        {
+            // nextOpenPos just made both, so a missing one is a fault --
+            // except where this process has no GL, and a sheet is CPU-only
+            // by design with nothing to upload the glyph to.
+            llassert(false);
+        }
+    }
+
+    // Reset the FT face transform so subsequent non-phased renders (e.g. for
+    // fallback paths or other faces sharing this FT_Library) aren't affected.
+    FT_Set_Transform(fontp->getFTFace(), nullptr, nullptr);
+
+    out_bitmap_glyph_type = bitmap_glyph_type;
+    return gi;
+}
+
+LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type) const
+{
+    // Cross-head dedup: a sibling head sharing fontp's face may have already
+    // rasterized this glyph. Reuse the face's cached entry rather than
+    // allocating a new atlas slot.
+    if (fontp && fontp->mFace)
+    {
+        if (LLFontGlyphInfo* existing = fontp->mFace->findGlyphInfo(glyph_index, requested_glyph_type))
+            return existing;
+    }
+
+    EFontGlyphType bitmap_glyph_type;
+    LLFontGlyphInfo* gi = renderAndCreateGlyph(fontp, glyph_index, requested_glyph_type, bitmap_glyph_type);
+    if (!gi)
+        return nullptr;
+
+    // insertGlyphInfo keeps an already-published entry over the incoming
+    // one (deleting the duplicate), so continue with its return value.
+    gi = fontp->mFace->insertGlyphInfo(glyph_index, gi);
+
+    // Optimization: when the rendered pixel format differs from what the
+    // caller requested (e.g. Color requested but the file is monochrome),
+    // also publish the entry under the bitmap_type so a future lookup that
+    // asks for that type hits dedup. Skip the secondary publish if a
+    // bitmap_type entry already exists; the existing one is correct.
+    if (requested_glyph_type != bitmap_glyph_type
+        && !fontp->mFace->findGlyphInfo(glyph_index, bitmap_glyph_type))
     {
         LLFontGlyphInfo* gi_temp = new LLFontGlyphInfo(*gi);
         gi_temp->mGlyphType = bitmap_glyph_type;
-        insertGlyphInfo(wch, gi_temp);
-    }
-
-    if (fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_MONO
-        || fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_GRAY)
-    {
-        U8 *buffer_data = fontp->mFTFace->glyph->bitmap.buffer;
-        S32 buffer_row_stride = fontp->mFTFace->glyph->bitmap.pitch;
-        U8 *tmp_graydata = nullptr;
-
-        if (fontp->mFTFace->glyph->bitmap.pixel_mode
-            == FT_PIXEL_MODE_MONO)
-        {
-            // need to expand 1-bit bitmap to 8-bit graymap.
-            tmp_graydata = new U8[width * height];
-            S32 xpos, ypos;
-            for (ypos = 0; ypos < height; ++ypos)
-            {
-                S32 bm_row_offset = buffer_row_stride * ypos;
-                for (xpos = 0; xpos < width; ++xpos)
-                {
-                    U32 bm_col_offsetbyte = xpos / 8;
-                    U32 bm_col_offsetbit = 7 - (xpos % 8);
-                    U32 bit =
-                    !!(buffer_data[bm_row_offset
-                               + bm_col_offsetbyte
-                       ] & (1 << bm_col_offsetbit) );
-                    tmp_graydata[width*ypos + xpos] =
-                        255 * bit;
-                }
-            }
-            // use newly-built graymap.
-            buffer_data = tmp_graydata;
-            buffer_row_stride = width;
-        }
-
-        setSubImageLuminanceAlpha(pos_x,
-                                    pos_y,
-                                    bitmap_num,
-                                    width,
-                                    height,
-                                    buffer_data,
-                                    buffer_row_stride);
-
-        if (tmp_graydata)
-            delete[] tmp_graydata;
-    }
-    else if (fontp->mFTFace->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA)
-    {
-        setSubImageBGRA(pos_x,
-                        pos_y,
-                        bitmap_num,
-                        fontp->mFTFace->glyph->bitmap.width,
-                        fontp->mFTFace->glyph->bitmap.rows,
-                        fontp->mFTFace->glyph->bitmap.buffer,
-                        llabs(fontp->mFTFace->glyph->bitmap.pitch));
-    } else {
-        llassert(false);
-    }
-
-    LLImageGL *image_gl = mFontBitmapCachep->getImageGL(bitmap_glyph_type, bitmap_num);
-    LLImageRaw *image_raw = mFontBitmapCachep->getImageRaw(bitmap_glyph_type, bitmap_num);
-    if (image_gl && image_raw)
-    {
-        image_gl->setSubImage(image_raw, 0, 0, image_gl->getWidth(), image_gl->getHeight());
-    }
-    else
-    {
-        llassert(false); //images were just inserted by nextOpenPos, they shouldn't be missing
+        fontp->mFace->insertGlyphInfo(glyph_index, gi_temp);
     }
 
     return gi;
@@ -596,72 +826,178 @@ LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, l
 
 LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_type) const
 {
-    std::pair<char_glyph_info_map_t::iterator, char_glyph_info_map_t::iterator> range_it = mCharGlyphInfoMap.equal_range(wch);
+    if (!getFTFace())
+        return nullptr;
+    llassert(!mIsFallback);
 
-    char_glyph_info_map_t::iterator iter = (EFontGlyphType::Unspecified != glyph_type)
-        ? std::find_if(range_it.first, range_it.second, [&glyph_type](const char_glyph_info_map_t::value_type& entry) { return entry.second->mGlyphType == glyph_type; })
-        : range_it.first;
-    if (iter != range_it.second)
+    // glyph_type passes through unresolved: getGlyphInfoByIndex treats
+    // Unspecified as match-any at lookup and only pins a concrete type
+    // when it has to rasterize.
+
+    // Hot path: codepoint exists on this head's face. One cmap lookup
+    // (cached) + one (face, glyph_index) hash lookup.
+    U32 glyph_index = getCharGlyphIndex(wch);
+    if (glyph_index != 0)
+        return getGlyphInfoByIndex(this, glyph_index, glyph_type);
+
+    // Cold path: walk fallbacks in codepoint-priority order, which
+    // differs from the shape-path priority in selectShapingFace:
+    //   1. Emoji-functor fallbacks gated on isPictographBase(wch). Same
+    //      predicate the shape itemizer uses — codepoint-path and
+    //      shape-path agree on which characters are emoji-eligible, so
+    //      BMP pictographs (heart etc.) route to the colour face here
+    //      just as they do during shaping.
+    //   2. Monochrome fallbacks (no functor). Priority over emoji
+    //      fallbacks for non-pictograph chars so legacy UI elements
+    //      (LSL dialogs, menu checkmarks at U+2611 etc.) still pick
+    //      monochrome.
+    //   3. Emoji-functor fallbacks ignoring the functor — last-resort
+    //      coverage for codepoints that aren't pictographs and aren't
+    //      in a monochrome fallback but DO exist in an emoji font's
+    //      charmap.
+    if (LLStringOps::isPictographBase(wch))
     {
-        return iter->second;
+        if (auto hit = find_fallback_hit(mFallbackFonts, wch,
+                [&](const char_functor_t& f) { return f && f(wch); });
+            hit.first)
+        {
+            return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
+        }
     }
-    else
+    if (auto hit = find_fallback_hit(mFallbackFonts, wch,
+            [](const char_functor_t& f) { return !f; });
+        hit.first)
     {
-        // this glyph doesn't yet exist, so render it and return the result
-        return addGlyph(wch, (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale);
+        return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
     }
+    if (auto hit = find_fallback_hit(mFallbackFonts, wch,
+            [](const char_functor_t& f) { return (bool)f; });
+        hit.first)
+    {
+        return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
+    }
+
+    // Nothing in the configured chain covers this codepoint: ask the OS for
+    // a face that does and attach it. Keeps scripts the static fallback list
+    // never named (CJK, Thai, Indic) from rendering as tofu.
+    if (auto hit = attachOsFallbackFor(wch); hit.first)
+    {
+        return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
+    }
+
+    // No face in our chain has this codepoint. Use the head face's
+    // notdef (glyph_index=0) — pre-warmed during loadFace.
+    return getGlyphInfoByIndex(this, 0, glyph_type);
 }
 
-void LLFontFreetype::insertGlyphInfo(llwchar wch, LLFontGlyphInfo* gi) const
+LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType glyph_type) const
 {
-    llassert(gi->mGlyphType < EFontGlyphType::Count);
-    std::pair<char_glyph_info_map_t::iterator, char_glyph_info_map_t::iterator> range_it = mCharGlyphInfoMap.equal_range(wch);
-
-    char_glyph_info_map_t::iterator iter =
-        std::find_if(range_it.first, range_it.second, [&gi](const char_glyph_info_map_t::value_type& entry) { return entry.second->mGlyphType == gi->mGlyphType; });
-    if (iter != range_it.second)
+    // Single source of truth: the source face's owning glyph cache. The head
+    // used to memoize this lookup in its own (fontp, glyph_index) map, but
+    // that introduced a dangling-pointer hazard on cross-face GC — the face
+    // would delete an entry in collectGarbage while sibling heads' maps
+    // still held non-owning copies of the pointer, and the next render
+    // would either dereference freed memory or short-circuit on a stuck
+    // bitmap_entry that pointed at a released sheet (manifesting as glyphs
+    // that "appear unloaded and never reload" after long idle periods).
+    // Routing every lookup through the face cache means atlas eviction
+    // is observed consistently by every freetype that ever rendered the
+    // glyph: the face's findGlyphInfo returns null after eviction, so we
+    // fall through to addShapedGlyphFromFont and re-rasterize.
+    //
+    // Unspecified probes the cache as match-any (findGlyphInfo returns the
+    // first entry of either type) and only resolves to Grayscale when the
+    // glyph has to be rasterized. Measurement paths pass Unspecified — they
+    // need metrics, not a particular atlas — and resolving before the probe
+    // forced a duplicate Grayscale rasterization (a full COLRv1 paint walk
+    // plus a Grayscale atlas slot) for every color glyph that had already
+    // been rendered through the Color atlas.
+    //
+    // A face with neither a color table (CBDT/sbix/COLR) nor OT-SVG can
+    // never produce a Color bitmap — FT_LOAD_COLOR on it rasterizes the
+    // same grayscale outline. Degrade the request up front so Color
+    // lookups on plain text faces (use_color=true is the UI default for
+    // every glyph, not just emoji) hit the existing Grayscale entry
+    // instead of missing and rasterizing a duplicate gray bitmap into
+    // fresh atlas slots published under a Color-typed entry. Reload paths
+    // that pre-warm ASCII as Grayscale made that the common case: the
+    // whole ASCII set stored twice per font, x8 phase slots on subpixel
+    // faces.
+    if (glyph_type == EFontGlyphType::Color
+        && fontp && fontp->mFace
+        && !fontp->mFace->hasColor()
+        && !fontp->mFace->hasSvg())
     {
-        delete iter->second;
-        iter->second = gi;
+        glyph_type = EFontGlyphType::Grayscale;
     }
-    else
+    if (fontp && fontp->mFace)
     {
-        mCharGlyphInfoMap.insert(std::make_pair(wch, gi));
+        if (LLFontGlyphInfo* gi = fontp->mFace->findGlyphInfo(glyph_index, glyph_type))
+            return gi;
     }
+    const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale;
+    return addShapedGlyphFromFont(fontp, glyph_index, resolve_type);
 }
 
 void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, llwchar wch) const
 {
-    if (mFTFace == nullptr)
+    if (getFTFace() == nullptr)
         return;
 
-    FT_Int32 load_flags = FT_LOAD_FORCE_AUTOHINT;
+    // COLRv1 fast path. FreeType's FT_LOAD_COLOR + FT_Render_Glyph rasterize
+    // COLRv0 / sbix / CBDT / OT-SVG natively but explicitly NOT COLRv1; for
+    // those faces we hand the paint walk off to HarfBuzz hb-raster. Runs
+    // for both Color and Grayscale requests:
+    // Color rasterizes BGRA into the Color atlas, Grayscale folds the paint
+    // tree into a luminance-shaded mask that the Grayscale atlas tints with
+    // text_color at draw time. Either bitmap_type request hits the COLRv1
+    // path on COLRv1 faces; the FT outline fallback below handles glyphs
+    // whose paint tree the walker can't process.
+    if (mFace && mFace->hasColrV1()
+        && (bitmap_type == EFontGlyphType::Color || bitmap_type == EFontGlyphType::Grayscale))
+    {
+        if (renderColrV1Glyph(glyph_index, bitmap_type))
+        {
+            mRenderGlyphCount++;
+            return;
+        }
+        // Fallthrough: walker bailed (unsupported paint feature / alloc / no
+        // paint tree on this glyph). The standard FT path runs next; its
+        // existing retry block downgrades a failed color render to grayscale,
+        // so glyphs without a paint tree still produce a usable bitmap.
+    }
+
+    FT_Int32 load_flags = (FT_Int32)mHinting;
     if (EFontGlyphType::Color == bitmap_type)
     {
-        // We may not actually get a color render so our caller should always examine mFTFace->glyph->bitmap.pixel_mode
+        // We may not actually get a color render so our caller should always examine getFTFace()->glyph->bitmap.pixel_mode
         load_flags |= FT_LOAD_COLOR;
     }
 
-    FT_Error error = FT_Load_Glyph(mFTFace, glyph_index, load_flags);
+    FT_Error error = FT_Load_Glyph(getFTFace(), glyph_index, load_flags);
     if (FT_Err_Ok != error)
     {
         if (error == FT_Err_Out_Of_Memory)
         {
             LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS() << "Out of memory loading glyph for character " << llformat("U+%xu", U32(wch)) << LL_ENDL;
+            LL_ERRS() << "Out of memory loading glyph for character " << llformat("U+%X", U32(wch)) << LL_ENDL;
         }
 
         std::string message = llformat(
             "Error %d (%s) loading wchar %u glyph %u/%u: bitmap_type=%u, load_flags=%d",
-            error, FT_Error_String(error), wch, glyph_index, mFTFace->num_glyphs, bitmap_type, load_flags);
+            error, FT_Error_String(error), wch, glyph_index, getFTFace()->num_glyphs, bitmap_type, load_flags);
         LL_WARNS_ONCE() << message << LL_ENDL;
-        error = FT_Load_Glyph(mFTFace, glyph_index, load_flags ^ FT_LOAD_COLOR);
-        if (FT_Err_Invalid_Outline == error
-            || FT_Err_Invalid_Composite == error
-            || (FT_Err_Ok != error && LLStringOps::isEmoji(wch)))
+        // Retry without color rendering — most common cause of failure on
+        // marginal color/SVG glyphs. Use & ~FT_LOAD_COLOR to clear the bit;
+        // an XOR would *add* it on a Grayscale request.
+        error = FT_Load_Glyph(getFTFace(), glyph_index, load_flags & ~FT_LOAD_COLOR);
+        if (FT_Err_Ok != error)
         {
-            // value~0 always corresponds to the 'missing glyph'
-            error = FT_Load_Glyph(mFTFace, 0, FT_LOAD_FORCE_AUTOHINT);
+            // value~0 always corresponds to the 'missing glyph'. Unconditional
+            // last-resort fallback so any retry failure (not just Invalid_*
+            // outlines or emoji codepoints) renders the notdef box rather than
+            // hitting the assert below.
+            error = FT_Load_Glyph(getFTFace(), 0, FT_LOAD_DEFAULT);
             if (FT_Err_Ok != error)
             {
                 LL_ERRS() << "Loading fallback for char '" << (U32)wch << "', glyph " << glyph_index << " failed with error : " << (S32)error << LL_ENDL;
@@ -670,18 +1006,124 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
         llassert_always_msg(FT_Err_Ok == error, message.c_str());
     }
 
-    llassert_always(! FT_Render_Glyph(mFTFace->glyph, gFontRenderMode) );
+    // An embedded bitmap strike and sbix / CBDT colour glyphs arrive already
+    // rasterized, with the slot's format left as FT_GLYPH_FORMAT_BITMAP.
+    // Rendering those again would throw the bitmap away. FT_Load_Glyph clears
+    // the slot on entry, so a buffer present here always belongs to this load.
+    if (!getFTFace()->glyph->bitmap.buffer)
+    {
+        // FT_Render_Glyph's mode arg overrides the load_flags' target. For
+        // LIGHT we want the lighter stem-weight filter to match the LIGHT
+        // autohinter's no-horizontal-fit output; everything else uses NORMAL.
+        const FT_Render_Mode render_mode = (mHinting == EFontHinting::LIGHT)
+            ? FT_RENDER_MODE_LIGHT
+            : FT_RENDER_MODE_NORMAL;
+        if (FT_Render_Glyph(getFTFace()->glyph, render_mode) != 0)
+        {
+            LL_WARNS() << "Failed to render glyph for character " << llformat("U+%X", U32(wch))
+                       << " at glyph index " << glyph_index << LL_ENDL;
+            // LIGHT is the only non-default target we ask for; fall back to
+            // NORMAL rather than leaving the slot without a bitmap.
+            if (render_mode != FT_RENDER_MODE_NORMAL
+                && FT_Render_Glyph(getFTFace()->glyph, FT_RENDER_MODE_NORMAL) != 0)
+            {
+                LL_WARNS() << "Fallback to FT_RENDER_MODE_NORMAL also failed for character "
+                           << llformat("U+%X", U32(wch)) << LL_ENDL;
+            }
+        }
+    }
 
     mRenderGlyphCount++;
 }
 
+bool LLFontFreetype::renderColrV1Glyph(U32 glyph_index, EFontGlyphType requested) const
+{
+    ALFT_Face ft = getFTFace();
+    if (!ft || !mFace)
+        return false;
+
+    // Outline-mode load just for metrics (advance, lsb/rsb deltas). NO_BITMAP
+    // skips FT producing a bitmap we'd immediately discard. NO_COLOR makes
+    // sure we don't get FT's COLRv0 fallback by accident.
+    const FT_Int32 metrics_flags = ((FT_Int32)mHinting & ~FT_LOAD_COLOR) | FT_LOAD_NO_BITMAP;
+    if (FT_Load_Glyph(ft, glyph_index, metrics_flags) != FT_Err_Ok)
+        return false;
+
+    // Reuse the painter (and its scratch buffers) across all renderGlyph
+    // calls on this thread. The painter holds no per-face state; declaring
+    // it static thread_local amortizes the small amount of construction cost
+    // and keeps the staging buffer sized to the running max glyph.
+    static thread_local ALFontColrV1Painter s_painter;
+    ALFontColrV1Painter::Result result;
+    // Foreground color: white for both BGRA and Gray paths. The BGRA atlas
+    // tints with white at draw time so CPAL palette colors come through
+    // verbatim; the Gray path needs white for the
+    // luminance-collapses-to-alpha invariant (max(Y, a*floor) == a holds
+    // iff R=G=B=A) so the rendered silhouette tints cleanly with
+    // text_color. Mixed CPAL+foreground glyphs render their foreground
+    // regions in white — threading the live text color through here is a
+    // follow-up.
+    const LLColor4U emoji_fg(255, 255, 255, 255);
+    const ALFontColrV1Painter::OutputFormat format =
+        (requested == EFontGlyphType::Grayscale)
+            ? ALFontColrV1Painter::OutputFormat::Gray
+            : ALFontColrV1Painter::OutputFormat::BGRA;
+    if (!s_painter.paintGlyph(mFace->getHbFont(), glyph_index, mPointSize,
+                              emoji_fg, mFace->paletteIndex(), format, result))
+    {
+        return false;
+    }
+    if (!result.mBitmap || result.mWidth <= 0 || result.mHeight <= 0)
+        return false;
+
+    // Patch FT's glyph slot in place. The existing pixel_mode switch in
+    // renderAndCreateGlyph reads exactly these fields and is oblivious to
+    // whether FT or our painter populated them. The slot resets on the next
+    // FT_Load_Glyph call, so the stale buffer pointer doesn't outlive its
+    // owner (the painter's mStaging vector, valid until next paintGlyph).
+    FT_Bitmap& bm = ft->glyph->bitmap;
+    bm.width      = static_cast<unsigned>(result.mWidth);
+    bm.rows       = static_cast<unsigned>(result.mHeight);
+    bm.pitch      = result.mPitch;
+    bm.buffer     = const_cast<unsigned char*>(result.mBitmap);
+    bm.pixel_mode = (format == ALFontColrV1Painter::OutputFormat::Gray)
+        ? (unsigned char)FT_PIXEL_MODE_GRAY
+        : (unsigned char)FT_PIXEL_MODE_BGRA;
+    bm.num_grays  = 256;
+    ft->glyph->bitmap_left = result.mLeft;
+    ft->glyph->bitmap_top  = result.mTop;
+    return true;
+}
+
+void LLFontFreetype::resetSelf(F32 vert_dpi, F32 horz_dpi)
+{
+    // Reset just this instance — clear its glyph caches, drop the previous
+    // face wrapper, and re-loadFace at the new DPI. Doesn't recurse into
+    // mFallbackFonts because shared fallback instances should be reset
+    // once by whoever owns the shared cache
+    // (LLFontRegistry::reloadForDpiChange).
+    resetBitmapCache();
+    loadFace(mName, mPointSize, vert_dpi, horz_dpi, mIsFallback, mFaceIndex, mHinting, mFontFlags, mVarAxes);
+
+    // Fallbacks we discovered through the OS are owned solely by this head,
+    // so the registry's cache-driven pass never reaches them. Without this
+    // they keep the old DPI while the head re-resolves, and
+    // mAttemptedFallbackChars stops them from ever being re-queried.
+    for (LLPointer<LLFontFreetype>& lazy : mLazyFallbacks)
+    {
+        lazy->resetSelf(vert_dpi, horz_dpi);
+    }
+}
+
 void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
 {
-    resetBitmapCache();
-    loadFace(mName, mPointSize, vert_dpi ,horz_dpi, mIsFallback, 0);
+    // Standalone API for callers outside the registry: do the full cascade
+    // (head plus its fallback chain). Inside the registry we use resetSelf
+    // and drive the fallback resets ourselves — see
+    // LLFontRegistry::reloadForDpiChange.
+    resetSelf(vert_dpi, horz_dpi);
     if (!mIsFallback)
     {
-        // This is the head of the list - need to rebuild ourself and all fallbacks.
         if (mFallbackFonts.empty())
         {
             LL_WARNS() << "LLFontGL::reset(), no fallback fonts present" << LL_ENDL;
@@ -690,7 +1132,7 @@ void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
         {
             for (fallback_font_vector_t::iterator it = mFallbackFonts.begin(); it != mFallbackFonts.end(); ++it)
             {
-                it->first->reset(vert_dpi, horz_dpi);
+                it->first->resetSelf(vert_dpi, horz_dpi);
             }
         }
     }
@@ -698,27 +1140,48 @@ void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
 
 void LLFontFreetype::resetBitmapCache()
 {
-    for (char_glyph_info_map_t::iterator it = mCharGlyphInfoMap.begin(), end_it = mCharGlyphInfoMap.end();
-        it != end_it;
-        ++it)
+    // No-op for the head's own state — atlas + glyph map are owned by
+    // ALFontFace and shared across freetypes that resolve to the same
+    // key. For DPI/scale changes that drive resetSelf, loadFace picks up
+    // a new face wrapper (different ALFontFaceKey) and the old wrapper
+    // drops to refcount 0 (naturally tearing down its atlas) once all
+    // heads have reloaded. For same-key resets the face cache is reused
+    // and any previously-rasterized glyphs remain valid.
+    if (!mIsFallback && mFace && !mFace->findGlyphInfo(0, EFontGlyphType::Grayscale))
     {
-        delete it->second;
-    }
-    mCharGlyphInfoMap.clear();
-    mFontBitmapCachep->reset();
-
-    // Adding default glyph is skipped for fallback fonts here as well as in loadFace().
-    // This if was added as fix for EXT-4971.
-    if(!mIsFallback)
-    {
-        // Add the empty glyph
-        addGlyphFromFont(this, 0, 0, EFontGlyphType::Grayscale);
+        // Pre-warm notdef only if the face cache doesn't already have it.
+        // Fresh face → insert; reused face → already-pre-warmed by an
+        // earlier head, skip.
+        addShapedGlyphFromFont(this, 0, EFontGlyphType::Grayscale);
     }
 }
 
 void LLFontFreetype::destroyGL()
 {
-    mFontBitmapCachep->destroyGL();
+    if (mFace)
+        mFace->destroyGL();
+
+    // Recurse into the fallback chain so each fallback face's atlas is
+    // cleared too. The registry's destroyGL iterates mFontMap (heads
+    // only), so without this recursion fallback faces — only reachable
+    // through the head's mFallbackFonts — would survive a teardown with
+    // stale atlas content. After a font reload that lands a new freetype
+    // on the SAME ALFontFaceKey (e.g. point size unchanged for a
+    // particular descriptor), getOrCreateFace returns the cached face
+    // with whatever glyphs the previous run rasterized into it.
+    // Idempotent: multiple heads may share a fallback face via
+    // mFallbackInstanceCache; calling destroyGL on an already-cleared
+    // face is a no-op. mIsFallback gate avoids descending into a
+    // fallback's own (empty) mFallbackFonts vector — only heads carry
+    // a populated chain.
+    if (!mIsFallback)
+    {
+        for (auto& fb : mFallbackFonts)
+        {
+            if (fb.first)
+                fb.first->destroyGL();
+        }
+    }
 }
 
 const std::string &LLFontFreetype::getName() const
@@ -742,26 +1205,34 @@ static void dumpFontBitmap(const LLImageRaw* image_raw, const std::string& file_
 void LLFontFreetype::dumpFontBitmaps() const
 {
     // Dump all the regular bitmaps (if any)
-    for (int idx = 0, cnt = mFontBitmapCachep->getNumBitmaps(EFontGlyphType::Grayscale); idx < cnt; idx++)
+    for (int idx = 0, cnt = getBitmapCache()->getNumBitmaps(EFontGlyphType::Grayscale); idx < cnt; idx++)
     {
-        dumpFontBitmap(mFontBitmapCachep->getImageRaw(EFontGlyphType::Grayscale, idx), llformat("%s_%d_%d_%d.png", mFTFace->family_name, (int)(mPointSize * 10), mStyle, idx));
+        const LLImageRaw* raw = getBitmapCache()->getImageRaw(EFontGlyphType::Grayscale, idx);
+        if (!raw) continue; // sheet was evicted
+        dumpFontBitmap(raw, llformat("%s_%d_%d_%d.png", getFTFace()->family_name, (int)(mPointSize * 10), mStyle, idx));
     }
 
     // Dump all the color bitmaps (if any)
-    for (int idx = 0, cnt = mFontBitmapCachep->getNumBitmaps(EFontGlyphType::Color); idx < cnt; idx++)
+    for (int idx = 0, cnt = getBitmapCache()->getNumBitmaps(EFontGlyphType::Color); idx < cnt; idx++)
     {
-        dumpFontBitmap(mFontBitmapCachep->getImageRaw(EFontGlyphType::Color, idx), llformat("%s_%d_%d_%d_clr.png", mFTFace->family_name, (int)(mPointSize * 10), mStyle, idx));
+        const LLImageRaw* raw = getBitmapCache()->getImageRaw(EFontGlyphType::Color, idx);
+        if (!raw) continue; // sheet was evicted
+        dumpFontBitmap(raw, llformat("%s_%d_%d_%d_clr.png", getFTFace()->family_name, (int)(mPointSize * 10), mStyle, idx));
     }
 }
 
 const LLFontBitmapCache* LLFontFreetype::getFontBitmapCache() const
 {
-    return mFontBitmapCachep;
+    return getBitmapCache();
 }
 
-void LLFontFreetype::setStyle(U8 style)
+void LLFontFreetype::collectGarbage() const
 {
-    mStyle = style;
+    // The sweep (and its throttle) lives on the shared face wrapper — the
+    // atlas and glyph map are face state, and siblings wrapping the same
+    // face should cost one sweep per interval, not one per head.
+    if (mFace)
+        mFace->collectGarbage();
 }
 
 U8 LLFontFreetype::getStyle() const
@@ -769,83 +1240,9 @@ U8 LLFontFreetype::getStyle() const
     return mStyle;
 }
 
-bool LLFontFreetype::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num, U16 width, U16 height, const U8* data, U32 stride) const
-{
-    LLImageRaw* image_raw = mFontBitmapCachep->getImageRaw(EFontGlyphType::Color, bitmap_num);
-    llassert(!mIsFallback);
-    if (!image_raw)
-    {
-        llassert(false);
-        return false;
-    }
-    llassert(image_raw->getComponents() == 4);
-
-    // NOTE: inspired by LLImageRaw::setSubImage()
-    U32* image_data = (U32*)image_raw->getData();
-    if (!image_data)
-    {
-        return false;
-    }
-
-    for (U32 idxRow = 0; idxRow < height; idxRow++)
-    {
-        const U32 nSrcRow = height - 1 - idxRow;
-        const U32 nSrcOffset = nSrcRow * width * image_raw->getComponents();
-        const U32 nDstOffset = (y + idxRow) * image_raw->getWidth() + x;
-
-        for (U32 idxCol = 0; idxCol < width; idxCol++)
-        {
-            U32 nTemp = nSrcOffset + idxCol * 4;
-            image_data[nDstOffset + idxCol] = data[nTemp + 3] << 24 | data[nTemp] << 16 | data[nTemp + 1] << 8 | data[nTemp + 2];
-        }
-    }
-
-    return true;
-}
-
-void LLFontFreetype::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num, U32 width, U32 height, U8 *data, S32 stride) const
-{
-    LLImageRaw *image_raw = mFontBitmapCachep->getImageRaw(EFontGlyphType::Grayscale, bitmap_num);
-
-    llassert(!mIsFallback);
-    if (!image_raw)
-    {
-        llassert(false);
-        return;
-    }
-
-    LLImageDataLock lock(image_raw);
-
-    llassert(image_raw->getComponents() == 2);
-
-    U8 *target = image_raw->getData();
-    llassert(target);
-
-    if (!data || !target)
-    {
-        return;
-    }
-
-    if (0 == stride)
-        stride = width;
-
-    U32 i, j;
-    U32 to_offset;
-    U32 from_offset;
-    U32 target_width = image_raw->getWidth();
-    for (i = 0; i < height; i++)
-    {
-        to_offset = (y + i)*target_width + x;
-        from_offset = (height - 1 - i)*stride;
-        for (j = 0; j < width; j++)
-        {
-            *(target + to_offset*2 + 1) = *(data + from_offset);
-            to_offset++;
-            from_offset++;
-        }
-    }
-}
-
+// (setSubImageBGRA / setSubImageLuminanceAlpha moved to ALFontFace —
+// they operate purely on the atlas, which now lives on the face wrapper.)
+// (setVariationAxis moved to ALFontFace::setVariationAxis — face state.)
 
 namespace ll
 {
@@ -859,45 +1256,124 @@ namespace ll
             {
                 mName = aName;
                 mSize = aSize;
-                mRefs = 1;
             }
             std::string mName;
             std::string mAddress;
             std::size_t mSize;
-            U32  mRefs;
         };
     }
 }
 
 U8 const* LLFontManager::loadFont( std::string const &aFilename, long &a_Size)
 {
-    a_Size = 0;
-    std::map< std::string, std::shared_ptr<ll::fonts::LoadedFont> >::iterator itr = m_LoadedFonts.find( aFilename );
-    if( itr != m_LoadedFonts.end() )
+    try
     {
-        ++itr->second->mRefs;
-        // A possible overflow cannot happen here, as it is asserted that the size is less than std::numeric_limits<long>::max() a few lines below.
-        a_Size = static_cast<long>(itr->second->mSize);
+        a_Size = 0;
+        std::map< std::string, std::shared_ptr<ll::fonts::LoadedFont> >::iterator itr = m_LoadedFonts.find(aFilename);
+        if (itr != m_LoadedFonts.end())
+        {
+            // A possible overflow cannot happen here, as it is asserted that the size is less than std::numeric_limits<long>::max() a few lines below.
+            a_Size = static_cast<long>(itr->second->mSize);
+            return reinterpret_cast<U8 const*>(itr->second->mAddress.c_str());
+        }
+
+        auto strContent = LLFile::getContents(aFilename);
+
+        if (strContent.empty())
+            return nullptr;
+
+        // For fontconfig a type of long is required, std::string::size() returns size_t. I think it is safe to limit this to 2GiB and not support fonts that huge (can that even be a thing?)
+        llassert_always(strContent.size() < std::numeric_limits<long>::max());
+
+        a_Size = static_cast<long>(strContent.size());
+
+        auto pCache = std::make_shared<ll::fonts::LoadedFont>(aFilename, strContent, a_Size);
+        itr = m_LoadedFonts.insert(std::make_pair(aFilename, pCache)).first;
+
         return reinterpret_cast<U8 const*>(itr->second->mAddress.c_str());
     }
+    catch (const std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS() << "Failed to load font. Out of memory." << LL_ENDL;
+    }
+    return nullptr;
+}
 
-    auto strContent = LLFile::getContents(aFilename);
+LLPointer<ALFontFace> LLFontManager::getOrCreateFace(const ALFontFaceKey& key)
+{
+    auto it = mFaceCache.find(key);
+    if (it != mFaceCache.end())
+        return it->second;
 
-    if( strContent.empty() )
+    LLPointer<ALFontFace> face = new ALFontFace;
+    if (!face->load(key.filename, key.face_index, key.point_size,
+                    key.vert_dpi, key.horz_dpi, key.hinting, key.flags,
+                    key.var_axes))
+    {
+        // Don't cache failures — caller handles retry through search paths.
         return nullptr;
-
-    // For fontconfig a type of long is required, std::string::size() returns size_t. I think it is safe to limit this to 2GiB and not support fonts that huge (can that even be a thing?)
-    llassert_always( strContent.size() < std::numeric_limits<long>::max() );
-
-    a_Size = static_cast<long>(strContent.size());
-
-    auto pCache = std::make_shared<ll::fonts::LoadedFont>( aFilename,  strContent, a_Size );
-    itr = m_LoadedFonts.insert( std::make_pair( aFilename, pCache ) ).first;
-
-    return reinterpret_cast<U8 const*>(itr->second->mAddress.c_str());
+    }
+    mFaceCache.emplace(key, face);
+    return face;
 }
 
 void LLFontManager::unloadAllFonts()
 {
+    // Order matters: face wrappers hold pointers into the byte cache via
+    // FT_OPEN_MEMORY. Drop the face cache first so FT_Done_Face fires while
+    // the bytes are still alive, then drop the byte cache.
+    mFaceCache.clear();
     m_LoadedFonts.clear();
+}
+
+void LLFontManager::collectGarbage()
+{
+    // Sweep mFaceCache: every live LLFontFreetype holds an
+    // LLPointer<ALFontFace> mFace, so the map's own LLPointer is the sole
+    // ref iff getNumRefs() == 1. Same-order rule as unloadAllFonts —
+    // ~ALFontFace runs FT_Done_Face, which dereferences the FT_OPEN_MEMORY
+    // bytes still in m_LoadedFonts.
+    std::size_t faces_trimmed = 0;
+    for (auto it = mFaceCache.begin(); it != mFaceCache.end(); )
+    {
+        if (it->second->getNumRefs() == 1)
+        {
+            it = mFaceCache.erase(it);
+            ++faces_trimmed;
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    // Sweep m_LoadedFonts: byte buffers are consumed only by surviving
+    // ALFontFace entries via FT_OPEN_MEMORY (see ALFontFace::load).
+    // Anything whose filename no longer keys any surviving face is dead.
+    std::unordered_set<std::string> live_filenames;
+    live_filenames.reserve(mFaceCache.size());
+    for (const auto& kv : mFaceCache)
+        live_filenames.insert(kv.first.filename);
+
+    std::size_t loaded_trimmed = 0;
+    for (auto it = m_LoadedFonts.begin(); it != m_LoadedFonts.end(); )
+    {
+        if (live_filenames.find(it->first) == live_filenames.end())
+        {
+            it = m_LoadedFonts.erase(it);
+            ++loaded_trimmed;
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    if (faces_trimmed || loaded_trimmed)
+    {
+        LL_INFOS() << "LLFontManager::collectGarbage: trimmed "
+                   << faces_trimmed << " faces, "
+                   << loaded_trimmed << " loaded fonts" << LL_ENDL;
+    }
 }

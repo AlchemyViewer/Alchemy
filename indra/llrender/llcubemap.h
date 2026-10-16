@@ -36,21 +36,10 @@ class LLVector3;
 // Environment map hack!
 class LLCubeMap : public LLRefCount
 {
-    bool mIssRGB;
 public:
-    LLCubeMap(bool init_as_srgb);
+    LLCubeMap();
     void init(const std::vector<LLPointer<LLImageRaw> >& rawimages);
 
-    // initialize as an undefined cubemap at the given resolution
-    //  used for render-to-cubemap operations
-    //  avoids usage of LLImageRaw
-    void initReflectionMap(U32 resolution, U32 components = 3);
-
-    // init from environment map images
-    // Similar to init, but takes ownership of rawimages and makes this cubemap
-    // respect the resolution of rawimages
-    // Raw images must point to array of six square images that are all the same resolution
-    void initEnvironmentMap(const std::vector<LLPointer<LLImageRaw> >& rawimages);
     void initGL();
     void initRawData(const std::vector<LLPointer<LLImageRaw> >& rawimages);
     void initGLData();
@@ -63,14 +52,15 @@ public:
 
     void disable(void);
     void disableTexture(void);
-    void setMatrix(S32 stage);
+    // Loads the rotation of the modelview into the texture matrix, so the
+    // lookup direction is in world space
+    void setMatrix(S32 stage, const LLMatrix4a& modelview);
     void restoreMatrix();
 
     U32 getResolution() { return mImages[0].notNull() ? mImages[0]->getWidth(0) : 0; }
 
     // generate mip maps for this Cube Map using GL
     // NOTE: Cube Map MUST already be resident in VRAM
-    void generateMipMaps();
 
     GLuint getGLName();
 
@@ -80,7 +70,7 @@ public:
     static bool sUseCubeMaps;
 
 protected:
-    friend class LLTexUnit;
+    friend class ALTextureSlot;
     ~LLCubeMap();
     LLGLenum mTargets[6];
     LLPointer<LLImageGL> mImages[6];

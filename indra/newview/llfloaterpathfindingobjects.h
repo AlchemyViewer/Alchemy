@@ -52,9 +52,11 @@ class LLTextBase;
 class LLFloaterPathfindingObjects : public LLFloater
 {
 public:
-    virtual void onOpen(const LLSD &pKey);
-    virtual void onClose(bool pIsAppQuitting);
-    virtual void draw();
+    AL_VIEW_TYPE(LLFloaterPathfindingObjects, LLFloater);
+
+    virtual void onOpen(const LLSD &pKey) override;
+    virtual void onClose(bool pIsAppQuitting) override;
+    virtual void draw() override;
 
 protected:
     friend class LLFloaterReg;
@@ -73,7 +75,7 @@ protected:
     LLFloaterPathfindingObjects(const LLSD &pSeed);
     virtual ~LLFloaterPathfindingObjects();
 
-    virtual bool                       postBuild();
+    virtual bool                       postBuild() override;
 
     virtual void                       requestGetObjects();
     LLPathfindingManager::request_id_t getNewRequestId();

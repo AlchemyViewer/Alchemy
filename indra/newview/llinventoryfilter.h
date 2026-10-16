@@ -208,12 +208,14 @@ public:
         Optional<FilterOps::Params> filter_ops;
         Optional<std::string>       substring;
         Optional<bool>              since_logoff;
+        Optional<S32>               order;
 
         Params()
         :   name("name"),
             filter_ops(""),
             substring("substring"),
-            since_logoff("since_logoff")
+            since_logoff("since_logoff"),
+            order("order")
         {}
     };
 
@@ -297,8 +299,7 @@ public:
 
     bool                showAllResults() const;
 
-    std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const;
-    std::string::size_type getFilterStringSize() const;
+    Match getFilterMatch(LLFolderViewModelItem* item) const;
     // +-------------------------------------------------------------------+
     // + Presentation
     // +-------------------------------------------------------------------+

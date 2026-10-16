@@ -23,6 +23,33 @@
  * $/LicenseInfo$
  */
 
+// Linearise an sRGB prim tint for a pass that shades in linear.
+//
+// The EXACT sRGB transfer function, not pow(2.2). The diffuse map this tint multiplies is
+// decoded by the hardware sampler (ALSampler::SRGBDecode), which applies the piecewise
+// curve; an approximation here would disagree with it. The two track each other well near
+// mid-grey and badly near black -- at a tint of 10/255 pow(2.2) is about 3.8x too dark, at
+// 32/255 about 28% -- which is exactly the range prim tints live in.
+//
+// Same maths as srgb_to_linear in environment/srgbF.glsl, which is not reachable from here:
+// attachShaderFeatures attaches that file to the VERTEX stage only for programs that
+// calculate atmospherics. This file it attaches to every vertex stage, which is why the
+// helper lives here rather than being repeated per writer.
+//
+// Converting in the vertex stage is deliberate: CPU-side would mean storing linear in the
+// 4xU8 colour attribute, where steps near black are ~0.0039 against sRGB's ~0.0003, so a
+// dark tint like (10,10,10) would quantise about 30% off. Here the attribute keeps its sRGB
+// precision, the conversion is per-vertex rather than per-fragment, and the interpolation
+// ends up linear -- which is what it should always have been. Alpha is never sRGB and passes
+// through untouched.
+vec4 linearizeVertexTint(vec4 tint)
+{
+    vec3 cs = max(tint.rgb, vec3(0.0));
+    vec3 low_range = cs / vec3(12.92);
+    vec3 high_range = pow((cs + vec3(0.055)) / vec3(1.055), vec3(2.4));
+    return vec4(mix(high_range, low_range, lessThanEqual(cs, vec3(0.04045))), tint.a);
+}
+
 // This shader code is taken from the sample code on the KHR_texture_transform
 // spec page page, plus or minus some sign error corrections (I think because the GLSL
 // matrix constructor is backwards?):
@@ -136,39 +163,6 @@ vec4 tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] kh
 
     // Remove scale from SL texture animation transform
     weights = normalize(weights);
-
-    // Convert back to right-handed coordinate system
-    weights.y = -weights.y;
-
-    // Similar to the MikkTSpace-compatible method of extracting the binormal
-    // from the normal and tangent, as seen in the fragment shader
-    vec3 vertex_binormal = vertex_tangent.w * cross(vertex_normal, vertex_tangent.xyz);
-
-    // An additional sign flip prevents the binormal from being flipped as a
-    // result of a propagation of the tangent sign during the cross product.
-    float sign_flip = khr_scale_sign.x * khr_scale_sign.y;
-    return vec4((weights.x * vertex_tangent.xyz) + (weights.y * vertex_binormal.xyz), vertex_tangent.w * sign_flip);
-}
-
-// Similar to tangent_space_transform but no texture animation support.
-vec4 terrain_tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] khr_gltf_transform)
-{
-    // Immediately convert to left-handed coordinate system, but it has no
-    // effect here because y is 0 ((1,0) -> (1,0))
-    vec2 weights = vec2(1, 0);
-
-    // Apply inverse KHR_texture_transform (rotation and scale sign only)
-    float khr_rotation = -khr_gltf_transform[0].z;
-    mat2 khr_rotation_mat = mat2(
-        cos(khr_rotation),-sin(khr_rotation),
-        sin(khr_rotation), cos(khr_rotation)
-    );
-    weights = khr_rotation_mat * weights;
-    vec2 khr_scale_sign = sign(khr_gltf_transform[0].xy);
-    weights *= khr_scale_sign.xy;
-
-    // Set weights to default if 0 for some reason
-    weights.x += 1.0 - abs(sign(sign(weights.x) + (0.5 * sign(weights.y))));
 
     // Convert back to right-handed coordinate system
     weights.y = -weights.y;

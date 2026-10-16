@@ -1,0 +1,209 @@
+# Architecture.md
+
+**Foundation layer:**
+- **llcommon** - Foundation: threading (`LLThread`, `LL::ThreadPool`, `LL::WorkQueue`), logging, string utils, timers, event system (`LLEventPump`), coroutines (`LLCoros`), LLSD (universal data type), `LLSingleton` base class, regular expressions (`ALRegex`, over RE2: linear time and no lookaround, so the script editor's find and vim search keep Boost.Regex for their Perl syntax)
+- **llmath** - Math primitives: vectors, matrices, quaternions, bounding boxes. Also includes mikktspace tangent generation and meshoptimizer
+
+**Data/IO layer:**
+- **llfilesystem** - Virtual filesystem and asset cache
+- **llxml** - XML parsing utilities (depends on llfilesystem)
+- **llimage** - Image decoding/encoding (JPEG, PNG, TGA, J2C via OpenJPEG or KDU)
+- **llimagej2coj** / **llkdu** - JPEG2000 codec implementations (OpenJPEG open-source, KDU proprietary optional)
+
+**Network layer:**
+- **llcorehttp** - Async HTTP client library (libcurl + OpenSSL). Used pervasively for API calls and asset fetches. Also the WebSocket server external editors connect to (Boost.Beast)
+- **llmessage** - Network protocol layer for communicating with Second Life servers. Includes UDP message system (`LLMessageSystem`) with template-based message definitions, and `LLAssetStorage` base
+
+**Rendering layer:**
+- **llrender** - OpenGL abstraction: shaders (`LLGLSLShader`, `LLShaderMgr`), vertex buffers (`LLVertexBuffer`), render targets (`LLRenderTarget`), textures, compute (`ALGPUBuffer`, `ALImageSlot`), font rendering (FreeType + HarfBuzz)
+- **llwindow** - Platform window management and input (native Win32/Cocoa, and SDL3 on Linux, where GL is EGL on Wayland and X11 alike -- the viewer includes no X11 or GLX header). Depends on llrender
+
+**Content model layer:**
+- **llinventory** - Inventory item/folder data model
+- **llcharacter** - Avatar skeleton, joints, animation
+- **llprimitive** - 3D primitive object data model (prims, sculpts, mesh, GLTF via tinygltf, collision via VHACD)
+- **llappearance** - Avatar appearance/baking (depends on llcharacter, llinventory, llimage, llrender)
+- **llaudio** - Audio engine abstraction (OpenAL or FMOD Studio, Vorbis decoding)
+
+**UI layer:**
+- **llui** - UI widget framework: panels, floaters, buttons, text editors, lists, toolbars, notifications. Layout defined in XUI (XML) files. Includes spell-check via Hunspell. Linden Lab's widgets sit at its top as upstream has them; Alchemy's own are in folders, each on the include path: `base/` (view types, skin words, surfaces, matching), `text/` (`ALTextView` and its document, undo, editing, layout, search, ruler, find bar), `code/` (`ALCodeEditor`, completion, fixes, folds, the grammar and highlighter, the keymap), `diff/` (`ALTextDiff`, `ALDiffView`), `vim/`, `xui/` (XUI Studio's model), `fields/` (the property grid and its field editors), `studio/` (a studio window's panes, folds, docks, quick open) and `widgets/`
+
+**Application layer:**
+- **lllogin** - Login subsystem
+- **llplugin** - Plugin framework for out-of-process media (CEF browser, VLC)
+- **llwebrtc** - WebRTC voice integration (conditional)
+- **llphysicsextensionsos** - Physics extensions stub (VHACD convex decomposition)
+- **media_plugins** - Out-of-process media plugin implementations (CEF, VLC, GStreamer)
+- **alscript** - Script Studio's language services, free of UI (depends on llcommon, llmath, and SLua's Luau with the Tailslide it carries). One folder a part, each on the include path: `core/` (problems, symbols, the lexicon, messages, weights, the formatter), `lint/` (the studio's lints and fixes), `lsl/` (the LSL analyzer over Tailslide, the SLua converter, and `ALLSLDepth`, the bound on how deep a parsed tree may go for any of them to walk it), `lsl/optimizer/` (the LSL optimizer, a pass a file, sharing `allsloptimizerpass.h`), `luau/` (the SLua analyzer), `masters/` (files on disk as the masters of scripts in the world: the links and their index, a master found from a script's `@file` hint or its name under the blessed folders, and what a send does) and `preprocessor/` (the preprocessor and its includes)
+- **lscript** - LL's LSL compiler and LSO VM, restored as a test-only reference for the optimizer and the weigher; built with tests, never linked into the viewer
+- **rust** - The Rust the viewer builds: one Cargo workspace and lock file, imported by Corrosion, a vcpkg port. It holds velopack_libc, Velopack's C API over the `velopack` crate from crates.io, its sources and headers vendored from the release with one buffer fix marked Alchemy (`cmake/Velopack.cmake`): a DLL on Windows, a static library on macOS and Linux, the release build for every configuration
+- **newview** - The main viewer application. Contains all viewer-specific logic: the rendering pipeline, scene graph, UI floaters/panels, settings, object/avatar systems, and the application entry point. Links against all libraries above plus third-party: Tracy, OpenXR, Discord SDK, NVAPI, TinyEXR, Velopack
+
+### Application Lifecycle
+
+The viewer application is `LLAppViewer` (derives from `LLApp`) in `indra/newview/llappviewer.h/.cpp`. The lifecycle is three methods:
+
+1. **`init()`** — Cache, window creation, graphics/feature detection, worker thread creation (texture cache, image decode, texture fetch), singleton initialization, event system setup
+2. **`frame()`** — Called in a loop. Processes events/messages, updates objects/regions/avatars, renders the frame, sleeps to maintain FPS cap
+3. **`cleanup()`** — Shuts down worker threads, disconnects from simulators, saves settings/cache, releases resources
+
+### Singleton Pattern
+
+The codebase uses `LLSingleton<T>` (`indra/llcommon/llsingleton.h`) extensively. It automatically tracks dependencies between singletons (by monitoring `getInstance()` calls during construction) and shuts them down in reverse dependency order. States: `UNINITIALIZED → CONSTRUCTING → INITIALIZING → INITIALIZED → DELETED`. A lighter `LLSimpleton<T>` variant is used by many Alchemy-specific classes.
+
+### Event System & LLSD
+
+**LLSD** (`indra/llcommon/llsd.h`) is the universal data container used for event messages, network messages, settings, HTTP bodies, and capability responses. Supports: Boolean, Integer, Real, UUID, String, Date, URI, Binary, Map, Array, and Undefined. Value semantics. Not thread-safe — transfer ownership across threads.
+
+**LLEventPump** (`indra/llcommon/llevents.h`) is the pub/sub event bus. Subsystems communicate by posting LLSD events to named pumps. Listeners return true to stop propagation. `LLEventAPI` wraps C++ APIs as event-driven interfaces with introspection. The `LLEventDispatcher` dispatches events to methods by string name.
+
+### Threading & Coroutines
+
+**Threads:** `LLThread` (basic), `LLQueuedThread`/`LLWorkerThread` (request-queue based), `LL::ThreadPool` + `LL::WorkQueue` (modern work dispatch with configurable pool sizes via `ThreadPoolSizes` setting). Work queues support `post()` (fire-and-forget), `postTo()` (handshake between queues), and `waitForResult()`.
+
+**Coroutines:** `LLCoros` singleton (`indra/llcommon/llcoros.h`) manages `boost::fibers::fiber` instances. Launched via `LLCoros::instance().launch("name", callable)` — always pass parameters by value. Key primitives in `lleventcoro.h`: `llcoro::suspend()` (yield one tick), `suspendUntilTimeout(seconds)`, `postAndSuspend(event, request_pump, reply_pump)`. Coroutines are the preferred pattern for async work, replacing older callback-based approaches.
+
+**Mutexes** are boost::fiber-aware (`boost::fibers::mutex`, `boost::fibers::condition_variable`) so coroutines and threads interoperate correctly.
+
+### Network & Region System
+
+**UDP Messages:** `LLMessageSystem` (`indra/llmessage/message.h`) handles viewer↔simulator communication using template-defined message formats with zerocoding, reliable/unreliable delivery, acks, and resends. `LLCircuitData` (`llcircuit.h`) tracks per-simulator connection state (packet IDs, ping, throttle buckets).
+
+**Regions:** `LLViewerRegion` (`indra/newview/llviewerregion.h`) represents a 256×256m simulator region containing terrain, objects, spatial partitions, capabilities (HTTP API endpoints), and an object cache (~50k objects). `LLWorld` singleton manages the set of nearby regions as the agent moves.
+
+**Assets:** `LLViewerAssetStorage` (`indra/newview/llviewerassetstorage.h`) fetches assets via coroutine-based HTTP requests using capability URLs from the region. Textures have a dedicated pipeline: `LLTextureFetch` (worker thread) → `LLImageDecodeThread` → `LLTextureCache` (disk) → `LLViewerTextureList` (in-memory).
+
+### Viewer Object System
+
+`LLViewerObject` (`indra/newview/llviewerobject.h`) is the base for all world objects, deriving from `LLPrimitive`. Key subclasses:
+- **`LLVOVolume`** (`llvovolume.h`) — Most common type: prims, meshes, sculpts. Contains volume geometry with multiple faces, materials, texture animation, media-on-surface, flex
+- **`LLVOAvatar`** (`llvoavatar.h`) — Avatar with skeletal system, mesh deformation, animation blending, appearance layering, impostor rendering. `LLVOAvatarSelf` is the player's own avatar
+- **`LLVOGrass`**, **`LLVOTree`**, **`LLVOSurfacePatch`** (terrain), **`LLVOPartGroup`** (particles), **`LLVOWLSky`** (sky dome)
+
+Water is not an object. A region's water height is `LLSurface`'s; `ALWaterSurface` (`alwatersurface.h`, owned by `LLPipeline`) lays the water out around the main camera at the start of each frame's display, before the mirrors, the shadow fit and the probes read it, from `ALWaterField` (`alwaterfield.h`, pure arithmetic): a square of region-sized cells over the loaded regions, each at its region's height and the empty ones at the agent region's, and rings of quads doubling in size out to the rim. A 32x32 cell map holds the heights, and the water is drawn instanced with no vertex buffer, placed by `environment/waterSurface.glsl` in parts (`ALWaterField::Draw`): the cells, the rings at three triangles a quad, ring 0's four sides fanned onto the square's cell corners, and, with waves, the cells beside the patches fanned onto the patches' corners. Every vertex two parts share is worked from the same exact multiples and lies on no edge it is not a corner of, so the field has no T-junction for a crack to open along. With `AlchemyRenderWaterWaves` on a GL 4.0 context, the main view draws the cells within the tessellation reach instead as 32 m tessellation patches (probe captures and mirrors, whose hero probe is a cube of faces, draw the field flat) (`gWaterWavesProgram`: `waterPatchV`, `waterTC`, `waterTE`; built, with the depth pyramid's program, only while the waves are wanted, and their failing leaves the water flat), their edges past the reach left whole so they meet the cells beside them corner to corner, displaced by heights integrated from the normal maps that shade the surface: `ALWaterHeightBake` (pocketfft, Frankot-Chellappa) bakes each map on the General queue and `ALWaterSurface` keeps the heights as RG16F textures. The waves' bound, A, widens the shadow fit, the field's slab and the sky-behind query, which counts the field raised by A as well; the plane stays the plane for every height consumer. The patches are drawn before the flat field and front to back along the view (`waterPatchOrder`), so the depth test turns away water a nearer crest hides before it is shaded, and the control stage drops a patch whose box is out of the frustum or, in the main view where the session computes (`AlchemyRenderWaterOcclusionCull`), wholly behind the scene's depth, through `ALDepthPyramid` built from the depth the water pass copied.
+
+`LLViewerObjectList` (`llviewerobjectlist.h`) is the global registry tracking all objects by UUID.
+
+### Rendering Pipeline
+
+The deferred rendering pipeline is orchestrated by `LLPipeline` (`indra/newview/pipeline.h/.cpp`).
+
+**Render passes** execute in this order:
+1. **Geometry/GBuffer** (`renderGeomDeferred()`) — Writes to multiple render targets
+2. **Shadows** (`renderGeomShadow()`) — 4 sun shadow cascades + 2 spot light shadow maps
+3. **Deferred Lighting** (`renderDeferredLighting()`) — Sun, point lights (up to 16 batched), spot lights, with reflection probe influence
+4. **Post-Deferred** (`renderGeomPostDeferred()`) — Alpha, water, atmospheric haze
+5. **Post-Processing** — Luminance/exposure, depth of field, bloom, then one pass doing tonemapping, color grading and the bloom composite together, then AA and CAS
+6. **Finalize** (`renderFinalize()`) — Final blit with lens distortion, vignette, film grain, dithering, CVD compensation
+
+Depth of field runs **before** bloom and before the tonemapper, on linear HDR. Gathering over display-space values gathers over already-compressed highlights, and bloom-after-defocus is the optical order, so a defocused highlight blooms as a soft disc rather than a sharp core on a blurred background.
+
+**Distances** (`ALFarPlane`, `alfarplane.h`) are kept apart, each with its own reader:
+- The **draw distance** (`RenderFarClip`, `LLViewerCamera::getFar()`) is a content budget: cull sphere, interest list, object cache, fog, shadow splits. Its ceiling is `MAX_FAR_CLIP` (2048 m) under reverse-Z and `FORWARD_Z_MAX_FAR_CLIP` (512 m) under forward 24-bit depth.
+- The **projection's far plane** (`LLViewerCamera::getProjectionFar()`) only says how depth is stored. Under reverse-Z the main view's projection is infinite (`al_perspective` with `z_far` = infinity, stored depth = near / distance); forward-Z, probe captures and previews keep `FINITE_PROJECTION_FAR` (1024 m). Depth reconstruction floors w so the cleared depth unprojects to `MAX_RECONSTRUCT_DISTANCE`, never infinity.
+- The **sky** draws last, on the far plane, writing no depth: it is wherever the depth buffer still holds the cleared value, under either projection. Every pass that tells sky from geometry (`isFarDepth`, the lens flare's `skyOf`, the water haze's fog past the surface) tests for exactly that value, and the full-screen lighting and haze passes leave it to the hardware: their triangles lie on the far plane too (`sunLightV.glsl`, `softenLightV.glsl`, `hazeV.glsl`), and `ALDrawnOnly` (`aldepthbounds.h`) holds them off the cleared value with the depth bounds test where the context has it, the depth test otherwise, so the sky is rejected before it is shaded. The depth test can do it only by testing against the scene's direction, which NVIDIA's hierarchical depth stops culling for until the next clear; the bounds also hold each local light's draw to the depths its sphere spans.
+- **Terrain and water** ignore the draw distance and reach as far as the projection lets them: under the infinite one terrain is culled to `TERRAIN_REACH` (8 km) and the water's rings stretch `EDGE_WATER_STRETCH` (256 km) past the cell square, to the horizon.
+- **Haze** is worked in the sky dome's frame wherever geometry is hazed: WindLight's `calcAtmosphericVars` takes eye space and turns it by `eyeToSky`, which the Environment block carries for the camera of each environment update (`ALFarPlane::eyeToSkyFrame`), so its altitude is the world's and its sun glow does not turn with the camera. The water surface alone, in the haze pass (`hazeF.glsl`'s `HAZE_ON_WATER` variant, drawn where the water marked its pixels in the stencil), converges as it thickens on the dome's own colour behind it (`mSkyBehind`), so far water meets the sky without a seam; it lies below the horizon, where the dome is the horizon's colour, while terrain rising above it would take the dome's fast change there and the glow of a sun behind it.
+
+**GBuffer layout** (MRT attachments on `deferredScreen`):
+- frag_data[0]: Base color (GL_RGBA)
+- frag_data[1]: Specular/ORM — PBR occlusion/roughness/metallic (GL_RGBA)
+- frag_data[2]: Normals (GL_RGBA16 or GL_RGB10_A2)
+- frag_data[3]: Emissive (GL_R11F_G11F_B10F, optional via `RenderEnableEmissiveBuffer`)
+
+**Render target packs** (`RenderTargetPack` in pipeline.h):
+- `mMainRT` — Full resolution for main scene
+- `mAuxillaryRT` — Reflection probe faces, at probe resolution × `ALProbeSuperSample`, and scaled by `RenderResolutionDivisor`/`RenderResolutionMultiplier` like the main pack. The GLTF material preview renders its sphere and post chain here
+- `mHeroProbeRT` — High-res hero probe rendering
+- `mPreviewMap` and `mBakeMap` sit outside the packs and are sized to their users, not the screen: `mPreviewMap` is `MAX_PREVIEW_WIDTH` square, the target every UI preview (`LLViewerDynamicTexture` below `ORDER_LAST`) draws into and copies out of; `mBakeMap` is the appearance bake scratch target
+- Additional targets: `mSceneMap` (SSR input), `mLuminanceMap`/`mExposureMap` (auto-exposure), `postPingMap`/`postPongMap` (post-process ping-pong), `mFXAAMap`, `mSMAABlendBuffer`, `bloomMip[BLOOM_MAX_MIPS]` (HDR bloom pyramid, up to 7 levels, live count in `bloomMipCount`), `mWaterDis` (refraction; also lends its quadrants to the cross-screen filter's two scratch buffers and accumulator, and its whole to depth of field's sharp copy, while it is idle after the water pass — `crossFilterReady`/`crossFilterWidth`/`crossFilterHeight` tell `colorCorrect` where the accumulator is), `mSpotShadow[2]`, `mPbrBrdfLut`, `mSkyBehind` (the sky dome redrawn at half resolution with no depth, so it covers what the world hides; the haze pass converges far water on it; drawn for the main view only, while its frustum holds the water and the camera is above it, and then on the GPU only if an occlusion query over the water field saw any of it, `mSkyBehindQuery`), `mDepthPyramid` (`ALDepthPyramid`: eight levels of an R32F mip chain, each texel the farthest depth under it, built by compute in two dispatches of shared-memory tiles from the view's depth where a cull asks for it; `depthPyramidUtil.glsl`'s `depth_pyramid_box_visible` is the test)
+- `mGlow[3]` is the **legacy non-HDR glow chain**, not the bloom pyramid, and lives outside the pack. So does `mLensDirtMap`, the generated lens dirt plate — an `LLRenderTarget` allocated the first frame the effect is enabled and released when it is switched off.
+
+**Post-processing chain:**
+- **Auto-exposure:** Progressive histogram (`gLuminanceProgram`, `gExposureProgram`) with history fade
+- **Lens flare sun state:** a 2x1 temporal pass (`gLensFlareStateProgram`, `lensFlareStateF.glsl`) run just before colour correction measures how much of the sun disc is unoccluded and its colour, and filters both under a rate limit; `computeLensFlare` in `postEffectUtilsF.glsl` reads one texel of it. The shader is the source of truth for the filter; `scripts/content_tools/check_lens_flare_state.py` mirrors it and is its regression test
+- **Bloom:** Bright-area extraction → downsample/upsample pyramid over `bloomMip[]` with warmth correction and optional halation carried in alpha. The additive composite is **not** a pass of its own: it is folded into `colorCorrect`'s `BLOOM_COMPOSITE` permutation. `compositeBloomHDR` is a standalone equivalent that nothing currently calls
+- **Cross-screen (star) filter:** `gCrossFilterProgram` streaks every thresholded highlight, seeded from `bloomMip[0]` and accumulated through three quadrants of `mWaterDis`, which the two shaders address through `uCrossRegion`/`uCrossClamp` so a tap at the quadrant's edge clamps exactly as it did at a dedicated target's edge. One strictly one-sided three-pass chain per arm, at strides that tile the reachable offsets exactly once — the tiling is load-bearing and the shader explains why. Composited in `colorCorrect` alongside the pyramid, so it inherits bloom strength. Each pass reads a quadrant the pass before it wrote while `mWaterDis` is still attached, which GL defines only across `glTextureBarrier`, so the filter runs only where that resolved (GL 4.5, or `GL_ARB_texture_barrier`/`GL_NV_texture_barrier`) and the Lightbox hides its sections elsewhere
+- **Lens dirt:** `gLensDirtGenProgram` draws the grime plate into `mLensDirtMap` — dust motes, wipe smudges, stray fibres, fine grit and optional scratches, built from hashes and distance fields rather than loaded from an image. Not a per-frame pass: it runs when a generation parameter moves or the window resizes, guarded by the cached parameter set in `mLensDirtParams`, which is also what makes a failed allocation stop retrying. Generated at the frame's own resolution, so nothing has to fit a square plate to a wide window. A rebuild is held off while `mLensDirtSliderHeld` is raised — the Lightbox raises it on a generation slider's mouse-down and lowers it on mouse-up, so a drag costs one plate on release rather than one per frame. Everything that is not a drag (typed values, resets, applying a Look, undo, window resizes) rebuilds immediately, which is what a settle timer would have delayed for no reason. `colorCorrect` multiplies the accumulated bloom and flare terms by it
+- **Depth of Field:** three passes — circle of confusion (`gDeferredCoFProgram`, writing sharp linear colour plus signed CoF in alpha), a gather blur at `CameraDoFResScale`, and a combine (`gDeferredDoFCombineProgram`) back over `mRT->screen` under `setColorMask(true, false)` so the legacy prim-glow alpha tag survives. It owns no targets: the sharp copy borrows `mWaterDis`, which the water passes refill each frame and have finished with, and the blur borrows `bloomMip[0]` between the luminance read and the extract pass (`postPongMap` without HDR). The blur viewport is clamped to what mip 0 can hold when `RenderBloomResolutionScale` shrinks it, and the combine is told the fraction it actually covers via `res_scale` and where it sits via `dof_uv_scale`. The gather has four compile-time variants over two axes, `FRONT_BLUR` × `DOF_SHAPED`: `gDeferredPostProgram`, `gDeferredPostProgramNoNear`, `gDeferredPostProgramShaped`, `gDeferredPostProgramNoNearShaped`. Optics: `CameraFNumber`, `CameraFocalLength`, `CameraFieldOfView`, `CameraMaxCoF`, `CameraDoFResScale`
+- **Bokeh shaping** (inside the `DOF_SHAPED` gather): polygonal aperture (`RenderBokehApertureBlades`, `Rotation`, `Curvature`), anamorphic squeeze, cat's-eye optical vignetting, defocus fringing, and the lens aberrations — spherical (`RenderBokehSphericalAberration`), field stretch for swirl and coma (`RenderBokehFieldStretch`, `FieldFalloff`) and comatic asymmetry. The CPU picks a shaped variant only when one of them is actually doing something
+- **Screen Space Reflections:** Class 3+ feature, iterative ray marching
+- **Tonemapping:** ACES, Reinhard, Filmic, AGX — selectable via `AlchemyRenderTonemapType`
+- **Color Grading:** 3D LUT-based (`gDeferredPostGammaCorrectCGLutProgram`, `mCGLut`), plus a CPU-baked 1D tone curve LUT (`mToneCurveLut`, baked from `ALToneCurveSet` on a dirty flag) and precomputed split-tone ramps; the helpers live in `colorGradeUtilF.glsl` under `shaders/class1/alchemy/`
+- **Anti-aliasing:** FXAA (1-pass, `gFXAAProgram[4]`) or SMAA (3-pass edge detect → blend weights → neighborhood blend, `gSMAAEdgeDetectProgram[4]`/`gSMAABlendWeightsProgram[4]`/`gSMAANeighborhoodBlendProgram[4]`). CAS (Contrast Adaptive Sharpening) via `gCASProgram`
+- **Final blit effects** (`blitWithEffectsF.glsl` in `shaders/class1/alchemy/`): geometric lens distortion (Brown-Conrady radial `k1`/`k2` and tangential `p1`/`p2`, anamorphic squeeze, decentring, with the auto-fit rescale solved on the CPU and out-of-frame samples masked to black), vignette (configurable shape/softness/color), film grain (luma/color/coarse/photon styles), TPDF dithering, CVD compensation/preview. Distortion warps the world view only — overlays drawn after the blit do not follow it
+- **Effects inside `colorCorrectF.glsl`** (`shaders/class1/alchemy/`), which runs in every variant including the no-post ones and so gates them itself: chromatic aberration (per-channel offset with amount, falloff, angle, anisotropy), the five-component lens flare, the bloom and cross-filter composite, and lens dirt — the generated grime plate above, multiplied by the accumulated flare and bloom terms, so it only lights up where something already is
+
+Post-processing settings are exposed in the Lightbox floater (`ALFloaterLightBox`); see `doc/LIGHTBOX.md` for how to add UI sections for new effects.
+
+**Snapshot cutouts.** The snapshot floater's Cutout mode (and File > Take Snapshot to Disk while it is on) draws one avatar with what it wears, or one linkset, and fills the rest with a colour whose alpha may be 0. The request is `ALSnapshotCutout`, built only by `ALSnapshotCutout::fromSettings()`; the subject is armed in `ALRenderIsolation`, whose `Scope` covers the frames of one `rawSnapshot`:
+- **Cull:** `LLPipeline::cullingToCutoutSubject()` is true for the main camera's pass only, so shadows, probes and impostor bakes keep the whole world and the subject stays lit where it stands. The choke points are the two sky pushes in `updateCull`, the render-by-group branch of `markNotCulled`, `markVisible` and a `stateSort(LLDrawable*)` backstop; what they turn away is still marked visible, for object-cache eviction, LOD and texture priority. A static linkset is made active on arming, since only a bridge of its own separates its geometry from its neighbours'. The water is drawn from its field rather than culled, so the water pool runs no pass there (`LLDrawPoolWater::getNumPostDeferredPasses`).
+- **Coverage:** kept in `mRT->screen`'s alpha as an impostor bake keeps it — `seedCutoutCoverageFromDepth` once the opaque forward pools (fullbright, shiny) have drawn and before the first blended one, then the alpha pool's blend (`alphaWritesCoverage()`), which the haze pass leaves alone — and written into the finished frame's alpha by `copyCutoutCoverageToAlpha`, since nothing in the post chain carries usable alpha. `colorCorrect` divides coverage out before grading and multiplies it back after (`uCutoutPremultiplied`).
+- **Post:** a cutout frame drops the lens and print effects (`suppressesLensAndPrintEffects()`), measures nothing (no metering, SSR copy, scopes or pixel probe) and runs nothing that spreads past a pixel (DoF, bloom, glow, AA, CAS); `render_ui` draws nothing over it. Edges come from rendering offscreen at a multiple of the size (the screen targets' size, with the resolution multiplier, held under the floater's largest snapshot) and averaging down while premultiplied in `ALCutoutImage::resolve`; `ALCutoutImage::layOverFill` then composites over the fill and keeps alpha only where the format can (`LLSnapshotModel::keepsAlpha`). The preview keeps the resolved cutout, so a new fill or format is laid down again without a render (`ALSnapshotCutout::drawsSameAs`).
+
+### Shader System
+
+Shader management has two layers:
+- `LLShaderMgr` (`indra/llrender/llshadermgr.h/.cpp`) — Base shader manager with uniform enums, binding, and feature defines
+- `LLViewerShaderMgr` (`indra/newview/llviewershadermgr.h/.cpp`) — Viewer-specific shader loading, program definitions, and quality class selection
+
+**Shader objects** have one owner each. A program owns the objects it compiles from its own files and deletes them once it links, detaching every object then, since a linked program needs none. The shared objects every program attaches by name are `LLShaderMgr`'s, deleted by `clearShaderObjects`, so unloading or rebuilding one program leaves the rest whole. `LLShaderMgr::sLiveObjects` counts what is compiled and not yet deleted.
+
+**Samplers**: every sampler type GL has gets a texture unit, float, int and unsigned, arrays and buffers included, in reserved-uniform order. `LLImageGL` and `LLRenderTarget` allocate, clear and sample the sized integer formats: point sampled, no mips.
+
+GLSL shaders live in `indra/newview/app_settings/shaders/` organized by quality class and category:
+- **`class1/`** — Base shaders (all hardware)
+- **`class2/`** — Mid-tier features
+- **`class3/`** — Advanced features (SSR, high-quality lighting)
+- Categories: `deferred/`, `objects/`, `environment/`, `alchemy/` (Alchemy post-processing), `effects/` (glow, the bloom pyramid, the cross-screen filter), `windlight/`, `avatar/`, `interface/`
+
+**Compute** (GL 4.3) runs through the same classes as everything else. `LLGLManager::mHasCompute` says the context has it and holds its limits; `LLRender::sCompute`, latched by `LLViewerShaderMgr::setShaders` from that, the GLSL the feature manager left (4.30) and `AlchemyRenderDisableCompute`, says the session uses it, and is what every compute feature gates on. A program whose `mShaderFiles` are `GL_COMPUTE_SHADER` is a compute program (`LLGLSLShader::isCompute`): `createShader` builds it as any other, through the binary cache, at `#version 430`, and `attachShaderFeatures` attaches nothing to it. A graphics program that reads storage blocks or images sets `mFeatures.mMinGLSLVersion` to 430; nothing else is raised past 420, since 4.30 makes `buffer` and `shared` keywords. Image uniforms get image units at link as samplers get texture units, in reserved-uniform order, an array's elements consecutive, and bind through `bindImage` onto `ALImageSlot`s, which `LLRender` keeps as it keeps the texture slots (redundant binds skipped, `refreshState` re-issues, `forgetTextures` drops). Storage blocks have their own reserved table (`LLShaderMgr::mReservedStorageBlocks`) and fixed binding points, the same in every program, as the engine's uniform blocks have theirs: a buffer bound once at a block's point (`gGL.bindStorageBuffer`, kept as the image units are) serves every program after it. Their stores are `ALGPUBuffer`s (immutable, DSA where it resolved; also the indirect commands); `ALGPUReadback` reads results back a frame or two later without waiting, and `ALGPUStream` writes per-frame data through a fenced, persistently mapped ring. `LLGLSLShader::dispatch`/`dispatchThreads`/`dispatchIndirect` and `gGL.drawArraysIndirect` flush what is batched and sync the matrices, as draws do, and `gGL.memoryBarrier` (eBarrier bits, stated by the caller for the reads that follow) flushes. macOS's 4.1 context has none of it but the indirect draw.
+
+Key shader groups: GBuffer write (`gDeferredDiffuseProgram`, `gDeferredPBROpaqueProgram`, `gDeferredBumpProgram`, `gDeferredMaterialProgram[]`, etc.), deferred lighting (`gDeferredSunProgram`, `gDeferredLightProgram`, `gDeferredMultiLightProgram[16]`, `gDeferredSpotLightProgram`), shadows (`gDeferredShadowProgram` and variants), environment (`gDeferredWLSkyProgram`, `gWaterProgram`, `gHazeProgram`), compute (`gDepthPyramidProgram`), post-processing (tonemap, FXAA, SMAA, CAS, the bloom pyramid programs, `gCrossFilterProgram`, and the four-variant DoF gather set).
+
+### Draw Pool & Spatial System
+
+**Draw pools** (`indra/newview/lldrawpool.h` and `lldrawpool*.h`) group geometry by material type for batched rendering. Each pool corresponds to a render pass. Key pools: `POOL_SIMPLE`, `POOL_BUMP`, `POOL_MATERIALS` (legacy), `POOL_GLTF_PBR` (PBR opaque), `POOL_GLTF_PBR_ALPHA_MASK`, `POOL_TERRAIN`, `POOL_AVATAR`, `POOL_CONTROL_AV` (animesh), `POOL_ALPHA_PRE_WATER`/`POOL_ALPHA_POST_WATER`, `POOL_WATER` (no faces: it draws the water field), `POOL_WL_SKY`, `POOL_GLOW`. Many pools have `_RIGGED` pass variants for skinned geometry.
+
+**Spatial partitioning** uses an octree. `LLSpatialPartition` (`indra/newview/llspatialpartition.h`) is the base, with specialized partitions: `LLVolumePartition`, `LLTerrainPartition`, `LLTreePartition`, `LLGrassPartition`, `LLParticlePartition`. `LLSpatialGroup` is an octree node grouping drawable geometry. `LLDrawInfo` encapsulates a single draw call (vertex buffer, index range, textures, material, blend mode, skin info). `LLCullResult` stores per-frame visible geometry organized by render type. The cull (`LLViewerOctreeCull`) visits each node's children nearest the camera first (`LLOctreeTraveler::traverseNearFirst`, by the node's child map), and the render map keeps the order groups were found in, so opaque geometry reaches the GPU roughly front to back; culls whose results keep no order (the object cache's, selection) and the sun's shadow cameras, which stand at the origin, keep the children's own order.
+
+The G-buffer writers that can discard are kept to the passes that need it: the opaque PBR, bump and PBR terrain programs have alpha-mask twins (`HAS_ALPHA_MASK`), bound only for masked content, since a program that can discard has its depth written after it shades.
+
+### PBR Materials & Reflection Probes
+
+**PBR:** GLTF PBR metallic-roughness workflow. `LLFetchedGLTFMaterial` (`llfetchedgltfmaterial.h`) wraps material data (base color, normal, metallic/roughness, emissive, occlusion textures). `LLGLTFMaterialList` manages the material registry. Terrain also supports PBR via `gDeferredPBRTerrainProgram[]`. BRDF LUT generated at startup via `gDeferredGenBrdfLutProgram`.
+
+**Reflection probes:** `LLReflectionMapManager` (`llreflectionmapmanager.h`) manages up to 256 probes with box/sphere shapes, stored in cubemap arrays. Resolution: 128×128 radiance; irradiance is nine spherical-harmonic coefficients per probe (`shProjectF.glsl`), integrated from the 8×8 mip by default (`ALProbeSHProjectionRes`). The projection runs row-parallel by default (`ALProbeSHProjectionTwoPass`): one fragment per coefficient and face row writes a partial-sum strip, then `shProjectReduceF.glsl` adds the rows. Probes are blended via neighbor tracking. `LLHeroProbeManager` (`llheroprobemanager.h`) handles up to 2 high-quality planar probes at 1024×1024 for mirrors and reflective surfaces. Probe data is bound as a UBO during the lighting pass.
+
+### Environment System
+
+`LLEnvironment` singleton (`indra/newview/llenvironment.h`) manages sky, water, and day cycle settings. `LLSettingsSky` controls sun/moon direction, color, haze, clouds. `LLSettingsWater` controls fog, waves, reflectivity. `LLSettingsDay` defines 4-track day cycles with altitude-based track selection and time-based interpolation.
+
+Environment selection priority (highest to lowest): edit environment → local → parcel → region → default.
+
+Sky rendering: `gDeferredWLSkyProgram` (sky dome), `gDeferredWLCloudProgram` (clouds), `gDeferredWLSunProgram`/`gDeferredWLMoonProgram` (celestial bodies), `gDeferredStarProgram` (stars). Water: `gWaterProgram` (surface with reflections/refractions), `gUnderWaterProgram` (underwater fog), wave normals from the environment's normal maps, their coordinates worked per fragment from phases the CPU takes in double (`ALWaterField::wavePhases`). Every read of the maps goes through `water_wave_normals` in `waterSurface.glsl`, which hex-tiles the layers `AlchemyRenderWaterHextile` names on a lattice still in the world, the one terrain's hex tiling uses (`class1/deferred/hexLatticeUtil.glsl`), the CPU placing the camera on it in double (`ALWaterField::latticePlaces`). The screen's depth carries stencil, where the water keeps two bits (`alwaterstencil.h`): where an exclusion prim removed it, and its own pixels.
+
+### UI Framework
+
+The widget hierarchy in `indra/llui/`: `LLView` (root, handles mouse events, drawing, view tree, `FOLLOWS_*` anchor flags) → `LLUICtrl` (interactive controls) → `LLPanel` (general container with borders/backgrounds) → `LLFloater` (dockable window with title bar, close/minimize/maximize). Other widgets: `LLButton`, `LLLineEditor`, `LLTextEditor`, `LLScrollListCtrl`, `LLComboBox`, `LLSliderCtrl`, `LLTabContainer`, `LLLayoutStack`, `LLToolBar`, `LLAccordionCtrl`, `LLFlatListView`.
+
+**XUI system:** `LLUICtrlFactory` singleton loads XML layout files and instantiates widget trees. `LLXUIParser` parses XUI. Widget types are registered via `LLChildRegistry<T>::Register<T>` for static type registration. The `LLInitParam` system provides declarative parameter blocks for widget configuration.
+
+**Floater management:** `LLFloaterReg` singleton maps floater names → build functions and instance lists. Template method `LLFloaterReg::build<T>(key)` instantiates floaters. `LLDockableFloater` for docking, `LLMultiFloater` for tabbed containers.
+
+**Notifications:** `LLNotifications` singleton (`indra/llui/llnotifications.h`) manages a prioritized queue with channel-based hierarchy. Templates loaded from XML. `LLNotificationsUtil::add()` is the public API.
+
+### Settings System
+
+Viewer settings are XML-defined in `indra/newview/app_settings/`:
+- `settings.xml` — Main viewer settings (inherited from upstream)
+- `settings_alchemy.xml` — Alchemy-specific settings
+- `settings_per_account.xml` / `settings_per_account_alchemy.xml` — Per-user settings
+
+### UI Skins
+
+UI is defined via XUI (XML User Interface) files in `indra/newview/skins/`. Multiple skins exist: `default`, `alchemy`, `gemini`, `heretic`, `ionic`. Each skin contains `xui/` (XML layouts), `textures/`, and theme files. English strings are in `xui/en/`. Skins support language-specific XUI overrides (en, de, es, fr, ja, it, pt, ru, tr, zh).
+
+### Tracy Profiling
+
+Tracy profiler support is built into the project. It is enabled by default for "Test" channel builds (controlled by `USE_TRACY`). Use `USE_TRACY_ON_DEMAND=ON` (default) to only profile when a Tracy server connects.

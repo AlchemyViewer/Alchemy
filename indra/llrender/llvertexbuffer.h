@@ -38,7 +38,7 @@
 #include <set>
 #include <vector>
 #include <list>
-#include <glm/gtc/matrix_transform.hpp>
+#include "llmatrix4a.h"
 
 #define LL_MAX_VERTEX_ATTRIB_LOCATION 64
 
@@ -64,17 +64,19 @@ public:
         , mMode(0)
         , mCount(0)
         , mTexName(0)
-        , mProjection(glm::identity<glm::mat4>())
-        , mModelView(glm::identity<glm::mat4>())
-        , mTexture0(glm::identity<glm::mat4>())
+        , mTexSampler(0)
+        , mProjection(LLMatrix4a::identity())
+        , mModelView(LLMatrix4a::identity())
+        , mTexture0(LLMatrix4a::identity())
     {}
-    LLVertexBufferData(LLVertexBuffer* buffer, U8 mode, U32 count, U32 tex_name, const glm::mat4& model_view, const glm::mat4& projection, const glm::mat4& texture0)
+    LLVertexBufferData(LLVertexBuffer* buffer, U8 mode, U32 count, U32 tex_name, U32 tex_sampler, const LLMatrix4a& model_view, const LLMatrix4a& projection, const LLMatrix4a& texture0)
         : mVB(buffer)
         , mMode(mode)
         , mCount(count)
         , mTexName(tex_name)
-        , mProjection(model_view)
-        , mModelView(projection)
+        , mTexSampler(tex_sampler)
+        , mProjection(projection)
+        , mModelView(model_view)
         , mTexture0(texture0)
     {}
     void drawWithMatrix();
@@ -83,9 +85,13 @@ public:
     U8 mMode;
     U32 mCount;
     U32 mTexName;
-    glm::mat4 mProjection;
-    glm::mat4 mModelView;
-    glm::mat4 mTexture0;
+    // The sampler bound with mTexName when the draw was recorded. Textures carry no
+    // sampling state of their own any more, so replaying the bind without the sampler
+    // would read the atlas through GL defaults instead of what the live draw used.
+    U32 mTexSampler;
+    LLMatrix4a mProjection;
+    LLMatrix4a mModelView;
+    LLMatrix4a mTexture0;
 };
 typedef std::list<LLVertexBufferData> buffer_data_list_t;
 
@@ -98,17 +104,8 @@ public:
         U32 mEnd;
     };
 
-    LLVertexBuffer(const LLVertexBuffer& rhs)
-        : LLRefCount(rhs)
-    {
-        *this = rhs;
-    }
-
-    const LLVertexBuffer& operator=(const LLVertexBuffer& rhs)
-    {
-        LL_ERRS() << "Illegal operation!" << LL_ENDL;
-        return *this;
-    }
+    LLVertexBuffer(const LLVertexBuffer& rhs) = delete;
+    const LLVertexBuffer& operator=(const LLVertexBuffer& rhs) = delete;
 
     static void initClass(LLWindow* window);
     static void cleanupClass();

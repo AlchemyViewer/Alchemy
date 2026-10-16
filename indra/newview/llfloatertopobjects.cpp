@@ -129,7 +129,9 @@ void LLFloaterTopObjects::setMode(U32 mode)
 // static
 void LLFloaterTopObjects::handle_land_reply(LLMessageSystem* msg, void** data)
 {
-    LLFloaterTopObjects* instance = LLFloaterReg::getTypedInstance<LLFloaterTopObjects>("top_objects");
+    // Found, not built: an answer can come while neither window is open
+    // (one of Script Studio's asks, given up on before it came).
+    LLFloaterTopObjects* instance = LLFloaterReg::findTypedInstance<LLFloaterTopObjects>("top_objects");
     if(instance && instance->isInVisibleChain())
     {
         instance->handleReply(msg, data);
@@ -143,7 +145,7 @@ void LLFloaterTopObjects::handle_land_reply(LLMessageSystem* msg, void** data)
     }
     else
     {
-        LLFloaterRegionInfo* region_info_floater = LLFloaterReg::getTypedInstance<LLFloaterRegionInfo>("region_info");
+        LLFloaterRegionInfo* region_info_floater = LLFloaterReg::findTypedInstance<LLFloaterRegionInfo>("region_info");
         if(region_info_floater)
         {
             region_info_floater->enableTopButtons();
@@ -152,8 +154,19 @@ void LLFloaterTopObjects::handle_land_reply(LLMessageSystem* msg, void** data)
 
 }
 
+bool LLFloaterTopObjects::waitsForOwner(std::string& owner) const
+{
+    if (!mWaiting || mAskedMode != STAT_REPORT_TOP_SCRIPTS || !(mAskedFlags & STAT_FILTER_BY_OWNER))
+    {
+        return false;
+    }
+    owner = mAskedFilter;
+    return true;
+}
+
 void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
 {
+    mWaiting = false;
     U32 request_flags;
     U32 total_count;
     U64 total_memory = 0;
@@ -187,17 +200,17 @@ void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
         msg->getStringFast(_PREHASH_ReportData, _PREHASH_TaskName, name_buf, block);
         msg->getStringFast(_PREHASH_ReportData, _PREHASH_OwnerName, owner_buf, block);
 
-        if(msg->has("DataExtended"))
+        if(msg->hasFast(_PREHASH_DataExtended))
         {
             have_extended_data = true;
-            msg->getU32("DataExtended", "TimeStamp", time_stamp, block);
-            msg->getF32("DataExtended", "MonoScore", mono_score, block);
-            msg->getS32("DataExtended", "PublicURLs", public_urls, block);
+            msg->getU32Fast(_PREHASH_DataExtended, _PREHASH_TimeStamp, time_stamp, block);
+            msg->getF32Fast(_PREHASH_DataExtended, _PREHASH_MonoScore, mono_score, block);
+            msg->getS32Fast(_PREHASH_DataExtended, _PREHASH_PublicURLs, public_urls, block);
 
             std::string parcel_name;
             F32 script_size = 0.f;
-            msg->getString("DataExtended", "ParcelName", parcel_name, block);
-            msg->getF32("DataExtended", "Size", script_size, block);
+            msg->getStringFast(_PREHASH_DataExtended, _PREHASH_ParcelName, parcel_name, block);
+            msg->getF32Fast(_PREHASH_DataExtended, _PREHASH_Size, script_size, block);
             if (parcel_name.size() > 0 || script_size > 0)
             {
                 parcel_buf = parcel_name;
@@ -456,6 +469,11 @@ void LLFloaterTopObjects::onRefresh()
     flags  = mFlags;
     filter = mFilter;
     clearList();
+
+    mWaiting     = true;
+    mAskedMode   = mode;
+    mAskedFlags  = flags;
+    mAskedFilter = filter;
 
     LLMessageSystem *msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_LandStatRequest);

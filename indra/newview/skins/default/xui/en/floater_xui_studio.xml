@@ -1,0 +1,2496 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ legacy_header_height="18"
+ can_resize="true"
+ height="525"
+ layout="topleft"
+ min_height="525"
+ min_width="1200"
+ name="xui_studio"
+ help_topic="xui_studio"
+ save_rect="true"
+ single_instance="true"
+ title="XUI Studio"
+ width="1680">
+    <floater.string name="ExternalEditorNotSet">No editor: set the ExternalEditor setting or the LL_XUI_EDITOR environment variable, with %s for the file and %L for the line.</floater.string>
+    <floater.string name="NoFile">Select a file.</floater.string>
+    <floater.string name="CaptureNoSnapshot">The window would not give a snapshot.</floater.string>
+    <floater.string name="CaptureNoPreview">Nothing is being previewed.</floater.string>
+    <floater.string name="CaptureOffScreen">The preview is off screen.</floater.string>
+    <floater.string name="CaptureWriteFailed">Could not write [PATH]</floater.string>
+    <floater.string name="CaptureWritten">Captured [WIDTH] by [HEIGHT] to [PATH]</floater.string>
+    <floater.string name="GalleryBuilt">Gallery: [COUNT] widgets in [SKIN]/[LANG]</floater.string>
+    <floater.string name="EditorOpened">Opened [PATH]:[LINE]</floater.string>
+    <floater.string name="NotBuilt">This kind of file is catalogued and searched, not built.</floater.string>
+    <floater.string name="ViewerWidget">[TAG] is a viewer widget: a shell build does not run its constructor. Catalogued and searched.</floater.string>
+    <floater.string name="TemplateAlone">A [TAG] cannot be built from its template alone: it wants a model, a parent or children the template does not give it.</floater.string>
+    <floater.string name="Built">[VIEWS] views in [MS] ms, [DIAG] findings, [SKIN]/[LANG]</floater.string>
+    <floater.string name="BuiltReal">[VIEWS] views in [MS] ms, [DIAG] findings, [SKIN]/[LANG]; the registered floater, so no handles</floater.string>
+    <floater.string name="BuildFailed">Could not build [FILE]: see the findings.</floater.string>
+    <floater.string name="Reloaded">Reloaded after a change on disk.</floater.string>
+    <floater.string name="NoResults">No matches.</floater.string>
+    <floater.string name="CanvasTabTip">[FILE] in [LAYER]</floater.string>
+    <floater.string name="CanvasTabDirtyTip">[FILE] in [LAYER], with edits not yet saved</floater.string>
+    <floater.string name="CanvasTabPreviewTip">[FILE] in [SKIN]/[LANG], being looked at and not held: the next file chosen takes its place</floater.string>
+    <floater.string name="CanvasTabWaiting">waiting</floater.string>
+    <floater.string name="CanvasDropInto">into [NAME]</floater.string>
+    <floater.string name="CanvasRoomFrom">from [NAME]</floater.string>
+    <floater.string name="CanvasTabWaitingTip">[FILE] is chosen and waits for the pin to come off; pressing here takes the pin off</floater.string>
+    <floater.string name="CanvasHeld">The canvas is held on [FILE]; [PENDING] is built when the pin comes off.</floater.string>
+    <floater.string name="CanvasPinnedHere">The canvas is held on [FILE], which is the file the catalog is on.</floater.string>
+    <floater.string name="EditTarget">Moves write to [FILE] in [LAYER]</floater.string>
+    <floater.string name="EditNoTarget">Select an element to move it.</floater.string>
+    <floater.string name="EditNoSelection">Nothing is selected.</floater.string>
+    <floater.string name="EditWrote">Wrote [ATTRS] to [FILE] in [LAYER]</floater.string>
+    <floater.string name="EditAligned">Lined [COUNT] up in [FILE] in [LAYER]</floater.string>
+    <floater.string name="AlignNeedsTwo">Select more than one element: shift-control-click on the canvas, or hold shift in the outline. The one the handles are on is the one the rest line up with.</floater.string>
+    <floater.string name="AlignNothingToDo">Nothing to move: what is selected is already lined up, or a stack places it.</floater.string>
+    <floater.string name="EditTookOut">Took [ATTRS] out of [FILE] in [LAYER]; whatever was in force before it is in force again</floater.string>
+    <floater.string name="EditWroteNotMoved">Wrote [ATTRS] to [FILE] in [LAYER]; the preview's own frame is placed here, not by the file</floater.string>
+    <floater.string name="EditRootMoved">Moved the preview on its canvas. Where it sits here is not in the file, so nothing was written.</floater.string>
+    <floater.string name="EditRootMove">The preview's own frame is placed here, not by the file: its size is editable, its position is not.</floater.string>
+    <floater.string name="EditUndone">Put [FILE] back the way it was.</floater.string>
+    <floater.string name="EditRedone">Did that to [FILE] again.</floater.string>
+    <floater.string name="EditUndoneWhat">Took back: [WHAT].</floater.string>
+    <floater.string name="EditRedoneWhat">Did again: [WHAT].</floater.string>
+    <floater.string name="StepWroteField">[WHAT] on [WHERE]</floater.string>
+    <floater.string name="StepTookFieldOut">[WHAT] taken off [WHERE]</floater.string>
+    <floater.string name="StepWroteText">the text of [WHERE]</floater.string>
+    <floater.string name="StepRenamed">naming [WHERE]</floater.string>
+    <floater.string name="StepAddedElement">something put in [WHERE]</floater.string>
+    <floater.string name="EditRemoved">Took [WHERE] out of [FILE] in [LAYER]</floater.string>
+    <floater.string name="EditMoved">Moved [WHERE] in [FILE] in [LAYER]</floater.string>
+    <floater.string name="EditDuplicated">Copied [WHERE] in [FILE] in [LAYER]</floater.string>
+    <floater.string name="StepMovedElement">moving [WHERE]</floater.string>
+    <floater.string name="StepRemovedElement">taking [WHERE] out</floater.string>
+    <floater.string name="EditSaved">Wrote [FILE].</floater.string>
+    <floater.string name="EditSavedAll">Wrote [COUNT] files.</floater.string>
+    <floater.string name="EditSavedSomeAll">Wrote [COUNT] files and stopped: [ERROR]</floater.string>
+    <floater.string name="EditSavedAndRepaired">Wrote [FILE] and moved [MOVES] translations to where it now puts them.</floater.string>
+    <floater.string name="RenameStrands">[COUNT] translations of this element stop applying; Save and Repair Translations moves them.</floater.string>
+    <floater.string name="FixTakeOut">Take [ATTR] out</floater.string>
+    <floater.string name="FixSpell">Spell it [NAME]</floater.string>
+    <floater.string name="FixMoveInside">Move it [DX], [DY]</floater.string>
+    <floater.string name="FixWidenBy">Widen it by [DX]</floater.string>
+    <floater.string name="FixApplied">Fixed [COUNT] findings in [FILE]; each one is its own edit to undo.</floater.string>
+    <floater.string name="FixNone">Nothing here offers a fix.</floater.string>
+    <floater.string name="FixGone">That is not written here any more.</floater.string>
+    <floater.string name="FixOtherFile">That finding is about [FILE]; open it to fix it.</floater.string>
+    <floater.string name="FixDidTakeOut">Took [ATTR] off [WHERE] in [FILE], [LAYER]</floater.string>
+    <floater.string name="FixDidSpell">[ATTR] on [WHERE] is [NAME] now, in [FILE], [LAYER]</floater.string>
+    <floater.string name="FixDidMove">Moved [WHERE] inside its parent in [FILE], [LAYER]</floater.string>
+    <floater.string name="FixDidWiden">Widened [WHERE] by [DX] in [FILE], [LAYER]</floater.string>
+    <floater.string name="StepSpeltFieldAgain">[WHAT] on [WHERE]</floater.string>
+    <floater.string name="StepManySteps">[STEPS] edits</floater.string>
+    <floater.string name="StepManyFiles">[STEPS] edits over [FILES] files</floater.string>
+    <floater.string name="HistoryWentTo">Put the files back to [COUNT] edits in.</floater.string>
+    <floater.string name="DropBefore">[WHAT] before [WHERE]</floater.string>
+    <floater.string name="DropInto">[WHAT] into [WHERE]</floater.string>
+    <floater.string name="DropAfter">[WHAT] after [WHERE]</floater.string>
+    <floater.string name="MenuUndo">Undo</floater.string>
+    <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
+    <floater.string name="MenuRedo">Redo</floater.string>
+    <floater.string name="MenuRedoWhat">Redo [WHAT]</floater.string>
+    <floater.string name="FindingsAll">[SHOWN] of [HELD] findings over [FILES] files checked</floater.string>
+    <floater.string name="FindingsSome">[SHOWN] of [TOTAL] shown; [HELD] findings over [FILES] files checked</floater.string>
+    <floater.string name="FindingsEveryRule">Every rule</floater.string>
+    <floater.string name="DocumentDirtyMark">•</floater.string>
+    <floater.string name="DocumentClosed">Let go of [FILE].</floater.string>
+    <floater.string name="OverrideField">[ATTR], as each layer has it; writing puts the value in force into the chosen one.</floater.string>
+    <floater.string name="OverrideNoField">No field chosen: click a gutter mark beside a row in Attributes.</floater.string>
+    <floater.string name="OverrideNoLayer">Choose the layer to write it into.</floater.string>
+    <floater.string name="OverrideNothingInForce">No layer writes that field, so there is no value to override.</floater.string>
+    <floater.string name="GutterTitle">[ATTR], layer by layer</floater.string>
+    <floater.string name="GutterLayer">Layer</floater.string>
+    <floater.string name="GutterSays">Says</floater.string>
+    <floater.string name="GutterWriteHere">Write Here</floater.string>
+    <floater.string name="GutterListTip">Every layer of this file, and what each says about [ATTR]; a dot marks the one the merge takes. Choose a layer and press Write Here to give it the value in force.</floater.string>
+    <floater.string name="GutterForceTip">A dot marks the layer whose value is in force</floater.string>
+    <floater.string name="GutterLayerTip">The skin and the language the layer belongs to, in the order they are merged</floater.string>
+    <floater.string name="GutterSaysTip">What this layer writes for [ATTR], or nothing where it does not write it</floater.string>
+    <floater.string name="GutterLineTip">The line the element starts on in that layer</floater.string>
+    <floater.string name="GutterWriteHereTip">Write the value of [ATTR] that is in force into the chosen layer, so that layer has the last word about it</floater.string>
+    <floater.string name="FindCountTip">How many places the words were found, in how many files</floater.string>
+    <floater.string name="FindQueryTip">The words to look for. Return runs the search; the results list where they were found, by file.</floater.string>
+    <floater.string name="CrumbRootTip">The root of the file: press to select it</floater.string>
+    <floater.string name="CrumbTip">Press to select [NAME]</floater.string>
+    <floater.string name="CrumbSiblingsTip">Press to select [NAME]; the arrow offers the [COUNT] other elements beside it</floater.string>
+    <floater.string name="BreadcrumbCodeBuilt">code-built</floater.string>
+    <floater.string name="QuickOpenTitle">Open quickly</floater.string>
+    <floater.string name="QuickOpenPlaceholder">a few letters of the file name</floater.string>
+    <floater.string name="PaletteTakesText">takes text</floater.string>
+    <floater.string name="GroupContainers">Containers</floater.string>
+    <floater.string name="GroupControls">Controls</floater.string>
+    <floater.string name="GroupLists">Lists</floater.string>
+    <floater.string name="GroupText">Text</floater.string>
+    <floater.string name="GroupChrome">Chrome</floater.string>
+    <floater.string name="PaletteTakesChildren">[COUNT] kinds of child</floater.string>
+    <floater.string name="FindWord">Find</floater.string>
+    <floater.string name="FindIn">in</floater.string>
+    <floater.string name="FindAny">anything</floater.string>
+    <floater.string name="FindTag">a tag</floater.string>
+    <floater.string name="FindAttribute">an attribute name</floater.string>
+    <floater.string name="FindValue">an attribute value</floater.string>
+    <floater.string name="FindName">an element name</floater.string>
+    <floater.string name="FindText">the text between tags</floater.string>
+    <floater.string name="FindContaining">containing</floater.string>
+    <floater.string name="FindMatching">matching</floater.string>
+    <floater.string name="FindStarting">starting with</floater.string>
+    <floater.string name="FindEnding">ending with</floater.string>
+    <floater.string name="FindEverywhere">every skin</floater.string>
+    <floater.string name="FindThisSkin">the [SKIN] skin</floater.string>
+    <floater.string name="FindThisLanguage">[SKIN]/[LANG]</floater.string>
+    <floater.string name="FindThisFile">this file</floater.string>
+    <floater.string name="FindPlaceholder">what to look for</floater.string>
+    <floater.string name="FindFieldTip">Which part of a file the words are looked for in</floater.string>
+    <floater.string name="FindHowTip">How the words are compared with what is in the file</floater.string>
+    <floater.string name="FindScopeTip">Which layers are looked at</floater.string>
+    <floater.string name="FindResults">[COUNT] in [FILES] files</floater.string>
+    <floater.string name="FindSomeResults">[COUNT] in [FILES] files, first [SHOWN]</floater.string>
+    <floater.string name="LintStarted">Lint all: [TOTAL] files...</floater.string>
+    <floater.string name="LintStepped">Lint all: [DONE] of [TOTAL] files, [FOUND] findings...</floater.string>
+    <floater.string name="LintStopped">Lint all: stopped.</floater.string>
+    <floater.string name="LintFinished">Lint all: [FOUND] findings over [FILES] files; the report is [PATH]</floater.string>
+    <floater.string name="TranslateImpactNone">No translation stops applying because of this.</floater.string>
+    <floater.string name="TranslateImpact">[COUNT] translations stop applying if this is written as it stands: [LANGS]. Save and Repair Translations moves them.</floater.string>
+    <floater.string name="EditReverted">Read [FILE] again; what was done to it is gone.</floater.string>
+    <floater.string name="EditNothingToSave">Nothing has been changed.</floater.string>
+    <floater.string name="EditChangedOnDisk">[FILE] changed on disk, and there are changes here that are not written. Save to keep these, or revert to take those.</floater.string>
+    <floater.string name="TranslateCounts">[TRANSLATED] translated, [RESCUED] applied after a move, [MISSING] missing, [NOTAPPLIED] applying to nothing, [PLACEHOLDERS] stale, [FORBIDDEN] forbidden</floater.string>
+    <floater.string name="TranslateNoFile">Select a file and a language.</floater.string>
+    <floater.string name="TranslateWrote">Wrote [FIELD] into [FILE]</floater.string>
+    <floater.string name="TranslateRemoved">Took [FIELD] out of [FILE]</floater.string>
+    <floater.string name="TranslateNothingToRemove">The language writes nothing for this row.</floater.string>
+    <floater.string name="TranslateTheText">the text</floater.string>
+    <floater.string name="TranslateRepaired">Moved [MOVES] values into place in [FILE]</floater.string>
+    <floater.string name="TranslateRepairedAll">Moved [COUNT] values into place across [FILES] files in [LANG]</floater.string>
+    <floater.string name="TranslateRemovedOrphans">Took [COUNT] orphaned values out of [FILES] files in [LANG]</floater.string>
+    <floater.string name="TranslateNothingToRepair">Nothing in [FILE] is written at a path the base has moved on from.</floater.string>
+    <floater.string name="TranslateSameLanguage">Choose a language other than the base to translate into.</floater.string>
+    <floater.string name="TranslateRoots">Gave [FILES] files in [LANG] the base's root name; [LEFT] left alone as translations of something else</floater.string>
+    <floater.string name="CensusStarted">Counting what every language's overlay does...</floater.string>
+    <floater.string name="CensusProgress">Counted [DONE] of [TOTAL] files</floater.string>
+    <floater.string name="CensusDone">[COVERED] values arrive, [NOTHING] apply to nothing; table written to [FILE]</floater.string>
+    <floater.string name="NotificationPosted">Sent [NAME] through the channels; the Channels tab says where it went.</floater.string>
+    <floater.string name="NotificationAnswered">Answered [NAME] with [BUTTON].</floater.string>
+    <floater.string name="AttributeUnknown">no such parameter</floater.string>
+    <floater.string name="SchemaWritten">[SUMMARY]; written to [FILE]</floater.string>
+    <floater.string name="SchemaFailed">Could not write [FILE]</floater.string>
+    <floater.string name="EditCut">[WHAT] is cut; select where it goes and choose Move It Here.</floater.string>
+    <floater.string name="EditNothingCut">Nothing is cut, or it is cut and this is where it already is.</floater.string>
+    <floater.string name="EditNoSibling">Nothing beside it that way.</floater.string>
+    <floater.string name="EditReparented">[WHAT] now lives in [INTO], with its position written for where it landed.</floater.string>
+    <floater.string name="EditStackAxis">A layout stack lays its panels out itself: drag the edge along the stack to change the one dimension it reads.</floater.string>
+    <floater.string name="EditWroteStack">Wrote [ATTRS] to [FILE] in [LAYER]; [SIBLING] gives up the room</floater.string>
+    <floater.string name="AttributeWhat">[NAME]   &lt;[TAG]&gt;   [CLASS]</floater.string>
+    <floater.string name="AttributeWhatCodeBuilt">[NAME]   built in code   [CLASS]</floater.string>
+    <floater.string name="AttributeWhatNone">Nothing selected</floater.string>
+    <floater.string name="AttributeNothingSelected">Nothing selected</floater.string>
+    <floater.string name="AttributeNothingSelectedHow">Choose an element in the outline, or control-click one on the canvas.</floater.string>
+    <floater.string name="AttributeNothingWritten">This element writes nothing</floater.string>
+    <floater.string name="AttributeNothingWrittenHow">Every value it has is in force from somewhere else: the widget's own defaults, or a layer under this one.</floater.string>
+    <floater.string name="AttributeShowEvery">Show every field</floater.string>
+    <floater.string name="AttributeNoMatch">No field of that name</floater.string>
+    <floater.string name="AttributeNoMatchHow">The filter matches the names a file writes, dots and all. Clear it to see the rest.</floater.string>
+    <floater.string name="PaneNavigator">XUI Studio: Navigator</floater.string>
+    <floater.string name="PaneBottom">XUI Studio: Findings and Tables</floater.string>
+    <floater.string name="PaneInspectors">XUI Studio: Inspectors</floater.string>
+    <floater.string name="AttributeTipField">[NAME]</floater.string>
+    <floater.string name="AttributeTipTyped">[NAME] : [TYPE]</floater.string>
+    <floater.string name="AttributeTipSource">Written in [SOURCE].</floater.string>
+    <floater.string name="AttributeTipUnwritten">Nobody writes this here. What is shown is what is in force, and changing it writes it for the first time.</floater.string>
+    <floater.string name="AttributeTipIgnored">[NAME] is read off every widget and thrown away. A file may write it; nothing does anything with it.</floater.string>
+    <floater.string name="AttributeTipUnknown">[NAME] is written here and declared by nothing. Either the name is a typo or the widget stopped answering to it.</floater.string>
+    <floater.string name="AttributeTipDeprecated">[NAME] works, and nothing new should write it.</floater.string>
+    <floater.string name="AttributeTipDeprecatedFor">[NAME] works, and nothing new should write it: [INSTEAD] is the name to use.</floater.string>
+    <floater.string name="AttributeTipRemove">Take [NAME] out of this file again, and let whatever was in force before it be in force.</floater.string>
+    <floater.string name="ImageChoicesTextures">Textures</floater.string>
+    <floater.string name="FollowsTipLeft">Holds the gap between this element's left edge and its parent's, so the element stays where it is when the parent widens. Click to hold it or to let it go.</floater.string>
+    <floater.string name="FollowsTipBottom">Holds the gap between this element's bottom edge and its parent's, so the element stays where it is when the parent grows taller. Click to hold it or to let it go.</floater.string>
+    <floater.string name="FollowsTipRight">Holds the gap between this element's right edge and its parent's, so the element travels with that edge when the parent widens. Click to hold it or to let it go.</floater.string>
+    <floater.string name="FollowsTipTop">Holds the gap between this element's top edge and its parent's, so the element travels with that edge when the parent grows taller. Click to hold it or to let it go.</floater.string>
+    <floater.string name="FollowsTipAcross">Both side edges held at once, which is a width that has to give: the element grows and shrinks across with its parent. Click to hold both or to let both go.</floater.string>
+    <floater.string name="FollowsTipDown">Both the top and the bottom held at once, which is a height that has to give: the element grows and shrinks down with its parent. Click to hold both or to let both go.</floater.string>
+    <floater.string name="EditNoNestedFile">This element does not name a file of its own.</floater.string>
+    <floater.string name="EditNestedMissing">[FILE] is named here but is not in the catalog.</floater.string>
+    <floater.string name="LayerMissing">-</floater.string>
+    <floater.string name="SourceEdited">Source edited: [FILE]</floater.string>
+    <floater.string name="SourceEditedBroken">[FILE] does not parse yet (line [LINE]: [MESSAGE]); the last text that did stays in force until it does</floater.string>
+    <floater.string name="Yes">yes</floater.string>
+    <floater.string name="No">no</floater.string>
+    <floater.string name="LayoutSize">size</floater.string>
+    <floater.string name="LayoutSizeValue">[WIDTH] x [HEIGHT]</floater.string>
+    <floater.string name="LayoutPairValue">[A] / [B]</floater.string>
+    <floater.string name="LayoutRectValue">left [LEFT]  top [TOP]  right [RIGHT]  bottom [BOTTOM]  ([WIDTH] x [HEIGHT])</floater.string>
+    <floater.string name="LayoutLeftTop">left / top (from parent's top-left)</floater.string>
+    <floater.string name="LayoutRightBottom">right / bottom (from parent's top-left)</floater.string>
+    <floater.string name="LayoutGap">gap to parent's right / bottom</floater.string>
+    <floater.string name="LayoutParent">parent</floater.string>
+    <floater.string name="LayoutParentValue">[NAME]  [SIZE]</floater.string>
+    <floater.string name="LayoutRect">rect (parent space, bottom-left origin)</floater.string>
+    <floater.string name="LayoutRectScreen">rect (screen)</floater.string>
+    <floater.string name="LayoutBoundingRect">bounding rect</floater.string>
+    <floater.string name="LayoutFollows">follows</floater.string>
+    <floater.string name="LayoutAuthored">authored</floater.string>
+    <floater.string name="LayoutAuthoredNone">(none: the widget's defaults)</floater.string>
+    <floater.string name="LayoutLayout">layout</floater.string>
+    <floater.string name="LayoutDefault">(default)</floater.string>
+    <floater.string name="LayoutFollowsAuthored">follows (authored)</floater.string>
+    <floater.string name="LayoutNone">(none)</floater.string>
+    <floater.string name="LayoutRelativeTo">relative to</floater.string>
+    <floater.string name="LayoutRelativeToValue">[NAME] &lt;[TAG]&gt;</floater.string>
+    <floater.string name="LayoutRelativeToParent">(no widget before it: the parent)</floater.string>
+    <floater.string name="LayoutUnnamed">unnamed</floater.string>
+    <floater.string name="LayoutResizable">resizable</floater.string>
+    <floater.string name="LayoutMinSize">min size</floater.string>
+    <floater.string name="BindingCommitRegistry">commit registry</floater.string>
+    <floater.string name="BindingEnableRegistry">enable registry</floater.string>
+    <floater.string name="BindingFloaterOwn">the floater's own</floater.string>
+    <floater.string name="BindingNowhere">registered nowhere</floater.string>
+    <floater.string name="BindingNotGlobal">not global</floater.string>
+    <floater.string name="BindingConfig">config</floater.string>
+    <floater.string name="BindingAccount">account</floater.string>
+    <floater.string name="BindingNoControl">no such control</floater.string>
+    <floater.string name="BindingInCatalog">in the catalog</floater.string>
+    <floater.string name="BindingNoFile">no such file</floater.string>
+    <floater.string name="StateVisible">visible</floater.string>
+    <floater.string name="StateInVisibleChain">in visible chain</floater.string>
+    <floater.string name="StateEnabled">enabled</floater.string>
+    <floater.string name="StateMouseOver">mouse over</floater.string>
+    <floater.string name="StateFocus">focus</floater.string>
+    <floater.string name="StateValue">value</floater.string>
+    <floater.string name="StateText">text</floater.string>
+    <floater.string name="StateTruncated">truncated</floater.string>
+    <floater.string name="StateTooltip">tooltip</floater.string>
+    <floater.string name="StateName">name</floater.string>
+    <floater.string name="StateClass">class</floater.string>
+    <floater.string name="SectionIdentity">Identity</floater.string>
+    <floater.string name="SectionGeometry">Position and size</floater.string>
+    <floater.string name="SectionAppearance">Appearance</floater.string>
+    <floater.string name="SectionBehaviour">Behaviour</floater.string>
+    <floater.string name="SectionOther">Other</floater.string>
+    <floater.string name="SectionIgnored">Read and thrown away</floater.string>
+    <floater.string name="SectionUnknown">Declared by nothing</floater.string>
+    <floater.string name="GalleryTitle">Widget gallery [[SKIN]/[LANG]]</floater.string>
+    <floater.string name="CaptionFiles">XUI files</floater.string>
+    <floater.string name="CaptionFilesMatching">XUI files matching "[FILTER]"</floater.string>
+    <floater.string name="CaptionSearch">Search for "[QUERY]" in [FIELD], [SKIN]/[LANG]</floater.string>
+    <floater.string name="CaptionNoFile">no file</floater.string>
+    <floater.string name="CaptionWhereFile">[FILE]</floater.string>
+    <floater.string name="CaptionWhere">[FILE] ([SKIN]/[LANG])</floater.string>
+    <floater.string name="CaptionFindings">Findings in [WHERE]</floater.string>
+    <floater.string name="CaptionRows">Rows</floater.string>
+    <floater.string name="CaptionLayout">Layout</floater.string>
+    <floater.string name="CaptionBindings">Bindings</floater.string>
+    <floater.string name="CaptionState">State</floater.string>
+    <floater.string name="CaptionSelectionFindings">Findings</floater.string>
+    <floater.string name="CaptionOf">[WHAT] of [PATH]</floater.string>
+    <floater.string name="CaptionIn">[WHAT] in [WHERE]</floater.string>
+    <floater.string name="OverlayNoBase">there is no base file to translate</floater.string>
+    <floater.string name="OverlayNoDirectory">the base file is in no directory</floater.string>
+    <floater.string name="OverlayNoLanguageDirectory">the base file is in no language directory</floater.string>
+    <floater.string name="OverlayMkdirFailed">could not make [DIR]</floater.string>
+    <floater.string name="TranslateStateTranslated">translated</floater.string>
+    <floater.string name="TranslateStateMissing">missing</floater.string>
+    <floater.string name="TranslateStatePlaceholders">placeholders differ</floater.string>
+    <floater.string name="TranslateStateForbidden">translate="false"</floater.string>
+    <floater.string name="TranslateStateRescued">applied where the base moved it</floater.string>
+    <floater.string name="TranslateStateNotApplied">applies to nothing</floater.string>
+    <floater.string name="TranslateStateMoved">applies to nothing: moved</floater.string>
+    <floater.string name="TranslateStateAbsent">applies to nothing: absent</floater.string>
+    <floater.string name="TranslateStateUnnamed">applies to nothing: unnamed</floater.string>
+    <floater.string name="TranslateStateAmbiguous">applies to nothing: ambiguous</floater.string>
+    <floater.string name="TranslateStateNoSuchField">applies to nothing: no such field</floater.string>
+    <floater.string name="FindingsHere">here</floater.string>
+    <floater.string name="FindingsRuleCount">[RULE] ([COUNT])</floater.string>
+
+    <menu_bar
+     bg_visible="false"
+     follows="left|top"
+     height="18"
+     layout="topleft"
+     left="4"
+     mouse_opaque="false"
+     name="studio_menu"
+     top="20"
+     width="600">
+        <menu
+         label="File"
+         layout="topleft"
+         mouse_opaque="false"
+         name="file"
+         tear_off="false"
+         width="200">
+            <menu_item_call
+             label="Open Quickly..."
+             layout="topleft"
+             name="quick_open"
+             shortcut="control|shift|O">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="quick_open" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Save"
+             layout="topleft"
+             name="save"
+             shortcut="control|S">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="save" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
+            </menu_item_call>
+            <menu_item_call
+             label="Save All"
+             layout="topleft"
+             name="save_all"
+             shortcut="control|shift|S">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="save_all" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
+            </menu_item_call>
+            <menu_item_call
+             label="Save and Repair Translations"
+             layout="topleft"
+             name="save_repair">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="save_repair" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
+            </menu_item_call>
+            <menu_item_call
+             label="Revert"
+             layout="topleft"
+             name="revert">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="revert" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Undo"
+             layout="topleft"
+             name="undo"
+             shortcut="control|Z">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="undo" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="undo" />
+            </menu_item_call>
+            <menu_item_call
+             label="Redo"
+             layout="topleft"
+             name="redo"
+             shortcut="control|Y">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="redo" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="redo" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Reload Catalog"
+             layout="topleft"
+             name="reload"
+             shortcut="control|R">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="reload" />
+            </menu_item_call>
+            <menu_item_call
+             label="Open in External Editor"
+             layout="topleft"
+             name="edit"
+             shortcut="control|E">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="edit" />
+            </menu_item_call>
+            <menu_item_call
+             label="Open the File This Element Names"
+             layout="topleft"
+             name="open_nested"
+             shortcut="control|shift|N">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="open_nested" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="nested" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Capture Preview..."
+             layout="topleft"
+             name="capture">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="capture" />
+            </menu_item_call>
+        </menu>
+        <menu
+         label="View"
+         layout="topleft"
+         mouse_opaque="false"
+         name="view"
+         tear_off="false"
+         width="200">
+            <menu_item_call
+             label="Show Preview"
+             layout="topleft"
+             name="show"
+             shortcut="control|shift|P">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="show" />
+            </menu_item_call>
+            <menu_item_call
+             label="Hide Previews"
+             layout="topleft"
+             name="hide"
+             shortcut="control|shift|H">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="hide" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check
+             label="Hover Highlight"
+             layout="topleft"
+             name="hover">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="hover" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="hover" />
+            </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check
+             label="Navigator"
+             layout="topleft"
+             name="pane_navigator"
+             shortcut="control|0">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="pane_navigator" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="pane_navigator" />
+            </menu_item_check>
+            <menu_item_check
+             label="Inspectors"
+             layout="topleft"
+             name="pane_inspectors"
+             shortcut="control|alt|0">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="pane_inspectors" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="pane_inspectors" />
+            </menu_item_check>
+            <menu_item_check
+             label="Findings and Tables"
+             layout="topleft"
+             name="pane_bottom"
+             shortcut="control|shift|B">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="pane_bottom" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="pane_bottom" />
+            </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check
+             label="Navigator in a Window of its Own"
+             layout="topleft"
+             name="out_navigator">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="out_navigator" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="out_navigator" />
+            </menu_item_check>
+            <menu_item_check
+             label="Inspectors in a Window of their Own"
+             layout="topleft"
+             name="out_inspectors">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="out_inspectors" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="out_inspectors" />
+            </menu_item_check>
+            <menu_item_check
+             label="Findings and Tables in a Window of their Own"
+             layout="topleft"
+             name="out_bottom">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="out_bottom" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="out_bottom" />
+            </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check
+             label="Preview in a Window of its Own"
+             layout="topleft"
+             name="float_preview">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="float_preview" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="float_preview" />
+            </menu_item_check>
+            <menu_item_check
+             label="Build the Registered Floater"
+             layout="topleft"
+             name="real_floater">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="real_floater" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="real_floater" />
+            </menu_item_check>
+            <menu_item_check
+             label="Code-built Rows"
+             layout="topleft"
+             name="code_built">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="code_built" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="code_built" />
+            </menu_item_check>
+        </menu>
+        <menu
+         label="Tools"
+         layout="topleft"
+         mouse_opaque="false"
+         name="tools"
+         tear_off="false"
+         width="220">
+            <menu_item_call
+             label="Library"
+             layout="topleft"
+             name="library"
+             shortcut="control|shift|L">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="library" />
+            </menu_item_call>
+            <menu_item_call
+             label="Widget Gallery"
+             layout="topleft"
+             name="gallery">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="gallery" />
+            </menu_item_call>
+            <menu_item_call
+             label="Lint All Files"
+             layout="topleft"
+             name="lint_all"
+             shortcut="control|L">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="lint_all" />
+            </menu_item_call>
+            <menu_item_call
+             label="Overlay Census"
+             layout="topleft"
+             name="census">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="census" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Export Schema"
+             layout="topleft"
+             name="schema">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="schema" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Color Settings"
+             layout="topleft"
+             name="colors">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="colors" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Translation Impact"
+             layout="topleft"
+             name="impact"
+             shortcut="control|I">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="impact" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
+            </menu_item_call>
+            <menu_item_call
+             label="Repair Roots"
+             layout="topleft"
+             name="repair_roots">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="repair_roots" />
+            </menu_item_call>
+            <menu_item_call
+             label="Repair Language"
+             layout="topleft"
+             name="repair_all">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="repair_all" />
+            </menu_item_call>
+            <menu_item_call
+             label="Remove Orphans"
+             layout="topleft"
+             name="remove_orphans">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="remove_orphans" />
+            </menu_item_call>
+        </menu>
+    </menu_bar>
+
+    <!-- Behind the row above the regions, so the controls that say which skin
+         and which language read as one band of chrome rather than as loose
+         things on the window. Declared first because children draw in the
+         order they are declared, and it must be under them; opaque to the eye
+         and not to the mouse, because it is a background and every click on
+         it belongs to whatever is on top. -->
+    <panel
+     background_visible="true"
+     background_opaque="true"
+     bg_opaque_color="MouseGray"
+     follows="left|top|right"
+     height="30"
+     layout="topleft"
+     left="4"
+     mouse_opaque="false"
+     name="header_bar"
+     top="40"
+     width="1672" />
+
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="8"
+     name="skin_label"
+     top="44"
+     width="30">Skin</text>
+    <combo_box
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left_pad="2"
+     name="skin_combo"
+     tool_tip="Which skin the preview is built in. A skin's own copy of a file is layered over the default's, so what is on the canvas is what that skin's users see."
+     top_delta="-3"
+     width="90" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left_pad="10"
+     name="language_label"
+     top_delta="3"
+     width="58">Language</text>
+    <combo_box
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left_pad="2"
+     name="language_combo"
+     tool_tip="Which language the preview is built in. The language file is layered over the base one, so what is on the canvas is what a reader of that language sees."
+     top_delta="-3"
+     width="56" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Library"
+     layout="topleft"
+     left_pad="4"
+     name="library_btn"
+     tool_tip="Every tag a file may write, what the schema knows about each, and one of it built to look at (Control+Shift+L)"
+     top_delta="0"
+     width="66" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Edit"
+     layout="topleft"
+     left_pad="4"
+     name="edit_btn"
+     tool_tip="Open the selected element's file in the external editor at its line"
+     top_delta="0"
+     width="60" />
+
+    <!-- The three regions' toggles, at the right end of the bar: they are
+         about the window's shape, not about what is being previewed. -->
+    <button
+     follows="right|top"
+     height="22"
+     image_overlay="SidebarLeft_Off"
+     image_overlay_alignment="left"
+     is_toggle="true"
+     label="Navigator"
+     layout="topleft"
+     name="fold_navigator"
+     right="-182"
+     tool_tip="The pane of files, the outline, search and the library, down the left (Control+0)"
+     top="41"
+     width="91" />
+    <button
+     follows="right|top"
+     height="22"
+     image_overlay="SidebarBottom_Off"
+     image_overlay_alignment="left"
+     is_toggle="true"
+     label="Tables"
+     layout="topleft"
+     name="fold_bottom"
+     right="-105"
+     tool_tip="The band under the canvas: findings, translation, notices and channels (Control+Shift+B)"
+     top="41"
+     width="75" />
+    <button
+     follows="right|top"
+     height="22"
+     image_overlay="SidebarRight_Off"
+     image_overlay_alignment="left"
+     is_toggle="true"
+     label="Inspectors"
+     layout="topleft"
+     name="fold_inspectors"
+     right="-8"
+     tool_tip="The inspectors of the selected element, down the right (Control+Alt+0)"
+     top="41"
+     width="95" />
+
+    <layout_stack
+     animate="false"
+     follows="all"
+     height="431"
+     layout="topleft"
+     left="8"
+     name="main_stack"
+     orientation="horizontal"
+     top="70"
+     width="1664"
+     border_size="10"
+     show_drag_handle="true"
+     drag_handle_thickness="4"
+     drag_handle_first_indent="10"
+     drag_handle_second_indent="10"
+     drag_handle_color="DkGray0"
+     drag_handle_on_hover="true">
+
+        <layout_panel
+         auto_resize="false"
+         expanded_min_dim="220"
+         height="474"
+         layout="topleft"
+         min_dim="0"
+         name="navigator_panel"
+         user_resize="true"
+         width="400"
+         background_visible="true"
+         background_opaque="true"
+         bg_opaque_color="DkGray2"
+         border="true">
+            <tab_container
+             follows="all"
+             height="474"
+             layout="topleft"
+             left="0"
+             name="navigator_tabs"
+             fill_width="true"
+             tab_height="26"
+             tab_position="top"
+             top="0"
+             width="400">
+                <panel
+                 follows="all"
+                 height="444"
+                 label="Files"
+                 layout="topleft"
+                 name="files_mode"
+                 tool_tip="Files: every XUI file in the skin, with the ones the chosen skin and language have of their own"
+                 width="376">
+                    <layout_stack
+                     animate="false"
+                     follows="all"
+                     height="444"
+                     layout="topleft"
+                     left="0"
+                     name="files_stack"
+                     orientation="vertical"
+                     top="0"
+                     width="376">
+                        <layout_panel
+                         auto_resize="true"
+                         height="418"
+                         layout="topleft"
+                         min_dim="80"
+                         name="file_list_area"
+                         width="376">
+                            <pane_list
+                             column_padding="0"
+                             draw_heading="true"
+                             multi_select="true"
+                             follows="all"
+                             height="418"
+                             layout="topleft"
+                             left="0"
+                             name="file_list"
+                             tool_tip="Every XUI file the skins hold, and which of them have a copy of each. Choose one to build it on the canvas."
+                             top="0"
+                             width="376">
+                                <pane_list.columns
+                                 label="Kind"
+                                 name="kind"
+                                 width="58" />
+                                <pane_list.columns
+                                 dynamic_width="true"
+                                 label="File"
+                                 name="name" />
+                                <pane_list.columns
+                                 label="L"
+                                 name="lang"
+                                 tool_tip="The chosen language has a file"
+                                 width="20" />
+                                <pane_list.columns
+                                 label="S"
+                                 name="skin"
+                                 tool_tip="The chosen skin has a file"
+                                 width="20" />
+                            </pane_list>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="catalog_filter_row"
+                         width="376">
+                            <filter_editor
+                             follows="left|top|right"
+                             height="22"
+                             label="Filter files"
+                             layout="topleft"
+                             left="0"
+                             name="catalog_filter"
+                             tool_tip="Narrow the list to the files whose name carries this"
+                             top="2"
+                             width="376" />
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+                <panel
+                 follows="all"
+                 height="444"
+                 label="Outline"
+                 layout="topleft"
+                 name="outline_mode"
+                 tool_tip="Outline: the tree of the previewed file, with its filter and the buttons that reorder it"
+                 width="376">
+                    <layout_stack
+                     animate="false"
+                     follows="all"
+                     height="444"
+                     layout="topleft"
+                     left="0"
+                     name="tree_stack"
+                     orientation="vertical"
+                     top="0"
+                     width="376">
+                        <layout_panel
+                         auto_resize="true"
+                         height="348"
+                         layout="topleft"
+                         min_dim="120"
+                         name="tree_area"
+                         width="376">
+                            <panel
+                             follows="all"
+                             height="348"
+                             layout="topleft"
+                             left="0"
+                             name="tree_host"
+                             top="0"
+                             width="376" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="breadcrumb_row"
+                         width="376">
+                            <jump_bar
+                             follows="left|top|right"
+                             height="22"
+                             layout="topleft"
+                             left="0"
+                             name="breadcrumb"
+                             tool_tip="Where the selected element is, from the root of the file down. Press a step to select it; press its arrow to pick one of the elements beside it instead."
+                             top="0"
+                             width="376" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="18"
+                         layout="topleft"
+                         min_dim="18"
+                         name="edit_target_row"
+                         width="376">
+                            <text
+                             follows="left|top|right"
+                             height="16"
+                             layout="topleft"
+                             left="0"
+                             name="edit_target"
+                             text_color="LabelDisabledColor"
+                             tool_tip="Ctrl-click an element in the preview to select it and Ctrl-drag to move it; the middle handle moves it and the corners and edges resize it; arrows move it a pixel and ten with shift; a plain click works the widget itself"
+                             top="0"
+                             width="376">Select an element to move it.</text>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="tree_buttons_row"
+                         width="376">
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Up"
+                             layout="topleft"
+                             left="0"
+                             name="tree_up"
+                             tool_tip="Move the element before the one above it (Control+Up)"
+                             top="2"
+                             width="38" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Down"
+                             layout="topleft"
+                             left_pad="2"
+                             name="tree_down"
+                             tool_tip="Move the element after the one below it (Control+Down)"
+                             top_delta="0"
+                             width="46" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="In"
+                             layout="topleft"
+                             left_pad="6"
+                             name="tree_in"
+                             tool_tip="Make it a child of the element above it (Control+Right)"
+                             top_delta="0"
+                             width="34" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Out"
+                             layout="topleft"
+                             left_pad="2"
+                             name="tree_out"
+                             tool_tip="Make it a sibling of its parent (Control+Left)"
+                             top_delta="0"
+                             width="40" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="tree_filter_row"
+                         width="376">
+                            <filter_editor
+                             follows="left|top|right"
+                             height="22"
+                             label="Filter by name or tag"
+                             layout="topleft"
+                             left="0"
+                             name="tree_filter"
+                             tool_tip="Narrow the outline to the elements whose name, tag or value carries this"
+                             top="2"
+                             width="376" />
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+                <panel
+                 follows="all"
+                 height="444"
+                 label="Find"
+                 layout="topleft"
+                 name="find_mode"
+                 tool_tip="Find: a search across every file and every layer"
+                 width="376">
+                    <layout_stack
+                     animate="false"
+                     follows="all"
+                     height="444"
+                     layout="topleft"
+                     left="0"
+                     name="find_stack"
+                     orientation="vertical"
+                     top="0"
+                     width="376">
+                        <layout_panel
+                         auto_resize="false"
+                         height="30"
+                         layout="topleft"
+                         min_dim="30"
+                         name="find_row"
+                         width="376">
+                            <scope_bar
+                             follows="left|top|right"
+                             height="30"
+                             layout="topleft"
+                             left="0"
+                             name="scope_bar"
+                             tool_tip="A search said as a sentence: what kind of thing to look for, how the words have to match, the words, and which layers to look in. Return runs it, and changing a word runs it again."
+                             top="0"
+                             width="376" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="true"
+                         height="414"
+                         layout="topleft"
+                         min_dim="60"
+                         name="find_results_area"
+                         width="376">
+                            <pane_list
+                             column_padding="0"
+                             draw_heading="true"
+                             multi_select="true"
+                             follows="all"
+                             height="414"
+                             layout="topleft"
+                             left="0"
+                             name="find_results"
+                             tool_tip="Where the words were found, gathered by file. Choose a row to open that file and select the element it is in."
+                             top="0"
+                             width="376">
+                                <pane_list.columns
+                                 label="File"
+                                 name="file"
+                                 width="110" />
+                                <pane_list.columns
+                                 label="Line"
+                                 name="line"
+                                 width="36" />
+                                <pane_list.columns
+                                 label="Layer"
+                                 name="layer"
+                                 width="60" />
+                                <pane_list.columns
+                                 dynamic_width="true"
+                                 label="Match"
+                                 name="snippet" />
+                            </pane_list>
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+                <panel
+                 follows="all"
+                 height="444"
+                 label="Documents"
+                 layout="topleft"
+                 name="documents_mode"
+                 tool_tip="Documents: every file this tool has open, and which of them have work the disk has not heard about"
+                 width="376">
+                    <layout_stack
+                     animate="false"
+                     follows="all"
+                     height="444"
+                     layout="topleft"
+                     left="0"
+                     name="documents_stack"
+                     orientation="vertical"
+                     top="0"
+                     width="376">
+                        <layout_panel
+                         auto_resize="true"
+                         height="418"
+                         layout="topleft"
+                         min_dim="80"
+                         name="documents_area"
+                         width="376">
+                            <pane_list
+                             column_padding="0"
+                             draw_heading="true"
+                             follows="all"
+                             height="418"
+                             layout="topleft"
+                             left="0"
+                             name="documents"
+                             tool_tip="Double-click to look at one; a dot means it has work the disk has not heard about"
+                             top="0"
+                             width="376">
+                                <pane_list.columns
+                                 label=""
+                                 name="dirty"
+                                 tool_tip="a dot means unsaved"
+                                 width="16" />
+                                <pane_list.columns
+                                 dynamic_width="true"
+                                 label="File"
+                                 name="file" />
+                                <pane_list.columns
+                                 label="Layer"
+                                 name="layer"
+                                 width="90" />
+                                <pane_list.columns
+                                 label="Steps"
+                                 name="steps"
+                                 tool_tip="how many edits are in it to put back"
+                                 width="46" />
+                            </pane_list>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="documents_foot"
+                         width="376">
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Save"
+                             layout="topleft"
+                             left="0"
+                             name="document_save"
+                             tool_tip="Write this one"
+                             top="2"
+                             width="60" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Revert"
+                             layout="topleft"
+                             left_pad="4"
+                             name="document_revert"
+                             tool_tip="Read it back off the disk, losing the work in it"
+                             top_delta="0"
+                             width="64" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Close"
+                             layout="topleft"
+                             left_pad="4"
+                             name="document_close"
+                             tool_tip="Let go of it; a document with work in it has to be saved or reverted first"
+                             top_delta="0"
+                             width="60" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Save All"
+                             layout="topleft"
+                             left_pad="4"
+                             name="document_save_all"
+                             tool_tip="Write every one that has work in it"
+                             top_delta="0"
+                             width="74" />
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+                <panel
+                 follows="all"
+                 height="444"
+                 label="Library"
+                 layout="topleft"
+                 name="palette_mode"
+                 tool_tip="Library: the tags the selected element may contain"
+                 width="376">
+                    <layout_stack
+                     animate="false"
+                     follows="all"
+                     height="444"
+                     layout="topleft"
+                     left="0"
+                     name="palette_stack"
+                     orientation="vertical"
+                     top="0"
+                     width="376">
+                        <layout_panel
+                         auto_resize="true"
+                         height="418"
+                         layout="topleft"
+                         min_dim="80"
+                         name="palette_area"
+                         width="376">
+                            <button
+                             follows="right|top"
+                             height="20"
+                             is_toggle="true"
+                             label="Grid"
+                             layout="topleft"
+                             name="palette_cells"
+                             right="-2"
+                             tool_tip="The widgets as cells across and down, each with its name under it, rather than one to a row"
+                             top="0"
+                             width="48" />
+                            <specimen_list
+                             empty_headline="Nothing may go in here."
+                             empty_sentence="Choose an element in the outline; what it accepts is listed here, each as the widget itself."
+                             follows="all"
+                             height="396"
+                             label_width="120"
+                             layout="topleft"
+                             left="0"
+                             name="palette"
+                             row_height="30"
+                             tool_tip="The tags the selected element may contain, each as the widget it builds"
+                             top="22"
+                             width="376" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="true"
+                         height="180"
+                         layout="topleft"
+                         min_dim="60"
+                         name="palette_detail"
+                         width="376">
+                            <text
+                             follows="left|top|right"
+                             height="30"
+                             layout="topleft"
+                             left="2"
+                             name="palette_note"
+                             right="-2"
+                             tool_tip="What the chosen tag is for, in a sentence from xui_notes.xml; a tag nobody has written one for says nothing here"
+                             top="2"
+                             use_ellipses="true"
+                             word_wrap="true" />
+                            <pane_list
+                             column_padding="0"
+                             draw_heading="true"
+                             follows="all"
+                             height="146"
+                             layout="topleft"
+                             left="0"
+                             name="palette_attributes"
+                             tool_tip="What the chosen tag takes, and what it already carries: an attribute written as what it carries says nothing the widget does not say itself"
+                             top_pad="2"
+                             width="376">
+                                <pane_list.columns
+                                 dynamic_width="true"
+                                 label="Attribute"
+                                 name="attribute" />
+                                <pane_list.columns
+                                 label="Type"
+                                 name="type"
+                                 width="96" />
+                                <pane_list.columns
+                                 label="Carries"
+                                 name="carries"
+                                 width="96" />
+                            </pane_list>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="palette_foot"
+                         width="376">
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Insert"
+                             layout="topleft"
+                             left="0"
+                             name="palette_insert"
+                             tool_tip="Put one of these under the selected element, with a name and where it goes and nothing else"
+                             top="2"
+                             width="64" />
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+            </tab_container>
+        </layout_panel>
+
+        <layout_panel
+         auto_resize="true"
+         height="474"
+         layout="topleft"
+         min_dim="400"
+         name="canvas_panel"
+         user_resize="true"
+         width="744">
+            <layout_stack
+             animate="false"
+             follows="all"
+             height="474"
+             layout="topleft"
+             left="0"
+             name="centre_stack"
+             orientation="vertical"
+             top="0"
+             width="744"
+             border_size="10"
+             show_drag_handle="true"
+             drag_handle_thickness="4"
+             drag_handle_first_indent="10"
+             drag_handle_second_indent="10"
+             drag_handle_color="DkGray0"
+             drag_handle_on_hover="true">
+
+
+                <layout_panel
+                 auto_resize="false"
+                 height="24"
+                 layout="topleft"
+                 min_dim="24"
+                 name="canvas_head"
+                 width="744"
+                 background_visible="true"
+                 background_opaque="true"
+                 bg_opaque_color="MouseGray"
+                 border="true">
+                    <button
+                     follows="left|top"
+                     height="20"
+                     is_toggle="true"
+                     label="Shown"
+                     layout="topleft"
+                     left="0"
+                     name="canvas_shown"
+                     tool_tip="Hide the preview and give the room to what is being read about it; what is on the canvas stays built"
+                     top="2"
+                     width="54" />
+                    <button
+                     follows="left|top"
+                     height="20"
+                     is_toggle="true"
+                     label="Pin"
+                     layout="topleft"
+                     left_pad="2"
+                     name="canvas_pinned"
+                     tool_tip="Hold the canvas on this file while the catalog is read; the file chosen meanwhile is taken when the pin comes off"
+                     top_delta="0"
+                     width="42" />
+                    <!-- One tab per document the tool holds, and one in the
+                         other face for a file being looked at without being
+                         held. The tab shown is the file on the canvas. -->
+                    <tab_strip
+                     follows="left|top|right"
+                     height="22"
+                     layout="topleft"
+                     left_pad="8"
+                     name="canvas_tabs"
+                     right="-4"
+                     tool_tip="The files this tool holds, one tab each; the tab shown is the file on the canvas, and a tab in the other face is only being looked at"
+                     top="1" />
+                </layout_panel>
+            <layout_panel
+             auto_resize="true"
+             height="476"
+             layout="topleft"
+             min_dim="106"
+             name="canvas_region"
+             width="744">
+            <layout_stack
+             animate="false"
+             follows="all"
+             height="476"
+             layout="topleft"
+             left="0"
+             name="canvas_region_stack"
+             orientation="vertical"
+             top="0"
+             width="744">
+                <layout_panel
+                 auto_resize="true"
+                 height="450"
+                 layout="topleft"
+                 min_dim="80"
+                 name="canvas_body"
+                 width="744"
+                 background_visible="true"
+                 background_opaque="true"
+                 bg_opaque_color="PanelDark"
+                 border="true">
+                    <scroll_container
+                     follows="all"
+                     height="450"
+                     layout="topleft"
+                     left="0"
+                     name="canvas_area"
+                     top="0"
+                     width="744" />
+                </layout_panel>
+
+            <layout_panel
+             auto_resize="false"
+             height="26"
+             layout="topleft"
+             min_dim="26"
+             name="canvas_foot"
+             width="744"
+             background_visible="true"
+             background_opaque="true"
+             bg_opaque_color="MouseGray"
+             border="true">
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="Show"
+                 layout="topleft"
+                 left="0"
+                 name="show_btn"
+                 tool_tip="Build the selected file again"
+                 top="2"
+                 width="54" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="Hide"
+                 layout="topleft"
+                 left_pad="2"
+                 name="hide_btn"
+                 tool_tip="Take what is on the canvas off it"
+                 top_delta="0"
+                 width="54" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="Reload"
+                 layout="topleft"
+                 left_pad="2"
+                 name="reload_btn"
+                 tool_tip="Read the catalog and the file again from disk"
+                 top_delta="0"
+                 width="54" />
+                <spinner
+                 decimal_digits="0"
+                 follows="left|top"
+                 height="22"
+                 increment="10"
+                 initial_value="100"
+                 layout="topleft"
+                 left_pad="8"
+                 max_val="800"
+                 min_val="20"
+                 name="canvas_zoom"
+                 scrub="true"
+                 tool_tip="How much bigger than life the preview is drawn, as a percentage; the numbers in it stay the file's own. Control and the wheel over the canvas moves it by the same step."
+                 top="2"
+                 width="60" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 is_toggle="true"
+                 label="Rulers"
+                 layout="topleft"
+                 left_pad="8"
+                 name="canvas_rulers"
+                 tool_tip="A rule along the top and the left of the canvas, numbered in the file's own coordinates"
+                 top_delta="0"
+                 width="58" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 is_toggle="true"
+                 label="Snap"
+                 layout="topleft"
+                 left_pad="2"
+                 name="canvas_snap"
+                 tool_tip="A drag lands on the grid rather than where the pointer is"
+                 top_delta="0"
+                 width="50" />
+                <combo_box
+                 follows="left|top"
+                 height="22"
+                 layout="topleft"
+                 left_pad="2"
+                 name="canvas_grid"
+                 tool_tip="How far apart the grid is, and how far a snapped drag moves"
+                 top_delta="0"
+                 width="52">
+                    <combo_box.item label="2 px" name="grid_2" value="2" />
+                    <combo_box.item label="3 px" name="grid_3" value="3" />
+                    <combo_box.item label="4 px" name="grid_4" value="4" />
+                    <combo_box.item label="5 px" name="grid_5" value="5" />
+                    <combo_box.item label="8 px" name="grid_8" value="8" />
+                    <combo_box.item label="16 px" name="grid_16" value="16" />
+                </combo_box>
+                <menu_button
+                 follows="left|top"
+                 height="22"
+                 image_overlay="Checker"
+                 label=""
+                 layout="topleft"
+                 left_pad="8"
+                 menu_filename="menu_xui_studio_backdrop.xml"
+                 name="canvas_backdrop"
+                 tool_tip="What is behind the preview: nothing, a pattern that shows what a translucent window does to what is under it, a checkerboard that shows what is transparent, the color of a window, or a light grey"
+                 top_delta="0"
+                 width="26" />
+                <check_box
+                 follows="left|top"
+                 height="16"
+                 label="Second"
+                 layout="topleft"
+                 left_pad="8"
+                 name="secondary_check"
+                 tool_tip="Build the file a second time in another language, on the canvas beside the first, sharing its selection"
+                 top_delta="3"
+                 width="66" />
+                <combo_box
+                 follows="left|top"
+                 height="22"
+                 layout="topleft"
+                 left_pad="0"
+                 name="language_combo_2"
+                 tool_tip="The language the second canvas is built in, beside the first. Both are the same file and share one selection."
+                 top_delta="-3"
+                 width="56" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 image_overlay="AlignLeft_Off"
+                 label=""
+                 layout="topleft"
+                 left_pad="8"
+                 name="align_left"
+                 tool_tip="Line the rest of the selection up with the left edge of the one the handles are on"
+                 top="2"
+                 width="26" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 image_overlay="AlignCenter_Off"
+                 label=""
+                 layout="topleft"
+                 left_pad="2"
+                 name="align_centre"
+                 tool_tip="Line the rest of the selection up with the middle of the one the handles are on, across"
+                 top_delta="0"
+                 width="26" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 image_overlay="AlignRight_Off"
+                 label=""
+                 layout="topleft"
+                 left_pad="2"
+                 name="align_right"
+                 tool_tip="Line the rest of the selection up with the right edge of the one the handles are on"
+                 top_delta="0"
+                 width="26" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 image_overlay="AlignTop_Off"
+                 label=""
+                 layout="topleft"
+                 left_pad="2"
+                 name="align_top"
+                 tool_tip="Line the rest of the selection up with the top of the one the handles are on"
+                 top_delta="0"
+                 width="26" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 image_overlay="AlignMiddle_Off"
+                 label=""
+                 layout="topleft"
+                 left_pad="2"
+                 name="align_middle"
+                 tool_tip="Line the rest of the selection up with the middle of the one the handles are on, down"
+                 top_delta="0"
+                 width="26" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 image_overlay="AlignBottom_Off"
+                 label=""
+                 layout="topleft"
+                 left_pad="2"
+                 name="align_bottom"
+                 tool_tip="Line the rest of the selection up with the bottom of the one the handles are on"
+                 top_delta="0"
+                 width="26" />
+            </layout_panel>
+            </layout_stack>
+            </layout_panel>
+
+            <layout_panel
+             auto_resize="false"
+             expanded_min_dim="120"
+             height="180"
+             layout="topleft"
+             min_dim="0"
+             name="bottom_panel"
+             user_resize="true"
+             width="744"
+             background_visible="true"
+             background_opaque="true"
+             bg_opaque_color="DkGray2"
+             border="true">
+                <tab_container
+                 follows="all"
+                 height="180"
+                 layout="topleft"
+                 left="0"
+                 name="bottom_tabs"
+                 tab_height="20"
+                 tab_position="top"
+                 top="0"
+                 width="744">
+                    <panel
+                     follows="all"
+                     height="158"
+                     label="Findings"
+                     layout="topleft"
+                     name="findings_mode"
+                     tool_tip="What the parser, the factory, the layer merge and the rules found in this file"
+                     width="742">
+                        <layout_stack
+                         animate="false"
+                         follows="all"
+                         height="158"
+                         layout="topleft"
+                         left="0"
+                         name="findings_stack"
+                         orientation="vertical"
+                         top="0"
+                         width="742">
+                            <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="findings_head"
+                             width="742">
+                                <combo_box
+                                 follows="left|top"
+                                 height="22"
+                                 layout="topleft"
+                                 left="0"
+                                 name="finding_scope"
+                                 tool_tip="This file, or every file a Lint All has checked"
+                                 top="2"
+                                 width="120">
+                                    <combo_box.item label="This file" name="file" value="file" />
+                                    <combo_box.item label="Every file" name="all" value="" />
+                                </combo_box>
+                                <combo_box
+                                 follows="left|top"
+                                 height="22"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="finding_rule"
+                                 tool_tip="Only the findings of one rule; each rule that found something is listed with how many"
+                                 top_delta="0"
+                                 width="190" />
+                                <combo_box
+                                 follows="left|top"
+                                 height="22"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="finding_severity"
+                                 tool_tip="The least severe finding to show: errors alone, warnings and errors, or everything down to notes"
+                                 top_delta="0"
+                                 width="150">
+                                    <combo_box.item label="Everything" name="everything" value="" />
+                                    <combo_box.item label="Errors and warnings" name="loud" value="loud" />
+                                    <combo_box.item label="Errors only" name="errors" value="errors" />
+                                </combo_box>
+                                <check_box
+                                 follows="left|top"
+                                 height="16"
+                                 label="Fixable"
+                                 layout="topleft"
+                                 left_pad="8"
+                                 name="finding_fixable"
+                                 tool_tip="Only the ones this tool offers to put right"
+                                 top_delta="4"
+                                 width="70" />
+                                <filter_editor
+                                 follows="left|top|right"
+                                 height="22"
+                                 label="Filter"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="finding_filter"
+                                 tool_tip="A word in the message, the name at fault, the element or the file"
+                                 top_delta="-4"
+                                 width="180" />
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="true"
+                             height="104"
+                             layout="topleft"
+                             name="findings_list_panel"
+                             width="742">
+                                <pane_list
+                                 column_padding="0"
+                                 draw_heading="true"
+                                 multi_select="true"
+                                 follows="all"
+                                 height="104"
+                                 layout="topleft"
+                                 left="0"
+                                 name="findings"
+                                 tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
+                                 top="0"
+                                 width="742">
+                                    <pane_list.columns
+                                     label=""
+                                     name="severity"
+                                     tool_tip="How bad it is: an error means the element does not work, a warning that it probably does not do what the file says, and a note is worth a look and often on purpose"
+                                     width="52" />
+                                    <pane_list.columns
+                                     label="Rule"
+                                     name="rule"
+                                     width="110" />
+                                    <pane_list.columns
+                                     label="Line"
+                                     name="line"
+                                     width="44" />
+                                    <pane_list.columns
+                                     dynamic_width="true"
+                                     label="Where"
+                                     name="where" />
+                                    <pane_list.columns
+                                     dynamic_width="true"
+                                     label="What"
+                                     name="message" />
+                                    <pane_list.columns
+                                     dynamic_width="true"
+                                     label="Fix"
+                                     name="fix"
+                                     tool_tip="What this tool would do about it, where it knows" />
+                                </pane_list>
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="findings_foot"
+                             width="742">
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Fix"
+                                 layout="topleft"
+                                 left="0"
+                                 name="finding_fix"
+                                 tool_tip="Do what the Fix column says, as one edit that can be undone"
+                                 top="2"
+                                 width="60" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Fix All"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="finding_fix_all"
+                                 tool_tip="Every finding in this file that offers one, each its own edit"
+                                 top_delta="0"
+                                 width="70" />
+                                <text
+                                 follows="left|top|right"
+                                 height="16"
+                                 layout="topleft"
+                                 left_pad="10"
+                                 name="finding_count"
+                                 tool_tip="How many findings the list shows, of how many it could, and how many files a Lint All has read"
+                                 top_delta="4"
+                                 width="440" />
+                            </layout_panel>
+                        </layout_stack>
+                    </panel>
+                    <panel
+                     follows="all"
+                     height="158"
+                     label="Translation"
+                     layout="topleft"
+                     name="translation_mode"
+                     tool_tip="One row per field a translator writes, for the chosen language"
+                     width="742">
+                        <layout_stack
+                         animate="false"
+                         follows="all"
+                         height="158"
+                         layout="topleft"
+                         left="0"
+                         name="translation_stack"
+                         orientation="vertical"
+                         top="0"
+                         width="742">
+                            <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="translate_head"
+                             width="742">
+                                <text
+                                 follows="left|top"
+                                 height="16"
+                                 layout="topleft"
+                                 left="0"
+                                 name="translate_label"
+                                 top="4"
+                                 width="58">Language</text>
+                                <combo_box
+                                 follows="left|top"
+                                 height="22"
+                                 layout="topleft"
+                                 left_pad="2"
+                                 name="translate_language"
+                                 tool_tip="The language this table is about, which the second variant on the canvas shows"
+                                 top_delta="-3"
+                                 width="56" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Repair File"
+                                 layout="topleft"
+                                 left_pad="12"
+                                 name="translate_repair_file"
+                                 tool_tip="Move every value this file writes at a path the base has moved on from, and change nothing else"
+                                 top_delta="0"
+                                 width="80" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Repair Language"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="translate_repair_all"
+                                 tool_tip="The same over every file this language has"
+                                 top_delta="0"
+                                 width="110" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Repair Roots"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="translate_repair_roots"
+                                 tool_tip="Give back the base's root name to the files of this language that carry another, or none: the root is what a whole file is matched on"
+                                 top_delta="0"
+                                 width="92" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Remove Orphans"
+                                 layout="topleft"
+                                 left_pad="12"
+                                 name="translate_remove_orphans"
+                                 tool_tip="Take out of every file of this language each value written for something the base no longer has: an element of a lost name, an element with no name, an attribute the base's element does not carry. What the base has moved is left for Repair File, and what it has at more than one path is left for you."
+                                 top_delta="0"
+                                 width="110" />
+                                <text
+                                 follows="left|top|right"
+                                 height="16"
+                                 layout="topleft"
+                                 left_pad="12"
+                                 name="translate_counts"
+                                 right="-4"
+                                 tool_tip="The rows by what state they are in: translated, missing from the language, written at a path the base has moved on from, translated but with different placeholders, or marked not to be translated"
+                                 top_delta="3"
+                                 use_ellipses="true" />
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="true"
+                             height="106"
+                             layout="topleft"
+                             min_dim="48"
+                             name="translate_table"
+                             width="742">
+                                <pane_list
+                                 column_padding="0"
+                                 draw_heading="true"
+                                 multi_select="true"
+                                 follows="all"
+                                 height="106"
+                                 layout="topleft"
+                                 left="0"
+                                 name="translate_list"
+                                 tool_tip="One row per field a translator writes; double-click selects the element"
+                                 top="0"
+                                 width="742">
+                                    <pane_list.columns
+                                     label="Where"
+                                     name="path"
+                                     width="160" />
+                                    <pane_list.columns
+                                     label="Field"
+                                     name="field"
+                                     width="80" />
+                                    <pane_list.columns
+                                     dynamic_width="true"
+                                     label="English"
+                                     name="english" />
+                                    <pane_list.columns
+                                     dynamic_width="true"
+                                     label="Translation"
+                                     name="translation" />
+                                    <pane_list.columns
+                                     label="State"
+                                     name="state"
+                                     tool_tip="Whether the language has this value, is missing it, or writes it at a path the base has moved on from"
+                                     width="120" />
+                                    <pane_list.columns
+                                     label="Fits"
+                                     name="fits"
+                                     tool_tip="Whether the translation fits its widget in the second variant"
+                                     width="36" />
+                                </pane_list>
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="false"
+                             height="50"
+                             layout="topleft"
+                             min_dim="50"
+                             name="translate_write_row"
+                             width="742">
+                                <text_editor
+                                 follows="left|top|right"
+                                 height="46"
+                                 word_wrap="true"
+                                 max_length="8192"
+                                 label="Select a row above to translate it"
+                                 layout="topleft"
+                                 left="0"
+                                 name="translate_value"
+                                 tool_tip="The translation for the selected row. A translation may run to several lines, so return puts one in; the button beside it writes."
+                                 top="2"
+                                 width="654" />
+                                <button
+                                 follows="right|top"
+                                 height="22"
+                                 label="Write"
+                                 layout="topleft"
+                                 left="658"
+                                 name="translate_write"
+                                 tool_tip="Write it where the merge will find it, under the ancestors the base gives it"
+                                 top="2"
+                                 width="80" />
+                                <button
+                                 follows="right|top"
+                                 height="22"
+                                 label="Remove"
+                                 layout="topleft"
+                                 left="658"
+                                 name="translate_remove"
+                                 tool_tip="Take the language's value for this row out of its file: the attribute, or the element where its text was all it carried. The way a value that names nothing the base has leaves the file."
+                                 top="26"
+                                 width="80" />
+                            </layout_panel>
+                        </layout_stack>
+                    </panel>
+                    <panel
+                     follows="all"
+                     height="158"
+                     label="Notices"
+                     layout="topleft"
+                     name="notifications_mode"
+                     tool_tip="Every template notifications.xml declares, and the panel each would produce"
+                     width="742">
+                        <layout_stack
+                         animate="false"
+                         follows="all"
+                         height="158"
+                         layout="topleft"
+                         left="0"
+                         name="notifications_stack"
+                         orientation="vertical"
+                         top="0"
+                         width="742">
+                            <layout_panel
+                             auto_resize="true"
+                             height="132"
+                             layout="topleft"
+                             min_dim="60"
+                             name="notifications_area"
+                             width="742">
+                                <pane_list
+                                 column_padding="0"
+                                 draw_heading="true"
+                                 follows="all"
+                                 height="132"
+                                 layout="topleft"
+                                 left="0"
+                                 name="notifications"
+                                 tool_tip="Every template notifications.xml declares; select one to build the panel it would produce"
+                                 top="0"
+                                 width="742">
+                                    <pane_list.columns
+                                     label="Name"
+                                     name="name"
+                                     width="240" />
+                                    <pane_list.columns
+                                     label="Type"
+                                     name="type"
+                                     width="90" />
+                                    <pane_list.columns
+                                     label="Buttons"
+                                     name="buttons"
+                                     width="60" />
+                                    <pane_list.columns
+                                     dynamic_width="true"
+                                     label="Message"
+                                     name="message" />
+                                </pane_list>
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="notification_foot"
+                             width="742">
+                                <filter_editor
+                                 follows="left|top|right"
+                                 height="22"
+                                 label="Filter"
+                                 layout="topleft"
+                                 left="0"
+                                 name="notification_filter"
+                                 tool_tip="Narrow the list to the templates whose name carries this"
+                                 top="2"
+                                 width="674" />
+                                <button
+                                 follows="right|top"
+                                 height="22"
+                                 label="Post"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="notification_post"
+                                 tool_tip="Send the selected notification for real, through the channels, as the viewer would"
+                                 top_delta="0"
+                                 width="64" />
+                            </layout_panel>
+                        </layout_stack>
+                    </panel>
+                    <panel
+                     follows="all"
+                     height="158"
+                     label="History"
+                     layout="topleft"
+                     name="history_mode"
+                     tool_tip="Everything done to the files this tool has open, with a mark where the present is"
+                     width="742">
+                        <history_list
+                         start_label="The files as they were opened"
+                         empty_headline="Nothing done yet."
+                         empty_sentence="Edits show up here as you make them, newest first. Double-click one to put the files back the way they were just after it."
+                         follows="all"
+                         height="158"
+                         layout="topleft"
+                         left="0"
+                         name="history"
+                         tool_tip="Everything done to the open files, newest first, with a mark on the present. Click a step to see the element it was about; double-click one to put the files back the way they were just after it."
+                         top="0"
+                         width="742" />
+                    </panel>
+                    <panel
+                     follows="all"
+                     height="158"
+                     label="Channels"
+                     layout="topleft"
+                     name="channels_mode"
+                     tool_tip="What the notification system did with what was posted"
+                     width="742">
+                        <layout_stack
+                         animate="false"
+                         follows="all"
+                         height="158"
+                         layout="topleft"
+                         left="0"
+                         name="channels_stack"
+                         orientation="vertical"
+                         top="0"
+                         width="742">
+                            <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="channel_head"
+                             width="742">
+                                <text
+                                 follows="left|top"
+                                 height="16"
+                                 layout="topleft"
+                                 left="0"
+                                 name="channel_label"
+                                 top="4"
+                                 width="58">Respond</text>
+                                <combo_box
+                                 follows="left|top"
+                                 height="22"
+                                 layout="topleft"
+                                 left_pad="2"
+                                 name="channel_response"
+                                 tool_tip="The buttons the selected notification's form declares"
+                                 top_delta="-3"
+                                 width="180" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Respond"
+                                 layout="topleft"
+                                 left_pad="8"
+                                 name="channel_respond"
+                                 tool_tip="Answer the notification as a user would, which is a real answer"
+                                 top_delta="0"
+                                 width="70" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Clear"
+                                 layout="topleft"
+                                 left_pad="12"
+                                 name="channel_clear"
+                                 tool_tip="Empty the list; what has already been through the channels stays through them"
+                                 top_delta="0"
+                                 width="60" />
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="true"
+                             height="132"
+                             layout="topleft"
+                             min_dim="60"
+                             name="channels_area"
+                             width="742">
+                                <pane_list
+                                 column_padding="0"
+                                 draw_heading="true"
+                                 follows="all"
+                                 height="132"
+                                 layout="topleft"
+                                 left="0"
+                                 name="channels"
+                                 tool_tip="Every notification through every channel since this floater opened, in the order the channels process them"
+                                 top="0"
+                                 width="742">
+                                    <pane_list.columns
+                                     label="Channel"
+                                     name="channel"
+                                     width="140" />
+                                    <pane_list.columns
+                                     label="Notification"
+                                     name="name"
+                                     width="200" />
+                                    <pane_list.columns
+                                     label="Time"
+                                     name="time"
+                                     width="80" />
+                                    <pane_list.columns
+                                     dynamic_width="true"
+                                     label="Message"
+                                     name="message" />
+                                </pane_list>
+                            </layout_panel>
+                        </layout_stack>
+                    </panel>
+                </tab_container>
+            </layout_panel>
+
+            </layout_stack>
+        </layout_panel>
+        <layout_panel
+         auto_resize="false"
+         expanded_min_dim="260"
+         height="474"
+         layout="topleft"
+         min_dim="0"
+         name="inspector_panel"
+         user_resize="true"
+         width="500"
+         background_visible="true"
+         background_opaque="true"
+         bg_opaque_color="DkGray2"
+         border="true">
+            <tab_container
+             follows="all"
+             height="474"
+             layout="topleft"
+             left="0"
+             name="inspector_tabs"
+             fill_width="true"
+             tab_min_width="60"
+             tab_position="top"
+             top="0"
+             width="500">
+                <panel
+                 label="Attributes"
+                 layout="topleft"
+                 follows="all"
+                 height="431"
+                 name="attributes_tab"
+                 tool_tip="Attributes: every field the tag answers to, with what is in force and who wrote it"
+                 width="478">
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="16"
+                     layout="topleft"
+                     left="8"
+                     name="attributes_what"
+                     text_color="EmphasisColor"
+                     tool_tip="The selected element: its name, its tag as the file writes it, and the class the viewer built for it"
+                     top="6"
+                     use_ellipses="true"
+                     width="300">Nothing selected</text>
+                    <filter_editor
+                     follows="top|right"
+                     height="20"
+                     label="Filter fields"
+                     layout="topleft"
+                     left="314"
+                     name="attributes_filter"
+                     tool_tip="Narrow the rows to the fields whose name carries this"
+                     top="4"
+                     width="156" />
+                    <check_box
+                     follows="left|top"
+                     height="16"
+                     initial_value="false"
+                     label="Only what the files write"
+                     layout="topleft"
+                     left="8"
+                     name="attributes_authored"
+                     tool_tip="The short list an author is working in: the fields this file actually writes"
+                     top="28"
+                     width="200" />
+                    <check_box
+                     follows="left|top"
+                     height="16"
+                     initial_value="false"
+                     label="Nested fields"
+                     layout="topleft"
+                     left="214"
+                     name="attributes_nested"
+                     tool_tip="The leaves of the blocks a field carries, such as font.name and bg_alpha_color.alpha. A nested field the file writes is always shown."
+                     top="28"
+                     width="160" />
+                </panel>
+                <panel
+                 label="Layout"
+                 layout="topleft"
+                 follows="all"
+                 height="431"
+                 name="layout_tab"
+                 tool_tip="Layout: where the element ended up, and which of its numbers decided that"
+                 width="478">
+                    <pane_list
+                     column_padding="0"
+                     draw_heading="true"
+                     multi_select="true"
+                     follows="all"
+                     height="431"
+                     layout="topleft"
+                     left="0"
+                     name="layout"
+                     tool_tip="What decides where this element is: its own numbers, the numbers the file writes, and what its parent does with them."
+                     top="0"
+                     width="478">
+                        <pane_list.columns
+                         label="Property"
+                         name="property"
+                         width="160" />
+                        <pane_list.columns
+                         dynamic_width="true"
+                         label="Value"
+                         name="value" />
+                    </pane_list>
+                </panel>
+                <panel
+                 label="Source"
+                 layout="topleft"
+                 follows="all"
+                 height="431"
+                 name="source_tab"
+                 tool_tip="Source: the element as each layer writes it, one after another"
+                 width="478">
+                    <layout_stack
+                     animate="false"
+                     follows="all"
+                     height="431"
+                     layout="topleft"
+                     left="0"
+                     name="source_stack"
+                     orientation="vertical"
+                     top="0"
+                     width="478">
+                        <layout_panel
+                         auto_resize="false"
+                         height="24"
+                         layout="topleft"
+                         min_dim="24"
+                         name="source_head"
+                         width="478">
+                            <text
+                             follows="left|top|right"
+                             height="16"
+                             layout="topleft"
+                             left="2"
+                             name="source_layers"
+                             tool_tip="Every layer of this file, with the line the selected element starts on in each, in the order they are merged; a dash where the layer does not carry it"
+                             top="4"
+                             use_ellipses="true"
+                             width="380" />
+                            <button
+                             follows="top|right"
+                             height="20"
+                             label="Open in Editor"
+                             layout="topleft"
+                             left_pad="4"
+                             name="jump_btn"
+                             tool_tip="Open the file in the external editor, at this element's line"
+                             top_delta="-2"
+                             width="90" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="true"
+                         height="130"
+                         layout="topleft"
+                         min_dim="60"
+                         name="source_layers_panel"
+                         width="478">
+                            <pane_list
+                             column_padding="0"
+                             draw_heading="true"
+                             follows="all"
+                             height="130"
+                             layout="topleft"
+                             left="0"
+                             name="source_layer_list"
+                             tool_tip="Every layer of this file: what each says about the chosen field, and which one the merge takes"
+                             top="0"
+                             width="478">
+                                <pane_list.columns
+                                 label=""
+                                 name="force"
+                                 tool_tip="a dot marks the one in force"
+                                 width="16" />
+                                <pane_list.columns
+                                 label="Layer"
+                                 name="layer"
+                                 width="110" />
+                                <pane_list.columns
+                                 dynamic_width="true"
+                                 label="Says"
+                                 name="value" />
+                                <pane_list.columns
+                                 label="Line"
+                                 name="line"
+                                 width="44" />
+                            </pane_list>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="source_override"
+                         width="478">
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Write Here"
+                             layout="topleft"
+                             left="0"
+                             name="write_override"
+                             tool_tip="Write the value in force into the chosen layer, so that layer overrides the rest"
+                             top="2"
+                             width="80" />
+                            <text
+                             follows="left|top|right"
+                             height="16"
+                             layout="topleft"
+                             left_pad="6"
+                             name="override_field"
+                             tool_tip="The field the list below is about, and what Write Here writes: the value in force, into the layer chosen there"
+                             top_delta="4"
+                             use_ellipses="true"
+                             width="380" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="true"
+                         height="240"
+                         layout="topleft"
+                         min_dim="60"
+                         name="source_text_panel"
+                         width="478">
+                            <code_editor
+                             follows="all"
+                             font="Monospace"
+                             height="240"
+                             layout="topleft"
+                             left="0"
+                             name="source_text"
+                             tool_tip="The layer's file as it stands, to edit: what is typed goes into the document once the typing pauses, the tree and the preview following; the schema completes tags, attributes and values, and the findings on this file are marked"
+                             syntax="xml"
+                             top="0"
+                             width="476"
+                             word_wrap="false" />
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+                <panel
+                 label="Bindings"
+                 layout="topleft"
+                 follows="all"
+                 height="431"
+                 name="bindings_tab"
+                 tool_tip="Bindings: the callbacks the file names, and whether anything answers to them"
+                 width="478">
+                    <pane_list
+                     column_padding="0"
+                     draw_heading="true"
+                     multi_select="true"
+                     follows="all"
+                     height="431"
+                     layout="topleft"
+                     left="0"
+                     name="bindings"
+                     tool_tip="The callbacks the file names, and whether anything is registered to answer to each name."
+                     top="0"
+                     width="478">
+                        <pane_list.columns
+                         label="Kind"
+                         name="kind"
+                         width="130" />
+                        <pane_list.columns
+                         dynamic_width="true"
+                         label="Name"
+                         name="name" />
+                        <pane_list.columns
+                         label="Status"
+                         name="status"
+                         width="120" />
+                    </pane_list>
+                </panel>
+                <panel
+                 label="State"
+                 layout="topleft"
+                 follows="all"
+                 height="431"
+                 name="state_tab"
+                 tool_tip="State: what the built widget says about itself right now"
+                 width="478">
+                    <pane_list
+                     column_padding="0"
+                     draw_heading="true"
+                     multi_select="true"
+                     follows="all"
+                     height="431"
+                     layout="topleft"
+                     left="0"
+                     name="state"
+                     tool_tip="What the built widget says about itself as it is now, read again while this tab is showing."
+                     top="0"
+                     width="478">
+                        <pane_list.columns
+                         label="Property"
+                         name="property"
+                         width="130" />
+                        <pane_list.columns
+                         dynamic_width="true"
+                         label="Value"
+                         name="value" />
+                    </pane_list>
+                </panel>
+                <panel
+                 label="Findings"
+                 layout="topleft"
+                 follows="all"
+                 height="431"
+                 name="findings_tab"
+                 tool_tip="Findings: what the parser, the merge and the rules said about this element"
+                 width="478">
+                    <pane_list
+                     column_padding="0"
+                     draw_heading="true"
+                     multi_select="true"
+                     follows="all"
+                     height="431"
+                     layout="topleft"
+                     left="0"
+                     name="selection_findings"
+                     tool_tip="The findings on the selected element and everything below it"
+                     top="0"
+                     width="478">
+                        <pane_list.columns
+                         label=""
+                         name="severity"
+                         width="52" />
+                        <pane_list.columns
+                         label="Rule"
+                         name="rule"
+                         width="90" />
+                        <pane_list.columns
+                         label="Where"
+                         name="where"
+                         width="110" />
+                        <pane_list.columns
+                         dynamic_width="true"
+                         label="What"
+                         name="message" />
+                    </pane_list>
+                </panel>
+            </tab_container>
+        </layout_panel>
+    </layout_stack>
+
+    <text
+     follows="left|right|bottom"
+     height="16"
+     layout="topleft"
+     left="8"
+     name="status"
+     top_pad="6"
+     use_ellipses="true"
+     width="1664" />
+</floater>

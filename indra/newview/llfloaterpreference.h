@@ -40,6 +40,8 @@
 #include "llsetkeybinddialog.h"
 #include "llkeyconflict.h"
 
+#include <boost/signals2/connection.hpp>
+
 class LLConversationLogObserver;
 class LLPanelPreference;
 class LLPanelLCD;
@@ -73,20 +75,22 @@ typedef enum
     } EGraphicsSettings;
 
 // Floater to control preferences (display, audio, bandwidth, general.
-class LLFloaterPreference : public LLFloater, public LLAvatarPropertiesObserver, public LLConversationLogObserver
+class LLFloaterPreference final : public LLFloater, public LLAvatarPropertiesObserver, public LLConversationLogObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPreference, LLFloater);
+
     LLFloaterPreference(const LLSD& key);
     ~LLFloaterPreference();
 
     void apply();
     void cancel(const std::vector<std::string> settings_to_skip = {});
-    /*virtual*/ void draw();
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void onClose(bool app_quitting);
-    /*virtual*/ void changed();
-    /*virtual*/ void changed(const LLUUID& session_id, U32 mask) {};
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ void onClose(bool app_quitting) override;
+    /*virtual*/ void changed() override;
+    /*virtual*/ void changed(const LLUUID& session_id, U32 mask) override {};
 
     // static data update, called from message handler
     static void updateUserInfo(const std::string& visibility);
@@ -103,7 +107,7 @@ public:
     // update Show Favorites checkbox
     static void updateShowFavoritesCheckbox(bool val);
 
-    void processProperties( void* pData, EAvatarProcessorType type );
+    void processProperties( void* pData, EAvatarProcessorType type ) override;
     void saveAvatarProperties( void );
     static void saveAvatarPropertiesCoro(const std::string url, bool allow_publish);
     void selectPrivacyPanel();
@@ -121,6 +125,7 @@ protected:
     void        onClickClearCache();            // Clear viewer texture cache, file cache on next startup
     void        onClickBrowserClearCache();     // Clear web history and caches as well as viewer caches above
     void        onLanguageChange();
+    void        onTimeFormatChange();
     void        onNotificationsChange(const std::string& OptionName);
     void        onNameTagOpacityChange(const LLSD& newvalue);
 
@@ -175,7 +180,7 @@ public:
     void setPersonalInfo(const std::string& visibility);
     void refreshEnabledState();
     void onCommitWindowedMode();
-    void refresh(); // Refresh enable/disable
+    void refresh() override; // Refresh enable/disable
     // if the quality radio buttons are changed
     void onChangeQuality(const LLSD& data);
 
@@ -198,6 +203,7 @@ public:
     void onClickRenderExceptions();
     void onClickAutoAdjustments();
     void onClickAdvanced();
+    void onClickScriptingPerfs();
     void applyUIColor(LLUICtrl* ctrl, const LLSD& param);
     void getUIColor(LLUICtrl* ctrl, const LLSD& param);
     void onLogChatHistorySaved();
@@ -232,6 +238,19 @@ private:
     void onSelectSkin(const LLSD& data);
     void refreshSkinInfo(const skin_t& skin);
 
+    // Themes panel: populate the UI Font / Mono Font dropdowns from the
+    // family list parsed from fonts.xml, and pre-select / pre-fill from
+    // the current AlchemyUIFontOverrides setting.
+    void populateUIFontDropdowns();
+    // Commit handler for the family dropdown. userdata = family being
+    // overridden ("SansSerif" or "Monospace"). Selecting "(default)"
+    // erases the override; selecting another value writes it.
+    void onUIFontSelected(LLUICtrl* ctrl, const LLSD& userdata);
+    // Commit handler for the "Or filename" line editor. userdata = family
+    // being overridden. Empty input erases the override; otherwise writes
+    // the raw filename.
+    void onUIFontFileEntered(LLUICtrl* ctrl, const LLSD& userdata);
+
     static std::string sSkin;
     notifications_map mNotificationOptions;
     bool mGotPersonalInfo;
@@ -258,6 +277,8 @@ private:
     LLButton*       mDeleteTranscriptsBtn = nullptr;
     LLButton*       mEnablePopupBtn = nullptr;
     LLButton*       mDisablePopupBtn = nullptr;
+    LLComboBox*     mTimeFormatCombobox = nullptr;
+    LLComboBox*     mLanguageCombobox = nullptr;
     std::unique_ptr< ll::prefs::SearchData > mSearchData;
     bool mSearchDataDirty;
 
@@ -269,6 +290,7 @@ private:
     boost::signals2::connection mAutoResponseNonFriendsConnection;
 
     void onUpdateFilterTerm( bool force = false );
+    void onCopySearch();
     void collectSearchableItems();
     void filterIgnorableNotifications();
 
@@ -278,8 +300,10 @@ private:
 class LLPanelPreference : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelPreference, LLPanel);
+
     LLPanelPreference();
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     virtual ~LLPanelPreference();
 
@@ -322,15 +346,17 @@ private:
     LOG_CLASS(LLPanelPreference);
 };
 
-class LLPanelPreferenceGraphics : public LLPanelPreference
+class LLPanelPreferenceGraphics final : public LLPanelPreference
 {
 public:
-    bool postBuild();
-    void draw();
-    void cancel(const std::vector<std::string> settings_to_skip = {});
-    void saveSettings();
+    AL_VIEW_TYPE(LLPanelPreferenceGraphics, LLPanelPreference);
+
+    bool postBuild() override;
+    void draw() override;
+    void cancel(const std::vector<std::string> settings_to_skip = {}) override;
+    void saveSettings() override;
     void resetDirtyChilds();
-    void setHardwareDefaults();
+    void setHardwareDefaults() override;
     void setPresetText();
 
 protected:
@@ -341,18 +367,49 @@ private:
     LOG_CLASS(LLPanelPreferenceGraphics);
 };
 
-class LLPanelPreferenceControls : public LLPanelPreference, public LLKeyBindResponderInterface
+// Specialised audio-preferences panel. Adds an output-device combo box
+// populated at panel-open time from the active FAudio engine's device
+// enumeration. The control_name binding writes the user's pick to
+// AudioFAudioOutputDevice; the engine reads it at next launch.
+class LLPanelPreferenceSound final : public LLPanelPreference
+{
+    LOG_CLASS(LLPanelPreferenceSound);
+public:
+    AL_VIEW_TYPE(LLPanelPreferenceSound, LLPanelPreference);
+
+    bool postBuild() override;
+
+private:
+    void populateOutputDeviceCombo();
+    // Refreshes the items in the audio_output_device_combo against the
+    // current engine enumeration. Invoked from postBuild() for the
+    // initial fill, from the combo's prearrange callback (covers
+    // hot-plug while the panel is open), and from the engine's
+    // devices-changed signal (covers active-device shifts driven by
+    // setOutputDevice).
+    void refreshOutputDeviceItems(const std::string& setting_key);
+
+    // Subscription to LLAudioEngine::getDevicesChangedSignal(). The
+    // scoped_connection disconnects automatically when the panel is
+    // destroyed; boost::signals2 makes that safe even if the engine
+    // outlives the panel.
+    boost::signals2::scoped_connection mDevicesChangedConn;
+};
+
+class LLPanelPreferenceControls final : public LLPanelPreference, public LLKeyBindResponderInterface
 {
     LOG_CLASS(LLPanelPreferenceControls);
 public:
+    AL_VIEW_TYPE(LLPanelPreferenceControls, LLPanelPreference);
+
     LLPanelPreferenceControls();
     virtual ~LLPanelPreferenceControls();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    void apply();
-    void cancel(const std::vector<std::string> settings_to_skip = {});
-    void saveSettings();
+    void apply() override;
+    void cancel(const std::vector<std::string> settings_to_skip = {}) override;
+    void saveSettings() override;
     void resetDirtyChilds();
 
     void onListCommit();
@@ -368,9 +425,9 @@ public:
     void updateAndApply();
 
     // from interface
-    /*virtual*/ bool onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes);
-    /*virtual*/ void onDefaultKeyBind(bool all_modes);
-    /*virtual*/ void onCancelKeyBind();
+    /*virtual*/ bool onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes) override;
+    /*virtual*/ void onDefaultKeyBind(bool all_modes) override;
+    /*virtual*/ void onCancelKeyBind() override;
 
 private:
     // reloads settings, discards current changes, updates table
@@ -408,9 +465,11 @@ class LLAvatarComplexityControls
     LOG_CLASS(LLAvatarComplexityControls);
 };
 
-class LLFloaterPreferenceProxy : public LLFloater
+class LLFloaterPreferenceProxy final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPreferenceProxy, LLFloater);
+
     LLFloaterPreferenceProxy(const LLSD& key);
     ~LLFloaterPreferenceProxy();
 
@@ -419,13 +478,13 @@ public:
     void cancel();
 
 protected:
-    bool postBuild();
-    void onOpen(const LLSD& key);
-    void onClose(bool app_quitting);
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void onClose(bool app_quitting) override;
     void saveSettings();
     void onBtnOk();
     void onBtnCancel();
-    void onClickCloseBtn(bool app_quitting = false);
+    void onClickCloseBtn(bool app_quitting = false) override;
 
     void onChangeSocksSettings();
 

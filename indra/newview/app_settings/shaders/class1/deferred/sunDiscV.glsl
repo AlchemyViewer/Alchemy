@@ -23,9 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 texture_matrix0;
-uniform mat4 modelview_matrix;
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 in vec3 position;
 in vec2 texcoord0;
@@ -33,7 +33,6 @@ in vec2 texcoord0;
 out vec2 vary_texcoord0;
 out float sun_fade;
 
-void calcAtmospherics(vec3 eye_pos);
 
 void main()
 {
@@ -44,11 +43,15 @@ void main()
 
     sun_fade = smoothstep(0.3, 1.0, (position.z + 50) / 512.0f);
 
-    // smash to *almost* far clip plane -- behind clouds but in front of stars
-    pos.z = pos.w*0.999999;
+    // On the far plane with the rest of the sky, which layers by draw order: after the stars,
+    // before the clouds. Reverse-Z puts the far plane at ndc z 0.
+#ifdef REVERSE_Z
+    pos.z = 0.0;
+#else
+    pos.z = pos.w;
+#endif
     gl_Position = pos;
 
-    calcAtmospherics(pos.xyz);
 
     vary_texcoord0 = (texture_matrix0 * vec4(texcoord0,0,1)).xy;
 }

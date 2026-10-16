@@ -1,0 +1,10 @@
+# UndefinedBehaviorSanitizer suppressions for the tests of a sanitized build
+# (ALAddTestBinary.cmake gives the runs this file). One per line:
+#
+#   <check>:<function, source file or library>
+#
+# where <check> is the name a report gives in brackets, such as alignment or
+# signed-integer-overflow (report_error_type is on). A suppression is for code
+# that is not ours -- a port's headers inlined into ours, a system library --
+# and says above it what it hides, why it cannot be fixed here, and where it
+# was reported upstream. Our own undefined behaviour is fixed, not listed.

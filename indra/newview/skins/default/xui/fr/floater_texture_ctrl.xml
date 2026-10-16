@@ -16,16 +16,14 @@
 	<button label="Défaut" label_selected="Défaut" name="Default" width="60"/>
 	<button label="Vierge" label_selected="Vierge" name="Blank" width="60"/>
 	<button label="Aucune" label_selected="Aucune" left="68" name="None" width="60"/>
-	<button bottom="-240" label="" label_selected="" name="Pipette"/>
+	<button bottom="-240" name="Pipette"/>
 	<text name="preview_disabled" value="Aperçu désactivé"/>
 	<filter_editor label="Filtrer les textures" name="inventory search editor"/>
-	<check_box initial_value="false" label="Afficher les dossiers" name="show_folders_check"/>
 	<button label="Ajouter" label_selected="Ajouter" name="l_add_btn"/>
 	<button label="Supprimer" label_selected="Supprimer" name="l_rem_btn"/>
 	<button label="Charger" label_selected="Charger" name="l_upl_btn"/>
 	<scroll_list name="l_name_list">
 		<column label="Nom" name="unit_name"/>
-		<column label="ID" name="unit_id_HIDDEN"/>
 	</scroll_list>
 	<combo_box name="l_bake_use_texture_combo_box" tool_tip="Choisir la texture mixte">
 		<combo_box.item label="Aucun" name="None"/>
@@ -41,7 +39,6 @@
 		<combo_box.item label="BAKED_AUX2" name="BAKED_AUX2"/>
 		<combo_box.item label="BAKED_AUX3" name="BAKED_AUX3"/>
 	</combo_box>
-	<check_box initial_value="false" label="Masquer la région maillée de base" name="hide_base_mesh_region"/>
 	<button label="OK" label_selected="OK" name="Select"/>
 	<button label="Annuler" label_selected="Annuler" name="Cancel"/>
 	<check_box initial_value="true" label="Appliquer maintenant" name="apply_immediate_check"/>

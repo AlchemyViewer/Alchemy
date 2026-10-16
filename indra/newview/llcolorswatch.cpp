@@ -30,6 +30,8 @@
 #include "llcolorswatch.h"
 
 // Linden library includes
+#include "llcontrol.h"
+#include "v3color.h"
 #include "v4color.h"
 #include "llwindow.h"   // setCursor()
 
@@ -61,6 +63,9 @@ LLColorSwatchCtrl::LLColorSwatchCtrl(const Params& p)
 :   LLUICtrl(p),
     mValid( true ),
     mColor(p.color()),
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+    mPrevColor(p.color()),
+// [/SL:KB]
     mCanApplyImmediately(p.can_apply_immediately),
     mAlphaGradientImage(p.alpha_background_image),
     mOnCancelCallback(p.cancel_callback()),
@@ -128,10 +133,25 @@ bool LLColorSwatchCtrl::handleUnicodeCharHere(llwchar uni_char)
     return LLUICtrl::handleUnicodeCharHere(uni_char);
 }
 
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+bool LLColorSwatchCtrl::isDirty() const
+{
+    return (mColor != mPrevColor);
+}
+
+void LLColorSwatchCtrl::resetDirty()
+{
+    mPrevColor = mColor;
+}
+// [/SL:KB]
+
 // forces color of this swatch and any associated floater to the input value, if currently invalid
 void LLColorSwatchCtrl::setOriginal(const LLColor4& color)
 {
     mColor = color;
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+    mPrevColor = mColor;
+// [/SL:KB]
     LLFloaterColorPicker* pickerp = (LLFloaterColorPicker*)mPickerHandle.get();
     if (pickerp)
     {
@@ -142,6 +162,9 @@ void LLColorSwatchCtrl::setOriginal(const LLColor4& color)
 void LLColorSwatchCtrl::set(const LLColor4& color, bool update_picker, bool from_event)
 {
     mColor = color;
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+    mPrevColor = mColor;
+// [/SL:KB]
     LLFloaterColorPicker* pickerp = (LLFloaterColorPicker*)mPickerHandle.get();
     if (pickerp && update_picker)
     {
@@ -200,12 +223,13 @@ void LLColorSwatchCtrl::draw()
     F32 alpha = getTransparencyType() == TT_ACTIVE ? 1.0f : getCurrentTransparency();
 
     mBorder->setKeyboardFocusHighlight(hasFocus());
-    // Draw border
-    LLRect border( 0, getRect().getHeight(), getRect().getWidth(), mLabelHeight );
-    gl_rect_2d( border, mBorderColor.get(), false );
 
-    LLRect interior = border;
+    LLRect gl_border(0, getRect().getHeight(), getRect().getWidth(), mLabelHeight);
+    LLColor4 gl_border_color = mBorderColor.get();
+    LLRect interior = gl_border;
     interior.stretch( -1 );
+
+    bool show_border_ctrl = true;
 
     // Check state
     if ( mValid )
@@ -239,7 +263,9 @@ void LLColorSwatchCtrl::draw()
     {
         if (mFallbackImage.notNull())
         {
-            mFallbackImage->draw(interior.mLeft, interior.mBottom, interior.getWidth(), interior.getHeight(), LLColor4::white % alpha);
+            mFallbackImage->draw(interior.mLeft - 1, interior.mBottom - 1, mFallbackImage->getWidth(), mFallbackImage->getHeight(), LLColor4::white % alpha);
+            gl_border_color = LLUIColorTable::instance().getColor("ColorSwatchBorderColorGray").get();
+            show_border_ctrl = false;
         }
         else
         {
@@ -249,6 +275,11 @@ void LLColorSwatchCtrl::draw()
             gl_draw_x(interior, LLColor4::black % alpha);
         }
     }
+
+    mBorder->setVisible(show_border_ctrl);
+
+    // Draw border
+    gl_rect_2d(gl_border, gl_border_color, false);
 
     LLUICtrl::draw();
 }
@@ -272,7 +303,21 @@ void LLColorSwatchCtrl::setEnabled( bool enabled )
 
 void LLColorSwatchCtrl::setValue(const LLSD& value)
 {
-    set(LLColor4(value), true, true);
+    LLColor4 color(value);
+    // Color3 controls carry no meaningful alpha: a 3-element array reads as
+    // alpha 0 through LLColor4(LLSD), and a round-trip through the picker can
+    // persist that stale 0 as a 4th element. Show such colors opaque.
+    bool opaque = value.isArray() && value.size() == 3;
+    if (!opaque)
+    {
+        LLControlVariable* controlp = getControlVariable();
+        opaque = controlp && controlp->type() == TYPE_COL3;
+    }
+    if (opaque)
+    {
+        color.mV[VALPHA] = 1.f;
+    }
+    set(color, true, true);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -295,7 +340,17 @@ void LLColorSwatchCtrl::onColorChanged ( void* data, EColorPickOp pick_op )
             if (color_changed)
             {
                 subject->mColor = updatedColor;
-                subject->setControlValue(updatedColor.getValue());
+                LLControlVariable* controlp = subject->getControlVariable();
+                if (controlp && controlp->type() == TYPE_COL3)
+                {
+                    // Color3 controls store three components; writing the
+                    // swatch's four would persist a meaningless alpha.
+                    subject->setControlValue(LLColor3(updatedColor).getValue());
+                }
+                else
+                {
+                    subject->setControlValue(updatedColor.getValue());
+                }
             }
 
             if (pick_op == COLOR_CANCEL && subject->mOnCancelCallback)
@@ -350,11 +405,28 @@ void LLColorSwatchCtrl::setValid(bool valid )
 
 void LLColorSwatchCtrl::showPicker(bool take_focus)
 {
+    // Both ways in -- the click and the space bar -- come through here, so
+    // this is the one place an owner can take the picking over.
+    if (mPickerOverride && mPickerOverride(this))
+    {
+        return;
+    }
+    showClassicPicker(take_focus);
+}
+
+void LLColorSwatchCtrl::showClassicPicker(bool take_focus)
+{
     LLFloaterColorPicker* pickerp = (LLFloaterColorPicker*)mPickerHandle.get();
     if (!pickerp)
     {
         pickerp = new LLFloaterColorPicker(this, mCanApplyImmediately);
         LLFloater* parent = gFloaterView->getParentFloater(this);
+        if (!parent)
+        {
+            // A window in a floater view of its own, as the snapshot floater
+            // is: the picker goes beside it, and into that view with it.
+            parent = getParentByType<LLFloater>();
+        }
         if (parent)
         {
             parent->addDependentFloater(pickerp);

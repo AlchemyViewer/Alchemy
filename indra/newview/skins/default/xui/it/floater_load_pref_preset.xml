@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<floater name="Load Pref Preset" title="CARICA VALORE PREDEFINITO PREFERENZA">
+<floater name="load_pref_preset" title="CARICA VALORE PREDEFINITO PREFERENZA">
 	<string name="title_graphic">
 		Carica valore predefinito grafica
 	</string>

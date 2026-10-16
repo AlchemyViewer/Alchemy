@@ -27,20 +27,11 @@
 #ifndef LL_QUATERNION2_H
 #define LL_QUATERNION2_H
 
-/////////////////////////////
-// LLQuaternion2
-/////////////////////////////
-// This class stores a quaternion x*i + y*j + z*k + w in <x, y, z, w> order
-// (i.e., w in high order element of vector)
-/////////////////////////////
-/////////////////////////////
-// These classes are intentionally minimal right now. If you need additional
-// functionality, please contact someone with SSE experience (e.g., Falcon or
-// Huseby).
-/////////////////////////////
+// A quaternion x*i + y*j + z*k + w in one register, in <x, y, z, w> order:
+// w is the high lane.
 #include "llquaternion.h"
 
-class LLQuaternion2
+class alignas(16) LLQuaternion2
 {
 public:
 
@@ -54,6 +45,17 @@ public:
     // Ctor from LLQuaternion
     explicit LLQuaternion2( const class LLQuaternion& quat );
 
+    // Ctor from the raw <x, y, z, w> vector
+    explicit LLQuaternion2( const LLVector4a& q ) : mQ(q) {}
+
+    // Lane for lane; see equals() for a tolerance, and remember a rotation
+    // has two quaternions.
+    bool operator==(const LLQuaternion2& rhs) const { return mQ == rhs.mQ; }
+    bool operator!=(const LLQuaternion2& rhs) const { return mQ != rhs.mQ; }
+
+    // The rotation that changes nothing
+    static inline const LLQuaternion2& identity();
+
     //////////////////////////
     // Get/Set
     //////////////////////////
@@ -64,6 +66,9 @@ public:
         mQ.loadua( quat.mQ );
     }
 
+    // Write out to an LLQuaternion
+    inline void store( LLQuaternion& dst ) const;
+
     // Return the internal LLVector4a representation of the quaternion
     inline const LLVector4a& getVector4a() const;
     inline LLVector4a& getVector4aRw();
@@ -72,8 +77,39 @@ public:
     // Quaternion modification
     /////////////////////////
 
+    // Set this to the rotation of radians about axis, which need not be
+    // unit length; the identity when the axis has no length.
+    inline void setAxisAngle(const LLVector4a& axis, F32 radians);
+
+    // Set this to the rotation the upper 3x3 of m applies, which must be
+    // orthonormal: the rows are read as the rotated axes. A basis that is
+    // not a rotation gives the identity.
+    void setFromMatrix(const class LLMatrix4a& m);
+
     // Set this quaternion to the conjugate of src
     inline void setConjugate(const LLQuaternion2& src);
+
+    // Set this quaternion to the inverse of src: the conjugate over the
+    // squared length, so that src composed with it is the identity whatever
+    // length src carries. For a rotation of unit length the two are the same
+    // and the division is by one.
+    inline void setInverse(const LLQuaternion2& src);
+
+    // Set this to the product LLQuaternion's operator* gives: the rotation a
+    // and then the rotation b, so that rotating by the result is rotating by
+    // a and then by b.
+    inline void setMul(const LLQuaternion2& a, const LLQuaternion2& b);
+
+    // Set this to the normalized linear interpolation from a to b, over the
+    // shorter of the two ways round. Unlike the free nlerp() this is a
+    // normalized lerp for every pair, including the ones more than a half
+    // turn apart, where that one hands over to slerp and its three sines.
+    inline void setLerp(const LLQuaternion2& a, const LLQuaternion2& b, F32 u);
+
+    // The same, but following the arc rather than the chord once the two are
+    // far enough apart for the difference to show. Interpolating an animation
+    // wants this; the two agree, and this costs the same, for close pairs.
+    inline void setSlerp(const LLQuaternion2& a, const LLQuaternion2& b, F32 u);
 
     // Renormalizes the quaternion. Assumes it has nonzero length.
     inline void normalize();
@@ -87,6 +123,14 @@ public:
     /////////////////////////
     // Quaternion inspection
     /////////////////////////
+
+    // Rotate a vector by this quaternion, the way LLVector3's operator* does.
+    // The result carries the w it was handed.
+    inline void rotate(const LLVector4a& v, LLVector4a& result) const;
+
+    // The four component dot product: the cosine of half the angle between
+    // the two rotations, negative when they are more than half a turn apart.
+    inline LLSimdScalar dot(const LLQuaternion2& rhs) const;
 
     // Return true if this quaternion is equal to 'rhs'.
     // Note! Quaternions exhibit "double-cover", so any rotation has two equally valid
@@ -102,6 +146,7 @@ protected:
 
 };
 
-static_assert(std::is_trivial<LLQuaternion2>::value, "LLQuaternion2 must be a trivial type");
+static_assert(std::is_trivially_copyable<LLQuaternion2>::value && std::is_standard_layout<LLQuaternion2>::value, "LLQuaternion2 is plain data");
+static_assert(sizeof(LLQuaternion2) == 16 && alignof(LLQuaternion2) == 16, "LLQuaternion2 is one register");
 
 #endif

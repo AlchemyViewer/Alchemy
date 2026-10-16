@@ -8,8 +8,6 @@
 	<menu_item_call label="起立" name="Object Stand Up"/>
 	<menu_item_call label="物件檔案" name="Object Inspect"/>
 	<menu_item_call label="放大" name="Zoom In"/>
-	<menu_item_call label="在聯結集裡顯示" name="show_in_linksets"/>
-	<menu_item_call label="在角色中顯示" name="show_in_characters"/>
 	<context_menu label="穿上" name="Put On">
 		<menu_item_call label="穿上" name="Wear"/>
 		<menu_item_call label="添加" name="Add"/>
@@ -30,4 +28,8 @@
 	<menu_item_call label="封鎖粒子所有人" name="Mute Particle"/>
 	<menu_item_call label="傾印 XML" name="Dump XML"/>
 	<menu_item_call label="重設骨架" name="Reset Skeleton"/>
+	<context_menu name="Tools">
+		<menu_item_call label="在角色中顯示" name="show_in_characters"/>
+		<menu_item_call label="在聯結集裡顯示" name="show_in_linksets"/>
+	</context_menu>
 </context_menu>

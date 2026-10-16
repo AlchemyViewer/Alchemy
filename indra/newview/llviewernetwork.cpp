@@ -63,13 +63,13 @@ const std::string  GRID_LOGIN_IDENTIFIER_TYPES = "login_identifier_types";
 const std::string GRID_SLURL_BASE = "slurl_base";
 const std::string GRID_APP_SLURL_BASE = "app_slurl_base";
 
-const std::string DEFAULT_LOGIN_PAGE = "https://viewer-splash.secondlife.com/";
+const std::string DEFAULT_LOGIN_PAGE = "https://viewer-splash-v2.secondlife.com/";
 
 const std::string MAIN_GRID_LOGIN_URI = "https://login.agni.lindenlab.com/cgi-bin/login.cgi";
 
 const std::string SL_UPDATE_QUERY_URL = "https://update.secondlife.com/update";
 
-const std::string MAIN_GRID_SLURL_BASE = "http://maps.secondlife.com/secondlife/";
+const std::string MAIN_GRID_SLURL_BASE = "https://maps.secondlife.com/secondlife/";
 const std::string SYSTEM_GRID_APP_SLURL_BASE = "secondlife:///app";
 
 const std::string MAIN_GRID_WEB_PROFILE_URL = "https://my.secondlife.com/";
@@ -125,7 +125,7 @@ void LLGridManager::initialize(const std::string& grid_file)
                   MAIN_GRID_WEB_PROFILE_URL,
                   "Agni");
     addSystemGrid(LLTrans::getString("AditiGridLabel"),
-                  "util.aditi.lindenlab.com",
+                  BETAGRID,
                   "https://login.aditi.lindenlab.com/cgi-bin/login.cgi",
                   "https://secondlife.aditi.lindenlab.com/helpers/",
                   DEFAULT_LOGIN_PAGE,
@@ -135,7 +135,8 @@ void LLGridManager::initialize(const std::string& grid_file)
 
     LLSD other_grids;
     llifstream llsd_xml;
-    if (!grid_file.empty())
+    // grids.xml is not supplied by default
+    if (!grid_file.empty() && LLFile::isfile(grid_file))
     {
         LL_INFOS("GridManager")<<"Grid configuration file '"<<grid_file<<"'"<<LL_ENDL;
         llsd_xml.open( grid_file.c_str(), std::ios::in | std::ios::binary );
@@ -281,7 +282,7 @@ bool LLGridManager::addGrid(LLSD& grid_data)
                 // Populate to the default values
                 if (!grid_data.has(GRID_LOGIN_PAGE_VALUE))
                 {
-                    grid_data[GRID_LOGIN_PAGE_VALUE] = std::string("http://") + grid + "/app/login/";
+                    grid_data[GRID_LOGIN_PAGE_VALUE] = std::string("https://") + grid + "/app/login/";
                 }
                 if (!grid_data.has(GRID_HELPER_URI_VALUE))
                 {
@@ -434,8 +435,8 @@ std::string LLGridManager::getGrid( const std::string &grid )
         {
             if (grid_iter->second.has(GRID_ID_VALUE))
             {
-                if (0 == (LLStringUtil::compareInsensitive(grid,
-                                                           grid_iter->second[GRID_ID_VALUE].asString())))
+                if (LLStringUtil::isEqualInsensitiveASCII(grid,
+                                                         grid_iter->second[GRID_ID_VALUE].asString()))
                 {
                     // found a matching label, return this name
                     grid_name = grid_iter->first;
@@ -575,11 +576,19 @@ std::string LLGridManager::getGridLoginID()
 
 std::string LLGridManager::getUpdateServiceURL()
 {
+    auto env_update_service = LLStringUtil::getoptenv("SL_UPDATE_SERVICE");
     std::string update_url_base = gSavedSettings.getString("CmdLineUpdateService");;
     if ( !update_url_base.empty() )
     {
         LL_INFOS("UpdaterService","GridManager")
             << "Update URL base overridden from command line: " << update_url_base
+            << LL_ENDL;
+    }
+    else if (env_update_service && env_update_service->find("http") != std::string::npos)
+    {
+        update_url_base = *env_update_service;
+        LL_INFOS("UpdaterService", "GridManager")
+            << "Update URL base overridden from SL_UPDATE_SERVICE environment variable: " << update_url_base
             << LL_ENDL;
     }
     else if ( mGridList[mGrid].has(GRID_UPDATE_SERVICE_URL) )

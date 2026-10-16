@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -43,12 +43,19 @@ public:
     bool init() override; // Override to do application initialization
     bool cleanup() override;
 
-    bool reportCrashToBugsplat(void* pExcepInfo) override;
+    // returns true if other windows were found and are still running.
+    static bool sendShutdownToOtherInstances(const std::wstring& install_dir);
+
+    // Whether Windows Error Reporting leaves the viewer's crashes alone; the
+    // entry persists in the registry across runs.
+    static void setWinErrorReportingExcluded(bool excluded);
 
 protected:
     bool initWindow() override; // Override to initialize the viewer's window.
     void initLoggingAndGetLastDuration() override; // Override to clean stack_trace info.
     void initConsole() override; // Initialize OS level debugging console.
+    void cleanupConsole() override;
+
     bool initHardwareTest() override; // Win32 uses DX9 to test hardware.
     bool initParseCommandLine(LLCommandLineParser& clp) override;
 
@@ -59,13 +66,19 @@ protected:
 
     std::string generateSerialNumber();
 
-    static const std::string sWindowClass;
-
 private:
-    void disableWinErrorReporting();
-
     std::string mCmdLine;
     bool mIsConsoleAllocated;
 };
+
+// Process-level setup shared between the native WinMain entry point and the
+// SDL main-callbacks driver (llappviewersdl.cpp) used when USE_SDL_WINDOW is
+// enabled on Windows.
+bool create_app_mutex();
+// Wraps NvAPI_Initialize + session creation + ll_nvapi_init, gated on the
+// NvAPICreateApplicationProfile setting; must run after LLAppViewer::init().
+// Returns an NvDRSSessionHandle as void* (null if disabled or unavailable).
+void* ll_nvapi_session_create();
+void ll_nvapi_session_destroy(void* session);
 
 #endif // LL_LLAPPVIEWERWIN32_H

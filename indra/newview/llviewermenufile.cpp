@@ -47,6 +47,8 @@
 #include "llimagej2c.h"
 #include "llimagejpeg.h"
 #include "llimagetga.h"
+#include "llimagewebp.h"
+#include "llimageavif.h"
 #include "llinventorymodel.h"   // gInventory
 #include "llpluginclassmedia.h"
 #include "llresourcedata.h"
@@ -71,6 +73,9 @@
 // linden libraries
 #include "llfilesystem.h"
 #include "llnotificationsutil.h"
+#include "alcutoutimage.h"
+#include "alrenderisolation.h"
+#include "alsnapshotcutout.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
 #include "llstring.h"
@@ -335,7 +340,9 @@ void LLFilePickerReplyThread::startPicker(const file_picked_signal_t::slot_type 
 
 void LLFilePickerReplyThread::startPicker(const file_picked_signal_t::slot_type & cb, LLFilePicker::ESaveFilter filter, const std::string & proposed_name, const file_picked_signal_t::slot_type & failure_cb)
 {
-    (new LLFilePickerReplyThread(cb, filter, proposed_name, failure_cb))->getFile();
+    // Remove invalid characters
+    std::string sanitized_name = LLDir::getScrubbedFileName(proposed_name);
+    (new LLFilePickerReplyThread(cb, filter, sanitized_name, failure_cb))->getFile();
 }
 
 void LLFilePickerReplyThread::notify(const std::vector<std::string>& filenames)
@@ -379,7 +386,7 @@ void LLMediaFilePicker::notify(const std::vector<std::string>& filenames)
 
 #if LL_WINDOWS
 static std::string SOUND_EXTENSIONS = "wav";
-static std::string IMAGE_EXTENSIONS = "tga bmp jpg jpeg png";
+static std::string IMAGE_EXTENSIONS = "tga bmp jpg jpeg png webp avif";
 static std::string ANIM_EXTENSIONS =  "bvh anim";
 static std::string XML_EXTENSIONS = "xml";
 static std::string SLOBJECT_EXTENSIONS = "slobject";
@@ -523,10 +530,6 @@ void upload_single_file(
         case LLFilePicker::FFLOAD_WAV:
             floater_name = "upload_sound";
             break;
-        case LLFilePicker::FFLOAD_MODEL:
-            if (LLFloaterModelPreview* pFloaterModelPreview = LLFloaterReg::getTypedInstance<LLFloaterModelPreview>("upload_model"))
-                pFloaterModelPreview->loadModel(LLModel::LOD_HIGH, filename);
-            return;
         case LLFilePicker::FFLOAD_GLTF:
             LLMaterialEditor::loadMaterialFromFile(filename, -1);
             return;
@@ -539,10 +542,9 @@ void upload_single_file(
             LLFloaterReg::showInstance(floater_name, args);
         }
     }
-    return;
 }
 
-void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k)
+void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLUUID& dest)
 {
     for (std::vector<std::string>::const_iterator in_iter = filenames.begin(); in_iter != filenames.end(); ++in_iter)
     {
@@ -654,7 +656,7 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k)
                         LLFileSystem fmt_file(new_asset_id, LLAssetType::AT_TEXTURE, LLFileSystem::WRITE);
                         fmt_file.write(formatted->getData(), formatted->getDataSize());
 
-                        LLResourceUploadInfo::ptr_t assetUploadInfo(new LLResourceUploadInfo(
+                        LLResourceUploadInfo::ptr_t assetUploadInfo = std::make_shared<LLResourceUploadInfo>(
                             tid, LLAssetType::AT_TEXTURE,
                             asset_name,
                             asset_name, 0,
@@ -662,15 +664,16 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k)
                             LLFloaterPerms::getNextOwnerPerms("Uploads"),
                             LLFloaterPerms::getGroupPerms("Uploads"),
                             LLFloaterPerms::getEveryonePerms("Uploads"),
-                            LLAgentBenefitsMgr::current().getTextureUploadCost(raw_image->getWidth(), raw_image->getHeight())
-                        ));
+                            LLAgentBenefitsMgr::current().getTextureUploadCost(raw_image->getWidth(), raw_image->getHeight()),
+                            dest
+                        );
 
                         upload_new_resource(assetUploadInfo);
                     }
                 }
                 else
                 {
-                    LLNewFileResourceUploadInfo* info_p = new LLNewFileResourceUploadInfo(
+                    LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLNewFileResourceUploadInfo>(
                         filename,
                         asset_name,
                         asset_name, 0,
@@ -678,8 +681,8 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k)
                         LLFloaterPerms::getNextOwnerPerms("Uploads"),
                         LLFloaterPerms::getGroupPerms("Uploads"),
                         LLFloaterPerms::getEveryonePerms("Uploads"),
-                        expected_upload_cost);
-                    LLResourceUploadInfo::ptr_t uploadInfo(info_p);
+                        expected_upload_cost,
+                        dest);
 
                     upload_new_resource(uploadInfo);
                 }
@@ -699,14 +702,14 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k)
                     // Todo:
                     // 1. Decouple bulk upload from material editor
                     // 2. Take into account possiblity of identical textures
-                    LLMaterialEditor::uploadMaterialFromModel(filename, model, i);
+                    LLMaterialEditor::uploadMaterialFromModel(filename, model, i, dest);
                 }
             }
         }
     }
 }
 
-void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLSD& notification, const LLSD& response)
+void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLSD& notification, const LLSD& response, const LLUUID& dest)
 {
     S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
     if (option != 0)
@@ -715,7 +718,7 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLS
         return;
     }
 
-    do_bulk_upload(filenames, allow_2k);
+    do_bulk_upload(filenames, allow_2k, dest);
 }
 
 bool get_bulk_upload_expected_cost(
@@ -839,7 +842,7 @@ void upload_bulk(const std::vector<std::string>& filtered_filenames, bool allow_
         static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
         if (sPowerfulWizard && expected_upload_cost == 0)
         {
-            do_bulk_upload(filtered_filenames, allow_2k);
+            do_bulk_upload(filtered_filenames, allow_2k, dest);
         }
         else
         {
@@ -912,7 +915,23 @@ class LLFileUploadModel : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        LLFloaterModelPreview::showModelPreview();
+        if (LLConvexDecomposition::isFunctional())
+        {
+            LLFloaterModelPreview::showModelPreview();
+        }
+        else
+        {
+            if (gGLManager.mIsApple)
+            {
+                LLNotificationsUtil::add("ModelUploaderMissingPhysicsApple");
+            }
+            else
+            {
+                // TPV?
+                LLNotificationsUtil::add("ModelUploaderMissingPhysics");
+                LLFloaterModelPreview::showModelPreview();
+            }
+        }
         return true;
     }
 };
@@ -1042,6 +1061,18 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
     {
         LLPointer<LLImageRaw> raw = new LLImageRaw;
 
+        const LLSnapshotModel::ESnapshotFormat fmt = (LLSnapshotModel::ESnapshotFormat) gSavedSettings.getS32("SnapshotFormat");
+
+        // A cutout while the snapshot window's Cutout box is on, whether or
+        // not the window is open -- the same cutout the window would take.
+        const std::optional<ALSnapshotCutout> cutout = ALSnapshotCutout::fromSettings(LLSnapshotModel::SNAPSHOT_LOCAL, fmt);
+        if (cutout && !ALRenderIsolation::findArmedObject())
+        {
+            // A snapshot of nothing, on a fill, is not what was asked for.
+            LLNotificationsUtil::add("CutoutTargetMissing");
+            return true;
+        }
+
         S32 width = gViewerWindow->getWindowWidthRaw();
         S32 height = gViewerWindow->getWindowHeightRaw();
 
@@ -1060,6 +1091,7 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
             render_hud = false;
         }
 
+        bool cutout_drawn = true;
         if (gViewerWindow->rawSnapshot(raw,
                                        width,
                                        height,
@@ -1071,28 +1103,36 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
                                        render_no_post,
                                        render_balance,
                                        LLSnapshotModel::SNAPSHOT_TYPE_COLOR,
-                                       high_res ? S32_MAX : MAX_SNAPSHOT_IMAGE_SIZE)) //per side
+                                       high_res ? S32_MAX : MAX_SNAPSHOT_IMAGE_SIZE, //per side
+                                       cutout ? &*cutout : nullptr,
+                                       &cutout_drawn))
         {
-            LLPointer<LLImageFormatted> formatted;
-            LLSnapshotModel::ESnapshotFormat fmt = (LLSnapshotModel::ESnapshotFormat) gSavedSettings.getS32("SnapshotFormat");
-            switch (fmt)
+            if (cutout && !cutout_drawn)
             {
-            case LLSnapshotModel::SNAPSHOT_FORMAT_JPEG:
-                formatted = new LLImageJPEG(gSavedSettings.getS32("SnapshotQuality"));
-                break;
-            default:
-                LL_WARNS() << "Unknown local snapshot format: " << fmt << LL_ENDL;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_PNG:
-                formatted = new LLImagePNG;
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
-                formatted = new LLImageBMP;
-                break;
+                // There, but out of the frame or past the draw distance: the
+                // image would be the fill alone.
+                LLNotificationsUtil::add("CutoutTargetMissing");
+                return true;
             }
+            if (cutout && !ALCutoutImage::layOverFill(*raw, cutout->mFill, cutout->mKeepAlpha))
+            {
+                return true;
+            }
+
+            LLPointer<LLImageFormatted> formatted = LLSnapshotLivePreview::createFormattedImage(fmt, gSavedSettings.getS32("SnapshotQuality"));
             formatted->enableOverSize() ;
             formatted->encode(raw, 0);
             formatted->disableOverSize() ;
-            LLSnapshotLivePreview::saveLocal(formatted);
+            if (cutout)
+            {
+                // Said every time: the box outlives the window, and a key
+                // pressed an hour later should not surprise anyone.
+                LLSnapshotLivePreview::saveLocal(formatted, []() { LLNotificationsUtil::add("CutoutSnapshotSaved"); });
+            }
+            else
+            {
+                LLSnapshotLivePreview::saveLocal(formatted);
+            }
         }
         return true;
     }
@@ -1144,7 +1184,7 @@ void handle_compress_image()
 // so doing dirty, but OS independent fopen and fseek
 size_t get_file_size(std::string &filename)
 {
-    LLFILE* file = LLFile::fopen(filename, "rb");       /*Flawfinder: ignore*/
+    LLFILE* file = LLFile::fopen(filename, LLFILE_MODE("rb"));       /*Flawfinder: ignore*/
     if (!file)
     {
         LL_WARNS() << "Error opening " << filename << LL_ENDL;
@@ -1298,7 +1338,7 @@ void upload_done_callback(
                     msg->nextBlockFast(_PREHASH_MoneyData);
                     msg->addUUIDFast(_PREHASH_SourceID, gAgent.getID());
                     msg->addUUIDFast(_PREHASH_DestID, LLUUID::null);
-                    msg->addU8("Flags", 0);
+                    msg->addU8Fast(_PREHASH_Flags, 0);
                     // we tell the sim how much we were expecting to pay so it
                     // can respond to any discrepancy
                     msg->addS32Fast(_PREHASH_Amount, expected_upload_cost);

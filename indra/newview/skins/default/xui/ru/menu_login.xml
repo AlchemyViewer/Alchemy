@@ -7,21 +7,16 @@
 		<menu_item_call label="Выход из [APP_NAME]" name="Quit"/>
 	</menu>
 	<menu label="Справка" name="Help">
-		<menu_item_call label="Инструкции..." name="How To"/>
-		<menu_item_call label="Краткое руководство" name="Quickstart"/>
 		<menu_item_call label="База знаний" name="Knowledge Base"/>
 		<menu_item_call label="Wiki" name="Wiki"/>
 		<menu_item_call label="Форумы сообщества" name="Community Forums"/>
 		<menu_item_call label="Портал поддержки" name="Support portal"/>
-		<menu_item_call label="Новости [SECOND_LIFE]" name="Second Life News"/>
 		<menu_item_call label="Блоги [SECOND_LIFE]" name="Second Life Blogs"/>
-		<menu_item_call label="Сообщить об ошибке" name="Report Bug"/>
 		<menu_item_call label="О [APP_NAME]" name="About Second Life"/>
 	</menu>
 	<menu_item_check label="Показать меню отладки" name="Show Debug Menu"/>
 	<menu label="Отладка" name="Debug">
 		<menu_item_call label="Настройки отладки" name="Debug Settings"/>
-		<menu_item_call label="Просмотр XUI" name="UI Preview Tool"/>
 		<menu label="Тест UI" name="UI Tests"/>
 		<menu_item_call label="Задать размер окна..." name="Set Window Size..."/>
 		<menu_item_call label="Показать лицензионное соглашение" name="TOS"/>

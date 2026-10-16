@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -28,13 +31,70 @@
 
 #include "llstring.h"
 #include "llerror.h"
-#include "llfasttimer.h"
 #include "llsd.h"
 #include <vector>
+
+#include <charconv>
+#include <cmath>
+#include <fast_float/fast_float.h>
+#include <simdutf.h>
+
+#include <array>
+
+#include <unicode/uchar.h>
+#include <unicode/ubrk.h>
+#include <unicode/ucasemap.h>
+#include <unicode/ucol.h>
+#include <unicode/ustring.h>
+#include <unicode/utext.h>
+#include <unicode/utf8.h>
+
 
 #if LL_WINDOWS
 #include "llwin32headers.h"
 #endif
+
+namespace
+{
+
+// Tolerantly convert src (SrcCh* of length len) using simdutf's fast path on
+// valid runs, substituting `replacement` for each rejected code unit. Mirrors
+// the "best-effort with LL_UNKNOWN_CHAR" semantics of the previous hand-rolled
+// decoders while letting valid segments ride the SIMD path.
+template<typename SrcCh, typename DstCh>
+std::basic_string<DstCh> utf_convert_with_replacement(
+    const SrcCh* src, size_t len,
+    simdutf::result (*validate)(const SrcCh*, size_t),
+    size_t (*out_len_from)(const SrcCh*, size_t),
+    size_t (*convert_valid)(const SrcCh*, size_t, DstCh*),
+    DstCh replacement)
+{
+    std::basic_string<DstCh> out;
+    if (len == 0 || !src) return out;
+
+    while (len > 0)
+    {
+        const auto r = validate(src, len);
+        const size_t valid = (r.error == simdutf::error_code::SUCCESS) ? len : r.count;
+        if (valid > 0)
+        {
+            const size_t pos = out.size();
+            out.resize(pos + out_len_from(src, valid));
+            convert_valid(src, valid, out.data() + pos);
+            src += valid;
+            len -= valid;
+        }
+        if (r.error != simdutf::error_code::SUCCESS)
+        {
+            out.push_back(replacement);
+            ++src;
+            --len;
+        }
+    }
+    return out;
+}
+
+} // anonymous namespace
 
 std::string ll_safe_string(const char* in)
 {
@@ -83,25 +143,6 @@ U8 hex_as_nybble(char hex)
     return 0; // uh - oh, not hex any more...
 }
 
-bool iswindividual(llwchar elem)
-{
-    U32 cur_char = (U32)elem;
-    bool result = false;
-    if (0x2E80<= cur_char && cur_char <= 0x9FFF)
-    {
-        result = true;
-    }
-    else if (0xAC00<= cur_char && cur_char <= 0xD7A0 )
-    {
-        result = true;
-    }
-    else if (0xF900<= cur_char && cur_char <= 0xFA60 )
-    {
-        result = true;
-    }
-    return result;
-}
-
 bool _read_file_into_string(std::string& str, const std::string& filename)
 {
     llifstream ifs(filename.c_str(), llifstream::binary);
@@ -127,17 +168,13 @@ bool _read_file_into_string(std::string& str, const std::string& filename)
 // it.
 
 
-std::ostream& operator<<(std::ostream &s, const LLWString &wstr)
+std::string rawstr_to_utf8(std::string_view raw)
 {
-    std::string utf8_str = wstring_to_utf8str(wstr);
-    s << utf8_str;
-    return s;
-}
-
-std::string rawstr_to_utf8(const std::string& raw)
-{
-    LLWString wstr(utf8str_to_wstring(raw));
-    return wstring_to_utf8str(wstr);
+    // Converting up and back is what this used to do, and what it was for:
+    // the conversion in replaces anything malformed. utf8str_sanitize is that
+    // same repair with simdutf asked first, so text that was already valid --
+    // which is nearly all of it -- skips both conversions.
+    return utf8str_sanitize(raw);
 }
 
 std::ptrdiff_t wchar_to_utf8chars(llwchar in_char, char* outchars)
@@ -191,146 +228,53 @@ std::ptrdiff_t wchar_to_utf8chars(llwchar in_char, char* outchars)
     return outchars - base;
 }
 
-auto utf16chars_to_wchar(const U16* inchars, llwchar* outchar)
+S32 utf8str_utf16_length(std::string_view utf8str, const S32 byte_offset, const S32 byte_len)
 {
-    const U16* base = inchars;
-    U16 cur_char = *inchars++;
-    llwchar char32 = cur_char;
-    if ((cur_char >= 0xD800) && (cur_char <= 0xDFFF))
+    const S32 size  = (S32)utf8str.size();
+    const S32 begin = llclamp(byte_offset, 0, size);
+    // The budget is clamped before it is added, not after: callers pass S32_MAX
+    // for "the rest of it", and begin + S32_MAX overflows to a negative.
+    const S32 end   = llmin(begin + llmin(S32_MAX - begin, llmax(byte_len, 0)), size);
+
+    // One UTF-16 code unit per character, two for anything above the BMP --
+    // which in UTF-8 is exactly the four-byte forms.
+    S32 units = 0;
+    for (S32 i = begin; i < end; )
     {
-        // Surrogates
-        char32 = ((llwchar)(cur_char - 0xD800)) << 10;
-        cur_char = *inchars++;
-        char32 += (llwchar)(cur_char - 0xDC00) + 0x0010000UL;
+        const LLCodepointAt at = utf8str_decode_at(utf8str, (size_t)i);
+        units += (at.cp >= 0x10000) ? 2 : 1;
+        i = (S32)at.next;
     }
-    else
-    {
-        char32 = (llwchar)cur_char;
-    }
-    *outchar = char32;
-    return inchars - base;
+    return units;
 }
 
-llutf16string wstring_to_utf16str(const llwchar* utf32str, size_t len)
+S32 utf8str_length_from_utf16_length(std::string_view utf8str, const S32 byte_offset,
+                                     const S32 utf16_length, bool *unaligned)
 {
-    llutf16string out;
+    const S32 size  = (S32)utf8str.size();
+    const S32 begin = llclamp(byte_offset, 0, size);
 
-    S32 i = 0;
-    while (i < len)
+    bool u = false;
+    S32  units = 0;
+    S32  i = begin;
+    while (i < size && units < utf16_length)
     {
-        U32 cur_char = utf32str[i];
-        if (cur_char > 0xFFFF)
+        const LLCodepointAt at = utf8str_decode_at(utf8str, (size_t)i);
+        const S32 cost = (at.cp >= 0x10000) ? 2 : 1;
+        if (units + cost > utf16_length)
         {
-            out += (0xD7C0 + (cur_char >> 10));
-            out += (0xDC00 | (cur_char & 0x3FF));
-        }
-        else
-        {
-            out += cur_char;
-        }
-        i++;
-    }
-    return out;
-}
-
-llutf16string utf8str_to_utf16str( const char* utf8str, size_t len )
-{
-    LLWString wstr = utf8str_to_wstring ( utf8str, len );
-    return wstring_to_utf16str ( wstr );
-}
-
-LLWString utf16str_to_wstring(const U16* utf16str, size_t len)
-{
-    LLWString wout;
-    if (len == 0) return wout;
-
-    S32 i = 0;
-    const U16* chars16 = utf16str;
-    while (i < len)
-    {
-        llwchar cur_char;
-        i += (S32)utf16chars_to_wchar(chars16+i, &cur_char);
-        wout += cur_char;
-    }
-    return wout;
-}
-
-// Length in llwchar (UTF-32) of the first len units (16 bits) of the given UTF-16 string.
-S32 utf16str_wstring_length(const llutf16string &utf16str, const S32 utf16_len)
-{
-    S32 surrogate_pairs = 0;
-    // ... craziness to make gcc happy (llutf16string.c_str() is tweaked on linux):
-    const U16 *const utf16_chars = &(*(utf16str.begin()));
-    S32 i = 0;
-    while (i < utf16_len)
-    {
-        const U16 c = utf16_chars[i++];
-        if (c >= 0xD800 && c <= 0xDBFF)     // See http://en.wikipedia.org/wiki/UTF-16
-        {   // Have first byte of a surrogate pair
-            if (i >= utf16_len)
-            {
-                break;
-            }
-            const U16 d = utf16_chars[i];
-            if (d >= 0xDC00 && d <= 0xDFFF)
-            {   // Have valid second byte of a surrogate pair
-                surrogate_pairs++;
-                i++;
-            }
-        }
-    }
-    return utf16_len - surrogate_pairs;
-}
-
-// Length in utf16string (UTF-16) of wlen wchars beginning at woffset.
-S32 wstring_utf16_length(const LLWString &wstr, const S32 woffset, const S32 wlen)
-{
-    const S32 end = llmin((S32)wstr.length(), woffset + wlen);
-    if (end < woffset)
-    {
-        return 0;
-    }
-    else
-    {
-        S32 length = end - woffset;
-        for (S32 i = woffset; i < end; i++)
-        {
-            if (wstr[i] >= 0x10000)
-            {
-                length++;
-            }
-        }
-        return length;
-    }
-}
-
-// Given a wstring and an offset in it, returns the length as wstring (i.e.,
-// number of llwchars) of the longest substring that starts at the offset
-// and whose equivalent utf-16 string does not exceeds the given utf16_length.
-S32 wstring_wstring_length_from_utf16_length(const LLWString & wstr, const S32 woffset, const S32 utf16_length, bool *unaligned)
-{
-    const auto end = wstr.length();
-    bool u{ false };
-    S32 n = woffset + utf16_length;
-    S32 i = woffset;
-    while (i < end)
-    {
-        if (wstr[i] >= 0x10000)
-        {
-            --n;
-        }
-        if (i >= n)
-        {
-            u = (i > n);
+            // The budget ends between the two halves of a surrogate pair.
+            u = true;
             break;
         }
-        i++;
+        units += cost;
+        i = (S32)at.next;
     }
     if (unaligned)
     {
         *unaligned = u;
     }
-    return i - woffset;
+    return i - begin;
 }
 
 S32 wchar_utf8_length(const llwchar wc)
@@ -386,226 +330,211 @@ std::string wchar_utf8_preview(const llwchar wc)
     return oss.str();
 }
 
-S32 wstring_utf8_length(const LLWString& wstr)
+namespace
 {
-    S32 len = 0;
-    for (S32 i = 0; i < (S32)wstr.length(); i++)
-    {
-        len += wchar_utf8_length(wstr[i]);
-    }
-    return len;
+
+// The one place UTF-32 survives: repairing UTF-8 means decoding it, and simdutf
+// is the arbiter of what is malformed. Going out through UTF-32 and back keeps
+// that judgement in simdutf's hands rather than a second decoder's, which would
+// have to agree with it exactly and has no way to prove that it does.
+std::u32string utf8_to_u32_lossy(std::string_view utf8str)
+{
+    return utf_convert_with_replacement<char, char32_t>(
+        utf8str.data(), utf8str.size(),
+        &simdutf::validate_utf8_with_errors,
+        &simdutf::utf32_length_from_utf8,
+        &simdutf::convert_valid_utf8_to_utf32,
+        static_cast<char32_t>(LL_UNKNOWN_CHAR));
 }
 
-LLWString utf8str_to_wstring(const char* utf8str, size_t len)
+std::string u32_to_utf8_lossy(std::u32string_view utf32str)
 {
-    LLWString wout;
+    return utf_convert_with_replacement<char32_t, char>(
+        utf32str.data(), utf32str.size(),
+        &simdutf::validate_utf32_with_errors,
+        &simdutf::utf8_length_from_utf32,
+        &simdutf::convert_valid_utf32_to_utf8,
+        static_cast<char>(LL_UNKNOWN_CHAR));
+}
 
-    S32 i = 0;
-    while (i < len)
+}
+
+std::string utf16str_to_utf8str(const char16_t* utf16str, size_t len)
+{
+    return utf_convert_with_replacement<char16_t, char>(
+        utf16str, len,
+        &simdutf::validate_utf16le_with_errors,
+        &simdutf::utf8_length_from_utf16le,
+        &simdutf::convert_valid_utf16le_to_utf8,
+        static_cast<char>(LL_UNKNOWN_CHAR));
+}
+
+std::u8string str_to_u8str(const char* str, size_t len)
+{
+    if (!str || len == 0) return {};
+
+    // We treat std::string as utf8 in this codebase so pass through
+    std::string_view str_view(str, len);
+    return std::u8string(str_view.begin(), str_view.end());
+}
+
+std::string u8str_to_str(const char8_t* u8str, size_t len)
+{
+    if (!u8str || len == 0) return {};
+
+    // We treat std::string as utf8 in this codebase so pass through
+    std::u8string_view u8str_view(u8str, len);
+    return std::string(u8str_view.begin(), u8str_view.end());
+}
+
+namespace
+{
+
+// Where the leading whitespace stops. The decode is the part that cannot be
+// skipped: LLStringOps::isSpace on a char answers for ASCII only, so trimming
+// bytes leaves a no-break space or an ideographic space behind. ASCII settles
+// without decoding, which is the whole of the common case.
+size_t utf8str_trim_head_offset(std::string_view utf8str)
+{
+    size_t i = 0;
+    while (i < utf8str.size())
     {
-        llwchar unichar;
-        U8 cur_char = utf8str[i];
-
-        if (cur_char < 0x80)
+        const unsigned char byte = static_cast<unsigned char>(utf8str[i]);
+        if (byte < 0x80)
         {
-            // Ascii character, just add it
-            unichar = cur_char;
+            if (!LLStringOps::isSpace(static_cast<char>(byte)))
+            {
+                break;
+            }
+            ++i;
+            continue;
+        }
+
+        const LLCodepointAt at = utf8str_decode_at(utf8str, i);
+        if (!LLStringOps::isSpace(at.cp))
+        {
+            break;
+        }
+        i = at.next;
+    }
+    return i;
+}
+
+// Where the trailing whitespace starts. Walks backward over continuation
+// bytes to find the character start, bounded by the longest encoding, and
+// stops on anything that does not decode back to exactly where it began --
+// malformed bytes are content, and leaving them is the safe direction.
+size_t utf8str_trim_tail_offset(std::string_view utf8str)
+{
+    size_t i = utf8str.size();
+    while (i > 0)
+    {
+        size_t start = i - 1;
+        while (start > 0
+               && (i - start) < 4
+               && (static_cast<unsigned char>(utf8str[start]) & 0xC0) == 0x80)
+        {
+            --start;
+        }
+
+        const unsigned char byte = static_cast<unsigned char>(utf8str[start]);
+        if (byte < 0x80)
+        {
+            if (start + 1 != i || !LLStringOps::isSpace(static_cast<char>(byte)))
+            {
+                break;
+            }
         }
         else
         {
-            S32 cont_bytes = 0;
-            if ((cur_char >> 5) == 0x6)         // Two byte UTF8 -> 1 UTF32
+            const LLCodepointAt at = utf8str_decode_at(utf8str, start);
+            if (at.next != i || !LLStringOps::isSpace(at.cp))
             {
-                unichar = (0x1F&cur_char);
-                cont_bytes = 1;
-            }
-            else if ((cur_char >> 4) == 0xe)    // Three byte UTF8 -> 1 UTF32
-            {
-                unichar = (0x0F&cur_char);
-                cont_bytes = 2;
-            }
-            else if ((cur_char >> 3) == 0x1e)   // Four byte UTF8 -> 1 UTF32
-            {
-                unichar = (0x07&cur_char);
-                cont_bytes = 3;
-            }
-            else if ((cur_char >> 2) == 0x3e)   // Five byte UTF8 -> 1 UTF32
-            {
-                unichar = (0x03&cur_char);
-                cont_bytes = 4;
-            }
-            else if ((cur_char >> 1) == 0x7e)   // Six byte UTF8 -> 1 UTF32
-            {
-                unichar = (0x01&cur_char);
-                cont_bytes = 5;
-            }
-            else
-            {
-                wout += LL_UNKNOWN_CHAR;
-                ++i;
-                continue;
-            }
-
-            // Check that this character doesn't go past the end of the string
-            auto end = (len < (i + cont_bytes)) ? len : (i + cont_bytes);
-            do
-            {
-                ++i;
-
-                cur_char = utf8str[i];
-                if ( (cur_char >> 6) == 0x2 )
-                {
-                    unichar <<= 6;
-                    unichar += (0x3F&cur_char);
-                }
-                else
-                {
-                    // Malformed sequence - roll back to look at this as a new char
-                    unichar = LL_UNKNOWN_CHAR;
-                    --i;
-                    break;
-                }
-            } while(i < end);
-
-            // Handle overlong characters and NULL characters
-            if ( ((cont_bytes == 1) && (unichar < 0x80))
-                || ((cont_bytes == 2) && (unichar < 0x800))
-                || ((cont_bytes == 3) && (unichar < 0x10000))
-                || ((cont_bytes == 4) && (unichar < 0x200000))
-                || ((cont_bytes == 5) && (unichar < 0x4000000)) )
-            {
-                unichar = LL_UNKNOWN_CHAR;
+                break;
             }
         }
-
-        wout += unichar;
-        ++i;
+        i = start;
     }
-    return wout;
+    return i;
 }
 
-std::string wstring_to_utf8str(const llwchar* utf32str, size_t len)
-{
-    std::string out;
-
-    S32 i = 0;
-    while (i < len)
-    {
-        char tchars[8];     /* Flawfinder: ignore */
-        auto n = wchar_to_utf8chars(utf32str[i], tchars);
-        tchars[n] = 0;
-        out += tchars;
-        i++;
-    }
-    return out;
 }
 
-std::string utf16str_to_utf8str(const U16* utf16str, size_t len)
+template<> void LLStringUtilBase<char>::trimHead(std::string& string)
 {
-    return wstring_to_utf8str(utf16str_to_wstring(utf16str, len));
+    string.erase(0, utf8str_trim_head_offset(string));
 }
 
-std::string utf8str_trim(const std::string& utf8str)
+template<> void LLStringUtilBase<char>::trimTail(std::string& string)
 {
-    LLWString wstr = utf8str_to_wstring(utf8str);
-    LLWStringUtil::trim(wstr);
-    return wstring_to_utf8str(wstr);
+    string.erase(utf8str_trim_tail_offset(string));
+}
+
+template<> void LLStringUtilBase<char>::trimHead(std::string_view& string)
+{
+    string = string.substr(utf8str_trim_head_offset(string));
+}
+
+template<> void LLStringUtilBase<char>::trimTail(std::string_view& string)
+{
+    string = string.substr(0, utf8str_trim_tail_offset(string));
+}
+
+std::string utf8str_trim(std::string_view utf8str)
+{
+    utf8str = utf8str.substr(utf8str_trim_head_offset(utf8str));
+    return std::string(utf8str.substr(0, utf8str_trim_tail_offset(utf8str)));
 }
 
 
-std::string utf8str_tolower(const std::string& utf8str)
+std::string utf8str_tolower(std::string_view utf8str)
 {
-    LLWString out_str = utf8str_to_wstring(utf8str);
-    LLWStringUtil::toLower(out_str);
-    return wstring_to_utf8str(out_str);
+    std::string out_str(utf8str);
+    LLStringUtilBase<char>::toLower(out_str);
+    return out_str;
 }
 
 
 S32 utf8str_compare_insensitive(const std::string& lhs, const std::string& rhs)
 {
-    LLWString wlhs = utf8str_to_wstring(lhs);
-    LLWString wrhs = utf8str_to_wstring(rhs);
-    return LLWStringUtil::compareInsensitive(wlhs, wrhs);
+    return LLStringUtilBase<char>::compareInsensitive(lhs, rhs);
 }
 
-std::string utf8str_truncate(const std::string& utf8str, const S32 max_len)
+std::string utf8str_truncate(std::string_view utf8str, const S32 max_len)
 {
-    if (0 == max_len)
-    {
-        return std::string();
-    }
-    if ((S32)utf8str.length() <= max_len)
-    {
-        return utf8str;
-    }
-    else
-    {
-        S32 cur_char = max_len;
-
-        // If we're ASCII, we don't need to do anything
-        if ((U8)utf8str[cur_char] > 0x7f)
-        {
-            // If first two bits are (10), it's the tail end of a multibyte char.  We need to shift back
-            // to the first character
-            while (0x80 == (0xc0 & utf8str[cur_char]))
-            {
-                cur_char--;
-                // Keep moving forward until we hit the first char;
-                if (cur_char == 0)
-                {
-                    // Make sure we don't trash memory if we've got a bogus string.
-                    break;
-                }
-            }
-        }
-        // The byte index we're on is one we want to get rid of, so we only want to copy up to (cur_char-1) chars
-        return utf8str.substr(0, cur_char);
-    }
+    // A negative bound would sail past the zero test and reach trim_partial_utf8
+    // as a size_t near its maximum, which reads until it faults. Callers get
+    // theirs from a settings file or a database constant, so it is worth not
+    // trusting the sign.
+    if (max_len <= 0) return std::string();
+    if ((S32)utf8str.length() <= max_len) return std::string(utf8str);
+    return std::string(utf8str.substr(0,
+        simdutf::trim_partial_utf8(utf8str.data(), (size_t)max_len)));
 }
 
 // [RLVa:KB] - Checked: RLVa-2.1.0
-std::string utf8str_substr(const std::string& utf8str, const S32 index, const S32 max_len)
+std::string utf8str_substr(std::string_view utf8str, const S32 index, const S32 max_len)
 {
-    if (0 == max_len)
+    if (max_len <= 0 || index < 0) return std::string();
+    // An index past the end makes the subtraction below wrap to an enormous
+    // size_t, so the fits-entirely test fails and the pointer arithmetic that
+    // follows walks off the buffer -- before the substr that would have thrown.
+    if ((size_t)index >= utf8str.length()) return std::string();
+    if (utf8str.length() - index <= (size_t)max_len)
     {
-        return std::string();
+        return std::string(utf8str.substr(index, max_len));
     }
-    if (utf8str.length() - index  <= max_len)
-    {
-        return utf8str.substr(index, max_len);
-    }
-    else
-    {
-        S32 cur_char = max_len;
-
-        // If we're ASCII, we don't need to do anything
-        if ((U8)utf8str[index + cur_char] > 0x7f)
-        {
-            // If first two bits are (10), it's the tail end of a multibyte char.  We need to shift back
-            // to the first character
-            while (0x80 == (0xc0 & utf8str[index + cur_char]))
-            {
-                cur_char--;
-                // Keep moving forward until we hit the first char;
-                if (cur_char == 0)
-                {
-                    // Make sure we don't trash memory if we've got a bogus string.
-                    break;
-                }
-            }
-        }
-        // The byte index we're on is one we want to get rid of, so we only want to copy up to (cur_char-1) chars
-        return utf8str.substr(index, cur_char);
-    }
+    return std::string(utf8str.substr(index,
+        simdutf::trim_partial_utf8(utf8str.data() + index, (size_t)max_len)));
 }
 
-void utf8str_split(std::list<std::string>& split_list, const std::string& utf8str, size_t maxlen, char split_token)
+void utf8str_split(std::list<std::string>& split_list, std::string_view utf8str, size_t maxlen, char split_token)
 {
     split_list.clear();
 
     std::string::size_type lenMsg = utf8str.length(), lenIt = 0;
 
-    const char* pstrIt = utf8str.c_str(); std::string strTemp;
+    const char* pstrIt = utf8str.data(); std::string strTemp;
     while (lenIt < lenMsg)
     {
         if (lenIt + maxlen < lenMsg)
@@ -625,17 +554,33 @@ void utf8str_split(std::list<std::string>& split_list, const std::string& utf8st
             strTemp = utf8str.substr(lenIt, std::string::npos);
         }
 
+        // A budget smaller than the character sitting at lenIt leaves nothing
+        // to cut, and an empty piece advances nothing -- the loop would push
+        // empty strings until it ran out of memory. Take one whole character
+        // instead: it overshoots the budget by less than a character, and it
+        // finishes.
+        if (strTemp.empty())
+        {
+            const size_t next = utf8str_decode_at(utf8str, lenIt).next;
+            if (next <= lenIt)
+                break;
+            strTemp = std::string(utf8str.substr(lenIt, next - lenIt));
+        }
+
         split_list.push_back(strTemp);
 
         lenIt += strTemp.length();
-        pstrIt = utf8str.c_str() + lenIt;
-        if (*pstrIt == split_token)
+        pstrIt = utf8str.data() + lenIt;
+        // A view carries no terminator, so the end has to be checked before
+        // the byte is read. c_str() used to make the one-past-the-end read
+        // land on the NUL.
+        if (lenIt < lenMsg && *pstrIt == split_token)
             lenIt++;
     }
 }
 // [/RLVa:KB]
 
-std::string utf8str_symbol_truncate(const std::string& utf8str, const S32 symbol_len)
+std::string utf8str_symbol_truncate(std::string_view utf8str, const S32 symbol_len)
 {
     if (0 == symbol_len)
     {
@@ -643,47 +588,76 @@ std::string utf8str_symbol_truncate(const std::string& utf8str, const S32 symbol
     }
     if ((S32)utf8str.length() <= symbol_len)
     {
-        return utf8str;
+        return std::string(utf8str);
     }
-    else
-    {
-        int len = 0, byteIndex = 0;
-        const char* aStr = utf8str.c_str();
-        size_t origSize = utf8str.size();
 
-        for (byteIndex = 0; len < symbol_len && byteIndex < origSize; byteIndex++)
+    int symbols = 0;
+    size_t byteIndex = 0;
+    const size_t origSize = utf8str.size();
+    while (byteIndex < origSize)
+    {
+        if ((utf8str[byteIndex] & 0xc0) != 0x80)
         {
-            if ((aStr[byteIndex] & 0xc0) != 0x80)
-            {
-                len += 1;
-            }
+            if (symbols == symbol_len)
+                break;
+            ++symbols;
         }
-        return utf8str.substr(0, byteIndex);
+        ++byteIndex;
     }
+    // Counting codepoints can stop in the middle of what the reader sees as
+    // one character -- between a letter and its accent, or inside a flag or a
+    // family. Give back the last whole one instead.
+    size_t cut = utf8str_grapheme_align_backward(utf8str, byteIndex);
+    if (0 == cut && byteIndex > 0)
+    {
+        // The very first character spends more codepoints than the budget
+        // allows, so no whole one fits inside it. Returning nothing would
+        // erase the text rather than shorten it -- a name that opens with a
+        // family emoji would render as blank -- so overshoot by that one
+        // character and let the caller's own width clip it.
+        cut = utf8str_grapheme_align_forward(utf8str, byteIndex);
+    }
+    return std::string(utf8str.substr(0, cut));
 }
 
 std::string utf8str_substChar(
-    const std::string& utf8str,
+    std::string_view utf8str,
     const llwchar target_char,
     const llwchar replace_char)
 {
-    LLWString wstr = utf8str_to_wstring(utf8str);
-    LLWStringUtil::replaceChar(wstr, target_char, replace_char);
-    //wstr = wstring_substChar(wstr, target_char, replace_char);
-    return wstring_to_utf8str(wstr);
+    // Decode and rebuild in one pass rather than converting to UTF-32 and
+    // back. It cannot be done in place either: the two characters need not
+    // occupy the same number of bytes.
+    std::string out_str;
+    out_str.reserve(utf8str.size());
+    for (size_t i = 0; i < utf8str.size(); )
+    {
+        const LLCodepointAt at = utf8str_decode_at(utf8str, i);
+        utf8str_append_cp(out_str, at.cp == target_char ? replace_char : at.cp);
+        i = at.next;
+    }
+    return out_str;
 }
 
-std::string utf8str_makeASCII(const std::string& utf8str)
+std::string utf8str_makeASCII(std::string_view utf8str)
 {
-    LLWString wstr = utf8str_to_wstring(utf8str);
-    LLWStringUtil::_makeASCII(wstr);
-    return wstring_to_utf8str(wstr);
+    // One character in, one byte out, in a single pass -- the conversion to
+    // UTF-32 and back that this replaces produced exactly the same thing.
+    std::string out_str;
+    out_str.reserve(utf8str.size());
+    for (size_t i = 0; i < utf8str.size(); )
+    {
+        const LLCodepointAt at = utf8str_decode_at(utf8str, i);
+        out_str.push_back(at.cp > 0x7f ? LL_UNKNOWN_CHAR : (char)at.cp);
+        i = at.next;
+    }
+    return out_str;
 }
 
-std::string mbcsstring_makeASCII(const std::string& wstr)
+std::string mbcsstring_makeASCII(std::string_view wstr)
 {
     // Replace non-ASCII chars with replace_char
-    std::string out_str = wstr;
+    std::string out_str(wstr);
     for (S32 i = 0; i < (S32)out_str.length(); i++)
     {
         if ((U8)out_str[i] > 0x7f)
@@ -694,7 +668,7 @@ std::string mbcsstring_makeASCII(const std::string& wstr)
     return out_str;
 }
 
-std::string utf8str_removeCRLF(const std::string& utf8str)
+std::string utf8str_removeCRLF(std::string_view utf8str)
 {
     if (0 == utf8str.length())
     {
@@ -715,7 +689,9 @@ std::string utf8str_removeCRLF(const std::string& utf8str)
     return out;
 }
 
-llwchar utf8str_to_wchar(const std::string& utf8str, size_t offset, size_t length)
+// Only used by utf8str_showBytesUTF8 below. Kept file-local after the simdutf
+// migration (no external callers).
+static llwchar utf8str_to_wchar(std::string_view utf8str, size_t offset, size_t length)
 {
     switch (length)
     {
@@ -755,7 +731,7 @@ llwchar utf8str_to_wchar(const std::string& utf8str, size_t offset, size_t lengt
     return LL_UNKNOWN_CHAR;
 }
 
-std::string utf8str_showBytesUTF8(const std::string& utf8str)
+std::string utf8str_showBytesUTF8(std::string_view utf8str)
 {
     std::string result;
 
@@ -828,41 +804,1085 @@ std::string utf8str_showBytesUTF8(const std::string& utf8str)
     return result;
 }
 
-// Search for any emoji symbol, return true if found
-bool wstring_has_emoji(LLWStringView wstr)
-{
-    for (const llwchar& wch : wstr)
-    {
-        if (LLStringOps::isEmoji(wch))
-            return true;
-    }
-
-    return false;
-}
-
-// Cut emoji symbols if exist
-bool wstring_remove_emojis(LLWString& wstr)
-{
-    bool found = false;
-    for (size_t i = 0; i < wstr.size(); ++i)
-    {
-        if (LLStringOps::isEmoji(wstr[i]))
-        {
-            wstr.erase(i--, 1);
-            found = true;
-        }
-    }
-    return found;
-}
-
 // Cut emoji symbols if exist
 bool utf8str_remove_emojis(std::string& utf8str)
 {
-    LLWString wstr = utf8str_to_wstring(utf8str);
-    if (!wstring_remove_emojis(wstr))
+    // Removal only ever shortens, so this compacts in place the way the wide
+    // form does. Converting to UTF-32 and back to drop a few characters cost
+    // two allocations of the whole string whether or not anything was found.
+    const auto clusters = utf8str_find_emoji_clusters(utf8str);
+    bool found = false;
+    size_t read = 0, write = 0;
+    auto cluster_it = clusters.begin();
+    while (read < utf8str.size())
+    {
+        if (cluster_it != clusters.end() && read == cluster_it->first)
+        {
+            read = cluster_it->second;
+            ++cluster_it;
+            found = true;
+            continue;
+        }
+
+        const LLCodepointAt at = utf8str_decode_at(utf8str, read);
+        if (LLStringOps::isEmoji(at.cp))
+        {
+            read = at.next;
+            found = true;
+            continue;
+        }
+
+        const size_t span = at.next - read;
+        if (write != read)
+        {
+            std::copy_n(utf8str.begin() + read, span, utf8str.begin() + write);
+        }
+        write += span;
+        read = at.next;
+    }
+    if (found)
+        utf8str.resize(write);
+    return found;
+}
+
+// Codepoints that can act as a ZWJ/VS emoji-sequence base. Broader than
+// LLStringOps::isEmoji, which asks only how a codepoint renders on its own —
+// BMP pictographs like ❤ (U+2764), © and ® are eligible sequence bases per
+// UAX #51, and compositions like ❤️‍🔥 (U+2764 U+FE0F U+200D U+1F525) need them
+// recognised here even though none of them renders as colour unaided.
+// (Defined as LLStringOps::isPictographBase so the same predicate is
+// available to llrender's shape-itemizer and font-fallback walkers.)
+
+LLCodepointAt utf8str_decode_at(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    if (byte_pos >= n)
+        return { 0, byte_pos };
+
+    const auto lead = (unsigned char)utf8str[byte_pos];
+    if (lead < 0x80)
+        return { (llwchar)lead, byte_pos + 1 };
+
+    size_t  len = 0;
+    llwchar cp  = 0;
+    if ((lead & 0xE0) == 0xC0)      { len = 2; cp = lead & 0x1F; }
+    else if ((lead & 0xF0) == 0xE0) { len = 3; cp = lead & 0x0F; }
+    else if ((lead & 0xF8) == 0xF0) { len = 4; cp = lead & 0x07; }
+    else
+        return { 0xFFFD, byte_pos + 1 };
+
+    if (byte_pos + len > n)
+        return { 0xFFFD, byte_pos + 1 };
+    for (size_t k = 1; k < len; ++k)
+    {
+        const auto cont = (unsigned char)utf8str[byte_pos + k];
+        if ((cont & 0xC0) != 0x80)
+            return { 0xFFFD, byte_pos + 1 };
+        cp = (cp << 6) | (cont & 0x3F);
+    }
+    // A well-formed sequence is the shortest one that spells its codepoint, is
+    // not half of a surrogate pair, and does not reach past the last codepoint
+    // there is. Taking the others at face value lets an overlong form carry a
+    // character past a filter that already looked for it -- an overlong slash
+    // still reads as a slash to everything downstream -- and puts values into
+    // llwchar that no encoder further on can represent.
+    static constexpr llwchar sMinForLength[5] = { 0, 0, 0x80, 0x800, 0x10000 };
+    if (cp < sMinForLength[len] || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+    {
+        return { 0xFFFD, byte_pos + 1 };
+    }
+    return { cp, byte_pos + len };
+}
+
+namespace
+{
+
+using CodepointAt = LLCodepointAt;
+
+CodepointAt decode_at(std::string_view utf8str, size_t pos)
+{
+    return utf8str_decode_at(utf8str, pos);
+}
+
+// True if position i begins an emoji sequence that the 1:1 codepoint->glyph
+// path cannot render correctly — i.e., the next codepoint transforms the base
+// (ZWJ, VS15/16, skin-tone, keycap combiner, tag character, or regional
+// indicator pair), or we're sitting on a keycap starter (digit/#/* + FE0F +
+// 20E3). Isolated emoji are excluded: they render fine through FreeType alone.
+template <typename VIEW>
+bool is_shaping_starter(VIEW text, size_t i)
+{
+    const CodepointAt at = decode_at(text, i);
+    const llwchar     c  = at.cp;
+    // Keycap sequence: digit/#/* + VS16 + COMBINING ENCLOSING KEYCAP.
+    // shapeRun itemises these into per-face sub-runs (digit on the text
+    // font, combining mark on the emoji font) so we can treat keycap as
+    // one cluster for cursor/grapheme purposes without losing the mark's
+    // natural overlay on the base.
+    if (c == '#' || c == '*' || (c >= '0' && c <= '9'))
+    {
+        const CodepointAt vs = decode_at(text, at.next);
+        if (vs.cp == 0xFE0F && decode_at(text, vs.next).cp == 0x20E3)
+            return true;
+    }
+    if (!LLStringOps::isPictographBase(c))
         return false;
-    utf8str = wstring_to_utf8str(wstr);
+    const llwchar next = decode_at(text, at.next).cp;
+    if (next == 0x200D || LLStringOps::isEmojiClusterExtender(next))
+        return true;
+    // Regional indicator pair (flag).
+    return c >= 0x1F1E6 && c <= 0x1F1FF
+        && next >= 0x1F1E6 && next <= 0x1F1FF;
+}
+
+// Greedy forward walk from a confirmed shaping-starter position, returning the
+// one-past-end position of the sequence.
+template <typename VIEW>
+size_t advance_shaping_run(VIEW text, size_t start)
+{
+    const CodepointAt first = decode_at(text, start);
+    const llwchar     base  = first.cp;
+    size_t            r     = first.next;
+
+    // Keycap: always exactly 3 codepoints.
+    if (base == '#' || base == '*' || (base >= '0' && base <= '9'))
+    {
+        const CodepointAt vs = decode_at(text, r);
+        if (vs.cp == 0xFE0F)
+        {
+            const CodepointAt keycap = decode_at(text, vs.next);
+            if (keycap.cp == 0x20E3)
+                return keycap.next;
+        }
+    }
+
+    // Regional indicator pair: exactly one trailing RI.
+    if (base >= 0x1F1E6 && base <= 0x1F1FF)
+    {
+        const CodepointAt second = decode_at(text, r);
+        if (second.cp >= 0x1F1E6 && second.cp <= 0x1F1FF)
+            return second.next;
+    }
+
+    // General case: ZWJ joins another base, then any number of plain
+    // extenders (VS, skin-tone, keycap mark, tag chars).
+    for (;;)
+    {
+        const CodepointAt at = decode_at(text, r);
+        if (at.next == r)
+            break; // end of text
+        if (at.cp == 0x200D)
+        {
+            // Accept any pictograph base after the joiner, including BMP
+            // pictographs like 🔥's partner heart in ❤️‍🔥 where the base
+            // sits outside the astral emoji range.
+            const CodepointAt joined = decode_at(text, at.next);
+            if (joined.next != at.next && LLStringOps::isPictographBase(joined.cp))
+            {
+                r = joined.next;
+                continue;
+            }
+            break; // orphan ZWJ
+        }
+        if (LLStringOps::isEmojiClusterExtender(at.cp))
+        {
+            r = at.next;
+            continue;
+        }
+        break;
+    }
+    return r;
+}
+
+template <typename VIEW>
+EmojiClusterList find_emoji_clusters(VIEW text)
+{
+    EmojiClusterList runs;
+    const size_t n = text.size();
+    size_t i = 0;
+    while (i < n)
+    {
+        const CodepointAt at = decode_at(text, i);
+        if (is_shaping_starter(text, i))
+        {
+            const size_t end = advance_shaping_run(text, i);
+            // is_shaping_starter accepts a base when the *next* codepoint is
+            // an extender, but advance_shaping_run can still bail (e.g. a
+            // ZWJ at end of string with nothing after it, or a ZWJ followed
+            // by something that isn't a pictograph base). That leaves us
+            // with a degenerate single-character "cluster" that's really just
+            // the base alone with a dangling extender. Skip those — isolated
+            // single-codepoint emoji shape correctly via the 1:1 path and
+            // are intentionally absent from the cluster list.
+            if (end > at.next)
+                runs.emplace_back(i, end);
+            i = end;
+        }
+        else
+        {
+            i = at.next;
+        }
+    }
+    return runs;
+}
+
+}
+
+EmojiClusterList utf8str_find_emoji_clusters(std::string_view utf8str)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(utf8str.size());
+    return find_emoji_clusters(utf8str);
+}
+
+namespace
+{
+
+// ubrk_open parses ICU's break rules into a state machine, so an iterator is
+// kept and pointed at fresh text rather than opened per query. They carry scan
+// state, so each thread keeps its own set.
+//
+// Breaking runs in the root locale rather than the user's: where the cursor
+// lands is a property of the text, and two people reading the same string
+// should see it land in the same place.
+const char* break_iterator_kind(UBreakIteratorType type)
+{
+    switch (type)
+    {
+    case UBRK_CHARACTER: return "character";
+    case UBRK_WORD:      return "word";
+    case UBRK_LINE:      return "line";
+    case UBRK_SENTENCE:  return "sentence";
+    default:             return "unknown";
+    }
+}
+
+// Segmentation failing is not a condition that comes and goes -- ICU either has
+// the data or it does not -- so it is said once and the callers get on with the
+// crude walk they fall back to. Saying it at all is the point: without it the
+// only symptom is a caret that moves a byte at a time, which reads as a
+// rendering bug rather than as missing data. The data filter that trims icudt
+// before shipping is exactly how this would start happening.
+class BreakIterators
+{
+public:
+    BreakIterators() = default;
+    BreakIterators(const BreakIterators&) = delete;
+    BreakIterators& operator=(const BreakIterators&) = delete;
+
+    ~BreakIterators()
+    {
+        for (UBreakIterator* iter : mIters)
+        {
+            if (iter)
+            {
+                ubrk_close(iter);
+            }
+        }
+    }
+
+    UBreakIterator* get(UBreakIteratorType type)
+    {
+        UBreakIterator*& slot = mIters[(size_t)type];
+        if (!slot)
+        {
+            UErrorCode status = U_ZERO_ERROR;
+            slot = ubrk_open(type, "", nullptr, 0, &status);
+            if (U_FAILURE(status))
+            {
+                slot = nullptr;
+                LL_WARNS_ONCE("Unicode") << "ICU has no " << break_iterator_kind(type)
+                    << " break iterator (" << u_errorName(status)
+                    << "); cursor movement, word selection and wrapping fall back"
+                       " to a crude walk" << LL_ENDL;
+            }
+        }
+        return slot;
+    }
+
+    // Hands out the shared iterator for `type`, unless one is already checked
+    // out on this thread -- then the caller gets one of its own to close. Two
+    // live queries of the same kind would otherwise be holding one iterator,
+    // and setting the text on the second silently re-points the first at a
+    // different string, which reads as a wrong answer rather than a crash.
+    // Nothing nests today; the cost of saying so here is a bool.
+    UBreakIterator* acquire(UBreakIteratorType type, bool& owned)
+    {
+        const size_t slot = (size_t)type;
+        if (slot >= mInUse.size())
+        {
+            owned = false;
+            return nullptr;
+        }
+        if (mInUse[slot])
+        {
+            UErrorCode status = U_ZERO_ERROR;
+            UBreakIterator* iter = ubrk_open(type, "", nullptr, 0, &status);
+            if (U_FAILURE(status))
+            {
+                LL_WARNS_ONCE("Unicode") << "ICU could not open a nested "
+                    << break_iterator_kind(type) << " break iterator ("
+                    << u_errorName(status) << ")" << LL_ENDL;
+                return nullptr;
+            }
+            owned = true;
+            return iter;
+        }
+        UBreakIterator* iter = get(type);
+        if (iter)
+        {
+            mInUse[slot] = true;
+            owned = false;
+        }
+        return iter;
+    }
+
+    void release(UBreakIteratorType type)
+    {
+        const size_t slot = (size_t)type;
+        if (slot < mInUse.size())
+        {
+            mInUse[slot] = false;
+        }
+    }
+
+private:
+    // UBRK_CHARACTER, UBRK_WORD, UBRK_LINE, UBRK_SENTENCE.
+    std::array<UBreakIterator*, 4> mIters {};
+    std::array<bool, 4>            mInUse {};
+};
+
+// The per-thread holder, reached by both Utf8Breaks and its destructor.
+inline BreakIterators& break_iterators()
+{
+    thread_local BreakIterators iters;
+    return iters;
+}
+
+// An ICU break iterator pointed at a span of UTF-8. ICU reads those bytes where
+// they lie -- no conversion, no index map, and the offsets it takes and reports
+// are the caller's own. The UText is held alongside because ICU keeps a pointer
+// to it rather than adopting it, so the two have to live and die together.
+class Utf8Breaks
+{
+public:
+    Utf8Breaks(std::string_view utf8str, UBreakIteratorType type)
+    {
+        if (utf8str.empty())
+            return;
+
+        UBreakIterator* iter = break_iterators().acquire(type, mOwned);
+        if (!iter)
+            return;
+        mHeld = iter;
+        mType = type;
+
+        UErrorCode status = U_ZERO_ERROR;
+        utext_openUTF8(&mText, utf8str.data(), (int64_t)utf8str.size(), &status);
+        if (U_FAILURE(status))
+        {
+            LL_WARNS_ONCE("Unicode") << "ICU could not read a " << utf8str.size()
+                << "-byte span as UTF-8 (" << u_errorName(status)
+                << "); segmentation of it falls back to a crude walk" << LL_ENDL;
+            return;
+        }
+        mOpen = true;
+
+        // A fresh status: the open above reports success through warnings as
+        // well, and ICU does nothing at all when handed a code already set.
+        status = U_ZERO_ERROR;
+        ubrk_setUText(iter, &mText, &status);
+        if (U_SUCCESS(status))
+        {
+            mIter = iter;
+        }
+        else
+        {
+            LL_WARNS_ONCE("Unicode") << "ICU could not point its "
+                << break_iterator_kind(type) << " break iterator at a span ("
+                << u_errorName(status) << "); segmentation of it falls back to"
+                   " a crude walk" << LL_ENDL;
+        }
+    }
+
+    ~Utf8Breaks()
+    {
+        if (mHeld)
+        {
+            if (mOwned)
+            {
+                ubrk_close(mHeld);
+            }
+            else
+            {
+                break_iterators().release(mType);
+            }
+        }
+        if (mOpen)
+        {
+            utext_close(&mText);
+        }
+    }
+
+    Utf8Breaks(const Utf8Breaks&) = delete;
+    Utf8Breaks& operator=(const Utf8Breaks&) = delete;
+
+    // Null when ICU could not supply an iterator, or the span was empty. The
+    // caller then has no segmentation to work from and falls back to something
+    // crude but bounded.
+    UBreakIterator* get() const { return mIter; }
+    explicit operator bool() const { return mIter != nullptr; }
+
+private:
+    UText mText = UTEXT_INITIALIZER;
+    bool mOpen = false;
+    // What get() hands out, and so only set once the text is attached. mHeld is
+    // the same iterator from the moment it is checked out, since the release
+    // owes the holder an answer whether the attach worked or not.
+    UBreakIterator* mIter = nullptr;
+    UBreakIterator* mHeld = nullptr;
+    UBreakIteratorType mType = UBRK_CHARACTER;
+    bool mOwned = false;
+};
+
+} // anonymous namespace
+
+void utf8str_append_cp(std::string& out, llwchar cp)
+{
+    // A lone surrogate or an out-of-range value has no UTF-8 form.
+    // Substituting rather than dropping keeps every codepoint contributing
+    // bytes, which is what an offset map built alongside this depends on.
+    const UChar32 c = (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+                    ? (UChar32)0xFFFD : (UChar32)cp;
+    char encoded[4];
+    int32_t written = 0;
+    U8_APPEND_UNSAFE(encoded, written, c);
+    out.append(encoded, (size_t)written);
+}
+
+std::string utf8str_from_cp(llwchar cp)
+{
+    std::string out;
+    utf8str_append_cp(out, cp);
+    return out;
+}
+
+size_t utf8str_codepoint_count(std::string_view utf8str)
+{
+    size_t count = 0;
+    for (size_t i = 0; i < utf8str.size(); ++count)
+    {
+        i = utf8str_decode_at(utf8str, i).next;
+    }
+    return count;
+}
+
+size_t utf8str_offset_from_codepoint_index(std::string_view utf8str, size_t index)
+{
+    size_t i = 0;
+    for (size_t seen = 0; seen < index && i < utf8str.size(); ++seen)
+    {
+        i = utf8str_decode_at(utf8str, i).next;
+    }
+    return i;
+}
+
+bool utf8str_is_valid(std::string_view utf8str)
+{
+    return utf8str.empty() || simdutf::validate_utf8(utf8str.data(), utf8str.size());
+}
+
+std::string utf8str_sanitize(std::string_view utf8str)
+{
+    if (utf8str_is_valid(utf8str))
+    {
+        return std::string(utf8str);
+    }
+
+    return u32_to_utf8_lossy(utf8_to_u32_lossy(utf8str));
+}
+
+// Bounds [begin, end) of the line containing byte_pos, excluding its newline.
+// UAX #29 breaks words either side of a newline (WB3a, WB3b), so one line is a
+// self-contained scan. Scanning for the byte is safe: 0x0A cannot appear inside
+// a multi-byte UTF-8 sequence, only as itself.
+static std::pair<size_t, size_t> utf8str_line_bounds(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    const size_t at = llmin(byte_pos, n);
+
+    size_t begin = 0;
+    if (at > 0)
+    {
+        const size_t newline = utf8str.rfind('\n', at - 1);
+        if (newline != std::string_view::npos)
+        {
+            begin = newline + 1;
+        }
+    }
+
+    size_t end = utf8str.find('\n', at);
+    if (end == std::string_view::npos)
+    {
+        end = n;
+    }
+    return { begin, end };
+}
+
+// A run the cursor should step over rather than stop in. Empty runs do not
+// count -- they are the zero-width segment at the end of a line.
+static bool utf8str_run_is_space(std::string_view utf8str, size_t begin, size_t end)
+{
+    if (begin >= end)
+        return false;
+
+    const uint8_t* bytes = (const uint8_t*)utf8str.data();
+    int32_t at = (int32_t)begin;
+    const int32_t limit = (int32_t)end;
+    while (at < limit)
+    {
+        UChar32 cp = 0;
+        U8_NEXT(bytes, at, limit, cp);
+        if (cp < 0 || !LLStringOps::isSpace((llwchar)cp))
+            return false;
+    }
     return true;
+}
+
+// Where the character containing byte_pos begins. Only for the paths that run
+// without ICU: they still owe their caller an offset it can cut a string at,
+// and stepping a raw byte would hand back somewhere inside a character.
+static size_t utf8str_prev_char_start(std::string_view utf8str, size_t byte_pos)
+{
+    size_t at = llmin(byte_pos, utf8str.size());
+    if (at > 0)
+    {
+        --at;
+    }
+    while (at > 0 && ((unsigned char)utf8str[at] & 0xC0) == 0x80)
+    {
+        --at;
+    }
+    return at;
+}
+
+// The other direction: the first character start at or after byte_pos.
+static size_t utf8str_next_char_start(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    size_t at = llmin(byte_pos, n);
+    while (at < n && ((unsigned char)utf8str[at] & 0xC0) == 0x80)
+    {
+        ++at;
+    }
+    return at;
+}
+
+size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    if (byte_pos >= n)
+        return n;
+
+    // No window here, unlike the wide form this replaced: reading UTF-8 costs
+    // nothing to set up, and ICU's own safe-backward rules keep a query local
+    // without one being drawn for it.
+    const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
+    if (!breaks)
+        return (size_t)utf8str_decode_at(utf8str, byte_pos).next;
+
+    const int32_t next = ubrk_following(breaks.get(), (int32_t)byte_pos);
+    return next == UBRK_DONE ? n : (size_t)next;
+}
+
+std::vector<size_t> utf8str_grapheme_starts(std::string_view utf8str, size_t end)
+{
+    std::vector<size_t> starts;
+    end = std::min(end, utf8str.size());
+    if (end == 0)
+        return starts;
+
+    const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
+    size_t           at = 0;
+    while (at < end)
+    {
+        starts.push_back(at);
+        if (!breaks)
+        {
+            at = (size_t)utf8str_decode_at(utf8str, at).next;
+            continue;
+        }
+        const int32_t next = ubrk_following(breaks.get(), (int32_t)at);
+        at                 = next == UBRK_DONE ? utf8str.size() : (size_t)next;
+    }
+    return starts;
+}
+
+size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    if (byte_pos == 0)
+        return 0;
+    // A position past the end clamps rather than steps. The caller is holding
+    // an index its own string cannot account for, and the end is the nearest
+    // answer that is certainly inside it.
+    if (byte_pos > n)
+        return n;
+
+    const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
+    if (!breaks)
+        return utf8str_prev_char_start(utf8str, byte_pos);
+
+    const int32_t prev = ubrk_preceding(breaks.get(), (int32_t)byte_pos);
+    return prev == UBRK_DONE ? 0 : (size_t)prev;
+}
+
+size_t utf8str_grapheme_align_backward(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    if (byte_pos == 0 || n == 0)
+        return 0;
+    if (byte_pos >= n)
+        return n;
+
+    // An offset landing inside a codepoint has to come back to that
+    // codepoint's own start first. ICU normalises such an index down and then
+    // steps strictly back from there, which lands a whole character too early.
+    while (byte_pos > 0 && ((unsigned char)utf8str[byte_pos] & 0xC0) == 0x80)
+    {
+        --byte_pos;
+    }
+
+    const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
+    if (!breaks)
+        return byte_pos;
+
+    const int32_t at = (int32_t)byte_pos;
+    if (ubrk_isBoundary(breaks.get(), at))
+        return byte_pos;
+
+    const int32_t prev = ubrk_preceding(breaks.get(), at);
+    return prev == UBRK_DONE ? 0 : (size_t)prev;
+}
+
+size_t utf8str_grapheme_align_forward(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    if (byte_pos >= n)
+        return n;
+    if (byte_pos == 0)
+        return 0;
+
+    const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
+    if (!breaks)
+        return utf8str_next_char_start(utf8str, byte_pos);
+
+    const int32_t at = (int32_t)byte_pos;
+    if (ubrk_isBoundary(breaks.get(), at))
+        return byte_pos;
+
+    const int32_t next = ubrk_following(breaks.get(), at);
+    return next == UBRK_DONE ? n : (size_t)next;
+}
+
+size_t utf8str_step_word_forward(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    if (byte_pos >= n)
+        return n;
+
+    const auto bounds = utf8str_line_bounds(utf8str, byte_pos);
+    if (byte_pos >= bounds.second)
+        return byte_pos;
+
+    const std::string_view line = utf8str.substr(bounds.first, bounds.second - bounds.first);
+    const Utf8Breaks breaks(line, UBRK_WORD);
+    if (!breaks)
+        return bounds.second;
+
+    UBreakIterator* iter = breaks.get();
+    int32_t prev = ubrk_first(iter);
+    for (int32_t next = ubrk_next(iter); next != UBRK_DONE; prev = next, next = ubrk_next(iter))
+    {
+        const size_t begin = bounds.first + (size_t)prev;
+        const size_t end = bounds.first + (size_t)next;
+        if (begin > byte_pos && !utf8str_run_is_space(utf8str, begin, end))
+            return begin;
+    }
+    return bounds.second;
+}
+
+// ---------------------------------------------------------------------------
+// The wide entry points, as adapters over the narrow ones above. Each converts
+// once, delegates, and brings the answer back through the offset map. Stage B
+// deletes this half and leaves the callers holding bytes of their own.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    // Casing runs in the root locale rather than the user's: Turkish would
+    // case an ASCII i into a dotless one, and these strings are matched,
+    // sorted and compared far more often than they are read.
+    const UCaseMap* case_map()
+    {
+        struct Holder
+        {
+            UCaseMap* map = nullptr;
+
+            Holder()
+            {
+                UErrorCode status = U_ZERO_ERROR;
+                map = ucasemap_open("", 0, &status);
+                if (U_FAILURE(status))
+                {
+                    map = nullptr;
+                }
+            }
+            ~Holder()
+            {
+                if (map)
+                {
+                    ucasemap_close(map);
+                }
+            }
+            Holder(const Holder&) = delete;
+            Holder& operator=(const Holder&) = delete;
+        };
+
+        thread_local Holder holder;
+        return holder.map;
+    }
+
+    using icu_case_utf8_fn = int32_t (*)(const UCaseMap*, char*, int32_t,
+                                         const char*, int32_t, UErrorCode*);
+
+    // A null destination asks for the length, which arrives alongside a buffer
+    // overflow that is not an error here. A buffer of exactly the reported size
+    // is enough -- ICU reports a warning about the terminator it could not
+    // write, and writes every byte that matters.
+    void utf8str_convert_case(std::string& string, icu_case_utf8_fn convert)
+    {
+        if (string.empty())
+            return;
+
+        const UCaseMap* csm = case_map();
+        if (!csm)
+            return;
+
+        UErrorCode status = U_ZERO_ERROR;
+        const int32_t needed = convert(csm, nullptr, 0, string.data(), (int32_t)string.size(), &status);
+        // Asking for the length always reports the overflow, since there is no
+        // buffer to write into; that one status is the expected answer and not
+        // a failure. Any other is ICU declining to measure the string at all,
+        // and it reports zero when it does. Case mapping never removes
+        // characters, so a zero length for input that is not empty can only
+        // mean failure -- leave the text as it stands rather than erasing it.
+        if (U_FAILURE(status) && U_BUFFER_OVERFLOW_ERROR != status)
+        {
+            return;
+        }
+        if (needed <= 0)
+        {
+            return;
+        }
+
+        std::string out((size_t)needed, '\0');
+        status = U_ZERO_ERROR;
+        const int32_t written = convert(csm, out.data(), needed, string.data(), (int32_t)string.size(), &status);
+        if (U_FAILURE(status) || written <= 0)
+            return;
+
+        out.resize((size_t)llmin(written, needed));
+        string.swap(out);
+    }
+}
+
+template<>
+void LLStringUtilBase<char>::toUpper(std::string& string)
+{
+    utf8str_convert_case(string, &ucasemap_utf8ToUpper);
+}
+
+template<>
+void LLStringUtilBase<char>::toLower(std::string& string)
+{
+    utf8str_convert_case(string, &ucasemap_utf8ToLower);
+}
+
+size_t utf8str_bytes_from_cased_bytes(std::string_view utf8str, size_t cased_bytes, bool to_upper)
+{
+    const UCaseMap* csm = case_map();
+    if (!csm)
+        return 0;
+
+    const icu_case_utf8_fn convert = to_upper ? &ucasemap_utf8ToUpper
+                                              : &ucasemap_utf8ToLower;
+    const uint8_t* bytes = (const uint8_t*)utf8str.data();
+    const int32_t length = (int32_t)utf8str.size();
+
+    size_t spent = 0;
+    int32_t at = 0;
+
+    while (at < length && spent < cased_bytes)
+    {
+        const int32_t begin = at;
+        UChar32 cp = 0;
+        U8_NEXT(bytes, at, length, cp);
+        if (cp < 0)
+        {
+            // Ill-formed. Stop at its start rather than partway through it, so
+            // the offset returned is always one a caller can slice on.
+            at = begin;
+            break;
+        }
+
+        // Ask for the cased length of this one codepoint without writing it.
+        UErrorCode status = U_ZERO_ERROR;
+        const int32_t cased = convert(csm, nullptr, 0, utf8str.data() + begin, at - begin, &status);
+        if (cased < 0 || spent + (size_t)cased > cased_bytes)
+        {
+            // The offset lands inside this codepoint's cased form; stop before
+            // it, which leaves `at` at this codepoint's own start.
+            at = begin;
+            break;
+        }
+        spent += (size_t)cased;
+    }
+    return (size_t)at;
+}
+
+void utf8str_line_break_opportunities(std::string_view utf8str, std::vector<size_t>& out)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(utf8str.size());
+    out.clear();
+    if (utf8str.empty())
+        return;
+
+    const Utf8Breaks breaks(utf8str, UBRK_LINE);
+    if (!breaks)
+    {
+        out.push_back(utf8str.size());
+        return;
+    }
+
+    // The first boundary is 0, which is never an opportunity. The last is the
+    // string's own end, which always is.
+    UBreakIterator* iter = breaks.get();
+    ubrk_first(iter);
+    for (int32_t b = ubrk_next(iter); b != UBRK_DONE; b = ubrk_next(iter))
+    {
+        out.push_back((size_t)b);
+    }
+}
+
+// UAX #29 says where the segments are, not which of them a human would call a
+// word -- runs of spaces and of punctuation are segments in their own right.
+// ICU tags every break with what kind of run preceded it, which is exactly
+// that distinction, and it knows about scripts a test for alphanumerics cannot
+// speak for.
+static bool utf8str_status_is_word(int32_t rule_status)
+{
+    return rule_status >= UBRK_WORD_NONE_LIMIT;
+}
+
+std::pair<size_t, size_t> utf8str_word_range_at(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    if (byte_pos >= n)
+        return { n, n };
+
+    const auto bounds = utf8str_line_bounds(utf8str, byte_pos);
+    if (byte_pos >= bounds.second)
+        return { byte_pos, byte_pos };
+
+    const std::string_view line = utf8str.substr(bounds.first, bounds.second - bounds.first);
+    const Utf8Breaks breaks(line, UBRK_WORD);
+    if (!breaks)
+        return { byte_pos, byte_pos };
+
+    // The segment holding byte_pos is the one ending at the first boundary
+    // past it.
+    UBreakIterator* iter = breaks.get();
+    const int32_t at = (int32_t)(byte_pos - bounds.first);
+    const int32_t end = ubrk_isBoundary(iter, at) ? ubrk_next(iter) : ubrk_current(iter);
+    if (end == UBRK_DONE)
+        return { byte_pos, byte_pos };
+
+    // The status describes the run behind the break the iterator sits on, so
+    // it has to be read before stepping back across it.
+    const bool is_word = utf8str_status_is_word(ubrk_getRuleStatus(iter));
+    const int32_t begin = ubrk_previous(iter);
+    if (!is_word || begin == UBRK_DONE)
+        return { byte_pos, byte_pos };
+
+    return { bounds.first + (size_t)begin, bounds.first + (size_t)end };
+}
+
+std::pair<size_t, size_t> utf8str_next_word_range(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    size_t at = llmin(byte_pos, n);
+
+    while (at < n)
+    {
+        const auto bounds = utf8str_line_bounds(utf8str, at);
+
+        if (at < bounds.second)
+        {
+            const std::string_view line = utf8str.substr(bounds.first, bounds.second - bounds.first);
+            const Utf8Breaks breaks(line, UBRK_WORD);
+            if (breaks)
+            {
+                UBreakIterator* iter = breaks.get();
+                int32_t begin = ubrk_first(iter);
+                for (int32_t end = ubrk_next(iter); end != UBRK_DONE;
+                     begin = end, end = ubrk_next(iter))
+                {
+                    if (bounds.first + (size_t)end > at
+                        && utf8str_status_is_word(ubrk_getRuleStatus(iter)))
+                    {
+                        return { bounds.first + (size_t)begin, bounds.first + (size_t)end };
+                    }
+                }
+            }
+        }
+        // Nothing left on this line; resume past its newline.
+        at = bounds.second + 1;
+    }
+    return { n, n };
+}
+
+void utf8str_word_ranges(std::string_view utf8str, std::vector<std::pair<size_t, size_t>>& out)
+{
+    out.clear();
+    const size_t n  = utf8str.size();
+    size_t       at = 0;
+    while (at < n)
+    {
+        const auto bounds = utf8str_line_bounds(utf8str, at);
+        if (at < bounds.second)
+        {
+            const std::string_view line = utf8str.substr(bounds.first, bounds.second - bounds.first);
+            const Utf8Breaks breaks(line, UBRK_WORD);
+            if (breaks)
+            {
+                UBreakIterator* iter = breaks.get();
+                int32_t begin = ubrk_first(iter);
+                for (int32_t end = ubrk_next(iter); end != UBRK_DONE;
+                     begin = end, end = ubrk_next(iter))
+                {
+                    if (utf8str_status_is_word(ubrk_getRuleStatus(iter)))
+                    {
+                        out.emplace_back(bounds.first + (size_t)begin, bounds.first + (size_t)end);
+                    }
+                }
+            }
+        }
+        at = bounds.second + 1;
+    }
+}
+
+size_t utf8str_step_word_backward(std::string_view utf8str, size_t byte_pos)
+{
+    if (byte_pos == 0)
+        return 0;
+    const size_t at = llmin(byte_pos, utf8str.size());
+
+    const auto bounds = utf8str_line_bounds(utf8str, at);
+    if (at <= bounds.first)
+        return at;
+
+    const std::string_view line = utf8str.substr(bounds.first, bounds.second - bounds.first);
+    const Utf8Breaks breaks(line, UBRK_WORD);
+    if (!breaks)
+        return bounds.first;
+
+    const size_t scan_end = llmin(at, bounds.second);
+    size_t best = bounds.first;
+
+    UBreakIterator* iter = breaks.get();
+    int32_t prev = ubrk_first(iter);
+    for (int32_t next = ubrk_next(iter); next != UBRK_DONE; prev = next, next = ubrk_next(iter))
+    {
+        const size_t begin = bounds.first + (size_t)prev;
+        if (begin >= scan_end)
+            break;
+        if (!utf8str_run_is_space(utf8str, begin, bounds.first + (size_t)next))
+            best = begin;
+    }
+    return best;
+}
+
+size_t utf8str_caret_word_forward(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t at = llmin(byte_pos, utf8str.size());
+    const size_t next = utf8str_step_word_forward(utf8str, at);
+    return next != at ? next : utf8str_step_grapheme_forward(utf8str, at);
+}
+
+size_t utf8str_caret_word_backward(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t at = llmin(byte_pos, utf8str.size());
+    const size_t previous = utf8str_step_word_backward(utf8str, at);
+    if (previous != at)
+        return previous;
+
+    return utf8str_step_word_backward(utf8str,
+                                      utf8str_step_grapheme_backward(utf8str, at));
+}
+
+// --- the wide adapters -----------------------------------------------------
+
+namespace
+{
+
+template <typename VIEW>
+std::pair<size_t, size_t> emoji_range_at(VIEW text, size_t pos,
+                                         const EmojiClusterList& clusters)
+{
+    if (pos >= text.size())
+        return { pos, pos };
+    for (const auto& run : clusters)
+    {
+        if (pos < run.first)
+            break;
+        if (pos < run.second)
+            return run;
+    }
+    // Single-codepoint pictographs are intentionally absent from the cluster
+    // list (they shape via the 1:1 path), but tooltip lookup still wants
+    // their bounds. Use isPictographBase rather than isEmoji so BMP
+    // pictographs (©, ®, ☦, ⚓, ❤, …) get a range; isPictographBase already
+    // excludes extenders (ZWJ, VS-15/16, keycap combiner, skin-tone mods,
+    // tag chars) which have no business being a standalone tooltip target.
+    // Over UTF-8 a position inside a character decodes to the replacement
+    // character, which is no pictograph, so it reports empty as it should.
+    const CodepointAt at = decode_at(text, pos);
+    return LLStringOps::isPictographBase(at.cp)
+        ? std::make_pair(pos, at.next)
+        : std::make_pair(pos, pos);
+}
+
+}
+
+std::pair<size_t, size_t> utf8str_emoji_range_at(std::string_view utf8str, size_t byte_pos,
+                                                 const EmojiClusterList& clusters)
+{
+    return emoji_range_at(utf8str, byte_pos, clusters);
+}
+
+std::pair<size_t, size_t> utf8str_emoji_range_at(std::string_view utf8str, size_t byte_pos)
+{
+    // Scans the whole string, which the drag-select and tooltip callers pay
+    // per mouse-move against a document that can be a chat history. Windowing
+    // it needs care this has not had: a window that opens inside a cluster can
+    // report no cluster at all rather than a cut one, so an empty result is not
+    // evidence that a wider window would agree -- and deciding where it is safe
+    // to cut means knowing what a cluster is made of, which is knowledge that
+    // lives in the walker and should stay there. The callers that already hold
+    // a list should pass it; see the overload above.
+    return utf8str_emoji_range_at(utf8str, byte_pos, utf8str_find_emoji_clusters(utf8str));
 }
 
 #if LL_WINDOWS
@@ -932,25 +1952,6 @@ std::wstring ll_convert_string_to_wide(const char* in, size_t len, unsigned int 
     return {&w_out[0]};
 }
 
-LLWString ll_convert_wide_to_wstring(const wchar_t* in, size_t len)
-{
-    // Whether or not std::wstring and llutf16string are distinct types, they
-    // both hold UTF-16LE characters. (See header file comments.) Pretend this
-    // wchar_t* sequence is really a U16* sequence and use the conversion we
-    // define above.
-    return utf16str_to_wstring(reinterpret_cast<const U16*>(in), len);
-}
-
-std::wstring ll_convert_wstring_to_wide(const llwchar* in, size_t len)
-{
-    // first, convert to llutf16string, for which we have a real implementation
-    auto utf16str{ wstring_to_utf16str(in, len) };
-    // then, because each U16 char must be UTF-16LE encoded, pretend the U16*
-    // string pointer is a wchar_t* and instantiate a std::wstring of the same
-    // length.
-    return { reinterpret_cast<const wchar_t*>(utf16str.c_str()), utf16str.length() };
-}
-
 std::string ll_convert_string_to_utf8_string(const std::string& in)
 {
     // If you pass code_page, you must also pass length, otherwise the code
@@ -977,7 +1978,7 @@ unsigned long windows_get_last_error()
 }
 
 template<>
-std::wstring windows_message<std::wstring>(DWORD error)
+LL_COMMON_API std::wstring windows_message<std::wstring>(DWORD error)
 {
     // derived from https://stackoverflow.com/a/455533
     wchar_t* rawptr = nullptr;
@@ -1048,6 +2049,15 @@ std::optional<std::wstring> llstring_getoptenv(const std::string& key)
     return {};
 }
 
+// Length in llwchar (UTF-32) of the first len units (16 bits) of the given UTF-16 string.
+S32 wide_wstring_length(const std::wstring& utf16str, const S32 utf16_len)
+{
+    if (utf16_len <= 0) return 0;
+    return (S32)simdutf::utf32_length_from_utf16le(
+        reinterpret_cast<const char16_t*>(utf16str.data()),
+        (size_t)utf16_len);
+}
+
 #else  // ! LL_WINDOWS
 
 std::optional<std::string> llstring_getoptenv(const std::string& key)
@@ -1070,7 +2080,7 @@ std::optional<std::string> llstring_getoptenv(const std::string& key)
 long LLStringOps::sPacificTimeOffset = 0;
 long LLStringOps::sLocalTimeOffset = 0;
 bool LLStringOps::sPacificDaylightTime = 0;
-std::map<std::string, std::string> LLStringOps::datetimeToCodes;
+std::map<std::string, std::string, std::less<>> LLStringOps::datetimeToCodes;
 
 std::vector<std::string> LLStringOps::sWeekDayList;
 std::vector<std::string> LLStringOps::sWeekDayShortList;
@@ -1085,25 +2095,422 @@ std::string LLStringOps::sPM;
 // static
 bool LLStringOps::isEmoji(llwchar a)
 {
-#if 0   // Do not consider special characters that might have a corresponding
-        // glyph in the monochorme fallback fonts as a "genuine" emoji. HB
-    return a == 0xa9 || a == 0xae || (a >= 0x2000 && a < 0x3300) ||
-           (a >= 0x1f000 && a < 0x20000);
-#else
-    // These are indeed "genuine" emojis, we *do want* rendered as such. HB
-    return a >= 0x1f000 && a < 0x20000;
-#endif
+    // Emoji_Presentation is the property that means "renders in colour unless
+    // asked otherwise", which is the question. Nothing below U+231A carries it,
+    // so ordinary text never reaches the table.
+    return a >= 0x231A && u_hasBinaryProperty((UChar32)a, UCHAR_EMOJI_PRESENTATION);
+}
+
+// static
+bool LLStringOps::isPictographBase(llwchar a)
+{
+    // Extended_Pictographic is what UAX #51 builds its sequences out of, and it
+    // already excludes every extender: ZWJ, the variation selectors, the keycap
+    // mark, the skin tones and the tag characters are none of them pictographic.
+    //
+    // Regional indicators are the one thing it leaves out that belongs here. A
+    // flag is a pair of them and nothing else, and Unicode does not count them
+    // as pictographic.
+    if (a < 0xA9)
+        return false;
+    if (a >= 0x1F1E6 && a <= 0x1F1FF)
+        return true;
+    return u_hasBinaryProperty((UChar32)a, UCHAR_EXTENDED_PICTOGRAPHIC);
+}
+
+bool LLStringOps::isEmojiClusterExtender(llwchar a)
+{
+    if (a < 0x20E3)
+        return false;
+    return a == 0xFE0E || a == 0xFE0F                             // VS-15 / VS-16
+        || a == 0x20E3                                            // keycap combiner
+        || (a >= 0xE0020 && a <= 0xE007F)                         // tag chars + CANCEL TAG
+        || u_hasBinaryProperty((UChar32)a, UCHAR_EMOJI_MODIFIER); // skin tones
+}
+
+// The simple, one-to-one case mappings. A codepoint whose full mapping is
+// longer than itself -- sharp s uppercasing to SS, U+0130 lowercasing to i
+// plus a combining dot -- keeps its simple mapping here, because one llwchar
+// in cannot give two out. LLStringUtilBase<llwchar>::toUpper/toLower case
+// whole strings and are free to change their length, so those are the ones
+// that get such a character right.
+llwchar LLStringOps::toUpperAboveAscii(llwchar elem)
+{
+    return (llwchar)u_toupper((UChar32)elem);
+}
+
+llwchar LLStringOps::toLowerAboveAscii(llwchar elem)
+{
+    return (llwchar)u_tolower((UChar32)elem);
+}
+
+bool LLStringOps::isNonprintable(llwchar a)
+{
+    // The ASCII printables are most of most text and never qualify.
+    if (a >= 0x20 && a < 0x7F)
+        return false;
+
+    switch (u_charType((UChar32)a))
+    {
+    case U_CONTROL_CHAR:
+    case U_LINE_SEPARATOR:
+    case U_PARAGRAPH_SEPARATOR:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool LLStringOps::isSpaceAboveAscii(llwchar elem)
+{
+    return u_hasBinaryProperty((UChar32)elem, UCHAR_WHITE_SPACE);
+}
+
+bool LLStringOps::isUpperAboveAscii(llwchar elem)
+{
+    return u_charType((UChar32)elem) == U_UPPERCASE_LETTER;
+}
+
+bool LLStringOps::isLowerAboveAscii(llwchar elem)
+{
+    return u_charType((UChar32)elem) == U_LOWERCASE_LETTER;
+}
+
+bool LLStringOps::isAlphaAboveAscii(llwchar elem)
+{
+    return u_isalpha((UChar32)elem) != 0;
+}
+
+bool LLStringOps::isAlnumAboveAscii(llwchar elem)
+{
+    return u_isalnum((UChar32)elem) != 0;
+}
+
+// Symbols count, as they do for the ASCII half: ispunct('+') is true, so
+// isPunct(U+00B1 PLUS-MINUS SIGN) had better be too. That is wider than
+// Unicode's own punctuation categories, which hold no symbols at all.
+bool LLStringOps::isPunctAboveAscii(llwchar elem)
+{
+    switch (u_charType((UChar32)elem))
+    {
+    case U_CONNECTOR_PUNCTUATION:
+    case U_DASH_PUNCTUATION:
+    case U_START_PUNCTUATION:
+    case U_END_PUNCTUATION:
+    case U_INITIAL_PUNCTUATION:
+    case U_FINAL_PUNCTUATION:
+    case U_OTHER_PUNCTUATION:
+    case U_MATH_SYMBOL:
+    case U_CURRENCY_SYMBOL:
+    case U_MODIFIER_SYMBOL:
+    case U_OTHER_SYMBOL:
+        return true;
+    default:
+        return false;
+    }
+}
+
+namespace
+{
+    // Root-locale collation, so a list sorts the same way for everyone. What
+    // this replaces did not: wcscmp on Windows is codepoint order, in which
+    // every accented letter sorts past z, while wcscoll elsewhere follows
+    // whatever locale the process happens to be in.
+    enum class CollatorKind
+    {
+        Plain,                // Unicode default order
+        Caseless,             // + case ignored
+        Dictionary,           // + digit runs compared as numbers
+        DictionaryCaseless,   // + digit runs, and case ignored
+        Count
+    };
+
+    UCollator* collator(CollatorKind kind)
+    {
+        struct Holder
+        {
+            std::array<UCollator*, (size_t)CollatorKind::Count> colls {};
+
+            Holder() = default;
+            Holder(const Holder&) = delete;
+            Holder& operator=(const Holder&) = delete;
+            ~Holder()
+            {
+                for (UCollator* coll : colls)
+                {
+                    if (coll)
+                    {
+                        ucol_close(coll);
+                    }
+                }
+            }
+        };
+
+        thread_local Holder holder;
+        UCollator*& slot = holder.colls[(size_t)kind];
+        if (!slot)
+        {
+            UErrorCode status = U_ZERO_ERROR;
+            UCollator* coll = ucol_open("", &status);
+            if (U_SUCCESS(status))
+            {
+                // Uppercase before lowercase, which is the order the viewer's
+                // lists have always had; Unicode's own default is the other way
+                // round. Case is a tertiary difference and accents are a
+                // secondary one, so this reorders the former and leaves the
+                // latter where collation puts it.
+                ucol_setAttribute(coll, UCOL_CASE_FIRST, UCOL_UPPER_FIRST, &status);
+            }
+            const bool numeric = (kind == CollatorKind::Dictionary
+                               || kind == CollatorKind::DictionaryCaseless);
+            const bool caseless = (kind == CollatorKind::Caseless
+                                || kind == CollatorKind::DictionaryCaseless);
+
+            if (U_SUCCESS(status) && numeric)
+            {
+                // A run of digits compares as the number it spells, so item2
+                // comes before item10.
+                ucol_setAttribute(coll, UCOL_NUMERIC_COLLATION, UCOL_ON, &status);
+            }
+            if (U_SUCCESS(status) && caseless)
+            {
+                // Case is a tertiary difference, so dropping to secondary
+                // strength folds it away. Accents are secondary and survive.
+                ucol_setStrength(coll, UCOL_SECONDARY);
+            }
+            if (U_FAILURE(status))
+            {
+                if (coll)
+                {
+                    ucol_close(coll);
+                }
+                return nullptr;
+            }
+            slot = coll;
+        }
+        return slot;
     }
 
-S32 LLStringOps::collate(const llwchar* a, const llwchar* b)
+    // With no collator to be had, order by codepoint. It is the wrong order,
+    // but it is still a total order, which is what a sort needs before it
+    // needs anything else.
+    // Whether a comparison exists to put things in order, as against to answer
+    // whether two strings are the same. Collation deliberately overlooks
+    // differences the reader is not meant to see -- the leading zeros in a
+    // numeric run, a variation selector, a soft hyphen -- and an ordering that
+    // calls two distinct names equal lets an unstable sort shuffle them between
+    // one refresh and the next. Breaking that tie by bytes is arbitrary, but it
+    // is fixed, which is all a sort needs.
+    //
+    // Only the case-sensitive dictionary order gets that treatment. Every other
+    // kind is asked whether two strings are the same and has callers relying on
+    // the answer: the caseless forms are equivalences on purpose, so a tie there
+    // is the result rather than a gap in it.
+    constexpr bool orders_rather_than_equates(CollatorKind kind)
+    {
+        return CollatorKind::Dictionary == kind;
+    }
+
+    S32 collate_utf8(std::string_view a, std::string_view b, CollatorKind kind)
+    {
+        UCollator* coll = collator(kind);
+        if (!coll)
+            return (S32)a.compare(b);
+
+        UErrorCode status = U_ZERO_ERROR;
+        const S32 result = (S32)ucol_strcollUTF8(coll, a.data(), (int32_t)a.size(),
+                                                 b.data(), (int32_t)b.size(), &status);
+        if (U_FAILURE(status))
+            return (S32)a.compare(b);
+        if (0 != result || !orders_rather_than_equates(kind))
+            return result;
+        return (S32)a.compare(b);
+    }
+}
+
+S32 LLStringOps::collate(const char* a, const char* b)
 {
-    #if LL_WINDOWS
-        // in Windows, wide string functions operator on 16-bit strings,
-        // not the proper 32 bit wide string
-        return strcmp(wstring_to_utf8str(LLWString(a)).c_str(), wstring_to_utf8str(LLWString(b)).c_str());
-    #else
-        return wcscoll(a, b);
-    #endif
+    return collate_utf8(a, b, CollatorKind::Plain);
+}
+
+// Malformed UTF-8 counts as unprintable, which is what it is.
+template<>
+bool LLStringUtilBase<char>::containsNonprintable(std::string_view string)
+{
+    const uint8_t* bytes = (const uint8_t*)string.data();
+    const int32_t length = (int32_t)string.size();
+    int32_t at = 0;
+    while (at < length)
+    {
+        UChar32 cp = 0;
+        U8_NEXT(bytes, at, length, cp);
+        if (cp < 0 || LLStringOps::isNonprintable((llwchar)cp))
+            return true;
+    }
+    return false;
+}
+
+template<>
+void LLStringUtilBase<char>::stripNonprintable(std::string& string)
+{
+    if (string.empty())
+        return;
+
+    const uint8_t* bytes = (const uint8_t*)string.data();
+    const int32_t length = (int32_t)string.size();
+    std::string kept;
+    kept.reserve(string.size());
+
+    int32_t at = 0;
+    while (at < length)
+    {
+        const int32_t begin = at;
+        UChar32 cp = 0;
+        U8_NEXT(bytes, at, length, cp);
+        if (cp >= 0 && !LLStringOps::isNonprintable((llwchar)cp))
+        {
+            kept.append(string, (size_t)begin, (size_t)(at - begin));
+        }
+    }
+    string.swap(kept);
+}
+
+// Capitalising a byte can only ever reach ASCII, so the narrow form goes
+// through codepoints. The word rule -- a capital after a space, a hyphen or an
+// underscore -- is the caller's and stays as it is.
+namespace
+{
+    // The stream extraction these replace skipped leading space and took a
+    // leading '+'; from_chars does neither. trim() has dealt with the space,
+    // so only the sign is left to handle by hand.
+    std::string_view without_plus(std::string_view s)
+    {
+        return (!s.empty() && s.front() == '+') ? s.substr(1) : s;
+    }
+}
+
+// A parse that consumes a prefix still succeeds, as extraction did: "12abc"
+// reads 12. What changes is that an out-of-range value now says so through
+// from_chars rather than through a stream failbit nobody could interpret,
+// which is what the TODOs these carried were asking for -- and that a
+// negative fed to the unsigned form is rejected instead of wrapping, which
+// is what num_get did with it.
+template<>
+bool LLStringUtilBase<char>::convertToU32(std::string_view string, U32& value)
+{
+    trim(string);
+    const std::string_view s = without_plus(string);
+    if (s.empty())
+        return false;
+
+    U32 v = 0;
+    const auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+    if (ec != std::errc{})
+        return false;
+
+    value = v;
+    return true;
+}
+
+template<>
+bool LLStringUtilBase<char>::convertToS32(std::string_view string, S32& value)
+{
+    trim(string);
+    const std::string_view s = without_plus(string);
+    if (s.empty())
+        return false;
+
+    S32 v = 0;
+    const auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+    if (ec != std::errc{})
+        return false;
+
+    value = v;
+    return true;
+}
+
+template<>
+bool LLStringUtilBase<char>::convertToF64(std::string_view string, F64& value)
+{
+    trim(string);
+    const std::string_view s = without_plus(string);
+    if (s.empty())
+        return false;
+
+    // fast_float rather than std::from_chars: libc++ marks the floating-point
+    // overloads unavailable below macOS 26, and llcommon already depends on it.
+    F64 v = 0.0;
+    const auto [ptr, ec] = fast_float::from_chars(s.data(), s.data() + s.size(), v);
+    if (ec != std::errc{})
+        return false;
+
+    // from_chars spells the same infinities and NaNs strtod does, so "inf" and
+    // "nan" parse where the stream this replaced set failbit on them. Settings,
+    // XML attributes and typed fields all reach here, and none of them means a
+    // non-finite number by writing a word.
+    if (!std::isfinite(v))
+        return false;
+
+    value = v;
+    return true;
+}
+
+template<>
+void LLStringUtilBase<char>::capitalize(std::string& str)
+{
+    if (str.empty())
+        return;
+
+    // Rebuilt rather than converted through UTF-32 and back. It cannot be done
+    // in place either: uppercasing one codepoint stays one codepoint, but not
+    // necessarily the same number of bytes -- dotless i is two and becomes I,
+    // which is one. `last` is the character that was WRITTEN, matching the
+    // wide form, so a capitalised separator would start the next word too.
+    std::string out_str;
+    out_str.reserve(str.size());
+    llwchar last = 0;
+    bool at_start = true;
+    for (size_t i = 0; i < str.size(); )
+    {
+        const LLCodepointAt at = utf8str_decode_at(str, i);
+        i = at.next;
+
+        const bool starts_word = at_start || last == ' ' || last == '-' || last == '_';
+        last = starts_word ? LLStringOps::toUpper(at.cp) : at.cp;
+        at_start = false;
+        utf8str_append_cp(out_str, last);
+    }
+    str.swap(out_str);
+}
+
+template<>
+S32 LLStringUtilBase<char>::compareInsensitive(const char* lhs, const char* rhs)
+{
+    if (lhs == rhs)
+        return 0;
+    if (!lhs || !lhs[0])
+        return (!rhs || !rhs[0]) ? 0 : 1;
+    if (!rhs || !rhs[0])
+        return -1;
+    return collate_utf8(lhs, rhs, CollatorKind::Caseless);
+}
+
+template<>
+S32 LLStringUtilBase<char>::compareInsensitive(std::string_view lhs, std::string_view rhs)
+{
+    return collate_utf8(lhs, rhs, CollatorKind::Caseless);
+}
+
+template<>
+S32 LLStringUtilBase<char>::compareDict(std::string_view a, std::string_view b)
+{
+    return collate_utf8(a, b, CollatorKind::Dictionary);
+}
+
+template<>
+S32 LLStringUtilBase<char>::compareDictInsensitive(std::string_view a, std::string_view b)
+{
+    return collate_utf8(a, b, CollatorKind::DictionaryCaseless);
 }
 
 void LLStringOps::setupDatetimeInfo (bool daylight)
@@ -1191,11 +2598,11 @@ void LLStringOps::setupDayFormat(const std::string& data)
 }
 
 
-std::string LLStringOps::getDatetimeCode (std::string key)
+std::string LLStringOps::getDatetimeCode (std::string_view key)
 {
-    std::map<std::string, std::string>::iterator iter;
-
-    iter = datetimeToCodes.find (key);
+    // datetimeToCodes is keyed on std::string; the transparent comparator lets
+    // the token probe it without a copy being made to ask.
+    auto iter = datetimeToCodes.find (key);
     if (iter != datetimeToCodes.end())
     {
         return iter->second;
@@ -1284,72 +2691,69 @@ namespace LLStringFn
         return output;
     }
 
-    using literals_t = std::map<char, std::string>;
-    static const literals_t xml_elem_literals =
-    {
-        { '<', "&lt;" },
-        { '>', "&gt;" },
-        { '&', "&amp;" }
-    };
-    static const literals_t xml_attr_literals =
-    {
-        { '"', "&quot;" },
-        { '\'', "&apos;" }
-    };
-
-    static void literals_encode(std::string& text, const literals_t& literals)
-    {
-        for (const std::pair<char, std::string> it : literals)
-        {
-            std::string::size_type pos = 0;
-            while ((pos = text.find(it.first, pos)) != std::string::npos)
-            {
-                text.replace(pos, 1, it.second);
-                pos += it.second.size();
-            }
-        }
-    }
-
-    static void literals_decode(std::string& text, const literals_t& literals)
-    {
-        for (const std::pair<char, std::string> it : literals)
-        {
-            std::string::size_type pos = 0;
-            while ((pos = text.find(it.second, pos)) != std::string::npos)
-            {
-                text[pos++] = it.first;
-                text.erase(pos, it.second.size() - 1);
-            }
-        }
-    }
-
     /**
      * @brief Replace all characters that are not allowed in XML 1.0
      * with corresponding literals: [ < > & ] => [ &lt; &gt; &amp; ]
+     * (plus [ " ' ] => [ &quot; &apos; ] when encoding for an attribute)
      */
     std::string xml_encode(const std::string& input, bool for_attribute)
     {
-        std::string result(input);
-        literals_encode(result, xml_elem_literals);
-        if (for_attribute)
+        std::string result;
+        result.reserve(input.size());
+        const char* const end = input.data() + input.size();
+        const char* run = input.data();
+        for (const char* p = run; p < end; ++p)
         {
-            literals_encode(result, xml_attr_literals);
+            const char* entity;
+            switch (*p)
+            {
+            case '<': entity = "&lt;"; break;
+            case '>': entity = "&gt;"; break;
+            case '&': entity = "&amp;"; break;
+            case '"': if (!for_attribute) continue; entity = "&quot;"; break;
+            case '\'': if (!for_attribute) continue; entity = "&apos;"; break;
+            default: continue;
+            }
+            result.append(run, p);
+            result.append(entity);
+            run = p + 1;
         }
+        result.append(run, end);
         return result;
     }
 
     /**
      * @brief Replace some of XML literals that are defined in XML 1.0
      * with corresponding characters: [ &lt; &gt; &amp; ] => [ < > & ]
+     * (plus [ &quot; &apos; ] => [ " ' ] when decoding an attribute)
+     *
+     * Each literal is decoded once, left to right, so text like &amp;lt;
+     * correctly becomes &lt; rather than cascading down to <.
      */
     std::string xml_decode(const std::string& input, bool for_attribute)
     {
-        std::string result(input);
-        literals_decode(result, xml_elem_literals);
-        if (for_attribute)
+        std::string result;
+        result.reserve(input.size());
+        const std::string_view text(input);
+        std::string_view::size_type run = 0; // start of the undecoded run
+        for (std::string_view::size_type pos = 0;
+             (pos = text.find('&', pos)) != std::string_view::npos; )
         {
-            literals_decode(result, xml_attr_literals);
+            const std::string_view rest = text.substr(pos);
+            char decoded;
+            std::string_view::size_type len;
+            if (rest.starts_with("&lt;"))       { decoded = '<';  len = 4; }
+            else if (rest.starts_with("&gt;"))  { decoded = '>';  len = 4; }
+            else if (rest.starts_with("&amp;")) { decoded = '&';  len = 5; }
+            else if (for_attribute && rest.starts_with("&quot;")) { decoded = '"';  len = 6; }
+            else if (for_attribute && rest.starts_with("&apos;")) { decoded = '\''; len = 6; }
+            else { ++pos; continue; }
+            result.append(text, run, pos - run);
+            result.push_back(decoded);
+            pos += len;
+            run = pos;
         }
+        result.append(text, run, text.size() - run);
         return result;
     }
 
@@ -1406,7 +2810,7 @@ void LLStringUtil::getTokens(const std::string& instr, std::vector<std::string >
 template<>
 LLStringUtil::size_type LLStringUtil::getSubstitution(const std::string& instr, size_type& start, std::vector<std::string>& tokens)
 {
-    const std::string delims (",");
+    static const std::string delims (",");
 
     // Find the first [
     size_type pos1 = instr.find('[', start);
@@ -1431,7 +2835,7 @@ LLStringUtil::size_type LLStringUtil::getSubstitution(const std::string& instr, 
 
 // static
 template<>
-bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token, const format_map_t& substitutions)
+bool LLStringUtil::simpleReplacement(std::string &replacement, std::string_view token, const format_map_t& substitutions)
 {
     // see if we have a replacement for the bracketed string (without the brackets)
     // test first using has() because if we just look up with operator[] we get back an
@@ -1443,8 +2847,12 @@ bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token
         replacement = iter->second;
         return true;
     }
-    // if not, see if there's one WITH brackets
-    iter = substitutions.find(std::string("[" + token + "]"));
+    // if not, see if there's one WITH brackets. Built into a buffer that is
+    // kept between calls: the first probe misses for every map that stores its
+    // keys bracketed, so this ran on the common path.
+    static thread_local std::string bracketed;
+    bracketed.assign(1, '[').append(token).append(1, ']');
+    iter = substitutions.find(std::string_view(bracketed));
     if (iter != substitutions.end())
     {
         replacement = iter->second;
@@ -1456,21 +2864,25 @@ bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token
 
 // static
 template<>
-bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token, const LLSD& substitutions)
+bool LLStringUtil::simpleReplacement(std::string &replacement, std::string_view token, const LLSD& substitutions)
 {
     // see if we have a replacement for the bracketed string (without the brackets)
     // test first using has() because if we just look up with operator[] we get back an
     // empty string even if the value is missing. We want to distinguish between
     // missing replacements and deliberately empty replacement strings.
-    if (substitutions.has(token))
+    // LLSD keys are std::string, so these do build one -- but only the two the
+    // lookups actually need, rather than a copy of the token as well.
+    const std::string key(token);
+    if (substitutions.has(key))
     {
-        replacement = substitutions[token].asString();
+        replacement = substitutions[key].asString();
         return true;
     }
     // if not, see if there's one WITH brackets
-    else if (substitutions.has(std::string("[" + token + "]")))
+    const std::string bracketed = "[" + key + "]";
+    if (substitutions.has(bracketed))
     {
-        replacement = substitutions[std::string("[" + token + "]")].asString();
+        replacement = substitutions[bracketed].asString();
         return true;
     }
 
@@ -1501,7 +2913,7 @@ std::string LLStringUtil::getLocale(void)
 
 // static
 template<>
-void LLStringUtil::formatNumber(std::string& numStr, std::string decimals)
+void LLStringUtil::formatNumber(std::string& numStr, std::string_view decimals)
 {
     std::stringstream strStream;
     S32 intDecimals = 0;
@@ -1543,8 +2955,8 @@ void LLStringUtil::formatNumber(std::string& numStr, std::string decimals)
 
 // static
 template<>
-bool LLStringUtil::formatDatetime(std::string& replacement, std::string token,
-                                  std::string param, S32 secFromEpoch)
+bool LLStringUtil::formatDatetime(std::string& replacement, std::string_view token,
+                                  std::string_view param, S32 secFromEpoch)
 {
     if (param == "local")   // local
     {
@@ -1659,77 +3071,134 @@ bool LLStringUtil::formatDatetime(std::string& replacement, std::string token,
 // [FOO,datetime,format]
 
 
+namespace
+{
+    // The formatting over a map, or over two: what each bracketed token is
+    // replaced by comes from `replace(replacement, token)`, and the seconds
+    // a datetime counts from, from `datetime(seconds)`, so that the loop is
+    // written once.
+    template <class Replace, class Datetime>
+    S32 formatWith(std::string& s, Replace replace, Datetime datetime)
+    {
+        S32 res = 0;
+
+        // Every substitution is bracketed, so a string with no '[' cannot
+        // produce one. Bail before building `output`: the loop below would
+        // copy the whole string into it and assign back, and most strings
+        // that reach here (button labels, menu entries, tooltips) have
+        // nothing to substitute.
+        if (s.find('[') == std::string::npos)
+        {
+            return res;
+        }
+
+        std::string output;
+        std::vector<std::string> tokens;
+
+        std::string::size_type start = 0;
+        std::string::size_type prev_start = 0;
+        std::string::size_type key_start = 0;
+        while ((key_start = LLStringUtil::getSubstitution(s, start, tokens)) != std::string::npos)
+        {
+            output += std::string(s, prev_start, key_start-prev_start);
+            prev_start = start;
+
+            bool found_replacement = false;
+            std::string replacement;
+
+            if (tokens.size() == 0)
+            {
+                found_replacement = false;
+            }
+            else if (tokens.size() == 1)
+            {
+                found_replacement = replace(replacement, tokens[0]);
+            }
+            else if (tokens[1] == "number")
+            {
+                std::string param = "0";
+
+                if (tokens.size() > 2) param = tokens[2];
+                found_replacement = replace(replacement, tokens[0]);
+                if (found_replacement) LLStringUtil::formatNumber(replacement, param);
+            }
+            else if (tokens[1] == "datetime")
+            {
+                std::string param;
+                if (tokens.size() > 2) param = tokens[2];
+
+                S32 secFromEpoch = 0;
+                if (datetime(secFromEpoch))
+                {
+                    found_replacement = LLStringUtil::formatDatetime(replacement, tokens[0], param, secFromEpoch);
+                }
+            }
+
+            if (found_replacement)
+            {
+                output += replacement;
+                res++;
+            }
+            else
+            {
+                // we had no replacement, use the string as is
+                // e.g. "hello [MISSING_REPLACEMENT]" or "-=[Stylized Name]=-"
+                output += std::string(s, key_start, start-key_start);
+            }
+            tokens.clear();
+        }
+        // send the remainder of the string (with no further matches for bracketed names)
+        output += std::string(s, start);
+        s = output;
+        return res;
+    }
+
+    // The seconds a map's "datetime" says, where it says any.
+    bool datetimeOf(const LLStringUtil::format_map_t& substitutions, S32& seconds)
+    {
+        LLStringUtil::format_map_t::const_iterator iter = substitutions.find("datetime");
+        return iter != substitutions.end() && LLStringUtil::convertToS32(iter->second(), seconds);
+    }
+}
+
 // static
 template<>
 S32 LLStringUtil::format(std::string& s, const format_map_t& substitutions)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
-    S32 res = 0;
+    return formatWith(
+        s, [&](std::string& replacement, std::string_view token) { return simpleReplacement(replacement, token, substitutions); },
+        [&](S32& seconds) { return datetimeOf(substitutions, seconds); });
+}
 
-    std::string output;
-    std::vector<std::string> tokens;
-
-    std::string::size_type start = 0;
-    std::string::size_type prev_start = 0;
-    std::string::size_type key_start = 0;
-    while ((key_start = getSubstitution(s, start, tokens)) != std::string::npos)
-    {
-        output += std::string(s, prev_start, key_start-prev_start);
-        prev_start = start;
-
-        bool found_replacement = false;
-        std::string replacement;
-
-        if (tokens.size() == 0)
+// static
+template<>
+S32 LLStringUtil::format(std::string& s, const format_map_t& substitutions, const format_map_t& fallback)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
+    // As a merge of the two with the first's keys kept would have it: the
+    // bare token in either, the first first, then the bracketed one.
+    auto find = [](const format_map_t& in, std::string_view key, std::string& out) {
+        format_map_t::const_iterator iter = in.find(key);
+        if (iter == in.end())
         {
-            found_replacement = false;
+            return false;
         }
-        else if (tokens.size() == 1)
-        {
-            found_replacement = simpleReplacement (replacement, tokens[0], substitutions);
-        }
-        else if (tokens[1] == "number")
-        {
-            std::string param = "0";
-
-            if (tokens.size() > 2) param = tokens[2];
-            found_replacement = simpleReplacement (replacement, tokens[0], substitutions);
-            if (found_replacement) formatNumber (replacement, param);
-        }
-        else if (tokens[1] == "datetime")
-        {
-            std::string param;
-            if (tokens.size() > 2) param = tokens[2];
-
-            format_map_t::const_iterator iter = substitutions.find("datetime");
-            if (iter != substitutions.end())
+        out = iter->second;
+        return true;
+    };
+    return formatWith(
+        s,
+        [&](std::string& replacement, std::string_view token) {
+            if (find(substitutions, token, replacement) || find(fallback, token, replacement))
             {
-                S32 secFromEpoch = 0;
-                bool r = LLStringUtil::convertToS32(iter->second, secFromEpoch);
-                if (r)
-                {
-                    found_replacement = formatDatetime(replacement, tokens[0], param, secFromEpoch);
-                }
+                return true;
             }
-        }
-
-        if (found_replacement)
-        {
-            output += replacement;
-            res++;
-        }
-        else
-        {
-            // we had no replacement, use the string as is
-            // e.g. "hello [MISSING_REPLACEMENT]" or "-=[Stylized Name]=-"
-            output += std::string(s, key_start, start-key_start);
-        }
-        tokens.clear();
-    }
-    // send the remainder of the string (with no further matches for bracketed names)
-    output += std::string(s, start);
-    s = output;
-    return res;
+            static thread_local std::string bracketed;
+            bracketed.assign(1, '[').append(token).append(1, ']');
+            return find(substitutions, bracketed, replacement) || find(fallback, bracketed, replacement);
+        },
+        [&](S32& seconds) { return datetimeOf(substitutions, seconds) || datetimeOf(fallback, seconds); });
 }
 
 //static
@@ -1737,69 +3206,65 @@ template<>
 S32 LLStringUtil::format(std::string& s, const LLSD& substitutions)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
-    S32 res = 0;
-
     if (!substitutions.isMap())
     {
-        return res;
+        return 0;
     }
+    return formatWith(
+        s, [&](std::string& replacement, std::string_view token) { return simpleReplacement(replacement, token, substitutions); },
+        // As it has always been read here: a datetime the map lacks counts
+        // from the epoch rather than being left alone.
+        [&](S32& seconds) {
+            seconds = (S32) substitutions["datetime"].asInteger();
+            return true;
+        });
+}
 
-    std::string output;
-    std::vector<std::string> tokens;
-
-    std::string::size_type start = 0;
-    std::string::size_type prev_start = 0;
-    std::string::size_type key_start = 0;
-    while ((key_start = getSubstitution(s, start, tokens)) != std::string::npos)
-    {
-        output += std::string(s, prev_start, key_start-prev_start);
-        prev_start = start;
-
-        bool found_replacement = false;
-        std::string replacement;
-
-        if (tokens.size() == 0)
+// static
+template<>
+S32 LLStringUtil::format(std::string& s, const format_map_t& substitutions, const LLSD& fallback)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
+    // What a notification's own substitutions under LLTrans's defaults
+    // come to, as copying the defaults into them had it: the bare token in
+    // either, the first first, then the bracketed one.
+    const bool sd = fallback.isMap();
+    auto in_map = [](const format_map_t& in, std::string_view key, std::string& out) {
+        format_map_t::const_iterator iter = in.find(key);
+        if (iter == in.end())
         {
-            found_replacement = false;
+            return false;
         }
-        else if (tokens.size() == 1)
+        out = iter->second;
+        return true;
+    };
+    auto in_sd = [&](const std::string& key, std::string& out) {
+        if (!sd || !fallback.has(key))
         {
-            found_replacement = simpleReplacement (replacement, tokens[0], substitutions);
+            return false;
         }
-        else if (tokens[1] == "number")
-        {
-            std::string param = "0";
-
-            if (tokens.size() > 2) param = tokens[2];
-            found_replacement = simpleReplacement (replacement, tokens[0], substitutions);
-            if (found_replacement) formatNumber (replacement, param);
-        }
-        else if (tokens[1] == "datetime")
-        {
-            std::string param;
-            if (tokens.size() > 2) param = tokens[2];
-
-            S32 secFromEpoch = (S32) substitutions["datetime"].asInteger();
-            found_replacement = formatDatetime (replacement, tokens[0], param, secFromEpoch);
-        }
-
-        if (found_replacement)
-        {
-            output += replacement;
-            res++;
-        }
-        else
-        {
-            // we had no replacement, use the string as is
-            // e.g. "hello [MISSING_REPLACEMENT]" or "-=[Stylized Name]=-"
-            output += std::string(s, key_start, start-key_start);
-        }
-        tokens.clear();
-    }
-    // send the remainder of the string (with no further matches for bracketed names)
-    output += std::string(s, start);
-    s = output;
-    return res;
+        out = fallback[key].asString();
+        return true;
+    };
+    return formatWith(
+        s,
+        [&](std::string& replacement, std::string_view token) {
+            const std::string key(token);
+            if (in_map(substitutions, token, replacement) || in_sd(key, replacement))
+            {
+                return true;
+            }
+            const std::string bracketed = "[" + key + "]";
+            return in_map(substitutions, bracketed, replacement) || in_sd(bracketed, replacement);
+        },
+        [&](S32& seconds) {
+            if (datetimeOf(substitutions, seconds))
+            {
+                return true;
+            }
+            seconds = sd ? (S32) fallback["datetime"].asInteger() : 0;
+            return sd;
+        });
 }
 
 ////////////////////////////////////////////////////////////
@@ -1831,7 +3296,7 @@ void LLStringUtilBase<T>::testHarness()
 
     std::string s4 = s2;
     llassert( !s4.empty() );
-    s4.empty();
+    s4.clear();
     llassert( s4.empty() );
 
     std::string s5("");

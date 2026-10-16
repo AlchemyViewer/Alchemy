@@ -137,7 +137,7 @@
    top_delta="0"
    height="22"
    width="22"
-   name="reset_offset_rear"
+   name="reset_focus_offset"
    image_overlay="Refresh_Off"
    tool_tip="Reset focus offset to default value">
       <button.commit_callback
@@ -197,7 +197,7 @@
 
   <text
   follows="top|left|right"
-  name="offset_scale_lbl"
+  name="camera_angle_lbl"
   height="16"
   layout="topleft"
   left="10"
@@ -248,7 +248,7 @@
 
    <text
    follows="top|left|right"
-   name="offset_scale_lbl"
+   name="zoom_speed_lbl"
    height="16"
    layout="topleft"
    left="10"
@@ -299,7 +299,7 @@
 
     <text
     follows="top|left|right"
-    name="offset_scale_lbl"
+    name="position_smoothing_lbl"
     height="16"
     layout="topleft"
     left="10"

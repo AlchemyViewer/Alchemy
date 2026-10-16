@@ -57,10 +57,10 @@ public:
 };
 
 // One function can bind to multiple Key options
-class LLKeyBind
+class LL_COMMON_API LLKeyBind
 {
 public:
-    LLKeyBind() {}
+    LLKeyBind() = default;
     LLKeyBind(const LLSD &key_bind);
 
     bool operator==(const LLKeyBind& rhs);

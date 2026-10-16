@@ -1,5 +1,5 @@
 /**
- * @file alpanelonlinestatus.h
+ * @file alpanelradaralert.h
  * @brief Radar alert tip toasts
  *
  * $LicenseInfo:firstyear=2010&license=viewerlgpl$
@@ -35,6 +35,9 @@
  */
 class ALPanelRadarAlert final : public LLPanelTipToast
 {
+public:
+    AL_VIEW_TYPE(ALPanelRadarAlert, LLPanelTipToast);
+private:
     // disallow instantiation of this class
 private:
     // grant privileges to instantiate this class to LLToastPanel

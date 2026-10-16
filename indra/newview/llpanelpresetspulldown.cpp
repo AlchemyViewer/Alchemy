@@ -35,10 +35,13 @@
 #include "lltabcontainer.h"
 #include "llfloater.h"
 #include "llfloaterperformance.h"
+#include "llfloaterpreference.h"
 #include "llfloaterreg.h"
 #include "llpresetsmanager.h"
+#include "llslider.h"
 #include "llsliderctrl.h"
 #include "llscrolllistctrl.h"
+#include "llspinctrl.h"
 #include "lltrans.h"
 
 ///----------------------------------------------------------------------------
@@ -51,8 +54,9 @@ LLPanelPresetsPulldown::LLPanelPresetsPulldown()
     mHoverTimer.stop();
 
     mCommitCallbackRegistrar.add("Presets.GoGraphicsPrefs", boost::bind(&LLPanelPresetsPulldown::onGraphicsButtonClick, this, _2));
-    mCommitCallbackRegistrar.add("Presets.GoAutofpsPrefs", boost::bind(&LLPanelPresetsPulldown::onAutofpsButtonClick, this, _2));
+    mCommitCallbackRegistrar.add("Presets.GoLightbox", boost::bind(&LLPanelPresetsPulldown::onLightboxButtonClick, this, _2));
     mCommitCallbackRegistrar.add("Presets.RowClick", boost::bind(&LLPanelPresetsPulldown::onRowClick, this, _2));
+    mCommitCallbackRegistrar.add("Presets.QualityPerformance", boost::bind(&LLPanelPresetsPulldown::onChangeQuality, this, _2));
 
     buildFromFile( "panel_presets_pulldown.xml");
 }
@@ -67,6 +71,18 @@ bool LLPanelPresetsPulldown::postBuild()
     populatePanel();
 
     return LLPanelPulldown::postBuild();
+}
+
+void LLPanelPresetsPulldown::onVisibilityChange(bool new_visibility)
+{
+    if (new_visibility)
+    {
+        LLSlider* slider = getChild<LLSlider>("draw_dist_slider_bar");
+        cap_draw_distance_control(slider, slider);
+        LLSpinCtrl* spinner = getChild<LLSpinCtrl>("draw_dist_spinner");
+        cap_draw_distance_control(spinner, spinner);
+    }
+    LLPanelPulldown::onVisibilityChange(new_visibility);
 }
 
 void LLPanelPresetsPulldown::populatePanel()
@@ -167,5 +183,20 @@ void LLPanelPresetsPulldown::onAutofpsButtonClick(const LLSD& user_data)
     if (performance_floater)
     {
         performance_floater->showAutoadjustmentsPanel();
+    }
+}
+
+void LLPanelPresetsPulldown::onLightboxButtonClick(const LLSD& user_data)
+{
+    setVisible(false);
+    LLFloaterReg::showInstanceOrBringToFront("lightbox");
+}
+
+void LLPanelPresetsPulldown::onChangeQuality(const LLSD& data)
+{
+    LLFloaterPreference* instance = LLFloaterReg::getTypedInstance<LLFloaterPreference>("preferences");
+    if (instance)
+    {
+        instance->onChangeQuality(data);
     }
 }

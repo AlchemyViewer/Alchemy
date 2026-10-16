@@ -818,6 +818,7 @@ void LLOutfitGallery::getCurrentCategories(uuid_vec_t& vcur)
 
 void LLOutfitGallery::updateAddedCategory(LLUUID cat_id)
 {
+    LL_PROFILE_ZONE_SCOPED;
     LLViewerInventoryCategory *cat = gInventory.getCategory(cat_id);
     if (!cat) return;
 
@@ -849,7 +850,12 @@ void LLOutfitGallery::updateAddedCategory(LLUUID cat_id)
 
     // Start observing changes in "My Outfits" category.
     mCategoriesObserver->addCategory(cat_id,
-        boost::bind(&LLOutfitGallery::refreshOutfit, this, cat_id), true);
+        [this, cat_id]()
+        {
+            mPendingOutfitRefreshes.insert(cat_id);
+            startIdleLoop(cat_id);
+        },
+        true);
 
     outfit_category->fetch();
     refreshOutfit(cat_id);
@@ -898,6 +904,18 @@ void LLOutfitGallery::updateChangedCategoryName(LLViewerInventoryCategory *cat, 
             item->setOutfitFavorite(cat->getIsFavorite());
         }
     }
+}
+
+bool LLOutfitGallery::updateOneOutfit()
+{
+    if (mPendingOutfitRefreshes.empty())
+        return false;
+
+    auto it = mPendingOutfitRefreshes.begin();
+    LLUUID outfit_id = *it;
+    mPendingOutfitRefreshes.erase(it);
+    refreshOutfit(outfit_id);
+    return true;
 }
 
 void LLOutfitGallery::onOutfitRightClick(LLUICtrl* ctrl, S32 x, S32 y, const LLUUID& cat_id)
@@ -987,6 +1005,8 @@ LLOutfitGalleryItem::LLOutfitGalleryItem(const Params& p)
     mSelected(false),
     mWorn(false),
     mDefaultImage(true),
+    mHidden(false),
+    mFavorite(false),
     mOutfitName(""),
     mUUID(LLUUID())
 {
@@ -1173,7 +1193,7 @@ bool LLOutfitGalleryItem::openOutfitsContent()
         if (panel)
         {
             LLAccordionCtrl* accordion = panel->getChild<LLAccordionCtrl>("outfits_accordion");
-            LLOutfitsList* outfit_list = dynamic_cast<LLOutfitsList*>(panel);
+            LLOutfitsList* outfit_list = panel->as<LLOutfitsList>();
             if (accordion != NULL && outfit_list != NULL)
             {
                 outfit_list->setSelectedOutfitByUUID(mUUID);
@@ -1285,7 +1305,7 @@ void LLOutfitGalleryGearMenu::onUpdateItemsVisibility()
 
 bool LLOutfitGalleryGearMenu::hasDefaultImage()
 {
-    LLOutfitGallery* gallery = dynamic_cast<LLOutfitGallery*>(mOutfitList);
+    LLOutfitGallery* gallery = ALViewType::as<LLOutfitGallery>(mOutfitList);
     LLUUID selected_outfit_id = getSelectedOutfitID();
     if (gallery && selected_outfit_id.notNull())
     {
@@ -1497,7 +1517,7 @@ void LLOutfitGallerySortMenu::onSort(LLSD::String param)
     }
     gSavedSettings.setS32("OutfitGallerySortOrder", new_sort_order);
 
-    LLOutfitGallery* gallery = dynamic_cast<LLOutfitGallery*>(mPanelHandle.get());
+    LLOutfitGallery* gallery = ALViewType::as<LLOutfitGallery>(mPanelHandle.get());
     if (gallery)
     {
         gallery->reArrangeRows();

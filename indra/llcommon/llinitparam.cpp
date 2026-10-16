@@ -30,6 +30,13 @@
 #include "llinitparam.h"
 #include "llformat.h"
 
+#include <algorithm>
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <unordered_set>
+
 
 namespace LLInitParam
 {
@@ -39,17 +46,35 @@ namespace LLInitParam
         return ll_make_predicate(PROVIDED) && !ll_make_predicate(EMPTY);
     }
 
+    std::size_t allocateParserTypeIndex()
+    {
+        // Parsers register their types while constructing, which can happen on
+        // more than one thread, so the counter is atomic. It runs a couple of
+        // dozen times over the life of the process.
+        static std::atomic<std::size_t> sNextIndex{0};
+        return sNextIndex.fetch_add(1, std::memory_order_relaxed);
+    }
+
     //
     // Param
     //
     Param::Param(BaseBlock* enclosing_block)
-    :   mIsProvided(false)
+    :   mEnclosingBlockOffset(0)
+    ,   mIsProvided(false)
     {
-        const U8* my_addr = reinterpret_cast<const U8*>(this);
-        const U8* block_addr = reinterpret_cast<const U8*>(enclosing_block);
-        U32 enclosing_block_offset = 0x7FFFffff & (U32)(my_addr - block_addr);
-        mEnclosingBlockOffsetLow = enclosing_block_offset & 0x0000ffff;
-        mEnclosingBlockOffsetHigh = (enclosing_block_offset & 0x007f0000) >> 16;
+        // Store the byte offset from the enclosing BaseBlock subobject to
+        // this Param subobject. With 31 bits of storage the limit is just
+        // over 2 GB -- well past any realistic block size -- so the only
+        // remaining precondition is that the offset is non-negative: under
+        // multiple inheritance arrangements where BaseBlock is not the
+        // leading base, a Param member could land at a lower address than
+        // the BaseBlock subobject and we'd wrap. None of the in-tree blocks
+        // do that, but assert both invariants so a regression fails loudly.
+        const ptrdiff_t offset =
+            reinterpret_cast<const U8*>(this) - reinterpret_cast<const U8*>(enclosing_block);
+        llassert(offset >= 0);
+        llassert(offset <= 0x7fffffff);
+        mEnclosingBlockOffset = static_cast<U32>(offset);
     }
 
     //
@@ -60,7 +85,6 @@ namespace LLInitParam
                                     deserialize_func_t deserialize_func,
                                     serialize_func_t serialize_func,
                                     validation_func_t validation_func,
-                                    inspect_func_t inspect_func,
                                     S32 min_count,
                                     S32 max_count)
     :   mParamHandle(p),
@@ -68,10 +92,8 @@ namespace LLInitParam
         mDeserializeFunc(deserialize_func),
         mSerializeFunc(serialize_func),
         mValidationFunc(validation_func),
-        mInspectFunc(inspect_func),
         mMinCount(min_count),
-        mMaxCount(max_count),
-        mUserData(NULL)
+        mMaxCount(max_count)
     {}
 
     ParamDescriptor::ParamDescriptor()
@@ -80,23 +102,13 @@ namespace LLInitParam
         mDeserializeFunc(NULL),
         mSerializeFunc(NULL),
         mValidationFunc(NULL),
-        mInspectFunc(NULL),
         mMinCount(0),
-        mMaxCount(0),
-        mUserData(NULL)
+        mMaxCount(0)
     {}
-
-    ParamDescriptor::~ParamDescriptor()
-    {
-        delete mUserData;
-    }
 
     //
     // Parser
     //
-    Parser::~Parser()
-    {}
-
     void Parser::parserWarning(const std::string& message)
     {
         if (mParseSilently) return;
@@ -113,51 +125,256 @@ namespace LLInitParam
     //
     // BlockDescriptor
     //
-    void BlockDescriptor::aggregateBlockData(BlockDescriptor& src_block_data)
+    namespace
     {
-        mNamedParams.insert(src_block_data.mNamedParams.begin(), src_block_data.mNamedParams.end());
-        std::copy(src_block_data.mUnnamedParams.begin(), src_block_data.mUnnamedParams.end(), std::back_inserter(mUnnamedParams));
-        std::copy(src_block_data.mValidationList.begin(), src_block_data.mValidationList.end(), std::back_inserter(mValidationList));
-        std::copy(src_block_data.mAllParams.begin(), src_block_data.mAllParams.end(), std::back_inserter(mAllParams));
+        // Descriptors are registered once per block type and read for the life
+        // of the process, so they are cut from chunks that are never freed.
+        // One per allocation is what a std::deque gave: MSVC hands a deque
+        // holding anything above eight bytes exactly one element per block, so
+        // every descriptor carried an allocation header of its own.
+        //
+        // The lock is not for contention -- a descriptor is allocated once,
+        // during a block type's first construction -- but because which thread
+        // that happens on is not ours to say.
+        constexpr std::size_t DESCRIPTORS_PER_CHUNK = 64;
+
+        ParamDescriptor* allocateDescriptor()
+        {
+            static std::mutex sChunkMutex;
+            static std::vector<std::unique_ptr<ParamDescriptor[]> > sChunks;
+            static std::size_t sUsedInChunk = DESCRIPTORS_PER_CHUNK;
+
+            std::lock_guard<std::mutex> lock(sChunkMutex);
+            if (sUsedInChunk == DESCRIPTORS_PER_CHUNK)
+            {
+                sChunks.push_back(std::make_unique<ParamDescriptor[]>(DESCRIPTORS_PER_CHUNK));
+                sUsedInChunk = 0;
+            }
+            return &sChunks.back()[sUsedInChunk++];
+        }
     }
 
-    void BlockDescriptor::addParam(const ParamDescriptorPtr in_param, const char* char_name)
+    ParamDescriptor* BlockDescriptor::addParam(param_handle_t handle,
+                                   ParamDescriptor::merge_func_t merge_func,
+                                   ParamDescriptor::deserialize_func_t deserialize_func,
+                                   ParamDescriptor::serialize_func_t serialize_func,
+                                   ParamDescriptor::validation_func_t validation_func,
+                                   S32 min_count,
+                                   S32 max_count,
+                                   const char* char_name)
     {
-        // create a copy of the param descriptor in mAllParams
-        // so other data structures can store a pointer to it
-        mAllParams.push_back(in_param);
-        ParamDescriptorPtr param(mAllParams.back());
-
-        std::string name(char_name);
-        if ((size_t)param->mParamHandle > mMaxParamOffset)
+        if ((size_t)handle > mMaxParamOffset)
         {
             LL_ERRS() << "Attempted to register param with block defined for parent class, make sure to derive from LLInitParam::Block<YOUR_CLASS, PARAM_BLOCK_BASE_CLASS>" << LL_ENDL;
         }
 
-        if (name.empty())
+        ParamDescriptorPtr param = allocateDescriptor();
+        *param = ParamDescriptor(handle, merge_func, deserialize_func, serialize_func,
+                                 validation_func, min_count, max_count);
+
+        mAllParams.push_back(param);
+
+        if (!char_name[0])
         {
             mUnnamedParams.push_back(param);
         }
         else
         {
             // don't use insert, since we want to overwrite existing entries
-            mNamedParams[name] = param;
+            mNamedParams[char_name] = param;
         }
 
-        if (param->mValidationFunc)
+        if (validation_func)
         {
-            mValidationList.push_back(std::make_pair(param->mParamHandle, param->mValidationFunc));
+            mValidationList.emplace_back(handle, validation_func);
         }
+
+        return param;
+    }
+
+    static std::vector<BlockDescriptor*>& block_descriptor_registry()
+    {
+        // Function-local so it is built before the first descriptor that
+        // registers into it, whatever order the statics initialize in.
+        static std::vector<BlockDescriptor*> sRegistry;
+        return sRegistry;
     }
 
     BlockDescriptor::BlockDescriptor()
-    :   mMaxParamOffset(0),
+    :   mBaseDescriptor(NULL),
+        mTypeName(""),
+        mMaxParamOffset(0),
         mInitializationState(UNINITIALIZED),
         mCurrentBlockPtr(NULL)
-    {}
+    {
+        block_descriptor_registry().push_back(this);
+    }
+
+    ParamDescriptorPtr BlockDescriptor::findNamedParam(std::string_view name) const
+    {
+        for (const BlockDescriptor* descriptor = this; descriptor; descriptor = descriptor->mBaseDescriptor)
+        {
+            param_map_t::const_iterator found = descriptor->mNamedParams.find(name);
+            if (found != descriptor->mNamedParams.end())
+            {
+                return found->second;
+            }
+        }
+        return NULL;
+    }
+
+    std::vector<std::pair<std::string_view, ParamDescriptorPtr> > BlockDescriptor::namedParams() const
+    {
+        std::vector<std::pair<std::string_view, ParamDescriptorPtr> > named;
+        std::unordered_set<std::string_view> seen;
+
+        for (const BlockDescriptor* descriptor = this; descriptor; descriptor = descriptor->mBaseDescriptor)
+        {
+            for (const param_map_t::value_type& pair : descriptor->mNamedParams)
+            {
+                // Nearest first, so the first spelling of a name wins and a
+                // base's shadowed one is passed over.
+                if (seen.insert(pair.first).second)
+                {
+                    named.push_back(pair);
+                }
+            }
+        }
+        return named;
+    }
+
+    // static
+    const std::vector<BlockDescriptor*>& BlockDescriptor::getAllDescriptors()
+    {
+        return block_descriptor_registry();
+    }
+
+    // static
+    std::string BlockDescriptor::getStatsReport()
+    {
+        const std::vector<BlockDescriptor*>& all = getAllDescriptors();
+
+        size_t own_entries = 0;
+        size_t effective_entries = 0;
+        size_t unnamed_entries = 0;
+        size_t all_param_entries = 0;
+        size_t validated_entries = 0;
+        size_t deepest_chain = 0;
+        std::unordered_set<std::string_view> distinct_names;
+        std::unordered_set<const ParamDescriptor*> distinct_descriptors;
+
+        for (const BlockDescriptor* descriptor : all)
+        {
+            own_entries += descriptor->mNamedParams.size();
+            unnamed_entries += descriptor->mUnnamedParams.size();
+            all_param_entries += descriptor->mAllParams.size();
+            validated_entries += descriptor->mValidationList.size();
+            effective_entries += descriptor->namedParams().size();
+
+            size_t depth = 0;
+            for (const BlockDescriptor* walk = descriptor; walk; walk = walk->mBaseDescriptor)
+            {
+                ++depth;
+            }
+            deepest_chain = llmax(deepest_chain, depth);
+
+            for (const param_map_t::value_type& pair : descriptor->mNamedParams)
+            {
+                distinct_names.emplace(pair.first);
+                distinct_descriptors.emplace(pair.second);
+            }
+            for (ParamDescriptorPtr ptr : descriptor->mUnnamedParams)
+            {
+                distinct_descriptors.emplace(ptr);
+            }
+        }
+
+        // A named entry in a flat map is a view and a pointer, with no node of
+        // its own. Only the entries a block declares itself are stored; a name
+        // it inherits is found by walking to the base that declared it, which
+        // is what effective_entries counts and own_entries does not.
+        const size_t named_node_bytes = own_entries * (sizeof(std::string_view) + sizeof(ParamDescriptorPtr));
+        const size_t list_node_bytes = all_param_entries * sizeof(ParamDescriptorPtr);
+        const size_t descriptor_bytes = distinct_descriptors.size() * sizeof(ParamDescriptor);
+
+        std::ostringstream out;
+        out << "LLInitParam block descriptors\n"
+            << "  block types registered : " << all.size() << "\n"
+            << "  named entries stored   : " << own_entries << "\n"
+            << "  named entries reachable: " << effective_entries
+            << " (what each block answers to, bases included)\n"
+            << "  unnamed param entries  : " << unnamed_entries << "\n"
+            << "  param table entries    : " << all_param_entries << "\n"
+            << "  distinct descriptors   : " << distinct_descriptors.size() << "\n"
+            << "  validated params       : " << validated_entries << "\n"
+            << "  distinct param names   : " << distinct_names.size()
+            << " (of " << own_entries << " stored)\n"
+            << "  deepest block chain    : " << deepest_chain << "\n"
+            << "  named map entries      : ~" << named_node_bytes << " bytes\n"
+            << "  mAllParams vector      : ~" << list_node_bytes << " bytes\n"
+            << "  descriptor objects     : ~" << descriptor_bytes << " bytes\n"
+            << "  approximate total      : ~"
+            << (named_node_bytes + list_node_bytes + descriptor_bytes) << " bytes\n";
+
+        // The type each descriptor was declared with, which a developer build
+        // keeps beside the table for the schema to read and a shipped one
+        // does not keep at all.
+        if (const size_t recorded = ALParamTypes::count())
+        {
+            out << "  recorded param types   : " << recorded
+                << ", ~" << ALParamTypes::bytes() << " bytes\n";
+        }
+
+        // A name declared at two levels of one chain resolves to the nearer,
+        // which is how Ignored swallows an attribute a base would otherwise
+        // act on -- a menu item takes its geometry from its menu, so
+        // LLMenuItemGL::Params declares rect and the deltas Ignored over
+        // LLView::Params. An Ignored param registers with neither a merge nor
+        // a serialize function, so the two cases are told apart here: the
+        // second list is two real parameters answering to one name, where one
+        // of them is unreachable from XUI and only the block that declared it
+        // can read what it holds.
+        std::vector<std::string> swallowed;
+        std::vector<std::string> collisions;
+        for (const BlockDescriptor* descriptor : all)
+        {
+            for (const param_map_t::value_type& pair : descriptor->mNamedParams)
+            {
+                for (const BlockDescriptor* base = descriptor->mBaseDescriptor; base; base = base->mBaseDescriptor)
+                {
+                    param_map_t::const_iterator found = base->mNamedParams.find(pair.first);
+                    if (found == base->mNamedParams.end() || found->second == pair.second)
+                    {
+                        continue;
+                    }
+
+                    std::ostringstream line;
+                    line << "    " << pair.first << " : " << descriptor->mTypeName
+                         << " over " << base->mTypeName << "\n";
+                    const bool ignored = !pair.second->mSerializeFunc && !pair.second->mMergeFunc;
+                    (ignored ? swallowed : collisions).push_back(line.str());
+                }
+            }
+        }
+        std::sort(swallowed.begin(), swallowed.end());
+        std::sort(collisions.begin(), collisions.end());
+
+        out << "  names an Ignored swallows : " << swallowed.size() << "\n";
+        for (const std::string& line : swallowed)
+        {
+            out << line;
+        }
+        out << "  names two params share    : " << collisions.size() << "\n";
+        for (const std::string& line : collisions)
+        {
+            out << line;
+        }
+
+        return out.str();
+    }
 
     // called by each derived class in least to most derived order
-    void BaseBlock::init(BlockDescriptor& descriptor, BlockDescriptor& base_descriptor, size_t block_size)
+    void BaseBlock::init(BlockDescriptor& descriptor, BlockDescriptor& base_descriptor, size_t block_size, const char* type_name)
     {
         descriptor.mCurrentBlockPtr = this;
         descriptor.mMaxParamOffset = block_size;
@@ -165,9 +382,12 @@ namespace LLInitParam
         switch(descriptor.mInitializationState)
         {
         case BlockDescriptor::UNINITIALIZED:
-            // copy params from base class here
-            descriptor.aggregateBlockData(base_descriptor);
-
+            descriptor.mTypeName = type_name;
+            // A block with no base of its own is handed its own descriptor,
+            // which would make findNamedParam walk in a circle.
+            descriptor.mBaseDescriptor = (&base_descriptor == &descriptor) ? NULL : &base_descriptor;
+            std::copy(base_descriptor.mUnnamedParams.begin(), base_descriptor.mUnnamedParams.end(),
+                      std::back_inserter(descriptor.mUnnamedParams));
             descriptor.mInitializationState = BlockDescriptor::INITIALIZING;
             break;
         case BlockDescriptor::INITIALIZING:
@@ -206,22 +426,45 @@ namespace LLInitParam
         // only validate block when it hasn't already passed validation with current data
         if (!mValidated)
         {
-        const BlockDescriptor& block_data = mostDerivedBlockDescriptor();
-        for (const BlockDescriptor::param_validation_list_t::value_type& pair : block_data.mValidationList)
-        {
-            const Param* param = getParamFromHandle(pair.first);
-            if (!pair.second(param))
-            {
-                if (emit_errors)
+            const BlockDescriptor& block_data = mostDerivedBlockDescriptor();
+            const bool failed = block_data.anyValidator(
+                [&](const BlockDescriptor::param_validation_list_t::value_type& pair)
                 {
-                    LL_WARNS() << "Invalid param \"" << getParamName(block_data, param) << "\"" << LL_ENDL;
-                }
+                    const Param* param = getParamFromHandle(pair.first);
+                    if (pair.second(param))
+                    {
+                        return false;
+                    }
+                    if (emit_errors)
+                    {
+                        LL_WARNS() << "Invalid param \"" << getParamName(block_data, param) << "\"" << LL_ENDL;
+                    }
+                    return true;
+                });
+            if (failed)
+            {
                 return false;
             }
-        }
             mValidated = true;
         }
         return mValidated;
+    }
+
+    namespace
+    {
+        // A block has one or two of these, so a scan beats building a set of
+        // them for every named param the caller is about to write.
+        bool isUnnamedParam(const BlockDescriptor& block_data, param_handle_t handle)
+        {
+            for (ParamDescriptorPtr ptr : block_data.mUnnamedParams)
+            {
+                if (ptr->mParamHandle == handle)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     bool BaseBlock::serializeBlock(Parser& parser, Parser::name_stack_t& name_stack, const predicate_rule_t predicate_rule, const LLInitParam::BaseBlock* diff_block) const
@@ -235,7 +478,7 @@ namespace LLInitParam
         // unnamed param is like LLView::Params::rect - implicit
         const BlockDescriptor& block_data = mostDerivedBlockDescriptor();
 
-        for (const ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
+        for (ParamDescriptorPtr ptr : block_data.mUnnamedParams)
         {
             param_handle_t param_handle = ptr->mParamHandle;
             const Param* param = getParamFromHandle(param_handle);
@@ -247,33 +490,38 @@ namespace LLInitParam
             }
         }
 
-        for (const BlockDescriptor::param_map_t::value_type& pair : block_data.mNamedParams)
+        // Named params are held by the block that declared them, so walk out
+        // to the bases rather than expecting one flat table.
+        for (const BlockDescriptor* descriptor = &block_data; descriptor; descriptor = descriptor->mBaseDescriptor)
         {
-            param_handle_t param_handle = pair.second->mParamHandle;
-            const Param* param = getParamFromHandle(param_handle);
-            ParamDescriptor::serialize_func_t serialize_func = pair.second->mSerializeFunc;
-            if (serialize_func && predicate_rule.check(ll_make_predicate(PROVIDED, param->anyProvided())))
+            for (const BlockDescriptor::param_map_t::value_type& pair : descriptor->mNamedParams)
             {
-                // Ensure this param has not already been serialized
-                // Prevents <rect> from being serialized as its own tag.
-                bool duplicate = false;
-                for (const ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
-                {
-                    if (param_handle == ptr->mParamHandle)
-                    {
-                        duplicate = true;
-                        break;
-                    }
-                }
-
-                //FIXME: for now, don't attempt to serialize values under synonyms, as current parsers
-                // don't know how to detect them
-                if (duplicate)
+                param_handle_t param_handle = pair.second->mParamHandle;
+                const Param* param = getParamFromHandle(param_handle);
+                ParamDescriptor::serialize_func_t serialize_func = pair.second->mSerializeFunc;
+                if (!serialize_func || !predicate_rule.check(ll_make_predicate(PROVIDED, param->anyProvided())))
                 {
                     continue;
                 }
 
-                name_stack.push_back(std::make_pair(pair.first, !duplicate));
+                // Write the entry a lookup would reach. A name a derived block
+                // redeclares appears at two levels, and the one it shadows is
+                // unreachable -- writing it too would emit the name twice.
+                if (block_data.findNamedParam(pair.first) != pair.second)
+                {
+                    continue;
+                }
+
+                // Ensure this param has not already been serialized
+                // Prevents <rect> from being serialized as its own tag.
+                //FIXME: for now, don't attempt to serialize values under synonyms, as current parsers
+                // don't know how to detect them
+                if (isUnnamedParam(block_data, param_handle))
+                {
+                    continue;
+                }
+
+                name_stack.emplace_back(pair.first, true);
                 const Param* diff_param = diff_block ? diff_block->getParamFromHandle(param_handle) : NULL;
                 serialized |= serialize_func(*param, parser, name_stack, predicate_rule, diff_param);
                 name_stack.pop_back();
@@ -288,52 +536,6 @@ namespace LLInitParam
         return serialized;
     }
 
-    bool BaseBlock::inspectBlock(Parser& parser, Parser::name_stack_t name_stack, S32 min_count, S32 max_count) const
-    {
-        // named param is one like LLView::Params::follows
-        // unnamed param is like LLView::Params::rect - implicit
-        const BlockDescriptor& block_data = mostDerivedBlockDescriptor();
-
-        for (const ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
-        {
-            param_handle_t param_handle = ptr->mParamHandle;
-            const Param* param = getParamFromHandle(param_handle);
-            ParamDescriptor::inspect_func_t inspect_func = ptr->mInspectFunc;
-            if (inspect_func)
-            {
-                name_stack.push_back(std::make_pair("", true));
-                inspect_func(*param, parser, name_stack, ptr->mMinCount, ptr->mMaxCount);
-                name_stack.pop_back();
-            }
-        }
-
-        for(const BlockDescriptor::param_map_t::value_type& pair : block_data.mNamedParams)
-        {
-            param_handle_t param_handle = pair.second->mParamHandle;
-            const Param* param = getParamFromHandle(param_handle);
-            ParamDescriptor::inspect_func_t inspect_func = pair.second->mInspectFunc;
-            if (inspect_func)
-            {
-                // Ensure this param has not already been inspected
-                bool duplicate = false;
-                for (const ParamDescriptorPtr &ptr : block_data.mUnnamedParams)
-                {
-                    if (param_handle == ptr->mParamHandle)
-                    {
-                        duplicate = true;
-                        break;
-                    }
-                }
-
-                name_stack.push_back(std::make_pair(pair.first, !duplicate));
-                inspect_func(*param, parser, name_stack, pair.second->mMinCount, pair.second->mMaxCount);
-                name_stack.pop_back();
-            }
-        }
-
-        return true;
-    }
-
     bool BaseBlock::deserializeBlock(Parser& p, Parser::name_stack_range_t& name_stack_range, bool ignored)
     {
         BlockDescriptor& block_data = mostDerivedBlockDescriptor();
@@ -345,14 +547,14 @@ namespace LLInitParam
 
         if (names_left)
         {
-            const std::string& top_name = name_stack_range.first->first;
+            const std::string_view top_name = name_stack_range.first->first;
 
-            BlockDescriptor::param_map_t::iterator found_it = block_data.mNamedParams.find(top_name);
-            if (found_it != block_data.mNamedParams.end())
+            ParamDescriptorPtr found = block_data.findNamedParam(top_name);
+            if (found)
             {
                 // find pointer to member parameter from offset table
-                Param* paramp = getParamFromHandle(found_it->second->mParamHandle);
-                ParamDescriptor::deserialize_func_t deserialize_func = found_it->second->mDeserializeFunc;
+                Param* paramp = getParamFromHandle(found->mParamHandle);
+                ParamDescriptor::deserialize_func_t deserialize_func = found->mDeserializeFunc;
 
                 Parser::name_stack_range_t new_name_stack(name_stack_range.first, name_stack_range.second);
                 ++new_name_stack.first;
@@ -370,7 +572,7 @@ namespace LLInitParam
         }
 
         // try to parse unnamed parameters, in declaration order
-        for (ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
+        for (ParamDescriptorPtr ptr : block_data.mUnnamedParams)
         {
             Param* paramp = getParamFromHandle(ptr->mParamHandle);
             ParamDescriptor::deserialize_func_t deserialize_func = ptr->mDeserializeFunc;
@@ -392,7 +594,7 @@ namespace LLInitParam
         return false;
     }
 
-    void BaseBlock::addSynonym(Param& param, const std::string& synonym)
+    void BaseBlock::addSynonymImpl(Param& param, std::string_view synonym)
     {
         BlockDescriptor& block_data = mostDerivedBlockDescriptor();
         if (block_data.mInitializationState == BlockDescriptor::INITIALIZING)
@@ -421,29 +623,38 @@ namespace LLInitParam
         }
     }
 
-    const std::string& BaseBlock::getParamName(const BlockDescriptor& block_data, const Param* paramp) const
+    std::string_view BaseBlock::getParamName(const BlockDescriptor& block_data, const Param* paramp) const
     {
         param_handle_t handle = getHandleFromParam(paramp);
-        for (BlockDescriptor::param_map_t::const_iterator it = block_data.mNamedParams.begin(); it != block_data.mNamedParams.end(); ++it)
+        for (const BlockDescriptor* descriptor = &block_data; descriptor; descriptor = descriptor->mBaseDescriptor)
         {
-            if (it->second->mParamHandle == handle)
+            for (const BlockDescriptor::param_map_t::value_type& pair : descriptor->mNamedParams)
             {
-                return it->first;
+                if (pair.second->mParamHandle == handle)
+                {
+                    return pair.first;
+                }
             }
         }
 
-        return LLStringUtil::null;
+        return {};
     }
 
     ParamDescriptorPtr BaseBlock::findParamDescriptor(const Param& param)
     {
         param_handle_t handle = getHandleFromParam(&param);
         BlockDescriptor& descriptor = mostDerivedBlockDescriptor();
-        for (ParamDescriptorPtr& ptr : descriptor.mAllParams)
+        ParamDescriptorPtr found = nullptr;
+        descriptor.anyParam([&](ParamDescriptorPtr ptr)
         {
-            if (ptr->mParamHandle == handle) return ptr;
-        }
-        return ParamDescriptorPtr();
+            if (ptr->mParamHandle != handle)
+            {
+                return false;
+            }
+            found = ptr;
+            return true;
+        });
+        return found;
     }
 
     // take all provided params from other and apply to self
@@ -451,17 +662,18 @@ namespace LLInitParam
     bool BaseBlock::mergeBlock(BlockDescriptor& block_data, const BaseBlock& other, bool overwrite)
     {
         bool some_param_changed = false;
-        for (const ParamDescriptorPtr& ptr : block_data.mAllParams)
+        block_data.anyParam([&](ParamDescriptorPtr ptr)
         {
-            const Param* other_paramp = other.getParamFromHandle(ptr->mParamHandle);
             ParamDescriptor::merge_func_t merge_func = ptr->mMergeFunc;
             if (merge_func)
             {
+                const Param* other_paramp = other.getParamFromHandle(ptr->mParamHandle);
                 Param* paramp = getParamFromHandle(ptr->mParamHandle);
                 llassert(paramp->getEnclosingBlockOffset() == ptr->mParamHandle);
                 some_param_changed |= merge_func(*paramp, *other_paramp, overwrite);
             }
-        }
+            return false;
+        });
         return some_param_changed;
     }
 }

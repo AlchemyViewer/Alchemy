@@ -51,11 +51,12 @@ class LLTabContainer;
 class LLTextBox;
 class LLMessageSystem;
 
-class LLFloaterGodTools
+class LLFloaterGodTools final
     : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterGodTools, LLFloater);
 
     enum EGodPanel
     {
@@ -75,9 +76,9 @@ public:
 
     void showPanel(const std::string& panel_name);
 
-    virtual void onOpen(const LLSD& key);
+    virtual void onOpen(const LLSD& key) override;
 
-    virtual void draw();
+    virtual void draw() override;
 
     // call this once per frame to handle visibility, rect location,
     // button highlights, etc.
@@ -102,7 +103,7 @@ protected:
 
 protected:
 
-    /*virtual*/ bool    postBuild();
+    /*virtual*/ bool    postBuild() override;
     // When the floater is going away, reset any options that need to be
     // cleared.
     void resetToolState();
@@ -120,16 +121,18 @@ public:
 // LLPanelRegionTools
 //-----------------------------------------------------------------------------
 
-class LLPanelRegionTools
+class LLPanelRegionTools final
 : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelRegionTools, LLPanel);
+
     LLPanelRegionTools();
     /*virtual*/ ~LLPanelRegionTools();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    /*virtual*/ void refresh();
+    /*virtual*/ void refresh() override;
 
     static void onSaveState(void* userdata);
     static void onChangeSimName(LLLineEditor* caller, void* userdata);
@@ -182,16 +185,18 @@ protected:
 // LLPanelGridTools
 //-----------------------------------------------------------------------------
 
-class LLPanelGridTools
+class LLPanelGridTools final
 : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelGridTools, LLPanel);
+
     LLPanelGridTools();
     virtual ~LLPanelGridTools();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    void refresh();
+    void refresh() override;
 
     static void onDragSunPhase(LLUICtrl *ctrl, void *userdata);
     void onClickFlushMapVisibilityCaches();
@@ -206,16 +211,18 @@ protected:
 // LLPanelObjectTools
 //-----------------------------------------------------------------------------
 
-class LLPanelObjectTools
+class LLPanelObjectTools final
 : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelObjectTools, LLPanel);
+
     LLPanelObjectTools();
     /*virtual*/ ~LLPanelObjectTools();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    /*virtual*/ void refresh();
+    /*virtual*/ void refresh() override;
 
     void setTargetAvatar(const LLUUID& target_id);
     U64 computeRegionFlags(U64 initial_flags) const;
@@ -248,15 +255,17 @@ protected:
 // LLPanelRequestTools
 //-----------------------------------------------------------------------------
 
-class LLPanelRequestTools : public LLPanel
+class LLPanelRequestTools final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelRequestTools, LLPanel);
+
     LLPanelRequestTools();
     /*virtual*/ ~LLPanelRequestTools();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    void refresh();
+    void refresh() override;
 
     static void sendRequest(const std::string& request,
                             const std::string& parameter,

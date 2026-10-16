@@ -36,7 +36,7 @@
     layout="topleft"
     left="30"
     min_val="64"
-    max_val="512"
+    max_val="2048"
     name="DrawDistance"
     top_delta="16"
     width="330">
@@ -76,19 +76,19 @@
     height="16"
     increment="1"
     initial_value="8"
-    label="Post process quality:"
+    label="Glow quality:"
     label_width="185"
     layout="topleft"
     left="30"
     min_val="8"
     max_val="9"
-    name="RenderPostProcess"
+    name="GlowResolution"
     show_text="false"
     top_delta="16"
     width="300">
     <slider.commit_callback
       function="Pref.UpdateSliderText"
-      parameter="PostProcessText" />
+      parameter="GlowResolutionText" />
   </slider>
   <text
     type="string"
@@ -96,7 +96,7 @@
     follows="left|top"
     height="16"
     layout="topleft"
-    name="PostProcessText"
+    name="GlowResolutionText"
     top_delta="0"
     left_delta="304"
     width="65">
@@ -359,18 +359,6 @@
     width="128">
      Hardware
   </text>
-
-  <check_box
-    control_name="RenderCompressTextures"
-    height="16"
-    initial_value="true"
-    label="Enable Texture Compression (requires restart)"
-    layout="topleft"
-    left="30"
-    top_delta="16"
-    name="texture compression"
-    tool_tip="Compresses textures in video memory, allowing for higher resolution textures to be loaded at the cost of some color quality."
-    width="315" />
 
   <check_box
     control_name="RenderHiDPI"
@@ -689,34 +677,37 @@
   </check_box>
 
   <slider
-    control_name="WLSkyDetail"
+    visible="false"
+    enabled_control="RenderDisableVintageMode"
+    control_name="RenderBloomMipCount"
     decimal_digits="0"
     follows="left|top"
     height="16"
-    increment="8"
-    initial_value="160"
-    label="Sky:"
-    label_width="145"
+    increment="1"
+    initial_value="6"
+    label="Bloom Quality:"
+    label_width="164"
     layout="topleft"
     left="420"
-    min_val="16"
-    max_val="128"
-    name="SkyMeshDetail"
+    min_val="5"
+    max_val="7"
+    name="RenderPostProcess"
     show_text="false"
     top_delta="22"
     width="260">
     <slider.commit_callback
       function="Pref.UpdateSliderText"
-      parameter="SkyMeshDetailText" />
+      parameter="PostProcessText" />
   </slider>
   <text
+    visible="false"
     type="string"
     length="1"
     follows="left|top"
     height="16"
     layout="topleft"
     left_delta="264"
-    name="SkyMeshDetailText"
+    name="PostProcessText"
     text_readonly_color="LabelDisabledColor"
     top_delta="0"
     width="65">
@@ -782,7 +773,7 @@
    control_name="RenderShadowDetail"
    height="18"
    layout="topleft"
-   left_delta="130"
+   left_delta="175"
    top_delta="0" 
    name="ShadowDetail"
    width="150">
@@ -832,7 +823,7 @@
    control_name="RenderReflectionProbeDetail"
    height="18"
    layout="topleft"
-   left_delta="130"
+   left_delta="175"
    top_delta="0"
    name="ReflectionDetail"
    width="150">
@@ -868,7 +859,7 @@
    control_name="RenderReflectionProbeLevel"
    height="18"
    layout="topleft"
-   left_delta="130"
+   left_delta="175"
    top_delta="0"
    name="ReflectionLevel"
    width="150">
@@ -900,7 +891,7 @@
       name="ReflectionProbeCount"
       text_readonly_color="LabelDisabledColor"
       top_delta="22"
-      width="128">
+      width="130">
         Max Reflection Probes:
     </text>
 
@@ -909,7 +900,7 @@
      height="18"
      layout="topleft"
      label="Max. Reflection Probes:"
-     left_delta="130"
+     left_delta="175"
      top_delta="0"
      name="ProbeCount"
      width="150">
@@ -943,7 +934,7 @@
     increment="0.1"
     initial_value="160"
     label="Exposure:"
-    label_width="145"
+    label_width="164"
     layout="topleft"
     left="420"
     min_val="0.5"
@@ -987,7 +978,7 @@
    control_name="RenderHeroProbeResolution"
    height="18"
    layout="topleft"
-   left_delta="130"
+   left_delta="175"
    top_delta="0"
    name="MirrorResolution"
    width="150">
@@ -1027,7 +1018,7 @@
    control_name="RenderHeroProbeUpdateRate"
    height="18"
    layout="topleft"
-   left_delta="130"
+   left_delta="175"
    top_delta="0"
    name="HeroProbeUpdateRate"
    width="150">
@@ -1052,13 +1043,13 @@
   <!-- Sharpening Settings -->
   <slider
     control_name="RenderCASSharpness"
-    decimal_digits="1"
+    decimal_digits="2"
     follows="left|top"
     height="16"
-    increment="0.1"
+    increment="0.05"
     initial_value="160"
     label="Sharpening:"
-    label_width="145"
+    label_width="164"
     layout="topleft"
     left="420"
     min_val="0.0"
@@ -1081,13 +1072,13 @@
     text_readonly_color="LabelDisabledColor"
     top_delta="25"
     width="128">
-    Tone Mapper:
+    Tone mapping:
   </text>
   <combo_box
-    control_name="RenderTonemapType"
+    control_name="AlchemyRenderTonemapType"
     height="18"
     layout="topleft"
-    left_delta="130"
+    left_delta="175"
     top_delta="0"
     name="TonemapType"
     width="150">
@@ -1099,6 +1090,26 @@
        label="ACES"
        name="1"
        value="1"/>
+     <combo_box.item
+       label="ACES Boosted"
+       name="2"
+       value="2"/>
+      <combo_box.item
+       label="Reinhard"
+       name="3"
+       value="3"/>
+      <combo_box.item
+       label="Filmic"
+       name="4"
+       value="4"/>
+      <combo_box.item
+       label="GT"
+       name="5"
+       value="5"/>
+      <combo_box.item
+       label="AgX"
+       name="6"
+       value="6"/>
   </combo_box>
   <slider
    control_name="RenderTonemapMix"
@@ -1107,9 +1118,9 @@
    height="16"
    increment="0.1"
    initial_value="1"
-   label="Tone Mapping Mix:"
+   label="Tone mapping strength:"
    tool_tip="Mix between linear and tone mapped colors"
-   label_width="145"
+   label_width="164"
    layout="topleft"
    left="420"
    min_val="0.0"

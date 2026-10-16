@@ -88,7 +88,7 @@ static const std::string NEARBY_TAB_NAME    = "nearby_panel";
 static const std::string FRIENDS_TAB_NAME   = "friends_panel";
 static const std::string GROUP_TAB_NAME     = "groups_panel";
 static const std::string RECENT_TAB_NAME    = "recent_panel";
-//static const std::string BLOCKED_TAB_NAME = "blocked_panel"; // blocked avatars
+//static const std::string BLOCKED_TAB_NAME   = "blocked_panel"; // blocked avatars
 static const std::string COLLAPSED_BY_USER  = "collapsed_by_user";
 
 /** Comparator for comparing avatar items by last interaction date */
@@ -222,8 +222,8 @@ protected:
     virtual bool doCompare(const LLAvatarListItem* item1, const LLAvatarListItem* item2) const
     {
 
-        F32 arr_time1 = LLRecentPeople::instance().getArrivalTimeByID(item1->getAvatarId());
-        F32 arr_time2 = LLRecentPeople::instance().getArrivalTimeByID(item2->getAvatarId());
+        F64 arr_time1 = LLRecentPeople::instance().getArrivalTimeByID(item1->getAvatarId());
+        F64 arr_time2 = LLRecentPeople::instance().getArrivalTimeByID(item2->getAvatarId());
 
         if (arr_time1 == arr_time2)
         {
@@ -256,7 +256,7 @@ static LLPanelInjector<LLPanelPeople> t_people("panel_people");
 class LLPanelPeople::Updater
 {
 public:
-    typedef boost::function<void()> callback_t;
+    typedef std::function<void()> callback_t;
     Updater(callback_t cb)
     : mCallback(cb)
     {
@@ -927,10 +927,6 @@ void LLPanelPeople::updateNearbyList()
     }
 // [/RLVa:KB]
     mNearbyList->setDirty();
-#ifdef LL_DISCORD
-    if (gSavedSettings.getBOOL("EnableDiscord"))
-        LLAppViewer::updateDiscordPartyMaxSize((S32)mNearbyList->getIDs().size());
-#endif
 
     DISTANCE_COMPARATOR.updateAvatarsPositions(positions, mNearbyList->getIDs());
     LLActiveSpeakerMgr::instance().update(true);
@@ -987,16 +983,11 @@ void LLPanelPeople::updateButtons()
         }
 
         {
-// [RLVa:KB] - Checked: RLVa-1.2.0
-//          if (cur_panel->hasChild("add_friend_btn", true))
-//              cur_panel->getChildView("add_friend_btn")->setEnabled(item_selected && !is_friend && !is_self && ((!nearby_tab_active) || (RlvActions::canShowName(RlvActions::SNC_DEFAULT, selected_id))));
-// [/RLBa:KB]
-//          if (cur_panel->hasChild("add_friend_btn", true))
-//              cur_panel->getChildView("add_friend_btn")->setEnabled(item_selected && !is_friend && !is_self);
-
             if(nearby_tab_active)
             {
-                mNearbyAddFriendBtn->setEnabled(item_selected && !is_friend && !is_self && ((!nearby_tab_active) || (RlvActions::canShowName(RlvActions::SNC_DEFAULT, selected_id))));
+// [RLVa:KB] - Checked: RLVa-1.2.0
+                mNearbyAddFriendBtn->setEnabled(item_selected && !is_friend && !is_self && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, selected_id)));
+// [/RLBa:KB]
                 mNearbyGearBtn->setEnabled(multiple_selected);
             }
 
@@ -1008,7 +999,7 @@ void LLPanelPeople::updateButtons()
 
             if (recent_tab_active)
             {
-                mRecentAddFriendBtn->setEnabled(item_selected && !is_friend && !is_self && ((!nearby_tab_active) || (RlvActions::canShowName(RlvActions::SNC_DEFAULT, selected_id))));
+                mRecentAddFriendBtn->setEnabled(item_selected && !is_friend && !is_self);
                 mRecentGearBtn->setEnabled(multiple_selected);
             }
         }
@@ -1054,7 +1045,7 @@ LLUUID LLPanelPeople::getCurrentItemID() const
         return mGroupList->getSelectedUUID();
 
     //if (cur_tab == BLOCKED_TAB_NAME)
-    //  return LLUUID::null; // FIXME?
+    //    return LLUUID::null; // FIXME?
 
     llassert(0 && "unknown tab selected");
     return LLUUID::null;
@@ -1077,7 +1068,7 @@ void LLPanelPeople::getCurrentItemIDs(uuid_vec_t& selected_uuids) const
     else if (cur_tab == GROUP_TAB_NAME)
         mGroupList->getSelectedUUIDs(selected_uuids);
     //else if (cur_tab == BLOCKED_TAB_NAME)
-    //  selected_uuids.clear(); // FIXME?
+    //    selected_uuids.clear(); // FIXME?
     else
         llassert(0 && "unknown tab selected");
 
@@ -1217,7 +1208,7 @@ void LLPanelPeople::onTabSelected(const LLSD& param)
 
 void LLPanelPeople::onAvatarListDoubleClicked(LLUICtrl* ctrl)
 {
-    LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl);
+    LLAvatarListItem* item = ALViewType::as<LLAvatarListItem>(ctrl);
     if(!item)
     {
         return;
@@ -1267,7 +1258,7 @@ void LLPanelPeople::onAvatarListCommitted(LLAvatarList* list)
 
 void LLPanelPeople::onNearbyListDoubleClicked(LLUICtrl* ctrl)
 {
-    LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl);
+    LLAvatarListItem* item = ALViewType::as<LLAvatarListItem>(ctrl);
     if(!item)
     {
         return;
@@ -1635,11 +1626,11 @@ void    LLPanelPeople::onOpen(const LLSD& key)
         mTabContainer->selectTabByName(tab_name);
         //if(tab_name == BLOCKED_TAB_NAME)
         //{
-        //  LLPanel* blocked_tab = mTabContainer->getCurrentPanel()->findChild<LLPanel>("panel_block_list_sidetray");
-        //  if(blocked_tab)
-        //  {
-        //      blocked_tab->onOpen(key);
-        //  }
+        //    LLPanel* blocked_tab = mTabContainer->getCurrentPanel()->findChild<LLPanel>("panel_block_list_sidetray");
+        //    if(blocked_tab)
+        //    {
+        //        blocked_tab->onOpen(key);
+        //    }
         //}
     }
 }
@@ -1648,7 +1639,7 @@ bool LLPanelPeople::notifyChildren(const LLSD& info)
 {
     if (info.has("task-panel-action") && info["task-panel-action"].asString() == "handle-tri-state")
     {
-        LLSideTrayPanelContainer* container = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+        LLSideTrayPanelContainer* container = getParentAs<LLSideTrayPanelContainer>();
         if (!container)
         {
             LL_WARNS() << "Cannot find People panel container" << LL_ENDL;

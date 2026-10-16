@@ -40,6 +40,8 @@
 #include "llimagej2c.h"
 #include "llimagetga.h"
 #include "llimagepng.h"
+#include "llimagewebp.h"
+#include "llimageavif.h"
 #include "llinventory.h"
 #include "llinventorymodel.h"
 #include "llnotificationsutil.h"
@@ -201,7 +203,7 @@ void LLPreviewTexture::draw()
     if (!isMinimized())
     {
         LLGLSUIDefault gls_ui;
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         const LLRect& border = mClientRect;
         LLRect interior = mClientRect;
@@ -304,7 +306,8 @@ void LLPreviewTexture::saveAs()
     if( mLoadingFullImage )
         return;
 
-    std::string filename = getItem() ? LLDir::getScrubbedFileName(getItem()->getName()) : LLStringUtil::null;
+    // startPicker will sanitize the name
+    std::string filename = getItem() ? getItem()->getName() : LLStringUtil::null;
     LLFilePickerReplyThread::startPicker(boost::bind(&LLPreviewTexture::saveTextureToFile, this, _1), LLFilePicker::FFSAVE_TGAPNG, filename);
 }
 
@@ -460,13 +463,17 @@ void LLPreviewTexture::onFileLoadedForSave(bool success,
     if( self && final && success )
     {
         LL_DEBUGS("FileSaveAs") << "Saving file to " << self->mSaveFileName << LL_ENDL;
-        const U32 ext_length = 3;
-        std::string extension = self->mSaveFileName.substr( self->mSaveFileName.length() - ext_length);
+        std::string extension;
+        size_t extpos = self->mSaveFileName.rfind(".");
+        if (extpos != std::string::npos)
+        {
+            extension = self->mSaveFileName.substr(extpos + 1);
+        }
 
         std::string filepath;
-        if (self->mSavingMultiple)
+        if (self->mSavingMultiple && extpos != std::string::npos)
         {
-            std::string part_path = self->mSaveFileName.substr(0, self->mSaveFileName.length() - ext_length - 1);
+            std::string part_path = self->mSaveFileName.substr(0, extpos - 1);
 
             S32 i = 0;
             S32 err = 0;
@@ -507,13 +514,17 @@ void LLPreviewTexture::onFileLoadedForSave(bool success,
         {
             image = new LLImageJPEG;
         }
-        else if(extension == "j2c")
-        {
-            image = new LLImageJ2C;
-        }
         else if(extension == "bmp")
         {
             image = new LLImageBMP;
+        }
+        else if (extension == "webp")
+        {
+            image = new LLImageWebP;
+        }
+        else if (extension == "avif")
+        {
+            image = new LLImageAVIF;
         }
 
         if( image && !image->encode( src, 0 ) )

@@ -3,7 +3,7 @@
  * @brief ALChatCommand header for chat input commands
  *
  * $LicenseInfo:firstyear=2013&license=viewerlgpl$
- * Copyright (C) 2013 Drake Arconis
+ * Copyright (C) Rye Mutt <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,8 +22,19 @@
 
 #include "linden_common.h"
 
+#include <string>
+#include <vector>
+
 namespace ALChatCommand
 {
+    struct AutocompleteCommand
+    {
+        std::string trigger;
+        std::string description;
+        bool accepts_arguments;
+    };
+
+    std::vector<AutocompleteCommand> getAutocompleteCommands();
     bool parseCommand(std::string data);
 };
 

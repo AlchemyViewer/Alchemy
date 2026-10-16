@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -49,6 +49,7 @@
 #include "llpreview.h"
 #include "llsidepanelinventory.h"
 #include "llstartup.h"
+#include "lltextbox.h"
 #include "lltrans.h"
 #include "llviewerassettype.h"
 #include "llviewerattachmenu.h"
@@ -117,7 +118,7 @@ protected:
 class LLInvPanelComplObserver : public LLInventoryCompletionObserver
 {
 public:
-    typedef boost::function<void()> callback_t;
+    typedef std::function<void()> callback_t;
 
     LLInvPanelComplObserver(callback_t cb)
     :   mCallback(cb)
@@ -191,6 +192,7 @@ LLInventoryPanel::LLInventoryPanel(const LLInventoryPanel::Params& p) :
     mCommitCallbackRegistrar.add("Inventory.BeginIMSession", boost::bind(&LLInventoryPanel::beginIMSession, this));
     mCommitCallbackRegistrar.add("Inventory.Share",  boost::bind(&LLAvatarActions::shareWithAvatars, this));
     mCommitCallbackRegistrar.add("Inventory.FileUploadLocation", boost::bind(&LLInventoryPanel::fileUploadLocation, this, _2));
+    mEnableCallbackRegistrar.add("Inventory.FileUploadLocation.Check", boost::bind(&LLInventoryPanel::isUploadLocationSelected, this, _2));
     mCommitCallbackRegistrar.add("Inventory.OpenNewFolderWindow", boost::bind(&LLInventoryPanel::openSingleViewInventory, this, LLUUID()));
 }
 
@@ -201,7 +203,6 @@ LLFolderView * LLInventoryPanel::createFolderRoot(LLUUID root_id )
     p.title = getLabel();
     p.rect = LLRect(0, 0, getRect().getWidth(), 0);
     p.parent_panel = this;
-    p.tool_tip = p.name;
     p.listener = mInvFVBridgeBuilder->createBridge( LLAssetType::AT_CATEGORY,
                                                                     LLAssetType::AT_CATEGORY,
                                                                     LLInventoryType::IT_CATEGORY,
@@ -417,6 +418,20 @@ void LLInventoryPanel::onVisibilityChange(bool new_visibility)
 
 void LLInventoryPanel::draw()
 {
+    // A panel that does not preinitialize its views waits to be told it became
+    // visible before building them, and that notification exists only for a
+    // change. A panel built into a chain that is already visible is born
+    // visible, never transitions, and so is never told -- it just draws.
+    //
+    // Being drawn carries the same fact, so it starts the build too. Without
+    // this the folder view says "Searching..." for the rest of the session:
+    // that message asks whether the filter has run, and the idle callback that
+    // runs it is registered by the build.
+    if (mViewsInitialized == VIEWS_UNINITIALIZED)
+    {
+        initializeViewBuilding();
+    }
+
     // Select the desired item (in case it wasn't loaded when the selection was requested)
     updateSelection();
 
@@ -549,15 +564,15 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
     LLFolderViewModelItemInventory* viewmodel_item =
         static_cast<LLFolderViewModelItemInventory*>(view_item ? view_item->getViewModelItem() : NULL);
 
-    // LLFolderViewFolder is derived from LLFolderViewItem so dynamic_cast from item
-    // to folder is the fast way to get a folder without searching through folders tree.
+    // LLFolderViewFolder is derived from LLFolderViewItem so asking the item its
+    // kind is the fast way to get a folder without searching through folders tree.
     LLFolderViewFolder* view_folder = NULL;
 
     // Check requires as this item might have already been deleted
     // as a child of its deleted parent.
     if (model_item && view_item)
     {
-        view_folder = dynamic_cast<LLFolderViewFolder*>(view_item);
+        view_folder = view_item->as<LLFolderViewFolder>();
     }
 
     // if folder is not fully initialized (likely due to delayed load on idle)
@@ -584,8 +599,9 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
             LLInvFVBridge* bridge = (LLInvFVBridge*)view_item->getViewModelItem();
             if(bridge)
             {
-                // Clear the display name first, so it gets properly re-built during refresh()
-                bridge->clearDisplayName();
+                // Clear the searchable name first, so it gets
+                // properly re-built during refresh()
+                bridge->clearSearchableName();
 
                 view_item->refresh();
             }
@@ -605,8 +621,8 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
         if (model_item && view_item && viewmodel_item)
         {
             const LLUUID idp = viewmodel_item->getUUID();
-            view_item->destroyView();
             removeItemID(idp);
+            view_item->destroyView();
         }
 
         LLInventoryObject const* objectp = mInventory->getObject(item_id);
@@ -622,7 +638,7 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
 
         viewmodel_item =
             static_cast<LLFolderViewModelItemInventory*>(view_item ? view_item->getViewModelItem() : NULL);
-        view_folder = dynamic_cast<LLFolderViewFolder *>(view_item);
+        view_folder = ALViewType::as<LLFolderViewFolder>(view_item);
     }
 
     //////////////////////////////
@@ -630,7 +646,7 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
     // This could be anything.  For now, just refresh the item.
     if (mask & LLInventoryObserver::INTERNAL)
     {
-        if (view_item)
+        if (view_item && view_item->getViewModelItem())
         {
             view_item->refresh();
         }
@@ -649,7 +665,7 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
 
     if (mask & LLInventoryObserver::UPDATE_FAVORITE)
     {
-        if (view_item)
+        if (view_item && view_item->getViewModelItem())
         {
             view_item->refresh();
             LLFolderViewFolder* parent = view_item->getParentFolder();
@@ -712,6 +728,7 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
                 LLFolderViewModelItem* old_parent_vmi = old_parent->getViewModelItem();
                 LLFolderViewModelItemInventory* viewmodel_folder = static_cast<LLFolderViewModelItemInventory*>(old_parent_vmi);
                 LLFolderViewFolder* new_parent = getFolderByID(model_item->getParentUUID());
+                const bool was_favorite = view_item->isFavorite();
 
                 if (old_parent != new_parent // Item has been moved.
                     && (new_parent != NULL || !isInRootContent(item_id, view_item)) // item is not or shouldn't be in root content
@@ -751,7 +768,7 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
                         old_parent_vmi->dirtyDescendantsFilter();
                     }
 
-                    if (view_item->isFavorite())
+                    if (was_favorite)
                     {
                         if (old_parent)
                         {
@@ -1064,35 +1081,72 @@ void LLInventoryPanel::initRootContent()
 
 LLFolderViewFolder * LLInventoryPanel::createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop)
 {
+    ensureViewTemplates();
+
     LLFolderViewFolder::Params params(mParams.folder);
 
-    params.name = bridge->getDisplayName();
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+    // Only usable for debug and first call has a large
+    // overhead from search string construction.
+    // As inventory names aren't unique and can change,
+    // there is little we can use them for in release builds.
+    params.name = bridge->getName();
+#else
+    // We don't have a source of unique names and inventory
+    // items can reach millions in quantity, just use
+    // a short descriptor
+    params.name = "fld";
+#endif
     params.root = mFolderRoot.get();
     params.listener = bridge;
-    params.tool_tip = params.name;
     params.allow_drop = allow_drop;
 
     params.font_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultColor);
     params.font_highlight_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultHighlightColor);
 
-    return LLUICtrlFactory::create<LLFolderViewFolder>(params);
+    return LLUICtrlFactory::createFromTemplate<LLFolderViewFolder>(params);
+}
+
+void LLInventoryPanel::ensureViewTemplates()
+{
+    if (mViewTemplatesMerged)
+    {
+        return;
+    }
+    mViewTemplatesMerged = true;
+
+    mParams.item.fillFrom(LLUICtrlFactory::getDefaultParams<LLFolderViewItem>());
+    mParams.folder.fillFrom(LLUICtrlFactory::getDefaultParams<LLFolderViewFolder>());
 }
 
 LLFolderViewItem * LLInventoryPanel::createFolderViewItem(LLInvFVBridge * bridge)
 {
+    ensureViewTemplates();
+
     LLFolderViewItem::Params params(mParams.item);
 
-    params.name = bridge->getDisplayName();
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+    // Only usable for debug and first call has a large
+    // overhead from search string construction.
+    // As inventory names aren't unique, are large and can change,
+    // there is little we can use them for in release builds.
+    // Prefer shorter
+    params.name = bridge->getName();
+#else
+    // We don't have a source of unique names and inventory
+    // items can reach millions in quantity, just use
+    // a short descriptor
+    params.name = "itm";
+#endif
     params.creation_date = bridge->getCreationDate();
     params.root = mFolderRoot.get();
     params.listener = bridge;
     params.rect = LLRect (0, 0, 0, 0);
-    params.tool_tip = params.name;
 
     params.font_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultColor);
     params.font_highlight_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultHighlightColor);
 
-    return LLUICtrlFactory::create<LLFolderViewItem>(params);
+    return LLUICtrlFactory::createFromTemplate<LLFolderViewItem>(params);
 }
 
 LLFolderViewItem* LLInventoryPanel::buildNewViews(const LLUUID& id)
@@ -1160,7 +1214,7 @@ LLFolderViewItem* LLInventoryPanel::buildViewsTree(const LLUUID& id,
         if (root_id == id)
         {
             // We insert an extra level that's seen by the UI but has no influence on the model
-            parent_folder = dynamic_cast<LLFolderViewFolder*>(folder_view_item);
+            parent_folder = ALViewType::as<LLFolderViewFolder>(folder_view_item);
             folder_view_item = NULL;
             allow_drop = mParams.allow_drop_on_root;
             create_root = true;
@@ -1325,7 +1379,7 @@ LLFolderViewItem* LLInventoryPanel::buildViewsTree(const LLUUID& id,
         const S32 MIN_ITEMS_PER_CALL = 500;
         const S32 starting_item_count = static_cast<S32>(mItemMap.size());
 
-        LLFolderViewFolder *parentp = dynamic_cast<LLFolderViewFolder*>(folder_view_item);
+        LLFolderViewFolder *parentp = folder_view_item->as<LLFolderViewFolder>();
         bool done = true;
 
         if(categories)
@@ -1424,7 +1478,7 @@ void LLInventoryPanel::openStartFolderOrMyInventory()
     // Find My Inventory folder and open it up by name
     for (LLView *child = mFolderRoot.get()->getFirstChild(); child; child = mFolderRoot.get()->findNextSibling(child))
     {
-        LLFolderViewFolder *fchild = dynamic_cast<LLFolderViewFolder*>(child);
+        LLFolderViewFolder *fchild = child->as<LLFolderViewFolder>();
         if (fchild
             && fchild->getViewModelItem()
             // Is this right? Name might be localized,
@@ -1598,7 +1652,7 @@ void LLInventoryPanel::setSelection(const LLUUID& obj_id, bool take_keyboard_foc
     setSelectionByID(obj_id, take_keyboard_focus);
 }
 
-void LLInventoryPanel::setSelectCallback(const boost::function<void (const std::deque<LLFolderViewItem*>& items, bool user_action)>& cb)
+void LLInventoryPanel::setSelectCallback(const std::function<void (const std::deque<LLFolderViewItem*>& items, bool user_action)>& cb)
 {
     if (mFolderRoot.get())
     {
@@ -1679,7 +1733,7 @@ void LLInventoryPanel::onSelectionChange(const std::deque<LLFolderViewItem*>& it
                     LLFolderBridge* prev_bridge = (LLFolderBridge*)prev_folder_item->getViewModelItem();
                     if(prev_bridge)
                     {
-                        prev_bridge->clearDisplayName();
+                        prev_bridge->clearSearchableName();
                         prev_bridge->setShowDescendantsCount(false);
                         prev_folder_item->refresh();
                     }
@@ -1688,7 +1742,7 @@ void LLInventoryPanel::onSelectionChange(const std::deque<LLFolderViewItem*>& it
                 LLFolderBridge* bridge = (LLFolderBridge*)folder_item->getViewModelItem();
                 if(bridge)
                 {
-                    bridge->clearDisplayName();
+                    bridge->clearSearchableName();
                     bridge->setShowDescendantsCount(true);
                     folder_item->refresh();
                     mPreviousSelectedFolder = bridge->getUUID();
@@ -1703,7 +1757,7 @@ void LLInventoryPanel::onSelectionChange(const std::deque<LLFolderViewItem*>& it
             LLFolderBridge* prev_bridge = (LLFolderBridge*)prev_folder_item->getViewModelItem();
             if(prev_bridge)
             {
-                prev_bridge->clearDisplayName();
+                prev_bridge->clearSearchableName();
                 prev_bridge->setShowDescendantsCount(false);
                 prev_folder_item->refresh();
             }
@@ -1723,7 +1777,7 @@ void LLInventoryPanel::updateFolderLabel(const LLUUID& folder_id)
         LLFolderBridge* bridge = (LLFolderBridge*)folder_item->getViewModelItem();
         if(bridge)
         {
-            bridge->clearDisplayName();
+            bridge->clearSearchableName();
             bridge->setShowDescendantsCount(true);
             folder_item->refresh();
         }
@@ -1872,6 +1926,13 @@ void LLInventoryPanel::fileUploadLocation(const LLSD& userdata)
     LLInventoryAction::fileUploadLocation(dest, param);
 }
 
+bool LLInventoryPanel::isUploadLocationSelected(const LLSD& userdata)
+{
+    const std::string param = userdata.asString();
+    const LLUUID dest = LLFolderBridge::sSelf.get()->getUUID();
+    return LLInventoryAction::isFileUploadLocation(dest, param);
+}
+
 void LLInventoryPanel::openSingleViewInventory(LLUUID folder_id)
 {
     LLPanelMainInventory::newFolderWindow(folder_id.isNull() ? LLFolderBridge::sSelf.get()->getUUID() : folder_id);
@@ -1881,6 +1942,7 @@ void LLInventoryPanel::purgeSelectedItems()
 {
     if (!mFolderRoot.get()) return;
 
+    const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
     const std::set<LLFolderViewItem*> inventory_selected = mFolderRoot.get()->getSelectionList();
     if (inventory_selected.empty()) return;
     LLSD args;
@@ -1890,12 +1952,17 @@ void LLInventoryPanel::purgeSelectedItems()
         it != end_it;
         ++it)
     {
+        // Selection allows items outside trash folder, only count the ones inside.
         LLUUID item_id = static_cast<LLFolderViewModelItemInventory*>((*it)->getViewModelItem())->getUUID();
-        LLInventoryModel::cat_array_t cats;
-        LLInventoryModel::item_array_t items;
-        gInventory.collectDescendents(item_id, cats, items, LLInventoryModel::INCLUDE_TRASH);
-        count += items.size() + cats.size();
-        selected_items.push_back(item_id);
+        LLInventoryObject* obj = gInventory.getObject(item_id);
+        if (obj->getParentUUID() == trash_id)
+        {
+            LLInventoryModel::cat_array_t cats;
+            LLInventoryModel::item_array_t items;
+            gInventory.collectDescendents(item_id, cats, items, LLInventoryModel::INCLUDE_TRASH);
+            count += items.size() + cats.size();
+            selected_items.push_back(item_id);
+        }
     }
     args["COUNT"] = static_cast<S32>(count);
     LLNotificationsUtil::add("PurgeSelectedItems", args, LLSD(), boost::bind(callbackPurgeSelectedItems, _1, _2, selected_items));
@@ -1976,7 +2043,7 @@ LLInventoryPanel* LLInventoryPanel::getActiveInventoryPanel(bool auto_open)
     LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end(); ++iter)
     {
-        LLFloaterSidePanelContainer* inventory_floater = dynamic_cast<LLFloaterSidePanelContainer*>(*iter);
+        LLFloaterSidePanelContainer* inventory_floater = (*iter)->as<LLFloaterSidePanelContainer>();
         inventory_panel = inventory_floater->findChild<LLSidepanelInventory>("main_panel");
 
         if (inventory_floater && inventory_panel && inventory_floater->getVisible())
@@ -2099,7 +2166,7 @@ void LLInventoryPanel::setSFViewAndOpenFolder(const LLInventoryPanel* panel, con
     LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end(); ++iter)
     {
-        LLFloaterSidePanelContainer* inventory_floater = dynamic_cast<LLFloaterSidePanelContainer*>(*iter);
+        LLFloaterSidePanelContainer* inventory_floater = (*iter)->as<LLFloaterSidePanelContainer>();
         LLSidepanelInventory* sidepanel_inventory = inventory_floater->findChild<LLSidepanelInventory>("main_panel");
 
         LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();
@@ -2154,8 +2221,7 @@ LLFolderViewItem* LLInventoryPanel::getItemByID(const LLUUID& id)
 {
     LL_PROFILE_ZONE_SCOPED;
 
-    std::map<LLUUID, LLFolderViewItem*>::iterator map_it;
-    map_it = mItemMap.find(id);
+    auto map_it = mItemMap.find(id);
     if (map_it != mItemMap.end())
     {
         return map_it->second;
@@ -2167,7 +2233,7 @@ LLFolderViewItem* LLInventoryPanel::getItemByID(const LLUUID& id)
 LLFolderViewFolder* LLInventoryPanel::getFolderByID(const LLUUID& id)
 {
     LLFolderViewItem* item = getItemByID(id);
-    return dynamic_cast<LLFolderViewFolder*>(item);
+    return ALViewType::as<LLFolderViewFolder>(item);
 }
 
 
@@ -2293,9 +2359,10 @@ bool LLInventoryPanel::isSelectionRemovable()
 /* Recent Inventory Panel related class                                 */
 /************************************************************************/
 static const LLRecentInventoryBridgeBuilder RECENT_ITEMS_BUILDER;
-class LLInventoryRecentItemsPanel : public LLInventoryPanel
+class LLInventoryRecentItemsPanel final : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLInventoryRecentItemsPanel, LLInventoryPanel);
     struct Params : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {};
 
@@ -2324,9 +2391,10 @@ LLInventoryRecentItemsPanel::LLInventoryRecentItemsPanel( const Params& params)
 /* Favorites Inventory Panel related class                              */
 /************************************************************************/
 static const LLFavoritesInventoryBridgeBuilder FAVORITES_BUILDER;
-class LLInventoryFavoritesItemsPanel : public LLInventoryPanel
+class LLInventoryFavoritesItemsPanel final : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLInventoryFavoritesItemsPanel, LLInventoryPanel);
     struct Params : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {};
 
@@ -2797,7 +2865,7 @@ void LLInventorySingleFolderPanel::updateSingleFolderRoot()
             mFolderRoot.get()->setFollowsAll();
             mFolderRoot.get()->addChild(mFolderRoot.get()->mStatusTextBox);
 
-            if (!mSelectionCallback.empty())
+            if (mSelectionCallback != nullptr)
             {
                 mFolderRoot.get()->setSelectCallback(mSelectionCallback);
             }

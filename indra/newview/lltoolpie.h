@@ -50,8 +50,8 @@ public:
     virtual bool        handleHover(S32 x, S32 y, MASK mask) override;
     virtual bool        handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool                handleScrollWheelAny(S32 x, S32 y, S32 clicks_x, S32 clicks_y);
-    virtual bool        handleScrollWheel(S32 x, S32 y, S32 clicks) override;
-    virtual bool        handleScrollHWheel(S32 x, S32 y, S32 clicks) override;
+    virtual bool        handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    virtual bool        handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
     virtual bool        handleToolTip(S32 x, S32 y, MASK mask) override;
 
     virtual void        render() override;

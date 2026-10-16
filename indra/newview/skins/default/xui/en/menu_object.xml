@@ -23,6 +23,22 @@
         function="EnableEdit"/>
   </menu_item_call>
   <menu_item_call
+      label="Play Local Animation..."
+      name="PlayLocalAnim">
+    <menu_item_call.on_click
+        function="Object.PlayLocalAnim" />
+    <menu_item_call.on_visible
+        function="Object.EnablePlayLocalAnim" />
+  </menu_item_call>
+  <menu_item_call
+      label="Stop Local Animation"
+      name="StopLocalAnim">
+    <menu_item_call.on_click
+        function="Object.StopLocalAnim" />
+    <menu_item_call.on_visible
+        function="Object.EnablePlayLocalAnim" />
+  </menu_item_call>
+  <menu_item_call
       label="Edit PBR material"
       name="EditGLTFMaterial">
     <menu_item_call.on_click
@@ -77,7 +93,7 @@
       </menu_item_call>
       <menu_item_separator layout="topleft" />
 	  <menu_item_call
-		  label="Recompile Scripts (Mono)"
+		  label="Recompile Scripts as LSL (Mono)"
 		  name="Mono">
 		  <menu_item_call.on_click
 			  function="Tools.SelectedScriptAction"
@@ -86,7 +102,7 @@
 			  function="EditableSelectedMono" />
 	  </menu_item_call>
 	  <menu_item_call
-		  label="Recompile Scripts (LSL)"
+		  label="Recompile Scripts as LSL (LSO)"
 		  name="LSL">
 		  <menu_item_call.on_click
 			  function="Tools.SelectedScriptAction"
@@ -270,7 +286,7 @@
         <menu_item_call.on_visible
           function="Object.EnableUnmute" />
     </menu_item_call>
-   <menu_item_call
+    <menu_item_call
       label="Session Derender"
       name="Object Session Derender">
          <menu_item_call.on_click

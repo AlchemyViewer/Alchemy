@@ -187,8 +187,15 @@ void LLMD5::finalize()
     }
 
     // Save number of bits.
-    // Treat count, a uint64_t, as uint32_t[2].
-    encode(bits, reinterpret_cast<uint32_t*>(&count), 8);
+    // Split count into two little-endian 32-bit halves explicitly; the
+    // earlier reinterpret_cast<uint32_t*>(&count) trick aliased a uint64_t
+    // as uint32_t[2] which is strict-aliasing UB (and got the wrong order
+    // on big-endian hosts).
+    const uint32_t count_words[2] = {
+        static_cast<uint32_t>(count),
+        static_cast<uint32_t>(count >> 32),
+    };
+    encode(bits, count_words, 8);
 
     // Pad out to 56 mod 64.
     index  = size_t((count >> 3) & 0x3f);
@@ -255,13 +262,15 @@ void LLMD5::raw_digest(unsigned char* s) const
     memcpy(s, digest, 16); /* Flawfinder: ignore */
 }
 
-#if LL_DARWIN
+#if LL_CLANG
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
 void LLMD5::hex_digest(char* s) const
 {
+    if(!s) return;
+
     if (!finalized)
     {
         std::cerr << "LLMD5::hex_digest:  Can't get digest if you haven't "
@@ -278,7 +287,7 @@ void LLMD5::hex_digest(char* s) const
     s[32] = '\0';
 }
 
-#if LL_DARWIN
+#if LL_CLANG
 #pragma clang diagnostic pop
 #endif
 

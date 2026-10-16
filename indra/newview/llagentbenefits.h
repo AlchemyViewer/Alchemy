@@ -57,7 +57,7 @@ public:
     S32 getTextureUploadCost(S32 w, S32 h) const;
     S32 get2KTextureUploadCost(S32 area) const;
 
-    bool findUploadCost(LLAssetType::EType& asset_type, S32& cost) const;
+    bool findUploadCost(const LLAssetType::EType& asset_type, S32& cost) const;
 
 private:
     S32 m_animated_object_limit;

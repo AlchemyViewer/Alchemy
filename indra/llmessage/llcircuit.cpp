@@ -71,8 +71,8 @@ LLCircuitData::LLCircuitData(const LLHost &host, TPACKETID in_id,
     mPacketsOutID(0),
     mPacketsInID(in_id),
     mHighestPacketID(in_id),
-    mTimeoutCallback(NULL),
-    mTimeoutUserData(NULL),
+    mTimeoutCallback(nullptr),
+    mTimeoutUserData(nullptr),
     mTrusted(false),
     mbAllowTimeout(true),
     mbAlive(true),
@@ -346,8 +346,7 @@ S32 LLCircuitData::resendUnackedPackets(const F64Seconds now)
 
             packetp->mBuffer[0] |= LL_RESENT_FLAG;  // tag packet id as being a resend
 
-            gMessageSystem->mPacketRing.sendPacket(packetp->mSocket,
-                                               (char *)packetp->mBuffer, packetp->mBufferLength,
+            gMessageSystem->sendPacketToSocket((char *)packetp->mBuffer, packetp->mBufferLength,
                                                packetp->mHost);
 
             mThrottles.throttleOverflow(TC_RESEND, packetp->mBufferLength * 8.f);
@@ -729,7 +728,10 @@ void LLCircuitData::checkPacketInID(TPACKETID id, bool receive_resent)
             U64Microseconds time = LLMessageSystem::getMessageTimeUsecs();
             TPACKETID index = mPacketsInID;
             S32 gap_count = 0;
-            if ((index < id) && ((id - index) < 16))
+            // Modular forward distance, so a small gap that spans the 24-bit
+            // packet-id wrap fills in normally; a genuinely old id yields a
+            // huge forward distance and still takes the out-of-order path.
+            if (LLModularMath::subtract<width>(id, index) < 16)
             {
                 while (index != id)
                 {
@@ -953,7 +955,7 @@ bool LLCircuitData::updateWatchDogTimers(LLMessageSystem *msgsys)
     // Send off the another ping.
     pingTimerStart();
     msgsys->newMessageFast(_PREHASH_StartPingCheck);
-    msgsys->nextBlock(_PREHASH_PingID);
+    msgsys->nextBlockFast(_PREHASH_PingID);
     msgsys->addU8Fast(_PREHASH_PingID, nextPingID());
     msgsys->addU32Fast(_PREHASH_OldestUnacked, packet_id);
     msgsys->sendMessage(mHost);
@@ -973,7 +975,7 @@ bool LLCircuitData::updateWatchDogTimers(LLMessageSystem *msgsys)
         {
             // let's call this one a loss!
             mPacketsLost++;
-            gMessageSystem->mDroppedPackets++;
+            gMessageSystem->mLostPackets++;
             if(gMessageSystem->mVerboseLog)
             {
                 std::ostringstream str;
@@ -1096,7 +1098,7 @@ void LLCircuit::sendAcks(F32 collect_time)
         circuit_data_map::iterator cur_it = it++;
         cd = (*cur_it).second;
         S32 count = (S32)cd->mAcks.size();
-        F32 age = cd->getAgeInSeconds() - cd->mAckCreationTime;
+        F32 age = (F32)(cd->getAgeInSeconds() - cd->mAckCreationTime);
         if (age > collect_time || count == 0)
         {
             if (count>0)
@@ -1274,6 +1276,7 @@ void LLCircuitData::pingTimerStop(const U8 ping_id)
         // Ack, we got our ping response on the same frame! Sigh, let's get a real time otherwise
         // all of our ping calculations will be skewed.
         mt_secs = LLMessageSystem::getMessageTimeSeconds(true);
+        time = mt_secs - mPingTime;
     }
     mLastPingReceivedTime = mt_secs;
 
@@ -1413,9 +1416,9 @@ void LLCircuitData::setTrusted(bool t)
     mTrusted = t;
 }
 
-F32 LLCircuitData::getAgeInSeconds() const
+F64 LLCircuitData::getAgeInSeconds() const
 {
-    return mExistenceTimer.getElapsedTimeF32();
+    return mExistenceTimer.getElapsedTimeF64();
 }
 
 std::vector<LLCircuitData*> LLCircuit::getCircuitDataList() const

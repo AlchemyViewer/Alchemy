@@ -31,6 +31,7 @@
 #include "llpanel.h"
 #include "llpointer.h"
 #include "llvolume.h"
+#include "lltextureentry.h"
 
 class LLSpinCtrl;
 class LLCheckBoxCtrl;
@@ -45,17 +46,19 @@ class LLTextureCtrl;
 class LLInventoryItem;
 class LLUUID;
 
-class LLPanelObject : public LLPanel
+class LLPanelObject final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelObject, LLPanel);
+
     LLPanelObject();
     virtual ~LLPanelObject();
 
-    virtual bool    postBuild();
-    virtual void    draw();
-    virtual void    clearCtrls();
+    virtual bool    postBuild() override;
+    virtual void    draw() override;
+    virtual void    clearCtrls() override;
 
-    void            refresh();
+    void            refresh() override;
 
     static bool     precommitValidate(const LLSD& data);
 
@@ -77,6 +80,17 @@ public:
     void            onPasteParams();
     static void     onCommitParametric(LLUICtrl* ctrl, void* userdata);
 
+    void            onClickPipettePos();
+    void            onClickPipetteSize();
+    void            onClickPipetteRot();
+    void            onClickPipetteParams();
+
+protected:
+    void onPosSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+    void onSizeSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+    void onRotSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+    void onParamsSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+public:
 
     void            onCommitSculpt(const LLSD& data);
     void            onCancelSculpt(const LLSD& data);
@@ -144,20 +158,17 @@ protected:
     LLTextBox*      mLabelRevolutions;
     LLSpinCtrl*     mSpinRevolutions;
 
-    LLMenuButton*   mMenuClipboardPos;
     LLTextBox*      mLabelPosition;
     LLSpinCtrl*     mCtrlPosX;
     LLSpinCtrl*     mCtrlPosY;
     LLSpinCtrl*     mCtrlPosZ;
 
-    LLMenuButton*   mMenuClipboardSize;
     LLTextBox*      mLabelSize;
     LLSpinCtrl*     mCtrlScaleX;
     LLSpinCtrl*     mCtrlScaleY;
     LLSpinCtrl*     mCtrlScaleZ;
     bool            mSizeChanged;
 
-    LLMenuButton*   mMenuClipboardRot;
     LLTextBox*      mLabelRotation;
     LLSpinCtrl*     mCtrlRotX;
     LLSpinCtrl*     mCtrlRotY;
@@ -173,6 +184,19 @@ protected:
     LLComboBox      *mCtrlSculptType;
     LLCheckBoxCtrl  *mCtrlSculptMirror;
     LLCheckBoxCtrl  *mCtrlSculptInvert;
+
+    LLButton        *mBtnCopyPosition = nullptr;
+    LLButton        *mBtnPastePosition = nullptr;
+    LLButton        *mBtnPipettePosition = nullptr;
+    LLButton        *mBtnCopySize = nullptr;
+    LLButton        *mBtnPasteSize = nullptr;
+    LLButton        *mBtnPipetteSize = nullptr;
+    LLButton        *mBtnCopyRotation = nullptr;
+    LLButton        *mBtnPasteRotation = nullptr;
+    LLButton        *mBtnPipetteRotation = nullptr;
+    LLButton        *mBtnCopyPrimParams = nullptr;
+    LLButton        *mBtnPastePrimParams = nullptr;
+    LLButton        *mBtnPipettePrimParams = nullptr;
 
     LLVector3       mCurEulerDegrees;       // to avoid sending rotation when not changed
     bool            mIsPhysical;            // to avoid sending "physical" when not changed

@@ -32,6 +32,8 @@
 #include "llgl.h"
 #include "llrender.h"
 
+#include <array>
+
 /*
  Wrapper around OpenGL framebuffer objects for use in render-to-texture
 
@@ -42,7 +44,7 @@
     ...
 
     //allocate a 256x256 RGBA render target with depth buffer
-    target.allocate(256,256,GL_RGBA,TRUE);
+    target.allocate(256,256,GL_RGBA,true);
 
     //render to contents of offscreen buffer
     target.bindTarget();
@@ -53,7 +55,7 @@
     ...
 
     //use target as a texture
-    gGL.getTexUnit(INDEX)->bind(&target);
+    gGL.getTextureSlot(INDEX)->bind(&target);
     ... <issue drawing commands> ...
 
 */
@@ -68,6 +70,24 @@ public:
     static U32 sCurResX;
     static U32 sCurResY;
 
+    // Format options for the depth buffer.
+    // Combined depth+stencil is selected automatically when stencil is requested.
+    enum eDepthFormat : U32
+    {
+        DEPTH_FMT_24 = 0,   // GL_DEPTH_COMPONENT24 / GL_DEPTH24_STENCIL8
+        DEPTH_FMT_32F,      // GL_DEPTH_COMPONENT32F / GL_DEPTH32F_STENCIL8
+    };
+
+    // Whether this target's colour attachments carry a mip chain, and who fills it.
+    //
+    // Lived on the texture-unit class as eTextureMipGeneration, where it had nothing to do
+    // with binding and no other consumer. It is an allocation policy for a render target.
+    enum eMipGeneration : U32
+    {
+        MIPS_NONE = 0,      // Single level. Attachments are not mipmapped.
+        MIPS_AUTO,          // Levels allocated, and regenerated on flush().
+        MIPS_MANUAL,        // Levels allocated; the owner regenerates them when it chooses.
+    };
 
     LLRenderTarget();
     ~LLRenderTarget();
@@ -79,8 +99,10 @@ public:
     // resY - height
     // color_fmt - GL color format (e.g. GL_RGB)
     // depth - if true, allocate a depth buffer
+    // stencil - if true, allocate a combined depth+stencil buffer (requires depth)
     // usage - deprecated, should always be TT_TEXTURE
-    bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, LLTexUnit::eTextureType usage = LLTexUnit::TT_TEXTURE, LLTexUnit::eTextureMipGeneration generateMipMaps = LLTexUnit::TMG_NONE);
+    // depth_fmt - bit depth for the depth component (ignored unless depth is true)
+    bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, bool stencil = false, ALTextureSlot::eTextureType usage = ALTextureSlot::TT_TEXTURE, eMipGeneration generateMipMaps = MIPS_NONE, eDepthFormat depth_fmt = DEPTH_FMT_24);
 
     //resize existing attachments to use new resolution and color format
     // CAUTION: if the GL runs out of memory attempting to resize, this render target will be undefined
@@ -131,10 +153,31 @@ public:
     //clear render targer, clears depth buffer if present,
     //uses scissor rect if in copy-to-texture mode
     // asserts that this target is currently bound
+    // An integer colour attachment clears to the clear colour's components rounded to integers, each held to what a
+    // 32-bit integer of the attachment's sign can hold: a negative one clears an unsigned attachment to 0.
     void clear(U32 mask = 0xFFFFFFFF);
 
     //get applied viewport
     void getViewport(S32* viewport);
+
+    // Restrict draw output to the first `count` colour attachments; 0 restores all of them.
+    // Asserts that this target is currently bound.
+    //
+    // A fragment shader that declares a single output leaves every OTHER attachment of the
+    // bound FBO undefined, and with blending enabled the driver mixes that undefined value
+    // into targets the pass never meant to touch. Narrowing is how a multi-attachment target
+    // hosts a single-output pass -- the impostor bake runs the forward alpha passes into its
+    // own G-buffer, so without this its normal and ORM attachments are corrupted wherever
+    // blended geometry drew, and those are what light the billboard afterwards.
+    void setDrawBuffers(U32 count = 0);
+
+    // Take the fragment shader's output `output` (frag_data[output]) into the first colour attachment and
+    // discard every other output. Asserts that this target is currently bound and has a colour attachment;
+    // the next bindTarget restores the one-to-one mapping.
+    //
+    // How a single-attachment target hosts a pass written for a G-buffer: the sky writes its colour to the
+    // emissive output, frag_data[3], when that buffer is on, and mSkyBehind keeps only that colour.
+    void setDrawOutput(U32 output);
 
     //get X resolution
     U32 getWidth() const { return mResX; }
@@ -142,14 +185,44 @@ public:
     //get Y resolution
     U32 getHeight() const { return mResY; }
 
-    LLTexUnit::eTextureType getUsage(void) const { return mUsage; }
+    ALTextureSlot::eTextureType getUsage(void) const { return mUsage; }
 
     U32 getTexture(U32 attachment = 0) const;
     U32 getNumTextures() const;
+    // The sized internal format the attachment was allocated with, or the attached image's for the texture
+    // setColorAttachment lent it; 0 for no such attachment.
+    U32 getInternalFormat(U32 attachment = 0) const;
 
     U32 getDepth(void) const { return mDepth; }
+    bool hasStencil() const { return mStencil; }
+    eDepthFormat getDepthFormat() const { return mDepthFormat; }
 
-    void bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilterOptions filter_options = LLTexUnit::TFO_BILINEAR);
+    // The sampler a caller gets when it does not name one.
+    //
+    // These reproduce, as sampler objects, the filter and wrap state that allocation used to
+    // write onto the texture objects themselves -- bilinear for attachment 0, point for the
+    // data attachments behind it, mirrored repeat except on rectangle textures, and point
+    // with plain repeat for depth -- and point for an integer attachment wherever it is, the
+    // only filter GL reads integers through. That state was the last texture-object sampling state left
+    // in the engine, and it stayed only because ALTextureSlot::bind(LLRenderTarget*) defaults its
+    // sampler to 0, meaning "sample through whatever the texture object carries".
+    //
+    // Answering the question here rather than at those call sites keeps the defaults in one
+    // place, next to the allocation that used to establish them. A caller that wants
+    // something else still passes its own sampler, or uses bindTexture.
+    U32 getDefaultColorSampler(U32 attachment = 0) const;
+    U32 getDefaultDepthSampler() const;
+
+    // Bind an attachment for sampling.
+    //
+    // The key selects an immutable sampler object rather than writing state onto the
+    // texture, so two passes can sample the same attachment differently in one frame --
+    // which the post-process chain does constantly.
+    //
+    // An unnamed key resolves through getDefaultColorSampler for THIS attachment --
+    // bilinear for 0, point for the data attachments and an integer one -- rather than a flat
+    // constant that would quietly answer the question differently from the policy function.
+    void bindTexture(U32 index, S32 channel, ALSampler key = ALSamplers::TargetDefault);
 
     //flush rendering operations
     //must be called when rendering is complete
@@ -158,6 +231,17 @@ public:
     // If an LLRenderTarget was bound when bindTarget was called, binds that RenderTarget for rendering (maintains RT stack)
     // asserts  that this target is currently bound
     void flush();
+
+    void copyContents(LLRenderTarget& source, S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0, S32 dstX1, S32 dstY1,
+                      U32 mask, U32 filter);
+
+    static void copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0,
+                                          S32 dstX1, S32 dstY1, U32 mask, U32 filter);
+
+    // Copies the colour of the rect srcX0..srcX1, srcY0..srcY1 of the framebuffer bound now (the window's where no
+    // target is) into this target's rect dstX0..dstX1, dstY0..dstY1, scaled with `filter`, GL_NEAREST or GL_LINEAR.
+    // The scissor does not clip it, and what is bound stays bound.
+    void copyFromBound(S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0, S32 dstX1, S32 dstY1, U32 filter);
 
     //Returns TRUE if target is ready to be rendered into.
     //That is, if the target has been allocated with at least
@@ -179,15 +263,27 @@ protected:
     U32 mResY;
     std::vector<U32> mTex;
     std::vector<U32> mInternalFormat;
+    // The format of the texture setColorAttachment attached, which this target does not own and so keeps out of
+    // mInternalFormat; 0 otherwise.
+    U32 mExternalFormat = 0;
     U32 mFBO;
     LLRenderTarget* mPreviousRT = nullptr;
 
     U32 mDepth;
     bool mUseDepth;
-    LLTexUnit::eTextureMipGeneration mGenerateMipMaps;
+    bool mStencil;
+    eDepthFormat mDepthFormat;
+    eMipGeneration mGenerateMipMaps;
     U32 mMipLevels;
 
-    LLTexUnit::eTextureType mUsage;
+    ALTextureSlot::eTextureType mUsage;
+
+    // The colour attachment each draw buffer writes, -1 for none, as bindTarget, setDrawBuffers and setDrawOutput
+    // last set them: the buffers clearColorBuffers clears, one at a time.
+    std::array<S8, 4> mDrawBuffers = { -1, -1, -1, -1 };
+
+    // Clear each colour draw buffer to the clear colour by the call its attachment's kind takes, float or integer.
+    void clearColorBuffers();
 };
 
 #endif

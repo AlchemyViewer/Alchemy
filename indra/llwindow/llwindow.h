@@ -38,9 +38,16 @@ class LLSplashScreen;
 class LLPreeditor;
 class LLWindowCallbacks;
 
+// Result of an OS font-fallback query; empty mPath means no font was found.
+struct LLFontFallbackMatch
+{
+    std::string mPath;
+    S32 mFaceIndex = 0;
+};
+
 // Refer to llwindow_test in test/common/llwindow for usage example
 
-class LLWindow : public LLInstanceTracker<LLWindow>
+class LLWindow
 {
 public:
 
@@ -69,9 +76,14 @@ public:
     virtual bool maximize() = 0;
     virtual void minimize() = 0;
     virtual void restore() = 0;
-    virtual bool getFullscreen() = 0;
+    bool getFullscreen()    { return mFullscreen; };
     virtual bool getPosition(LLCoordScreen *position) = 0;
+
+    // Returns the platform-defined window size in physical (backing) pixels.
+    // On macOS: backing content view size (excludes title bar).
+    // On Windows: outer window frame size (includes title bar and borders).
     virtual bool getSize(LLCoordScreen *size) = 0;
+
     virtual bool getSize(LLCoordWindow *size) = 0;
     virtual bool setPosition(LLCoordScreen position) = 0;
     bool setSize(LLCoordScreen size);
@@ -92,9 +104,43 @@ public:
 
     virtual bool setCursorPosition(LLCoordWindow position) = 0;
     virtual bool getCursorPosition(LLCoordWindow *position) = 0;
-#if LL_WINDOWS && !LL_SDL_WINDOW
+#if LL_WINDOWS || LL_SDL_WINDOW
+    // Return the cumulative mouse motion delta in PIXELS since the previous
+    // call, then reset the accumulator to zero. Backends should accumulate
+    // event-level relative motion (Win32 raw input, SDL3 event.motion.xrel/yrel)
+    // so per-frame delta queries stay accurate at high frame rates, where the
+    // per-frame change in absolute position can be sub-pixel and round to
+    // zero. Returns true if delta was populated.
     virtual bool getCursorDelta(LLCoordCommon* delta) = 0;
 #endif
+    virtual bool isWrapMouse() const = 0;
+
+    // True when the user's current modifier state is AltGr (Right-Alt acting
+    // as a level-3 chooser) rather than plain Alt. On layouts that use AltGr
+    // for character composition (€/Å/Ø/ñ/etc. on European keyboards), an
+    // AltGr-modified key delivers its composed character via the text-input
+    // channel; the viewer should NOT also fire its Alt-bound in-world action
+    // for the underlying letter. Default false — Win32 and SDL3 override.
+    virtual bool isAltGrPressed() const { return false; }
+
+    // Pointer-device state for tools that care about pen / stylus / touch
+    // metadata richer than a mouse can provide. The default implementations
+    // model a regular mouse (always full pressure, no tilt, no eraser tip),
+    // so tools that don't opt into these queries continue to work unchanged.
+    //
+    // SDL3 populates these from SDL_EVENT_PEN_AXIS / FINGER_* events while
+    // also keeping the mouse-emulation event stream that the viewer's
+    // input plumbing already consumes (LLWindowSDL handles this).
+    //
+    // The pressure value is normalised [0, 1]. Tilt is in degrees, range
+    // [-90, 90] per axis. isPointerEraserTip distinguishes the eraser end
+    // of a stylus from the writing tip (most graphics tablets surface this).
+    virtual F32 getPointerPressure() const { return 1.f; }
+    virtual F32 getPointerTiltX() const { return 0.f; }
+    virtual F32 getPointerTiltY() const { return 0.f; }
+    virtual bool isPointerEraserTip() const { return false; }
+    virtual bool isPointerPenActive() const { return false; }
+
     virtual void showCursor() = 0;
     virtual void hideCursor() = 0;
     virtual bool isCursorHidden() = 0;
@@ -127,12 +173,12 @@ public:
     virtual void setMouseClipping( bool b ) = 0;
 
     virtual bool isClipboardTextAvailable() = 0;
-    virtual bool pasteTextFromClipboard(LLWString &dst) = 0;
-    virtual bool copyTextToClipboard(const LLWString &src) = 0;
+    virtual bool pasteTextFromClipboard(std::string &dst) = 0;
+    virtual bool copyTextToClipboard(const std::string &src) = 0;
 
     virtual bool isPrimaryTextAvailable();
-    virtual bool pasteTextFromPrimary(LLWString &dst);
-    virtual bool copyTextToPrimary(const LLWString &src);
+    virtual bool pasteTextFromPrimary(std::string &dst);
+    virtual bool copyTextToPrimary(const std::string &src);
 
     virtual void flashIcon(F32 seconds) = 0;
     virtual F32 getGamma() = 0;
@@ -170,8 +216,14 @@ public:
     // Returns true if valid color selected
     virtual bool dialogColorPicker(F32 *r, F32 *g, F32 *b);
 
-// return a platform-specific window reference (HWND on Windows, (__unsafe_unretained) NSWindow on the Mac, Gtk window on Linux)
+// return a platform-specific window reference (HWND on Windows, WindowRef on the Mac, Gtk window on Linux)
     virtual void *getPlatformWindow() = 0;
+
+    // Lowercase name of the display server / windowing backend in use
+    // ("wayland" or "x11" on Linux/SDL). Empty when not applicable or unknown.
+    // Lets out-of-process children (e.g. the CEF media plugin) pin their backend
+    // to the viewer's instead of guessing from their own environment.
+    virtual std::string getDisplayServer() const { return {}; }
 
     // control platform's Language Text Input mechanisms.
     virtual void allowLanguageTextInput(LLPreeditor *preeditor, bool b) {}
@@ -181,6 +233,9 @@ public:
     virtual void spawnWebBrowser(const std::string& escaped_url, bool async) {};
 
     static std::vector<std::string> getDynamicFallbackFontList();
+
+    // Ask the OS for a font file covering the given codepoint (lazy fallback).
+    static LLFontFallbackMatch findFallbackFontForChar(llwchar wch);
 
     // Provide native key event data
     virtual LLSD getNativeKeyData() { return LLSD::emptyMap(); }
@@ -201,6 +256,8 @@ public:
     };
 
     virtual S32 getRefreshRate() { return mRefreshRate; }
+
+    virtual void initWatchdog() {} // windows runs window as a thread and it needs a watchdog
 protected:
     LLWindow(LLWindowCallbacks* callbacks, bool fullscreen, U32 flags);
     virtual ~LLWindow();
@@ -288,6 +345,14 @@ constexpr S32 OSBTN_NO = 1;
 constexpr S32 OSBTN_OK = 2;
 constexpr S32 OSBTN_CANCEL = 3;
 
+// Which window LLWindowManager makes.
+enum class ALWindowBackend
+{
+    Native,     // the platform's window: LLWindowWin32 or LLWindowSDL
+    Hidden,     // ALWindowSDLHeadless: an SDL window never shown, with a GL context on it
+    None,       // LLWindowHeadless: no window and no GL
+};
+
 //
 // LLWindowManager
 // Manages window creation and error checking
@@ -302,18 +367,28 @@ public:
         bool fullscreen = false,
         bool clearBg = false,
         bool enable_vsync = false,
-        bool use_gl = true,
+        ALWindowBackend backend = ALWindowBackend::Native,
         bool ignore_pixel_depth = false,
         U32 fsaa_samples = 0,
         U32 max_cores = 0,
         F32 max_gl_version = 4.6f);
     static bool destroyWindow(LLWindow* window);
     static bool isWindowValid(LLWindow *window);
+
+    // The backend of the window most recently asked for, Native until one is.
+    // Set before that window is constructed, so what fails on the way up is
+    // already reported the way the backend wants: a hidden window gets no
+    // message box and no splash.
+    static ALWindowBackend getBackend() { return sBackend; }
+
+private:
+    static ALWindowBackend sBackend;
 };
 
 //
 // helper funcs
 //
+extern LLWindow* gWindowp;
 extern bool gDebugWindowProc;
 
 // Protocols, like "http" and "https" we support in URLs

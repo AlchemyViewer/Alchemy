@@ -59,6 +59,8 @@
 #include "rlvcommon.h"
 // [/RLVa:KB]
 
+//const char* const DEFAULT_DESC = "(No Description)";
+
 class PropertiesChangedCallback : public LLInventoryCallback
 {
 public:
@@ -69,7 +71,7 @@ public:
     void fire(const LLUUID &inv_item)
     {
         // inv_item can be null for some reason
-        LLSidepanelItemInfo* sidepanel = dynamic_cast<LLSidepanelItemInfo*>(mHandle.get());
+        LLSidepanelItemInfo* sidepanel = ALViewType::as<LLSidepanelItemInfo>(mHandle.get());
         if (sidepanel)
         {
             // sidepanel waits only for most recent update
@@ -130,8 +132,9 @@ LLSidepanelItemInfo::LLSidepanelItemInfo(const LLPanel::Params& p)
     , mObjectInventoryObserver(NULL)
     , mUpdatePendingId(-1)
     , mIsDirty(false) /*Not ready*/
-    , mParentFloater(NULL)
-    , mLabelItemDesc(NULL)
+    , mParentFloater(nullptr)
+    , mLabelItemDescMultiLine(nullptr)
+    , mLabelItemDescSingleLine(nullptr)
 {
     gInventory.addObserver(this);
     gIdleCallbacks.addFunction(&LLSidepanelItemInfo::onIdle, (void*)this);
@@ -162,11 +165,14 @@ bool LLSidepanelItemInfo::postBuild()
     mItemTypeIcon = getChild<LLIconCtrl>("item_type_icon");
     mLabelOwnerName = getChild<LLTextBox>("LabelOwnerName");
     mLabelCreatorName = getChild<LLTextBox>("LabelCreatorName");
-    mLabelItemDesc = getChild<LLTextEditor>("LabelItemDesc");
+    mLabelItemDescMultiLine = getChild<LLTextEditor>("LabelItemDescMultiLine");
+    mLabelItemDescSingleLine = getChild<LLLineEditor>("LabelItemDescSingleLine");
 
     getChild<LLLineEditor>("LabelItemName")->setPrevalidate(&LLTextValidate::validateASCIIPrintableNoPipe);
     getChild<LLUICtrl>("LabelItemName")->setCommitCallback(boost::bind(&LLSidepanelItemInfo::onCommitName,this));
-    mLabelItemDesc->setCommitCallback(boost::bind(&LLSidepanelItemInfo:: onCommitDescription, this));
+    mLabelItemDescMultiLine->setCommitCallback(boost::bind(&LLSidepanelItemInfo::onCommitDescription, this));
+    mLabelItemDescSingleLine->setCommitCallback(boost::bind(&LLSidepanelItemInfo::onCommitDescription, this));
+
     // Thumnail edition
     mChangeThumbnailBtn->setCommitCallback(boost::bind(&LLSidepanelItemInfo::onEditThumbnail, this));
     // acquired date
@@ -347,9 +353,16 @@ void LLSidepanelItemInfo::refreshFromItem(LLViewerInventoryItem* item)
     getChildView("LabelItemName")->setEnabled(is_modifiable && !is_calling_card); // for now, don't allow rename of calling cards
     getChild<LLUICtrl>("LabelItemName")->setValue(item->getName());
     getChildView("LabelItemDescTitle")->setEnabled(true);
-    getChildView("LabelItemDesc")->setEnabled(is_modifiable);
-    getChild<LLUICtrl>("LabelItemDesc")->setValue(item->getDescription());
     getChild<LLUICtrl>("item_thumbnail")->setValue(item->getThumbnailUUID());
+
+    // Rezzable objects do not support multiline descriptions.
+    const bool is_object = item->getInventoryType() == LLInventoryType::IT_OBJECT;
+    mLabelItemDescMultiLine->setEnabled(!is_object && is_modifiable);
+    mLabelItemDescSingleLine->setEnabled(is_object && is_modifiable);
+    mLabelItemDescMultiLine->setValue(item->getDescription());
+    mLabelItemDescSingleLine->setValue(item->getDescription());
+    mLabelItemDescMultiLine->setVisible(!is_object);
+    mLabelItemDescSingleLine->setVisible(is_object);
 
     LLUIImagePtr icon_img = LLInventoryIcon::getIcon(item->getType(), item->getInventoryType(), item->getFlags(), false);
     mItemTypeIcon->setImage(icon_img);
@@ -428,7 +441,6 @@ void LLSidepanelItemInfo::refreshFromItem(LLViewerInventoryItem* item)
     ////////////////
     if(perm.isOwned())
     {
-// RYETODO FIXRLVA
 // [RLVa:KB] - Checked: RVLa-2.0.1
         bool fRlvCanShowOwner = true;
 // [/RLVa:KB]
@@ -524,7 +536,8 @@ void LLSidepanelItemInfo::refreshFromItem(LLViewerInventoryItem* item)
     }
     else
     {
-        std::string timeStr = getString("acquiredDate");
+        static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+        std::string timeStr = use_24h ? getString("acquiredDate") : getString("acquiredDateAMPM");
         LLSD substitution;
         substitution["datetime"] = (S32) time_utc;
         LLStringUtil::format (timeStr, substitution);
@@ -991,7 +1004,7 @@ void LLSidepanelItemInfo::onCommitDescription()
     LLViewerInventoryItem* item = findItem();
     if(!item) return;
 
-    if(!mLabelItemDesc)
+    if (!mLabelItemDescMultiLine) // either both are set or none, so just check one
     {
         return;
     }
@@ -1000,10 +1013,18 @@ void LLSidepanelItemInfo::onCommitDescription()
         return;
     }
     std::string old_desc = item->getDescription();
-    std::string new_desc = mLabelItemDesc->getText();
+    std::string new_desc;
+    if (mLabelItemDescMultiLine->getVisible())
+    {
+        new_desc = mLabelItemDescMultiLine->getText();
+    }
+    else
+    {
+        new_desc = mLabelItemDescSingleLine->getText();
+    }
     if(old_desc != new_desc)
     {
-        mLabelItemDesc->setSelectAllOnFocusReceived(false);
+        mLabelItemDescMultiLine->setSelectAllOnFocusReceived(false);
         LLPointer<LLViewerInventoryItem> new_item = new LLViewerInventoryItem(item);
 
         new_item->setDescription(new_desc);
@@ -1260,13 +1281,4 @@ LLViewerInventoryItem* LLSidepanelItemInfo::findItem() const
         }
     }
     return item;
-}
-
-// virtual
-void LLSidepanelItemInfo::save()
-{
-    onCommitName();
-    onCommitDescription();
-    updatePermissions();
-    updateSaleInfo();
 }

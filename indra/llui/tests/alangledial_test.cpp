@@ -1,0 +1,123 @@
+/**
+ * @file alangledial_test.cpp
+ * @brief ALAngleDial: a direction turned by dragging, and a drag that ends when the mouse is taken away
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "alangledial.h"
+
+#include "../llfocusmgr.h"
+#include "../llspinctrl.h"
+#include "../lluictrlfactory.h"
+
+#include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <string>
+
+namespace
+{
+    struct alangledial_data
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+        // Focus and capture as the test found them, whatever it leaves
+        // them on.
+        ll_test::FocusScope  focus;
+
+        // 70 tall: the dial is the 66-pixel square at the left, its centre
+        // at (35, 35).
+        static ALAngleDial* dial()
+        {
+            ALAngleDial::Params p(LLUICtrlFactory::getDefaultParams<ALAngleDial>());
+            p.name = "dial";
+            p.rect = LLRect(0, 70, 200, 0);
+            return LLUICtrlFactory::create<ALAngleDial>(p);
+        }
+    };
+
+    // A press turns the dial to the pointer, a drag keeps turning it, and
+    // the release commits once.
+    TEST_CASE_METHOD(alangledial_data, "alangledial: a press and a drag turn the dial and the release commits once", "[alangledial]")
+    {
+        if (!ui.ok())
+        {
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALAngleDial* d = dial();
+        S32 commits = 0;
+        d->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
+
+        d->handleMouseDown(60, 35, MASK_NONE);
+        UNSCOPED_INFO("pressed to the right, it points right");
+        CHECK(d->getValue().asString() == std::string("1 0"));
+        CHECK(d->hasMouseCapture());
+        d->handleHover(35, 60, MASK_NONE);
+        UNSCOPED_INFO("dragged up, it points up");
+        CHECK(d->getValue().asString().ends_with(" 1"));
+        CHECK(commits == 0);
+        d->handleMouseUp(35, 60, MASK_NONE);
+        CHECK(commits == 1);
+        CHECK_FALSE(d->hasMouseCapture());
+        d->die();
+    }
+
+    // The mouse taken away mid-drag ends the drag: the pointer passing over
+    // the dial afterwards, no button held, turns nothing.
+    TEST_CASE_METHOD(alangledial_data, "alangledial: losing mouse capture mid-drag ends the drag", "[alangledial]")
+    {
+        if (!ui.ok())
+        {
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALAngleDial* d = dial();
+        d->handleMouseDown(60, 35, MASK_NONE);
+        gFocusMgr.setMouseCapture(nullptr);
+        d->handleHover(35, 60, MASK_NONE);
+        UNSCOPED_INFO("a hover after the loss turns nothing");
+        CHECK(d->getValue().asString() == std::string("1 0"));
+        d->die();
+    }
+
+    TEST_CASE_METHOD(alangledial_data, "alangledial: degrees typed in the box turn the dial and a set value turns the box", "[alangledial]")
+    {
+        if (!ui.ok())
+        {
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALAngleDial* d       = dial();
+        S32          commits = 0;
+        d->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
+        LLSpinCtrl* degrees = d->getChild<LLSpinCtrl>("degrees");
+        degrees->setValue(LLSD(0.0));
+        degrees->onCommit();
+        UNSCOPED_INFO("typed: it points right");
+        CHECK(d->getValue().asString() == std::string("1 0"));
+        CHECK(commits == 1);
+        d->setValue("0 1");
+        UNSCOPED_INFO("a value pointing up is ninety degrees");
+        CHECK(degrees->getValue().asInteger() == 90);
+        d->die();
+    }
+}

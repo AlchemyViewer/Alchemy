@@ -39,8 +39,8 @@ public:
     LLKeyboardWin32();
     ~LLKeyboardWin32() = default;
 
-    bool    handleKeyUp(const U16 key, MASK mask) override;
-    bool    handleKeyDown(const U16 key, MASK mask) override;
+    bool    handleKeyUp(const LLKeyboard::NATIVE_KEY_TYPE key, MASK mask) override;
+    bool    handleKeyDown(const LLKeyboard::NATIVE_KEY_TYPE key, MASK mask) override;
     void    resetMaskKeys() override;
     MASK    currentMask(bool for_mouse_event) override;
     void    scanKeyboard() override;
@@ -54,6 +54,11 @@ protected:
 private:
     std::map<U16, KEY> mTranslateNumpadMap;
     std::map<KEY, U16> mInvTranslateNumpadMap;
+    // The KEY each physical key resolved to on its key-down, replayed on key-up
+    // so press/release stay symmetric across a mid-press NumLock toggle (which
+    // otherwise changes the numpad VK — VK_NUMPAD2 vs VK_DOWN — and leaves the
+    // down KEY's level stuck). Keyed by NumLock-independent scancode, not VK.
+    std::map<U32, KEY> mKeyDownTranslation;
 };
 
 #endif

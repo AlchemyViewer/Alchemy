@@ -29,7 +29,6 @@
 #include "lldebugview.h"
 
 // library includes
-#include "llfasttimerview.h"
 #include "llconsole.h"
 #include "lltextureview.h"
 #include "llresmgr.h"
@@ -38,7 +37,6 @@
 #include "llappviewer.h"
 #include "llsceneview.h"
 #include "llviewertexture.h"
-#include "llfloaterreg.h"
 #include "llscenemonitor.h"
 //
 // Globals
@@ -53,7 +51,6 @@ static LLDefaultChildRegistry::Register<LLDebugView> r("debug_view");
 
 LLDebugView::LLDebugView(const LLDebugView::Params& p)
 :   LLView(p),
-    mFastTimerView(NULL),
     mDebugConsolep(NULL),
     mFloaterSnapRegion(NULL)
 {}
@@ -89,8 +86,6 @@ void LLDebugView::init()
     r.setLeftTopAndSize(25, rect.getHeight() - 50, (S32) (gViewerWindow->getWindowRectScaled().getWidth() * 0.75f),
                                      (S32) (gViewerWindow->getWindowRectScaled().getHeight() * 0.75f));
 
-    mFastTimerView = dynamic_cast<LLFastTimerView*>(LLFloaterReg::getInstance("block_timers"));
-
     gSceneView = new LLSceneView(r);
     gSceneView->setFollowsTop();
     gSceneView->setFollowsLeft();
@@ -105,7 +100,7 @@ void LLDebugView::init()
     addChild(gSceneMonitorView);
     gSceneMonitorView->setRect(rect);
 
-    r.set(150, rect.getHeight() - 60, 820, 110);
+    r.set(150, rect.getHeight() - 60, 835, 110);
     LLTextureView::Params tvp;
     tvp.name("gTextureView");
     tvp.rect(r);

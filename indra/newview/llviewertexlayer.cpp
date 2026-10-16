@@ -52,7 +52,7 @@ LLViewerTexLayerSetBuffer::LLViewerTexLayerSetBuffer(LLTexLayerSet* const owner,
                                          S32 width, S32 height) :
     // ORDER_LAST => must render these after the hints are created.
     LLTexLayerSetBuffer(owner),
-    LLViewerDynamicTexture(width, height, 4, LLViewerDynamicTexture::ORDER_LAST, false),
+    LLViewerDynamicTexture(width, height, 4, LLViewerDynamicTexture::ORDER_LAST),
     mNeedsUpdate(true),
     mNumLowresUpdates(0)
 {

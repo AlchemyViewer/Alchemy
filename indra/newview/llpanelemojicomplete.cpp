@@ -118,10 +118,10 @@ void LLPanelEmojiComplete::draw()
 
     for (size_t curIdx = firstVisibleIdx; curIdx < lastVisibleIdx; curIdx++)
     {
-        LLWString text(1, mEmojis[curIdx].Character);
-        mIconFont->render(text, 0, iconCenterX, iconCenterY,
+        const std::string& text = mEmojis[curIdx].Character;
+        mIconFont->renderBytes(text, 0, iconCenterX, iconCenterY,
             LLColor4::white, LLFontGL::HCENTER, LLFontGL::VCENTER, LLFontGL::NORMAL,
-            LLFontGL::DROP_SHADOW_SOFT, 1);
+            LLFontGL::DROP_SHADOW_SOFT, static_cast<S32>(text.size()), S32_MAX, nullptr, false, true);
         if (mVertical)
         {
             const std::string& shortCode = mEmojis[curIdx].String;
@@ -254,12 +254,12 @@ bool LLPanelEmojiComplete::handleMouseUp(S32 x, S32 y, MASK mask)
     return true;
 }
 
-bool LLPanelEmojiComplete::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLPanelEmojiComplete::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (mNoScroll)
         return false;
 
-    if (mScrollbar && mScrollbar->getVisible() && mScrollbar->handleScrollWheel(x, y, clicks))
+    if (mScrollbar && mScrollbar->getVisible() && mScrollbar->handleScrollWheel(x, y, delta))
     {
         mCurSelected = posToIndex(x, y);
         return true;
@@ -270,7 +270,7 @@ bool LLPanelEmojiComplete::handleScrollWheel(S32 x, S32 y, S32 clicks)
         // In case of wheel up (clicks < 0) we shouldn't subtract more than value of mScrollPos
         // Example: if mScrollPos = 0, clicks = -1 then (mScrollPos + clicks) becomes SIZE_MAX
         // As a result of llclamp<size_t>() mScrollPos becomes (mTotalEmojis - mVisibleEmojis)
-        S32 newScrollPos = llmax(0, (S32)mScrollPos + clicks);
+        S32 newScrollPos = llmax(0, (S32)mScrollPos + delta.mClicks);
         mScrollPos = llclamp<size_t>((size_t)newScrollPos, 0, mTotalEmojis - mVisibleEmojis);
         mCurSelected = posToIndex(x, y);
         return true;
@@ -283,7 +283,7 @@ void LLPanelEmojiComplete::onCommit()
 {
     if (mCurSelected < mTotalEmojis)
     {
-        LLSD value(wstring_to_utf8str(LLWString(1, mEmojis[mCurSelected].Character)));
+        LLSD value(mEmojis[mCurSelected].Character);
         setValue(value);
         LLUICtrl::onCommit();
     }
@@ -302,12 +302,12 @@ void LLPanelEmojiComplete::reshape(S32 width, S32 height, bool called_from_paren
     }
 }
 
-void LLPanelEmojiComplete::setEmojis(const LLWString& emojis)
+void LLPanelEmojiComplete::setEmojis(const std::vector<std::string>& emojis)
 {
     mEmojis.clear();
 
     auto& emoji2descr = LLEmojiDictionary::instance().getEmoji2Descr();
-    for (const llwchar& emoji : emojis)
+    for (const std::string& emoji : emojis)
     {
         std::string shortCode;
         if (mVertical)
@@ -329,7 +329,7 @@ void LLPanelEmojiComplete::setEmojis(const LLWString& emojis)
 
 void LLPanelEmojiComplete::setEmojiHint(const std::string& hint)
 {
-    llwchar curEmoji = mCurSelected < mTotalEmojis ? mEmojis[mCurSelected].Character : 0;
+    const std::string curEmoji = mCurSelected < mTotalEmojis ? mEmojis[mCurSelected].Character : std::string();
 
     LLEmojiDictionary::instance().findByShortCode(mEmojis, hint);
     mTotalEmojis = mEmojis.size();
@@ -441,7 +441,8 @@ void LLPanelEmojiComplete::updateConstraints()
 {
     mRenderRect = getLocalRect();
 
-    mEmojiWidth = (U16)(mIconFont->getWidthF32(LLWString(1, 0x1F431).c_str()) + mPadding * 2);
+    static const std::string emojiForSize = "🏳️‍🌈"; // 4 code points, one of the widest emojis
+    mEmojiWidth = (U16)(mIconFont->getWidthF32(emojiForSize) + mPadding * 2);
     if (mVertical)
     {
         mEmojiHeight = mIconFont->getLineHeight() + mPadding * 2;

@@ -31,15 +31,22 @@
 
 #include "llpanelpulldown.h"
 
-class LLPanelPresetsCameraPulldown : public LLPanelPulldown
+class LLPanelPresetsCameraPulldown final : public LLPanelPulldown
 {
  public:
+    AL_VIEW_TYPE(LLPanelPresetsCameraPulldown, LLPanelPulldown);
+
     LLPanelPresetsCameraPulldown();
     bool postBuild() override;
-    void populatePanel();
+    void draw() override;
 
+    void populatePanel();
  private:
-    void onViewButtonClick(const LLSD& user_data);
+    void onCommitSettings();
+    void updateCameraControl(const LLVector3& vector);
+    void updateFocusControl(const LLVector3d& vector3d);
+
+   void onViewButtonClick(const LLSD& user_data);
     void onRowClick(const LLSD& user_data);
 
     std::list<std::string> mPresetNames;

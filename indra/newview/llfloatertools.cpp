@@ -32,6 +32,7 @@
 #include "llcoord.h"
 //#include "llgl.h"
 
+#include "altoolalign.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llbutton.h"
@@ -84,6 +85,8 @@
 #include "llviewermenu.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerwindow.h"
+#include "llvograss.h"
+#include "llvotree.h"
 #include "llvovolume.h"
 #include "lluictrlfactory.h"
 #include "llmeshrepository.h"
@@ -241,16 +244,20 @@ bool    LLFloaterTools::postBuild()
     mBtnGridOptions     = getChild<LLButton>("Options...");
     mBtnLink            = getChild<LLButton>("link_btn");
     mBtnUnlink          = getChild<LLButton>("unlink_btn");
+    mBtnPrevPart        = getChild<LLButton>("prev_part_btn");
+    mBtnNextPart        = getChild<LLButton>("next_part_btn");
 
     mCheckSelectIndividual  = getChild<LLCheckBoxCtrl>("checkbox edit linked parts");
     getChild<LLUICtrl>("checkbox edit linked parts")->setValue((bool)gSavedSettings.getBOOL("EditLinkedParts"));
     mCheckSnapToGrid        = getChild<LLCheckBoxCtrl>("checkbox snap to grid");
-    getChild<LLUICtrl>("checkbox snap to grid")->setValue((bool)gSavedSettings.getBOOL("SnapEnabled"));
+    mCheckSnapToGrid->setValue((bool)gSavedSettings.getBOOL("SnapEnabled"));
     mCheckStretchUniform    = getChild<LLCheckBoxCtrl>("checkbox uniform");
     getChild<LLUICtrl>("checkbox uniform")->setValue((bool)gSavedSettings.getBOOL("ScaleUniform"));
     mCheckStretchTexture    = getChild<LLCheckBoxCtrl>("checkbox stretch textures");
     getChild<LLUICtrl>("checkbox stretch textures")->setValue((bool)gSavedSettings.getBOOL("ScaleStretchTextures"));
     mComboGridMode          = getChild<LLComboBox>("combobox grid mode");
+
+    mCheckActualRoot = getChild<LLCheckBoxCtrl>("checkbox actual root");
 
     //
     // Create Buttons
@@ -276,6 +283,7 @@ bool    LLFloaterTools::postBuild()
     mCheckCopyRotates = getChild<LLCheckBoxCtrl>("checkbox copy rotates");
     getChild<LLUICtrl>("checkbox copy rotates")->setValue((bool)gSavedSettings.getBOOL("CreateToolCopyRotates"));
 
+    mTreeGrassCombo         = getChild<LLComboBox>("tree_grass_combo");
     mRadioGroupLand         = getChild<LLRadioGroup>("land_radio_group");
     mBtnApplyToSelection    = getChild<LLButton>("button apply to selection");
     mSliderDozerSize        = getChild<LLSlider>("slider brush size");
@@ -291,7 +299,7 @@ bool    LLFloaterTools::postBuild()
 
     mTextSelectionCount = getChild<LLTextBox>("selection_count");
     mTextSelectionEmpty = getChild<LLTextBox>("selection_empty");
-    mTextSelectionFaces = getChild<LLTextBox>("selection_faces");
+    //mTextSelectionFaces = getChild<LLTextBox>("selection_faces");
 
     mCostTextBorder = getChild<LLViewBorder>("cost_text_border");
 
@@ -340,6 +348,7 @@ LLFloaterTools::LLFloaterTools(const LLSD& key)
     mCheckStretchUniform(NULL),
     mCheckStretchTexture(NULL),
     mCheckStretchUniformLabel(NULL),
+    mCheckActualRoot(nullptr),
 
     mBtnRotateLeft(NULL),
     mBtnRotateReset(NULL),
@@ -348,6 +357,8 @@ LLFloaterTools::LLFloaterTools(const LLSD& key)
     mBtnLink(NULL),
     mBtnUnlink(NULL),
 
+    mBtnPrevPart(nullptr),
+    mBtnNextPart(nullptr),
     mBtnDelete(NULL),
     mBtnDuplicate(NULL),
     mBtnDuplicateInPlace(NULL),
@@ -403,6 +414,8 @@ LLFloaterTools::LLFloaterTools(const LLSD& key)
     mCommitCallbackRegistrar.add("BuildTool.LinkObjects",       boost::bind(&LLSelectMgr::linkObjects, LLSelectMgr::getInstance()));
     mCommitCallbackRegistrar.add("BuildTool.UnlinkObjects",     boost::bind(&LLSelectMgr::unlinkObjects, LLSelectMgr::getInstance()));
 
+    mCommitCallbackRegistrar.add("BuildTool.TreeGrass",         boost::bind(&LLFloaterTools::onSelectTreeGrassCombo, this));
+
     mLandImpactsObserver = new LLLandImpactsObserver();
     LLViewerParcelMgr::getInstance()->addObserver(mLandImpactsObserver);
 }
@@ -454,6 +467,73 @@ void LLFloaterTools::refresh()
 
     // Refresh object and prim count labels
     LLLocale locale(LLLocale::USER_LOCALE);
+
+    std::string desc_string;
+    std::string num_string;
+    bool enable_link_count = true;
+
+    LLObjectSelectionHandle selected_objects = LLSelectMgr::getInstance()->getSelection();
+    S32 prim_count = selected_objects->getObjectCount();
+    if (prim_count == 1 && LLToolMgr::getInstance()->getCurrentTool() == LLToolFace::getInstance())
+    {
+        desc_string = getString("selected_faces");
+
+        LLViewerObject* objectp = mObjectSelection->getFirstRootObject();
+        LLSelectNode* nodep = mObjectSelection->getFirstRootNode();
+        if(!objectp || !nodep)
+        {
+            objectp = selected_objects->getFirstObject();
+            nodep = selected_objects->getFirstNode();
+        }
+
+        if (objectp && objectp->getNumTEs() == selected_objects->getTECount())
+            num_string = "ALL_SIDES";
+        else if (objectp && nodep)
+        {
+            for (S32 i = 0; i < objectp->getNumTEs(); i++)
+            {
+                if (nodep->isTESelected(i))
+                {
+                    if (!num_string.empty())
+                        num_string.append(", ");
+                    num_string.append(llformat("%d", i));
+                }
+            }
+        }
+    }
+    else if (prim_count == 1 && gSavedSettings.getBOOL("EditLinkedParts"))
+    {
+        desc_string = getString("link_number");
+        LLViewerObject* objectp = selected_objects->getFirstObject();
+        if (objectp && objectp->getRootEdit())
+        {
+            const LLViewerObject::const_child_list_t& children = objectp->getRootEdit()->getChildren();
+            if (children.empty())
+                num_string = "0"; //a childless prim is always link zero, and unhappy
+            else if (objectp->getRootEdit()->isSelected())
+                num_string = "1"; //root prim is always link one
+            else
+            {
+                S32 index = 1;
+                for (LLViewerObject* selected_child : children)
+                {
+                    index++;
+                    if (selected_child->isSelected())
+                    {
+                        LLResMgr::getInstance()->getIntegerString(num_string, index);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        enable_link_count = false;
+    }
+    getChild<LLUICtrl>("link_num_obj_count")->setTextArg("[DESC]", desc_string);
+    getChild<LLUICtrl>("link_num_obj_count")->setTextArg("[NUM]", num_string);
+
 #if 0
     if (!gMeshRepo.meshRezEnabled())
     {
@@ -470,14 +550,11 @@ void LLFloaterTools::refresh()
             std::string prim_cost_string;
             S32 render_cost = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectRenderCost();
             LLResMgr::getInstance()->getIntegerString(prim_cost_string, render_cost);
-            getChild<LLUICtrl>("RenderingCost")->setTextArg("[COUNT]", prim_cost_string);
         }
 
         // disable the object and prim counts if nothing selected
         bool have_selection = ! LLSelectMgr::getInstance()->getSelection()->isEmpty();
-        getChildView("obj_count")->setEnabled(have_selection);
-        getChildView("prim_count")->setEnabled(have_selection);
-        getChildView("RenderingCost")->setEnabled(have_selection && sShowObjectCost);
+        getChildView("link_num_obj_count")->setEnabled(have_selection);
     }
     else
 #endif
@@ -485,7 +562,7 @@ void LLFloaterTools::refresh()
         LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
         F32 link_cost = selection->getSelectedLinksetCost();
         S32 link_count = selection->getRootObjectCount();
-        S32 object_count = selection->getObjectCount();
+        //S32 object_count = selection->getObjectCount();
 
         LLCrossParcelFunctor func;
         if (!LLSelectMgr::getInstance()->getSelection()->applyToRootObjects(&func, true))
@@ -495,47 +572,62 @@ void LLFloaterTools::refresh()
             if (selected_object)
             {
                 // Select a parcel at the currently selected object's position.
-                LLViewerParcelMgr::getInstance()->selectParcelAt(selected_object->getPositionGlobal());
+                if (!selected_object->isAttachment())
+                {
+                    LLViewerParcelMgr::getInstance()->selectParcelAt(selected_object->getPositionGlobal());
+                }
+                else
+                {
+                    const LLStringExplicit empty_str("");
+                    childSetTextArg("remaining_capacity", "[CAPACITY_STRING]", empty_str);
+                }
             }
             else
             {
                 LL_WARNS() << "Failed to get selected object" << LL_ENDL;
             }
         }
-
-        if (object_count == 1)
+        else
         {
-            // "selection_faces" shouldn't be visible if not LLToolFace::getInstance()
-            // But still need to be populated in case user switches
-
-            std::string faces_str = "";
-
-            for (LLObjectSelection::iterator iter = selection->begin(); iter != selection->end();)
-            {
-                LLObjectSelection::iterator nextiter = iter++; // not strictly needed, we have only one object
-                LLSelectNode* node = *nextiter;
-                LLViewerObject* object = (*nextiter)->getObject();
-                if (!object)
-                    continue;
-                S32 num_tes = llmin((S32)object->getNumTEs(), (S32)object->getNumFaces());
-                for (S32 te = 0; te < num_tes; ++te)
-                {
-                    if (node->isTESelected(te))
-                    {
-                        if (!faces_str.empty())
-                        {
-                            faces_str += ", ";
-                        }
-                        faces_str += llformat("%d", te);
-                    }
-                }
-            }
-            mTextSelectionFaces->setTextArg("[FACES_STRING]", faces_str);
+            // Selection crosses parcel bounds.
+            // We don't display remaining land capacity in this case.
+            const LLStringExplicit empty_str("");
+            childSetTextArg("remaining_capacity", "[CAPACITY_STRING]", empty_str);
         }
 
-        bool show_faces = (object_count == 1)
-                          && LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool();
-        mTextSelectionFaces->setVisible(show_faces);
+        //if (object_count == 1)
+        //{
+        //    // "selection_faces" shouldn't be visible if not LLToolFace::getInstance()
+        //    // But still need to be populated in case user switches
+        //
+        //    std::string faces_str = "";
+        //
+        //    for (LLObjectSelection::iterator iter = selection->begin(); iter != selection->end();)
+        //    {
+        //        LLObjectSelection::iterator nextiter = iter++; // not strictly needed, we have only one object
+        //        LLSelectNode* node = *nextiter;
+        //        LLViewerObject* object = (*nextiter)->getObject();
+        //        if (!object)
+        //            continue;
+        //        S32 num_tes = llmin((S32)object->getNumTEs(), (S32)object->getNumFaces());
+        //        for (S32 te = 0; te < num_tes; ++te)
+        //        {
+        //            if (node->isTESelected(te))
+        //            {
+        //                if (!faces_str.empty())
+        //                {
+        //                    faces_str += ", ";
+        //                }
+        //                faces_str += llformat("%d", te);
+        //            }
+        //        }
+        //    }
+        //    mTextSelectionFaces->setTextArg("[FACES_STRING]", faces_str);
+        //}
+        //
+        //bool show_faces = (object_count == 1)
+        //                  && LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool();
+        //mTextSelectionFaces->setVisible(show_faces);
 
         LLStringUtil::format_map_t selection_args;
         selection_args["OBJ_COUNT"] = llformat("%.1d", link_count);
@@ -544,6 +636,9 @@ void LLFloaterTools::refresh()
         mTextSelectionCount->setText(getString("status_selectcount", selection_args));
     }
 
+    // disable the object and prim counts if nothing selected
+    bool have_selection = !selected_objects->isEmpty();
+    getChildView("link_num_obj_count")->setEnabled(have_selection && enable_link_count);
 
     // Refresh child tabs
     mPanelPermissions->refresh();
@@ -682,6 +777,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
                         tool == LLToolCompScale::getInstance() ||
                         tool == LLToolFace::getInstance() ||
                         tool == LLToolIndividual::getInstance() ||
+                        tool == ALToolAlign::getInstance() ||
                         tool == LLToolPipette::getInstance();
 
     mBtnEdit    ->setToggleState( edit_visible );
@@ -694,6 +790,14 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 
     mBtnLink->setEnabled(LLSelectMgr::instance().enableLinkObjects());
     mBtnUnlink->setEnabled(LLSelectMgr::instance().enableUnlinkObjects());
+
+    mBtnPrevPart->setVisible(edit_visible);
+    mBtnNextPart->setVisible(edit_visible);
+
+    bool select_btn_enabled = (!LLSelectMgr::getInstance()->getSelection()->isEmpty()
+                                && (gSavedSettings.getBOOL("EditLinkedParts") || LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()));
+    mBtnPrevPart->setEnabled(select_btn_enabled);
+    mBtnNextPart->setEnabled(select_btn_enabled);
 
     if (mCheckSelectIndividual)
     {
@@ -716,6 +820,10 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
     else if ( tool == LLToolFace::getInstance() )
     {
         mRadioGroupEdit->setValue("radio select face");
+    }
+    else if ( tool == ALToolAlign::getInstance() )
+    {
+        mRadioGroupEdit->setValue("radio align");
     }
 
     if (mComboGridMode)
@@ -753,9 +861,16 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
     if (mCheckStretchUniform) mCheckStretchUniform->setVisible( edit_visible );
     if (mCheckStretchTexture) mCheckStretchTexture->setVisible( edit_visible );
     if (mCheckStretchUniformLabel) mCheckStretchUniformLabel->setVisible( edit_visible );
+    if (mCheckActualRoot) mCheckActualRoot->setVisible( edit_visible );
+    getChild<LLUICtrl>("checkbox selection")->setVisible( edit_visible );
+    getChild<LLUICtrl>("checkbox select probes")->setVisible(edit_visible);
 
     // Create buttons
     bool create_visible = (tool == LLToolCompCreate::getInstance());
+
+    // Tree/grass picker
+    mTreeGrassCombo->setVisible(create_visible);
+    if (create_visible) buildTreeGrassCombo();
 
     mBtnCreate  ->setToggleState(   tool == LLToolCompCreate::getInstance() );
 
@@ -850,8 +965,9 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
     bool have_selection = !LLSelectMgr::getInstance()->getSelection()->isEmpty();
 
     mTextSelectionCount->setVisible(!land_visible && have_selection);
-    mTextSelectionFaces->setVisible(LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()
-                                                && LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1);
+    getChildView("remaining_capacity")->setVisible(!land_visible && have_selection);
+    //mTextSelectionFaces->setVisible(LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()
+    //                                            && LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1);
     mTextSelectionEmpty->setVisible(!land_visible && !have_selection);
 
     mTab->setVisible(!land_visible);
@@ -1038,6 +1154,10 @@ void commit_radio_group_edit(LLUICtrl *ctrl)
     {
         LLFloaterTools::setEditTool( LLToolFace::getInstance() );
     }
+    else if (selected == "radio align")
+    {
+        LLFloaterTools::setEditTool( ALToolAlign::getInstance() );
+    }
     gSavedSettings.setBOOL("ShowParcelOwners", show_owners);
 }
 
@@ -1098,6 +1218,7 @@ void LLFloaterTools::setObjectType( LLPCode pcode )
 {
     LLToolPlacer::setObjectType( pcode );
     gSavedSettings.setBOOL("CreateToolCopySelection", false);
+    gFloaterTools->buildTreeGrassCombo();
     gFocusMgr.setMouseCapture(NULL);
 }
 
@@ -1165,6 +1286,26 @@ void LLFloaterTools::updateLandImpacts()
         return;
     }
 
+    S32 rezzed_prims = parcel->getSimWidePrimCount();
+    S32 total_capacity = parcel->getSimWideMaxPrimCapacity();
+    LLViewerRegion* region = LLViewerParcelMgr::getInstance()->getSelectionRegion();
+    if (region)
+    {
+        S32 max_tasks_per_region = (S32)region->getMaxTasks();
+        total_capacity = llmin(total_capacity, max_tasks_per_region);
+    }
+    std::string remaining_capacity_str = "";
+
+    bool show_mesh_cost = gMeshRepo.meshRezEnabled();
+    if (show_mesh_cost)
+    {
+        LLStringUtil::format_map_t remaining_capacity_args;
+        remaining_capacity_args["LAND_CAPACITY"] = llformat("%d", total_capacity - rezzed_prims);
+        remaining_capacity_str = getString("status_remaining_capacity", remaining_capacity_args);
+    }
+
+    childSetTextArg("remaining_capacity", "[CAPACITY_STRING]", remaining_capacity_str);
+
     // Update land impacts info in the weights floater
     LLFloaterObjectWeights* object_weights_floater = LLFloaterReg::findTypedInstance<LLFloaterObjectWeights>("object_weights");
     if(object_weights_floater)
@@ -1173,3 +1314,90 @@ void LLFloaterTools::updateLandImpacts()
     }
 }
 
+template<class P>
+void build_plant_combo(const std::map<U32, P*>& list, LLComboBox* combo)
+{
+    if (!combo || list.empty()) return;
+    combo->removeall();
+    typename std::map<U32, P*>::const_iterator it = list.begin();
+    typename std::map<U32, P*>::const_iterator end = list.end();
+    for ( ; it != end; ++it )
+    {
+        P* plant = (*it).second;
+        if (plant) combo->addSimpleElement(plant->mName, ADD_BOTTOM);
+    }
+}
+
+void LLFloaterTools::buildTreeGrassCombo()
+{
+    if (!mTreeGrassCombo) return;
+
+    // Rebuild the combo with the list we need, then select the last-known use
+    // TODO: rebuilding this list continuously is probably not the best way
+    LLPCode pcode = LLToolPlacer::getObjectType();
+    std::string type = LLStringUtil::null;
+
+    // LL_PCODE_TREE_NEW seems to be "new" as in "dodo"
+    switch (pcode)
+    {
+        case LL_PCODE_LEGACY_TREE:
+        case LL_PCODE_TREE_NEW:
+            build_plant_combo(LLVOTree::sSpeciesTable, mTreeGrassCombo);
+            mTreeGrassCombo->addSimpleElement("Random", ADD_TOP);
+            type = "Tree";
+            break;
+        case LL_PCODE_LEGACY_GRASS:
+            build_plant_combo(LLVOGrass::sSpeciesTable, mTreeGrassCombo);
+            mTreeGrassCombo->addSimpleElement("Random", ADD_TOP);
+            type = "Grass";
+            break;
+        default:
+            mTreeGrassCombo->setEnabled(false);
+            break;
+    }
+
+    // select last selected if exists
+    if (!type.empty())
+    {
+        // Enable the options
+        mTreeGrassCombo->setEnabled(true);
+
+        // Set the last selection, or "Random" (old default) if there isn't one
+        std::string last_selected = gSavedSettings.getString("LastSelected"+type);
+        if (last_selected.empty())
+        {
+            mTreeGrassCombo->selectByValue(LLSD(std::string("Random")));
+        }
+        else
+        {
+            mTreeGrassCombo->selectByValue(LLSD(last_selected));
+        }
+    }
+}
+
+void LLFloaterTools::onSelectTreeGrassCombo()
+{
+    // Save the last-used selection
+    std::string last_selected = mTreeGrassCombo->getValue().asString();
+    LLPCode pcode = LLToolPlacer::getObjectType();
+    std::string type = "";
+
+    switch (pcode)
+    {
+        case LL_PCODE_LEGACY_GRASS:
+            type = "Grass";
+            break;
+        case LL_PCODE_LEGACY_TREE:
+        case LL_PCODE_TREE_NEW:
+            type = "Tree";
+            break;
+        default:
+            break;
+    }
+
+    if (!type.empty())
+    {
+        // Should never be an empty string
+        gSavedSettings.setString("LastSelected"+type, last_selected);
+    }
+}

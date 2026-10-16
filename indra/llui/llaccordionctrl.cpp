@@ -47,6 +47,8 @@ static constexpr F32 AUTO_SCROLL_RATE_ACCEL = 120.f;
 
 static LLDefaultChildRegistry::Register<LLAccordionCtrl>    t2("accordion");
 
+std::set<LLAccordionCtrl*> LLAccordionCtrl::sPendingArrange;
+
 LLAccordionCtrl::LLAccordionCtrl(const Params& params):LLPanel(params)
  , mFitParent(params.fit_parent)
  , mNoVisibleTabsOrigString(params.no_visible_tabs_text.initial_value().asString())
@@ -126,7 +128,7 @@ bool LLAccordionCtrl::postBuild()
     std::vector<LLAccordionCtrlTab*> accordion_tabs;
     for(LLView* viewp : *getChildList())
     {
-        LLAccordionCtrlTab* accordion_tab = dynamic_cast<LLAccordionCtrlTab*>(viewp);
+        LLAccordionCtrlTab* accordion_tab = viewp->as<LLAccordionCtrlTab>();
         if (accordion_tab == NULL)
             continue;
         if (std::find(mAccordionTabs.begin(), mAccordionTabs.end(), accordion_tab) == mAccordionTabs.end())
@@ -163,7 +165,11 @@ bool LLAccordionCtrl::postBuild()
 //---------------------------------------------------------------------------------
 LLAccordionCtrl::~LLAccordionCtrl()
 {
-  mAccordionTabs.clear();
+    if (mArrangePending)
+    {
+        sPendingArrange.erase(this);
+    }
+    mAccordionTabs.clear();
 }
 
 //---------------------------------------------------------------------------------
@@ -184,7 +190,7 @@ void LLAccordionCtrl::reshape(S32 width, S32 height, bool called_from_parent)
     // necessary text paddings can be set via h_pad and v_pad
     mNoVisibleTabsHelpText->setRect(getLocalRect());
 
-    arrange();
+    scheduleArrange();
 }
 
 //---------------------------------------------------------------------------------
@@ -325,7 +331,7 @@ void LLAccordionCtrl::addCollapsibleCtrl(LLAccordionCtrlTab* accordion_tab)
     mAccordionTabs.push_back(accordion_tab);
 
     accordion_tab->setDropDownStateChangedCallback( boost::bind(&LLAccordionCtrl::onCollapseCtrlCloseOpen, this, (S16)(mAccordionTabs.size() - 1)) );
-    arrange();
+    scheduleArrange();
 }
 
 void LLAccordionCtrl::removeCollapsibleCtrl(LLAccordionCtrlTab* accordion_tab)
@@ -494,6 +500,7 @@ void LLAccordionCtrl::arrangeMultiple()
 
 void LLAccordionCtrl::arrange()
 {
+    LL_PROFILE_ZONE_SCOPED;
     updateNoTabsHelpTextVisibility();
 
     if (mAccordionTabs.empty())
@@ -529,11 +536,20 @@ void LLAccordionCtrl::arrange()
 
 //---------------------------------------------------------------------------------
 
-bool LLAccordionCtrl::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLAccordionCtrl::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    if (LLPanel::handleScrollWheel(x, y, clicks))
+    if (LLPanel::handleScrollWheel(x, y, delta))
         return true;
-    if (mScrollbar->getVisible() && mScrollbar->handleScrollWheel(0, 0, clicks))
+    if (mScrollbar->getVisible() && mScrollbar->handleScrollWheel(0, 0, delta))
+        return true;
+    return false;
+}
+
+bool LLAccordionCtrl::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    if (LLPanel::handleScrollHWheel(x, y, delta))
+        return true;
+    if (mScrollbar->getVisible() && mScrollbar->handleScrollHWheel(0, 0, delta))
         return true;
     return false;
 }
@@ -666,7 +682,8 @@ void LLAccordionCtrl::onOpen(const LLSD& key)
 {
     for (LLAccordionCtrlTab* accordion_tab : mAccordionTabs)
     {
-        LLPanel* panel = dynamic_cast<LLPanel*>(accordion_tab->getAccordionView());
+        LLView* viewp = accordion_tab->getAccordionView();
+        LLPanel* panel = viewp ? viewp->as<LLPanel>() : nullptr;
         if (panel != NULL)
         {
             panel->onOpen(key);
@@ -678,11 +695,12 @@ S32 LLAccordionCtrl::notifyParent(const LLSD& info)
 {
     if (info.has("action"))
     {
-        std::string str_action = info["action"];
+        const std::string& str_action = info["action"].asStringRef();
         if (str_action == "size_changes")
         {
-            //
-            arrange();
+            // Multiple children can request an arrange,
+            // but only need to do it once so schedule it for later.
+            scheduleArrange();
             return 1;
         }
         if (str_action == "select_next")
@@ -941,4 +959,26 @@ void LLAccordionCtrl::collapseAllTabs()
         }
         arrange();
     }
+}
+
+void LLAccordionCtrl::scheduleArrange()
+{
+    if (!mArrangePending)
+    {
+        mArrangePending = true;
+        sPendingArrange.insert(this);
+    }
+}
+
+void LLAccordionCtrl::updateClass()
+{
+    for (LLAccordionCtrl* inst : sPendingArrange)
+    {
+        if (inst)
+        {
+            inst->mArrangePending = false;
+            inst->arrange();
+        }
+    }
+    sPendingArrange.clear();
 }

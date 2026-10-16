@@ -30,11 +30,20 @@ out vec4 frag_color;
 uniform sampler2D diffuseRect;
 uniform sampler2D lightMap;
 
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 
 uniform float max_cof;
+// Fraction of the screen the blur was rendered at: CameraDoFResScale, or less
+// if the borrowed target could not hold that. Drives the CoF arithmetic.
 uniform float res_scale;
+// Where the blur sits inside the texture it was rendered into. The blur is
+// drawn into a corner of a borrowed target that need not be screen-sized, so a
+// screen coordinate is scaled by dof_uv_scale to land on it, and clamped to
+// dof_width/dof_height, the last texel it wrote.
+uniform vec2  dof_uv_scale;
 uniform float dof_width;
 uniform float dof_height;
 
@@ -52,11 +61,15 @@ void main()
 {
     vec2 tc = vary_fragcoord.xy;
 
-    vec4 dof = dofSample(diffuseRect, vary_fragcoord.xy*res_scale);
+    vec4 dof = dofSample(diffuseRect, vary_fragcoord.xy*dof_uv_scale);
 
     vec4 diff = texture(lightMap, vary_fragcoord.xy);
 
-    float a = min(abs(diff.a*2.0-1.0) * max_cof*res_scale*res_scale, 1.0);
+    #if FRONT_BLUR
+        float a = min(abs(diff.a*2.0-1.0) * max_cof*res_scale*res_scale, 1.0);
+    #else
+        float a = (diff.a > 0.5) ? 0.0 : min(abs(diff.a*2.0-1.0) * max_cof*res_scale*res_scale, 1.0);
+    #endif
 
     if (a > 0.25 && a < 0.75)
     { //help out the transition a bit

@@ -96,13 +96,13 @@
     <!-- Named Colors -->
     <color
      name="EmphasisColor"
-     value="0 0.631 0.878 1" />
+     value="0 0.631 0.874 1" />
     <color
      name="EmphasisColor_13"
-     value="0 0.631 0.878 0.13" />
+     value="0 0.631 0.874 0.13" />
     <color
      name="EmphasisColor_35"
-     value="0 0.631 0.878 0.35" />
+     value="0 0.631 0.874 0.35" />
     <color
      name="BeaconColor"
 	 value="0.65 0.25 0.23 0.97" />
@@ -717,7 +717,7 @@
      value="0 0.78 0.78 1" />
     <color
      name="NotifyBoxColor"
-     value="LtGray" />
+     reference="LtGray" />
     <color
      name="NotifyCautionBoxColor"
      reference="AlUrgentInfoYellow" />
@@ -810,7 +810,7 @@
      value="0 1 0 0.4" />
     <color
      name="ScriptBgReadOnlyColor"
-     value="0.39 0.39 0.39 1" />
+     value="0.975 0.975 0.975 1" />
     <color
      name="ScriptErrorColor"
      reference="Red" />
@@ -852,7 +852,7 @@
      reference="White" />
     <color
      name="SilhouetteChildColor"
-     reference="EmphasisColor" /> <!-- Child Prim highlight color (Edit mode) -->
+     value="0.473 0.809 1 1" /> <!-- Child Prim highlight color (Edit mode) -->
     <color
      name="SilhouetteParentColor"
      reference="Yellow" /> <!-- Root Prim highlight color (Edit mode) -->
@@ -1043,31 +1043,31 @@
     value="0 0.5 0 1" />
   <color
     name="SyntaxLslConstant"
-    value="0 0.6 0.6 1" />
+    value="0 0.439 0.757 1" />
   <color
     name="SyntaxLslControlFlow"
-    value="0.4 0 0.8 1" />
+    value="0.686 0 0.859 1" />
   <color
     name="SyntaxLslControlLabel"
-    value="0 0 0.8 1" />
+    value="0.506 0.122 0.247 1" />
   <color
     name="SyntaxLslDataType"
-    value="0.8 0.4 0 1" />
+    value="0 0 1 1" />
    <color
     name="SyntaxLslDeprecated"
-    value="0.9 0.0 0.66, 1" />
+    value="0.753 0 0.478 1" />
   <color
    name="SyntaxLslEvent"
-   value="0 0.3 0.5 1" />
+   value="0.702 0.349 0 1" />
   <color
    name="SyntaxLslFunction"
-   value="0.3 0 0.5 1" />
+   value="0.475 0.369 0.149 1" />
   <color
    name="SyntaxLslGodMode"
    value="0.7 .2 .35 1" />
   <color
     name="SyntaxLslStringLiteral"
-    value="1 0.14 0 1" />
+    value="0.639 0.082 0.082 1" />
 	
   <!-- Alchemy -->
   <color
@@ -1166,4 +1166,18 @@
 	<color
      name="NameTagBeyondShoutDistanceColor"
      reference="AlDangerRed" />
+  <!-- The studios' panes, notice, dividers and tabs apart: this skin's
+       greys are one. -->
+  <color
+    name="StudioPaneColor"
+    value="0.137 0.137 0.137 1" />
+  <color
+    name="StudioNoticeColor"
+    value="0.216 0.216 0.216 1" />
+  <color
+    name="StudioDividerColor"
+    value="0.27 0.27 0.27 1" />
+  <color
+    name="StudioTabColor"
+    value="0.137 0.137 0.137 1" />
 </colors>

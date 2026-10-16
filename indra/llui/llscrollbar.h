@@ -35,12 +35,13 @@
 //
 // Classes
 //
-class LLScrollbar
+class LLScrollbar final
 : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLScrollbar, LLUICtrl);
 
-    typedef boost::function<void (S32, LLScrollbar*)> callback_t;
+    typedef std::function<void (S32, LLScrollbar*)> callback_t;
     struct Params
     :   public LLInitParam::Block<Params, LLUICtrl::Params>
     {
@@ -79,22 +80,22 @@ protected:
 public:
     virtual ~LLScrollbar();
 
-    virtual void setValue(const LLSD& value);
+    virtual void setValue(const LLSD& value) override;
 
     // Overrides from LLView
-    virtual bool    handleKeyHere(KEY key, MASK mask);
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask);
-    virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual bool    handleScrollWheel(S32 x, S32 y, S32 clicks);
-    virtual bool    handleScrollHWheel(S32 x, S32 y, S32 clicks);
+    virtual bool    handleKeyHere(KEY key, MASK mask) override;
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
     virtual bool    handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
-        EDragAndDropType cargo_type, void *cargo_data, EAcceptance *accept, std::string &tooltip_msg);
+        EDragAndDropType cargo_type, void *cargo_data, EAcceptance *accept, std::string &tooltip_msg) override;
 
-    virtual void    reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual void    reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
-    virtual void    draw();
+    virtual void    draw() override;
 
     // How long the "document" is.
     void                setDocSize( S32 size );
@@ -130,6 +131,7 @@ public:
 private:
     void                updateThumbRect();
     bool                changeLine(S32 delta, bool update_thumb );
+    bool                scrollByWheel(F32 precise); // precise sub-notch wheel delta -> whole lines + residue
 
     callback_t          mChangeCallback;
 
@@ -138,6 +140,7 @@ private:
     S32                 mDocPos;        // Position within the doc that the scrollbar is modeling, in "lines" (user size)
     S32                 mPageSize;      // Maximum number of lines that can be seen at one time.
     S32                 mStepSize;
+    F32                 mScrollWheelResidue = 0.f; // carries sub-line precise scroll between events
     bool                mDocChanged;
 
     LLRect              mThumbRect;

@@ -37,6 +37,7 @@
 #include "llinventorymodel.h"
 #include "llscrollcontainer.h"
 #include "lluictrlfactory.h"
+#include <functional>
 #include <set>
 
 class LLInvFVBridge;
@@ -60,6 +61,8 @@ class LLInventoryPanel : public LLPanel
     // Data
     //--------------------------------------------------------------------
 public:
+    AL_VIEW_TYPE(LLInventoryPanel, LLPanel);
+
     struct Filter : public LLInitParam::Block<Filter>
     {
         Optional<U32>           sort_order;
@@ -182,7 +185,7 @@ public:
     // Call this method to set the selection.
     void openAllFolders();
     void setSelection(const LLUUID& obj_id, bool take_keyboard_focus);
-    void setSelectCallback(const boost::function<void (const std::deque<LLFolderViewItem*>& items, bool user_action)>& cb);
+    void setSelectCallback(const std::function<void (const std::deque<LLFolderViewItem*>& items, bool user_action)>& cb);
     void clearSelection();
     selected_items_t getSelectedItems() const;
 
@@ -225,6 +228,7 @@ public:
     void doCreate(const LLSD& userdata);
     bool beginIMSession();
     void fileUploadLocation(const LLSD& userdata);
+    bool isUploadLocationSelected(const LLSD& userdata);
     void openSingleViewInventory(LLUUID folder_id = LLUUID());
     void purgeSelectedItems();
     bool attachObject(const LLSD& userdata);
@@ -298,7 +302,20 @@ protected:
     LLPointer<LLFolderViewGroupedItemBridge> mGroupedItemBridge;
     Params                      mParams;    // stored copy of parameter block
 
-    std::map<LLUUID, LLFolderViewItem*> mItemMap;
+    // Merge the type defaults into the item and folder templates, once. Every
+    // view this panel builds is a copy of one of these, so the merge is done
+    // here rather than per widget -- an inventory builds a view per item it
+    // holds, which reaches six figures.
+    //
+    // Asked for where the templates are read rather than where they are
+    // assigned: a subclass is free to take a different route through
+    // initFromParams, and one that skips this class's leaves every item it
+    // builds without an item_height, which has no value of its own outside the
+    // widget defaults.
+    void                        ensureViewTemplates();
+    bool                        mViewTemplatesMerged { false };
+
+    boost::unordered_map<LLUUID, LLFolderViewItem*> mItemMap;
     /**
      * Pointer to LLInventoryFolderViewModelBuilder.
      *
@@ -373,7 +390,7 @@ protected:
     virtual LLFolderViewFolder* createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop);
     virtual LLFolderViewItem*   createFolderViewItem(LLInvFVBridge * bridge);
 
-    boost::function<void(const std::deque<LLFolderViewItem*>& items, bool user_action)> mSelectionCallback;
+    std::function<void(const std::deque<LLFolderViewItem*>& items, bool user_action)> mSelectionCallback;
 
     // buildViewsTree does not include some checks and is meant
     // for recursive use, use buildNewViews() for first call
@@ -402,9 +419,11 @@ protected:
 };
 
 
-class LLInventorySingleFolderPanel : public LLInventoryPanel
+class LLInventorySingleFolderPanel final : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLInventorySingleFolderPanel, LLInventoryPanel);
+
     struct Params : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {};
 
@@ -435,7 +454,7 @@ public:
     std::list<LLUUID> getNavBackwardList() { return mBackwardFolders; }
     std::list<LLUUID> getNavForwardList() { return mForwardFolders; }
 
-    typedef boost::function<void()> root_changed_callback_t;
+    typedef std::function<void()> root_changed_callback_t;
     boost::signals2::connection setRootChangedCallback(root_changed_callback_t cb);
 
 protected:
@@ -461,6 +480,8 @@ protected:
 class LLAssetFilteredInventoryPanel : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLAssetFilteredInventoryPanel, LLInventoryPanel);
+
     struct Params
         : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {

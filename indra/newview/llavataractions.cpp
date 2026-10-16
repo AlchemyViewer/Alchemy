@@ -29,14 +29,14 @@
 
 #include "llavataractions.h"
 
-#include "boost/lambda/lambda.hpp"  // for lambda::constant
-
 #include "llavatarnamecache.h"  // IDEVO
 #include "llsd.h"
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
 #include "roles_constants.h"    // for GP_MEMBER_INVITE
 
+#include "alfloaterprofilelegacy.h"
+#include "alpanelprofilelegacy.h"
 #include "llaccordionctrl.h"
 #include "llagent.h"
 #include "llappviewer.h"        // for gLastVersionChannel
@@ -50,7 +50,6 @@
 #include "llfloaterreg.h"
 #include "llfloaterpay.h"
 #include "llfloaterprofile.h"
-#include "llfloaterprofilelegacy.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llfloaterwebcontent.h"
 #include "llfloaterworldmap.h"
@@ -65,7 +64,6 @@
 #include "llnotificationsutil.h"    // for LLNotificationsUtil
 #include "llpaneloutfitedit.h"
 #include "llpanelprofile.h"
-#include "llpanelprofilelegacy.h"
 #include "llparcel.h"
 #include "llrecentpeople.h"
 #include "lltrans.h"
@@ -76,11 +74,11 @@
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "lltrans.h"
+#include "llcallingcard.h"
 #include "llslurl.h"            // IDEVO
 #include "llsidepanelinventory.h"
 #include "llavatarname.h"
 #include "llagentui.h"
-#include "lluiusage.h"
 // [RLVa:KB] - Checked: 2011-04-11 (RLVa-1.3.0)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -384,7 +382,7 @@ void LLAvatarActions::showProfile(const LLUUID& avatar_id)
     {
         if (gSkinSettings.getBOOL("LegacyProfile"))
         {
-            LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
         }
         else
@@ -394,6 +392,17 @@ void LLAvatarActions::showProfile(const LLUUID& avatar_id)
     }
 }
 
+bool LLAvatarActions::myProfileVisible()
+{
+    LLFloater* floaterp = findProfileFloater(gAgentID);
+    return floaterp && floaterp->isInVisibleChain();
+}
+
+bool LLAvatarActions::myPicksTabVisible()
+{
+    return myProfileVisible() && isPickTabSelected(gAgentID);
+}
+
 // static
 void LLAvatarActions::showPicks(const LLUUID& avatar_id)
 {
@@ -401,7 +410,7 @@ void LLAvatarActions::showPicks(const LLUUID& avatar_id)
     {
         if (gSkinSettings.getBOOL("LegacyProfile"))
         {
-            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
             LLPanel* tab = profile->expandTab("avatar_picks_tab");
             tab->getChild<LLAccordionCtrl>("accordion")->expandTab("tab_picks");
@@ -425,9 +434,9 @@ void LLAvatarActions::showPick(const LLUUID& avatar_id, const LLUUID& pick_id)
     {
         if (gSkinSettings.getBOOL("LegacyProfile"))
         {
-            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
-            auto* tab = dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+            auto* tab = ALViewType::as<ALPanelProfileLegacy::ALPanelProfilePicks>(profile->expandTab("avatar_picks_tab"));
             if(tab)
             {
                 // *TODO: Finish
@@ -479,10 +488,10 @@ bool LLAvatarActions::isPickTabSelected(const LLUUID& avatar_id)
         static LLCachedControl<bool> legacy_profile(gSkinSettings, "LegacyProfile");
         if (legacy_profile)
         {
-            const LLFloaterProfileLegacy* profile = LLFloaterReg::findTypedInstance<LLFloaterProfileLegacy>(
+            const ALFloaterProfileLegacy* profile = LLFloaterReg::findTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id));
             if (profile == nullptr) { return false; }
-            return dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->getExpandedTab()) != nullptr;
+            return ALViewType::as<ALPanelProfileLegacy::ALPanelProfilePicks>(profile->getExpandedTab()) != nullptr;
         }
         else
         {
@@ -503,7 +512,7 @@ void LLAvatarActions::showClassifieds(const LLUUID& avatar_id)
     {
         if (gSkinSettings.getBOOL("LegacyProfile"))
         {
-            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
             LLPanel* tab = profile->expandTab("avatar_picks_tab");
             tab->getChild<LLAccordionCtrl>("accordion")->expandTab("tab_classifieds");
@@ -527,7 +536,7 @@ void LLAvatarActions::showClassified(const LLUUID& avatar_id, const LLUUID& clas
     {
         if (gSkinSettings.getBOOL("LegacyProfile"))
         {
-            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
             LLPanel* tab = profile->expandTab("avatar_picks_tab");
             tab->getChild<LLAccordionCtrl>("accordion")->expandTab("tab_classifieds");
@@ -536,7 +545,7 @@ void LLAvatarActions::showClassified(const LLUUID& avatar_id, const LLUUID& clas
         else
         {
             LLFloaterProfile* profilefloater =
-                dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", avatar_id)));
+                LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
             if (profilefloater)
             {
                 profilefloater->showClassified(classified_id, edit);
@@ -550,16 +559,16 @@ void LLAvatarActions::createClassified()
 {
     if (gSkinSettings.getBOOL("LegacyProfile"))
     {
-        const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+        const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
             "legacy_profile", LLSD().with("avatar_id", gAgent.getID()));
-        auto* tab = dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+        auto* tab = ALViewType::as<ALPanelProfileLegacy::ALPanelProfilePicks>(profile->expandTab("avatar_picks_tab"));
         tab->createNewClassified();
 
     }
     else
     {
         LLFloaterProfile* profilefloater =
-            dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+            LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", gAgent.getID()));
         if (profilefloater)
         {
             profilefloater->createClassified();
@@ -574,13 +583,13 @@ bool LLAvatarActions::profileVisible(const LLUUID& avatar_id)
     return floater && floater->isShown();
 }
 
-//static
+// static
 LLFloater* LLAvatarActions::findProfileFloater(const LLUUID& avatar_id)
 {
     LLFloater* profile = nullptr;
     static LLCachedControl<bool> legacy_profile(gSkinSettings, "LegacyProfile");
     if (legacy_profile) {
-        profile = LLFloaterReg::findTypedInstance<LLFloaterProfileLegacy>("legacy_profile", LLSD().with("avatar_id", avatar_id));
+        profile = LLFloaterReg::findTypedInstance<ALFloaterProfileLegacy>("legacy_profile", LLSD().with("avatar_id", avatar_id));
     } else {
         profile = LLFloaterReg::findTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
     }
@@ -591,15 +600,15 @@ void LLAvatarActions::createPick(const LLPickData& data)
 {
     if (gSkinSettings.getBOOL("LegacyProfile"))
     {
-        const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+        const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
             "legacy_profile", LLSD().with("avatar_id", gAgent.getID()));
-        auto* tab = dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+        auto* tab = ALViewType::as<ALPanelProfileLegacy::ALPanelProfilePicks>(profile->expandTab("avatar_picks_tab"));
         tab->createNewPick();
     }
     else
     {
         LLFloaterProfile* floater =
-            dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+            LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", gAgent.getID()));
         if (floater)
         {
             floater->createPick(data);
@@ -874,7 +883,7 @@ namespace action_give_inventory
      */
     static LLInventoryPanel* get_outfit_editor_inventory_panel()
     {
-        LLPanelOutfitEdit* panel_outfit_edit = dynamic_cast<LLPanelOutfitEdit*>(LLFloaterSidePanelContainer::getPanel("appearance", "panel_outfit_edit"));
+        LLPanelOutfitEdit* panel_outfit_edit = LLFloaterSidePanelContainer::getPanel<LLPanelOutfitEdit>("appearance", "panel_outfit_edit");
         if (NULL == panel_outfit_edit) return NULL;
 
         LLInventoryPanel* inventory_panel = panel_outfit_edit->findChild<LLInventoryPanel>("folder_view");
@@ -1028,6 +1037,13 @@ namespace action_give_inventory
                     break;
                 }
                 LLViewerInventoryItem* inv_item = gInventory.getItem(*it);
+                if (!inv_item)
+                {
+                    shared = false;
+                    LL_WARNS() << "Failed to share an item " << *it
+                        << ". Item was not found in inventory." << LL_ENDL;
+                    continue;
+                }
                 if (!inv_item->getPermissions().allowCopyBy(gAgentID))
                 {
                     if (!noncopy_item_names.empty())
@@ -1255,7 +1271,7 @@ void LLAvatarActions::shareWithAvatars(LLView * panel)
     using namespace action_give_inventory;
 
     LLFloater* root_floater = gFloaterView->getParentFloater(panel);
-    LLInventoryPanel* inv_panel = dynamic_cast<LLInventoryPanel*>(panel);
+    LLInventoryPanel* inv_panel = ALViewType::as<LLInventoryPanel>(panel);
     LLFloaterAvatarPicker* picker =
         LLFloaterAvatarPicker::show(boost::bind(give_inventory, _1, _2, inv_panel), true, false, false, root_floater->getName());
     if (!picker)
@@ -1559,7 +1575,7 @@ bool LLAvatarActions::handleKick(const LLSD& notification, const LLSD& response)
         msg->addUUIDFast(_PREHASH_GodID,        gAgent.getID() );
         msg->addUUIDFast(_PREHASH_GodSessionID, gAgent.getSessionID());
         msg->addUUIDFast(_PREHASH_AgentID,   avatar_id );
-        msg->addU32("KickFlags", KICK_FLAGS_DEFAULT );
+        msg->addU32Fast(_PREHASH_KickFlags, KICK_FLAGS_DEFAULT );
         msg->addStringFast(_PREHASH_Reason,    response["message"].asString() );
         gAgent.sendReliableMessage();
     }
@@ -1581,13 +1597,13 @@ bool LLAvatarActions::handleFreezeAvatar(const LLSD& notification, const LLSD& r
         LLUUID avatar_id = notification["payload"]["avatar_id"].asUUID();
         LLMessageSystem* msg = gMessageSystem;
 
-        msg->newMessage("FreezeUser");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgent.getID());
-        msg->addUUID("SessionID", gAgent.getSessionID());
-        msg->nextBlock("Data");
-        msg->addUUID("TargetID", avatar_id );
-        msg->addU32("Flags", flags );
+        msg->newMessageFast(_PREHASH_FreezeUser);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addUUIDFast(_PREHASH_TargetID, avatar_id );
+        msg->addU32Fast(_PREHASH_Flags, flags );
         gAgent.sendReliableMessage();
     }
     return false;
@@ -1607,13 +1623,13 @@ bool LLAvatarActions::handleEjectAvatar(const LLSD& notification, const LLSD& re
     {
         LLMessageSystem* msg = gMessageSystem;
         U32 flags = 0x0;
-        msg->newMessage("EjectUser");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgent.getID() );
-        msg->addUUID("SessionID", gAgent.getSessionID() );
-        msg->nextBlock("Data");
-        msg->addUUID("TargetID", avatar_id );
-        msg->addU32("Flags", flags );
+        msg->newMessageFast(_PREHASH_EjectUser);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addUUIDFast(_PREHASH_TargetID, avatar_id );
+        msg->addU32Fast(_PREHASH_Flags, flags );
         gAgent.sendReliableMessage();
     }
     else if (ban_enabled)
@@ -1621,13 +1637,13 @@ bool LLAvatarActions::handleEjectAvatar(const LLSD& notification, const LLSD& re
         LLMessageSystem* msg = gMessageSystem;
 
         U32 flags = 0x1;
-        msg->newMessage("EjectUser");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgent.getID() );
-        msg->addUUID("SessionID", gAgent.getSessionID() );
-        msg->nextBlock("Data");
-        msg->addUUID("TargetID", avatar_id );
-        msg->addU32("Flags", flags );
+        msg->newMessageFast(_PREHASH_EjectUser);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+        msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addUUIDFast(_PREHASH_TargetID, avatar_id );
+        msg->addU32Fast(_PREHASH_Flags, flags );
         gAgent.sendReliableMessage();
     }
     return false;
@@ -1646,7 +1662,7 @@ bool LLAvatarActions::handleFreeze(const LLSD& notification, const LLSD& respons
         msg->addUUIDFast(_PREHASH_GodID,        gAgent.getID() );
         msg->addUUIDFast(_PREHASH_GodSessionID, gAgent.getSessionID());
         msg->addUUIDFast(_PREHASH_AgentID,   avatar_id );
-        msg->addU32("KickFlags", KICK_FLAGS_FREEZE );
+        msg->addU32Fast(_PREHASH_KickFlags, KICK_FLAGS_FREEZE );
         msg->addStringFast(_PREHASH_Reason, response["message"].asString() );
         gAgent.sendReliableMessage();
     }
@@ -1667,7 +1683,7 @@ bool LLAvatarActions::handleUnfreeze(const LLSD& notification, const LLSD& respo
         msg->addUUIDFast(_PREHASH_GodID,        gAgent.getID() );
         msg->addUUIDFast(_PREHASH_GodSessionID, gAgent.getSessionID());
         msg->addUUIDFast(_PREHASH_AgentID,   avatar_id );
-        msg->addU32("KickFlags", KICK_FLAGS_UNFREEZE );
+        msg->addU32Fast(_PREHASH_KickFlags, KICK_FLAGS_UNFREEZE );
         msg->addStringFast(_PREHASH_Reason,    text );
         gAgent.sendReliableMessage();
     }
@@ -1679,7 +1695,6 @@ bool LLAvatarActions::handleUnfreeze(const LLSD& notification, const LLSD& respo
 void LLAvatarActions::requestFriendship(const LLUUID& target_id, const std::string& target_name, const std::string& message)
 {
     const LLUUID calling_card_folder_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_CALLINGCARD);
-    LLUIUsage::instance().logCommand("Agent.SendFriendRequest");
 
     send_improved_im(target_id,
                      target_name,
@@ -1726,19 +1741,4 @@ bool LLAvatarActions::canBlock(const LLUUID& id)
     bool is_linden = (full_name.find("Linden") != std::string::npos);
     bool is_self = id == gAgentID;
     return !is_self && !is_linden;
-}
-
-//static
-bool LLAvatarActions::isAgentMappable(const LLUUID& agent_id)
-{
-    const LLRelationship* buddy_info = nullptr;
-    bool is_friend = LLAvatarActions::isFriend(agent_id);
-
-    if (is_friend)
-        buddy_info = LLAvatarTracker::instance().getBuddyInfo(agent_id);
-
-    return (buddy_info &&
-            buddy_info->isOnline() &&
-            buddy_info->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION)
-            );
 }

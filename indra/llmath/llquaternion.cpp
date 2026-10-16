@@ -37,9 +37,8 @@
 #include "m3math.h"
 #include "llquantize.h"
 
-// WARNING: Don't use this for global const definitions!  using this
-// at the top of a *.cpp file might not give you what you think.
-const LLQuaternion LLQuaternion::DEFAULT;
+// LLQuaternion::DEFAULT is now inline constexpr in llquaternion.h so it can be
+// used as a compile-time constant.
 
 // Constructors
 
@@ -307,6 +306,11 @@ const LLQuaternion& LLQuaternion::setQuat(F32 roll, F32 pitch, F32 yaw)
     mQ[VX] = sinX * cosY * cosZ + cosX * sinY * sinZ;
     mQ[VY] = cosX * sinY * cosZ - sinX * cosY * sinZ;
     mQ[VZ] = cosX * cosY * sinZ + sinX * sinY * cosZ;
+    // The Euler-to-quat formula is unit in exact arithmetic, but every sin/cos
+    // and multiply introduces float error. Every sibling setQuat / set
+    // overload normalizes; do the same here so chained rotations don't
+    // accumulate drift.
+    normalize();
     return (*this);
 }
 
@@ -454,7 +458,10 @@ void LLQuaternion::shortestArc(const LLVector3 &a, const LLVector3 &b)
     F32 ab = a * b; // dotproduct
     LLVector3 c = a % b; // crossproduct
     F32 cc = c * c; // squared length of the crossproduct
-    if (ab * ab + cc) // test if the arguments have sufficient magnitude
+    // ab*ab + cc = |a|^2 * |b|^2, so this checks that both inputs have nonzero
+    // length. The previous truthiness-of-float test was equivalent on IEEE but
+    // hard to read.
+    if (ab * ab + cc > 0.f) // test if the arguments have sufficient magnitude
     {
         if (cc > 0.0f) // test if the arguments are (anti)parallel
         {
@@ -531,18 +538,6 @@ std::ostream& operator<<(std::ostream &s, const LLQuaternion &a)
 
 
 // Does NOT renormalize the result
-LLQuaternion    operator*(const LLQuaternion &a, const LLQuaternion &b)
-{
-//  LLQuaternion::mMultCount++;
-
-    LLQuaternion q(
-        b.mQ[3] * a.mQ[0] + b.mQ[0] * a.mQ[3] + b.mQ[1] * a.mQ[2] - b.mQ[2] * a.mQ[1],
-        b.mQ[3] * a.mQ[1] + b.mQ[1] * a.mQ[3] + b.mQ[2] * a.mQ[0] - b.mQ[0] * a.mQ[2],
-        b.mQ[3] * a.mQ[2] + b.mQ[2] * a.mQ[3] + b.mQ[0] * a.mQ[1] - b.mQ[1] * a.mQ[0],
-        b.mQ[3] * a.mQ[3] - b.mQ[0] * a.mQ[0] - b.mQ[1] * a.mQ[1] - b.mQ[2] * a.mQ[2]
-    );
-    return q;
-}
 
 /*
 LLMatrix4   operator*(const LLMatrix4 &m, const LLQuaternion &q)
@@ -596,13 +591,6 @@ LLVector3d      operator*(const LLVector3d &a, const LLQuaternion &rot)
     return LLVector3d(nx, ny, nz);
 }
 
-F32 dot(const LLQuaternion &a, const LLQuaternion &b)
-{
-    return a.mQ[VX] * b.mQ[VX] +
-           a.mQ[VY] * b.mQ[VY] +
-           a.mQ[VZ] * b.mQ[VZ] +
-           a.mQ[VW] * b.mQ[VW];
-}
 
 // DEMO HACK: This lerp is probably inocrrect now due intermediate normalization
 // it should look more like the lerp below
@@ -620,11 +608,16 @@ LLQuaternion lerp(F32 t, const LLQuaternion &p, const LLQuaternion &q)
 // lerp from identity to q
 LLQuaternion lerp(F32 t, const LLQuaternion &q)
 {
+    // lerp from identity (0,0,0,1) to q:
+    //   r = (1-t)*identity + t*q
+    //   r.W = (1-t)*1 + t*q.W = 1 + t*(q.W - 1)
+    // The previous version used q.mQ[VZ] in the W computation, which was a
+    // typo (VZ instead of VW). Then normalize cleans up any non-unit result.
     LLQuaternion r;
     r.mQ[VX] = t * q.mQ[VX];
     r.mQ[VY] = t * q.mQ[VY];
     r.mQ[VZ] = t * q.mQ[VZ];
-    r.mQ[VW] = t * (q.mQ[VZ] - 1.f) + 1.f;
+    r.mQ[VW] = t * (q.mQ[VW] - 1.f) + 1.f;
     r.normalize();
     return r;
 }
@@ -719,17 +712,25 @@ LLQuaternion nlerp(F32 t, const LLQuaternion &q)
 // slerp from identity quaternion to another quaternion
 LLQuaternion slerp(F32 t, const LLQuaternion &q)
 {
-    F32 c = q.mQ[VW];
-    if (1.0f == t  ||  1.0f == c)
+    const F32 c = q.mQ[VW];
+
+    // Trivial cases:
+    //   t == 1: result is q.
+    //   c near +1: q is essentially identity, the rotation is zero.
+    //   c near -1: q is essentially -identity (same rotation as identity), and
+    //   the previous implementation divided by sqrt(1 - c*c) which is zero
+    //   here, returning NaN. The same is true for any c slightly outside
+    //   [-1, 1] from a non-unit input -- sqrt of a negative is NaN.
+    constexpr F32 SLERP_EPS = 0.00001f;
+    if (1.0f == t || c >= 1.0f - SLERP_EPS || c <= -1.0f + SLERP_EPS)
     {
-        // the trivial cases
         return q;
     }
 
     LLQuaternion r;
-    F32 s, angle, stq, stp;
+    F32 angle, stq, stp;
 
-    s = (F32) sqrt(1.f - c*c);
+    const F32 s = sqrtf(1.f - c * c);
 
     if (c < 0.0f)
     {
@@ -738,15 +739,15 @@ LLQuaternion slerp(F32 t, const LLQuaternion &q)
         // p or q to reduce unecessary spins
         // A equivalent way to do it is to convert acos(c) as if it had
         // been negative, and to negate stp
-        angle   = (F32) acos(-c);
-        stp     = -(F32) sin(angle * (1.f - t));
-        stq     = (F32) sin(angle * t);
+        angle   = acosf(-c);
+        stp     = -sinf(angle * (1.f - t));
+        stq     = sinf(angle * t);
     }
     else
     {
-        angle   = (F32) acos(c);
-        stp     = (F32) sin(angle * (1.f - t));
-        stq     = (F32) sin(angle * t);
+        angle   = acosf(c);
+        stp     = sinf(angle * (1.f - t));
+        stq     = sinf(angle * t);
     }
 
     r.mQ[VX] = (q.mQ[VX] * stq) / s;

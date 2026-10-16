@@ -28,31 +28,41 @@
 #define LLFLOATEREMOJIPICKER_H
 
 #include "llfloater.h"
+#include "llframetimer.h"
 
 class LLEmojiGridRow;
 class LLEmojiGridIcon;
 struct LLEmojiDescriptor;
 struct LLEmojiSearchResult;
+struct LLEmojiVariant;
 
-class LLFloaterEmojiPicker : public LLFloater
+class LLFloaterEmojiPicker final : public LLFloater
 {
     using super = LLFloater;
 
 public:
+    AL_VIEW_TYPE(LLFloaterEmojiPicker, LLFloater);
+
     // The callback function will be called with an emoji char.
-    typedef boost::function<void (llwchar)> pick_callback_t;
-    typedef boost::function<void ()> close_callback_t;
+    typedef std::function<void(llwchar)> pick_callback_t;
+    typedef std::function<void ()> close_callback_t;
 
     LLFloaterEmojiPicker(const LLSD& key);
 
     virtual bool postBuild() override;
+    virtual void draw() override;
     virtual void dirtyRect() override;
     virtual void goneFromFront() override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+
+    // Called by LLEmojiGridIcon when it receives a right-click — pops the
+    // variant flyout for that icon's descriptor (no-op if no variants).
+    void onIconRightClick(LLEmojiGridIcon* icon);
 
     void hideFloater() const;
 
-    static std::list<llwchar>& getRecentlyUsed();
-    static void onEmojiUsed(llwchar emoji);
+    static std::list<std::string>& getRecentlyUsed();
+    static void onEmojiUsed(const std::string& emoji);
 
     static void loadState();
     static void saveState();
@@ -62,18 +72,37 @@ private:
     void fillGroups();
     void fillCategoryFrequentlyUsed(std::map<std::string, std::vector<LLEmojiSearchResult>>& cats);
     void fillGroupEmojis(std::map<std::string, std::vector<LLEmojiSearchResult>>& cats, U32 index);
-    void createGroupButton(LLButton::Params& params, const LLRect& rect, llwchar emoji);
+    void createGroupButton(LLButton::Params& params, const LLRect& rect, const std::string& emoji);
     void resizeGroupButtons();
     void selectEmojiGroup(U32 index);
     void fillEmojis(bool fromResize = false);
     void fillEmojisCategory(const std::vector<LLEmojiSearchResult>& emojis,
         const std::string& category, const LLPanel::Params& row_panel_params, const LLUICtrl::Params& row_list_params,
         const LLPanel::Params& icon_params, const LLRect& icon_rect, S32 max_icons, const LLColor4& bg);
-    void createEmojiIcon(const LLEmojiSearchResult& emoji,
+    void createEmojiIcon(LLEmojiSearchResult emoji,
         const std::string& category, const LLPanel::Params& row_panel_params, const LLUICtrl::Params& row_list_params,
         const LLPanel::Params& icon_params, const LLRect& icon_rect, S32 max_icons, const LLColor4& bg,
         LLEmojiGridRow*& row, int& icon_index);
     void showPreview(bool show);
+
+    // Tone strip and variant flyout helpers.
+    void buildToneStrip();
+    void layoutToneStripButtons();
+    void onToneButtonClick(S32 tone);
+    void refreshToneStripHighlight();
+    void showVariantFlyout(LLEmojiGridIcon* baseIcon);
+    void dismissVariantFlyout();
+    void commitVariant(const std::string& sequence);
+    // Keyboard nav over the 2D flyout grid. Returns true when the
+    // event was consumed.
+    bool moveFlyoutFocus(S32 dRow, S32 dCol);
+    void setFlyoutFocus(S32 row, S32 col);
+    void clearFlyoutFocus();
+    bool commitFlyoutFocused();
+    // Substitute a variant character into a search-result-shaped struct
+    // when the global tone preference applies. Skips the substitution if
+    // the input is already a variant (i.e. came from recents).
+    void applyTonePreference(LLEmojiSearchResult& emoji) const;
 
     void onGroupButtonClick(LLUICtrl* ctrl);
     void onGroupButtonMouseEnter(LLUICtrl* ctrl);
@@ -98,6 +127,22 @@ private:
 
     class LLPanel* mGroups { nullptr };
     class LLPanel* mBadge { nullptr };
+    class LLPanel* mToneStrip { nullptr };
+    class LLPanel* mVariantFlyout { nullptr };
+    bool mVariantFlyoutPendingDismiss { false };
+    // Main-grid icon that opened the current flyout. Pinned to the
+    // selected/highlighted state for the duration of the flyout so the
+    // user can see which base they're picking variants from. Reset to
+    // nullptr in dismissVariantFlyout. Cleared (without unhighlighting)
+    // by fillEmojis when the grid is rebuilt — the icon is gone in that
+    // case, so the pointer would dangle.
+    LLEmojiGridIcon* mFlyoutBaseIcon { nullptr };
+    // 2D matrix of variant-flyout cells; nullptr entries are "gaps"
+    // (e.g. man-astronaut has no tone-3 variant in the data). Used by
+    // the keyboard nav to walk only valid cells.
+    std::vector<std::vector<LLEmojiGridIcon*>> mFlyoutCells;
+    S32 mFlyoutFocusRow { -1 };
+    S32 mFlyoutFocusCol { -1 };
     class LLScrollContainer* mEmojiScroll { nullptr };
     class LLScrollingPanelList* mEmojiGrid { nullptr };
     class LLEmojiPreviewPanel* mPreview { nullptr };
@@ -117,6 +162,20 @@ private:
     LLEmojiGridIcon* mHoveredIcon { nullptr };
 
     U64 mRecentReturnPressedMs { 0 };
+
+    // Long-press detection: we record the icon under the mouse on
+    // mouse-down and check elapsed time in draw(). On expiry the variant
+    // flyout opens. Mouse-up or mouse-leave clears mLongPressIcon.
+    // mLongPressFired guards the subsequent mouse-up from also committing
+    // the base character — once the flyout has opened, the release is
+    // just dismissing the hold, not picking the cell.
+    LLFrameTimer mLongPressTimer;
+    LLEmojiGridIcon* mLongPressIcon { nullptr };
+    bool mLongPressFired { false };
+
+    // Cached strip width so dirtyRect can detect a resize and re-flow
+    // the tone-strip buttons without doing the work every frame.
+    S32 mToneStripLastWidth { 0 };
 };
 
 #endif

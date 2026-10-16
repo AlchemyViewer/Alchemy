@@ -1,16 +1,10 @@
 # -*- cmake -*-
 
-project(llprimitive)
+add_library(llprimitive STATIC)
 
-include(00-Common)
-include(LLCommon)
-include(LLCoreHttp)
-include(LLPhysicsExtensions)
-include(LLPrimitive)
-include(GLM)
-include(TinyGLTF)
-
-set(llprimitive_SOURCE_FILES
+target_sources(
+  llprimitive
+  PRIVATE
     lldaeloader.cpp
     llgltfmaterial.cpp
     llmaterialid.cpp
@@ -26,69 +20,62 @@ set(llprimitive_SOURCE_FILES
     lltreeparams.cpp
     llvolumemessage.cpp
     material_codes.cpp
-    )
+  PUBLIC
+    FILE_SET HEADERS
+      FILES
+        lldaeloader.h
+        llgltfmaterial.h
+        llgltfmaterial_templates.h
+        legacy_object_types.h
+        llmaterial.h
+        llmaterialid.h
+        llmaterialtable.h
+        llmediaentry.h
+        llmodel.h
+        llmodelloader.h
+        llprimitive.h
+        llprimtexturelist.h
+        lllslconstants.h
+        lltextureanim.h
+        lltextureentry.h
+        lltreeparams.h
+        lltree_common.h
+        llvolumemessage.h
+        material_codes.h
+        object_flags.h
+)
 
-set(llprimitive_HEADER_FILES
-    CMakeLists.txt
-    lldaeloader.h
-    llgltfmaterial.h
-    llgltfmaterial_templates.h
-    legacy_object_types.h
-    llmaterial.h
-    llmaterialid.h
-    llmaterialtable.h
-    llmediaentry.h
-    llmodel.h
-    llmodelloader.h
-    llprimitive.h
-    llprimtexturelist.h
-    lllslconstants.h
-    lltextureanim.h
-    lltextureentry.h
-    lltreeparams.h
-    lltree_common.h
-    llvolumemessage.h
-    material_codes.h
-    object_flags.h
-    )
+target_link_libraries(
+  llprimitive
+  PRIVATE al::flags
+  PUBLIC llcharacter llrender llmessage llcorehttp llxml llcommon llmath ll::colladadom ll::tinygltf
+)
 
-list(APPEND llprimitive_SOURCE_FILES ${llprimitive_HEADER_FILES})
+target_link_libraries(llprimitive PUBLIC llphysicsextensionsos)
 
-add_library (llprimitive ${llprimitive_SOURCE_FILES})
-target_include_directories( llprimitive  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
+target_precompile_headers(llprimitive REUSE_FROM llprecompiled)
 
-target_link_libraries(llprimitive
-        llcommon
-        llmath
-        llmessage
-        llcorehttp
-        llxml
-        llcharacter
-        llrender
-        llphysicsextensions_impl
-        ll::colladadom
-        ll::glm
-        )
-
-if (TARGET llconvexdecomposition)
-    target_link_libraries(llprimitive
-            llconvexdecomposition
-            )
-endif ()
-
-if (USE_PRECOMPILED_HEADERS)
-    target_precompile_headers(llprimitive REUSE_FROM llprecompiled)
-endif ()
-
-#add unit tests
-if (LL_TESTS)
-    INCLUDE(LLAddBuildTest)
-    SET(llprimitive_TEST_SOURCE_FILES
-      llmediaentry.cpp
-      llprimitive.cpp
-      llgltfmaterial.cpp
-      )
-
-    set_property(SOURCE llprimitive.cpp PROPERTY LL_TEST_ADDITIONAL_LIBRARIES llmessage)
-    LL_ADD_PROJECT_UNIT_TESTS(llprimitive "${llprimitive_TEST_SOURCE_FILES}")
-endif (LL_TESTS)
+# add unit tests
+if(AL_BUILD_TESTS)
+  # llgltfmaterial_test.cpp is the one file that defines tinygltf's and stb's
+  # implementations, which the library leaves to the viewer.
+  al_add_test_binary(
+    llprimitive_tests
+    PROJECT llprimitive
+    SOURCES
+      tests/llgltfmaterial_test.cpp
+      tests/llmaterial_test.cpp
+      tests/llmaterialid_test.cpp
+      tests/llmediaentry_test.cpp
+    LIBRARIES llprimitive
+  )
+  # This one stubs LLMaterialID and LLPrimTextureList, which the library
+  # defines, so it compiles the one file it tests instead of linking it.
+  al_add_test_binary(
+    llprimitive_test
+    PROJECT llprimitive
+    SOURCES tests/llprimitive_test.cpp
+    UNIT llprimitive.cpp
+    LIBRARIES llmessage llmath llcommon
+  )
+endif()

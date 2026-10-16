@@ -32,17 +32,22 @@
 #include "llpanelpulldown.h"
 
 
-class LLPanelPresetsPulldown : public LLPanelPulldown
+class LLPanelPresetsPulldown final : public LLPanelPulldown
 {
  public:
+    AL_VIEW_TYPE(LLPanelPresetsPulldown, LLPanelPulldown);
+
     LLPanelPresetsPulldown();
     bool postBuild() override;
+    void onVisibilityChange(bool new_visibility) override;
     void populatePanel();
 
  private:
     void onGraphicsButtonClick(const LLSD& user_data);
     void onAutofpsButtonClick(const LLSD& user_data);
+    void onLightboxButtonClick(const LLSD& user_data);
     void onRowClick(const LLSD& user_data);
+    void onChangeQuality(const LLSD& data);
 
     std::list<std::string> mPresetNames;
     LOG_CLASS(LLPanelPresetsPulldown);

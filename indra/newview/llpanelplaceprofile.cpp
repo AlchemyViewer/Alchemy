@@ -342,18 +342,18 @@ void LLPanelPlaceProfile::displaySelectedParcelInfo(LLParcel* parcel,
         return;
 
     if (mLastSelectedRegionID != region->getRegionID()
-        || mNextCovenantUpdateTime < LLTimer::getElapsedSeconds())
+        || mNextCovenantUpdateTime < LLTimer::getUptimeSeconds())
     {
         // send EstateCovenantInfo message
         // Note: LLPanelPlaceProfile doesn't change Covenant's content and any
         // changes made by Estate floater should be requested by Estate floater
         LLMessageSystem *msg = gMessageSystem;
-        msg->newMessage("EstateCovenantRequest");
+        msg->newMessageFast(_PREHASH_EstateCovenantRequest);
         msg->nextBlockFast(_PREHASH_AgentData);
         msg->addUUIDFast(_PREHASH_AgentID,  gAgent.getID());
         msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
         msg->sendReliable(region->getHost());
-        mNextCovenantUpdateTime = LLTimer::getElapsedSeconds() + COVENANT_REFRESH_TIME_SEC;
+        mNextCovenantUpdateTime = LLTimer::getUptimeSeconds() + COVENANT_REFRESH_TIME_SEC;
     }
 
     LLParcelData parcel_data;
@@ -520,7 +520,7 @@ void LLPanelPlaceProfile::displaySelectedParcelInfo(LLParcel* parcel,
             std::string parcel_owner =
                 LLSLURL("agent", parcel->getOwnerID(), "inspect").getSLURLString();
             mParcelOwner->setText(parcel_owner);
-            LLAvatarNameCache::get(region->getOwner(), boost::bind(&LLPanelPlaceInfo::onAvatarNameCache, _1, _2, mRegionOwnerText));
+            mAvatarNameCacheConnection = LLAvatarNameCache::get(region->getOwner(), boost::bind(&LLPanelPlaceInfo::onAvatarNameCache, _1, _2, mRegionOwnerText));
             mRegionGroupText->setText( getString("none_text"));
         }
 
@@ -551,7 +551,7 @@ void LLPanelPlaceProfile::displaySelectedParcelInfo(LLParcel* parcel,
         const LLUUID& auth_buyer_id = parcel->getAuthorizedBuyerID();
         if(auth_buyer_id.notNull())
         {
-            LLAvatarNameCache::get(auth_buyer_id, boost::bind(&LLPanelPlaceInfo::onAvatarNameCache, _1, _2, mSaleToText));
+            mAvatarNameCacheConnection = LLAvatarNameCache::get(auth_buyer_id, boost::bind(&LLPanelPlaceInfo::onAvatarNameCache, _1, _2, mSaleToText));
 
             // Show sales info to a specific person or a group he belongs to.
             if (auth_buyer_id != gAgent.getID() && !gAgent.isInGroup(auth_buyer_id))

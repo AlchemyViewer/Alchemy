@@ -35,6 +35,7 @@
 #include "hbxxh.h"
 
 #include <array>
+#include <cstring>
 #include <string>
 #include <map>
 
@@ -115,8 +116,26 @@ public:
     static const char* const GLTF_FILE_EXTENSION_TRANSFORM_ROTATION;
     static const LLUUID GLTF_OVERRIDE_NULL_UUID;
 
-    // get a UUID based on a hash of this LLGLTFMaterial
-    LLUUID getHash() const;
+    // Get a UUID based on a hash of this LLGLTFMaterial. Cheap to call: the
+    // fast path packs the meaningful members into a stack buffer, compares to
+    // the cached snapshot, and returns the cached hash on a match (avoids the
+    // HBXXH128 work). The slow path (state changed) recomputes the hash and
+    // refreshes the snapshot. The cache also fixes the previous raw-object-
+    // memory hashing scheme, which read padding bytes (UB / compiler-dependent
+    // values) and only "worked" because the constructor zeroed padding.
+    LLUUID getHash() const
+    {
+        U8 buf[HASH_BYTES];
+        packHashBytes(buf);
+        if (!mHashInitialized ||
+            std::memcmp(buf, mHashCacheBytes, HASH_BYTES) != 0)
+        {
+            std::memcpy(mHashCacheBytes, buf, HASH_BYTES);
+            HBXXH128::digest(mHashCache, buf, HASH_BYTES);
+            mHashInitialized = true;
+        }
+        return mHashCache;
+    }
 
     //setters for various members (will clamp to acceptable ranges)
     // for_override - set to true if this value is being set as part of an override (important for handling override to default value)
@@ -214,6 +233,22 @@ public:
     bool hasLocalTextures() { return !mTrackingIdToLocalTexture.empty(); }
     virtual bool replaceLocalTexture(const LLUUID& tracking_id, const LLUUID &old_id, const LLUUID& new_id);
     virtual void updateTextureTracking();
+
+    // Convert legacy TE transform values to PBR transform values.
+    static void convertTextureTransformToPBR(F32 tex_scale_s, F32 tex_scale_t,
+                                             F32 tex_offset_s, F32 tex_offset_t,
+                                             F32 tex_rotation,
+                                             LLVector2& pbr_scale,
+                                             LLVector2& pbr_offset,
+                                             F32& pbr_rotation);
+
+    // Convert PBR transform values to legacy TE transform values.
+    static void convertPBRTransformToTexture(const LLVector2& pbr_scale,
+                                             const LLVector2& pbr_offset,
+                                             F32 pbr_rotation,
+                                             F32& tex_scale_s, F32& tex_scale_t,
+                                             F32& tex_offset_s, F32& tex_offset_t,
+                                             F32& tex_rotation);
 protected:
     static LLVector2 vec2FromJson(const std::map<std::string, tinygltf::Value>& object, const char* key, const LLVector2& default_value);
     static F32 floatFromJson(const std::map<std::string, tinygltf::Value>& object, const char* key, const F32 default_value);
@@ -253,21 +288,20 @@ public:
 
     // Used to store a digest of mTrackingIdToLocalTexture when the latter is
     // not empty, or zero otherwise. HB
-    U64 mLocalTexDataDigest;
+    U64 mLocalTexDataDigest = 0;
 
     std::array<LLUUID, GLTF_TEXTURE_INFO_COUNT> mTextureId;
     std::array<TextureTransform, GLTF_TEXTURE_INFO_COUNT> mTextureTransform;
 
-    // NOTE: initialize values to defaults according to the GLTF spec
-    // NOTE: these values should be in linear color space
-    LLColor4 mBaseColor;
-    LLColor3 mEmissiveColor;
+    // Defaults from the GLTF spec. Values are in linear color space.
+    LLColor4 mBaseColor{1.f, 1.f, 1.f, 1.f};
+    LLColor3 mEmissiveColor; // (0, 0, 0)
 
-    F32 mMetallicFactor;
-    F32 mRoughnessFactor;
-    F32 mAlphaCutoff;
+    F32 mMetallicFactor  = 1.f;
+    F32 mRoughnessFactor = 1.f;
+    F32 mAlphaCutoff     = 0.5f;
 
-    AlphaMode mAlphaMode;
+    AlphaMode mAlphaMode = ALPHA_MODE_OPAQUE;
 
     bool mDoubleSided = false;
 
@@ -275,4 +309,32 @@ public:
     // hack
     bool mOverrideDoubleSided = false;
     bool mOverrideAlphaMode = false;
+
+private:
+    // Canonical hashable payload (padding-free, deterministic across compilers).
+    //   mLocalTexDataDigest                                                       8
+    //   mTextureId[N]                            N * 16
+    //   mTextureTransform[N]: offset.xy + scale.xy + rotation  N * 5 * sizeof(F32)
+    //   mBaseColor                                                  4 * sizeof(F32)
+    //   mEmissiveColor                                              3 * sizeof(F32)
+    //   mMetallicFactor / mRoughnessFactor / mAlphaCutoff           3 * sizeof(F32)
+    //   mAlphaMode (normalized to S32)                                  sizeof(S32)
+    //   mDoubleSided / mOverrideDoubleSided / mOverrideAlphaMode             3 * 1
+    static constexpr size_t HASH_BYTES =
+          sizeof(U64)
+        + GLTF_TEXTURE_INFO_COUNT * UUID_BYTES
+        + GLTF_TEXTURE_INFO_COUNT * 5 * sizeof(F32)
+        + 4 * sizeof(F32)
+        + 3 * sizeof(F32)
+        + 3 * sizeof(F32)
+        + sizeof(S32)
+        + 3;
+
+    // Pack the meaningful members into `buf` in canonical order. The buffer
+    // must point to at least HASH_BYTES of storage.
+    void packHashBytes(U8* buf) const;
+
+    mutable LLUUID mHashCache;
+    mutable U8     mHashCacheBytes[HASH_BYTES] {};
+    mutable bool   mHashInitialized = false;
 };

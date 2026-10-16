@@ -275,9 +275,9 @@ bool LLFloaterModelPreview::postBuild()
 
     if (LLConvexDecomposition::getInstance() != NULL)
     {
-        mCalculateBtn->setClickedCallback(boost::bind(&LLFloaterModelPreview::onClickCalculateBtn, this));
+    mCalculateBtn->setClickedCallback(boost::bind(&LLFloaterModelPreview::onClickCalculateBtn, this));
 
-        toggleCalculateButton(true);
+    toggleCalculateButton(true);
     }
     else
     {
@@ -782,7 +782,7 @@ void LLFloaterModelPreview::draw3dPreview()
 {
     gGL.color3f(1.f, 1.f, 1.f);
 
-    gGL.getTexUnit(0)->bind(mModelPreview);
+    gGL.getTextureSlot(0)->bindSampled(mModelPreview, ALSamplers::AnisoWrap);
 
     gGL.begin(LLRender::TRIANGLES);
     {
@@ -802,7 +802,7 @@ void LLFloaterModelPreview::draw3dPreview()
     }
     gGL.end();
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 }
 
 //-----------------------------------------------------------------------------
@@ -941,16 +941,16 @@ bool LLFloaterModelPreview::handleHover (S32 x, S32 y, MASK mask)
 //-----------------------------------------------------------------------------
 // handleScrollWheel()
 //-----------------------------------------------------------------------------
-bool LLFloaterModelPreview::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLFloaterModelPreview::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (mPreviewRect.pointInRect(x, y) && mModelPreview)
     {
-        mModelPreview->zoom((F32)clicks * -0.2f);
+        mModelPreview->zoom((F32)delta.mPrecise * -0.2f);
         mModelPreview->refresh();
     }
     else
     {
-        LLFloaterModelUploadBase::handleScrollWheel(x, y, clicks);
+        LLFloaterModelUploadBase::handleScrollWheel(x, y, delta);
     }
     return true;
 }
@@ -1067,35 +1067,21 @@ void LLFloaterModelPreview::onPhysicsBrowse(LLUICtrl* ctrl, void* userdata)
 //static
 void LLFloaterModelPreview::onPhysicsUseLOD(LLUICtrl* ctrl, void* userdata)
 {
-    S32 num_lods = 4;
-    S32 which_mode;
-
-    LLCtrlSelectionInterface* iface = sInstance->childGetSelectionInterface("physics_lod_combo");
-    if (iface)
+    const std::string source = ctrl->getValue().asString();
+    if (source == "bounding_box")
     {
-        which_mode = iface->getFirstSelectedIndex();
+        sInstance->loadModel(LLModel::LOD_PHYSICS, getBoundingBoxCubePath());
     }
     else
     {
-        LL_WARNS() << "no iface" << LL_ENDL;
-        return;
-    }
-
-    if (which_mode <= 0)
-    {
-        LL_WARNS() << "which_mode out of range, " << which_mode << LL_ENDL;
-    }
-
-    S32 file_mode = iface->getItemCount() - 1;
-    S32 cube_mode = file_mode - 1;
-    if (which_mode < cube_mode)
-    {
-        S32 which_lod = num_lods - which_mode;
-        sInstance->mModelPreview->setPhysicsFromLOD(which_lod);
-    }
-    else if (which_mode == cube_mode)
-    {
-        sInstance->loadModel(LLModel::LOD_PHYSICS, getBoundingBoxCubePath());
+        for (S32 lod = 0; lod < NUM_LOD; ++lod)
+        {
+            if (source == lod_name[lod])
+            {
+                sInstance->mModelPreview->setPhysicsFromLOD(lod);
+                break;
+            }
+        }
     }
 
     LLModelPreview *model_preview = sInstance->mModelPreview;
@@ -1144,6 +1130,7 @@ void LLFloaterModelPreview::initDecompControls()
     childSetCommitCallback("decompose_cancel", onPhysicsStageCancel, NULL);
     childSetCommitCallback("analyze_cancel", onPhysicsStageCancel, NULL);
 
+    childSetValue("physics_lod_combo", "none");
     childSetCommitCallback("physics_lod_combo", onPhysicsUseLOD, NULL);
     childSetCommitCallback("physics_browse", onPhysicsBrowse, NULL);
 
@@ -1198,7 +1185,7 @@ void LLFloaterModelPreview::initDecompControls()
 
 
                 LLUICtrl* ctrl = getChild<LLUICtrl>(name);
-                if (LLSliderCtrl* slider = dynamic_cast<LLSliderCtrl*>(ctrl))
+                if (LLSliderCtrl* slider = ALViewType::as<LLSliderCtrl>(ctrl))
                 {
                     slider->setMinValue(param[i].mDetails.mRange.mLow.mFloat);
                     slider->setMaxValue(param[i].mDetails.mRange.mHigh.mFloat);
@@ -1206,7 +1193,7 @@ void LLFloaterModelPreview::initDecompControls()
                     slider->setValue(param[i].mDefault.mFloat);
                     slider->setCommitCallback(onPhysicsParamCommit, (void*) &param[i]);
                 }
-                else if (LLSpinCtrl* spinner = dynamic_cast<LLSpinCtrl*>(ctrl))
+                else if (LLSpinCtrl* spinner = ALViewType::as<LLSpinCtrl>(ctrl))
                 {
                     bool is_retain_ctrl = "Retain%" == name;
                     float coefficient = is_retain_ctrl ? (F32)RETAIN_COEFFICIENT : 1.f;
@@ -1217,7 +1204,7 @@ void LLFloaterModelPreview::initDecompControls()
                     spinner->setValue(param[i].mDefault.mFloat * coefficient);
                     spinner->setCommitCallback(onPhysicsParamCommit, (void*) &param[i]);
                 }
-                else if (LLComboBox* combo_box = dynamic_cast<LLComboBox*>(ctrl))
+                else if (LLComboBox* combo_box = ALViewType::as<LLComboBox>(ctrl))
                 {
                     float min = param[i].mDetails.mRange.mLow.mFloat;
                     float max = param[i].mDetails.mRange.mHigh.mFloat;
@@ -1247,7 +1234,7 @@ void LLFloaterModelPreview::initDecompControls()
 
 
                 LLUICtrl* ctrl = getChild<LLUICtrl>(name);
-                if (LLSliderCtrl* slider = dynamic_cast<LLSliderCtrl*>(ctrl))
+                if (LLSliderCtrl* slider = ALViewType::as<LLSliderCtrl>(ctrl))
                 {
                     slider->setMinValue((F32)param[i].mDetails.mRange.mLow.mIntOrEnumValue);
                     slider->setMaxValue((F32)param[i].mDetails.mRange.mHigh.mIntOrEnumValue);
@@ -1255,7 +1242,7 @@ void LLFloaterModelPreview::initDecompControls()
                     slider->setValue((F32)param[i].mDefault.mIntOrEnumValue);
                     slider->setCommitCallback(onPhysicsParamCommit, (void*) &param[i]);
                 }
-                else if (LLComboBox* combo_box = dynamic_cast<LLComboBox*>(ctrl))
+                else if (LLComboBox* combo_box = ALViewType::as<LLComboBox>(ctrl))
                 {
                     for(int k = param[i].mDetails.mRange.mLow.mIntOrEnumValue; k<=param[i].mDetails.mRange.mHigh.mIntOrEnumValue; k+=param[i].mDetails.mRange.mDelta.mIntOrEnumValue)
                     {
@@ -1637,8 +1624,7 @@ void LLFloaterModelPreview::addStringToLogTab(const std::string& str, bool flash
         return;
     }
 
-    LLWString text = utf8str_to_wstring(str);
-    S32 add_text_len = static_cast<S32>(text.length()) + 1; // newline
+    S32 add_text_len = static_cast<S32>(str.length()) + 1; // newline
     S32 editor_max_len = mUploadLogText->getMaxTextLength();
     if (add_text_len > editor_max_len)
         {
@@ -1646,7 +1632,7 @@ void LLFloaterModelPreview::addStringToLogTab(const std::string& str, bool flash
     }
 
     // Make sure we have space for new string
-    S32 editor_text_len = mUploadLogText->getLength();
+    S32 editor_text_len = mUploadLogText->getLengthBytes();
     if (editor_max_len < (editor_text_len + add_text_len)
         && mUploadLogText->getLineCount() <= 0)
     {
@@ -1782,7 +1768,7 @@ void LLFloaterModelPreview::setCtrlLoadFromFile(S32 lod)
         LLComboBox* lod_combo = findChild<LLComboBox>("physics_lod_combo");
         if (lod_combo)
         {
-            lod_combo->setCurrentByIndex(lod_combo->getItemCount() - 1);
+            lod_combo->setValue("file");
         }
     }
     else
@@ -1911,7 +1897,7 @@ void LLFloaterModelPreview::resetUploadOptions()
             ctrl->setValue(p.second);
         }
     }
-    getChild<LLComboBox>("physics_lod_combo")->setCurrentByIndex(0);
+    childSetValue("physics_lod_combo", "none");
     getChild<LLComboBox>("Cosine%")->setCurrentByIndex(0);
 }
 

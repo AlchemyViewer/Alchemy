@@ -28,13 +28,17 @@
 #define LL_PANELPROFILECLASSIFIEDS_H
 
 #include "llavatarpropertiesprocessor.h"
-#include "llfloaterpublishclassified.h"
+#include "llclassifiedinfo.h"
+#include "llfloater.h"
 #include "llpanel.h"
 #include "llpanelavatar.h"
+#include "llrect.h"
 #include "lluuid.h"
 #include "v3dmath.h"
+#include "llcoros.h"
 #include "lleventcoro.h"
 
+class LLFloaterPublishClassified;
 class LLCheckBoxCtrl;
 class LLLineEditor;
 class LLMediaCtrl;
@@ -44,13 +48,34 @@ class LLTextEditor;
 class LLTextureCtrl;
 class LLUICtrl;
 
+#if 0 // Moved to LLFloaterPublishClassified
+class LLPublishClassifiedFloater final : public LLFloater
+{
+public:
+    AL_VIEW_TYPE(LLPublishClassifiedFloater, LLFloater);
+
+    LLPublishClassifiedFloater(const LLSD& key);
+    virtual ~LLPublishClassifiedFloater();
+
+    bool postBuild() override;
+
+    void setPrice(S32 price);
+    S32 getPrice();
+
+    void setPublishClickedCallback(const commit_signal_t::slot_type& cb);
+    void setCancelClickedCallback(const commit_signal_t::slot_type& cb);
+};
+#endif
+
 /**
 * Panel for displaying Avatar's picks.
 */
-class LLPanelProfileClassifieds
+class LLPanelProfileClassifieds final
     : public LLPanelProfilePropertiesProcessorTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileClassifieds, LLPanelProfilePropertiesProcessorTab);
+
     LLPanelProfileClassifieds();
     /*virtual*/ ~LLPanelProfileClassifieds();
 
@@ -91,14 +116,14 @@ private:
     LLUUID          mClassifiedToSelectOnLoad;
     bool            mClassifiedEditOnLoad;
     bool            mSheduledClassifiedCreation;
-    boost::signals2::connection mRlvBehaviorConn;
 };
 
 
-class LLPanelProfileClassified
+class LLPanelProfileClassified final
     : public LLPanelProfilePropertiesProcessorTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileClassified, LLPanelProfilePropertiesProcessorTab);
 
     static LLPanelProfileClassified* create();
 

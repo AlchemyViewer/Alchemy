@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,6 +37,7 @@
 # include <mach/mach_init.h>
 #include <mach/mach_host.h>
 #elif LL_LINUX
+# include <cstdio>
 # include <unistd.h>
 # include <sys/resource.h>
 # include <sys/sysinfo.h>
@@ -51,6 +52,9 @@
 //----------------------------------------------------------------------------
 
 //static
+
+// On windows commit charge information is vital for OOM diagnosis.
+U32Megabytes LLMemory::sAvailCommitMemInMB(U32_MAX);
 
 // most important memory metric for texture streaming
 //  On Windows, this should agree with resource monitor -> performance -> memory -> available
@@ -69,6 +73,13 @@ U32Kilobytes LLMemory::sMaxHeapSizeInKB(U32_MAX);
 U32Kilobytes LLMemory::sAllocatedMemInKB(0);
 
 U32Kilobytes LLMemory::sAllocatedPageSizeInKB(0);
+
+LLFrameTimer LLMemory::sMemoryCheckTimer;
+F32 LLMemory::sSysMemoryFactor = 1.f;
+U32 LLMemory::sFactorLastFrameCount = 0;
+bool LLMemory::sSysMemoryBudgetEnabled = true;
+
+static const S32Megabytes MEM_LOW_THRESHOLD = S32Megabytes(256);
 
 
 static LLTrace::SampleStatHandle<F64Megabytes> sAllocatedMem("allocated_mem", "active memory in use by application");
@@ -102,23 +113,14 @@ void LLMemory::updateMemoryInfo()
 {
     LL_PROFILE_ZONE_SCOPED;
 
+    sMemoryCheckTimer.reset();
     sMaxPhysicalMemInKB = gSysMemory.getPhysicalMemoryKB();
 
-    U32Kilobytes avail_mem;
-    LLMemoryInfo::getAvailableMemoryKB(avail_mem);
-    sAvailPhysicalMemInKB = avail_mem;
+    LLMemoryInfo::updateAvailableMemory();
 
 #if LL_WINDOWS
-    PROCESS_MEMORY_COUNTERS counters;
-
-    if (!GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)))
-    {
-        LL_WARNS() << "GetProcessMemoryInfo failed" << LL_ENDL;
-        return ;
-    }
-
-    sAllocatedMemInKB = U32Kilobytes::convert(U64Bytes(counters.WorkingSetSize));
-    sAllocatedPageSizeInKB = U32Kilobytes::convert(U64Bytes(counters.PagefileUsage));
+    // On windows updateAvailableMemory fills sAvailPhysicalMemInKB,
+    //sAllocatedMemInKB and sAllocatedPageSizeInKB
     sample(sVirtualMem, sAllocatedPageSizeInKB);
 
 #elif defined(LL_DARWIN)
@@ -146,9 +148,6 @@ void LLMemory::updateMemoryInfo()
         LL_WARNS() << "task_info failed" << LL_ENDL;
     }
 #elif defined(LL_LINUX)
-    // Use sysinfo() to get the total physical memory.
-    struct sysinfo info;
-    sysinfo(&info);
     sAllocatedMemInKB = U32Kilobytes::convert(U64Bytes(LLMemory::getCurrentRSS())); // represents the RAM allocated by this process only (in line with the windows implementation)
 #else
     //not valid for other systems for now.
@@ -157,7 +156,17 @@ void LLMemory::updateMemoryInfo()
 #endif
     sample(sAllocatedMem, sAllocatedMemInKB);
 
-    sAvailPhysicalMemInKB = llmin(sAvailPhysicalMemInKB, sMaxHeapSizeInKB - sAllocatedMemInKB);
+    // Headroom under the heap cap. The units are unsigned, so an allocation
+    // past the cap has to read as no room left rather than wrap around. A
+    // platform that could not say what is available leaves the sentinel in
+    // place, so the readers know there is no figure rather than a large one.
+    if (sAvailPhysicalMemInKB != U32Kilobytes(U32_MAX))
+    {
+        const U32Kilobytes heap_headroom = sAllocatedMemInKB < sMaxHeapSizeInKB
+            ? U32Kilobytes(sMaxHeapSizeInKB - sAllocatedMemInKB)
+            : U32Kilobytes(0);
+        sAvailPhysicalMemInKB = llmin(sAvailPhysicalMemInKB, heap_headroom);
+    }
 
     return ;
 }
@@ -200,6 +209,119 @@ void LLMemory::logMemoryInfo(bool update)
     LL_INFOS() << llformat("Current available physical memory: %.2f MB", sAvailPhysicalMemInKB / 1024.0) << LL_ENDL;
     LL_INFOS() << llformat("Current max usable memory: %.2f MB", sMaxPhysicalMemInKB / 1024.0) << LL_ENDL;
 }
+
+void LLMemory::updateFreeSystemMemory()
+{
+    if (sMemoryCheckTimer.getElapsedTimeF32() >= 1.f) //once per second.
+    {
+        LLMemory::updateMemoryInfo(); // resets the timer
+    }
+}
+
+//static
+void LLMemory::setSystemMemoryBudgetEnabled(bool enabled)
+{
+    sSysMemoryBudgetEnabled = enabled;
+    if (!enabled)
+    {
+        // Restore full draw range immediately rather than ramping out of
+        // whatever reduction was in effect when this was turned off.
+        sSysMemoryFactor = 1.f;
+    }
+}
+
+S32Megabytes LLMemory::getScarcestFreeMemMB()
+{
+    S32Megabytes free_mem = getAvailableMemKB();
+#if LL_WINDOWS
+    // Running out of commit charge kills us just as fast as running out of
+    // physical memory, so budget against whichever is scarcer. Physical is
+    // the one that matters in practice: commit includes the page file and
+    // only collapses once the machine is already thrashing.
+    const U32Megabytes avail_commit = getAvailableCommitMemMB();
+    if (avail_commit != U32Megabytes(U32_MAX)) // unset would convert to -1MB
+    {
+        free_mem = llmin(free_mem, S32Megabytes(avail_commit));
+    }
+#endif
+    return free_mem;
+}
+
+//static
+F32 LLMemory::getSystemMemoryBudgetFactor()
+{
+    if (!sSysMemoryBudgetEnabled)
+    {
+        return 1.f;
+    }
+
+    // Only update once per frame
+    U32 current_frame = LLFrameTimer::getFrameCount();
+    if (sFactorLastFrameCount == current_frame)
+    {
+        return sSysMemoryFactor;
+    }
+    sFactorLastFrameCount = current_frame;
+
+    updateFreeSystemMemory();
+
+    if (sAvailPhysicalMemInKB == U32Kilobytes(U32_MAX))
+    {
+        // Counters have never been read; every value is still its sentinel.
+        return sSysMemoryFactor;
+    }
+
+    const S32Megabytes free_sys_mem = getScarcestFreeMemMB();
+    // sSysMemoryFactor divides draw distance, so 1 is full range and 2 is half.
+    // The target is 1 at the threshold and 2 once only PAD_BUFFER is left, so a
+    // shallow dip costs a little range and a deep one costs a lot.
+    //
+    // Draw range reduction is a last resort, texture bias is supposed
+    // to free at least some memory before we get here.
+    // Note: textures were mostly moved to vram, we might want to
+    // detach texture bias from system memory.
+
+    // Leave some padding, otherwise we will crash out of memory before hitting factor 2.
+    const S32Megabytes PAD_BUFFER(32);
+    const S32Megabytes budget_target = MEM_LOW_THRESHOLD - PAD_BUFFER;
+
+    // debt is a negative value when free memory is under the threshold.
+    const S32Megabytes sys_budget_debt = free_sys_mem - MEM_LOW_THRESHOLD;
+    const F32 factor_target = 1.f + llclamp(-(F32)sys_budget_debt.value() / (F32)budget_target.value(), 0.f, 1.f);
+
+    // Recovery waits for real breathing room, so the factor holds steady in the
+    // 256-406MB band instead of pumping every time free memory grazes the
+    // threshold. This has to stay under isSystemMemoryLow's threshold, or we
+    // drag texture bias back into 1.5+ territory on each fluctuation.
+    const S32Megabytes RECOVERY_THRESHOLD = MEM_LOW_THRESHOLD + S32Megabytes(150);
+    if (factor_target < sSysMemoryFactor && free_sys_mem <= RECOVERY_THRESHOLD)
+    {
+        return sSysMemoryFactor;
+    }
+
+    // Rate limit both directions: rising fast enough to matter under real
+    // pressure, falling slower so draw range does not oscillate, but bounded
+    // either way so one dip cannot cost minutes of reduced range.
+    constexpr F32 MAX_RISE_PER_SEC = 0.5f;
+    constexpr F32 MAX_FALL_PER_SEC = 0.1f;
+    const F32 max_step = (factor_target > sSysMemoryFactor ? MAX_RISE_PER_SEC : MAX_FALL_PER_SEC)
+                         * LLFrameTimer::getFrameDeltaTimeF32();
+    sSysMemoryFactor += llclamp(factor_target - sSysMemoryFactor, -max_step, max_step);
+    sSysMemoryFactor = llclamp(sSysMemoryFactor, 1.f, 2.f);
+
+    return sSysMemoryFactor;
+}
+
+#if LL_WINDOWS
+//static
+U32Megabytes LLMemory::getAvailableCommitMemMB()
+{
+    // Commit charge combines page file and ram,
+    // theoretical limit is 128TB on 64bit windows.
+    // Store as MB instead of KB to prevent overflow.
+    return sAvailCommitMemInMB;
+}
+#endif
 
 //static
 U32Kilobytes LLMemory::getAvailableMemKB()
@@ -271,15 +393,27 @@ U64 LLMemory::getCurrentRSS()
 
 U64 LLMemory::getCurrentRSS()
 {
-    struct rusage usage;
-
-    if (getrusage(RUSAGE_SELF, &usage) != 0) {
-        // Error handling code could be here
-        return 0;
+    // /proc/self/statm: size resident shared text lib data dt, in pages. The
+    // resident figure is the set as it is now. getrusage's ru_maxrss is the
+    // peak, and a memory budget that reads the peak only ever tightens.
+    if (FILE* statm = fopen("/proc/self/statm", "r"))
+    {
+        long size = 0;
+        long resident = 0;
+        const int got = fscanf(statm, "%ld %ld", &size, &resident);
+        fclose(statm);
+        if (got == 2 && resident > 0)
+        {
+            return (U64)resident * (U64)sysconf(_SC_PAGESIZE);
+        }
     }
 
-    // ru_maxrss (since Linux 2.6.32)
-    // This is the maximum resident set size used (in kilobytes).
+    struct rusage usage;
+    if (getrusage(RUSAGE_SELF, &usage) != 0)
+    {
+        return 0;
+    }
+    // ru_maxrss (since Linux 2.6.32): the peak resident set size, in kilobytes
     return usage.ru_maxrss * 1024;
 }
 

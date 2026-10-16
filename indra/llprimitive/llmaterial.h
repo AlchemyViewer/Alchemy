@@ -123,7 +123,18 @@ public:
     bool        operator != (const LLMaterial& rhs) const;
 
     U32         getShaderMask(U32 alpha_mode, bool is_alpha);
-    LLUUID      getHash() const;
+
+    // Fast path inlined here so the cache hit reduces to a load + branch
+    // + 16-byte struct return. The recompute is called per-face in
+    // llvovolume's draw-pool rebuild, so the cache is the hot path.
+    LLUUID getHash() const
+    {
+        if (mHashDirty)
+        {
+            recomputeHash();
+        }
+        return mHashCache;
+    }
 
 protected:
     LLUUID      mNormalID;
@@ -145,6 +156,12 @@ protected:
     U8          mEnvironmentIntensity;
     U8          mDiffuseAlphaMode;
     U8          mAlphaMaskCutoff;
+
+private:
+    void recomputeHash() const;
+
+    mutable LLUUID mHashCache;
+    mutable bool   mHashDirty = true;
 };
 
 typedef LLPointer<LLMaterial> LLMaterialPtr;

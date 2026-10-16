@@ -45,7 +45,7 @@ public:
     mediaPluginExample(LLPluginInstance::sendMessageFunction host_send_func, void *host_user_data);
     ~mediaPluginExample();
 
-    /*virtual*/ void receiveMessage(const char* message_string);
+    /*virtual*/ void receiveMessage(const std::string& message_string);
 
 private:
     bool init();
@@ -89,7 +89,7 @@ mediaPluginExample::~mediaPluginExample()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-void mediaPluginExample::receiveMessage(const char* message_string)
+void mediaPluginExample::receiveMessage(const std::string& message_string)
 {
     //  std::cerr << "MediaPluginWebKit::receiveMessage: received message: \"" << message_string << "\"" << std::endl;
     LLPluginMessage message_in;
@@ -182,7 +182,7 @@ void mediaPluginExample::receiveMessage(const char* message_string)
                 message.setValueS32("default_width", 1024);
                 message.setValueS32("default_height", 1024);
                 message.setValueS32("depth", mDepth);
-                message.setValueU32("internalformat", GL_RGB);
+                message.setValueU32("internalformat", GL_RGB8);
                 message.setValueU32("format", GL_RGBA);
                 message.setValueU32("type", GL_UNSIGNED_BYTE);
                 message.setValueBoolean("coords_opengl", true);

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="MODELİ KARŞIYA YÜKLE">
-	<string name="status_idle"/>
 	<string name="status_parse_error">
 		Hata: Tarih ayrıştırma sorunu - ayrıntılar için günlüğe bakın.
 	</string>
@@ -78,19 +77,6 @@
 			<text name="name_label">
 				Model adı:
 			</text>
-			<text name="model_category_label">
-				Bu modelin temsil ettiği...
-			</text>
-			<combo_box name="model_category_combo">
-				<combo_item label="Birini Seçin..." name="Choose one"/>
-				<combo_item label="Avatar şekli" name="Avatar shape"/>
-				<combo_item label="Avatar aksesuarı" name="Avatar attachment"/>
-				<combo_item label="Hareket eden nesne (araç, hayvan)" name="Moving object (vehicle, animal)"/>
-				<combo_item label="Bina Bileşeni" name="Building Component"/>
-				<combo_item label="Büyük, hareketsiz, vs." name="Large, non moving etc"/>
-				<combo_item label="Daha küçük, hareketsiz, vs." name="Smaller, non-moving etc"/>
-				<combo_item label="Bunlardan herhangi biri değil" name="Not really any of these"/>
-			</combo_box>
 		</panel>
 		<tab_container name="import_tab">
 			<panel label="Ayrıntı Seviyesi" name="lod_panel" title="Ayrıntı Seviyesi">
@@ -100,7 +86,6 @@
 				<text initial_value="Yüksek" name="high_label" value="Yüksek"/>
 				<combo_box name="lod_source_high">
 					<item label="Dosyadan yükle" name="Load from file" value="Dosyadan yükle"/>
-					<item label="Oluştur" name="Generate" value="Oluştur"/>
 				</combo_box>
 				<button label="Gözat..." name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
@@ -112,7 +97,6 @@
 				<text initial_value="Orta" name="medium_label" value="Orta"/>
 				<combo_box name="lod_source_medium">
 					<item label="Dosyadan yükle" name="Load from file" value="Dosyadan yükle"/>
-					<item label="Oluştur" name="Generate" value="Oluştur"/>
 					<item label="Yukarıdaki ayrıntı seviyesini kullan" name="Use LoD above" value="Yukarıdaki ayrıntı seviyesini kullan"/>
 				</combo_box>
 				<button label="Gözat..." name="lod_browse_medium"/>
@@ -125,7 +109,6 @@
 				<text initial_value="Düşük" name="low_label" value="Düşük"/>
 				<combo_box name="lod_source_low">
 					<item label="Dosyadan yükle" name="Load from file" value="Dosyadan yükle"/>
-					<item label="Oluştur" name="Generate" value="Oluştur"/>
 					<item label="Yukarıdaki ayrıntı seviyesini kullan" name="Use LoD above" value="Yukarıdaki ayrıntı seviyesini kullan"/>
 				</combo_box>
 				<button label="Gözat..." name="lod_browse_low"/>
@@ -138,7 +121,6 @@
 				<text initial_value="En Düşük" name="lowest_label" value="En Düşük"/>
 				<combo_box name="lod_source_lowest">
 					<item label="Dosyadan yükle" name="Load from file" value="Dosyadan yükle"/>
-					<item label="Oluştur" name="Generate" value="Oluştur"/>
 					<item label="Yukarıdaki ayrıntı seviyesini kullan" name="Use LoD above" value="Yukarıdaki ayrıntı seviyesini kullan"/>
 				</combo_box>
 				<button label="Gözat..." name="lod_browse_lowest"/>
@@ -158,43 +140,14 @@
 						1. Adım: Ayrıntı Seviyesi
 					</text>
 					<combo_box name="physics_lod_combo" tool_tip="Fizik şekli için kullanılacak ayrıntı">
-						<combo_item name="choose_one">
-							Birini seçin...
-						</combo_item>
-						<combo_item name="physics_high">
-							Yüksek
-						</combo_item>
-						<combo_item name="physics_medium">
-							Orta
-						</combo_item>
-						<combo_item name="physics_low">
-							Düşük
-						</combo_item>
-						<combo_item name="physics_lowest">
-							En Düşük
-						</combo_item>
-						<combo_item name="load_from_file">
-							Dosyadan
-						</combo_item>
+						<combo_item name="choose_one" label="Birini seçin..."/>
+						<combo_item name="physics_high" label="Yüksek"/>
+						<combo_item name="physics_medium" label="Orta"/>
+						<combo_item name="physics_low" label="Düşük"/>
+						<combo_item name="physics_lowest" label="En Düşük"/>
+						<combo_item name="load_from_file" label="Dosyadan"/>
 					</combo_box>
 					<button label="Gözat..." name="physics_browse"/>
-				</panel>
-				<panel name="physics analysis">
-					<text name="method_label">
-						2. Adım: Çözümle
-					</text>
-					<text name="analysis_method_label">
-						Yöntem:
-					</text>
-					<text name="quality_label">
-						Kalite:
-					</text>
-					<text name="smooth_method_label">
-						Düzeltme:
-					</text>
-					<check_box label="Delikleri Kapat" name="Close Holes (Slow)"/>
-					<button label="Çözümle" name="Decompose"/>
-					<button label="İptal" name="decompose_cancel"/>
 				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
@@ -230,6 +183,25 @@
 						Gövdeler: [HULLS]
 					</text>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="smooth_method_label">
+						Düzeltme:
+					</text>
+					<text name="quality_label">
+						Kalite:
+					</text>
+					<text name="analysis_method_label">
+						Yöntem:
+					</text>
+					<text name="method_label">
+						2. Adım: Çözümle
+					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="İptal" name="decompose_cancel"/>
+					<button label="Çözümle" name="Decompose"/>
+					<check_box label="Delikleri Kapat" name="Close Holes (Slow)"/>
+				</panel>
 			</panel>
 			<panel label="Karşıya yükleme seçenekleri" name="modifiers_panel">
 				<text name="scale_label">
@@ -243,16 +215,15 @@
 					[X] X [Y] X [Z]
 				</text>
 				<check_box label="Dokuları dahil et" name="upload_textures"/>
-				<text name="include_label">
-					Sadece avatar modelleri için:
-				</text>
-				<check_box label="Dış katman ağırlığını dahil et" name="upload_skin"/>
-				<check_box label="Eklem konumlarını dahil et" name="upload_joints"/>
-				<check_box label="Eklem konumu tanımlandıysa ölçeği kilitle" name="lock_scale_if_joint_position"/>
+			</panel>
+			<panel name="rigging_panel">
+				<spinner name="pelvis_offset" value="0.0"/>
 				<text name="pelvis_offset_label">
 					Z kayması (avatarı kaldırmak veya indirmek için):
 				</text>
-				<spinner name="pelvis_offset" value="0.0"/>
+				<check_box label="Eklem konumu tanımlandıysa ölçeği kilitle" name="lock_scale_if_joint_position"/>
+				<check_box label="Eklem konumlarını dahil et" name="upload_joints"/>
+				<check_box label="Dış katman ağırlığını dahil et" name="upload_skin"/>
 			</panel>
 		</tab_container>
 		<panel name="weights_and_warning_panel">

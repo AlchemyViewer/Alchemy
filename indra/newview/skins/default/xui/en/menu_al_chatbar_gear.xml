@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<toggleable_menu
+ layout="topleft"
+ mouse_opaque="false"
+ name="menu_chatbar_gear"
+ visible="false">
+  <menu_item_check
+   label="Close chat bar on return"
+   name="CloseChatBarOnReturn">
+    <menu_item_check.on_check
+     function="CheckControl"
+     parameter="CloseChatBarOnReturn" />
+    <menu_item_check.on_click
+     function="ToggleControl"
+     parameter="CloseChatBarOnReturn" />
+  </menu_item_check>
+  <menu_item_check
+   label="Letter keys open chat"
+   name="LetterKeysFocusChatBar">
+    <menu_item_check.on_check
+     function="CheckControl"
+     parameter="LetterKeysFocusChatBar" />
+    <menu_item_check.on_click
+     function="ToggleControl"
+     parameter="LetterKeysFocusChatBar" />
+  </menu_item_check>
+  <menu_item_separator />
+  <menu_item_check
+   label="&quot;:&quot; as a synonym for &quot;/me&quot;"
+   name="EnableMUPoseChat">
+    <menu_item_check.on_check
+     function="CheckControl"
+     parameter="EnableMUPoseChat" />
+    <menu_item_check.on_click
+     function="ToggleControl"
+     parameter="EnableMUPoseChat" />
+  </menu_item_check>
+  <menu_item_check
+   label="Auto-close ((OOC)) parentheses"
+   name="EnableAutoCloseOOC">
+    <menu_item_check.on_check
+     function="CheckControl"
+     parameter="EnableAutoCloseOOC" />
+    <menu_item_check.on_click
+     function="ToggleControl"
+     parameter="EnableAutoCloseOOC" />
+  </menu_item_check>
+  <menu_item_separator />
+  <menu_item_call
+   label="Shout (Control)"
+   layout="topleft"
+   name="shout">
+    <menu_item_call.on_click
+     function="Chatbar.Shout" />
+  </menu_item_call>
+  <menu_item_call
+   label="Whisper (Control-Shift)"
+   layout="topleft"
+   name="whisper">
+    <menu_item_call.on_click
+     function="Chatbar.Whisper" />
+  </menu_item_call>
+</toggleable_menu>

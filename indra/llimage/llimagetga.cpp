@@ -330,8 +330,7 @@ bool LLImageTGA::decode(LLImageRaw* raw_image, F32 decode_time)
 {
     llassert_always(raw_image);
 
-    LLImageDataSharedLock lockIn(this);
-    LLImageDataLock lockOut(raw_image);
+    LLImageDataCopyLock lock(this, raw_image);
 
     // Check to make sure that this instance has been initialized with data
     if (!getData() || (0 == getDataSize()))
@@ -649,8 +648,7 @@ bool LLImageTGA::encode(const LLImageRaw* raw_image, F32 encode_time)
 {
     llassert_always(raw_image);
 
-    LLImageDataSharedLock lockIn(raw_image);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(raw_image, this);
 
     deleteData();
 
@@ -804,7 +802,6 @@ bool LLImageTGA::decodeTruecolorRle32( LLImageRaw* raw_image, bool &alpha_opaque
     alpha_opaque = true;
 
     U8* dst = raw_image->getData();
-    U32* dst_pixels = (U32*) dst;
 
     U8* src = getData() + mDataOffset;
     U8* last_src = src + getDataSize();
@@ -812,8 +809,8 @@ bool LLImageTGA::decodeTruecolorRle32( LLImageRaw* raw_image, bool &alpha_opaque
     U32 rgba;
     U8* rgba_byte_p = (U8*) &rgba;
 
-    U32* last_dst_pixel = dst_pixels + getHeight() * getWidth() - 1;
-    while( dst_pixels <= last_dst_pixel )
+    U8* last_dst = dst + (getHeight() * getWidth() - 1) * 4;
+    while( dst <= last_dst )
     {
         // Read RLE block header
 
@@ -841,11 +838,10 @@ bool LLImageTGA::decodeTruecolorRle32( LLImageRaw* raw_image, bool &alpha_opaque
             }
 
             src += 4;
-            U32 value = rgba;
             do
             {
-                *dst_pixels = value;
-                dst_pixels++;
+                memcpy(dst, &rgba, sizeof(rgba));
+                dst += sizeof(rgba);
                 block_pixel_count--;
             }
             while( block_pixel_count > 0 );
@@ -858,16 +854,16 @@ bool LLImageTGA::decodeTruecolorRle32( LLImageRaw* raw_image, bool &alpha_opaque
                 if (src + 3 >= last_src)
                     return false;
 
-                ((U8*)dst_pixels)[0] = src[2];
-                ((U8*)dst_pixels)[1] = src[1];
-                ((U8*)dst_pixels)[2] = src[0];
-                ((U8*)dst_pixels)[3] = src[3];
+                dst[0] = src[2];
+                dst[1] = src[1];
+                dst[2] = src[0];
+                dst[3] = src[3];
                 if (src[3] != 255)
                 {
                     alpha_opaque = false;
                 }
                 src += 4;
-                dst_pixels++;
+                dst += 4;
                 block_pixel_count--;
             }
             while( block_pixel_count > 0 );
@@ -1070,8 +1066,7 @@ bool LLImageTGA::decodeAndProcess( LLImageRaw* raw_image, F32 domain, F32 weight
     // --+---Input--------------------------------
     //   |
 
-    LLImageDataSharedLock lockIn(this);
-    LLImageDataLock lockOut(raw_image);
+    LLImageDataCopyLock lock(this, raw_image);
 
     if (!getData() || (0 == getDataSize()))
     {
@@ -1191,7 +1186,7 @@ bool LLImageTGA::loadFile( const std::string& path )
         return false;
     }
 
-    LLFILE* file = LLFile::fopen(path, "rb");   /* Flawfinder: ignore */
+    LLFILE* file = LLFile::fopen(path, LLFILE_MODE("rb")); /* Flawfinder: ignore */
     if( !file )
     {
         LL_WARNS() << "Couldn't open file " << path << LL_ENDL;

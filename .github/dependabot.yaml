@@ -1,7 +1,14 @@
 version: 2
 updates:
 
+  # The workflows, and the composite actions they share.
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
-      interval: monthly
+      interval: weekly
+
+  # No vcpkg entry: Dependabot moves builtin-baseline but not the vcpkg
+  # submodule, and a baseline the submodule does not contain fails every
+  # configure. The two move together, by hand.

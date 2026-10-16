@@ -12,22 +12,78 @@
          label="Show Navigation &amp; Favorites Bar"
          layout="topleft"
          name="ShowNavbarNavigationPanel">
-           <on_click
-             function="ToggleControl"
-             parameter="ShowNavbarNavigationPanel" /> 
-             <on_check
-             function="CheckControl"
-             parameter="ShowNavbarNavigationPanel" />
+        <on_click
+          function="ToggleLocationBar"
+          parameter="2" />
+        <on_check
+        function="CheckLocationBar"
+        parameter="2" />
     </menu_item_check>
     <menu_item_check
          label="Show Mini-Location Bar"
          layout="topleft"
          name="ShowMiniLocationPanel">
-           <on_click
-             function="ToggleControl"
-             parameter="ShowMiniLocationPanel" />
-             <on_check
-             function="CheckControl"
-             parameter="ShowMiniLocationPanel" />
+        <on_click
+          function="ToggleLocationBar"
+          parameter="1" />
+        <on_check
+        function="CheckLocationBar"
+        parameter="1" />
     </menu_item_check>
+    <menu_item_check
+         label="Hide Location Bar"
+         layout="topleft"
+         name="HideLocationPanels">
+        <on_click
+          function="ToggleLocationBar"
+          parameter="0" />
+        <on_check
+        function="CheckLocationBar"
+        parameter="0" />
+    </menu_item_check>
+	<menu_item_separator />
+	<menu_item_check
+         label="Show Menu Search"
+         layout="topleft"
+         name="MenuSearch">
+		<on_click
+		  function="ToggleControl"
+		  parameter="MenuSearch" />
+		<on_check
+		function="CheckControl"
+		parameter="MenuSearch" />
+	</menu_item_check>
+	<menu_item_check
+         label="Show Clock"
+         layout="topleft"
+         name="ShowStatusBarTime">
+		<on_click
+		  function="ToggleControl"
+		  parameter="ShowStatusBarTime" />
+		<on_check
+		function="CheckControl"
+		parameter="ShowStatusBarTime" />
+	</menu_item_check>
+	<menu_item_check
+         label="Show seconds in Clock"
+         layout="topleft"
+         name="ShowStatusBarSeconds">
+		<on_click
+		  function="ToggleControl"
+		  parameter="ShowStatusBarSeconds" />
+		<on_check
+		function="CheckControl"
+		parameter="ShowStatusBarSeconds" />
+	</menu_item_check>
+	<menu_item_check
+         label="Show FPS"
+         layout="topleft"
+         name="ShowStatusBarFPS">
+		<on_click
+		  function="ToggleControl"
+		  parameter="ShowStatusBarFPS" />
+		<on_check
+		function="CheckControl"
+		parameter="ShowStatusBarFPS" />
+	</menu_item_check>
 </menu>

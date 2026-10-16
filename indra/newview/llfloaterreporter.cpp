@@ -425,8 +425,8 @@ void LLFloaterReporter::requestAbuseCategoriesCoro(std::string url, LLHandle<LLF
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("requestAbuseCategoriesCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestAbuseCategoriesCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -668,9 +668,9 @@ void LLFloaterReporter::showFromAvatar(const LLUUID& avatar_id, const std::strin
 }
 
 // static
-void LLFloaterReporter::showFromChat(const LLUUID& avatar_id, const std::string& avatar_name, const std::string& time, const std::string& description)
+void LLFloaterReporter::showFromChatObj(const LLUUID& object_id, const std::string& time, const std::string& description)
 {
-    show(avatar_id, avatar_name);
+    show(object_id, LLStringUtil::null, LLUUID::null);
 
     LLStringUtil::format_map_t args;
     args["[MSG_TIME]"] = time;
@@ -679,8 +679,25 @@ void LLFloaterReporter::showFromChat(const LLUUID& avatar_id, const std::string&
     LLFloaterReporter *self = LLFloaterReg::findTypedInstance<LLFloaterReporter>("reporter");
     if (self)
     {
-        std::string description = self->getString("chat_report_format", args);
-        self->getChild<LLUICtrl>("details_edit")->setValue(description);
+        std::string description_frmt = self->getString("chat_report_format", args);
+        self->getChild<LLUICtrl>("details_edit")->setValue(description_frmt);
+    }
+}
+
+// static
+void LLFloaterReporter::showFromChatAv(const LLUUID& avatar_id, const std::string& avatar_name, const std::string& time, const std::string& description)
+{
+    show(avatar_id, avatar_name);
+
+    LLStringUtil::format_map_t args;
+    args["[MSG_TIME]"] = time;
+    args["[MSG_DESCRIPTION]"] = description;
+
+    LLFloaterReporter* self = LLFloaterReg::findTypedInstance<LLFloaterReporter>("reporter");
+    if (self)
+    {
+        std::string description_frmt = self->getString("chat_report_format", args);
+        self->getChild<LLUICtrl>("details_edit")->setValue(description_frmt);
     }
 }
 
@@ -841,17 +858,17 @@ void LLFloaterReporter::sendReportViaLegacy(const LLSD & report)
 
     msg->nextBlockFast(_PREHASH_ReportData);
     msg->addU8Fast(_PREHASH_ReportType, report["report-type"].asInteger());
-    msg->addU8(_PREHASH_Category, report["category"].asInteger());
+    msg->addU8Fast(_PREHASH_Category, report["category"].asInteger());
     msg->addVector3Fast(_PREHASH_Position,  LLVector3(report["position"]));
     msg->addU8Fast(_PREHASH_CheckFlags, report["check-flags"].asInteger());
     msg->addUUIDFast(_PREHASH_ScreenshotID, report["screenshot-id"].asUUID());
     msg->addUUIDFast(_PREHASH_ObjectID, report["object-id"].asUUID());
-    msg->addUUID("AbuserID", report["abuser-id"].asUUID());
-    msg->addString("AbuseRegionName", report["abuse-region-name"].asString());
-    msg->addUUID("AbuseRegionID", report["abuse-region-id"].asUUID());
+    msg->addUUIDFast(_PREHASH_AbuserID, report["abuser-id"].asUUID());
+    msg->addStringFast(_PREHASH_AbuseRegionName, report["abuse-region-name"].asString());
+    msg->addUUIDFast(_PREHASH_AbuseRegionID, report["abuse-region-id"].asUUID());
 
     msg->addStringFast(_PREHASH_Summary, report["summary"].asString());
-    msg->addString("VersionString", report["version-string"]);
+    msg->addStringFast(_PREHASH_VersionString, report["version-string"].asString());
     msg->addStringFast(_PREHASH_Details, report["details"] );
 
     msg->sendReliable(regionp->getHost());
@@ -868,7 +885,7 @@ void LLFloaterReporter::sendReportViaCaps(std::string url, std::string sshot_url
     if(!sshot_url.empty())
     {
         // try to upload screenshot
-        LLResourceUploadInfo::ptr_t uploadInfo(new  LLARScreenShotUploader(report, mResourceDatap->mAssetInfo.mUuid, mResourceDatap->mAssetInfo.mType));
+        LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLARScreenShotUploader>(report, mResourceDatap->mAssetInfo.mUuid, mResourceDatap->mAssetInfo.mType);
         LLViewerAssetUpload::EnqueueInventoryUpload(sshot_url, uploadInfo);
     }
     else

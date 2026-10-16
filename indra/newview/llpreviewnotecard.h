@@ -27,111 +27,210 @@
 #ifndef LL_LLPREVIEWNOTECARD_H
 #define LL_LLPREVIEWNOTECARD_H
 
+#include "almasterlinks.h"
+#include "alquickask.h"
+#include "alrecoverykeeper.h"
+#include "alsavehistory.h"
+#include "alscripttypes.h"
+#include "altextundo.h"
 #include "llpreview.h"
-#include "llassetstorage.h"
-#include "llpreviewscript.h"
-#include "lliconctrl.h"
 #include "llvoinventorylistener.h"
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Class LLPreviewNotecard
-//
-// This class allows us to edit notecards
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#include <boost/signals2.hpp>
 
-class LLViewerTextEditor;
+#include <array>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
+class ALDiffView;
+class ALNotecardEmbedded;
+class ALTextView;
 class LLButton;
+class LLLayoutPanel;
 class LLLineEditor;
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
-class LLTextEditor;
-// [/SL:KB]
+class LLLiveLSLFile;
+class LLTextBox;
 
-class LLPreviewNotecard : public LLPreview, public LLVOInventoryListener
+// A notecard, for anyone to read and write, as the viewer has always opened
+// one: from the inventory, an object's contents, an offer, a link. Its text
+// is on the engine Script Studio's editors use (ALTextView) -- the reading
+// face, wrapped, spell-checked, no line numbers -- with the items it
+// carries as buttons in it (ALNotecardEmbedded), which open, copy out and
+// drag out. It saves as every editor does (ALScriptWorkspace), hears a save
+// of the same notecard made anywhere else, and keeps what is typed in the
+// recovery store against the viewer closing before it was saved.
+class LLPreviewNotecard final : public LLPreview, public LLVOInventoryListener
 {
 public:
+    AL_VIEW_TYPE(LLPreviewNotecard, LLPreview);
+
     LLPreviewNotecard(const LLSD& key);
-    virtual ~LLPreviewNotecard();
+    ~LLPreviewNotecard() override;
 
-    bool saveItem();
+    bool postBuild() override;
     void setObjectID(const LLUUID& object_id) override;
-
-    // llview
     void draw() override;
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
-    virtual bool hasAccelerators() const override { return true; }
-// [/SL:KB]
+    // Its keys before the viewer's menu has them: Control-F is Search out
+    // there, and Control-G Gestures.
+    bool hasAccelerators() const override { return true; }
     bool handleKeyHere(KEY key, MASK mask) override;
-    void setEnabled(bool enabled) override;
-
-    // llfloater
     bool canClose() override;
 
-    // llpanel
-    bool postBuild() override;
+    void inventoryChanged(LLViewerObject* object, LLInventoryObject::object_list_t* inventory, S32 serial_num, void* user_data) override;
 
-    // reach into the text editor, and grab the drag item
-    const LLInventoryItem* getDragItem();
-
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
-    LLTextEditor* getEditor();
-// [/SL:KB]
-    // return true if there is any embedded inventory.
-    bool hasEmbeddedInventory();
-
-    // After saving a notecard, the tcp based upload system will
-    // change the asset, therefore, we need to re-fetch it from the
-    // asset system. :(
-    void refreshFromInventory(const LLUUID& item_id = LLUUID::null);
-
-    void syncExternal();
-
-    void inventoryChanged(LLViewerObject* object,
-        LLInventoryObject::object_list_t* inventory,
-        S32 serial_num,
-        void* user_data) override;
+    // A text the window kept, taken up where it belongs -- this window
+    // for its notecard, opened, the text put in as it loads -- where the
+    // notecard can be had: false where it cannot, and whoever asked keeps
+    // it some other way.
+    static bool recover(const ALRecoveryEntry& entry);
 
 protected:
-
     void updateTitleButtons() override;
     void loadAsset() override;
-    bool saveIfNeeded(LLInventoryItem* copyitem = NULL, bool sync = true);
 
-    void deleteNotecard();
+private:
+    ALScriptRef ref() const { return ALScriptRef(mObjectUUID, mItemUUID); }
 
-    static void onLoadComplete(const LLUUID& asset_uuid,
-                               LLAssetType::EType type,
-                               void* user_data, S32 status, LLExtStat ext_status);
+    // --- loading ---------------------------------------------------------------------
 
-    static void onSaveComplete(const LLUUID& asset_uuid,
-                               void* user_data,
-                               S32 status, LLExtStat ext_status);
+    // The workspace's answer: the text and its items put in, or why there
+    // are none said where the text would be.
+    void loaded(const ALScriptLoaded& answer);
+    // Nothing to show, and why: in place of the text, read-only.
+    void showUnloaded(const std::string& why);
+    // Whether the text may be changed, and the rest of the window with it:
+    // the description, the lock, Edit and Save.
+    void showModifiable(bool modifiable);
 
+    // --- saving ------------------------------------------------------------------------
+
+    bool saveIfNeeded();
+    // A notecard whose master is a file on disk (ALScriptDiskMasters): the
+    // link, where it is one to save through; said over the text as it
+    // loads, with Unlink; and a save here written to the file, whose write
+    // sends it, as any save of the file does. A file holds text alone, so
+    // one carrying items is not saved through it.
+    std::optional<ALMasterLink> masterLink() const;
+    void                        showLinked();
+    bool                        saveThroughFile(const ALMasterLink& link);
+    // A save of ours answered.
+    void savedHere(const ALScriptCompileResult& result);
+    // A save of this notecard heard from anywhere else: taken, marked
+    // saved, or asked about (ALScriptSaved::heard).
+    void heard(const ALScriptSaved& saved);
+    void takeTheirs();
+    void keepMine();
+    // The text compared with what was saved elsewhere, or with a save of
+    // its history; and back.
+    void toggleCompare();
     bool handleSaveChangesDialog(const LLSD& notification, const LLSD& response);
+    void deleteNotecard();
     bool handleConfirmDeleteDialog(const LLSD& notification, const LLSD& response);
 
-    static void finishInventoryUpload(LLUUID itemId, LLUUID newAssetId, LLUUID newItemId);
-    static void finishTaskUpload(LLUUID itemId, LLUUID newAssetId, LLUUID taskId);
+    // Go to Line, as Script Studio's is, by the numbers a script reads a
+    // notecard's lines by: from 0.
+    void goToLine();
 
-    void openInExternalEditor();
-    bool onExternalChange(const std::string& filename);
-    bool loadNotecardText(const std::string& filename);
-    bool writeToFile(const std::string& filename);
-    std::string getTmpFileName();
+    // --- what it was saved as before ------------------------------------------------------
 
-protected:
-    LLViewerTextEditor* mEditor = nullptr;
-    LLLineEditor* mDescEditor = nullptr;
-    LLButton* mSaveBtn = nullptr;
-    LLButton* mEditBtn = nullptr;
-    LLButton* mDeleteBtn = nullptr;
-    LLUICtrl* mLockBtn = nullptr;
+    // Its saves listed, as Script Studio's File > Local History lists a
+    // tab's (ALScriptStudioHistory); one chosen compared with the text now,
+    // and offered back as one step to undo; and let go of, with its notice.
+    void showHistory();
+    void compareSave(ALSavedText saved);
+    // What the notice says of the save compared, and offers.
+    void showHistoryNotice();
+    void restoreSave();
+    void endHistory();
 
-    LLUUID mAssetID;
+    // --- what the window says ---------------------------------------------------------
 
-    LLUUID mObjectID;
+    void setStatus(const std::string& text, bool failure = false);
+    // A line over the text, with up to three buttons, each doing what it
+    // is given; none hides it.
+    struct NoticeButton
+    {
+        std::string           label;
+        std::function<void()> action;
+    };
+    void showNotice(const std::string& text, std::vector<NoticeButton> buttons);
+    void hideNotice();
+
+    // --- kept against a crash -----------------------------------------------------------
+
+    ALRecoveryEntry recoveryEntry() const;
+    // What earlier sessions kept of this notecard, offered once it has
+    // loaded; and one taken up over the text, as one step to undo, or with
+    // its history where nothing was typed here.
+    void offerKept();
+    void takeUp(ALRecoveryEntry entry);
+
+    // --- the external editor ------------------------------------------------------------
+
+    void        openInExternalEditor();
+    // The copy an editor outside is given, written and watched; and that
+    // editor started on a file, what went wrong said.
+    std::string writeEditorCopy();
+    void        runExternalEditor(const std::string& filename);
+    bool        onExternalChange(const std::string& filename);
+    bool        loadNotecardText(const std::string& filename);
+    bool        writeToFile(const std::string& filename);
+    void        syncExternal();
+    std::string getCleanNameForTmpFile() const;
+    std::string getTmpFileName(const std::string& note_name) const;
+
+    ALTextView*                          mText        = nullptr;
+    LLLineEditor*                        mDescEditor  = nullptr;
+    LLButton*                            mSaveBtn     = nullptr;
+    LLButton*                            mEditBtn     = nullptr;
+    LLButton*                            mDeleteBtn   = nullptr;
+    LLButton*                            mHistoryBtn  = nullptr;
+    LLUICtrl*                            mLockBtn     = nullptr;
+    LLTextBox*                           mStatus      = nullptr;
+    LLLayoutPanel*                       mNoticePanel = nullptr;
+    LLTextBox*                           mNoticeText  = nullptr;
+    std::array<LLButton*, 3>             mNoticeButtons{};
+    std::array<std::function<void()>, 3> mNoticeActions;
+    ALDiffView*                          mCompare     = nullptr;
+    std::shared_ptr<ALNotecardEmbedded>  mItems;
+    ALQuickAsk                           mQuickAsk;
+
+    std::string mNoteName;
+    LLUUID      mAssetID;
+    bool        mLoaded     = false;
+    bool        mModifiable = false;
+
+    // A save of ours on its way: its request, where the text stood as it
+    // went, and the items it carried.
+    U64                   mSaveRequest = 0;
+    bool                  mSaving      = false;
+    ALTextUndo::SavePoint mSavePoint;
+    std::vector<LLUUID>   mSentItems;
+    // Saved elsewhere while this had changes of its own: that text, until
+    // it is taken or kept.
+    std::optional<std::string> mSavedThere;
+    // A save of its history compared with it, until the comparison ends.
+    std::optional<ALSavedText> mHistoryShown;
+    // The notecard loaded again for a Take Theirs, whose text goes in over
+    // what was typed rather than as a fresh load.
+    bool                       mTakingTheirs = false;
+    // Where the caret and the view were, for a load of a save heard from
+    // elsewhere to put them back.
+    std::optional<std::pair<ALTextPos, S32>> mKeepPlace;
+
+    // What is typed kept in the recovery store; and a kept text to take
+    // up once the notecard has loaded.
+    ALRecoveryKeeper                     mKeeper;
+    std::optional<ALRecoveryEntry>       mPendingRecovery;
+
+    boost::signals2::scoped_connection mSavedConnection;
+    boost::signals2::scoped_connection mFullConnection;
 
     LLLiveLSLFile* mLiveFile = nullptr;
 };
-
 
 #endif // LL_LLPREVIEWNOTECARD_H

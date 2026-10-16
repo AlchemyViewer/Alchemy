@@ -53,7 +53,9 @@ class LLStreamingAudio_MediaPlugins final : public LLStreamingAudioInterface
     bool supportsAdjustableBufferSizes() override {return false;}
     void setBufferSizes(U32 streambuffertime, U32 decodebuffertime) override {};
 
-    virtual bool supportsMetaData() override { return false; }
+    // The stream's tags, from the media plugin; GStreamer's on Linux.
+    bool supportsMetaData() override { return true; }
+    LLSD getMetadata() const override { return mMetadata; }
     virtual bool supportsWaveData() override { return false; }
     virtual bool getWaveData(float* arr, S32 count, S32 stride = 1) override { return false; }
 
@@ -64,6 +66,11 @@ private:
 
     std::string mURL;
     F32 mGain;
+    LLSD mMetadata;
+    // What isPlaying() last said, so the ticker hears of a change.
+    int mLastPlaying = 0;
+
+    void setMetadata(const LLSD& metadata);
 };
 
 

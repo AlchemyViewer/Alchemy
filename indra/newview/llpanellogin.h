@@ -37,18 +37,22 @@ class LLPanelLoginListener;
 class LLSLURL;
 class LLCredential;
 
-class LLPanelLogin:
+class LLPanelLogin final:
     public LLPanel,
     public LLViewerMediaObserver
 {
     LOG_CLASS(LLPanelLogin);
 public:
+    AL_VIEW_TYPE(LLPanelLogin, LLPanel);
+
     LLPanelLogin(const LLRect &rect,
                 void (*callback)(S32 option, void* user_data),
                 void *callback_data);
     ~LLPanelLogin();
 
-    virtual void setFocus( bool b );
+    void draw() override;
+
+    virtual void setFocus( bool b ) override;
 
     static void show(const LLRect &rect,
         void (*callback)(S32 option, void* user_data),
@@ -75,7 +79,7 @@ public:
     static void setAlwaysRefresh(bool refresh);
 
     // inherited from LLViewerMediaObserver
-    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event);
+    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
     static void updateServer();  // update the combo box, change the login page to the new server, clear the combo
 
     /// to be called from LLStartUp::setStartSLURL
@@ -86,6 +90,8 @@ public:
 
     // extract name from cred in a format apropriate for username field
     static std::string getUserName(LLPointer<LLCredential> &cred);
+
+    void collapseGridPanel(bool collapse);
 
 private:
     friend class LLPanelLoginListener;
@@ -105,8 +111,11 @@ private:
     static void onRememberPasswordCheck(void*);
     static void onPassKey(LLLineEditor* caller, void* user_data);
 
+    bool onUpdateNotification(const LLSD& notify);
+
 private:
     std::unique_ptr<LLPanelLoginListener> mListener;
+    LLTempBoundListener mAlertListener;
 
     void updateLoginButtons();
     void populateUserList(LLPointer<LLCredential> credential);
@@ -119,13 +128,22 @@ private:
 
     static LLPanelLogin* sInstance;
     static bool     sCapslockDidNotification;
-    bool            mFirstLoginThisInstall;
 
     static bool sCredentialSet;
 
     unsigned int mUsernameLength;
     unsigned int mPasswordLength;
     unsigned int mLocationLength;
+
+    LLTimer mForceRefreshTimer;
+    bool mForceRefresh {false};
+
+    bool mAlertNotif;
+    LLButton* mLoginBtn;
+    LLLayoutPanel* mGridPanel;
+    LLLayoutStack* mLoginStack;
+
+    LLMediaCtrl* mWebBrowser;
 };
 
 #endif

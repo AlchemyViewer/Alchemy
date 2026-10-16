@@ -38,7 +38,7 @@
 #include "lluicolortable.h"
 #include "message.h"
 #include "llnotificationsutil.h"
-#include <boost/regex.hpp>
+#include "llviewercontrol.h"
 
 LLNotificationListItem::LLNotificationListItem(const Params& p) : LLPanel(p),
     mParams(p),
@@ -133,10 +133,22 @@ std::string LLNotificationListItem::buildNotificationDate(const LLDate& time_sta
         default:
             timeStr = "[" + LLTrans::getString("TimeMonth") + "]/["
                 +LLTrans::getString("TimeDay")+"]/["
-                +LLTrans::getString("TimeYear")+"] ["
-                +LLTrans::getString("TimeHour")+"]:["
-                +LLTrans::getString("TimeMin")+"] ["
-                +LLTrans::getString("TimeTimezone")+"]";
+                +LLTrans::getString("TimeYear")+"] [";
+
+            static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+            if (use_24h)
+            {
+                timeStr += LLTrans::getString("TimeHour") + "]:["
+                    + LLTrans::getString("TimeMin") + "] ["
+                    + LLTrans::getString("TimeTimezone") + "]";
+            }
+            else
+            {
+                timeStr += LLTrans::getString("TimeHour12") + "]:["
+                    + LLTrans::getString("TimeMin") + "] ["
+                    + LLTrans::getString("TimeAMPM") + "] ["
+                    + LLTrans::getString("TimeTimezone") + "]";
+            }
             break;
     }
     LLSD substitution;
@@ -162,13 +174,15 @@ void LLNotificationListItem::onMouseEnter(S32 x, S32 y, MASK mask)
 {
     mCondensedViewPanel->setTransparentColor(LLUIColorTable::instance().getColor( "ScrollHoveredColor" ));
     mExpandedViewPanel->setTransparentColor(LLUIColorTable::instance().getColor( "ScrollHoveredColor" ));
+    mNoticeTextExp->setBgReadOnlyColor(LLUIColorTable::instance().getColor("SelectedBgReadOnlyColor"));
 }
 
 void LLNotificationListItem::onMouseLeave(S32 x, S32 y, MASK mask)
 {
     mCondensedViewPanel->setTransparentColor(LLUIColorTable::instance().getColor( "SysWellItemUnselected" ));
     mExpandedViewPanel->setTransparentColor(LLUIColorTable::instance().getColor( "SysWellItemUnselected" ));
-}
+    mNoticeTextExp->setBgReadOnlyColor(LLUIColorTable::instance().getColor("TextBgReadOnlyColor"));
+ }
 
 //static
 LLNotificationListItem* LLNotificationListItem::create(const Params& p)

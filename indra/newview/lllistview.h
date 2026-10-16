@@ -32,10 +32,12 @@
 
 class LLTextBox;
 
-class LLListView
+class LLListView final
 :   public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLListView, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<LLUIColor> bg_color,

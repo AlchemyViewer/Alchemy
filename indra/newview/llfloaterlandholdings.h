@@ -34,18 +34,20 @@ class LLTextBox;
 class LLScrollListCtrl;
 class LLButton;
 
-class LLFloaterLandHoldings
+class LLFloaterLandHoldings final
 :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterLandHoldings, LLFloater);
+
     LLFloaterLandHoldings(const LLSD& key);
     virtual ~LLFloaterLandHoldings();
 
-    virtual bool postBuild();
-    virtual void onOpen(const LLSD& key);
-    virtual void draw();
+    virtual bool postBuild() override;
+    virtual void onOpen(const LLSD& key) override;
+    virtual void draw() override;
 
-    void refresh();
+    void refresh() override;
 
     void buttonCore(S32 which);
 

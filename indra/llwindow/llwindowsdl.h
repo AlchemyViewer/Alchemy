@@ -31,9 +31,16 @@
 
 #include "llwindow.h"
 #include "lltimer.h"
+#include "llmutex.h"
+
+#include <set>
 
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_endian.h"
+
+#if LL_WINDOWS
+#include "llwin32headers.h" // HWND / WNDPROC for the WM_COPYDATA subclass
+#endif
 
 class LLPreeditor;
 
@@ -71,7 +78,47 @@ public:
     bool setCursorPosition(LLCoordWindow position) override;
 
     bool getCursorPosition(LLCoordWindow *position) override;
+    bool getCursorDelta(LLCoordCommon* delta) override;
+    // Whether LLViewerWindow::moveCursorToCenter should warp the cursor when
+    // MouseWarpMode == 0 (the default, "trust the backend"). Same semantics
+    // as LLWindowWin32::isWrapMouse: false when the active pointing device
+    // is absolute-positioned (touchscreen, stylus) so we don't try to warp
+    // a finger; true for ordinary mice. The "true" case is also the path
+    // that would have warped pre-relative-mode — relative mode covers it
+    // now, so isWrapMouse no longer drives camera-control warping, but the
+    // touch/pen branch still needs to disable warp.
+    bool isWrapMouse() const override { return !mAbsoluteCursorPosition; }
 
+    // Asked by LLViewerWindow::handleKey so an AltGr-composed character
+    // (AltGr+E for € on a German layout) doesn't also fire the in-world
+    // "Alt+E" binding — mirrors the AltGr block for LLWindowWin32 there.
+    // On X11 and Wayland AltGr is xkb's ISO_Level3_Shift, which SDL reports
+    // as SDL_KMOD_MODE and never as an Alt, and Level5_Shift (Neo and the
+    // like) as SDL_KMOD_LEVEL5; a Right-Alt there is a plain Alt, as on US
+    // layouts. Cocoa reports Option, the Mac's composing key, as an Alt, and
+    // SDL's Windows backend reports AltGr as Right-Alt with Windows' extra
+    // Ctrl dropped, so there Right-Alt alone is the signature.
+    bool isAltGrPressed() const override
+    {
+#if LL_LINUX
+        return (mKeyModifiers & (SDL_KMOD_MODE | SDL_KMOD_LEVEL5)) != 0;
+#else
+        return (mKeyModifiers & SDL_KMOD_RALT)
+            && !(mKeyModifiers & SDL_KMOD_LALT)
+            && !(mKeyModifiers & SDL_KMOD_CTRL);
+#endif
+    }
+
+    // Pen / stylus and touchscreen metadata sourced from SDL_EVENT_PEN_AXIS
+    // (pressure, tilt) and SDL_EVENT_PEN_PROXIMITY_IN/OUT (active state +
+    // eraser-tip flag). For touch input, mPenPressure carries the contact
+    // pressure of the most recent SDL_EVENT_FINGER_* sample if the device
+    // reports one. Mouse events keep their defaults (pressure=1, no tilt).
+    F32 getPointerPressure() const override { return mPenInProximity ? mPenPressure : 1.f; }
+    F32 getPointerTiltX() const override { return mPenTiltX; }
+    F32 getPointerTiltY() const override { return mPenTiltY; }
+    bool isPointerEraserTip() const override { return mPenEraserTip; }
+    bool isPointerPenActive() const override { return mPenInProximity; }
     void showCursor() override;
     void hideCursor() override;
     bool isCursorHidden() override;
@@ -89,12 +136,12 @@ public:
     void setMinSize(U32 min_width, U32 min_height, bool enforce_immediately = true) override;
 
     bool isClipboardTextAvailable() override;
-    bool pasteTextFromClipboard(LLWString &dst) override;
-    bool copyTextToClipboard(const LLWString &src) override;
+    bool pasteTextFromClipboard(std::string &dst) override;
+    bool copyTextToClipboard(const std::string &src) override;
 
     bool isPrimaryTextAvailable() override;
-    bool pasteTextFromPrimary(LLWString &dst) override;
-    bool copyTextToPrimary(const LLWString &src) override;
+    bool pasteTextFromPrimary(std::string &dst) override;
+    bool copyTextToPrimary(const std::string &src) override;
 
     void flashIcon(F32 seconds) override;
     void maybeStopFlashIcon();
@@ -138,16 +185,25 @@ public:
 
     void *getPlatformWindow() override;
 
-    void bringToFront() override;
+    // "wayland" / "x11" / "" - reports the SDL video driver this window is on.
+    std::string getDisplayServer() const override;
 
-    void allowLanguageTextInput(LLPreeditor *preeditor, bool b) override;
+    void bringToFront() override;
+    // bringToFront() with the xdg-activation token another process was
+    // launched with and handed over, which on Wayland is what lets a window
+    // out of focus take it. Without a token, or on X11, it is bringToFront().
+    void bringToFront(const std::string& activation_token);
+
     void setLanguageTextInput(const LLCoordGL& pos) override;
+    void updateLanguageTextInputArea() override;
+    void allowLanguageTextInput(LLPreeditor* preeditor, bool b) override;
 
     void spawnWebBrowser(const std::string &escaped_url, bool async) override;
 
     void setTitle(const std::string title) override;
 
     static std::vector<std::string> getDynamicFallbackFontList();
+    static LLFontFallbackMatch findFallbackFontForChar(llwchar wch);
 
     void *createSharedContext() override;
     void makeContextCurrent(void *context) override;
@@ -156,15 +212,46 @@ public:
 
     F32 getSystemUISize() override;
 
-    bool getFullscreen() override { return mFullscreen; };
-
     static std::vector<std::string> getDisplaysResolutionList();
+
+    // Accessor for the main viewer SDL_Window used by the singleton viewer instance.
+    // Code outside llwindowsdl (e.g. file pickers) should prefer this over
+    // SDL_GL_GetCurrentWindow() so the parent window is correct even when a
+    // worker thread has its own GL context current.
+    static SDL_Window* getMainSDLWindow();
+
+    // Bracket an async OS dialog. SDL3's file picker resolves on a later frame,
+    // so beforeDialog()/afterDialog() can't wrap it on a single stack frame;
+    // enterDialog()/exitDialog() drive the same mDialogDepth machinery from the
+    // launch site and the completion callback instead. exitDialog() also restores
+    // key-window focus, which SDL leaves dropped after its dialog sheet closes.
+    static void enterDialog();
+    static void exitDialog();
+
+    // True while any OS dialog is up. The frame loop services modeless pickers,
+    // so it must skip BackgroundYieldTime while one is open or it turns laggy.
+    static bool dialogOpen();
 
 #if LL_DARWIN
     static U64 getVramSize();
     static void setUseMultGL(bool use_mult_gl);
 
     static bool sUseMultGL;
+#endif
+
+#if LL_WINDOWS
+    // DirectInput8 access for llviewerjoystick / SpaceNavigator — same
+    // contract as LLWindowWin32 (DI8 needs only the module handle, not the
+    // window, so the SDL backend can provide it too).
+    void* getDirectInput8() override;
+    bool getInputDevices(U32 device_type_filter,
+                         std::function<bool(std::string&, LLSD&, void*)> osx_callback,
+                         void* di8_devices_callback,
+                         void* userdata) override;
+
+    // Forwards WM_COPYDATA payloads (SLURL hand-off from a second viewer
+    // instance) from the subclassed WndProc to the window callbacks.
+    void handleDataCopy(S32 data_type, void* data);
 #endif
 
 protected:
@@ -196,17 +283,41 @@ protected:
     bool SDLReallyCaptureInput(bool capture);
     U32 SDLCheckGrabbyKeys(U32 keysym, bool gain);
 
+    // Recompute mMinWindowWidthPx/HeightPx from the base-class screen-coord
+    // minimum scaled by the current SDL_GetWindowPixelDensity. Called at the
+    // end of createContext (after mWindow exists), from setMinSize, and from
+    // the display/scale-change event handlers when the active monitor's
+    // density might have changed under us.
+    void refreshMinSizePixelShadow();
+
+    // Re-cache the window pixel density + pixel height that the per-event input
+    // handlers and convertCoords read, so they don't each hit
+    // SDL_GetWindowPixelDensity / SDL_GetWindowSizeInPixels (-> GetClientRect, a
+    // USER32 syscall) on every mouse event. Run wherever the window's pixel size
+    // or density can change (resize / DPI / monitor).
+    void refreshPixelMetrics();
+
+#if LL_LINUX
+    // GPU reset detection, on NVIDIA's EGL: armGraphicsResetCheck once GL is
+    // loaded, to poll when createContext got a context that reports a reset,
+    // then checkGraphicsReset each frame from swapBuffers. A reset found is
+    // said once and the viewer quits, as nothing the GPU held survives it.
+    void armGraphicsResetCheck();
+    void checkGraphicsReset();
+    bool mGraphicsResetSeen = false;
+#endif
+
     //
     // Platform specific variables
     //
     U32 mGrabbyKeyFlags = 0;
-
+    S32 mReallyCapturedCount = 0;
     SDL_Window *mWindow = nullptr;
-    SDL_GLContext mContext;
+    SDL_GLContext mContext = nullptr;
     SDL_Cursor *mSDLCursors[UI_CURSOR_COUNT];
 
     std::string mWindowTitle;
-    F32 mOriginalAspectRatio = 1.0f;
+    F32 mNativeAspectRatio = 0.0f;
     F32 mOverrideAspectRatio = 0.0f;
     F32 mGamma = 0.0f;
     U32 mFSAASamples = 0;
@@ -218,11 +329,179 @@ private:
     LLTimer mFlashTimer;
     U32 mKeyVirtualKey = 0;
     U32 mKeyModifiers = SDL_KMOD_NONE;
+    // Platform-dependent scancode (SDL_KeyboardEvent.raw) of the last key event.
+    // Forwarded through getNativeKeyData() to the CEF media plugin, which needs
+    // it as CefKeyEvent.native_key_code for key events to reach the page.
+    U32 mKeyRawScanCode = 0;
 
-    bool mLanguageTextInputAllowed = false;
+    // Per-frame mouse-motion accumulator. SDL_EVENT_MOUSE_MOTION delivers
+    // event.motion.xrel/yrel (relative motion since the last event, in
+    // screen-coord units unless relative mode gives device counts); we
+    // scale the screen-coord kind by pixel density and sum into this
+    // member so getCursorDelta() — queried once per frame from
+    // LLViewerWindow::updateMouseDelta — sees every motion event, not
+    // just the last-position-minus-first-position which truncates to zero
+    // at high frame rates.
+    //
+    // Float storage carries sub-pixel residue across queries so fractional
+    // motion eventually integrates into integer deltas instead of being
+    // rounded away each frame.
+    // Pixel-unit shadow of the screen-coord minimum size stored in the base
+    // class. LLWindow::setSize(LLCoordWindow) clamps against
+    // mMinWindowWidth/Height as a U32, but LLCoordWindow is in pixels on
+    // this backend while the base stores screen-coord (logical) units —
+    // direct comparison under-clamps on HiDPI. setSizeImpl(LLCoordWindow)
+    // re-clamps against this pixel-unit copy to make the dimensions match.
+    U32 mMinWindowWidthPx = 0;
+    U32 mMinWindowHeightPx = 0;
+
+    // Cached pixel metrics; see refreshPixelMetrics(). Density is pre-clamped to
+    // > 0. Height starts at 0 — convertCoords falls back to a live query until
+    // the first refresh (end of createContext).
+    F32 mCachedPixelDensity = 1.f;
+    S32 mCachedWindowHeightPx = 0;
+
+    F32 mMouseDeltaAccumX = 0.f;
+    F32 mMouseDeltaAccumY = 0.f;
+
+    // Count of synthetic SDL_EVENT_MOUSE_MOTION events queued by recent
+    // non-relative-mode SDL_WarpMouseInWindow calls. Each warp that moves
+    // the cursor produces one synthetic event with xrel/yrel set to the
+    // warp distance — feeding that into the camera signal would partially
+    // cancel real user motion (visible during alt-cam recenter every
+    // frame). Incremented in setCursorPosition / showCursor wherever we
+    // warp, decremented by the MOUSE_MOTION handler which drops the
+    // synthetic event before it reaches the accumulator. Win32 raw input
+    // doesn't have this problem; SDL3 emits the synthetic event by API
+    // contract in non-relative mode.
+    S32 mPendingWarpSuppressCount = 0;
+
+    // Per-frame scroll-wheel accumulator. SDL_EVENT_MOUSE_WHEEL delivers
+    // float-precision deltas (event.wheel.x/y) that we sum here, then
+    // emit integer "clicks" through handleScrollWheel/HWheel each time the
+    // accumulator crosses ±1. Lets smooth-scroll devices (touchpads,
+    // high-resolution wheels) eventually integrate into scroll events
+    // instead of having every sub-tick dropped by the integer_x/integer_y
+    // truncation the legacy code used.
+    F32 mScrollWheelAccumX = 0.f;
+    F32 mScrollWheelAccumY = 0.f;
+
+    // A touchpad pinch, given to the viewer as Control+wheel clicks (see
+    // SDL_EVENT_PINCH_UPDATE): the scale the gesture last reported, where a
+    // backend reports it from the gesture's start, and the clicks it has not
+    // yet made whole. Both reset with each gesture.
+    F32 mPinchLastScale = 1.f;
+    F32 mPinchClickAccum = 0.f;
+
+    // Mirrors LLWindowWin32::mAbsoluteCursorPosition. Set true while the
+    // most recent mouse motion/button event was synthesised from a touch
+    // screen (event.motion.which == SDL_TOUCH_MOUSEID) or a pen / stylus
+    // (SDL_PEN_MOUSEID). Drives isWrapMouse() so MouseWarpMode=0 skips
+    // the warp path for absolute-positioned devices, and also suppresses
+    // relative-mouse-mode entry in hideCursor() since SDL3 doesn't deliver
+    // relative deltas for finger drags — relative mode there would freeze
+    // mouselook input entirely.
+    bool mAbsoluteCursorPosition = false;
+
+    // Pen / stylus state cached from the native SDL3 pen events. SDL3
+    // continues to deliver mouse-emulation events alongside these (we
+    // don't disable SDL_HINT_PEN_MOUSE_EVENTS), so the viewer's existing
+    // input plumbing keeps working unchanged; this state is purely for
+    // tools that opt into pressure/tilt/eraser data via the LLWindow
+    // virtual getters.
+    bool mPenInProximity = false;
+    bool mPenEraserTip = false;
+    F32 mPenPressure = 1.f;
+    F32 mPenTiltX = 0.f;
+    F32 mPenTiltY = 0.f;
+
+    // True while SDL_SetWindowRelativeMouseMode is active. We enter relative
+    // mode on hideCursor() (the permanent-hide path used by mouselook /
+    // camera-grab tools) and leave on showCursor(). In this mode the OS
+    // cursor is parked and SDL delivers hardware-level relative motion via
+    // SDL_EVENT_MOUSE_MOTION xrel/yrel; the absolute motion.x/y is undefined
+    // and we don't forward it to the viewer. The legacy "warp cursor to
+    // window center every frame and read the position delta" path is gone.
+    bool mRelativeMouseMode = false;
+
+    // Snapshot of mRelativeMouseMode at the OUTERMOST beforeDialog() entry.
+    // We drop relative mode while a modal dialog is up (otherwise the user
+    // can't see the cursor to click it) and use this to decide whether to
+    // re-enter pointer-lock when the outermost afterDialog() balances out.
+    // Nested dialogs (e.g. a device-loss notification surfacing while a
+    // file picker is open) are gated by mDialogDepth so only the outermost
+    // pair saves/restores state.
+    bool mDialogSavedRelativeMode = false;
+    S32 mDialogDepth = 0;
+
+    // The exit position the viewer asked for via setCursorPosition() while
+    // we were in relative mode. SDL3 keeps the cursor parked during relative
+    // mode, so an in-flight warp can't be honoured immediately; we cache the
+    // requested position and apply it as one real warp on showCursor(),
+    // right before the OS cursor becomes visible again. Without this,
+    // alt-cam handleMouseUp's "put the cursor back at the click point"
+    // call would be silently dropped, leaving the cursor at wherever SDL
+    // parked it. Mouselook deselect doesn't set this, so showCursor()
+    // defaults to window center in that case.
+    LLCoordWindow mDeferredCursorWarp;
+    bool mHasDeferredCursorWarp = false;
+
+    // Shared GL contexts for worker threads, made and bound by the
+    // sdl_*_shared_context functions in llsdl.h. mSharedContexts tracks the
+    // live handles ONLY so destroyContext can warn about and reclaim any a
+    // worker failed to release; it is touched only under mSharedCtxMutex.
+    LLMutex mSharedCtxMutex;
+    std::set<void*> mSharedContexts;
+
+    // Files and text accumulated between SDL_EVENT_DROP_BEGIN and
+    // SDL_EVENT_DROP_COMPLETE. Each SDL_EVENT_DROP_FILE only carries one path
+    // and each SDL_EVENT_DROP_TEXT one line, so we batch them and dispatch a
+    // single handleDragNDrop on COMPLETE.
+    std::string mPendingDropText;
+    std::vector<std::string> mPendingDropFiles;
+
+    // Currently-focused preeditor receiving SDL_EVENT_TEXT_EDITING composition
+    // updates. Set by LLLineEditor/LLTextEditor via allowLanguageTextInput()
+    // on focus-in; cleared on focus-out. Null when no widget owns IME.
+    //
+    // Note: we do NOT toggle SDL_StartTextInput / SDL_StopTextInput in step
+    // with mPreeditor. SDL3 ties both committed-text events
+    // (SDL_EVENT_TEXT_INPUT) and composition events (SDL_EVENT_TEXT_EDITING)
+    // to the same SDL_StartTextInput flag — turning it off when no text
+    // widget is focused would also kill the TEXT_INPUT path that
+    // LLMenuGL::handleUnicodeCharHere() needs to drive menu jump keys
+    // (see llmenugl.cpp:3135-3142). Unlike Win32's IMM, which keeps WM_CHAR
+    // delivery on regardless of composition state, there is no way to get
+    // just-the-commits from SDL3.
     LLPreeditor* mPreeditor = nullptr;
 
-    void tryFindFullscreenSize(int &aWidth, int &aHeight);
+    // Hand the platform IME the text input area of mPreeditor, the caret
+    // and the preedit around it, as the preeditor places them, so the IME's
+    // candidate window opens under the caret. False when there is no
+    // preeditor or it cannot place its caret (scrolled out of sight).
+    bool placeLanguageTextInputArea();
+
+    enum EServerProtocol{ X11, Wayland, Unknown };
+    EServerProtocol mServerProtocol = Unknown;
+
+    // Wayland only: set from SDL_EVENT_WINDOW_OCCLUDED until the EXPOSED that
+    // follows the window's return. xdg-shell never tells a client it was
+    // minimised; the toplevel's "suspended" state, which SDL reports as
+    // occlusion, is what arrives instead. getMinimized() counts it.
+    bool mOccluded = false;
+
+#if LL_WINDOWS
+    // Install/remove a WndProc subclass on the SDL window's HWND so we can
+    // service WM_COPYDATA (SLURL hand-off from a second instance) — SDL3's
+    // message hook never sees cross-process SendMessage. Paired around the
+    // SDL window lifetime in createContext/destroyContext.
+    void installWin32Subclass();
+    void removeWin32Subclass();
+    static LRESULT CALLBACK win32WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+
+    HWND mWin32Hwnd = nullptr;
+    WNDPROC mPrevWndProc = nullptr;
+#endif
 };
 
 class LLSplashScreenSDL : public LLSplashScreen
@@ -231,9 +510,22 @@ public:
     LLSplashScreenSDL();
     virtual ~LLSplashScreenSDL();
 
-    void showImpl();
-    void updateImpl(const std::string& mesg);
-    void hideImpl();
+    void showImpl() override;
+    void updateImpl(const std::string& mesg) override;
+    void hideImpl() override;
+
+private:
+    // Redraw the splash (background + current status text) and pump events so
+    // it paints while the main thread is busy loading.
+    void render();
+
+    SDL_Window*   mWindow = nullptr;
+    SDL_Renderer* mRenderer = nullptr;
+    void*         mFont = nullptr;   // TTF_Font* (kept opaque to spare the header SDL_ttf)
+    SDL_Texture*  mIcon = nullptr;   // branded app icon, left side
+    std::string   mMessage;
+    bool          mInitedVideo = false;
+    bool          mInitedTTF = false;
 };
 
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type);

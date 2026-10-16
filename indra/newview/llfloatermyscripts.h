@@ -30,9 +30,11 @@
 #include "llfloater.h"
 #include "llpanel.h"
 
-class LLFloaterMyScripts : public LLFloater
+class LLFloaterMyScripts final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterMyScripts, LLFloater);
+
     LLFloaterMyScripts(const LLSD& seed);
 
     bool postBuild() override;

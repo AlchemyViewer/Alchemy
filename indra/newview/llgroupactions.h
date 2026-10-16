@@ -59,6 +59,18 @@ public:
      */
     static void show(const LLUUID& group_id, bool expand_notices_tab = false);
 
+// [SL:KB] - Patch: Notification-GroupCreateNotice | Checked: 2012-02-16 (Catznip-3.2)
+    /**
+     * Show group information panel.
+     */
+    static void showNotices(const LLUUID& group_id);
+
+    /**
+     * Show the group's chat history.
+     */
+    static void viewChatHistory(const LLUUID& group_id);
+// [/SL:KB]
+
     /**
      * Show group inspector floater.
      */
@@ -93,6 +105,8 @@ public:
      * End group instant messaging session.
      */
     static void endIM(const LLUUID& group_id);
+    static void leaveIM(const LLUUID& group_id);
+    static void snoozeIM(const LLUUID& group_id, S32 snooze_duration = -1);
 
     /// Returns if the current user is a member of the group
     static bool isInGroup(const LLUUID& group_id);

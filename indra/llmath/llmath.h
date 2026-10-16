@@ -27,27 +27,23 @@
 #ifndef LLMATH_H
 #define LLMATH_H
 
+#include "llpreprocessor.h"
+
+#include <bit>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
-#include <vector>
 #include <limits>
 #include "lldefs.h"
-//#include "llstl.h" // *TODO: Remove when LLString is gone
-//#include "llstring.h" // *TODO: Remove when LLString is gone
-// lltut.h uses is_approx_equal_fraction(). This was moved to its own header
-// file in llcommon so we can use lltut.h for llcommon tests without making
-// llcommon depend on llmath.
+// The tests' float matchers use is_approx_equal_fraction(). This was moved
+// to its own header file in llcommon so llcommon's tests can use them without
+// making llcommon depend on llmath.
 #include "is_approx_equal_fraction.h"
 
-#define llisnan(val)  std::isnan(val)
-#define llfinite(val) std::isfinite(val)
-
-// Single Precision Floating Point Routines
-// (There used to be more defined here, but they appeared to be redundant and
-// were breaking some other includes. Removed by Falcon, reviewed by Andrew, 11/25/09)
-/*#ifndef tanf
-#define tanf(x)     ((F32)tan((F64)(x)))
-#endif*/
+inline bool llisnan(F32 val) noexcept { return std::isnan(val); }
+inline bool llisnan(F64 val) noexcept { return std::isnan(val); }
+inline bool llfinite(F32 val) noexcept { return std::isfinite(val); }
+inline bool llfinite(F64 val) noexcept { return std::isfinite(val); }
 
 constexpr F32   GRAVITY         = -9.8f;
 
@@ -106,53 +102,65 @@ constexpr bool is_approx_zero(F32 f) { return (-F_APPROXIMATELY_ZERO < f) && (f 
 // infinity is comparable with F32_MIN
 
 // handles negative and positive zeros
-inline bool is_zero(F32 x)
+constexpr bool is_zero(F32 x) noexcept
 {
-    return (*(U32*)(&x) & 0x7fffffff) == 0;
+    return (std::bit_cast<U32>(x) & 0x7fffffffu) == 0;
 }
 
-inline bool is_approx_equal(F32 x, F32 y)
+constexpr bool is_approx_equal(F32 x, F32 y) noexcept
 {
-    constexpr S32 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
-    return (std::abs((S32) ((U32&)x - (U32&)y) ) < COMPARE_MANTISSA_UP_TO_BIT);
+    constexpr U32 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
+    const U32 xb = std::bit_cast<U32>(x);
+    const U32 yb = std::bit_cast<U32>(y);
+    const U32 diff = (xb > yb) ? (xb - yb) : (yb - xb);
+    return diff < COMPARE_MANTISSA_UP_TO_BIT;
 }
 
-inline bool is_approx_equal(F64 x, F64 y)
+constexpr bool is_approx_equal(F64 x, F64 y) noexcept
 {
-    constexpr S64 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
-    return (std::abs((S32) ((U64&)x - (U64&)y) ) < COMPARE_MANTISSA_UP_TO_BIT);
+    // The previous implementation cast (U64 - U64) down to S32, which silently
+    // truncated the high 32 bits of the bit-pattern difference -- it called
+    // pairs of doubles "equal" when they only matched in the low half of their
+    // bit pattern. Use the full 64-bit diff (and bit_cast to avoid strict
+    // aliasing UB).
+    constexpr U64 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
+    const U64 xb = std::bit_cast<U64>(x);
+    const U64 yb = std::bit_cast<U64>(y);
+    const U64 diff = (xb > yb) ? (xb - yb) : (yb - xb);
+    return diff < COMPARE_MANTISSA_UP_TO_BIT;
 }
 
-inline S32 llabs(const S32 a)
+constexpr S32 llabs(const S32 a) noexcept
 {
-    return S32(std::labs(a));
+    return a < 0 ? -a : a;
 }
 
-inline F32 llabs(const F32 a)
+// Clears the sign bit. Constexpr-compatible (unlike std::fabs in C++20) and
+// behaves the same as std::fabs for +/-0, +/-inf, NaN, and ordinary values.
+constexpr F32 llabs(const F32 a) noexcept
 {
-    return F32(std::fabs(a));
+    return std::bit_cast<F32>(std::bit_cast<U32>(a) & 0x7fffffffu);
 }
 
-inline F64 llabs(const F64 a)
+constexpr F64 llabs(const F64 a) noexcept
 {
-    return F64(std::fabs(a));
+    return std::bit_cast<F64>(std::bit_cast<U64>(a) & 0x7fffffffffffffffull);
 }
 
-constexpr S32 lltrunc(F32 f)
+inline S32 lltrunc(F32 f)
 {
-    return narrow(f);
+    return (S32)std::trunc(f);
 }
 
-constexpr S32 lltrunc(F64 f)
+inline S32 lltrunc(F64 f)
 {
-    return narrow(f);
+    return (S32)std::trunc(f);
 }
 
 inline S32 llfloor(F32 f)
 {
-    return (S32)floor(f);
+    return (S32)std::floor(f);
 }
-
 
 inline S32 llceil( F32 f )
 {
@@ -160,15 +168,13 @@ inline S32 llceil( F32 f )
     return (S32)ceil(f);
 }
 
-// Use this round.  Does an arithmetic round (0.5 always rounds up)
 inline S32 ll_round(const F32 val)
 {
-    return llfloor(val + 0.5f);
+    return (S32)lround(val);
 }
-
 inline F64 ll_round(const F64 val)
 {
-    return F64(floor(val + 0.5f));
+    return round(val);
 }
 
 inline F32 ll_round( F32 val, F32 nearest )
@@ -209,23 +215,6 @@ constexpr F32 fastMagnitude(F32 a, F32 b)
 
 
 ////////////////////
-//
-// Fast F32/S32 conversions
-//
-// Culled from www.stereopsis.com/FPU.html
-
-constexpr F64 LL_DOUBLE_TO_FIX_MAGIC    = 68719476736.0*1.5;     //2^36 * 1.5,  (52-_shiftamt=36) uses limited precisicion to floor
-constexpr S32 LL_SHIFT_AMOUNT           = 16;                    //16.16 fixed point representation,
-
-// Endian dependent code
-#ifdef LL_LITTLE_ENDIAN
-    #define LL_EXP_INDEX                1
-    #define LL_MAN_INDEX                0
-#else
-    #define LL_EXP_INDEX                0
-    #define LL_MAN_INDEX                1
-#endif
-
 ////////////////////////////////////////////////
 //
 // Fast exp and log
@@ -233,27 +222,28 @@ constexpr S32 LL_SHIFT_AMOUNT           = 16;                    //16.16 fixed p
 
 // Implementation of fast exp() approximation (from a paper by Nicol N. Schraudolph
 // http://www.inf.ethz.ch/~schraudo/pubs/exp.pdf
-static union
+//
+// The trick: pack an integer (derived from the input) into the high 32 bits of
+// a double's bit pattern (i.e. the sign + exponent + top mantissa bits), with
+// the low 32 bits set to zero. The previous implementation did this with a
+// file-scope static union, which had two problems: (1) the union member
+// access for type-punning is UB in C++ even though it works in practice on
+// gcc/clang, and (2) the static union is shared by every caller in the TU,
+// so concurrent calls from multiple threads race on LLECO.n.i. Use std::bit_cast
+// (well-defined since C++20) over a stack-local U64 to fix both.
+constexpr F64 LL_EXP_A = 1048576 * OO_LN2; // use 1512775 for integer
+constexpr S32 LL_EXP_C = 60801;            // this value of C good for -4 < y < 4
+
+inline double ll_fast_exp(double y) noexcept
 {
-    double d;
-    struct
-    {
-#ifdef LL_LITTLE_ENDIAN
-        S32 j, i;
-#else
-        S32 i, j;
-#endif
-    } n;
-} LLECO; // not sure what the name means
-
-#define LL_EXP_A (1048576 * OO_LN2) // use 1512775 for integer
-#define LL_EXP_C (60801)            // this value of C good for -4 < y < 4
-
-#define LL_FAST_EXP(y) (LLECO.n.i = ll_round(F32(LL_EXP_A*(y))) + (1072693248 - LL_EXP_C), LLECO.d)
+    const S32 i = ll_round(F32(LL_EXP_A * y)) + (1072693248 - LL_EXP_C);
+    const U64 bits = static_cast<U64>(static_cast<U32>(i)) << 32;
+    return std::bit_cast<double>(bits);
+}
 
 inline F32 llfastpow(const F32 x, const F32 y)
 {
-    return (F32)(LL_FAST_EXP(y * log(x)));
+    return (F32)(ll_fast_exp(y * log(x)));
 }
 
 
@@ -399,51 +389,6 @@ constexpr U32 get_next_power_two(U32 val, U32 max_power_two)
 inline F32 llgaussian(F32 x, F32 o)
 {
     return 1.f/(F_SQRT_TWO_PI*o)*powf(F_E, -(x*x)/(2.f*o*o));
-}
-
-//helper function for removing outliers
-template <class VEC_TYPE>
-inline void ll_remove_outliers(std::vector<VEC_TYPE>& data, F32 k)
-{
-    if (data.size() < 100)
-    { //not enough samples
-        return;
-    }
-
-    VEC_TYPE Q1 = data[data.size()/4];
-    VEC_TYPE Q3 = data[data.size()-data.size()/4-1];
-
-    if ((F32)(Q3-Q1) < 1.f)
-    {
-        // not enough variation to detect outliers
-        return;
-    }
-
-
-    VEC_TYPE min = (VEC_TYPE) ((F32) Q1-k * (F32) (Q3-Q1));
-    VEC_TYPE max = (VEC_TYPE) ((F32) Q3+k * (F32) (Q3-Q1));
-
-    U32 i = 0;
-    while (i < data.size() && data[i] < min)
-    {
-        i++;
-    }
-
-    size_t j = data.size()-1;
-    while (j > 0 && data[j] > max)
-    {
-        j--;
-    }
-
-    if (j < data.size()-1)
-    {
-        data.erase(data.begin()+j, data.end());
-    }
-
-    if (i > 0)
-    {
-        data.erase(data.begin(), data.begin()+i);
-    }
 }
 
 // Converts given value from a linear RGB floating point value (0..1) to a gamma corrected (sRGB) value.

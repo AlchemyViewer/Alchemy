@@ -27,7 +27,9 @@
 #ifndef LL_MESSAGE_H
 #define LL_MESSAGE_H
 
+#include <array>
 #include <cstring>
+#include <functional>
 #include <set>
 
 #if LL_LINUX
@@ -45,6 +47,7 @@
 #include "llcircuit.h"
 #include "lltimer.h"
 #include "llpacketring.h"
+#include "alnetimpairment.h"
 #include "llhost.h"
 #include "llhttpnode.h"
 //#include "llpacketack.h"
@@ -55,15 +58,14 @@
 #include "llmessagesenderinterface.h"
 
 #include "llstoredmessage.h"
-#include "boost/function.hpp"
 #include "llpounceable.h"
 #include "llcoros.h"
 #include LLCOROS_MUTEX_HEADER
 
-const U32 MESSAGE_MAX_STRINGS_LENGTH = 64;
-const U32 MESSAGE_NUMBER_OF_HASH_BUCKETS = 8192;
+constexpr U32 MESSAGE_MAX_STRINGS_LENGTH = 64;
+constexpr U32 MESSAGE_NUMBER_OF_HASH_BUCKETS = 8192;
 
-const S32 MESSAGE_MAX_PER_FRAME = 400;
+constexpr S32 MESSAGE_MAX_PER_FRAME = 400;
 
 class LLMessageStringTable : public LLSingleton<LLMessageStringTable>
 {
@@ -118,6 +120,49 @@ public:
 // }
 // Repeat for number of messages in file
 //
+
+// UDP Packet Buffer Layout
+//
+// Every UDP message sent or received by LLMessageSystem uses the following
+// on-wire layout.  Offsets are defined in EPacketHeaderLayout below.
+//
+// Byte(s)  Name          Description
+// -------  ----          -----------
+//   0      Flags         Bit-field (see flag constants below):
+//                          0x80  LL_ZERO_CODE_FLAG – body is zero-run-length encoded
+//                          0x40  LL_RELIABLE_FLAG  – sender expects a packet ACK
+//                          0x20  LL_RESENT_FLAG    – this is a retransmission
+//                          0x10  LL_ACK_FLAG       – piggybacked ACKs are appended
+//                                                    at the tail of this packet
+//  1-4     Packet ID     Sequence number, U32 in network (big-endian) byte order.
+//   5      Offset        Byte offset from PHL_NAME to the start of the message
+//                        body (past the message-ID bytes).  Zero for most messages.
+//  6+      Message ID    Variable-length message type identifier:
+//                          High-frequency   (1 byte,  values 0x01–0xFE)
+//                          Medium-frequency (2 bytes, 0xFF hh)
+//                          Low-frequency    (4 bytes, 0xFF 0xFF hh ll)
+//  ...     Body          Message block data, described by the message template.
+//                        Present only when LL_ZERO_CODE_FLAG is clear; otherwise
+//                        the body (everything after byte 5) is zero-coded (see
+//                        below).  The 6-byte header is never zero-coded.
+//
+// Optional ACK tail (present when LL_ACK_FLAG is set in the flags byte):
+//
+//  ...     ACK IDs       N packet-sequence IDs being acknowledged, each a U32 in
+//                        network byte order, packed contiguously immediately before
+//                        the ACK count byte.  Read in reverse: walk backwards from
+//                        just before the count byte, 4 bytes at a time.
+//  last    ACK Count     U8 giving N, the number of appended ACK IDs (max 255).
+//                        This is the very last byte of the UDP payload.
+//
+// Zero-coding (applied when LL_ZERO_CODE_FLAG is set):
+//
+//   Runs of zero bytes in the body are replaced by a two-byte token:
+//     0x00 N        – represents (N + 1) zero bytes, for N in 1..254
+//     0x00 0x00 N   – represents (256 + N) zero bytes  (wrap/overflow case)
+//   A literal 0x00 byte that starts no run is encoded as 0x00 0x00 0x00.
+//   The six-byte packet header is excluded from zero-coding and is always
+//   transmitted as-is.
 
 // Constants
 const S32 MAX_MESSAGE_INTERNAL_NAME_SIZE = 255;
@@ -291,8 +336,16 @@ class LLMessageSystem : public LLMessageSenderInterface
     bool                mBlockUntrustedInterface;
     LLHost              mUntrustedInterface;
 
+ protected:
+    LLPacketRing        mHighPriorityInbound;
+    LLPacketRing        mLowPriorityInbound;
+#if AL_NET_IMPAIRMENT
+    // Deliberate damage to the inbound stream, so the recovery paths can be watched on a link
+    // that is not actually broken. Compiled out of the build that ships.
+    ALNetImpairment     mNetImpairment;
+#endif
+
  public:
-    LLPacketRing                mPacketRing;
     LLReliablePacketParams      mReliablePacketParams;
 
     // Set this flag to true when you want *very* verbose logs.
@@ -303,11 +356,9 @@ class LLMessageSystem : public LLMessageSenderInterface
     typedef std::map<const char *, LLMessageTemplate*> message_template_name_map_t;
     typedef std::map<U32, LLMessageTemplate*> message_template_number_map_t;
 
-private:
     message_template_name_map_t     mMessageTemplates;
     message_template_number_map_t   mMessageNumbers;
 
-public:
     S32                 mSystemVersionMajor;
     S32                 mSystemVersionMinor;
     S32                 mSystemVersionPatch;
@@ -334,7 +385,7 @@ public:
     U32                 mReliablePacketsIn;     // total reliable packets in
     U32                 mReliablePacketsOut;        // total reliable packets out
 
-    U32                 mDroppedPackets;            // total dropped packets in
+    U32                 mLostPackets;               // total reliable outbound packets declared lost
     U32                 mResentPackets;             // total resent packets out
     U32                 mFailedResendPackets;       // total resend failure packets out
     U32                 mOffCircuitPackets;         // total # of off-circuit packets rejected
@@ -386,6 +437,12 @@ public:
         setHandlerFuncFast(LLMessageStringTable::getInstance()->getString(name), handler_func, user_data);
     }
 
+    void addHandlerFuncFast(const char *name, std::function<void (LLMessageSystem *msgsystem)> handler_slot);
+    void addHandlerFunc(const char *name, std::function<void (LLMessageSystem *msgsystem)> handler_slot)
+    {
+        addHandlerFuncFast(LLMessageStringTable::getInstance()->getString(name), handler_slot);
+    }
+
     // Set a callback function for a message system exception.
     void setExceptionFunc(EMessageException exception, msg_exception_callback func, void* data = NULL);
     // Call the specified exception func, and return true if a
@@ -414,11 +471,31 @@ public:
     bool addCircuitCode(U32 code, const LLUUID& session_id);
 
     bool    poll(F32 seconds); // Number of seconds that we want to block waiting for data, returns if data was received
-    bool    checkMessages(LockMessageChecker&, S64 frame_count = 0 );
+    bool    checkMessages(LockMessageChecker&, S64 frame_count = 0,
+                          bool faked_message = false, U8 fake_buffer[MAX_BUFFER_SIZE] = nullptr, LLHost fake_host = LLHost(), S32 fake_size = 0);
     void    processAcks(LockMessageChecker&, F32 collect_time = 0.f);
 
     // returns total number of buffered packets after the drain
     S32     drainUdpSocket();
+
+    // Inbound Packet-loss simulation controls
+    void dropPackets(U32 num_to_drop);
+    void setDropPercentage(F32 percent_to_drop);
+
+    // UDP byte-accounting
+    S32  getActualInBytes()  const { return mActualBytesIn; }
+    S32  getActualOutBytes() const { return mActualBytesOut; }
+    S32  getAndResetActualInBits()  { S32 bits = mActualBytesIn  * 8; mActualBytesIn  = 0; return bits; }
+    S32  getAndResetActualOutBits() { S32 bits = mActualBytesOut * 8; mActualBytesOut = 0; return bits; }
+
+    // Get number of "dropped" inbound packets
+    S32  getTotalNumDroppedPackets()   const { return mNumDroppedPacketsTotal + mNumDroppedPackets; }
+
+    S32  getNumBufferedPackets()  const { return mHighPriorityInbound.getNumBufferedPackets() + mLowPriorityInbound.getNumBufferedPackets(); }
+    void dumpPacketRingStats();
+
+    // Send datap to host via mSocket (with SOCKS proxy support if enabled).
+    bool sendPacketToSocket(const char* datap, S32 data_size, LLHost host);
 
     bool    isMessageFast(const char *msg);
     bool    isMessage(const char *msg)
@@ -534,12 +611,9 @@ public:
     bool isSendFull(const char* blockname = NULL);
     bool isSendFullFast(const char* blockname = NULL);
 
-    bool removeLastBlock();
-
     //void  buildMessage();
 
     S32     zeroCodeExpand(U8 **data, S32 *data_size);
-    S32     zeroCodeAdjustCurrentSendTotal();
 
     // Uses ping-based retry
     S32 sendReliable(const LLHost &host);
@@ -660,6 +734,7 @@ public:
     void getCircuitInfo(LLSD& info) const;
 
     U32 getOurCircuitCode();
+    LLCircuit* getCircuit();
 
     void    enableCircuit(const LLHost &host, bool trusted);
     void    disableCircuit(const LLHost &host);
@@ -688,7 +763,7 @@ public:
     bool isUntrustedMessage(const std::string& name) const;
 
     // Mark an interface ineligible for trust
-    void setUntrustedInterface( const LLHost host ) { mUntrustedInterface = host; }
+    void setUntrustedInterface( const LLHost& host ) { mUntrustedInterface = host; }
     LLHost getUntrustedInterface() const { return mUntrustedInterface; }
     void setBlockUntrustedInterface( bool block ) { mBlockUntrustedInterface = block; } // Throw a switch to allow, sending warnings only
     bool getBlockUntrustedInterface() const { return mBlockUntrustedInterface; }
@@ -727,6 +802,7 @@ public:
     LLHost  findHost(const U32 circuit_code);
     void    sanityCheck();
 
+    bool    hasFast(const char* blockname) const;
     bool    has(const char *blockname) const;
     S32     getNumberOfBlocksFast(const char *blockname) const;
     S32     getNumberOfBlocks(const char *blockname) const;
@@ -754,7 +830,7 @@ public:
     S32     getReceiveBytes() const;
 
     S32     getUnackedListSize() const          { return mUnackedListSize; }
-    F32     getBufferLoadRate() const           { return mPacketRing.getBufferLoadRate(); }
+    F32     getBufferLoadRate() const;
 
     //const char* getCurrentSMessageName() const { return mCurrentSMessageName; }
     //const char* getCurrentSBlockName() const { return mCurrentSBlockName; }
@@ -826,7 +902,7 @@ public:
     void receivedMessageFromTrustedSender();
 
 private:
-    typedef boost::function<void(S32)>  UntrustedCallback_t;
+    typedef std::function<void(S32)>  UntrustedCallback_t;
     void sendUntrustedSimulatorMessageCoro(std::string url, std::string message, LLSD body, UntrustedCallback_t callback);
 
 
@@ -845,14 +921,13 @@ private:
 
     void        logMsgFromInvalidCircuit( const LLHost& sender, bool recv_reliable );
     void        logTrustedMsgFromUntrustedCircuit( const LLHost& sender );
-    void        logValidMsg(LLCircuitData *cdp, const LLHost& sender, bool recv_reliable, bool recv_resent, bool recv_acks );
+    void        logValidMsg(LLCircuitData *cdp, const LLHost& sender, bool recv_reliable, bool recv_resent, bool recv_acks, bool skip_packet_id_check );
 
-    class LLMessageCountInfo
+    struct LLMessageCountInfo
     {
-    public:
-        U32 mMessageNum;
-        U32 mMessageBytes;
-        bool mInvalid;
+        U32 mMessageNum = 0;
+        U32 mMessageBytes = 0;
+        bool mInvalid = false;
     };
 
     LLMessagePollInfo                       *mPollInfop;
@@ -868,7 +943,7 @@ private:
 
     F64Seconds                                      mResendDumpTime; // The last time we dumped resends
 
-    LLMessageCountInfo mMessageCountList[MAX_MESSAGE_COUNT_NUM];
+    std::array<LLMessageCountInfo, MAX_MESSAGE_COUNT_NUM> mMessageCountList;
     S32 mNumMessageCounts;
     F32Seconds mReceiveTime;
     F32Seconds mMaxMessageTime; // Max number of seconds for processing messages
@@ -898,6 +973,44 @@ private:
     S32 mIncomingCompressedSize;        // original size of compressed msg (0 if uncomp.)
     TPACKETID mCurrentRecvPacketID;       // packet ID of current receive packet (for reporting)
 
+    // Socket I/O helpers
+
+    // Receive one packet: pop from ring if buffered, else read from mSocket.
+    // Sets mLastSender and mLastReceivingIF.
+    // Sets packet_id_already_checked to whether checkPacketInID() was already
+    // run for this packet back when it was buffered (see bufferInboundPacket()).
+    // Returns packet_size, or 0 if no packet or packet was dropped.
+    S32  receivePacketOrDrop(char* datap, bool& packet_id_already_checked);
+
+public:
+#if AL_NET_IMPAIRMENT
+    // Synthetic loss and reordering. Safe to call every frame; zero loss and zero reordering
+    // leave the stream untouched.
+    void setNetImpairment(F32 loss_percent, F32 burst_packets, F32 reorder_percent, S32 reorder_delay);
+    const ALNetImpairment& getNetImpairment() const { return mNetImpairment; }
+#endif
+private:
+
+    // Read one raw packet from mSocket into inbound message queues
+    // Returns packet_size (0 if no packet was available).
+    S32  bufferInboundPacket();
+
+    // Returns true if the next inbound packet should be intentionally dropped.
+    bool computeDrop();
+
+    // Returns true if pkt carries a high-priority message and should be queued
+    // in mHighPriorityInbound.
+    bool isHighPriorityMessage(const LLPacketBuffer& pkt) const;
+
+    // Packet-loss simulation and byte-accounting state
+    S32 mActualBytesIn;
+    S32 mActualBytesOut;
+    F32 mDropPercentage;        // % of inbound packets to drop
+    U32 mPacketsToDrop;         // drop next N inbound packets
+    S32 mNumDroppedPackets;     // inbound
+    S32 mNumDroppedPacketsTotal;// inbound
+
+public:
     LLMessageBuilder* mMessageBuilder;
     LLTemplateMessageBuilder* mTemplateMessageBuilder;
     LLSDMessageBuilder* mLLSDMessageBuilder;
@@ -905,6 +1018,7 @@ private:
     LLTemplateMessageReader* mTemplateMessageReader;
     LLSDMessageReader* mLLSDMessageReader;
 
+private:
     friend class LLMessageHandlerBridge;
     friend class LockMessageChecker;
 
@@ -1127,7 +1241,7 @@ static inline void *htolememcpy(void *vs, const void *vct, EMsgVariableType type
             LL_ERRS() << "Size argument passed to htolememcpy doesn't match swizzle type size" << LL_ENDL;
         }
 #ifdef LL_BIG_ENDIAN
-        length = n % 2;
+        length = (S32)(n / 2);
         for (i = 1; i < length; i++)
         {
             htolememcpy(s + i*2, ct + i*2, MVT_S16, 2);

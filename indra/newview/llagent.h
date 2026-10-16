@@ -39,8 +39,9 @@
 #include "httprequest.h"
 #include "llcorehttputil.h"
 
-#include <boost/function.hpp>
 #include <boost/signals2.hpp>
+
+#include <functional>
 
 extern const bool   ANIMATE;
 extern const U8     AGENT_STATE_TYPING;  // Typing indication
@@ -214,6 +215,22 @@ public:
     F32             getVelocityZ() const    { return getVelocity().mV[VZ]; } // ! HACK !
 
     //--------------------------------------------------------------------
+    // Health
+    //--------------------------------------------------------------------
+public:
+    typedef boost::signals2::signal<void(S32)> health_changed_signal_t;
+
+    S32             getHealth() const { return mHealth; }
+    // Arrives in HealthMessage as a percentage. Plays the damage sound and
+    // notifies below, both only when the value actually moves.
+    void            setHealth(S32 health);
+    boost::signals2::connection addHealthChangedCallback(const health_changed_signal_t::slot_type& cb);
+
+private:
+    S32                         mHealth { 100 };
+    health_changed_signal_t     mHealthChangedSignal;
+
+    //--------------------------------------------------------------------
     // Coordinate System
     //--------------------------------------------------------------------
 public:
@@ -254,7 +271,7 @@ public:
     void changeParcels(); // called by LLViewerParcelMgr when we cross a parcel boundary
 
     // Register a boost callback to be called when the agent changes parcels
-    typedef boost::function<void()> parcel_changed_callback_t;
+    typedef std::function<void()> parcel_changed_callback_t;
     boost::signals2::connection     addParcelChangedCallback(parcel_changed_callback_t);
 
 private:
@@ -273,7 +290,7 @@ public:
     bool            inPrelude();
 
     // Capability
-    std::string     getRegionCapability(const std::string &name); // short hand for if (getRegion()) { getRegion()->getCapability(name) }
+    std::string     getRegionCapability(std::string_view name); // short hand for if (getRegion()) { getRegion()->getCapability(name) }
 
     /**
      * Register a boost callback to be called when the agent changes regions
@@ -344,7 +361,7 @@ private:
     LLFrameTimer    mFidgetTimer;
     LLFrameTimer    mFocusObjectFadeTimer;
     LLFrameTimer    mMoveTimer;
-    F32             mNextFidgetTime;
+    F64             mNextFidgetTime;    // on mFidgetTimer, which runs all session
     S32             mCurrentFidget;
 
     //--------------------------------------------------------------------
@@ -395,6 +412,7 @@ protected:
     void            ageChat();              // Helper function to prematurely age chat when agent is moving
 private:
     LLFrameTimer    mChatTimer;
+    U32             mChatAgedFrame = 0;     // LLFrameTimer::getFrameCount() of the last ageChat(), which ages a frame once
     LLUUID          mLastChatterID;
     F32             mNearChatRadius;
 
@@ -507,6 +525,7 @@ private:
     S32             mControlsTakenCount[TOTAL_CONTROLS];
     S32             mControlsTakenPassedOnCount[TOTAL_CONTROLS];
     U32             mControlFlags;                  // Replacement for the mFooKey's
+    F64             mLastJumpInputTime;             // Time of last jump input (key-down) in seconds from LLTimer::getTotalSeconds()
 
     bool            mIgnorePrejump;
     //--------------------------------------------------------------------
@@ -611,7 +630,7 @@ private:
     bool            mAutoPilotUseRotation;
     LLVector3       mAutoPilotTargetFacing;
     F32             mAutoPilotTargetDist;
-    S32             mAutoPilotNoProgressFrameCount;
+    F32             mAutoPilotNoProgressTime;   // seconds without getting closer
     F32             mAutoPilotRotationThreshold;
     std::string     mAutoPilotBehaviorName;
     void            (*mAutoPilotFinishedCallback)(bool, void *);
@@ -788,7 +807,7 @@ public:
     void            requestEnterGodMode();
     void            requestLeaveGodMode();
 
-    typedef boost::function<void (U8)>         god_level_change_callback_t;
+    typedef std::function<void(U8)>            god_level_change_callback_t;
     typedef boost::signals2::signal<void (U8)> god_level_change_signal_t;
     typedef boost::signals2::connection        god_level_change_slot_t;
 
@@ -876,7 +895,7 @@ private:
     // HUD
     //--------------------------------------------------------------------
 public:
-    const LLColor4  getEffectColor();
+    LLColor4        getEffectColor();
     void            setEffectColor(const LLColor4 &color);
 private:
     LLUIColor * mEffectColor;
@@ -997,8 +1016,8 @@ public:
 
     /// Utilities for allowing the the agent sub managers to post and get via
     /// HTTP using the agent's policy settings and headers.
-    bool requestPostCapability(const std::string &capName, LLSD &postData, httpCallback_t cbSuccess = NULL, httpCallback_t cbFailure = NULL);
-    bool requestGetCapability(const std::string &capName, httpCallback_t cbSuccess = NULL, httpCallback_t cbFailure = NULL);
+    bool requestPostCapability(const std::string &capName, LLSD &postData, httpCallback_t cbSuccess = nullptr, httpCallback_t cbFailure = nullptr);
+    bool requestGetCapability(const std::string& capName, httpCallback_t cbSuccess = nullptr, httpCallback_t cbFailure = nullptr);
 
     LLCore::HttpRequest::policy_t getAgentPolicy() const { return mHttpPolicy; }
 

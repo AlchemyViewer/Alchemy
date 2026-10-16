@@ -47,7 +47,10 @@ LLLocalTextureObject::LLLocalTextureObject(LLGLTexture* image, const LLUUID& id)
     mDiscard(MAX_DISCARD_LEVEL+1)
 {
     mImage = image;
-    gGL.getTexUnit(0)->bind(mImage);
+    // Nothing is drawn here -- this binds in a constructor and returns. It reads as a
+    // residency/creation nudge rather than a sample, so no sampler is named. Suspect: it
+    // may do nothing at all, but proving that wants its own look.
+    gGL.getTextureSlot(0)->bindSampled(mImage, ALSamplers::AnisoWrap);
     mID = id;
 }
 

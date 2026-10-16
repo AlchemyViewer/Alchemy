@@ -27,7 +27,6 @@
 #include "linden_common.h"
 #include "lllfsthread.h"
 #include "llstl.h"
-#include "llapr.h"
 
 //============================================================================
 
@@ -40,6 +39,7 @@ void LLLFSThread::initClass(bool local_is_threaded)
 {
     llassert(sLocal == NULL);
     sLocal = new LLLFSThread(local_is_threaded);
+    sLocal->start();
 }
 
 //static
@@ -51,6 +51,7 @@ S32 LLLFSThread::updateClass(U32 ms_elapsed)
 //static
 void LLLFSThread::cleanupClass()
 {
+    LL_PROFILE_ZONE_SCOPED;
     llassert(sLocal != NULL);
     sLocal->setQuitting();
     while (sLocal->getPending())
@@ -67,15 +68,10 @@ void LLLFSThread::cleanupClass()
 LLLFSThread::LLLFSThread(bool threaded) :
     LLQueuedThread("LFS", threaded)
 {
-    if(!mLocalAPRFilePoolp)
-    {
-        mLocalAPRFilePoolp = new LLVolatileAPRPool() ;
-    }
 }
 
 LLLFSThread::~LLLFSThread()
 {
-    // mLocalAPRFilePoolp cleanup in LLThread
     // ~LLQueuedThread() will be called here
 }
 
@@ -183,9 +179,10 @@ bool LLLFSThread::Request::processRequest()
     if (mOperation ==  FILE_READ)
     {
         llassert(mOffset >= 0);
-        LLAPRFile infile ; // auto-closes
-        infile.open(mFileName, LL_APR_RB, mThread->getLocalAPRFilePool());
-        if (!infile.getFileHandle())
+        std::error_code ec;
+        LLFile infile ; // auto-closes
+        infile.open(mFileName, LLFile::in|LLFile::binary, ec);
+        if (!infile || ec)
         {
             LL_WARNS() << "LLLFS: Unable to read file: " << mFileName << LL_ENDL;
             mBytesRead = 0; // fail
@@ -193,22 +190,37 @@ bool LLLFSThread::Request::processRequest()
         }
         S32 off;
         if (mOffset < 0)
-            off = infile.seek(APR_END, 0);
+            off = infile.seek(0, LLFile::end, ec);
         else
-            off = infile.seek(APR_SET, mOffset);
+            off = infile.seek(mOffset, LLFile::beg, ec);
         llassert_always(off >= 0);
-        mBytesRead = infile.read(mBuffer, mBytes );
+        mBytesRead = narrow(infile.read(mBuffer, mBytes, ec));
         complete = true;
 //      LL_INFOS() << "LLLFSThread::READ:" << mFileName << " Bytes: " << mBytesRead << LL_ENDL;
     }
     else if (mOperation ==  FILE_WRITE)
     {
-        apr_int32_t flags = APR_CREATE|APR_WRITE|APR_BINARY;
+        auto flags = LLFile::out|LLFile::binary;
         if (mOffset < 0)
-            flags |= APR_APPEND;
-        LLAPRFile outfile ; // auto-closes
-        outfile.open(mFileName, flags, mThread->getLocalAPRFilePool());
-        if (!outfile.getFileHandle())
+            flags |= LLFile::trunc;
+        else
+        {
+            if (LLFile::isfile(mFileName))
+            {
+                // if file exists, open for read/write so we can seek and write
+                flags |= LLFile::in;
+            }
+            else
+            {
+                // if file doesn't exist, just create it
+                flags |= LLFile::trunc;
+            }
+        }
+
+        std::error_code ec;
+        LLFile outfile ; // auto-closes
+        outfile.open(mFileName, flags, ec);
+        if (!outfile || ec)
         {
             LL_WARNS() << "LLLFS: Unable to write file: " << mFileName << LL_ENDL;
             mBytesRead = 0; // fail
@@ -216,7 +228,7 @@ bool LLLFSThread::Request::processRequest()
         }
         if (mOffset >= 0)
         {
-            S32 seek = outfile.seek(APR_SET, mOffset);
+            S32 seek = outfile.seek(mOffset, LLFile::beg, ec);
             if (seek < 0)
             {
                 LL_WARNS() << "LLLFS: Unable to write file (seek failed): " << mFileName << LL_ENDL;
@@ -224,7 +236,7 @@ bool LLLFSThread::Request::processRequest()
                 return true;
             }
         }
-        mBytesRead = outfile.write(mBuffer, mBytes );
+        mBytesRead = narrow(outfile.write(mBuffer, mBytes, ec));
         complete = true;
 //      LL_INFOS() << "LLLFSThread::WRITE:" << mFileName << " Bytes: " << mBytesRead << "/" << mBytes << " Offset:" << mOffset << LL_ENDL;
     }

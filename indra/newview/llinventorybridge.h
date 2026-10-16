@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -87,7 +87,7 @@ public:
     virtual const LLUUID& getUUID() const { return mUUID; }
     virtual const LLUUID& getThumbnailUUID() const { return LLUUID::null; }
     virtual bool isFavorite() const { return false; }
-    virtual void clearDisplayName() { mDisplayName.clear(); }
+    virtual void clearSearchableName() { mSearchableName.clear(); }
     virtual void restoreItem() {}
     virtual void restoreToWorld() {}
 
@@ -202,12 +202,11 @@ protected:
     LLInventoryType::EType mInvType;
     bool                        mIsLink;
     LLTimer                     mTimeSinceRequestStart;
-    mutable std::string         mDisplayName;
     mutable std::string         mSearchableName;
 
     void purgeItem(LLInventoryModel *model, const LLUUID &uuid);
     void removeObject(LLInventoryModel *model, const LLUUID &uuid);
-    virtual void buildDisplayName() const {}
+    virtual void buildSearchableName() const {}
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -239,7 +238,7 @@ public:
                  const LLUUID& uuid) :
         LLInvFVBridge(inventory, root, uuid) {}
 
-    typedef boost::function<void(std::string& slurl)> slurl_callback_t;
+    typedef std::function<void(std::string& slurl)> slurl_callback_t;
 
     virtual void performAction(LLInventoryModel* model, std::string action);
     virtual void selectItem();
@@ -266,7 +265,7 @@ public:
 protected:
     bool confirmRemoveItem(const LLSD& notification, const LLSD& response);
     virtual bool isItemPermissive() const;
-    virtual void buildDisplayName() const;
+    virtual void buildSearchableName() const;
     void doActionOnCurSelectedLandmark(LLLandmarkList::loaded_callback_t cb);
 
 private:
@@ -287,7 +286,7 @@ public:
     void callback_dropItemIntoFolder(const LLSD& notification, const LLSD& response, LLInventoryItem* inv_item);
     void callback_dropCategoryIntoFolder(const LLSD& notification, const LLSD& response, LLInventoryCategory* inv_category);
 
-    virtual void buildDisplayName() const;
+    virtual void buildSearchableName() const;
 
     virtual void performAction(LLInventoryModel* model, std::string action);
     virtual void openItem();
@@ -572,6 +571,7 @@ public:
                     LLFolderView* root,
                     const LLUUID& uuid ) :
         LLItemBridge(inventory, root, uuid) {}
+    virtual LLUIImagePtr getIcon() const;
     virtual void openItem();
 };
 
@@ -833,7 +833,7 @@ void rez_attachment(LLViewerInventoryItem* item,
 bool move_inv_category_world_to_agent(const LLUUID& object_id,
                                       const LLUUID& category_id,
                                       bool drop,
-                                      std::function<void(S32, void*, const LLMoveInv *)> callback = NULL,
+                                      std::function<void(S32, void*, const LLMoveInv *)> callback = nullptr,
                                       void* user_data = NULL,
                                       LLInventoryFilter* filter = NULL);
 

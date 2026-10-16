@@ -51,8 +51,8 @@ LLMotion::LLMotion( const LLUUID &id ) :
     mSendStopTimestamp(F32_MAX),
     mResidualWeight(0.f),
     mFadeWeight(1.f),
-    mDeactivateCallback(NULL),
-    mDeactivateCallbackUserData(NULL)
+    mDeactivateCallback(nullptr),
+    mDeactivateCallbackUserData(nullptr)
 {
     for (S32 i=0; i<3; ++i)
         memset(&mJointSignature[i][0], 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
@@ -129,7 +129,7 @@ void LLMotion::setDeactivateCallback( void (*cb)(void *), void* userdata )
 }
 
 //virtual
-void LLMotion::setStopTime(F32 time)
+void LLMotion::setStopTime(F64 time)
 {
     mStopTimestamp = time;
     mStopped = true;
@@ -143,7 +143,7 @@ bool LLMotion::isBlending()
 //-----------------------------------------------------------------------------
 // activate()
 //-----------------------------------------------------------------------------
-void LLMotion::activate(F32 time)
+void LLMotion::activate(F64 time)
 {
     mActivationTimestamp = time;
     mStopped = false;

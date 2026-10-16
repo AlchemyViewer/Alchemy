@@ -80,7 +80,6 @@ Account: [ACCTTYPE]
       <profile_image
        name="2nd_life_pic"
        image_name="Generic_Person_Large"
-       show_loading="false"
        layout="topleft"
        follows="all"
        interactable="true"
@@ -584,6 +583,7 @@ Account: [ACCTTYPE]
        parse_urls="true"
        word_wrap="true"
        show_emoji_helper="true"
+       use_color="true"
         />
     </layout_panel>
     <layout_panel

@@ -410,7 +410,7 @@ void LLPanelGroupLandMoney::impl::contributionKeystrokeCallback(LLLineEditor* ca
 //static
 void LLPanelGroupLandMoney::impl::processGroupLand(LLMessageSystem* msg)
 {
-    S32 count = msg->getNumberOfBlocks("QueryData");
+    S32 count = msg->getNumberOfBlocksFast(_PREHASH_QueryData);
     if(count > 0)
     {
         S32 first_block = 0;
@@ -418,8 +418,8 @@ void LLPanelGroupLandMoney::impl::processGroupLand(LLMessageSystem* msg)
         LLUUID owner_id;
         LLUUID trans_id;
 
-        msg->getUUID("QueryData", "OwnerID", owner_id, 0);
-        msg->getUUID("TransactionData", "TransactionID", trans_id);
+        msg->getUUIDFast(_PREHASH_QueryData, _PREHASH_OwnerID, owner_id, 0);
+        msg->getUUIDFast(_PREHASH_TransactionData, _PREHASH_TransactionID, trans_id);
 
         if(owner_id.isNull())
         {
@@ -431,19 +431,19 @@ void LLPanelGroupLandMoney::impl::processGroupLand(LLMessageSystem* msg)
 
             if(count == 1)
             {
-                msg->getS32("QueryData", "BillableArea", committed, 0);
+                msg->getS32Fast(_PREHASH_QueryData, _PREHASH_BillableArea, committed, 0);
             }
             else
             {
                 for(S32 i = first_block; i < count; ++i)
                 {
-                    msg->getS32("QueryData", "BillableArea", billable_area, i);
+                    msg->getS32Fast(_PREHASH_QueryData, _PREHASH_BillableArea, billable_area, i);
                     committed+=billable_area;
                 }
             }
 
             S32 total_contribution;
-            msg->getS32("QueryData", "ActualArea", total_contribution, 0);
+            msg->getS32Fast(_PREHASH_QueryData, _PREHASH_ActualArea, total_contribution, 0);
             mPanel.getChild<LLUICtrl>("total_contributed_land_value")->setTextArg("[AREA]", llformat("%d", total_contribution));
 
             mPanel.getChild<LLUICtrl>("total_land_in_use_value")->setTextArg("[AREA]", llformat("%d", committed));
@@ -481,15 +481,15 @@ void LLPanelGroupLandMoney::impl::processGroupLand(LLMessageSystem* msg)
 
         for(S32 i = first_block; i < count; ++i)
         {
-            msg->getUUID("QueryData", "OwnerID", owner_id, i);
-            msg->getString("QueryData", "Name", name, i);
-            msg->getString("QueryData", "Desc", desc, i);
-            msg->getS32("QueryData", "ActualArea", actual_area, i);
-            msg->getS32("QueryData", "BillableArea", billable_area, i);
-            msg->getU8("QueryData", "Flags", flags, i);
-            msg->getF32("QueryData", "GlobalX", global_x, i);
-            msg->getF32("QueryData", "GlobalY", global_y, i);
-            msg->getString("QueryData", "SimName", sim_name, i);
+            msg->getUUIDFast(_PREHASH_QueryData, _PREHASH_OwnerID, owner_id, i);
+            msg->getStringFast(_PREHASH_QueryData, _PREHASH_Name, name, i);
+            msg->getStringFast(_PREHASH_QueryData, _PREHASH_Desc, desc, i);
+            msg->getS32Fast(_PREHASH_QueryData, _PREHASH_ActualArea, actual_area, i);
+            msg->getS32Fast(_PREHASH_QueryData, _PREHASH_BillableArea, billable_area, i);
+            msg->getU8Fast(_PREHASH_QueryData, _PREHASH_Flags, flags, i);
+            msg->getF32Fast(_PREHASH_QueryData, _PREHASH_GlobalX, global_x, i);
+            msg->getF32Fast(_PREHASH_QueryData, _PREHASH_GlobalY, global_y, i);
+            msg->getStringFast(_PREHASH_QueryData, _PREHASH_SimName, sim_name, i);
 
             if ( msg->getSizeFast(_PREHASH_QueryData, i, _PREHASH_ProductSKU) > 0 )
             {
@@ -839,7 +839,7 @@ bool LLPanelGroupLandMoney::isVisibleByAgent(LLAgent* agentp)
 void LLPanelGroupLandMoney::processPlacesReply(LLMessageSystem* msg, void**)
 {
     LLUUID group_id;
-    msg->getUUID("AgentData", "QueryID", group_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_QueryID, group_id);
 
     group_id_map_t::iterator found_it = sGroupIDs.find(group_id);
     if(found_it == sGroupIDs.end())

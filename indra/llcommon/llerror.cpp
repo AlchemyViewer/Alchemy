@@ -47,7 +47,6 @@
 #include "string.h"
 
 #include "llapp.h"
-#include "llapr.h"
 #include "llfile.h"
 #include "lllivefile.h"
 #include "llsd.h"
@@ -57,12 +56,8 @@
 #include "lltimer.h"
 #include "llprofiler.h"
 
-// On Mac, got:
-// #error "Boost.Stacktrace requires `_Unwind_Backtrace` function. Define
-// `_GNU_SOURCE` macro or `BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED` if
-// _Unwind_Backtrace is available without `_GNU_SOURCE`."
-#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
 #include <boost/stacktrace.hpp>
+#include <boost/unordered_map.hpp>
 
 namespace {
 #if LL_WINDOWS
@@ -134,7 +129,6 @@ namespace {
             mName(filename)
         {
             showMultiline(true);
-
             mFile.open(filename.c_str(), std::ios_base::out | std::ios_base::app);
             if (!mFile)
             {
@@ -335,7 +329,9 @@ namespace {
 
         virtual bool enabled() override
         {
-            return LLError::getEnabledLogTypesMask() & 0x10;
+            // debugger_print() is a no-op without a debugger, but every enabled
+            // recorder is handed a freshly formatted copy of each line first.
+            return (LLError::getEnabledLogTypesMask() & 0x10) && IsDebuggerPresent();
         }
 
         virtual void recordMessage(LLError::ELevel level,
@@ -343,6 +339,51 @@ namespace {
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
             debugger_print(message);
+        }
+    };
+#endif
+
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+    class RecordToTracy : public LLError::Recorder
+    {
+    public:
+        RecordToTracy()
+        {
+            this->showMultiline(true);
+            this->showTags(false);
+            this->showLocation(false);
+        }
+
+        virtual bool enabled() override { return LLError::getEnabledLogTypesMask() & 0x12; }
+
+        virtual void recordMessage(LLError::ELevel level, const std::string& message) override
+        {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING;
+            switch (level)
+            {
+                case LLError::LEVEL_DEBUG:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::Turquoise);
+                    break;
+                }
+                default:
+                case LLError::LEVEL_NONE:
+                case LLError::LEVEL_INFO:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::White);
+                    break;
+                }
+                case LLError::LEVEL_WARN:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::Yellow);
+                    break;
+                }
+                case LLError::LEVEL_ERROR:
+                {
+                    TracyMessageC(message.c_str(), message.size(), tracy::Color::Red);
+                    break;
+                }
+            }
         }
     };
 #endif
@@ -437,13 +478,9 @@ namespace
 
         std::string file = user_dir + "/logcontrol-dev.xml";
 
-        llstat stat_info;
-        if (LLFile::stat(file, &stat_info)) {
-            // NB: stat returns non-zero if it can't read the file, for example
-            // if it doesn't exist.  LLFile has no better abstraction for
-            // testing for file existence.
-
-            file = app_dir + "/logcontrol.xml";
+        if (!LLFile::isfile(file))
+        {
+             file = app_dir + "/logcontrol.xml";
         }
         return * new LogControlFile(file);
             // NB: This instance is never freed
@@ -482,11 +519,13 @@ namespace
     }
 
 
-    typedef std::map<std::string, LLError::ELevel> LevelMap;
+    typedef boost::unordered_map<std::string, LLError::ELevel> LevelMap;
     typedef std::vector<LLError::RecorderPtr> Recorders;
     typedef std::vector<LLError::CallSite*> CallSiteVector;
 
-    class SettingsConfig : public LLRefCount
+    // Held by every thread that logs, some of them without the log's lock,
+    // so counted atomically.
+    class SettingsConfig : public LLThreadSafeRefCount
     {
         friend class Globals;
 
@@ -503,7 +542,7 @@ namespace
         LevelMap                            mClassLevelMap;
         LevelMap                            mFileLevelMap;
         LevelMap                            mTagLevelMap;
-        std::map<std::string, unsigned int> mUniqueLogMessages;
+        boost::unordered_map<std::string, unsigned int> mUniqueLogMessages;
 
         LLError::FatalFunction              mCrashFunction;
         LLError::TimeFunction               mTimeFunction;
@@ -520,7 +559,7 @@ namespace
     typedef LLPointer<SettingsConfig> SettingsConfigPtr;
 
     SettingsConfig::SettingsConfig()
-        : LLRefCount(),
+        : LLThreadSafeRefCount(),
         mDefaultLevel(LLError::LEVEL_DEBUG),
         mLogAlwaysFlush(true),
         mEnabledLogTypesMask(255),
@@ -529,8 +568,8 @@ namespace
         mFileLevelMap(),
         mTagLevelMap(),
         mUniqueLogMessages(),
-        mCrashFunction(NULL),
-        mTimeFunction(NULL),
+        mCrashFunction(nullptr),
+        mTimeFunction(nullptr),
         mRecorders(),
         mShouldLogCallCounter(0)
     {
@@ -637,8 +676,7 @@ namespace LLError
         mLine(line),
         mClassInfo(class_info),
         mFunction(function),
-        mCached(false),
-        mShouldLog(false),
+        mCached(UNDECIDED),
         mPrintOnce(printOnce),
         mTags(new const char* [tag_count]),
         mTagCount(tag_count)
@@ -693,7 +731,7 @@ namespace LLError
 
     void CallSite::invalidate()
     {
-        mCached = false;
+        mCached.store(UNDECIDED, std::memory_order_relaxed);
     }
 }
 
@@ -759,6 +797,11 @@ namespace
 #if LL_WINDOWS
         LLError::RecorderPtr recordToWinDebug(new RecordToWinDebug());
         LLError::addRecorder(recordToWinDebug);
+#endif
+
+#if defined(LL_PROFILER_CONFIGURATION) && LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+        LLError::RecorderPtr recordToTracy(new RecordToTracy());
+        LLError::addRecorder(recordToTracy);
 #endif
 
         LogControlFile& e = LogControlFile::fromDirectory(user_dir, app_dir);
@@ -1233,7 +1276,7 @@ namespace
 
             std::ostringstream message_stream;
 
-            if (r->wantsTime() && s->mTimeFunction != NULL)
+            if (r->wantsTime() && s->mTimeFunction != nullptr)
             {
                 message_stream << s->mTimeFunction();
             }
@@ -1291,12 +1334,6 @@ namespace {
         // guaranteed to be initialized the first time control reaches here
         static LL_PROFILE_MUTEX_NAMED(std::recursive_mutex, sLogMutex, "Log Mutex");
         return &sLogMutex;
-    }
-    auto getStacksMutex()
-    {
-        // guaranteed to be initialized the first time control reaches here
-        static LL_PROFILE_MUTEX_NAMED(std::recursive_mutex, sStacksMutex, "Stacks Mutex");
-        return &sStacksMutex;
     }
 
     bool checkLevelMap(const LevelMap& map, const std::string& key,
@@ -1382,9 +1419,10 @@ namespace LLError
             ? checkLevelMap(s->mTagLevelMap, site.mTags, site.mTagCount, compareLevel)
             : false);
 
-        site.mCached = true;
+        const bool should_log = site.mLevel >= compareLevel;
+        site.mCached.store(should_log ? CallSite::LOGS : CallSite::SILENT, std::memory_order_relaxed);
         g->addCallSite(site);
-        return site.mShouldLog = site.mLevel >= compareLevel;
+        return should_log;
     }
 
 
@@ -1406,7 +1444,7 @@ namespace LLError
         {
             std::ostringstream message_stream;
 
-            std::map<std::string, unsigned int>::iterator messageIter = s->mUniqueLogMessages.find(message);
+            auto messageIter = s->mUniqueLogMessages.find(message);
             if (messageIter != s->mUniqueLogMessages.end())
             {
                 messageIter->second++;
@@ -1517,90 +1555,6 @@ namespace LLError
 
 namespace LLError
 {
-    LLCallStacks::StringVector LLCallStacks::sBuffer ;
-
-    //static
-    void LLCallStacks::push(const char* function, const int line)
-    {
-        std::unique_lock lock(*getStacksMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getStacksMutex());
-        if (!lock)
-        {
-            return;
-        }
-
-        if(sBuffer.size() > 511)
-        {
-            clear() ;
-        }
-
-        std::ostringstream out;
-        insert(out, function, line);
-        sBuffer.push_back(out.str());
-    }
-
-    //static
-    void LLCallStacks::insert(std::ostream& out, const char* function, const int line)
-    {
-        out << function << " line " << line << " " ;
-    }
-
-    //static
-    void LLCallStacks::end(const std::ostringstream& out)
-    {
-        std::unique_lock lock(*getStacksMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getStacksMutex());
-        if (!lock)
-        {
-            return;
-        }
-
-        if(sBuffer.size() > 511)
-        {
-            clear() ;
-        }
-
-        sBuffer.push_back(out.str());
-    }
-
-    //static
-    void LLCallStacks::print()
-    {
-        std::unique_lock lock(*getStacksMutex(), std::try_to_lock); LL_PROFILE_MUTEX_LOCK(*getStacksMutex());
-        if (!lock)
-        {
-            return;
-        }
-
-        if(! sBuffer.empty())
-        {
-            LL_INFOS() << " ************* PRINT OUT LL CALL STACKS ************* " << LL_ENDL;
-            for (StringVector::const_reverse_iterator ri(sBuffer.rbegin()), re(sBuffer.rend());
-                 ri != re; ++ri)
-            {
-                LL_INFOS() << (*ri) << LL_ENDL;
-            }
-            LL_INFOS() << " *************** END OF LL CALL STACKS *************** " << LL_ENDL;
-        }
-
-        cleanup();
-    }
-
-    //static
-    void LLCallStacks::clear()
-    {
-        sBuffer.clear();
-    }
-
-    //static
-    void LLCallStacks::cleanup()
-    {
-        clear();
-    }
-
-    std::ostream& operator<<(std::ostream& out, const LLStacktrace&)
-    {
-        return out << boost::stacktrace::stacktrace();
-    }
-
     // LLOutOfMemoryWarning
     std::string LLUserWarningMsg::sLocalizedOutOfMemoryTitle;
     std::string LLUserWarningMsg::sLocalizedOutOfMemoryWarning;
@@ -1627,7 +1581,7 @@ namespace LLError
         // Files Are missing, likely can't localize.
         const std::string error_string =
             "Alchemy Viewer couldn't access some of the files it needs and will be closed."
-            "\n\nPlease reinstall viewer from  https://www.alchemyviewer.org/downloads and "
+            "\n\nPlease reinstall viewer from https://www.alchemyviewer.org/downloads and "
             "contact the Alchemy Viewer team if the issue persists after reinstall.";
         sHandler("Missing Files", error_string, ERROR_MISSING_FILES);
     }

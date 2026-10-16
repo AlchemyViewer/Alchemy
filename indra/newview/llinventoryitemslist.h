@@ -37,6 +37,8 @@ class LLViewerInventoryItem;
 class LLInventoryItemsList : public LLFlatListViewEx
 {
 public:
+    AL_VIEW_TYPE(LLInventoryItemsList, LLFlatListViewEx);
+
     struct Params : public LLInitParam::Block<Params, LLFlatListViewEx::Params>
     {
         Params();
@@ -59,14 +61,17 @@ public:
      * Sets the flag indicating that the list needs to be refreshed even if it is
      * not currently visible.
      */
-    void setForceRefresh(bool force_refresh) { mForceRefresh = force_refresh; }
+    void setForceRefresh(bool force_refresh)
+    {
+        mForceRefresh = force_refresh;
+    }
 
     /**
     * If refreshes when invisible.
     */
     bool getForceRefresh() { return mForceRefresh; }
 
-    virtual bool selectItemByValue(const LLSD& value, bool select = true);
+    virtual bool selectItemByValue(const LLSD& value, bool select = true) override;
 
     void updateSelection();
 
@@ -76,7 +81,7 @@ public:
      * This is needed for example to filter items of the list hidden by closed
      * accordion tab.
      */
-    virtual void doIdle();                      // Real idle routine
+    bool doIdle();                          // Real idle routine
     static void idle(void* user_data);      // static glue to doIdle()
 
 protected:
@@ -114,6 +119,7 @@ protected:
     };
 
     ERefreshStates mRefreshState;
+    bool mNeedsArrange = true;
 
 private:
     uuid_vec_t mIDs; // IDs of items that were added in refreshList().
@@ -126,6 +132,12 @@ private:
     bool mForceRefresh;
 
     commit_signal_t mRefreshCompleteSignal;
+
+    // Update synchronization
+    typedef std::vector<LLInventoryItemsList*> all_list_t;
+    static all_list_t sAllLists;
+    static all_list_t::iterator sAllListIter;
+    static bool sListIdleRegistered;
 };
 
 #endif //LL_LLINVENTORYITEMSLIST_H

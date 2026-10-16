@@ -5,56 +5,62 @@
 			Legenda
 		</text>
 	</panel>
-	<panel name="layout_panel_2">
-		<button name="Show My Location" tool_tip="Wyśrodkuj mapę w miejscu, gdzie znajduje się mój awatar" />
-		<text name="me_label">
-			Ja
-		</text>
-		<text name="person_label">
-			Rezydent
-		</text>
-		<text name="land_sale_label">
-			Sprzedaż ziemi
-		</text>
-		<text name="auction_label">
-			Aukcja ziemi
-		</text>
-		<text name="by_owner_label">
-			przez właściciela
-		</text>
-		<button name="Go Home" tool_tip="Teleportuj do mojego Miejsca Startowego" />
-		<text name="Home_label">
-			Do Startu
-		</text>
-		<text name="events_label">
-			Wydarzenia:
-		</text>
-	</panel>
-	<panel name="layout_panel_3">
-		<text name="find_on_map_label">
-			Znajdź na mapie
-		</text>
-	</panel>
-	<panel name="layout_panel_4">
-		<combo_box label="Dostępni znajomi" name="friend combo" tool_tip="Pokaż znajomych na mapie">
-			<combo_box.item label="Moi dostępni znajomi" name="item1" />
-		</combo_box>
-		<combo_box label="Zapisane miejsca" name="landmark combo" tool_tip="Pokaż zapisane miejsce na mapie">
-			<combo_box.item label="Zapisane miejsca" name="item1" />
-		</combo_box>
-		<search_editor label="Regiony według nazwy" name="location" tool_tip="Wpisz nazwę regionu" />
-		<button label="Znajdź" name="DoSearch" tool_tip="Szukaj regionu" />
-		<button name="Clear" tool_tip="Wyczyść zapamiętane linie i zresetuj mapę" />
-		<text name="events_label">
-			Lokalizacja:
-		</text>
-		<button label="Teleportuj" name="Teleport" tool_tip="Teleportuj do wybranego miejsca" />
-		<button label="Kopiuj SLurl" name="copy_slurl" tool_tip="Kopiuje obecną lokalizację jako SLurl, aby można było ją użyć na stronie internetowej." />
-		<button label="Pokaż wybrane" name="Show Destination" tool_tip="Wyśrodkuj mapę w wybranym miejscu" />
-	</panel>
-	<panel name="layout_panel_5">
-		<text name="zoom_label">
+	<layout_stack name="floater_map_stack">
+		<layout_panel name="controls_lp">
+			<panel name="layout_panel_5">
+				<text name="zoom_label">
 			Powiększ
 		</text>
-	</panel>
+			</panel>
+			<panel name="layout_panel_7">
+				<button label="Pokaż wybrane" name="Show Destination" tool_tip="Wyśrodkuj mapę w wybranym miejscu" />
+				<button label="Kopiuj SLurl" name="copy_slurl" tool_tip="Kopiuje obecną lokalizację jako SLurl, aby można było ją użyć na stronie internetowej." />
+				<button label="Teleportuj" name="Teleport" tool_tip="Teleportuj do wybranego miejsca" />
+			</panel>
+			<panel name="layout_panel_4">
+				<combo_box label="Dostępni znajomi" name="friend combo" tool_tip="Pokaż znajomych na mapie">
+					<combo_box.item label="Moi dostępni znajomi" name="item1" />
+				</combo_box>
+				<combo_box label="Zapisane miejsca" name="landmark combo" tool_tip="Pokaż zapisane miejsce na mapie">
+					<combo_box.item label="Zapisane miejsca" name="item1" />
+				</combo_box>
+				<search_editor label="Regiony według nazwy" name="location" tool_tip="Wpisz nazwę regionu" />
+				<button label="Znajdź" name="DoSearch" tool_tip="Szukaj regionu" />
+				<button name="Clear" tool_tip="Wyczyść zapamiętane linie i zresetuj mapę" />
+				<text name="events_label">
+					Lokalizacja:
+				</text>
+			</panel>
+			<panel name="layout_panel_3">
+				<text name="find_on_map_label">
+			Znajdź na mapie
+		</text>
+			</panel>
+			<panel name="layout_panel_2">
+				<button name="Show My Location" tool_tip="Wyśrodkuj mapę w miejscu, gdzie znajduje się mój awatar" />
+				<text name="me_label">
+			Ja
+		</text>
+				<text name="person_label">
+			Rezydent
+		</text>
+				<text name="land_sale_label">
+			Sprzedaż ziemi
+		</text>
+				<text name="auction_label">
+			Aukcja ziemi
+		</text>
+				<text name="by_owner_label">
+			przez właściciela
+		</text>
+				<button name="Go Home" tool_tip="Teleportuj do mojego Miejsca Startowego" />
+				<text name="Home_label">
+			Do Startu
+		</text>
+				<text name="events_label">
+					Wydarzenia:
+				</text>
+			</panel>
+		</layout_panel>
+	</layout_stack>
 </floater>

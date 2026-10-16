@@ -29,7 +29,9 @@
  */
 
 //Protos for ObjectiveC classes (cannot import cocoa here due to BOOL conflict)
-#ifndef __OBJC__
+#ifdef __OBJC__
+@class NSWindow;
+#else
 class NSWindow;
 #endif // __OBJC__
 
@@ -47,8 +49,13 @@ public:
     void processEvents();
 public:
     //EventTargetRef mEventTarget;
+#ifdef __OBJC__
+    __unsafe_unretained NSWindow* mFrontWindow;
+    __unsafe_unretained NSWindow* mPluginWindow;
+#else
     NSWindow* mFrontWindow;
     NSWindow* mPluginWindow;
+#endif
     int mHackState;
 };
 

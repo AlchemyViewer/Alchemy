@@ -34,42 +34,104 @@
 class LLMsgVarData
 {
 public:
-    LLMsgVarData() : mName(NULL), mSize(-1), mDataSize(-1), mData(NULL), mType(MVT_U8)
+    LLMsgVarData() : mName(nullptr), mSize(-1), mDataSize(-1), mData(nullptr), mType(MVT_U8)
     {
     }
 
-    LLMsgVarData(const char *name, EMsgVariableType type) : mSize(-1), mDataSize(-1), mData(NULL), mType(type)
+    LLMsgVarData(const char *name, EMsgVariableType type) : mSize(-1), mDataSize(-1), mData(nullptr), mType(type)
     {
         mName = (char *)name;
     }
 
-    ~LLMsgVarData()
-    {
-        // copy constructor just copies the mData pointer, so only delete mData explicitly
-    }
+    ~LLMsgVarData() = default; // copy constructor just copies the mData pointer, so only delete mData explicitly
 
     void deleteData()
     {
         delete[] mData;
-        mData = NULL;
+        mData = nullptr;
     }
 
     void addData(const void *indata, S32 size, EMsgVariableType type, S32 data_size = -1);
 
     char *getName() const   { return mName; }
     S32 getSize() const     { return mSize; }
-    void *getData()         { return (void*)mData; }
-    const void *getData() const { return (const void*)mData; }
+    void *getData()         { return mData ? (void*)mData : (mSize > 0 ? (void*)mInlineData : nullptr); }
+    const void *getData() const { return mData ? (const void*)mData : (mSize > 0 ? (const void*)mInlineData : nullptr); }
     S32 getDataSize() const { return mDataSize; }
     EMsgVariableType getType() const    { return mType; }
 
 protected:
+    // Payloads up to this size are stored in mInlineData instead of a heap
+    // block, sized to fit the largest fixed wire type (LLVector3d, 24 bytes)
+    // so only long Variable fields allocate.
+    static constexpr S32 INLINE_DATA_SIZE = 24;
+
     char                *mName;
     S32                 mSize;
     S32                 mDataSize;
 
-    U8                  *mData;
+    U8                  *mData;     // heap storage, only used when mSize > INLINE_DATA_SIZE
     EMsgVariableType    mType;
+    U8                  mInlineData[INLINE_DATA_SIZE];
+};
+
+// Insertion-ordered flat map from prehashed name pointer to variable data.
+// One instance exists per block per decoded/built message, with at most a
+// few dozen entries, so a linear pointer-compare scan wins over a node-based
+// map and avoids its per-entry allocations on the packet decode path.
+class LLMsgVarDataMap
+{
+public:
+    typedef std::vector<LLMsgVarData>::iterator iterator;
+    typedef std::vector<LLMsgVarData>::const_iterator const_iterator;
+
+    LLMsgVarDataMap()               { mEntries.reserve(8); }
+
+    iterator begin()                { return mEntries.begin(); }
+    const_iterator begin() const    { return mEntries.begin(); }
+    iterator end()                  { return mEntries.end(); }
+    const_iterator end() const      { return mEntries.end(); }
+    bool empty() const              { return mEntries.empty(); }
+    size_t size() const             { return mEntries.size(); }
+    void clear()                    { mEntries.clear(); } // keeps capacity for reuse
+
+    // Returns the entry for name, inserting an empty one keyed to name if
+    // absent (std::map::operator[] semantics — repeated misses yield the
+    // same entry, never duplicates). An inserted entry has size -1 until
+    // someone calls addData on it.
+    LLMsgVarData& operator[](const char* name)
+    {
+        for (LLMsgVarData& entry : mEntries)
+        {
+            if (entry.getName() == name)
+            {
+                return entry;
+            }
+        }
+        return mEntries.emplace_back(name, MVT_U8);
+    }
+
+    iterator find(const char* name)
+    {
+        iterator it = mEntries.begin();
+        const iterator it_end = mEntries.end();
+        for (; it != it_end; ++it)
+        {
+            if (it->getName() == name)
+            {
+                break;
+            }
+        }
+        return it;
+    }
+
+    const_iterator find(const char* name) const
+    {
+        return const_cast<LLMsgVarDataMap*>(this)->find(name);
+    }
+
+private:
+    std::vector<LLMsgVarData> mEntries;
 };
 
 class LLMsgBlkData
@@ -82,17 +144,33 @@ public:
 
     ~LLMsgBlkData()
     {
-        for (msg_var_data_map_t::iterator iter = mMemberVarData.begin();
-             iter != mMemberVarData.end(); iter++)
+        for (auto& iter : mMemberVarData)
         {
-            iter->deleteData();
+            iter.deleteData();
         }
     }
 
-    void addVariable(const char *name, EMsgVariableType type)
+    // Reset identity and drop variable data for pooled reuse, keeping the
+    // variable-map's capacity. Frees any heap payloads first: clearing the
+    // vector destroys the LLMsgVarData entries with their trivial destructor,
+    // which does not own mData.
+    void reinit(char *name, S32 blocknum)
     {
-        LLMsgVarData tmp(name,type);
-        mMemberVarData[name] = tmp;
+        for (LLMsgVarData& var : mMemberVarData)
+        {
+            var.deleteData();
+        }
+        mMemberVarData.clear();
+        mName = name;
+        mBlockNumber = blocknum;
+        mTotalSize = -1;
+    }
+
+    LLMsgVarData& addVariable(const char *name, EMsgVariableType type)
+    {
+        LLMsgVarData& entry = mMemberVarData[name];
+        entry = LLMsgVarData(name, type);
+        return entry;
     }
 
     void addData(char *name, const void *data, S32 size, EMsgVariableType type, S32 data_size = -1)
@@ -102,44 +180,147 @@ public:
     }
 
     S32                                 mBlockNumber;
-    typedef LLIndexedVector<LLMsgVarData, const char *, 8> msg_var_data_map_t;
+    typedef LLMsgVarDataMap msg_var_data_map_t;
     msg_var_data_map_t                  mMemberVarData;
     char                                *mName;
     S32                                 mTotalSize;
 };
 
+// One decoded or built message's block data. Each block name owns an ordered
+// list of its repeat instances; groups are kept in first-seen order, which is
+// the template's block order for both decode and build.
+//
+// This replaces an older std::map keyed by (canonical name pointer + repeat
+// index) pointer arithmetic. String-table names are contiguous 64-byte rows,
+// so name + i for i past ~64 walked into the adjacent name's storage; two
+// block names within range plus enough repeats aliased keys, overwriting (and
+// leaking) blocks and corrupting data. ImprovedTerseObjectUpdate-class
+// messages reach ~180 repeats after zerocode expansion, so this was reachable
+// from inbound traffic. Grouping by name sidesteps the synthesized key
+// entirely and drops the per-block map node.
 class LLMsgData
 {
 public:
-    LLMsgData(const char *name) : mTotalSize(-1)
+    struct BlockGroup
     {
-        mName = (char *)name;
+        char*                       mName;   // canonical (string-table) block name
+        std::vector<LLMsgBlkData*>  mBlocks; // repeat instances in order; owned
+    };
+    typedef std::vector<BlockGroup> msg_blk_data_map_t;
+
+    LLMsgData(const char *name) : mName((char *)name), mTotalSize(-1)
+    {
+        mMemberBlocks.reserve(8);
     }
     ~LLMsgData()
     {
-        for_each(mMemberBlocks.begin(), mMemberBlocks.end(), DeletePairedPointer());
-        mMemberBlocks.clear();
+        for (BlockGroup& group : mMemberBlocks)
+        {
+            for (LLMsgBlkData* blockp : group.mBlocks)
+            {
+                delete blockp;
+            }
+        }
+        for (LLMsgBlkData* blockp : mBlockPool)
+        {
+            delete blockp;
+        }
     }
 
+    // Reset for reuse on the next message: recycle every block into the free
+    // pool and clear the groups, keeping all the vector capacity. Variable
+    // data on the recycled blocks is freed lazily by allocBlock() on reuse
+    // (or by the destructor), so a decode after warmup allocates nothing.
+    void reset(const char *name = nullptr)
+    {
+        for (BlockGroup& group : mMemberBlocks)
+        {
+            for (LLMsgBlkData* blockp : group.mBlocks)
+            {
+                mBlockPool.push_back(blockp);
+            }
+        }
+        mMemberBlocks.clear(); // keeps capacity
+        mName = (char *)name;
+        mTotalSize = -1;
+    }
+
+    // Obtain a block for name+blocknum (from the pool, or freshly allocated)
+    // and append it as the next repeat of its group; returns it.
+    LLMsgBlkData* allocBlock(char *name, S32 blocknum)
+    {
+        LLMsgBlkData* blockp;
+        if (!mBlockPool.empty())
+        {
+            blockp = mBlockPool.back();
+            mBlockPool.pop_back();
+            blockp->reinit(name, blocknum);
+        }
+        else
+        {
+            blockp = new LLMsgBlkData(name, blocknum);
+        }
+        getOrAddGroup(name).mBlocks.push_back(blockp);
+        return blockp;
+    }
+
+    // Append blockp as the next repeat of its (canonical) block name.
     void addBlock(LLMsgBlkData *blockp)
     {
-        mMemberBlocks[blockp->mName] = blockp;
+        getOrAddGroup(blockp->mName).mBlocks.push_back(blockp);
     }
 
-    void addDataFast(char *blockname, char *varname, const void *data, S32 size, EMsgVariableType type, S32 data_size = -1);
+    bool empty() const { return mMemberBlocks.empty(); }
 
-public:
-    typedef std::map<char*, LLMsgBlkData*> msg_blk_data_map_t;
-    msg_blk_data_map_t                  mMemberBlocks;
+    // Repeat #blocknum of name, or nullptr if name or that index is absent.
+    LLMsgBlkData* getBlock(const char* name, S32 blocknum = 0) const
+    {
+        const BlockGroup* group = findGroup(name);
+        if (!group || blocknum < 0 || blocknum >= (S32)group->mBlocks.size())
+        {
+            return nullptr;
+        }
+        return group->mBlocks[blocknum];
+    }
+
+    msg_blk_data_map_t                  mMemberBlocks; // groups in template order
     char                                *mName;
     S32                                 mTotalSize;
+
+private:
+    std::vector<LLMsgBlkData*>          mBlockPool; // recycled blocks ready for reuse
+
+    BlockGroup& getOrAddGroup(char* name)
+    {
+        for (BlockGroup& group : mMemberBlocks)
+        {
+            if (group.mName == name)
+            {
+                return group;
+            }
+        }
+        mMemberBlocks.push_back(BlockGroup{name, {}});
+        return mMemberBlocks.back();
+    }
+
+    const BlockGroup* findGroup(const char* name) const
+    {
+        for (const BlockGroup& group : mMemberBlocks)
+        {
+            if (group.mName == name)
+            {
+                return &group;
+            }
+        }
+        return nullptr;
+    }
 };
 
 // LLMessage* classes store the template of messages
 class LLMessageVariable
 {
 public:
-    LLMessageVariable() : mName(NULL), mType(MVT_NULL), mSize(-1)
+    LLMessageVariable() : mName(nullptr), mType(MVT_NULL), mSize(-1)
     {
     }
 
@@ -153,7 +334,7 @@ public:
         mName = LLMessageStringTable::getInstance()->getString(name);
     }
 
-    ~LLMessageVariable() {}
+    ~LLMessageVariable() = default;
 
     friend std::ostream&     operator<<(std::ostream& s, LLMessageVariable &msg);
 
@@ -192,7 +373,7 @@ public:
     void addVariable(char *name, const EMsgVariableType type, const S32 size)
     {
         LLMessageVariable** varp = &mMemberVariables[name];
-        if (*varp != NULL)
+        if (*varp != nullptr)
         {
             LL_ERRS() << name << " has already been used as a variable name!" << LL_ENDL;
         }
@@ -270,7 +451,7 @@ public:
     LLMessageTemplate(const char *name, U32 message_number, EMsgFrequency freq)
         :
         //mMemberBlocks(),
-        mName(NULL),
+        mName(nullptr),
         mFrequency(freq),
         mTrust(MT_NOTRUST),
         mEncoding(ME_ZEROCODED),
@@ -285,9 +466,7 @@ public:
         mTotalDecodeTime(0.f),
         mMaxDecodeTimePerMsg(0.f),
         mBanFromTrusted(false),
-        mBanFromUntrusted(false),
-        mHandlerFunc(NULL),
-        mUserData(NULL)
+        mBanFromUntrusted(false)
     {
         mName = LLMessageStringTable::getInstance()->getString(name);
     }
@@ -300,7 +479,7 @@ public:
     void addBlock(LLMessageBlock *blockp)
     {
         LLMessageBlock** member_blockp = &mMemberBlocks[blockp->mName];
-        if (*member_blockp != NULL)
+        if (*member_blockp != nullptr)
         {
             LL_ERRS() << "Block " << blockp->mName
                 << "has already been used as a block name!" << LL_ENDL;
@@ -357,18 +536,21 @@ public:
 
     void setHandlerFunc(void (*handler_func)(LLMessageSystem *msgsystem, void **user_data), void **user_data)
     {
-        mHandlerFunc = handler_func;
-        mUserData = user_data;
+        mMessageCallbacks.clear();
+        if (handler_func)
+            addHandlerFunc(std::bind(handler_func, std::placeholders::_1, user_data));
+    }
+
+    void addHandlerFunc(std::function<void(LLMessageSystem *msgsystem)> callback)
+    {
+        mMessageCallbacks.emplace_back(callback);
     }
 
     bool callHandlerFunc(LLMessageSystem *msgsystem) const
     {
-        if (mHandlerFunc)
-        {
-            mHandlerFunc(msgsystem, mUserData);
-            return true;
-        }
-        return false;
+        for (auto& cb : mMessageCallbacks)
+            cb(msgsystem);
+        return !mMessageCallbacks.empty();
     }
 
     bool isUdpBanned() const
@@ -414,8 +596,8 @@ public:
 
 private:
     // message handler function (this is set by each application)
-    void                                    (*mHandlerFunc)(LLMessageSystem *msgsystem, void **user_data);
-    void                                    **mUserData;
+    typedef std::vector<std::function<void(LLMessageSystem *msgsystem)>> callback_list_t;
+    callback_list_t mMessageCallbacks;
 };
 
 #endif // LL_LLMESSAGETEMPLATE_H

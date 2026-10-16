@@ -299,7 +299,7 @@ void LLWind::renderVectors()
 
     F32 region_width_meters = LLWorld::getInstance()->getRegionWidthInMeters();
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gGL.pushMatrix();
     LLVector3 origin_agent;
     origin_agent = gAgent.getPosAgentFromGlobal(mOriginGlobal);
@@ -335,7 +335,7 @@ void LLViewerParcelMgr::renderRect(const LLVector3d &west_south_bottom_global,
                                    const LLVector3d &east_north_top_global)
 {
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest gls_depth(GL_TRUE);
 
     LLVector3 west_south_bottom_agent = gAgent.getPosAgentFromGlobal(west_south_bottom_global);
@@ -404,7 +404,7 @@ void LLViewerParcelMgr::renderRect(const LLVector3d &west_south_bottom_global,
 
 // north = a wall going north/south.  Need that info to set up texture
 // coordinates correctly.
-void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 height, U8 direction, LLViewerRegion* regionp)
+void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 height, U8 direction, LLViewerRegion* regionp, bool absolute_height /* = false */)
 {
     // HACK: At edge of last region of world, we need to make sure the region
     // resolves correctly so we can get a height value.
@@ -436,7 +436,7 @@ void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 hei
 
     if (height < 1.f)
     {
-        z = z1+height;
+        z = absolute_height ? height : z1+height;
         gGL.vertex3f(x1, y1, z);
 
         gGL.vertex3f(x1, y1, z1);
@@ -447,7 +447,8 @@ void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 hei
 
         gGL.vertex3f(x2, y2, z2);
 
-        z = z2+height;
+        z = absolute_height ? height : z2+height;
+
         gGL.vertex3f(x2, y2, z);
     }
     else
@@ -484,7 +485,8 @@ void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 hei
         gGL.vertex3f(x2, y2, z2);
 
         // top edge stairsteps
-        z = llmax(z2 + height, z1 + height);
+        z = absolute_height ? height : llmax(z2+height, z1+height);
+
         gGL.texCoord2f(tex_coord2 * 0.5f + 0.5f, z * 0.5f);
         gGL.vertex3f(x2, y2, z);
 
@@ -508,8 +510,11 @@ void LLViewerParcelMgr::renderHighlightSegments(const U8* segments, LLViewerRegi
     bool has_segments = false;
 
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest gls_depth(GL_TRUE);
+
+    static LLCachedControl<bool> RenderParcelSelectionToMaxBuildHeight(gSavedSettings, "RenderParcelSelectionToMaxHeight", false);
+    F32 height = RenderParcelSelectionToMaxBuildHeight ? LLWorld::instance().getRegionMaxHeight() : PARCEL_POST_HEIGHT;
 
     gGL.color4f(1.f, 1.f, 0.f, 0.2f);
 
@@ -537,7 +542,7 @@ void LLViewerParcelMgr::renderHighlightSegments(const U8* segments, LLViewerRegi
                     has_segments = true;
                     gGL.begin(LLRender::TRIANGLES);
                 }
-                renderOneSegment(x1, y1, x2, y2, PARCEL_POST_HEIGHT, SOUTH_MASK, regionp);
+                renderOneSegment(x1, y1, x2, y2, height, SOUTH_MASK, regionp, RenderParcelSelectionToMaxBuildHeight);
             }
 
             if (segment_mask & WEST_MASK)
@@ -553,7 +558,7 @@ void LLViewerParcelMgr::renderHighlightSegments(const U8* segments, LLViewerRegi
                     has_segments = true;
                     gGL.begin(LLRender::TRIANGLES);
                 }
-                renderOneSegment(x1, y1, x2, y2, PARCEL_POST_HEIGHT, WEST_MASK, regionp);
+                renderOneSegment(x1, y1, x2, y2, height, WEST_MASK, regionp, RenderParcelSelectionToMaxBuildHeight);
             }
         }
     }
@@ -600,11 +605,11 @@ void LLViewerParcelMgr::renderCollisionSegments(U8* segments, bool use_pass, LLV
 
     if (use_pass && (mCollisionBanned == BA_NOT_ON_LIST))
     {
-        gGL.getTexUnit(0)->bind(mPassImage);
+        gGL.getTextureSlot(0)->bindSampled(mPassImage, ALSamplers::AnisoWrap);
     }
     else
     {
-        gGL.getTexUnit(0)->bind(mBlockedImage);
+        gGL.getTextureSlot(0)->bindSampled(mBlockedImage, ALSamplers::AnisoWrap);
     }
 
     gGL.begin(LLRender::TRIANGLES);
@@ -760,7 +765,7 @@ void LLViewerObjectList::renderObjectBeacons()
     gUIProgram.bind();
 
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         S32 last_line_width = -1;
         // gGL.begin(LLRender::LINES); // Always happens in (line_width != last_line_width)
@@ -773,7 +778,6 @@ void LLViewerObjectList::renderObjectBeacons()
             S32 line_width = debug_beacon.mLineWidth;
             if (line_width != last_line_width)
             {
-                gGL.flush();
                 gGL.setLineWidth( (F32)line_width );
                 last_line_width = line_width;
             }
@@ -790,7 +794,7 @@ void LLViewerObjectList::renderObjectBeacons()
     }
 
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         LLGLDepthTest gls_depth(GL_TRUE);
 
         S32 last_line_width = -1;
@@ -803,7 +807,6 @@ void LLViewerObjectList::renderObjectBeacons()
             S32 line_width = debug_beacon.mLineWidth;
             if (line_width != last_line_width)
             {
-                gGL.flush();
                 gGL.setLineWidth( (F32)line_width );
                 last_line_width = line_width;
             }
@@ -846,7 +849,7 @@ void LLSky::renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& di
 {
     LLGLSUIDefault gls_ui;
     gUIProgram.bind();
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     LLVector3 pos_end;
     for (S32 i = 0; i < 3; ++i)
@@ -877,9 +880,10 @@ void LLSky::renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& di
 // a struct rather than a class simply because every member is public.
 struct ShaderProfileHelper
 {
+    // The benchmark turns samples drawn into bandwidth, so it counts the samples themselves.
     ShaderProfileHelper()
     {
-        LLGLSLShader::initProfile();
+        LLGLSLShader::initProfile(true);
     }
     ~ShaderProfileHelper()
     {
@@ -894,7 +898,7 @@ class TextureHolder
 {
 public:
     TextureHolder(U32 unit, U32 size) :
-        texUnit(gGL.getTexUnit(unit)),
+        texUnit(gGL.getTextureSlot(unit)),
         source(size)            // preallocate vector
     {
         // takes (count, pointer)
@@ -907,7 +911,7 @@ public:
         // unbind
         if (texUnit)
         {
-                texUnit->unbind(LLTexUnit::TT_TEXTURE);
+                texUnit->unbind();
         }
         // ensure that we delete these textures regardless of how we exit
         LLImageGL::deleteTextures(static_cast<S32>(source.size()), &source[0]);
@@ -917,14 +921,17 @@ public:
     {
         if (texUnit) // should always be there with dummy (-1), but just in case
         {
-            return texUnit->bindManual(LLTexUnit::TT_TEXTURE, source[index]);
+            // Point filtering with no mips is the point of the benchmark -- it forces
+            // cache misses. Passed as a sampler so it applies to the sampling binds too.
+            return texUnit->bindManual(ALTextureSlot::TT_TEXTURE, source[index],
+                                       gGL.getSampler(ALSamplers::PointWrap));
         }
         return false;
     }
 
 private:
-    // capture which LLTexUnit we're going to use
-    LLTexUnit* texUnit;
+    // capture which ALTextureSlot we're going to use
+    ALTextureSlot* texUnit;
 
     // use std::vector for implicit resource management
     std::vector<U32> source;
@@ -948,17 +955,45 @@ private:
 };
 
 
+F32 shader_timer_benchmark(std::vector<LLRenderTarget> & dest, TextureHolder & texHolder, U32 textures_count, LLVertexBuffer * buff, F32 &seconds)
+{
+    // run GPU timer benchmark
+
+    //number of samples to take
+    const S32 samples = 64;
+
+    {
+        ShaderProfileHelper initProfile;
+        dest[0].bindTarget();
+        gBenchmarkProgram.bind();
+        for (S32 c = 0; c < samples; ++c)
+        {
+            for (U32 i = 0; i < textures_count; ++i)
+            {
+                texHolder.bind(i);
+                buff->setBuffer();
+                buff->drawArrays(LLRender::TRIANGLES, 0, 3);
+            }
+        }
+        gBenchmarkProgram.unbind();
+        dest[0].flush();
+    }
+
+    F32 ms = gBenchmarkProgram.mTimeElapsed / 1000000.f;
+    seconds = ms / 1000.f;
+
+    F64 samples_drawn = (F64)gBenchmarkProgram.mSamplesDrawn;
+    F64 gpixels_drawn = samples_drawn / 1000000000.0;
+    F32 samples_sec = (F32)(gpixels_drawn / seconds);
+    return samples_sec * 4;  // 4 bytes per sample
+}
+
 //-----------------------------------------------------------------------------
 // gpu_benchmark()
 //  returns measured memory bandwidth of GPU in gigabytes per second
 //-----------------------------------------------------------------------------
 F32 gpu_benchmark()
 {
-    if (gGLManager.mGLVersion < 3.3f)
-    { // don't bother benchmarking venerable drivers which don't support accurate timing anyway
-        return -1.f;
-    }
-
     if (gBenchmarkProgram.mProgramObject == 0)
     {
         LLViewerShaderMgr::instance()->initAttribsAndUniforms();
@@ -989,9 +1024,6 @@ F32 gpu_benchmark()
     //number of textures
     const U32 count = 32;
 
-    //number of samples to take
-    const S32 samples = 64;
-
     //time limit, allocation operations shouldn't take longer then 30 seconds, same for actual benchmark.
     const F32 time_limit = 30;
 
@@ -1004,7 +1036,7 @@ F32 gpu_benchmark()
 
     for (U32 i = 0; i < res*res*4; ++i)
     {
-        pixels[i] = (U8) ll_rand(255);
+        pixels[i] = (U8) ll_rand(256);
     }
 
     gGL.setColorMask(true, true);
@@ -1015,7 +1047,7 @@ F32 gpu_benchmark()
     for (U32 i = 0; i < count; ++i)
     {
         //allocate render targets and textures
-        if (!dest[i].allocate(res, res, GL_RGBA))
+        if (!dest[i].allocate(res, res, GL_RGBA8))
         {
             LL_WARNS("Benchmark") << "Failed to allocate render target." << LL_ENDL;
             // abandon the benchmark test
@@ -1028,16 +1060,15 @@ F32 gpu_benchmark()
 
         if (!texHolder.bind(i))
         {
-            // can use a dummy value mDummyTexUnit = new LLTexUnit(-1);
+            // can use a dummy value mDummySlot = new ALTextureSlot(-1);
             LL_WARNS("Benchmark") << "Failed to bind tex unit." << LL_ENDL;
             // abandon the benchmark test
             delete[] pixels;
             return -1.f;
         }
-        LLImageGL::setManualImage(GL_TEXTURE_2D, 0, GL_RGBA, res,res,GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-        // disable mipmaps and use point filtering to cause cache misses
-        gGL.getTexUnit(0)->setHasMipMaps(false);
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, res, res, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        // Mipless point filtering (to cause cache misses) comes from the sampler
+        // TexHolder::bind selects; nothing to set on the texture object.
 
         if (alloc_timer.getElapsedTimeF32() > time_limit)
         {
@@ -1081,33 +1112,15 @@ F32 gpu_benchmark()
 
     LLGLSLShader::unbind();
 
-    // run GPU timer benchmark
-    {
-        ShaderProfileHelper initProfile;
-        dest[0].bindTarget();
-        gBenchmarkProgram.bind();
-        for (S32 c = 0; c < samples; ++c)
-        {
-            for (U32 i = 0; i < count; ++i)
-            {
-                texHolder.bind(i);
-                buff->setBuffer();
-                buff->drawArrays(LLRender::TRIANGLES, 0, 3);
-            }
-        }
-        gBenchmarkProgram.unbind();
-        dest[0].flush();
-    }
+    // run GPU timer benchmark twice
+    F32 seconds = 0;
+    F32 gbps = shader_timer_benchmark(dest, texHolder, count, buff.get(), seconds);
 
-    F32 ms = gBenchmarkProgram.mTimeElapsed/1000000.f;
-    F32 seconds = ms/1000.f;
+    LL_INFOS("Benchmark") << "Memory bandwidth, 1st run is " << llformat("%.3f", gbps) << " GB/sec according to ARB_timer_query, total time " << seconds << " seconds" << LL_ENDL;
 
-    F64 samples_drawn = (F64)gBenchmarkProgram.mSamplesDrawn;
-    F64 gpixels_drawn = samples_drawn / 1000000000.0;
-    F32 samples_sec = (F32)(gpixels_drawn/seconds);
-    F32 gbps = samples_sec*4;  // 4 bytes per sample
+    gbps = shader_timer_benchmark(dest, texHolder, count, buff.get(), seconds);
 
-    LL_INFOS("Benchmark") << "Memory bandwidth is " << llformat("%.3f", gbps) << " GB/sec according to ARB_timer_query, total time " << seconds << " seconds" << LL_ENDL;
+    LL_INFOS("Benchmark") << "Memory bandwidth, final run is " << llformat("%.3f", gbps) << " GB/sec according to ARB_timer_query, total time " << seconds << " seconds" << LL_ENDL;
 
     return gbps;
 }

@@ -52,7 +52,7 @@ namespace
 
     // This is called so early that we can't count on static objects being
     // properly constructed yet, so declare a pointer instead of an instance.
-    std::ofstream* prelogf = nullptr;
+    llofstream* prelogf = nullptr;
 
     void prelog(const std::string& message)
     {
@@ -208,7 +208,7 @@ LLDir_Win32::LLDir_Win32()
         {
             // successfully created logdir, plunk a log file there
             std::string logfilename(add(mOSUserDir, "lldir.log"));
-            std::ofstream logfile(logfilename.c_str());
+            llofstream logfile(logfilename.c_str());
             if (! logfile.is_open())
             {
                 report(std::cerr);
@@ -373,34 +373,13 @@ std::string LLDir_Win32::getCurPath()
     return ll_convert<std::string>(std::wstring(w_str));
 }
 
-
-bool LLDir_Win32::fileExists(const std::string &filename) const
-{
-    llstat stat_data;
-    // Check the age of the file
-    // Now, we see if the files we've gathered are recent...
-    int res = LLFile::stat(filename, &stat_data);
-    if (!res)
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-
-/*virtual*/ std::string LLDir_Win32::getLLPluginLauncher()
-{
-    return gDirUtilp->getExecutableDir() + gDirUtilp->getDirDelimiter() +
-        "SLPlugin.exe";
-}
-
 /*virtual*/ std::string LLDir_Win32::getLLPluginFilename(std::string base_name)
 {
+    // Each plugin is now its own host executable named for the plugin
+    // (e.g. media_plugin_cef.exe), launched directly - there is no separate
+    // SLPlugin launcher or dlopen'd .dll any more.
     return gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() +
-        base_name + ".dll";
+        base_name + ".exe";
 }
 
 

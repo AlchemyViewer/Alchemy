@@ -1,0 +1,159 @@
+/**
+ * @file algradehistory.h
+ * @brief Undo/redo for the Lightbox's settings, as transactions
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Alchemy Viewer Project.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#ifndef AL_GRADEHISTORY_H
+#define AL_GRADEHISTORY_H
+
+#include "alundostack.h"
+#include "llsd.h"
+
+#include <string>
+#include <vector>
+
+/**
+ * The Lightbox's undo stack.
+ *
+ * @par Why transactions rather than single values
+ * "Undo" has to mean one thing the user did, and one thing the user did is
+ * often several settings. A section's Reset All writes eleven controls; undoing
+ * that eleven times would be absurd. So the unit here is a transaction -- a set
+ * of (control, before, after) -- and a group of writes can be marked as one.
+ *
+ * @par Why coalescing
+ * Dragging a wheel puck emits a commit per mouse-move. Recorded naively, one
+ * drag would be a hundred undo steps and Ctrl+Z would appear broken. Successive
+ * writes to the *same* control within a short window therefore extend the top
+ * transaction instead of pushing a new one: its `before` stays the value from
+ * the start of the drag, and its `after` follows the puck.
+ *
+ * @par No clock in here
+ * `record` takes the current time rather than reading one, so the coalescing
+ * window is exercised by the tests directly instead of by sleeping.
+ *
+ * @par Nothing that changed nothing
+ * A step whose every control ends where it started is not kept: a drag that
+ * comes back to its starting value, a group whose writes cancel out, a write
+ * of the value already there. Each of those would be an undo step that visibly
+ * does nothing, which reads as Ctrl+Z being broken just as surely as a hundred
+ * steps for one drag does.
+ *
+ * @par Names
+ * A group can be given a label when it opens -- "Reset Bloom", "Look: Soft
+ * Film" -- and the step it makes carries it, for a history that is shown
+ * rather than only stepped through. A step made any other way has none, and
+ * the caller names it from its changes.
+ *
+ * @par Over the undo stack
+ * The steps are an ALUndoStack's: its runs are the coalescing, keyed by the
+ * control; its groups are these; its drop of a step that changed nothing is
+ * the rule above.
+ *
+ * @par What it deliberately does not do
+ * It stores values, not dirty state. Undoing restores what the settings were;
+ * it does not try to restore whether the active Look was considered modified.
+ * Reconstructing that faithfully would mean modelling the Looks system's own
+ * history as well, and the honest simple behaviour -- your values come back,
+ * the Look stays dirty -- is one a user can predict.
+ */
+class ALGradeHistory
+{
+public:
+    struct Change
+    {
+        std::string mName;
+        LLSD        mBefore;
+        LLSD        mAfter;
+    };
+
+    using Transaction = std::vector<Change>;
+
+    /// Writes to one control closer together than this join the previous step.
+    static constexpr F32 COALESCE_SECONDS = 0.5f;
+
+    /// Steps kept. Beyond this the oldest is dropped: a grading session is long
+    /// and the values are small, but it should not grow without bound.
+    static constexpr size_t MAX_DEPTH = 64;
+
+    /// Record one control changing from @a before to @a after at @a now
+    /// (seconds, monotonic; only differences matter). Recording anything
+    /// discards the redo tail, as every undo stack does -- except a write of
+    /// the value already there, which is not a change and leaves the stack
+    /// exactly as it was.
+    void record(const std::string& name, const LLSD& before, const LLSD& after, F64 now);
+
+    /// @name Grouping
+    /// Everything recorded between these becomes a single step, whatever the
+    /// controls or the timing -- for a section reset, or applying a Look.
+    /// Nesting is counted, so a group inside a group is still one step, and
+    /// the outermost group's @a label is the one the step carries.
+    /// @{
+    void beginGroup(const std::string& label = std::string());
+    void endGroup();
+    /// @}
+
+    bool canUndo() const { return mSteps.canUndo(); }
+    bool canRedo() const { return mSteps.canRedo(); }
+
+    /// Step back one transaction and return it, or null if there is nothing to
+    /// undo. Apply each Change's @c mBefore, in any order -- a transaction
+    /// never contains the same control twice.
+    const Transaction* undo();
+
+    /// Step forward one transaction and return it, or null. Apply @c mAfter.
+    const Transaction* redo();
+
+    void   clear();
+    size_t depth() const { return mSteps.undone().size() + mSteps.redone().size(); }
+    size_t cursor() const { return mSteps.inForce(); }
+
+    /// @name Reading the stack, oldest first
+    /// For showing the history: @a index runs 0 .. depth() - 1, and the first
+    /// cursor() of them are the ones in force.
+    /// @{
+    const Transaction& at(size_t index) const { return stepAt(index).mChanges; }
+    /// The label of the group that made the step, or empty.
+    const std::string& labelOf(size_t index) const { return stepAt(index).mLabel; }
+    /// @}
+
+    /// Changes whenever the stack or the cursor does, and at no other time,
+    /// so a view of the history can tell from one number whether it is
+    /// showing the stack as it is now.
+    U32 revision() const { return mRevision; }
+
+private:
+    struct Step
+    {
+        Transaction mChanges;
+        std::string mLabel;
+    };
+
+    /// The step at @a index of the whole stack, oldest first: the steps back,
+    /// then the steps forward, which the stack keeps newest-undone last.
+    const Step& stepAt(size_t index) const;
+
+    ALUndoStack<Step> mSteps{ MAX_DEPTH };
+    U32               mRevision = 0;
+};
+
+#endif // AL_GRADEHISTORY_H

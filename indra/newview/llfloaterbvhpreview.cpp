@@ -34,7 +34,6 @@
 #include "lldir.h"
 #include "llnotificationsutil.h"
 #include "llfilesystem.h"
-#include "llapr.h"
 #include "llstring.h"
 
 #include "llagent.h"
@@ -195,45 +194,46 @@ bool LLFloaterBvhPreview::postBuild()
         // loading a bvh file
 
         // now load bvh file
-        S32 file_size;
+        S64 file_size;
 
-        LLAPRFile infile ;
-        infile.open(mFilenameAndPath, LL_APR_RB, NULL, &file_size);
+        std::error_code ec;
+        LLFile infile ;
+        infile.open(mFilenameAndPath, LLFile::in|LLFile::binary, ec);
 
-        if (!infile.getFileHandle())
+        if (!infile || ec)
         {
             LL_WARNS() << "Can't open BVH file:" << mFilename << LL_ENDL;
         }
         else
         {
-            char*   file_buffer;
-
-            file_buffer = new char[file_size + 1];
-
-            if (file_size == infile.read(file_buffer, file_size))
+            file_size = infile.size(ec);
+            if (file_size > 0 )
             {
-                file_buffer[file_size] = '\0';
-                LL_INFOS() << "Loading BVH file " << mFilename << LL_ENDL;
-                ELoadStatus load_status = E_ST_OK;
-                S32 line_number = 0;
-
-                auto joint_alias_map = getJointAliases();
-
-                loaderp = new LLBVHLoader(file_buffer, load_status, line_number, joint_alias_map);
-                std::string status = getString(BVHSTATUS[load_status]);
-
-                if(load_status == E_ST_NO_XLT_FILE)
+                std::unique_ptr<char[]> file_buffer = std::make_unique<char[]>(file_size + 1);
+                if (file_size == infile.read(file_buffer.get(), file_size, ec) && !ec)
                 {
-                    LL_WARNS() << "NOTE: No translation table found." << LL_ENDL;
-                }
-                else
-                {
-                    LL_WARNS() << "ERROR: [line: " << line_number << "] " << status << LL_ENDL;
+                    file_buffer[file_size] = '\0';
+                    LL_INFOS() << "Loading BVH file " << mFilename << LL_ENDL;
+                    ELoadStatus load_status = E_ST_OK;
+                    S32 line_number = 0;
+
+                    auto joint_alias_map = getJointAliases();
+
+                    loaderp = new LLBVHLoader(file_buffer.get(), load_status, line_number, joint_alias_map);
+                    std::string status = getString(BVHSTATUS[load_status]);
+
+                    if (load_status == E_ST_NO_XLT_FILE)
+                    {
+                        LL_WARNS() << "NOTE: No translation table found." << LL_ENDL;
+                    }
+                    else
+                    {
+                        LL_WARNS() << "ERROR: [line: " << line_number << "] " << status << LL_ENDL;
+                    }
                 }
             }
 
-            infile.close() ;
-            delete[] file_buffer;
+            infile.close();
         }
     }
 
@@ -369,7 +369,7 @@ void LLFloaterBvhPreview::draw()
     {
         gGL.color3f(1.f, 1.f, 1.f);
 
-        gGL.getTexUnit(0)->bind(mAnimPreview);
+        gGL.getTextureSlot(0)->bindSampled(mAnimPreview, ALSamplers::AnisoWrap);
 
         gGL.begin(LLRender::TRIANGLES);
         {
@@ -389,7 +389,7 @@ void LLFloaterBvhPreview::draw()
         }
         gGL.end();
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         LLVOAvatar* avatarp = mAnimPreview->getDummyAvatar();
         if (!avatarp->areAnimationsPaused())
@@ -529,12 +529,12 @@ bool LLFloaterBvhPreview::handleHover(S32 x, S32 y, MASK mask)
 //-----------------------------------------------------------------------------
 // handleScrollWheel()
 //-----------------------------------------------------------------------------
-bool LLFloaterBvhPreview::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLFloaterBvhPreview::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (!mAnimPreview)
         return false;
 
-    mAnimPreview->zoom((F32)clicks * -0.2f);
+    mAnimPreview->zoom((F32)delta.mPrecise * -0.2f);
     mAnimPreview->requestUpdate();
 
     return true;
@@ -986,7 +986,7 @@ void LLFloaterBvhPreview::onBtnOK(void* userdata)
                 std::string desc = floaterp->getChild<LLUICtrl>("description_form")->getValue().asString();
                 S32 expected_upload_cost = LLAgentBenefitsMgr::current().getAnimationUploadCost();
 
-                LLResourceUploadInfo::ptr_t assetUploadInfo(new LLResourceUploadInfo(
+                LLResourceUploadInfo::ptr_t assetUploadInfo = std::make_shared<LLResourceUploadInfo>(
                     floaterp->mTransactionID, LLAssetType::AT_ANIMATION,
                     name, desc, 0,
                     LLFolderType::FT_NONE, LLInventoryType::IT_ANIMATION,
@@ -994,7 +994,7 @@ void LLFloaterBvhPreview::onBtnOK(void* userdata)
                     LLFloaterPerms::getGroupPerms("Uploads"),
                     LLFloaterPerms::getEveryonePerms("Uploads"),
                     expected_upload_cost,
-                    floaterp->mDestinationFolderId));
+                    floaterp->mDestinationFolderId);
 
                 upload_new_resource(assetUploadInfo);
             }
@@ -1017,7 +1017,7 @@ void LLFloaterBvhPreview::onBtnOK(void* userdata)
 //-----------------------------------------------------------------------------
 // LLPreviewAnimation
 //-----------------------------------------------------------------------------
-LLPreviewAnimation::LLPreviewAnimation(S32 width, S32 height) : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE, false)
+LLPreviewAnimation::LLPreviewAnimation(S32 width, S32 height) : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE)
 {
     mNeedsUpdate = true;
     mCameraDistance = PREVIEW_CAMERA_DISTANCE;
@@ -1076,7 +1076,7 @@ bool    LLPreviewAnimation::render()
     gUIProgram.bind();
 
     LLGLSUIDefault def;
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gGL.color4f(0.15f, 0.2f, 0.3f, 1.f);
 
     gl_rect_2d_simple( mFullWidth, mFullHeight );
@@ -1097,10 +1097,10 @@ bool    LLPreviewAnimation::render()
     LLViewerCamera* camera = LLViewerCamera::getInstance();
 
     LLQuaternion av_rot = avatarp->mRoot->getWorldRotation() * camera_rot;
-    camera->setOriginAndLookAt(
+    camera->lookAt(
         target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),     // camera
-        LLVector3::z_axis,                                                                  // up
-        target_pos + (mCameraOffset  * av_rot) );                                           // point of interest
+        target_pos + (mCameraOffset  * av_rot),                                             // point of interest
+        LLVector3::z_axis);                                                                 // up
 
     camera->setViewNoBroadcast(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
     camera->setAspect((F32) mFullWidth / (F32) mFullHeight);

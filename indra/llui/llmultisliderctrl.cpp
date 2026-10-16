@@ -93,7 +93,7 @@ LLMultiSliderCtrl::LLMultiSliderCtrl(const LLMultiSliderCtrl::Params& p)
     {
         if (p.label_width == 0)
         {
-            label_width = p.font()->getWidth(p.label);
+            label_width = p.font()->getWidth(p.label());
         }
         LLRect label_rect( left, top, label_width, bottom );
         LLTextBox::Params params;
@@ -114,13 +114,13 @@ LLMultiSliderCtrl::LLMultiSliderCtrl(const LLMultiSliderCtrl::Params& p)
             text_width = 0;
             // calculate the size of the text box (log max_value is number of digits - 1 so plus 1)
             if ( p.max_value() )
-                text_width = p.font()->getWidth(std::string("0")) * ( static_cast < S32 > ( log10  ( p.max_value ) ) + p.decimal_digits + 1 );
+                text_width = p.font()->getWidth("0") * ( static_cast < S32 > ( log10  ( p.max_value ) ) + p.decimal_digits + 1 );
 
             if ( p.increment < 1.0f )
-                text_width += p.font()->getWidth(std::string(".")); // (mostly) take account of decimal point in value
+                text_width += p.font()->getWidth("."); // (mostly) take account of decimal point in value
 
             if ( p.min_value < 0.0f || p.max_value < 0.0f )
-                text_width += p.font()->getWidth(std::string("-")); // (mostly) take account of minus sign
+                text_width += p.font()->getWidth("-"); // (mostly) take account of minus sign
 
             // padding to make things look nicer
             text_width += 8;
@@ -245,7 +245,7 @@ bool LLMultiSliderCtrl::setLabelArg( const std::string& key, const LLStringExpli
         res = mLabelBox->setTextArg(key, text);
         if (res && mLabelWidth == 0)
         {
-            S32 label_width = mFont->getWidth(mLabelBox->getWText().c_str());
+            S32 label_width = mFont->getWidthBytes(mLabelBox->getText(), 0, S32_MAX);
             LLRect rect = mLabelBox->getRect();
             S32 prev_right = rect.mRight;
             rect.mRight = rect.mLeft + label_width;
@@ -363,7 +363,7 @@ void LLMultiSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata)
     if (!ctrl)
         return;
 
-    LLMultiSliderCtrl* self = dynamic_cast<LLMultiSliderCtrl*>(ctrl->getParent());
+    LLMultiSliderCtrl* self = ctrl->getParentAs<LLMultiSliderCtrl>();
     llassert(self);
     if (!self) // cast failed - wrong type! :O
         return;
@@ -380,7 +380,8 @@ void LLMultiSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata)
         if( self->mMultiSlider->getMinValue() <= val && val <= self->mMultiSlider->getMaxValue() )
         {
             self->setCurSliderValue( val );  // set the value temporarily so that the callback can retrieve it.
-            if( !self->mValidateSignal || (*(self->mValidateSignal))( self, val ) )
+            enable_signal_t* signal = self->validateSignal();
+            if( !signal || (*signal)( self, val ) )
             {
                 success = true;
             }
@@ -405,7 +406,7 @@ void LLMultiSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata)
 // static
 void LLMultiSliderCtrl::onSliderCommit(LLUICtrl* ctrl, const LLSD& userdata)
 {
-    LLMultiSliderCtrl* self = dynamic_cast<LLMultiSliderCtrl*>(ctrl->getParent());
+    LLMultiSliderCtrl* self = ctrl->getParentAs<LLMultiSliderCtrl>();
     if (!self)
         return;
 
@@ -414,7 +415,8 @@ void LLMultiSliderCtrl::onSliderCommit(LLUICtrl* ctrl, const LLSD& userdata)
     F32 new_val = self->mMultiSlider->getCurSliderValue();
 
     self->mCurValue = new_val;  // set the value temporarily so that the callback can retrieve it.
-    if( !self->mValidateSignal || (*(self->mValidateSignal))( self, new_val ) )
+    enable_signal_t* signal = self->validateSignal();
+    if( !signal || (*signal)( self, new_val ) )
     {
         success = true;
     }

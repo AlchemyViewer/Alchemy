@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -449,8 +450,8 @@ void RlvRenameOnWearObserver::doneIdle()
             // If we can modify the item then we rename it directly, otherwise we create a new folder and move it
             if (pItem->getPermissions().allowModifyBy(gAgent.getID()))
             {
-                std::string strName = pItem->getName();
-                LLStringUtil::truncate(strName, DB_INV_ITEM_NAME_STR_LEN - strAttachPt.length() - 3);
+                std::string strName = utf8str_truncate(pItem->getName(),
+                    (S32)(DB_INV_ITEM_NAME_STR_LEN - strAttachPt.length() - 3));
 
                 strName += " (" + strAttachPt + ")";
 
@@ -635,8 +636,7 @@ void RlvGiveToRLVTaskOffer::doneIdle()
 
 void RlvGiveToRLVTaskOffer::onDestinationCreated(const LLUUID& idDestFolder, const std::string& strName)
 {
-    const LLViewerInventoryCategory* pTarget = (idDestFolder.notNull()) ? gInventory.getCategory(idDestFolder) : nullptr;
-    if (pTarget)
+    if (idDestFolder.notNull())
     {
         moveAndRename(m_Folders.front(), idDestFolder, strName, new LLBoostFuncInventoryCallback(boost::bind(&RlvGiveToRLVTaskOffer::onOfferCompleted, this, _1)));
     }

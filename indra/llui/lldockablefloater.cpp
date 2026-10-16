@@ -80,7 +80,7 @@ LLDockableFloater::~LLDockableFloater()
 bool LLDockableFloater::postBuild()
 {
     // Remember we should force docking when the floater is opened for the first time
-    if (mIsDockedStateForcedCallback != NULL && mIsDockedStateForcedCallback())
+    if (mIsDockedStateForcedCallback != nullptr && mIsDockedStateForcedCallback())
     {
         mForceDocking = true;
     }
@@ -97,7 +97,7 @@ void LLDockableFloater::toggleInstance(const LLSD& sdname)
     std::string name = sdname.asString();
 
     LLDockableFloater* instance =
-            dynamic_cast<LLDockableFloater*> (LLFloaterReg::findInstance(name));
+            ALViewType::as<LLDockableFloater>(LLFloaterReg::findInstance(name));
     // if floater closed or docked
     if (instance == NULL || (instance && instance->isDocked()))
     {

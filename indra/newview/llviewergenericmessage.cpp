@@ -45,18 +45,18 @@ void send_generic_message(const std::string& method,
                           const LLUUID& invoice)
 {
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("GenericMessage");
+    msg->newMessageFast(_PREHASH_GenericMessage);
     msg->nextBlockFast(_PREHASH_AgentData);
     msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
-    msg->nextBlock("MethodData");
-    msg->addString("Method", method);
-    msg->addUUID("Invoice", invoice);
+    msg->nextBlockFast(_PREHASH_MethodData);
+    msg->addStringFast(_PREHASH_Method, method);
+    msg->addUUIDFast(_PREHASH_Invoice, invoice);
     if(strings.empty())
     {
-        msg->nextBlock("ParamList");
-        msg->addString("Parameter", NULL);
+        msg->nextBlockFast(_PREHASH_ParamList);
+        msg->addStringFast(_PREHASH_Parameter, nullptr);
     }
     else
     {
@@ -64,8 +64,8 @@ void send_generic_message(const std::string& method,
         std::vector<std::string>::const_iterator end = strings.end();
         for(; it != end; ++it)
         {
-            msg->nextBlock("ParamList");
-            msg->addString("Parameter", *it);
+            msg->nextBlockFast(_PREHASH_ParamList);
+            msg->addStringFast(_PREHASH_Parameter, *it);
         }
     }
     gAgent.sendReliableMessage();
@@ -73,8 +73,9 @@ void send_generic_message(const std::string& method,
 
 void process_generic_message(LLMessageSystem* msg, void**)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     LLUUID agent_id;
-    msg->getUUID("AgentData", "AgentID", agent_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
     if (agent_id != gAgent.getID())
     {
         LL_WARNS() << "GenericMessage for wrong agent" << LL_ENDL;
@@ -95,6 +96,7 @@ void process_generic_message(LLMessageSystem* msg, void**)
 
 void process_generic_streaming_message(LLMessageSystem* msg, void**)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     LLGenericStreamingMessage data;
     data.unpack(msg);
     switch (data.mMethod)
@@ -110,8 +112,9 @@ void process_generic_streaming_message(LLMessageSystem* msg, void**)
 
 void process_large_generic_message(LLMessageSystem* msg, void**)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     LLUUID agent_id;
-    msg->getUUID("AgentData", "AgentID", agent_id);
+    msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
     if (agent_id != gAgent.getID())
     {
         LL_WARNS() << "GenericMessage for wrong agent" << LL_ENDL;

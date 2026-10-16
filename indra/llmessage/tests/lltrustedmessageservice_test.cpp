@@ -25,7 +25,7 @@
  */
 
 #include "lltrustedmessageservice.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "llhost.cpp" // LLHost is a value type for test purposes.
 #include "net.cpp" // Needed by LLHost.
@@ -36,6 +36,17 @@
 #include "llpounceable.h"
 
 LLPounceable<LLMessageSystem*, LLPounceableStatic> gMessageSystem;
+
+#include "almessagesystem_stub.cpp"
+
+// What the test doubles below record.
+namespace
+{
+bool messageDispatched = false;
+bool messageDispatchedAsBinary = false;
+LLSD lastLLSD;
+std::string lastMessageName;
+}
 
 LLMessageConfig::SenderTrust
 LLMessageConfig::getSenderTrustedness(const std::string& msg_name)
@@ -57,11 +68,6 @@ bool LLMessageSystem::isTrustedMessage(const std::string& name) const
     return false;
 }
 
-bool messageDispatched = false;
-bool messageDispatchedAsBinary = false;
-LLSD lastLLSD;
-std::string lastMessageName;
-
 void LLMessageSystem::dispatch(const std::string& msg_name,
                                const LLSD& message,
                                LLHTTPNode::ResponsePtr responsep)
@@ -80,12 +86,13 @@ void LLMessageSystem::dispatchTemplate(const std::string& msg_name,
     messageDispatchedAsBinary = true;
 }
 
-namespace tut
+namespace
 {
         struct LLTrustedMessageServiceData
         {
             LLTrustedMessageServiceData()
             {
+                gMessageSystem = stubMessageSystem();
                 LLSD emptyLLSD;
                 lastLLSD = emptyLLSD;
                 lastMessageName = "uninitialised message name";
@@ -94,24 +101,16 @@ namespace tut
             }
         };
 
-    typedef test_group<LLTrustedMessageServiceData> factory;
-    typedef factory::object object;
 }
 
 namespace
-{
-    tut::factory tf("LLTrustedMessageServiceData");
-}
-
-namespace tut
 {
     // characterisation tests
 
     // 1) test that messages get forwarded with names etc. as current behaviour (something like LLMessageSystem::dispatch(name, data...)
 
     // test llsd messages are sent as normal using LLMessageSystem::dispatch() (eventually)
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(LLTrustedMessageServiceData, "LLTrustedMessageServiceData: an llsd message goes to dispatch with a body", "[LLTrustedMessageServiceData]")
     {
         LLHTTPNode::ResponsePtr response;
         LLSD input;
@@ -119,14 +118,13 @@ namespace tut
         LLTrustedMessageService adapter;
         adapter.post(response, context, input);
         // test original ting got called wit nowt, ya get me blood?
-        ensure_equals(messageDispatched, true);
-        ensure(lastLLSD.has("body"));
+        CHECK(messageDispatched);
+        CHECK(lastLLSD.has("body"));
     }
 
     // test that llsd wrapped binary-template-data messages are
     // sent via LLMessageSystem::binaryDispatch() or similar
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(LLTrustedMessageServiceData, "LLTrustedMessageServiceData: binary-template-data goes to dispatchTemplate", "[LLTrustedMessageServiceData]")
     {
         LLHTTPNode::ResponsePtr response;
         LLSD input;
@@ -135,8 +133,8 @@ namespace tut
         LLTrustedMessageService adapter;
 
         adapter.post(response, context, input);
-        ensure("check template-binary-data message was dispatched as binary", messageDispatchedAsBinary);
-        ensure_equals(lastLLSD["body"]["binary-template-data"].asString(),  "10001010110");
+        CHECK(messageDispatchedAsBinary);
+        CHECK(lastLLSD["body"]["binary-template-data"].asString() == "10001010110");
         // test somit got called with "10001010110" (something like LLMessageSystem::dispatchTemplate(blah))
     }
 }

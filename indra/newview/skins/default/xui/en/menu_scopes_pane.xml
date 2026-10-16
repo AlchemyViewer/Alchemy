@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<!-- Assigns a scope to the pane that was right-clicked. The pane is remembered
+     by the floater when the menu is spawned, so every item here acts on it
+     without needing to carry it. Values match ALFloaterScopes::EMode and the
+     AlchemyScopePane* settings. -->
+<context_menu
+ layout="topleft"
+ name="Scopes Pane Menu">
+    <menu_item_check
+     label="Histogram: RGB"
+     layout="topleft"
+     name="mode_rgb">
+        <on_check function="Scopes.IsPaneMode" parameter="0" />
+        <on_click function="Scopes.SetPaneMode" parameter="0" />
+    </menu_item_check>
+    <menu_item_check
+     label="Histogram: Luminance"
+     layout="topleft"
+     name="mode_luma">
+        <on_check function="Scopes.IsPaneMode" parameter="1" />
+        <on_click function="Scopes.SetPaneMode" parameter="1" />
+    </menu_item_check>
+    <menu_item_check
+     label="Histogram: Red"
+     layout="topleft"
+     name="mode_red">
+        <on_check function="Scopes.IsPaneMode" parameter="2" />
+        <on_click function="Scopes.SetPaneMode" parameter="2" />
+    </menu_item_check>
+    <menu_item_check
+     label="Histogram: Green"
+     layout="topleft"
+     name="mode_green">
+        <on_check function="Scopes.IsPaneMode" parameter="3" />
+        <on_click function="Scopes.SetPaneMode" parameter="3" />
+    </menu_item_check>
+    <menu_item_check
+     label="Histogram: Blue"
+     layout="topleft"
+     name="mode_blue">
+        <on_check function="Scopes.IsPaneMode" parameter="4" />
+        <on_click function="Scopes.SetPaneMode" parameter="4" />
+    </menu_item_check>
+    <menu_item_separator layout="topleft" />
+    <menu_item_check
+     label="Waveform: Luminance"
+     layout="topleft"
+     name="mode_wave_luma">
+        <on_check function="Scopes.IsPaneMode" parameter="6" />
+        <on_click function="Scopes.SetPaneMode" parameter="6" />
+    </menu_item_check>
+    <menu_item_check
+     label="Waveform: RGB"
+     layout="topleft"
+     name="mode_wave_rgb">
+        <on_check function="Scopes.IsPaneMode" parameter="7" />
+        <on_click function="Scopes.SetPaneMode" parameter="7" />
+    </menu_item_check>
+    <menu_item_check
+     label="Parade: R G B"
+     layout="topleft"
+     name="mode_parade">
+        <on_check function="Scopes.IsPaneMode" parameter="8" />
+        <on_click function="Scopes.SetPaneMode" parameter="8" />
+    </menu_item_check>
+    <menu_item_separator layout="topleft" />
+    <menu_item_check
+     label="Vectorscope"
+     layout="topleft"
+     name="mode_vector">
+        <on_check function="Scopes.IsPaneMode" parameter="5" />
+        <on_click function="Scopes.SetPaneMode" parameter="5" />
+    </menu_item_check>
+</context_menu>

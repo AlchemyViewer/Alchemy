@@ -31,20 +31,24 @@
 #include "llpointer.h"
 #include "llstreamtools.h" // for fullread
 
+#include <bit>
+#include <charconv>
 #include <iostream>
-#include "apr_base64.h"
+#include <limits>
+
+#include <fast_float/fast_float.h>
+#include <fmt/format.h>
+#include <fmt/printf.h>
+#include <simdutf.h>
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
-
-#ifdef LL_USESYSTEMLIBS
-# include <zlib.h>
-#else
-# include "zlib-ng/zlib.h"  // for davep's dirty little zip functions
-#endif
+#include <zlib.h>
 
 #if !LL_WINDOWS
 #include <netinet/in.h> // htonl & ntohl
+#else
+#include "llwin32headers.h"
 #endif
 
 #include "lldate.h"
@@ -76,7 +80,7 @@ void format_using(const LLSD& data, std::ostream& ostr,
 }
 
 template <class Parser>
-S32 parse_using(std::istream& istr, LLSD& data, size_t max_bytes, S32 max_depth=-1)
+S32 parse_using(std::istream& istr, LLSD& data, llssize max_bytes, S32 max_depth=-1)
 {
     LLPointer<Parser> p{ new Parser };
     return p->parse(istr, data, max_bytes, max_depth);
@@ -144,7 +148,8 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
     // without pulling it from the stream. If it turns out that the stream
     // does NOT contain a header, and the content includes meaningful '\n',
     // it's important to pull that into hdr_buf too.
-    if (inbuf < max_bytes && str.get(hdr_buf[inbuf]))
+    if ((max_bytes == LLSDSerialize::SIZE_UNLIMITED || inbuf < max_bytes)
+        && str.get(hdr_buf[inbuf]))
     {
         // got the delimiting '\n'
         ++inbuf;
@@ -159,11 +164,18 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
         fail_if_not_legacy = true;
     }
 
-    if (!strncasecmp(LEGACY_NON_HEADER, hdr_buf, strlen(LEGACY_NON_HEADER))) /* Flawfinder: ignore */
+    // SIZE_UNLIMITED is negative: subtracting the header length from it would
+    // produce a bogus negative byte budget that the parsers would then
+    // enforce, failing any sized payload (strings, binary).
+    llssize remaining = (max_bytes == LLSDSerialize::SIZE_UNLIMITED)
+        ? LLSDSerialize::SIZE_UNLIMITED
+        : max_bytes - inbuf;
+
+    if (!strnicmp(LEGACY_NON_HEADER, hdr_buf, strlen(LEGACY_NON_HEADER))) /* Flawfinder: ignore */
     {   // Create a LLSD XML parser, and parse the first chunk read above.
         LLSDXMLParser x;
         x.parsePart(hdr_buf, inbuf);    // Parse the first part that was already read
-        auto parsed = x.parse(str, sd, max_bytes - inbuf); // Parse the rest of it
+        auto parsed = x.parse(str, sd, remaining); // Parse the rest of it
         // Formally we should probably check (parsed != PARSE_FAILURE &&
         // parsed > 0), but since PARSE_FAILURE is -1, this suffices.
         return (parsed > 0);
@@ -202,17 +214,17 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
     /*
      * Create the parser as appropriate
      */
-    if (0 == LLStringUtil::compareInsensitive(header, LLSD_BINARY_HEADER))
+    if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_BINARY_HEADER))
     {
-        return (parse_using<LLSDBinaryParser>(str, sd, max_bytes-inbuf) > 0);
+        return (parse_using<LLSDBinaryParser>(str, sd, remaining) > 0);
     }
-    else if (0 == LLStringUtil::compareInsensitive(header, LLSD_XML_HEADER))
+    else if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_XML_HEADER))
     {
-        return (parse_using<LLSDXMLParser>(str, sd, max_bytes-inbuf) > 0);
+        return (parse_using<LLSDXMLParser>(str, sd, remaining) > 0);
     }
-    else if (0 == LLStringUtil::compareInsensitive(header, LLSD_NOTATION_HEADER))
+    else if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_NOTATION_HEADER))
     {
-        return (parse_using<LLSDNotationParser>(str, sd, max_bytes-inbuf) > 0);
+        return (parse_using<LLSDNotationParser>(str, sd, remaining) > 0);
     }
     else // no header we recognize
     {
@@ -276,24 +288,13 @@ U64 ll_ntohll(U64 netlonglong)
     return ((U64)(ntohl((U32)((netlonglong >> 32) & 0xFFFFFFFF))) |
             ((U64)(ntohl((U32)(netlonglong & 0xFFFFFFFF))) << 32));
 }
-union LLEndianSwapper
-{
-    F64 d;
-    U64 i;
-};
 F64 ll_htond(F64 hostdouble)
 {
-    LLEndianSwapper tmp;
-    tmp.d = hostdouble;
-    tmp.i = ll_htonll(tmp.i);
-    return tmp.d;
+    return std::bit_cast<F64>(ll_htonll(std::bit_cast<U64>(hostdouble)));
 }
 F64 ll_ntohd(F64 netdouble)
 {
-    LLEndianSwapper tmp;
-    tmp.d = netdouble;
-    tmp.i = ll_ntohll(tmp.i);
-    return tmp.d;
+    return std::bit_cast<F64>(ll_ntohll(std::bit_cast<U64>(netdouble)));
 }
 #endif
 
@@ -362,7 +363,7 @@ llssize deserialize_boolean(
  * @param value The string to escape and serialize
  * @param str The stream to serialize to.
  */
-void serialize_string(const std::string& value, std::ostream& str);
+void serialize_string(std::string& out, const std::string& value);
 
 
 /**
@@ -379,7 +380,7 @@ static const char BINARY_FALSE_SERIAL = '0';
  * LLSDParser
  */
 LLSDParser::LLSDParser()
-    : mCheckLimits(true), mMaxBytesLeft(0), mParseLines(false)
+    : mCheckLimits(true), mMaxBytesLeft(0)
 {
 }
 
@@ -395,19 +396,69 @@ S32 LLSDParser::parse(std::istream& istr, LLSD& data, llssize max_bytes, S32 max
 }
 
 
-// Parse using routine to get() lines, faster than parse()
+// Parse a whole document, with no byte budget to enforce
 S32 LLSDParser::parseLines(std::istream& istr, LLSD& data)
 {
     mCheckLimits = false;
-    mParseLines = true;
     return doParse(istr, data);
 }
 
 
+namespace
+{
+    // istream::peek() and istream::get() build a sentry for every character.
+    // For a parser that decides byte by byte that costs an order of magnitude
+    // more than reading the byte: 10.6 ns against 0.82 ns through the
+    // streambuf. These go straight to the streambuf and set by hand the stream
+    // state those functions would have set, the tie flush aside -- nothing here
+    // parses from a tied stream.
+    typedef std::istream::traits_type stream_traits;
+
+    inline int stream_peek(std::istream& istr)
+    {
+        if (!istr.good())
+        {   // the sentry these replace fails, and sets failbit doing so
+            istr.setstate(std::ios::failbit);
+            return stream_traits::eof();
+        }
+        const int c = istr.rdbuf()->sgetc();
+        if (c == stream_traits::eof())
+        {
+            istr.setstate(std::ios::eofbit);
+        }
+        return c;
+    }
+
+    inline int stream_bump(std::istream& istr)
+    {
+        if (!istr.good())
+        {
+            istr.setstate(std::ios::failbit);
+            return stream_traits::eof();
+        }
+        const int c = istr.rdbuf()->sbumpc();
+        if (c == stream_traits::eof())
+        {
+            istr.setstate(std::ios::eofbit | std::ios::failbit);
+        }
+        return c;
+    }
+
+    // std::ws, without the sentry per character.
+    inline void stream_skip_ws(std::istream& istr)
+    {
+        int c;
+        while ((c = stream_peek(istr)) != stream_traits::eof() && isspace(c))
+        {
+            istr.rdbuf()->sbumpc();
+        }
+    }
+}
+
 int LLSDParser::get(std::istream& istr) const
 {
     if(mCheckLimits) --mMaxBytesLeft;
-    return istr.get();
+    return stream_bump(istr);
 }
 
 std::istream& LLSDParser::get(
@@ -433,14 +484,31 @@ std::istream& LLSDParser::get(
 
 std::istream& LLSDParser::ignore(std::istream& istr) const
 {
-    istr.ignore();
+    if (!istr.good())
+    {
+        istr.setstate(std::ios::failbit);
+    }
+    else if (istr.rdbuf()->sbumpc() == stream_traits::eof())
+    {   // ignore() reports the end of the stream, but does not fail for it
+        istr.setstate(std::ios::eofbit);
+    }
     if(mCheckLimits) --mMaxBytesLeft;
     return istr;
 }
 
 std::istream& LLSDParser::putback(std::istream& istr, char c) const
 {
-    istr.putback(c);
+    // putback() clears eofbit before it does anything else, so a character read
+    // at the end of the stream can still be given back.
+    istr.clear(istr.rdstate() & ~std::ios::eofbit);
+    if (!istr.good())
+    {
+        istr.setstate(std::ios::failbit);
+    }
+    else if (istr.rdbuf()->sputbackc(c) == stream_traits::eof())
+    {
+        istr.setstate(std::ios::badbit);
+    }
     if(mCheckLimits) ++mMaxBytesLeft;
     return istr;
 }
@@ -450,8 +518,20 @@ std::istream& LLSDParser::read(
     char* s,
     std::streamsize n) const
 {
-    istr.read(s, n);
-    if(mCheckLimits) mMaxBytesLeft -= istr.gcount();
+    // The binary parser calls this once per value, so it goes through the
+    // streambuf like get() does. istr.gcount() is not updated -- the count is
+    // tracked here instead, and no caller reads it after this.
+    if (!istr.good())
+    {
+        istr.setstate(std::ios::failbit);
+        return istr;
+    }
+    const std::streamsize got = istr.rdbuf()->sgetn(s, n);
+    if (got < n)
+    {
+        istr.setstate(std::ios::eofbit | std::ios::failbit);
+    }
+    if(mCheckLimits) mMaxBytesLeft -= got;
     return istr;
 }
 
@@ -460,6 +540,92 @@ void LLSDParser::account(llssize bytes) const
     if(mCheckLimits) mMaxBytesLeft -= bytes;
 }
 
+
+namespace
+{
+    void scan_digits(std::istream& istr, char*& out, const char* const out_end)
+    {
+        int c;
+        while (out < out_end && (c = stream_peek(istr)) >= '0' && c <= '9')
+        {
+            *out++ = (char)stream_bump(istr);
+        }
+    }
+
+    // True when a scan stopped because the buffer filled while the stream
+    // still holds characters of the same numeric lexeme; accepting the
+    // buffered prefix would let one oversized token parse as several values.
+    bool numeric_token_truncated(std::istream& istr, size_t len, size_t cap)
+    {
+        if (len < cap)
+        {
+            return false;
+        }
+        int c = stream_peek(istr);
+        return isalnum(c) || c == '.' || c == '+' || c == '-';
+    }
+
+    // Scan an integer token ([ws][+-]digits) from istr into buf, leaving the
+    // terminating character in the stream. Returns the token length.
+    size_t scan_integer_token(std::istream& istr, char* buf, size_t cap)
+    {
+        char* p = buf;
+        const char* const end = buf + cap;
+        stream_skip_ws(istr);
+        int c = stream_peek(istr);
+        if ((c == '+' || c == '-') && p < end)
+        {
+            *p++ = (char)stream_bump(istr);
+        }
+        scan_digits(istr, p, end);
+        return p - buf;
+    }
+
+    // Scan a real token ([ws][+-](inf|nan|digits[.digits][eE[+-]digits]))
+    // from istr into buf, leaving the terminating character in the stream.
+    // The caller validates the token by parsing it; the buffer is sized so
+    // any printf-formatted double fits.
+    size_t scan_real_token(std::istream& istr, char* buf, size_t cap)
+    {
+        char* p = buf;
+        const char* const end = buf + cap;
+        stream_skip_ws(istr);
+        int c = stream_peek(istr);
+        if ((c == '+' || c == '-') && p < end)
+        {
+            *p++ = (char)stream_bump(istr);
+            c = stream_peek(istr);
+        }
+        if (isalpha(c)) // inf, infinity, nan
+        {
+            while (p < end && isalpha(stream_peek(istr)))
+            {
+                *p++ = (char)stream_bump(istr);
+            }
+        }
+        else
+        {
+            scan_digits(istr, p, end);
+            if (stream_peek(istr) == '.' && p < end)
+            {
+                *p++ = (char)stream_bump(istr);
+                scan_digits(istr, p, end);
+            }
+            c = stream_peek(istr);
+            if ((c == 'e' || c == 'E') && p < end)
+            {
+                *p++ = (char)stream_bump(istr);
+                c = stream_peek(istr);
+                if ((c == '+' || c == '-') && p < end)
+                {
+                    *p++ = (char)stream_bump(istr);
+                }
+                scan_digits(istr, p, end);
+            }
+        }
+        return p - buf;
+    }
+}
 
 /**
  * LLSDNotationParser
@@ -487,8 +653,11 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
     // uri: l"escaped"
     // date: d"YYYY-MM-DDTHH:MM:SS.FFZ"
     // binary: b##"ff3120ab1" | b(size)"raw data"
-    char c;
-    c = istr.peek();
+    // c stays an int: peek() yields EOF or 0..255, both safe for isspace();
+    // truncating to char first makes high-bit bytes negative, which is UB
+    // for the ctype functions.
+    int c;
+    c = stream_peek(istr);
     if (max_depth == 0)
     {
         return PARSE_FAILURE;
@@ -497,7 +666,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
     {
         // pop the whitespace.
         c = get(istr);
-        c = istr.peek();
+        c = stream_peek(istr);
         continue;
     }
     if(!istr.good())
@@ -558,7 +727,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
     case 'F':
     case 'f':
         ignore(istr);
-        c = istr.peek();
+        c = stream_peek(istr);
         if(isalpha(c))
         {
             auto cnt = deserialize_boolean(
@@ -588,7 +757,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
     case 'T':
     case 't':
         ignore(istr);
-        c = istr.peek();
+        c = stream_peek(istr);
         if(isalpha(c))
         {
             auto cnt = deserialize_boolean(istr,data,NOTATION_TRUE_SERIAL,true);
@@ -609,10 +778,18 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
     case 'i':
     {
         c = get(istr);
+        char buf[64];
+        size_t len = scan_integer_token(istr, buf, sizeof(buf));
+        const char* start = buf;
+        if (len && *start == '+')
+        {
+            ++start; // from_chars does not accept an explicit plus
+        }
         S32 integer = 0;
-        istr >> integer;
+        auto [ptr, ec] = std::from_chars(start, buf + len, integer);
         data = integer;
-        if(istr.fail())
+        if (numeric_token_truncated(istr, len, sizeof(buf)) ||
+            ec != std::errc() || ptr != buf + len)
         {
             LL_INFOS() << "STREAM FAILURE reading integer." << LL_ENDL;
             parse_count = PARSE_FAILURE;
@@ -623,10 +800,18 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
     case 'r':
     {
         c = get(istr);
+        char buf[512];
+        size_t len = scan_real_token(istr, buf, sizeof(buf));
+        const char* start = buf;
+        if (len && *start == '+')
+        {
+            ++start; // from_chars does not accept an explicit plus
+        }
         F64 real = 0.0;
-        istr >> real;
+        auto [ptr, ec] = fast_float::from_chars(start, buf + len, real);
         data = real;
-        if(istr.fail())
+        if (numeric_token_truncated(istr, len, sizeof(buf)) ||
+            ec != std::errc() || ptr != buf + len)
         {
             LL_INFOS() << "STREAM FAILURE reading real." << LL_ENDL;
             parse_count = PARSE_FAILURE;
@@ -667,7 +852,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
         c = get(istr); // pop the 'l'
         c = get(istr); // pop the delimiter
         std::string str;
-        auto cnt = deserialize_string_delim(istr, str, c);
+        auto cnt = deserialize_string_delim(istr, str, (char)c);
         if(PARSE_FAILURE == cnt)
         {
             parse_count = PARSE_FAILURE;
@@ -690,7 +875,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
         c = get(istr); // pop the 'd'
         c = get(istr); // pop the delimiter
         std::string str;
-        auto cnt = deserialize_string_delim(istr, str, c);
+        auto cnt = deserialize_string_delim(istr, str, (char)c);
         if(PARSE_FAILURE == cnt)
         {
             parse_count = PARSE_FAILURE;
@@ -739,7 +924,9 @@ S32 LLSDNotationParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) c
     // map: { string:object, string:object }
     map = LLSD::emptyMap();
     S32 parse_count = 0;
-    char c = get(istr);
+    // int, not char: get() returns EOF or 0..255 and isspace() requires
+    // exactly that range.
+    int c = get(istr);
     if(c == '{')
     {
         // eat commas, white
@@ -752,7 +939,7 @@ S32 LLSDNotationParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) c
             {
                 if((c == '\"') || (c == '\'') || (c == 's'))
                 {
-                    putback(istr, c);
+                    putback(istr, (char)c);
                     found_name = true;
                     auto count = deserialize_string(istr, name, mMaxBytesLeft);
                     if(PARSE_FAILURE == count) return PARSE_FAILURE;
@@ -767,7 +954,7 @@ S32 LLSDNotationParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) c
                     c = get(istr);
                     continue;
                 }
-                putback(istr, c);
+                putback(istr, (char)c);
                 LLSD child;
                 S32 count = doParse(istr, child, max_depth);
                 if(count > 0)
@@ -775,7 +962,8 @@ S32 LLSDNotationParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) c
                     // There must be a value for every key, thus
                     // child_count must be greater than 0.
                     parse_count += count;
-                    map.insert(name, child);
+                    map.insert(std::move(name), std::move(child)); // Move as name will be filled on next iteration
+                    name.clear();
                 }
                 else
                 {
@@ -800,7 +988,9 @@ S32 LLSDNotationParser::parseArray(std::istream& istr, LLSD& array, S32 max_dept
     // array: [ object, object, object ]
     array = LLSD::emptyArray();
     S32 parse_count = 0;
-    char c = get(istr);
+    // int, not char: get() returns EOF or 0..255 and isspace() requires
+    // exactly that range.
+    int c = get(istr);
     if(c == '[')
     {
         // eat commas, white
@@ -813,7 +1003,7 @@ S32 LLSDNotationParser::parseArray(std::istream& istr, LLSD& array, S32 max_dept
                 c = get(istr);
                 continue;
             }
-            putback(istr, c);
+            putback(istr, (char)c);
             S32 count = doParse(istr, child, max_depth);
             if(PARSE_FAILURE == count)
             {
@@ -822,7 +1012,7 @@ S32 LLSDNotationParser::parseArray(std::istream& istr, LLSD& array, S32 max_dept
             else
             {
                 parse_count += count;
-                array.append(child);
+                array.append(std::move(child));
             }
             c = get(istr);
         }
@@ -841,7 +1031,7 @@ bool LLSDNotationParser::parseString(std::istream& istr, LLSD& data) const
     auto count = deserialize_string(istr, value, mMaxBytesLeft);
     if(PARSE_FAILURE == count) return false;
     account(count);
-    data = value;
+    data = std::move(value);
     return true;
 }
 
@@ -867,34 +1057,49 @@ bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
         // We probably have a valid raw binary stream. determine
         // the size, and read it.
         auto len = strtol(buf + 2, NULL, 0);
+        // A negative length would sign-extend to a huge resize() request.
+        if(len < 0) return false;
         if(mCheckLimits && (len > mMaxBytesLeft)) return false;
         std::vector<U8> value;
         if(len)
         {
             value.resize(len);
-            account(fullread(istr, (char *)&value[0], len));
+            account(fullread(istr, (char*)value.data(), len));
         }
         c = get(istr); // strip off the trailing double-quote
-        data = value;
+        if(c != '"') return false;
+        data = std::move(value);
     }
     else if(0 == strncmp("b64", buf, 3))
     {
-        // *FIX: A bit inefficient, but works for now. To make the
-        // format better, I would need to add a hint into the
-        // serialization format that indicated how long it was.
-        std::stringstream coded_stream;
-        get(istr, *(coded_stream.rdbuf()), '\"');
-        c = get(istr);
-        std::string encoded(coded_stream.str());
-        S32 len = apr_base64_decode_len(encoded.c_str());
-        std::vector<U8> value;
-        if(len)
+        // Read the encoded characters up to (and including) the closing
+        // quote. istream::get(streambuf&) can't be used here: it sets
+        // failbit when it extracts zero characters, which the valid empty
+        // form b64"" would trigger.
+        std::string encoded;
+        std::streambuf* sb = istr.rdbuf();
+        int ch = sb->sbumpc();
+        while(ch != std::istream::traits_type::eof() && ch != '"')
         {
-            value.resize(len);
-            len = apr_base64_decode_binary(&value[0], encoded.c_str());
-            value.resize(len);
+            encoded += (char)ch;
+            ch = sb->sbumpc();
         }
-        data = value;
+        if(ch == std::istream::traits_type::eof())
+        {
+            istr.setstate(std::ios::failbit | std::ios::eofbit);
+            return false;
+        }
+        account(static_cast<llssize>(encoded.size() + 1)); // content plus closing quote
+        // binary_length_from_base64 is exact even when the input contains
+        // whitespace, which base64_to_binary (forgiving mode) skips.
+        std::vector<U8> value(simdutf::binary_length_from_base64(encoded.data(), encoded.size()));
+        // convert to binary and check for errors
+        simdutf::result r = simdutf::base64_to_binary(encoded.data(), encoded.size(), (char*)value.data());
+        if(r.error != simdutf::error_code::SUCCESS)
+        {
+            return false;
+        }
+        data = std::move(value);
     }
     else if(0 == strncmp("b16", buf, 3))
     {
@@ -902,30 +1107,32 @@ bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
         // double quote or base 16 data. If it's a double quote, we're
         // done parsing. If it's not, put the data back, and read the
         // stream until the next double quote.
-        char* read;  /*Flawfinder: ignore*/
-        U8 byte;
         U8 byte_buffer[BINARY_BUFFER_SIZE];
-        U8* write;
         std::vector<U8> value;
         c = get(istr);
         while(c != '"')
         {
+            if(!istr.good()) return false; // unterminated b16 data
             putback(istr, c);
-            read = buf;
-            write = byte_buffer;
             get(istr, buf, STREAM_GET_COUNT, '"');
+            std::streamsize got = istr.gcount();
             c = get(istr);
-            while(*read != '\0')     /*Flawfinder: ignore*/
+            // Full chunks are STREAM_GET_COUNT-1 (even) characters, so hex
+            // pairs stay aligned across chunks; an odd count means the
+            // total hex digit count is odd, which is malformed.
+            if(got & 1) return false;
+            U8* write = byte_buffer;
+            for(std::streamsize i = 0; i < got; i += 2)
             {
-                byte = hex_as_nybble(*read++);
+                U8 byte = hex_as_nybble(buf[i]);
                 byte = byte << 4;
-                byte |= hex_as_nybble(*read++);
+                byte |= hex_as_nybble(buf[i + 1]);
                 *write++ = byte;
             }
             // copy the data out of the byte buffer
             value.insert(value.end(), byte_buffer, write);
         }
-        data = value;
+        data = std::move(value);
     }
     else
     {
@@ -1038,6 +1245,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
         if(istr.fail())
         {
             LL_INFOS() << "STREAM FAILURE reading binary integer." << LL_ENDL;
+            parse_count = PARSE_FAILURE;
         }
         break;
     }
@@ -1050,6 +1258,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
         if(istr.fail())
         {
             LL_INFOS() << "STREAM FAILURE reading binary real." << LL_ENDL;
+            parse_count = PARSE_FAILURE;
         }
         break;
     }
@@ -1062,6 +1271,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
         if(istr.fail())
         {
             LL_INFOS() << "STREAM FAILURE reading binary uuid." << LL_ENDL;
+            parse_count = PARSE_FAILURE;
         }
         break;
     }
@@ -1077,7 +1287,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
         }
         else
         {
-            data = value;
+            data = std::move(value);
             account(cnt);
         }
         if(istr.fail())
@@ -1094,7 +1304,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
         std::string value;
         if(parseString(istr, value))
         {
-            data = value;
+            data = std::move(value);
         }
         else
         {
@@ -1147,7 +1357,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
         U32 size_nbo = 0;
         read(istr, (char*)&size_nbo, sizeof(U32));  /*Flawfinder: ignore*/
         S32 size = (S32)ntohl(size_nbo);
-        if(mCheckLimits && (size > mMaxBytesLeft))
+        if(size < 0 || (mCheckLimits && (size > mMaxBytesLeft)))
         {
             parse_count = PARSE_FAILURE;
         }
@@ -1159,7 +1369,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
                 value.resize(size);
                 account(fullread(istr, (char*)&value[0], size));
             }
-            data = value;
+            data = std::move(value);
         }
         if(istr.fail())
         {
@@ -1188,6 +1398,10 @@ S32 LLSDBinaryParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) con
     U32 value_nbo = 0;
     read(istr, (char*)&value_nbo, sizeof(U32));      /*Flawfinder: ignore*/
     S32 size = (S32)ntohl(value_nbo);
+    if(size < 0)
+    {
+        return PARSE_FAILURE;
+    }
     S32 parse_count = 0;
     S32 count = 0;
     char c = get(istr);
@@ -1210,6 +1424,10 @@ S32 LLSDBinaryParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) con
             account(cnt);
             break;
         }
+        default:
+            // not a recognized key marker: don't silently insert an
+            // empty-named key and misparse the rest of the stream.
+            return PARSE_FAILURE;
         }
         LLSD child;
         S32 child_count = doParse(istr, child, max_depth);
@@ -1218,7 +1436,7 @@ S32 LLSDBinaryParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) con
             // There must be a value for every key, thus child_count
             // must be greater than 0.
             parse_count += child_count;
-            map.insert(name, child);
+            map.insert(std::move(name), std::move(child));
         }
         else
         {
@@ -1238,17 +1456,23 @@ S32 LLSDBinaryParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) con
 
 S32 LLSDBinaryParser::parseArray(std::istream& istr, LLSD& array, S32 max_depth) const
 {
-    array = LLSD::emptyArray();
     U32 value_nbo = 0;
     read(istr, (char*)&value_nbo, sizeof(U32));      /*Flawfinder: ignore*/
     S32 size = (S32)ntohl(value_nbo);
+    if(size < 0)
+    {
+        return PARSE_FAILURE;
+    }
 
-    // *FIX: This would be a good place to reserve some space in the
-    // array...
+    // Preallocate array to avoid incremental allocation, but cap how much
+    // memory an untrusted wire size field can commit up front; beyond the
+    // cap append() still grows the array geometrically.
+    constexpr S32 MAX_RESERVE = 4096;
+    array = LLSD::emptyReservedArray((size_t)llmin(size, MAX_RESERVE));
 
     S32 parse_count = 0;
     S32 count = 0;
-    char c = istr.peek();
+    char c = (char)stream_peek(istr);
     while((c != ']') && (count < size) && istr.good())
     {
         LLSD child;
@@ -1260,10 +1484,10 @@ S32 LLSDBinaryParser::parseArray(std::istream& istr, LLSD& array, S32 max_depth)
         if(child_count)
         {
             parse_count += child_count;
-            array.append(child);
+            array.append(std::move(child));
         }
         ++count;
-        c = istr.peek();
+        c = (char)stream_peek(istr);
     }
     c = get(istr);
     if((c != ']') || (count < size))
@@ -1279,18 +1503,15 @@ bool LLSDBinaryParser::parseString(
     std::istream& istr,
     std::string& value) const
 {
-    // *FIX: This is memory inefficient.
     U32 value_nbo = 0;
     read(istr, (char*)&value_nbo, sizeof(U32));      /*Flawfinder: ignore*/
     S32 size = (S32)ntohl(value_nbo);
     if(mCheckLimits && (size > mMaxBytesLeft)) return false;
     if(size < 0) return false;
-    std::vector<char> buf;
     if(size)
     {
-        buf.resize(size);
-        account(fullread(istr, &buf[0], size));
-        value.assign(buf.begin(), buf.end());
+        value.resize(size);
+        account(fullread(istr, value.data(), size));
     }
     return true;
 }
@@ -1333,8 +1554,84 @@ S32 LLSDFormatter::format(const LLSD& data, std::ostream& ostr, EFormatterOption
 
 void LLSDFormatter::formatReal(LLSD::Real real, std::ostream& ostr) const
 {
-    std::string buffer = llformat(mRealFormat.c_str(), real);
+    std::string buffer;
+    formatReal(real, buffer);
     ostr << buffer;
+}
+
+void LLSDFormatter::formatReal(LLSD::Real real, std::string& out) const
+{
+    // mRealFormat is a printf conversion supplied by the caller, so this is
+    // fmt's printf layer rather than its brace syntax.
+    out += fmt::sprintf(mRealFormat, real);
+}
+
+
+static const size_t SINK_BLOCK = 64 * 1024;
+
+LLSDFormatter::Sink::Sink(std::ostream& ostr)
+    : mOstr(ostr)
+{
+    mBuf.reserve(SINK_BLOCK + 1024);
+}
+
+LLSDFormatter::Sink::~Sink()
+{
+    flush();
+}
+
+void LLSDFormatter::Sink::checkFlush()
+{
+    if (mBuf.size() >= SINK_BLOCK)
+    {
+        flush();
+    }
+}
+
+void LLSDFormatter::Sink::flush()
+{
+    if (!mBuf.empty())
+    {
+        mOstr.write(mBuf.data(), (std::streamsize)mBuf.size());
+        mBuf.clear();
+    }
+}
+
+void LLSDFormatter::Sink::putInteger(LLSD::Integer value)
+{
+    // std::to_chars rather than the stream: num_put goes through the locale and
+    // costs more than an order of magnitude more per integer.
+    char buf[16];
+    const auto result = std::to_chars(buf, buf + sizeof(buf), value);
+    mBuf.append(buf, result.ptr - buf);
+    checkFlush();
+}
+
+void LLSDFormatter::Sink::putCount(size_t value)
+{
+    char buf[24];
+    const auto result = std::to_chars(buf, buf + sizeof(buf), value);
+    mBuf.append(buf, result.ptr - buf);
+    checkFlush();
+}
+
+void LLSDFormatter::Sink::putReal(LLSD::Real value)
+{
+    // shortest representation that round-trips to the same double; fmt rather
+    // than std::to_chars because Apple gates the floating-point overloads
+    // behind macOS 13.3
+    char buf[32];
+    const auto result = fmt::format_to_n(buf, sizeof(buf), "{}", value);
+    mBuf.append(buf, result.out - buf);
+    checkFlush();
+}
+
+void LLSDFormatter::Sink::putUUID(const LLSD::UUID& value)
+{
+    char buf[UUID_STR_LENGTH];
+    value.to_chars(buf);
+    mBuf.append(buf, UUID_STR_SIZE);
+    checkFlush();
 }
 
 /**
@@ -1353,12 +1650,20 @@ LLSDNotationFormatter::~LLSDNotationFormatter()
 // static
 std::string LLSDNotationFormatter::escapeString(const std::string& in)
 {
-    std::ostringstream ostr;
-    serialize_string(in, ostr);
-    return ostr.str();
+    std::string out;
+    serialize_string(out, in);
+    return out;
 }
 
+// virtual
 S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
+                                       EFormatterOptions options, U32 level) const
+{
+    Sink sink(ostr);
+    return format_impl(data, sink, options, level);
+}
+
+S32 LLSDNotationFormatter::format_impl(const LLSD& data, Sink& sink,
                                        EFormatterOptions options, U32 level) const
 {
     S32 format_count = 1;
@@ -1367,10 +1672,7 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 
     if (options & LLSDFormatter::OPTIONS_PRETTY)
     {
-        for (U32 i = 0; i < level; i++)
-        {
-            pre += "    ";
-        }
+        pre.assign(4 * (size_t)level, ' ');
         post = "\n";
     }
 
@@ -1378,8 +1680,8 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
     {
     case LLSD::TypeMap:
     {
-        if (0 != level) ostr << post << pre;
-        ostr << "{";
+        if (0 != level) { sink.put(post); sink.put(pre); }
+        sink.put('{');
         std::string inner_pre;
         if (options & LLSDFormatter::OPTIONS_PRETTY)
         {
@@ -1391,133 +1693,136 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
         LLSD::map_const_iterator end = data.endMap();
         for(; iter != end; ++iter)
         {
-            if(need_comma) ostr << ",";
+            if(need_comma) sink.put(',');
             need_comma = true;
-            ostr << post << inner_pre << '\'';
-            serialize_string((*iter).first, ostr);
-            ostr << "':";
-            format_count += format_impl((*iter).second, ostr, options, level + 2);
+            sink.put(post); sink.put(inner_pre); sink.put('\'');
+            serialize_string(sink.buffer(), (*iter).first);
+            sink.checkFlush();
+            sink.put("':");
+            format_count += format_impl((*iter).second, sink, options, level + 2);
         }
-        ostr << post << pre << "}";
+        sink.put(post); sink.put(pre); sink.put('}');
         break;
     }
 
     case LLSD::TypeArray:
     {
-        ostr << post << pre << "[";
+        sink.put(post); sink.put(pre); sink.put('[');
         bool need_comma = false;
         LLSD::array_const_iterator iter = data.beginArray();
         LLSD::array_const_iterator end = data.endArray();
         for(; iter != end; ++iter)
         {
-            if(need_comma) ostr << ",";
+            if(need_comma) sink.put(',');
             need_comma = true;
-            format_count += format_impl(*iter, ostr, options, level + 1);
+            format_count += format_impl(*iter, sink, options, level + 1);
         }
-        ostr << "]";
+        sink.put(']');
         break;
     }
 
     case LLSD::TypeUndefined:
-        ostr << "!";
+        sink.put('!');
         break;
 
     case LLSD::TypeBoolean:
         if(mBoolAlpha ||
-#if( LL_WINDOWS || __GNUC__ > 2)
-           (ostr.flags() & std::ios::boolalpha)
-#else
-           (ostr.flags() & 0x0100)
-#endif
+           (sink.streamFlags() & std::ios::boolalpha)
             )
         {
-            ostr << (data.asBoolean()
-                     ? NOTATION_TRUE_SERIAL : NOTATION_FALSE_SERIAL);
+            sink.put(data.asBoolean() ? NOTATION_TRUE_SERIAL : NOTATION_FALSE_SERIAL);
         }
         else
         {
-            ostr << (data.asBoolean() ? 1 : 0);
+            sink.put(data.asBoolean() ? '1' : '0');
         }
         break;
 
     case LLSD::TypeInteger:
-        ostr << "i" << data.asInteger();
+        sink.put('i');
+        sink.putInteger(data.asInteger());
         break;
 
     case LLSD::TypeReal:
-        ostr << "r";
+    {
+        sink.put('r');
         if(mRealFormat.empty())
         {
-            ostr << data.asReal();
+            sink.putReal(data.asReal());
         }
         else
         {
-            formatReal(data.asReal(), ostr);
+            formatReal(data.asReal(), sink.buffer());
+            sink.checkFlush();
         }
         break;
+    }
 
     case LLSD::TypeUUID:
-        ostr << "u" << data.asUUID();
+        sink.put('u');
+        sink.putUUID(data.asUUID());
         break;
 
     case LLSD::TypeString:
-        ostr << '\'';
-        serialize_string(data.asStringRef(), ostr);
-        ostr << '\'';
+        sink.put('\'');
+        serialize_string(sink.buffer(), data.asStringRef());
+        sink.checkFlush();
+        sink.put('\'');
         break;
 
     case LLSD::TypeDate:
-        ostr << "d\"" << data.asDate() << "\"";
+        sink.put("d\"");
+        sink.put(data.asDate().asString());
+        sink.put('"');
         break;
 
     case LLSD::TypeURI:
-        ostr << "l\"";
-        serialize_string(data.asString(), ostr);
-        ostr << "\"";
+        sink.put("l\"");
+        serialize_string(sink.buffer(), data.asString());
+        sink.checkFlush();
+        sink.put('"');
         break;
 
     case LLSD::TypeBinary:
     {
-        // *FIX: memory inefficient.
         const std::vector<U8>& buffer = data.asBinary();
         if (options & LLSDFormatter::OPTIONS_PRETTY_BINARY)
         {
-            ostr << "b16\"";
+            sink.put("b16\"");
             if (! buffer.empty())
             {
-                std::ios_base::fmtflags old_flags = ostr.flags();
-                ostr.setf( std::ios::hex, std::ios::basefield );
                 // It shouldn't strictly matter whether the emitted hex digits
                 // are uppercase; LLSDNotationParser handles either; but as of
                 // 2020-05-13, Python's llbase.llsd requires uppercase hex.
-                ostr << std::uppercase;
-                auto oldfill(ostr.fill('0'));
-                auto oldwidth(ostr.width());
+                static const char hex_digits[] = "0123456789ABCDEF";
+                std::string& out = sink.buffer();
+                const size_t at = out.size();
+                out.resize(at + buffer.size() * 2);
                 for (size_t i = 0; i < buffer.size(); i++)
                 {
-                    // have to restate setw() before every conversion
-                    ostr << std::setw(2) << (int) buffer[i];
+                    out[at + 2 * i] = hex_digits[buffer[i] >> 4];
+                    out[at + 2 * i + 1] = hex_digits[buffer[i] & 0x0F];
                 }
-                ostr.width(oldwidth);
-                ostr.fill(oldfill);
-                ostr.flags(old_flags);
+                sink.checkFlush();
             }
         }
         else                        // ! OPTIONS_PRETTY_BINARY
         {
-            ostr << "b(" << buffer.size() << ")\"";
+            sink.put("b(");
+            sink.putCount(buffer.size());
+            sink.put(")\"");
             if (! buffer.empty())
             {
-                ostr.write((const char*)&buffer[0], buffer.size());
+                sink.put((const char*)&buffer[0], buffer.size());
             }
         }
-        ostr << "\"";
+        sink.put('"');
         break;
     }
 
     default:
         // *NOTE: This should never happen.
-        ostr << "!";
+        sink.put('!');
         break;
     }
     return format_count;
@@ -1537,7 +1842,15 @@ LLSDBinaryFormatter::~LLSDBinaryFormatter()
 { }
 
 // virtual
+// virtual
 S32 LLSDBinaryFormatter::format_impl(const LLSD& data, std::ostream& ostr,
+                                     EFormatterOptions options, U32 level) const
+{
+    Sink sink(ostr);
+    return format_impl(data, sink, options, level);
+}
+
+S32 LLSDBinaryFormatter::format_impl(const LLSD& data, Sink& sink,
                                      EFormatterOptions options, U32 level) const
 {
     S32 format_count = 1;
@@ -1545,100 +1858,100 @@ S32 LLSDBinaryFormatter::format_impl(const LLSD& data, std::ostream& ostr,
     {
     case LLSD::TypeMap:
     {
-        ostr.put('{');
+        sink.put('{');
         U32 size_nbo = htonl(static_cast<u_long>(data.size()));
-        ostr.write((const char*)(&size_nbo), sizeof(U32));
+        sink.put((const char*)(&size_nbo), sizeof(U32));
         LLSD::map_const_iterator iter = data.beginMap();
         LLSD::map_const_iterator end = data.endMap();
         for(; iter != end; ++iter)
         {
-            ostr.put('k');
-            formatString((*iter).first, ostr);
-            format_count += format_impl((*iter).second, ostr, options, level+1);
+            sink.put('k');
+            formatString((*iter).first, sink);
+            format_count += format_impl((*iter).second, sink, options, level+1);
         }
-        ostr.put('}');
+        sink.put('}');
         break;
     }
 
     case LLSD::TypeArray:
     {
-        ostr.put('[');
+        sink.put('[');
         U32 size_nbo = htonl(static_cast<u_long>(data.size()));
-        ostr.write((const char*)(&size_nbo), sizeof(U32));
+        sink.put((const char*)(&size_nbo), sizeof(U32));
         LLSD::array_const_iterator iter = data.beginArray();
         LLSD::array_const_iterator end = data.endArray();
         for(; iter != end; ++iter)
         {
-            format_count += format_impl(*iter, ostr, options, level+1);
+            format_count += format_impl(*iter, sink, options, level+1);
         }
-        ostr.put(']');
+        sink.put(']');
         break;
     }
 
     case LLSD::TypeUndefined:
-        ostr.put('!');
+        sink.put('!');
         break;
 
     case LLSD::TypeBoolean:
-        if(data.asBoolean()) ostr.put(BINARY_TRUE_SERIAL);
-        else ostr.put(BINARY_FALSE_SERIAL);
+        if(data.asBoolean()) sink.put(BINARY_TRUE_SERIAL);
+        else sink.put(BINARY_FALSE_SERIAL);
         break;
 
     case LLSD::TypeInteger:
     {
-        ostr.put('i');
+        sink.put('i');
         U32 value_nbo = htonl(data.asInteger());
-        ostr.write((const char*)(&value_nbo), sizeof(U32));
+        sink.put((const char*)(&value_nbo), sizeof(U32));
         break;
     }
 
     case LLSD::TypeReal:
     {
-        ostr.put('r');
+        sink.put('r');
         F64 value_nbo = ll_htond(data.asReal());
-        ostr.write((const char*)(&value_nbo), sizeof(F64));
+        sink.put((const char*)(&value_nbo), sizeof(F64));
         break;
     }
 
     case LLSD::TypeUUID:
     {
-        ostr.put('u');
+        sink.put('u');
         LLUUID temp = data.asUUID();
-        ostr.write((const char*)(&(temp.mData)), UUID_BYTES);
+        sink.put((const char*)(&(temp.mData)), UUID_BYTES);
         break;
     }
 
     case LLSD::TypeString:
-        ostr.put('s');
-        formatString(data.asStringRef(), ostr);
+        sink.put('s');
+        formatString(data.asStringRef(), sink);
         break;
 
     case LLSD::TypeDate:
     {
-        ostr.put('d');
+        sink.put('d');
         F64 value = data.asReal();
-        ostr.write((const char*)(&value), sizeof(F64));
+        sink.put((const char*)(&value), sizeof(F64));
         break;
     }
 
     case LLSD::TypeURI:
-        ostr.put('l');
-        formatString(data.asString(), ostr);
+        sink.put('l');
+        formatString(data.asString(), sink);
         break;
 
     case LLSD::TypeBinary:
     {
-        ostr.put('b');
+        sink.put('b');
         const std::vector<U8>& buffer = data.asBinary();
         U32 size_nbo = htonl(static_cast<u_long>(buffer.size()));
-        ostr.write((const char*)(&size_nbo), sizeof(U32));
-        if(buffer.size()) ostr.write((const char*)&buffer[0], buffer.size());
+        sink.put((const char*)(&size_nbo), sizeof(U32));
+        if(buffer.size()) sink.put((const char*)&buffer[0], buffer.size());
         break;
     }
 
     default:
         // *NOTE: This should never happen.
-        ostr.put('!');
+        sink.put('!');
         break;
     }
     return format_count;
@@ -1653,12 +1966,21 @@ void LLSDBinaryFormatter::formatString(
     ostr.write(string.c_str(), string.size());
 }
 
+void LLSDBinaryFormatter::formatString(
+    const std::string& string,
+    Sink& sink) const
+{
+    U32 size_nbo = htonl(static_cast<u_long>(string.size()));
+    sink.put((const char*)(&size_nbo), sizeof(U32));
+    sink.put(string.data(), string.size());
+}
+
 /**
  * local functions
  */
 llssize deserialize_string(std::istream& istr, std::string& value, llssize max_bytes)
 {
-    int c = istr.get();
+    int c = stream_bump(istr);
     if(istr.fail())
     {
         // No data in stream, bail out but mention the character we
@@ -1691,22 +2013,33 @@ llssize deserialize_string_delim(
     std::string& value,
     char delim)
 {
-    std::ostringstream write_buffer;
+    // This is the hot inner loop for every notation string and map key:
+    // read straight from the streambuf into a std::string rather than
+    // paying istream::get() and ostringstream overhead per character.
+    if(!istr.good())
+    {
+        value.clear();
+        return LLSDParser::PARSE_FAILURE;
+    }
+
+    std::string write_buffer;
     bool found_escape = false;
     bool found_hex = false;
     bool found_digit = false;
     U8 byte = 0;
     llssize count = 0;
+    std::streambuf* sb = istr.rdbuf();
 
     while (true)
     {
-        int next_byte = istr.get();
+        int next_byte = sb->sbumpc();
         ++count;
 
-        if(istr.fail())
+        if(next_byte == std::istream::traits_type::eof())
         {
             // If our stream is empty, break out
-            value = write_buffer.str();
+            istr.setstate(std::ios::failbit | std::ios::eofbit);
+            value = std::move(write_buffer);
             return LLSDParser::PARSE_FAILURE;
         }
 
@@ -1724,7 +2057,7 @@ llssize deserialize_string_delim(
                     found_escape = false;
                     byte = byte << 4;
                     byte |= hex_as_nybble(next_char);
-                    write_buffer << byte;
+                    write_buffer += (char)byte;
                     byte = 0;
                 }
                 else
@@ -1744,28 +2077,28 @@ llssize deserialize_string_delim(
                 switch(next_char)
                 {
                 case 'a':
-                    write_buffer << '\a';
+                    write_buffer += '\a';
                     break;
                 case 'b':
-                    write_buffer << '\b';
+                    write_buffer += '\b';
                     break;
                 case 'f':
-                    write_buffer << '\f';
+                    write_buffer += '\f';
                     break;
                 case 'n':
-                    write_buffer << '\n';
+                    write_buffer += '\n';
                     break;
                 case 'r':
-                    write_buffer << '\r';
+                    write_buffer += '\r';
                     break;
                 case 't':
-                    write_buffer << '\t';
+                    write_buffer += '\t';
                     break;
                 case 'v':
-                    write_buffer << '\v';
+                    write_buffer += '\v';
                     break;
                 default:
-                    write_buffer << next_char;
+                    write_buffer += next_char;
                     break;
                 }
                 found_escape = false;
@@ -1781,11 +2114,11 @@ llssize deserialize_string_delim(
         }
         else
         {
-            write_buffer << next_char;
+            write_buffer += next_char;
         }
     }
 
-    value = write_buffer.str();
+    value = std::move(write_buffer);
     return count;
 }
 
@@ -1799,24 +2132,23 @@ llssize deserialize_string_raw(
     char buf[BUF_LEN];      /* Flawfinder: ignore */
     istr.get(buf, BUF_LEN - 1, ')');
     count += istr.gcount();
-    int c = istr.get();
-    c = istr.get();
+    int c = stream_bump(istr);
+    c = stream_bump(istr);
     count += 2;
     if(((c == '"') || (c == '\'')) && (buf[0] == '('))
     {
         // We probably have a valid raw string. determine
         // the size, and read it.
-        // *FIX: This is memory inefficient.
-        auto len = strtol(buf + 1, NULL, 0);
+        auto len = strtol(buf + 1, nullptr, 0);
+        // A negative length would sign-extend to a huge resize() request.
+        if(len < 0) return LLSDParser::PARSE_FAILURE;
         if((max_bytes>0)&&(len>max_bytes)) return LLSDParser::PARSE_FAILURE;
-        std::vector<char> buf;
         if(len)
         {
-            buf.resize(len);
-            count += fullread(istr, (char *)&buf[0], len);
-            value.assign(buf.begin(), buf.end());
+            value.resize(len);
+            count += fullread(istr, value.data(), len);
         }
-        c = istr.get();
+        c = stream_bump(istr);
         ++count;
         if(!((c == '"') || (c == '\'')))
         {
@@ -2090,15 +2422,30 @@ static const char* NOTATION_STRING_CHARACTERS[256] =
     "\\xff"     // 255
 };
 
-void serialize_string(const std::string& value, std::ostream& str)
+void serialize_string(std::string& out, const std::string& value)
 {
-    std::string::const_iterator it = value.begin();
-    std::string::const_iterator end = value.end();
-    U8 c;
-    for(; it != end; ++it)
+    // Append unescaped runs in bulk; only bytes outside 32..126 plus the
+    // quote and backslash need the escape table.
+    out.reserve(out.size() + value.size());
+    const char* start = value.data();
+    const char* end = start + value.size();
+    const char* run = start;
+    for(const char* p = start; p < end; ++p)
     {
-        c = (U8)(*it);
-        str << NOTATION_STRING_CHARACTERS[c];
+        U8 c = (U8)(*p);
+        if(c < 32 || c >= 127 || c == '\'' || c == '\\')
+        {
+            if(p > run)
+            {
+                out.append(run, p - run);
+            }
+            out.append(NOTATION_STRING_CHARACTERS[c]);
+            run = p + 1;
+        }
+    }
+    if(end > run)
+    {
+        out.append(run, end - run);
     }
 }
 
@@ -2121,14 +2468,14 @@ llssize deserialize_boolean(
     //
     llssize bytes_read = 0;
     std::string::size_type ii = 0;
-    char c = istr.peek();
+    char c = (char)stream_peek(istr);
     while((++ii < compare.size())
           && (tolower(c) == (int)compare[ii])
           && istr.good())
     {
-        istr.ignore();
+        stream_bump(istr);
         ++bytes_read;
-        c = istr.peek();
+        c = (char)stream_peek(istr);
     }
     if(compare.size() != ii)
     {
@@ -2170,7 +2517,7 @@ std::string zip_llsd(LLSD& data)
         return std::string();
     }
 
-    std::string source = llsd_strm.str();
+    std::string source = std::move(llsd_strm).str();
 
     U8 out[CHUNK];
 
@@ -2263,6 +2610,10 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
     if (!out)
     {
         out = std::unique_ptr<U8[]>(new(std::nothrow) U8[CHUNK]);
+        if (!out)
+        {
+            return ZR_MEM_ERROR;
+        }
     }
 
     strm.zalloc = Z_NULL;
@@ -2272,6 +2623,12 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
     strm.next_in = const_cast<U8*>(in);
 
     S32 ret = inflateInit(&strm);
+    if (ret != Z_OK)
+    {
+        return ret == Z_MEM_ERROR ? ZR_MEM_ERROR
+            : ret == Z_VERSION_ERROR ? ZR_VERSION_ERROR
+            : ZR_BUFFER_ERROR;
+    }
 
     do
     {
@@ -2319,7 +2676,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
         memcpy(result+cur_size, out.get(), have);
         cur_size += have;
 
-    } while (ret == Z_OK && ret != Z_STREAM_END);
+    } while (ret == Z_OK);
 
     inflateEnd(&strm);
 
@@ -2380,31 +2737,31 @@ U8* unzip_llsdNavMesh( bool& valid, size_t& outsize, std::istream& is, S32 size 
 
 
     S32 ret = inflateInit2(&strm,  windowBits | ENABLE_ZLIB_GZIP );
+    if (ret != Z_OK)
+    {
+        delete [] in;
+        valid = false;
+        return NULL;
+    }
     do
     {
         strm.avail_out = CHUNK;
         strm.next_out = out;
         ret = inflate(&strm, Z_NO_FLUSH);
-        if (ret == Z_STREAM_ERROR)
-        {
-            inflateEnd(&strm);
-            free(result);
-            delete [] in;
-            valid = false;
-        }
-
         switch (ret)
         {
+        case Z_STREAM_ERROR:
         case Z_NEED_DICT:
-            ret = Z_DATA_ERROR;
-            [[fallthrough]];
         case Z_DATA_ERROR:
         case Z_MEM_ERROR:
+            // must return immediately: falling through here used to
+            // realloc() the just-freed 'result' and then free it and
+            // 'in' a second time after the loop.
             inflateEnd(&strm);
             free(result);
             delete [] in;
             valid = false;
-            break;
+            return NULL;
         }
 
         U32 have = CHUNK-strm.avail_out;
@@ -2453,16 +2810,23 @@ U8* unzip_llsdNavMesh( bool& valid, size_t& outsize, std::istream& is, S32 size 
 char* strip_deprecated_header(char* in, llssize& cur_size, llssize* header_size)
 {
     const char* deprecated_header = "<? LLSD/Binary ?>";
-    constexpr size_t deprecated_header_size = 17;
+    constexpr llssize deprecated_header_size = 17;
 
     if (cur_size > deprecated_header_size
-        && memcmp(in, deprecated_header, deprecated_header_size) == 0)
+        && memcmp(in, deprecated_header, (size_t)deprecated_header_size) == 0)
     {
-        in = in + deprecated_header_size;
-        cur_size = cur_size - deprecated_header_size;
+        llssize skipped = deprecated_header_size;
+        // serialize() writes a '\n' after the header; the binary parser
+        // does not tolerate leading whitespace, so consume it here too.
+        if (cur_size > skipped && in[skipped] == '\n')
+        {
+            ++skipped;
+        }
+        in += skipped;
+        cur_size -= skipped;
         if (header_size)
         {
-            *header_size = deprecated_header_size + 1;
+            *header_size = skipped;
         }
     }
 

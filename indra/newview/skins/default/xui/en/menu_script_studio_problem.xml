@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- The right-click menu of Script Studio's problems: what would put the
+     problem right, each by what it does, and the same for every problem of
+     its kind; the message, with or without where it is, and every problem
+     listed; the run-time errors let go of; and the lint the problem is,
+     which a scripter may turn off or make an error, as the Lints tab of the
+     preferences does. -->
+<context_menu
+ name="Script studio problem menu">
+  <!-- Each fix the problem offers goes in above these, by what it does,
+       however many it offers. -->
+  <menu_item_call label="Fix All of This Kind" layout="topleft" name="fix_kind">
+    <menu_item_call.on_click function="Problem.Action" parameter="fix_kind" />
+    <menu_item_call.on_visible function="Problem.FixVisible" parameter="kind" />
+  </menu_item_call>
+  <menu_item_call label="Fix All Problems" layout="topleft" name="fix_all">
+    <menu_item_call.on_click function="Problem.Action" parameter="fix_all" />
+    <menu_item_call.on_visible function="Problem.FixVisible" parameter="all" />
+  </menu_item_call>
+  <menu_item_call label="Fix What Is Left From LSL" layout="topleft" name="fix_migration">
+    <menu_item_call.on_click function="Problem.Action" parameter="fix_migration" />
+    <menu_item_call.on_visible function="Problem.FixVisible" parameter="migration" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" name="fix_separator" />
+  <menu_item_call label="Copy Message" layout="topleft" name="copy">
+    <menu_item_call.on_click function="Problem.Action" parameter="copy" />
+    <menu_item_call.on_enable function="Problem.Enable" parameter="copy" />
+  </menu_item_call>
+  <menu_item_call label="Copy With Location" layout="topleft" name="copy_where">
+    <menu_item_call.on_click function="Problem.Action" parameter="copy_where" />
+    <menu_item_call.on_enable function="Problem.Enable" parameter="copy_where" />
+  </menu_item_call>
+  <menu_item_call label="Copy All Listed" layout="topleft" name="copy_all">
+    <menu_item_call.on_click function="Problem.Action" parameter="copy_all" />
+    <menu_item_call.on_enable function="Problem.Enable" parameter="copy_all" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Clear Run-time Errors" layout="topleft" name="clear_runtime">
+    <menu_item_call.on_click function="Problem.Action" parameter="clear_runtime" />
+    <menu_item_call.on_enable function="Problem.Enable" parameter="clear_runtime" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Turn Off This Warning" layout="topleft" name="off">
+    <menu_item_call.on_click function="Problem.Action" parameter="off" />
+    <menu_item_call.on_enable function="Problem.Enable" parameter="off" />
+  </menu_item_call>
+  <menu_item_check label="Count as Error" layout="topleft" name="error">
+    <menu_item_check.on_click function="Problem.Action" parameter="error" />
+    <menu_item_check.on_enable function="Problem.Enable" parameter="error" />
+    <menu_item_check.on_check function="Problem.Check" parameter="error" />
+  </menu_item_check>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Lint Settings..." layout="topleft" name="settings">
+    <menu_item_call.on_click function="Problem.Action" parameter="settings" />
+    <menu_item_call.on_enable function="Problem.Enable" parameter="settings" />
+  </menu_item_call>
+</context_menu>

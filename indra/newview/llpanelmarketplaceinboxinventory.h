@@ -36,9 +36,11 @@
 
 
 
-class LLInboxInventoryPanel : public LLInventoryPanel
+class LLInboxInventoryPanel final : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLInboxInventoryPanel, LLInventoryPanel);
+
     struct Params : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {};
 
@@ -47,16 +49,18 @@ public:
 
     // virtual
     void initFromParams(const LLInventoryPanel::Params&);
-    LLFolderViewFolder* createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop);
-    LLFolderViewItem * createFolderViewItem(LLInvFVBridge * bridge);
+    LLFolderViewFolder* createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop) override;
+    LLFolderViewItem * createFolderViewItem(LLInvFVBridge * bridge) override;
 
     void onRemoveItemFreshness(const LLUUID& item_id);
 };
 
 
-class LLInboxFolderViewFolder : public LLFolderViewFolder, public LLBadgeOwner
+class LLInboxFolderViewFolder final : public LLFolderViewFolder, public LLBadgeOwner
 {
 public:
+    AL_VIEW_TYPE(LLInboxFolderViewFolder, LLFolderViewFolder);
+
     struct Params : public LLInitParam::Block<Params, LLFolderViewFolder::Params>
     {
         Optional<LLBadge::Params>   new_badge;
@@ -68,12 +72,12 @@ public:
 
     LLInboxFolderViewFolder(const Params& p);
 
-    void addItem(LLFolderViewItem* item);
-    void draw();
+    void addItem(LLFolderViewItem* item) override;
+    void draw() override;
 
-    bool handleMouseDown(S32 x, S32 y, MASK mask);
-    bool handleDoubleClick(S32 x, S32 y, MASK mask);
-    void selectItem();
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    void selectItem() override;
 
     void computeFreshness();
     void deFreshify();
@@ -86,9 +90,11 @@ protected:
 };
 
 
-class LLInboxFolderViewItem : public LLFolderViewItem, public LLBadgeOwner
+class LLInboxFolderViewItem final : public LLFolderViewItem, public LLBadgeOwner
 {
 public:
+    AL_VIEW_TYPE(LLInboxFolderViewItem, LLFolderViewItem);
+
     struct Params : public LLInitParam::Block<Params, LLFolderViewItem::Params>
     {
         Optional<LLBadge::Params>   new_badge;
@@ -100,12 +106,12 @@ public:
 
     LLInboxFolderViewItem(const Params& p);
 
-    void addToFolder(LLFolderViewFolder* folder);
-    bool handleDoubleClick(S32 x, S32 y, MASK mask);
+    void addToFolder(LLFolderViewFolder* folder) override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
-    void draw();
+    void draw() override;
 
-    void selectItem();
+    void selectItem() override;
 
     void computeFreshness();
     void deFreshify();

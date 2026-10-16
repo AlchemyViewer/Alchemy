@@ -32,14 +32,16 @@
 class LLSliderCtrl;
 class LLTextBox;
 
-class LLFloaterPreferenceGraphicsAdvanced : public LLFloater
+class LLFloaterPreferenceGraphicsAdvanced final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPreferenceGraphicsAdvanced, LLFloater);
+
     LLFloaterPreferenceGraphicsAdvanced(const LLSD& key);
     ~LLFloaterPreferenceGraphicsAdvanced();
-    /*virtual*/ bool postBuild();
-    void onOpen(const LLSD& key);
-    void onClickCloseBtn(bool app_quitting);
+    /*virtual*/ bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void onClickCloseBtn(bool app_quitting) override;
     void disableUnavailableSettings();
     void refreshEnabledGraphics();
     void refreshEnabledState();
@@ -51,10 +53,9 @@ public:
     void updateComplexityMode(const LLSD& newvalue);
     void updateComplexityText();
     void updateObjectMeshDetailText();
-    void refresh();
+    void refresh() override;
     // callback for when client modifies a render option
     void onRenderOptionEnable();
-    void onAdvancedAtmosphericsEnable();
     LOG_CLASS(LLFloaterPreferenceGraphicsAdvanced);
 
 protected:

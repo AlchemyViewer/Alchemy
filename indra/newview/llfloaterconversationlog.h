@@ -31,9 +31,10 @@
 class LLConversationLogList;
 class LLMenuButton;
 
-class LLFloaterConversationLog : public LLFloater
+class LLFloaterConversationLog final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterConversationLog, LLFloater);
 
     LLFloaterConversationLog(const LLSD& key);
     virtual ~LLFloaterConversationLog(){};

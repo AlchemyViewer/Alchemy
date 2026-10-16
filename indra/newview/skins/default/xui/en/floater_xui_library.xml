@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ can_resize="true"
+ height="560"
+ layout="topleft"
+ legacy_header_height="18"
+ min_height="360"
+ min_width="620"
+ name="xui_library"
+ help_topic="xui_library"
+ save_rect="true"
+ single_instance="true"
+ title="XUI Library"
+ width="860">
+    <floater.string name="GroupChrome">Chrome</floater.string>
+    <floater.string name="GroupContainers">Containers</floater.string>
+    <floater.string name="GroupControls">Controls</floater.string>
+    <floater.string name="GroupLists">Lists</floater.string>
+    <floater.string name="GroupText">Text</floater.string>
+    <floater.string name="LibraryUnknownTag">[TAG] is not a tag the schema knows.</floater.string>
+    <floater.string name="LibraryTakesText">What is between its tags is read as its value.</floater.string>
+    <floater.string name="LibraryAttributes">Attributes ([VALUE])</floater.string>
+    <floater.string name="LibraryRequired">required</floater.string>
+    <floater.string name="LibraryIgnored">read and thrown away</floater.string>
+    <floater.string name="LibraryDeprecated">deprecated</floater.string>
+    <floater.string name="LibraryDeprecatedFor">deprecated, write [VALUE]</floater.string>
+    <floater.string name="LibraryAlias">also written [VALUE]</floater.string>
+    <floater.string name="LibraryOneOf">one of:</floater.string>
+    <floater.string name="LibraryElements">Parameter elements ([VALUE])</floater.string>
+    <floater.string name="LibraryAnyNumber">any number</floater.string>
+    <floater.string name="LibraryMayContain">May contain ([VALUE])</floater.string>
+    <floater.string name="LibraryNothing">nothing</floater.string>
+    <floater.string name="LibraryMayGoInside">May go inside ([VALUE])</floater.string>
+    <floater.string name="LibraryRoot">nothing, so it is a root</floater.string>
+    <floater.string name="LibraryUsedInOne">Used in [VALUE] file</floater.string>
+    <floater.string name="LibraryUsedIn">Used in [VALUE] files</floater.string>
+    <floater.string name="LibraryToWrite">To write one</floater.string>
+
+    <layout_stack
+     animate="false"
+     follows="all"
+     height="516"
+     layout="topleft"
+     left="8"
+     name="library_stack"
+     orientation="horizontal"
+     top="24"
+     width="844">
+
+        <layout_panel
+         auto_resize="false"
+         expanded_min_dim="180"
+         height="516"
+         layout="topleft"
+         min_dim="0"
+         name="library_list"
+         user_resize="true"
+         width="240">
+            <layout_stack
+             animate="false"
+             follows="all"
+             height="516"
+             layout="topleft"
+             left="0"
+             name="library_list_stack"
+             orientation="vertical"
+             top="0"
+             width="240">
+                <layout_panel
+                 auto_resize="true"
+                 height="490"
+                 layout="topleft"
+                 min_dim="80"
+                 name="library_tags_area"
+                 width="240">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="false"
+                     follows="all"
+                     height="490"
+                     layout="topleft"
+                     left="0"
+                     name="library_tags"
+                     tool_tip="Every tag a file may write, grouped by what it is"
+                     top="0"
+                     width="240">
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Tag"
+                         name="tag" />
+                    </scroll_list>
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 height="26"
+                 layout="topleft"
+                 min_dim="26"
+                 name="library_filter_row"
+                 width="240">
+                    <filter_editor
+                     follows="left|top|right"
+                     height="22"
+                     label="Filter tags"
+                     layout="topleft"
+                     left="0"
+                     name="library_filter"
+                     tool_tip="Narrow the list to the tags whose name carries this"
+                     top="2"
+                     width="240" />
+                </layout_panel>
+            </layout_stack>
+        </layout_panel>
+
+        <layout_panel
+         auto_resize="true"
+         height="516"
+         layout="topleft"
+         min_dim="300"
+         name="library_doc"
+         user_resize="true"
+         width="604">
+            <layout_stack
+             animate="false"
+             follows="all"
+             height="516"
+             layout="topleft"
+             left="0"
+             name="library_doc_stack"
+             orientation="vertical"
+             top="0"
+             width="604">
+                <layout_panel
+                 auto_resize="false"
+                 height="48"
+                 layout="topleft"
+                 min_dim="48"
+                 name="library_specimen"
+                 tool_tip="One of the chosen tag, built from nothing but a name and a size, so the word has the widget beside it; a tag that needs more than that to build leaves this empty"
+                 width="604" />
+                <layout_panel
+                 auto_resize="true"
+                 height="468"
+                 layout="topleft"
+                 min_dim="100"
+                 name="library_about_area"
+                 width="604">
+                    <text_editor
+                     follows="all"
+                     height="468"
+                     layout="topleft"
+                     left="0"
+                     max_length="65536"
+                     name="library_about"
+                     tool_tip="What the schema knows about the chosen tag: what it builds, what it takes, what may go in it, what it may go in, and how many files use it"
+                     read_only="true"
+                     top="0"
+                     width="604"
+                     word_wrap="true" />
+                </layout_panel>
+            </layout_stack>
+        </layout_panel>
+    </layout_stack>
+</floater>

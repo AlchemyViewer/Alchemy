@@ -1,74 +1,55 @@
 # -*- cmake -*-
 
-# some webrtc headers require C++ 20
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# The one wrapper of the vendor library. libwebrtc ships no Debug build on
+# Windows, so this target is not built for that configuration; ll::webrtc
+# tells the viewer so.
+add_library(llwebrtc STATIC)
 
-include(00-Common)
-include(Linking)
-include(WebRTC)
-
-project(llwebrtc)
-
-set(llwebrtc_SOURCE_FILES
+target_sources(
+  llwebrtc
+  PRIVATE
+    alaudiodevicenotifier.cpp
+    alaudioechobuffer.cpp
     llwebrtc.cpp
-    )
-
-set(llwebrtc_HEADER_FILES
-    CMakeLists.txt
-    llwebrtc.h
+    alaudiodevicenotifier.h
+    alaudioechobuffer.h
     llwebrtc_impl.h
-    )
+  PUBLIC FILE_SET HEADERS FILES llwebrtc.h
+)
 
-list(APPEND llwebrtc_SOURCE_FILES ${llwebrtc_HEADER_FILES})
+target_link_libraries(llwebrtc PRIVATE al::flags)
 
-add_library (llwebrtc SHARED ${llwebrtc_SOURCE_FILES})
-
-set_target_properties(llwebrtc PROPERTIES PUBLIC_HEADER llwebrtc.h)
-
-if (WINDOWS)
-    cmake_policy(SET CMP0091 NEW)
-    set_target_properties(llwebrtc
-        PROPERTIES
-        LINK_FLAGS "/debug /LARGEADDRESSAWARE"
-        )
-    target_link_libraries(llwebrtc PRIVATE ll::webrtc
-                                       secur32
-                                       winmm
-                                       dmoguids
-                                       wmcodecdspuuid
-                                       msdmo
-                                       strmiids
-                                       iphlpapi
-                                       libcmt)
-    # as the webrtc libraries are release, build this binary as release as well.
-    target_compile_options(llwebrtc PRIVATE "/MT")
-    if (USE_BUGSPLAT)
-        set_target_properties(llwebrtc PROPERTIES PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}")
-    endif (USE_BUGSPLAT)
-elseif (DARWIN)
-    target_link_libraries(llwebrtc PRIVATE ll::webrtc)
-    if (USE_BUGSPLAT)
-        set_target_properties(llwebrtc PROPERTIES XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
-                                                  XCODE_ATTRIBUTE_DWARF_DSYM_FOLDER_PATH "${SYMBOLS_STAGING_DIR}/dSYMs")
-    endif (USE_BUGSPLAT)
-elseif (LINUX)
-    target_link_libraries(llwebrtc PRIVATE ll::webrtc)
-endif (WINDOWS)
-
-target_include_directories( llwebrtc INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-
-if (WINDOWS)
-    set_property(TARGET llwebrtc PROPERTY
-        MSVC_RUNTIME_LIBRARY "MultiThreadedDebug")
+# WebRTC is built with RTTI disabled (-fno-rtti / /GR-). Subclasses such as
+# LLWebRTCLogSink / LLCustomProcessor need matching flags or the linker looks
+# for typeinfo symbols that libwebrtc.a does not provide.
+if(WINDOWS)
+  target_compile_options(llwebrtc PRIVATE /GR-)
 else()
-    target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
-endif (WINDOWS)
+  target_compile_options(llwebrtc PRIVATE -fno-rtti)
+endif()
 
-ADD_CUSTOM_COMMAND(TARGET llwebrtc POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $<TARGET_FILE:llwebrtc>
-                               ${SHARED_LIB_STAGING_DIR})
-# Add tests
-if (LL_TESTS)
-endif (LL_TESTS)
+target_link_libraries(llwebrtc PRIVATE unofficial::webrtc::webrtc)
+
+if(WINDOWS)
+  set_target_properties(llwebrtc PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_DEBUG ON)
+  target_link_libraries(
+    llwebrtc
+    PRIVATE secur32 winmm dmoguids wmcodecdspuuid msdmo strmiids iphlpapi ole32
+  )
+elseif(DARWIN)
+  target_link_libraries(
+    llwebrtc
+    PRIVATE
+      ll::oslibraries
+      "-framework AVFoundation"
+      "-framework AudioToolbox"
+      "-framework CoreAudio"
+      "-framework CoreMedia"
+      "-framework CoreVideo"
+      "-framework Foundation"
+  )
+  target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
+else()
+  target_link_libraries(llwebrtc PRIVATE ${CMAKE_DL_LIBS})
+  target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
+endif()

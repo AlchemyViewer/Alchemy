@@ -1,56 +1,29 @@
 # -*- cmake -*-
 
-project(llkdu)
+if(AL_USE_KDU)
+  add_library(llkdu STATIC)
 
-# Visual Studio 2005 has a dumb bug that causes it to fail compilation
-# of KDU if building with both optimisation and /WS (treat warnings as
-# errors), even when the specific warnings that make it croak are
-# disabled.
+  target_sources(
+    llkdu
+    PRIVATE llimagej2ckdu.cpp llkdumem.cpp
+    PUBLIC FILE_SET HEADERS FILES llimagej2ckdu.h llkdumem.h
+  )
 
-#set(VS_DISABLE_FATAL_WARNINGS ON)
-
-include(00-Common)
-include(LLCommon)
-include(LLImage)
-include(LLKDU)
-
-set(llkdu_SOURCE_FILES
-    llimagej2ckdu.cpp
-    llkdumem.cpp
-    )
-
-set(llkdu_HEADER_FILES
-    CMakeLists.txt
-    llimagej2ckdu.h
-    llkdumem.h
-    )
-
-list(APPEND llkdu_SOURCE_FILES ${llkdu_HEADER_FILES})
-
-if (USE_KDU)
-  add_library (llkdu ${llkdu_SOURCE_FILES})
-
-  target_link_libraries(llkdu ll::kdu llimage llcommon)
-  target_include_directories( llkdu  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(llkdu PRIVATE al::flags PUBLIC ll::kdu llimage llcommon)
 
   # Add tests
-  if (LL_TESTS)
-    include(LLAddBuildTest)
-    include(Tut)
-    SET(llkdu_TEST_SOURCE_FILES
-      llimagej2ckdu.cpp
-      )
-    SET(llkdu_test_additional_HEADER_FILES
-      llimagej2ckdu.h
-      llkdumem.h
-      lltut.h
-      )
-
-    get_property( llimage_include_dir TARGET llimage PROPERTY INTERFACE_INCLUDE_DIRECTORIES )
-    set_property( SOURCE ${llkdu_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_LIBRARIES  ll::kdu llcommon)
-    set_property( SOURCE ${llkdu_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_INCLUDE_DIRS ${llimage_include_dir})
-
-    LL_ADD_PROJECT_UNIT_TESTS(llkdu "${llkdu_TEST_SOURCE_FILES}")
-  endif (LL_TESTS)
-
-endif (USE_KDU)
+  if(AL_BUILD_TESTS)
+    get_property(llimage_include_dir TARGET llimage PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+    # The codec, compiled into its test, over the test's stubs of llimage
+    # and of the KDU calls it makes. Built only with KDU, which has no port
+    # yet: this has not been compiled since it moved to Catch2.
+    al_add_test_binary(
+      llimagej2ckdu_test
+      PROJECT llkdu
+      SOURCES tests/llimagej2ckdu_test.cpp
+      UNIT llimagej2ckdu.cpp
+      LIBRARIES ll::kdu llmath llcommon
+      INCLUDES ${llimage_include_dir}
+    )
+  endif()
+endif()

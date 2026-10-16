@@ -31,7 +31,7 @@
 #include "llerror.h"
 #include "llpointer.h"
 #include "llrefcount.h"
-#include "boost/function.hpp"
+#include <functional>
 #include <string>
 
 class LLSD;
@@ -70,7 +70,6 @@ namespace LLError
         Setting a level means log messages at that level or above.
     */
 
-    LL_COMMON_API void setPrintLocation(bool);
     LL_COMMON_API void setDefaultLevel(LLError::ELevel);
     LL_COMMON_API ELevel getDefaultLevel();
     LL_COMMON_API void setAlwaysFlush(bool flush);
@@ -92,7 +91,7 @@ namespace LLError
         Control functions.
     */
 
-    typedef boost::function<void(const std::string&)> FatalFunction;
+    typedef std::function<void(const std::string&)> FatalFunction;
 
     LL_COMMON_API void setFatalFunction(const FatalFunction&);
         // The fatal function will be called after an message of LEVEL_ERROR
@@ -232,7 +231,7 @@ namespace LLError
         Utilities for use by the unit tests of LLError itself.
     */
 
-    typedef LLPointer<LLRefCount> SettingsStoragePtr;
+    typedef LLPointer<LLThreadSafeRefCount> SettingsStoragePtr;
     LL_COMMON_API SettingsStoragePtr saveAndResetSettings();
     LL_COMMON_API void restoreSettings(SettingsStoragePtr pSettingsStorage);
 

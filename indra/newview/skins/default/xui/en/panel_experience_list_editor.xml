@@ -56,7 +56,6 @@
     name="experience_list">
     <name_list.columns
       width="225"
-      user_resize="false"
       name="experience_name"
       label="Name"/>
   </name_list>

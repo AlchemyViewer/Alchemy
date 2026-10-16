@@ -25,6 +25,7 @@
  */
 
 #include "llterrainpaintmap.h"
+#include "llspatialpartition.h"
 
 #include "llviewerprecompiledheaders.h"
 
@@ -77,19 +78,19 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
     // Use a scratch render target because its dimensions may exceed the standard bake target, and this is a one-off bake
     LLRenderTarget scratch_target;
     const S32 dim = llmin(tex.getWidth(), tex.getHeight());
-    scratch_target.allocate(dim, dim, GL_RGB, false, LLTexUnit::eTextureType::TT_TEXTURE,
-                                   LLTexUnit::eTextureMipGeneration::TMG_NONE);
+    scratch_target.allocate(dim, dim, GL_RGB8, false, false, ALTextureSlot::eTextureType::TT_TEXTURE,
+                                   LLRenderTarget::MIPS_NONE);
     if (!scratch_target.isComplete())
     {
         llassert(false);
         LL_WARNS() << "Failed to allocate render target" << LL_ENDL;
         return false;
     }
-    gGL.getTexUnit(0)->disable();
+    gGL.getTextureSlot(0)->unbind();
     stop_glerror();
 
     scratch_target.bindTarget();
-    glClearColor(0, 0, 0, 0);
+    gGL.setClearColor(LLColor4::transparent);
     scratch_target.clear();
 
     // Render terrain heightmap to paint map via shader
@@ -107,16 +108,12 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
     const LLVector3 region_center = LLVector3(region_half_width, region_half_width, 0.0) + region.getOriginAgent();
     const LLVector3 camera_origin = LLVector3(0.0f, 0.0f, region_camera_height) + region_center;
     camera.lookAt(camera_origin, region_center, LLVector3::y_axis);
-    camera.setAspect(F32(scratch_target.getHeight()) / F32(scratch_target.getWidth()));
+    camera.setAspect(F32(scratch_target.getWidth()) / F32(scratch_target.getHeight()));
     const LLRect texture_rect(0, scratch_target.getHeight(), scratch_target.getWidth(), 0);
     glViewport(texture_rect.mLeft, texture_rect.mBottom, texture_rect.getWidth(), texture_rect.getHeight());
-    // Manually get modelview matrix from camera orientation.
-    glm::mat4 modelview(glm::make_mat4((GLfloat *) OGL_TO_CFR_ROTATION));
-    GLfloat ogl_matrix[16];
-    camera.getOpenGLTransform(ogl_matrix);
-    modelview *= glm::make_mat4(ogl_matrix);
+    const LLMatrix4a modelview = camera.frameModelview();
     gGL.matrixMode(LLRender::MM_MODELVIEW);
-    gGL.loadMatrix(glm::value_ptr(modelview));
+    gGL.loadMatrix(modelview);
     // Override the projection matrix from the camera
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
@@ -128,21 +125,12 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
     gGL.ortho(-region_half_width, region_half_width, -region_half_width, region_half_width, region_high_near, region_low_far);
     // No need to call camera.setPerspective because we don't need the clip planes. It would be inaccurate due to the perspective rendering anyway.
 
-    // Need to get the full resolution vertices in order to get an accurate
-    // paintmap. It's not sufficient to iterate over the surface patches, as
-    // they may be at lower LODs.
-    // The functionality here is a subset of
-    // LLVOSurfacePatch::getTerrainGeometry. Unlike said function, we don't
-    // care about stride length since we're always rendering at full
-    // resolution. We also don't care about normals/tangents because those
-    // don't contribute to the paintmap.
-    // *NOTE: The actual getTerrainGeometry fits the terrain vertices snugly
-    // under the 16-bit indices limit. For the sake of simplicity, that has not
-    // been replicated here.
+    // Need the full resolution vertices in order to get an accurate paintmap:
+    // the drawn terrain is tessellated on the GPU from the region's height
+    // map, so this builds its own grid mesh at one vertex per grid point. We
+    // don't care about normals because those don't contribute to the paintmap.
     std::vector<LLPointer<LLDrawInfo>> infos;
-    // Vertex and index counts adapted from LLVOSurfacePatch::getGeomSizesMain,
-    // with additional vertices added as we are including the north and east
-    // edges here.
+    // Vertex and index counts per patch, including the north and east edges.
     const U32 patch_size = (U32)surface.getGridsPerPatchEdge();
     constexpr U32 stride = 1;
     const U32 vert_size = (patch_size / stride) + 1;
@@ -202,11 +190,9 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
                 {
                     for (U32 i = 0; i < vert_size; ++i)
                     {
-                        LLVector3 scratch3;
                         LLVector3 pos3;
-                        LLVector2 tex0_temp;
                         LLVector2 tex1_temp;
-                        patch->eval(i, j, stride, &pos3, &scratch3, &tex0_temp, &tex1_temp);
+                        patch->eval(i, j, &pos3, &tex1_temp);
                         (*pos++).set(pos3.mV[VX], pos3.mV[VY], pos3.mV[VZ]);
                         *tex1++ = tex1_temp;
                         vertex_total++;
@@ -238,8 +224,7 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
 
         S32 alpha_ramp = shader.enableTexture(LLViewerShaderMgr::TERRAIN_ALPHARAMP);
         LLPointer<LLViewerTexture> alpha_ramp_texture = LLViewerTextureManager::getFetchedTexture(IMG_ALPHA_GRAD_2D);
-        gGL.getTexUnit(alpha_ramp)->bind(alpha_ramp_texture);
-        gGL.getTexUnit(alpha_ramp)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        gGL.getTextureSlot(alpha_ramp)->bindSampled(alpha_ramp_texture, ALSamplers::AnisoClamp);
 
         buf->setBuffer();
         for (U32 rj = 0; rj < patch_count; ++rj)
@@ -257,9 +242,7 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
 
         shader.disableTexture(LLViewerShaderMgr::TERRAIN_ALPHARAMP);
 
-        gGL.getTexUnit(alpha_ramp)->unbind(LLTexUnit::TT_TEXTURE);
-        gGL.getTexUnit(alpha_ramp)->disable();
-        gGL.getTexUnit(alpha_ramp)->activate();
+        gGL.getTextureSlot(alpha_ramp)->unbind();
 
         shader.unbind();
     }
@@ -275,7 +258,9 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
     {
         LL_WARNS() << "Failed to copy framebuffer to paintmap" << LL_ENDL;
     }
-    glGenerateMipmap(GL_TEXTURE_2D);
+    // setSubImageFromFrameBuffer left the paintmap bound on unit 0 under the last draw's
+    // sampler; generateMipmaps clears that so mip generation follows the texture's own state.
+    LLImageGL::generateMipmaps(GL_TEXTURE_2D);
     stop_glerror();
 
     scratch_target.flush();

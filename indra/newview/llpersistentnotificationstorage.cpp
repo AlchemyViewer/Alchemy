@@ -114,7 +114,7 @@ void LLPersistentNotificationStorage::loadNotifications()
     }
 
     using namespace LLNotificationsUI;
-    LLScreenChannel* notification_channel = dynamic_cast<LLScreenChannel*>(LLChannelManager::getInstance()->
+    LLScreenChannel* notification_channel = ALViewType::as<LLScreenChannel>(LLChannelManager::getInstance()->
         findChannelByID(LLNotificationsUI::NOTIFICATION_CHANNEL_UUID));
 
     LLNotifications& instance = LLNotifications::instance();
@@ -141,7 +141,7 @@ void LLPersistentNotificationStorage::loadNotifications()
             ++notification_it)
     {
         LLSD notification_params = *notification_it;
-        LLNotificationPtr notification(new LLNotification(notification_params));
+        LLNotificationPtr notification = std::make_shared<LLNotification>(notification_params);
 
         LLNotificationResponderPtr responder(createResponder(notification_params["name"], notification_params["responder"]));
         notification->setResponseFunctor(responder);

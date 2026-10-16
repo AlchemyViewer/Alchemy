@@ -31,7 +31,6 @@
 #include "llfilesystem.h"
 
 using namespace LL::GLTF;
-using namespace boost::json;
 
 namespace LL
 {
@@ -158,6 +157,11 @@ bool Buffer::prep(Asset& asset)
     {
         std::string dir = gDirUtilp->getDirName(asset.mFilename);
         std::string bin_file = dir + gDirUtilp->getDirDelimiter() + mUri;
+        if (!gDirUtilp->fileExists(bin_file))
+        {
+            // Characters might be escaped in the URI
+            bin_file = dir + gDirUtilp->getDirDelimiter() + LLURI::unescape(mUri);
+        }
 
         llifstream file(bin_file.c_str(), std::ios::binary);
         if (!file.is_open())
@@ -208,7 +212,7 @@ bool Buffer::save(Asset& asset, const std::string& folder)
 
     bin_file += mUri;
 
-    std::ofstream file(bin_file, std::ios::binary);
+    llofstream file(bin_file, std::ios::binary);
     if (!file.is_open())
     {
         LL_WARNS("GLTF") << "Failed to open file: " << bin_file << LL_ENDL;
@@ -220,7 +224,7 @@ bool Buffer::save(Asset& asset, const std::string& folder)
     return true;
 }
 
-void Buffer::serialize(object& dst) const
+void Buffer::serialize(JsonWriter& dst) const
 {
     write(mName, "name", dst);
     write(mUri, "uri", dst);
@@ -242,7 +246,7 @@ const Buffer& Buffer::operator=(const Value& src)
     return *this;
 }
 
-void BufferView::serialize(object& dst) const
+void BufferView::serialize(JsonWriter& dst) const
 {
     write_always(mBuffer, "buffer", dst);
     write_always(mByteLength, "byteLength", dst);
@@ -266,7 +270,7 @@ const BufferView& BufferView::operator=(const Value& src)
     return *this;
 }
 
-void Accessor::serialize(object& dst) const
+void Accessor::serialize(JsonWriter& dst) const
 {
     write(mName, "name", dst);
     write(mBufferView, "bufferView", dst, INVALID_INDEX);

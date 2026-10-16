@@ -34,9 +34,9 @@
 
 #include "llavatarname.h"
 #include "llhost.h" // for resolving parcel name by parcel id
+#include "alregex.h"
 
 #include <boost/signals2.hpp>
-#include <boost/regex.hpp>
 #include <string>
 #include <map>
 
@@ -73,7 +73,11 @@ public:
     virtual ~LLUrlEntryBase();
 
     /// Return the regex pattern that matches this Url
-    boost::regex getPattern() const { return mPattern; }
+    const ALRegex& getPattern() const { return mPattern; }
+
+    /// Return the group of the pattern whose extent is the Url: 0, the
+    /// whole match, unless the pattern has to read what follows the Url
+    U32 getUrlGroup() const { return mUrlGroup; }
 
     /// Return the url from a string that matched the regex
     virtual std::string getUrl(const std::string &string) const;
@@ -132,7 +136,8 @@ protected:
         LLUrlLabelSignal *signal;
     } LLUrlEntryObserver;
 
-    boost::regex                                    mPattern;
+    ALRegex                                         mPattern;
+    U32                                             mUrlGroup = 0;
     std::string                                     mIcon;
     std::string                                     mMenuName;
     std::string                                     mTooltip;
@@ -590,6 +595,7 @@ public:
     /*virtual*/ std::string getQuery(const std::string &url) const;
 
     std::string mHostPath;
+    ALRegex     mHostRegex;
 };
 
 class LLKeyBindingToStringHandler;

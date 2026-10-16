@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<!-- Superset menu for the Scene Explorer: shown as the tree's right-click
+     context menu AND as the bottom-bar gear menu. Entries are shown/hidden
+     and enabled per row type by ALFloaterSceneExplorer::buildRowContextMenu;
+     nothing here carries its own visibility logic. -->
+<toggleable_menu
+ layout="topleft"
+ name="menu_scene_explorer">
+    <menu_item_call
+     label="Touch"
+     name="touch">
+        <menu_item_call.on_click
+         function="Object.Touch" />
+    </menu_item_call>
+    <menu_item_call
+     label="Sit Here"
+     name="sit">
+        <menu_item_call.on_click
+         function="SceneExplorer.Sit" />
+    </menu_item_call>
+    <menu_item_call
+     label="Open"
+     name="open">
+        <menu_item_call.on_click
+         function="Object.Open" />
+    </menu_item_call>
+    <menu_item_call
+     label="Buy"
+     name="buy">
+        <menu_item_call.on_click
+         function="Object.Buy" />
+    </menu_item_call>
+    <menu_item_call
+     label="Pay..."
+     name="pay">
+        <menu_item_call.on_click
+         function="PayObject" />
+    </menu_item_call>
+    <menu_item_call
+     label="Take Copy"
+     name="take_copy">
+        <menu_item_call.on_click
+         function="Tools.TakeCopy" />
+    </menu_item_call>
+    <menu_item_call
+     label="View Profile"
+     name="av_profile">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="profile" />
+    </menu_item_call>
+    <menu_item_call
+     label="Send IM..."
+     name="av_im">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="im" />
+    </menu_item_call>
+    <menu_item_call
+     label="Offer Teleport"
+     name="av_offer_tp">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="offer_tp" />
+    </menu_item_call>
+    <menu_item_call
+     label="Request Teleport"
+     name="av_request_tp">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="request_tp" />
+    </menu_item_call>
+    <menu_item_separator name="sep_avatar_actions" />
+    <menu_item_separator name="sep_object_actions" />
+    <menu_item_call
+     label="Focus Camera"
+     name="focus">
+        <menu_item_call.on_click
+         function="SceneExplorer.Focus" />
+    </menu_item_call>
+    <menu_item_call
+     label="Zoom In"
+     name="av_zoom">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="zoom" />
+    </menu_item_call>
+    <menu_item_call
+     label="Edit..."
+     name="edit">
+        <menu_item_call.on_click
+         function="SceneExplorer.Edit" />
+    </menu_item_call>
+    <menu_item_call
+     label="Inspect..."
+     name="inspect">
+        <menu_item_call.on_click
+         function="SceneExplorer.Inspect" />
+    </menu_item_call>
+    <menu_item_call
+     label="Teleport To"
+     name="teleport">
+        <menu_item_call.on_click
+         function="SceneExplorer.Teleport" />
+    </menu_item_call>
+    <menu_item_call
+     label="Teleport To"
+     name="av_teleport">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="teleport_to" />
+    </menu_item_call>
+    <menu_item_call
+     label="Show on Map"
+     name="show_map">
+        <menu_item_call.on_click
+         function="SceneExplorer.ShowOnMap" />
+    </menu_item_call>
+    <menu_item_call
+     label="Beacon"
+     name="beacon"
+     tool_tip="Set a tracking beacon on this row's position; use again to clear">
+        <menu_item_call.on_click
+         function="SceneExplorer.Beacon" />
+    </menu_item_call>
+    <menu_item_separator name="sep_copy" />
+    <menu
+     label="Copy"
+     name="copy_menu">
+        <menu_item_call
+         label="Name"
+         name="copy_name">
+            <menu_item_call.on_click
+             function="SceneExplorer.Copy"
+             parameter="name" />
+        </menu_item_call>
+        <menu_item_call
+         label="UUID"
+         name="copy_uuid">
+            <menu_item_call.on_click
+             function="SceneExplorer.Copy"
+             parameter="uuid" />
+        </menu_item_call>
+        <menu_item_call
+         label="Position"
+         name="copy_pos">
+            <menu_item_call.on_click
+             function="SceneExplorer.Copy"
+             parameter="pos" />
+        </menu_item_call>
+        <menu_item_call
+         label="SLurl"
+         name="copy_slurl">
+            <menu_item_call.on_click
+             function="SceneExplorer.Copy"
+             parameter="slurl" />
+        </menu_item_call>
+    </menu>
+    <menu_item_call
+     label="Filter by This Owner"
+     name="filter_by_owner"
+     tool_tip="Show only objects with the same owner">
+        <menu_item_call.on_click
+         function="SceneExplorer.FilterByOwner" />
+    </menu_item_call>
+    <menu_item_separator name="sep_admin" />
+    <menu_item_call
+     label="Return to Owner"
+     name="return">
+        <menu_item_call.on_click
+         function="Object.Return" />
+    </menu_item_call>
+    <menu_item_call
+     label="Freeze"
+     name="freeze">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="freeze" />
+    </menu_item_call>
+    <menu_item_call
+     label="Eject"
+     name="eject">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="eject" />
+    </menu_item_call>
+    <menu_item_call
+     label="Teleport Home"
+     name="estate_home">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="estate_tp_home" />
+    </menu_item_call>
+    <menu_item_call
+     label="Kick from Estate"
+     name="estate_kick">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="estate_kick" />
+    </menu_item_call>
+    <menu_item_call
+     label="Ban from Estate"
+     name="estate_ban">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="estate_ban" />
+    </menu_item_call>
+    <menu_item_separator name="sep_moderation" />
+    <menu_item_call
+     label="Block"
+     name="block_object">
+        <menu_item_call.on_click
+         function="Object.Mute" />
+    </menu_item_call>
+    <menu_item_call
+     label="Block Owner"
+     name="block_owner">
+        <menu_item_call.on_click
+         function="SceneExplorer.BlockOwner" />
+    </menu_item_call>
+    <menu_item_call
+     label="Block / Unblock"
+     name="av_block">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="block" />
+    </menu_item_call>
+    <menu_item_call
+     label="Report Abuse..."
+     name="report">
+        <menu_item_call.on_click
+         function="Object.ReportAbuse" />
+    </menu_item_call>
+    <menu_item_call
+     label="Report Abuse..."
+     name="av_report">
+        <menu_item_call.on_click
+         function="SceneExplorer.AvatarAction"
+         parameter="report" />
+    </menu_item_call>
+    <menu_item_separator name="sep_derender" />
+    <menu_item_call
+     label="Derender"
+     name="derender_temp">
+        <menu_item_call.on_click
+         function="SceneExplorer.Derender"
+         parameter="temporary" />
+    </menu_item_call>
+    <menu_item_call
+     label="Derender Permanently"
+     name="derender_perm">
+        <menu_item_call.on_click
+         function="SceneExplorer.Derender"
+         parameter="permanent" />
+    </menu_item_call>
+    <menu_item_call
+     label="Restore"
+     name="restore_derendered">
+        <menu_item_call.on_click
+         function="SceneExplorer.Restore" />
+    </menu_item_call>
+    <menu_item_call
+     label="Refresh"
+     name="refresh">
+        <menu_item_call.on_click
+         function="SceneExplorer.Refresh" />
+    </menu_item_call>
+    <menu_item_call
+     label="Copy Results to Clipboard"
+     name="copy_results"
+     tool_tip="Copy the filtered list as CSV (name, owner, LI, triangles, distance, UUID)">
+        <menu_item_call.on_click
+         function="SceneExplorer.CopyResults" />
+    </menu_item_call>
+</toggleable_menu>

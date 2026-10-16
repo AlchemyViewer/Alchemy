@@ -34,11 +34,12 @@
 
 #include "llagent.h"
 #include "llappviewer.h"
+#include "llfloatermarketplace.h"
 #include "llfloaterwebcontent.h"
 #include "llfloaterreg.h"
 #include "lllogininstance.h"
 #include "llparcel.h"
-#include "llregex.h"
+#include "alregex.h"
 #include "llsd.h"
 #include "llui.h"
 #include "lluri.h"
@@ -74,12 +75,20 @@ void LLWeb::loadURL(const std::string& url, const std::string& target, const std
 }
 
 // static
-// Explicitly open a Web URL using the Web content floater
+// Explicitly open a Web URL using the Web content floater or Marketplace floater
 void LLWeb::loadURLInternal(const std::string &url, const std::string& target, const std::string& uuid, bool dev_mode)
 {
     LLFloaterWebContent::Params p;
     p.url(url).target(target).id(uuid).dev_mode(dev_mode);
-    LLFloaterReg::showInstance("web_content", p);
+
+    if (LLFloaterMarketplace::isMarketplaceURL(url))
+    {
+        LLFloaterReg::showInstance("marketplace", p);
+    }
+    else
+    {
+        LLFloaterReg::showInstance("web_content", p);
+    }
 }
 
 // static
@@ -232,15 +241,13 @@ bool LLWeb::useExternalBrowser(const std::string &url)
         up.extractParts();
         std::string uri_string = up.host();
 
-        boost::regex pattern = boost::regex("\\b(lindenlab.com|secondlife.com|secondlife.io)$", boost::regex::perl|boost::regex::icase);
-        boost::match_results<std::string::const_iterator> matches;
-        return !(ll_regex_search(uri_string, matches, pattern));
+        static const ALRegex pattern("\\b(lindenlab.com|secondlife.com|secondlife.io)$", ALRegex::ICASE);
+        return !pattern.search(uri_string);
     }
     else
     {
-        boost::regex pattern = boost::regex("^mailto:", boost::regex::perl | boost::regex::icase);
-        boost::match_results<std::string::const_iterator> matches;
-        return ll_regex_search(url, matches, pattern);
+        static const ALRegex pattern("^mailto:", ALRegex::ICASE);
+        return pattern.search(url);
     }
 #endif
 }

@@ -189,7 +189,7 @@ bool LLPanelPermissions::postBuild()
     childSetCommitCallback("clickaction",LLPanelPermissions::onCommitClickAction,this);
     childSetCommitCallback("search_check",LLPanelPermissions::onCommitIncludeInSearch,this);
 
-    mLabelGroupName = getChild<LLNameBox>("Group Name Proxy");
+    mLabelGroupName = getChild<LLTextBox>("Group Name");
     mLabelOwnerName = getChild<LLTextBox>("Owner Name");
     mLabelCreatorName = getChild<LLTextBox>("Creator Name");
 
@@ -220,26 +220,22 @@ void LLPanelPermissions::disableAll()
     getChild<LLUICtrl>("pathfinding_attributes_value")->setValue(LLStringUtil::null);
 
     getChildView("Creator:")->setEnabled(false);
-    getChild<LLUICtrl>("Creator Icon")->setVisible(false);
     mLabelCreatorName->setValue(LLStringUtil::null);
     mLabelCreatorName->setEnabled(false);
 
     getChildView("Owner:")->setEnabled(false);
-    getChild<LLUICtrl>("Owner Icon")->setVisible(false);
-    getChild<LLUICtrl>("Owner Group Icon")->setVisible(false);
     mLabelOwnerName->setValue(LLStringUtil::null);
     mLabelOwnerName->setEnabled(false);
 
     getChildView("Group:")->setEnabled(false);
-    getChild<LLUICtrl>("Group Name Proxy")->setValue(LLStringUtil::null);
-    getChildView("Group Name Proxy")->setEnabled(false);
+    mLabelGroupName->setValue(LLStringUtil::null);
+    mLabelGroupName->setEnabled(false);
     getChildView("button set group")->setEnabled(false);
 
     getChild<LLUICtrl>("Object Name")->setValue(LLStringUtil::null);
     getChildView("Object Name")->setEnabled(false);
     getChildView("Name:")->setEnabled(false);
-    getChild<LLUICtrl>("Group Name")->setValue(LLStringUtil::null);
-    getChildView("Group Name")->setEnabled(false);
+
     getChildView("Description:")->setEnabled(false);
     getChild<LLUICtrl>("Object Description")->setValue(LLStringUtil::null);
     getChildView("Object Description")->setEnabled(false);
@@ -300,7 +296,8 @@ void LLPanelPermissions::refresh()
     if(BtnDeedToGroup)
     {
         std::string deedText;
-        if (gWarningSettings.getBOOL("DeedObject"))
+        static const LLCachedControl<bool> deed_object(gWarningSettings, "DeedObject");
+        if (deed_object)
         {
             deedText = getString("text deed continued");
         }
@@ -418,7 +415,7 @@ void LLPanelPermissions::refresh()
     //style_params.font.size = LLFontGL::sizeFromFont(fontp);
     //style_params.font.style = "UNDERLINE";
 
-    LLAvatarName av_name;
+    //LLAvatarName av_name;
     //style_params.link_href = creator_app_link;
 // [RLVa:KB] - Checked: RLVa-2.0.1
     // Only anonymize the creator if all of the selection was created by the same avie who's also the owner or they're a nearby avie
@@ -522,25 +519,17 @@ void LLPanelPermissions::refresh()
 
     // update group text field
     getChildView("Group:")->setEnabled(true);
-    getChild<LLUICtrl>("Group Name")->setValue(LLStringUtil::null);
     LLUUID group_id;
     bool groups_identical = LLSelectMgr::getInstance()->selectGetGroup(group_id);
     if (groups_identical)
     {
-        if (mLabelGroupName)
-        {
-            mLabelGroupName->setNameID(group_id,true);
-            mLabelGroupName->setEnabled(true);
-        }
+        mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
+        mLabelGroupName->setEnabled(true);
     }
     else
     {
-        if (mLabelGroupName)
-        {
-            mLabelGroupName->setNameID(LLUUID::null, true);
-            mLabelGroupName->refresh(LLUUID::null, std::string(), true);
-            mLabelGroupName->setEnabled(false);
-        }
+        mLabelGroupName->setValue(LLStringUtil::null);
+        mLabelGroupName->setEnabled(false);
     }
 
     getChildView("button set group")->setEnabled(root_selected && owners_identical && (mOwnerID == gAgent.getID()) && is_nonpermanent_enforced);
@@ -567,13 +556,23 @@ void LLPanelPermissions::refresh()
     }
     else
     {
-        getChild<LLUICtrl>("Object Name")->setValue(LLStringUtil::null);
-        LineEditorObjectDesc->setText(LLStringUtil::null);
+        if (keyboard_focus_view != LineEditorObjectName)
+        {
+            getChild<LLUICtrl>("Object Name")->setValue(getString("multiple selection"));
+        }
+
+        if (LineEditorObjectDesc)
+        {
+            if (keyboard_focus_view != LineEditorObjectDesc)
+            {
+                LineEditorObjectDesc->setText(getString("multiple selection"));
+            }
+        }
     }
 
     // figure out the contents of the name, description, & category
     bool edit_name_desc = false;
-    if (is_one_object && objectp->permModify() && !objectp->isPermanentEnforced())
+    if (objectp->permModify() && !objectp->isPermanentEnforced())
     {
         edit_name_desc = true;
     }
@@ -814,7 +813,9 @@ void LLPanelPermissions::refresh()
         getChildView("Edit Cost")->setEnabled(change_sale_allowed && !is_for_sale_mixed);
         // Set the checkbox to tentative if the prices of each object selected
         // are not the same.
-        getChild<LLUICtrl>("checkbox for sale")->setTentative(              is_for_sale_mixed);
+        // If object is marked for sale yet is not transferable, mark as tentative,
+        // as it is in a state where it can't be sold
+        getChild<LLUICtrl>("checkbox for sale")->setTentative((!can_transfer && num_for_sale) || is_for_sale_mixed);
         getChildView("sale type")->setEnabled(num_for_sale && can_transfer && !is_sale_price_mixed);
 
         getChildView("Next owner can:")->setEnabled(true);
@@ -1007,6 +1008,30 @@ void LLPanelPermissions::refresh()
 
     getChildView("label click action")->setEnabled(is_perm_modify && is_nonpermanent_enforced  && all_volume);
     getChildView("clickaction")->setEnabled(is_perm_modify && is_nonpermanent_enforced && all_volume);
+
+    // Client-only local mesh previews have no server-side identity: none of the
+    // sim-backed properties above apply, and edits would be silently dropped
+    // (sendListToRegions is short-circuited for them). Keep name/desc visible
+    // (read-only) but disable every editing/permission/sale/group/click control.
+    if (objectp->isLocalOnly())
+    {
+        static const std::string sim_only_ctrls[] = {
+            "Object Name", "Object Description",
+            "button set group", "button deed", "checkbox share with group",
+            "checkbox allow everyone move", "checkbox allow everyone copy",
+            "checkbox next owner can modify", "checkbox next owner can copy",
+            "checkbox next owner can transfer",
+            "checkbox for sale", "sale type", "Edit Cost",
+            "search_check", "clickaction",
+        };
+        for (const std::string& ctrl_name : sim_only_ctrls)
+        {
+            if (LLView* v = findChildView(ctrl_name, true))
+            {
+                v->setEnabled(false);
+            }
+        }
+    }
 }
 
 // Shorten name if it doesn't fit into max_pixels of two lines
@@ -1014,29 +1039,28 @@ void shorten_name(std::string &name, const LLStyle::Params& style_params, S32 ma
 {
     const LLFontGL* font = style_params.font();
 
-    LLWString wline = utf8str_to_wstring(name);
     // panel supports two lines long names
-    S32 segment_length = font->maxDrawableChars(wline.c_str(), (F32)max_pixels, static_cast<S32>(wline.length()), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
-    if (segment_length == wline.length())
+    S32 segment_length = font->maxDrawableBytes(name, (F32)max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+    if (segment_length == (S32)name.length())
     {
         // no work needed
         return;
     }
 
     S32 first_line_length = segment_length;
-    segment_length = font->maxDrawableChars(wline.substr(first_line_length).c_str(), (F32)max_pixels, static_cast<S32>(wline.length()), LLFontGL::ANYWHERE);
-    if (segment_length + first_line_length == wline.length())
+    segment_length = font->maxDrawableBytes(std::string_view(name).substr(first_line_length), (F32)max_pixels, S32_MAX, LLFontGL::ANYWHERE);
+    if (segment_length + first_line_length == (S32)name.length())
     {
         // no work needed
         return;
     }
 
     // name does not fit, cut it, add ...
-    const LLWString dots_pad(utf8str_to_wstring(std::string("....")));
-    F32 elipses_width = font->getWidthF32(dots_pad.c_str());
-    segment_length = font->maxDrawableChars(wline.substr(first_line_length).c_str(), (F32)max_pixels - elipses_width, static_cast<S32>(wline.length()), LLFontGL::ANYWHERE);
+    static const std::string ELLIPSIS_PAD("....");
+    F32 elipses_width = font->getWidthF32(ELLIPSIS_PAD);
+    segment_length = font->maxDrawableBytes(std::string_view(name).substr(first_line_length), (F32)max_pixels - elipses_width, S32_MAX, LLFontGL::ANYWHERE);
 
-    name = name.substr(0, segment_length + first_line_length) + std::string("...");
+    name = name.substr(0, segment_length + first_line_length) + "...";
 }
 
 void LLPanelPermissions::updateOwnerName(const LLUUID& owner_id, const LLAvatarName& owner_name, const LLStyle::Params& style_params)
@@ -1101,10 +1125,8 @@ void LLPanelPermissions::onClickGroup()
 
 void LLPanelPermissions::cbGroupID(LLUUID group_id)
 {
-    if(mLabelGroupName)
-    {
-        mLabelGroupName->setNameID(group_id, true);
-    }
+    mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
+    mLabelGroupName->setEnabled(true);
     LLSelectMgr::getInstance()->sendGroup(group_id);
 }
 

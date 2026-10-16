@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2011, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -496,7 +497,7 @@ void RlvAttachmentLockWatchdog::detach(const LLViewerObject* pAttachObj)
 {
     if (pAttachObj)
     {
-        gMessageSystem->newMessage("ObjectDetach");
+        gMessageSystem->newMessageFast(_PREHASH_ObjectDetach);
         gMessageSystem->nextBlockFast(_PREHASH_AgentData);
         gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
         gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
@@ -528,7 +529,7 @@ void RlvAttachmentLockWatchdog::detach(S32 idxAttachPt, const uuid_vec_t& idsAtt
 
     if (!attachObjs.empty())
     {
-        gMessageSystem->newMessage("ObjectDetach");
+        gMessageSystem->newMessageFast(_PREHASH_ObjectDetach);
         gMessageSystem->nextBlockFast(_PREHASH_AgentData);
         gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
         gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
@@ -549,6 +550,12 @@ void RlvAttachmentLockWatchdog::detach(S32 idxAttachPt, const uuid_vec_t& idsAtt
 // Checked: 2010-09-23 (RLVa-1.2.1d) | Modified: RLVa-1.2.1d
 void RlvAttachmentLockWatchdog::onAttach(const LLViewerObject* pAttachObj, const LLViewerJointAttachment* pAttachPt)
 {
+    // Client-only objects (e.g. local mesh previews) have no inventory item and
+    // never participate in attachment locks. Their null attachment-item id would
+    // trip the RLV_ASSERT below, which is fatal (LL_ERRS) in debug-info builds.
+    if (!pAttachObj || pAttachObj->isLocalOnly())
+        return;
+
     S32 idxAttachPt = RlvAttachPtLookup::getAttachPointIndex(pAttachObj);
     const LLUUID& idAttachItem = (pAttachObj) ? pAttachObj->getAttachmentItemID() : LLUUID::null;
     RLV_ASSERT( (!isAgentAvatarValid()) || ((idxAttachPt) && (idAttachItem.notNull())) );
@@ -656,6 +663,10 @@ void RlvAttachmentLockWatchdog::onAttach(const LLViewerObject* pAttachObj, const
 // Checked: 2010-07-28 (RLVa-1.2.0i) | Modified: RLVa-1.2.0i
 void RlvAttachmentLockWatchdog::onDetach(const LLViewerObject* pAttachObj, const LLViewerJointAttachment* pAttachPt)
 {
+    // See onAttach(): client-only objects never participate in attachment locks.
+    if (!pAttachObj || pAttachObj->isLocalOnly())
+        return;
+
     S32 idxAttachPt = RlvAttachPtLookup::getAttachPointIndex(pAttachPt);
     const LLUUID& idAttachItem = (pAttachObj) ? pAttachObj->getAttachmentItemID() : LLUUID::null;
     RLV_ASSERT( (!isAgentAvatarValid()) || ((idxAttachPt) && (idAttachItem.notNull())) );
@@ -706,7 +717,7 @@ void RlvAttachmentLockWatchdog::onSavedAssetIntoInventory(const LLUUID& idItem)
         if ( (!itAttach->second.fAssetSaved) && (idItem == itAttach->second.idItem) )
         {
             LLAttachmentsMgr::instance().addAttachmentRequest(itAttach->second.idItem, itAttach->first, true, true);
-            itAttach->second.tsAttach = LLFrameTimer::getElapsedSeconds();
+            itAttach->second.tsAttach = LLFrameTimer::getUptimeSeconds();
         }
     }
 }
@@ -715,7 +726,7 @@ void RlvAttachmentLockWatchdog::onSavedAssetIntoInventory(const LLUUID& idItem)
 bool RlvAttachmentLockWatchdog::onTimer()
 {
     // RELEASE-RLVa: [SL-2.0.0] This will need rewriting for "ENABLE_MULTIATTACHMENTS"
-    F64 tsCurrent = LLFrameTimer::getElapsedSeconds();
+    F64 tsCurrent = LLFrameTimer::getUptimeSeconds();
 
     // Garbage collect (failed) wear requests older than 60 seconds
     rlv_wear_map_t::iterator itWear = m_PendingWear.begin();

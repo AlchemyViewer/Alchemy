@@ -28,18 +28,22 @@
 
 #include "stdtypes.h"
 
+// LLStrider walks an Object array (or a byte-typed buffer used to hold
+// Objects) with a configurable byte stride. Storage is a single U8*
+// cursor — pointer arithmetic and copies go through the char alias
+// exemption; the Object-typed view is reconstituted at each access via
+// reinterpret_cast. The previous implementation used a
+// `union { Object* mObjectp; U8* mBytep; }`, which is strict-aliasing
+// UB in C++ (active-member switching) under -fstrict-aliasing + LTO.
+
 template <class Object> class LLStrider
 {
-    union
-    {
-        Object* mObjectp;
-        U8*     mBytep;
-    };
-    U32     mSkip;
+    U8* mBytep;
+    U32 mSkip;
 public:
-    LLStrider()  { mObjectp = NULL; mSkip = sizeof(Object); }
-    LLStrider(Object* first) { mObjectp = first; mSkip = sizeof(Object); }
-    ~LLStrider() { }
+    LLStrider()                    : mBytep(nullptr), mSkip(sizeof(Object)) {}
+    LLStrider(Object* first)       : mBytep(reinterpret_cast<U8*>(first)), mSkip(sizeof(Object)) {}
+    ~LLStrider() = default;
 
     const LLStrider<Object>& operator=(const LLStrider<Object>& rhs)
     {
@@ -48,27 +52,31 @@ public:
         return *this;
     }
 
-    const LLStrider<Object>& operator =  (Object *first)    { mObjectp = first; return *this;}
-    void setStride (S32 skipBytes)  { mSkip = (skipBytes ? skipBytes : sizeof(Object));}
+    const LLStrider<Object>& operator=(Object* first)
+    {
+        mBytep = reinterpret_cast<U8*>(first);
+        return *this;
+    }
+
+    void setStride(S32 skipBytes)  { mSkip = (skipBytes ? skipBytes : sizeof(Object)); }
 
     LLStrider<Object> operator+(const S32& index)
     {
         LLStrider<Object> ret;
         ret.mBytep = mBytep + mSkip*index;
         ret.mSkip = mSkip;
-
         return ret;
     }
 
-    void skip(const U32 index)     { mBytep += mSkip*index;}
+    void skip(const U32 index)     { mBytep += mSkip*index; }
     U32 getSkip() const            { return mSkip; }
-    Object* get()                  { return mObjectp; }
-    Object* operator->()           { return mObjectp; }
-    Object& operator *()           { return *mObjectp; }
-    Object* operator ++(int)       { Object* old = mObjectp; mBytep += mSkip; return old; }
-    Object* operator +=(int i)     { mBytep += mSkip*i; return mObjectp; }
+    Object* get()                  { return reinterpret_cast<Object*>(mBytep); }
+    Object* operator->()           { return reinterpret_cast<Object*>(mBytep); }
+    Object& operator*()            { return *reinterpret_cast<Object*>(mBytep); }
+    Object* operator++(int)        { Object* old = reinterpret_cast<Object*>(mBytep); mBytep += mSkip; return old; }
+    Object* operator+=(int i)      { mBytep += mSkip*i; return reinterpret_cast<Object*>(mBytep); }
 
-    Object& operator[](U32 index)  { return *(Object*)(mBytep + (mSkip * index)); }
+    Object& operator[](U32 index)  { return *reinterpret_cast<Object*>(mBytep + mSkip*index); }
 };
 
 #endif // LL_LLSTRIDER_H

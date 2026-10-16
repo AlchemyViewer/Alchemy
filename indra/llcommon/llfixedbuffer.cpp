@@ -46,20 +46,13 @@ void LLFixedBuffer::clear()
     mMutex.lock() ;
     mLines.clear();
     mAddTimes.clear();
-    mLineLengths.clear();
     mMutex.unlock() ;
 
     mTimer.reset();
 }
 
 
-void LLFixedBuffer::addLine(const std::string& utf8line)
-{
-    LLWString wstring = utf8str_to_wstring(utf8line);
-    addWLine(wstring);
-}
-
-void LLFixedBuffer::addWLine(const LLWString& line)
+void LLFixedBuffer::addLine(const std::string& line)
 {
     if (line.empty())
     {
@@ -70,7 +63,6 @@ void LLFixedBuffer::addWLine(const LLWString& line)
 
     mMutex.lock() ;
     mLines.push_back(line);
-    mLineLengths.push_back((S32)line.length());
     mAddTimes.push_back(mTimer.getElapsedTimeF32());
     mMutex.unlock() ;
 }
@@ -91,7 +83,6 @@ void LLFixedBuffer::removeExtraLines()
     {
         mLines.pop_front();
         mAddTimes.pop_front();
-        mLineLengths.pop_front();
     }
     mMutex.unlock() ;
 }

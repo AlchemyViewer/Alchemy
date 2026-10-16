@@ -76,12 +76,13 @@ static LLPanelInjector<LLPanelMainInventory> t_inventory("panel_main_inventory")
 /// LLFloaterInventoryFinder
 ///----------------------------------------------------------------------------
 
-class LLFloaterInventoryFinder : public LLFloater
+class LLFloaterInventoryFinder final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterInventoryFinder, LLFloater);
     LLFloaterInventoryFinder(LLPanelMainInventory* inventory_view);
-    void draw();
-    bool postBuild();
+    void draw() override;
+    bool postBuild() override;
     void changeFilter(LLInventoryFilter* filter);
     void updateElementsFromFilter();
     bool getCheckShowEmpty();
@@ -216,14 +217,14 @@ bool LLPanelMainInventory::postBuild()
         mWornItemsPanel->setSelectCallback(boost::bind(&LLPanelMainInventory::onSelectionChange, this, mWornItemsPanel, _1, _2));
     }
 
-    LLInventoryPanel* favorites_panel = getChild<LLInventoryPanel>(FAVORITES);
-    if (favorites_panel)
+    mFavoritesPanel = getChild<LLInventoryPanel>(FAVORITES);
+    if (mFavoritesPanel)
     {
-        favorites_panel->setSortOrder(gSavedSettings.getU32(LLInventoryPanel::DEFAULT_SORT_ORDER));
-        LLInventoryFilter& favorites_filter = favorites_panel->getFilter();
+        mFavoritesPanel->setSortOrder(gSavedSettings.getU32(LLInventoryPanel::DEFAULT_SORT_ORDER));
+        LLInventoryFilter& favorites_filter = mFavoritesPanel->getFilter();
         favorites_filter.setEmptyLookupMessage("InventoryNoMatchingFavorites");
         favorites_filter.markDefault();
-        favorites_panel->setSelectCallback(boost::bind(&LLPanelMainInventory::onSelectionChange, this, favorites_panel, _1, _2));
+        mFavoritesPanel->setSelectCallback(boost::bind(&LLPanelMainInventory::onSelectionChange, this, mFavoritesPanel, _1, _2));
     }
 
     mSearchTypeCombo  = getChild<LLComboBox>("search_type");
@@ -253,11 +254,21 @@ bool LLPanelMainInventory::postBuild()
                 LLParamSDParser parser;
                 parser.readSD(recent_items, p);
                 mRecentPanel->getFilter().fromParams(p);
-                mRecentPanel->setSortOrder(gSavedSettings.getU32(LLInventoryPanel::RECENTITEMS_SORT_ORDER));
+
+                // Restore sort order if it was saved
+                if (p.order.isProvided())
+                {
+                    mRecentPanel->setSortOrder(p.order());
+                }
+                else
+                {
+                    mRecentPanel->setSortOrder(gSavedSettings.getU32(LLInventoryPanel::RECENTITEMS_SORT_ORDER));
+                }
             }
         }
         if(mActivePanel)
         {
+            // 'all items' tab
             if(savedFilterState.has(mActivePanel->getFilter().getName()))
             {
                 LLSD items = savedFilterState.get(mActivePanel->getFilter().getName());
@@ -318,6 +329,10 @@ bool LLPanelMainInventory::postBuild()
         menu->getChild<LLMenuItemGL>("Upload Sound")->setLabelArg("[COST]", sound_upload_cost_str);
         menu->getChild<LLMenuItemGL>("Upload Animation")->setLabelArg("[COST]", animation_upload_cost_str);
     }
+
+    mFilterTabs->setTabVisibility(mRecentPanel, gSavedSettings.getBOOL("InventoryShowRecentTab"));
+    mFilterTabs->setTabVisibility(mWornItemsPanel, gSavedSettings.getBOOL("InventoryShowWornTab"));
+    mFilterTabs->setTabVisibility(mFavoritesPanel, gSavedSettings.getBOOL("InventoryShowFavoritesTab"));
 
     // Trigger callback for focus received so we can deselect items in inbox/outbox
     LLFocusableElement::setFocusReceivedCallback(boost::bind(&LLPanelMainInventory::onFocusReceived, this));
@@ -487,10 +502,10 @@ void LLPanelMainInventory::newFolderWindow(LLUUID folder_id, LLUUID item_to_sele
     LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end();)
     {
-        LLFloaterSidePanelContainer* inventory_container = dynamic_cast<LLFloaterSidePanelContainer*>(*iter++);
+        LLFloaterSidePanelContainer* inventory_container = (*iter++)->as<LLFloaterSidePanelContainer>();
         if (inventory_container)
         {
-            LLSidepanelInventory* sidepanel_inventory = dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+            LLSidepanelInventory* sidepanel_inventory = inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
             if (sidepanel_inventory)
             {
                 LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();
@@ -513,7 +528,7 @@ void LLPanelMainInventory::newFolderWindow(LLUUID folder_id, LLUUID item_to_sele
     LLFloaterSidePanelContainer* inventory_container = LLFloaterReg::showTypedInstance<LLFloaterSidePanelContainer>("inventory", LLSD(instance_num));
     if(inventory_container)
     {
-        LLSidepanelInventory* sidepanel_inventory = dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+        LLSidepanelInventory* sidepanel_inventory = inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
         if (sidepanel_inventory)
         {
             LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();
@@ -847,46 +862,6 @@ void LLPanelMainInventory::onFilterEdit(const std::string& search_string )
     }
 }
 
-
- //static
- bool LLPanelMainInventory::incrementalFind(LLFolderViewItem* first_item, const char *find_text, bool backward)
- {
-    LLPanelMainInventory* active_view = NULL;
-
-    LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
-    for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end(); ++iter)
-    {
-        LLPanelMainInventory* iv = dynamic_cast<LLPanelMainInventory*>(*iter);
-        if (iv)
-        {
-            if (gFocusMgr.childHasKeyboardFocus(iv))
-            {
-                active_view = iv;
-                break;
-            }
-        }
-    }
-
-    if (!active_view)
-    {
-        return false;
-    }
-
-    std::string search_string(find_text);
-
-    if (search_string.empty())
-    {
-        return false;
-    }
-
-    if (active_view->getPanel() &&
-        active_view->getPanel()->getRootFolder()->search(first_item, search_string, backward))
-    {
-        return true;
-    }
-
-    return false;
- }
 
 void LLPanelMainInventory::onFilterSelected()
 {
@@ -1613,8 +1588,10 @@ void LLPanelMainInventory::initSingleFolderRoot(const LLUUID& start_folder_id)
 void LLPanelMainInventory::initInventoryViews()
 {
     mAllItemsPanel->initializeViewBuilding();
-    mRecentPanel->initializeViewBuilding();
-    mWornItemsPanel->initializeViewBuilding();
+    if (gSavedSettings.getBOOL("InventoryShowRecentTab"))
+        mRecentPanel->initializeViewBuilding();
+    if (gSavedSettings.getBOOL("InventoryShowWornTab"))
+        mWornItemsPanel->initializeViewBuilding();
 }
 
 void LLPanelMainInventory::toggleViewMode()
@@ -1939,7 +1916,7 @@ void LLPanelMainInventory::onCustomAction(const LLSD& userdata)
             LLFloaterSidePanelContainer* inventory_container = newWindow();
             if (inventory_container)
             {
-                LLSidepanelInventory* sidepanel_inventory = dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+                LLSidepanelInventory* sidepanel_inventory = inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
                 if (sidepanel_inventory)
                 {
                     LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();
@@ -1999,7 +1976,7 @@ void LLPanelMainInventory::onCustomAction(const LLSD& userdata)
         LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
         for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end();)
         {
-            LLFloaterSidePanelContainer* iv = dynamic_cast<LLFloaterSidePanelContainer*>(*iter++);
+            LLFloaterSidePanelContainer* iv = (*iter++)->as<LLFloaterSidePanelContainer>();
             if (iv)
             {
                 iv->closeFloater();
@@ -2055,6 +2032,27 @@ void LLPanelMainInventory::onCustomAction(const LLSD& userdata)
     if (command_name == "combination_view")
     {
         setViewMode(MODE_COMBINATION);
+    }
+
+    if (command_name == "toggle_recent_tab")
+    {
+        bool visibility = !gSavedSettings.getBOOL("InventoryShowRecentTab");
+        gSavedSettings.setBOOL("InventoryShowRecentTab", visibility);
+        mFilterTabs->setTabVisibility(mRecentPanel, visibility);
+        mRecentPanel->initializeViewBuilding();
+    }
+    if (command_name == "toggle_worn_tab")
+    {
+        bool visibility = !gSavedSettings.getBOOL("InventoryShowWornTab");
+        gSavedSettings.setBOOL("InventoryShowWornTab", visibility);
+        mFilterTabs->setTabVisibility(mWornItemsPanel, visibility);
+        mWornItemsPanel->initializeViewBuilding();
+    }
+    if (command_name == "toggle_favorites_tab")
+    {
+        bool visibility = !gSavedSettings.getBOOL("InventoryShowFavoritesTab");
+        gSavedSettings.setBOOL("InventoryShowFavoritesTab", visibility);
+        mFilterTabs->setTabVisibility(mFavoritesPanel, visibility);
     }
 }
 
@@ -2281,6 +2279,19 @@ bool LLPanelMainInventory::isActionChecked(const LLSD& userdata)
     if (command_name == "combination_view")
     {
         return isCombinationViewMode();
+    }
+
+    if (command_name == "recent_tab")
+    {
+        return mFilterTabs->getTabVisibility(mRecentPanel);
+    }
+    if (command_name == "worn_tab")
+    {
+        return mFilterTabs->getTabVisibility(mWornItemsPanel);
+    }
+    if (command_name == "favorites_tab")
+    {
+        return mFilterTabs->getTabVisibility(mFavoritesPanel);
     }
 
     return false;
@@ -2572,10 +2583,10 @@ void LLPanelMainInventory::updateNavButtons()
 
 LLSidepanelInventory* LLPanelMainInventory::getParentSidepanelInventory()
 {
-    LLFloaterSidePanelContainer* inventory_container = dynamic_cast<LLFloaterSidePanelContainer*>(gFloaterView->getParentFloater(this));
+    LLFloaterSidePanelContainer* inventory_container = ALViewType::as<LLFloaterSidePanelContainer>(gFloaterView->getParentFloater(this));
     if(inventory_container)
     {
-        return dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+        return inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
     }
     return NULL;
 }

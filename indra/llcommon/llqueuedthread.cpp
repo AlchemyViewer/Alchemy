@@ -46,14 +46,19 @@ LLQueuedThread::LLQueuedThread(const std::string& name, bool threaded, bool shou
     llassert(threaded); // not threaded implementation is deprecated
     mMainQueue = LL::WorkQueue::getInstance("mainloop");
 
+    // The thread starts when the owner calls start(), once the object is made.
+    if (mThreaded && should_pause)
+    {
+        pause();
+    }
+}
+
+// MAIN THREAD
+void LLQueuedThread::start()
+{
     if (mThreaded)
     {
-        if(should_pause)
-        {
-            pause() ; //call this before start the thread.
-        }
-
-        start();
+        LLThread::start();
     }
 }
 
@@ -80,7 +85,7 @@ void LLQueuedThread::shutdown()
             mRequestQueue.close();
         }
 
-        S32 timeout = 100;
+        S32 timeout = 50;
         for ( ; timeout>0; timeout--)
         {
             if (isStopped())
@@ -101,19 +106,34 @@ void LLQueuedThread::shutdown()
     }
 
     QueuedRequest* req;
-    S32 active_count = 0;
+    S32 queued_count = 0;
+    bool  has_active = false;
+    lockData();
     while ( (req = (QueuedRequest*)mRequestHash.pop_element()) )
     {
-        if (req->getStatus() == STATUS_QUEUED || req->getStatus() == STATUS_INPROGRESS)
+        if (req->getStatus() == STATUS_INPROGRESS)
         {
-            ++active_count;
+            has_active = true;
+            req->setFlags(FLAG_ABORT | FLAG_AUTO_COMPLETE);
+            continue;
+        }
+        if (req->getStatus() == STATUS_QUEUED)
+        {
+            ++queued_count;
             req->setStatus(STATUS_ABORTED); // avoid assert in deleteRequest
         }
         req->deleteRequest();
     }
-    if (active_count)
+    unlockData();
+    if (queued_count)
     {
-        LL_WARNS() << "~LLQueuedThread() called with active requests: " << active_count << LL_ENDL;
+        LL_WARNS() << "~LLQueuedThread() called with unpocessed requests: " << queued_count << LL_ENDL;
+    }
+    if (has_active)
+    {
+        LL_WARNS() << "~LLQueuedThread() called with active requests!" << LL_ENDL;
+        ms_sleep(100); // last chance for request to finish
+        printQueueStats();
     }
 
     mRequestQueue.close();
@@ -207,6 +227,33 @@ void LLQueuedThread::waitOnPending()
     return;
 }
 
+void LLQueuedThread::waitOnPending(F32 max_time_sec)
+{
+    LLTimer wait_timer;
+    wait_timer.reset();
+    while (1)
+    {
+        update(0);
+
+        if (mIdleThread)
+        {
+            break;
+        }
+
+        if (wait_timer.getElapsedTimeF64() >= max_time_sec)
+        {
+            LL_WARNS() << "waitOnPending() timed out after " << max_time_sec
+                << " seconds in thread: " << mName << LL_ENDL;
+            break;
+        }
+
+        if (mThreaded)
+        {
+            yield();
+        }
+    }
+}
+
 // MAIN thread
 void LLQueuedThread::printQueueStats()
 {
@@ -245,7 +292,7 @@ bool LLQueuedThread::addRequest(QueuedRequest* req)
 #endif
     unlockData();
 
-    llassert(!mDataLock->isSelfLocked());
+    llassert(!mRunCondition->isSelfLocked());
     mRequestQueue.post([this, req]() { processRequest(req); });
 
     return true;
@@ -452,7 +499,7 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
 
                 unlockData();
 
-                llassert(!mDataLock->isSelfLocked());
+                llassert(!mRunCondition->isSelfLocked());
 
 #if 0
                 // try again on next frame
@@ -510,10 +557,9 @@ bool LLQueuedThread::runCondition()
 // virtual
 void LLQueuedThread::run()
 {
-    // call checPause() immediately so we don't try to do anything before the class is fully constructed
+    // A queue made paused waits here until it is unpaused.
     checkPause();
     startThread();
-    mStarted = true;
 
 
     /*while (1)
@@ -570,7 +616,12 @@ LLQueuedThread::QueuedRequest::QueuedRequest(LLQueuedThread::handle_t handle, U3
 
 LLQueuedThread::QueuedRequest::~QueuedRequest()
 {
-    llassert_always(mStatus == STATUS_DELETE);
+    if (mStatus != STATUS_DELETE)
+    {
+        // The only method to delete a request is deleteRequest(),
+        // it should have set the status to STATUS_DELETE
+        LL_ERRS() << "LLQueuedThread::QueuedRequest deleted with status " << mStatus << LL_ENDL;
+    }
 }
 
 //virtual

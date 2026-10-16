@@ -41,7 +41,7 @@ LLViewerStatsRecorder::LLViewerStatsRecorder() :
     mLastSnapshotTime(0.0),
     mEnableStatsRecording(false),
     mEnableStatsLogging(false),
-    mInterval(0.2),
+    mInterval(0.2f),
     mMaxDuration(300.f),
     mSkipSaveIfZeros(false)
 {
@@ -194,7 +194,7 @@ void LLViewerStatsRecorder::writeToLog( F32 interval )
 
         // Open the data file
         makeStatsFileName();
-        mStatsFile = LLFile::fopen(mStatsFileName, "wb");
+        mStatsFile = LLFile::fopen(mStatsFileName, LLFILE_MODE("wb"));
 
         if (mStatsFile)
         {
@@ -297,8 +297,7 @@ void LLViewerStatsRecorder::makeStatsFileName()
     std::string stats_file_name("slviewerstats-");
 #endif
 
-    F64         now      = LLFrameTimer::getTotalSeconds();
-    std::string date_str = LLDate(now).asString();
+    std::string date_str = LLDate::now().asString();
     std::replace(date_str.begin(), date_str.end(), ':', '-');  // Make it valid for a filename
     stats_file_name.append(date_str);
     stats_file_name.append(".csv");

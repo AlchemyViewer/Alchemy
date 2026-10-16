@@ -34,22 +34,23 @@
 class LLFloaterModelUploadBase : public LLFloater, public LLUploadPermissionsObserver, public LLWholeModelFeeObserver, public LLWholeModelUploadObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterModelUploadBase, LLFloater);
 
     LLFloaterModelUploadBase(const LLSD& key);
 
     virtual ~LLFloaterModelUploadBase(){};
 
-    virtual void setPermissonsErrorStatus(S32 status, const std::string& reason) = 0;
+    virtual void setPermissonsErrorStatus(S32 status, const std::string& reason) override = 0;
 
-    virtual void onPermissionsReceived(const LLSD& result) = 0;
+    virtual void onPermissionsReceived(const LLSD& result) override = 0;
 
-    virtual void onModelPhysicsFeeReceived(const LLSD& result, std::string upload_url) = 0;
+    virtual void onModelPhysicsFeeReceived(const LLSD& result, std::string upload_url) override = 0;
 
-    virtual void setModelPhysicsFeeErrorStatus(S32 status, const std::string& reason, const LLSD& result) = 0;
+    virtual void setModelPhysicsFeeErrorStatus(S32 status, const std::string& reason, const LLSD& result) override = 0;
 
-    virtual void onModelUploadSuccess() {};
+    virtual void onModelUploadSuccess() override {};
 
-    virtual void onModelUploadFailure() {};
+    virtual void onModelUploadFailure() override {};
 
 protected:
 

@@ -156,9 +156,7 @@ public:
     // Attachment link management
     void unregisterAttachment(const LLUUID& item_id);
     void registerAttachment(const LLUUID& item_id);
-// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
-    bool getAttachmentInvLinkEnable() { return mAttachmentInvLinkEnabled; }
-// [/SL:KB]
+    bool getAttachmentInvLinkEnable() const { return mAttachmentInvLinkEnabled; }
     void setAttachmentInvLinkEnable(bool val);
 
     // Add COF link to individual item.
@@ -227,6 +225,15 @@ public:
 
     bool moveWearable(LLViewerInventoryItem* item, bool closer_to_body);
 
+    // Move a clothing item to an absolute layer index within its wearable type
+    // (0 == closest to the body). Persists the new order to the COF link descriptions.
+    bool reorderWearable(LLViewerInventoryItem* item, U32 new_index);
+
+    // Apply a complete layer order for one wearable type, persisting it to the
+    // COF link descriptions. ordered_link_ids lists the type's COF link items
+    // furthest-to-closest.
+    bool reorderWearableGroup(LLWearableType::EType type, const uuid_vec_t& ordered_link_ids);
+
     static void sortItemsByActualDescription(LLInventoryModel::item_array_t& items);
 
     //Divvy items into arrays by wearable type
@@ -256,7 +263,7 @@ public:
     void setAppearanceServiceURL(const std::string& url) { mAppearanceServiceURL = url; }
     std::string getAppearanceServiceURL() const;
 
-    typedef boost::function<void ()> attachments_changed_callback_t;
+    typedef std::function<void()>            attachments_changed_callback_t;
     typedef boost::signals2::signal<void ()> attachments_changed_signal_t;
     boost::signals2::connection setAttachmentsChangedCallback(attachments_changed_callback_t cb);
 
@@ -270,7 +277,11 @@ private:
 
 private:
 
-    void filterWearableItems(LLInventoryModel::item_array_t& items, S32 max_per_type, S32 max_total);
+    // Rewrite COF sort-index descriptions for one wearable type to match the
+    // current in-memory layer order, then trigger a single appearance update.
+    void persistWearableOrder(LLWearableType::EType type);
+
+    void filterWearableItems(LLInventoryModel::item_array_t& items, S32 max_per_type, S32 max_total, bool skip_bodyparts = false);
 
     void getDescendentsOfAssetType(const LLUUID& category,
                                           LLInventoryModel::item_array_t& items,
@@ -282,6 +293,7 @@ private:
                                    LLInventoryModel::item_array_t& gest_items);
 
     static void onOutfitRename(const LLSD& notification, const LLSD& response);
+
 
     bool mAttachmentInvLinkEnabled;
     bool mOutfitIsDirty;

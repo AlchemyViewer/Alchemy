@@ -36,13 +36,16 @@ class LLFrameTimer;
 class LLPanelPulldown : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelPulldown, LLPanel);
+
     LLPanelPulldown();
     void onMouseEnter(S32 x, S32 y, MASK mask) override;
     void onMouseLeave(S32 x, S32 y, MASK mask) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
-    bool handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
     void onTopLost() override;
     void onVisibilityChange(bool new_visibility) override;
 

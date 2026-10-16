@@ -31,7 +31,6 @@
 #include <string>
 // std headers
 // external library headers
-#include <boost/assign/list_of.hpp>
 // Precompiled header
 #include "linden_common.h"
 // associated header
@@ -43,8 +42,11 @@
 #endif
 
 /*****************************************************************************
-*   Display helpers: must be defined BEFORE lltut.h!
+*   Display helpers
 *****************************************************************************/
+namespace
+{
+
 // Display an arbitary value as itself...
 template<typename T>
 std::ostream& display(std::ostream& out, const T& value)
@@ -55,7 +57,7 @@ std::ostream& display(std::ostream& out, const T& value)
 
 // ...but display std::string enclosed in double quotes.
 template<>
-std::ostream& display(std::ostream& out, const std::string& value)
+[[maybe_unused]] std::ostream& display(std::ostream& out, const std::string& value)
 {
     out << '"' << value << '"';
     return out;
@@ -98,15 +100,15 @@ std::ostream& operator<<(std::ostream& out, const std::set<ENTRY>& set)
     return out;
 }
 
-/*****************************************************************************
-*   Now we can #include lltut.h
-*****************************************************************************/
-#include "../test/lltut.h"
+} // anonymous namespace
+
+#include <catch2/catch_test_macros.hpp>
 
 /*****************************************************************************
 *   Other helpers
 *****************************************************************************/
-using boost::assign::list_of;
+namespace
+{
 
 typedef LLDependencies<> StringDeps;
 typedef StringDeps::KeyList StringList;
@@ -145,54 +147,48 @@ bool is_empty(const RANGE& range)
     return boost::begin(range) == boost::end(range);
 }
 
-/*****************************************************************************
-*   tut test group
-*****************************************************************************/
-namespace tut
-{
-    struct deps_data
-    {
-    };
-    typedef test_group<deps_data> deps_group;
-    typedef deps_group::object deps_object;
-    tut::deps_group depsgr("LLDependencies");
+} // anonymous namespace
 
-    template<> template<>
-    void deps_object::test<1>()
+/*****************************************************************************
+*   Tests
+*****************************************************************************/
+namespace
+{
+    TEST_CASE("LLDependencies: sort orders keys by their before and after constraints", "[LLDependencies]")
     {
         StringDeps deps;
         StringList empty;
         // The quick brown fox jumps over the lazy yellow dog.
         // (note, "The" and "the" are distinct, else this test wouldn't work)
         deps.add("lazy");
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("lazy")));
+        CHECK(sorted_keys(deps) == StringList{"lazy"});
         deps.add("jumps");
-        ensure("found lazy", deps.get("lazy"));
-        ensure("not found dog.", ! deps.get("dog."));
+        CHECK(deps.get("lazy"));
+        CHECK_FALSE(deps.get("dog."));
         // NOTE: Maybe it's overkill to test each of these intermediate
         // results before all the interdependencies have been specified. My
         // thought is simply that if the order changes, I'd like to know why.
         // A change to the implementation of boost::topological_sort() would
         // be an acceptable reason, and you can simply update the expected
         // test output.
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("lazy")("jumps")));
-        deps.add("The", 0, empty, list_of("fox")("dog."));
+        CHECK(sorted_keys(deps) == StringList{ "lazy", "jumps" });
+        deps.add("The", 0, empty, { "fox", "dog." });
         // Test key accessors
-        ensure("empty before deps for missing key", is_empty(deps.get_before_range("bogus")));
-        ensure("empty before deps for jumps", is_empty(deps.get_before_range("jumps")));
-        ensure_equals(instance_from_range< std::set<std::string> >(deps.get_before_range("The")),
-                      make< std::set<std::string> >(list_of("dog.")("fox")));
+        UNSCOPED_INFO("empty before deps for missing key");
+        CHECK(is_empty(deps.get_before_range("bogus")));
+        CHECK(is_empty(deps.get_before_range("jumps")));
+        CHECK(instance_from_range< std::set<std::string> >(deps.get_before_range("The")) == std::set<std::string>{ "dog.", "fox" });
         // resume building dependencies
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("lazy")("jumps")("The")));
-        deps.add("the", 0, list_of("The"));
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("lazy")("jumps")("The")("the")));
-        deps.add("fox", 0, list_of("The"), list_of("jumps"));
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("lazy")("The")("the")("fox")("jumps")));
-        deps.add("the", 0, list_of("The")); // same, see if cache works
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("lazy")("The")("the")("fox")("jumps")));
-        deps.add("jumps", 0, empty, list_of("over")); // update jumps deps
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("lazy")("The")("the")("fox")("jumps")));
-/*==========================================================================*|
+        CHECK(sorted_keys(deps) == StringList{ "lazy", "jumps", "The" });
+        deps.add("the", 0, { "The" });
+        CHECK(sorted_keys(deps) == StringList{ "lazy", "jumps", "The", "the" });
+        deps.add("fox", 0, { "The" }, { "jumps" });
+        CHECK(sorted_keys(deps) == StringList{ "lazy", "The", "the", "fox", "jumps" });
+        deps.add("the", 0, { "The" }); // same, see if cache works
+        CHECK(sorted_keys(deps) == StringList{ "lazy", "The", "the", "fox", "jumps" });
+        deps.add("jumps", 0, empty, { "over" }); // update jumps deps
+        CHECK(sorted_keys(deps) == StringList{ "lazy", "The", "the", "fox", "jumps" });
+        /*==========================================================================*|
         // It drives me nuts that this test doesn't work in the test
         // framework, because -- for reasons unknown -- running the test
         // framework on Mac OS X 10.5 Leopard and Windows XP Pro, the catch
@@ -216,87 +212,73 @@ namespace tut
             deps.remove("over");
         }
 |*==========================================================================*/
-        deps.add("dog.", 0, list_of("yellow")("lazy"));
-        ensure_equals(instance_from_range< std::set<std::string> >(deps.get_after_range("dog.")),
-                      make< std::set<std::string> >(list_of("lazy")("yellow")));
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("lazy")("The")("the")("fox")("jumps")("dog.")));
-        deps.add("quick", 0, list_of("The"), list_of("fox")("brown"));
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("lazy")("The")("the")("quick")("fox")("jumps")("dog.")));
-        deps.add("over", 0, list_of("jumps"), list_of("yellow")("the"));
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("lazy")("The")("quick")("fox")("jumps")("over")("the")("dog.")));
-        deps.add("yellow", 0, list_of("the"), list_of("lazy"));
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("The")("quick")("fox")("jumps")("over")("the")("yellow")("lazy")("dog.")));
+        deps.add("dog.", 0, { "yellow", "lazy" });
+        CHECK(instance_from_range< std::set<std::string> >(deps.get_after_range("dog.")) == std::set<std::string>{ "lazy", "yellow" });
+        CHECK(sorted_keys(deps) == StringList{ "lazy", "The", "the", "fox", "jumps", "dog." });
+        deps.add("quick", 0, { "The" }, { "fox", "brown" });
+        CHECK(sorted_keys(deps) == StringList{ "lazy", "The", "the", "quick", "fox", "jumps", "dog." });
+        deps.add("over", 0, { "jumps" }, { "yellow", "the" });
+        CHECK(sorted_keys(deps) == StringList{ "lazy", "The", "quick", "fox", "jumps", "over", "the", "dog." });
+        deps.add("yellow", 0, { "the" }, { "lazy" });
+        CHECK(sorted_keys(deps) == StringList{ "The", "quick", "fox", "jumps", "over", "the", "yellow", "lazy", "dog." });
         deps.add("brown");
         // By now the dependencies are pretty well in place. A change to THIS
         // order should be viewed with suspicion.
-        ensure_equals(sorted_keys(deps), make<StringList>(list_of("The")("quick")("brown")("fox")("jumps")("over")("the")("yellow")("lazy")("dog.")));
+        CHECK(sorted_keys(deps) == StringList{ "The", "quick", "brown", "fox", "jumps", "over", "the", "yellow", "lazy", "dog." });
 
-        StringList keys(make<StringList>(list_of("The")("brown")("dog.")("fox")("jumps")("lazy")("over")("quick")("the")("yellow")));
-        ensure_equals(instance_from_range<StringList>(deps.get_key_range()), keys);
-#if (! defined(__GNUC__)) || (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ > 3)
-        // This is the succinct way, works on modern compilers
-        ensure_equals(instance_from_range<StringList>(make_transform_range(deps.get_range(), extract_key)), keys);
-#else   // gcc 3.3
-        StringDeps::range got_range(deps.get_range());
-        StringDeps::iterator kni = got_range.begin(), knend = got_range.end();
-        StringList::iterator ki = keys.begin(), kend = keys.end();
-        for ( ; kni != knend && ki != kend; ++kni, ++ki)
-        {
-            ensure_equals(kni->first, *ki);
-        }
-        ensure("get_range() returns proper length", kni == knend && ki == kend);
-#endif  // gcc 3.3
+        StringList keys(StringList{ "The", "brown", "dog.", "fox", "jumps", "lazy", "over", "quick", "the", "yellow" });
+        CHECK(instance_from_range<StringList>(deps.get_key_range()) == keys);
+        CHECK(instance_from_range<StringList>(make_transform_range(deps.get_range(), extract_key)) == keys);
         // blow off get_node_range() because they're all LLDependenciesEmpty instances
     }
 
-    template<> template<>
-    void deps_object::test<2>()
+    TEST_CASE("LLDependencies: range and iterator accessors reach each key and its int node", "[LLDependencies]")
     {
         typedef LLDependencies<std::string, int> NameIndexDeps;
         NameIndexDeps nideps;
         const NameIndexDeps& const_nideps(nideps);
-        nideps.add("def", 2, list_of("ghi"));
+        nideps.add("def", 2, { "ghi" });
         nideps.add("ghi", 3);
-        nideps.add("abc", 1, list_of("def"));
+        nideps.add("abc", 1, { "def" });
         NameIndexDeps::range range(nideps.get_range());
-        ensure_equals(range.begin()->first, "abc");
-        ensure_equals(range.begin()->second, 1);
+        CHECK(range.begin()->first == "abc");
+        CHECK(range.begin()->second == 1);
         range.begin()->second = 0;
         range.begin()->second = 1;
         NameIndexDeps::const_range const_range(const_nideps.get_range());
         NameIndexDeps::const_iterator const_iterator(const_range.begin());
         ++const_iterator;
-        ensure_equals(const_iterator->first, "def");
-        ensure_equals(const_iterator->second, 2);
+        CHECK(const_iterator->first == "def");
+        CHECK(const_iterator->second == 2);
 //        NameIndexDeps::node_range node_range(nideps.get_node_range());
-//        ensure_equals(instance_from_range<std::vector<int> >(node_range), make< std::vector<int> >(list_of(1)(2)(3)));
+//        ensure_equals(instance_from_range<std::vector<int> >(node_range), make< std::vector<int> >(list_of(1,2,3)));
 //        *node_range.begin() = 0;
 //        *node_range.begin() = 1;
         NameIndexDeps::const_node_range const_node_range(const_nideps.get_node_range());
-        ensure_equals(instance_from_range<std::vector<int> >(const_node_range), make< std::vector<int> >(list_of(1)(2)(3)));
+        CHECK(instance_from_range<std::vector<int>>(const_node_range) == std::vector<int>{ 1, 2, 3 });
         NameIndexDeps::const_key_range const_key_range(const_nideps.get_key_range());
-        ensure_equals(instance_from_range<StringList>(const_key_range), make<StringList>(list_of("abc")("def")("ghi")));
+        CHECK(instance_from_range<StringList>(const_key_range) == StringList{ "abc", "def", "ghi" });
         NameIndexDeps::sorted_range sorted(const_nideps.sort());
         NameIndexDeps::sorted_iterator sortiter(sorted.begin());
-        ensure_equals(sortiter->first, "ghi");
-        ensure_equals(sortiter->second, 3);
+        CHECK(sortiter->first == "ghi");
+        CHECK(sortiter->second == 3);
 
         // test all iterator-flavored versions of get_after_range()
-        StringList def(make<StringList>(list_of("def")));
-        ensure("empty abc before list", is_empty(nideps.get_before_range(nideps.get_range().begin())));
-        ensure_equals(instance_from_range<StringList>(nideps.get_after_range(nideps.get_range().begin())),
+        StringList def{"def"};
+        UNSCOPED_INFO("abc has nothing before it");
+        CHECK(is_empty(nideps.get_before_range(nideps.get_range().begin())));
+        CHECK(instance_from_range<StringList>(nideps.get_after_range(nideps.get_range().begin())) ==
                       def);
-        ensure_equals(instance_from_range<StringList>(const_nideps.get_after_range(const_nideps.get_range().begin())),
+        CHECK(instance_from_range<StringList>(const_nideps.get_after_range(const_nideps.get_range().begin())) ==
                       def);
 //        ensure_equals(instance_from_range<StringList>(nideps.get_after_range(nideps.get_node_range().begin())),
 //                      def);
-        ensure_equals(instance_from_range<StringList>(const_nideps.get_after_range(const_nideps.get_node_range().begin())),
+        CHECK(instance_from_range<StringList>(const_nideps.get_after_range(const_nideps.get_node_range().begin())) ==
                       def);
-        ensure_equals(instance_from_range<StringList>(nideps.get_after_range(nideps.get_key_range().begin())),
+        CHECK(instance_from_range<StringList>(nideps.get_after_range(nideps.get_key_range().begin())) ==
                       def);
         // advance from "ghi" to "def", which must come after "ghi"
         ++sortiter;
-        ensure_equals(instance_from_range<StringList>(const_nideps.get_after_range(sortiter)),
-                      make<StringList>(list_of("ghi")));
+        CHECK(instance_from_range<StringList>(const_nideps.get_after_range(sortiter)) == StringList{ "ghi" });
     }
-} // namespace tut
+} // anonymous namespace

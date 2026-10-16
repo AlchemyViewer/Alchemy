@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,29 +26,15 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#ifdef INCLUDE_VLD
-#include "vld.h"
-#endif
-#include "llwin32headers.h"
-
-#include "llwindow.h"
-
-#if !LL_SDL_WINDOW
-#include "llwindowwin32.h" // *FIX: for setting gIconResource.
-#endif
-
 #include "llappviewerwin32.h"
 
-#include "llgl.h"
 #if !LL_SDL_WINDOW
-#include "res/resource.h" // *FIX: for setting gIconResource.
+#include "llwindowwin32.h" // for gIconResource, set in the native WINMAIN below
 #endif
 
-#include <fcntl.h>      //_O_APPEND
-#include <io.h>         //_open_osfhandle()
+#include "res/resource.h" // *FIX: for setting gIconResource.
+
 #include <WERAPI.H>     // for WerAddExcludedApplication()
-#include <process.h>    // _spawnl()
-#include <tchar.h>      // For TCHAR support
 
 #include "llviewercontrol.h"
 #include "lldxhardware.h"
@@ -58,173 +44,26 @@
 
 #include <stdlib.h>
 
-#include "llweb.h"
-
-#include "llviewernetwork.h"
 #include "llmd5.h"
 #include "llfindlocale.h"
 
 #include "llcommandlineparser.h"
-#include "lltrans.h"
 
 #ifndef LL_RELEASE_FOR_DOWNLOAD
 #include "llwindebug.h"
 #endif
 
-#include "stringize.h"
 #include "lldir.h"
-#include "llerrorcontrol.h"
 
-#include <fstream>
 #include <exception>
 
-// Bugsplat (http://bugsplat.com) crash reporting tool
-#ifdef LL_BUGSPLAT
-#include "BugSplat.h"
-#include "boost/json.hpp"                 // Boost.Json
-#include "llagent.h"                // for agent location
-#include "llstartup.h"
-#include "llviewerregion.h"
-#include "llvoavatarself.h"         // for agent name
+// Velopack installer and update framework
+#if LL_VELOPACK
+#include "llvelopack.h"
+#endif
+#include "llversioninfovars.h"
 
-namespace
-{
-    // MiniDmpSender's constructor is defined to accept __wchar_t* instead of
-    // plain wchar_t*. That said, wunder() returns std::basic_string<__wchar_t>,
-    // NOT plain __wchar_t*, despite the apparent convenience. Calling
-    // wunder(something).c_str() as an argument expression is fine: that
-    // std::basic_string instance will survive until the function returns.
-    // Calling c_str() on a std::basic_string local to wunder() would be
-    // Undefined Behavior: we'd be left with a pointer into a destroyed
-    // std::basic_string instance. But we can do that with a macro...
-    #define WCSTR(string) wunder(string).c_str()
-
-    // It would be nice if, when wchar_t is the same as __wchar_t, this whole
-    // function would optimize away. However, we use it only for the arguments
-    // to the BugSplat API -- a handful of calls.
-    inline std::basic_string<__wchar_t> wunder(const std::wstring& str)
-    {
-        return { str.begin(), str.end() };
-    }
-
-    // when what we have in hand is a std::string, convert from UTF-8 using
-    // specific wstringize() overload
-    inline std::basic_string<__wchar_t> wunder(const std::string& str)
-    {
-        return wunder(wstringize(str));
-    }
-
-    // Irritatingly, MiniDmpSender::setCallback() is defined to accept a
-    // classic-C function pointer instead of an arbitrary C++ callable. If it
-    // did accept a modern callable, we could pass a lambda that binds our
-    // MiniDmpSender pointer. As things stand, though, we must define an
-    // actual function and store the pointer statically.
-    static MiniDmpSender *sBugSplatSender = nullptr;
-
-    bool bugsplatSendLog(UINT nCode, LPVOID lpVal1, LPVOID lpVal2)
-    {
-        if (nCode == MDSCB_EXCEPTIONCODE)
-        {
-            // send the main viewer log file, one per instance
-            // widen to wstring, convert to __wchar_t, then pass c_str()
-            sBugSplatSender->sendAdditionalFile(
-                WCSTR(LLError::logFileName()));
-
-            // second instance does not have some log files
-            // TODO: This needs fixing, if each instance now has individual logs,
-            // same should be made true for static debug files
-            if (!LLAppViewer::instance()->isSecondInstance())
-            {
-                sBugSplatSender->sendAdditionalFile(
-                    WCSTR(*LLAppViewer::instance()->getStaticDebugFile()));
-            }
-
-            sBugSplatSender->sendAdditionalFile(
-                WCSTR(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "settings.xml")));
-
-            // We don't have an email address for any user. Hijack this
-            // metadata field for the platform identifier.
-            sBugSplatSender->setDefaultUserEmail(
-                WCSTR(LLOSInfo::instance().getOSStringSimple()));
-
-            if (gAgentAvatarp)
-            {
-                // user name, when we have it
-                sBugSplatSender->setDefaultUserName(WCSTR(gAgentAvatarp->getFullname()));
-
-                sBugSplatSender->sendAdditionalFile(
-                    WCSTR(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "settings_per_account.xml")));
-            }
-
-            // LL_ERRS message, when there is one
-            sBugSplatSender->setDefaultUserDescription(WCSTR(LLError::getFatalMessage()));
-
-            sBugSplatSender->setAttribute(WCSTR(L"OS"), WCSTR(LLOSInfo::instance().getOSStringSimple())); // In case we ever stop using email for this
-            sBugSplatSender->setAttribute(WCSTR(L"AppState"), WCSTR(LLStartUp::getStartupStateString()));
-            sBugSplatSender->setAttribute(WCSTR(L"GLVendor"), WCSTR(gGLManager.mGLVendor));
-            sBugSplatSender->setAttribute(WCSTR(L"GLVersion"), WCSTR(gGLManager.mGLVersionString));
-            sBugSplatSender->setAttribute(WCSTR(L"GPUVersion"), WCSTR(gGLManager.mDriverVersionVendorString));
-            sBugSplatSender->setAttribute(WCSTR(L"GLRenderer"), WCSTR(gGLManager.mGLRenderer));
-            sBugSplatSender->setAttribute(WCSTR(L"VRAM"), WCSTR(STRINGIZE(gGLManager.mVRAM)));
-            sBugSplatSender->setAttribute(WCSTR(L"RAM"), WCSTR(STRINGIZE(gSysMemory.getPhysicalMemoryKB().value())));
-
-            if (gAgent.getRegion())
-            {
-                // region location, when we have it
-                LLVector3 loc = gAgent.getPositionAgent();
-                sBugSplatSender->resetAppIdentifier(
-                    WCSTR(STRINGIZE(gAgent.getRegion()->getName()
-                                    << '/' << loc.mV[0]
-                                    << '/' << loc.mV[1]
-                                    << '/' << loc.mV[2])));
-            }
-        } // MDSCB_EXCEPTIONCODE
-
-        return false;
-    }
-}
-#endif // LL_BUGSPLAT
-
-namespace
-{
-    void (*gOldTerminateHandler)() = NULL;
-}
-
-static void exceptionTerminateHandler()
-{
-    // reinstall default terminate() handler in case we re-terminate.
-    if (gOldTerminateHandler) std::set_terminate(gOldTerminateHandler);
-    // treat this like a regular viewer crash, with nice stacktrace etc.
-    long *null_ptr;
-    null_ptr = 0;
-    *null_ptr = 0xDEADBEEF; //Force an exception that will trigger breakpad.
-
-    // we've probably been killed-off before now, but...
-    gOldTerminateHandler(); // call old terminate() handler
-}
-
-LONG WINAPI catchallCrashHandler(EXCEPTION_POINTERS * /*ExceptionInfo*/)
-{
-    LL_WARNS() << "Hit last ditch-effort attempt to catch crash." << LL_ENDL;
-    exceptionTerminateHandler();
-    return 0;
-}
-
-const std::string LLAppViewerWin32::sWindowClass = "Alchemy";
-
-/*
-    This function is used to print to the command line a text message
-    describing the nvapi error and quits
-*/
-void nvapi_error(NvAPI_Status status)
-{
-    NvAPI_ShortString szDesc = {0};
-    NvAPI_GetErrorMessage(status, szDesc);
-    LL_WARNS() << szDesc << LL_ENDL;
-
-    //should always trigger when asserts are enabled
-    //llassert(status == NVAPI_OK);
-}
+extern bool gGPUBenchmarkMode;
 
 // Create app mutex creates a unique global windows object.
 // If the object can be created it returns true, otherwise
@@ -247,6 +86,20 @@ bool create_app_mutex()
     return result;
 }
 
+/*
+    This function is used to print to the command line a text message
+    describing the nvapi error and quits
+*/
+void nvapi_error(NvAPI_Status status)
+{
+    NvAPI_ShortString szDesc = {0};
+    NvAPI_GetErrorMessage(status, szDesc);
+    LL_WARNS() << "nvapi error: " << szDesc << LL_ENDL;
+
+    //should always trigger when asserts are enabled
+    //llassert(status == NVAPI_OK);
+}
+
 void ll_nvapi_init(NvDRSSessionHandle hSession)
 {
     // (2) load all the system settings into the session
@@ -258,8 +111,7 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
     }
 
     NvAPI_UnicodeString profile_name;
-    std::string app_name = LLTrans::getString("APP_NAME");
-    std::wstring w_app_name = ll_convert<std::wstring>(app_name);
+    std::wstring w_app_name = TEXT("Alchemy Viewer");
     wsprintf(reinterpret_cast<wchar_t*>(profile_name), L"%s", w_app_name.c_str());
     NvDRSProfileHandle hProfile = 0;
     // (3) Check if we already have an application profile for the viewer
@@ -272,7 +124,7 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
     else if (status == NVAPI_PROFILE_NOT_FOUND)
     {
         // Don't have an application profile yet - create one
-        LL_INFOS() << "Creating NVIDIA application profile" << LL_ENDL;
+        LL_INFOS() << "Creating Alchemy Viewer profile for NVIDIA driver" << LL_ENDL;
 
         NVDRS_PROFILE profileInfo;
         profileInfo.version = NVDRS_PROFILE_VER;
@@ -285,11 +137,51 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
             nvapi_error(status);
             return;
         }
+
+        // set the preferred power management mode
+        {
+            NVDRS_SETTING drsSetting = {};
+            drsSetting.version = NVDRS_SETTING_VER;
+            drsSetting.settingId = PREFERRED_PSTATE_ID;
+            drsSetting.settingType = NVDRS_DWORD_TYPE;
+            drsSetting.u32CurrentValue = PREFERRED_PSTATE_PREFER_MAX;
+            status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
+            if (status != NVAPI_OK)
+            {
+                nvapi_error(status);
+                return;
+            }
+            LL_INFOS() << "Set preferred power management mode" << LL_ENDL;
+        }
+
+        // set the preferred opengl threading state
+        {
+            NVDRS_SETTING drsSetting = {};
+            drsSetting.version = NVDRS_SETTING_VER;
+            drsSetting.settingId = OGL_THREAD_CONTROL_ID;
+            drsSetting.settingType = NVDRS_DWORD_TYPE;
+            drsSetting.u32CurrentValue = OGL_THREAD_CONTROL_ENABLE;
+            status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
+            if (status != NVAPI_OK)
+            {
+                nvapi_error(status);
+                return;
+            }
+            LL_INFOS() << "Set preferred GL Threading mode" << LL_ENDL;
+        }
+
+        // apply our changes to the system
+        status = NvAPI_DRS_SaveSettings(hSession);
+        if (status != NVAPI_OK)
+        {
+            nvapi_error(status);
+            return;
+        }
     }
 
     // (4) Check if current exe is part of the profile
     std::string exe_name = gDirUtilp->getExecutableFilename();
-    NVDRS_APPLICATION profile_application;
+    NVDRS_APPLICATION profile_application = {};
     profile_application.version = NVDRS_APPLICATION_VER;
 
     std::wstring w_exe_name = ll_convert<std::wstring>(exe_name);
@@ -307,12 +199,12 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
         LL_INFOS() << "Creating application for " << exe_name << " for NVIDIA application profile" << LL_ENDL;
 
         // Add this exe to the profile
-        NVDRS_APPLICATION application;
+        NVDRS_APPLICATION application = {};
         application.version = NVDRS_APPLICATION_VER;
         application.isPredefined = 0;
         wsprintf(reinterpret_cast<wchar_t*>(application.appName), L"%s", w_exe_name.c_str());
-        wsprintf(reinterpret_cast<wchar_t*>(application.userFriendlyName), L"%s", w_exe_name.c_str());
         wsprintf(reinterpret_cast<wchar_t*>(application.launcher), L"%s", w_exe_name.c_str());
+        wsprintf(reinterpret_cast<wchar_t*>(application.userFriendlyName), L"%s", w_app_name.c_str());
         wsprintf(reinterpret_cast<wchar_t*>(application.fileInFolder), L"%s", "");
 
         status = NvAPI_DRS_CreateApplication(hSession, hProfile, &application);
@@ -339,68 +231,58 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
         return;
     }
 
-    //get the preferred power management mode for Second Life
-    NVDRS_SETTING drsSetting = {0};
-    drsSetting.version = NVDRS_SETTING_VER;
-    status = NvAPI_DRS_GetSetting(hSession, hProfile, PREFERRED_PSTATE_ID, &drsSetting);
-    if (status == NVAPI_SETTING_NOT_FOUND)
-    { //only override if the user hasn't specifically set this setting
-        // (5) Specify that we want to enable maximum performance setting
-        // first we fill the NVDRS_SETTING struct, then we call the function
-        drsSetting.version = NVDRS_SETTING_VER;
-        drsSetting.settingId = PREFERRED_PSTATE_ID;
-        drsSetting.settingType = NVDRS_DWORD_TYPE;
-        drsSetting.u32CurrentValue = PREFERRED_PSTATE_PREFER_MAX;
-        status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-
-        // (6) Now we apply (or save) our changes to the system
-        status = NvAPI_DRS_SaveSettings(hSession);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-    }
-    else if (status != NVAPI_OK)
-    {
-        nvapi_error(status);
-        return;
-    }
-
-    // enable Threaded Optimization instead of letting the driver decide
-    status = NvAPI_DRS_GetSetting(hSession, hProfile, OGL_THREAD_CONTROL_ID, &drsSetting);
-    if (status == NVAPI_SETTING_NOT_FOUND || (status == NVAPI_OK && drsSetting.u32CurrentValue != OGL_THREAD_CONTROL_ENABLE))
-    {
-        drsSetting.version = NVDRS_SETTING_VER;
-        drsSetting.settingId = OGL_THREAD_CONTROL_ID;
-        drsSetting.settingType = NVDRS_DWORD_TYPE;
-        drsSetting.u32CurrentValue = OGL_THREAD_CONTROL_ENABLE;
-        status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-
-        // Now we apply (or save) our changes to the system
-        status = NvAPI_DRS_SaveSettings(hSession);
-        if (status != NVAPI_OK)
-        {
-            nvapi_error(status);
-            return;
-        }
-    }
-    else if (status != NVAPI_OK)
+    // apply our changes to the system
+    status = NvAPI_DRS_SaveSettings(hSession);
+    if (status != NVAPI_OK)
     {
         nvapi_error(status);
         return;
     }
 }
+
+void* ll_nvapi_session_create()
+{
+    NvDRSSessionHandle hSession = 0;
+    static LLCachedControl<bool> use_nv_api(gSavedSettings, "NvAPICreateApplicationProfile", true);
+    if (use_nv_api)
+    {
+        NvAPI_Status status;
+
+        // Initialize NVAPI
+        status = NvAPI_Initialize();
+
+        if (status == NVAPI_OK)
+        {
+            // Create the session handle to access driver settings
+            status = NvAPI_DRS_CreateSession(&hSession);
+            if (status != NVAPI_OK)
+            {
+                nvapi_error(status);
+                hSession = 0;
+            }
+            else
+            {
+                //override driver setting as needed
+                ll_nvapi_init(hSession);
+            }
+        }
+    }
+    return hSession;
+}
+
+void ll_nvapi_session_destroy(void* session)
+{
+    // (NVAPI) (6) We clean up. This is analogous to doing a free()
+    if (session)
+    {
+        NvAPI_DRS_DestroySession(reinterpret_cast<NvDRSSessionHandle>(session));
+    }
+}
+
+// When USE_SDL_WINDOW is enabled on Windows the exe entry point is SDL's
+// generated wWinMain in llappviewersdl.cpp (SDL_MAIN_USE_CALLBACKS), which
+// drives LLAppViewerWin32 through the SDL_App* callbacks instead.
+#if !LL_SDL_WINDOW
 
 //#define DEBUGGING_SEH_FILTER 1
 #if DEBUGGING_SEH_FILTER
@@ -414,6 +296,17 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
                      PWSTR     pCmdLine,
                      int       nCmdShow)
 {
+#if LL_VELOPACK
+    // Velopack MUST be initialized first - it may handle install/uninstall
+    // commands and exit the process before we do anything else.
+    if (!velopack_initialize())
+    {
+        // Obsolete? Always return true
+        // Velopack handled the invocation (install/uninstall hook)
+        return 0;
+    }
+#endif
+
     // Call Tracy first thing to have it allocate memory
     // https://github.com/wolfpld/tracy/issues/196
     LL_PROFILER_FRAME_END;
@@ -423,11 +316,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     DWORD heap_enable_lfh_error[MAX_HEAPS];
     S32 num_heaps = 0;
 
-#if !LL_SDL_WINDOW
-    LLWindowWin32::setDPIAwareness();
-#endif
-
-#if WINDOWS_CRT_MEM_CHECKS && !INCLUDE_VLD
+#if WINDOWS_CRT_MEM_CHECKS
     _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // dump memory leaks on exit
 #elif 0
     // Experimental - enable the low fragmentation heap
@@ -454,17 +343,24 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 #endif
 #endif
 
-#if !LL_SDL_WINDOW
     // *FIX: global
     gIconResource = MAKEINTRESOURCE(IDI_LL_ICON);
-#endif
+
+    // Benchmark subprocess mode before full init for LLFeatureManager::loadGPUClass().
+    {
+        std::wstring cmdLineStr(pCmdLine ? pCmdLine : L"");
+        if (cmdLineStr.find(L"--gpubenchmark") != std::wstring::npos)
+        {
+            gGPUBenchmarkMode = true;
+        }
+    }
 
     LLAppViewerWin32* viewer_app_ptr = new LLAppViewerWin32(ll_convert_wide_to_string(pCmdLine).c_str());
 
-    gOldTerminateHandler = std::set_terminate(exceptionTerminateHandler);
+    LLAppViewer::installTerminateHandler();
 
     // Set a debug info flag to indicate if multiple instances are running.
-    bool found_other_instance = !create_app_mutex();
+    bool found_other_instance = gGPUBenchmarkMode || !create_app_mutex();
     gDebugInfo["FoundOtherInstanceAtStartup"] = LLSD::Boolean(found_other_instance);
 
     bool ok = viewer_app_ptr->init();
@@ -474,30 +370,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
         return -1;
     }
 
-    NvDRSSessionHandle hSession = 0;
-    static LLCachedControl<bool> use_nv_api(gSavedSettings, "NvAPICreateApplicationProfile", true);
-    if (use_nv_api)
-    {
-        NvAPI_Status status;
-
-        // Initialize NVAPI
-        status = NvAPI_Initialize();
-
-        if (status == NVAPI_OK)
-        {
-            // Create the session handle to access driver settings
-            status = NvAPI_DRS_CreateSession(&hSession);
-            if (status != NVAPI_OK)
-            {
-                nvapi_error(status);
-            }
-            else
-            {
-                //override driver setting as needed
-                ll_nvapi_init(hSession);
-            }
-        }
-    }
+    NvDRSSessionHandle hSession = reinterpret_cast<NvDRSSessionHandle>(ll_nvapi_session_create());
 
     // Have to wait until after logging is initialized to display LFH info
     if (num_heaps > 0)
@@ -555,12 +428,8 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     delete viewer_app_ptr;
     viewer_app_ptr = NULL;
 
-    // (NVAPI) (6) We clean up. This is analogous to doing a free()
-    if (hSession)
-    {
-        NvAPI_DRS_DestroySession(hSession);
-        hSession = 0;
-    }
+    ll_nvapi_session_destroy(hSession);
+    hSession = 0;
 
     return 0;
 }
@@ -586,17 +455,25 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 }
 #endif
 
-void LLAppViewerWin32::disableWinErrorReporting()
+#endif // !LL_SDL_WINDOW
+
+void LLAppViewerWin32::setWinErrorReportingExcluded(bool excluded)
 {
     std::string executable_name = gDirUtilp->getExecutableFilename();
+    std::wstring wide_name = ll_convert<std::wstring>(executable_name);
 
-    if( S_OK == WerAddExcludedApplication(ll_convert<std::wstring>(executable_name).c_str(), FALSE ) )
+    const char* call = excluded ? "WerAddExcludedApplication" : "WerRemoveExcludedApplication";
+    HRESULT result = excluded ? WerAddExcludedApplication(wide_name.c_str(), FALSE)
+                              : WerRemoveExcludedApplication(wide_name.c_str(), FALSE);
+    if (S_OK == result)
     {
-        LL_INFOS() << "WerAddExcludedApplication() succeeded for " << executable_name << LL_ENDL;
+        LL_INFOS() << call << "() succeeded for " << executable_name << LL_ENDL;
     }
     else
     {
-        LL_INFOS() << "WerAddExcludedApplication() failed for " << executable_name << LL_ENDL;
+        // Removing an entry that is not there is the usual way here.
+        LL_INFOS() << call << "() returned 0x" << std::hex << result << std::dec
+                   << " for " << executable_name << LL_ENDL;
     }
 }
 
@@ -685,116 +562,15 @@ bool LLAppViewerWin32::init()
 {
     // Platform specific initialization.
 
-    // Turn off Windows Error Reporting
-    // (Don't send our data to Microsoft--at least until we are Logo approved and have a way
-    // of getting the data back from them.)
-    //
-    // LL_INFOS() << "Turning off Windows error reporting." << LL_ENDL;
-    disableWinErrorReporting();
-
 #ifndef LL_RELEASE_FOR_DOWNLOAD
     // Merely requesting the LLSingleton instance initializes it.
     LLWinDebug::instance();
 #endif
 
-#if LL_SEND_CRASH_REPORTS
-#if ! defined(LL_BUGSPLAT)
-#pragma message("Building without BugSplat")
-
-#else // LL_BUGSPLAT
-#pragma message("Building with BugSplat")
-
-    if (!isSecondInstance())
-    {
-        // Cleanup previous session
-        std::string log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "bugsplat.log");
-        LLFile::remove(log_file, ENOENT);
-    }
-
-    // Win7 is no longer supported
-    bool is_win_7_or_below = LLOSInfo::getInstance()->mMajorVer <= 6 && LLOSInfo::getInstance()->mMajorVer <= 1;
-
-    if (!is_win_7_or_below)
-    {
-        std::string build_data_fname(
-            gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "build_data.json"));
-        // Use llifstream instead of std::ifstream because LL_PATH_EXECUTABLE
-        // could contain non-ASCII characters, which std::ifstream doesn't handle.
-        llifstream inf(build_data_fname.c_str());
-        if (!inf.is_open())
-        {
-            LL_WARNS("BUGSPLAT") << "Can't initialize BugSplat, can't read '" << build_data_fname
-                << "'" << LL_ENDL;
-        }
-        else
-        {
-            boost::system::error_code ec;
-            boost::json::value build_data = boost::json::parse(inf, ec);
-            if(ec.failed())
-            {
-                // gah, the typo is baked into Json::Reader API
-                LL_WARNS("BUGSPLAT") << "Can't initialize BugSplat, can't parse '" << build_data_fname
-                    << "': " << ec.what() << LL_ENDL;
-            }
-            else
-            {
-                if (!build_data.is_object() || !build_data.as_object().contains("BugSplat DB"))
-                {
-                    LL_WARNS("BUGSPLAT") << "Can't initialize BugSplat, no 'BugSplat DB' entry in '"
-                        << build_data_fname << "'" << LL_ENDL;
-                }
-                else
-                {
-                    boost::json::value BugSplat_DB = build_data.at("BugSplat DB");
-
-                    // Got BugSplat_DB, onward!
-                    std::wstring version_string(WSTRINGIZE(LL_VIEWER_VERSION_MAJOR << '.' <<
-                        LL_VIEWER_VERSION_MINOR << '.' <<
-                        LL_VIEWER_VERSION_PATCH << '.' <<
-                        LL_VIEWER_VERSION_BUILD));
-
-                    DWORD dwFlags = MDSF_NONINTERACTIVE | // automatically submit report without prompting
-                        MDSF_PREVENTHIJACKING; // disallow swiping Exception filter
-
-                    bool needs_log_file = !isSecondInstance();
-                    LL_DEBUGS("BUGSPLAT");
-                    if (needs_log_file)
-                    {
-                        // Startup only!
-                        LL_INFOS("BUGSPLAT") << "Engaged BugSplat logging to bugsplat.log" << LL_ENDL;
-                        dwFlags |= MDSF_LOGFILE | MDSF_LOG_VERBOSE;
-                    }
-                    LL_ENDL;
-
-                    // have to convert normal wide strings to strings of __wchar_t
-                    sBugSplatSender = new MiniDmpSender(
-                        WCSTR(boost::json::value_to<std::string>(BugSplat_DB)),
-                        WCSTR(LL_TO_WSTRING(LL_VIEWER_CHANNEL)),
-                        WCSTR(version_string),
-                        nullptr,              // szAppIdentifier -- set later
-                        dwFlags);
-                    sBugSplatSender->setCallback(bugsplatSendLog);
-
-                    LL_DEBUGS("BUGSPLAT");
-                    if (needs_log_file)
-                    {
-                        // Log file will be created in %TEMP%, but it will be moved into logs folder in case of crash
-                        std::string log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "bugsplat.log");
-                        sBugSplatSender->setLogFilePath(WCSTR(log_file));
-                    }
-                    LL_ENDL;
-
-                    // engage stringize() overload that converts from wstring
-                    LL_INFOS("BUGSPLAT") << "Engaged BugSplat(" << LL_TO_STRING(LL_VIEWER_CHANNEL)
-                        << ' ' << stringize(version_string) << ')' << LL_ENDL;
-                } // got BugSplat_DB
-            } // parsed build_data.json
-        } // opened build_data.json
-    } // !is_win_7_or_below
-#endif // LL_BUGSPLAT
-#endif // LL_SEND_CRASH_REPORTS
-
     bool success = LLAppViewer::init();
+
+    // Enable WER for this process. This is a no-op if WER is not available.
+    setWinErrorReportingExcluded(false);
 
     return success;
 }
@@ -804,26 +580,9 @@ bool LLAppViewerWin32::cleanup()
     bool result = LLAppViewer::cleanup();
 
     gDXHardware.cleanup();
-
-    if (mIsConsoleAllocated)
-    {
-        FreeConsole();
-        mIsConsoleAllocated = false;
-    }
+    cleanupConsole();
 
     return result;
-}
-
-bool LLAppViewerWin32::reportCrashToBugsplat(void* pExcepInfo)
-{
-#if defined(LL_BUGSPLAT)
-    if (sBugSplatSender)
-    {
-        sBugSplatSender->createReport((EXCEPTION_POINTERS*)pExcepInfo);
-        return true;
-    }
-#endif // LL_BUGSPLAT
-    return false;
 }
 
 bool LLAppViewerWin32::initWindow()
@@ -857,8 +616,20 @@ void LLAppViewerWin32::initLoggingAndGetLastDuration()
 void LLAppViewerWin32::initConsole()
 {
     // pop up debug console
-    mIsConsoleAllocated = create_console();
+    if (!gGPUBenchmarkMode)
+    {
+        mIsConsoleAllocated = create_console();
+    }
     return LLAppViewer::initConsole();
+}
+
+void LLAppViewerWin32::cleanupConsole()
+{
+    if (mIsConsoleAllocated)
+    {
+        FreeConsole();
+        mIsConsoleAllocated = false;
+    }
 }
 
 void write_debug_dx(const char* str)
@@ -926,14 +697,14 @@ bool LLAppViewerWin32::restoreErrorTrap()
 bool LLAppViewerWin32::sendURLToOtherInstance(const std::string& url)
 {
     wchar_t window_class[256]; /* Flawfinder: ignore */   // Assume max length < 255 chars.
-    mbstowcs(window_class, sWindowClass.c_str(), 255);
+    mbstowcs(window_class, sWindowClass, 255);
     window_class[255] = 0;
     // Use the class instead of the window name.
     HWND other_window = FindWindow(window_class, NULL);
 
     if (other_window != NULL)
     {
-        LL_DEBUGS() << "Found other window with the name '" << getWindowTitle() << "'" << LL_ENDL;
+        LL_DEBUGS("AppInit") << "Found other window with the name '" << getWindowTitle() << "'" << LL_ENDL;
         COPYDATASTRUCT cds;
         const S32 SLURL_MESSAGE_TYPE = 0;
         cds.dwData = SLURL_MESSAGE_TYPE;
@@ -941,11 +712,229 @@ bool LLAppViewerWin32::sendURLToOtherInstance(const std::string& url)
         cds.lpData = (void*)url.c_str();
 
         LRESULT msg_result = SendMessage(other_window, WM_COPYDATA, NULL, (LPARAM)&cds);
-        LL_DEBUGS() << "SendMessage(WM_COPYDATA) to other window '"
+        LL_DEBUGS("AppInit") << "SendMessage(WM_COPYDATA) to other window '"
                  << getWindowTitle() << "' returned " << msg_result << LL_ENDL;
         return true;
     }
     return false;
+}
+
+bool LLAppViewerWin32::sendShutdownToOtherInstances(const std::wstring& install_dir)
+{
+    // Velopack installs viewer like this:
+    // %appdata%\Local\ChannelNameViewer\Update.exe // which is our uninstaller
+    // %appdata%\Local\ChannelNameViewer\SecondLifeViewer.exe // wrapper, redirects to main executable
+    // %appdata%\Local\ChannelNameViewer\current\SecondLifeViewer.exe // main executable
+    // For reliability don't expect install_dir to be actually in the base path, strip 'current'
+
+    const std::wstring current_suffix = L"\\current";
+    std::wstring normalized_path(install_dir);
+    if (normalized_path.length() >= current_suffix.length() &&
+        _wcsicmp(normalized_path.c_str() + normalized_path.length() - current_suffix.length(),
+            current_suffix.c_str()) == 0)
+    {
+        normalized_path.resize(normalized_path.length() - current_suffix.length());
+    }
+
+    wchar_t window_class[256]; // Assume max length < 255 chars.
+    mbstowcs(window_class, sWindowClass, 255);
+    window_class[255] = 0;
+
+    // Normalize the directory path
+    wchar_t our_dir_normalized[MAX_PATH];
+    wchar_t* file_part = nullptr;
+    DWORD result = GetFullPathNameW(normalized_path.c_str(), MAX_PATH, our_dir_normalized, &file_part);
+    if (result == 0 || result >= MAX_PATH)
+    {
+        LL_WARNS() << "Failed to normalize our executable path" << LL_ENDL;
+        return false;
+    }
+
+    // Remove trailing backslash if present
+    size_t dir_len = wcslen(our_dir_normalized);
+    if (dir_len > 0 && our_dir_normalized[dir_len - 1] == L'\\')
+    {
+        our_dir_normalized[dir_len - 1] = L'\0';
+        dir_len--;
+    }
+
+    // This message is meant for velopack, so we don't expect to have
+    // a window of our own, store any matching windows.
+    struct EnumData
+    {
+        const wchar_t* target_class;
+        const wchar_t* our_dir_normalized;
+        std::vector<HWND> found_windows;
+    };
+
+    EnumData enum_data;
+    enum_data.target_class = window_class;
+    enum_data.our_dir_normalized = our_dir_normalized;
+
+    // Callback function to find all matching windows
+    auto find_windows_callback = [](HWND hwnd, LPARAM lParam) -> BOOL
+    {
+        EnumData* data = reinterpret_cast<EnumData*>(lParam);
+        wchar_t class_name[256];
+
+        if (GetClassName(hwnd, class_name, 256) > 0)
+        {
+            if (wcscmp(class_name, data->target_class) == 0)
+            {
+                // Get the process ID for this window
+                DWORD process_id = 0;
+                GetWindowThreadProcessId(hwnd, &process_id);
+
+                // Open the process to query its executable path
+                HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+                if (hProcess)
+                {
+                    wchar_t exe_path[MAX_PATH];
+                    DWORD size = MAX_PATH;
+                    if (QueryFullProcessImageNameW(hProcess, 0, exe_path, &size))
+                    {
+                        // Normalize the other process's path
+                        wchar_t other_dir_normalized[MAX_PATH];
+                        wchar_t* other_file_part = nullptr;
+                        DWORD result = GetFullPathNameW(exe_path, MAX_PATH, other_dir_normalized, &other_file_part);
+
+                        if (result > 0 && result < MAX_PATH)
+                        {
+                            // Remove the filename part to get just the directory
+                            // We are doing this to avoid incidents, like having
+                            // multiple viewer version exes in the same folder.
+                            if (other_file_part)
+                            {
+                                *other_file_part = L'\0';
+                            }
+
+                            // Remove trailing backslash if present
+                            size_t other_dir_len = wcslen(other_dir_normalized);
+                            if (other_dir_len > 0 && other_dir_normalized[other_dir_len - 1] == L'\\')
+                            {
+                                other_dir_normalized[other_dir_len - 1] = L'\0';
+                                other_dir_len--;
+                            }
+
+                            // Strip "\current" suffix if present to normalize comparison
+                            // This handles both release (with \current) and debug builds (without)
+                            const std::wstring current_suffix = L"\\current";
+                            if (other_dir_len >= current_suffix.length())
+                            {
+                                size_t offset = other_dir_len - current_suffix.length();
+                                if (_wcsicmp(other_dir_normalized + offset, current_suffix.c_str()) == 0)
+                                {
+                                    other_dir_normalized[offset] = L'\0';
+                                }
+                            }
+
+                            // Compare directories (case-insensitive)
+                            if (_wcsicmp(other_dir_normalized, data->our_dir_normalized) == 0)
+                            {
+                                data->found_windows.push_back(hwnd);
+                            }
+                        }
+                    }
+                    CloseHandle(hProcess);
+                }
+            }
+        }
+
+        return TRUE; // Continue enumeration
+    };
+
+    // Find all matching windows and send shutdown messages
+    EnumWindows(find_windows_callback, reinterpret_cast<LPARAM>(&enum_data));
+
+    if (enum_data.found_windows.empty())
+    {
+        LL_DEBUGS("AppInit") << "No other instances found" << LL_ENDL;
+        return false;
+    }
+
+    LL_INFOS("AppInit") << "Found " << (S32)(enum_data.found_windows.size()) << " other instance(s), sending shutdown messages" << LL_ENDL;
+
+    // Get our own process ID to include in the message
+    DWORD our_process_id = GetCurrentProcessId();
+
+    constexpr UINT timeout_ms = 2000; // 2s. Viewer's message thread is supposed to be fast.
+    for (HWND other_window : enum_data.found_windows)
+    {
+        if (IsWindow(other_window))
+        {
+            DWORD_PTR result = 0;
+            LRESULT send_result = SendMessageTimeout(
+                other_window,
+                WM_POST_UNINSTALL_,
+                static_cast<WPARAM>(our_process_id),
+                static_cast<LPARAM>(WM_POST_UNINSTALL_MSG_SHUTDOWN),
+                SMTO_ABORTIFHUNG | SMTO_BLOCK,
+                timeout_ms,
+                &result
+            );
+
+            if (send_result == 0)
+            {
+                DWORD error = GetLastError();
+                if (error == ERROR_TIMEOUT)
+                {
+                    LL_WARNS("AppInit") << "Shutdown message timed out for window " << std::hex << other_window << std::dec << LL_ENDL;
+                }
+                else
+                {
+                    LL_WARNS("AppInit") << "Failed to send shutdown message to window " << std::hex << other_window
+                        << ", error: " << error << std::dec << LL_ENDL;
+                }
+
+                PostMessage(other_window, WM_CLOSE, 0, 0);
+            }
+            else
+            {
+                LL_DEBUGS("AppInit") << "Shutdown message sent successfully to window " << std::hex << other_window << std::dec << LL_ENDL;
+            }
+        }
+    }
+
+    // Poll for up to 30 seconds, checking every 5 seconds
+    const S32 MAX_WAIT_TIME_MS = 60000; // 30 seconds
+    const S32 POLL_INTERVAL_MS = 5000;  // 5 seconds
+    S32 elapsed_time_ms = 0;
+    size_t still_open_count = enum_data.found_windows.size();
+
+    while (elapsed_time_ms < MAX_WAIT_TIME_MS)
+    {
+        LL_INFOS("AppInit") << "Waiting for " << (S32)still_open_count << " instance(s) to close... ("
+            << (S32)(elapsed_time_ms / 1000) << "s elapsed)" << LL_ENDL;
+
+        ms_sleep(POLL_INTERVAL_MS);
+        elapsed_time_ms += POLL_INTERVAL_MS;
+
+        // Check if the specific windows we found still exist
+        // Don't enumerate all windows for new ones, assume that
+        // no instances were reused and assume user won't open
+        // the app again. For now just check our list.
+        still_open_count = 0;
+        for (HWND hwnd : enum_data.found_windows)
+        {
+            if (IsWindow(hwnd))
+            {
+                still_open_count++;
+            }
+        }
+
+        if (still_open_count == 0)
+        {
+            LL_INFOS("AppInit") << "All other instances have closed after " << (S32)(elapsed_time_ms / 1000) << " seconds" << LL_ENDL;
+            return false;
+        }
+    }
+
+    if (still_open_count != 0)
+    {
+        LL_WARNS("AppInit") << "Proceeding with uninstall with " << (S32)still_open_count << " instance(s) still open." << LL_ENDL;
+    }
+
+    return true;
 }
 
 

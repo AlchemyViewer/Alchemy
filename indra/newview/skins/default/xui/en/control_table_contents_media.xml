@@ -83,4 +83,14 @@
          name="lst_action"
          value="Interact (Script LMB)" />
     </rows>
+    <rows
+     name="grade_bypass_key"
+     value="grade_bypass_key">
+        <columns
+         column="lst_action"
+         font="SansSerif"
+         halign="left"
+         name="lst_action"
+         value="Hold to Compare (Bypass Color Grading)" />
+    </rows>
 </contents>

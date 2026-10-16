@@ -41,6 +41,8 @@ class LLJoint;
 class LLScrollingPanelParamBase : public LLScrollingPanel
 {
 public:
+    AL_VIEW_TYPE(LLScrollingPanelParamBase, LLScrollingPanel);
+
     LLScrollingPanelParamBase( const LLPanel::Params& panel_params,
                    LLViewerJointMesh* mesh, LLViewerVisualParam* param, bool allow_modify, LLWearable* wearable, LLJoint* jointp, bool use_hints = false );
     virtual ~LLScrollingPanelParamBase();
@@ -53,11 +55,11 @@ public:
     F32                 percentToWeight( F32 percent );
 
 public:
-    LLViewerVisualParam* mParam = nullptr;
+    LLViewerVisualParam* mParam;
 protected:
     LLUICtrl* mParamSlider = nullptr;
-    bool mAllowModify = false;
-    LLWearable *mWearable = nullptr;
+    bool mAllowModify;
+    LLWearable *mWearable;
 };
 
 #endif

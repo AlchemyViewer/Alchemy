@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <context_menu name="Self Pie">
-	<menu_item_call label="Sid ned" name="Sit Down Here"/>
-	<menu_item_call label="Stå op" name="Stand Up"/>
 	<context_menu label="Tag af" name="Take Off &gt;">
 		<context_menu label="Tøj" name="Clothes &gt;">
 			<menu_item_call label="Trøje" name="Shirt"/>
@@ -24,7 +22,6 @@
 	</context_menu>
 	<menu_item_call label="Mit udseende" name="Chenge Outfit"/>
 	<menu_item_call label="Redigér mit sæt" name="Edit Outfit"/>
-	<menu_item_call label="Redigér min form" name="Edit My Shape"/>
 	<menu_item_call label="Venner" name="Friends..."/>
 	<menu_item_call label="Grupper" name="Groups..."/>
 	<menu_item_call label="Profil" name="Profile..."/>

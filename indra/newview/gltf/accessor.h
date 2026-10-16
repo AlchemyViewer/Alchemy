@@ -27,7 +27,6 @@
  */
 
 #include "llstrider.h"
-#include "boost/json.hpp"
 
 #include "common.h"
 
@@ -50,7 +49,7 @@ namespace LL
 
             bool prep(Asset& asset);
 
-            void serialize(boost::json::object& obj) const;
+            void serialize(JsonWriter& obj) const;
             const Buffer& operator=(const Value& value);
 
             bool save(Asset& asset, const std::string& folder);
@@ -67,7 +66,7 @@ namespace LL
 
             std::string mName;
 
-            void serialize(boost::json::object& obj) const;
+            void serialize(JsonWriter& obj) const;
             const BufferView& operator=(const Value& value);
         };
 
@@ -105,7 +104,7 @@ namespace LL
             Type mType = Type::SCALAR;
             bool mNormalized = false;
 
-            void serialize(boost::json::object& obj) const;
+            void serialize(JsonWriter& obj) const;
             const Accessor& operator=(const Value& value);
         };
 

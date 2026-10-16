@@ -97,13 +97,18 @@ public:
     /*virtual*/ bool setVisualParamWeight(const LLVisualParam *which_param, F32 weight);
     /*virtual*/ bool setVisualParamWeight(const char* param_name, F32 weight);
     /*virtual*/ bool setVisualParamWeight(S32 index, F32 weight);
-    /*virtual*/ void updateVisualParams();
+    /*virtual*/ bool setVisualParamWeight(S32 index, S32 type, F32 weight);
+    /*virtual*/ bool updateVisualParams();
     void writeWearablesToAvatar();
     /*virtual*/ void idleUpdateAppearanceAnimation();
 
 private:
     // helper function. Passed in param is assumed to be in avatar's parameter list.
-    bool setParamWeight(const LLViewerVisualParam *param, F32 weight);
+    bool setParamWeight(LLViewerVisualParam *param, F32 weight);
+
+    // How many of the weights the last writeWearablesToAvatar pushed were
+    // weights the avatar did not already have. Read by the profiler.
+    static S32 sParamWeightsChanged;
 
     std::mutex          mJointMapMutex; // getJoint gets used from mesh thread
 
@@ -298,6 +303,8 @@ public:
     static bool         detachAttachmentIntoInventory(const LLUUID& item_id);
 
     bool hasAttachmentsInTrash();
+
+// [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
     enum EAttachAction { ACTION_ATTACH, ACTION_DETACH };
     typedef boost::signals2::signal<void (LLViewerObject*, const LLViewerJointAttachment*, EAttachAction)> attachment_signal_t;
     boost::signals2::connection setAttachmentCallback(const attachment_signal_t::slot_type& cb);
@@ -358,7 +365,7 @@ public:
     static void     dumpTotalLocalTextureByteCount();
     void            dumpLocalTextures() const;
     static void     dumpScratchTextureByteCount();
-    void            dumpWearableInfo(LLAPRFile& outfile);
+    void            dumpWearableInfo(LLFile& outfile);
 
     //--------------------------------------------------------------------
     // Avatar Rez Metrics

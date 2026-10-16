@@ -40,9 +40,11 @@ class LLScrollListCtrl;
 class LLSpinCtrl;
 
 
-class LLPanelGroupCreate : public LLPanel
+class LLPanelGroupCreate final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupCreate, LLPanel);
+
     LLPanelGroupCreate();
     virtual ~LLPanelGroupCreate();
 

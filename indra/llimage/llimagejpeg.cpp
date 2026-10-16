@@ -196,8 +196,7 @@ bool LLImageJPEG::decode(LLImageRaw* raw_image, F32 decode_time)
 
     resetLastError();
 
-    LLImageDataLock lockIn(this);
-    LLImageDataLock lockOut(raw_image);
+    LLImageDataLockPair lock(this, raw_image);
 
     // Check to make sure that this instance has been initialized with data
     if (!getData() || (0 == getDataSize()))
@@ -505,8 +504,7 @@ bool LLImageJPEG::encode( const LLImageRaw* raw_image, F32 encode_time )
         return false;
     }
 
-    LLImageDataSharedLock lockIn(raw_image);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(raw_image, this);
 
     switch( raw_image->getComponents() )
     {

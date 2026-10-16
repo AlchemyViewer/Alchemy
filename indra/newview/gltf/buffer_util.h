@@ -43,7 +43,7 @@ namespace LL
     namespace GLTF
     {
 
-        using string_view = boost::json::string_view;
+        using string_view = std::string_view;
 
         // copy one Scalar from src to dst
         template<class S, class T>
@@ -141,6 +141,42 @@ namespace LL
         }
 
         template<>
+        inline void copyScalar<U32, LLVector4a>(U32* src, LLVector4a& dst)
+        {
+            dst.set((F32)*src, 0.f, 0.f, 0.f);
+        }
+
+        template<>
+        inline void copyScalar<U16, LLVector4a>(U16* src, LLVector4a& dst)
+        {
+            dst.set((F32)*src, 0.f, 0.f, 0.f);
+        }
+
+        template<>
+        inline void copyScalar<U8, LLVector4a>(U8* src, LLVector4a& dst)
+        {
+            dst.set((F32)*src, 0.f, 0.f, 0.f);
+        }
+
+        template<>
+        inline void copyScalar<U32, LLVector2>(U32* src, LLVector2& dst)
+        {
+            dst.set((F32)*src, 0.f);
+        }
+
+        template<>
+        inline void copyScalar<U16, LLVector2>(U16* src, LLVector2& dst)
+        {
+            dst.set((F32)*src, 0.f);
+        }
+
+        template<>
+        inline void copyScalar<U8, LLVector2>(U8* src, LLVector2& dst)
+        {
+            dst.set((F32)*src, 0.f);
+        }
+
+        template<>
         inline void copyVec2<F32, LLVector2>(F32* src, LLVector2& dst)
         {
             dst.set(src[0], src[1]);
@@ -155,7 +191,7 @@ namespace LL
         template<>
         inline void copyVec3<F32, vec3>(F32* src, vec3& dst)
         {
-            dst = vec3(src[0], src[1], src[2]);
+            dst.set(src);
         }
 
         template<>
@@ -221,6 +257,12 @@ namespace LL
         }
 
         template<>
+        inline void copyVec4<U32, LLVector4a>(U32* src, LLVector4a& dst)
+        {
+            dst.set((F32)src[0], (F32)src[1], (F32)src[2], (F32)src[3]);
+        }
+
+        template<>
         inline void copyVec4<U16, LLVector4a>(U16* src, LLVector4a& dst)
         {
             dst.set(src[0], src[1], src[2], src[3]);
@@ -235,16 +277,13 @@ namespace LL
         template<>
         inline void copyVec4<F32, quat>(F32* src, quat& dst)
         {
-            dst.x = src[0];
-            dst.y = src[1];
-            dst.z = src[2];
-            dst.w = src[3];
+            dst.getVector4aRw().loadua(src);
         }
 
         template<>
         inline void copyMat4<F32, mat4>(F32* src, mat4& dst)
         {
-            dst = glm::make_mat4(src);
+            dst.loadu(src);
         }
 
         //=========================================================================================================
@@ -373,7 +412,7 @@ namespace LL
             }
             else
             {
-                LL_ERRS("GLTF") << "Unsupported accessor type" << LL_ENDL;
+                LL_ERRS("GLTF") << "Unsupported accessor type " << (S32)accessor.mType << LL_ENDL;
             }
         }
 
@@ -433,8 +472,21 @@ namespace LL
 
 
         //=========================================================================================================
-        // boost::json copying utilities
+        // JSON copying utilities. Reads come from a parsed simdjson document
+        // (Value), writes stream JSON text through JsonWriter.
         // ========================================================================================================
+
+        // read any JSON number into a float, mirroring numeric coercion
+        inline bool to_float(const Value& src, F32& dst)
+        {
+            double d;
+            if (src.get_double().get(d) == simdjson::SUCCESS)
+            {
+                dst = (F32)d;
+                return true;
+            }
+            return false;
+        }
 
         //====================== unspecialized base template, single value ===========================
 
@@ -447,22 +499,23 @@ namespace LL
         }
 
         template<typename T>
-        inline bool write(const T& src, Value& dst)
+        inline bool write(const T& src, JsonWriter& dst)
         {
-            dst = boost::json::object();
-            src.serialize(dst.as_object());
+            dst.startObject();
+            src.serialize(dst);
+            dst.endObject();
             return true;
         }
 
         template<typename T>
-        inline bool copy(const Value& src, boost::unordered_map<std::string, T>& dst)
+        inline bool copy(const Value& src, std::unordered_map<std::string, T>& dst)
         {
-            if (src.is_object())
+            simdjson::dom::object obj;
+            if (src.get_object().get(obj) == simdjson::SUCCESS)
             {
-                const boost::json::object& obj = src.as_object();
-                for (const auto& [key, value] : obj)
+                for (const auto& member : obj)
                 {
-                    copy<T>(value, dst[key]);
+                    copy<T>(member.value, dst[std::string(member.key)]);
                 }
                 return true;
             }
@@ -470,22 +523,15 @@ namespace LL
         }
 
         template<typename T>
-        inline bool write(const boost::unordered_map<std::string, T>& src, Value& dst)
+        inline bool write(const std::unordered_map<std::string, T>& src, JsonWriter& dst)
         {
-            boost::json::object obj;
+            dst.startObject();
             for (const auto& [key, value] : src)
             {
-                Value v;
-                if (write<T>(value, v))
-                {
-                    obj[key] = v;
-                }
-                else
-                {
-                    return false;
-                }
+                dst.key(key);
+                write<T>(value, dst);
             }
-            dst = obj;
+            dst.endObject();
             return true;
         }
 
@@ -493,13 +539,14 @@ namespace LL
         template<typename T>
         inline bool copy(const Value& src, std::vector<T>& dst)
         {
-            if (src.is_array())
+            simdjson::dom::array arr;
+            if (src.get_array().get(arr) == simdjson::SUCCESS)
             {
-                const boost::json::array& arr = src.get_array();
                 dst.resize(arr.size());
-                for (size_t i = 0; i < arr.size(); ++i)
+                size_t i = 0;
+                for (const Value& v : arr)
                 {
-                    copy(arr[i], dst[i]);
+                    copy(v, dst[i++]);
                 }
                 return true;
             }
@@ -508,47 +555,35 @@ namespace LL
         }
 
         template<typename T>
-        inline bool write(const std::vector<T>& src, Value& dst)
+        inline bool write(const std::vector<T>& src, JsonWriter& dst)
         {
-            boost::json::array arr;
+            dst.startArray();
             for (const T& t : src)
             {
-                Value v;
-                if (write(t, v))
-                {
-                    arr.push_back(v);
-                }
-                else
-                {
-                    return false;
-                }
+                write(t, dst);
             }
-            dst = arr;
+            dst.endArray();
             return true;
         }
 
         // to/from object member
         template<typename T>
-        inline bool copy(const boost::json::object& src, string_view member, T& dst)
+        inline bool copy(const simdjson::dom::object& src, string_view member, T& dst)
         {
-            auto it = src.find(member);
-            if (it != src.end())
+            Value v;
+            if (src[member].get(v) == simdjson::SUCCESS)
             {
-                return copy(it->value(), dst);
+                return copy(v, dst);
             }
             return false;
         }
 
         // always write a member to an object without checking default
         template<typename T>
-        inline bool write_always(const T& src, string_view member, boost::json::object& dst)
+        inline bool write_always(const T& src, string_view member, JsonWriter& dst)
         {
-            Value& v = dst[member];
-            if (!write(src, v))
-            {
-                dst.erase(member);
-                return false;
-            }
+            dst.key(member);
+            write(src, dst);
             return true;
         }
 
@@ -556,15 +591,24 @@ namespace LL
         // to/from extension
 
         // for internal use only, use copy_extensions instead
-        template<typename T>
-        inline bool _copy_extension(const boost::json::object& extensions, std::string_view member, T* dst)
+        inline bool _copy_extension(const simdjson::dom::object& extensions)
         {
-            if (extensions.contains(member))
+            return false;
+        }
+
+        template<typename T, class... Rest>
+        inline bool _copy_extension(const simdjson::dom::object& extensions, std::string_view member, T* dst, Rest... rest)
+        {
+            bool copied = false;
+            Value v;
+            if (extensions[member].get(v) == simdjson::SUCCESS)
             {
-                return copy(extensions.at(member), *dst);
+                copied = copy(v, *dst);
             }
 
-            return false;
+            // copy each extension; do not short circuit on success
+            bool rest_copied = _copy_extension(extensions, rest...);
+            return copied || rest_copied;
         }
 
         // Copy all extensions from src.extensions to provided destinations
@@ -574,50 +618,47 @@ namespace LL
         //                  "KHR_materials_pbrSpecularGlossiness", &mPbrSpecularGlossiness);
         // returns true if any of the extensions are copied
         template<class... Types>
-        inline bool copy_extensions(const boost::json::value& src, Types... args)
+        inline bool copy_extensions(const Value& src, Types... args)
         {
             // extract the extensions object (don't assume it exists and verify that it is an object)
-            if (src.is_object())
+            simdjson::dom::object obj;
+            if (src.get_object().get(obj) == simdjson::SUCCESS)
             {
-                boost::json::object obj = src.get_object();
-                if (obj.contains("extensions"))
+                simdjson::dom::object ext_obj;
+                if (obj["extensions"].get_object().get(ext_obj) == simdjson::SUCCESS)
                 {
-                    const boost::json::value& extensions = obj.at("extensions");
-                    if (extensions.is_object())
-                    {
-                        const boost::json::object& ext_obj = extensions.as_object();
-                        bool success = false;
-                        // copy each extension, return true if any of them succeed, do not short circuit on success
-                        U32 count = sizeof...(args);
-                        for (U32 i = 0; i < count; i += 2)
-                        {
-                            if (_copy_extension(ext_obj, args...))
-                            {
-                                success = true;
-                            }
-                        }
-                        return success;
-                    }
+                    return _copy_extension(ext_obj, args...);
                 }
             }
 
             return false;
         }
 
-        // internal use aonly, use write_extensions instead
-        template<typename T>
-        inline bool _write_extension(boost::json::object& extensions, const T* src, string_view member)
+        // internal use only, use write_extensions instead
+        inline bool _any_extension_present()
+        {
+            return false;
+        }
+
+        template<typename T, class... Rest>
+        inline bool _any_extension_present(const T* src, string_view member, Rest... rest)
+        {
+            return src->mPresent || _any_extension_present(rest...);
+        }
+
+        inline void _write_extension(JsonWriter& dst)
+        {
+        }
+
+        template<typename T, class... Rest>
+        inline void _write_extension(JsonWriter& dst, const T* src, string_view member, Rest... rest)
         {
             if (src->mPresent)
             {
-                Value v;
-                if (write(*src, v))
-                {
-                    extensions[member] = v;
-                    return true;
-                }
+                dst.key(member);
+                write(*src, dst);
             }
-            return false;
+            _write_extension(dst, rest...);
         }
 
         // Write all extensions to dst.extensions
@@ -627,33 +668,25 @@ namespace LL
         //                   mPbrSpecularGlossiness, "KHR_materials_pbrSpecularGlossiness");
         // returns true if any of the extensions are written
         template<class... Types>
-        inline bool write_extensions(boost::json::object& dst, Types... args)
+        inline bool write_extensions(JsonWriter& dst, Types... args)
         {
-            bool success = false;
-
-            boost::json::object extensions;
-            U32 count = sizeof...(args) - 1;
-
-            for (U32 i = 0; i < count; i += 2)
+            if (!_any_extension_present(args...))
             {
-                if (_write_extension(extensions, args...))
-                {
-                    success = true;
-                }
+                return false;
             }
 
-            if (success)
-            {
-                dst["extensions"] = extensions;
-            }
+            dst.key("extensions");
+            dst.startObject();
+            _write_extension(dst, args...);
+            dst.endObject();
 
-            return success;
+            return true;
         }
 
         // conditionally write a member to an object if the member
         // is not the default value
         template<typename T>
-        inline bool write(const T& src, string_view member, boost::json::object& dst, const T& default_value = T())
+        inline bool write(const T& src, string_view member, JsonWriter& dst, const T& default_value = T())
         {
             if (src != default_value)
             {
@@ -663,31 +696,25 @@ namespace LL
         }
 
         template<typename T>
-        inline bool write(const boost::unordered_map<std::string, T>& src, string_view member, boost::json::object& dst, const std::unordered_map<std::string, T>& default_value = std::unordered_map<std::string, T>())
+        inline bool write(const std::unordered_map<std::string, T>& src, string_view member, JsonWriter& dst, const std::unordered_map<std::string, T>& default_value = std::unordered_map<std::string, T>())
         {
             if (!src.empty())
             {
-                Value v;
-                if (write<T>(src, v))
-                {
-                    dst[member] = v;
-                    return true;
-                }
+                dst.key(member);
+                write(src, dst);
+                return true;
             }
             return false;
         }
 
         template<typename T>
-        inline bool write(const std::vector<T>& src, string_view member, boost::json::object& dst, const std::vector<T>& deafault_value = std::vector<T>())
+        inline bool write(const std::vector<T>& src, string_view member, JsonWriter& dst, const std::vector<T>& deafault_value = std::vector<T>())
         {
             if (!src.empty())
             {
-                Value v;
-                if (write(src, v))
-                {
-                    dst[member] = v;
-                    return true;
-                }
+                dst.key(member);
+                write(src, dst);
+                return true;
             }
             return false;
         }
@@ -695,9 +722,9 @@ namespace LL
         template<typename T>
         inline bool copy(const Value& src, string_view member, T& dst)
         {
-            if (src.is_object())
+            simdjson::dom::object obj;
+            if (src.get_object().get(obj) == simdjson::SUCCESS)
             {
-                const boost::json::object& obj = src.as_object();
                 return copy(obj, member, dst);
             }
 
@@ -708,18 +735,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, Accessor::ComponentType& dst)
         {
-            if (src.is_int64())
+            int64_t i;
+            if (src.get_int64().get(i) == simdjson::SUCCESS)
             {
-                dst = (Accessor::ComponentType)src.get_int64();
+                dst = (Accessor::ComponentType)i;
                 return true;
             }
             return false;
         }
 
         template<>
-        inline bool write(const Accessor::ComponentType& src, Value& dst)
+        inline bool write(const Accessor::ComponentType& src, JsonWriter& dst)
         {
-            dst = (S32)src;
+            dst.value((S32)src);
             return true;
         }
 
@@ -727,56 +755,75 @@ namespace LL
         template<>
         inline bool copy(const Value& src, Primitive::Mode& dst)
         {
-            if (src.is_int64())
+            int64_t i;
+            if (src.get_int64().get(i) == simdjson::SUCCESS)
             {
-                dst = (Primitive::Mode)src.get_int64();
+                dst = (Primitive::Mode)i;
                 return true;
             }
             return false;
         }
 
         template<>
-        inline bool write(const Primitive::Mode& src, Value& dst)
+        inline bool write(const Primitive::Mode& src, JsonWriter& dst)
         {
-            dst = (S32)src;
+            dst.value((S32)src);
             return true;
+        }
+
+        // count floats from a JSON array into dst, or false leaving dst alone
+        template<U32 count>
+        inline bool copy_floats(const Value& src, F32* dst)
+        {
+            simdjson::dom::array arr;
+            if (src.get_array().get(arr) == simdjson::SUCCESS && arr.size() == count)
+            {
+                // populate a temporary local in case we hit an error in the
+                // middle of the array (don't partially write the destination)
+                F32 t[count];
+                for (U32 i = 0; i < count; ++i)
+                {
+                    if (!to_float(arr.at(i).value_unsafe(), t[i]))
+                    {
+                        return false;
+                    }
+                }
+                for (U32 i = 0; i < count; ++i)
+                {
+                    dst[i] = t[i];
+                }
+                return true;
+            }
+            return false;
+        }
+
+        inline void write_floats(const F32* src, U32 count, JsonWriter& dst)
+        {
+            dst.startArray();
+            for (U32 i = 0; i < count; ++i)
+            {
+                dst.value(src[i]);
+            }
+            dst.endArray();
         }
 
         // vec4
         template<>
         inline bool copy(const Value& src, vec4& dst)
         {
-            if (src.is_array())
+            F32 v[4];
+            if (copy_floats<4>(src, v))
             {
-                const boost::json::array& arr = src.as_array();
-                if (arr.size() == 4)
-                {
-                    vec4 v;
-                    std::error_code ec;
-
-                    v.x = arr[0].to_number<F32>(ec); if (ec) return false;
-                    v.y = arr[1].to_number<F32>(ec); if (ec) return false;
-                    v.z = arr[2].to_number<F32>(ec); if (ec) return false;
-                    v.w = arr[3].to_number<F32>(ec); if (ec) return false;
-
-                    dst = v;
-
-                    return true;
-                }
+                dst.loadua(v);
+                return true;
             }
             return false;
         }
 
         template<>
-        inline bool write(const vec4& src, Value& dst)
+        inline bool write(const vec4& src, JsonWriter& dst)
         {
-            dst = boost::json::array();
-            boost::json::array& arr = dst.get_array();
-            arr.resize(4);
-            arr[0] = src.x;
-            arr[1] = src.y;
-            arr[2] = src.z;
-            arr[3] = src.w;
+            write_floats(src.getF32ptr(), 4, dst);
             return true;
         }
 
@@ -784,33 +831,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, quat& dst)
         {
-            if (src.is_array())
+            F32 q[4];
+            if (copy_floats<4>(src, q))
             {
-                const boost::json::array& arr = src.as_array();
-                if (arr.size() == 4)
-                {
-                    std::error_code ec;
-                    dst.x = arr[0].to_number<F32>(ec); if (ec) return false;
-                    dst.y = arr[1].to_number<F32>(ec); if (ec) return false;
-                    dst.z = arr[2].to_number<F32>(ec); if (ec) return false;
-                    dst.w = arr[3].to_number<F32>(ec); if (ec) return false;
-
-                    return true;
-                }
+                dst.getVector4aRw().loadua(q);
+                return true;
             }
             return false;
         }
 
         template<>
-        inline bool write(const quat& src, Value& dst)
+        inline bool write(const quat& src, JsonWriter& dst)
         {
-            dst = boost::json::array();
-            boost::json::array& arr = dst.get_array();
-            arr.resize(4);
-            arr[0] = src.x;
-            arr[1] = src.y;
-            arr[2] = src.z;
-            arr[3] = src.w;
+            write_floats(src.getVector4a().getF32ptr(), 4, dst);
             return true;
         }
 
@@ -819,33 +852,13 @@ namespace LL
         template<>
         inline bool copy(const Value& src, vec3& dst)
         {
-            if (src.is_array())
-            {
-                const boost::json::array& arr = src.as_array();
-                if (arr.size() == 3)
-                {
-                    std::error_code ec;
-                    vec3 t;
-                    t.x = arr[0].to_number<F32>(ec); if (ec) return false;
-                    t.y = arr[1].to_number<F32>(ec); if (ec) return false;
-                    t.z = arr[2].to_number<F32>(ec); if (ec) return false;
-
-                    dst = t;
-                    return true;
-                }
-            }
-            return false;
+            return copy_floats<3>(src, dst.mV);
         }
 
         template<>
-        inline bool write(const vec3& src, Value& dst)
+        inline bool write(const vec3& src, JsonWriter& dst)
         {
-            dst = boost::json::array();
-            boost::json::array& arr = dst.as_array();
-            arr.resize(3);
-            arr[0] = src.x;
-            arr[1] = src.y;
-            arr[2] = src.z;
+            write_floats(src.mV, 3, dst);
             return true;
         }
 
@@ -853,32 +866,13 @@ namespace LL
         template<>
         inline bool copy(const Value& src, vec2& dst)
         {
-            if (src.is_array())
-            {
-                const boost::json::array& arr = src.as_array();
-                if (arr.size() == 2)
-                {
-                    std::error_code ec;
-                    vec2 t;
-                    t.x = arr[0].to_number<F32>(ec); if (ec) return false;
-                    t.y = arr[1].to_number<F32>(ec); if (ec) return false;
-
-                    dst = t;
-                    return true;
-                }
-            }
-            return false;
+            return copy_floats<2>(src, dst.mV);
         }
 
         template<>
-        inline bool write(const vec2& src, Value& dst)
+        inline bool write(const vec2& src, JsonWriter& dst)
         {
-            dst = boost::json::array();
-            boost::json::array& arr = dst.as_array();
-            arr.resize(2);
-            arr[0] = src.x;
-            arr[1] = src.y;
-
+            write_floats(src.mV, 2, dst);
             return true;
         }
 
@@ -886,18 +880,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, bool& dst)
         {
-            if (src.is_bool())
+            bool b;
+            if (src.get_bool().get(b) == simdjson::SUCCESS)
             {
-                dst = src.get_bool();
+                dst = b;
                 return true;
             }
             return false;
         }
 
         template<>
-        inline bool write(const bool& src, Value& dst)
+        inline bool write(const bool& src, JsonWriter& dst)
         {
-            dst = src;
+            dst.value(src);
             return true;
         }
 
@@ -905,16 +900,13 @@ namespace LL
         template<>
         inline bool copy(const Value& src, F32& dst)
         {
-            std::error_code ec;
-            F32 t = src.to_number<F32>(ec); if (ec) return false;
-            dst = t;
-            return true;
+            return to_float(src, dst);
         }
 
         template<>
-        inline bool write(const F32& src, Value& dst)
+        inline bool write(const F32& src, JsonWriter& dst)
         {
-            dst = src;
+            dst.value(src);
             return true;
         }
 
@@ -923,18 +915,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, U32& dst)
         {
-            if (src.is_int64())
+            int64_t i;
+            if (src.get_int64().get(i) == simdjson::SUCCESS)
             {
-                dst = (U32)src.get_int64();
+                dst = (U32)i;
                 return true;
             }
             return false;
         }
 
         template<>
-        inline bool write(const U32& src, Value& dst)
+        inline bool write(const U32& src, JsonWriter& dst)
         {
-            dst = src;
+            dst.value(src);
             return true;
         }
 
@@ -942,16 +935,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, F64& dst)
         {
-            std::error_code ec;
-            F64 t = src.to_number<F64>(ec); if (ec) return false;
-            dst = t;
-            return true;
+            double d;
+            if (src.get_double().get(d) == simdjson::SUCCESS)
+            {
+                dst = d;
+                return true;
+            }
+            return false;
         }
 
         template<>
-        inline bool write(const F64& src, Value& dst)
+        inline bool write(const F64& src, JsonWriter& dst)
         {
-            dst = src;
+            dst.value(src);
             return true;
         }
 
@@ -959,18 +955,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, Accessor::Type& dst)
         {
-            if (src.is_string())
+            std::string_view sv;
+            if (src.get_string().get(sv) == simdjson::SUCCESS)
             {
-                dst = gltf_type_to_enum(src.get_string().c_str());
+                dst = gltf_type_to_enum(std::string(sv));
                 return true;
             }
             return false;
         }
 
         template<>
-        inline bool write(const Accessor::Type& src, Value& dst)
+        inline bool write(const Accessor::Type& src, JsonWriter& dst)
         {
-            dst = enum_to_gltf_type(src);
+            dst.value(enum_to_gltf_type(src));
             return true;
         }
 
@@ -978,18 +975,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, S32& dst)
         {
-            if (src.is_int64())
+            int64_t i;
+            if (src.get_int64().get(i) == simdjson::SUCCESS)
             {
-                dst = (U32)src.get_int64();
+                dst = (S32)i;
                 return true;
             }
             return false;
         }
 
         template<>
-        inline bool write(const S32& src, Value& dst)
+        inline bool write(const S32& src, JsonWriter& dst)
         {
-            dst = src;
+            dst.value(src);
             return true;
         }
 
@@ -998,18 +996,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, std::string& dst)
         {
-            if (src.is_string())
+            std::string_view sv;
+            if (src.get_string().get(sv) == simdjson::SUCCESS)
             {
-                dst = src.get_string().c_str();
+                dst = std::string(sv);
                 return true;
             }
             return false;
         }
 
         template<>
-        inline bool write(const std::string& src, Value& dst)
+        inline bool write(const std::string& src, JsonWriter& dst)
         {
-            dst = src;
+            dst.value(src);
             return true;
         }
 
@@ -1017,46 +1016,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, mat4& dst)
         {
-            if (src.is_array())
+            F32 m[16];
+            if (copy_floats<16>(src, m))
             {
-                const boost::json::array& arr = src.get_array();
-                if (arr.size() == 16)
-                {
-                    // populate a temporary local in case
-                    // we hit an error in the middle of the array
-                    // (don't partially write a matrix)
-                    mat4 t;
-                    F32* p = glm::value_ptr(t);
-
-                    for (U32 i = 0; i < arr.size(); ++i)
-                    {
-                        std::error_code ec;
-                        p[i] = arr[i].to_number<F32>(ec);
-                        if (ec)
-                        {
-                            return false;
-                        }
-                    }
-
-                    dst = t;
-                    return true;
-                }
+                dst.loadu(m);
+                return true;
             }
-
             return false;
         }
 
         template<>
-        inline bool write(const mat4& src, Value& dst)
+        inline bool write(const mat4& src, JsonWriter& dst)
         {
-            dst = boost::json::array();
-            boost::json::array& arr = dst.get_array();
-            arr.resize(16);
-            const F32* p = glm::value_ptr(src);
-            for (U32 i = 0; i < 16; ++i)
-            {
-                arr[i] = p[i];
-            }
+            write_floats(src.getF32ptr(), 16, dst);
             return true;
         }
 
@@ -1064,18 +1036,19 @@ namespace LL
         template<>
         inline bool copy(const Value& src, Material::AlphaMode& dst)
         {
-            if (src.is_string())
+            std::string_view sv;
+            if (src.get_string().get(sv) == simdjson::SUCCESS)
             {
-                dst = gltf_alpha_mode_to_enum(src.get_string().c_str());
+                dst = gltf_alpha_mode_to_enum(std::string(sv));
                 return true;
             }
-            return true;
+            return false;
         }
 
         template<>
-        inline bool write(const Material::AlphaMode& src, Value& dst)
+        inline bool write(const Material::AlphaMode& src, JsonWriter& dst)
         {
-            dst = enum_to_gltf_alpha_mode(src);
+            dst.value(enum_to_gltf_alpha_mode(src));
             return true;
         }
 

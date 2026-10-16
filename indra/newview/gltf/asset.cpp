@@ -33,24 +33,24 @@
 #include "../llviewertexturelist.h"
 #include "../pipeline.h"
 #include "buffer_util.h"
-#include <boost/url.hpp>
 #include "llimagejpeg.h"
 #include "../llskinningutil.h"
 
+#include <future>
+
 using namespace LL::GLTF;
-using namespace boost::json;
 
 
 namespace LL
 {
     namespace GLTF
     {
-        static boost::unordered_set<std::string> ExtensionsSupported = {
+        static std::unordered_set<std::string> ExtensionsSupported = {
             "KHR_materials_unlit",
             "KHR_texture_transform"
         };
 
-        static boost::unordered_set<std::string> ExtensionsIgnored = {
+        static std::unordered_set<std::string> ExtensionsIgnored = {
             "KHR_materials_pbrSpecularGlossiness"
         };
 
@@ -93,7 +93,7 @@ namespace LL
 
 void Scene::updateTransforms(Asset& asset)
 {
-    mat4 identity = glm::identity<mat4>();
+    const mat4 identity = LLMatrix4a::identity();
 
     for (auto& nodeIndex : mNodes)
     {
@@ -105,9 +105,10 @@ void Scene::updateTransforms(Asset& asset)
 void Node::updateTransforms(Asset& asset, const mat4& parentMatrix)
 {
     makeMatrixValid();
-    mAssetMatrix = parentMatrix * mMatrix;
+    // this node's transform, then the parent's
+    mAssetMatrix.setMul(mMatrix, parentMatrix);
 
-    mAssetMatrixInv = glm::inverse(mAssetMatrix);
+    mAssetMatrixInv.setInverse(mAssetMatrix);
 
     S32 my_index = (S32)(this - &asset.mNodes[0]);
 
@@ -157,7 +158,7 @@ void Asset::uploadTransforms()
 
     for (U32 i = 0; i < node_count; ++i)
     {
-        F32* m = glm::value_ptr(t_mp[i]);
+        const F32* m = t_mp[i].getF32ptr();
 
         U32 idx = i * 12;
 
@@ -177,14 +178,7 @@ void Asset::uploadTransforms()
         mp[idx + 11] = m[14];
     }
 
-    if (mNodesUBO == 0)
-    {
-        glGenBuffers(1, &mNodesUBO);
-    }
-
-    glBindBuffer(GL_UNIFORM_BUFFER, mNodesUBO);
-    glBufferData(GL_UNIFORM_BUFFER, glmp.size() * sizeof(F32), glmp.data(), GL_STREAM_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    mNodesUBO.update(glmp.data(), glmp.size() * sizeof(F32));
 }
 
 void Asset::uploadMaterials()
@@ -207,33 +201,26 @@ void Asset::uploadMaterials()
 
         // add texture transforms and UV indices
         material.mPbrMetallicRoughness.mBaseColorTexture.mTextureTransform.getPacked(&md[i+0]);
-        md[i + 1].g = (F32)material.mPbrMetallicRoughness.mBaseColorTexture.getTexCoord();
+        md[i + 1].getF32ptr()[1] = (F32)material.mPbrMetallicRoughness.mBaseColorTexture.getTexCoord();
         material.mNormalTexture.mTextureTransform.getPacked(&md[i + 2]);
-        md[i + 3].g = (F32)material.mNormalTexture.getTexCoord();
+        md[i + 3].getF32ptr()[1] = (F32)material.mNormalTexture.getTexCoord();
         material.mPbrMetallicRoughness.mMetallicRoughnessTexture.mTextureTransform.getPacked(&md[i+4]);
-        md[i + 5].g = (F32)material.mPbrMetallicRoughness.mMetallicRoughnessTexture.getTexCoord();
+        md[i + 5].getF32ptr()[1] = (F32)material.mPbrMetallicRoughness.mMetallicRoughnessTexture.getTexCoord();
         material.mEmissiveTexture.mTextureTransform.getPacked(&md[i + 6]);
-        md[i + 7].g = (F32)material.mEmissiveTexture.getTexCoord();
+        md[i + 7].getF32ptr()[1] = (F32)material.mEmissiveTexture.getTexCoord();
         material.mOcclusionTexture.mTextureTransform.getPacked(&md[i + 8]);
-        md[i + 9].g = (F32)material.mOcclusionTexture.getTexCoord();
+        md[i + 9].getF32ptr()[1] = (F32)material.mOcclusionTexture.getTexCoord();
 
         // add material properties
         F32 min_alpha = material.mAlphaMode == Material::AlphaMode::MASK ? material.mAlphaCutoff : -1.0f;
-        md[i + 10] = vec4(material.mEmissiveFactor, 1.f);
+        md[i + 10] = vec4(material.mEmissiveFactor.mV[0], material.mEmissiveFactor.mV[1], material.mEmissiveFactor.mV[2], 1.f);
         md[i + 11] = vec4(0.f,
             material.mPbrMetallicRoughness.mRoughnessFactor,
             material.mPbrMetallicRoughness.mMetallicFactor,
             min_alpha);
     }
 
-    if (mMaterialsUBO == 0)
-    {
-        glGenBuffers(1, &mMaterialsUBO);
-    }
-
-    glBindBuffer(GL_UNIFORM_BUFFER, mMaterialsUBO);
-    glBufferData(GL_UNIFORM_BUFFER, md.size() * sizeof(vec4), md.data(), GL_STREAM_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    mMaterialsUBO.update(md.data(), md.size() * sizeof(vec4));
 }
 
 S32 Asset::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
@@ -259,8 +246,7 @@ S32 Asset::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
         {
             bool newHit = false;
 
-            LLMatrix4a ami;
-            ami.loadu(glm::value_ptr(node.mAssetMatrixInv));
+            const LLMatrix4a& ami = node.mAssetMatrixInv;
             // transform start and end to this node's local space
             ami.affineTransform(start, local_start);
             ami.affineTransform(asset_end, local_end);
@@ -286,10 +272,8 @@ S32 Asset::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
 
             if (newHit)
             {
-                LLMatrix4a am;
-                am.loadu(glm::value_ptr(node.mAssetMatrix));
                 // shorten line segment on hit
-                am.affineTransform(p, asset_end);
+                node.mAssetMatrix.affineTransform(p, asset_end);
 
                 // transform results back to asset space
                 if (intersection)
@@ -299,10 +283,8 @@ S32 Asset::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
 
                 if (normal || tangent)
                 {
-                    mat4 normalMatrix = glm::transpose(node.mAssetMatrixInv);
-
                     LLMatrix4a norm_mat;
-                    norm_mat.loadu(glm::value_ptr(normalMatrix));
+                    norm_mat.setTranspose(node.mAssetMatrixInv);
 
                     if (normal)
                     {
@@ -344,7 +326,7 @@ void Node::makeMatrixValid()
 {
     if (!mMatrixValid && mTRSValid)
     {
-        mMatrix = glm::recompose(mScale, mRotation, mTranslation, vec3(0,0,0), vec4(0,0,0,1));
+        mMatrix.setTRS(LLVector4a(mTranslation.mV[0], mTranslation.mV[1], mTranslation.mV[2]), mRotation, LLVector4a(mScale.mV[0], mScale.mV[1], mScale.mV[2]));
         mMatrixValid = true;
     }
 
@@ -355,9 +337,12 @@ void Node::makeTRSValid()
 {
     if (!mTRSValid && mMatrixValid)
     {
-        vec3 skew;
-        vec4 perspective;
-        glm::decompose(mMatrix, mScale, mRotation, mTranslation, skew, perspective);
+        LLVector4a scale, translation;
+        if (mMatrix.decompose(scale, mRotation, translation))
+        {
+            mScale.set(scale.getF32ptr());
+            mTranslation.set(translation.getF32ptr());
+        }
 
         mTRSValid = true;
     }
@@ -386,12 +371,12 @@ void Node::setScale(const vec3& s)
     mMatrixValid = false;
 }
 
-void Node::serialize(object& dst) const
+void Node::serialize(JsonWriter& dst) const
 {
     write(mName, "name", dst);
-    write(mMatrix, "matrix", dst, glm::identity<mat4>());
-    write(mRotation, "rotation", dst, glm::identity<quat>());
-    write(mTranslation, "translation", dst, glm::vec3(0.f, 0.f, 0.f));
+    write(mMatrix, "matrix", dst, LLMatrix4a::identity());
+    write(mRotation, "rotation", dst, LLQuaternion2::identity());
+    write(mTranslation, "translation", dst, vec3(0.f, 0.f, 0.f));
     write(mScale, "scale", dst, vec3(1.f,1.f,1.f));
     write(mChildren, "children", dst);
     write(mMesh, "mesh", dst, INVALID_INDEX);
@@ -417,7 +402,7 @@ const Node& Node::operator=(const Value& src)
     return *this;
 }
 
-void Image::serialize(object& dst) const
+void Image::serialize(JsonWriter& dst) const
 {
     write(mUri, "uri", dst);
     write(mMimeType, "mimeType", dst);
@@ -448,7 +433,7 @@ const Image& Image::operator=(const Value& src)
 void Asset::update()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_GLTF;
-    F32 dt = gFrameTimeSeconds - mLastUpdateTime;
+    F32 dt = (F32)(gFrameTimeSeconds - mLastUpdateTime);
 
     if (dt > 0.f)
     {
@@ -554,138 +539,6 @@ bool Asset::prep()
             return false;
         }
     }
-    if (mLoadIntoVRAM)
-    {
-        // prepare vertex buffers
-
-        // material count is number of materials + 1 for default material
-        U32 mat_count = (U32) mMaterials.size() + 1;
-
-        if (LLGLSLShader::sCurBoundShaderPtr == nullptr)
-        { // make sure a shader is bound to satisfy mVertexBuffer->setBuffer
-            gDebugProgram.bind();
-        }
-
-        for (S32 double_sided = 0; double_sided < 2; ++double_sided)
-        {
-            RenderData& rd = mRenderData[double_sided];
-            for (U32 i = 0; i < LLGLSLShader::NUM_GLTF_VARIANTS; ++i)
-            {
-                rd.mBatches[i].resize(mat_count);
-            }
-
-            // for each material
-            for (S32 mat_id = -1; mat_id < (S32)mMaterials.size(); ++mat_id)
-            {
-                // for each shader variant
-                U32 vertex_count[LLGLSLShader::NUM_GLTF_VARIANTS] = { 0 };
-                U32 index_count[LLGLSLShader::NUM_GLTF_VARIANTS] = { 0 };
-
-                S32 ds_mat = mat_id == -1 ? 0 : mMaterials[mat_id].mDoubleSided;
-                if (ds_mat != double_sided)
-                {
-                    continue;
-                }
-
-                for (U32 variant = 0; variant < LLGLSLShader::NUM_GLTF_VARIANTS; ++variant)
-                {
-#ifdef SHOW_ASSERT
-                    U32 attribute_mask = 0;
-#endif
-                    // for each mesh
-                    for (auto& mesh : mMeshes)
-                    {
-                        // for each primitive
-                        for (auto& primitive : mesh.mPrimitives)
-                        {
-                            if (primitive.mMaterial == mat_id && primitive.mShaderVariant == variant)
-                            {
-                                // accumulate vertex and index counts
-                                primitive.mVertexOffset = vertex_count[variant];
-                                primitive.mIndexOffset = index_count[variant];
-
-                                vertex_count[variant] += primitive.getVertexCount();
-                                index_count[variant] += primitive.getIndexCount();
-
-                                // all primitives of a given variant and material should all have the same attribute mask
-                                llassert(attribute_mask == 0 || primitive.mAttributeMask == attribute_mask);
-#ifdef SHOW_ASSERT
-                                attribute_mask |= primitive.mAttributeMask;
-#endif
-                            }
-                        }
-                    }
-
-                    // allocate vertex buffer and pack it
-                    if (vertex_count[variant] > 0)
-                    {
-                        #if 0
-                        U32 mat_idx = mat_id + 1;
-                        LLVertexBuffer* vb = new LLVertexBuffer(attribute_mask);
-
-                        rd.mBatches[variant][mat_idx].mVertexBuffer = vb;
-                        vb->allocateBuffer(vertex_count[variant],
-                            index_count[variant] * 2); // hack double index count... TODO: find a better way to indicate 32-bit indices will be used
-                        vb->setBuffer();
-
-                        for (auto& mesh : mMeshes)
-                        {
-                            for (auto& primitive : mesh.mPrimitives)
-                            {
-                                if (primitive.mMaterial == mat_id && primitive.mShaderVariant == variant)
-                                {
-                                    primitive.upload(vb);
-                                }
-                            }
-                        }
-
-                        vb->unmapBuffer();
-
-                        vb->unbind();
-                        #endif
-                    }
-                }
-            }
-        }
-#if 0
-        // sanity check that all primitives have a vertex buffer
-        for (auto& mesh : mMeshes)
-        {
-            for (auto& primitive : mesh.mPrimitives)
-            {
-                //llassert(primitive.mVertexBuffer.notNull());
-            }
-        }
-#endif
-    }
-    #if 0
-    // build render batches
-    for (S32 node_id = 0; node_id < mNodes.size(); ++node_id)
-    {
-        Node& node = mNodes[node_id];
-
-        if (node.mMesh != INVALID_INDEX)
-        {
-            auto& mesh = mMeshes[node.mMesh];
-
-            S32 mat_idx = mesh.mPrimitives[0].mMaterial + 1;
-
-            S32 double_sided = mat_idx == 0 ? 0 : mMaterials[mat_idx - 1].mDoubleSided;
-
-            for (S32 j = 0; j < mesh.mPrimitives.size(); ++j)
-            {
-                auto& primitive = mesh.mPrimitives[j];
-
-                S32 variant = primitive.mShaderVariant;
-
-                RenderData& rd = mRenderData[double_sided];
-                RenderBatch& rb = rd.mBatches[variant][mat_idx];
-
-                rb.mPrimitives.push_back({ j, node_id });
-            }
-        }
-    }
-    #endif
     return true;
 }
 
@@ -709,7 +562,13 @@ bool Asset::load(std::string_view filename, bool loadIntoVRAM)
 
         if (ext == "gltf")
         {
-            Value val = parse(str);
+            simdjson::dom::parser parser;
+            Value val;
+            if (parser.parse(str).get(val) != simdjson::SUCCESS)
+            {
+                LL_WARNS("GLTF") << "Failed to parse: " << mFilename << LL_ENDL;
+                return false;
+            }
             *this = val;
             return prep();
         }
@@ -732,6 +591,17 @@ bool Asset::load(std::string_view filename, bool loadIntoVRAM)
     return false;
 }
 
+// Read a little-endian U32 from the byte cursor and advance it. memcpy
+// avoids strict-aliasing UB of *(U32*)ptr against a std::string-backed
+// byte buffer.
+static U32 read_u32(const U8*& ptr)
+{
+    U32 v;
+    memcpy(&v, ptr, sizeof(v));
+    ptr += sizeof(v);
+    return v;
+}
+
 bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
 {
     mLoadIntoVRAM = loadIntoVRAM;
@@ -745,8 +615,7 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    U32 magic = *(U32*)ptr;
-    ptr += 4;
+    U32 magic = read_u32(ptr);
 
     if (magic != 0x46546C67)
     {
@@ -754,8 +623,7 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    U32 version = *(U32*)ptr;
-    ptr += 4;
+    U32 version = read_u32(ptr);
 
     if (version != 2)
     {
@@ -763,8 +631,7 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    U32 length = *(U32*)ptr;
-    ptr += 4;
+    U32 length = read_u32(ptr);
 
     if (length != data.size())
     {
@@ -772,8 +639,7 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    U32 chunkLength = *(U32*)ptr;
-    ptr += 4;
+    U32 chunkLength = read_u32(ptr);
 
     if (end - ptr < chunkLength + 8)
     {
@@ -781,8 +647,7 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    U32 chunkType = *(U32*)ptr;
-    ptr += 4;
+    U32 chunkType = read_u32(ptr);
 
     if (chunkType != 0x4E4F534A)
     {
@@ -790,7 +655,13 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    Value val = parse(std::string_view((const char*)ptr, chunkLength));
+    simdjson::dom::parser parser;
+    Value val;
+    if (parser.parse((const char*)ptr, chunkLength).get(val) != simdjson::SUCCESS)
+    {
+        LL_WARNS("GLTF") << "Failed to parse GLB JSON chunk" << LL_ENDL;
+        return false;
+    }
     *this = val;
 
     if (mBuffers.size() > 0 && mBuffers[0].mUri.empty())
@@ -804,11 +675,8 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
             return false;
         }
 
-        chunkLength = *(U32*)ptr;
-        ptr += 4;
-
-        chunkType = *(U32*)ptr;
-        ptr += 4;
+        chunkLength = read_u32(ptr);
+        chunkType = read_u32(ptr);
 
         if (chunkType != 0x004E4942)
         {
@@ -836,21 +704,23 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
 
 const Asset& Asset::operator=(const Value& src)
 {
-    if (src.is_object())
+    simdjson::dom::object obj;
+    if (src.get_object().get(obj) == simdjson::SUCCESS)
     {
-        const object& obj = src.as_object();
-
-        const auto it = obj.find("asset");
-
-        if (it != obj.end())
+        Value asset;
+        if (obj["asset"].get(asset) == simdjson::SUCCESS)
         {
-            const Value& asset = it->value();
-
             copy(asset, "version", mVersion);
             copy(asset, "minVersion", mMinVersion);
             copy(asset, "generator", mGenerator);
             copy(asset, "copyright", mCopyright);
-            copy(asset, "extras", mExtras);
+
+            // preserve the arbitrary extras subtree as minified JSON text
+            Value extras;
+            if (asset["extras"].get(extras) == simdjson::SUCCESS)
+            {
+                mExtras = simdjson::to_string(extras);
+            }
         }
 
         copy(obj, "scene", mScene);
@@ -873,16 +743,23 @@ const Asset& Asset::operator=(const Value& src)
     return *this;
 }
 
-void Asset::serialize(object& dst) const
+void Asset::serialize(JsonWriter& dst) const
 {
     static const std::string sGenerator = "Linden Lab GLTF Prototype v0.1";
 
-    dst["asset"] = object{};
-    object& asset = dst["asset"].get_object();
+    dst.key("asset");
+    dst.startObject();
+    write(mVersion, "version", dst);
+    write(mMinVersion, "minVersion", dst, std::string());
+    write(sGenerator, "generator", dst);
+    write(mCopyright, "copyright", dst, std::string());
+    if (!mExtras.empty())
+    {
+        dst.key("extras");
+        dst.rawValue(mExtras);
+    }
+    dst.endObject();
 
-    write(mVersion, "version", asset);
-    write(mMinVersion, "minVersion", asset, std::string());
-    write(sGenerator, "generator", asset);
     write(mScene, "scene", dst, INVALID_INDEX);
     write(mScenes, "scenes", dst);
     write(mNodes, "nodes", dst);
@@ -926,11 +803,23 @@ bool Asset::save(const std::string& filename)
     }
 
     // save .gltf
-    object obj;
-    serialize(obj);
-    std::string buffer = boost::json::serialize(obj, {});
-    std::ofstream file(filename, std::ios::binary);
+    JsonWriter writer;
+    writer.startObject();
+    serialize(writer);
+    writer.endObject();
+    std::string buffer = writer.str();
+    llofstream file(filename, std::ios::binary);
+    if (!file.is_open())
+    {
+        LL_WARNS("GLTF") << "Failed to open file for writing: " << filename << LL_ENDL;
+        return false;
+    }
     file.write(buffer.c_str(), buffer.size());
+    if (!file.good())
+    {
+        LL_WARNS("GLTF") << "Failed to write file: " << filename << LL_ENDL;
+        return false;
+    }
 
     return true;
 }
@@ -962,8 +851,40 @@ LLViewerFetchedTexture* fetch_texture(const LLUUID& id);
 bool Image::prep(Asset& asset, bool loadIntoVRAM)
 {
     mLoadIntoTexturePipe = loadIntoVRAM;
+
     LLUUID id;
     if (mUri.size() == UUID_STR_SIZE && LLUUID::parseUUID(mUri, &id) && id.notNull())
+    { // loaded from an asset, fetch the texture from the asset system
+        LL_DEBUGS("GLTF") << "Loading image from an id" << id<< LL_ENDL;
+    }
+    else if (mUri.find("data:") == 0)
+    { // embedded in a data URI, load the texture from the URI
+        LL_WARNS("GLTF") << "Data URIs not yet supported" << LL_ENDL;
+        return false;
+    }
+
+    // Image::prepImpl containes code that must run on the main thread
+    std::promise<bool> prep_promise;
+    std::future<bool> prep_future = prep_promise.get_future();
+
+    LLAppViewer::instance()->postToMainCoro([this, &asset, id, &prep_promise]() mutable {
+        try {
+            bool result = prepImpl(asset, id);
+            prep_promise.set_value(result);
+        }
+        catch (...) {
+            // Propagate exception to the waiting thread
+            prep_promise.set_exception(std::current_exception());
+        }
+    });
+
+    // Block until prep is done on the main thread
+    return prep_future.get();
+}
+
+bool Image::prepImpl(Asset& asset, const LLUUID& id)
+{
+    if (id.notNull())
     { // loaded from an asset, fetch the texture from the asset system
         mTexture = fetch_texture(id);
     }
@@ -994,6 +915,12 @@ bool Image::prep(Asset& asset, bool loadIntoVRAM)
     { // loaded locally and not embedded, load the texture as a local preview
         std::string dir = gDirUtilp->getDirName(asset.mFilename);
         std::string img_file = dir + gDirUtilp->getDirDelimiter() + mUri;
+
+        if (!gDirUtilp->fileExists(img_file))
+        {
+            // URI might be escaped, unescape.
+            img_file = dir + gDirUtilp->getDirDelimiter() + LLURI::unescape(mUri);
+        }
 
         LLUUID tracking_id = LLLocalBitmapMgr::getInstance()->addUnit(img_file);
         if (tracking_id.notNull() && mLoadIntoTexturePipe)
@@ -1091,7 +1018,7 @@ bool Image::save(Asset& asset, const std::string& folder)
         // set URI to non-j2c file for now, but later we'll want to reference the j2c hash
         mUri = name + extension;
 
-        std::ofstream file(filename, std::ios::binary);
+        llofstream file(filename, std::ios::binary);
         file.write((const char*)buffer.mData.data() + bufferView.mByteOffset, bufferView.mByteLength);
     }
     else if (mTexture.notNull())
@@ -1154,7 +1081,7 @@ bool Image::save(Asset& asset, const std::string& folder)
     return true;
 }
 
-void TextureInfo::serialize(object& dst) const
+void TextureInfo::serialize(JsonWriter& dst) const
 {
     write(mIndex, "index", dst, INVALID_INDEX);
     write(mTexCoord, "texCoord", dst, 0);
@@ -1201,7 +1128,7 @@ bool TextureInfo::operator!=(const TextureInfo& rhs) const
     return !(*this == rhs);
 }
 
-void OcclusionTextureInfo::serialize(object& dst) const
+void OcclusionTextureInfo::serialize(JsonWriter& dst) const
 {
     TextureInfo::serialize(dst);
     write(mStrength, "strength", dst, 1.f);
@@ -1219,7 +1146,7 @@ const OcclusionTextureInfo& OcclusionTextureInfo::operator=(const Value& src)
     return *this;
 }
 
-void NormalTextureInfo::serialize(object& dst) const
+void NormalTextureInfo::serialize(JsonWriter& dst) const
 {
     TextureInfo::serialize(dst);
     write(mScale, "scale", dst, 1.f);
@@ -1252,7 +1179,7 @@ const Material::PbrMetallicRoughness& Material::PbrMetallicRoughness::operator=(
     return *this;
 }
 
-void Material::PbrMetallicRoughness::serialize(object& dst) const
+void Material::PbrMetallicRoughness::serialize(JsonWriter& dst) const
 {
     write(mBaseColorFactor, "baseColorFactor", dst, vec4(1.f, 1.f, 1.f, 1.f));
     write(mBaseColorTexture, "baseColorTexture", dst);
@@ -1281,15 +1208,15 @@ const Material::Unlit& Material::Unlit::operator=(const Value& src)
     return *this;
 }
 
-void Material::Unlit::serialize(object& dst) const
+void Material::Unlit::serialize(JsonWriter& dst) const
 {
     // no members and object has already been created, nothing to do
 }
 
 void TextureTransform::getPacked(vec4* packed) const
 {
-    packed[0] = vec4(mScale.x, mScale.y, mRotation, mOffset.x);
-    packed[1] = vec4(mOffset.y, 0.f, 0.f, 0.f);
+    packed[0] = vec4(mScale.mV[0], mScale.mV[1], mRotation, mOffset.mV[0]);
+    packed[1] = vec4(mOffset.mV[1], 0.f, 0.f, 0.f);
 }
 
 const TextureTransform& TextureTransform::operator=(const Value& src)
@@ -1306,7 +1233,7 @@ const TextureTransform& TextureTransform::operator=(const Value& src)
     return *this;
 }
 
-void TextureTransform::serialize(object& dst) const
+void TextureTransform::serialize(JsonWriter& dst) const
 {
     write(mOffset, "offset", dst, vec2(0.f, 0.f));
     write(mRotation, "rotation", dst, 0.f);
@@ -1315,7 +1242,7 @@ void TextureTransform::serialize(object& dst) const
 }
 
 
-void Material::serialize(object& dst) const
+void Material::serialize(JsonWriter& dst) const
 {
     write(mName, "name", dst);
     write(mEmissiveFactor, "emissiveFactor", dst, vec3(0.f, 0.f, 0.f));
@@ -1349,7 +1276,7 @@ const Material& Material::operator=(const Value& src)
 }
 
 
-void Mesh::serialize(object& dst) const
+void Mesh::serialize(JsonWriter& dst) const
 {
     write(mPrimitives, "primitives", dst);
     write(mWeights, "weights", dst);
@@ -1381,7 +1308,7 @@ bool Mesh::prep(Asset& asset)
     return true;
 }
 
-void Scene::serialize(object& dst) const
+void Scene::serialize(JsonWriter& dst) const
 {
     write(mNodes, "nodes", dst);
     write(mName, "name", dst);
@@ -1395,7 +1322,7 @@ const Scene& Scene::operator=(const Value& src)
     return *this;
 }
 
-void Texture::serialize(object& dst) const
+void Texture::serialize(JsonWriter& dst) const
 {
     write(mSampler, "sampler", dst, INVALID_INDEX);
     write(mSource, "source", dst, INVALID_INDEX);
@@ -1414,7 +1341,7 @@ const Texture& Texture::operator=(const Value& src)
     return *this;
 }
 
-void Sampler::serialize(object& dst) const
+void Sampler::serialize(JsonWriter& dst) const
 {
     write(mMagFilter, "magFilter", dst, LINEAR);
     write(mMinFilter, "minFilter", dst, LINEAR_MIPMAP_LINEAR);

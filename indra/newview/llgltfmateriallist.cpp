@@ -26,6 +26,8 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llgltfmateriallist.h"
+#include "llappviewer.h"
+#include "pipeline.h"
 
 #include "llagent.h"
 #include "llassetstorage.h"
@@ -44,7 +46,7 @@
 #include "llvocache.h"
 #include "llworld.h"
 
-#include "tinygltf/tiny_gltf.h"
+#include <tiny_gltf.h>
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
@@ -170,7 +172,7 @@ namespace
 
 void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::string& data_in)
 {
-    std::istringstream str(data_in);
+    boost::iostreams::stream<boost::iostreams::array_source> str(data_in.data(), data_in.size());
 
     LLSD data;
 
@@ -212,10 +214,16 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
             auto count = llmin(tes.size(), MAX_TES);
             for (size_t i = 0; i < count; ++i)
             {
+                S32 te = tes[i].asInteger();
+                if (te < 0 || te >= (S32)MAX_TES)
+                {
+                    // the face index comes off the wire and indexes arrays here
+                    LL_WARNS("GLTF") << "Override for face " << te << " of " << id << " is out of range, ignored" << LL_ENDL;
+                    continue;
+                }
+
                 LLGLTFMaterial* mat = new LLGLTFMaterial(); // setTEGLTFMaterialOverride and cache will take ownership
                 mat->applyOverrideLLSD(od[i]);
-
-                S32 te = tes[i].asInteger();
 
                 has_te[te] = true;
                 cache.mSides[te] = od[i];
@@ -245,8 +253,8 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
                 }
             }
 
-            region->cacheFullUpdateGLTFOverride(cache);
             LL_DEBUGS("GLTF") << "GLTF Material Override: " << cache.mObjectId << " " << cache.mLocalId << " " << cache.mRegionHandle << " (sides:" << (cache.mSides.size()) << ")" << LL_ENDL;
+            region->cacheFullUpdateGLTFOverride(std::move(cache));
         }
 
     }
@@ -327,6 +335,13 @@ void LLGLTFMaterialList::applyQueuedOverrides(LLViewerObject* obj)
 
 void LLGLTFMaterialList::queueModify(const LLViewerObject* obj, S32 side, const LLGLTFMaterial* mat)
 {
+    if (obj && obj->isLocalOnly())
+    {
+        // Client-only local mesh preview: it has no sim counterpart, so never
+        // queue a ModifyMaterialParams round-trip. Local render state is applied
+        // directly by the caller (setRenderMaterialID / setGLTFMaterialOverride).
+        return;
+    }
     if (obj && obj->getRenderMaterialID(side).notNull())
     {
         if (mat == nullptr)
@@ -342,6 +357,10 @@ void LLGLTFMaterialList::queueModify(const LLViewerObject* obj, S32 side, const 
 
 void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const LLUUID& asset_id)
 {
+    if (obj && obj->isLocalOnly())
+    {
+        return; // client-only preview: no sim material sync (see queueModify)
+    }
     const LLGLTFMaterial* material_override = obj->getTE(side)->getGLTFMaterialOverride();
     if (material_override)
     {
@@ -357,8 +376,13 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
 
 void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const LLUUID& asset_id, const std::string &override_json)
 {
+    if (obj && obj->isLocalOnly())
+    {
+        return; // client-only preview: no sim material sync (see queueModify)
+    }
     if (asset_id.isNull() || override_json.empty())
     {
+        // If there is no asset, there can't be an override
         queueApply(obj, side, asset_id);
     }
     else
@@ -369,8 +393,13 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
 
 void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const LLUUID& asset_id, const LLGLTFMaterial* material_override)
 {
+    if (obj && obj->isLocalOnly())
+    {
+        return; // client-only preview: no sim material sync (see queueModify)
+    }
     if (asset_id.isNull() || material_override == nullptr)
     {
+        // If there is no asset, there can't be an override
         queueApply(obj, side, asset_id);
     }
     else
@@ -470,7 +499,7 @@ void LLGLTFMaterialList::flushUpdatesOnce(std::shared_ptr<CallbackHolder> callba
         {
             data[i]["gltf_json"] = e.override_data->asJSON();
         }
-        if (!e.override_json.empty())
+        else if (!e.override_json.empty())
         {
             data[i]["gltf_json"] = e.override_json;
         }
@@ -523,7 +552,7 @@ void LLGLTFMaterialList::onAssetLoadComplete(const LLUUID& id, LLAssetType::ETyp
 
     if (status != LL_ERR_NOERR)
     {
-        LL_WARNS("GLTF") << "Error getting material asset data: " << LLAssetStorage::getErrorString(status) << " (" << status << ")" << LL_ENDL;
+        LL_WARNS("GLTF") << "Error getting material asset data: " << LLAssetStorage::getErrorString(status) << " (" << status << ") for asset " << id << LL_ENDL;
         asset_data->mMaterial->materialComplete(false);
         delete asset_data;
     }
@@ -721,9 +750,9 @@ void LLGLTFMaterialList::modifyMaterialCoro(std::string cap_url, LLSD overrides,
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("modifyMaterialCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("modifyMaterialCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     LLCore::HttpHeaders::ptr_t httpHeaders;
 
     httpOpts->setFollowRedirects(true);

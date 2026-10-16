@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater name="floater_chat_alerts" title="Alerty słów kluczowych w czacie">
+	<sound_drop_target name="sound_drop_target"/>
+	<check_box label="Włącz alerty" name="alerts_check"/>
+	<scroll_list draw_heading="true" name="alerts_list">
+		<scroll_list.columns label="Słowo kluczowe" name="alert_keyword"/>
+	</scroll_list>
+	<button label="Nowy" name="alerts_new_btn"/>
+	<button label="Usuń" name="alerts_delete_btn"/>
+	<view_border name="divisor"/>
+	<text name="alerts_keyword_label">
+		Słowo kluczowe:
+	</text>
+	<line_editor name="alerts_keyword"/>
+	<check_box label="Rozróżniaj wielkość liter" name="alerts_keyword_case"/>
+	<text name="alerts_color_label">
+		Kolor podświetlenia:
+	</text>
+	<color_swatch name="alerts_highlight_color"/>
+	<text name="alerts_sound_label">
+		Odtwórz dźwięk:
+	</text>
+	<line_editor label="Przeciągnij tu element z inwentarza" name="alerts_sound_name"/>
+	<icon name="alerts_sound_icon"/>
+	<button name="alerts_sound_clear_btn"/>
+	<text name="alerts_trigger_label">
+		Wyzwalaj w:
+	</text>
+	<check_box label="Czat" name="alerts_trigger_chat"/>
+	<check_box label="Wiadomości" name="alerts_trigger_im"/>
+	<check_box label="Grupy" name="alerts_trigger_group"/>
+	<button label="Zapisz wpis" name="alerts_save_btn"/>
+	<button label="Przywróć wpis" name="alerts_revert_btn"/>
+</floater>

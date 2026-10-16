@@ -47,7 +47,7 @@
 //#include "llstartup.h"
 
 // Used for LCD display
-extern void AddNewDebugConsoleToLCD(const LLWString &newLine);
+extern void AddNewDebugConsoleToLCD(const std::string &newLine);
 
 LLConsole* gConsole = NULL;  // Created and destroyed in LLViewerWindow.
 
@@ -67,6 +67,10 @@ LLConsole::LLConsole(const LLConsole::Params& p)
     {
         setFontSize(p.font_size_index);
     }
+    if (mFont == nullptr)
+    {
+        setFontSize(0); // sans-serif
+    }
     mFadeTime = mLinePersistTime - FADE_DURATION;
     setMaxLines(LLUI::getInstance()->mSettingGroups["config"]->getS32("ConsoleMaxLines"));
 }
@@ -79,6 +83,13 @@ void LLConsole::setLinePersistTime(F32 seconds)
 
 void LLConsole::reshape(S32 width, S32 height, bool called_from_parent)
 {
+    if (mFont == nullptr)
+    {
+        // not initialized yet
+        LL_WARNS() << "LLConsole::reshape called before font is set" << LL_ENDL;
+        return;
+    }
+
     S32 new_width = llmax(50, llmin(getRect().getWidth(), width));
     S32 new_height = llmax(mFont->getLineHeight() + 15, llmin(getRect().getHeight(), height));
 
@@ -136,11 +147,12 @@ void LLConsole::draw()
     static const F32 padding_vertical = 3;
     LLGLSUIDefault gls_ui;
 
-    // skip lines added more than mLinePersistTime ago
-    F32 cur_time = mTimer.getElapsedTimeF32();
+    // skip lines added more than mLinePersistTime ago. In F64: the console's timer runs all
+    // session, and F32 seconds of hours step the fade.
+    const F64 cur_time = mTimer.getElapsedTimeF64();
 
-    F32 skip_time = cur_time - mLinePersistTime;
-    F32 fade_time = cur_time - mFadeTime;
+    const F64 skip_time = cur_time - mLinePersistTime;
+    const F64 fade_time = cur_time - mFadeTime;
 
     if (mParagraphs.empty())    //No text to draw.
     {
@@ -178,7 +190,7 @@ void LLConsole::draw()
     // draw remaining lines
     F32 y_pos = 0.f;
 
-    LLUIImagePtr imagep = LLUI::getUIImage("transparent");
+    LLUIImagePtr imagep = LLUI::getUIImage("transparent.j2c");
 
     static LLCachedControl<F32> console_bg_opacity(*LLUI::getInstance()->mSettingGroups["config"], "ConsoleBackgroundOpacity", 0.7f);
     F32 console_opacity = llclamp(console_bg_opacity(), 0.f, 1.f);
@@ -203,7 +215,7 @@ void LLConsole::draw()
 
         if ((mLinePersistTime > 0.f) && ((*paragraph_it).mAddTime < fade_time))
         {
-            alpha = ((*paragraph_it).mAddTime - skip_time)/(mLinePersistTime - mFadeTime);
+            alpha = (F32)(((*paragraph_it).mAddTime - skip_time)/(mLinePersistTime - mFadeTime));
         }
         else
         {
@@ -220,7 +232,7 @@ void LLConsole::draw()
                         seg_it != (*line_it).mLineColorSegments.end();
                         seg_it++)
                 {
-                    mFont->render((*seg_it).mText, 0, (*seg_it).mXPosition - 8, y_pos -  y_off,
+                    mFont->renderBytes((*seg_it).mText, 0, (*seg_it).mXPosition - 8, y_pos -  y_off,
                         LLColor4(
                             (*seg_it).mColor.mV[VRED],
                             (*seg_it).mColor.mV[VGREEN],
@@ -245,7 +257,7 @@ void LLConsole::draw()
 void LLConsole::Paragraph::makeParagraphColorSegments (const LLColor4 &color)
 {
     LLSD paragraph_color_segments;
-    paragraph_color_segments[0]["text"] =wstring_to_utf8str(mParagraphText);
+    paragraph_color_segments[0]["text"] = mParagraphText;
     LLSD color_sd = color.getValue();
     paragraph_color_segments[0]["color"]=color_sd;
 
@@ -259,7 +271,7 @@ void LLConsole::Paragraph::makeParagraphColorSegments (const LLColor4 &color)
         ParagraphColorSegment color_segment;
 
         color_segment.mColor.setValue(color_llsd);
-        color_segment.mNumChars = static_cast<S32>(color_str.length());
+        color_segment.mNumBytes = static_cast<S32>(color_str.length());
 
         mParagraphColorSegments.push_back(color_segment);
     }
@@ -290,7 +302,7 @@ void LLConsole::Paragraph::updateLines(F32 screen_width, const LLFontGL* font, b
     mMaxWidth = 0.0f;
 
     paragraph_color_segments_t::iterator current_color = mParagraphColorSegments.begin();
-    U32 current_color_length = (*current_color).mNumChars;
+    U32 current_color_length = (*current_color).mNumBytes;
 
     S32 paragraph_offset = 0;           //Offset into the paragraph text.
 
@@ -300,8 +312,10 @@ void LLConsole::Paragraph::updateLines(F32 screen_width, const LLFontGL* font, b
     {
         S32 skip_chars; // skip '\n'
         // Figure out if a word-wrapped line fits here.
-        LLWString::size_type line_end = mParagraphText.find_first_of(llwchar('\n'), paragraph_offset);
-        if (line_end != LLWString::npos)
+        // '\n' cannot appear inside a multi-byte sequence, so scanning for the
+        // byte finds only real newlines.
+        std::string::size_type line_end = mParagraphText.find('\n', paragraph_offset);
+        if (line_end != std::string::npos)
         {
             skip_chars = 1; // skip '\n'
         }
@@ -311,13 +325,13 @@ void LLConsole::Paragraph::updateLines(F32 screen_width, const LLFontGL* font, b
             skip_chars = 0;
         }
 
-        U32 drawable = font->maxDrawableChars(mParagraphText.c_str()+paragraph_offset, screen_width, static_cast<S32>(line_end) - paragraph_offset, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+        U32 drawable = font->maxDrawableBytes(std::string_view(mParagraphText).substr(paragraph_offset), screen_width, static_cast<S32>(line_end) - paragraph_offset, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
 
         if (drawable != 0)
         {
             F32 x_position = 0;                     //Screen X position of text.
 
-            mMaxWidth = llmax( mMaxWidth, (F32)font->getWidth( mParagraphText.substr( paragraph_offset, drawable ).c_str() ) );
+            mMaxWidth = llmax( mMaxWidth, (F32)font->getWidthBytes( std::string_view(mParagraphText).substr( paragraph_offset, drawable ), 0, S32_MAX ) );
             Line line;
 
             U32 left_to_draw = drawable;
@@ -326,12 +340,12 @@ void LLConsole::Paragraph::updateLines(F32 screen_width, const LLFontGL* font, b
             while (left_to_draw >= current_color_length
                 && current_color != mParagraphColorSegments.end() )
             {
-                LLWString color_text = mParagraphText.substr( paragraph_offset + drawn, current_color_length );
+                std::string color_text = mParagraphText.substr( paragraph_offset + drawn, current_color_length );
                 line.mLineColorSegments.push_back( LineColorSegment( color_text,            //Append segment to line.
                                                 (*current_color).mColor,
                                                 x_position ) );
 
-                x_position += font->getWidth( color_text.c_str() ); //Set up next screen position.
+                x_position += font->getWidth( color_text ); //Set up next screen position.
 
                 drawn += current_color_length;
                 left_to_draw -= current_color_length;
@@ -340,13 +354,13 @@ void LLConsole::Paragraph::updateLines(F32 screen_width, const LLFontGL* font, b
 
                 if (current_color != mParagraphColorSegments.end())
                 {
-                    current_color_length = (*current_color).mNumChars;
+                    current_color_length = (*current_color).mNumBytes;
                 }
             }
 
             if (left_to_draw > 0 && current_color != mParagraphColorSegments.end() )
             {
-                    LLWString color_text = mParagraphText.substr( paragraph_offset + drawn, left_to_draw );
+                    std::string color_text = mParagraphText.substr( paragraph_offset + drawn, left_to_draw );
 
                     line.mLineColorSegments.push_back( LineColorSegment( color_text,        //Append segment to line.
                                                     (*current_color).mColor,
@@ -361,8 +375,8 @@ void LLConsole::Paragraph::updateLines(F32 screen_width, const LLFontGL* font, b
 }
 
 //Pass in the string and the default color for this block of text.
-LLConsole::Paragraph::Paragraph (LLWString str, const LLColor4 &color, F32 add_time, const LLFontGL* font, F32 screen_width)
-:   mParagraphText(str), mAddTime(add_time), mMaxWidth(-1)
+LLConsole::Paragraph::Paragraph (std::string str, const LLColor4 &color, F64 add_time, const LLFontGL* font, F32 screen_width)
+:   mParagraphText(std::move(str)), mAddTime(add_time), mMaxWidth(-1)
 {
     makeParagraphColorSegments(color);
     updateLines( screen_width, font );
@@ -380,19 +394,24 @@ void LLConsole::updateClass()
 
 void LLConsole::update()
 {
+    // The lines are taken out under the lock and laid out after it is let go. Laying out
+    // draws glyphs, and a line logged meanwhile comes back to this buffer through its
+    // recorder, which takes the lock again.
+    std::deque<std::string> lines;
     {
         LLCoros::LockType lock(mMutex);
+        lines.swap(mLines);
+        mAddTimes.clear();
+    }
 
-        while (!mLines.empty())
-        {
-            mParagraphs.push_back(
-                Paragraph(  mLines.front(),
-                            LLColor4::white,
-                            mTimer.getElapsedTimeF32(),
-                            mFont,
-                            (F32)getRect().getWidth()));
-            mLines.pop_front();
-        }
+    for (std::string& line : lines)
+    {
+        mParagraphs.push_back(
+            Paragraph(  std::move(line),
+                        LLColor4::white,
+                        mTimer.getElapsedTimeF64(),
+                        mFont,
+                        (F32)getRect().getWidth()));
     }
 
     // remove old paragraphs which can't possibly be visible any more.  ::draw() will do something similar but more conservative - we do this here because ::draw() isn't guaranteed to ever be called!  (i.e. the console isn't visible)

@@ -33,12 +33,21 @@
 #include "llpluginmessageclasses.h"
 #include "llcontrol.h"
 
+#if LL_WINDOWS
+#include <process.h>   // _getpid (host pid for accelerated-paint handle dup)
+#else
+#include <unistd.h>    // getpid
+#endif
+#include <cmath>
+
 extern LLControlGroup gSavedSettings;
-#if LL_DARWIN
+#if LL_DARWIN || LL_LINUX
 extern bool gHiDPISupport;
 #endif
 
 static int LOW_PRIORITY_TEXTURE_SIZE_DEFAULT = 256;
+static const U32 MIN_DEBUG_PORT = 1024;
+static const U32 MAX_DEBUG_PORT = 65535;
 
 static int nextPowerOf2( int value )
 {
@@ -55,6 +64,11 @@ LLPluginClassMedia::LLPluginClassMedia(LLPluginClassMediaOwner *owner)
 {
     mOwner = owner;
     reset();
+
+    // Unique per-media id for the macOS accelerated-paint mach-port demux. Media
+    // sources are created on the main thread, so a plain counter is fine.
+    static int sNextAccelId = 1;
+    mAccelId = sNextAccelId++;
 
     //debug use
     mDeleteOK = true ;
@@ -75,11 +89,28 @@ bool LLPluginClassMedia::init(const std::string &launcher_filename, const std::s
 
     mPlugin = LLPluginProcessParent::create(this);
     mPlugin->setSleepTime(mSleepTime);
+    mPlugin->setUseDaemon(mUseDaemon, mDaemonRendezvous);
 
     // Queue up the media init message -- it will be sent after all the currently queued messages.
     LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "init");
     message.setValue("target", mTarget);
     message.setValueReal("factor", mZoomFactor);
+    // Zero-copy paint: ask for GPU shared-texture handles, and hand the plugin
+    // this (viewer) process id so it can DuplicateHandle the shared texture into
+    // us across the process boundary.
+    message.setValueBoolean("accelerated_paint", mUseAcceleratedPaint);
+    // macOS shares the accelerated-paint IOSurface over a mach channel; the plugin
+    // rendezvous via the bootstrap name derived from host_pid, and tags each frame
+    // with accel_id so the viewer demuxes it back to this media.
+    message.setValueS32("accel_id", mAccelId);
+#if LL_WINDOWS
+    message.setValueS32("host_pid", (S32)_getpid());
+#else
+    message.setValueS32("host_pid", (S32)getpid());
+#endif
+    // Linux: which windowing backend the viewer chose, so the CEF plugin can pin
+    // its Ozone platform (X11 vs Wayland) to match. Empty on other platforms.
+    message.setValue("display_server", mDisplayServer);
     sendMessage(message);
 
     mPlugin->init(launcher_filename, plugin_dir, plugin_filename, debug);
@@ -90,6 +121,7 @@ bool LLPluginClassMedia::init(const std::string &launcher_filename, const std::s
 
 void LLPluginClassMedia::reset()
 {
+    LL_PROFILE_ZONE_SCOPED;
     if(mPlugin)
     {
         mPlugin->requestShutdown();
@@ -139,6 +171,8 @@ void LLPluginClassMedia::reset()
     mCanPaste = false;
     mCanDoDelete = false;
     mCanSelectAll = false;
+    mContextMenuX = 0;
+    mContextMenuY = 0;
     mMediaName.clear();
     mMediaDescription.clear();
     mBackgroundColor = LLColor4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -168,6 +202,7 @@ void LLPluginClassMedia::reset()
 
 void LLPluginClassMedia::idle(void)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     if(mPlugin)
     {
         mPlugin->idle();
@@ -370,14 +405,6 @@ void LLPluginClassMedia::setSizeInternal(void)
     {
         mRequestedMediaWidth = nextPowerOf2(mRequestedMediaWidth);
         mRequestedMediaHeight = nextPowerOf2(mRequestedMediaHeight);
-    }
-
-    {
-        if (mRequestedMediaWidth > 8192)
-            mRequestedMediaWidth = 8192;
-
-        if (mRequestedMediaHeight > 8192)
-            mRequestedMediaHeight = 8192;
     }
 }
 
@@ -956,6 +983,34 @@ void LLPluginClassMedia::showPageSource()
     sendMessage(message);
 }
 
+
+static U32 assignCefDebuggingPort()
+{
+    U32 base_port = gSavedSettings.getU32("CEFRemoteDebuggingPort");
+    if (base_port == 0)
+    {
+        return 0;
+    }
+    base_port = llclamp<U32>(base_port, MIN_DEBUG_PORT, MAX_DEBUG_PORT);
+
+    static U32 last_base_port = 0;
+    static U32 offset = 0;
+    if (base_port != last_base_port)
+    {
+        last_base_port = base_port;
+        offset = 0;
+    }
+
+    U32 new_port = base_port + offset;
+    if (new_port > MAX_DEBUG_PORT)
+    {
+        return 0;
+    }
+
+    ++offset;
+    return new_port;
+}
+
 void LLPluginClassMedia::setUserDataPath(const std::string &user_data_path_cache,
                                          const std::string &username,
                                          const std::string &user_data_path_cef_log)
@@ -967,6 +1022,10 @@ void LLPluginClassMedia::setUserDataPath(const std::string &user_data_path_cache
 
     bool cef_verbose_log = gSavedSettings.getBOOL("CefVerboseLog");
     message.setValueBoolean("cef_verbose_log", cef_verbose_log);
+
+    U32 cef_remote_debugging_port = assignCefDebuggingPort();
+    message.setValueU32("cef_remote_debugging_port", cef_remote_debugging_port);
+    mCefRemoteDebuggingPort = cef_remote_debugging_port;
     sendMessage(message);
 }
 
@@ -1012,6 +1071,15 @@ void LLPluginClassMedia::enableMediaPluginDebugging( bool enable )
     sendMessage( message );
 }
 
+#if LL_LINUX
+void LLPluginClassMedia::enablePipeWireVolumeCatcher( bool enable )
+{
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "enable_pipewire_volume_catcher");
+    message.setValueBoolean( "enable", enable );
+    sendMessage( message );
+}
+#endif
+
 void LLPluginClassMedia::setTarget(const std::string &target)
 {
     mTarget = target;
@@ -1044,6 +1112,32 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
             setSizeInternal();
 
             mTextureParamsReceived = true;
+        }
+        else if(message_name == "accelerated_paint")
+        {
+            // Zero-copy frame ready. The plugin holds one persistent keyed-mutex
+            // shared texture and sends its viewer-side handle ONLY when that
+            // texture is (re)created (handle != 0, once per size); a "0" handle
+            // means "same texture, new frame". Keep the last real handle so a
+            // per-frame ping doesn't clear it before the consumer takes it. The
+            // value is a decimal string so a 64-bit handle survives intact.
+            // On Windows the handle is the persistent shared-texture handle, sent
+            // only when it is (re)created (handle != 0, once per size); "0" means
+            // "same texture, new frame", so keep the last real handle. On macOS and
+            // Linux the frame travels out-of-band (IOSurface mach port / dma-buf
+            // SCM_RIGHTS), so handle is always "0" and this message is just the
+            // per-frame dirty trigger. Value is a decimal string so a 64-bit handle
+            // survives intact.
+            unsigned long long h = strtoull(message.getValue("handle").c_str(), nullptr, 10);
+            if (h != 0)
+            {
+                mAcceleratedPaintHandle = h;
+            }
+            mAcceleratedPaintFormat = message.getValueS32("format");
+            mAcceleratedPaintWidth = message.getValueS32("width");
+            mAcceleratedPaintHeight = message.getValueS32("height");
+            mAcceleratedPaintDirty = true;
+            mediaEvent(LLPluginClassMediaOwner::MEDIA_EVENT_CONTENT_UPDATED);
         }
         else if(message_name == "updated")
         {
@@ -1238,11 +1332,23 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
                 mCanSelectAll = message.getValueBoolean("select_all");
             }
         }
+        else if(message_name == "context_menu")
+        {
+            // The plugin pushed up-to-date edit state just before this, so the
+            // host can now show its context menu with correct enable state.
+            mContextMenuX = message.getValueS32("x");
+            mContextMenuY = message.getValueS32("y");
+            mediaEvent(LLPluginClassMediaOwner::MEDIA_EVENT_CONTEXT_MENU);
+        }
         else if(message_name == "name_text")
         {
             mHistoryBackAvailable = message.getValueBoolean("history_back_available");
             mHistoryForwardAvailable = message.getValueBoolean("history_forward_available");
             mMediaName = message.getValue("name");
+            if (message.hasValue("metadata"))
+            {
+                mMediaMetadata = message.getValueLLSD("metadata");
+            }
             mediaEvent(LLPluginClassMediaOwner::MEDIA_EVENT_NAME_CHANGED);
         }
         else if(message_name == "pick_file")
@@ -1612,7 +1718,13 @@ void LLPluginClassMedia::setLoop(bool loop)
 
 void LLPluginClassMedia::setVolume(float volume)
 {
-    if(volume != mRequestedVolume)
+    // VLC's volume is integer, 0 to 100 range. When converted from float,
+    // changes below 0.01 won't be noticed by VLC.
+    // CEF's audio range is DWORD, 0 to 65535. But changes so small are
+    // inaudible and don't warrant the overhead, so use a bigger epsilon
+    // to avoid extra messages and locking.
+    constexpr float VOLUME_EPSILON = 0.002f;
+    if (std::abs(volume - mRequestedVolume) > VOLUME_EPSILON)
     {
         mRequestedVolume = volume;
 
@@ -1637,4 +1749,16 @@ void LLPluginClassMedia::initializeUrlHistory(const LLSD& url_history)
     sendMessage(message);
 
     LL_DEBUGS("Plugin") << "Sending history" << LL_ENDL;
+}
+
+void LLPluginClassMedia::forceRenderRefresh()
+{
+    // Force layout recalculation by briefly hiding/showing the web content
+    // Used to clear black screen issues after resize, see #5607
+    const std::string refresh_script =
+        "document.documentElement.style.visibility='hidden';"
+        "document.documentElement.offsetHeight;"
+        "document.documentElement.style.visibility='';";
+
+    executeJavaScript(refresh_script);
 }

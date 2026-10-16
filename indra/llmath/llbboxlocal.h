@@ -34,18 +34,18 @@ class LLMatrix4;
 class LLBBoxLocal
 {
 public:
-    LLBBoxLocal() {}
-    LLBBoxLocal( const LLVector3& min, const LLVector3& max ) : mMin( min ), mMax( max ) {}
+    constexpr LLBBoxLocal() noexcept = default;
+    constexpr LLBBoxLocal( const LLVector3& min, const LLVector3& max ) noexcept : mMin( min ), mMax( max ) {}
     // Default copy constructor is OK.
 
-    const LLVector3&    getMin() const                  { return mMin; }
-    void                setMin( const LLVector3& min )  { mMin = min; }
+    constexpr const LLVector3& getMin() const noexcept                  { return mMin; }
+    constexpr void             setMin( const LLVector3& min ) noexcept  { mMin = min; }
 
-    const LLVector3&    getMax() const                  { return mMax; }
-    void                setMax( const LLVector3& max )  { mMax = max; }
+    constexpr const LLVector3& getMax() const noexcept                  { return mMax; }
+    constexpr void             setMax( const LLVector3& max ) noexcept  { mMax = max; }
 
-    LLVector3           getCenter() const               { return (mMax - mMin) * 0.5f + mMin; }
-    LLVector3           getExtent() const               { return mMax - mMin; }
+    constexpr LLVector3        getCenter() const noexcept               { return (mMax - mMin) * 0.5f + mMin; }
+    constexpr LLVector3        getExtent() const noexcept               { return mMax - mMin; }
 
     void                addPoint(const LLVector3& p);
     void                addBBox(const LLBBoxLocal& b) { addPoint( b.mMin ); addPoint( b.mMax ); }
@@ -55,8 +55,8 @@ public:
     friend LLBBoxLocal operator*(const LLBBoxLocal& a, const LLMatrix4& b);
 
 private:
-    LLVector3 mMin;
-    LLVector3 mMax;
+    LLVector3 mMin {};
+    LLVector3 mMax {};
 };
 
 LLBBoxLocal operator*(const LLBBoxLocal &a, const LLMatrix4 &b);

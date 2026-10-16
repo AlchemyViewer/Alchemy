@@ -38,7 +38,20 @@ LLWindowHeadless::LLWindowHeadless(LLWindowCallbacks* callbacks, const std::stri
                              bool enable_vsync, bool use_gl, bool ignore_pixel_depth)
     : LLWindow(callbacks, fullscreen, flags)
 {
+    // Honor the requested geometry so tests can configure the virtual
+    // display through the normal LLWindowManager::createWindow path.
+    // Width / height <= 0 falls back to the default member initialisers
+    // (1024x768) so a test that doesn't care about size still gets a
+    // sensible virtual window.
+    if (width > 0) mSize.mX = width;
+    if (height > 0) mSize.mY = height;
+    mPosition.mX = x;
+    mPosition.mY = y;
+
     // Initialize a headless keyboard.
+    // One keyboard for the process, a window made after another replacing
+    // the one before, which nothing else holds.
+    delete gKeyboard;
     gKeyboard = new LLKeyboardHeadless();
     gKeyboard->setCallbacks(callbacks);
 }

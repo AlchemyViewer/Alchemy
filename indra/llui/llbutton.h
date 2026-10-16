@@ -35,6 +35,7 @@
 #include "v4color.h"
 #include "llframetimer.h"
 #include "lluiimage.h"
+#include "llfonttextcache.h"
 #include "lluistring.h"
 
 //
@@ -55,7 +56,7 @@ S32 round_up(S32 grid, S32 value);
 
 class LLUICtrlFactory;
 class LLFontGL;
-class LLFontVertexBuffer;
+
 
 //
 // Classes
@@ -66,6 +67,8 @@ class LLButton
 , public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLButton, LLUICtrl);
+
     struct Params
     :   public LLInitParam::Block<Params, LLUICtrl::Params>
     {
@@ -111,6 +114,7 @@ public:
         //image overlay paddings
         Optional<S32>           image_top_pad;
         Optional<S32>           image_bottom_pad;
+        Optional<S32>           image_overlay_right_delta;
 
         /**
          * Space between image_overlay and label
@@ -133,7 +137,9 @@ public:
         Optional<F32>               hover_glow_amount;
         Optional<TimeIntervalParam> held_down_delay;
 
-        Optional<bool>              use_draw_context_alpha;
+        Optional<bool>              use_draw_context_alpha,
+                                    draw_focus_border,
+                                    hover_hand_cursor;
 
         Optional<LLBadge::Params>   badge;
 
@@ -153,8 +159,9 @@ protected:
 public:
 
     ~LLButton();
+
     // For backward compatability only
-    typedef boost::function<void(void*)> button_callback_t;
+    typedef std::function<void(void*)> button_callback_t;
 
     void            addImageAttributeToXML(LLXMLNodePtr node, const std::string& imageName,
                                         const LLUUID&   imageID,const std::string&  xmlTagName) const;
@@ -219,14 +226,16 @@ public:
     LLFontGL::HAlign getHAlign() const                      { return mHAlign; }
     void            setLeftHPad( S32 pad )                  { mLeftHPad = pad; }
     void            setRightHPad( S32 pad )                 { mRightHPad = pad; }
+    S32             getLeftHPad() const                     { return mLeftHPad; }
+    S32             getRightHPad() const                    { return mRightHPad; }
 
     void            setImageOverlayTopPad( S32 pad )            { mImageOverlayTopPad = pad; }
     S32             getImageOverlayTopPad() const               { return mImageOverlayTopPad; }
     void            setImageOverlayBottomPad( S32 pad )         { mImageOverlayBottomPad = pad; }
     S32             getImageOverlayBottomPad() const            { return mImageOverlayBottomPad; }
 
-    const std::string   getLabelUnselected() const { return wstring_to_utf8str(mUnselectedLabel); }
-    const std::string   getLabelSelected() const { return wstring_to_utf8str(mSelectedLabel); }
+    const std::string&  getLabelUnselected() const { return mUnselectedLabel.getString(); }
+    const std::string&  getLabelSelected() const { return mSelectedLabel.getString(); }
 
     void            setImageColor(const LLUIColor& c);
     /*virtual*/ void    setColor(const LLUIColor& c) override;
@@ -256,7 +265,7 @@ public:
     const LLFontGL* getFont() const override { return mGLFont; }
     const std::string& getText() const override { return getCurrentLabel().getString(); }
 
-    S32             getLastDrawCharsCount() const { return mLastDrawCharsCount; }
+    S32             getLastDrawBytesCount() const { return mLastDrawBytesCount; }
     bool            labelIsTruncated() const;
     const LLUIString&   getCurrentLabel() const;
 
@@ -274,6 +283,7 @@ public:
     void            setImageDisabled(LLPointer<LLUIImage> image);
     void            setImageDisabledSelected(LLPointer<LLUIImage> image);
     void            setImageFlash(LLPointer<LLUIImage> image);
+    LLPointer<LLUIImage> getImageFlash() const { return mImageFlash; }
     void            setImagePressed(LLPointer<LLUIImage> image);
 
     void            setCommitOnReturn(bool commit) { mCommitOnReturn = commit; }
@@ -295,8 +305,6 @@ protected:
 
     LLFrameTimer    mMouseDownTimer;
     bool            mNeedsHighlight;
-    S32             mButtonFlashCount;
-    F32             mButtonFlashRate;
 
     void            drawBorder(LLUIImage* imagep, const LLColor4& color, S32 size);
     void            resetMouseDownTimer();
@@ -309,7 +317,7 @@ protected:
     S32                         mMouseHeldDownCount;    // Counter for parameter passed to held-down callback
     F32                         mHeldDownDelay;         // seconds, after which held-down callbacks get called
     S32                         mHeldDownFrameDelay;    // frames, after which held-down callbacks get called
-    S32                         mLastDrawCharsCount;
+    S32                         mLastDrawBytesCount;
 
     bool                        mImageOverlayEnable;
     LLPointer<LLUIImage>        mImageOverlay;
@@ -334,7 +342,6 @@ protected:
     LLUIColor                   mDisabledLabelColor;
 
     LLPointer<LLUIImage>        mImageDisabledSelected;
-    LLUIString                  mDisabledSelectedLabel;
     LLUIColor                   mDisabledSelectedLabelColor;
 
     LLPointer<LLUIImage>        mImagePressed;
@@ -368,11 +375,15 @@ protected:
     S32                         mImageOverlayBottomPad;
 
     bool                        mUseDrawContextAlpha;
+    bool                        mDrawFocusBorder;
+    bool                        mHoverHandCursor;
 
     /*
      * Space between image_overlay and label
      */
     S32                         mImgOverlayLabelSpace;
+
+    S32                         mImageOverlayRightDelta;
 
     F32                         mHoverGlowStrength;
     F32                         mCurGlowStrength;
@@ -383,14 +394,13 @@ protected:
     bool                        mForcePressedState;
     bool                        mDisplayPressedState;
 
-    LLFrameTimer                mFrameTimer;
     LLFlashTimer *              mFlashingTimer;
     bool                        mForceFlashing; // Stick flashing color even if button is pressed
     bool                        mHandleRightMouse;
 
 private:
     const LLFontGL* mGLFont;
-    LLFontVertexBuffer          mFontBuffer;
+    LLFontTextCache          mFontBuffer;
 
 protected:
     virtual std::string _getSearchText() const override

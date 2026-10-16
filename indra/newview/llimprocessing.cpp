@@ -43,7 +43,7 @@
 #include "llnotificationsutil.h"
 #include "llnotificationmanager.h"
 #include "llpanelgroup.h"
-#include "llregex.h"
+#include "alregex.h"
 #include "llregionhandle.h"
 #include "llsdserialize.h"
 #include "llslurl.h"
@@ -61,6 +61,7 @@
 #include "rlvactions.h"
 #include "rlvhelper.h"
 #include "rlvhandler.h"
+#include "rlvinventory.h"
 #include "rlvui.h"
 // [/RLVa:KB]
 
@@ -140,20 +141,20 @@ static std::string clean_name_from_im(const std::string& name, EInstantMessage t
 static std::string clean_name_from_task_im(const std::string& msg,
     bool from_group)
 {
-    boost::smatch match;
-    static const boost::regex returned_exp(
+    ALRegexMatch match;
+    static const ALRegex returned_exp(
         "(.*been returned to your inventory lost and found folder by )(.+)( (from|near).*)");
-    if (ll_regex_match(msg, match, returned_exp))
+    if (returned_exp.match(msg, &match))
     {
         // match objects are 1-based for groups
-        std::string final = match[1].str();
-        std::string name = match[2].str();
+        std::string final = match.str(1);
+        std::string name = match.str(2);
         // Don't try to clean up group names
         if (!from_group)
         {
             final += LLCacheName::buildUsername(name);
         }
-        final += match[3].str();
+        final += match.str(3);
         return final;
     }
     return msg;
@@ -210,28 +211,54 @@ void inventory_offer_handler(LLOfferInfo* info)
     }
 
     bool bAutoAccept(false);
-    // Avoid the Accept/Discard dialog if the user so desires. JC
-    if (gSavedSettings.getBOOL("AutoAcceptNewInventory")
-        && (info->mType == LLAssetType::AT_NOTECARD
-        || info->mType == LLAssetType::AT_LANDMARK
-        || info->mType == LLAssetType::AT_TEXTURE))
-    {
-        // For certain types, just accept the items into the inventory,
-        // and possibly open them on receipt depending upon "ShowNewInventory".
-        bAutoAccept = true;
-    }
 
     // Strip any SLURL from the message display. (DEV-2754)
     std::string msg = info->mDesc;
     auto indx = msg.find(" ( http://slurl.com/secondlife/");
     if (indx == std::string::npos)
     {
-        // try to find new slurl host
+        // https
+        indx = msg.find(" ( https://slurl.com/secondlife/");
+    }
+    if (indx == std::string::npos)
+    {
+        // try to find new slurl http host
         indx = msg.find(" ( http://maps.secondlife.com/secondlife/");
+    }
+    if (indx == std::string::npos)
+    {
+        // try to find new slurl https host
+        indx = msg.find(" ( https://maps.secondlife.com/secondlife/");
     }
     if (indx >= 0)
     {
         LLStringUtil::truncate(msg, indx);
+    }
+
+    // Avoid the Accept/Discard dialog if the user so desires.
+    if (gSavedSettings.getBOOL("AutoAcceptNewInventory")
+        && ((!rlv_handler_t::isEnabled()) || (!RlvInventory::instance().isGiveToRLVOffer(*info))))
+    {
+        bAutoAccept = true;
+
+        // Archive parity: announce auto-accepted inventory in a toast.
+        if (info->mType != LLAssetType::AT_NOTECARD
+            && info->mType != LLAssetType::AT_LANDMARK
+            && info->mType != LLAssetType::AT_TEXTURE)
+        {
+            LLSD auto_accept_args;
+            auto_accept_args["NAME"] = LLSLURL(info->mFromGroup ? "group" : "agent", info->mFromID, "about").getSLURLString();
+            if (info->mFromObject)
+            {
+                auto_accept_args["ITEM"] = msg;
+            }
+            else
+            {
+                const std::string& verb = "select?name=" + LLURI::escape(msg);
+                auto_accept_args["ITEM"] = LLSLURL("inventory", info->mObjectID, verb.c_str()).getSLURLString();
+            }
+            LLNotificationsUtil::add("AutoAcceptedInventory", auto_accept_args);
+        }
     }
 
     LLSD args;
@@ -363,6 +390,28 @@ void inventory_offer_handler(LLOfferInfo* info)
             p.payload = payload;
             LLPostponedNotification::add<LLPostponedOfferNotification>(p, info->mFromID, false);
         }
+
+        if (bAutoAccept && gSavedSettings.getBOOL("ShowNewInventory"))
+        {
+            LLViewerInventoryCategory* catp = nullptr;
+            catp = (LLViewerInventoryCategory*)gInventory.getCategory(info->mObjectID);
+            LLViewerInventoryItem* itemp = nullptr;
+            if (!catp)
+            {
+                itemp = (LLViewerInventoryItem*)gInventory.getItem(info->mObjectID);
+            }
+
+            LLOpenAgentOffer* open_agent_offer = new LLOpenAgentOffer(info->mObjectID, info->mFromName, false);
+            open_agent_offer->startFetch();
+            if (catp || (itemp && itemp->isFinished()))
+            {
+                open_agent_offer->done();
+            }
+            else
+            {
+                gInventory.addObserver(open_agent_offer);
+            }
+        }
     }
 
     LLFirstUse::newInventory();
@@ -479,7 +528,8 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
     // make sure that we don't have an empty or all-whitespace name
     LLStringUtil::trim(name);
-    if (name.empty())
+    static const LLCachedControl<bool> sMarkUnnamedObjects(gSavedSettings, "AlchemyChatMarkUnnamedObjects", true);
+    if (sMarkUnnamedObjects && name.empty())
     {
         name = LLTrans::getString("Unnamed");
     }
@@ -495,9 +545,9 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     // NOTE: Not set on this
     // *TODO*: Revisit this
     // -- Fallen
-    static LLCachedControl<bool> AlchemyRejectTeleportOffers(gSavedPerAccountSettings, "AlchemyRejectTeleportOffersMode");
-    static LLCachedControl<bool> AlchemyDontRejectTeleportOffersFromFriends(gSavedPerAccountSettings, "AlchemyDontRejectTeleportOffersFromFriends");
-    static LLCachedControl<bool> AlchemyRejectFriendshipRequests(gSavedPerAccountSettings, "AlchemyRejectFriendshipRequestsMode");
+    static LLCachedControl<bool> AlchemyRejectTeleportOffers(gSavedPerAccountSettings, "ALRejectTeleportOffersMode");
+    static LLCachedControl<bool> AlchemyDontRejectTeleportOffersFromFriends(gSavedPerAccountSettings, "ALDontRejectTeleportOffersFromFriends");
+    static LLCachedControl<bool> AlchemyRejectFriendshipRequests(gSavedPerAccountSettings, "ALRejectFriendshipRequestsMode");
 
     // Resurrect AutoResponse from Alchemy Archive (Thanks Cinders!)
     // -- Fallen
@@ -658,7 +708,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     pack_instant_message(
                         gMessageSystem,
                         gAgent.getID(),
-                        FALSE,
+                        false,
                         gAgent.getSessionID(),
                         from_id,
                         my_name,
@@ -1236,7 +1286,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 // [SL:KB] - Checked: 2010-11-02 (RLVa-1.2.2a) | Added: RLVa-1.2.2a
             chat.mURL = LLSLURL("objectim", session_id, LLURI::mapToQueryString(query_string)).getSLURLString();
 // [/SL:KB]
-           chat.mText = message;
+            chat.mText = message;
 
             // Note: lie to Nearby Chat, pretending that this is NOT an IM, because
             // IMs from obejcts don't open IM sessions.
@@ -1295,10 +1345,15 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             // should happen after you get an "invitation"
             if (!gIMMgr->hasSession(session_id))
             {
-                return;
+                if (!gAgent.isInGroup(session_id) ||
+                    !gIMMgr->checkSnoozeExpiration(session_id) ||
+                    !gIMMgr->restoreSnoozedSession(session_id))
+                {
+                    return;
+                }
             }
 
-            else if (offline == IM_ONLINE && is_do_not_disturb)
+            if (offline == IM_ONLINE && is_do_not_disturb)
             {
 
                 // return a standard "do not disturb" message, but only do it to online IM
@@ -1394,7 +1449,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                   ((IM_TELEPORT_REQUEST == dialog) && (RlvActions::autoAcceptTeleportRequest(from_id))) );
 // [/RLVa:KB]
 
-           if (is_muted)
+            if (is_muted)
             {
                 return;
             }
@@ -1690,7 +1745,6 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 return;
             }
 
-
             bool add_notification = true;
             for (auto& panel : LLToastNotifyPanel::instance_snapshot())
             {
@@ -1730,6 +1784,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                         LLNotification::Params params("OfferFriendship");
                         params.substitutions = args;
                         params.payload = payload;
+                        params.offer_from_agent = true;
                         LLPostponedNotification::add<LLPostponedOfferNotification>(params, from_id, false);
                     }
                 }
@@ -1778,7 +1833,7 @@ void LLIMProcessing::requestOfflineMessages()
         && isAgentAvatarValid()
         && gAgent.getRegion()
         && gAgent.getRegion()->capabilitiesReceived()
-        && (LLMuteList::getInstance()->isLoaded() || LLMuteList::getInstance()->getLoadFailed()))
+        && LLMuteList::getInstance()->updateLoadState())
     {
         std::string cap_url = gAgent.getRegionCapability("ReadOfflineMsgs");
 
@@ -1806,8 +1861,8 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("requestOfflineMessagesCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestOfflineMessagesCoro", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -1826,7 +1881,8 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
 
     if (!contents.size())
     {
-        LL_WARNS("Messaging") << "No contents received for offline messages via capability " << url << LL_ENDL;
+        // Received no offline messages on login.
+        LL_INFOS("Messaging") << "No contents received for offline messages via capability " << url << LL_ENDL;
         return;
     }
 
@@ -1959,4 +2015,3 @@ void LLIMProcessing::requestOfflineMessagesLegacy()
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     gAgent.sendReliableMessage();
 }
-

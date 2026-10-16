@@ -71,7 +71,7 @@ LLSliderCtrl::LLSliderCtrl(const LLSliderCtrl::Params& p)
     {
         if (!p.label_width.isProvided())
         {
-            label_width = p.font()->getWidth(p.label);
+            label_width = p.font()->getWidth(p.label());
         }
         LLRect label_rect( left, top, label_width, bottom );
         LLTextBox::Params params(p.slider_label);
@@ -93,13 +93,13 @@ LLSliderCtrl::LLSliderCtrl(const LLSliderCtrl::Params& p)
     {
         // calculate the size of the text box (log max_value is number of digits - 1 so plus 1)
         if ( p.max_value )
-            text_width = p.font()->getWidth(std::string("0")) * ( static_cast < S32 > ( log10  ( p.max_value ) ) + p.decimal_digits + 1 );
+            text_width = p.font()->getWidth("0") * ( static_cast < S32 > ( log10  ( p.max_value ) ) + p.decimal_digits + 1 );
 
         if ( p.increment < 1.0f )
-            text_width += p.font()->getWidth(std::string(".")); // (mostly) take account of decimal point in value
+            text_width += p.font()->getWidth("."); // (mostly) take account of decimal point in value
 
         if ( p.min_value < 0.0f || p.max_value < 0.0f )
-            text_width += p.font()->getWidth(std::string("-")); // (mostly) take account of minus sign
+            text_width += p.font()->getWidth("-"); // (mostly) take account of minus sign
 
         // padding to make things look nicer
         text_width += 8;
@@ -225,7 +225,7 @@ bool LLSliderCtrl::setLabelArg( const std::string& key, const LLStringExplicit& 
         res = mLabelBox->setTextArg(key, text);
         if (res && mLabelFont && mLabelWidth == 0)
         {
-            S32 label_width = mLabelFont->getWidth(mLabelBox->getWText().c_str());
+            S32 label_width = mLabelFont->getWidthBytes(mLabelBox->getText(), 0, S32_MAX);
             LLRect rect = mLabelBox->getRect();
             S32 prev_right = rect.mRight;
             rect.mRight = rect.mLeft + label_width;
@@ -302,7 +302,16 @@ void LLSliderCtrl::updateSliderRect()
     }
     if (mTextBox)
     {
-        right -= mTextBox->getRect().getWidth() + sliderctrl_spacing;
+        // Keep the value text pinned to the right edge, the same way the
+        // editable variant above is; without this a resized slider leaves
+        // the text floating at its construction-time offset mid-track.
+        LLRect text_rect = mTextBox->getRect();
+        const S32 text_width = text_rect.getWidth();
+        text_rect.mRight = right;
+        text_rect.mLeft = right - text_width;
+        mTextBox->setRect(text_rect);
+
+        right -= text_width + sliderctrl_spacing;
     }
     if (mLabelBox)
     {
@@ -315,7 +324,7 @@ void LLSliderCtrl::updateSliderRect()
 // static
 void LLSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata )
 {
-    LLSliderCtrl* self = dynamic_cast<LLSliderCtrl*>(ctrl->getParent());
+    LLSliderCtrl* self = ctrl->getParentAs<LLSliderCtrl>();
     if (!self)
         return;
 
@@ -331,7 +340,8 @@ void LLSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata )
         if( self->mSlider->getMinValue() <= val && val <= self->mSlider->getMaxValue() )
         {
             self->setValue( val );  // set the value temporarily so that the callback can retrieve it.
-            if( !self->mValidateSignal || (*(self->mValidateSignal))( self, val ) )
+            enable_signal_t* signal = self->validateSignal();
+            if( !signal || (*signal)( self, val ) )
             {
                 success = true;
             }
@@ -358,7 +368,7 @@ void LLSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata )
 // static
 void LLSliderCtrl::onSliderCommit( LLUICtrl* ctrl, const LLSD& userdata )
 {
-    LLSliderCtrl* self = dynamic_cast<LLSliderCtrl*>(ctrl->getParent());
+    LLSliderCtrl* self = ctrl->getParentAs<LLSliderCtrl>();
     if (!self)
         return;
 
@@ -367,7 +377,8 @@ void LLSliderCtrl::onSliderCommit( LLUICtrl* ctrl, const LLSD& userdata )
     F32 new_val = self->mSlider->getValueF32();
 
     self->mValue = new_val;  // set the value temporarily so that the callback can retrieve it.
-    if( !self->mValidateSignal || (*(self->mValidateSignal))( self, new_val ) )
+    enable_signal_t* signal = self->validateSignal();
+    if( !signal || (*signal)( self, new_val ) )
     {
         success = true;
     }

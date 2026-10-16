@@ -24,7 +24,7 @@
 namespace LL
 {
 
-    class ThreadPoolBase: public LLInstanceTracker<ThreadPoolBase, std::string>
+    class LL_COMMON_API ThreadPoolBase: public LLInstanceTracker<ThreadPoolBase, std::string>
     {
     private:
         using super = LLInstanceTracker<ThreadPoolBase, std::string>;
@@ -37,10 +37,12 @@ namespace LL
          * The number of threads you pass sets the compile-time default. But
          * if the user has overridden the LLSD map in the "ThreadPoolSizes"
          * setting with a key matching this ThreadPool name, that setting
-         * overrides this parameter.
+         * overrides this parameter -- unless fixed_width says the work is
+         * not safe on more threads than it was given.
          */
         ThreadPoolBase(const std::string& name, size_t threads,
-                       WorkQueueBase* queue, bool auto_shutdown = true);
+                       WorkQueueBase* queue, bool auto_shutdown = true,
+                       bool fixed_width = false);
         virtual ~ThreadPoolBase();
 
         /**
@@ -62,7 +64,9 @@ namespace LL
 
         /**
          * Override run() if you need special processing. The default run()
-         * implementation simply calls WorkQueue::runUntilClose().
+         * implementation simply calls WorkQueue::runUntilClose(). A class
+         * that overrides it calls close() in its own destructor, so that its
+         * threads are done with it before any of it is destroyed.
          */
         virtual void run();
 
@@ -101,7 +105,7 @@ namespace LL
      * Specialize with WorkQueue or, for timestamped tasks, WorkSchedule
      */
     template <class QUEUE>
-    struct ThreadPoolUsing: public ThreadPoolBase
+    struct LL_COMMON_API ThreadPoolUsing : public ThreadPoolBase
     {
         using queue_t = QUEUE;
 
@@ -117,14 +121,21 @@ namespace LL
          * Pass an explicit capacity to limit the size of the queue.
          * Constraining the queue can cause a submitter to block. Do not
          * constrain any ThreadPool accepting work from the main thread.
+         *
+         * Pass fixed_width for work that is not safe on more threads than
+         * it was given: the "ThreadPoolSizes" setting is not read for it.
          */
         ThreadPoolUsing(const std::string& name,
                         size_t threads=1,
                         size_t capacity=1024*1024,
-                        bool auto_shutdown = true):
-            ThreadPoolBase(name, threads, new queue_t(name, capacity, false), auto_shutdown)
+                        bool auto_shutdown = true,
+                        bool fixed_width = false):
+            ThreadPoolBase(name, threads, new queue_t(name, capacity, false), auto_shutdown, fixed_width)
         {}
-        ~ThreadPoolUsing() override {}
+        // Closes, and joins the threads, before any of the pool is destroyed:
+        // until then they run its virtual run(). ~ThreadPoolBase closes too,
+        // but by then the vptr is reset and whatever derives from it is gone.
+        ~ThreadPoolUsing() override { close(); }
 
         /**
          * obtain a non-const reference to the specific WorkQueue subclass to

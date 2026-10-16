@@ -271,27 +271,13 @@
 						ステップ１：描画詳細度
 					</text>
 					<combo_box name="physics_lod_combo" tool_tip="実像に適用するＬｏＤを定義します。">
-						<combo_item name="choose_one">
-							１つを選択…
-						</combo_item>
-						<combo_item name="physics_high">
-							高
-						</combo_item>
-						<combo_item name="physics_medium">
-							中
-						</combo_item>
-						<combo_item name="physics_low">
-							低
-						</combo_item>
-						<combo_item name="physics_lowest">
-							最低
-						</combo_item>
-						<combo_item name="physics_bounding_box">
-							バウンディングボックス
-						</combo_item>
-						<combo_item name="load_from_file">
-							ファイルから
-						</combo_item>
+						<combo_item name="choose_one" label="１つを選択…"/>
+						<combo_item name="physics_high" label="高"/>
+						<combo_item name="physics_medium" label="中"/>
+						<combo_item name="physics_low" label="低"/>
+						<combo_item name="physics_lowest" label="最低"/>
+						<combo_item name="physics_bounding_box" label="バウンディングボックス"/>
+						<combo_item name="load_from_file" label="ファイルから"/>
 					</combo_box>
 					<button name="physics_browse" label="参照…"/>
 					<!--
@@ -313,9 +299,6 @@
 					<text name="smooth_method_label">
 						滑らかさ：
 					</text>
-					<check_box label="穴を閉じる" name="Close Holes (Slow)"/>
-					<button label="分析" name="Decompose"/>
-					<button label="キャンセル" name="decompose_cancel"/>
 				</panel>
 				<panel name="physics analysis vhacd">
 					<text name="method_label">
@@ -324,7 +307,7 @@
 					<text name="analysis_method_label">
 						フィルモード：
 					</text>
-					<text name="quality_label">
+					<text name="hulls_per_mesh_label">
 						解像度：
 					</text>
 					<text name="quality_label">
@@ -373,6 +356,11 @@
 					<text name="physics_hulls">
 						凸包数：[HULLS]
 					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="キャンセル" name="decompose_cancel"/>
+					<button label="分析" name="Decompose"/>
+					<check_box label="穴を閉じる" name="Close Holes (Slow)"/>
 				</panel>
 			</panel>
 			<!-- MODIFIERS PANEL -->

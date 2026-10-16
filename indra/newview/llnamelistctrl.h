@@ -75,10 +75,12 @@ private:
 };
 
 
-class LLNameListCtrl
+class LLNameListCtrl final
 :   public LLScrollListCtrl, public LLInstanceTracker<LLNameListCtrl>
 {
 public:
+    AL_VIEW_TYPE(LLNameListCtrl, LLScrollListCtrl);
+
     typedef boost::signals2::signal<void(bool)> namelist_complete_signal_t;
 
     typedef enum e_name_type
@@ -147,11 +149,7 @@ public:
                      bool enabled = true, const std::string& suffix = LLStringUtil::null, const std::string& prefix = LLStringUtil::null);
     LLScrollListItem* addNameItem(NameItem& item, EAddPosition pos = ADD_BOTTOM);
 
-//  /*virtual*/ LLScrollListItem* addElement(const LLSD& element, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL);
-// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
-    LLScrollListItem* addElement(const LLSD& element, EAddPosition pos = ADD_BOTTOM, void* userdata = nullptr) override;
-    LLScrollListItem* addElement(const LLSD& element, const LLScrollListItem::commit_signal_t::slot_type& cb, EAddPosition pos = ADD_BOTTOM) override;
-// [/SL:KB]
+    /*virtual*/ LLScrollListItem* addElement(const LLSD& element, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL) override;
     LLScrollListItem* addNameItemRow(const NameItem& value, EAddPosition pos = ADD_BOTTOM, const std::string& suffix = LLStringUtil::null,
                                                                                             const std::string& prefix = LLStringUtil::null);
 
@@ -214,12 +212,12 @@ private:
     boost::signals2::signal<void(const LLUUID &)> mIconClickedSignal;
 
 public:
-    boost::signals2::connection setOnNameListCompleteCallback(boost::function<void(bool)> onNameListCompleteCallback)
+    boost::signals2::connection setOnNameListCompleteCallback(std::function<void(bool)> onNameListCompleteCallback)
     {
         return mNameListCompleteSignal.connect(onNameListCompleteCallback);
     }
 
-    boost::signals2::connection setIconClickedCallback(boost::function<void(const LLUUID &)> cb)
+    boost::signals2::connection setIconClickedCallback(std::function<void(const LLUUID&)> cb)
     {
         return mIconClickedSignal.connect(cb);
     }

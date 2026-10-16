@@ -35,9 +35,11 @@
 #include <boost/bind.hpp>
 #include "llautoreplace.h"
 
-class LLFloaterAutoReplaceSettings : public LLFloater
+class LLFloaterAutoReplaceSettings final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterAutoReplaceSettings, LLFloater);
+
     LLFloaterAutoReplaceSettings(const LLSD& key);
 
     bool postBuild() override;

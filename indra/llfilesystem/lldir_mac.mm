@@ -1,0 +1,221 @@
+/**
+ * @file lldir_mac.cpp
+ * @brief Implementation of directory utilities for macOS
+ *
+ * $LicenseInfo:firstyear=2002&license=viewerlgpl$
+ * Second Life Viewer Source Code
+ * Copyright (C) 2010, Linden Research, Inc.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
+ * $/LicenseInfo$
+ */
+
+#if LL_DARWIN
+
+#include "linden_common.h"
+
+#include "lldir_mac.h"
+#include "llerror.h"
+#include "llrand.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <glob.h>
+#include <filesystem>
+
+#import <Cocoa/Cocoa.h>
+
+// --------------------------------------------------------------------------------
+
+//findSystemDirectory scoped exclusively to this file.
+std::string findSystemDirectory(NSSearchPathDirectory searchPathDirectory,
+                                NSSearchPathDomainMask domainMask)
+{
+    std::string result;
+    @autoreleasepool {
+        NSString *path = nil;
+
+        // Search for the path
+        NSArray* paths = NSSearchPathForDirectoriesInDomains(searchPathDirectory,
+                                                             domainMask,
+                                                             YES);
+        if ([paths count])
+        {
+            path = [paths objectAtIndex:0];
+            //HACK:  Always attempt to create directory, ignore errors.
+            NSError *error = nil;
+
+            [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:&error];
+
+
+            result = std::string([path UTF8String]);
+        }
+    }
+    return result;
+}
+
+static bool CreateDirectory(const std::string &parent,
+                            const std::string &child,
+                            std::string *fullname)
+{
+
+    std::filesystem::path p(parent);
+    p /= child;
+
+    if (fullname)
+        *fullname = std::string(p.string());
+
+    if (! std::filesystem::create_directory(p))
+    {
+        return (std::filesystem::is_directory(p));
+    }
+    return true;
+}
+
+// --------------------------------------------------------------------------------
+
+LLDir_Mac::LLDir_Mac()
+{
+    mDirDelimiter = "/";
+
+    const std::string secondLifeString = "AlchemyNext";
+
+    std::string executablepathstr;
+    @autoreleasepool {
+        NSString *bundlePath = [[NSBundle mainBundle] executablePath];
+        executablepathstr = std::string([bundlePath UTF8String]);
+    }
+
+    //NOTE:  LLINFOS/LLERRS will not output to log here.  The streams are not initialized.
+
+    if (!executablepathstr.empty())
+    {
+        // mExecutablePathAndName
+        mExecutablePathAndName = executablepathstr;
+
+        std::filesystem::path executablepath(executablepathstr);
+
+        mExecutableFilename = executablepath.filename().string();
+        mExecutableDir = executablepath.parent_path().string();
+
+        // mAppRODataDir
+        @autoreleasepool {
+            NSString *bundlePath = [[NSBundle mainBundle] resourcePath];
+            mAppRODataDir = std::string([bundlePath UTF8String]);
+        }
+
+        // *NOTE: When running in a dev tree, use the copy of
+        // skins in indra/newview/ rather than in the application bundle.  This
+        // mirrors Windows dev environment behavior and allows direct checkin
+        // of edited skins/xui files. JC
+
+        // MBW -- This keeps the mac application from finding other things.
+        // If this is really for skins, it should JUST apply to skins.
+
+        std::string::size_type build_dir_pos = mExecutableDir.rfind("/build-darwin-");
+        if (build_dir_pos != std::string::npos)
+        {
+            // ...we're in a dev checkout
+            mSkinBaseDir = mExecutableDir.substr(0, build_dir_pos)
+                + "/indra/newview/skins";
+            LL_INFOS() << "Running in dev checkout with mSkinBaseDir "
+                << mSkinBaseDir << LL_ENDL;
+        }
+        else
+        {
+            // ...normal installation running
+            mSkinBaseDir = mAppRODataDir + mDirDelimiter + "skins";
+        }
+
+        // mOSUserDir
+        std::string appdir = findSystemDirectory(NSApplicationSupportDirectory, NSUserDomainMask);
+        std::string rootdir;
+
+        //Create root directory
+        if (CreateDirectory(appdir, secondLifeString, &rootdir))
+        {
+
+            // Save the full path to the folder
+            mOSUserDir = rootdir;
+
+            // Create our sub-dirs
+            CreateDirectory(rootdir, std::string("data"), NULL);
+            CreateDirectory(rootdir, std::string("logs"), NULL);
+            CreateDirectory(rootdir, std::string("user_settings"), NULL);
+            CreateDirectory(rootdir, std::string("browser_profile"), NULL);
+        }
+
+        //mOSCacheDir
+        std::string cachedir =  findSystemDirectory(NSCachesDirectory, NSUserDomainMask);
+        if (!cachedir.empty())
+        {
+            mOSCacheDir = cachedir;
+            //TODO:  This changes from ~/Library/Cache/Secondlife to ~/Library/Cache/com.app.secondlife/Secondlife.  Last dir level could go away.
+            CreateDirectory(mOSCacheDir, secondLifeString, NULL);
+        }
+
+        // mOSUserAppDir
+        mOSUserAppDir = mOSUserDir;
+
+        // mTempDir
+        std::string tmpdir = LLFile::tmpdir();
+        if (!tmpdir.empty())
+        {
+            CreateDirectory(tmpdir, secondLifeString, &mTempDir);
+        }
+
+        mWorkingDir = getCurPath();
+
+        mLLPluginDir = mAppRODataDir;
+    }
+}
+
+LLDir_Mac::~LLDir_Mac()
+{
+}
+
+// Implementation
+
+
+void LLDir_Mac::initAppDirs(const std::string &app_name,
+                            const std::string& app_read_only_data_dir)
+{
+    // Allow override so test apps can read newview directory
+    if (!app_read_only_data_dir.empty())
+    {
+        mAppRODataDir = app_read_only_data_dir;
+        mSkinBaseDir = add(mAppRODataDir, "skins");
+    }
+    mCAFile = add(mAppRODataDir, "ca-bundle.crt");
+}
+
+std::string LLDir_Mac::getCurPath()
+{
+    return std::filesystem::path( std::filesystem::current_path() ).string();
+}
+
+/*virtual*/ std::string LLDir_Mac::getLLPluginFilename(std::string base_name)
+{
+    // Each plugin is now its own host .app bundle named for the plugin
+    // (e.g. media_plugin_cef.app), launched directly - there is no separate
+    // SLPlugin launcher or dlopen'd .dylib any more.
+    return gDirUtilp->getAppRODataDir() + gDirUtilp->getDirDelimiter() +
+        base_name + ".app/Contents/MacOS/" + base_name;
+}
+
+
+#endif // LL_DARWIN

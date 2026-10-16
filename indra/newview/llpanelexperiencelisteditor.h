@@ -36,18 +36,19 @@ class LLScrollListCtrl;
 class LLButton;
 class LLFloaterExperiencePicker;
 
-class LLPanelExperienceListEditor : public LLPanel
+class LLPanelExperienceListEditor final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelExperienceListEditor, LLPanel);
 
     typedef boost::signals2::signal<void (const LLUUID&) > list_changed_signal_t;
     // filter function for experiences, return true if the experience should be hidden.
-    typedef boost::function<bool (const LLSD&)> experience_function;
+    typedef std::function<bool(const LLSD&)> experience_function;
     typedef std::vector<experience_function> filter_list;
     typedef LLHandle<LLFloaterExperiencePicker> PickerHandle;
     LLPanelExperienceListEditor();
     ~LLPanelExperienceListEditor();
-    bool postBuild();
+    bool postBuild() override;
 
     void loading();
 

@@ -28,37 +28,32 @@
 
 #include "lldiriterator.h"
 
-#include "fix_macros.h"
-#include "llregex.h"
-#include <boost/filesystem.hpp>
+#include "fsyspath.h"
+#include "alregex.h"
+#include <filesystem>
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 static std::string glob_to_regex(const std::string& glob);
 
 class LLDirIterator::Impl
 {
 public:
-    Impl(const std::string &dirname, const std::string &mask);
+    Impl(const std::filesystem::path& dirname, const std::string& mask);
+
     ~Impl();
 
     bool next(std::string &fname);
 
 private:
-    boost::regex            mFilterExp;
+    ALRegex                 mFilterExp;
     fs::directory_iterator  mIter;
     bool                    mIsValid;
 };
 
-LLDirIterator::Impl::Impl(const std::string &dirname, const std::string &mask)
+LLDirIterator::Impl::Impl(const std::filesystem::path& dir_path, const std::string& mask)
     : mIsValid(false)
 {
-#ifdef LL_WINDOWS // or BOOST_WINDOWS_API
-    fs::path dir_path(ll_convert<std::wstring>(dirname));
-#else
-    fs::path dir_path(dirname);
-#endif
-
     bool is_dir = false;
 
     // Check if path is a directory.
@@ -74,7 +69,7 @@ LLDirIterator::Impl::Impl(const std::string &dirname, const std::string &mask)
 
     if (!is_dir)
     {
-        LL_WARNS() << "Invalid path: \"" << dir_path.string() << "\"" << LL_ENDL;
+        LL_WARNS() << "Invalid path: \"" << fsyspath(dir_path).string() << "\"" << LL_ENDL;
         return;
     }
 
@@ -92,17 +87,12 @@ LLDirIterator::Impl::Impl(const std::string &dirname, const std::string &mask)
     // Convert the glob mask to a regular expression
     std::string exp = glob_to_regex(mask);
 
-    // Initialize boost::regex with the expression converted from
-    // the glob mask.
-    // An exception is thrown if the expression is not valid.
-    try
-    {
-        mFilterExp.assign(exp);
-    }
-    catch (boost::regex_error& e)
+    // Compile the expression converted from the glob mask.
+    mFilterExp = ALRegex(exp);
+    if (!mFilterExp.ok())
     {
         LL_WARNS() << "\"" << exp << "\" is not a valid regular expression: "
-                << e.what() << LL_ENDL;
+                << mFilterExp.error() << LL_ENDL;
         return;
     }
 
@@ -131,20 +121,26 @@ bool LLDirIterator::Impl::next(std::string &fname)
     {
         while (mIter != end_itr && !found)
         {
-            boost::smatch match;
-            std::string name = mIter->path().filename().string();
-            found = ll_regex_match(name, match, mFilterExp);
-            if (found)
+            try
             {
-                fname = name;
+                std::string name = ll_convert<std::string>(mIter->path().filename().u8string());
+                found = mFilterExp.match(name);
+                if (found)
+                {
+                    fname = name;
+                }
+            }
+            catch (const std::system_error& e)
+            {
+                LL_WARNS() << "Exception accessing directory entry: " << e.what() << LL_ENDL;
             }
 
             ++mIter;
         }
     }
-    catch (const fs::filesystem_error& e)
+    catch (const std::system_error& e)
     {
-        LL_WARNS() << e.what() << LL_ENDL;
+        LL_WARNS() << "Exception iterating directory: " << e.what() << LL_ENDL;
     }
 
     return found;
@@ -229,9 +225,19 @@ std::string glob_to_regex(const std::string& glob)
     return regex;
 }
 
+LLDirIterator::LLDirIterator(const char* dirname, const std::string& mask)
+{
+    mImpl = new Impl(fsyspath(dirname), mask);
+}
+
 LLDirIterator::LLDirIterator(const std::string &dirname, const std::string &mask)
 {
-    mImpl = new Impl(dirname, mask);
+    mImpl = new Impl(fsyspath(dirname), mask);
+}
+
+LLDirIterator::LLDirIterator(const std::filesystem::path& dir_path, const std::string& mask)
+{
+    mImpl = new Impl(dir_path, mask);
 }
 
 LLDirIterator::~LLDirIterator()

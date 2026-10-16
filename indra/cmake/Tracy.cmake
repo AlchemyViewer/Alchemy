@@ -1,42 +1,40 @@
 # -*- cmake -*-
-include(Prebuilt)
-
 include_guard()
-add_library( ll::tracy INTERFACE IMPORTED )
+add_library(ll::tracy INTERFACE IMPORTED)
 
-# default Tracy profiling on for test builds, but off for all others
-string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
-if(channel_lower MATCHES "^alchemy test")
-  option(USE_TRACY "Use Tracy profiler." ON)
-else()
-    option(USE_TRACY "Use Tracy profiler." OFF)
-endif()
+if(AL_USE_TRACY)
+  find_package(Tracy CONFIG REQUIRED)
 
-if (USE_TRACY)
-  option(USE_TRACY_ON_DEMAND "Use on-demand Tracy profiling." ON)
-  option(USE_TRACY_LOCAL_ONLY "Disallow remote Tracy profiling." OFF)
-  option(USE_TRACY_GPU "Use Tracy GPU profiling" OFF)
-
-  use_system_binary(tracy)
-  use_prebuilt_binary(tracy)
-
-  target_include_directories( ll::tracy SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/tracy)
-
-  target_compile_definitions(ll::tracy INTERFACE -DTRACY_ENABLE=1 -DTRACY_ONLY_IPV4=1)
-
-  if (USE_TRACY_ON_DEMAND)
-    target_compile_definitions(ll::tracy INTERFACE -DTRACY_ON_DEMAND=1)
-  endif ()
-
-  if (USE_TRACY_LOCAL_ONLY)
-    target_compile_definitions(ll::tracy INTERFACE -DTRACY_NO_BROADCAST=1 -DTRACY_ONLY_LOCALHOST=1)
-  endif ()
-
-  if (USE_TRACY_GPU AND NOT DARWIN) # Tracy OpenGL mode is incompatible with macOS/iOS
-    target_compile_definitions(ll::tracy INTERFACE -DLL_PROFILER_ENABLE_TRACY_OPENGL=1)
-  endif ()
+  if(AL_ENABLE_TRACY_GPU AND NOT DARWIN) # Tracy OpenGL mode is incompatible with macOS/iOS
+    target_compile_definitions(ll::tracy INTERFACE LL_PROFILER_ENABLE_TRACY_OPENGL=1)
+  endif()
 
   # See: indra/llcommon/llprofiler.h
-  add_compile_definitions(LL_PROFILER_CONFIGURATION=3)
-endif (USE_TRACY)
+  # Additionally we only want tracy support in RelWithDebInfo and Release builds.
+  target_compile_definitions(
+    ll::tracy
+    INTERFACE
+      $<$<CONFIG:RelWithDebInfo,Release>:LL_PROFILER_CONFIGURATION=2>
+      $<$<CONFIG:Debug,OptDebug>:LL_PROFILER_CONFIGURATION=0>
+  )
+  target_link_libraries(ll::tracy INTERFACE $<$<CONFIG:RelWithDebInfo,Release>:Tracy::TracyClient>)
 
+  # Tracy starts its profiler thread from a static initializer, and the
+  # thread's first act, the broadcast saying where it listens, resolves an
+  # address with getaddrinfo, which on macOS dlopens libnetwork and the
+  # hundreds of images under it. Done while dyld is still finishing the
+  # process's start on the main thread, that now and then crashes dyld
+  # (dyld4::prepare, in generateAtlas): a test, or the viewer, dead before
+  # main. Linked, libnetwork is loaded with the process, before any
+  # initializer runs, and the dlopen finds it already there. -needed, since
+  # nothing calls into it and -dead_strip_dylibs would drop it.
+  if(DARWIN)
+    target_link_options(
+      ll::tracy
+      INTERFACE $<$<CONFIG:RelWithDebInfo,Release>:LINKER:-needed-lnetwork>
+    )
+  endif()
+else()
+  # See: indra/llcommon/llprofiler.h
+  target_compile_definitions(ll::tracy INTERFACE LL_PROFILER_CONFIGURATION=0)
+endif()

@@ -14,6 +14,7 @@
 
 #include "llcoros.h"
 #include "llexception.h"
+#include "llhandle.h"
 #include "llinstancetracker.h"
 #include "llinstancetrackersubclass.h"
 #include "threadsafeschedule.h"
@@ -21,6 +22,9 @@
 #include <exception>                // std::current_exception
 #include <functional>               // std::function
 #include <string>
+
+class LLEventPumps;
+
 
 namespace LL
 {
@@ -31,7 +35,7 @@ namespace LL
     /**
      * A typical WorkQueue has a string name that can be used to find it.
      */
-    class WorkQueueBase: public LLInstanceTracker<WorkQueueBase, std::string>
+    class LL_COMMON_API WorkQueueBase : public LLInstanceTracker<WorkQueueBase, std::string>
     {
     private:
         using super = LLInstanceTracker<WorkQueueBase, std::string>;
@@ -202,12 +206,14 @@ namespace LL
 
         // Name used for the LLApp event listener (empty if not registered)
         std::string mListenerName;
+        // Due to shutdown order issues, store by handle
+        LLHandle<LLEventPumps> mPumpHandle;
     };
 
 /*****************************************************************************
 *   WorkQueue: no timestamped task support
 *****************************************************************************/
-    class WorkQueue: public LLInstanceTrackerSubclass<WorkQueue, WorkQueueBase>
+    class LL_COMMON_API WorkQueue : public LLInstanceTrackerSubclass<WorkQueue, WorkQueueBase>
     {
     private:
         using super = LLInstanceTrackerSubclass<WorkQueue, WorkQueueBase>;
@@ -255,9 +261,17 @@ namespace LL
         bool post(const Work&) override;
 
         /**
-         * post work, unless the queue is full
+         * post work, unless the queue is full -- or its lock is held at
+         * that moment, by a consumer popping as likely as not
          */
         bool tryPost(const Work&) override;
+
+        /**
+         * post work, waiting no longer than timeout for the queue's lock
+         * and for room in it: false where it was not posted in that time,
+         * or the queue is closed
+         */
+        bool tryPostFor(const std::chrono::milliseconds& timeout, const Work&);
 
     private:
         using Queue = LLThreadSafeQueue<Work>;
@@ -270,12 +284,16 @@ namespace LL
 /*****************************************************************************
 *   WorkSchedule: add support for timestamped tasks
 *****************************************************************************/
-    class WorkSchedule: public LLInstanceTrackerSubclass<WorkSchedule, WorkQueueBase>
+    class LL_COMMON_API WorkSchedule : public LLInstanceTrackerSubclass<WorkSchedule, WorkQueueBase>
     {
     private:
         using super = LLInstanceTrackerSubclass<WorkSchedule, WorkQueueBase>;
         using Queue = ThreadSafeSchedule<Work>;
         // helper for postEvery()
+        // NOT LL_COMMON_API: BackJack is instantiated with caller-local types
+        // (the lambda passed to postEvery()), so each consumer must emit its own
+        // instantiation -- tagging it makes consumers try to import an
+        // instantiation the DLL can never contain.
         template <typename Rep, typename Period, typename CALLABLE>
         class BackJack;
 
@@ -530,7 +548,11 @@ namespace LL
                         reply,
                         // Bind the current exception to transport back to the
                         // originating WorkQueue. Once there, rethrow it.
-                        [exc = std::current_exception()](){ std::rethrow_exception(exc); });
+                        [exc = std::current_exception()]()
+                    {
+                        LL_INFOS("LLCoros") << "Rethrowing exception from WorkQueueBase::postTo" << LL_ENDL;
+                        std::rethrow_exception(exc);
+                    });
                 }
             },
             // if caller passed a TimePoint, pass it along to post()

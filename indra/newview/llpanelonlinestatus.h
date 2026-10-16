@@ -33,8 +33,11 @@
 /**
  * Represents online tip toast panel.
  */
-class LLPanelOnlineStatus : public LLPanelTipToast
+class LLPanelOnlineStatus final : public LLPanelTipToast
 {
+public:
+    AL_VIEW_TYPE(LLPanelOnlineStatus, LLPanelTipToast);
+private:
     // disallow instantiation of this class
 private:
     // grant privileges to instantiate this class to LLToastPanel

@@ -173,7 +173,15 @@ LLUUID const ANIM_AGENT_YES                   ("15dd911d-be82-2856-26db-27659b14
 LLUUID const ANIM_AGENT_YES_HAPPY             ("b8c8b2a3-9008-1771-3bfc-90924955ab2d");
 LLUUID const ANIM_AGENT_YOGA_FLOAT            ("42ecd00b-9947-a97c-400a-bbc9174c7aeb");
 
-LLUUID AGENT_WALK_ANIMS[] = {ANIM_AGENT_WALK, ANIM_AGENT_RUN, ANIM_AGENT_CROUCHWALK, ANIM_AGENT_TURNLEFT, ANIM_AGENT_TURNRIGHT};
+// Every animation that means the avatar is walking under its own legs. The
+// five the viewer plays instead of the first two, for a female avatar or under
+// UseNewWalkRun, are as much a walk as the ones they stand in for: what asks
+// this question wants to know whether the legs are moving, not which of the
+// files is doing it.
+LLUUID AGENT_WALK_ANIMS[] = {ANIM_AGENT_WALK, ANIM_AGENT_WALK_NEW,
+                             ANIM_AGENT_FEMALE_WALK, ANIM_AGENT_FEMALE_WALK_NEW,
+                             ANIM_AGENT_RUN, ANIM_AGENT_RUN_NEW, ANIM_AGENT_FEMALE_RUN_NEW,
+                             ANIM_AGENT_CROUCHWALK, ANIM_AGENT_TURNLEFT, ANIM_AGENT_TURNRIGHT};
 S32 NUM_AGENT_WALK_ANIMS = LL_ARRAY_SIZE(AGENT_WALK_ANIMS);
 
 LLUUID AGENT_GUN_HOLD_ANIMS[] = {ANIM_AGENT_HOLD_RIFLE_R, ANIM_AGENT_HOLD_HANDGUN_R, ANIM_AGENT_HOLD_BAZOOKA_R, ANIM_AGENT_HOLD_BOW_L};

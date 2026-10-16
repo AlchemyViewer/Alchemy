@@ -108,25 +108,14 @@ public:
     virtual void changed() { LLFloaterLand::refreshAll(); }
 };
 
-// class needed to get full access to textbox inside checkbox, because LLCheckBoxCtrl::setLabel() has string as its argument.
-// It was introduced while implementing EXT-4706
-class LLCheckBoxWithTBAcess : public LLCheckBoxCtrl
-{
-public:
-    LLTextBox* getTextBox()
-    {
-        return mLabel;
-    }
-};
-
-
-class LLPanelLandExperiences
+class LLPanelLandExperiences final
     :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandExperiences, LLPanel);
     LLPanelLandExperiences(LLSafeHandle<LLParcelSelection>& parcelp);
-    virtual bool postBuild();
-    void refresh();
+    virtual bool postBuild() override;
+    void refresh() override;
 
     void experienceAdded(const LLUUID& id, U32 xp_type, U32 access_type);
     void experienceRemoved(const LLUUID& id, U32 access_type);
@@ -142,10 +131,11 @@ protected:
 };
 
 
-class LLPanelLandEnvironment
+class LLPanelLandEnvironment final
     : public LLPanelEnvironmentInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandEnvironment, LLPanelEnvironmentInfo);
                         LLPanelLandEnvironment(LLSafeHandle<LLParcelSelection>& parcelp);
 
     virtual bool        isRegion() const override { return false; }
@@ -461,13 +451,9 @@ bool LLPanelLandGeneral::postBuild()
     mTextSalePending = getChild<LLTextBox>("SalePending");
     mTextOwnerLabel = getChild<LLTextBox>("Owner:");
     mTextOwner = getChild<LLTextBox>("OwnerText");
-    mTextOwner->setIsFriendCallback(LLAvatarActions::isFriend);
 
     mContentRating = getChild<LLTextBox>("ContentRatingText");
     mLandType = getChild<LLTextBox>("LandTypeText");
-
-    mBtnProfile = getChild<LLButton>("Profile...");
-    mBtnProfile->setClickedCallback(boost::bind(&LLPanelLandGeneral::onClickProfile, this));
 
 
     mTextGroupLabel = getChild<LLTextBox>("Group:");
@@ -599,8 +585,6 @@ void LLPanelLandGeneral::refresh()
     mTextOwner->setText(LLStringUtil::null);
     mContentRating->setText(LLStringUtil::null);
     mLandType->setText(LLStringUtil::null);
-    mBtnProfile->setLabel(getString("profile_text"));
-    mBtnProfile->setEnabled(false);
 
     mTextClaimDate->setText(LLStringUtil::null);
     mTextGroup->setText(LLStringUtil::null);
@@ -682,7 +666,6 @@ void LLPanelLandGeneral::refresh()
             mTextSalePending->setEnabled(false);
             mTextOwner->setText(getString("public_text"));
             mTextOwner->setEnabled(false);
-            mBtnProfile->setEnabled(false);
             mTextClaimDate->setText(LLStringUtil::null);
             mTextClaimDate->setEnabled(false);
             mTextGroup->setText(getString("none_text"));
@@ -711,21 +694,14 @@ void LLPanelLandGeneral::refresh()
             //refreshNames();
             mTextOwner->setEnabled(true);
 
-            // We support both group and personal profiles
-            mBtnProfile->setEnabled(true);
-
             if (parcel->getGroupID().isNull())
             {
-                // Not group owned, so "Profile"
-                mBtnProfile->setLabel(getString("profile_text"));
 
                 mTextGroup->setText(getString("none_text"));
                 mTextGroup->setEnabled(false);
             }
             else
             {
-                // Group owned, so "Info"
-                mBtnProfile->setLabel(getString("info_text"));
 
                 //mTextGroup->setText("HIPPOS!");//parcel->getGroupName());
                 mTextGroup->setEnabled(true);
@@ -733,7 +709,8 @@ void LLPanelLandGeneral::refresh()
 
             // Display claim date
             time_t claim_date = parcel->getClaimDate();
-            std::string claim_date_str = getString("time_stamp_template");
+            static bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+            std::string claim_date_str = use_24h ? getString("time_stamp_template") : getString("time_stamp_template_ampm");
             LLSD substitution;
             substitution["datetime"] = (S32) claim_date;
             LLStringUtil::format (claim_date_str, substitution);
@@ -955,23 +932,6 @@ void LLPanelLandGeneral::onClickSetGroup()
             fg->setOrigin(new_rect.mLeft, new_rect.mBottom);
             parent_floater->addDependentFloater(fg);
         }
-    }
-}
-
-void LLPanelLandGeneral::onClickProfile()
-{
-    LLParcel* parcel = mParcel->getParcel();
-    if (!parcel) return;
-
-    if (parcel->getIsGroupOwned())
-    {
-        const LLUUID& group_id = parcel->getGroupID();
-        LLGroupActions::show(group_id);
-    }
-    else
-    {
-        const LLUUID& avatar_id = parcel->getOwnerID();
-        LLAvatarActions::showProfile(avatar_id);
     }
 }
 
@@ -1239,7 +1199,6 @@ bool LLPanelLandObjects::postBuild()
     mIconGroup = LLUIImageList::getInstance()->getUIImage("icon_group.tga", 0);
 
     mOwnerList = getChild<LLNameListCtrl>("owner list");
-    mOwnerList->setIsFriendCallback(LLAvatarActions::isFriend);
     mOwnerList->sortByColumnIndex(3, false);
     childSetCommitCallback("owner list", onCommitList, this);
     mOwnerList->setDoubleClickCallback(onDoubleClickOwner, this);
@@ -1438,8 +1397,8 @@ void send_return_objects_message(S32 parcel_local_id, S32 return_type,
     msg->addU32Fast(_PREHASH_ReturnType, (U32) return_type);
 
     // Dummy task id, not used
-    msg->nextBlock("TaskIDs");
-    msg->addUUID("TaskID", LLUUID::null);
+    msg->nextBlockFast(_PREHASH_TaskIDs);
+    msg->addUUIDFast(_PREHASH_TaskID, LLUUID::null);
 
     // Throw all return ids into the packet.
     // TODO: Check for too many ids.
@@ -1669,9 +1628,9 @@ void LLPanelLandObjects::processParcelObjectOwnersReply(LLMessageSystem *msg, vo
         msg->getBOOLFast(_PREHASH_Data, _PREHASH_IsGroupOwned,  is_group_owned, i);
         msg->getS32Fast (_PREHASH_Data, _PREHASH_Count,         object_count,   i);
         msg->getBOOLFast(_PREHASH_Data, _PREHASH_OnlineStatus,  is_online,      i);
-        if(msg->has("DataExtended"))
+        if(msg->hasFast(_PREHASH_DataExtended))
         {
-            msg->getU32("DataExtended", "TimeStamp", most_recent_time, i);
+            msg->getU32Fast(_PREHASH_DataExtended, _PREHASH_TimeStamp, most_recent_time, i);
         }
 
         if (owner_id.isNull())
@@ -2175,12 +2134,11 @@ void LLPanelLandOptions::refresh()
             mMatureCtrl->setVisible(true);
             LLStyle::Params style;
             style.image(LLUI::getUIImage(gFloaterView->getParentFloater(this)->getString("maturity_icon_moderate")));
-            LLCheckBoxWithTBAcess* fullaccess_mature_ctrl = (LLCheckBoxWithTBAcess*)mMatureCtrl;
-            fullaccess_mature_ctrl->getTextBox()->setText(LLStringExplicit(""));
-            fullaccess_mature_ctrl->getTextBox()->appendImageSegment(style);
-            fullaccess_mature_ctrl->getTextBox()->appendText(getString("mature_check_mature"), false);
-            fullaccess_mature_ctrl->setToolTip(getString("mature_check_mature_tooltip"));
-            fullaccess_mature_ctrl->reshape(fullaccess_mature_ctrl->getRect().getWidth(), fullaccess_mature_ctrl->getRect().getHeight(), false);
+            mMatureCtrl->getTextBox()->setText(LLStringExplicit(""));
+            mMatureCtrl->getTextBox()->appendImageSegment(style);
+            mMatureCtrl->getTextBox()->appendText(getString("mature_check_mature"), false);
+            mMatureCtrl->setToolTip(getString("mature_check_mature_tooltip"));
+            mMatureCtrl->reshape(mMatureCtrl->getRect().getWidth(), mMatureCtrl->getRect().getHeight(), false);
 
             // they can see the checkbox, but its disposition depends on the
             // state of the region
@@ -2542,7 +2500,7 @@ void LLPanelLandAccess::refresh()
                 if (entry.mTime != 0)
                 {
                     LLStringUtil::format_map_t args;
-                    S32 now = (S32)time(NULL);
+                    S32 now = (S32)time_corrected();
                     S32 seconds = entry.mTime - now;
                     if (seconds < 0) seconds = 0;
                     prefix.assign(" (");
@@ -2591,7 +2549,7 @@ void LLPanelLandAccess::refresh()
                 if (entry.mTime != 0)
                 {
                     LLStringUtil::format_map_t args;
-                    S32 now = (S32)time(NULL);
+                    S32 now = (S32)time_corrected();
                     seconds = entry.mTime - now;
                     if (seconds < 0) seconds = 0;
 
@@ -2721,8 +2679,10 @@ void LLPanelLandAccess::refresh_ui()
         bool public_access = mPublicAccessCheck->getValue().asBoolean();
         if (public_access)
         {
+            bool override = false;
             if(parcel->getRegionDenyAnonymousOverride())
             {
+                override = true;
                 mPaymentInfoCheck->setEnabled(false);
             }
             else
@@ -2731,6 +2691,7 @@ void LLPanelLandAccess::refresh_ui()
             }
             if(parcel->getRegionDenyAgeUnverifiedOverride())
             {
+                override = true;
                 mAgeVerifiedCheck->setEnabled(false);
             }
             else
@@ -3051,7 +3012,6 @@ bool LLPanelLandCovenant::postBuild()
     mLastRegionID = LLUUID::null;
     mNextUpdateTime = 0;
     mTextEstateOwner = getChild<LLTextBox>("estate_owner_text");
-    mTextEstateOwner->setIsFriendCallback(LLAvatarActions::isFriend);
     return true;
 }
 
@@ -3103,20 +3063,20 @@ void LLPanelLandCovenant::refresh()
     }
 
     if (mLastRegionID != region->getRegionID()
-        || mNextUpdateTime < LLTimer::getElapsedSeconds())
+        || mNextUpdateTime < LLTimer::getUptimeSeconds())
     {
         // Request Covenant Info
         // Note: LLPanelLandCovenant doesn't change Covenant's content and any
         // changes made by Estate floater should be requested by Estate floater
         LLMessageSystem *msg = gMessageSystem;
-        msg->newMessage("EstateCovenantRequest");
+        msg->newMessageFast(_PREHASH_EstateCovenantRequest);
         msg->nextBlockFast(_PREHASH_AgentData);
         msg->addUUIDFast(_PREHASH_AgentID,  gAgent.getID());
         msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
         msg->sendReliable(region->getHost());
 
         mLastRegionID = region->getRegionID();
-        mNextUpdateTime = LLTimer::getElapsedSeconds() + COVENANT_REFRESH_TIME_SEC;
+        mNextUpdateTime = LLTimer::getUptimeSeconds() + COVENANT_REFRESH_TIME_SEC;
     }
 }
 

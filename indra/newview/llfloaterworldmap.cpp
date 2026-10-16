@@ -410,7 +410,7 @@ void* LLFloaterWorldMap::createWorldMapView(void* data)
 
 bool LLFloaterWorldMap::postBuild()
 {
-    mMapView = dynamic_cast<LLWorldMapView*>(getChild<LLPanel>("objects_mapview"));
+    mMapView = getChild<LLPanel>("objects_mapview")->as<LLWorldMapView>();
     mMapView->setPan(0, 0, true);
 
     mTeleportButton = getChild<LLButton>("Teleport");
@@ -426,7 +426,7 @@ bool LLFloaterWorldMap::postBuild()
     mEventsMatureCheck = getChild<LLCheckBoxCtrl>("events_mature_chk");
     mEventsAdultCheck = getChild<LLCheckBoxCtrl>("events_adult_chk");
 
-    mAvatarIcon = getChild<LLUICtrl>("avatar_icon");
+    mFriendAvatarIcon = getChild<LLUICtrl>("friends_icon");
     mLandmarkIcon = getChild<LLUICtrl>("landmark_icon");
     mLocationIcon = getChild<LLUICtrl>("location_icon");
 
@@ -571,7 +571,7 @@ bool LLFloaterWorldMap::handleHover(S32 x, S32 y, MASK mask)
     return handled;
 }
 
-bool LLFloaterWorldMap::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLFloaterWorldMap::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (!isMinimized() && isFrontmost())
     {
@@ -580,14 +580,14 @@ bool LLFloaterWorldMap::handleScrollWheel(S32 x, S32 y, S32 clicks)
         if (mMapView->pointInView(map_x, map_y))
         {
             F32 old_slider_zoom = (F32) mZoomSlider->getValue().asReal();
-            F32 slider_zoom     = old_slider_zoom + ((F32) clicks * -0.3333f);
+            F32 slider_zoom     = old_slider_zoom + ((F32) delta.mPrecise * -0.3333f);
             mZoomSlider->setValue(LLSD(slider_zoom));
             mMapView->zoomWithPivot(slider_zoom, map_x, map_y);
             return true;
         }
     }
 
-    return LLFloater::handleScrollWheel(x, y, clicks);
+    return LLFloater::handleScrollWheel(x, y, delta);
 }
 
 
@@ -617,11 +617,11 @@ void LLFloaterWorldMap::draw()
     LLTracker::ETrackingStatus tracking_status = LLTracker::getTrackingStatus();
     if (LLTracker::TRACKING_AVATAR == tracking_status)
     {
-        mAvatarIcon->setColor( map_track_color);
+        mFriendAvatarIcon->setColor( map_track_color);
     }
     else
     {
-        mAvatarIcon->setColor( map_track_disabled_color);
+        mFriendAvatarIcon->setColor( map_track_disabled_color);
     }
 
     if (LLTracker::TRACKING_LANDMARK == tracking_status)
@@ -641,7 +641,7 @@ void LLFloaterWorldMap::draw()
     {
         if (mCompletingRegionName != "")
         {
-            F64 seconds = LLTimer::getElapsedSeconds();
+            F64 seconds = LLTimer::getUptimeSeconds();
             double value = fmod(seconds, 2);
             value = 0.5 + 0.5*cos(value * F_PI);
             LLColor4 loading_color(0.0, F32(value/2), F32(value), 1.0);
@@ -907,8 +907,7 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 void LLFloaterWorldMap::enableTeleportCoordsDisplay( bool enabled )
 {
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
-    LLUICtrl* pCtrl = getChild<LLUICtrl>("events_label");
-    pCtrl->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+    getChild<LLUICtrl>("events_label")->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
 
     mTeleportCoordSpinX->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
     mTeleportCoordSpinX->setEnabled(enabled);
@@ -1532,7 +1531,7 @@ void LLFloaterWorldMap::onClickTeleportBtn()
 
 void LLFloaterWorldMap::onCopySLURL()
 {
-    getWindow()->copyTextToClipboard(utf8str_to_wstring(mSLURL.getSLURLString()));
+    getWindow()->copyTextToClipboard(mSLURL.getSLURLString());
 
     LLSD args;
     args["SLURL"] = mSLURL.getSLURLString();

@@ -115,7 +115,7 @@ void LLManipRotate::handleSelect()
 void LLManipRotate::render()
 {
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->bind(LLViewerFetchedTexture::sWhiteImagep);
+    gGL.getTextureSlot(0)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap);
     LLGLDepthTest gls_depth(GL_TRUE);
     LLGLEnable gl_blend(GL_BLEND);
 
@@ -555,7 +555,6 @@ void LLManipRotate::drag( S32 x, S32 y )
 
     bool damped = mSmoothRotate;
     mSmoothRotate = false;
-    bool gltf_mode = false;
 
     for (LLObjectSelection::iterator iter = mObjectSelection->begin();
          iter != mObjectSelection->end(); iter++)
@@ -569,16 +568,6 @@ void LLManipRotate::drag( S32 x, S32 y )
             ((root_object == NULL) || !root_object->isPermanentEnforced()) &&
             (object->isRootEdit() || selectNode->mIndividualSelection))
         {
-
-            if (selectNode->mSelectedGLTFNode != -1)
-            {
-                LLQuaternion new_rot = selectNode->mSavedRotation * mRotation;
-
-                object->setGLTFNodeRotationAgent(selectNode->mSelectedGLTFNode, new_rot);
-
-                gltf_mode = true;
-            }
-            else if (!gltf_mode)
             {
                 if (!object->isRootEdit())
                 {
@@ -646,7 +635,6 @@ void LLManipRotate::drag( S32 x, S32 y )
     }
 
     // update positions
-    if (!gltf_mode)
     {
         for (LLObjectSelection::iterator iter = mObjectSelection->begin();
             iter != mObjectSelection->end(); iter++)
@@ -665,11 +653,6 @@ void LLManipRotate::drag( S32 x, S32 y )
                 LLVector3 old_position;
                 LLVector3 new_position;
 
-                if (selectNode->mSelectedGLTFNode != -1)
-                {
-
-                }
-                else
                 {
                     if (object->isAttachment() && object->mDrawable.notNull())
                     {
@@ -1168,10 +1151,10 @@ void LLManipRotate::renderSnapGuides()
             std::string help_text =  LLTrans::getString("manip_hint1");
             LLColor4 help_text_color = LLColor4::white;
             help_text_color.mV[VALPHA] = clamp_rescale(mHelpTextTimer.getElapsedTimeF32(), sHelpTextVisibleTime, sHelpTextVisibleTime + sHelpTextFadeTime, line_alpha, 0.f);
-            hud_render_utf8text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
+            hud_render_text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
             help_text =  LLTrans::getString("manip_hint2");
             help_text_pos -= offset_dir * mRadiusMeters * 0.4f;
-            hud_render_utf8text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
+            hud_render_text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
         }
     }
 }

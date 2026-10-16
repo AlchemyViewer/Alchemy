@@ -34,14 +34,16 @@ class LLCheckBoxCtrl;
 class LLNameListCtrl;
 class LLTextBox;
 
-class LLFloaterPerformance : public LLFloater
+class LLFloaterPerformance final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPerformance, LLFloater);
+
     LLFloaterPerformance(const LLSD& key);
     virtual ~LLFloaterPerformance();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void draw();
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void draw() override;
 
     void showSelectedPanel(LLPanel* selected_panel);
     void showMainPanel();

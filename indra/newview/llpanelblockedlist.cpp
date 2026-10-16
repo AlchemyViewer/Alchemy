@@ -49,7 +49,6 @@
 #include "llviewercontrol.h"
 
 #if 0
-
 static LLPanelInjector<LLPanelBlockedList> t_panel_blocked_list("panel_block_list_sidetray");
 
 //
@@ -80,6 +79,10 @@ bool LLPanelBlockedList::postBuild()
 {
     mBlockedList = getChild<LLBlockList>("blocked");
     mBlockedList->setCommitOnSelectionChange(true);
+    mBlockedList->setNoItemsMsg(getString("no_blocked"));
+    mBlockedList->setNoFilteredItemsMsg(getString("no_filtered_blocked"));
+    mBlockedList->setLoadingItemsMsg(getString("loading_blocked"));
+    mBlockedList->setFailedItemsMsg(getString("failed_blocked"));
     this->setVisibleCallback(boost::bind(&LLPanelBlockedList::removePicker, this));
 
     switch (gSavedSettings.getU32("BlockPeopleSortOrder"))
@@ -267,7 +270,7 @@ void LLPanelBlockedList::callbackBlockByName(const std::string& text)
 // Constructor/Destructor
 LLFloaterGetBlockedObjectName::LLFloaterGetBlockedObjectName(const LLSD& key)
 : LLFloater(key)
-, mGetObjectNameCallback(NULL)
+, mGetObjectNameCallback(nullptr)
 {
 }
 

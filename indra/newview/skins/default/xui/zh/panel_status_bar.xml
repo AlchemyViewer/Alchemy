@@ -6,7 +6,7 @@
 	<panel.string name="bandwidth_tooltip">
 		頻寬
 	</panel.string>
-	<panel.string name="time">
+	<panel.string name="time_ampm">
 		[hour12, datetime, slt]:[min, datetime, slt] [ampm, datetime, slt] [timezone,datetime, slt]
 	</panel.string>
 	<panel.string name="timeTooltip">
@@ -27,5 +27,4 @@
 		24:00 AM PST
 	</text>
 	<button name="media_toggle_btn" tool_tip="開始/停止全部媒體（音樂、影片、網頁）"/>
-	<button name="volume_btn" tool_tip="全域音量控制"/>
 </panel>

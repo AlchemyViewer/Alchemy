@@ -33,6 +33,7 @@
 #include "llavatarnamecache.h"
 #include "llinstantmessage.h"
 #include "llcachename.h"
+#include "alxmllayermerge.h"
 #include "llxmlnode.h"
 #include "lluictrl.h"
 #include "lluictrlfactory.h"
@@ -44,10 +45,9 @@
 #include "llsdutil.h"
 
 #include <algorithm>
-#include <boost/regex.hpp>
 
 
-//const std::string NOTIFICATION_PERSIST_VERSION = "0.93";
+const std::string NOTIFICATION_PERSIST_VERSION = "0.93";
 
 void NotificationPriorityValues::declareValues()
 {
@@ -355,7 +355,7 @@ void LLNotificationForm::append(const LLSD& sub_form)
     }
 }
 
-void LLNotificationForm::formatElements(const LLSD& substitutions)
+void LLNotificationForm::formatElements(const LLStringUtil::format_map_t& defaults, const LLSD& substitutions)
 {
     for (LLSD::array_iterator it = mFormData.beginArray();
         it != mFormData.endArray();
@@ -365,13 +365,13 @@ void LLNotificationForm::formatElements(const LLSD& substitutions)
         if ((*it).has("text"))
         {
             std::string text = (*it)["text"].asString();
-            LLStringUtil::format(text, substitutions);
+            LLStringUtil::format(text, defaults, substitutions);
             (*it)["text"] = text;
         }
         if ((*it)["type"].asString() == "text" && (*it).has("value"))
         {
             std::string value = (*it)["value"].asString();
-            LLStringUtil::format(value, substitutions);
+            LLStringUtil::format(value, defaults, substitutions);
             (*it)["value"] = value;
         }
     }
@@ -423,7 +423,6 @@ LLNotificationTemplate::LLNotificationTemplate(const LLNotificationTemplate::Par
     mIcon(p.icon),
     mURL(p.url.value),
     mExpireSeconds(p.duration),
-    mExpireOption(p.expire_option),
     mURLOption(p.url.option),
     mURLTarget(p.url.target),
     mForceUrlsExternal(p.force_urls_external),
@@ -431,7 +430,6 @@ LLNotificationTemplate::LLNotificationTemplate(const LLNotificationTemplate::Par
     mCombineBehavior(p.unique.combine),
     mPriority(p.priority),
     mPersist(p.persist),
-    mDefaultFunctor(p.functor.isProvided() ? p.functor() : p.name()),
     mLogToChat(p.log_to_chat),
     mLogToIM(p.log_to_im),
     mShowToast(p.show_toast),
@@ -457,7 +455,7 @@ LLNotificationTemplate::LLNotificationTemplate(const LLNotificationTemplate::Par
         mTags.push_back(tag.value);
     }
 
-    mForm = LLNotificationFormPtr(new LLNotificationForm(p.name, p.form_ref.form));
+    mForm = std::make_shared<LLNotificationForm>(p.name, p.form_ref.form);
 }
 
 LLNotificationVisibilityRule::LLNotificationVisibilityRule(const LLNotificationVisibilityRule::Rule &p)
@@ -864,23 +862,19 @@ void LLNotification::init(const std::string& template_name, const LLSD& form_ele
     mTemplatep = LLNotifications::instance().getTemplate(template_name);
     if (!mTemplatep) return;
 
-    // add default substitutions
-    const LLStringUtil::format_map_t& default_args = LLTrans::getDefaultArgs();
-    for (LLStringUtil::format_map_t::const_iterator iter = default_args.begin();
-         iter != default_args.end(); ++iter)
-    {
-        mSubstitutions[std::string(iter->first)] = iter->second;
-    }
+    // The default substitutions -- [APP_NAME] and the rest -- are read
+    // beside these wherever the template's words are formatted, rather
+    // than copied into every notification made.
     mSubstitutions["_URL"] = getURL();
     mSubstitutions["_NAME"] = template_name;
     // TODO: something like this so that a missing alert is sensible:
     //mSubstitutions["_ARGS"] = get_all_arguments_as_text(mSubstitutions);
 
-    mForm = LLNotificationFormPtr(new LLNotificationForm(*mTemplatep->mForm));
+    mForm = std::make_shared<LLNotificationForm>(*mTemplatep->mForm);
     mForm->append(form_elements);
 
     // apply substitution to form labels
-    mForm->formatElements(mSubstitutions);
+    mForm->formatElements(LLTrans::getDefaultArgs(), mSubstitutions);
 
     mIgnored = mForm->getIgnored();
 
@@ -915,7 +909,7 @@ std::string LLNotification::getMessage() const
         return std::string();
 
     std::string message = mTemplatep->mMessage;
-    LLStringUtil::format(message, mSubstitutions);
+    LLStringUtil::format(message, LLTrans::getDefaultArgs(), mSubstitutions);
     return message;
 }
 
@@ -925,14 +919,14 @@ std::string LLNotification::getFooter() const
         return std::string();
 
     std::string footer = mTemplatep->mFooter;
-    LLStringUtil::format(footer, mSubstitutions);
+    LLStringUtil::format(footer, LLTrans::getDefaultArgs(), mSubstitutions);
     return footer;
 }
 
 std::string LLNotification::getLabel() const
 {
     std::string label = mTemplatep->mLabel;
-    LLStringUtil::format(label, mSubstitutions);
+    LLStringUtil::format(label, LLTrans::getDefaultArgs(), mSubstitutions);
     return (mTemplatep ? label : "");
 }
 
@@ -948,7 +942,7 @@ std::string LLNotification::getURL() const
     if (!mTemplatep)
         return std::string();
     std::string url = mTemplatep->mURL;
-    LLStringUtil::format(url, mSubstitutions);
+    LLStringUtil::format(url, LLTrans::getDefaultArgs(), mSubstitutions);
     return (mTemplatep ? url : "");
 }
 
@@ -1257,7 +1251,7 @@ LLNotifications::LLNotifications()
 :   LLNotificationChannelBase(LLNotificationFilters::includeEverything),
     mIgnoreAllNotifications(false)
 {
-        mListener.reset(new LLNotificationsListener(*this));
+    mListener = std::make_unique<LLNotificationsListener>(*this);
     LLUICtrl::CommitCallbackRegistry::currentRegistrar().add("Notification.Show", boost::bind(&LLNotifications::addFromCallback, this, _2));
 
     // touch the instance tracker for notification channels, so that it will still be around in our destructor
@@ -1310,9 +1304,11 @@ bool LLNotifications::uniqueFilter(LLNotificationPtr pNotif)
         return true;
     }
 
-    // checks against existing unique notifications
-    for (LLNotificationMap::iterator existing_it = mUniqueNotifications.find(pNotif->getName());
-        existing_it != mUniqueNotifications.end();
+    // checks against existing unique notifications. A name can hold several,
+    // and multimap::find promises only some entry with the key, so the walk
+    // is over the whole run under it.
+    for (auto [existing_it, end] = mUniqueNotifications.equal_range(pNotif->getName());
+        existing_it != end;
         ++existing_it)
     {
         LLNotificationPtr existing_notification = existing_it->second;
@@ -1373,8 +1369,8 @@ bool LLNotifications::failedUniquenessTest(const LLSD& payload)
         // Update the existing unique notification with the data from this particular instance...
         // This guarantees that duplicate notifications will be collapsed to the one
         // most recently triggered
-        for (LLNotificationMap::iterator existing_it = mUniqueNotifications.find(pNotif->getName());
-            existing_it != mUniqueNotifications.end();
+        for (auto [existing_it, end] = mUniqueNotifications.equal_range(pNotif->getName());
+            existing_it != end;
             ++existing_it)
         {
             LLNotificationPtr existing_notification = existing_it->second;
@@ -1393,8 +1389,8 @@ bool LLNotifications::failedUniquenessTest(const LLSD& payload)
         // Add to the existing unique notification with the data from this particular instance...
         // This guarantees that duplicate notifications will be collapsed to the one
         // most recently triggered
-        for (LLNotificationMap::iterator existing_it = mUniqueNotifications.find(pNotif->getName());
-            existing_it != mUniqueNotifications.end();
+        for (auto [existing_it, end] = mUniqueNotifications.equal_range(pNotif->getName());
+            existing_it != end;
             ++existing_it)
         {
             LLNotificationPtr existing_notification = existing_it->second;
@@ -1432,6 +1428,7 @@ LLNotificationChannelPtr LLNotifications::getChannel(const std::string& channelN
 // this function is called once at construction time, after the object is constructed.
 void LLNotifications::initSingleton()
 {
+    LL_PROFILE_ZONE_SCOPED;
     loadTemplates();
     loadVisibilityRules();
     createDefaultChannels();
@@ -1444,6 +1441,8 @@ void LLNotifications::cleanupSingleton()
 
 void LLNotifications::createDefaultChannels()
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     LL_INFOS("Notifications") << "Generating default notification channels" << LL_ENDL;
     // now construct the various channels AFTER loading the notifications,
     // because the history channel is going to rewrite the stored notifications file
@@ -1495,7 +1494,7 @@ bool LLNotifications::templateExists(std::string_view name)
 
 void LLNotifications::forceResponse(const LLNotification::Params& params, S32 option)
 {
-    LLNotificationPtr temp_notify(new LLNotification(params));
+    LLNotificationPtr temp_notify = std::make_shared<LLNotification>(params);
 
     if (!temp_notify->getForm())
     {
@@ -1586,6 +1585,8 @@ void addPathIfExists(const std::string& new_path, std::vector<std::string>& path
 
 bool LLNotifications::loadTemplates()
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     LL_INFOS("Notifications") << "Reading notifications template" << LL_ENDL;
     // Passing findSkinnedFilenames(constraint=LLDir::ALL_SKINS) makes it
     // output all relevant pathnames instead of just the ones from the most
@@ -1600,7 +1601,7 @@ bool LLNotifications::loadTemplates()
 
     std::string base_filename = search_paths.front();
     LLXMLNodePtr root;
-    bool success  = LLXMLNode::getLayeredXMLNode(root, search_paths);
+    bool success  = ALXmlLayerMerge::load(search_paths, root);
 
     if (!success || root.isNull() || !root->hasName( "notifications" ))
     {
@@ -1624,7 +1625,7 @@ bool LLNotifications::loadTemplates()
 
     for (const LLNotificationTemplate::GlobalString& string : params.strings)
     {
-        mGlobalStrings[string.name] = string.value;
+        mGlobalStrings[string.name()] = string.value;
     }
 
     std::map<std::string, LLNotificationForm::Params> form_templates;
@@ -1661,7 +1662,7 @@ bool LLNotifications::loadTemplates()
                 replaceFormText(notification.form_ref.form, "$ignoretext", notification.form_ref.form_template.ignore_text);
             }
         }
-        mTemplates[notification.name] = LLNotificationTemplatePtr(new LLNotificationTemplate(notification));
+        mTemplates[notification.name()] = std::make_shared<LLNotificationTemplate>(notification);
     }
 
     LL_INFOS("Notifications") << "...done" << LL_ENDL;
@@ -1671,6 +1672,8 @@ bool LLNotifications::loadTemplates()
 
 bool LLNotifications::loadVisibilityRules()
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     const std::string xml_filename = "notification_visibility.xml";
     // Note that here we're looking for the "en" version, the default
     // language, rather than the most localized version of this file.
@@ -1691,7 +1694,7 @@ bool LLNotifications::loadVisibilityRules()
 
     for (const LLNotificationVisibilityRule::Rule& rule : params.rules)
     {
-        mVisibilityRules.push_back(LLNotificationVisibilityRulePtr(new LLNotificationVisibilityRule(rule)));
+        mVisibilityRules.push_back(std::make_shared<LLNotificationVisibilityRule>(rule));
     }
 
     return true;
@@ -1734,7 +1737,7 @@ LLNotificationPtr LLNotifications::add(const std::string& name, const LLSD& subs
 // generalized add function that takes a parameter block object for more complex instantiations
 LLNotificationPtr LLNotifications::add(const LLNotification::Params& p)
 {
-    LLNotificationPtr pNotif(new LLNotification(p));
+    LLNotificationPtr pNotif = std::make_shared<LLNotification>(p);
     add(pNotif);
     return pNotif;
 }
@@ -1842,7 +1845,7 @@ void LLNotifications::update(const LLNotificationPtr pNotif)
 
 LLNotificationPtr LLNotifications::find(LLUUID uuid)
 {
-    LLNotificationPtr target = LLNotificationPtr(new LLNotification(LLNotification::Params().id(uuid)));
+    LLNotificationPtr target = std::make_shared<LLNotification>(LLNotification::Params().id(uuid));
     LLNotificationSet::iterator it=mItems.find(target);
     if (it == mItems.end())
     {

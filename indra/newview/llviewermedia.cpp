@@ -65,6 +65,10 @@
 #include "llviewertexture.h"
 #include "llviewertexturelist.h"
 #include "llviewerwindow.h"
+#include "llcefaccelinterop.h"
+#include "llcefsurfacereceiver.h"
+#include "llrender.h"
+#include "llgl.h"
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
 #include "llvovolume.h"
@@ -83,6 +87,8 @@ extern bool gCubeSnapshot;
 
 // *TODO: Consider enabling mipmaps (they have been disabled for a long time). Likely has a significant performance impact for tiled/high texture repeat media. Mip generation in a shader may also be an option if necessary.
 constexpr bool USE_MIPMAPS = false;
+constexpr S32 MAX_MEDIA_INSTANCES_DEFAULT = 8;
+constexpr S32 MEDIA_INSTANCES_MIN_LIMIT = 6; // 4 'permanent' floaters plus reserve for dynamic ones
 
 void init_threaded_picker_load_dialog(LLPluginClassMedia* plugin, LLFilePicker::ELoadFilter filter, bool get_multiple)
 {
@@ -166,6 +172,12 @@ static LLViewerMedia::impl_list sViewerMediaImplList;
 static LLViewerMedia::impl_id_map sViewerMediaTextureIDMap;
 static LLTimer sMediaCreateTimer;
 static const F32 LLVIEWERMEDIA_CREATE_DELAY = 1.0f;
+// Shared-CEF-daemon crash recovery: cap on consecutive re-init attempts before a
+// daemon-mode media gives up, and the backoff schedule between them (so a daemon
+// that crashes on every launch can't spin the viewer respawning it forever).
+static const S32 DAEMON_RECOVERY_MAX_ATTEMPTS = 5;
+static const F32 DAEMON_RECOVERY_BASE_DELAY = 2.0f;   // seconds, multiplied by attempt #
+static const F32 DAEMON_RECOVERY_MAX_DELAY = 30.0f;   // seconds, backoff ceiling
 static F32 sGlobalVolume = 1.0f;
 static bool sForceUpdate = false;
 static LLUUID sOnlyAudibleTextureID = LLUUID::null;
@@ -211,9 +223,23 @@ static bool sViewerMediaMuteListObserverInitialized = false;
 /*static*/ const char* LLViewerMedia::SHOW_MEDIA_WITHIN_PARCEL_SETTING = "MediaShowWithinParcel";
 /*static*/ const char* LLViewerMedia::SHOW_MEDIA_OUTSIDE_PARCEL_SETTING = "MediaShowOutsideParcel";
 
+namespace
+{
+    // Per-viewer-instance CEF daemon rendezvous file: user-writable logs dir
+    // (never the read-only install dir) plus this viewer's PID so separate
+    // viewer instances don't share a daemon. newSourceFromMediaType() hands this
+    // exact path to setUseDaemon(); the cleanup in ~LLViewerMedia() recomputes
+    // it to remove the file the (force-killed) daemon cannot remove itself.
+    std::string cefDaemonRendezvousPath()
+    {
+        return gDirUtilp->getExpandedFilename(LL_PATH_LOGS, llformat("SLPluginCEF_%d.daemon", LLApp::getPid()));
+    }
+}
+
 LLViewerMedia::LLViewerMedia():
 mAnyMediaShowing(false),
 mAnyMediaPlaying(false),
+mMaxIntances(MAX_MEDIA_INSTANCES_DEFAULT),
 mSpareBrowserMediaSource(NULL)
 {
 }
@@ -222,10 +248,22 @@ LLViewerMedia::~LLViewerMedia()
 {
     gIdleCallbacks.deleteFunction(LLViewerMedia::onIdle, NULL);
     mTeleportFinishConnection.disconnect();
+    mMaxInstancesConnection.disconnect();
     if (mSpareBrowserMediaSource != NULL)
     {
         delete mSpareBrowserMediaSource;
         mSpareBrowserMediaSource = NULL;
+    }
+
+    // The shared CEF daemon lives in this viewer's job object, so it is
+    // force-killed on exit and never reaches its own rendezvous cleanup. Remove
+    // the rendezvous (and any stale spawn lock) here. No-op if daemon mode was
+    // never used or the files are already gone.
+    if (gDirUtilp)
+    {
+        const std::string rv = cefDaemonRendezvousPath();
+        LLFile::remove(rv);
+        LLFile::remove(rv + ".lock");
     }
 }
 
@@ -235,6 +273,35 @@ void LLViewerMedia::initSingleton()
     gIdleCallbacks.addFunction(LLViewerMedia::onIdle, NULL);
     mTeleportFinishConnection = LLViewerParcelMgr::getInstance()->
         setTeleportFinishedCallback(boost::bind(&LLViewerMedia::onTeleportFinished, this));
+
+    LLControlVariable* ctrl = gSavedSettings.getControl("PluginInstancesTotal");
+    if (ctrl)
+    {
+        setMaxInstances(ctrl->getValue().asInteger());
+        mMaxInstancesConnection = ctrl->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+        {
+            setMaxInstances(new_val.asInteger());
+        });
+    }
+    else
+    {
+        setMaxInstances(MAX_MEDIA_INSTANCES_DEFAULT);
+    }
+}
+
+void LLViewerMedia::setMaxInstances(S32 max_instances)
+{
+    const F32Gigabytes MIN_PHYSICAL_MEMORY(8);
+    LLMemory::updateMemoryInfo();
+    F32Gigabytes physical_mem = LLMemory::getMaxMemKB();
+    if (MIN_PHYSICAL_MEMORY > physical_mem)
+    {
+        mMaxIntances = llmax(max_instances - 2, MEDIA_INSTANCES_MIN_LIMIT);
+    }
+    else
+    {
+        mMaxIntances = llmax(max_instances, MEDIA_INSTANCES_MIN_LIMIT);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -264,7 +331,7 @@ viewer_media_t LLViewerMedia::newMediaImpl(
     return media_impl;
 }
 
-viewer_media_t LLViewerMedia::updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self, bool is_hud_attachment)
+viewer_media_t LLViewerMedia::updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self)
 {
     llassert(!gCubeSnapshot);
     // Try to find media with the same media ID
@@ -313,7 +380,7 @@ viewer_media_t LLViewerMedia::updateMediaImpl(LLMediaEntry* media_entry, const s
             // The current media URL is not empty.
             // If (the media was already loaded OR the media was set to autoplay) AND this update didn't come from this agent,
             // do a navigate.
-            bool auto_play = media_impl->isAutoPlayable(is_hud_attachment);
+            bool auto_play = media_impl->isAutoPlayable();
             if((was_loaded || auto_play) && !update_from_self)
             {
                 needs_navigate = url_changed;
@@ -336,7 +403,7 @@ viewer_media_t LLViewerMedia::updateMediaImpl(LLMediaEntry* media_entry, const s
         media_impl->setHomeURL(media_entry->getHomeURL());
         media_impl->mMediaAutoPlay = media_entry->getAutoPlay();
         media_impl->mMediaEntryURL = media_entry->getCurrentURL();
-        if(media_impl->isAutoPlayable(is_hud_attachment))
+        if(media_impl->isAutoPlayable())
         {
             needs_navigate = true;
         }
@@ -382,10 +449,6 @@ LLViewerMediaImpl* LLViewerMedia::getMediaImplFromTextureID(const LLUUID& textur
 //////////////////////////////////////////////////////////////////////////////////////////
 std::string LLViewerMedia::getCurrentUserAgent()
 {
-    // Don't use user-visible string to avoid
-    // punctuation and strange characters.
-    std::string skin_name = gSavedSettings.getString("SkinCurrent");
-
     // Just in case we need to check browser differences in A/B test
     // builds.
     std::string channel = LLVersionInfo::instance().getChannel();
@@ -399,7 +462,7 @@ std::string LLViewerMedia::getCurrentUserAgent()
     std::ostringstream codec;
     codec << "SecondLife/";
     codec << LLVersionInfo::instance().getVersion();
-    codec << " (" << channel << "; " << skin_name << " skin)";
+    codec << " (" << channel << "; default skin)";
     LL_INFOS() << codec.str() << LL_ENDL;
 
     return codec.str();
@@ -527,55 +590,34 @@ LLViewerMedia::impl_list &LLViewerMedia::getPriorityList()
 // This is the predicate function used to sort sViewerMediaImplList by priority.
 bool LLViewerMedia::priorityComparitor(const LLViewerMediaImpl* i1, const LLViewerMediaImpl* i2)
 {
-    if(i1->isForcedUnloaded() && !i2->isForcedUnloaded())
+    // isForcedUnloaded can be pricey, avoid a repeat,
+    // note that this one is specifically i2, when everything else is i1
+    // Consider making isForcedUnloaded cache the value temporarily?
+    bool i2_forced_unloaded = i2->isForcedUnloaded();
+    if (i1->isForcedUnloaded() != i2_forced_unloaded)
     {
         // Muted or failed items always go to the end of the list, period.
-        return false;
+        return i2_forced_unloaded;
     }
-    else if(i2->isForcedUnloaded() && !i1->isForcedUnloaded())
-    {
-        // Muted or failed items always go to the end of the list, period.
-        return true;
-    }
-    else if(i1->hasFocus())
+    else if(i1->hasFocus() != i2->hasFocus())
     {
         // The item with user focus always comes to the front of the list, period.
-        return true;
+        return i1->hasFocus();
     }
-    else if(i2->hasFocus())
-    {
-        // The item with user focus always comes to the front of the list, period.
-        return false;
-    }
-    else if(i1->isParcelMedia())
+    else if(i1->isParcelMedia() != i2->isParcelMedia())
     {
         // The parcel media impl sorts above all other inworld media, unless one has focus.
-        return true;
+        return i1->isParcelMedia();
     }
-    else if(i2->isParcelMedia())
+    else if (i1->getUsedInUI() != i2->getUsedInUI())
     {
-        // The parcel media impl sorts above all other inworld media, unless one has focus.
-        return false;
+        // UI elements sort above inworld media.
+        return i1->getUsedInUI();
     }
-    else if(i1->getUsedInUI() && !i2->getUsedInUI())
-    {
-        // i1 is a UI element, i2 is not.  This makes i1 "less than" i2, so it sorts earlier in our list.
-        return true;
-    }
-    else if(i2->getUsedInUI() && !i1->getUsedInUI())
-    {
-        // i2 is a UI element, i1 is not.  This makes i2 "less than" i1, so it sorts earlier in our list.
-        return false;
-    }
-    else if(i1->isPlayable() && !i2->isPlayable())
+    else if (i1->isPlayable() != i2->isPlayable())
     {
         // Playable items sort above ones that wouldn't play even if they got high enough priority
-        return true;
-    }
-    else if(!i1->isPlayable() && i2->isPlayable())
-    {
-        // Playable items sort above ones that wouldn't play even if they got high enough priority
-        return false;
+        return i1->isPlayable();
     }
     else if(i1->getInterest() == i2->getInterest())
     {
@@ -609,15 +651,6 @@ static bool proximity_comparitor(const LLViewerMediaImpl* i1, const LLViewerMedi
     }
 }
 
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_UPDATE("Update Media");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SPARE_IDLE("Spare Idle");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_UPDATE_INTEREST("Update/Interest");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_UPDATE_VOLUME("Update/Volume");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SORT("Media Sort");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SORT2("Media Sort 2");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_MISC("Misc");
-
-
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMedia::onIdle(void *dummy_arg)
 {
@@ -627,12 +660,13 @@ void LLViewerMedia::onIdle(void *dummy_arg)
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMedia::updateMedia(void *dummy_arg)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
 
     llassert(!gCubeSnapshot);
+    static LLCachedControl<bool> use_read_thread(gSavedSettings, "PluginUseReadThread", true);
 
     // Enable/disable the plugin read thread
-    LLPluginProcessParent::setUseReadThread(gSavedSettings.getBOOL("PluginUseReadThread"));
+    LLPluginProcessParent::setUseReadThread(use_read_thread());
 
     // SL-16418 We can't call LLViewerMediaImpl->update() if we are in the state of shutting down.
     if(LLApp::isExiting())
@@ -653,7 +687,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     impl_list::iterator end = sViewerMediaImplList.end();
 
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media update interest"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE_INTEREST);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media update interest");
         for(; iter != end;)
         {
             LLViewerMediaImpl* pimpl = *iter++;
@@ -665,12 +699,12 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     // Let the spare media source actually launch
     if(mSpareBrowserMediaSource)
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media spare idle"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_SPARE_IDLE);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media spare idle");
         mSpareBrowserMediaSource->idle();
     }
 
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_SORT);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort");
         // Sort the static instance list using our interest criteria
         sViewerMediaImplList.sort(priorityComparitor);
     }
@@ -688,10 +722,9 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
 
     static LLCachedControl<bool> inworld_media_enabled(gSavedSettings, "AudioStreamingMedia", true);
     static LLCachedControl<bool> inworld_audio_enabled(gSavedSettings, "AudioStreamingMusic", true);
-    static LLCachedControl<U32> max_instances(gSavedSettings, "PluginInstancesTotal", 8);
     static LLCachedControl<U32> max_normal(gSavedSettings, "PluginInstancesNormal", 2);
     static LLCachedControl<U32> max_low(gSavedSettings, "PluginInstancesLow", 4);
-    static LLCachedControl<F32> max_cpu(gSavedSettings, "PluginInstancesCPULimit", 0.9);
+    static LLCachedControl<F32> max_cpu(gSavedSettings, "PluginInstancesCPULimit", 0.9f);
     // Setting max_cpu to 0.0 disables CPU usage checking.
     bool check_cpu_usage = (max_cpu != 0.0f);
 
@@ -702,14 +735,14 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     // If max_normal + max_low is less than max_instances, things will tend to get unloaded instead of being set to slideshow.
 
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media misc"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_MISC);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media misc");
         for(; iter != end; iter++)
         {
             LLViewerMediaImpl* pimpl = *iter;
 
             LLPluginClassMedia::EPriority new_priority = LLPluginClassMedia::PRIORITY_NORMAL;
 
-            if(pimpl->isForcedUnloaded() || (impl_count_total >= (int)max_instances))
+            if(pimpl->isForcedUnloaded() || (impl_count_total >= mMaxIntances))
             {
                 // Never load muted or failed impls.
                 // Hard limit on the number of instances that will be loaded at one time
@@ -869,7 +902,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     sLowestLoadableImplInterest = 0.0f;
 
     // Only do this calculation if we've hit the impl count limit -- up until that point we always need to load media data.
-    if(lowest_interest_loadable && (impl_count_total >= (int)max_instances))
+    if(lowest_interest_loadable && (impl_count_total >= mMaxIntances))
     {
         // Get the interest value of this impl's object for use by isInterestingEnough
         LLVOVolume *object = lowest_interest_loadable->getSomeObject();
@@ -889,7 +922,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     }
     else
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort2"); // LL_RECORD_BLOCK_TIME(FTM_MEDIA_SORT2);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort2");
         // Use a distance-based sort for proximity values.
         std::stable_sort(proximity_order.begin(), proximity_order.end(), proximity_comparitor);
     }
@@ -1191,7 +1224,7 @@ bool LLViewerMedia::parseRawCookie(const std::string raw_cookie, std::string& na
 /////////////////////////////////////////////////////////////////////////////////////////
 LLCore::HttpHeaders::ptr_t LLViewerMedia::getHttpHeaders()
 {
-    LLCore::HttpHeaders::ptr_t headers(new LLCore::HttpHeaders);
+    LLCore::HttpHeaders::ptr_t headers = std::make_shared<LLCore::HttpHeaders>();
 
     headers->append(HTTP_OUT_HEADER_ACCEPT, "*/*");
     headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_XML);
@@ -1201,6 +1234,54 @@ LLCore::HttpHeaders::ptr_t LLViewerMedia::getHttpHeaders()
     return headers;
 }
 
+bool LLViewerMedia::getOpenIDCookie(LLMediaCtrl* media_instance) const
+{
+    if (mOpenIDCookie.empty())
+    {
+        return false;
+    }
+
+    std::string authority = mOpenIDURL.mAuthority;
+    std::string::size_type hostStart = authority.find('@');
+    if (hostStart == std::string::npos)
+    {
+        // no username/password
+        hostStart = 0;
+    }
+    else
+    {
+        // Hostname starts after the @.
+        // (If the hostname part is empty, this may put host_start at the end of the string.  In that case, it will end up passing through an empty hostname, which is correct.)
+        ++hostStart;
+    }
+    std::string::size_type hostEnd = authority.rfind(':');
+    if ((hostEnd == std::string::npos) || (hostEnd < hostStart))
+    {
+        // no port
+        hostEnd = authority.size();
+    }
+
+    std::string cookie_host = authority.substr(hostStart, hostEnd - hostStart);
+    std::string cookie_name = "";
+    std::string cookie_value = "";
+    std::string cookie_path = "";
+    bool httponly = true;
+    bool secure = true;
+    if (!parseRawCookie(mOpenIDCookie, cookie_name, cookie_value, cookie_path, httponly, secure))
+    {
+        return false;
+    }
+    std::string cefUrl(std::string(mOpenIDURL.mURI) + "://" + std::string(mOpenIDURL.mAuthority));
+    if (media_instance && media_instance->getMediaPlugin())
+    {
+        media_instance->getMediaPlugin()->setCookie(cefUrl, cookie_name, cookie_value, cookie_host,
+            cookie_path, httponly, secure);
+
+        media_instance->getMediaPlugin()->storeOpenIDCookie(cefUrl, cookie_name, cookie_value,
+            cookie_host, cookie_path, httponly, secure);
+    }
+    return true;
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMedia::setOpenIDCookie(const std::string& url)
@@ -1219,10 +1300,11 @@ void LLViewerMedia::getOpenIDCookieCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("getOpenIDCookieCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
-    LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getOpenIDCookieCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
 
     httpOpts->setFollowRedirects(true);
     httpOpts->setWantHeaders(true);
@@ -1267,7 +1349,7 @@ void LLViewerMedia::getOpenIDCookieCoro(std::string url)
                 bool secure = true;
 
                 LLViewerMedia* inst = getInstance();
-                if (inst->parseRawCookie(inst->mOpenIDCookie, cookie_name, cookie_value, cookie_path, httponly, secure))
+                if (parseRawCookie(inst->mOpenIDCookie, cookie_name, cookie_value, cookie_path, httponly, secure))
                 {
                     // MAINT-5711 - inexplicably, the CEF setCookie function will no longer set the cookie if the
                     // url and domain are not the same. This used to be my.sl.com and id.sl.com respectively and worked.
@@ -1284,20 +1366,24 @@ void LLViewerMedia::getOpenIDCookieCoro(std::string url)
                         std::string browser_name;
                     };
                     struct MediaCookieInstance media_cookie_instances[] = {
-                        {"search", "search_contents" },
-                        {"marketplace", "marketplace_contents" },
+                        {"search", "webbrowser" },
+                        {"marketplace", "webbrowser" },
                         {"destinations", "destination_guide_contents" },
                     };
                     for (MediaCookieInstance mci : media_cookie_instances)
                     {
-                        LLMediaCtrl* media_instance = LLFloaterReg::getInstance(mci.floater_name)->getChild<LLMediaCtrl>(mci.browser_name);
-                        if (media_instance && media_instance->getMediaPlugin())
+                        LLFloater *floaterp = LLFloaterReg::findInstance(mci.floater_name);
+                        if (floaterp)
                         {
-                            media_instance->getMediaPlugin()->setCookie(cefUrl, cookie_name, cookie_value, cookie_host,
-                                cookie_path, httponly, secure);
+                            LLMediaCtrl* media_instance = floaterp->getChild<LLMediaCtrl>(mci.browser_name);
+                            if (media_instance && media_instance->getMediaPlugin())
+                            {
+                                media_instance->getMediaPlugin()->setCookie(cefUrl, cookie_name, cookie_value, cookie_host,
+                                    cookie_path, httponly, secure);
 
-                            media_instance->getMediaPlugin()->storeOpenIDCookie(cefUrl, cookie_name, cookie_value,
-                                cookie_host, cookie_path, httponly, secure);
+                                media_instance->getMediaPlugin()->storeOpenIDCookie(cefUrl, cookie_name, cookie_value,
+                                    cookie_host, cookie_path, httponly, secure);
+                            }
                         }
                     }
                 }
@@ -1357,10 +1443,11 @@ void LLViewerMedia::openIDSetupCoro(std::string openidUrl, std::string openidTok
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("openIDSetupCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
-    LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("openIDSetupCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
 
     httpOpts->setWantHeaders(true);
 
@@ -1497,7 +1584,12 @@ bool LLViewerMedia::hasParcelMedia()
 //////////////////////////////////////////////////////////////////////////////////////////
 bool LLViewerMedia::hasParcelAudio()
 {
-    return !LLViewerMedia::getParcelAudioURL().empty();
+    // Asked, not fetched. getParcelAudioURL returns the URL by value, and the
+    // status bar asks this twice a frame -- once for whether the media button
+    // is enabled and once, through isParcelAudioPlaying, for what it shows --
+    // so a question about whether a string is empty was copying it, twice,
+    // every frame the viewer ran.
+    return !LLViewerParcelMgr::getInstance()->getAgentParcel()->getMusicURL().empty();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -1605,6 +1697,13 @@ LLViewerMediaImpl::~LLViewerMediaImpl()
 {
     destroyMediaSource();
 
+    if (mAccelInterop)
+    {
+        mAccelInterop->shutdown();
+        delete mAccelInterop;
+        mAccelInterop = nullptr;
+    }
+
     LLViewerMediaTexture::removeMediaImplFromTexture(mTextureId) ;
 
     setTextureID();
@@ -1673,7 +1772,19 @@ void LLViewerMediaImpl::createMediaSource()
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMediaImpl::destroyMediaSource()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     mNeedsNewTexture = true;
+    // The plugin's shared texture is going away; tear the interop down fully and
+    // force a fresh bind when the next media source delivers a handle (even if the
+    // value is reused). Keeping the old interop alive would let a stray accelerated
+    // dirty event blit stale/invalid content from the previous source.
+    mAccelBoundHandle = 0;
+    if (mAccelInterop)
+    {
+        mAccelInterop->shutdown();
+        delete mAccelInterop;
+        mAccelInterop = nullptr;
+    }
 
     // Tell the viewer media texture it's no longer active
     LLViewerMediaTexture* oldImage = LLViewerTextureManager::findMediaTexture( mTextureId );
@@ -1735,28 +1846,58 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
     }
     else
     {
-        std::string launcher_name = gDirUtilp->getLLPluginLauncher();
-        std::string plugin_name = gDirUtilp->getLLPluginFilename(plugin_basename);
+#if LL_LINUX
+        // GStreamer plays media on Linux; VLC, where it was built, only when
+        // asked for.
+        if(plugin_basename == "media_plugin_gstreamer10" && gSavedSettings.getBOOL("MediaPluginForceVLC"))
+        {
+            if (LLFile::isfile(gDirUtilp->getLLPluginFilename("media_plugin_libvlc")))
+            {
+                plugin_basename = "media_plugin_libvlc";
+            }
+            else
+            {
+                LL_WARNS_ONCE("Media") << "MediaPluginForceVLC is set, but this viewer has no VLC plugin; using GStreamer" << LL_ENDL;
+            }
+        }
+#endif
+
+        // Each plugin is its own host executable now, named exactly for the
+        // plugin (e.g. media_plugin_cef) and launched directly - there is no
+        // generic SLPlugin shell and no dlopen'd plugin library. The CEF host's
+        // daemon/sandbox behaviour is selected at runtime (see setUseDaemon and
+        // the ALCef* settings), not by choosing a different executable.
+        std::string launcher_name = gDirUtilp->getLLPluginFilename(plugin_basename);
 
         std::string user_data_path_cache = gDirUtilp->getCacheDir(false);
         user_data_path_cache += gDirUtilp->getDirDelimiter();
 
-        // See if the plugin executable exists
-        llstat s;
-        if(LLFile::stat(launcher_name, &s))
+        // See if the plugin host executable exists
+        if (!LLFile::isfile(launcher_name))
         {
-            LL_WARNS_ONCE("Media") << "Couldn't find launcher at " << launcher_name << LL_ENDL;
-        }
-        else if(LLFile::stat(plugin_name, &s))
-        {
-#if !LL_LINUX
-            LL_WARNS_ONCE("Media") << "Couldn't find plugin at " << plugin_name << LL_ENDL;
-#endif
+            LL_WARNS_ONCE("Media") << "Couldn't find plugin host at " << launcher_name << LL_ENDL;
         }
         else
         {
             media_source = new LLPluginClassMedia(owner);
             media_source->setSize(default_width, default_height);
+            // Route CEF media through the shared daemon host when enabled. The
+            // rendezvous file lives in a user-writable runtime dir (the logs
+            // dir) - never the install/plugin dir, which may be read-only - and
+            // carries this viewer's PID so separate viewer instances do not
+            // share a daemon. Computed once and used by every CEF tab here.
+            const bool use_daemon = (plugin_basename == "media_plugin_cef" &&
+                                     gSavedSettings.getBOOL("ALCefDaemonEnabled"));
+            media_source->setUseDaemon(use_daemon, use_daemon ? cefDaemonRendezvousPath() : std::string());
+
+            // Zero-copy GPU paint: deliver shared-texture handles instead of CPU
+            // pixels (the plugin duplicates them into this process). Only request
+            // it when the consumer-side interop is actually available on this
+            // platform - otherwise the plugin would emit GPU frames the viewer
+            // cannot bind, leaving the media blank with no CPU fallback.
+            media_source->setUseAcceleratedPaint(plugin_basename == "media_plugin_cef" &&
+                                                 gSavedSettings.getBOOL("ALCefAcceleratedPaint") &&
+                                                 LLCEFAccelInterop::isSupported());
             std::string user_data_path_cef_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "cef.log");
             media_source->setUserDataPath(user_data_path_cache, gDirUtilp->getUserName(), user_data_path_cef_log);
             media_source->setLanguageCode(LLUI::getLanguage());
@@ -1783,6 +1924,11 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
             bool media_plugin_debugging_enabled = gSavedSettings.getBOOL("MediaPluginDebugging");
             media_source->enableMediaPluginDebugging( media_plugin_debugging_enabled  || clean_browser);
 
+#if LL_LINUX
+            bool media_plugin_pipewire_volume_catcher = gSavedSettings.getBOOL("MediaPluginPipeWireVolumeCatcher");
+            media_source->enablePipeWireVolumeCatcher( media_plugin_pipewire_volume_catcher );
+#endif
+
             // need to set agent string here before instance created
             media_source->setBrowserUserAgent(LLViewerMedia::getInstance()->getCurrentUserAgent());
 
@@ -1792,8 +1938,21 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 
             media_source->setTarget(target);
 
+#if LL_LINUX
+            // Tell the CEF plugin which windowing backend the viewer is on so
+            // its Ozone platform (X11 vs Wayland) matches ours, rather than the
+            // plugin guessing from its own subprocess environment.
+            if (gViewerWindow && gViewerWindow->getWindow())
+            {
+                media_source->setDisplayServer(gViewerWindow->getWindow()->getDisplayServer());
+            }
+#endif
+
             const std::string plugin_dir = gDirUtilp->getLLPluginDir();
-            if (media_source->init(launcher_name, plugin_dir, plugin_name, gSavedSettings.getBOOL("PluginAttachDebuggerToPlugins")))
+            // plugin_dir/plugin_basename are vestigial now (the host statically
+            // links its plugin); they ride along in the load_plugin message only
+            // to satisfy its non-empty contract.
+            if (media_source->init(launcher_name, plugin_dir, plugin_basename, gSavedSettings.getBOOL("PluginAttachDebuggerToPlugins")))
             {
                 return media_source;
             }
@@ -1804,9 +1963,7 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
             }
         }
     }
-#if !LL_LINUX
     LL_WARNS_ONCE("Plugin") << "plugin initialization failed for mime type: " << media_type << LL_ENDL;
-#endif
 
     if(gAgent.isInitialized())
     {
@@ -2097,7 +2254,7 @@ void LLViewerMediaImpl::setMute(bool mute)
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMediaImpl::updateVolume()
 {
-    LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE_VOLUME);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     if(mMediaSource)
     {
         // always scale the volume by the global media volume
@@ -2105,16 +2262,19 @@ void LLViewerMediaImpl::updateVolume()
 
         if (mProximityCamera > 0)
         {
-            if (mProximityCamera > gSavedSettings.getF32("MediaRollOffMax"))
+            static LLCachedControl<F32> media_rolloff_min(gSavedSettings, "MediaRollOffMin");
+            static LLCachedControl<F32> media_rolloff_max(gSavedSettings, "MediaRollOffMax");
+            static LLCachedControl<F32> media_rolloff_rate(gSavedSettings, "MediaRollOffRate");
+            if (mProximityCamera > media_rolloff_max())
             {
                 volume = 0;
             }
-            else if (mProximityCamera > gSavedSettings.getF32("MediaRollOffMin"))
+            else if (mProximityCamera > media_rolloff_min())
             {
                 // attenuated_volume = 1 / (roll_off_rate * (d - min))^2
                 // the +1 is there so that for distance 0 the volume stays the same
-                F64 adjusted_distance = mProximityCamera - gSavedSettings.getF32("MediaRollOffMin");
-                F64 attenuation = 1.0 + (gSavedSettings.getF32("MediaRollOffRate") * adjusted_distance);
+                F64 adjusted_distance = mProximityCamera - media_rolloff_min();
+                F64 attenuation = 1.0 + (media_rolloff_rate() * adjusted_distance);
                 attenuation = 1.0 / (attenuation * attenuation);
                 // the attenuation multiplier should never be more than one since that would increase volume
                 volume = volume * (F32)llmin(1.0, attenuation);
@@ -2540,19 +2700,30 @@ void LLViewerMediaImpl::navigateTo(const std::string& url, const std::string& mi
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-void LLViewerMediaImpl::navigateInternal()
+void LLViewerMediaImpl::navigateInternal(bool should_log)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     // Helpful to have media urls in log file. Shouldn't be spammy.
     {
         // Do not log the query parts
         LLURI u(mMediaURL);
         std::string sanitized_url = (u.query().empty() ? mMediaURL : u.scheme() + "://" + u.authority() + u.path());
-        LL_INFOS() << "media id= " << mTextureId << " url=" << sanitized_url << ", mime_type=" << mMimeType << LL_ENDL;
+        if (should_log)
+        {
+            LL_INFOS("Media") << "media id= " << mTextureId << " url=" << sanitized_url << ", mime_type=" << mMimeType << LL_ENDL;
+        }
+        else
+        {
+            LL_DEBUGS("Media") << "media id= " << mTextureId << " url=" << sanitized_url << ", mime_type=" << mMimeType << LL_ENDL;
+        }
     }
 
     if(mNavigateSuspended)
     {
-        LL_WARNS() << "Deferring navigate." << LL_ENDL;
+        if (should_log || !mNavigateSuspendedDeferred)
+        {
+            LL_WARNS() << "Deferring navigate." << LL_ENDL;
+        }
         mNavigateSuspendedDeferred = true;
         return;
     }
@@ -2560,7 +2731,13 @@ void LLViewerMediaImpl::navigateInternal()
 
     if (!mMimeProbe.expired())
     {
-        LL_WARNS() << "MIME type probe already in progress -- bailing out." << LL_ENDL;
+        if (should_log)
+        {
+            // media periodically suspends and unsuspends (should_log == false),
+            // unsuspend calls this function, it's epxected that sometimes
+            // unsuspend will be attempted while a probe is in flight.
+            LL_WARNS() << "MIME type probe already in progress -- bailing out." << LL_ENDL;
+        }
         return;
     }
 
@@ -2621,9 +2798,13 @@ void LLViewerMediaImpl::navigateInternal()
     {
         loadURI();
     }
-    else
+    else if (should_log)
     {
         LL_WARNS("Media") << "Couldn't navigate to: " << mMediaURL << " as there is no media type for: " << mMimeType << LL_ENDL;
+    }
+    else
+    {
+        LL_DEBUGS("Media") << "Couldn't navigate to: " << mMediaURL << " as there is no media type for: " << mMimeType << LL_ENDL;
     }
 }
 
@@ -2631,10 +2812,11 @@ void LLViewerMediaImpl::mimeDiscoveryCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("mimeDiscoveryCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
-    LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("mimeDiscoveryCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
 
     // Increment our refcount so that we do not go away while the coroutine is active.
     this->ref();
@@ -2778,7 +2960,7 @@ bool LLViewerMediaImpl::handleUnicodeCharHere(llwchar uni_char)
         {
             LLSD native_key_data = gViewerWindow->getWindow()->getNativeKeyData();
 
-            mMediaSource->textInput(wstring_to_utf8str(LLWString(1, uni_char)), gKeyboard->currentMask(false), native_key_data);
+            mMediaSource->textInput(utf8str_from_cp(uni_char), gKeyboard->currentMask(false), native_key_data);
         }
     }
 
@@ -2808,14 +2990,21 @@ bool LLViewerMediaImpl::canNavigateBack()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_DO_UPDATE("Do Update");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_GET_DATA("Get Data");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SET_SUBIMAGE("Set Subimage");
-
-
 void LLViewerMediaImpl::update()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_DO_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
+
+    // Shared CEF daemon crash recovery: once the backoff has elapsed, clear the
+    // failure latch so the normal load path below recreates the source (which
+    // respawns or reconnects the daemon). isForcedUnloaded() pins mPriority to
+    // PRIORITY_UNLOADED while mMediaSourceFailed is set, so this is what lets the
+    // tab come back after a daemon crash.
+    if (mDaemonRecoveryPending && mDaemonRecoveryTimer.hasExpired())
+    {
+        mDaemonRecoveryPending = false;
+        mMediaSourceFailed = false;
+    }
+
     if(mMediaSource == NULL)
     {
         if(mPriority == LLPluginClassMedia::PRIORITY_UNLOADED)
@@ -2881,6 +3070,26 @@ void LLViewerMediaImpl::update()
         return;
     }
 
+    // Zero-copy paint: the plugin delivers a GPU shared texture instead of CPU
+    // pixels, so this media never uses the shm/setSubImage upload path below.
+    // Pull the latest frame straight into the media GL texture on this (main)
+    // thread and we're done.
+    if (mMediaSource->getUseAcceleratedPaint())
+    {
+#if LL_DARWIN || LL_LINUX
+        // Bring up the surface side channel up front (not gated on a frame): the
+        // plugin only starts producing once our receive endpoint exists (mach port
+        // on macOS, AF_UNIX socket on Linux), so waiting for the first frame to
+        // register would deadlock.
+        LLCEFSurfaceReceiver::instance().ensureStarted();
+#endif
+        if (!mSuspendUpdates && mVisible && mMediaSource->getAcceleratedPaintDirty())
+        {
+            updateAcceleratedTexture();
+        }
+        return;
+    }
+
     if(!mMediaSource->textureValid())
     {
         return;
@@ -2910,6 +3119,11 @@ void LLViewerMediaImpl::update()
             mTextureUpdatePending = true;
             ref();  // protect texture from deletion while active on bg queue
             media_tex->ref();
+            // The texture reports the frame it shows until the worker's publishes: see
+            // LLImageGL::beginUpload, taken here on the main thread before the post and
+            // released in the callback.
+            LLPointer<LLImageGL> gl_image = media_tex->getGLTexture();
+            gl_image->beginUpload();
             main_queue->postTo(
                 mTexUpdateQueue, // Worker thread queue
                 [=, this]() // work done on update worker thread
@@ -2924,9 +3138,16 @@ void LLViewerMediaImpl::update()
 #if LL_IMAGEGL_THREAD_CHECK
                     media_tex->getGLTexture()->mActiveThread = LLThread::currentID();
 #endif
-                    mTextureUpdatePending = false;
-                    media_tex->unref();
-                    unref();
+                    // The frame publishes once the GPU has finished with it; the next
+                    // update must not start before then.
+                    gl_image->afterPublish([=, this]()
+                    {
+                        // A no-op when syncTexName published the frame.
+                        gl_image->endUpload();
+                        mTextureUpdatePending = false;
+                        media_tex->unref();
+                        unref();
+                    });
                 });
         }
         else
@@ -3001,18 +3222,35 @@ void LLViewerMediaImpl::doMediaTexUpdate(LLViewerMediaTexture* media_tex, U8* da
     // -Cosmic,2023-04-04
     // Allocate GL texture based on LLImageRaw but do NOT copy to GL
     LLGLuint tex_name = 0;
-    media_tex->createGLTexture(0, raw, 0, true, LLGLTexture::OTHER, true, &tex_name);
-
-    // copy just the subimage covered by the image raw to GL
-    media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
-
-    if (sync)
     {
-        media_tex->getGLTexture()->syncToMainThread(tex_name);
+        // Phase 0 baseline: this GL allocate + CPU->GPU upload is exactly the
+        // per-surface cost the accelerated-paint (shared-texture) path removes,
+        // so isolate it under its own zone for before/after comparison.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media texUpload");
+        if (!media_tex->createGLTexture(0, raw, 0, true, LLGLTexture::OTHER, true, &tex_name))
+        {
+            LL_WARNS("Media") << "Failed to create media texture" << LL_ENDL;
+        }
+        else
+        {
+            // copy just the subimage covered by the image raw to GL
+            media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+        }
     }
-    else
+
+    // With no new texture there is nothing to upload into or publish. Given a tex_name of
+    // 0, setSubImage writes the texture on screen instead -- from the worker, while the
+    // main thread may be sampling it.
+    if (tex_name != 0)
     {
-        media_tex->getGLTexture()->syncTexName(tex_name);
+        if (sync)
+        {
+            media_tex->getGLTexture()->syncToMainThread(tex_name);
+        }
+        else
+        {
+            media_tex->getGLTexture()->syncTexName(tex_name);
+        }
     }
 
     // release the data pointer before freeing raw so LLImageRaw destructor doesn't
@@ -3023,6 +3261,124 @@ void LLViewerMediaImpl::doMediaTexUpdate(LLViewerMediaTexture* media_tex, U8* da
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMediaImpl::updateImagesMediaStreams()
 {
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// Zero-copy paint consumer. Bring the plugin's GPU shared texture straight into
+// the media GL texture with no CPU round-trip. Main thread (has the GL context).
+bool LLViewerMediaImpl::updateAcceleratedTexture()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
+
+    // Bring up the interop first so a failure here doesn't consume the frame; the
+    // plugin's handle is persistent and we retry next frame.
+    if (!mAccelInterop)
+    {
+        mAccelInterop = new LLCEFAccelInterop();
+        if (!mAccelInterop->init())
+        {
+            delete mAccelInterop;
+            mAccelInterop = nullptr;
+            return false;
+        }
+    }
+
+    mMediaSource->clearAcceleratedPaintDirty();
+#if LL_DARWIN
+    // macOS: CEF's IOSurface is shared via a mach port (no cross-process global
+    // id), so the surface arrives out-of-band through the mach receiver, demuxed
+    // by this media's accel id. Drain the newest and (re)bind it; the interop
+    // takes ownership of the +1-retained IOSurfaceRef (and releases it on a
+    // failed bind). If no new surface this frame, keep the current binding.
+    void* surf = LLCEFSurfaceReceiver::instance().takeLatest(mMediaSource->getAccelId());
+    if (surf)
+    {
+        if (!mAccelInterop->setStableTexture((unsigned long long)(uintptr_t)surf,
+                                             mMediaSource->getAcceleratedPaintWidth(),
+                                             mMediaSource->getAcceleratedPaintHeight(),
+                                             mMediaSource->getAcceleratedPaintFormat(),
+                                             0, 0, 0, 0))
+        {
+            return false;   // import failed; don't blit a stale/invalid binding
+        }
+    }
+#elif LL_WINDOWS
+    // The handle is persistent (re)sent only on (re)create. (Re)bind the interop
+    // when it differs from what we have bound; only advance mAccelBoundHandle on a
+    // successful bind so a transient failure is retried with the same handle.
+    unsigned long long handle = mMediaSource->getAcceleratedPaintHandle();
+    if (handle != 0 && handle != mAccelBoundHandle)
+    {
+        if (mAccelInterop->setStableTexture(handle,
+                                            mMediaSource->getAcceleratedPaintWidth(),
+                                            mMediaSource->getAcceleratedPaintHeight(),
+                                            mMediaSource->getAcceleratedPaintFormat()))
+        {
+            mAccelBoundHandle = handle;
+        }
+        else
+        {
+            return false;
+        }
+    }
+#else  // LL_LINUX
+    // CEF's dma-buf fds arrive out-of-band via the SCM_RIGHTS side channel (a
+    // dma-buf fd cannot cross the process boundary through the LLSD/TCP channel,
+    // nor be reopened via /proc), demuxed by this media's accel id. Take the
+    // newest frame, import its planes directly (the fds are open in this process),
+    // then close them. Keep the current binding if no new frame arrived this tick.
+    LLCEFSurfaceReceiver::DmabufFrame frame;
+    if (LLCEFSurfaceReceiver::instance().takeLatestDmabuf(mMediaSource->getAccelId(), frame))
+    {
+        unsigned long long plane_fds[4]     = {};
+        unsigned int       plane_strides[4] = {};
+        unsigned long long plane_offsets[4] = {};
+        for (int i = 0; i < frame.plane_count && i < 4; ++i)
+        {
+            plane_fds[i]     = (unsigned long long)frame.fd[i];
+            plane_strides[i] = frame.stride[i];
+            plane_offsets[i] = frame.offset[i];
+        }
+        // The interop imports the fds directly (no /proc); we own them and close
+        // them right after - EGL keeps its own reference once the image is made.
+        bool imported = mAccelInterop->setStableTexture(plane_fds[0],
+                                        frame.width, frame.height, frame.format,
+                                        plane_strides[0], plane_offsets[0], frame.modifier,
+                                        0, frame.plane_count, plane_fds, plane_strides, plane_offsets);
+        frame.closeFds();
+        if (!imported)
+        {
+            return false;   // import failed; don't blit a stale/invalid binding
+        }
+    }
+#endif
+
+    LLViewerMediaTexture* media_tex = updateMediaImage();
+    if (!media_tex || !media_tex->getGLTexture())
+    {
+        return false;
+    }
+
+    U32 tex_name = media_tex->getGLTexture()->getTexName();
+    if (!tex_name)
+    {
+        return false;
+    }
+
+    // The interop blit reads the shared texture through a framebuffer, which
+    // both samples it in the correct channel order and flips it to bottom-up, so
+    // no swizzle / coord fix-up is needed here.
+    if (!mAccelInterop->blitTo(tex_name, media_tex->getWidth(), media_tex->getHeight()))
+    {
+        return false;
+    }
+
+    // Only switch the prim face onto the media texture once it actually holds a
+    // blitted frame. The CPU path waits on textureValid() for the same reason;
+    // the accelerated path skips that check, so presenting before the first blit
+    // would flash the empty placeholder texture (the grey-before-media flicker).
+    media_tex->setPlaying(true);
+    return true;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -3073,7 +3429,10 @@ LLViewerMediaTexture* LLViewerMediaImpl::updateMediaImage()
             mMediaSource->getTextureFormatSwapBytes());
 
         int discard_level = 0;
-        media_tex->createGLTexture(discard_level, raw);
+        if (!media_tex->createGLTexture(discard_level, raw))
+        {
+            LL_WARNS("Media") << "Failed to create media texture" << LL_ENDL;
+        }
 
         // MEDIAOPT: set this dynamically on play/stop
         // FIXME
@@ -3305,6 +3664,24 @@ void LLViewerMediaImpl::handleMediaEvent(LLPluginClassMedia* plugin, LLPluginCla
             // Reset the last known state of the media to defaults.
             resetPreviousMediaState();
 
+            // Shared CEF daemon: one daemon crash drops every tab at once. Rather
+            // than leaving all of them permanently failed, schedule a bounded,
+            // backed-off re-init for daemon-mode media. The first impl to recreate
+            // its source wins the spawn lock and respawns the daemon
+            // (discover-or-spawn); the rest reconnect to it as new tabs. The retry
+            // cap + backoff keep a daemon that crashes on launch from spinning.
+            if (plugin && plugin->getUseDaemon() && mDaemonRecoveryAttempts < DAEMON_RECOVERY_MAX_ATTEMPTS)
+            {
+                mDaemonRecoveryAttempts++;
+                F32 delay = llmin(DAEMON_RECOVERY_BASE_DELAY * (F32)mDaemonRecoveryAttempts, DAEMON_RECOVERY_MAX_DELAY);
+                mDaemonRecoveryPending = true;
+                mDaemonRecoveryTimer.reset();
+                mDaemonRecoveryTimer.setTimerExpirySec(delay);
+                LL_WARNS("Media") << "CEF daemon tab failed; scheduling recovery attempt "
+                                  << mDaemonRecoveryAttempts << "/" << DAEMON_RECOVERY_MAX_ATTEMPTS
+                                  << " in " << delay << "s" << LL_ENDL;
+            }
+
             LLSD args;
             args["PLUGIN"] = LLMIMETypes::implType(mCurrentMimeType);
             // SJB: This is getting called every frame if the plugin fails to load, continuously respawining the alert!
@@ -3346,6 +3723,10 @@ void LLViewerMediaImpl::handleMediaEvent(LLPluginClassMedia* plugin, LLPluginCla
         case LLViewerMediaObserver::MEDIA_EVENT_NAVIGATE_COMPLETE:
         {
             LL_DEBUGS("Media") << "MEDIA_EVENT_NAVIGATE_COMPLETE, uri is: " << plugin->getNavigateURI() << LL_ENDL;
+
+            // A page finished loading: the (possibly just-respawned) daemon tab is
+            // healthy again, so clear the crash-recovery backoff counter.
+            mDaemonRecoveryAttempts = 0;
 
             std::string url = plugin->getNavigateURI();
             if(getNavState() == MEDIANAVSTATE_BEGUN)
@@ -3528,7 +3909,7 @@ LLViewerMediaImpl::canUndo() const
     if (mMediaSource)
         return mMediaSource->canUndo();
     else
-        return FALSE;
+        return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3548,7 +3929,7 @@ LLViewerMediaImpl::canRedo() const
     if (mMediaSource)
         return mMediaSource->canRedo();
     else
-        return FALSE;
+        return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3628,7 +4009,7 @@ LLViewerMediaImpl::canDoDelete() const
     if (mMediaSource)
         return mMediaSource->canDoDelete();
     else
-        return FALSE;
+        return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3648,7 +4029,7 @@ LLViewerMediaImpl::canSelectAll() const
     if (mMediaSource)
         return mMediaSource->canSelectAll();
     else
-        return FALSE;
+        return false;
 }
 
 void LLViewerMediaImpl::setUpdated(bool updated)
@@ -3661,11 +4042,9 @@ bool LLViewerMediaImpl::isUpdated()
     return mIsUpdated ;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_CALCULATE_INTEREST("Calculate Interest");
-
 void LLViewerMediaImpl::calculateInterest()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_CALCULATE_INTEREST);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     LLViewerMediaTexture* texture = LLViewerTextureManager::findMediaTexture( mTextureId );
 
     llassert(!gCubeSnapshot);
@@ -3887,7 +4266,7 @@ void LLViewerMediaImpl::setNavigateSuspended(bool suspend)
             if(mNavigateSuspendedDeferred)
             {
                 mNavigateSuspendedDeferred = false;
-                navigateInternal();
+                navigateInternal(false /*suspend happens periodically, don't log*/);
             }
         }
     }
@@ -3962,11 +4341,10 @@ void LLViewerMediaImpl::setTextureID(LLUUID id)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 //
-bool LLViewerMediaImpl::isAutoPlayable(bool is_hud_attachment) const
+bool LLViewerMediaImpl::isAutoPlayable() const
 {
-    static LLCachedControl<bool> hud_auto_play(gSavedSettings, "MediaAutoPlayHuds", true);
     return (mMediaAutoPlay &&
-            ((gSavedSettings.getS32("ParcelMediaAutoPlayEnable") != 0) || (hud_auto_play && (is_hud_attachment || isAttachedToHUD()))) &&
+            gSavedSettings.getS32("ParcelMediaAutoPlayEnable") != 0 &&
             gSavedSettings.getBOOL("MediaTentativeAutoPlay"));
 }
 

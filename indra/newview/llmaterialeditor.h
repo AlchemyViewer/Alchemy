@@ -48,14 +48,16 @@ namespace tinygltf
 // todo: Consider making into a notification or just merging with
 // presets. Layout is identical to camera/graphics presets so there
 // is no point in having multiple separate xmls and classes.
-class LLFloaterComboOptions : public LLFloater
+class LLFloaterComboOptions final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterComboOptions, LLFloater);
+
     typedef std::function<void(const std::string&, S32)> combo_callback;
     LLFloaterComboOptions();
 
     virtual ~LLFloaterComboOptions();
-    /*virtual*/ bool    postBuild();
+    /*virtual*/ bool    postBuild() override;
 
     static LLFloaterComboOptions* showUI(
         combo_callback callback,
@@ -84,8 +86,10 @@ protected:
     LLTextBox *mComboText;
 };
 
-class LLMaterialEditor : public LLPreview, public LLVOInventoryListener
+class LLMaterialEditor final : public LLPreview, public LLVOInventoryListener
 { public:
+    AL_VIEW_TYPE(LLMaterialEditor, LLPreview);
+
     LLMaterialEditor(const LLSD& key);
     ~LLMaterialEditor();
 

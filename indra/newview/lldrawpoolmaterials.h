@@ -41,6 +41,11 @@ class LLGLSLShader;
 class LLDrawPoolMaterials : public LLRenderPass
 {
     LLGLSLShader *mShader;
+
+    // True when this pass's render map is empty (no geometry). begin/render/end all
+    // consult it so an empty pass skips the deferred shader bind/unbind entirely --
+    // modern PBR/simple scenes leave most of the 12 legacy material passes empty.
+    bool isPassEmpty(S32 pass);
 public:
     LLDrawPoolMaterials();
 

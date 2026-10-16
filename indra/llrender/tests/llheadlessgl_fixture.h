@@ -1,0 +1,714 @@
+/**
+ * @file llheadlessgl_fixture.h
+ * @brief One-shot GL bring-up shared across the GL-backed llrender
+ *        integration tests.
+ *
+ * The window is LLWindowManager's hidden backend: an SDL window never
+ * shown, with the same GL the viewer runs on -- WGL on Windows, EGL on
+ * Linux -- and where Linux has no display, SDL's offscreen driver.
+ *
+ * Standing the context up is the expensive part — Catch2 makes a fresh
+ * fixture per test case, so a test that can share one takes the
+ * static-local instance behind sharedHeadlessGL() and keeps its own
+ * state (font registry, atlas pages) in the fixture. A test that
+ * needs a context of its own makes a HeadlessGL per test instead.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#ifndef LL_LLHEADLESSGL_FIXTURE_H
+#define LL_LLHEADLESSGL_FIXTURE_H
+
+#include "linden_common.h"
+
+#include "../llgltexture.h"
+#include "../llglslshader.h"
+#include "../llimagegl.h"
+#include "../llfontfreetype.h"
+#include "../alfontshaping.h"
+#include "../aluniformbuffer.h"
+#include "../llfonttextcache.h"
+#include "../llrender.h"
+#include "../llshadermgr.h"
+#include "../llvertexbuffer.h"
+
+#include "llwindow.h"
+#include "llwindowcallbacks.h"
+
+#include "alsanitizer.h"
+#include "fsyspath.h"
+#include "llfile.h"
+#include "lluuid.h"
+
+#include "alteststateguard.h"
+#include "altestteardown.h"
+
+#include <algorithm>
+#include <cstring>
+#include <filesystem>
+#include <iterator>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace ll_test
+{
+    // Test-only accessor for LLFontTextCache's private capture lists.
+    // Friended in llfonttextcache.h so we can count emitted quads per
+    // pass without poisoning the production API with public accessors.
+    struct VertexBufferProbe
+    {
+        struct CaptureCounts
+        {
+            size_t shadow_quads     = 0;
+            size_t foreground_quads = 0;
+        };
+
+        static CaptureCounts count(const LLFontTextCache& buf)
+        {
+            CaptureCounts c;
+            for (const LLVertexBufferData& e : buf.mShadowBufferList)
+                c.shadow_quads += e.mCount / 6;
+            for (const LLVertexBufferData& e : buf.mForegroundBufferList)
+                c.foreground_quads += e.mCount / 6;
+            return c;
+        }
+    };
+
+    // Drop transient font caches that would otherwise leak between tests
+    // sharing sharedHeadlessGL(). Safe to call repeatedly;
+    // does NOT touch LLFontManager / LLImageGL / GL state — those stay
+    // alive for the whole binary because LLFontGL's static fontp caches
+    // (getFontSansSerif et al.) dangle across a re-init cycle (see
+    // llfontgl_test.cpp:64-74). The shape LRU is the only piece we can
+    // safely flush mid-binary, since its entries hold raw face* and would
+    // re-populate on the next shape call regardless.
+    inline void resetFontState()
+    {
+        ALFontShaping::clearCache();
+    }
+
+    // RAII scope — calls resetFontState() in dtor. Embed in a fixture
+    // struct to guarantee the shape cache is empty after every test,
+    // regardless of how the test exited.
+    struct FontStateScope
+    {
+        FontStateScope() = default;
+        ~FontStateScope() { resetFontState(); }
+
+        FontStateScope(const FontStateScope&) = delete;
+        FontStateScope& operator=(const FontStateScope&) = delete;
+    };
+
+    // Concrete LLShaderMgr for render-output tests. They don't pump the
+    // per-frame uniform updates the viewer does, so updateShaderUniforms is a
+    // no-op. LLRender::syncMatrices still pushes matrix uniforms directly each
+    // draw — that path lives in llrender.cpp and doesn't go through the mgr.
+    // A test that loads the viewer's own shader files passes the tree's class
+    // prefix ("<app_settings>/shaders/class"), which loadShaderFile completes
+    // with the class number and the file's path; the rest load none.
+    class TestShaderMgr : public LLShaderMgr
+    {
+    public:
+        // One made over another, as a test's own over the shared context's,
+        // stands in for it while it lives and hands the instance back.
+        explicit TestShaderMgr(std::string dir_prefix = std::string())
+        : mDirPrefix(std::move(dir_prefix)),
+          mPrevious(sInstance)
+        {
+            sInstance = this;
+            initAttribsAndUniforms();
+        }
+        ~TestShaderMgr() override { if (sInstance == this) sInstance = mPrevious; }
+
+        std::string getShaderDirPrefix() override { return mDirPrefix; }
+        void updateShaderUniforms(LLGLSLShader* /*shader*/) override {}
+
+    private:
+        std::string mDirPrefix;
+        LLShaderMgr* mPrevious;
+    };
+
+    // A shader tree on disk for programs built through LLGLSLShader::createShader, which reads its
+    // stage files as the viewer reads its own: <root>/class1/<path>, found by a TestShaderMgr given
+    // prefix(). Made empty in the system's temporary directory, and removed with the object.
+    class TestShaderDir
+    {
+    public:
+        TestShaderDir()
+        {
+            std::filesystem::path tmp = fsyspath(LLFile::tmpdir());
+            mRoot = tmp / fsyspath("llrender-gl-test-" + LLUUID::generateNewID().asString());
+            std::error_code ec;
+            std::filesystem::create_directories(mRoot / "class1", ec);
+        }
+
+        ~TestShaderDir()
+        {
+            std::error_code ec;
+            std::filesystem::remove_all(mRoot, ec);
+        }
+
+        // Write `source` to class1/<path>, making its folders. False if it could not be written.
+        bool write(const std::string& path, const std::string& source) const
+        {
+            const std::filesystem::path file = mRoot / "class1" / fsyspath(path);
+            std::error_code ec;
+            std::filesystem::create_directories(file.parent_path(), ec);
+            llofstream out(fsyspath(file).string(), std::ios::out | std::ios::binary);
+            out << source;
+            return out.good();
+        }
+
+        // What getShaderDirPrefix() returns: loadShaderFile appends the class number and the path.
+        std::string prefix() const
+        {
+            return fsyspath(mRoot / "class").string();
+        }
+
+        TestShaderDir(const TestShaderDir&)            = delete;
+        TestShaderDir& operator=(const TestShaderDir&) = delete;
+
+    private:
+        std::filesystem::path mRoot;
+    };
+
+    // Whether the context runs compute: what LLRender::sCompute needs, less the user's setting,
+    // which a test does not have.
+    inline bool contextHasCompute()
+    {
+        return gGLManager.mHasCompute
+            && gGLManager.mGLSLVersionMajor * 100 + gGLManager.mGLSLVersionMinor >= 430;
+    }
+
+    // GL 3.3 core pass-through UI vertex shader. Same uniform / attribute
+    // shape as indra/newview/app_settings/shaders/class1/interface/uiV.glsl:
+    // the matrices are read from the Matrices block, laid out as
+    // class1/deferred/matricesBlock.glsl lays it out, which
+    // LLRender::syncMatrices fills and mapUniforms binds at UB_MATRICES.
+    inline const char* kTestUIVertexShader()
+    {
+        return
+            "#version 330\n"
+            "layout (std140) uniform Matrices\n"
+            "{\n"
+            "    mat4 modelview_matrix;\n"
+            "    mat4 projection_matrix;\n"
+            "    mat4 modelview_projection_matrix;\n"
+            "    mat4 inv_proj;\n"
+            "    mat4 texture_matrix0;\n"
+            "    mat3 normal_matrix;\n"
+            "};\n"
+            "in vec3 position;\n"
+            "in vec4 diffuse_color;\n"
+            "in vec2 texcoord0;\n"
+            "out vec4 vertex_color;\n"
+            "out vec2 vary_texcoord0;\n"
+            "void main()\n"
+            "{\n"
+            "    gl_Position = modelview_projection_matrix * vec4(position, 1.0);\n"
+            "    vary_texcoord0 = (texture_matrix0 * vec4(texcoord0, 0.0, 1.0)).xy;\n"
+            "    vertex_color = diffuse_color;\n"
+            "}\n";
+    }
+
+    // GL 3.3 core pass-through UI fragment shader. Mirrors uiF.glsl's
+    // shadowMode==0 fast path. Tests run with LLFontGL::sEnableShaderShadow
+    // off (default), so the multi-tap shadow branches are not exercised
+    // and aren't compiled in here.
+    inline const char* kTestUIFragmentShader()
+    {
+        return
+            "#version 330\n"
+            "out vec4 frag_color;\n"
+            "uniform sampler2D diffuseMap;\n"
+            "in vec2 vary_texcoord0;\n"
+            "in vec4 vertex_color;\n"
+            "void main()\n"
+            "{\n"
+            "    frag_color = vertex_color * texture(diffuseMap, vary_texcoord0);\n"
+            "}\n";
+    }
+
+    // Compile a shader stage from inline source. Returns 0 on failure;
+    // logs the compiler diagnostic so test setup failures show up in CI.
+    inline GLuint compileTestShader(GLenum stage, const char* src)
+    {
+        GLuint sh = glCreateShader(stage);
+        glShaderSource(sh, 1, &src, nullptr);
+        glCompileShader(sh);
+        GLint ok = GL_FALSE;
+        glGetShaderiv(sh, GL_COMPILE_STATUS, &ok);
+        if (!ok)
+        {
+            GLchar log[2048] = {0};
+            glGetShaderInfoLog(sh, sizeof(log) - 1, nullptr, log);
+            LL_WARNS("HeadlessGL") << "Shader compile failed: " << log << LL_ENDL;
+            glDeleteShader(sh);
+            return 0;
+        }
+        return sh;
+    }
+
+    // Compile, link, and map gUIProgram via the standard LLGLSLShader API.
+    // attachObject + mapAttributes binds reserved attrib slots and links;
+    // mapUniforms reads back uniform locations against the LLShaderMgr's
+    // reserved-name table. The TestShaderMgr ctor already populated that
+    // table via initAttribsAndUniforms.
+    inline bool setupTestUIProgram(LLShaderMgr* /*mgr*/)
+    {
+        GLuint vs = compileTestShader(GL_VERTEX_SHADER, kTestUIVertexShader());
+        GLuint fs = compileTestShader(GL_FRAGMENT_SHADER, kTestUIFragmentShader());
+        if (!vs || !fs)
+        {
+            if (vs) glDeleteShader(vs);
+            if (fs) glDeleteShader(fs);
+            return false;
+        }
+
+        gUIProgram.mProgramObject = glCreateProgram();
+        gUIProgram.mName = "ui (test stub)";
+        gUIProgram.attachObject(vs);
+        gUIProgram.attachObject(fs);
+        // mapAttributes binds reserved attrib slots, links the program,
+        // then reads back mAttribute + mAttributeMask. Returns false on
+        // link failure.
+        if (!gUIProgram.mapAttributes())
+        {
+            glDeleteShader(vs);
+            glDeleteShader(fs);
+            gUIProgram.unload();
+            gUIProgram.mProgramObject = 0;
+            return false;
+        }
+        // Stage shaders are referenced by the linked program now; safe
+        // to delete the standalone handles.
+        glDeleteShader(vs);
+        glDeleteShader(fs);
+
+        if (!gUIProgram.mapUniforms())
+        {
+            gUIProgram.unload();
+            gUIProgram.mProgramObject = 0;
+            return false;
+        }
+        return true;
+    }
+
+    inline void teardownTestUIProgram()
+    {
+        if (gUIProgram.mProgramObject)
+        {
+            LLGLSLShader::unbind();
+            gUIProgram.unload();
+            gUIProgram.mProgramObject = 0;
+        }
+    }
+
+    // A white texel where the viewer puts its white image, which an unbound
+    // texture slot samples: what is drawn with no texture then comes out in
+    // its own colour, as it does in the viewer, rather than black. Made once,
+    // on the first call; the context must be up. A Catch2 binary releases it
+    // after the last case, before the shared context it was made in ends.
+    inline void installWhiteTexture()
+    {
+        static LLPointer<LLImageGL> white;
+        if (!white)
+        {
+            LLPointer<LLImageRaw> raw = new LLImageRaw(1, 1, 4);
+            std::memset(raw->getData(), 0xFF, 4);
+            white = new LLImageGL(raw, false);
+            ll_test::Teardown::add([] { white = nullptr; });
+        }
+        ALTextureSlot::sWhiteTexture = white->getTexName();
+        // Bound once, so that the slot holds a texture: an unbind puts the
+        // white one back only over one that was there.
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, white->getTexName());
+    }
+
+    // Read back the framebuffer's color buffer as RGBA8 (tightly
+    // packed, row 0 = bottom of GL viewport). Tests use this to assert
+    // pixel-level invariants — alignment column position, drop-shadow
+    // offset, underline row band — against an actually-rendered frame.
+    inline std::vector<U8> readFramebufferRGBA(S32 w, S32 h)
+    {
+        std::vector<U8> px(static_cast<std::size_t>(w) * h * 4, 0);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+        return px;
+    }
+
+    // Route the debug context's messages into the test log. Anything the
+    // driver considers an error or a portability problem shows up named,
+    // rather than as a wrong pixel three tests later. Notifications are
+    // dropped -- drivers use them for buffer-allocation chatter.
+#ifndef APIENTRY
+#  define APIENTRY
+#endif
+    inline void APIENTRY onGLDebugMessage(GLenum /*source*/, GLenum type, GLuint id,
+                                          GLenum severity, GLsizei /*length*/,
+                                          const GLchar* message, const void* /*user*/)
+    {
+        if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+            return;
+
+        const char* kind = (type == GL_DEBUG_TYPE_ERROR)               ? "error"
+                         : (type == GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR)  ? "undefined behaviour"
+                         : (type == GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR) ? "deprecated"
+                         : (type == GL_DEBUG_TYPE_PORTABILITY)         ? "portability"
+                         : (type == GL_DEBUG_TYPE_PERFORMANCE)         ? "performance"
+                         : "other";
+
+        LL_WARNS("HeadlessGL") << "GL " << kind << " [" << id << "]: "
+                               << (message ? message : "(no message)") << LL_ENDL;
+    }
+
+    inline void installDebugMessageCallback()
+    {
+        if (!glDebugMessageCallback)
+        {
+            LL_WARNS("HeadlessGL") << "No glDebugMessageCallback; GL debug output is off" << LL_ENDL;
+            return;
+        }
+        glEnable(GL_DEBUG_OUTPUT);
+        // Synchronous, so a message arrives while the call that caused it is
+        // still on the stack and a breakpoint here is worth setting.
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        glDebugMessageCallback(&onGLDebugMessage, nullptr);
+    }
+
+    // Owns the GL context plus the GL-side singletons that the llrender
+    // code paths assume are alive. Construction order is context →
+    // LLImageGL → LLFontManager (→ TestShaderMgr + gUIProgram when
+    // needs_render); teardown is the reverse.
+    struct HeadlessGL
+    {
+        static constexpr S32 WIDTH  = 256;
+        static constexpr S32 HEIGHT = 256;
+
+        // needs_render = true compiles gUIProgram and binds it so
+        // LLFontTextCache::render() / LLFontGL::render() complete
+        // end-to-end against the context. Implies the other three flags
+        // (rendering needs vbos + imagegl + llrender to be live).
+        HeadlessGL(bool needs_vbos = true, bool needs_imagegl = true,
+                   bool needs_llrender = true, bool needs_render = false)
+        {
+            if (needs_render)
+            {
+                needs_vbos = needs_imagegl = needs_llrender = true;
+            }
+
+            // The profile the viewer runs on: core on macOS, where the only
+            // other offer is a 2.1 context on which every entry point past
+            // GL 2 is null and every 3.x query an invalid enum; and core
+            // wherever else, since the viewer's shaders are core's. The
+            // backend reads the flag as the viewer's window does.
+            LLRender::sGLCoreProfile = true;
+            // A debug context costs nothing here and turns "the draw came out
+            // wrong" into a message naming the call that did it. The backend
+            // reads gDebugGL for it, as the viewer's does; raised only for the
+            // creation, since left on it also turns every LLGLState into an
+            // llassert_always and the tests are not written against that.
+            gDebugGL = true;
+            mWindow = LLWindowManager::createWindow(&mCallbacks, "llrender-gl-test", "llrender-gl-test",
+                                                    0, 0, WIDTH, HEIGHT, 0,
+                                                    /*fullscreen=*/false, /*clearBg=*/false, /*enable_vsync=*/false,
+                                                    ALWindowBackend::Hidden);
+            gDebugGL = false;
+            if (!mWindow)
+            {
+                throw std::runtime_error("Failed to create the hidden window");
+            }
+            // What the driver keeps for the process is still the driver's
+            // when LeakSanitizer looks at exit (alsanitizer.h).
+            LL::pinLoadedLibraries();
+
+            installDebugMessageCallback();
+
+            // The window's viewport, as the viewer's window records it: what a
+            // render target's flush puts back when no outer target is bound.
+            gGLViewport[0] = 0;
+            gGLViewport[1] = 0;
+            gGLViewport[2] = WIDTH;
+            gGLViewport[3] = HEIGHT;
+
+            // Both of these take an LLWindow only to hand to worker threads
+            // they are not being asked to start: ENABLE_GL_WORK_QUEUE is 0,
+            // and the texture and media threads are off below.
+            if (needs_vbos)
+            {
+                LLVertexBuffer::initClass(mWindow);
+            }
+
+            if (needs_llrender)
+            {
+                gGL.init(needs_vbos);
+            }
+
+            if (needs_imagegl)
+            {
+                // num_catagories=1 mirrors the smallest sane init the viewer uses;
+                // the test never tags textures so the count is moot beyond ≥1.
+                // thread_texture_loads/thread_media_updates default to false so no
+                // worker threads are spun up — keeps teardown simple.
+                LLImageGL::initClass(mWindow, LLGLTexture::MAX_GL_IMAGE_CATEGORY, false, false, false);
+            }
+
+            LLFontManager::initClass();
+
+            if (needs_render)
+            {
+                mShaderMgr = std::make_unique<TestShaderMgr>();
+                if (!setupTestUIProgram(mShaderMgr.get()))
+                {
+                    throw std::runtime_error("Failed to compile stub gUIProgram");
+                }
+                gUIProgram.bind();
+
+                // Pixel-coord ortho for the 256x256 framebuffer; tests render
+                // at known pixel positions and verify via glReadPixels.
+                glViewport(0, 0, WIDTH, HEIGHT);
+                gGL.matrixMode(LLRender::MM_PROJECTION);
+                gGL.pushMatrix();
+                gGL.loadIdentity();
+                gGL.ortho(0.f, (F32)WIDTH, 0.f, (F32)HEIGHT, -1.f, 1.f);
+                gGL.matrixMode(LLRender::MM_MODELVIEW);
+                gGL.pushMatrix();
+                gGL.loadIdentity();
+            }
+        }
+
+        ~HeadlessGL()
+        {
+            if (mShaderMgr)
+            {
+                gGL.matrixMode(LLRender::MM_PROJECTION);
+                gGL.popMatrix();
+                gGL.matrixMode(LLRender::MM_MODELVIEW);
+                gGL.popMatrix();
+
+                teardownTestUIProgram();
+                mShaderMgr.reset();
+            }
+
+            LLFontManager::cleanupClass();
+            LLImageGL::cleanupClass();
+            gGL.shutdown();
+            LLVertexBuffer::cleanupClass();
+            // Drop ALUniformBuffer's process-lifetime statics (streaming rings, the
+            // rigged-palette scratch ring) with this context: a stale buffer name
+            // surviving into the next fixture's fresh context would alias or fail.
+            ALUniformBuffer::cleanupClass();
+
+            LLWindowManager::destroyWindow(mWindow);
+            std::fill(std::begin(gGLViewport), std::end(gGLViewport), 0);
+        }
+
+        void swapBuffer()
+        {
+            mWindow->swapBuffers();
+        }
+
+        LLWindow* window() const { return mWindow; }
+
+        // Clear the framebuffer to opaque black so a fresh readFramebufferRGBA
+        // reflects only what the test rendered this turn.
+        void clearFramebuffer()
+        {
+            gGL.setClearColor(LLColor4::black);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+
+        HeadlessGL(const HeadlessGL&)            = delete;
+        HeadlessGL& operator=(const HeadlessGL&) = delete;
+
+    private:
+        LLWindowCallbacks mCallbacks;
+        LLWindow* mWindow = nullptr;
+        std::unique_ptr<TestShaderMgr> mShaderMgr;
+    };
+
+    // The one context of the tests that share theirs: made by the first test
+    // to ask and kept for the rest of the process, so a binary of them has
+    // one window. Every part of the fixture is up, the union of what those
+    // tests need, so each must leave the image, render and shader state as
+    // it found it. Tests that make a HeadlessGL of their own per test end
+    // the GL classes under it, and are never linked beside a caller of this.
+    //
+    // A Catch2 binary ends it after the last case, while APR and LLError are
+    // still up, rather than at static destruction. What making it changes --
+    // the context, the bound program, the matrices pushed, and whatever the
+    // driver chooses for the process -- is the state the guard compares with
+    // from then on, so the case that first asked is not blamed for it.
+    inline HeadlessGL& sharedHeadlessGL()
+    {
+        static HeadlessGL* gl = []
+        {
+            HeadlessGL* made = new HeadlessGL(/*needs_vbos=*/true,
+                                              /*needs_imagegl=*/true,
+                                              /*needs_llrender=*/true,
+                                              /*needs_render=*/true);
+            ll_test::Teardown::add([made] { delete made; });
+            ll_test::StateGuard::accept();
+            return made;
+        }();
+        return *gl;
+    }
+
+    // A test's hold on the shared context. It takes sharedHeadlessGL() as it
+    // is made and reads what a test may change of the context, then puts that
+    // back as it goes, whether the test changed it through gGL's and the
+    // shader's caches or behind them, so the next test finds the context as
+    // the fixture left it. The first member of a test's fixture, so that it
+    // goes after the fixture's own GL objects. A test that leaves a matrix
+    // pushed (only one that failed between a push and its pop) leaves the
+    // stack deeper; the matrices themselves are put back regardless.
+    class SharedGLScope
+    {
+    public:
+        SharedGLScope()
+        : mGL(sharedHeadlessGL())
+        {
+            mShader = LLGLSLShader::sCurBoundShaderPtr;
+            glGetIntegerv(GL_CURRENT_PROGRAM, &mProgram);
+            glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &mVertexArray);
+            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &mDrawFramebuffer);
+            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &mReadFramebuffer);
+            glGetIntegerv(GL_VIEWPORT, mViewport);
+            glGetIntegerv(GL_SCISSOR_BOX, mScissor);
+            mScissorTest = glIsEnabled(GL_SCISSOR_TEST);
+            mDepthTest = glIsEnabled(GL_DEPTH_TEST);
+            glGetIntegerv(GL_DEPTH_FUNC, &mDepthFunc);
+            glGetBooleanv(GL_DEPTH_WRITEMASK, &mDepthMask);
+            glGetDoublev(GL_DEPTH_CLEAR_VALUE, &mClearDepth);
+            if (gGLManager.mHasClipControl)
+            {
+                glGetIntegerv(GL_CLIP_ORIGIN, &mClipOrigin);
+                glGetIntegerv(GL_CLIP_DEPTH_MODE, &mClipDepthMode);
+            }
+            mClearColor = gGL.getClearColor();
+            mReverseZ = LLRender::sReverseZ;
+            mCompute = LLRender::sCompute;
+            mMatrixMode = gGL.getMatrixMode();
+            mModelview = gGL.getModelviewMatrix();
+            mProjection = gGL.getProjectionMatrix();
+        }
+
+        ~SharedGLScope()
+        {
+            // The shader through its own cache, then the program behind it.
+            if (LLGLSLShader::sCurBoundShaderPtr != mShader)
+            {
+                if (mShader)
+                {
+                    mShader->bind();
+                }
+                else
+                {
+                    LLGLSLShader::unbind();
+                }
+            }
+            glUseProgram(mProgram);
+            // LLRender's own vertex array, and LLVertexBuffer's buffers
+            // through it, so that its next draw binds and points them again.
+            glBindVertexArray(mVertexArray);
+            LLVertexBuffer::unbind();
+
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mDrawFramebuffer);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, mReadFramebuffer);
+            glViewport(mViewport[0], mViewport[1], mViewport[2], mViewport[3]);
+
+            S32 scissor[4];
+            gGL.getScissor(scissor);
+            if (scissor[2] >= 0)
+            {
+                gGL.setScissor(mScissor[0], mScissor[1], mScissor[2], mScissor[3]);
+            }
+            glScissor(mScissor[0], mScissor[1], mScissor[2], mScissor[3]);
+            setEnabled(GL_SCISSOR_TEST, mScissorTest);
+
+            setEnabled(GL_DEPTH_TEST, mDepthTest);
+            glDepthFunc(mDepthFunc);
+            glDepthMask(mDepthMask);
+            glClearDepth(mClearDepth);
+            if (gGLManager.mHasClipControl)
+            {
+                glClipControl(mClipOrigin, mClipDepthMode);
+            }
+            LLRender::sReverseZ = mReverseZ;
+            // The compute cases turn compute on where the context has it.
+            LLRender::sCompute = mCompute;
+
+            gGL.setClearColor(mClearColor);
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
+            gGL.loadIdentity();
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.loadMatrix(mProjection);
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+            gGL.loadMatrix(mModelview);
+            gGL.matrixMode(mMatrixMode);
+            // The texture slots, colour mask and the rest gGL keeps, issued
+            // again from its cache over whatever was bound behind it.
+            gGL.refreshState();
+        }
+
+        HeadlessGL& gl() const { return mGL; }
+
+        SharedGLScope(const SharedGLScope&)            = delete;
+        SharedGLScope& operator=(const SharedGLScope&) = delete;
+
+    private:
+        static void setEnabled(GLenum cap, GLboolean enabled)
+        {
+            if (enabled)
+            {
+                glEnable(cap);
+            }
+            else
+            {
+                glDisable(cap);
+            }
+        }
+
+        HeadlessGL& mGL;
+        LLGLSLShader* mShader = nullptr;
+        GLint mProgram = 0;
+        GLint mVertexArray = 0;
+        GLint mDrawFramebuffer = 0;
+        GLint mReadFramebuffer = 0;
+        GLint mViewport[4] = { 0, 0, 0, 0 };
+        GLint mScissor[4] = { 0, 0, 0, 0 };
+        GLboolean mScissorTest = GL_FALSE;
+        GLboolean mDepthTest = GL_FALSE;
+        GLint mDepthFunc = GL_LESS;
+        GLboolean mDepthMask = GL_TRUE;
+        GLdouble mClearDepth = 1.0;
+        GLint mClipOrigin = GL_LOWER_LEFT;
+        GLint mClipDepthMode = GL_NEGATIVE_ONE_TO_ONE;
+        LLColor4 mClearColor;
+        bool mReverseZ = false;
+        bool mCompute = false;
+        LLRender::eMatrixMode mMatrixMode = LLRender::MM_MODELVIEW;
+        LLMatrix4a mModelview;
+        LLMatrix4a mProjection;
+    };
+}
+
+#endif // LL_LLHEADLESSGL_FIXTURE_H

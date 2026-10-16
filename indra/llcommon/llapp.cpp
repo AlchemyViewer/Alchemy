@@ -37,8 +37,7 @@
 #endif
 
 #include "llcommon.h"
-#include "llapr.h"
-#include "llerrorcontrol.h"
+
 #include "llframetimer.h"
 #include "lllivefile.h"
 #include "llmemory.h"
@@ -57,14 +56,6 @@
 # include <unistd.h> // for fork()
 void setup_signals();
 void default_unix_signal_handler(int signum, siginfo_t *info, void *);
-
-#if LL_LINUX
-#else
-// Called by breakpad exception handler after the minidump has been generated.
-bool unix_post_minidump_callback(const char *dump_dir,
-                      const char *minidump_id,
-                      void *context, bool succeeded);
-#endif
 
 # if LL_DARWIN
 /* OSX doesn't support SIGRT* */
@@ -93,6 +84,7 @@ bool LLApp::sDisableCrashlogger = false;
 LLScalarCond<LLApp::EAppStatus> LLApp::sStatus{LLApp::APP_STATUS_STOPPED};
 LLAppErrorHandler LLApp::sErrorHandler = NULL;
 
+bool gDisconnected = false;
 
 LLApp::LLApp()
 {
@@ -135,6 +127,12 @@ LLApp::~LLApp()
     setStopped();
 
     SUBSYSTEM_CLEANUP_DBG(LLCommon);
+
+    // Gone, so instance() no longer finds it.
+    if (sApplication == this)
+    {
+        sApplication = NULL;
+    }
 }
 
 // static
@@ -155,126 +153,6 @@ LLSD LLApp::getOption(const std::string& name) const
         if(rv.isDefined()) break;
     }
     return rv;
-}
-
-bool LLApp::parseCommandOptions(int argc, char** argv)
-{
-    LLSD commands;
-    std::string name;
-    std::string value;
-    for(int ii = 1; ii < argc; ++ii)
-    {
-        if(argv[ii][0] != '-')
-        {
-            LL_INFOS() << "Did not find option identifier while parsing token: "
-                << argv[ii] << LL_ENDL;
-            return false;
-        }
-        int offset = 1;
-        if(argv[ii][1] == '-') ++offset;
-        name.assign(&argv[ii][offset]);
-        if(((ii+1) >= argc) || (argv[ii+1][0] == '-'))
-        {
-            // we found another option after this one or we have
-            // reached the end. simply record that this option was
-            // found and continue.
-            int flag = name.compare("logfile");
-            if (0 == flag)
-            {
-                commands[name] = "log";
-            }
-            else
-            {
-                commands[name] = true;
-            }
-
-            continue;
-        }
-        ++ii;
-        value.assign(argv[ii]);
-
-#if LL_WINDOWS
-        //Windows changed command line parsing.  Deal with it.
-        size_t slen = value.length() - 1;
-        size_t start = 0;
-        size_t end = slen;
-        if (argv[ii][start]=='"')start++;
-        if (argv[ii][end]=='"')end--;
-        if (start!=0 || end!=slen)
-        {
-            value = value.substr (start,end);
-        }
-#endif
-
-        commands[name] = value;
-    }
-    setOptionData(PRIORITY_COMMAND_LINE, commands);
-    return true;
-}
-
-bool LLApp::parseCommandOptions(int argc, wchar_t** wargv)
-{
-    LLSD commands;
-    std::string name;
-    std::string value;
-    for(int ii = 1; ii < argc; ++ii)
-    {
-        if(wargv[ii][0] != '-')
-        {
-            LL_INFOS() << "Did not find option identifier while parsing token: "
-                << (intptr_t)wargv[ii] << LL_ENDL;
-            return false;
-        }
-        int offset = 1;
-        if(wargv[ii][1] == '-') ++offset;
-
-#if LL_WINDOWS
-    name.assign(ll_convert_wide_to_string(&wargv[ii][offset]));
-#else
-    name.assign(wstring_to_utf8str(&wargv[ii][offset]));
-#endif
-        if(((ii+1) >= argc) || (wargv[ii+1][0] == '-'))
-        {
-            // we found another option after this one or we have
-            // reached the end. simply record that this option was
-            // found and continue.
-            int flag = name.compare("logfile");
-            if (0 == flag)
-            {
-                commands[name] = "log";
-            }
-            else
-            {
-                commands[name] = true;
-            }
-
-            continue;
-        }
-        ++ii;
-
-#if LL_WINDOWS
-    value.assign(ll_convert_wide_to_string((wargv[ii])));
-#else
-    value.assign(wstring_to_utf8str((wargv[ii])));
-#endif
-
-#if LL_WINDOWS
-        //Windows changed command line parsing.  Deal with it.
-        size_t slen = value.length() - 1;
-        size_t start = 0;
-        size_t end = slen;
-        if (wargv[ii][start]=='"')start++;
-        if (wargv[ii][end]=='"')end--;
-        if (start!=0 || end!=slen)
-        {
-            value = value.substr (start,end);
-        }
-#endif
-
-        commands[name] = value;
-    }
-    setOptionData(PRIORITY_COMMAND_LINE, commands);
-    return true;
 }
 
 void LLApp::manageLiveFile(LLLiveFile* livefile)
@@ -323,7 +201,6 @@ void LLApp::setupErrorHandling(bool second_instance)
 
 #else  // ! LL_WINDOWS
 
-#if ! defined(LL_BUGSPLAT)
     //
     // Start up signal handling.
     //
@@ -331,7 +208,6 @@ void LLApp::setupErrorHandling(bool second_instance)
     // thread, asynchronous signals can be delivered to any thread (in theory)
     //
     setup_signals();
-#endif // ! LL_BUGSPLAT
 
 #endif // ! LL_WINDOWS
 }
@@ -503,6 +379,11 @@ void LLApp::sendOutOfDiskSpaceNotification()
 }
 
 #ifndef LL_WINDOWS
+// With a crash reporter in the process, the crash signals are its own:
+// crashpad on Linux and SentryCrash on macOS install their handlers after
+// this runs, and a handler of ours underneath would have nothing to add once
+// the reporter re-raises. The signals the app answers itself, for a graceful
+// quit or to ignore, stay with it either way.
 void setup_signals()
 {
     //
@@ -513,14 +394,11 @@ void setup_signals()
     sigemptyset( &act.sa_mask );
     act.sa_flags = SA_SIGINFO;
 
+#if ! AL_SENTRY
     // Synchronous signals
-#   ifndef LL_BUGSPLAT
     sigaction(SIGABRT, &act, NULL);
-#   endif
-    sigaction(SIGALRM, &act, NULL);
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGFPE, &act, NULL);
-    sigaction(SIGHUP, &act, NULL);
     sigaction(SIGILL, &act, NULL);
     sigaction(SIGPIPE, &act, NULL);
     sigaction(SIGSEGV, &act, NULL);
@@ -528,6 +406,20 @@ void setup_signals()
 
     sigaction(LL_HEARTBEAT_SIGNAL, &act, NULL);
     sigaction(LL_SMACKDOWN_SIGNAL, &act, NULL);
+
+    // Asynchronous signals that result in core
+    sigaction(SIGQUIT, &act, NULL);
+#else // AL_SENTRY
+    // SentryCrash counts a broken pipe as a crash, and leaves an ignored
+    // signal alone.
+    struct sigaction ignore;
+    ignore.sa_handler = SIG_IGN;
+    sigemptyset( &ignore.sa_mask );
+    ignore.sa_flags = 0;
+    sigaction(SIGPIPE, &ignore, NULL);
+#endif // AL_SENTRY
+
+    sigaction(SIGALRM, &act, NULL);
 
     // Asynchronous signals that are normally ignored
 #ifndef LL_IGNORE_SIGCHLD
@@ -539,10 +431,6 @@ void setup_signals()
     sigaction(SIGHUP, &act, NULL);
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT, &act, NULL);
-
-    // Asynchronous signals that result in core
-    sigaction(SIGQUIT, &act, NULL);
-
 }
 
 void clear_signals()
@@ -552,14 +440,11 @@ void clear_signals()
     sigemptyset( &act.sa_mask );
     act.sa_flags = SA_SIGINFO;
 
+#if ! AL_SENTRY
     // Synchronous signals
-#   ifndef LL_BUGSPLAT
     sigaction(SIGABRT, &act, NULL);
-#   endif
-    sigaction(SIGALRM, &act, NULL);
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGFPE, &act, NULL);
-    sigaction(SIGHUP, &act, NULL);
     sigaction(SIGILL, &act, NULL);
     sigaction(SIGPIPE, &act, NULL);
     sigaction(SIGSEGV, &act, NULL);
@@ -568,29 +453,40 @@ void clear_signals()
     sigaction(LL_HEARTBEAT_SIGNAL, &act, NULL);
     sigaction(LL_SMACKDOWN_SIGNAL, &act, NULL);
 
+    // Asynchronous signals that result in core
+    sigaction(SIGQUIT, &act, NULL);
+#endif // ! AL_SENTRY
+
+    sigaction(SIGALRM, &act, NULL);
+
     // Asynchronous signals that are normally ignored
 #ifndef LL_IGNORE_SIGCHLD
     sigaction(SIGCHLD, &act, NULL);
 #endif // LL_IGNORE_SIGCHLD
+    sigaction(SIGUSR2, &act, NULL);
 
     // Asynchronous signals that result in attempted graceful exit
     sigaction(SIGHUP, &act, NULL);
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT, &act, NULL);
-
-    // Asynchronous signals that result in core
-    sigaction(SIGUSR2, &act, NULL);
-    sigaction(SIGQUIT, &act, NULL);
 }
 
-
+const char* signal_to_string(int sig) {
+    switch (sig) {
+        case SIGINT:  return "SIGINT";
+        case SIGILL:  return "SIGILL";
+        case SIGFPE:  return "SIGFPE";
+        case SIGSEGV: return "SIGSEGV";
+        case SIGTERM: return "SIGTERM";
+        case SIGABRT: return "SIGABRT";
+        default:      return "UNKNOWN_SIGNAL";
+    }
+}
 
 void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 {
     // Unix implementation of synchronous signal handler
     // This runs in the thread that threw the signal.
-    // We do the somewhat sketchy operation of blocking in here until the error handler
-    // has gracefully stopped the app.
 
     // FIXME(brad) - we are using this handler for asynchronous signals as well, so sLogInSignal is currently
     // disabled for safety.  we need to find a way to selectively reenable it when it is safe.
@@ -598,7 +494,7 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 
     if (LLApp::sLogInSignal)
     {
-        LL_INFOS() << "Signal handler - Got signal " << signum << " - " << apr_signal_description_get(signum) << LL_ENDL;
+        LL_INFOS() << "Signal handler - Got signal " << signum << " (" << signal_to_string(signum) << ")" << LL_ENDL;
     }
 
 
@@ -613,7 +509,8 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 
         return;
     case SIGABRT:
-        // Note that this handler is not set for SIGABRT when using Bugsplat
+        // With a crash reporter in the process this handler is not installed
+        // for SIGABRT, or any other crash signal; see setup_signals().
         // Abort just results in termination of the app, no funky error handling.
         if (LLApp::sLogInSignal)
         {
@@ -659,11 +556,6 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
                 {
                     LL_WARNS() << "Signal handler - Handling smackdown signal!" << LL_ENDL;
                 }
-                else
-                {
-                    // Don't log anything, even errors - this is because this signal could happen anywhere.
-                    LLError::setDefaultLevel(LLError::LEVEL_NONE);
-                }
 
                 // Change the signal that we reraise to SIGABRT, so we generate a core dump.
                 signum = SIGABRT;
@@ -671,43 +563,21 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 
             if (LLApp::sLogInSignal)
             {
-                LL_WARNS() << "Signal handler - Handling fatal signal!" << LL_ENDL;
+                LL_WARNS() << "Signal handler - Fatal signal, passing it back to the operating system" << LL_ENDL;
             }
 
-            if (LLApp::isError())
-            {
-                // Received second fatal signal while handling first, just die right now
-                // Set the signal handlers back to default before handling the signal - this makes the next signal wipe out the app.
-                clear_signals();
-
-                if (LLApp::sLogInSignal)
-                {
-                    LL_WARNS() << "Signal handler - Got another fatal signal while in the error handler, die now!" << LL_ENDL;
-                }
-                raise(signum);
-                return;
-            }
-
-            if (LLApp::sLogInSignal)
-            {
-                LL_WARNS() << "Signal handler - Flagging error status and waiting for shutdown" << LL_ENDL;
-            }
-
-            if (LLApp::isCrashloggerDisabled()) // Don't gracefully handle any signal, crash and core for a gdb post mortem
-            {
-                clear_signals();
-                LL_WARNS() << "Fatal signal received, not handling the crash here, passing back to operating system" << LL_ENDL;
-                raise(signum);
-                return;
-            }
-
-            // Flag status to ERROR
-            LLApp::setError();
-
-            if (LLApp::sLogInSignal)
-            {
-                LL_WARNS() << "Signal handler - App is stopped, reraising signal" << LL_ENDL;
-            }
+            // A fatal signal is never handled here, on any thread. LLApp::setError()
+            // posts the status change, and its listeners close work queues and join
+            // thread pools -- none of it safe inside a signal handler, least of all
+            // after a fault, when the heap may already be damaged. Each worker that
+            // exits frees its malloc cache on the way out and aborts on that damage,
+            // so the core records a worker's abort instead of the fault that started
+            // it; and a fault on a thread the shutdown waits for, such as a
+            // libdispatch worker inside the macOS GL driver, deadlocks outright.
+            // LLApp::isError() is no safer, since it locks a fiber mutex.
+            //
+            // Restoring the default handlers before re-raising also covers a second
+            // fatal signal: it takes the process down by default.
             clear_signals();
             raise(signum);
             return;
@@ -720,47 +590,4 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
     }
 }
 
-bool unix_post_minidump_callback(const char *dump_dir,
-                      const char *minidump_id,
-                      void *context, bool succeeded)
-{
-    // Copy minidump file path into fixed buffer in the app instance to avoid
-    // heap allocations in a crash handler.
-
-    // path format: <dump_dir>/<minidump_id>.dmp
-    auto dirPathLength = strlen(dump_dir);
-    auto idLength = strlen(minidump_id);
-
-    // The path must not be truncated.
-    llassert((dirPathLength + idLength + 5) <= LLApp::MAX_MINDUMP_PATH_LENGTH);
-
-    char * path = LLApp::instance()->getMiniDumpFilename();
-    auto remaining = LLApp::MAX_MINDUMP_PATH_LENGTH;
-    strncpy(path, dump_dir, remaining);
-    remaining -= dirPathLength;
-    path += dirPathLength;
-    if (remaining > 0 && dirPathLength > 0 && path[-1] != '/')
-    {
-        *path++ = '/';
-        --remaining;
-    }
-    if (remaining > 0)
-    {
-        strncpy(path, minidump_id, remaining);
-        remaining -= idLength;
-        path += idLength;
-        strncpy(path, ".dmp", remaining);
-    }
-
-    LL_INFOS("CRASHREPORT") << "generated minidump: " << LLApp::instance()->getMiniDumpFilename() << LL_ENDL;
-    LLApp::runErrorHandler();
-
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-    clear_signals();
-    return false;
-#else
-    return true;
-#endif
-}
 #endif // !WINDOWS
-

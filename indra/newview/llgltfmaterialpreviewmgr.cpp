@@ -5,6 +5,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2023, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -185,7 +188,7 @@ namespace
 };  // namespace
 
 LLGLTFPreviewTexture::LLGLTFPreviewTexture(LLPointer<LLFetchedGLTFMaterial> material, S32 width)
-    : LLViewerDynamicTexture(width, width, 4, EOrder::ORDER_MIDDLE, false)
+    : LLViewerDynamicTexture(width, width, 4, EOrder::ORDER_MIDDLE)
     , mGLTFMaterial(material)
 {
 }
@@ -226,7 +229,7 @@ namespace {
 
 struct GLTFPreviewModel
 {
-    GLTFPreviewModel(LLPointer<LLDrawInfo>& info, const LLMatrix4& mat)
+    GLTFPreviewModel(LLPointer<LLDrawInfo>& info, const LLMatrix4a& mat)
     : mDrawInfo(info)
     , mModelMatrix(mat)
     {
@@ -240,14 +243,14 @@ struct GLTFPreviewModel
         gGLLastMatrix = nullptr;
     }
     LLPointer<LLDrawInfo> mDrawInfo;
-    LLMatrix4 mModelMatrix; // Referenced by mDrawInfo
+    LLMatrix4a mModelMatrix; // Referenced by mDrawInfo
 };
 
 using PreviewSpherePart = std::unique_ptr<GLTFPreviewModel>;
 using PreviewSphere = std::vector<PreviewSpherePart>;
 
 // Like LLVolumeGeometryManager::registerFace but without batching or too-many-indices/vertices checking.
-PreviewSphere create_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, const LLMatrix4& model_matrix)
+PreviewSphere create_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, const LLMatrix4a& model_matrix)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
@@ -365,7 +368,7 @@ void set_preview_sphere_material(PreviewSphere& preview_sphere, LLPointer<LLFetc
     }
 }
 
-PreviewSphere& get_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, const LLMatrix4& model_matrix)
+PreviewSphere& get_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, const LLMatrix4a& model_matrix)
 {
     static PreviewSphere preview_sphere;
     if (preview_sphere.empty())
@@ -393,7 +396,7 @@ void fixup_shader_constants(LLGLSLShader& shader)
         const S32 channel = shader.getTextureChannel(LLShaderMgr::DEFERRED_SHADOW0+i);
         if (channel != -1)
         {
-            gGL.getTexUnit(channel)->bind(LLViewerFetchedTexture::sWhiteImagep, true);
+            gGL.getTextureSlot(channel)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap, true);
         }
     }
 }
@@ -425,10 +428,15 @@ bool LLGLTFPreviewTexture::render()
 
     if (!mShouldRender) { return false; }
 
-    glClearColor(0, 0, 0, 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // The swatch's alpha is its coverage, drawn over a checkerboard. Without this the
+    // preview takes whatever mask the last frame ended on, and after a HUD pass that leaves
+    // alpha unwritten from the clears through the final blit.
+    LLGLSColorMask color_mask(true, true);
 
-    LLGLDepthTest(GL_FALSE);
+    gGL.setClearColor(LLColor4::transparent);
+    gGL.clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    LLGLDepthTest depth(GL_FALSE);
     LLGLDisable stencil(GL_STENCIL_TEST);
     LLGLDisable scissor(GL_SCISSOR_TEST);
     SetTemporarily<bool> no_dof(&LLPipeline::RenderDepthOfField, false);
@@ -445,6 +453,9 @@ bool LLGLTFPreviewTexture::render()
 
     gPipeline.mReflectionMapManager.forceDefaultProbeAndUpdateUniforms();
 
+    // setPerspective makes the preview camera current; the UI draw this
+    // returns into wants the one it was using
+    const LLCamera saved_camera = LLViewerCamera::getCurrent();
     LLViewerCamera camera;
 
     // Calculate the object distance at which the object of a given radius will
@@ -456,25 +467,26 @@ bool LLGLTFPreviewTexture::render()
     // Negative coordinate shows the textures on the sphere right-side up, when
     // combined with the UV hacks in create_preview_sphere
     const LLVector3 object_position(0.0, -object_distance, 0.0);
-    LLMatrix4 object_transform;
-    object_transform.translate(object_position);
+    LLMatrix4a object_transform;
+    object_transform.setIdentity();
+    object_transform.setTranslation(object_position);
 
     // Set up camera and viewport
     const LLVector3 origin(0.0, 0.0, 0.0);
     camera.lookAt(origin, object_position);
-    camera.setAspect((F32)(mFullHeight / mFullWidth));
+    camera.setAspect((F32)(mFullWidth / mFullHeight));
     const LLRect texture_rect(0, mFullHeight, mFullWidth, 0);
-    camera.setPerspective(NOT_FOR_SELECTION, texture_rect.mLeft, texture_rect.mBottom, texture_rect.getWidth(), texture_rect.getHeight(), false, camera.getNear(), MAX_FAR_CLIP*2.f);
+    camera.setPerspective(NOT_FOR_SELECTION, texture_rect.mLeft, texture_rect.mBottom, texture_rect.getWidth(), texture_rect.getHeight(), false, camera.getNear(), FINITE_PROJECTION_FAR);
 
     // Generate sphere object on-the-fly. Discard afterwards. (Vertex buffer is
     // discarded, but the sphere should be cached in LLVolumeMgr.)
     PreviewSphere& preview_sphere = get_preview_sphere(mGLTFMaterial, object_transform);
 
     gPipeline.setupHWLights();
-    glm::mat4 mat = get_current_modelview();
-    glm::vec4 transformed_light_dir(light_dir);
-    transformed_light_dir = mat * transformed_light_dir;
-    SetTemporarily<LLVector4> force_sun_direction_high_graphics(&gPipeline.mTransformedSunDir, LLVector4(transformed_light_dir));
+    LLVector4a light_dir_in, transformed_light_dir;
+    light_dir_in.loadua(light_dir.mV);
+    LLViewerCamera::getCurrent().getModelview().transform4(light_dir_in, transformed_light_dir);
+    SetTemporarily<LLVector4> force_sun_direction_high_graphics(&gPipeline.mTransformedSunDir, LLVector4(transformed_light_dir.getF32ptr()));
     // Override lights to ensure the sun is always shining from a certain direction (low graphics)
     // See also force_sun_direction_high_graphics and fixup_shader_constants
     {
@@ -500,16 +512,20 @@ bool LLGLTFPreviewTexture::render()
         // Alpha blend rendering
 
         screen.bindTarget();
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Colour only: the sphere draws with the depth test off, and depth writes are off
+        // with it, so a depth clear here would do nothing.
+        gGL.clear(GL_COLOR_BUFFER_BIT);
 
-        LLGLSLShader& shader = gDeferredPBRAlphaProgram;
+        LLGLSLShader& shader = *gDeferredPBRAlphaProgram.selectVariant();
 
         gPipeline.bindDeferredShader(shader);
         fixup_shader_constants(shader);
 
+        LLFetchedGLTFMaterial* lastMat = nullptr;
+        LLViewerTexture* lastTex = nullptr;
         for (PreviewSpherePart& part : preview_sphere)
         {
-            LLRenderPass::pushGLTFBatch(*part->mDrawInfo);
+            LLRenderPass::pushGLTFBatch(*part->mDrawInfo, lastMat, lastTex);
         }
 
         gPipeline.unbindDeferredShader(shader);
@@ -520,26 +536,40 @@ bool LLGLTFPreviewTexture::render()
     // *HACK: Hide mExposureMap from generateExposure
     gPipeline.mExposureMap.swapFBORefs(gPipeline.mLastExposure);
 
-    gPipeline.copyScreenSpaceReflections(&screen, &gPipeline.mSceneMap);
-    gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);
-    gPipeline.generateExposure(&gPipeline.mLuminanceMap, &gPipeline.mExposureMap, /*use_history = */ false);
-    gPipeline.gammaCorrect(&screen, &gPipeline.mPostPingMap);
+    static LLCachedControl<bool> hdr(gSavedSettings, "RenderHDREnabled", false);
+    if (hdr)
+    {
+        gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);
+        gPipeline.generateExposure(&gPipeline.mLuminanceMap, &gPipeline.mExposureMap, /*use_history = */ false);
+
+        // Bloom composite is folded into colorCorrect's tonemap variants, so we
+        // only generate the pyramid here.
+        gPipeline.generateBloomHDR(&screen);
+    }
+
+    gPipeline.colorCorrect(&screen, &gPipeline.mRT->postPingMap, true, false);
     LLVertexBuffer::unbind();
-    gPipeline.generateGlow(&gPipeline.mPostPingMap);
-    gPipeline.combineGlow(&gPipeline.mPostPingMap, &screen);
-    gPipeline.renderDoF(&screen, &gPipeline.mPostPingMap);
-    gPipeline.applyFXAA(&gPipeline.mPostPingMap, &screen);
+
+    if (!hdr)
+    {
+        gPipeline.generateGlow(&gPipeline.mRT->postPingMap);
+        gPipeline.combineGlow(&gPipeline.mRT->postPingMap, &screen);
+    }
 
     // *HACK: Restore mExposureMap (it will be consumed by generateExposure next frame)
     gPipeline.mExposureMap.swapFBORefs(gPipeline.mLastExposure);
 
     // Final render
-
+    // Nested post-processing targets restore the full preview target's viewport.
+    glViewport(mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight);
     gDeferredPostNoDoFProgram.bind();
 
     // From LLPipeline::renderFinalize: "Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems."
-    gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &screen);
-    gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, mBoundTarget, true);
+    // Under HDR that is colorCorrect's output in postPingMap; otherwise the glow combine has
+    // written the result back to the screen.
+    LLRenderTarget* last_in_chain = hdr ? &gPipeline.mRT->postPingMap : &screen;
+    gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, last_in_chain);
+    gDeferredPostNoDoFProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &gPipeline.mAuxillaryRT.deferredScreen);
 
     {
         LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);
@@ -553,6 +583,7 @@ bool LLGLTFPreviewTexture::render()
     gPipeline.setupHWLights();
     gPipeline.mReflectionMapManager.forceDefaultProbeAndUpdateUniforms(false);
     gSavedSettings.set<S32>("RenderLocalLightCount", old_local_light_count);
+    LLViewerCamera::setCurrent(saved_camera);
 
     return true;
 }

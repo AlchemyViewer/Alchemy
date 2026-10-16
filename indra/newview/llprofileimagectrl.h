@@ -30,16 +30,17 @@
 #include "lliconctrl.h"
 #include "llviewertexture.h"
 
-class LLProfileImageCtrl: public LLIconCtrl
+class LLProfileImageCtrl final: public LLIconCtrl
 {
 public:
+    AL_VIEW_TYPE(LLProfileImageCtrl, LLIconCtrl);
+
     struct Params: public LLInitParam::Block<Params, LLIconCtrl::Params>
     {
     };
 
     LLProfileImageCtrl(const Params& p);
     virtual ~LLProfileImageCtrl();
-
 
     virtual void setValue(const LLSD& value) override;
     LLUUID getImageAssetId() { return mImageID; }
@@ -48,6 +49,7 @@ public:
 
     typedef boost::signals2::signal<void(bool success, LLViewerFetchedTexture* imagep)> image_loaded_signal_t;
     boost::signals2::connection setImageLoadedCallback(const image_loaded_signal_t::slot_type& cb);
+
 private:
     void onImageLoaded(bool success, LLViewerFetchedTexture* src_vi);
     static void onImageLoaded(bool success,
@@ -60,6 +62,7 @@ private:
     void releaseTexture();
 
     void setImageAssetId(const LLUUID& asset_id);
+
 private:
     LLPointer<LLViewerFetchedTexture> mImage;
     LLUUID mImageID;

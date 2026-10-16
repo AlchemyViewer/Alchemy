@@ -36,13 +36,12 @@
 #include "lltoolmgr.h"
 #include "llselectmgr.h"
 #include "llviewermenu.h"
-#include "llviewerwindow.h"
 #include "llwindow.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llfocusmgr.h"
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
 // Require DirectInput version 8
 #define DIRECTINPUT_VERSION 0x0800
 
@@ -110,7 +109,7 @@ std::ostream& operator<<(std::ostream& out, NDOF_Device* ptr)
 #endif // LIB_NDOF
 
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
 // this should reflect ndof and set axises, see ndofdev_win.cpp from ndof package
 BOOL CALLBACK EnumObjectsCallback(const DIDEVICEOBJECTINSTANCE* inst, VOID* user_data)
 {
@@ -329,7 +328,9 @@ LLViewerJoystick::LLViewerJoystick()
     memset(mBtn, 0, sizeof(mBtn));
 
     // factor in bandwidth? bandwidth = gViewerStats->mKBitStat
-    mPerfScale = 4000.f / (F32)gSysCPU.getMHz(); // hmm.  why?
+    // An unknown clock (0) leaves the scale alone rather than infinite.
+    const F64 cpu_mhz = gSysCPU.getMHz();
+    mPerfScale = cpu_mhz > 0.0 ? 4000.f / (F32)cpu_mhz : 1.f; // hmm.  why?
 
     mLastDeviceUUID = LLSD::Integer(1);
 }
@@ -379,7 +380,7 @@ void LLViewerJoystick::init(bool autoenable)
             void* win_callback = nullptr;
             std::function<bool(std::string&, LLSD&, void*)> osx_callback;
             // di8_devices_callback callback is immediate and happens in scope of getInputDevices()
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
             // space navigator is marked as DI8DEVCLASS_GAMECTRL in ndof lib
             device_type = DI8DEVCLASS_GAMECTRL;
             win_callback = &di8_devices_callback;
@@ -476,7 +477,7 @@ void LLViewerJoystick::initDevice(LLSD &guid)
     std::function<bool(std::string&, LLSD&, void*)> osx_callback;
     mDriverState = JDS_INITIALIZING;
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     // space navigator is marked as DI8DEVCLASS_GAMECTRL in ndof lib
     device_type = DI8DEVCLASS_GAMECTRL;
     win_callback = &di8_devices_callback;
@@ -1167,7 +1168,7 @@ void LLViewerJoystick::moveAvatar(bool reset)
 void LLViewerJoystick::moveFlycam(bool reset)
 {
     static LLQuaternion         sFlycamRotation;
-    static LLVector3            sFlycamPosition;
+    static LLVector3d           sFlycamPosition;
     static F32                  sFlycamZoom;
 
     if (!gFocusMgr.getAppHasFocus() || mDriverState != JDS_INITIALIZED
@@ -1190,7 +1191,7 @@ void LLViewerJoystick::moveFlycam(bool reset)
     bool in_build_mode = LLToolMgr::getInstance()->inBuildMode();
     if (reset || mResetFlag)
     {
-        sFlycamPosition = LLViewerCamera::getInstance()->getOrigin();
+        sFlycamPosition = gAgentCamera.getCameraPositionGlobal();
         sFlycamRotation = LLViewerCamera::getInstance()->getQuaternion();
         sFlycamZoom = LLViewerCamera::getInstance()->getView();
 
@@ -1293,7 +1294,7 @@ void LLViewerJoystick::moveFlycam(bool reset)
         }
     }
 
-    sFlycamPosition += LLVector3(sDelta) * sFlycamRotation;
+    sFlycamPosition += LLVector3d(sDelta[VX], sDelta[VY], sDelta[VZ]) * sFlycamRotation;
 
     LLMatrix3 rot_mat(sDelta[3], sDelta[4], sDelta[5]);
     sFlycamRotation = LLQuaternion(rot_mat)*sFlycamRotation;
@@ -1328,7 +1329,8 @@ void LLViewerJoystick::moveFlycam(bool reset)
     LLMatrix3 mat(sFlycamRotation);
 
     LLViewerCamera::getInstance()->setView(sFlycamZoom);
-    LLViewerCamera::getInstance()->setOrigin(sFlycamPosition);
+    LLVector3 new_camera_pos = gAgent.getPosAgentFromGlobal(sFlycamPosition);
+    LLViewerCamera::getInstance()->setOrigin(new_camera_pos);
     LLViewerCamera::getInstance()->mXAxis = LLVector3(mat.mMatrix[0]);
     LLViewerCamera::getInstance()->mYAxis = LLVector3(mat.mMatrix[1]);
     LLViewerCamera::getInstance()->mZAxis = LLVector3(mat.mMatrix[2]);
@@ -1417,7 +1419,7 @@ void LLViewerJoystick::scanJoystick()
 // -----------------------------------------------------------------------------
 bool LLViewerJoystick::isDeviceUUIDSet()
 {
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     // for ease of comparison and to dial less with platform specific variables, we store id as LLSD binary
     return mLastDeviceUUID.isBinary();
 #elif LL_DARWIN
@@ -1434,7 +1436,7 @@ LLSD LLViewerJoystick::getDeviceUUID()
 
 std::string LLViewerJoystick::getDeviceUUIDString()
 {
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     // Might be simpler to just convert _GUID into string everywhere, store and compare as string
     if (mLastDeviceUUID.isBinary())
     {
@@ -1466,7 +1468,7 @@ std::string LLViewerJoystick::getDeviceUUIDString()
 
 void LLViewerJoystick::saveDeviceIdToSettings()
 {
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     // can't save as binary directly,
     // someone editing the xml will corrupt it
     // so convert to string first
@@ -1481,7 +1483,7 @@ void LLViewerJoystick::saveDeviceIdToSettings()
 void LLViewerJoystick::loadDeviceIdFromSettings()
 {
     LLSD dev_id = gSavedSettings.getLLSD("JoystickDeviceUUID");
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     // We can't save binary data to gSavedSettings, somebody editing the file will corrupt it,
     // so _GUID data gets converted to string (we probably can convert it to LLUUID with memcpy)
     // and here we need to convert it back to binary from string

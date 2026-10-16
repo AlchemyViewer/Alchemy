@@ -23,7 +23,6 @@
 		</layout_panel>
 		<layout_panel name="external_controls">
 			<button label="Web Tarayıcımda Aç" name="open_browser"/>
-			<check_box label="Her zaman web tarayıcımda aç" name="open_always"/>
 			<button label="Kapat" name="close"/>
 		</layout_panel>
 	</layout_stack>

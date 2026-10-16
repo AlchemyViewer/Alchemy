@@ -96,33 +96,32 @@ bool LLKeyframeWalkMotion::onActivate()
 //-----------------------------------------------------------------------------
 void LLKeyframeWalkMotion::onDeactivate()
 {
-    mCharacter->removeAnimationData("Down Foot");
     LLKeyframeMotion::onDeactivate();
 }
 
 //-----------------------------------------------------------------------------
 // LLKeyframeWalkMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLKeyframeWalkMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLKeyframeWalkMotion::onUpdate(F64 time, U8* joint_mask)
 {
-    LL_PROFILE_ZONE_SCOPED;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // compute time since last update
-    F32 deltaTime = time - mRealTimeLast;
+    F64 deltaTime = time - mRealTimeLast;
 
-    void* speed_ptr = mCharacter->getAnimationData("Walk Speed");
+    void* speed_ptr = mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED);
     F32 speed = (speed_ptr) ? *((F32 *)speed_ptr) : 1.f;
 
     // adjust the passage of time accordingly
-    F32 adjusted_time = mAdjTimeLast + (deltaTime * speed);
+    F64 adjusted_time = mAdjTimeLast + (deltaTime * speed);
 
     // save time for next update
     mRealTimeLast = time;
     mAdjTimeLast = adjusted_time;
 
     // handle wrap around
-    if (adjusted_time < 0.0f)
+    if (adjusted_time < 0.0)
     {
-        adjusted_time = getDuration() + fmod(adjusted_time, getDuration());
+        adjusted_time = getDuration() + fmod(adjusted_time, (F64)getDuration());
     }
 
     // let the base class update the cycle
@@ -176,9 +175,25 @@ LLMotion::LLMotionInitStatus LLWalkAdjustMotion::onInitialize(LLCharacter *chara
 //-----------------------------------------------------------------------------
 bool LLWalkAdjustMotion::onActivate()
 {
-    mAnimSpeed = 0.f;
-    mAdjustedSpeed = 0.f;
+    // One is this servo's idea of no adjustment at all: the animation plays at
+    // the rate it was authored for, which is what the standing case below damps
+    // back towards. Nought is not a neutral starting guess, it is "do not play
+    // the animation", and the rate at which it is allowed to climb out of that
+    // is half a second of a walk that barely moves.
+    //
+    // Which would only cost the first half second of a walk, except that this
+    // servo is stopped and started again for reasons that have nothing to do
+    // with walking -- the avatar being taken for airborne is one, and standing
+    // on a prim above the ground is enough for that. Started again mid-stride,
+    // it dropped the walk back to a crawl every time.
+    mAnimSpeed = 1.f;
+    mAdjustedSpeed = 1.f;
     mRelativeDir = 1.f;
+    // The time handed to onUpdate starts again from this activation, so the
+    // clock it is measured against has to as well, or the first frame's
+    // interval comes out negative and is clamped to a thousandth of a second
+    // -- which is then divided into a foot's travel.
+    mLastTime = 0.f;
     mPelvisState->setPosition(LLVector3::zero);
     // store ankle positions for next frame
     mLastLeftFootGlobalPos = mCharacter->getPosGlobalFromAgent(mLeftAnkleJoint->getWorldPosition());
@@ -195,13 +210,39 @@ bool LLWalkAdjustMotion::onActivate()
 }
 
 //-----------------------------------------------------------------------------
+// LLWalkAdjustMotion::speedMultiplier()
+//-----------------------------------------------------------------------------
+// static
+F32 LLWalkAdjustMotion::speedMultiplier(F32 speed, F32 foot_speed, F32 min_multiplier, F32 max_multiplier)
+{
+    // How much faster the animation has to play for the planted foot to keep
+    // up with the ground. A foot going forward as fast as the avatar makes
+    // that ratio infinite, and one going forward faster makes it negative --
+    // and a negative ratio taken through a clamp comes out as the *smallest*
+    // multiplier there is, which slows the animation, which makes the foot
+    // slip further forward, which keeps the ratio negative. Once in, it stays
+    // in, and the avatar slides with its legs still.
+    //
+    // Running never gets there: the ratio it asks for is far above the
+    // ceiling, so it sits pinned at the top. Walking asks for about one, and
+    // one is where a foot's travel measured over a single frame changes sign
+    // at every footfall.
+    if (!(foot_speed > 0.f))
+    {
+        return max_multiplier;
+    }
+
+    return llclamp(speed / foot_speed, min_multiplier, max_multiplier);
+}
+
+//-----------------------------------------------------------------------------
 // LLWalkAdjustMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLWalkAdjustMotion::onUpdate(F64 time, U8* joint_mask)
 {
-    LL_PROFILE_ZONE_SCOPED;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // delta_time is guaranteed to be non zero
-    F32 delta_time = llclamp(time - mLastTime, TIME_EPSILON, MAX_TIME_DELTA);
+    F32 delta_time = llclamp((F32)(time - mLastTime), TIME_EPSILON, MAX_TIME_DELTA);
     mLastTime = time;
 
     // find the avatar motion vector in the XY plane
@@ -216,23 +257,31 @@ bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
     LLQuaternion world_to_avatar_rot(avatar_to_world_rot);
     world_to_avatar_rot.conjugate();
 
+    // calculate world-space foot drift
+    // use global coordinates to seamlessly handle region crossings
+    //
+    // The feet are somewhere whether or not the avatar is moving, and the
+    // first frame of a walk has to measure one frame of drift. Kept only while
+    // already walking, this measured the whole of the stand instead -- however
+    // far the feet had been moved since the last step, by foot placement
+    // reaching for ground, by a turn, by being put somewhere else entirely.
+    // One frame of that is a foot travelling forward faster than any avatar,
+    // which is the reading the playback rate below cannot make sense of.
+    LLVector3d leftFootGlobalPosition = mCharacter->getPosGlobalFromAgent(mLeftAnkleJoint->getWorldPosition());
+    leftFootGlobalPosition.mdV[VZ] = 0.0;
+    LLVector3 leftFootDelta(leftFootGlobalPosition - mLastLeftFootGlobalPos);
+    mLastLeftFootGlobalPos = leftFootGlobalPosition;
+
+    LLVector3d rightFootGlobalPosition = mCharacter->getPosGlobalFromAgent(mRightAnkleJoint->getWorldPosition());
+    rightFootGlobalPosition.mdV[VZ] = 0.0;
+    LLVector3 rightFootDelta(rightFootGlobalPosition - mLastRightFootGlobalPos);
+    mLastRightFootGlobalPos = rightFootGlobalPosition;
+
     LLVector3 foot_slip_vector;
 
     // find foot drift along velocity vector
     if (speed > MIN_WALK_SPEED)
     {   // walking/running
-
-        // calculate world-space foot drift
-        // use global coordinates to seamlessly handle region crossings
-        LLVector3d leftFootGlobalPosition = mCharacter->getPosGlobalFromAgent(mLeftAnkleJoint->getWorldPosition());
-        leftFootGlobalPosition.mdV[VZ] = 0.0;
-        LLVector3 leftFootDelta(leftFootGlobalPosition - mLastLeftFootGlobalPos);
-        mLastLeftFootGlobalPos = leftFootGlobalPosition;
-
-        LLVector3d rightFootGlobalPosition = mCharacter->getPosGlobalFromAgent(mRightAnkleJoint->getWorldPosition());
-        rightFootGlobalPosition.mdV[VZ] = 0.0;
-        LLVector3 rightFootDelta(rightFootGlobalPosition - mLastRightFootGlobalPos);
-        mLastRightFootGlobalPos = rightFootGlobalPosition;
 
         // get foot drift along avatar direction of motion
         F32 left_foot_slip_amt = leftFootDelta * avatar_velocity;
@@ -283,7 +332,8 @@ bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
 
         // multiply animation playback rate so that foot speed matches avatar speed
         F32 min_speed_multiplier = clamp_rescale(speed, 0.f, 1.f, 0.f, 0.1f);
-        F32 desired_speed_multiplier = llclamp(speed / foot_speed, min_speed_multiplier, ANIM_SPEED_MAX);
+        F32 desired_speed_multiplier =
+            speedMultiplier(speed, foot_speed, min_speed_multiplier, ANIM_SPEED_MAX);
 
         // blend towards new speed adjustment value
         F32 new_speed_adjust = LLSmoothInterpolation::lerp(mAdjustedSpeed, desired_speed_multiplier, SPEED_ADJUST_TIME_CONSTANT);
@@ -303,13 +353,14 @@ bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
     else
     {   // standing/turning
 
-        // damp out speed adjustment to 0
+        // damp the speed adjustment back to one, which is the animation
+        // playing at the rate it was authored for
         mAnimSpeed = LLSmoothInterpolation::lerp(mAnimSpeed, 1.f, 0.2f);
         //mPelvisOffset = lerp(mPelvisOffset, LLVector3::zero, LLSmoothInterpolation::getInterpolant(0.2f));
     }
 
     // broadcast walk speed change
-    mCharacter->setAnimationData("Walk Speed", &mAnimSpeed);
+    mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED, &mAnimSpeed);
 
     // set position
     // need to update *some* joint to keep this animation active
@@ -323,7 +374,7 @@ bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
 //-----------------------------------------------------------------------------
 void LLWalkAdjustMotion::onDeactivate()
 {
-    mCharacter->removeAnimationData("Walk Speed");
+    mCharacter->removeAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED);
 }
 
 //-----------------------------------------------------------------------------
@@ -373,9 +424,9 @@ bool LLFlyAdjustMotion::onActivate()
 //-----------------------------------------------------------------------------
 // LLFlyAdjustMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLFlyAdjustMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLFlyAdjustMotion::onUpdate(F64 time, U8* joint_mask)
 {
-    LL_PROFILE_ZONE_SCOPED;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLVector3 ang_vel = mCharacter->getCharacterAngularVelocity() * mCharacter->getTimeDilation();
     F32 speed = mCharacter->getCharacterVelocity().magVec();
 

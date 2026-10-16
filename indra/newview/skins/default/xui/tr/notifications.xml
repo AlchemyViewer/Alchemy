@@ -658,24 +658,10 @@ Nesne aralık dışında ya da silinmiş olabilir.
 	<notification name="SaveNotecardFailReason">
 		Aşağıdaki nedenden dolayı, not kartı kaydedilirken bir sorun oluştu: [REASON].  Lütfen not kartını kaydetmeyi daha sonra tekrar deneyin.
 	</notification>
-	<notification name="ScriptCannotUndo">
-		Komut dosyası sürümünüzdeki tüm değişiklikler geri alınamadı.
-Sunucunun son kaydedilmiş sürümünü yüklemek ister misiniz?
-(**Uyarı** Bu işlem geri alınamaz.)
-		<usetemplate name="okcancelbuttons" notext="İptal" yestext="Tamam"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">
-		İçinde olduğu nesne bulunamadığından komut dosyası kaydedilemiyor.
-Nesne aralık dışında ya da silinmiş olabilir.
-	</notification>
 	<notification name="StartRegionEmpty">
 		Başlangıç Bölgeniz tanımlanmamış.
 Lütfen Başlangıç Konumu kutusuna Bölge adını yazın ya da Son Bulunduğum Konum veya Ana Konumumu Başlangıç Konumu olarak seçin.
 		<usetemplate name="okbutton" yestext="Tamam"/>
-	</notification>
-	<notification name="CouldNotStartStopScript">
-		Üzerinde bulunduğu nesne bulunamadığından komut dosyası başlatılamadı veya durdurulamadı.
-Nesne aralık dışında ya da silinmiş olabilir.
 	</notification>
 	<notification name="CannotDownloadFile">
 		Dosya karşıdan yüklenemiyor.
@@ -1149,10 +1135,6 @@ Yeni parselin adını ve seçeneklerini yeniden ayarlamanız gerekecektir.
 Arazi birleştirilsin mi?
 		<usetemplate name="okcancelbuttons" notext="İptal" yestext="Tamam"/>
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		Öğe kopyalanmadan veya görüntülenmeden önce bu not kartının kaydedilmesi gerekiyor. Not kartı kaydedilsin mi?
-		<usetemplate name="okcancelbuttons" notext="İptal" yestext="Tamam"/>
-	</notification>
 	<notification name="ConfirmItemCopy">
 		Bu öğe envanterinize kopyalansın mı?
 		<usetemplate name="okcancelbuttons" notext="İptal Et" yestext="Kopyala"/>
@@ -1460,7 +1442,6 @@ Yeni bir ana konum ayarlamak isteyebilirsiniz.
 		Karakteriniz birazdan görünecek.
 
 Yürümek için ok tuşlarını kullanın.
-Yardım almak ya da [SECOND_LIFE] hakkında daha fazla bilgi edinmek için istediğiniz zaman F1 tuşuna basın.
 Lütfen bir erkek ya da kadın avatar seçin. Fikrinizi daha sonra değiştirebilirsiniz.
 		<usetemplate name="okcancelbuttons" notext="Kadın" yestext="Erkek"/>
 	</notification>
@@ -2602,15 +2583,6 @@ Parolanızı yanlış yazmanıza sebep olabilir.
 		Not kartı karşıya yüklenemiyor.
 Lütfen tekrar deneyin.
 	</notification>
-	<notification name="ScriptMissing">
-		Komut dosyası veri tabanında yok.
-	</notification>
-	<notification name="ScriptNoPermissions">
-		Komut dosyasını görüntülemek için yetersiz izin.
-	</notification>
-	<notification name="UnableToLoadScript">
-		Komut dosyası karşıya yüklenemiyor. Lütfen tekrar deneyin.
-	</notification>
 	<notification name="IncompleteInventory">
 		Teklif etmek istediğiniz içeriğin tamamı henüz yerel olarak kullanılabilir değil. Lütfen bu öğeleri bir dakika içerisinde tekrar teklif etmeyi deneyin.
 	</notification>
@@ -3370,7 +3342,6 @@ Detaylar için Alchemy.log&apos;a bakın
 Paylaşmanın yapılacağı Second Life Sakinleri:
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="İptal" yestext="Tamam"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		Bir defada sadece bir klasör paylaşılabilir.
@@ -3700,11 +3671,6 @@ Devam etmek istiyor musunuz?
 		Seçilen nesne navigasyon örgüsünü etkiliyor.  Bunu bir Esnek Yol olarak değiştirirseniz, navigasyon örgüsünden çıkartmış olursunuz.
 		<usetemplate ignoretext="Seçilen nesne navigasyon örgüsünü etkiliyor.  Bunu bir Esnek Yol olarak değiştirirseniz, navigasyon örgüsünden çıkartmış olursunuz." name="okcancelignore" notext="İptal" yestext="Tamam"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">
-		[APP_NAME] uygulaması için gerekli donanım gereksinimlerine sahip olmadığınız görünüyor. [APP_NAME] çoklu doku desteği sunan bir OpenGL grafik kartı gerektiriyor. Eğer grafik kartınız bu özellikteyse, grafik kartınızın en son sürücülerine ve işletim sisteminiz için gerekli Service Pack ve yamalara sahip olup olmadığınızı kontrol etmeyi deneyebilirsiniz.
-
-Sorun yaşamaya devam ederseniz, lütfen [SUPPORT_SITE] bölümünü ziyaret edin.
-	</global>
 	<global name="UnsupportedCPUAmount">
 		796
 	</global>

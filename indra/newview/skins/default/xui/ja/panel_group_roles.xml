@@ -88,7 +88,6 @@ Ctrlキーを押しながら、メンバー名をクリックすることで複�
 		<text name="static">
 			割当られた役割
 		</text>
-		<scroll_list name="member_assigned_roles"/>
 		<text name="static2">
 			許可されたアクション
 		</text>

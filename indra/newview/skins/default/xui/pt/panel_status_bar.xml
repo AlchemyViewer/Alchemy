@@ -6,7 +6,7 @@
 	<panel.string name="bandwidth_tooltip">
 		Banda
 	</panel.string>
-	<panel.string name="time">
+	<panel.string name="time_ampm">
 		[hour12, datetime, slt]:[min, datetime, slt] [ampm, datetime, slt] [timezone,datetime, slt]
 	</panel.string>
 	<panel.string name="timeTooltip">
@@ -27,5 +27,4 @@
 		24:00 AM PST
 	</text>
 	<button name="media_toggle_btn" tool_tip="Tocar/Pausar todas mídias (música, vídeo, páginas web)"/>
-	<button name="volume_btn" tool_tip="Volume geral"/>
 </panel>

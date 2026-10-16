@@ -166,7 +166,7 @@ void LLToolBrushLand::modifyLandAtPointGlobal(const LLVector3d &pos_global,
         regionp->forceUpdate();
 
         // tell the simulator what we've done
-        F32 seconds = (1.0f / gFPSClamped) * gSavedSettings.getF32("LandBrushForce");
+        F32 seconds = gFrameDTClamped * gSavedSettings.getF32("LandBrushForce");
         F32 x_pos = (F32)pos_region.mV[VX];
         F32 y_pos = (F32)pos_region.mV[VY];
         LLMessageSystem* msg = gMessageSystem;
@@ -185,8 +185,8 @@ void LLToolBrushLand::modifyLandAtPointGlobal(const LLVector3d &pos_global,
         msg->addF32Fast(_PREHASH_South, y_pos );
         msg->addF32Fast(_PREHASH_East, x_pos );
         msg->addF32Fast(_PREHASH_North, y_pos );
-        msg->nextBlock("ModifyBlockExtended");
-        msg->addF32("BrushSize", mBrushSize);
+        msg->nextBlockFast(_PREHASH_ModifyBlockExtended);
+        msg->addF32Fast(_PREHASH_BrushSize, mBrushSize);
         msg->sendMessage(regionp->getHost());
     }
 }
@@ -340,8 +340,8 @@ void LLToolBrushLand::modifyLandInSelectionGlobal()
             msg->addF32Fast(_PREHASH_North, max_region.mV[VY] );
         }
 
-        msg->nextBlock("ModifyBlockExtended");
-        msg->addF32("BrushSize", mBrushSize);
+        msg->nextBlockFast(_PREHASH_ModifyBlockExtended);
+        msg->addF32Fast(_PREHASH_BrushSize, mBrushSize);
 
         msg->sendMessage(regionp->getHost());
     }
@@ -525,7 +525,7 @@ void LLToolBrushLand::renderOverlay(LLSurface& land, const LLVector3& pos_region
                                     const LLVector3& pos_world)
 {
     gGL.matrixMode(LLRender::MM_MODELVIEW);
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest mDepthTest(GL_TRUE);
     gGL.pushMatrix();
     gGL.color4fv(OVERLAY_COLOR.mV);
@@ -685,7 +685,10 @@ bool LLToolBrushLand::canTerraformParcel(LLViewerRegion* regionp) const
     if (selected_parcel)
     {
         bool owner_release = LLViewerParcelMgr::isParcelOwnedByAgent(selected_parcel, GP_LAND_ALLOW_EDIT_LAND);
-        is_terraform_allowed = ( gAgent.canManageEstate() || (selected_parcel->getOwnerID() == regionp->getOwner()) || owner_release);
+        is_terraform_allowed = ( regionp->canManageEstate()
+                                 || (selected_parcel->getOwnerID() == regionp->getOwner())
+                                 || owner_release
+                                 || selected_parcel->getAllowTerraform());
     }
 
     return is_terraform_allowed;

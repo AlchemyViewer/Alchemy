@@ -395,7 +395,7 @@ LLSD LLSettingsBase::interpolateSDValue(const std::string& key_name, const LLSD 
     return new_value;
 }
 
-LLSettingsBase::stringset_t LLSettingsBase::getSkipInterpolateKeys() const
+const LLSettingsBase::stringset_t& LLSettingsBase::getSkipInterpolateKeys() const
 {
     static stringset_t skipSet;
 
@@ -406,6 +406,18 @@ LLSettingsBase::stringset_t LLSettingsBase::getSkipInterpolateKeys() const
     }
 
     return skipSet;
+}
+
+const LLSettingsBase::stringset_t& LLSettingsBase::getSlerpKeys() const
+{
+    static stringset_t empty;
+    return empty;
+}
+
+const LLSettingsBase::parammapping_t& LLSettingsBase::getParameterMap() const
+{
+    static parammapping_t empty;
+    return empty;
 }
 
 LLSD& LLSettingsBase::getSettings()
@@ -600,7 +612,7 @@ bool LLSettingsBase::Validator::verify(LLSD &data, U32 flags)
         return false;
     }
 
-    if (!mVerify.empty() && !mVerify(data[mName], flags))
+    if (mVerify != nullptr && !mVerify(data[mName], flags))
     {
         LL_WARNS("SETTINGS") << "Setting '" << mName << "' fails validation." << LL_ENDL;
         return false;
@@ -759,7 +771,7 @@ void LLSettingsBlender::update(const LLSettingsBase::BlendFactor& blendf)
 F64 LLSettingsBlender::setBlendFactor(const LLSettingsBase::BlendFactor& blendf_in)
 {
     LLSettingsBase::TrackPosition blendf = (F32)blendf_in;
-    llassert(!isnan(blendf));
+    llassert(!std::isnan(blendf));
     if (blendf >= 1.0)
     {
         triggerComplete();

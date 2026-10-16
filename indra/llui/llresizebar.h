@@ -29,9 +29,11 @@
 
 #include "llview.h"
 
-class LLResizeBar : public LLView
+class LLResizeBar final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLResizeBar, LLView);
+
     enum Side { LEFT, TOP, RIGHT, BOTTOM };
 
     struct Params : public LLInitParam::Block<Params, LLView::Params>
@@ -53,18 +55,19 @@ protected:
 
 public:
 
-    virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask);
+    bool            handleHover(S32 x, S32 y, MASK mask) override;
+    bool            handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool            handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool            handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
     void            setResizeLimits( S32 min_size, S32 max_size ) { mMinSize = min_size; mMaxSize = max_size; }
     void            setEnableSnapping(bool enable) { mSnappingEnabled = enable; }
     void            setAllowDoubleClickSnapping(bool allow) { mAllowDoubleClickSnapping = allow; }
     bool            canResize() const { return getEnabled() && mMaxSize > mMinSize; }
-    void            setResizeListener(boost::function<void(void*)> listener) {mResizeListener = listener;}
-    void            setImagePanel(LLPanel * panelp);
-    LLPanel *       getImagePanel() const;
+    void            setResizeListener(std::function<void(void*)> listener) { mResizeListener = listener; }
+    // Told once when a drag on the bar ends, where the listener above
+    // is told of every step of it.
+    void            setResizeDoneListener(std::function<void()> listener) { mResizeDoneListener = std::move(listener); }
 
 private:
     S32                             mDragLastScreenX;
@@ -78,9 +81,8 @@ private:
     bool                            mSnappingEnabled,
                                     mAllowDoubleClickSnapping;
     LLView*                         mResizingView;
-    boost::function<void(void*)>    mResizeListener;
-    LLPointer<LLUIImage>            mDragHandleImage;
-    LLPanel *                       mImagePanel;
+    std::function<void(void*)>      mResizeListener;
+    std::function<void()>           mResizeDoneListener;
 };
 
 #endif  // LL_RESIZEBAR_H

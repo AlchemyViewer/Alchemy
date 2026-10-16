@@ -1,0 +1,106 @@
+/**
+ * @file alxuiselection.h
+ * @brief The one selection every pane of XUI Studio agrees about, keyed by name path.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include "stdtypes.h"
+
+#include <boost/signals2.hpp>
+
+#include <string>
+#include <string_view>
+#include <vector>
+
+class LLView;
+
+// A selection and a hover, each a path of names from a root view down. A
+// path holds no view, so it survives the tree it was taken from being
+// rebuilt, and resolves against the new tree by the same names. The
+// observers are the panes; none of them owns it.
+class ALXUISelection
+{
+public:
+    using path_t = std::vector<std::string>;
+    using signal_t = boost::signals2::signal<void()>;
+
+    // A step is the view's name, with "#n" appended for the nth sibling of
+    // that name after the first, counting in creation order.
+    static std::string step(std::string_view name, S32 ordinal);
+
+    // A step read back: the name it carries, and which of the siblings of
+    // that name it means. A name can carry a '#' of its own -- the menu
+    // item "Forbid Give to #RLV" does -- so only digits after the last one
+    // are the ordinal this writes, and a step is otherwise all name.
+    static bool splitOrdinal(std::string_view step, std::string_view& name, S32& ordinal);
+
+    // The path of a view under a root; false when it is not under it. The
+    // root's own path is empty.
+    static bool pathOf(const LLView* view, const LLView* root, path_t& path);
+    static LLView* resolve(LLView* root, const path_t& path);
+
+    static std::string toString(const path_t& path);
+    static path_t fromString(std::string_view text);
+
+    bool hasSelection() const { return mHasSelection; }
+    const path_t& selection() const { return mSelection; }
+    void select(const path_t& path);
+    void clearSelection();
+
+    // What else is selected. The selection proper stays one path, because
+    // every pane that shows a thing shows one thing: the inspectors are
+    // about it, the breadcrumb names it, an edit writes to it. These are
+    // the others an alignment moves along with it, and nothing else reads
+    // them.
+    const std::vector<path_t>& also() const { return mAlso; }
+    bool isSelected(const path_t& path) const;
+    S32 selectedCount() const { return mHasSelection ? 1 + (S32)mAlso.size() : 0; }
+
+    // Adds the path to the selection, or takes it out again if it is
+    // already in it. Selecting the one the panes are about with this takes
+    // nothing away: there would be nothing left to be about.
+    void selectAlso(const path_t& path);
+
+    bool hasHover() const { return mHasHover; }
+    const path_t& hover() const { return mHover; }
+    void setHover(const path_t& path);
+    void clearHover();
+
+    boost::signals2::connection onSelectionChanged(const signal_t::slot_type& slot)
+    {
+        return mSelectionChanged.connect(slot);
+    }
+    boost::signals2::connection onHoverChanged(const signal_t::slot_type& slot)
+    {
+        return mHoverChanged.connect(slot);
+    }
+
+private:
+    path_t                  mSelection;
+    std::vector<path_t>     mAlso;
+    path_t                  mHover;
+    signal_t    mSelectionChanged;
+    signal_t    mHoverChanged;
+    bool        mHasSelection = false;
+    bool        mHasHover = false;
+};

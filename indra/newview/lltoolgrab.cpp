@@ -339,8 +339,9 @@ bool LLToolGrabBase::handleObjectHit(const LLPickInfo& info)
 void LLToolGrabBase::startSpin()
 {
     LLViewerObject* objectp = mGrabPick.getObject();
-    if (!objectp)
+    if (!objectp || objectp->isLocalOnly())
     {
+        // Client-only local previews have no sim object to spin.
         return;
     }
     mSpinGrabbing = true;
@@ -365,7 +366,7 @@ void LLToolGrabBase::stopSpin()
     mSpinGrabbing = false;
 
     LLViewerObject* objectp = mGrabPick.getObject();
-    if (!objectp)
+    if (!objectp || objectp->isLocalOnly())
     {
         return;
     }
@@ -598,16 +599,22 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
             mSpinRotation = mSpinRotation * rotation_around_vertical;
             mSpinRotation = mSpinRotation * rotation_around_left;
 
-            // TODO: Throttle these
-            LLMessageSystem *msg = gMessageSystem;
-            msg->newMessageFast(_PREHASH_ObjectSpinUpdate);
-            msg->nextBlockFast(_PREHASH_AgentData);
-            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
-            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-            msg->nextBlockFast(_PREHASH_ObjectData);
-            msg->addUUIDFast(_PREHASH_ObjectID, objectp->getID() );
-            msg->addQuatFast(_PREHASH_Rotation, mSpinRotation );
-            msg->sendMessage( objectp->getRegion()->getHost() );
+            // Client-only local previews have no sim object to spin. The toggle
+            // above re-sets mSpinGrabbing from the mask every hover, so
+            // startSpin()'s early-out alone doesn't keep us out of this block.
+            if (!objectp->isLocalOnly())
+            {
+                // TODO: Throttle these
+                LLMessageSystem *msg = gMessageSystem;
+                msg->newMessageFast(_PREHASH_ObjectSpinUpdate);
+                msg->nextBlockFast(_PREHASH_AgentData);
+                msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+                msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+                msg->nextBlockFast(_PREHASH_ObjectData);
+                msg->addUUIDFast(_PREHASH_ObjectID, objectp->getID() );
+                msg->addQuatFast(_PREHASH_Rotation, mSpinRotation );
+                msg->sendMessage( objectp->getRegion()->getHost() );
+            }
         }
         else
         {
@@ -665,7 +672,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
             */
 
             // Don't let object centers go underground.
-            F32 land_height = LLWorld::getInstance()->resolveLandHeightGlobal(grab_point_global);
+            F32 land_height = LLWorld::getInstance()->resolveLandHeightGlobal(grab_point_global, objectp->getRegion());
 
             if (grab_point_global.mdV[VZ] < land_height)
             {
@@ -690,7 +697,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 
             const S32 ROTATE_H_MARGIN = gViewerWindow->getWorldViewWidthScaled() / 20;
             const F32 ROTATE_ANGLE_PER_SECOND = 30.f * DEG_TO_RAD;
-            const F32 rotate_angle = ROTATE_ANGLE_PER_SECOND / gFPSClamped;
+            const F32 rotate_angle = ROTATE_ANGLE_PER_SECOND * gFrameDTClamped;
             // ...build mode moves camera about focus point
             if (grab_center_gl.mX < ROTATE_H_MARGIN)
             {
@@ -715,8 +722,10 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
                 }
             }
 
-            // Don't move above top of screen or below bottom
-            if ((grab_center_gl.mY < gViewerWindow->getWorldViewHeightScaled() - 6)
+            // Don't move above top of screen or below bottom; client-only local
+            // previews have no sim object to update.
+            if (!objectp->isLocalOnly()
+                && (grab_center_gl.mY < gViewerWindow->getWorldViewHeightScaled() - 6)
                 && (grab_center_gl.mY > 24))
             {
                 // Transmit update to simulator
@@ -732,13 +741,13 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
                 msg->addVector3Fast(_PREHASH_GrabOffsetInitial, mGrabOffsetFromCenterInitial );
                 msg->addVector3Fast(_PREHASH_GrabPosition, grab_pos_region );
                 msg->addU32Fast(_PREHASH_TimeSinceLast, dt_milliseconds );
-                msg->nextBlock("SurfaceInfo");
-                msg->addVector3("UVCoord", LLVector3(mGrabPick.mUVCoords));
-                msg->addVector3("STCoord", LLVector3(mGrabPick.mSTCoords));
+                msg->nextBlockFast(_PREHASH_SurfaceInfo);
+                msg->addVector3Fast(_PREHASH_UVCoord, LLVector3(mGrabPick.mUVCoords));
+                msg->addVector3Fast(_PREHASH_STCoord, LLVector3(mGrabPick.mSTCoords));
                 msg->addS32Fast(_PREHASH_FaceIndex, mGrabPick.mObjectFace);
-                msg->addVector3("Position", mGrabPick.mIntersection);
-                msg->addVector3("Normal", mGrabPick.mNormal);
-                msg->addVector3("Binormal", mGrabPick.mBinormal);
+                msg->addVector3Fast(_PREHASH_Position, mGrabPick.mIntersection);
+                msg->addVector3Fast(_PREHASH_Normal, mGrabPick.mNormal);
+                msg->addVector3Fast(_PREHASH_Binormal, mGrabPick.mBinormal);
 
                 msg->sendMessage( objectp->getRegion()->getHost() );
             }
@@ -889,7 +898,7 @@ void LLToolGrabBase::handleHoverNonPhysical(S32 x, S32 y, MASK mask)
         changed_since_last_update = true;
     }
 
-    if (changed_since_last_update)
+    if (changed_since_last_update && !objectp->isLocalOnly())
     {
         LLMessageSystem *msg = gMessageSystem;
         msg->newMessageFast(_PREHASH_ObjectGrabUpdate);
@@ -901,13 +910,13 @@ void LLToolGrabBase::handleHoverNonPhysical(S32 x, S32 y, MASK mask)
         msg->addVector3Fast(_PREHASH_GrabOffsetInitial, mGrabOffsetFromCenterInitial );
         msg->addVector3Fast(_PREHASH_GrabPosition, grab_pos_region );
         msg->addU32Fast(_PREHASH_TimeSinceLast, dt_milliseconds );
-        msg->nextBlock("SurfaceInfo");
-        msg->addVector3("UVCoord", LLVector3(pick.mUVCoords));
-        msg->addVector3("STCoord", LLVector3(pick.mSTCoords));
+        msg->nextBlockFast(_PREHASH_SurfaceInfo);
+        msg->addVector3Fast(_PREHASH_UVCoord, LLVector3(pick.mUVCoords));
+        msg->addVector3Fast(_PREHASH_STCoord, LLVector3(pick.mSTCoords));
         msg->addS32Fast(_PREHASH_FaceIndex, pick.mObjectFace);
-        msg->addVector3("Position", pick.mIntersection);
-        msg->addVector3("Normal", pick.mNormal);
-        msg->addVector3("Binormal", pick.mBinormal);
+        msg->addVector3Fast(_PREHASH_Position, pick.mIntersection);
+        msg->addVector3Fast(_PREHASH_Normal, pick.mNormal);
+        msg->addVector3Fast(_PREHASH_Binormal, pick.mBinormal);
 
         msg->sendMessage( objectp->getRegion()->getHost() );
 
@@ -1173,7 +1182,8 @@ LLVector3d LLToolGrabBase::getGrabPointGlobal()
 
 void send_ObjectGrab_message(LLViewerObject* object, const LLPickInfo & pick, const LLVector3 &grab_offset)
 {
-    if (!object) return;
+    // Client-only local previews have no sim object; localid 0 means nothing there.
+    if (!object || object->isLocalOnly()) return;
 
     LLMessageSystem *msg = gMessageSystem;
 
@@ -1184,13 +1194,13 @@ void send_ObjectGrab_message(LLViewerObject* object, const LLPickInfo & pick, co
     msg->nextBlockFast( _PREHASH_ObjectData);
     msg->addU32Fast(    _PREHASH_LocalID, object->mLocalID);
     msg->addVector3Fast(_PREHASH_GrabOffset, grab_offset);
-    msg->nextBlock("SurfaceInfo");
-    msg->addVector3("UVCoord", LLVector3(pick.mUVCoords));
-    msg->addVector3("STCoord", LLVector3(pick.mSTCoords));
+    msg->nextBlockFast(_PREHASH_SurfaceInfo);
+    msg->addVector3Fast(_PREHASH_UVCoord, LLVector3(pick.mUVCoords));
+    msg->addVector3Fast(_PREHASH_STCoord, LLVector3(pick.mSTCoords));
     msg->addS32Fast(_PREHASH_FaceIndex, pick.mObjectFace);
-    msg->addVector3("Position", pick.mIntersection);
-    msg->addVector3("Normal", pick.mNormal);
-    msg->addVector3("Binormal", pick.mBinormal);
+    msg->addVector3Fast(_PREHASH_Position, pick.mIntersection);
+    msg->addVector3Fast(_PREHASH_Normal, pick.mNormal);
+    msg->addVector3Fast(_PREHASH_Binormal, pick.mBinormal);
     msg->sendMessage( object->getRegion()->getHost());
 
     /*  Diagnostic code
@@ -1210,7 +1220,7 @@ void send_ObjectGrab_message(LLViewerObject* object, const LLPickInfo & pick, co
 
 void send_ObjectDeGrab_message(LLViewerObject* object, const LLPickInfo & pick)
 {
-    if (!object) return;
+    if (!object || object->isLocalOnly()) return;
 
     LLMessageSystem *msg = gMessageSystem;
 
@@ -1220,13 +1230,13 @@ void send_ObjectDeGrab_message(LLViewerObject* object, const LLPickInfo & pick)
     msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
     msg->nextBlockFast(_PREHASH_ObjectData);
     msg->addU32Fast(_PREHASH_LocalID, object->mLocalID);
-    msg->nextBlock("SurfaceInfo");
-    msg->addVector3("UVCoord", LLVector3(pick.mUVCoords));
-    msg->addVector3("STCoord", LLVector3(pick.mSTCoords));
+    msg->nextBlockFast(_PREHASH_SurfaceInfo);
+    msg->addVector3Fast(_PREHASH_UVCoord, LLVector3(pick.mUVCoords));
+    msg->addVector3Fast(_PREHASH_STCoord, LLVector3(pick.mSTCoords));
     msg->addS32Fast(_PREHASH_FaceIndex, pick.mObjectFace);
-    msg->addVector3("Position", pick.mIntersection);
-    msg->addVector3("Normal", pick.mNormal);
-    msg->addVector3("Binormal", pick.mBinormal);
+    msg->addVector3Fast(_PREHASH_Position, pick.mIntersection);
+    msg->addVector3Fast(_PREHASH_Normal, pick.mNormal);
+    msg->addVector3Fast(_PREHASH_Binormal, pick.mBinormal);
     msg->sendMessage(object->getRegion()->getHost());
 }
 

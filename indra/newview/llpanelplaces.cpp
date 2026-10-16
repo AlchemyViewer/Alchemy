@@ -74,6 +74,10 @@
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+#include "rlvhandler.h"
+// [/RLVa:KB]
 
 // Constants
 static const F32 PLACE_INFO_UPDATE_INTERVAL = 3.0;
@@ -84,6 +88,7 @@ static const std::string LANDMARK_INFO_TYPE         = "landmark";
 static const std::string REMOTE_PLACE_INFO_TYPE     = "remote_place";
 static const std::string TELEPORT_HISTORY_INFO_TYPE = "teleport_history";
 static const std::string LANDMARK_TAB_INFO_TYPE     = "open_landmark_tab";
+static const std::string TELEPORT_HISTORY_TAB_INFO_TYPE = "open_teleport_history_tab";
 
 // Support for secondlife:///app/parcel/{UUID}/about SLapps
 class LLParcelHandler : public LLCommandHandler
@@ -221,7 +226,7 @@ public:
     }
     /*virtual*/ void setErrorStatus(S32 status, const std::string& reason)
     {
-        LL_ERRS() << "Can't complete remote parcel request. Http Status: "
+        LL_WARNS() << "Can't complete remote parcel request. Http Status: "
                << status << ". Reason : " << reason << LL_ENDL;
     }
 
@@ -411,12 +416,21 @@ void LLPanelPlaces::onOpen(const LLSD& key)
             // Update the buttons at the bottom of the panel
             updateVerbs();
         }
+        else if (key_type == TELEPORT_HISTORY_TAB_INFO_TYPE)
+        {
+            // toggle twice, similar to LANDMARK_TAB_INFO_TYPE
+            togglePlaceInfoPanel(false);
+            mPlaceInfoType = key_type;
+            togglePlaceInfoPanel(false);
+            onTabSelected();
+            updateVerbs();
+        }
         else if (key_type == CREATE_PICK_TYPE)
         {
             LLUUID item_id = key["item_id"];
 
             LLLandmarksPanel* landmarks_panel =
-                dynamic_cast<LLLandmarksPanel*>(mTabContainer->getPanelByName("Landmarks"));
+                ALViewType::as<LLLandmarksPanel>(mTabContainer->getPanelByName("Landmarks"));
             if (landmarks_panel && item_id.notNull())
             {
                 LLLandmark* landmark = LLLandmarkActions::getLandmark(item_id, boost::bind(&LLLandmarksPanel::doCreatePick, landmarks_panel, _1, item_id));
@@ -650,8 +664,8 @@ void LLPanelPlaces::onFilterEdit(const std::string& search_string, bool force_fi
 
 void LLPanelPlaces::onTabSelected()
 {
-    mActivePanel = dynamic_cast<LLPanelPlacesTab*>(mTabContainer->getCurrentPanel());
-    if (!mActivePanel)
+    mActivePanel = ALViewType::as<LLPanelPlacesTab>(mTabContainer->getCurrentPanel());
+    if (!mActivePanel || !mTabsCreated)
         return;
 
     onFilterEdit(mActivePanel->getFilterSubString(), true);
@@ -1087,7 +1101,7 @@ void LLPanelPlaces::togglePlaceInfoPanel(bool visible)
                 }
             }
 
-            LLLandmarksPanel* landmarks_panel = dynamic_cast<LLLandmarksPanel*>(mTabContainer->getPanelByName(tab_panel_name));
+            LLLandmarksPanel* landmarks_panel = ALViewType::as<LLLandmarksPanel>(mTabContainer->getPanelByName(tab_panel_name));
             if (landmarks_panel)
             {
                 // If a landmark info is being closed we open the landmarks tab
@@ -1101,6 +1115,18 @@ void LLPanelPlaces::togglePlaceInfoPanel(bool visible)
                 {
                     landmarks_panel->resetSelection();
                 }
+            }
+        }
+    }
+    else if (mPlaceInfoType == TELEPORT_HISTORY_TAB_INFO_TYPE)
+    {
+        mLandmarkInfo->setVisible(false);
+        mPlaceProfile->setVisible(false);
+        if (!visible)
+        {
+            if (LLPanel* teleport_history_panel = mTabContainer->getPanelByName("Teleport History"))
+            {
+                mTabContainer->selectTabPanel(teleport_history_panel);
             }
         }
     }
@@ -1200,7 +1226,7 @@ void LLPanelPlaces::createTabs()
 
     mTabContainer->selectFirstTab();
 
-    mActivePanel = dynamic_cast<LLPanelPlacesTab*>(mTabContainer->getCurrentPanel());
+    mActivePanel = ALViewType::as<LLPanelPlacesTab>(mTabContainer->getCurrentPanel());
 
     if (mActivePanel)
     {
@@ -1305,10 +1331,20 @@ void LLPanelPlaces::updateVerbs()
             mTeleportBtn->setEnabled(have_3d_pos &&
                                      !LLViewerParcelMgr::getInstance()->inAgentParcel(mPosGlobal));
         }
-        else if (mPlaceInfoType == LANDMARK_INFO_TYPE || mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+// [RLVa:KB]
+        else if (mPlaceInfoType == LANDMARK_INFO_TYPE)
         {
-            mTeleportBtn->setEnabled(have_3d_pos);
+            mTeleportBtn->setEnabled(have_3d_pos && !gRlvHandler.hasBehaviour(RLV_BHVR_TPLM));
         }
+        else if (mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+        {
+            mTeleportBtn->setEnabled(have_3d_pos && RlvActions::canTeleportToLocation());
+        }
+// [/RLVa:KB]
+//      else if (mPlaceInfoType == LANDMARK_INFO_TYPE || mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+//      {
+//          mTeleportBtn->setEnabled(have_3d_pos);
+//      }
     }
     else
     {
@@ -1335,6 +1371,13 @@ LLPanelPlaceInfo* LLPanelPlaces::getCurrentInfoPanel()
     return NULL;
 }
 
+void LLPanelPlaces::hideBackBtn()
+{
+    mPlaceProfileBackBtn->setVisible(false);
+    setBackgroundVisible(false);
+    mPlaceProfile->setBackgroundVisible(false);
+}
+
 static bool is_agent_in_selected_parcel(LLParcel* parcel)
 {
     LLViewerParcelMgr* parcel_mgr = LLViewerParcelMgr::getInstance();
@@ -1349,7 +1392,13 @@ static bool is_agent_in_selected_parcel(LLParcel* parcel)
 
 static void onSLURLBuilt(std::string& slurl)
 {
-    LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(slurl));
+    if (slurl.empty())
+    {
+        LLNotificationsUtil::add("LandmarkLocationUnknown");
+        return;
+    }
+
+    LLView::getWindow()->copyTextToClipboard(slurl);
 
     LLSD args;
     args["SLURL"] = slurl;

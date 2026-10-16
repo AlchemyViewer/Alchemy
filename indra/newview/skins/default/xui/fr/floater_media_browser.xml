@@ -24,7 +24,7 @@
 		</layout_panel>
 		<layout_panel name="external_controls">
 			<button label="Ouvrir dans mon navigateur web" name="open_browser" width="196"/>
-			<check_box label="Toujours ouvrir dans mon navigateur web" left_delta="201" name="open_always"/>
+			<check_box left_delta="201" name="open_always"/>
 			<button label="Fermer" name="close"/>
 		</layout_panel>
 	</layout_stack>

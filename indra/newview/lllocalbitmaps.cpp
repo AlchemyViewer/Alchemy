@@ -31,22 +31,17 @@
 /* own header */
 #include "lllocalbitmaps.h"
 
-/* boost: will not compile unless equivalent is undef'd, beware. */
-#include "fix_macros.h"
-#include <boost/filesystem.hpp>
-
 /* image compression headers. */
 #include "llimagebmp.h"
 #include "llimagetga.h"
 #include "llimagej2c.h"
 #include "llimagejpeg.h"
 #include "llimagepng.h"
-
-/* time headers */
-#include <time.h>
-#include <ctime>
+#include "llimagewebp.h"
+#include "llimageavif.h"
 
 /* misc headers */
+#include "fsyspath.h"
 #include "llgltfmaterial.h"
 #include "llscrolllistctrl.h"
 #include "lllocaltextureobject.h"
@@ -114,6 +109,14 @@ LLLocalBitmap::LLLocalBitmap(std::string filename)
     else if (temp_exten == "png")
     {
         mExtension = ET_IMG_PNG;
+    }
+    else if (temp_exten == "webp")
+    {
+        mExtension = ET_IMG_WEBP;
+    }
+    else if (temp_exten == "avif")
+    {
+        mExtension = ET_IMG_AVIF;
     }
     else
     {
@@ -192,15 +195,8 @@ bool LLLocalBitmap::updateSelf(EUpdateType optional_firstupdate)
         if (gDirUtilp->fileExists(mFilename))
         {
             // verifying that the file has indeed been modified
-
-#ifndef LL_WINDOWS
-            const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(mFilename));
-#else
-            const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(ll_convert<std::wstring>(mFilename)));
-#endif
-            LLSD new_last_modified = asctime(localtime(&temp_time));
-
-            if (mLastModified.asString() != new_last_modified.asString())
+            const std::filesystem::file_time_type new_last_modified = std::filesystem::last_write_time(fsyspath(mFilename));
+            if (mLastModified != new_last_modified)
             {
                 /* loading the image file and decoding it, here is a critical point which,
                    if fails, invalidates the whole update (or unit creation) process. */
@@ -219,7 +215,10 @@ bool LLLocalBitmap::updateSelf(EUpdateType optional_firstupdate)
                     LLPointer<LLViewerFetchedTexture> texture = new LLViewerFetchedTexture
                         ("file://"+mFilename, FTT_LOCAL_FILE, mWorldID, LL_LOCAL_USE_MIPMAPS);
 
-                    texture->createGLTexture(LL_LOCAL_DISCARD_LEVEL, raw_image);
+                    if (!texture->createGLTexture(LL_LOCAL_DISCARD_LEVEL, raw_image))
+                    {
+                        LL_WARNS() << "Failed to create GL texture for local bitmap: " << mFilename << " " << mWorldID << LL_ENDL;
+                    }
                     texture->ref();
 
                     gTextureList.addImage(texture, TEX_LIST_STANDARD);
@@ -378,6 +377,28 @@ bool LLLocalBitmap::decodeBitmap(LLPointer<LLImageRaw> rawimg)
         {
             LLPointer<LLImagePNG> png_image = new LLImagePNG;
             if (png_image->load(mFilename) && png_image->decode(rawimg, 0.0f))
+            {
+                rawimg->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
+                decode_successful = true;
+            }
+            break;
+        }
+
+        case ET_IMG_WEBP:
+        {
+            LLPointer<LLImageWebP> webp_image = new LLImageWebP;
+            if (webp_image->load(mFilename) && webp_image->decode(rawimg, 0.0f))
+            {
+                rawimg->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
+                decode_successful = true;
+            }
+            break;
+        }
+
+        case ET_IMG_AVIF:
+        {
+            LLPointer<LLImageAVIF> avif_image = new LLImageAVIF;
+            if (avif_image->load(mFilename) && avif_image->decode(rawimg, 0.0f))
             {
                 rawimg->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
                 decode_successful = true;
@@ -593,7 +614,7 @@ void LLLocalBitmap::updateUserVolumes(LLUUID old_id, LLUUID new_id, U32 channel)
             if (object->isSculpted() && object->getVolume() &&
                 object->getVolume()->getParams().getSculptID() == old_id)
             {
-                LLSculptParams* old_params = (LLSculptParams*)object->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+                LLSculptParams* old_params = object->getSculptParams();
                 LLSculptParams new_params(*old_params);
                 new_params.setSculptTexture(new_id, (*old_params).getSculptType());
                 object->setParameterEntry(LLNetworkData::PARAMS_SCULPT, new_params, true);
@@ -1068,6 +1089,10 @@ bool LLLocalBitmapMgr::addUnit(const std::vector<std::string>& filenames)
         iter++;
     }
     mTimer.startTimer();
+    if (add_successful)
+    {
+        mUnitsChangedSignal();
+    }
     return add_successful;
 }
 
@@ -1076,11 +1101,39 @@ LLUUID LLLocalBitmapMgr::addUnit(const std::string& filename)
     mTimer.stopTimer();
     LLUUID tracking_id = addUnitInternal(filename);
     mTimer.startTimer();
+    if (tracking_id.notNull())
+    {
+        mUnitsChangedSignal();
+    }
     return tracking_id;
 }
 
-LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename)
+LLUUID LLLocalBitmapMgr::addUnit(const std::string& filename, bool mesh_owned)
 {
+    mTimer.stopTimer();
+    LLUUID tracking_id = addUnitInternal(filename, mesh_owned);
+    mTimer.startTimer();
+    if (tracking_id.notNull())
+    {
+        mUnitsChangedSignal();
+    }
+    return tracking_id;
+}
+
+LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename, bool mesh_owned)
+{
+    // No double-add: reuse an existing unit for this file. A user add (mesh_owned
+    // false) only matches a user unit, and a mesh import only matches a mesh-owned
+    // unit -- so the same file can be both a user texture and a (hidden) mesh-owned
+    // import without colliding, and re-adding a loaded file won't duplicate it.
+    for (LLLocalBitmap* unit : mBitmapList)
+    {
+        if (unit->getFilename() == filename && unit->isMeshOwned() == mesh_owned)
+        {
+            return unit->getTrackingID();
+        }
+    }
+
     if (!checkTextureDimensions(filename))
     {
         return LLUUID::null;
@@ -1090,6 +1143,7 @@ LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename)
 
     if (unit->getValid())
     {
+        unit->setMeshOwned(mesh_owned);
         mBitmapList.push_back(unit);
         return unit->getTrackingID();
     }
@@ -1109,12 +1163,12 @@ LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename)
     return LLUUID::null;
 }
 
-LLUUID LLLocalBitmapMgr::getUnitID(const std::string& filename)
+LLUUID LLLocalBitmapMgr::getUnitID(const std::string& filename, bool mesh_owned)
 {
     for (local_list_iter itBitmap = mBitmapList.begin(); mBitmapList.end() != itBitmap; ++itBitmap)
     {
         LLLocalBitmap* unit = *itBitmap;
-        if (filename == unit->getFilename())
+        if (filename == unit->getFilename() && unit->isMeshOwned() == mesh_owned)
         {
             return unit->getTrackingID();
         }
@@ -1185,6 +1239,27 @@ void LLLocalBitmapMgr::delUnit(LLUUID tracking_id)
             unit = NULL;
         }
     }
+    mUnitsChangedSignal();
+}
+
+boost::signals2::connection LLLocalBitmapMgr::setUnitsChangedCallback(const std::function<void()>& cb)
+{
+    return mUnitsChangedSignal.connect(cb);
+}
+
+std::vector<std::string> LLLocalBitmapMgr::getFilenames() const
+{
+    std::vector<std::string> out;
+    out.reserve(mBitmapList.size());
+    for (const LLLocalBitmap* unit : mBitmapList)
+    {
+        if (unit->isMeshOwned())
+        {
+            continue; // a mesh's imported texture, not part of the user's set
+        }
+        out.push_back(unit->getFilename());
+    }
+    return out;
 }
 
 LLUUID LLLocalBitmapMgr::getTrackingID(const LLUUID& world_id) const
@@ -1215,6 +1290,18 @@ LLUUID LLLocalBitmapMgr::getWorldID(const LLUUID &tracking_id) const
     }
 
     return world_id;
+}
+
+bool LLLocalBitmapMgr::isMeshOwned(const LLUUID& tracking_id) const
+{
+    for (local_list_citer iter = mBitmapList.begin(); iter != mBitmapList.end(); iter++)
+    {
+        if ((*iter)->getTrackingID() == tracking_id)
+        {
+            return (*iter)->isMeshOwned();
+        }
+    }
+    return false;
 }
 
 bool LLLocalBitmapMgr::isLocal(const LLUUID &world_id) const
@@ -1285,19 +1372,30 @@ void LLLocalBitmapMgr::feedScrollList(LLScrollListCtrl* ctrl)
             for (local_list_iter iter = mBitmapList.begin();
                  iter != mBitmapList.end(); iter++)
             {
+                // Model-loaded (mesh-owned) textures are shown too, tagged "(model)"
+                // and flagged so the UI treats them as read-only / transient.
+                const bool mesh_owned = (*iter)->isMeshOwned();
                 LLSD element;
 
                 element["columns"][0]["column"] = "icon";
                 element["columns"][0]["type"] = "icon";
                 element["columns"][0]["value"] = icon_name;
 
+                std::string unit_name = (*iter)->getShortName();
+                if (mesh_owned)
+                {
+                    LLSD name_args;
+                    name_args["NAME"] = unit_name;
+                    unit_name = LLTrans::getString("LocalAssetModelOwned", name_args);
+                }
                 element["columns"][1]["column"] = "unit_name";
                 element["columns"][1]["type"] = "text";
-                element["columns"][1]["value"] = (*iter)->getShortName();
+                element["columns"][1]["value"] = unit_name;
 
                 LLSD data;
                 data["id"] = (*iter)->getTrackingID();
                 data["type"] = (S32)LLAssetType::AT_TEXTURE;
+                data["mesh_owned"] = mesh_owned;
                 element["value"] = data;
 
                 ctrl->addElement(element);

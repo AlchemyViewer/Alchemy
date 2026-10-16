@@ -86,7 +86,7 @@ LLPanelWearableListItem::LLPanelWearableListItem(LLViewerInventoryItem* item, co
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
-static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelWearableOutfitItem(&typeid(LLPanelWearableOutfitItem::Params), "wearable_outfit_list_item");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelWearableOutfitItem(typeid(LLPanelWearableOutfitItem::Params), "wearable_outfit_list_item");
 
 LLPanelWearableOutfitItem::Params::Params()
 :   add_btn("add_btn"),
@@ -226,7 +226,7 @@ void LLPanelWearableOutfitItem::updateItem(const std::string& name,
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
-static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelClothingListItem(&typeid(LLPanelClothingListItem::Params), "clothing_list_item");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelClothingListItem(typeid(LLPanelClothingListItem::Params), "clothing_list_item");
 
 
 LLPanelClothingListItem::Params::Params()
@@ -313,7 +313,7 @@ bool LLPanelClothingListItem::postBuild()
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelBodyPartsListItem(&typeid(LLPanelBodyPartsListItem::Params), "bodyparts_list_item");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelBodyPartsListItem(typeid(LLPanelBodyPartsListItem::Params), "bodyparts_list_item");
 
 
 LLPanelBodyPartsListItem::Params::Params()
@@ -384,7 +384,7 @@ bool LLPanelBodyPartsListItem::postBuild()
     return true;
 }
 
-static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelDeletableWearableListItem(&typeid(LLPanelDeletableWearableListItem::Params), "deletable_wearable_list_item");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelDeletableWearableListItem(typeid(LLPanelDeletableWearableListItem::Params), "deletable_wearable_list_item");
 
 LLPanelDeletableWearableListItem::Params::Params()
 :   delete_btn("delete_btn")
@@ -471,7 +471,7 @@ void LLPanelAttachmentListItem::updateItem(const std::string& name,
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
-static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelDummyClothingListItem(&typeid(LLPanelDummyClothingListItem::Params), "dummy_clothing_list_item");
+static LLWidgetNameRegistry::StaticRegistrar sRegisterPanelDummyClothingListItem(typeid(LLPanelDummyClothingListItem::Params), "dummy_clothing_list_item");
 
 LLPanelDummyClothingListItem::Params::Params()
 :   add_panel("add_panel"),
@@ -791,7 +791,7 @@ void LLWearableItemsList::updateChangedItems(const uuid_vec_t& changed_items_uui
     while (pairs_iter != pairs_end)
     {
         LLPanel* panel = (*(pairs_iter++))->first;
-        LLPanelInventoryListItemBase* item = dynamic_cast<LLPanelInventoryListItemBase*>(panel);
+        LLPanelInventoryListItemBase* item = panel->as<LLPanelInventoryListItemBase>();
         if (!item)
             continue;
 
@@ -868,14 +868,14 @@ LLWearableItemsList::ContextMenu::ContextMenu()
 
 void LLWearableItemsList::ContextMenu::show(LLView* spawning_view, const uuid_vec_t& uuids, S32 x, S32 y)
 {
-    mParent = dynamic_cast<LLWearableItemsList*>(spawning_view);
+    mParent = ALViewType::as<LLWearableItemsList>(spawning_view);
     LLListContextMenu::show(spawning_view, uuids, x, y);
     mParent = NULL; // to avoid dereferencing an invalid pointer
 }
 
 void LLWearableItemsList::ContextMenu::show(LLView* spawning_view, LLWearableType::EType w_type, S32 x, S32 y)
 {
-    mParent = dynamic_cast<LLWearableItemsList*>(spawning_view);
+    mParent = ALViewType::as<LLWearableItemsList>(spawning_view);
     LLContextMenu* menup = mMenuHandle.get();
     if (menup)
     {

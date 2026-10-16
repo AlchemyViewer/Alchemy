@@ -155,9 +155,9 @@ S32 LLXfer_VFile::startDownload()
     gMessageSystem->nextBlockFast(_PREHASH_XferID);
     gMessageSystem->addU64Fast(_PREHASH_ID, mID);
     gMessageSystem->addStringFast(_PREHASH_Filename, "");
-    gMessageSystem->addU8("FilePath", (U8) LL_PATH_NONE);
-    gMessageSystem->addBOOL("DeleteOnCompletion", false);
-    gMessageSystem->addBOOL("UseBigPackets", mChunkSize == LL_XFER_LARGE_PAYLOAD);
+    gMessageSystem->addU8Fast(_PREHASH_FilePath, (U8) LL_PATH_NONE);
+    gMessageSystem->addBOOLFast(_PREHASH_DeleteOnCompletion, false);
+    gMessageSystem->addBOOLFast(_PREHASH_UseBigPackets, mChunkSize == LL_XFER_LARGE_PAYLOAD);
     gMessageSystem->addUUIDFast(_PREHASH_VFileID, mRemoteID);
     gMessageSystem->addS16Fast(_PREHASH_VFileType, (S16)mType);
 

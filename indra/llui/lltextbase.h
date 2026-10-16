@@ -30,11 +30,11 @@
 
 #include "v4color.h"
 #include "lleditmenuhandler.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llspellcheckmenuhandler.h"
 #include "llstyle.h"
-#include "llkeywords.h"
 #include "llpanel.h"
+#include "llpointer.h"
 #include "llurlmatch.h"
 
 #include <string>
@@ -44,9 +44,12 @@
 #include <boost/signals2.hpp>
 
 class LLScrollContainer;
+class LLTextSegment;
+typedef LLPointer<LLTextSegment> LLTextSegmentPtr;
 class LLContextMenu;
 class LLUrlMatch;
 class LLTextBase;
+class LLHighlightEntry;
 
 ///
 /// A text segment is used to specify a subsection of a text string
@@ -67,23 +70,24 @@ public:
     virtual LLTextSegmentPtr clone(LLTextBase& terget) const { return new LLTextSegment(mStart, mEnd); }
     static LLStyleSP cloneStyle(LLTextBase& target, const LLStyle* source);
 
-    bool                        getDimensions(S32 first_char, S32 num_chars, S32& width, S32& height) const;
+    bool                        getDimensions(S32 first_byte, S32 num_bytes, S32& width, S32& height);
 
-    virtual bool                getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const;
-    virtual S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const;
+    virtual bool                getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    virtual S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_bytes, bool round) const;
 
     /**
-    * Get number of chars that fit into free part of current line.
+    * Get number of bytes that fit into free part of current line.
     *
     * @param num_pixels - maximum width of rect
-    * @param segment_offset - symbol in segment we start processing line from
-    * @param line_offset - symbol in line after which segment starts
-    * @param max_chars - limit of symbols that will fit in current line
+    * @param segment_offset - byte in segment we start processing line from
+    * @param line_offset - byte in line after which segment starts
+    * @param max_bytes - limit of bytes that will fit in current line
     * @param line_ind - index of not word-wrapped string inside segment for multi-line segments.
     * Two string separated by word-wrap will have same index.
-    * @return number of chars that will fit into current line
+    * @return number of bytes that will fit into current line, always ending on
+    * a character boundary
     */
-    virtual S32                 getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    virtual S32                 getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     virtual void                updateLayout(const class LLTextBase& editor);
     virtual F32                 draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
     virtual bool                canEdit() const;
@@ -94,8 +98,6 @@ public:
     //virtual void              setColor(const LLUIColor &color);
     virtual LLStyleConstSP      getStyle() const;
     virtual void                setStyle(LLStyleConstSP style);
-    virtual void                setToken( LLKeywordToken* token );
-    virtual LLKeywordToken*     getToken() const;
     virtual void                setToolTip(const std::string& tooltip);
     virtual void                dump() const;
 
@@ -108,8 +110,8 @@ public:
     /*virtual*/ bool            handleRightMouseUp(S32 x, S32 y, MASK mask);
     /*virtual*/ bool            handleDoubleClick(S32 x, S32 y, MASK mask);
     /*virtual*/ bool            handleHover(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool            handleScrollWheel(S32 x, S32 y, S32 clicks);
-    /*virtual*/ bool            handleScrollHWheel(S32 x, S32 y, S32 clicks);
+    /*virtual*/ bool            handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    /*virtual*/ bool            handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
     /*virtual*/ bool            handleToolTip(S32 x, S32 y, MASK mask);
     /*virtual*/ const std::string&  getName() const;
     /*virtual*/ void            onMouseCaptureLost();
@@ -135,17 +137,15 @@ public:
     virtual ~LLNormalTextSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
 
-    /*virtual*/ bool                getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const;
-    /*virtual*/ S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const;
-    /*virtual*/ S32                 getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool                getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    /*virtual*/ S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_bytes, bool round) const;
+    /*virtual*/ S32                 getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     /*virtual*/ void                updateLayout(const class LLTextBase& editor);
     /*virtual*/ F32                 draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
     /*virtual*/ bool                canEdit() const { return mCanEdit; }
     /*virtual*/ const LLUIColor&     getColor() const                    { return mStyle->getColor(); }
     /*virtual*/ LLStyleConstSP      getStyle() const                    { return mStyle; }
     /*virtual*/ void                setStyle(LLStyleConstSP style)  { mStyle = style; }
-    /*virtual*/ void                setToken( LLKeywordToken* token )   { mToken = token; }
-    /*virtual*/ LLKeywordToken*     getToken() const                    { return mToken; }
     /*virtual*/ void                setToolTip(const std::string& tooltip);
     /*virtual*/ void                dump() const;
 
@@ -159,30 +159,58 @@ protected:
     virtual bool        useFontBuffers() const { return true; }
     F32                 drawClippedSegment(S32 seg_start, S32 seg_end, S32 selection_start, S32 selection_end, LLRectf rect);
 
-    virtual     const LLWString&    getWText()  const;
-    virtual     const S32           getLength() const;
+    // The document this segment draws from, and the span of it the segment
+    // covers. Both count BYTES, as every offset in this class does; the names
+    // carry the unit because an S32 cannot.
+    virtual     const std::string&  getTextUtf8()   const;
+    virtual     const S32           getLengthBytes() const;
 
     void setAllowEdit(bool can_edit) { mCanEdit = can_edit; }
 
 protected:
     class LLTextBase&   mEditor;
     LLStyleConstSP      mStyle;
-    S32                 mFontHeight;
-    LLKeywordToken*     mToken;
     std::string         mTooltip;
     boost::signals2::connection mImageLoadedConnection;
 
     bool mCanEdit { true };
 
-    // font rendering
-    LLFontVertexBuffer  mFontBufferPreSelection;
-    LLFontVertexBuffer  mFontBufferSelection;
-    LLFontVertexBuffer  mFontBufferPostSelection;
-    S32                 mLastGeneration = -1;
+    // Font rendering. A segment that wraps is drawn once per line it covers --
+    // a different span of it, in a different place, each time -- so one set of
+    // caches per segment holds one line and every other line rebuilds its
+    // geometry on every frame, which is the whole of what the cache exists to
+    // prevent. There is a set per piece instead.
+    //
+    // Three spans within a piece: before the selection, inside it, after it.
+    struct LinePieceCache
+    {
+        LLFontTextCache mPreSelection;
+        LLFontTextCache mSelection;
+        LLFontTextCache mPostSelection;
+    };
+
+    // Indexed by the order the pieces are drawn in, which is the order of the
+    // lines they sit on and is the same on every pass. A pass that draws fewer
+    // pieces than the last leaves the tail of the vector alone, so a segment
+    // scrolling back into view finds its geometry where it left it.
+    std::vector<LinePieceCache> mLinePieces;
+    size_t                      mNextLinePiece = 0;
+    // 0 is "not drawn yet", and cannot be mistaken for a real pass: the editor
+    // counts the pass before any segment draws in it, so the first one seen
+    // here is 1. A lap of the counter can hand a segment a pass number it has
+    // seen before, which costs one pass of rebuilding and then settles.
+    U32                         mLastDrawPass = 0;
+
+    LinePieceCache&     nextLinePiece();
+
+    // Widths, which are asked for spans that are never drawn and are asked
+    // during reflow, before there is a piece to answer from. Its own cache, so
+    // a measurement and a draw cannot evict each other.
+    LLFontTextCache     mMeasureCache;
 };
 
 // This text segment is the same as LLNormalTextSegment, the only difference
-// is that LLNormalTextSegment draws value of LLTextBase (LLTextBase::getWText()),
+// is that LLNormalTextSegment draws value of LLTextBase (LLTextBase::getText()),
 // but LLLabelTextSegment draws label of the LLTextBase (LLTextBase::mLabel)
 class LLLabelTextSegment : public LLNormalTextSegment
 {
@@ -193,21 +221,8 @@ public:
 
 protected:
 
-    /*virtual*/ const LLWString&    getWText()  const;
-    /*virtual*/ const S32           getLength() const;
-};
-
-// Text segment that represents a single emoji character that has a different style (=font size) than the rest of
-// the document it belongs to
-class LLEmojiTextSegment : public LLNormalTextSegment
-{
-public:
-    LLEmojiTextSegment(LLStyleConstSP style, S32 start, S32 end, LLTextBase& editor);
-    LLEmojiTextSegment(const LLUIColor& color, S32 start, S32 end, LLTextBase& editor, bool is_visible = true);
-    /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const override;
-
-    bool canEdit() const override { return false; }
-    bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ const std::string&  getTextUtf8()   const;
+    /*virtual*/ const S32           getLengthBytes() const;
 };
 
 // Text segment that changes it's style depending of mouse pointer position ( is it inside or outside segment)
@@ -250,11 +265,12 @@ public:
     ~LLInlineViewSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
 
-    /*virtual*/ bool        getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const;
-    /*virtual*/ S32         getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool        getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    /*virtual*/ S32         getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     /*virtual*/ void        updateLayout(const class LLTextBase& editor);
     /*virtual*/ F32         draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
     /*virtual*/ bool        canEdit() const { return false; }
+    /*virtual*/ bool        getPermitsEmoji() const { return false; }
     /*virtual*/ void        unlinkFromDocument(class LLTextBase* editor);
     /*virtual*/ void        linkToDocument(class LLTextBase* editor);
 
@@ -275,12 +291,16 @@ public:
     LLLineBreakTextSegment(S32 pos);
     ~LLLineBreakTextSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
-    /*virtual*/ bool        getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const;
-    S32         getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool        getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    S32         getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     F32         draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
 
 private:
-    S32         mFontHeight;
+    // Stored stable LLFontGL*; getDimensionsF32 calls
+    // mFont->getLineSpacing() each access so an in-place font reload
+    // (LLFontGL::initClass on existing registry) is reflected in line-
+    // break heights.
+    const LLFontGL* mFont = nullptr;
 };
 
 class LLImageTextSegment : public LLTextSegment
@@ -290,8 +310,8 @@ public:
     ~LLImageTextSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
 
-    /*virtual*/ bool        getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const;
-    S32         getNumChars(S32 num_pixels, S32 segment_offset, S32 char_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool        getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    S32         getNumBytes(S32 num_pixels, S32 segment_offset, S32 byte_offset, S32 max_bytes, S32 line_ind) const;
     F32         draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
 
     /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask);
@@ -319,12 +339,13 @@ class LLTextBase
     public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLTextBase, LLUICtrl);
+    LLView* asView() override { return this; }
+
     friend class LLTextSegment;
     friend class LLNormalTextSegment;
+    friend class LLEmbeddedItemSegment;
     friend class LLUICtrlFactory;
-
-    typedef boost::signals2::signal<bool (const LLUUID& user_id)> is_friend_signal_t;
-    typedef boost::signals2::signal<bool (const LLUUID& blocked_id, const std::string from)> is_blocked_signal_t;
 
     struct LineSpacingParams : public LLInitParam::ChoiceBlock<LineSpacingParams>
     {
@@ -346,7 +367,8 @@ public:
                                 bg_highlighted_color,
 // [/SL:KB]
                                 text_selected_color,
-                                bg_selected_color;
+                                bg_selected_color,
+                                link_color;
 
         Optional<bool>          bg_visible,
                                 border_visible,
@@ -393,7 +415,8 @@ public:
     /*virtual*/ bool        handleRightMouseUp(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool        handleDoubleClick(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool        handleHover(S32 x, S32 y, MASK mask) override;
-    /*virtual*/ bool        handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    /*virtual*/ bool        handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    /*virtual*/ bool        handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
     /*virtual*/ bool        handleToolTip(S32 x, S32 y, MASK mask) override;
 
     // LLView interface
@@ -403,8 +426,10 @@ public:
     // LLUICtrl interface
     /*virtual*/ bool        acceptsTextInput() const override { return !mReadOnly; }
     /*virtual*/ void        setColor(const LLUIColor& c) override;
+    const LLUIColor&        getColor() const { return mFgColor; }
     virtual     void        setReadOnlyColor(const LLUIColor& c);
     /*virtual*/ void        onVisibilityChange(bool new_visibility) override;
+    void                    setBgReadOnlyColor(const LLUIColor& c) { mReadOnlyBgColor = c; }
 
     /*virtual*/ void        setValue(const LLSD& value) override;
     /*virtual*/ LLTextViewModel* getViewModel() const override;
@@ -440,10 +465,8 @@ public:
     // used by LLTextSegment layout code
     bool                    getWordWrap() const { return mWordWrap; }
     bool                    getUseEllipses() const { return mUseEllipses; }
-    bool                    getUseEmoji() const { return mUseEmoji; }
     void                    setUseEmoji(bool value) { mUseEmoji = value; }
     bool                    getUseColor() const { return mUseColor; }
-    void                    setUseColor(bool value) { mUseColor = value; }
     bool                    truncate(); // returns true of truncation occurred
 
     bool                    isContentTrusted() const { return mTrustedContent; }
@@ -454,15 +477,22 @@ public:
 
     // Text accessors
     // TODO: add optional style parameter
-    virtual void            setText(const LLStringExplicit &utf8str , const LLStyle::Params& input_params = LLStyle::Params()); // uses default style
+    // By view. Every implementation below copies what it is given, because
+    // it has to validate and truncate it; taking an owning string as well
+    // meant the caller copied it first so the callee could copy it again.
+    virtual void            setText(ALStringViewExplicit utf8str , const LLStyle::Params& input_params = LLStyle::defaultParams()); // uses default style
     /*virtual*/ const std::string& getText() const override;
     void                    setMaxTextLength(S32 length) { mMaxTextByteLength = length; }
     S32                     getMaxTextLength() const { return mMaxTextByteLength; }
 
-    // wide-char versions
-    void                    setWText(const LLWString& text);
-    const LLWString&        getWText() const;
     S32                     getTextGeneration() const;
+
+    // Counts passes over the visible text. A segment that wraps is drawn once
+    // per line it covers, and this is how it tells the pieces of one pass from
+    // the pieces of the next. Unsigned because it is only ever compared for
+    // equality and must be allowed to wrap: signed overflow would be undefined
+    // where this is simply a lap of the counter.
+    U32                     getDrawPass() const { return mDrawPass; }
 
     void                    appendText(const std::string &new_text, bool prepend_newline, const LLStyle::Params& input_params = LLStyle::Params());
 
@@ -470,7 +500,6 @@ public:
     /*virtual*/ bool        setLabelArg(const std::string& key, const LLStringExplicit& text) override;
 
     const   std::string&    getLabel()  { return mLabel.getString(); }
-    const   LLWString&      getWlabel() { return mLabel.getWString();}
 
     void                    setLastSegmentToolTip(const std::string &tooltip);
 
@@ -485,7 +514,10 @@ public:
     // force reflow of text
     void                    needsReflow(S32 index = 0);
 
-    S32                     getLength() const { return static_cast<S32>(getWText().length()); }
+    // Named for its unit. Every offset this class takes and hands back --
+    // cursor, selection, segment bounds, line ranges -- is a byte offset into
+    // getText(), sitting at a character start.
+    S32                     getLengthBytes() const { return static_cast<S32>(getText().length()); }
     S32                     getLineCount() const { return static_cast<S32>(mLineInfoList.size()); }
     S32                     removeFirstLine(); // returns removed length
 
@@ -499,7 +531,6 @@ public:
     S32                     getVPad() const { return mVPad; }
     S32                     getHPad() const { return mHPad; }
     F32                     getLineSpacingMult() const { return mLineSpacingMult; }
-    S32                     getLineSpacingPixels() const { return mLineSpacingPixels; } // only for multiline
 
     S32                     getDocIndexFromLocalCoord( S32 local_x, S32 local_y, bool round, bool hit_past_end_of_line = true) const;
     LLRect                  getLocalRectFromDocIndex(S32 pos) const;
@@ -519,6 +550,14 @@ public:
     // cursor manipulation
     bool                    setCursor(S32 row, S32 column);
     bool                    setCursorPos(S32 cursor_pos, bool keep_cursor_offset = false);
+
+    // Drag-select cursor placement with cluster-aware hysteresis. Locks
+    // mCursorPos to whichever boundary it's already on (cluster start vs
+    // end) until the mouse moves clearly into the cluster's other half,
+    // so sub-pixel jitter or slow motion across the glyph doesn't bounce
+    // the highlight rect across the cluster's full pixel span. Returns
+    // true if the cursor moved.
+    bool                    dragSelectCursorTo(S32 local_x, S32 local_y);
     void                    startOfLine();
     void                    endOfLine();
     void                    startOfDoc();
@@ -546,11 +585,18 @@ public:
     virtual void            appendImageSegment(const LLStyle::Params& style_params);
     virtual void            appendWidget(const LLInlineViewSegment::Params& params, const std::string& text, bool allow_undo);
     boost::signals2::connection setURLClickedCallback(const commit_signal_t::slot_type& cb);
-    boost::signals2::connection setIsFriendCallback(const is_friend_signal_t::slot_type& cb);
-    boost::signals2::connection setIsObjectBlockedCallback(const is_blocked_signal_t::slot_type& cb);
 
     void                    setWordWrap(bool wrap);
     LLScrollContainer*      getScrollContainer() const { return mScroller; }
+
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+    void setParseHighlights(bool parse)       { mParseHighlights = parse; }
+    S32  getHighlightsMask() const            { return mHighlightsMask; }
+    void setHighlightsMask(S32 category_mask) { mHighlightsMask = category_mask; }
+
+    typedef boost::signals2::signal<void(const std::string&, const LLHighlightEntry*)> highlights_signal_t;
+    boost::signals2::connection setHighlightsCallback(const highlights_signal_t::slot_type& cb);
+// [/SL:KB]
 
 protected:
     // protected member variables
@@ -610,7 +656,7 @@ protected:
         virtual bool    hasExtCharValue( llwchar value ) const { return false; }
 
         // Defined here so they can access protected LLTextEditor editing methods
-        S32             insert(LLTextBase* editor, S32 pos, const LLWString &wstr) { return editor->insertStringNoUndo( pos, wstr, &mSegments ); }
+        S32             insert(LLTextBase* editor, S32 pos, std::string_view utf8str) { return editor->insertStringNoUndo( pos, utf8str, &mSegments ); }
         S32             remove(LLTextBase* editor, S32 pos, S32 length) { return editor->removeStringNoUndo( pos, length ); }
         S32             overwrite(LLTextBase* editor, S32 pos, llwchar wc) { return editor->overwriteCharNoUndo(pos, wc); }
 
@@ -648,7 +694,7 @@ protected:
     void                            drawHighlightedBackground();
 
     // modify contents
-    S32                             insertStringNoUndo(S32 pos, const LLWString &wstr, segment_vec_t* segments = NULL); // returns num of chars actually inserted
+    S32                             insertStringNoUndo(S32 pos, std::string_view utf8str, segment_vec_t* segments = NULL); // returns num of BYTES actually inserted
     S32                             removeStringNoUndo(S32 pos, S32 length);
     S32                             overwriteCharNoUndo(S32 pos, llwchar wc);
     void                            appendAndHighlightText(const std::string &new_text, S32 highlight_part, const LLStyle::Params& stylep, e_underline underline_link = e_underline::UNDERLINE_ALWAYS);
@@ -668,10 +714,19 @@ protected:
     void                            insertSegment(LLTextSegmentPtr segment_to_insert);
     const LLStyle::Params&          getStyleParams();
 
+    // The default style as one shared, immutable object. Segments that carry
+    // nothing but the widget's own style all point at this instead of each
+    // holding a copy of the same values. Callers that go on to change the
+    // style must build their own from getStyleParams().
+    //
+    // Shared within this widget only: the style holds links to this widget's
+    // own colour members, so it means nothing to another one.
+    const LLStyleConstSP&           getDefaultStyle();
+
     //  manage lines
 // [SL:KB] - Patch: Control-TextEditor | Checked: Catznip-5.2
 public:
-// [/SL:KB
+// [/SL:KB]
 //  S32                             getLineStart( S32 line ) const;
 // [SL:KB] - Patch: Control-TextEditor | Checked: 2013-12-31 (Catznip-3.6)
     S32                             getLineStart(S32 line, bool include_wordwrap = true) const;
@@ -709,7 +764,6 @@ protected:
 
     void                            appendTextImpl(const std::string &new_text, const LLStyle::Params& input_params = LLStyle::Params(), bool force_slurl = false);
     void                            appendAndHighlightTextImpl(const std::string &new_text, S32 highlight_part, const LLStyle::Params& style_params, e_underline underline_link = e_underline::UNDERLINE_ALWAYS);
-    S32 normalizeUri(std::string& uri);
 
 protected:
     // virtual
@@ -719,7 +773,7 @@ protected:
     }
 
 public:
-    bool                            hasSelection() const { return (mSelectionStart !=mSelectionEnd); }
+    bool hasSelection() const { return (mSelectionStart != mSelectionEnd); }
 
     std::vector<LLRect> getSelectionRects(const highlight_list_t& highlights);
     std::vector<std::pair<LLRect, LLUIColor>> getHighlightedBgRects();
@@ -728,11 +782,13 @@ protected:
     // text segmentation and flow
     segment_set_t               mSegments;
     line_list_t                 mLineInfoList;
+    U32                         mDrawPass = 0;
     LLRect                      mVisibleTextRect;           // The rect in which text is drawn.  Excludes borders.
     LLRect                      mTextBoundingRect;
 
     // default text style
     LLStyle::Params             mStyle;
+    LLStyleConstSP              mDefaultStyle;
     bool                        mStyleDirty;
     const LLFontGL*             mFont;
     const LLFontGL::ShadowType  mFontShadow;
@@ -773,7 +829,7 @@ protected:
 
 // [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
     // highlighting
-    LLWString                   mHighlightWord;
+    std::string                 mHighlightWord;
     bool                        mHighlightCaseInsensitive;
     highlight_list_t            mHighlights;
     bool                        mHighlightsDirty;
@@ -796,6 +852,7 @@ protected:
     bool                        mUseEmoji;
     bool                        mUseColor;
     bool                        mTrackEnd;          // if true, keeps scroll position at end of document during resize
+    bool                        mTrackValueChange;  // if true, send out onValueChange() from low level text modification methods
     bool                        mReadOnly;
     bool                        mBGVisible;         // render background?
     bool                        mClip;              // clip text to widget rect
@@ -808,6 +865,8 @@ protected:
     bool                        mAlwaysShowIcons;
 
     bool                        mSkipLinkUnderline;
+    bool                        mHasLinkColor;
+    LLUIColor                   mLinkColor;
 
     // support widgets
     LLHandle<LLContextMenu>     mPopupMenuHandle;
@@ -822,9 +881,14 @@ protected:
     // Fired when a URL link is clicked
     commit_signal_t*            mURLClickSignal;
 
-    // Used to check if user with given ID is avatar's friend
-    is_friend_signal_t*         mIsFriendSignal;
-    is_blocked_signal_t*        mIsObjectBlockedSignal;
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+    S32                         mHighlightsMask;    // category mask for matching highlights
+    highlights_signal_t*        mHighlightsSignal;  // signal fires whenever a highlighted segment is appended
+    // Dedup of highlight-signal fires across one appendText call. Cleared by
+    // appendTextImpl, populated by it and appendAndHighlightTextImpl. Per-instance
+    // and main-thread-only — appendText is not called from worker threads.
+    std::set<const LLHighlightEntry*> mAppendTextFiredEntries;
+// [/SL:KB]
 
     LLUIString                  mLabel; // text label that is visible when no user text provided
 };

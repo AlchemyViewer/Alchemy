@@ -75,6 +75,7 @@ LLScrollContainer::Params::Params()
     max_auto_scroll_rate("max_auto_scroll_rate", 1000),
     max_auto_scroll_zone("max_auto_scroll_zone", 16),
     reserve_scroll_corner("reserve_scroll_corner", false),
+    keep_scroll_pos("keep_scroll_pos", false),
     size("size", -1)
 {}
 
@@ -93,8 +94,12 @@ LLScrollContainer::LLScrollContainer(const LLScrollContainer::Params& p)
     mMaxAutoScrollRate(p.max_auto_scroll_rate),
     mMaxAutoScrollZone(p.max_auto_scroll_zone),
     mScrolledView(NULL),
+    mKeepScrollPos(p.keep_scroll_pos),
     mSize(p.size)
 {
+    mStoredDocPos[VERTICAL] = 0;
+    mStoredDocPos[HORIZONTAL] = 0;
+
     static LLUICachedControl<S32> scrollbar_size_control ("UIScrollbarSize", 0);
     S32 scrollbar_size = (mSize == -1 ? scrollbar_size_control : mSize);
 
@@ -182,6 +187,7 @@ void LLScrollContainer::scrollVertical( S32 new_pos )
 void LLScrollContainer::reshape(S32 width, S32 height,
                                         bool called_from_parent)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     LLUICtrl::reshape( width, height, called_from_parent );
 
     mInnerRect = getLocalRect();
@@ -257,11 +263,11 @@ bool LLScrollContainer::handleUnicodeCharHere(llwchar uni_char)
     return false;
 }
 
-bool LLScrollContainer::handleScrollWheel( S32 x, S32 y, S32 clicks )
+bool LLScrollContainer::handleScrollWheel( S32 x, S32 y, LLScrollDelta delta )
 {
     // Give event to my child views - they may have scroll bars
     // (Bad UI design, but technically possible.)
-    if (LLUICtrl::handleScrollWheel(x,y,clicks))
+    if (LLUICtrl::handleScrollWheel(x,y,delta))
         return true;
 
     // When the vertical scrollbar is visible, scroll wheel
@@ -273,7 +279,7 @@ bool LLScrollContainer::handleScrollWheel( S32 x, S32 y, S32 clicks )
         && vertical->getEnabled())
     {
         // Pretend the mouse is over the scrollbar
-        if (vertical->handleScrollWheel( 0, 0, clicks ) )
+        if (vertical->handleScrollWheel( 0, 0, delta ) )
         {
             updateScroll();
         }
@@ -286,7 +292,7 @@ bool LLScrollContainer::handleScrollWheel( S32 x, S32 y, S32 clicks )
     // LLView::childrenHandleScrollWheel().
     if (horizontal->getVisible()
         && horizontal->getEnabled()
-        && horizontal->handleScrollWheel( 0, 0, clicks ) )
+        && horizontal->handleScrollWheel( 0, 0, delta ) )
     {
         updateScroll();
         return true;
@@ -294,9 +300,9 @@ bool LLScrollContainer::handleScrollWheel( S32 x, S32 y, S32 clicks )
     return false;
 }
 
-bool LLScrollContainer::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLScrollContainer::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    if (LLUICtrl::handleScrollHWheel(x,y,clicks))
+    if (LLUICtrl::handleScrollHWheel(x,y,delta))
     {
         return true;
     }
@@ -304,7 +310,7 @@ bool LLScrollContainer::handleScrollHWheel(S32 x, S32 y, S32 clicks)
     LLScrollbar* horizontal = mScrollbar[HORIZONTAL];
     if (horizontal->getVisible()
         && horizontal->getEnabled()
-        && horizontal->handleScrollHWheel( 0, 0, clicks ) )
+        && horizontal->handleScrollHWheel( 0, 0, delta ) )
     {
         updateScroll();
         return true;
@@ -480,6 +486,7 @@ void LLScrollContainer::calcVisibleSize( S32 *visible_width, S32 *visible_height
 
 void LLScrollContainer::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     static LLUICachedControl<S32> scrollbar_size_control ("UIScrollbarSize", 0);
     S32 scrollbar_size = (mSize == -1 ? scrollbar_size_control : mSize);
 
@@ -511,7 +518,7 @@ void LLScrollContainer::draw()
         {
             F32 alpha = getCurrentTransparency();
 
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
             gl_rect_2d(mInnerRect, mBackgroundColor.get() % alpha);
         }
 
@@ -585,8 +592,21 @@ bool LLScrollContainer::addChild(LLView* view, S32 tab_group)
     return ret_val;
 }
 
+void LLScrollContainer::removeChild(LLView* view)
+{
+    if (view == mScrolledView)
+    {
+        mScrolledView = nullptr;
+    }
+    LLView::removeChild(view);
+}
+
 void LLScrollContainer::updateScroll()
 {
+    // Reached several times over in one layout: from this container's reshape,
+    // from every getContentWindowRect a scrolled view asks for, and again from
+    // draw. It had no zone, so all of that was charged to whatever contained it.
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     if (!getVisible() || !mScrolledView)
     {
         return;
@@ -604,6 +624,22 @@ void LLScrollContainer::updateScroll()
     calcVisibleSize( &visible_width, &visible_height, &show_h_scrollbar, &show_v_scrollbar );
 
     S32 border_width = getBorderWidth();
+
+    // Remember the position only while the scrollbar is genuinely showing scrollable
+    // content, so a transient empty pass (e.g. a list clearing before it repopulates)
+    // cannot overwrite it with 0.
+    if (mKeepScrollPos)
+    {
+        if (show_v_scrollbar && mScrollbar[VERTICAL]->getVisible())
+        {
+            mStoredDocPos[VERTICAL] = mScrollbar[VERTICAL]->getDocPos();
+        }
+        if (show_h_scrollbar && mScrollbar[HORIZONTAL]->getVisible())
+        {
+            mStoredDocPos[HORIZONTAL] = mScrollbar[HORIZONTAL]->getDocPos();
+        }
+    }
+
     if( show_v_scrollbar )
     {
         if( doc_rect.mTop < getRect().getHeight() - border_width )
@@ -672,6 +708,18 @@ void LLScrollContainer::updateScroll()
 
     mScrollbar[VERTICAL]->setDocSize( doc_height );
     mScrollbar[VERTICAL]->setPageSize( visible_height );
+
+    if (mKeepScrollPos)
+    {
+        if (show_v_scrollbar)
+        {
+            mScrollbar[VERTICAL]->setDocPos(mStoredDocPos[VERTICAL]);
+        }
+        if (show_h_scrollbar)
+        {
+            mScrollbar[HORIZONTAL]->setDocPos(mStoredDocPos[HORIZONTAL]);
+        }
+    }
 } // end updateScroll
 
 void LLScrollContainer::setBorderVisible(bool b)
@@ -693,6 +741,7 @@ LLRect LLScrollContainer::getVisibleContentRect()
 
 LLRect LLScrollContainer::getContentWindowRect()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     updateScroll();
     LLRect scroller_view_rect;
     S32 visible_width = 0;

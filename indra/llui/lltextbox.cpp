@@ -43,7 +43,7 @@ template class LLTextBox* LLView::getChild<class LLTextBox>(
 
 LLTextBox::LLTextBox(const LLTextBox::Params& p)
 :   LLTextBase(p),
-    mClickedCallback(NULL),
+    mClickedCallback(nullptr),
     mShowCursorHand(true)
 {
     mSkipTripleClick = true;
@@ -109,7 +109,10 @@ bool LLTextBox::handleHover(S32 x, S32 y, MASK mask)
     if (!handled && mClickedCallback && mShowCursorHand)
     {
         // Clickable text boxes change the cursor to a hand
-        LLUI::getInstance()->getWindow()->setCursor(UI_CURSOR_HAND);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_HAND);
+        }
         return true;
     }
     return handled;
@@ -127,22 +130,43 @@ void LLTextBox::setEnabled(bool enabled)
     LLTextBase::setEnabled(enabled);
 }
 
-void LLTextBox::setText(const LLStringExplicit& text , const LLStyle::Params& input_params )
+void LLTextBox::setText(ALStringViewExplicit text , const LLStyle::Params& input_params )
 {
     // does string argument insertion
     mText.assign(text);
 
+    // LLTextBase::setText below clears the document, re-parses it into
+    // segments and reflows, so a panel that writes its label the value it
+    // already holds pays for a rebuild producing the same thing. The guard
+    // inside LLUIString::assign cannot prevent that on its own, because this
+    // call is made whether or not the value moved.
+    //
+    // Asked of the document rather than of a remembered version, so it stays
+    // right whatever else wrote it. The style half is asked by identity: a
+    // caller supplying no style resolves its default argument to
+    // LLStyle::defaultParams(), and one that supplies a style always rebuilds
+    // -- LLInitParam blocks cannot be compared, so a style that happens to
+    // hold defaults is indistinguishable from one that means something.
+    const bool styled = (&input_params != &LLStyle::defaultParams());
+    if (!styled && !mLastSetTextStyled && getText() == mText.getString())
+    {
+        return;
+    }
+    // Remembered so an unstyled write of text a styled write already put there
+    // still rebuilds: it has a style to take back off.
+    mLastSetTextStyled = styled;
+
     LLTextBase::setText(mText.getString(), input_params );
 }
 
-void LLTextBox::setClickedCallback( boost::function<void (void*)> cb, void* userdata /*= NULL */ )
+void LLTextBox::setClickedCallback(std::function<void (void*)> cb, void* userdata /*= nullptr */)
 {
     mClickedCallback = boost::bind(cb, userdata);
 }
 
 void LLTextBox::clearClickedCallback()
 {
-    mClickedCallback.clear();
+    mClickedCallback = nullptr;
 }
 
 S32 LLTextBox::getTextPixelWidth()
@@ -164,8 +188,7 @@ LLSD LLTextBox::getValue() const
 bool LLTextBox::setTextArg( const std::string& key, const LLStringExplicit& text )
 {
     mText.setArg(key, text);
-    static const LLStyle::Params input_params = LLStyle::Params();
-    LLTextBase::setText(mText.getString(), input_params);
+    LLTextBase::setText(mText.getString());
 
     return true;
 }

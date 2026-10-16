@@ -54,7 +54,7 @@ namespace LL
 
                 bool prep(Asset& asset);
 
-                void serialize(boost::json::object& dst) const;
+                void serialize(JsonWriter& dst) const;
                 const Sampler& operator=(const Value& value);
 
                 // get the frame index and time for the specified time
@@ -77,14 +77,14 @@ namespace LL
                     bool operator==(const Target& other) const;
                     bool operator!=(const Target& other) const;
 
-                    void serialize(boost::json::object& dst) const;
+                    void serialize(JsonWriter& dst) const;
                     const Target& operator=(const Value& value);
                 };
 
                 S32 mSampler = INVALID_INDEX;
                 Target mTarget;
 
-                void serialize(boost::json::object& dst) const;
+                void serialize(JsonWriter& dst) const;
                 const Channel& operator=(const Value& value);
             };
 
@@ -150,7 +150,7 @@ namespace LL
             std::vector<TranslationChannel> mTranslationChannels;
             std::vector<ScaleChannel> mScaleChannels;
 
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
             const Animation& operator=(const Value& value);
 
             bool prep(Asset& asset);

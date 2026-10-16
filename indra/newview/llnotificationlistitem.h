@@ -43,6 +43,8 @@
 class LLNotificationListItem : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLNotificationListItem, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         LLUUID          notification_id;
@@ -79,12 +81,12 @@ public:
     std::string& getNotificationName() { return mNotificationName; }
 
     // handlers
-    virtual bool handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual void onMouseEnter(S32 x, S32 y, MASK mask);
-    virtual void onMouseLeave(S32 x, S32 y, MASK mask);
+    virtual bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    virtual void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
     //callbacks
-    typedef boost::function<void (LLNotificationListItem* item)> item_callback_t;
+    typedef std::function<void (LLNotificationListItem* item)> item_callback_t;
     typedef boost::signals2::signal<void (LLNotificationListItem* item)> item_signal_t;
     item_signal_t mOnItemClose;
     item_signal_t mOnItemClick;
@@ -93,7 +95,7 @@ public:
 
     virtual bool showPopup() { return true; }
     void setExpanded(bool value);
-    virtual bool postBuild();
+    virtual bool postBuild() override;
     void reshapeNotification();
 
     typedef enum e_time_type
@@ -137,12 +139,14 @@ class LLGroupNotificationListItem
     : public LLNotificationListItem, public LLGroupMgrObserver
 {
 public:
+    AL_VIEW_TYPE(LLGroupNotificationListItem, LLNotificationListItem);
+
     virtual ~LLGroupNotificationListItem();
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void setGroupId(const LLUUID& value);
     // LLGroupMgrObserver observer trigger
-    virtual void changed(LLGroupChange gc);
+    virtual void changed(LLGroupChange gc) override;
 
     friend class LLNotificationListItem;
 protected:
@@ -156,27 +160,29 @@ protected:
     LLTextBox*  mGroupNameBoxExp;
 
 private:
-    LLGroupNotificationListItem(const LLGroupNotificationListItem &);
-    LLGroupNotificationListItem & operator=(LLGroupNotificationListItem &);
+    LLGroupNotificationListItem(const LLGroupNotificationListItem&) = delete;
+    LLGroupNotificationListItem& operator=(LLGroupNotificationListItem&) = delete;
 
     void setGroupName(std::string name);
     bool updateFromCache();
 };
 
-class LLGroupInviteNotificationListItem
+class LLGroupInviteNotificationListItem final
     : public LLGroupNotificationListItem
 {
 public:
-    static std::set<std::string> getTypes();
-    virtual bool postBuild();
+    AL_VIEW_TYPE(LLGroupInviteNotificationListItem, LLGroupNotificationListItem);
 
-    /*virtual*/ bool showPopup() { return false; }
+    static std::set<std::string> getTypes();
+    virtual bool postBuild() override;
+
+    /*virtual*/ bool showPopup() override { return false; }
 
 private:
     friend class LLNotificationListItem;
     LLGroupInviteNotificationListItem(const Params& p);
-    LLGroupInviteNotificationListItem(const LLGroupInviteNotificationListItem &);
-    LLGroupInviteNotificationListItem & operator=(LLGroupInviteNotificationListItem &);
+    LLGroupInviteNotificationListItem(const LLGroupInviteNotificationListItem&) = delete;
+    LLGroupInviteNotificationListItem& operator=(LLGroupInviteNotificationListItem&) = delete;
 
     void setFee(S32 fee);
 
@@ -190,24 +196,26 @@ private:
     LLButton*       mInfoBtn;
 };
 
-class LLGroupNoticeNotificationListItem
+class LLGroupNoticeNotificationListItem final
     : public LLGroupNotificationListItem
 {
 public:
-    static std::set<std::string> getTypes();
-    virtual bool postBuild();
+    AL_VIEW_TYPE(LLGroupNoticeNotificationListItem, LLGroupNotificationListItem);
 
-    /*virtual*/ bool showPopup() { return false; }
+    static std::set<std::string> getTypes();
+    virtual bool postBuild() override;
+
+    /*virtual*/ bool showPopup() override { return false; }
 
 private:
     friend class LLNotificationListItem;
     LLGroupNoticeNotificationListItem(const Params& p);
-    LLGroupNoticeNotificationListItem(const LLGroupNoticeNotificationListItem &);
-    LLGroupNoticeNotificationListItem & operator=(LLGroupNoticeNotificationListItem &);
+    LLGroupNoticeNotificationListItem(const LLGroupNoticeNotificationListItem&) = delete;
+    LLGroupNoticeNotificationListItem& operator=(LLGroupNoticeNotificationListItem&) = delete;
 
     void setSender(std::string sender);
     void onClickAttachment();
-    /*virtual*/ void close();
+    /*virtual*/ void close() override;
 
     static bool isAttachmentOpenable(LLAssetType::EType);
 
@@ -218,29 +226,33 @@ private:
     LLOfferInfo*    mInventoryOffer;
 };
 
-class LLTransactionNotificationListItem : public LLNotificationListItem
+class LLTransactionNotificationListItem final : public LLNotificationListItem
 {
 public:
+    AL_VIEW_TYPE(LLTransactionNotificationListItem, LLNotificationListItem);
+
     static std::set<std::string> getTypes();
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 private:
     friend class LLNotificationListItem;
     LLTransactionNotificationListItem(const Params& p);
-    LLTransactionNotificationListItem(const LLTransactionNotificationListItem &);
-    LLTransactionNotificationListItem & operator=(LLTransactionNotificationListItem &);
+    LLTransactionNotificationListItem(const LLTransactionNotificationListItem&) = delete;
+    LLTransactionNotificationListItem& operator=(LLTransactionNotificationListItem&) = delete;
     LLAvatarIconCtrl* mAvatarIcon;
     LLAvatarIconCtrl* mAvatarIconExp;
 };
 
-class LLSystemNotificationListItem : public LLNotificationListItem
+class LLSystemNotificationListItem final : public LLNotificationListItem
 {
 public:
-    virtual bool postBuild();
+    AL_VIEW_TYPE(LLSystemNotificationListItem, LLNotificationListItem);
+
+    virtual bool postBuild() override;
 private:
     friend class LLNotificationListItem;
     LLSystemNotificationListItem(const Params& p);
-    LLSystemNotificationListItem(const LLSystemNotificationListItem &);
-    LLSystemNotificationListItem & operator=(LLSystemNotificationListItem &);
+    LLSystemNotificationListItem(const LLSystemNotificationListItem&) = delete;
+    LLSystemNotificationListItem & operator=(LLSystemNotificationListItem &) = delete;
     LLIconCtrl* mSystemNotificationIcon;
     LLIconCtrl* mSystemNotificationIconExp;
     bool mIsCaution;

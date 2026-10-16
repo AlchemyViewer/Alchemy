@@ -29,6 +29,7 @@
 
 #include <string>
 #include "llrect.h"
+#include "llcheckboxctrl.h"
 #include "lluictrl.h"
 #include "lluicolor.h"
 #include "llstyle.h"
@@ -50,6 +51,7 @@ class LLAccordionCtrlTab : public LLUICtrl
 {
 // Interface
 public:
+    AL_VIEW_TYPE(LLAccordionCtrlTab, LLUICtrl);
 
     struct Params
      : public LLInitParam::Block<Params, LLUICtrl::Params>
@@ -65,14 +67,11 @@ public:
 
         // Overlay images (arrows on the left)
         Mandatory<LLUIImage*>   header_expand_img,
-                                header_expand_img_pressed,
-                                header_collapse_img,
-                                header_collapse_img_pressed;
+                                header_collapse_img;
 
         // Background images for the accordion tabs
         Mandatory<LLUIImage*>   header_image,
                                 header_image_over,
-                                header_image_pressed,
                                 header_image_focused;
 
         Optional<LLUIColor>     header_bg_color,
@@ -80,6 +79,25 @@ public:
                                 dropdown_bg_color;
 
         Optional<bool>          header_visible;
+
+        // What the section is for, shown over the header and nowhere else.
+        // The tab's own tool_tip is no use for that: a parent's tooltip is
+        // offered before its children's, so one on the tab pops up over
+        // every caption and gap in the panel it holds.
+        Optional<std::string>   header_tool_tip;
+
+        // An interactive checkbox at the right end of the header, for a
+        // section that can be switched off without being collapsed. Omitted
+        // by every tab that does not want one, and there is no checkbox at
+        // all in that case -- not a hidden one -- so the tabs already in the
+        // viewer keep the header they have.
+        //
+        // A full check_box params block, so control_name, enabled_control,
+        // tool_tip and commit_callback all work as they do anywhere else.
+        // Sizing is the one thing it does not take from the block: an
+        // unsized checkbox gets a default square wide enough for the box,
+        // and a header checkbox that carries a label has to say how wide.
+        Optional<LLCheckBoxCtrl::Params> header_check_box;
 
         Optional<bool>          fit_panel;
 
@@ -134,13 +152,19 @@ public:
     void canOpenClose(bool can_open_close) { mCanOpenClose = can_open_close; };
     bool canOpenClose() const { return mCanOpenClose; };
 
-    virtual bool postBuild();
+    // The header checkbox, or null for a tab that did not ask for one --
+    // which is all of them unless header_check_box was given. Callers that
+    // want the value should reach it through this rather than getChild: the
+    // checkbox lives inside the header, not in the tab's own child list.
+    LLCheckBoxCtrl* getHeaderCheckBox() const { return mHeaderCheckBox; }
 
-    S32 notifyParent(const LLSD& info);
-    S32 notify(const LLSD& info);
-    bool notifyChildren(const LLSD& info);
+    virtual bool postBuild() override;
 
-    virtual void draw();
+    S32 notifyParent(const LLSD& info) override;
+    S32 notify(const LLSD& info) override;
+    bool notifyChildren(const LLSD& info) override;
+
+    virtual void draw() override;
 
     void storeOpenCloseState();
     void restoreOpenCloseState();
@@ -153,25 +177,25 @@ protected:
 public:
 
     // Call reshape after changing size
-    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     /**
      * Raises notifyParent event with "child_visibility_change" = new_visibility
      */
-    void onVisibilityChange(bool new_visibility);
-    virtual void onUpdateScrollToChild(const LLUICtrl * cntrl);
+    void onVisibilityChange(bool new_visibility) override;
+    virtual void onUpdateScrollToChild(const LLUICtrl * cntrl) override;
 
     // Changes expand/collapse state and triggers expand/collapse callbacks
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
-    virtual bool handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool handleKey(KEY key, MASK mask, bool called_from_parent);
+    virtual bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool handleKey(KEY key, MASK mask, bool called_from_parent) override;
 
-    virtual bool handleToolTip(S32 x, S32 y, MASK mask);
-    virtual bool handleScrollWheel( S32 x, S32 y, S32 clicks );
+    virtual bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    virtual bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta ) override;
+    virtual bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
-
-    virtual bool addChild(LLView* child, S32 tab_group = 0 );
+    virtual bool addChild(LLView* child, S32 tab_group = 0 ) override;
 
     bool isExpanded() const { return mDisplayChildren; }
 
@@ -219,10 +243,18 @@ protected:
     void selectOnFocusReceived();
     void deselectOnFocusLost();
 
+    // Whether (x, y), in this tab's coordinates, lands on the header
+    // checkbox. False whenever there is no checkbox.
+    bool pointInHeaderCheckBox(S32 x, S32 y) const;
+
 private:
 
     class LLAccordionCtrlTabHeader;
     LLAccordionCtrlTabHeader* mHeader; //Header
+
+    // Owned by the header, which is where it is drawn and where its rect is
+    // kept; held here too because the tab is what the mouse reaches first.
+    LLCheckBoxCtrl* mHeaderCheckBox;
 
     bool mDisplayChildren; //Expanded/collapsed
     bool mCollapsible;

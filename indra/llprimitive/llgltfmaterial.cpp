@@ -31,8 +31,12 @@
 
 #include "llsdserialize.h"
 
+#include "hbxxh.h"
+
+#include <boost/container_hash/hash.hpp>
+
 // NOTE -- this should be the one and only place tiny_gltf.h is included
-#include "tinygltf/tiny_gltf.h"
+#include <tiny_gltf.h>
 #include "llgltfmaterial_templates.h"
 
 const char* const LLGLTFMaterial::ASSET_VERSION = "1.1";
@@ -47,39 +51,7 @@ const char* const LLGLTFMaterial::GLTF_FILE_EXTENSION_TRANSFORM_ROTATION = "rota
 // special UUID that indicates a null UUID in override data
 const LLUUID LLGLTFMaterial::GLTF_OVERRIDE_NULL_UUID = LLUUID("ffffffff-ffff-ffff-ffff-ffffffffffff");
 
-LLGLTFMaterial::LLGLTFMaterial()
-{
-    // IMPORTANT: since we use the hash of the member variables memory block of
-    // this class to detect changes, we must ensure that all its padding bytes
-    // have been zeroed out. But of course, we must leave the LLRefCount member
-    // variable untouched (and skip it when hashing), and we cannot either
-    // touch the local texture overrides map (else we destroy pointers, and
-    // sundry private data, which would lead to a crash when using that map).
-    // The variable members have therefore been arranged so that anything,
-    // starting at mLocalTexDataDigest and up to the end of the members, can be
-    // safely zeroed. HB
-    const size_t offset = intptr_t(&mLocalTexDataDigest) - intptr_t(this);
-    memset((void*)((const char*)this + offset), 0, sizeof(*this) - offset);
-
-    // Now that we zeroed out our member variables, we can set the ones that
-    // should not be zero to their default value. HB
-    mBaseColor.set(1.f, 1.f, 1.f, 1.f);
-    mMetallicFactor = mRoughnessFactor = 1.f;
-    mAlphaCutoff = 0.5f;
-    for (U32 i = 0; i < GLTF_TEXTURE_INFO_COUNT; ++i)
-    {
-        mTextureTransform[i].mScale.set(1.f, 1.f);
-#if 0
-        mTextureTransform[i].mOffset.clear();
-        mTextureTransform[i].mRotation = 0.f;
-#endif
-    }
-#if 0
-    mLocalTexDataDigest = 0;
-    mAlphaMode = ALPHA_MODE_OPAQUE;    // This is 0
-    mOverrideDoubleSided = mOverrideAlphaMode = false;
-#endif
-}
+LLGLTFMaterial::LLGLTFMaterial() = default;
 
 void LLGLTFMaterial::TextureTransform::getPacked(Pack& packed) const
 {
@@ -148,18 +120,18 @@ LLGLTFMaterial& LLGLTFMaterial::operator=(const LLGLTFMaterial& rhs)
 
 void LLGLTFMaterial::updateLocalTexDataDigest()
 {
-    mLocalTexDataDigest = 0;
-    if (!mTrackingIdToLocalTexture.empty())
+    // mTrackingIdToLocalTexture is an ordered map, so walking it in iteration
+    // order gives two materials holding the same entries the same digest.
+    // Combining sequentially rather than folding the entries together keeps
+    // the tracking id distinct from the texture it maps to, and keeps a pair
+    // of entries from cancelling each other out.
+    std::size_t digest = 0;
+    for (const auto& [tracking_id, local_texture] : mTrackingIdToLocalTexture)
     {
-        for (local_tex_map_t::const_iterator
-                it = mTrackingIdToLocalTexture.begin(),
-                end = mTrackingIdToLocalTexture.end();
-             it != end; ++it)
-        {
-            mLocalTexDataDigest ^= it->first.getDigest64() ^
-                                   it->second.getDigest64();
-        }
+        boost::hash_combine(digest, tracking_id);
+        boost::hash_combine(digest, local_texture);
     }
+    mLocalTexDataDigest = (U64)digest;
 }
 
 bool LLGLTFMaterial::operator==(const LLGLTFMaterial& rhs) const
@@ -214,7 +186,7 @@ std::string LLGLTFMaterial::asJSON(bool prettyprint) const
     // to WriteGltfSceneToStream in the viewer.
     gltf.WriteGltfSceneToStream(&model_out, str, prettyprint, false);
 
-    return str.str();
+    return std::move(str).str();
 }
 
 void LLGLTFMaterial::setFromModel(const tinygltf::Model& model, S32 mat_index)
@@ -674,8 +646,12 @@ void LLGLTFMaterial::applyOverride(const LLGLTFMaterial& override_mat)
 
     if (!override_mat.mTrackingIdToLocalTexture.empty())
     {
-        auto it = override_mat.mTrackingIdToLocalTexture.begin();
-        mTrackingIdToLocalTexture.insert(it, it);
+        // The override is the layer on top, so where both track a local
+        // texture its entry wins, as its texture ids do above.
+        for (const auto& [tracking_id, local_texture] : override_mat.mTrackingIdToLocalTexture)
+        {
+            mTrackingIdToLocalTexture.insert_or_assign(tracking_id, local_texture);
+        }
         updateLocalTexDataDigest();
         updateTextureTracking();
     }
@@ -759,9 +735,11 @@ void LLGLTFMaterial::applyOverrideLLSD(const LLSD& data)
 
     if (tex.isArray())
     {
-        for (int i = 0; i < tex.size(); ++i)
+        // a message or a cache record can name more textures than there are
+        const size_t count = llmin((size_t)tex.size(), mTextureId.size());
+        for (size_t i = 0; i < count; ++i)
         {
-            mTextureId[i] = tex[i].asUUID();
+            mTextureId[i] = tex[(S32)i].asUUID();
         }
     }
 
@@ -787,10 +765,15 @@ void LLGLTFMaterial::applyOverrideLLSD(const LLSD& data)
         }
     }
 
+    // Both factors are clamped on the way in, as setMetallicFactor/setRoughnessFactor do for
+    // every other route into these fields -- this is the one path that reaches them straight
+    // off the wire, so it is the one that has to reject a value the glTF spec does not allow.
+    // Roughness is the sharp edge: it reaches the shaders as 1.0 - roughness, and a value past
+    // 1 turns that negative, which is off the end of the BRDF lookup table.
     const LLSD& mf = data["mf"];
     if (mf.isReal())
     {
-        mMetallicFactor = (F32)mf.asReal();
+        mMetallicFactor = llclamp((F32)mf.asReal(), 0.f, 1.f);
         if (mMetallicFactor == getDefaultMetallicFactor())
         {
             // HACK -- nudge by epsilon if we receive a default value (indicates override to default)
@@ -801,7 +784,7 @@ void LLGLTFMaterial::applyOverrideLLSD(const LLSD& data)
     const LLSD& rf = data["rf"];
     if (rf.isReal())
     {
-        mRoughnessFactor = (F32)rf.asReal();
+        mRoughnessFactor = llclamp((F32)rf.asReal(), 0.f, 1.f);
         if (mRoughnessFactor == getDefaultRoughnessFactor())
         {
             // HACK -- nudge by epsilon if we receive a default value (indicates override to default)
@@ -860,20 +843,52 @@ void LLGLTFMaterial::applyOverrideLLSD(const LLSD& data)
     }
 }
 
-LLUUID LLGLTFMaterial::getHash() const
+void LLGLTFMaterial::packHashBytes(U8* buf) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    // *HACK: hash the bytes of this object but do not include the ref count
-    // neither the local texture overrides (which is a map, with pointers to
-    // key/value pairs that would change from one LLGLTFMaterial instance to
-    // the other, even though the key/value pairs could be the same, and stored
-    // elsewhere in the memory heap or on the stack).
-    // Note: this does work properly to compare two LLGLTFMaterial instances
-    // only because the padding bytes between their member variables have been
-    // dutifully zeroed in the constructor. HB
-    const size_t offset = intptr_t(&mLocalTexDataDigest) - intptr_t(this);
-    return HBXXH128::digest((const void*)((const char*)this + offset),
-                            sizeof(*this) - offset);
+
+    // Pack the semantically meaningful members into a contiguous, padding-free
+    // byte sequence in canonical order. Excludes the LLRefCount base, the
+    // mTrackingIdToLocalTexture map (which holds pointer-shaped state that
+    // varies between equivalent instances; its content is summarized in
+    // mLocalTexDataDigest, which IS hashed), and any inter-member padding.
+    U8* p = buf;
+    auto pack = [&p](const void* src, size_t len) noexcept
+    {
+        std::memcpy(p, src, len);
+        p += len;
+    };
+
+    pack(&mLocalTexDataDigest, sizeof(mLocalTexDataDigest));
+    for (U32 i = 0; i < GLTF_TEXTURE_INFO_COUNT; ++i)
+    {
+        pack(mTextureId[i].mData, UUID_BYTES);
+    }
+    for (U32 i = 0; i < GLTF_TEXTURE_INFO_COUNT; ++i)
+    {
+        const TextureTransform& t = mTextureTransform[i];
+        pack(t.mOffset.mV, 2 * sizeof(F32));
+        pack(t.mScale.mV,  2 * sizeof(F32));
+        pack(&t.mRotation, sizeof(F32));
+    }
+    pack(mBaseColor.mV,     4 * sizeof(F32));
+    pack(mEmissiveColor.mV, 3 * sizeof(F32));
+    pack(&mMetallicFactor,  sizeof(F32));
+    pack(&mRoughnessFactor, sizeof(F32));
+    pack(&mAlphaCutoff,     sizeof(F32));
+
+    // Normalize enum / bools to fixed widths so the hash payload doesn't
+    // depend on the compiler's choice of enum underlying type or bool storage.
+    const S32 alpha_mode = (S32)mAlphaMode;
+    pack(&alpha_mode, sizeof(S32));
+    const U8 flags[3] = {
+        (U8)(mDoubleSided         ? 1 : 0),
+        (U8)(mOverrideDoubleSided ? 1 : 0),
+        (U8)(mOverrideAlphaMode   ? 1 : 0),
+    };
+    pack(flags, sizeof(flags));
+
+    llassert(p == buf + HASH_BYTES);
 }
 
 void LLGLTFMaterial::addLocalTextureTracking(const LLUUID& tracking_id, const LLUUID& tex_id)
@@ -922,4 +937,148 @@ void LLGLTFMaterial::updateTextureTracking()
 {
     // setTEGLTFMaterialOverride is responsible for tracking
     // for material overrides editor will set it
+}
+
+// Test cases:
+// Case 1.
+// Input: scale 1.0,1.0; Offset horizontal 0.0, Offset vertical 0.0 Rotation 0.349066;
+// Expected output: scale 1.0,1.0; Offset horizontal 0.201, Offset vertical -0.141 Rotation -0.349066;
+// Case 2.
+// Input: scale 1.0,1.0; Offset horizontal 0.5, Offset vertical 0.1 Rotation 0;
+// Expected output: scale 1.0,1.0; Offset horizontal 0.5, Offset vertical -0.1 Rotation -0;
+// Case 3.
+// Input: scale 1.0,1.0; Offset horizontal 0.1, Offset vertical 0.2 Rotation 0.349066;
+// Expected output: scale 1.0,1.0; Offset horizontal 0.295, Offset vertical -0.345 Rotation -0.349066;
+// Case 4.
+// Input: scale 1.0,1.0; Offset horizontal 0.5, Offset vertical 0.0 Rotation 0.349066;
+// Expected output: scale 1.0,1.0; Offset horizontal 0.701, Offset vertical -0.141 Rotation -0.349066;
+// Case 5.
+// Input: scale 10.0,15.0; Offset horizontal 0.0, Offset vertical 0.0 Rotation -1.57079637
+// Expected output: scale 15.0,10.0; Offset horizontal 7.5, Offset vertical -4.0 Rotation 1.57079637;
+// Case 6.
+// Input: scale 10.0,15.0; Offset horizontal 0.0, Offset vertical 0.0 Rotation 0
+// Expected output: scale 10.0,15.0; Offset horizontal 0.5, Offset vertical .0 Rotation 0;
+// Case 7.
+// Input: scale 10.0,15.0; Offset horizontal 0.0, Offset vertical 0.0 Rotation -0.785398163
+// Expected output: scale 12.74,12.74; Offset horizontal 0.5, Offset vertical .0 Rotation 0.785398163;
+//
+// Legacy offsets are right to left and top to bottom.
+// PBR offsets are right to left and bottom to top.
+//
+// Legacy rotation is relative to face's center counter clockwise,
+// PBR rotation is relative to top-left corner, clockwise
+void LLGLTFMaterial::convertTextureTransformToPBR(
+    F32 tex_scale_s,
+    F32 tex_scale_t,
+    F32 tex_offset_s,
+    F32 tex_offset_t,
+    F32 tex_rotation,
+    LLVector2& pbr_scale,
+    LLVector2& pbr_offset,
+    F32& pbr_rotation)
+{
+    // Legacy is counter-clockwise, PBR is clockwise
+    pbr_rotation = -tex_rotation;
+
+    // Center of the tile
+    const F32 center_s = 0.5f;
+    const F32 center_t = 0.5f;
+
+    // Calculate the rotated scale
+    F32 cos_rot = cosf(tex_rotation);
+    F32 sin_rot = sinf(tex_rotation);
+    F32 cos_sq = cos_rot * cos_rot;
+    F32 sin_sq = sin_rot * sin_rot;
+
+    // GLTF scale doesn't match legacy scaling when rotation is applied.
+    // Legacy applies scale then rotation, which allows for planar aligment
+    // withoutn deformations, but gltf rotates first, so when scale gets
+    // aplied image gets deformed by rotation.
+    // It appears to be imposible to properly match legacy scale, so this
+    // is an approximation that at least matches at 0, 90, 180, 270 degree
+    // rotations, and is close enough at angles like 45.
+    pbr_scale.mV[VX] = tex_scale_s * cos_sq + tex_scale_t * sin_sq;
+    pbr_scale.mV[VY] = tex_scale_s * sin_sq + tex_scale_t * cos_sq;
+
+    // Center adjustment for scale
+    F32 center_adjust_s = 0.5f * (1.0f - pbr_scale.mV[VX]);
+    F32 center_adjust_t = 0.5f * (1.0f - pbr_scale.mV[VY]);
+
+    // 2. Offset from center
+    F32 pos_s = center_adjust_s - center_s;
+    F32 pos_t = center_adjust_t - center_t;
+
+    // 3. Rotate around center (clockwise, as per GLTF spec)
+    F32 c = cosf(pbr_rotation);
+    F32 s = sinf(pbr_rotation);
+    F32 rot_s = pos_s * c + pos_t * s;
+    F32 rot_t = -pos_s * s + pos_t * c;
+
+    // 4. Move back to top-left and apply offset
+    pbr_offset.set(rot_s + center_s + tex_offset_s, rot_t + center_t - tex_offset_t);
+}
+
+// Convert PBR transform values back to legacy TE transform values.
+// This is the reverse of convertTextureTransformToPBR.
+void LLGLTFMaterial::convertPBRTransformToTexture(
+    const LLVector2& pbr_scale,
+    const LLVector2& pbr_offset,
+    F32 pbr_rotation,
+    F32& tex_scale_s,
+    F32& tex_scale_t,
+    F32& tex_offset_s,
+    F32& tex_offset_t,
+    F32& tex_rotation)
+{
+    tex_rotation = -pbr_rotation;
+
+    // Reverse the scale transformation
+    // From: pbr_s = tex_s * cos² + tex_t * sin²
+    //       pbr_t = tex_s * sin² + tex_t * cos²
+    // Solve for tex_s and tex_t
+    F32 cos_rot = cosf(tex_rotation);
+    F32 sin_rot = sinf(tex_rotation);
+    F32 cos_sq = cos_rot * cos_rot;
+    F32 sin_sq = sin_rot * sin_rot;
+
+    F32 denom = cos_sq * cos_sq - sin_sq * sin_sq;
+
+    if (fabsf(denom) < 0.0001f) // Near 45 degrees (cos²≈sin²≈0.5)
+    {
+        // At 45°: both scales contribute equally
+        // pbr_s = pbr_t = (tex_s + tex_t) / 2
+        // So: tex_s + tex_t = 2 * pbr_avg
+        // Use the average and assume symmetric scaling
+        tex_scale_s = tex_scale_t = (pbr_scale.mV[VX] + pbr_scale.mV[VY]) / 2.f;
+    }
+    else
+    {
+        // Solve the 2x2 system:
+        // pbr_s * cos² - pbr_t * sin² = tex_s * (cos⁴ - sin⁴)
+        // pbr_t * cos² - pbr_s * sin² = tex_t * (cos⁴ - sin⁴)
+        tex_scale_s = (pbr_scale.mV[VX] * cos_sq - pbr_scale.mV[VY] * sin_sq) / denom;
+        tex_scale_t = (pbr_scale.mV[VY] * cos_sq - pbr_scale.mV[VX] * sin_sq) / denom;
+    }
+
+    // Center of the tile
+    const F32 center_s = 0.5f;
+    const F32 center_t = 0.5f;
+
+    // Center adjustment for scale
+    F32 center_adjust_s = 0.5f * (1.0f - pbr_scale.mV[VX]);
+    F32 center_adjust_t = 0.5f * (1.0f - pbr_scale.mV[VY]);
+
+    // 2. Offset from center
+    F32 pos_s = center_adjust_s - center_s;
+    F32 pos_t = center_adjust_t - center_t;
+
+    // 3. Rotate around center (clockwise, as per GLTF spec)
+    F32 c = cosf(pbr_rotation);
+    F32 s = sinf(pbr_rotation);
+    F32 rot_s = pos_s * c + pos_t * s;
+    F32 rot_t = -pos_s * s + pos_t * c;
+
+    // 3. Recover legacy offset
+    tex_offset_s = pbr_offset.mV[0] - rot_s - center_s;
+    tex_offset_t = -(pbr_offset.mV[1] - rot_t - center_t);
 }

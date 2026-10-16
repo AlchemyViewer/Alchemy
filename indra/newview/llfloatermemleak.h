@@ -29,10 +29,12 @@
 
 #include "llfloater.h"
 
-class LLFloaterMemLeak : public LLFloater
+class LLFloaterMemLeak final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterMemLeak, LLFloater);
+
     /// initialize all the callbacks for the menu
 
     bool postBuild() override;

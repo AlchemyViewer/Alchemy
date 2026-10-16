@@ -27,7 +27,8 @@
 #ifndef LL_LLJOINTDATA_H
 #define LL_LLJOINTDATA_H
 
-#include "v4math.h"
+#include "v3math.h"
+#include "llmatrix4a.h"
 
 // may be just move LLAvatarBoneInfo
 class LLJointData
@@ -35,9 +36,9 @@ class LLJointData
 public:
     std::string mName;
     std::string mGroup;
-    glm::mat4 mJointMatrix;
-    glm::mat4 mRestMatrix;
-    glm::vec3 mScale;
+    LLMatrix4a mJointMatrix;
+    LLMatrix4a mRestMatrix;
+    LLVector3 mScale;
     LLVector3 mRotation;
 
     typedef std::vector<LLJointData> bones_t;

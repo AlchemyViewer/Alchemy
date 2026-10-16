@@ -153,7 +153,6 @@ public:
     F32             getCameraMinOffGround();        // Minimum height off ground for this mode, meters
     void            setCameraCollidePlane(const LLVector4 &plane) { mCameraCollidePlane = plane; }
     bool            calcCameraMinDistance(F32 &obj_min_distance);
-    F32             getCurrentCameraBuildOffset() const { return (F32)mCameraFocusOffset.length(); }
     void            clearCameraLag() { mCameraLag.clearVec(); }
     const LLVector3& getCameraUpVector() const { return mCameraUpVector; }
 private:
@@ -282,7 +281,7 @@ public:
     // Zoom
     //--------------------------------------------------------------------
 public:
-    void            handleScrollWheel(S32 clicks);                          // Mousewheel driven zoom
+    void            handleScrollWheel(F32 clicks);                          // Mousewheel driven zoom
     void            cameraZoomIn(const F32 factor);                         // Zoom in by fraction of current distance
     F32             getCameraZoomFraction(bool get_third_person = false);   // Get camera zoom as fraction of minimum and maximum zoom
     void            setCameraZoomFraction(F32 fraction);                    // Set camera zoom as fraction of minimum and maximum zoom

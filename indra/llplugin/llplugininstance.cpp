@@ -30,21 +30,18 @@
 
 #include "llplugininstance.h"
 
-#include "llapr.h"
-
-#if LL_WINDOWS
-#include "direct.h" // needed for _chdir()
-#endif
-
 /** Virtual destructor. */
 LLPluginInstanceMessageListener::~LLPluginInstanceMessageListener()
 {
 }
 
-/**
- * TODO:DOC describe how it's used
- */
-const char *LLPluginInstance::PLUGIN_INIT_FUNCTION_NAME = "LLPluginInitEntryPoint";
+LLPluginInstance::pluginInitFunction LLPluginInstance::sStaticInitFunction = NULL;
+
+// static
+void LLPluginInstance::setStaticInitFunction(pluginInitFunction func)
+{
+    sStaticInitFunction = func;
+}
 
 /**
  * Constructor.
@@ -52,7 +49,6 @@ const char *LLPluginInstance::PLUGIN_INIT_FUNCTION_NAME = "LLPluginInitEntryPoin
  * @param[in] owner Plugin instance. TODO:DOC is this a good description of what "owner" is?
  */
 LLPluginInstance::LLPluginInstance(LLPluginInstanceMessageListener *owner) :
-    mDSOHandle(NULL),
     mPluginUserData(NULL),
     mPluginSendMessageFunction(NULL)
 {
@@ -64,72 +60,36 @@ LLPluginInstance::LLPluginInstance(LLPluginInstanceMessageListener *owner) :
  */
 LLPluginInstance::~LLPluginInstance()
 {
-    if(mDSOHandle != NULL)
-    {
-        apr_dso_unload(mDSOHandle);
-        mDSOHandle = NULL;
-    }
 }
 
 /**
- * Dynamically loads the plugin and runs the plugin's init function.
+ * Runs the statically-linked plugin's init function.
  *
- * @param[in] plugin_file Name of plugin dll/dylib/so. TODO:DOC is this correct? see .h
- * @return 0 if successful, APR error code or error code from the plugin's init function on failure.
+ * Each plugin now lives in its own host executable that statically links exactly
+ * one plugin and registers its entry point via setStaticInitFunction(), so there
+ * is no longer a dlopen path. plugin_dir/plugin_file are vestigial - they remain
+ * in the load_plugin message contract but are ignored here.
+ *
+ * @return 0 if successful, or the error code returned from the plugin's init function.
  */
 int LLPluginInstance::load(const std::string& plugin_dir, std::string &plugin_file)
 {
-    pluginInitFunction init_function = NULL;
+    (void)plugin_dir;
+    (void)plugin_file;
 
-    if ( plugin_dir.length() )
+    if (!sStaticInitFunction)
     {
-#if LL_WINDOWS
-        // VWR-21275:
-        // *SOME* Windows systems fail to load the Qt plugins if the current working
-        // directory is not the same as the directory with the Qt DLLs in.
-        // This should not cause any run time issues since we are changing the cwd for the
-        // plugin shell process and not the viewer.
-        // Changing back to the previous directory is not necessary since the plugin shell
-        // quits once the plugin exits.
-        _chdir( plugin_dir.c_str() );
-#endif
-    };
-
-    int result = apr_dso_load(&mDSOHandle,
-                      plugin_file.c_str(),
-                      gAPRPoolp);
-    if(result != APR_SUCCESS)
-    {
-        char buf[1024];
-        apr_dso_error(mDSOHandle, buf, sizeof(buf));
-
-        LL_WARNS("Plugin") << "apr_dso_load of " << plugin_file << " failed with error " << result << " , additional info string: " << buf << LL_ENDL;
-
+        LL_WARNS("Plugin") << "no statically-linked plugin init function registered" << LL_ENDL;
+        return -1;
     }
 
-    if(result == APR_SUCCESS)
+    int result = sStaticInitFunction(staticReceiveMessage, (void*)this, &mPluginSendMessageFunction, &mPluginUserData);
+    if (result != 0)
     {
-        result = apr_dso_sym((apr_dso_handle_sym_t*)&init_function,
-                         mDSOHandle,
-                         PLUGIN_INIT_FUNCTION_NAME);
-
-        if(result != APR_SUCCESS)
-        {
-            LL_WARNS("Plugin") << "apr_dso_sym failed with error " << result << LL_ENDL;
-        }
+        LL_WARNS("Plugin") << "call to init function failed with error " << result << LL_ENDL;
     }
 
-    if(result == APR_SUCCESS)
-    {
-        result = init_function(staticReceiveMessage, (void*)this, &mPluginSendMessageFunction, &mPluginUserData);
-
-        if(result != APR_SUCCESS)
-        {
-            LL_WARNS("Plugin") << "call to init function failed with error " << result << LL_ENDL;
-        }
-    }
-
-    return (int)result;
+    return result;
 }
 
 /**
@@ -142,7 +102,7 @@ void LLPluginInstance::sendMessage(const std::string &message)
     if(mPluginSendMessageFunction)
     {
         LL_DEBUGS("Plugin") << "sending message to plugin: \"" << message << "\"" << LL_ENDL;
-        mPluginSendMessageFunction(message.c_str(), &mPluginUserData);
+        mPluginSendMessageFunction(message.data(), message.size(), &mPluginUserData);
     }
     else
     {
@@ -159,28 +119,31 @@ void LLPluginInstance::idle(void)
 }
 
 // static
-void LLPluginInstance::staticReceiveMessage(const char *message_string, void **user_data)
+void LLPluginInstance::staticReceiveMessage(const char *message_string, size_t message_size, void **user_data)
 {
     // TODO: validate that the user_data argument is still a valid LLPluginInstance pointer
     // we could also use a key that's looked up in a map (instead of a direct pointer) for safety, but that's probably overkill
     LLPluginInstance *self = (LLPluginInstance*)*user_data;
-    self->receiveMessage(message_string);
+    self->receiveMessage(message_string, message_size);
 }
 
 /**
  * Plugin receives message from plugin loader shell.
  *
- * @param[in] message_string Message
+ * @param[in] message_string Message bytes (binary LLSD, may contain embedded NULs)
+ * @param[in] message_size Length of message_string in bytes
  */
-void LLPluginInstance::receiveMessage(const char *message_string)
+void LLPluginInstance::receiveMessage(const char *message_string, size_t message_size)
 {
+    // Reconstruct the message with its exact length: the payload is binary and
+    // may contain embedded NULs, so it can't be treated as a C string.
+    std::string message(message_string, message_size);
     if(mOwner)
     {
-        LL_DEBUGS("Plugin") << "processing incoming message: \"" << message_string << "\"" << LL_ENDL;
-        mOwner->receivePluginMessage(message_string);
+        mOwner->receivePluginMessage(message);
     }
     else
     {
-        LL_WARNS("Plugin") << "dropping incoming message: \"" << message_string << "\"" << LL_ENDL;
+        LL_WARNS("Plugin") << "dropping incoming message: \"" << message << "\"" << LL_ENDL;
     }
 }

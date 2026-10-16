@@ -76,12 +76,12 @@ LLViewerPart::LLViewerPart() :
     mPartID(0),
     mLastUpdateTime(0.f),
     mSkipOffset(0.f),
-    mVPCallback(NULL),
-    mImagep(NULL)
+    mVPCallback(nullptr),
+    mImagep(nullptr)
 {
-    mPartSourcep = NULL;
-    mParent = NULL;
-    mChild = NULL;
+    mPartSourcep = nullptr;
+    mParent      = nullptr;
+    mChild       = nullptr;
     ++LLViewerPartSim::sParticleCount2 ;
 }
 
@@ -656,10 +656,10 @@ void LLViewerPartSim::shift(const LLVector3 &offset)
     }
 }
 
-static LLTrace::BlockTimerStatHandle FTM_SIMULATE_PARTICLES("Simulate Particles");
-
 void LLViewerPartSim::updateSimulation()
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     static LLFrameTimer update_timer;
 
     const F32 dt = llmin(update_timer.getElapsedTimeAndResetF32(), 0.1f);
@@ -668,8 +668,6 @@ void LLViewerPartSim::updateSimulation()
     {
         return;
     }
-
-    LL_RECORD_BLOCK_TIME(FTM_SIMULATE_PARTICLES);
 
     // Start at a random particle system so the same
     // particle system doesn't always get first pick at the
@@ -716,15 +714,21 @@ void LLViewerPartSim::updateSimulation()
 
             if (upd && vobj && (vobj->getPCode() == LL_PCODE_VOLUME))
             {
-                if(vobj->getAvatar() && vobj->getAvatar()->isTooComplex() && vobj->getAvatar()->isTooSlow())
+                LLVOVolume* vvo = (LLVOVolume*)vobj;
+                if (vvo->isAttachment())
                 {
-                    upd = false;
-                }
-
-                LLVOVolume* vvo = (LLVOVolume *)vobj;
-                if (!LLPipeline::sRenderAttachedParticles && vvo && vvo->isAttachment())
-                {
-                    upd = false;
+                    if (!LLPipeline::sRenderAttachedParticles)
+                    {
+                        upd = false;
+                    }
+                    else
+                    {
+                        LLVOAvatar* avatarp = vobj->getAvatar();
+                        if (avatarp && avatarp->isTooComplex() && avatarp->isTooSlow())
+                        {
+                            upd = false;
+                        }
+                    }
                 }
             }
 

@@ -65,7 +65,6 @@
 
 // for XUIParse
 #include "llquaternion.h"
-#include <boost/tokenizer.hpp>
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string/finder.hpp>
 
@@ -157,6 +156,7 @@ mWindow(NULL), // set later in startup
 mRootView(NULL),
 mHelpImpl(NULL)
 {
+    LL_PROFILE_ZONE_SCOPED;
     LLRender2D::createInstance(image_provider);
     LLSpellChecker::createInstance();
 
@@ -219,13 +219,19 @@ void LLUI::setMousePositionScreen(S32 x, S32 y)
     S32 screen_x = ll_round((F32)x * getScaleFactor().mV[VX]);
     S32 screen_y = ll_round((F32)y * getScaleFactor().mV[VY]);
 
-    LLView::getWindow()->setCursorPosition(LLCoordGL(screen_x, screen_y).convert());
+    if (LLWindow* window = getWindow())
+    {
+        window->setCursorPosition(LLCoordGL(screen_x, screen_y).convert());
+    }
 }
 
 void LLUI::getMousePositionScreen(S32 *x, S32 *y)
 {
     LLCoordWindow cursor_pos_window;
-    getWindow()->getCursorPosition(&cursor_pos_window);
+    if (LLWindow* window = getWindow())
+    {
+        window->getCursorPosition(&cursor_pos_window);
+    }
     LLCoordGL cursor_pos_gl(cursor_pos_window.convert());
     *x = ll_round((F32)cursor_pos_gl.mX / getScaleFactor().mV[VX]);
     *y = ll_round((F32)cursor_pos_gl.mY / getScaleFactor().mV[VY]);
@@ -389,6 +395,12 @@ LLControlGroup& LLUI::getControlControlGroup (std::string_view controlname)
     return *mSettingGroups["config"]; // default group
 }
 
+LLControlGroup* LLUI::getSettingGroup(std::string_view name) const
+{
+    settings_map_t::const_iterator found = mSettingGroups.find(name);
+    return found != mSettingGroups.end() ? found->second : nullptr;
+}
+
 void LLUI::addPopup(LLView* viewp)
 {
     if (mAddPopupFunc)
@@ -546,11 +558,11 @@ namespace LLInitParam
     void ParamValue<LLUIColor>::updateBlockFromValue(bool make_block_authoritative)
     {
         LLColor4 color = getValue();
-        red.set(color.mV[VRED], make_block_authoritative);
-        green.set(color.mV[VGREEN], make_block_authoritative);
-        blue.set(color.mV[VBLUE], make_block_authoritative);
-        alpha.set(color.mV[VALPHA], make_block_authoritative);
-        control.set("", make_block_authoritative);
+        setComponent(red, color.mV[VRED], make_block_authoritative);
+        setComponent(green, color.mV[VGREEN], make_block_authoritative);
+        setComponent(blue, color.mV[VBLUE], make_block_authoritative);
+        setComponent(alpha, color.mV[VALPHA], make_block_authoritative);
+        setComponent(control, LLStringUtil::null, make_block_authoritative);
     }
 
     bool ParamCompare<const LLFontGL*, false>::equals(const LLFontGL* a, const LLFontGL* b)
@@ -598,11 +610,15 @@ namespace LLInitParam
 
     void ParamValue<const LLFontGL*>::updateBlockFromValue(bool make_block_authoritative)
     {
-        if (getValue())
+        const LLFontGL* fontp = getValue();
+        if (fontp)
         {
-            name.set(LLFontGL::nameFromFont(getValue()), make_block_authoritative);
-            size.set(LLFontGL::sizeFromFont(getValue()), make_block_authoritative);
-            style.set(LLFontGL::getStringFromStyle(getValue()->getFontDesc().getStyle()), make_block_authoritative);
+            // The descriptor holds the name and size as strings already;
+            // nameFromFont and sizeFromFont would hand back copies of them.
+            const LLFontDescriptor& desc = fontp->getFontDesc();
+            setComponent(name, desc.getName(), make_block_authoritative);
+            setComponent(size, desc.getSize(), make_block_authoritative);
+            setComponent(style, LLFontGL::getStringFromStyle(desc.getStyle()), make_block_authoritative);
         }
     }
 
@@ -690,13 +706,13 @@ namespace LLInitParam
         // in this case, that is left+width and bottom+height
         LLRect& value = getValue();
 
-        right.set(value.mRight, false);
-        left.set(value.mLeft, make_block_authoritative);
-        width.set(value.getWidth(), make_block_authoritative);
+        setComponent(right, value.mRight, false);
+        setComponent(left, value.mLeft, make_block_authoritative);
+        setComponent(width, value.getWidth(), make_block_authoritative);
 
-        top.set(value.mTop, false);
-        bottom.set(value.mBottom, make_block_authoritative);
-        height.set(value.getHeight(), make_block_authoritative);
+        setComponent(top, value.mTop, false);
+        setComponent(bottom, value.mBottom, make_block_authoritative);
+        setComponent(height, value.getHeight(), make_block_authoritative);
     }
 
     ParamValue<LLCoordGL>::ParamValue(const LLCoordGL& coord)
@@ -714,8 +730,9 @@ namespace LLInitParam
 
     void ParamValue<LLCoordGL>::updateBlockFromValue(bool make_block_authoritative)
     {
-        x.set(getValue().mX, make_block_authoritative);
-        y.set(getValue().mY, make_block_authoritative);
+        const LLCoordGL& coord = getValue();
+        setComponent(x, coord.mX, make_block_authoritative);
+        setComponent(y, coord.mY, make_block_authoritative);
     }
 
 

@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -28,7 +31,11 @@
 #define LL_LLFONTBITMAPCACHE_H
 
 #include <vector>
+#include "llimagegl.h"
+#include "llpointer.h"
 #include "lltrace.h"
+
+class LLImageRaw;
 
 enum class EFontGlyphType : U32
 {
@@ -52,7 +59,16 @@ public:
 
     void reset();
 
-    bool nextOpenPos(S32 width, S32& posX, S32& posY, EFontGlyphType bitmapType, U32& bitmapNum);
+    // Reserve an atlas slot of (width, height). The cache advances its X
+    // pen by `width`; height drives the Y pen step when the row fills.
+    // Passing the actual rasterized glyph height (rather than relying on
+    // the font's bbox-derived mMaxCharHeight) is necessary for color-emoji
+    // fonts where the FontBBox is unreliable in *both* directions: the
+    // outline bbox can underestimate SBIX/SVG strike bitmap heights (rows
+    // would overlap), and at small point sizes the SFNT-level bbox covering
+    // strike dimensions can vastly overestimate actual rendered heights
+    // (rows would be hundreds of px too tall).
+    bool nextOpenPos(S32 width, S32 height, S32& posX, S32& posY, EFontGlyphType bitmapType, U32& bitmapNum);
 
     void destroyGL();
 
@@ -65,19 +81,95 @@ public:
     S32 getBitmapHeight() const { return mBitmapHeight; }
     S32 getCacheGeneration() const { return mGeneration; }
 
+    // Snapshot of the global atlas-mutation counter. Every nextOpenPos /
+    // releaseSheet / reset / new LLFontBitmapCache anywhere bumps this; it
+    // is the uniqueness source every per-instance mGeneration draws from,
+    // which is what makes summing per-instance generations a monotonic
+    // per-font invalidation stamp (see LLFontGL::getCacheGeneration —
+    // production no longer compares against the global value directly,
+    // since that invalidated every cached text buffer viewer-wide on any
+    // font's glyph churn). Kept public for tests and diagnostics.
+    static S32 getGlobalGeneration() { return sNextGeneration; }
+
+    // Drop the underlying images for a sheet, freeing the GPU and CPU memory.
+    // The slot index stays valid as a nullptr placeholder so surviving
+    // sheet-index references remain numerically stable; callers must purge
+    // any glyph cache entries that referenced this sheet *before* releasing
+    // it, otherwise the next render will try to draw from a null texture.
+    // Released slots are recycled by the next nextOpenPos that needs a new
+    // sheet (the purge contract guarantees nothing references the index by
+    // then), so the slot vectors don't grow monotonically across eviction
+    // cycles. Bumps the cache generation so vertex buffers invalidate.
+    void releaseSheet(EFontGlyphType bitmap_type, U32 bitmap_num);
+
+    // Wall-clock seconds (LLFrameTimer::getTotalSeconds) when this sheet was
+    // last read or written. Returns 0 for invalid (type, num) and for sheets
+    // that have been released — the caller can distinguish via isSheetReleased.
+    F64 getSheetLastUsedTime(EFontGlyphType bitmap_type, U32 bitmap_num) const;
+
+    // True when a sheet at this index has been released. The slot still exists
+    // for index stability but holds no images.
+    bool isSheetReleased(EFontGlyphType bitmap_type, U32 bitmap_num) const;
+
+    // Whether this process has a GL context to upload glyph sheets to. A
+    // viewer has one; a headless test does not, and there a sheet stays on
+    // the CPU: glyphs still rasterize into it and still measure, and nothing
+    // is uploaded. A slot with no GL image is the state a released sheet is
+    // already in, so every reader of one already handles it.
+    static void setUsesGL(bool uses_gl) { sUsesGL = uses_gl; }
+    static bool usesGL() { return sUsesGL; }
+
 protected:
     static U32 getNumComponents(EFontGlyphType bitmap_type);
 
 private:
+    // Bump mLastUsedTime[type][num] to the current frame time. Called on every
+    // getImageGL / getImageRaw / nextOpenPos so per-sheet usage tracking covers
+    // both the read (render) and write (rasterize) paths without an explicit
+    // touch from each caller.
+    void touchSheet(EFontGlyphType bitmap_type, U32 bitmap_num) const;
+
     S32 mBitmapWidth = 0;
     S32 mBitmapHeight = 0;
-    S32 mCurrentOffsetX[static_cast<U32>(EFontGlyphType::Count)] = { 1 };
-    S32 mCurrentOffsetY[static_cast<U32>(EFontGlyphType::Count)] = { 1 };
+    // 4px atlas border guarantees safe shadow-shader sampling: with a 2px
+    // screen-space dilation around each glyph and the asymmetric (0,2) tap
+    // sampling 2 atlas texels further, the worst-case sample reach is
+    // 4 atlas pixels from the glyph edge. Atlases are zero-cleared on
+    // construction so those out-of-glyph samples contribute zero alpha
+    // rather than picking up adjacent glyph data.
+    // (Note: array initializer applies the brace value to every element —
+    // earlier `= { 4 }` form set only [0] to 4 and silently zero-init'd [1].
+    // That was a real bug for Color atlases — they started at offset 0.)
+    S32 mCurrentOffsetX[static_cast<U32>(EFontGlyphType::Count)] = { 4, 4 };
+    S32 mCurrentOffsetY[static_cast<U32>(EFontGlyphType::Count)] = { 4, 4 };
+    // Tallest glyph height placed in the current row, per atlas type.
+    // Drives the Y pen advance when the row fills, so rows with mixed
+    // glyph heights (text + tall color emoji bitmaps) don't have later
+    // rows overwriting earlier rows.
+    S32 mCurrentRowMaxHeight[static_cast<U32>(EFontGlyphType::Count)] = { 0, 0 };
+    // Slot index the pen offsets above point into, per atlas type; -1
+    // until the first sheet is created. Explicit because the active sheet
+    // is no longer necessarily the last slot: nextOpenPos recycles
+    // released slots, so the allocation target can sit mid-vector.
+    S32 mCurrentSheet[static_cast<U32>(EFontGlyphType::Count)] = { -1, -1 };
     S32 mMaxCharWidth = 0;
     S32 mMaxCharHeight = 0;
-    S32 mGeneration = 0;
+    // Globally-unique generation. Each new LLFontBitmapCache instance and
+    // every atlas mutation (nextOpenPos / releaseSheet / reset) takes a
+    // fresh value from sNextGeneration. This guarantees vertex/width
+    // buffers comparing their stored mLastFontCacheGen against the
+    // current cache generation can't false-match across an in-place font
+    // reload — without uniqueness, both buffers' stored gen and the new
+    // cache's initial gen could both happen to be 0 and the buffer would
+    // keep rendering with stale atlas UVs from the previous font.
+    S32 mGeneration;
+    static S32 sNextGeneration;
+    static bool sUsesGL;
     std::vector<LLPointer<LLImageRaw>> mImageRawVec[static_cast<U32>(EFontGlyphType::Count)];
     std::vector<LLPointer<LLImageGL>> mImageGLVec[static_cast<U32>(EFontGlyphType::Count)];
+    // Per-sheet last-used timestamp, parallel-indexed with mImageRawVec /
+    // mImageGLVec. mutable so const reads (getImageGL) can update it.
+    mutable std::vector<F64> mLastUsedTime[static_cast<U32>(EFontGlyphType::Count)];
 };
 
 #endif //LL_LLFONTBITMAPCACHE_H

@@ -33,7 +33,8 @@
 #include "stdtypes.h"
 #include "lltimer.h"
 #include "llsdutil.h"
-#include <boost/function.hpp>
+
+#include <functional>
 
 class LLEventTimer;
 class LLDate;
@@ -61,7 +62,7 @@ private:
 /**
  * Pass through only events matching a specified pattern
  */
-class LLEventMatching: public LLEventFilter
+class LL_COMMON_API LLEventMatching: public LLEventFilter
 {
 public:
     /// Pass an LLSD map with keys and values the incoming event must match
@@ -92,8 +93,8 @@ public:
     /// construct and connect
     LLEventTimeoutBase(LLEventPump& source);
 
-    /// Callable, can be constructed with boost::bind()
-    typedef boost::function<void()> Action;
+    /// Callable, can be constructed with std::bind()
+    typedef std::function<void()> Action;
 
     /**
      * Start countdown timer for the specified number of @a seconds. Forward
@@ -346,7 +347,7 @@ private:
 /**
  * Production implementation of LLEventThrottle.
  */
-class LLEventThrottle: public LLEventThrottleBase
+class LL_COMMON_API LLEventThrottle: public LLEventThrottleBase
 {
 public:
     LLEventThrottle(F32 interval);
@@ -373,7 +374,7 @@ private:
  * pending events into an LLSD Array, optionally flushing when the batch grows
  * to a certain size.
  */
-class LLEventBatchThrottle: public LLEventThrottle
+class LL_COMMON_API LLEventBatchThrottle: public LLEventThrottle
 {
 public:
     // pass time interval and (optionally) max batch size; 0 means batch can
@@ -407,7 +408,7 @@ private:
  * the iterator. Useful with boost::coroutine2!
  */
 template <typename T>
-class LLStoreListener: public LLEventFilter
+class LLStoreListener: public LLEventFilter   // template: methods are inline; do NOT tag LL_COMMON_API
 {
 public:
     // pass target and optional path to element
@@ -506,7 +507,7 @@ public:
  * The proxy role means that LLEventLogProxy intercepts more of LLEventPump's
  * API than a typical LLEventFilter subclass.
  */
-class LLEventLogProxy: public LLEventFilter
+class LL_COMMON_API LLEventLogProxy: public LLEventFilter
 {
     typedef LLEventFilter super;
 public:

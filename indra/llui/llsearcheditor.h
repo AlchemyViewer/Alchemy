@@ -42,6 +42,8 @@
 class LLSearchEditor : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLSearchEditor, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLLineEditor::Params>
     {
         Optional<LLButton::Params>  search_button,
@@ -51,9 +53,7 @@ public:
                                     highlight_text_field;
         Optional<commit_callback_t> keystroke_callback;
 
-        Optional<LLUIImage*>        background_image,
-                                    background_image_focused,
-                                    background_image_highlight;
+        Optional<LLUIImage*>        background_image_highlight;
 
         Params()
         :   search_button("search_button"),
@@ -61,8 +61,6 @@ public:
             clear_button("clear_button"),
             clear_button_visible("clear_button_visible"),
             highlight_text_field("highlight_text_field"),
-            background_image("background_image"),
-            background_image_focused("background_image_focused"),
             background_image_highlight("background_image_highlight")
         {}
     };
@@ -76,19 +74,19 @@ protected:
 public:
     virtual ~LLSearchEditor();
 
-    /*virtual*/ void    draw();
+    /*virtual*/ void    draw() override;
 
-    void setText(const LLStringExplicit &new_text) { mSearchEditor->setText(new_text); }
-    const std::string& getText() const      { return mSearchEditor->getText(); }
+    void setText(ALStringViewExplicit new_text) { mSearchEditor->setText(new_text); }
+    const std::string& getText() const override      { return mSearchEditor->getText(); }
 
     // LLUICtrl interface
-    virtual void    setValue(const LLSD& value );
-    virtual LLSD    getValue() const;
-    virtual bool    setTextArg( const std::string& key, const LLStringExplicit& text );
-    virtual bool    setLabelArg( const std::string& key, const LLStringExplicit& text );
+    virtual void    setValue(const LLSD& value ) override;
+    virtual LLSD    getValue() const override;
+    virtual bool    setTextArg( const std::string& key, const LLStringExplicit& text ) override;
+    virtual bool    setLabelArg( const std::string& key, const LLStringExplicit& text ) override;
     virtual void    setLabel( const LLStringExplicit &new_label );
-    virtual void    clear();
-    virtual void    setFocus( bool b );
+    virtual void    clear() override;
+    virtual void    setFocus( bool b ) override;
 
     void            setKeystrokeCallback( commit_callback_t cb ) { mKeystrokeCallback = cb; }
     void            setTextChangedCallback( commit_callback_t cb ) { mTextChangedCallback = cb; }
@@ -106,7 +104,6 @@ protected:
     LLPointer<LLUIImage> mEditorImage;
     LLPointer<LLUIImage> mEditorImageFocused;
     LLPointer<LLUIImage> mEditorSearchImage;
-    LLPointer<LLUIImage> mEditorSearchImageFocused;
 
     bool mHighlightTextField;
 };

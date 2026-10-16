@@ -30,9 +30,6 @@
 #define LL_LLIOPIPE_H
 
 #include <boost/intrusive_ptr.hpp>
-#include "llwin32headers.h"
-#include "apr_poll.h"
-
 #include "llsd.h"
 
 class LLIOPipe;
@@ -235,6 +232,16 @@ protected:
      * @brief Base Constructor.
      */
     LLIOPipe();
+
+    /**
+     * @brief A copy is a pipe of its own, held by nothing yet.
+     *
+     * LLCloneIOFactory makes each chain's pipe a copy of its original, which
+     * its handle holds: a copy of the count would start the copy referenced,
+     * and it would never be freed.
+     */
+    LLIOPipe(const LLIOPipe&) : mReferenceCount(0) {}
+    LLIOPipe& operator=(const LLIOPipe&) { return *this; }
 
     /**
      * @brief Process the data in buffer

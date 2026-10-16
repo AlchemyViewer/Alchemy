@@ -39,7 +39,7 @@ class LLViewerJointMesh;
 //-----------------------------------------------------------------------------
 // class LLViewerJoint
 //-----------------------------------------------------------------------------
-class LLViewerJoint :
+class alignas(16) LLViewerJoint :
     public virtual LLAvatarJoint
 {
 public:

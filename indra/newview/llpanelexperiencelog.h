@@ -31,18 +31,19 @@
 #include "llpanel.h"
 class LLScrollListCtrl;
 
-class LLPanelExperienceLog
+class LLPanelExperienceLog final
     : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelExperienceLog, LLPanel);
 
     LLPanelExperienceLog();
 
     static LLPanelExperienceLog* create();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    void refresh();
+    void refresh() override;
 protected:
     void logSizeChanged();
     void notifyChanged();

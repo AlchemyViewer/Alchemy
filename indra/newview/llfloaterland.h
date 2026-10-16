@@ -70,11 +70,13 @@ class LLParcel;
 class LLPanelLandExperiences;
 class LLPanelLandEnvironment;
 
-class LLFloaterLand
+class LLFloaterLand final
 :   public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterLand, LLFloater);
+
     static void refreshAll();
 
     static LLPanelLandObjects* getCurrentPanelLandObjects();
@@ -82,8 +84,8 @@ public:
 
     LLParcel* getCurrentSelectedParcel();
 
-    virtual void onOpen(const LLSD& key);
-    virtual bool postBuild();
+    virtual void onOpen(const LLSD& key) override;
+    virtual bool postBuild() override;
 
 private:
     // Does its own instance management, so clients not allowed
@@ -95,7 +97,7 @@ private:
 
 protected:
 
-    /*virtual*/ void refresh();
+    /*virtual*/ void refresh() override;
 
     static void* createPanelLandGeneral(void* data);
     static void* createPanelLandCovenant(void* data);
@@ -135,18 +137,19 @@ public:
 };
 
 
-class LLPanelLandGeneral
+class LLPanelLandGeneral final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandGeneral, LLPanel);
+
     LLPanelLandGeneral(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual ~LLPanelLandGeneral();
-    /*virtual*/ void refresh();
+    /*virtual*/ void refresh() override;
     void refreshNames();
-    virtual void draw();
+    virtual void draw() override;
 
     void setGroup(const LLUUID& group_id);
-    void onClickProfile();
     void onClickSetGroup();
     static void onClickDeed(void*);
     static void onClickBuyLand(void* data);
@@ -176,7 +179,7 @@ public:
     static void confirmSaleChange(S32 landSize, S32 salePrice, std::string authorizedName, void(*callback)(void*), void* userdata);
     static void callbackConfirmSaleChange(S32 option, void* userdata);
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
 protected:
     bool            mUncheckedSell; // True only when verifying land information when land is for sale on sale info change
@@ -193,7 +196,6 @@ protected:
 
     LLTextBox*      mTextOwnerLabel;
     LLTextBox*      mTextOwner;
-    LLButton*       mBtnProfile;
 
     LLTextBox*      mContentRating;
     LLTextBox*      mLandType;
@@ -243,14 +245,16 @@ protected:
     static LLHandle<LLFloater> sBuyPassDialogHandle;
 };
 
-class LLPanelLandObjects
+class LLPanelLandObjects final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandObjects, LLPanel);
+
     LLPanelLandObjects(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual ~LLPanelLandObjects();
-    /*virtual*/ void refresh();
-    virtual void draw();
+    /*virtual*/ void refresh() override;
+    virtual void draw() override;
 
     bool callbackReturnOwnerObjects(const LLSD& notification, const LLSD& response);
     bool callbackReturnGroupObjects(const LLSD& notification, const LLSD& response);
@@ -275,7 +279,7 @@ public:
     static void onCommitClean(LLUICtrl* caller, void* user_data);
     static void processParcelObjectOwnersReply(LLMessageSystem *msg, void **);
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
 protected:
 
@@ -314,15 +318,17 @@ protected:
 };
 
 
-class LLPanelLandOptions
+class LLPanelLandOptions final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandOptions, LLPanel);
+
     LLPanelLandOptions(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual ~LLPanelLandOptions();
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void draw();
-    /*virtual*/ void refresh();
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ void refresh() override;
 
 private:
     // Refresh the "show in search" checkbox and category selector.
@@ -362,22 +368,24 @@ private:
 };
 
 
-class LLPanelLandAccess
+class LLPanelLandAccess final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandAccess, LLPanel);
+
     LLPanelLandAccess(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual ~LLPanelLandAccess();
-    void refresh();
+    void refresh() override;
     void refresh_ui();
     void refreshNames();
-    virtual void draw();
+    virtual void draw() override;
 
     static void onCommitPublicAccess(LLUICtrl* ctrl, void *userdata);
     static void onCommitAny(LLUICtrl* ctrl, void *userdata);
     static void onCommitGroupCheck(LLUICtrl* ctrl, void *userdata);
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void onClickAddAccess();
     void onClickAddBanned();
@@ -409,14 +417,16 @@ protected:
 };
 
 
-class LLPanelLandCovenant
+class LLPanelLandCovenant final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandCovenant, LLPanel);
+
     LLPanelLandCovenant(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual ~LLPanelLandCovenant();
-    virtual bool postBuild();
-    void refresh();
+    virtual bool postBuild() override;
+    void refresh() override;
     static void updateCovenant(const LLTextBase* source);
     static void updateCovenantText(const std::string& string);
     static void updateEstateName(const std::string& name);

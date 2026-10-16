@@ -7,15 +7,11 @@
 		<menu_item_call label="Sair do [APP_NAME]" name="Quit"/>
 	</menu>
 	<menu label="Ajuda" name="Help">
-		<menu_item_call label="Como..." name="How To"/>
-		<menu_item_call label="Início rápido" name="Quickstart"/>
 		<menu_item_call label="Base de conhecimento" name="Knowledge Base"/>
 		<menu_item_call label="Wiki" name="Wiki"/>
 		<menu_item_call label="Fóruns da comunidade" name="Community Forums"/>
 		<menu_item_call label="Portal de suporte" name="Support portal"/>
-		<menu_item_call label="Notícias do [SECOND_LIFE]" name="Second Life News"/>
 		<menu_item_call label="Blogs do [SECOND_LIFE]" name="Second Life Blogs"/>
-		<menu_item_call label="Relatar bug" name="Report Bug"/>
 		<menu_item_call label="Sobre [APP_NAME]" name="About Second Life"/>
 	</menu>
 	<menu_item_check label="Exibir menu de depuração" name="Show Debug Menu"/>
@@ -34,6 +30,5 @@
 			<menu_item_check label="Nenhum" name="None"/>
 		</menu>
 		<menu_item_call label="Exibir painel de notificações" name="Show Notifications Console"/>
-		<menu_item_call name="UI Preview Tool" label="Ferramenta de Visualização XUI"/>
 	</menu>
 </menu_bar>

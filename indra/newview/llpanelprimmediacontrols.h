@@ -41,15 +41,17 @@ class LLViewerMediaImpl;
 class LLWindowShade;
 class LLLineEditor;
 
-class LLPanelPrimMediaControls : public LLPanel
+class LLPanelPrimMediaControls final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelPrimMediaControls, LLPanel);
+
     LLPanelPrimMediaControls();
     virtual ~LLPanelPrimMediaControls();
     bool postBuild() override;
     void draw() override;
-    bool handleScrollWheel(S32 x, S32 y, S32 clicks) override;
-    bool handleScrollHWheel(S32 x, S32 y, S32 clicks) override;
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;

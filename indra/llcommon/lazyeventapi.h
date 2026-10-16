@@ -49,7 +49,7 @@ namespace LL
      */
     // No LLInstanceTracker key: we don't need to find a specific instance,
     // LLLeapListener just needs to be able to enumerate all instances.
-    class LazyEventAPIBase: public LLInstanceTracker<LazyEventAPIBase>
+    class LL_COMMON_API LazyEventAPIBase: public LLInstanceTracker<LazyEventAPIBase>
     {
     public:
         LazyEventAPIBase(const std::string& name, const std::string& desc,

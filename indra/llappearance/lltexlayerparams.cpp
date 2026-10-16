@@ -35,7 +35,6 @@
 #include "lltexturemanagerbridge.h"
 #include "../llui/llui.h"
 #include "llwearable.h"
-#include "llfasttimer.h"
 
 //-----------------------------------------------------------------------------
 // LLTexLayerParam
@@ -338,15 +337,17 @@ bool LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
                 // Create the GL texture, and then hang onto it for future use.
                 if (mNeedsCreateTexture)
                 {
-                    mCachedProcessedTexture->createGLTexture(0, mStaticImageRaw);
+                    if (!mCachedProcessedTexture->createGLTexture(0, mStaticImageRaw))
+                    {
+                        LL_WARNS() << "Failed to create GL texture for image: " << mCachedProcessedTexture->getID() << LL_ENDL;
+                    }
                     mNeedsCreateTexture = false;
-                    gGL.getTexUnit(0)->bind(mCachedProcessedTexture);
-                    mCachedProcessedTexture->setAddressMode(LLTexUnit::TAM_CLAMP);
+                    gGL.getTextureSlot(0)->bindSampled(mCachedProcessedTexture, ALSamplers::AnisoClamp);
                 }
 
-                gGL.getTexUnit(0)->bind(mCachedProcessedTexture);
+                gGL.getTextureSlot(0)->bindSampled(mCachedProcessedTexture, ALSamplers::AnisoClamp);
                 gl_rect_2d_simple_tex(width, height);
-                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(0)->unbind();
                 stop_glerror();
             }
         }
@@ -360,7 +361,7 @@ bool LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
     }
     else
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         gGL.color4f(0.f, 0.f, 0.f, effective_weight);
         gl_rect_2d_simple(width, height);
     }

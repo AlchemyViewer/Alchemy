@@ -15,9 +15,6 @@ Stai cercando persone da frequentare? Prova la [secondlife:///app/worldmap Mappa
 		Non riesci a trovare quello che cerchi? Prova [secondlife:///app/search/people/[SEARCH_TERM] Cerca].
 	</string>
 	<string name="no_filtered_groups_msg" value="Non riesci a trovare quello che cerchi? Prova [secondlife:///app/search/groups/[SEARCH_TERM] Cerca]."/>
-	<string name="no_groups_msg" value="Stai cercando gruppi di cui far parte? Prova [secondlife:///app/search/groups Cerca]."/>
-	<string name="MiniMapToolTipMsg" value="[REGION](Fai doppio clic per aprire la Mappa, premi il tasto Maiusc e trascina per la panoramica)"/>
-	<string name="AltMiniMapToolTipMsg" value="[REGION](Fai doppio clic per teleportarti, premi il tasto Maiusc e trascina per la panoramica)"/>
 	<string name="GroupCountWithInfo" value="Fai parte di [COUNT] gruppi e puoi ancora unirti a [REMAINING] gruppi. [secondlife:/// Aumenta il tuo limite]"/>
 	<tab_container name="tabs">
 		<panel label="NELLE VICINANZE" name="nearby_panel">
@@ -40,7 +37,6 @@ Stai cercando persone da frequentare? Prova la [secondlife:///app/worldmap Mappa
 			<accordion name="friends_accordion">
 				<accordion_tab name="tab_online" title="Online"/>
 				<accordion_tab name="tab_all" title="Tutto"/>
-				<accordion_tab name="tab_suggested_friends" title="Persone che potresti voler aggiungere agli amici"/>
 			</accordion>
 		</panel>
 		<panel label="GRUPPI" name="groups_panel">
@@ -63,9 +59,6 @@ Stai cercando persone da frequentare? Prova la [secondlife:///app/worldmap Mappa
 				<button name="add_friend_btn" tool_tip="Offri amicizia a un residente"/>
 				<dnd_button name="recent_del_btn" tool_tip="Rimuovi la persona selezionata dagli amici"/>
 			</panel>
-		</panel>
-		<panel label="BLOCCATO" name="blocked_panel">
-			<panel label="Residenti e oggetti bloccati" name="panel_block_list_sidetray"/>
 		</panel>
 	</tab_container>
 </panel>

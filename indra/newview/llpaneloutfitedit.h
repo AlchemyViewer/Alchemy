@@ -61,10 +61,11 @@ class LLFindWearablesOfType;
 class LLWearableItemTypeNameComparator;
 class LLLoadingIndicator;
 
-class LLPanelOutfitEdit : public LLPanel
+class LLPanelOutfitEdit final : public LLPanel
 {
     LOG_CLASS(LLPanelOutfitEdit);
 public:
+    AL_VIEW_TYPE(LLPanelOutfitEdit, LLPanel);
 
     // NOTE: initialize mFolderViewItemTypes at the index of any new enum you add in the LLPanelOutfitEdit() constructor
     typedef enum e_folder_view_item_type
@@ -125,8 +126,8 @@ public:
     LLPanelOutfitEdit();
     /*virtual*/ ~LLPanelOutfitEdit();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
     void moveWearable(bool closer_to_body);
 
@@ -186,7 +187,7 @@ public:
                                       EDragAndDropType cargo_type,
                                       void* cargo_data,
                                       EAcceptance* accept,
-                                      std::string& tooltip_msg);
+                                      std::string& tooltip_msg) override;
 
 private:
     void onAddMoreButtonClicked();

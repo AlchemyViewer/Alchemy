@@ -71,10 +71,11 @@ class LLPanelRegionEnvironment;
 
 class LLEventTimer;
 
-class LLFloaterRegionInfo : public LLFloater
+class LLFloaterRegionInfo final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterRegionInfo, LLFloater);
 
 
     void onOpen(const LLSD& key) override;
@@ -137,6 +138,8 @@ private:
 class LLPanelRegionInfo : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelRegionInfo, LLPanel);
+
     LLPanelRegionInfo();
 
     void onBtnSet();
@@ -183,10 +186,12 @@ protected:
 // Actual panels start here
 /////////////////////////////////////////////////////////////////////////////
 
-class LLPanelRegionGeneralInfo : public LLPanelRegionInfo
+class LLPanelRegionGeneralInfo final : public LLPanelRegionInfo
 {
 
 public:
+    AL_VIEW_TYPE(LLPanelRegionGeneralInfo, LLPanelRegionInfo);
+
     LLPanelRegionGeneralInfo()
         :   LLPanelRegionInfo() {}
     ~LLPanelRegionGeneralInfo() {}
@@ -197,8 +202,11 @@ public:
 
     void onBtnSet();
     void setObjBonusFactor(F32 object_bonus_factor) {mObjBonusFactor = object_bonus_factor;}
+    void setCombatEnabled(bool enabled) { mSupportsCombat2 = enabled; }
 
-protected:
+  protected:
+    void initCombatCtrl(const std::string &name);
+
     bool sendUpdate() override;
     void onClickKick();
     void onKickCommit(const uuid_vec_t& ids);
@@ -207,16 +215,19 @@ protected:
     static void onClickMessage(void* userdata);
     bool onMessageCommit(const LLSD& notification, const LLSD& response);
     bool onChangeObjectBonus(const LLSD& notification, const LLSD& response);
+    void onChangeCombatEnabled();
 
     F32 mObjBonusFactor;
-
+    bool mSupportsCombat2 {false};
 };
 
 /////////////////////////////////////////////////////////////////////////////
 
-class LLPanelRegionDebugInfo : public LLPanelRegionInfo
+class LLPanelRegionDebugInfo final : public LLPanelRegionInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelRegionDebugInfo, LLPanelRegionInfo);
+
     LLPanelRegionDebugInfo()
         :   LLPanelRegionInfo(), mTargetAvatar() {}
     ~LLPanelRegionDebugInfo() {}
@@ -245,11 +256,13 @@ private:
 
 /////////////////////////////////////////////////////////////////////////////
 
-class LLPanelRegionTerrainInfo : public LLPanelRegionInfo
+class LLPanelRegionTerrainInfo final : public LLPanelRegionInfo
 {
     LOG_CLASS(LLPanelRegionTerrainInfo);
 
 public:
+    AL_VIEW_TYPE(LLPanelRegionTerrainInfo, LLPanelRegionInfo);
+
     LLPanelRegionTerrainInfo();
     ~LLPanelRegionTerrainInfo() {}
 
@@ -268,12 +281,11 @@ public:
     void updateForMaterialType();
 
     static void onClickDownloadRaw(void*);
-    static void onClickDownloadRawCallback(const std::vector<std::string>& filenames, void* data);
     static void onClickUploadRaw(void*);
-    static void onClickUploadRawCallback(void* data, const std::vector<std::string>& filenames);
     static void onClickBakeTerrain(void*);
     bool callbackBakeTerrain(const LLSD& notification, const LLSD& response);
     bool callbackTextureHeights(const LLSD& notification, const LLSD& response);
+    void callbackMaterialCommit(S32 index);
 
 protected:
     bool sendUpdate() override;
@@ -299,9 +311,11 @@ private:
 
 /////////////////////////////////////////////////////////////////////////////
 
-class LLPanelEstateInfo : public LLPanelRegionInfo
+class LLPanelEstateInfo final : public LLPanelRegionInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelEstateInfo, LLPanelRegionInfo);
+
     static void initDispatch(LLDispatcher& dispatch);
 
     void onChangeFixedSun();
@@ -361,9 +375,11 @@ protected:
 
 /////////////////////////////////////////////////////////////////////////////
 
-class LLPanelEstateCovenant : public LLPanelRegionInfo
+class LLPanelEstateCovenant final : public LLPanelRegionInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelEstateCovenant, LLPanelRegionInfo);
+
     LLPanelEstateCovenant();
     ~LLPanelEstateCovenant() {}
 
@@ -423,11 +439,13 @@ protected:
 /////////////////////////////////////////////////////////////////////////////
 
 
-class LLPanelRegionExperiences : public LLPanelRegionInfo
+class LLPanelRegionExperiences final : public LLPanelRegionInfo
 {
     LOG_CLASS(LLPanelRegionExperiences);
 
 public:
+    AL_VIEW_TYPE(LLPanelRegionExperiences, LLPanelRegionInfo);
+
     LLPanelRegionExperiences(){}
     bool postBuild() override;
 
@@ -459,11 +477,13 @@ private:
 };
 
 
-class LLPanelEstateAccess : public LLPanelRegionInfo
+class LLPanelEstateAccess final : public LLPanelRegionInfo
 {
     LOG_CLASS(LLPanelEstateAccess);
 
 public:
+    AL_VIEW_TYPE(LLPanelEstateAccess, LLPanelRegionInfo);
+
     LLPanelEstateAccess();
 
     bool postBuild() override;
@@ -508,8 +528,8 @@ private:
     // used for both add and remove operations
     static bool accessCoreConfirm(const LLSD& notification, const LLSD& response);
 
-    // Send the actual EstateOwnerRequest "estateaccessdelta" message
 public:
+    // Send the actual EstateOwnerRequest "estateaccessdelta" message
     static void sendEstateAccessDelta(U32 flags, const LLUUID& agent_id);
 
 private:
@@ -518,8 +538,8 @@ private:
     void searchAgent(LLNameListCtrl* listCtrl, const std::string& search_string);
     void copyListToClipboard(std::string list_name);
 
-    bool mPendingUpdate;
-    bool mCtrlsEnabled;
+    bool mPendingUpdate = false;
+    bool mCtrlsEnabled = false;
 };
 
 #endif

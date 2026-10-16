@@ -31,6 +31,8 @@
 #include <list>
 #include <map>
 #include <array>
+#include <string>
+#include <vector>
 
 #include "v3math.h"
 #include "v3dmath.h"
@@ -41,7 +43,9 @@
 #include "llextendedstatus.h"
 
 #include "lllistener.h"
-#include "boost/unordered_map.hpp"
+
+#include <boost/signals2/signal.hpp>
+#include <boost/unordered_map.hpp>
 
 const F32 LL_WIND_UPDATE_INTERVAL = 0.1f;
 const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
@@ -49,8 +53,18 @@ const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
 const F32 ATTACHED_OBJECT_TIMEOUT = 5.0f;
 const F32 DEFAULT_MIN_DISTANCE = 2.0f;
 
-#define LL_MAX_AUDIO_CHANNELS 30
-#define LL_MAX_AUDIO_BUFFERS 40 // Some extra for preloading, maybe?
+// One entry in an audio engine's output-device enumeration. The id is a
+// backend-provided stable identifier (e.g. a WASAPI / PulseAudio device
+// node, an SDL device ID) suitable for persisting across sessions; the
+// name is the user-facing label suitable for display in a combo box.
+struct LLAudioOutputDevice
+{
+    std::string id;
+    std::string name;
+};
+
+#define LL_MAX_AUDIO_CHANNELS 120
+#define LL_MAX_AUDIO_BUFFERS 140 // Some extra for preloading, maybe?
 
 class LLAudioSource;
 class LLAudioData;
@@ -59,6 +73,7 @@ class LLAudioChannelOpenAL;
 class LLAudioBuffer;
 class LLStreamingAudioInterface;
 struct SoundData;
+struct LLSoundHistoryItem;
 
 //
 //  LLAudioEngine definition
@@ -95,6 +110,62 @@ public:
     virtual LLStreamingAudioInterface *createDefaultStreamingAudioImpl() const = 0;
     virtual void shutdown();
 
+    // Output device enumeration / selection. The base defaults are
+    // empty / no-op — backends that support user-pickable output devices
+    // override. Selection is stored as the device id (stable across
+    // reboots and OS updates / locale changes), not the display name.
+    // Each backend owns its own gSavedSettings key — device ids from
+    // one backend (e.g. WASAPI GUIDs from FAudio) won't match those of
+    // another (OpenAL device names, FMOD GUIDs), so storing them under
+    // separate keys avoids cross-backend confusion when the user
+    // changes the active engine. Backends return their key name via
+    // getOutputDeviceSettingName(); empty means the backend doesn't
+    // surface device selection.
+    virtual std::vector<LLAudioOutputDevice> enumerateOutputDevices() const { return {}; }
+    virtual std::string getActiveOutputDevice() const { return {}; }
+    virtual std::string getActiveOutputDeviceId() const { return {}; }
+    virtual std::string getOutputDeviceSettingName() const { return {}; }
+    // Tear down + re-create the backend's voice graph against the device
+    // matching this id. Empty id picks the system default. Backends that
+    // don't support hot-swap inherit the no-op default.
+    virtual void setOutputDevice(const std::string& /*id*/) {}
+
+    // Push notification surface for "the device list or active device
+    // has changed". UIs subscribe via boost::signals2::scoped_connection
+    // and refresh against enumerateOutputDevices / getActiveOutputDevice.
+    // Backends fire it from setOutputDevice after a successful swap so
+    // the prefs combo's active-selection display tracks reality without
+    // the user needing to open the dropdown to trigger a refresh. The
+    // signal is owned by the engine; signals2 makes scoped disconnect
+    // safe even if the engine outlives the slot's owner.
+    using devices_changed_signal_t = boost::signals2::signal<void()>;
+    devices_changed_signal_t& getDevicesChangedSignal()
+    {
+        return mDevicesChangedSignal;
+    }
+
+    // Reverb. Backends that surface an I3DL2-style preset (FAudio via
+    // FAudioFXReverb, OpenAL via the EFX EAXReverb effect) override
+    // these — base class no-ops let other backends (FMOD studio, the
+    // headless test backend) inherit "no reverb" cleanly. supportsReverb
+    // gates UI visibility so the Sound prefs panel doesn't surface the
+    // preset / wet-level controls on backends that ignore them.
+    virtual bool supportsReverb() const { return false; }
+    virtual void setReverbPreset(const std::string& /*name*/) {}
+    virtual void setReverbSendScale(float /*scale*/) {}
+
+    // The reverb-wet scalar maps to three different DSP scales across
+    // backends — FAudio writes it as a matrix coefficient on top of
+    // F3DAudio's dsp.ReverbLevel; OpenAL writes it directly to AL_
+    // EFFECTSLOT_GAIN; FMOD writes it to Channel::setReverbProperties
+    // wet. The same numeric value perceives very differently across
+    // them, so each backend persists its own value under its own key.
+    // Empty string means "no reverb-scale persistence" — a backend
+    // that doesn't override returns empty and the UI falls back to a
+    // no-op binding. AudioPreset stays shared (preset *names* are
+    // semantically equivalent across all three backend implementations).
+    virtual std::string getReverbSendScaleSettingName() const { return {}; }
+
     // Used by the mechanics of the engine
     //virtual void processQueue(const LLUUID &sound_guid);
     virtual void setListener(LLVector3 pos,LLVector3 vel,LLVector3 up,LLVector3 at);
@@ -120,7 +191,7 @@ public:
     void setMasterGain(F32 gain);
 
     F32 getSecondaryGain(S32 type);
-    void setSecondaryGain(S32 type, F32 gain);
+    virtual void setSecondaryGain(S32 type, F32 gain);
 
     F32 getInternetStreamGain();
 
@@ -135,8 +206,10 @@ public:
     // Owner ID is the owner of the object making the request
     void triggerSound(const LLUUID &sound_id, const LLUUID& owner_id, const F32 gain,
                       const S32 type = LLAudioEngine::AUDIO_TYPE_NONE,
-                      const LLVector3d &pos_global = LLVector3d::zero);
-    void triggerSound(SoundData& soundData);
+                      const LLVector3d &pos_global = LLVector3d::zero,
+                      const LLUUID& source_object = LLUUID::null,
+                      const LLUUID& audio_source_id = LLUUID::null);
+    void triggerSound(const SoundData& soundData);
 
     bool preloadSound(const LLUUID &id);
 
@@ -204,7 +277,60 @@ protected:
     F64 mapWindVecToPitch(LLVector3 wind_vec);
     F64 mapWindVecToPan(LLVector3 wind_vec);
 
+    // Maximum wind-vector magnitude (m/s) at which mapWindVecToGain
+    // saturates to 1.0. Region wind layers don't typically exceed
+    // ~10 m/s but bursty data + the avatar-velocity subtraction in
+    // llvieweraudio.cpp can push the relative vector above that, so
+    // we clip rather than letting gain blow past unity.
+    static constexpr F32 WIND_MAX_VELOCITY_MPS = 20.f;
+
+    // Altitude-dependent shaping result. Applied to the wind synth's
+    // mTargetFreq / mTargetGain before each updateWind tick. Single
+    // policy carried by computeWindAltitudeShape() below so each
+    // backend gets the same "what does wind sound like at this
+    // altitude / depth" behaviour.
+    struct WindAltitudeShape
+    {
+        F32 freq_mul = 1.f;   // multiplier on mTargetFreq
+        F32 gain_mul = 1.f;   // multiplier on mTargetGain
+    };
+
+public:
+    // Live setters for the wind tunables — public because they're
+    // driven from llstartup's settings-signal handlers. Routed
+    // through virtuals so each backend forwards to its own LLWindGen
+    // instance; the base class doesn't own a generator. Default
+    // no-op overrides keep backends without wind support (headless)
+    // honest.
+    virtual void setWindGustiness(F32 /*depth*/) {}
+    void setWindAltitudeBoost(F32 boost)
+    {
+        if (boost < 0.f) boost = 0.f;
+        if (boost > 1.f) boost = 1.f;
+        mAltitudeBoost = boost;
+    }
+
 protected:
+    // Linden frame (+X fwd, +Y left, +Z up) -> DirectSound 3D / X3D
+    // frame (+X right, +Y up, +Z back) flip applied to the wind
+    // vector before it's fed into the spatialiser. Lives in the
+    // base class so OpenAL and FAudio share the same transform —
+    // the historical pattern was duplicated identically across the
+    // two backends. FMOD uses LLVector3 directly via its DSP path
+    // and doesn't call this helper.
+    static LLVector3 lindenToDS3DWind(const LLVector3& v)
+    {
+        return LLVector3(-v.mV[1], v.mV[2], -v.mV[0]);
+    }
+
+    // Compute the altitude shape from camera_height_above_water.
+    // Negative = submerged; muffles via lower resonator cutoff +
+    // attenuates gain (wind doesn't fully cut at the water-line
+    // because a brief tail feels more natural than an instantaneous
+    // mute). Positive = above water; subtle gain lift with altitude,
+    // scaled by mAltitudeBoost.
+    WindAltitudeShape computeWindAltitudeShape(F32 height_above_water) const;
+
     LLListener *mListenerp;
 
     bool mMuted;
@@ -213,6 +339,15 @@ protected:
     S32 mLastStatus;
 
     bool mEnableWind;
+
+    // Strength multiplier for altitude-dependent gain lift in
+    // computeWindAltitudeShape. 0 = no lift; 1 = full 1.5x at
+    // 100m+ above water. Default 0.5 means a modest 1.25x at the
+    // saturation point — felt rather than heard, the way real
+    // altitude wind tends to register.
+    F32 mAltitudeBoost = 0.5f;
+
+    devices_changed_signal_t mDevicesChangedSignal;
 
     LLUUID mCurrentTransfer; // Audio file currently being transferred by the system
     LLFrameTimer mCurrentTransferTimer;
@@ -240,6 +375,17 @@ protected:
 
     LLFrameTimer mWindUpdateTimer;
 
+public:
+    void logSoundPlay(const LLUUID& id, LLVector3d position, S32 type, const LLUUID& assetid, const LLUUID& ownerid, const LLUUID& sourceid, bool is_trigger, bool is_looped);
+    void logSoundStop(const LLUUID& id);
+    void pruneSoundLog();
+
+    auto& getSoundLog() { return mSoundHistory; }
+private:
+    S32 mSoundHistoryPruneCounter = 0;
+
+    using sound_history_map = boost::unordered_map<LLUUID, std::unique_ptr<LLSoundHistoryItem>>;
+    sound_history_map mSoundHistory;
 private:
     void setDefaults();
     LLStreamingAudioInterface *mStreamingAudioImpl;
@@ -265,7 +411,7 @@ class LLAudioSource
 public:
     // owner_id is the id of the agent responsible for making this sound
     // play, for example, the owner of the object currently playing it
-    LLAudioSource(const LLUUID &id, const LLUUID& owner_id, const F32 gain, const S32 type = LLAudioEngine::AUDIO_TYPE_NONE);
+    LLAudioSource(const LLUUID &id, const LLUUID& owner_id, const F32 gain, const S32 type = LLAudioEngine::AUDIO_TYPE_NONE, const LLUUID& source_id = LLUUID::null, const bool is_trigger = true);
     virtual ~LLAudioSource();
 
     virtual void update();                      // Update this audio source
@@ -305,6 +451,8 @@ public:
     virtual void setGain(const F32 gain)                            { mGain = llclamp(gain, 0.f, 1.f); }
 
     const LLUUID &getID() const     { return mID; }
+    const LLUUID &getLogID() const { return mLogID; }
+
     bool isDone() const;
     bool isMuted() const { return mSourceMuted; }
 
@@ -345,6 +493,9 @@ protected:
     S32             mType;
     LLVector3d      mPositionGlobal;
     LLVector3       mVelocity;
+    LLUUID          mLogID;
+    LLUUID          mSourceID;
+    bool            mIsTrigger;
 
     //LLAudioSource *mSyncMasterp;  // If we're a slave, the source that we're synced to.
     LLAudioChannel  *mChannelp;     // If we're currently playing back, this is the channel that we're assigned to.
@@ -453,7 +604,7 @@ protected:
 class LLAudioBuffer
 {
 public:
-    virtual ~LLAudioBuffer() = default;
+    virtual ~LLAudioBuffer() {};
     virtual bool loadWAV(const std::string& filename) = 0;
     virtual U32 getLength() = 0;
 
@@ -490,5 +641,34 @@ struct SoundData
 
 
 extern LLAudioEngine* gAudiop;
+
+struct LLSoundHistoryItem
+{
+    LLUUID mID;
+    LLVector3d mPosition;
+    S32 mType;
+    bool mPlaying;
+    LLUUID mAssetID;
+    LLUUID mOwnerID;
+    LLUUID mSourceID;
+    bool mIsTrigger;
+    bool mIsLooped;
+    F64 mTimeStarted;
+    F64 mTimeStopped;
+    bool mReviewed;
+    bool mReviewedCollision;
+
+    LLSoundHistoryItem()
+      : mType(0)
+      , mPlaying(0)
+      , mIsTrigger(0)
+      , mIsLooped(0)
+      , mTimeStarted(0.f)
+      , mTimeStopped(0.f)
+      , mReviewed(false)
+      , mReviewedCollision(false)
+    {
+    }
+};
 
 #endif

@@ -1,61 +1,41 @@
 # -*- cmake -*-
 
-project(llxml)
+add_library(llxml STATIC)
 
-include(00-Common)
-include(LLCommon)
-
-set(llxml_SOURCE_FILES
+target_sources(
+  llxml
+  PRIVATE
+    alxmldocument.cpp
+    alxmllayermerge.cpp
+    alxmlmergelog.cpp
     llcontrol.cpp
     llxmlnode.cpp
-    llxmlparser.cpp
     llxmltree.cpp
-    )
+)
 
-set(llxml_HEADER_FILES
-    CMakeLists.txt
+target_sources(
+  llxml
+  PUBLIC
+    FILE_SET HEADERS
+      FILES alxmldocument.h alxmllayermerge.h alxmlmergelog.h llcontrol.h llxmlnode.h llxmltree.h
+)
 
-    llcontrol.h
-    llxmlnode.h
-    llxmlparser.h
-    llxmltree.h
-    )
-
-list(APPEND llxml_SOURCE_FILES ${llxml_HEADER_FILES})
-
-add_library (llxml ${llxml_SOURCE_FILES})
-# Libraries on which this library depends, needed for Linux builds
-# Sort by high-level to low-level
-target_link_libraries( llxml
-        llfilesystem
-        llmath
-        llcommon
-        ll::expat
-    )
-target_include_directories( llxml  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
-
-if (USE_PRECOMPILED_HEADERS)
-  target_precompile_headers(llxml REUSE_FROM llprecompiled)
-endif ()
+target_link_libraries(llxml PRIVATE al::flags PUBLIC llfilesystem llmath llcommon ll::pugixml)
+target_precompile_headers(llxml REUSE_FROM llprecompiled)
 
 # tests
+if(AL_BUILD_TESTS)
+  # The state guard's checks on what llxml keeps for the process, for every
+  # test binary that links it.
+  add_library(llxml_test_checks OBJECT tests/llxml_test_checks.cpp)
+  target_link_libraries(llxml_test_checks PRIVATE al::flags al_test_support llxml)
+  set_target_properties(llxml_test_checks PROPERTIES FOLDER "Tests/llxml")
 
-if (LL_TESTS)
-    # unit tests
-
-    SET(llxml_TEST_SOURCE_FILES
-      # none yet!
-      )
-    LL_ADD_PROJECT_UNIT_TESTS(llxml "${llxml_TEST_SOURCE_FILES}")
-
-    # integration tests
-
-    #    set(TEST_DEBUG on)
-    set(test_libs
-            llxml
-            llmath
-            llcommon
-            )
-
-    LL_ADD_INTEGRATION_TEST(llcontrol "" "${test_libs}")
-endif (LL_TESTS)
+  al_add_test_binary(
+    llxml_tests
+    PROJECT llxml
+    SOURCES tests/alxmllayermerge_test.cpp tests/llcontrol_test.cpp tests/llxmlnode_test.cpp
+    LIBRARIES llxml llmath llcommon
+    SUPPORT llxml_test_checks
+  )
+endif()

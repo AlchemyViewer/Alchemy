@@ -404,9 +404,10 @@ LLEditWearableDictionary::PickerControlEntry::PickerControlEntry(ETextureIndex t
 /**
  * Class to prevent hack in LLButton's constructor and use paddings declared in xml.
  */
-class LLLabledBackButton : public LLButton
+class LLLabledBackButton final : public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLLabledBackButton, LLButton);
         struct Params : public LLInitParam::Block<Params, LLButton::Params>
         {
                 Params() {}
@@ -440,7 +441,7 @@ template <typename T>
 const LLEditWearableDictionary::PickerControlEntry*
 get_picker_entry (const ETextureIndex index) { return NULL; }
 
-typedef boost::function<void(LLPanel* panel, const LLEditWearableDictionary::PickerControlEntry*)> function_t;
+typedef std::function<void(LLPanel* panel, const LLEditWearableDictionary::PickerControlEntry*)> function_t;
 
 typedef struct PickerControlEntryNamePredicate
 {
@@ -985,7 +986,7 @@ void LLPanelEditWearable::onCommitSexChange()
 
 void LLPanelEditWearable::onTexturePickerCommit(const LLUICtrl* ctrl)
 {
-        const LLTextureCtrl* texture_ctrl = dynamic_cast<const LLTextureCtrl*>(ctrl);
+        const LLTextureCtrl* texture_ctrl = ALViewType::as<LLTextureCtrl>(ctrl);
         if (!texture_ctrl)
         {
                 LL_WARNS() << "got commit signal from not LLTextureCtrl." << LL_ENDL;
@@ -1043,6 +1044,11 @@ void LLPanelEditWearable::onColorSwatchCommit(const LLUICtrl* ctrl)
                         if (old_color != new_color)
                         {
                                 getWearable()->setClothesColor(entry->mTextureIndex, new_color);
+                                // The colour is three parameters on the wearable,
+                                // and the layer set that tints from them reads the
+                                // avatar's copy of them.
+                                getWearable()->writeToAvatar(gAgentAvatarp);
+                                gAgentAvatarp->updateVisualParams();
                                 LLVisualParamHint::requestHintUpdates();
                                 gAgentAvatarp->wearableUpdated(getWearable()->getType());
                         }
@@ -1159,6 +1165,11 @@ void LLPanelEditWearable::revertChanges()
         }
 
         mWearablePtr->revertValues();
+        if (isAgentAvatarValid())
+        {
+                mWearablePtr->writeToAvatar(gAgentAvatarp);
+                gAgentAvatarp->updateVisualParams();
+        }
         mNameEditor->setText(mWearableItem->getName());
         updatePanelPickerControls(mWearablePtr->getType());
         updateTypeSpecificControls(mWearablePtr->getType());
@@ -1371,7 +1382,7 @@ void LLPanelEditWearable::toggleTypeSpecificControls(LLWearableType::EType type)
 void LLPanelEditWearable::updateTypeSpecificControls(LLWearableType::EType type)
 {
         const F32 ONE_METER = 1.0;
-        const F32 ONE_FOOT = 0.3048 * ONE_METER; // in meters
+        const F32 ONE_FOOT = 0.3048f * ONE_METER; // in meters
         // Update controls specific to shape editing panel.
         if (type == LLWearableType::WT_SHAPE)
         {
@@ -1529,6 +1540,7 @@ void LLPanelEditWearable::getSortedParams(value_map_t &sorted_params, const std:
 
 void LLPanelEditWearable::buildParamList(LLScrollingPanelList *panel_list, value_map_t &sorted_params, LLAccordionCtrlTab *tab, LLJoint* jointp)
 {
+        bool show_hints = gSavedSettings.getBOOL("AlchemyAppearanceShowHints");
         // sorted_params is sorted according to magnitude of effect from
         // least to greatest.  Adding to the front of the child list
         // reverses that order.
@@ -1542,7 +1554,7 @@ void LLPanelEditWearable::buildParamList(LLScrollingPanelList *panel_list, value
                         p.name("LLScrollingPanelParam");
                         LLViewerWearable *wearable = this->getWearable();
                         LLScrollingPanelParamBase *panel_param = NULL;
-                        if (wearable && wearable->getType() == LLWearableType::WT_PHYSICS) // Hack to show a different panel for physics.  Should generalize this later.
+                        if (!show_hints || (wearable && wearable->getType() == LLWearableType::WT_PHYSICS)) // Hack to show a different panel for physics.  Should generalize this later.
                         {
                                 panel_param = new LLScrollingPanelParamBase( p, NULL, (*it).second, true, this->getWearable(), jointp);
                         }

@@ -66,7 +66,6 @@
 #include "llprimitive.h"
 #include "llwindow.h"           // incBusyCount()
 #include "material_codes.h"
-#include "lluiusage.h"
 
 const LLVector3 DEFAULT_OBJECT_SCALE(0.5f, 0.5f, 0.5f);
 
@@ -214,13 +213,13 @@ bool LLToolPlacer::addObject( LLPCode pcode, S32 x, S32 y, U8 use_physics )
     case LL_PCODE_LEGACY_GRASS:
         //  Randomize size of grass patch
         scale.setVec(10.f + ll_frand(20.f), 10.f + ll_frand(20.f),  1.f + ll_frand(2.f));
-        state = rand() % LLVOGrass::sMaxGrassSpecies;
+        state = ll_rand(LLVOGrass::sMaxGrassSpecies);
         break;
 
 
     case LL_PCODE_LEGACY_TREE:
     case LL_PCODE_TREE_NEW:
-        state = rand() % LLVOTree::sMaxTreeSpecies;
+        state = ll_rand(LLVOTree::sMaxTreeSpecies);
         break;
 
     case LL_PCODE_SPHERE:
@@ -242,7 +241,6 @@ bool LLToolPlacer::addObject( LLPCode pcode, S32 x, S32 y, U8 use_physics )
                                gAgent.getID(), 1.0f, LLAudioEngine::AUDIO_TYPE_UI);
     }
 
-    LLUIUsage::instance().logCommand("Build.ObjectAdd");
     gMessageSystem->newMessageFast(_PREHASH_ObjectAdd);
     gMessageSystem->nextBlockFast(_PREHASH_AgentData);
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
@@ -445,10 +443,11 @@ bool LLToolPlacer::addObject( LLPCode pcode, S32 x, S32 y, U8 use_physics )
         gViewerWindow->getWindow()->incBusyCount();
     }
 
-    if (!gSavedSettings.getBOOL("EnableSelectionHints"))
+    static LLCachedControl<bool> enable_selection_hints(gSavedSettings, "EnableSelectionHints", false);
+    if (enable_selection_hints)
     {
         // VEFFECT: AddObject
-        LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
+        LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, true);
         effectp->setSourceObject((LLViewerObject*)gAgentAvatarp);
         effectp->setPositionGlobal(regionp->getPosGlobalFromRegion(ray_end_region));
         effectp->setDuration(LL_HUD_DUR_SHORT);

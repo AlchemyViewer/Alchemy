@@ -33,13 +33,11 @@
 
 #include "llsingleton.h"
 
-class ALStreamInfo : public LLSimpleton<ALStreamInfo>
+class ALStreamInfo : public LLSingleton<ALStreamInfo>
 {
-public:
-    ALStreamInfo();
+    LLSINGLETON(ALStreamInfo);
     ~ALStreamInfo();
 
-private:
     void handleMetadataUpdate(const LLSD& metadata);
 
     boost::signals2::connection mMetadataConnection;

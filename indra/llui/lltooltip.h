@@ -36,9 +36,11 @@
 //
 // Classes
 //
-class LLToolTipView : public LLView
+class LLToolTipView final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLToolTipView, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Params();
@@ -48,7 +50,8 @@ public:
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
-    bool handleScrollWheel( S32 x, S32 y, S32 clicks ) override;
+    bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta ) override;
+    bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
     void drawStickyRect();
 
@@ -58,6 +61,7 @@ public:
 class LLToolTip : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLToolTip, LLPanel);
 
     struct StyledText : public LLInitParam::Block<StyledText>
     {
@@ -67,8 +71,8 @@ public:
 
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
-        typedef boost::function<void(void)> click_callback_t;
-        typedef boost::function<LLToolTip*(LLToolTip::Params)> create_callback_t;
+        typedef std::function<void(void)> click_callback_t;
+        typedef std::function<LLToolTip*(LLToolTip::Params)> create_callback_t;
 
         Optional<std::string>       message;
         Multiple<StyledText>        styled_message;
@@ -133,9 +137,11 @@ protected:
 };
 
 // used for the inspector tooltips which need different background images etc.
-class LLInspector : public LLToolTip
+class LLInspector final : public LLToolTip
 {
 public:
+    AL_VIEW_TYPE(LLInspector, LLToolTip);
+
     struct Params : public LLInitParam::Block<Params, LLToolTip::Params>
     {};
 };

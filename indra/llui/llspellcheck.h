@@ -31,14 +31,19 @@
 #include "llui.h"
 #include "llinitdestroyclass.h"
 #include <boost/signals2.hpp>
+#include <memory>
+#include <unordered_set>
 
-class Hunspell;
+// The active platform spell-check backend (Hunspell, NSSpellChecker, or the Windows Spell Checking
+// API), selected at build time. LLSpellChecker owns one via a pImpl and keeps all backend-agnostic
+// logic itself, so this header stays platform-clean.
+class LLSpellCheckEngine;
 
 class LLSpellChecker : public LLSimpleton<LLSpellChecker>
 {
 public:
     LLSpellChecker();
-    ~LLSpellChecker();
+    ~LLSpellChecker();   // defined in llspellcheck.cpp (pImpl: unique_ptr<LLSpellCheckEngine>)
 
     void addToCustomDictionary(const std::string& word);
     void addToIgnoreList(const std::string& word);
@@ -46,7 +51,9 @@ public:
     S32  getSuggestions(const std::string& word, std::vector<std::string>& suggestions) const;
 protected:
     void addToDictFile(const std::string& dict_path, const std::string& word);
-    void initHunspell(const std::string& dict_language);
+    void activateDictionary(const std::string& dict_language);  // (re)activate the engine + accepted words
+    void rebuildAcceptedWords();                                // reload custom + ignore + secondary words
+    bool isAccepted(const std::string& word) const;             // case-insensitive accepted-word lookup
 
 public:
     typedef std::list<std::string> dict_list_t;
@@ -76,11 +83,11 @@ public:
     static boost::signals2::connection setSettingsChangeCallback(const settings_change_signal_t::slot_type& cb);
 
 protected:
-    std::unique_ptr<Hunspell>   mHunspell;
-    std::string mDictLanguage;
-    std::string mDictFile;
-    dict_list_t mDictSecondary;
-    std::vector<std::string> mIgnoreList;
+    std::unique_ptr<LLSpellCheckEngine> mEngine;        // active platform backend
+    std::string mDictLanguage;                          // active primary dictionary (display name)
+    dict_list_t mDictSecondary;                         // active secondary dictionaries (e.g. SL glossary)
+    std::vector<std::string> mIgnoreList;               // session ignore list, lowercased (user_ignore.dic)
+    std::unordered_set<std::string> mAcceptedWords;     // lowercased custom + ignore + secondary words
     LLSD mDictMap;
 
     static settings_change_signal_t sSettingsChangeSignal;

@@ -28,7 +28,6 @@
 #define LL_TABCONTAINER_H
 
 #include "llpanel.h"
-#include "lltextbox.h"
 #include "llframetimer.h"
 #include "lliconctrl.h"
 #include "llbutton.h"
@@ -38,6 +37,8 @@ class LLTabTuple;
 class LLTabContainer : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLTabContainer, LLPanel);
+
     enum TabPosition
     {
         TOP,
@@ -91,11 +92,6 @@ public:
                                             last_tab;
 
         /**
-         * Tab label horizontal alignment
-         */
-        Optional<LLFontGL::HAlign>          font_halign;
-
-        /**
          * Tab label ellipses
          */
         Optional<bool>                      use_ellipses;
@@ -123,6 +119,12 @@ public:
 
         Optional<bool> use_tab_offset;
 
+        // The tabs share the strip's width when they fit in it, each
+        // taking its own width and an equal part of what is left, so the
+        // strip runs the whole way across its pages. Tabs that do not fit
+        // keep their own widths and scroll.
+        Optional<bool> fill_width;
+
         Params();
     };
 
@@ -136,32 +138,30 @@ public:
 
     /*virtual*/ ~LLTabContainer();
 
-    // from LLView
-    /*virtual*/ void setValue(const LLSD& value);
 
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
-    /*virtual*/ void draw();
-    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleMouseUp( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
+    // from LLView
+    /*virtual*/ void setValue(const LLSD& value) override;
+    /*virtual*/ LLSD getValue() const override;
+
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleMouseUp( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleKeyHere(KEY key, MASK mask) override;
     /*virtual*/ bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                        EDragAndDropType type, void* cargo_data,
-                                       EAcceptance* accept, std::string& tooltip);
-    /*virtual*/ LLView* getChildView(std::string_view name, bool recurse = true) const;
-    /*virtual*/ LLView* findChildView(std::string_view name, bool recurse = true) const;
+                                       EAcceptance* accept, std::string& tooltip) override;
     /*virtual*/ void initFromParams(const LLPanel::Params& p);
-    /*virtual*/ bool addChild(LLView* view, S32 tab_group = 0);
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool addChild(LLView* view, S32 tab_group = 0) override;
+    /*virtual*/ bool postBuild() override;
 
     struct TabPanelParams : public LLInitParam::Block<TabPanelParams>
     {
         Mandatory<LLPanel*>         panel;
 
         Optional<std::string>       label;
-        Optional<bool>              select_tab,
-                                    is_placeholder;
+        Optional<bool>              select_tab;
         Optional<S32>               indent;
         Optional<eInsertionPoint>   insert_at;
         Optional<void*>             user_data;
@@ -170,7 +170,6 @@ public:
         :   panel("panel", NULL),
             label("label"),
             select_tab("select_tab"),
-            is_placeholder("is_placeholder"),
             indent("indent"),
             insert_at("insert_at", END)
         {}
@@ -178,16 +177,20 @@ public:
 
     void        addTabPanel(LLPanel* panel);
     void        addTabPanel(const TabPanelParams& panel);
-    void        addPlaceholder(LLPanel* child, const std::string& label);
+    // Removing a tab, or all of them, lets its panel go without deleting it:
+    // the panel is its owner's again, who must keep it or have it die(). An
+    // owner that keeps none of them has deleteAllTabs() delete them, as it
+    // cannot reach them after.
     void        removeTabPanel( LLPanel* child );
     void        lockTabs(S32 num_tabs = 0);
     void        unlockTabs();
     S32         getNumLockedTabs() const { return mLockedTabCount; }
     void        enableTabButton(S32 which, bool enable);
-    void        deleteAllTabs();
+    void        deleteAllTabs(bool delete_panels = false);
     LLPanel*    getCurrentPanel();
     S32         getCurrentPanelIndex() const;
     S32         getTabCount() const;
+    S32         getVisibleTabCount() const;
     LLPanel*    getPanelByIndex(S32 index) const;
     S32         getIndexForPanel(LLPanel* panel) const;
     S32         getPanelIndexByTitle(std::string_view title) const;
@@ -206,10 +209,17 @@ public:
 
     bool        getTabPanelFlashing(LLPanel* child);
     void        setTabPanelFlashing(LLPanel* child, bool state);
-    void        setTabImage(LLPanel* child, std::string img_name, const LLColor4& color = LLColor4::white);
+    // A tab with a picture on it. The alignment is where the picture sits
+    // against the label; a tab with no label wants it centred, which is what
+    // a strip of icons is.
+    void        setTabImage(LLPanel* child, std::string img_name, const LLColor4& color = LLColor4::white,
+                            LLFontGL::HAlign align = LLFontGL::LEFT);
     void        setTabImage(LLPanel* child, const LLUUID& img_id, const LLColor4& color = LLColor4::white);
     void        setTabImage(LLPanel* child, LLIconCtrl* icon);
-    void        setTitle( const std::string& title );
+    // What a tab has to say beyond its name: a count, a state, a dot, on the
+    // button that selects it. An empty label takes it away again, so a tab
+    // with nothing to say looks like one that never had anything.
+    void        setTabBadge(LLPanel* child, const std::string& label);
     const std::string getPanelTitle(S32 index);
 
     void        setTopBorderHeight(S32 height);
@@ -225,8 +235,14 @@ public:
     S32         getMaxTabWidth() const { return mMaxTabWidth; }
 
     void setTabVisibility( LLPanel const *aPanel, bool );
+    bool getTabVisibility(const LLPanel* panel) const;
 
     void        startDragAndDropDelayTimer() { mDragAndDropDelayTimer.start(); }
+
+    // How far the strip is scrolled, and how far it can be, in tabs that
+    // show; a hidden tab is not a place to scroll to.
+    S32 getScrollPos() const            { return mScrollPos; }
+    S32 getMaxScrollPos() const         { return mMaxScrollPos; }
 
     void onTabBtn( const LLSD& data, LLPanel* panel );
     void onNextBtn(const LLSD& data);
@@ -246,24 +262,36 @@ private:
     LLTabTuple* getTabByPanel(LLPanel* child);
     void insertTuple(LLTabTuple * tuple, eInsertionPoint insertion_point);
 
-    S32 getScrollPos() const            { return mScrollPos; }
     void setScrollPos(S32 pos)          { mScrollPos = pos; }
-    S32 getMaxScrollPos() const         { return mMaxScrollPos; }
     void setMaxScrollPos(S32 pos)       { mMaxScrollPos = pos; }
+    S32 visibleTabWidth() const;
+    void scrollTabIntoView(const LLTabTuple* tuple);
+    S32 pageLeft() const;
+    S32 pageRight() const;
+    S32 stripRoom(bool with_arrows) const;
+    void setNaturalWidth(LLTabTuple* tuple, S32 width);
+    void fillStrip();
     S32 getScrollPosPixels() const      { return mScrollPosPixels; }
     void setScrollPosPixels(S32 pixels) { mScrollPosPixels = pixels; }
 
+public:
+    // Whether the row of tabs is shown: a host that takes every tab but one
+    // away hides the row and gives the page its room.
     void setTabsHidden(bool hidden)     { mTabsHidden = hidden; }
     bool getTabsHidden() const          { return mTabsHidden; }
+
+private:
 
     void scrollPrev() { mScrollPos = llmax(0, mScrollPos-1); } // No wrap
     void scrollNext() { mScrollPos = llmin(mScrollPos+1, mMaxScrollPos); } // No wrap
 
     void updateMaxScrollPos();
     void commitHoveredButton(S32 x, S32 y);
+    bool commitTabAt(S32 x, S32 y);
+    void selectNeighbour(S32 step);
 
     // updates tab button images given the tuple, tab position and the corresponding params
-    void update_images(LLTabTuple* tuple, TabParams params, LLTabContainer::TabPosition pos);
+    void update_images(LLTabTuple* tuple, const TabParams& params, LLTabContainer::TabPosition pos);
     void reshapeTuple(LLTabTuple* tuple);
 
     // Variables
@@ -280,8 +308,6 @@ private:
     S32                             mScrollPos;
     S32                             mScrollPosPixels;
     S32                             mMaxScrollPos;
-
-    LLTextBox*                      mTitleBox;
 
     S32                             mTopBorderHeight;
     TabPosition                     mTabPosition;
@@ -325,6 +351,7 @@ private:
     LLFrameTimer                    mMouseDownTimer;
 
     bool mUseTabOffset;
+    bool mFillWidth;
 };
 
 #endif  // LL_TABCONTAINER_H

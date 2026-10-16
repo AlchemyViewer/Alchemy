@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2018, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -17,6 +18,7 @@
 #ifndef RLV_HANDLER_H
 #define RLV_HANDLER_H
 
+#include "llevent.h"
 #include "llgroupmgr.h"
 #include <stack>
 

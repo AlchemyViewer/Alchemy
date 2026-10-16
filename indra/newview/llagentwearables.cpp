@@ -403,8 +403,7 @@ void LLAgentWearables::saveWearableAs(const LLWearableType::EType type,
         LL_WARNS() << "LLAgent::saveWearableAs() no inventory item." << LL_ENDL;
         return;
     }
-    std::string trunc_name(new_name);
-    LLStringUtil::truncate(trunc_name, DB_INV_ITEM_NAME_STR_LEN);
+    std::string trunc_name = utf8str_truncate(new_name, DB_INV_ITEM_NAME_STR_LEN);
     LLViewerWearable* new_wearable = LLWearableList::instance().createCopy(
         old_wearable,
         trunc_name);
@@ -548,6 +547,36 @@ LLInventoryItem* LLAgentWearables::getWearableInventoryItem(LLWearableType::ETyp
     return item;
 }
 
+const S32 LLAgentWearables::getWearableIdxFromItem(const LLViewerInventoryItem* item) const
+{
+    if (!item) return -1;
+    if (!item->isWearableType()) return -1;
+
+    LLWearableType::EType type = item->getWearableType();
+    U32 wearable_count = getWearableCount(type);
+    if (0 == wearable_count) return -1;
+
+    // Match by linked inventory item id so the correct copy is found when several
+    // worn wearables of this type share the same asset.
+    const LLUUID item_id = gInventory.getLinkedItemID(item->getUUID());
+    for (U32 i = 0; i < wearable_count; ++i)
+    {
+        const LLViewerWearable* wearable = getViewerWearable(type, i);
+        if (!wearable) continue;
+        if (wearable->getItemID() == item_id) return i;
+    }
+
+    // Fall back to asset id for items whose inventory id can't be resolved.
+    const LLUUID& asset_id = item->getAssetUUID();
+    for (U32 i = 0; i < wearable_count; ++i)
+    {
+        const LLViewerWearable* wearable = getViewerWearable(type, i);
+        if (!wearable) continue;
+        if (wearable->getAssetID() == asset_id) return i;
+    }
+
+    return -1;
+}
 const LLViewerWearable* LLAgentWearables::getWearableFromItemID(const LLUUID& item_id) const
 {
     const LLUUID& base_item_id = gInventory.getLinkedItemID(item_id);
@@ -623,6 +652,15 @@ void LLAgentWearables::wearableUpdated(LLWearable *wearable, bool removed)
     }
 
     LLWearableData::wearableUpdated(wearable, removed);
+
+    // Every wear, and every change to something already worn, arrives here.
+    // What the wearable says has to reach the avatar, and after the line above
+    // has settled the values it takes from its neighbours.
+    if (!removed && isAgentAvatarValid())
+    {
+        wearable->writeToAvatar(gAgentAvatarp);
+        gAgentAvatarp->updateVisualParams();
+    }
 
     if (!removed)
     {
@@ -1452,7 +1490,7 @@ void LLAgentWearables::userRemoveMultipleAttachments(llvo_vec_t& objects_to_remo
         return;
 
     LL_DEBUGS("Avatar") << "ATT [ObjectDetach] removing " << objects_to_remove.size() << " objects" << LL_ENDL;
-    gMessageSystem->newMessage("ObjectDetach");
+    gMessageSystem->newMessageFast(_PREHASH_ObjectDetach);
     gMessageSystem->nextBlockFast(_PREHASH_AgentData);
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
     gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
@@ -1546,7 +1584,7 @@ bool LLAgentWearables::moveWearable(const LLViewerInventoryItem* item, bool clos
 
     LLWearableType::EType type = item->getWearableType();
     U32 wearable_count = getWearableCount(type);
-    if (0 == wearable_count) return false;
+    if (wearable_count < 2) return false;
 
     const LLUUID& asset_id = item->getAssetUUID();
 
@@ -1581,6 +1619,37 @@ bool LLAgentWearables::moveWearable(const LLViewerInventoryItem* item, bool clos
     }
 
     return false;
+}
+
+bool LLAgentWearables::moveWearableToIndex(const LLViewerInventoryItem* item, U32 new_index)
+{
+    if (!item) return false;
+    if (!item->isWearableType()) return false;
+
+    LLWearableType::EType type = item->getWearableType();
+    U32 wearable_count = getWearableCount(type);
+    if (wearable_count < 2) return false;
+
+    if (new_index >= wearable_count) new_index = wearable_count - 1;
+
+    S32 cur = getWearableIdxFromItem(item);
+    if (cur < 0) return false;
+    if ((U32)cur == new_index) return true; // already in place
+
+    // step the wearable to its new slot one swap at a time
+    U32 pos = (U32)cur;
+    while (pos < new_index)
+    {
+        if (!swapWearables(type, pos, pos + 1)) return false;
+        ++pos;
+    }
+    while (pos > new_index)
+    {
+        if (!swapWearables(type, pos, pos - 1)) return false;
+        --pos;
+    }
+
+    return true;
 }
 
 // static

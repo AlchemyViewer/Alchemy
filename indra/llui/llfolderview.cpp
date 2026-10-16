@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -125,7 +125,7 @@ const LLRect LLFolderViewScrollContainer::getScrolledViewRect() const
     LLRect rect = LLRect::null;
     if (mScrolledView)
     {
-        LLFolderView* folder_view = dynamic_cast<LLFolderView*>(mScrolledView);
+        LLFolderView* folder_view = mScrolledView->as<LLFolderView>();
         if (folder_view)
         {
             S32 height = folder_view->getRect().getHeight();
@@ -207,7 +207,7 @@ LLFolderView::LLFolderView(const Params& p)
     mAutoOpenCandidate = NULL;
     mAutoOpenTimer.stop();
     mKeyboardSelection = false;
-    mIndentation =  getParentFolder() ? getParentFolder()->getIndentation() + mLocalIndentation : 0;
+    mIndentation =  getParentFolder() ? getParentFolder()->getIndentation() + mStyle->localIndentation : 0;
 
     //clear label
     // go ahead and render root folder as usual
@@ -230,11 +230,11 @@ LLFolderView::LLFolderView(const Params& p)
     // Textbox
     LLTextBox::Params text_p;
     LLFontGL* font = getLabelFontForStyle(mLabelStyle);
-    //mIconPad, mTextPad are set in folder_view_item.xml
-    LLRect new_r = LLRect(rect.mLeft + mIconPad,
-                  rect.mTop - mTextPad,
+    //icon_pad, text_pad are set in folder_view_item.xml (shared via mStyle)
+    LLRect new_r = LLRect(rect.mLeft + mStyle->iconPad,
+                  rect.mTop - mStyle->textPad,
                   rect.mRight,
-                  rect.mTop - mTextPad - font->getLineHeight());
+                  rect.mTop - mStyle->textPad - font->getLineHeight());
     text_p.rect(new_r);
     text_p.name(std::string(p.name));
     text_p.font(font);
@@ -323,6 +323,14 @@ void LLFolderView::openTopLevelFolders()
 // conform show folder state works
 S32 LLFolderView::arrange( S32* unused_width, S32* unused_height )
     {
+    // Lays out the whole item tree, and had no zone of its own, so whatever it
+    // costs was charged to whichever caller happened to contain it. The value
+    // is how many items re-measured their label -- a shape apiece, plus a
+    // model query for the suffix -- which is what separates an arrange that
+    // only moved things from one that measured the entire inventory.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("folder view arrange");
+    LLFolderViewItem::sArrangeRemeasures = 0;
+
     mMinWidth = 0;
     S32 target_height;
 
@@ -340,6 +348,7 @@ S32 LLFolderView::arrange( S32* unused_width, S32* unused_height )
     // move item renamer text field to item's new position
     updateRenamerPosition();
 
+    LL_PROFILE_ZONE_NUM(LLFolderViewItem::sArrangeRemeasures);
     return ll_round(mTargetHeight);
 }
 
@@ -356,11 +365,37 @@ void LLFolderView::filter( LLFolderViewFilter& filter )
 
 void LLFolderView::reshape(S32 width, S32 height, bool called_from_parent)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    // Named, because a floater can hold several of these and show one -- the
+    // inventory keeps four in a tab container -- and a capture that says only
+    // how many reshapes happened cannot say how many were for nobody.
+    LL_PROFILE_ZONE_TEXT(getName().c_str(), getName().length());
+
     LLRect scroll_rect;
     if (mScrollContainer)
     {
-        LLView::reshape(width, height, called_from_parent);
+        // What the scroll container needs in order to say whether it wants a
+        // scrollbar is this view's own size, which it reads off this rect; it
+        // never asks an item. So the size it is to answer for goes onto the
+        // rect and comes straight back off. A reshape here would have walked
+        // the whole item tree to place children that the reshape below then
+        // places again, and that walk is what a resize costs.
+        const S32 own_width = getRect().getWidth();
+        const S32 own_height = getRect().getHeight();
+
+        LLRect asked_rect = getRect();
+        asked_rect.mRight = asked_rect.mLeft + width;
+        asked_rect.mTop = asked_rect.mBottom + height;
+        setRect(asked_rect);
+
         scroll_rect = mScrollContainer->getContentWindowRect();
+
+        // Answering that question scrolls, which moves us, so the size is put
+        // back onto wherever we now sit rather than onto the corner we left.
+        LLRect restored_rect = getRect();
+        restored_rect.mRight = restored_rect.mLeft + own_width;
+        restored_rect.mTop = restored_rect.mBottom + own_height;
+        setRect(restored_rect);
     }
     width  = llmax(mMinWidth, scroll_rect.getWidth());
     height = llmax(ll_round(mCurHeight), scroll_rect.getHeight());
@@ -651,9 +686,11 @@ bool LLFolderView::startDrag()
 
 void LLFolderView::commitRename( const LLSD& data )
 {
+    // Intentionally doesn't check mRenamer->getVisible(),
+    // since this can be called from 'focus lost' event.
+    // Ex: clicking inworld should commit the rename.
     finishRenamingItem();
     arrange( NULL, NULL );
-
 }
 
 void LLFolderView::draw()
@@ -679,7 +716,16 @@ void LLFolderView::draw()
     }
     else if (mShowEmptyMessage)
     {
-        mStatusTextBox->setValue(getFolderViewModel()->getStatusText(mItems.empty() && mFolders.empty()));
+        // Set only when it says something different. Setting a text widget
+        // tears its document down and builds it again -- every segment, the
+        // URL and highlight parsing, the reflow -- and this runs on every
+        // frame an empty panel is drawn, to arrive at the same sentence it
+        // already showed.
+        const std::string& status_text = getFolderViewModel()->getStatusText(mItems.empty() && mFolders.empty());
+        if (status_text != mStatusTextBox->getText())
+        {
+            mStatusTextBox->setValue(status_text);
+        }
         mStatusTextBox->setVisible( true );
 
         // firstly reshape message textbox with current size. This is necessary to
@@ -727,13 +773,17 @@ void LLFolderView::draw()
 
 void LLFolderView::finishRenamingItem( void )
 {
-    if(!mRenamer)
+    if (!mRenamer)
     {
         return;
     }
     if( mRenameItem )
     {
         mRenameItem->rename( mRenamer->getText() );
+        // Clear text to avoid duplicate renames.
+        // Ex: 'return' key will trigger rename from handleKeyHere
+        // and might trigger commitRename from focus lost event.
+        mRenamer->setText(LLStringUtil::null);
     }
 
     closeRenamer();
@@ -1035,7 +1085,7 @@ void LLFolderView::paste()
         for (selected_it = mSelectedItems.begin(); selected_it != mSelectedItems.end(); ++selected_it)
         {
             LLFolderViewItem* item = *selected_it;
-            LLFolderViewFolder* folder = dynamic_cast<LLFolderViewFolder*>(item);
+            LLFolderViewFolder* folder = item->as<LLFolderViewFolder>();
             if (folder == NULL)
             {
                 folder = item->getParentFolder();
@@ -1362,7 +1412,7 @@ bool LLFolderView::handleUnicodeCharHere(llwchar uni_char)
         mSearchTimer.reset();
         if (mSearchString.size() < 128)
         {
-            mSearchString += uni_char;
+            mSearchString += (char)uni_char;
         }
         search(getCurSelectedItem(), mSearchString, false);
 
@@ -1423,6 +1473,7 @@ bool LLFolderView::search(LLFolderViewItem* first_item, const std::string &searc
             }
         }
 
+        // Note: for inventory getSearchableName should already be 'upper' case.
         std::string current_item_label(search_item->getViewModelItem()->getSearchableName());
         LLStringUtil::toUpper(current_item_label);
         auto search_string_length = llmin(upper_case_string.size(), current_item_label.size());
@@ -1510,6 +1561,7 @@ bool LLFolderView::handleRightMouseDown( S32 x, S32 y, MASK mask )
         && ( count > 0 && (hasVisibleChildren()) ))) && // show menu only if selected items are visible
         !hide_folder_menu)
     {
+        LL_INFOS("Inventory") << "Opening inventory menu from path: " << getPathname() << LL_ENDL;
         if (mCallbackRegistrar)
         {
             mCallbackRegistrar->pushScope();
@@ -1581,7 +1633,7 @@ bool LLFolderView::handleHover( S32 x, S32 y, MASK mask )
 
 LLFolderViewItem* LLFolderView::getHoveredItem() const
 {
-    return dynamic_cast<LLFolderViewItem*>(mHoveredItem.get());
+    return mHoveredItem.get();
 }
 
 void LLFolderView::setHoveredItem(LLFolderViewItem* itemp)
@@ -1589,7 +1641,7 @@ void LLFolderView::setHoveredItem(LLFolderViewItem* itemp)
     if (mHoveredItem.get() != itemp)
     {
         if (itemp)
-            mHoveredItem = itemp->getHandle();
+            mHoveredItem = itemp->getDerivedHandle<LLFolderViewItem>();
         else
             mHoveredItem.markDead();
     }
@@ -1716,14 +1768,12 @@ void LLFolderView::setShowSingleSelection(bool show)
     }
 }
 
-static LLTrace::BlockTimerStatHandle FTM_INVENTORY("Inventory");
-
 // Main idle routine
 void LLFolderView::update()
 {
     // If this is associated with the user's inventory, don't do anything
     // until that inventory is loaded up.
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI; //LL_RECORD_BLOCK_TIME(FTM_INVENTORY);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     // If there's no model, the view is in suspended state (being deleted) and shouldn't be updated
     if (getFolderViewModel() == NULL)
@@ -1950,14 +2000,16 @@ void LLFolderView::updateRenamerPosition()
 // Update visibility and availability (i.e. enabled/disabled) of context menu items.
 void LLFolderView::updateMenuOptions(LLMenuGL* menu)
 {
-    const LLView::child_list_t *list = menu->getChildList();
+    // Claims made for the last menu this built stop counting here.
+    LLMenuItemGL::beginContextBuild();
 
-    LLView::child_list_t::const_iterator menu_itor;
-    for (menu_itor = list->begin(); menu_itor != list->end(); ++menu_itor)
+    // Back to the all-visible, all-enabled baseline the passes below narrow.
+    // setVisible only does work where it changes something, so an entry the
+    // last build left visible costs nothing.
+    for (LLView* menu_item : *menu->getChildList())
     {
-        (*menu_itor)->setVisible(false);
-        (*menu_itor)->pushVisible(true);
-        (*menu_itor)->setEnabled(true);
+        menu_item->setVisible(true);
+        menu_item->setEnabled(true);
     }
 
     // Successively filter out invalid options
@@ -2019,8 +2071,7 @@ bool LLFolderView::isFolderSelected()
     selected_items_t::iterator item_iter;
     for (item_iter = mSelectedItems.begin(); item_iter != mSelectedItems.end(); ++item_iter)
     {
-        LLFolderViewFolder* folder = dynamic_cast<LLFolderViewFolder*>(*item_iter);
-        if (folder != NULL)
+        if ((*item_iter)->as<LLFolderViewFolder>())
         {
             return true;
         }

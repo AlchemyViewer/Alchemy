@@ -31,6 +31,7 @@
 #include <climits>
 #include <limits>
 #include <type_traits>
+#include <utility>
 
 typedef signed char             S8;
 typedef unsigned char           U8;
@@ -38,49 +39,22 @@ typedef signed short            S16;
 typedef unsigned short          U16;
 typedef signed int              S32;
 typedef unsigned int            U32;
+typedef long long int           S64;
+typedef long long unsigned int  U64;
+
+#define S64L(a) (a##LL)
+#define U64L(a) (a##ULL)
 
 // to express an index that might go negative
 // (ssize_t is provided by SOME compilers, don't collide)
 typedef typename std::make_signed<std::size_t>::type llssize;
 
-#if LL_WINDOWS
-// https://docs.microsoft.com/en-us/cpp/build/reference/zc-wchar-t-wchar-t-is-native-type
-// https://docs.microsoft.com/en-us/cpp/cpp/fundamental-types-cpp
-// Windows wchar_t is 16-bit, whichever way /Zc:wchar_t is set. In effect,
-// Windows wchar_t is always a typedef, either for unsigned short or __wchar_t.
-// (__wchar_t, available either way, is Microsoft's native 2-byte wchar_t type.)
-// The version of clang available with VS 2019 also defines wchar_t as __wchar_t
-// which is also 16 bits.
-// In any case, llwchar should be a UTF-32 type.
-typedef U32                 llwchar;
-#else
-typedef wchar_t             llwchar;
-// What we'd actually want is a simple module-scope 'if constexpr' to test
-// std::is_same<wchar_t, llwchar>::value and use that to define, or not
-// define, string conversion specializations. Since we don't have that, we'll
-// have to rely on #if instead. Sorry, Dr. Stroustrup.
-#define LLWCHAR_IS_WCHAR_T 1
-#endif
-
-#if LL_WINDOWS
-typedef signed __int64          S64;
-// probably should be 'hyper' or similiar
-#define S64L(a)                 (a)
-typedef unsigned __int64        U64;
-#define U64L(a)                 (a)
-#else
-typedef long long int           S64;
-typedef long long unsigned int      U64;
-#if LL_DARWIN || LL_LINUX
-#define S64L(a)             (a##LL)
-#define U64L(a)             (a##ULL)
-#endif
-#endif
+// llwchar should be a UTF-32 type.
+typedef char32_t            llwchar;
 
 typedef float               F32;
 typedef double              F64;
 
-typedef S32             BOOL;
 typedef U8              KEY;
 typedef U32             MASK;
 typedef U32             TPACKETID;
@@ -104,15 +78,6 @@ typedef U32             TPACKETID;
 #define F32_MIN     (FLT_MIN)
 #define F64_MIN     (DBL_MIN)
 
-
-#ifndef TRUE
-#define TRUE            (1)
-#endif
-
-#ifndef FALSE
-#define FALSE           (0)
-#endif
-
 #ifndef NULL
 #define NULL            (0)
 #endif
@@ -120,10 +85,6 @@ typedef U32             TPACKETID;
 typedef U8 LLPCode;
 
 #define LL_ARRAY_SIZE( _kArray ) ( sizeof( (_kArray) ) / sizeof( _kArray[0] ) )
-
-#if LL_LINUX && __GNUC__ <= 2
-typedef int intptr_t;
-#endif
 
 /*****************************************************************************
 *   Narrowing
@@ -174,13 +135,11 @@ public:
     constexpr
     operator TO() const
     {
-        // The reason we skip the
-        // assert(value >= std::numeric_limits<TO>::lowest());
-        // like the overload below is that to perform the above comparison,
-        // the compiler promotes the signed lowest() to the unsigned FROM
-        // type, making it hugely positive -- so a reasonable 'value' will
-        // always fail the assert().
-        assert(mValue <= std::numeric_limits<TO>::max());
+        // An unsigned value is never below a signed type's lowest(), so only
+        // the upper bound needs checking. std::cmp_less_equal compares across
+        // signedness by value, without the promotion that would otherwise
+        // turn a signed limit into a huge unsigned one.
+        assert(std::cmp_less_equal(mValue, std::numeric_limits<TO>::max()));
         return static_cast<TO>(mValue);
     }
 

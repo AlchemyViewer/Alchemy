@@ -36,14 +36,16 @@
 class LLAvatarName;
 class LLScrollListCtrl;
 
-class LLFloaterAvatarPicker :public LLFloater
+class LLFloaterAvatarPicker final :public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterAvatarPicker, LLFloater);
+
     typedef boost::signals2::signal<bool(const uuid_vec_t&), boost_boolean_combiner> validate_signal_t;
     typedef validate_signal_t::slot_type validate_callback_t;
 
     // The callback function will be called with an avatar name and UUID.
-    typedef boost::function<void (const uuid_vec_t&, const std::vector<LLAvatarName>&)> select_callback_t;
+    typedef std::function<void(const uuid_vec_t&, const std::vector<LLAvatarName>&)> select_callback_t;
     // Call this to select an avatar.
     static LLFloaterAvatarPicker* show(select_callback_t callback,
                                        bool allow_multiple = false,
@@ -55,7 +57,7 @@ public:
     LLFloaterAvatarPicker(const LLSD& key);
     virtual ~LLFloaterAvatarPicker();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void setOkBtnEnableCb(validate_callback_t cb);
 
@@ -65,7 +67,7 @@ public:
     bool handleDragAndDrop(S32 x, S32 y, MASK mask,
                            bool drop, EDragAndDropType cargo_type,
                            void *cargo_data, EAcceptance *accept,
-                           std::string& tooltip_msg);
+                           std::string& tooltip_msg) override;
 
     void openFriendsTab();
     bool isExcludeAgentFromSearchResults() {return mExcludeAgentFromSearchResults;}
@@ -86,16 +88,15 @@ private:
     void populateFriend();
     bool visibleItemsSelected() const; // Returns true if any items in the current tab are selected.
 
-    static void findCoro(std::string url, LLUUID mQueryID, std::string mName);
+    static void findByIdCoro(std::string url, LLUUID query_id, LLUUID agent_id, std::string floater_key);
+    static void findByNameCoro(std::string url, LLUUID mQueryID, std::string mName);
     void find();
     void setAllowMultiple(bool allow_multiple);
     LLScrollListCtrl* getActiveList();
 
     void drawFrustum();
-    virtual void draw();
-    virtual bool handleKeyHere(KEY key, MASK mask);
-
-    void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
+    virtual void draw() override;
+    virtual bool handleKeyHere(KEY key, MASK mask) override;
 
     LLUUID              mQueryID;
     int                 mNumResultsReturned;
@@ -110,8 +111,6 @@ private:
 
     validate_signal_t mOkButtonValidateSignal;
     select_callback_t mSelectionCallback;
-
-    boost::signals2::connection mAvatarNameCacheConnection;
 };
 
 #endif

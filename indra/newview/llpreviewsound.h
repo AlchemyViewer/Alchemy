@@ -29,9 +29,11 @@
 
 #include "llpreview.h"
 
-class LLPreviewSound : public LLPreview
+class LLPreviewSound final : public LLPreview
 {
 public:
+    AL_VIEW_TYPE(LLPreviewSound, LLPreview);
+
     LLPreviewSound(const LLSD& key);
 
     static void playSound( void* userdata );

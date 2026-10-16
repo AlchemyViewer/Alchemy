@@ -76,7 +76,7 @@ LLGestureMgr::LLGestureMgr()
     mLoadingCount(0)
 {
     gInventory.addObserver(this);
-    mListener.reset(new LLGestureListener());
+    mListener = std::make_shared<LLGestureListener>();
 }
 
 
@@ -213,18 +213,18 @@ void LLGestureMgr::activateGestures(LLViewerInventoryItem::item_array_t& items)
 
         if (start_message)
         {
-            msg->newMessage("ActivateGestures");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgent.getID());
-            msg->addUUID("SessionID", gAgent.getSessionID());
-            msg->addU32("Flags", 0x0);
+            msg->newMessageFast(_PREHASH_ActivateGestures);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->addU32Fast(_PREHASH_Flags, 0x0);
             start_message = false;
         }
 
-        msg->nextBlock("Data");
-        msg->addUUID("ItemID", item->getUUID());
-        msg->addUUID("AssetID", item->getAssetUUID());
-        msg->addU32("GestureFlags", 0x0);
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addUUIDFast(_PREHASH_ItemID, item->getUUID());
+        msg->addUUIDFast(_PREHASH_AssetID, item->getAssetUUID());
+        msg->addU32Fast(_PREHASH_GestureFlags, 0x0);
 
         if (msg->getCurrentSendTotal() > MTUBYTES)
         {
@@ -335,15 +335,15 @@ void LLGestureMgr::deactivateGesture(const LLUUID& item_id)
 
     // Inform the database of this change
     LLMessageSystem* msg = gMessageSystem;
-    msg->newMessage("DeactivateGestures");
-    msg->nextBlock("AgentData");
-    msg->addUUID("AgentID", gAgent.getID());
-    msg->addUUID("SessionID", gAgent.getSessionID());
-    msg->addU32("Flags", 0x0);
+    msg->newMessageFast(_PREHASH_DeactivateGestures);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->addU32Fast(_PREHASH_Flags, 0x0);
 
-    msg->nextBlock("Data");
-    msg->addUUID("ItemID", item_id);
-    msg->addU32("GestureFlags", 0x0);
+    msg->nextBlockFast(_PREHASH_Data);
+    msg->addUUIDFast(_PREHASH_ItemID, item_id);
+    msg->addU32Fast(_PREHASH_GestureFlags, 0x0);
 
     gAgent.sendReliableMessage();
 
@@ -402,17 +402,17 @@ void LLGestureMgr::deactivateSimilarGestures(LLMultiGesture* in, const LLUUID& i
     {
         if (start_message)
         {
-            msg->newMessage("DeactivateGestures");
-            msg->nextBlock("AgentData");
-            msg->addUUID("AgentID", gAgent.getID());
-            msg->addUUID("SessionID", gAgent.getSessionID());
-            msg->addU32("Flags", 0x0);
+            msg->newMessageFast(_PREHASH_DeactivateGestures);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->addU32Fast(_PREHASH_Flags, 0x0);
             start_message = false;
         }
 
-        msg->nextBlock("Data");
-        msg->addUUID("ItemID", *vit);
-        msg->addU32("GestureFlags", 0x0);
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addUUIDFast(_PREHASH_ItemID, *vit);
+        msg->addU32Fast(_PREHASH_GestureFlags, 0x0);
 
         if (msg->getCurrentSendTotal() > MTUBYTES)
         {
@@ -807,6 +807,8 @@ struct IsGesturePlaying
 
 void LLGestureMgr::update()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VIEWER;
+
     S32 i;
     for (i = 0; i < (S32)mPlaying.size(); ++i)
     {
@@ -1074,8 +1076,7 @@ void LLGestureMgr::runStep(LLMultiGesture* gesture, LLGestureStep* step)
 
             if(!chat_text.empty() && !ALChatCommand::parseCommand(chat_text))
             {
-                (LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))->
-                        sendChatFromViewer(chat_text, CHAT_TYPE_NORMAL, animate);
+                LLFloaterIMNearbyChat::sendChatFromViewer(chat_text, CHAT_TYPE_NORMAL, animate);
             }
 
             gesture->mCurrentStep++;
@@ -1217,16 +1218,16 @@ void LLGestureMgr::onLoadComplete(const LLUUID& asset_uuid,
             {
                 // Inform the database of this change
                 LLMessageSystem* msg = gMessageSystem;
-                msg->newMessage("ActivateGestures");
-                msg->nextBlock("AgentData");
-                msg->addUUID("AgentID", gAgent.getID());
-                msg->addUUID("SessionID", gAgent.getSessionID());
-                msg->addU32("Flags", 0x0);
+                msg->newMessageFast(_PREHASH_ActivateGestures);
+                msg->nextBlockFast(_PREHASH_AgentData);
+                msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+                msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+                msg->addU32Fast(_PREHASH_Flags, 0x0);
 
-                msg->nextBlock("Data");
-                msg->addUUID("ItemID", item_id);
-                msg->addUUID("AssetID", asset_uuid);
-                msg->addU32("GestureFlags", 0x0);
+                msg->nextBlockFast(_PREHASH_Data);
+                msg->addUUIDFast(_PREHASH_ItemID, item_id);
+                msg->addUUIDFast(_PREHASH_AssetID, asset_uuid);
+                msg->addU32Fast(_PREHASH_GestureFlags, 0x0);
 
                 gAgent.sendReliableMessage();
             }
@@ -1509,15 +1510,21 @@ bool LLGestureMgr::matchPrefix(const std::string& in_str, std::string* out_str)
                 continue;
             }
 
-            std::string trigger_trunc = trigger;
-            LLStringUtil::truncate(trigger_trunc, in_len);
+            // A trigger is whatever the gesture's author typed, so cutting it
+            // to a byte count can split a character and hand the comparison
+            // ill-formed UTF-8, which the collator has no good answer for.
+            const std::string trigger_trunc = utf8str_truncate(trigger, (S32)in_len);
             if (!LLStringUtil::compareInsensitive(in_str, trigger_trunc))
             {
+                // The rest of the trigger begins where the part that matched
+                // ends. Counting from the typed string instead assumes the two
+                // are the same length, and a caseless match does not promise
+                // that -- folding can change how many bytes a word takes.
                 if (rest_of_match.compare("") == 0)
                 {
-                    rest_of_match = trigger.substr(in_str.size());
+                    rest_of_match = trigger.substr(trigger_trunc.size());
                 }
-                std::string cur_rest_of_match = trigger.substr(in_str.size());
+                std::string cur_rest_of_match = trigger.substr(trigger_trunc.size());
                 buf = "";
                 S32 i=0;
 

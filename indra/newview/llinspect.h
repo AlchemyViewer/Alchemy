@@ -34,21 +34,23 @@
 class LLInspect : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLInspect, LLFloater);
+
     LLInspect(const LLSD& key);
     virtual ~LLInspect();
 
     /// Inspectors have a custom fade-in/fade-out animation
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
 
-    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask);
-    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
     /// Start open animation
-    /*virtual*/ void onOpen(const LLSD& avatar_id);
+    /*virtual*/ void onOpen(const LLSD& avatar_id) override;
 
     /// Inspectors close themselves when they lose focus
-    /*virtual*/ void onFocusLost();
+    /*virtual*/ void onFocusLost() override;
 
     void repositionInspector(const LLSD& data);
 

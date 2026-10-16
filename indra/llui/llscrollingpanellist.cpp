@@ -79,6 +79,7 @@ S32 LLScrollingPanelList::addPanel(LLScrollingPanel* panel, bool back)
 
 void LLScrollingPanelList::removePanel(LLScrollingPanel* panel)
 {
+    U32 index = 0;
     LLScrollingPanelList::panel_list_t::const_iterator iter;
 
     if (!mPanelList.empty())

@@ -50,6 +50,13 @@ public:
     void sleep(F64 seconds);
     void pump();
 
+    // Mark this child as a tab inside the shared daemon host (one process serving
+    // many tabs). In daemon mode the child must never exit() the process on its
+    // own teardown (that would kill every other tab) and a lost parent socket is
+    // handled with a graceful plugin unload rather than a hard error. Set before
+    // the first idle().
+    void setDaemonMode(bool daemon) { mDaemonMode = daemon; }
+
     // returns true if the plugin is in the steady state (processing messages)
     bool isRunning(void);
 
@@ -104,6 +111,7 @@ private:
     LLTimer mHeartbeat;
     F64     mSleepTime;
     F64     mCPUElapsed;
+    bool    mDaemonMode = false;
     bool    mBlockingRequest;
     bool    mBlockingResponseReceived;
     std::queue<std::string> mMessageQueue;

@@ -57,7 +57,7 @@ class fsyspath: public std::filesystem::path
 
 public:
     // default
-    fsyspath() {}
+    fsyspath() = default;
     // construct from UTF-8 encoded string
     fsyspath(const std::string& path): fsyspath(std::string_view(path)) {}
     fsyspath(const char* path):        fsyspath(std::string_view(path)) {}
@@ -66,8 +66,10 @@ public:
     {}
     // construct from existing path
     fsyspath(const super& path): super(path) {}
+    fsyspath(super&& path) : super(std::move(path)) {}
 
     fsyspath& operator=(const super& p)       { super::operator=(p); return *this; }
+    fsyspath& operator=(super&& p)            { super::operator=(std::move(p)); return *this; }
     fsyspath& operator=(const std::string& p) { return (*this) = std::string_view(p); }
     fsyspath& operator=(const char* p)        { return (*this) = std::string_view(p); }
     fsyspath& operator=(std::string_view p)
@@ -79,11 +81,8 @@ public:
     // shadow base-class string() method with UTF-8 aware method
     std::string string() const
     {
-        // Short of forbidden type punning, I see no way to avoid copying this
-        // std::u8string to a std::string.
-        auto u8str{ super::u8string() };
-        // from https://github.com/tahonermann/char8_t-remediation/blob/master/char8_t-remediation.h#L180-L182
-        return { u8str.begin(), u8str.end() };
+        auto u8 = super::u8string();
+        return std::string(u8.begin(), u8.end());
     }
     // On Posix systems, where value_type is already char, this operator
     // std::string() method shadows the base class operator string_type()

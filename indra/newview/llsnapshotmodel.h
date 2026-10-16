@@ -42,14 +42,43 @@ public:
     {
         SNAPSHOT_FORMAT_PNG,
         SNAPSHOT_FORMAT_JPEG,
-        SNAPSHOT_FORMAT_BMP
+        SNAPSHOT_FORMAT_BMP,
+        SNAPSHOT_FORMAT_WEBP,
+        SNAPSHOT_FORMAT_AVIF,
+        SNAPSHOT_FORMAT_AVIF_LOSSLESS
     } ESnapshotFormat;
 
     typedef enum
     {
         SNAPSHOT_TYPE_COLOR,
-        SNAPSHOT_TYPE_DEPTH
+        SNAPSHOT_TYPE_DEPTH,
+        SNAPSHOT_TYPE_DEPTH24
     } ESnapshotLayerType;
+
+    /// Whether an image of @a type saved as @a format can keep an alpha
+    /// channel. An inventory texture is J2C whatever the format says; JPEG and
+    /// BMP have nowhere to put alpha, and a postcard is always JPEG.
+    static bool keepsAlpha(ESnapshotType type, ESnapshotFormat format)
+    {
+        if (type == SNAPSHOT_TEXTURE)
+        {
+            return true;
+        }
+        if (type == SNAPSHOT_POSTCARD)
+        {
+            return false;
+        }
+        switch (format)
+        {
+        case SNAPSHOT_FORMAT_PNG:
+        case SNAPSHOT_FORMAT_WEBP:
+        case SNAPSHOT_FORMAT_AVIF:
+        case SNAPSHOT_FORMAT_AVIF_LOSSLESS:
+            return true;
+        default:
+            return false;
+        }
+    }
 };
 
 #endif // LL_LLSNAPSHOTMODEL_H

@@ -65,16 +65,15 @@
 #include "llfavoritesbar.h"
 #include "llagentui.h"
 
-#include <boost/regex.hpp>
-
 //-- LLTeleportHistoryMenuItem -----------------------------------------------
 
 /**
  * Item look varies depending on the type (backward/current/forward).
  */
-class LLTeleportHistoryMenuItem : public LLMenuItemCallGL
+class LLTeleportHistoryMenuItem final : public LLMenuItemCallGL
 {
 public:
+    AL_VIEW_TYPE(LLTeleportHistoryMenuItem, LLMenuItemCallGL);
     typedef enum e_item_type
     {
         TYPE_BACKWARD,
@@ -104,9 +103,9 @@ public:
         {}
     };
 
-    /*virtual*/ void    draw();
-    /*virtual*/ void    onMouseEnter(S32 x, S32 y, MASK mask);
-    /*virtual*/ void    onMouseLeave(S32 x, S32 y, MASK mask);
+    /*virtual*/ void    draw() override;
+    /*virtual*/ void    onMouseEnter(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ void    onMouseLeave(S32 x, S32 y, MASK mask) override;
 
 private:
     LLTeleportHistoryMenuItem(const Params&);
@@ -350,6 +349,8 @@ void LLNavigationBar::setVisible(bool visible)
 
 void LLNavigationBar::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     if (isBackgroundVisible())
     {
         static LLUIColor color_drop_shadow = LLUIColorTable::instance().getColor("ColorDropShadow");
@@ -657,7 +658,7 @@ void    LLNavigationBar::showTeleportHistoryMenu(LLUICtrl* btn_ctrl)
     mTeleportHistoryMenu->updateParent(LLMenuGL::sMenuContainer);
     const S32 MENU_SPAWN_PAD = -1;
     LLMenuGL::showPopup(btn_ctrl, mTeleportHistoryMenu, 0, MENU_SPAWN_PAD);
-    LLButton* nav_button = dynamic_cast<LLButton*>(btn_ctrl);
+    LLButton* nav_button = ALViewType::as<LLButton>(btn_ctrl);
     if(nav_button)
     {
         if(mHistoryMenuConnection.connected())
@@ -721,7 +722,14 @@ void LLNavigationBar::refreshLocationCtrl()
 
 void LLNavigationBar::invokeSearch(std::string search_text)
 {
-    LLFloaterReg::showInstance("search", LLSD().with("category", "standard").with("query", LLSD(search_text)));
+    LLSD key;
+    key["category"] = "standard";
+    key["query"] = search_text;
+    LLSD collections = LLSD::emptyArray();
+    collections.append("destinations");
+    collections.append("places");
+    key["collections"] = collections;
+    LLFloaterReg::showInstance("search", key);
 }
 
 void LLNavigationBar::clearHistoryCache()

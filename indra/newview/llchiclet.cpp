@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h" // must be first include
 #include "llchiclet.h"
 
+#include "allegacynotificationwellwindow.h"
 #include "llchicletbar.h"
 #include "llfloaterimsession.h"
 #include "llfloaterimcontainer.h"
@@ -37,7 +38,6 @@
 #include "llsyswellwindow.h"
 #include "llfloaternotificationstabbed.h"
 #include "llviewermenu.h"
-#include "lllegacynotificationwellwindow.h"
 // [SL:KB] - Patch: UI-Notifications | Checked: 2013-05-09 (Catznip-3.5)
 #include "llchannelmanager.h"
 // [/SL:KB]
@@ -180,7 +180,7 @@ LLNotificationChiclet::LLNotificationChiclet(const Params& p)
     // handle toast add/delete events.
     if (gSkinSettings.getBOOL("LegacyNotificationWell"))
     {
-        LLLegacyNotificationWellWindow::getInstance()->setSysWellChiclet(this);
+        ALLegacyNotificationWellWindow::getInstance()->setSysWellChiclet(this);
     }
     else
     {
@@ -200,7 +200,7 @@ void LLNotificationChiclet::onMenuItemClicked(const LLSD& user_data)
     {
         if (gSkinSettings.getBOOL("LegacyNotificationWell"))
         {
-            LLLegacyNotificationWellWindow::getInstance()->closeAll();
+            ALLegacyNotificationWellWindow::getInstance()->closeAll();
         }
         else
         {
@@ -261,7 +261,7 @@ bool LLNotificationChiclet::ChicletNotificationChannel::filterNotification( LLNo
     if (   (notification->getName() == "ScriptDialog") // special case for scripts
         // if there is no toast window for the notification, filter it
         || (gSkinSettings.getBOOL("LegacyNotificationWell")
-            && !LLLegacyNotificationWellWindow::getInstance()->findItemByID(notification->getID()))
+            && !ALLegacyNotificationWellWindow::getInstance()->findItemByID(notification->getID()))
         || (!gSkinSettings.getBOOL("LegacyNotificationWell")
             && !LLFloaterNotificationsTabbed::getInstance()->findItemByID(notification->getID(), notification->getName()))
         )
@@ -524,7 +524,7 @@ void LLChicletPanel::objectChicletCallback(const LLSD& data)
     std::list<LLChiclet *>::iterator iter;
     for (iter = chiclets.begin(); iter != chiclets.end(); iter++)
     {
-        LLIMChiclet* chiclet = dynamic_cast<LLIMChiclet*>(*iter);
+        LLIMChiclet* chiclet = (*iter)->as<LLIMChiclet>();
         if (chiclet != NULL)
         {
             chiclet->setShowNewMessagesIcon(new_message);
@@ -565,7 +565,7 @@ void LLChicletPanel::onCurrentVoiceChannelChanged(const LLUUID& session_id)
 
     for(std::list<LLChiclet *>::iterator it = chiclets.begin(); it != chiclets.end(); ++it)
     {
-        LLIMChiclet* chiclet = dynamic_cast<LLIMChiclet*>(*it);
+        LLIMChiclet* chiclet = (*it)->as<LLIMChiclet>();
         if(chiclet)
         {
             if (gSavedSettings.getBOOL("OpenIMOnVoice"))
@@ -696,7 +696,7 @@ void LLChicletPanel::removeChiclet(const LLUUID& im_session_id)
     chiclet_list_t::iterator it = mChicletList.begin();
     for( ; mChicletList.end() != it; ++it)
     {
-        LLIMChiclet* chiclet = dynamic_cast<LLIMChiclet*>(*it);
+        LLIMChiclet* chiclet = (*it)->as<LLIMChiclet>();
 
         if(chiclet->getSessionId() == im_session_id)
         {
@@ -780,7 +780,7 @@ S32 LLChicletPanel::notifyParent(const LLSD& info)
 {
     if(info.has("notification"))
     {
-        std::string str_notification = info["notification"];
+        const std::string& str_notification = info["notification"].asStringRef();
         if(str_notification == "size_changes")
         {
             arrange();
@@ -902,7 +902,7 @@ void LLChicletPanel::draw()
     for( ; getChildList()->end() != it; ++it)
     {
         LLView* child = *it;
-        if(child == dynamic_cast<LLView*>(mScrollArea))
+        if(child == mScrollArea)
         {
             LLLocalClipRect clip(mScrollArea->getRect());
             drawChild(mScrollArea);
@@ -1028,13 +1028,13 @@ boost::signals2::connection LLChicletPanel::setChicletClickedCallback(
     return setCommitCallback(cb);
 }
 
-bool LLChicletPanel::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLChicletPanel::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    if(clicks > 0)
+    if(delta.mClicks > 0)
     {
         scrollRight();
     }
-    else
+    else if (delta.mClicks < 0)
     {
         scrollLeft();
     }

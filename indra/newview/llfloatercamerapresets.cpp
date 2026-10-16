@@ -78,7 +78,7 @@ void LLFloaterCameraPresets::populateList()
 
 void LLFloaterCameraPresets::onSelectionChange()
 {
-    LLCameraPresetFlatItem* selected_preset = dynamic_cast<LLCameraPresetFlatItem*>(mPresetList->getSelectedItem());
+    LLCameraPresetFlatItem* selected_preset = ALViewType::as<LLCameraPresetFlatItem>(mPresetList->getSelectedItem());
     if(selected_preset)
     {
         LLFloaterCamera::switchToPreset(selected_preset->getPresetName());
@@ -148,10 +148,6 @@ void LLCameraPresetFlatItem::onDeleteBtnClick()
         LLSD args;
         args["NAME"] = mPresetName;
         LLNotificationsUtil::add("PresetNotDeleted", args);
-    }
-    else if (gSavedSettings.getString("PresetCameraActive") == mPresetName)
-    {
-        gSavedSettings.setString("PresetCameraActive", "");
     }
 }
 

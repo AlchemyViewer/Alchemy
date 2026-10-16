@@ -52,7 +52,7 @@ LLFloaterIMNearbyChatListener::LLFloaterIMNearbyChatListener() :
 // "sendChat" command
 void LLFloaterIMNearbyChatListener::sendChat(LLSD const& chat_data)
 {
-    F64 cur_time = LLTimer::getElapsedSeconds();
+    F64 cur_time = LLTimer::getUptimeSeconds();
 
     if (cur_time < mLastThrottleTime + CHAT_THROTTLE_PERIOD)
     {

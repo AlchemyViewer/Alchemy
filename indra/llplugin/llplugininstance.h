@@ -29,9 +29,6 @@
 #define LL_LLPLUGININSTANCE_H
 
 #include "llstring.h"
-#include "llapr.h"
-
-#include "apr_dso.h"
 
 /**
  * @brief LLPluginInstanceMessageListener receives messages sent from the plugin loader shell to the plugin.
@@ -54,8 +51,9 @@ public:
     LLPluginInstance(LLPluginInstanceMessageListener *owner);
     virtual ~LLPluginInstance();
 
-    // Load a plugin dll/dylib/so
-    // Returns 0 if successful, APR error code or error code returned from the plugin's init function on failure.
+    // Run the statically-linked plugin's init function (registered via
+    // setStaticInitFunction). plugin_dir/plugin_file are ignored - kept only for
+    // the load_plugin message contract. Returns 0 on success.
     int load(const std::string& plugin_dir, std::string &plugin_file);
 
     // Sends a message to the plugin.
@@ -69,10 +67,11 @@ public:
 
     /** The signature of the function for sending a message from plugin to plugin loader shell.
     *
-     * @param[in] message_string Null-terminated C string
+     * @param[in] message_string Message bytes (may contain embedded NULs - it is binary LLSD)
+     * @param[in] message_size Length of message_string in bytes
     * @param[in] user_data The opaque reference that the callee supplied during setup.
     */
-    typedef void (*sendMessageFunction) (const char *message_string, void **user_data);
+    typedef void (*sendMessageFunction) (const char *message_string, size_t message_size, void **user_data);
 
     /** The signature of the plugin init function. TODO:DOC check direction (pluging loader shell to plugin?)
     *
@@ -81,19 +80,24 @@ public:
     */
     typedef int (*pluginInitFunction) (sendMessageFunction host_send_func, void *host_user_data, sendMessageFunction *plugin_send_func, void **plugin_user_data);
 
-   /** Name of plugin init function */
-    static const char *PLUGIN_INIT_FUNCTION_NAME;
+    // Register the statically-linked plugin init entry point. Each plugin now
+    // lives in its own host executable that links exactly one plugin, so load()
+    // always calls this directly - there is no dlopen path. (This also satisfies
+    // the Windows sandbox requirement that a host and its sub-processes be one
+    // image, and avoids dlopen of large TLS-using libraries like CEF on Linux.)
+    static void setStaticInitFunction(pluginInitFunction func);
 
 private:
-    static void staticReceiveMessage(const char *message_string, void **user_data);
-    void receiveMessage(const char *message_string);
-
-    apr_dso_handle_t *mDSOHandle;
+    static void staticReceiveMessage(const char *message_string, size_t message_size, void **user_data);
+    void receiveMessage(const char *message_string, size_t message_size);
 
     void *mPluginUserData;
     sendMessageFunction mPluginSendMessageFunction;
 
     LLPluginInstanceMessageListener *mOwner;
+
+    // non-null in dedicated single-plugin host executables; see setStaticInitFunction
+    static pluginInitFunction sStaticInitFunction;
 };
 
 #endif // LL_LLPLUGININSTANCE_H

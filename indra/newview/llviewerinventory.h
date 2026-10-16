@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -41,6 +41,8 @@ class LLFolderBridge;
 class LLViewerInventoryCategory;
 class LLInventoryCallback;
 class LLAvatarName;
+
+constexpr U8 NO_INV_SUBTYPE{ 0 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLViewerInventoryItem
@@ -84,6 +86,10 @@ public:
     virtual U32 getCRC32() const; // really more of a checksum.
 
     static bool extractSortFieldAndDisplayName(const std::string& name, S32* sortField, std::string* displayName);
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
+    static bool lookupLocalizedName(std::string& name);
+    static bool lookupSystemName(std::string& name);
+// [/SL:KB]
 
     // construct a complete viewer inventory item
     LLViewerInventoryItem(const LLUUID& uuid, const LLUUID& parent_uuid,
@@ -149,6 +155,10 @@ public:
     };
     LLTransactionID getTransactionID() const { return mTransactionID; }
 
+    // Script runtime state (from task inventory cap)
+    bool getIsRunning() const { return mIsRunning; }
+    bool getIsFaulted() const { return mIsFaulted; }
+
     bool getIsBrokenLink() const; // true if the baseitem this points to doesn't exist in memory.
     LLViewerInventoryItem *getLinkedItem() const;
     LLViewerInventoryCategory *getLinkedCategory() const;
@@ -166,6 +176,10 @@ public:
 public:
     bool mIsComplete;
     LLTransactionID mTransactionID;
+
+    // Script runtime state (only valid for task inventory scripts)
+    bool mIsRunning = false;
+    bool mIsFaulted = false;
 };
 
 
@@ -208,6 +222,13 @@ public:
     enum { VERSION_UNKNOWN = -1, VERSION_INITIAL = 1 };
     S32 getVersion() const;
     void setVersion(S32 version);
+
+    const std::string& getDisplayName() const;
+    // The display name gets cached on demand, so needs a cleanup method.
+    // But in practice only secure folders' display name mismatches
+    // actual name, and those folders can't be renamed, so in practice
+    // this is useless unless we want to free memory.
+    void invalidateDisplayName();
 
     // Returns true if a fetch was issued (not nessesary in progress).
     // no requests will happen during expiry_seconds even if fetch completed
@@ -253,6 +274,19 @@ protected:
     S32 mDescendentCount;
     EFetchType mFetching;
     LLFrameTimer mDescendentsRequested;
+
+    // Display names are generated on demand and cached.
+    // buildDisplayName is essentially a way to localize
+    // system and library folders.
+    //
+    // TODO: This is on demand and mutable because that's how it
+    // worked in inventory bridge, before it was moved.
+    // But system folders always get loaded, it's likely better
+    // to just generate from the get go.
+    // Consider merging with localizeName.
+    void buildDisplayName() const;
+    mutable std::string mDisplayName;
+    mutable bool mNeedsDisplayNameUpdate = true;
 };
 
 class LLInventoryCallback : public LLRefCount
@@ -284,9 +318,9 @@ private:
     LLUUID mTargetLandmarkId;
 };
 
-typedef boost::function<void(const LLUUID&)> inventory_func_type;
-typedef boost::function<void(const LLSD&)> llsd_func_type;
-typedef boost::function<void()> nullary_func_type;
+typedef std::function<void(const LLUUID&)> inventory_func_type;
+typedef std::function<void(const LLSD&)> llsd_func_type;
+typedef std::function<void()> nullary_func_type;
 
 void no_op_inventory_func(const LLUUID&); // A do-nothing inventory_func
 void no_op_llsd_func(const LLSD&); // likewise for LLSD
@@ -358,8 +392,6 @@ public:
 };
 extern LLInventoryCallbackManager gInventoryCallbacks;
 
-
-const U8 NO_INV_SUBTYPE{ 0 };
 
 // *TODO: Find a home for these
 void create_inventory_item(const LLUUID& agent_id, const LLUUID& session_id,
@@ -470,7 +502,7 @@ void menu_create_inventory_item(LLInventoryPanel* root,
                                 const LLSD& userdata,
                                 const LLUUID& default_parent_uuid = LLUUID::null);
 
-void menu_create_inventory_item(LLInventoryPanel* panel, LLUUID dest_id, const LLSD& userdata, const LLUUID& default_parent_uuid = LLUUID::null, std::function<void(const LLUUID&)> folder_created_cb = NULL);
+void menu_create_inventory_item(LLInventoryPanel* panel, LLUUID dest_id, const LLSD& userdata, const LLUUID& default_parent_uuid = LLUUID::null, std::function<void(const LLUUID&)> folder_created_cb = nullptr);
 
 void slam_inventory_folder(const LLUUID& folder_id,
                            const LLSD& contents,

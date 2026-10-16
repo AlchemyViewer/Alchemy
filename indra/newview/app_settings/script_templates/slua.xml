@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  Script Studio's templates for new SLua scripts: what New Script offers
+  besides your own (the preferences' Templates), each a name, a line
+  about it, and the script. A file of the same name under the settings
+  folder's script_templates/ adds a person's own.
+-->
+<llsd>
+  <array>
+    <map>
+      <key>name</key>
+      <string>Touch</string>
+      <key>detail</key>
+      <string>Says who touched it</string>
+      <key>body</key>
+      <string>LLEvents:on("touch_start", function(detected)
+    ll.Say(0, "Touched by " .. detected[1]:getName() .. ".")
+end)
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>Listener</string>
+      <key>detail</key>
+      <string>Hears a channel, and says what it heard to its owner</string>
+      <key>body</key>
+      <string>local CHANNEL = 7
+
+ll.Listen(CHANNEL, "", NULL_KEY, "")
+
+LLEvents:on("listen", function(channel, name, id, message)
+    print(name .. " said: " .. message)
+end)
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>Timer</string>
+      <key>detail</key>
+      <string>Does something every second</string>
+      <key>body</key>
+      <string>LLTimers:every(1.0, function()
+    ll.SetText(tostring(os.time()), vector(1, 1, 1), 1.0)
+end)
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>Dialog menu</string>
+      <key>detail</key>
+      <string>A menu for whoever touches it, answered on a channel of its own</string>
+      <key>body</key>
+      <string>local BUTTONS = { "Red", "Green", "Blue" }
+local COLOURS = { Red = vector(1, 0, 0), Green = vector(0, 1, 0), Blue = vector(0, 0, 1) }
+local listening = nil
+local expiry = nil
+
+local function stopListening()
+    if listening then
+        ll.ListenRemove(listening)
+        listening = nil
+    end
+    if expiry then
+        LLTimers:off(expiry)
+        expiry = nil
+    end
+end
+
+LLEvents:on("touch_start", function(detected)
+    local toucher = detected[1]:getKey()
+    stopListening()
+    local channel = -1 - math.random(1000000)
+    listening = ll.Listen(channel, "", toucher, "")
+    ll.Dialog(toucher, "Choose a colour.", BUTTONS, channel)
+    expiry = LLTimers:once(30, stopListening)
+end)
+
+LLEvents:on("listen", function(channel, name, id, message)
+    stopListening()
+    local colour = COLOURS[message]
+    if colour then
+        ll.SetColor(colour, ALL_SIDES)
+    end
+end)
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>Sensor</string>
+      <key>detail</key>
+      <string>Tells its owner who is near, every few seconds</string>
+      <key>body</key>
+      <string>ll.SensorRepeat("", NULL_KEY, AGENT, 20.0, PI, 5.0)
+
+LLEvents:on("sensor", function(detected)
+    for _, one in detected do
+        local away = vector.magnitude(ll.GetPos() - one:getPos())
+        print(one:getName() .. " is " .. math.round(away) .. " m away.")
+    end
+end)
+
+LLEvents:on("no_sensor", function()
+    print("Nobody near.")
+end)
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>HTTP request</string>
+      <key>detail</key>
+      <string>Asks a web address when touched, and says what came back</string>
+      <key>body</key>
+      <string>local request = nil
+
+LLEvents:on("touch_start", function(detected)
+    request = ll.HTTPRequest("https://example.com/", { HTTP_METHOD, "GET" }, "")
+end)
+
+LLEvents:on("http_response", function(request_id, status, metadata, body)
+    if request_id == request then
+        print("HTTP " .. status .. ": " .. string.sub(body, 1, 200))
+    end
+end)
+</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>Notecard reader</string>
+      <key>detail</key>
+      <string>Reads a notecard in the object a line at a time</string>
+      <key>body</key>
+      <string>local NOTECARD = "config"
+local line = 0
+local query = nil
+
+local function readNext()
+    query = ll.GetNotecardLine(NOTECARD, line)
+end
+
+LLEvents:on("dataserver", function(query_id, data)
+    if query_id ~= query then
+        return
+    end
+    if data == EOF then
+        print("Read " .. line .. " lines.")
+        return
+    end
+    print(data)
+    line += 1
+    readNext()
+end)
+
+LLEvents:on("changed", function(change)
+    if bit32.btest(change, CHANGED_INVENTORY) then
+        ll.ResetScript()
+    end
+end)
+
+if ll.GetInventoryType(NOTECARD) == INVENTORY_NOTECARD then
+    readNext()
+else
+    print("No notecard called " .. NOTECARD .. " in this object.")
+end
+</string>
+    </map>
+  </array>
+</llsd>

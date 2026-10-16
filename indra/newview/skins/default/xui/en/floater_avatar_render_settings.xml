@@ -9,7 +9,7 @@
  name="floater_avatar_render_settings"
  save_rect="true"
  single_instance="true"
- reuse_instance="true"
+ reuse_instance="false"
  title="AVATAR DISPLAY EXCEPTIONS"
  width="300">
     <string

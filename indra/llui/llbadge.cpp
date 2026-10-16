@@ -30,7 +30,8 @@
 #include "llbadge.h"
 
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llrender2dutils.h"
+#include "llfonttextcache.h"
 #include "llscrollcontainer.h"
 #include "lluictrlfactory.h"
 
@@ -48,7 +49,6 @@ LLBadge::Params::Params()
     , border_image("border_image")
     , border_color("border_color")
     , image_color("image_color")
-    , label("label")
     , label_color("label_color")
     , label_offset_horiz("label_offset_horiz")
     , label_offset_vert("label_offset_vert")
@@ -171,7 +171,7 @@ bool LLBadge::addToView(LLView * view)
 
         LLView * parent = mOwner.get();
 
-        while ((parent != NULL) && ((mParentScroller = dynamic_cast<LLScrollContainer *>(parent)) == NULL))
+        while ((parent != NULL) && ((mParentScroller = parent->as<LLScrollContainer>()) == NULL))
         {
             parent = parent->getParent();
         }
@@ -193,18 +193,22 @@ void renderBadgeBackground(F32 centerX, F32 centerY, F32 width, F32 height, cons
     gGL.pushUIMatrix();
     gGL.loadUIIdentity();
     gGL.setSceneBlendType(LLRender::BT_REPLACE);
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     gGL.color4ubv(color.mV);
     gGL.texCoord2i(0, 0);
 
-    F32 x = LLFontGL::sCurOrigin.mX + centerX - width * 0.5f;
-    F32 y = LLFontGL::sCurOrigin.mY + centerY - height * 0.5f;
+    // Drawn in screen coordinates under a reset UI matrix, so it asks where
+    // its own corner lands.
+    F32 x, y;
+    LLRender2D::toScreen(centerX - width * 0.5f, centerY - height * 0.5f, x, y);
+    const F32 w = width * LLFontGL::sCurScaleX;
+    const F32 h = height * LLFontGL::sCurScaleY;
 
     LLRectf screen_rect((F32)ll_round(x),
                         (F32)ll_round(y),
-                        (F32)ll_round(x) + width,
-                        (F32)ll_round(y) + height);
+                        (F32)ll_round(x) + w,
+                        (F32)ll_round(y) + h);
 
     LLVector4a vertices[4];
     vertices[0].set(screen_rect.mLeft,  screen_rect.mTop,    1.0f);
@@ -236,13 +240,15 @@ void LLBadge::draw()
             //
 
             S32 badge_label_begin_offset = 0;
-            S32 badge_char_length = S32_MAX;
+            S32 badge_byte_length = S32_MAX;
             S32 badge_pixel_length = S32_MAX;
             F32 *right_position_out = NULL;
             bool do_not_use_ellipses = false;
 
+            mFontBuffer.setSource(&mLabel, mLabel.getGeneration());
             F32 badge_width = (2.0f * mPaddingHoriz) +
-                mGLFont->getWidthF32(mLabel.getWString().c_str(), badge_label_begin_offset, badge_char_length);
+                mFontBuffer.getWidthBytes(mGLFont, mLabel.getString(),
+                                          badge_label_begin_offset, badge_byte_length, false);
 
             F32 badge_height = (2.0f * mPaddingVert) + mGLFont->getLineHeight();
 
@@ -355,8 +361,8 @@ void LLBadge::draw()
             //
             // Draw the label
             //
-            mFontBuffer.render(mGLFont,
-                               mLabel.getWString(),
+            mFontBuffer.renderBytes(mGLFont,
+                               mLabel.getString(),
                                badge_label_begin_offset,
                                badge_center_x + mLabelOffsetHoriz,
                                badge_center_y + mLabelOffsetVert,
@@ -364,7 +370,7 @@ void LLBadge::draw()
                                LLFontGL::HCENTER, LLFontGL::VCENTER, // centered around the position
                                LLFontGL::NORMAL, // normal text (not bold, italics, etc.)
                                LLFontGL::DROP_SHADOW_SOFT,
-                               badge_char_length, badge_pixel_length,
+                               badge_byte_length, badge_pixel_length,
                                right_position_out, do_not_use_ellipses);
         }
     }

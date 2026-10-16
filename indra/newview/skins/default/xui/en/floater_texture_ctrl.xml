@@ -192,8 +192,8 @@ PICK: TEXTURE
      left_delta="0"
      name="inventory panel"
      top_pad="4"
-     filter_asset_types="texture|material"
-     width="231" />
+     width="231"
+     filter_asset_types="texture|material"/>
     <line_editor
      follows="left|bottom|right"
      layout="topleft"
@@ -263,7 +263,7 @@ PICK: TEXTURE
      search_column="1"
      visible="false">
         <column name="icon" label="" width="20" />
-        <column name="unit_name" label="Name" dynamicwidth="true" />
+        <column name="unit_name" label="Name" dynamic_width="true" />
     </scroll_list>
 
 <!-- middle: bake mode -->

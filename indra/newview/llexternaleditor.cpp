@@ -35,6 +35,7 @@
 
 // static
 const std::string LLExternalEditor::sFilenameMarker = "%s";
+const std::string LLExternalEditor::sLineMarker = "%L";
 
 // static
 const std::string LLExternalEditor::sSetting = "ExternalEditor";
@@ -44,18 +45,22 @@ LLExternalEditor::EErrorCode LLExternalEditor::setCommand(const std::string& env
     std::string cmd = findCommand(env_var, override);
     if (cmd.empty())
     {
-        LL_WARNS() << "Editor command is empty or not set, falling back to OS-specific open handler" << LL_ENDL;
+        LL_INFOS() << "Editor command is empty or not set, falling back to OS open handler" << LL_ENDL;
 #if LL_WINDOWS
-        static const std::string os_cmd = "C:\\Windows\\explorer.exe \"%s\"";
+        std::string os_cmd = LLStringUtil::getenv("SystemRoot", "");
+        if (!os_cmd.empty())
+        {
+            os_cmd.append("\\explorer.exe \"%s\"");
+        }
 #elif LL_DARWIN
-        static const std::string os_cmd = "/usr/bin/open \"%s\"";
+        static const std::string os_cmd = "/usr/bin/open -t \"%s\"";
 #elif LL_LINUX
         static const std::string os_cmd = "/usr/bin/xdg-open \"%s\"";
 #endif
         cmd = findCommand("", os_cmd);
         if (cmd.empty())
         {
-            LL_WARNS() << "Failed to find the OS-specific open handler \"" << cmd << "\"" << LL_ENDL;
+            LL_WARNS() << "Failed to find OS open handler \"" << cmd << "\"" << LL_ENDL;
             return EC_NOT_SPECIFIED;
         }
     }
@@ -91,7 +96,7 @@ LLExternalEditor::EErrorCode LLExternalEditor::setCommand(const std::string& env
     return EC_SUCCESS;
 }
 
-LLExternalEditor::EErrorCode LLExternalEditor::run(const std::string& file_path)
+LLExternalEditor::EErrorCode LLExternalEditor::run(const std::string& file_path, S32 line)
 {
     if (std::string(mProcessParams.executable).empty() || mProcessParams.args.empty())
     {
@@ -99,15 +104,19 @@ LLExternalEditor::EErrorCode LLExternalEditor::run(const std::string& file_path)
         return EC_NOT_SPECIFIED;
     }
 
-    // Copy params block so we can replace sFilenameMarker
+    // Copy params block so we can replace the markers
     LLProcess::Params params;
     params.executable = mProcessParams.executable;
 
-    // Substitute the filename marker in the command with the actual passed file name.
+    // Substitute the filename marker in the command with the actual passed
+    // file name, and the line marker with the line, or its first line when
+    // none was asked for.
+    const std::string line_text = std::to_string(line > 0 ? line : 1);
     for (const std::string& arg : mProcessParams.args)
     {
         std::string fixed(arg);
         LLStringUtil::replaceString(fixed, sFilenameMarker, file_path);
+        LLStringUtil::replaceString(fixed, sLineMarker, line_text);
         params.args.add(fixed);
     }
 

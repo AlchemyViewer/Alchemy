@@ -30,6 +30,7 @@
 #include "linden_common.h"
 #include "llrect.h"
 #include "indra_constants.h"
+#include "llscrolldelta.h"
 
 // Mostly-abstract interface.
 // Intended for use via multiple inheritance.
@@ -57,8 +58,8 @@ public:
     virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask) = 0;
 
     virtual bool    handleHover(S32 x, S32 y, MASK mask) = 0;
-    virtual bool    handleScrollWheel(S32 x, S32 y, S32 clicks) = 0;
-    virtual bool    handleScrollHWheel(S32 x, S32 y, S32 clicks) = 0;
+    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) = 0;
+    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) = 0;
     virtual bool    handleToolTip(S32 x, S32 y, MASK mask) = 0;
     virtual const std::string& getName() const = 0;
 

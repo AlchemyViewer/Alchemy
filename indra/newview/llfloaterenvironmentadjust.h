@@ -40,11 +40,13 @@ class LLLineEditor;
 /**
  * Floater container for taking a snapshot of the current environment and making minor adjustments.
  */
-class LLFloaterEnvironmentAdjust : public LLFloater
+class LLFloaterEnvironmentAdjust final : public LLFloater
 {
     LOG_CLASS(LLFloaterEnvironmentAdjust);
 
 public:
+    AL_VIEW_TYPE(LLFloaterEnvironmentAdjust, LLFloater);
+
                                 LLFloaterEnvironmentAdjust(const LLSD &key);
     virtual                     ~LLFloaterEnvironmentAdjust();
 

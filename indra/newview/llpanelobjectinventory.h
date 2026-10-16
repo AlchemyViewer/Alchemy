@@ -45,9 +45,11 @@ class LLViewerObject;
 // particular task's inventory.
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLPanelObjectInventory : public LLPanel, public LLVOInventoryListener
+class LLPanelObjectInventory final : public LLPanel, public LLVOInventoryListener
 {
 public:
+    AL_VIEW_TYPE(LLPanelObjectInventory, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         Optional<bool> show_root_folder;
@@ -60,13 +62,13 @@ public:
     LLPanelObjectInventory(const Params&);
     virtual ~LLPanelObjectInventory();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     LLFolderViewModelInventory& getRootViewModel() { return mInventoryViewModel; }
 
     void doToSelected(const LLSD& userdata);
 
-    void refresh();
+    void refresh() override;
     const LLUUID& getTaskUUID() { return mTaskUUID;}
     void clearInventoryTask();
     void removeSelectedItem();
@@ -76,12 +78,12 @@ public:
     LLInventoryFilter& getFilter() { return mInventoryViewModel.getFilter(); }
     const LLInventoryFilter& getFilter() const { return mInventoryViewModel.getFilter(); }
 
-    virtual void draw();
-    virtual void deleteAllChildren();
-    virtual bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void *cargo_data, EAcceptance *accept, std::string& tooltip_msg);
+    virtual void draw() override;
+    virtual void deleteAllChildren() override;
+    virtual bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void *cargo_data, EAcceptance *accept, std::string& tooltip_msg) override;
 
-    /*virtual*/ void onFocusLost();
-    /*virtual*/ void onFocusReceived();
+    /*virtual*/ void onFocusLost() override;
+    /*virtual*/ void onFocusReceived() override;
 
     static void idle(void* user_data);
 
@@ -92,7 +94,7 @@ protected:
     /*virtual*/ void inventoryChanged(LLViewerObject* object,
                                  LLInventoryObject::object_list_t* inventory,
                                  S32 serial_num,
-                                 void* user_data);
+                                 void* user_data) override;
     void updateInventory();
     void createFolderViews(LLInventoryObject* inventory_root, LLInventoryObject::object_list_t& contents);
     void createViewsForCategory(LLInventoryObject::object_list_t* inventory,
@@ -105,11 +107,11 @@ protected:
     void removeItemID(const LLUUID& id);
     void clearItemIDs();
 
-    bool            handleKeyHere( KEY key, MASK mask );
+    bool            handleKeyHere( KEY key, MASK mask ) override;
     bool            isSelectionRemovable();
 
 private:
-    std::map<LLUUID, LLFolderViewItem*> mItemMap;
+    boost::unordered_map<LLUUID, LLFolderViewItem*> mItemMap;
 
     LLScrollContainer* mScroller;
     LLFolderView* mFolders;
@@ -118,6 +120,7 @@ private:
     LLUUID mAttachmentUUID;
     bool mHaveInventory; // 'Loading' label and used for initial request
     bool mIsInventoryEmpty; // 'Empty' label
+    bool mInventoryFailed = false; // the request for it failed: not empty, unknown
     bool mInventoryNeedsUpdate; // for idle, set on changed callback
     LLFolderViewModelInventory  mInventoryViewModel;
     bool mShowRootFolder;

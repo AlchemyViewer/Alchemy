@@ -51,11 +51,13 @@ class LLLandImpactsObserver;
 
 typedef LLSafeHandle<LLObjectSelection> LLObjectSelectionHandle;
 
-class LLFloaterTools
+class LLFloaterTools final
 : public LLFloater
 {
 public:
-    virtual bool    postBuild();
+    AL_VIEW_TYPE(LLFloaterTools, LLFloater);
+
+    virtual bool    postBuild() override;
     static  void*   createPanelPermissions(void*    vdata);
     static  void*   createPanelObject(void* vdata);
     static  void*   createPanelVolume(void* vdata);
@@ -66,11 +68,11 @@ public:
     LLFloaterTools(const LLSD& key);
     virtual ~LLFloaterTools();
 
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ bool canClose();
-    /*virtual*/ void onClose(bool app_quitting);
-    /*virtual*/ void draw();
-    /*virtual*/ void onFocusReceived();
+    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ bool canClose() override;
+    /*virtual*/ void onClose(bool app_quitting) override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ void onFocusReceived() override;
 
     // call this once per frame to handle visibility, rect location,
     // button highlights, etc.
@@ -104,9 +106,12 @@ public:
     LLPanelFace* getPanelFace() { return mPanelFace; }
 
 private:
-    void refresh();
+    void refresh() override;
     static void setObjectType( LLPCode pcode );
     void onClickGridOptions();
+
+    void buildTreeGrassCombo();
+    void onSelectTreeGrassCombo();
 
 public:
     LLButton        *mBtnFocus;
@@ -130,11 +135,15 @@ public:
     LLButton*       mBtnLink;
     LLButton*       mBtnUnlink;
 
+    LLButton*       mBtnPrevPart;
+    LLButton*       mBtnNextPart;
+
     LLCheckBoxCtrl* mCheckSnapToGrid;
     LLButton*       mBtnGridOptions;
     LLComboBox*     mComboGridMode;
     LLCheckBoxCtrl* mCheckStretchUniform;
     LLCheckBoxCtrl* mCheckStretchTexture;
+    LLCheckBoxCtrl* mCheckActualRoot;
 
     // !HACK! Replacement of mCheckStretchUniform label because LLCheckBoxCtrl
     //  doesn't support word_wrap of its label. Need to fix truncation bug EXT-6658
@@ -150,8 +159,9 @@ public:
 
     LLTextBox*  mTextSelectionCount = nullptr;
     LLTextBox*  mTextSelectionEmpty = nullptr;
-    LLTextBox*  mTextSelectionFaces = nullptr;
+    //LLTextBox*  mTextSelectionFaces = nullptr;
     LLSlider*   mSliderZoom = nullptr;
+    LLComboBox* mTreeGrassCombo = nullptr;
 
     // Create buttons
     LLCheckBoxCtrl  *mCheckSticky;

@@ -173,9 +173,9 @@ void LLComboBox::initFromParams(const LLComboBox::Params& p)
 // virtual
 bool LLComboBox::postBuild()
 {
-    if (mControlVariable)
+    if (getControlVariable())
     {
-        setValue(mControlVariable->getValue()); // selects the appropriate item
+        setValue(getControlVariable()->getValue()); // selects the appropriate item
     }
     return true;
 }
@@ -217,10 +217,14 @@ void LLComboBox::onCommit()
             mTextEntry->setValue(label);
             mTextEntry->setTentative(false);
         }
+        // Chosen or typed: the value is the control's own now, whoever had
+        // written it before.
+        mUnset = false;
         setControlValue(item->getValue());
     }
     else if (mAllowTextEntry)
     {
+        mUnset = false;
         setControlValue(mTextEntry->getValue());
     }
     else
@@ -278,9 +282,9 @@ LLScrollListItem* LLComboBox::add(const std::string& name, EAddPosition pos, boo
     item->setEnabled(enabled);
     if (!mAllowTextEntry && mLabel.empty())
     {
-        if (mControlVariable)
+        if (getControlVariable())
         {
-            setValue(mControlVariable->getValue()); // selects the appropriate item
+            setValue(getControlVariable()->getValue()); // selects the appropriate item
         }
         else
         {
@@ -297,9 +301,9 @@ LLScrollListItem* LLComboBox::add(const std::string& name, const LLUUID& id, EAd
     item->setEnabled(enabled);
     if (!mAllowTextEntry && mLabel.empty())
     {
-        if (mControlVariable)
+        if (getControlVariable())
         {
-            setValue(mControlVariable->getValue()); // selects the appropriate item
+            setValue(getControlVariable()->getValue()); // selects the appropriate item
         }
         else
         {
@@ -317,9 +321,9 @@ LLScrollListItem* LLComboBox::add(const std::string& name, void* userdata, EAddP
     item->setUserdata( userdata );
     if (!mAllowTextEntry && mLabel.empty())
     {
-        if (mControlVariable)
+        if (getControlVariable())
         {
-            setValue(mControlVariable->getValue()); // selects the appropriate item
+            setValue(getControlVariable()->getValue()); // selects the appropriate item
         }
         else
         {
@@ -336,9 +340,9 @@ LLScrollListItem* LLComboBox::add(const std::string& name, LLSD value, EAddPosit
     item->setEnabled(enabled);
     if (!mAllowTextEntry && mLabel.empty())
     {
-        if (mControlVariable)
+        if (getControlVariable())
         {
-            setValue(mControlVariable->getValue()); // selects the appropriate item
+            setValue(getControlVariable()->getValue()); // selects the appropriate item
         }
         else
         {
@@ -454,8 +458,21 @@ void LLComboBox::setLabel(const LLStringExplicit& name)
     }
 }
 
+void LLComboBox::setUnset(bool unset)
+{
+    mUnset = unset;
+    if (mTextEntry)
+    {
+        mTextEntry->setTentative(unset);
+    }
+}
+
 void LLComboBox::updateLabel()
 {
+    // An item chosen is shown as settled, and is: whoever had written the
+    // value before, it is the control's own now.
+    mUnset = false;
+
     // Update the combo editor with the selected
     // item label.
     if (mTextEntry)
@@ -536,17 +553,8 @@ bool LLComboBox::setCurrentByIndex(S32 index)
         if (item->getEnabled())
         {
             mList->selectItem(item, -1, true);
-            LLSD::String label = item->getColumn(0)->getValue().asString();
-            if (mTextEntry)
-            {
-                mTextEntry->setText(label);
-                mTextEntry->setTentative(false);
-            }
-            if (!mAllowTextEntry)
-            {
-                mButton->setLabel(label);
-            }
             mLastSelectedIndex = index;
+            updateLabel();
             return true;
         }
     }
@@ -681,7 +689,10 @@ void LLComboBox::showList()
 {
     // Make sure we don't go off top of screen.
     LLCoordWindow window_size;
-    getWindow()->getSize(&window_size);
+    if (LLWindow* window = getWindow())
+    {
+        window->getSize(&window_size);
+    }
     //HACK: shouldn't have to know about scale here
     mList->fitContents( 192, llfloor((F32)window_size.mY / LLUI::getScaleFactor().mV[VY]) - 50 );
 
@@ -960,11 +971,11 @@ bool LLComboBox::handleUnicodeCharHere(llwchar uni_char)
 }
 
 // virtual
-bool LLComboBox::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLComboBox::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (mList->getVisible())
     {
-        return mList->handleScrollWheel(x, y, clicks);
+        return mList->handleScrollWheel(x, y, delta);
     }
 
     if (mAllowTextEntry) // We might be editable
@@ -976,9 +987,9 @@ bool LLComboBox::handleScrollWheel(S32 x, S32 y, S32 clicks)
     }
 
     S32 current_index = getCurrentIndex();
-    if (clicks > 0)
+    if (delta.mClicks > 0)
     {
-        for (S32 i = 0; i < clicks; ++i)
+        for (S32 i = 0; i < delta.mClicks; ++i)
         {
             if (!selectNextItem())
                 break;
@@ -986,7 +997,7 @@ bool LLComboBox::handleScrollWheel(S32 x, S32 y, S32 clicks)
     }
     else
     {
-        for (S32 i = 0; i < -clicks; ++i)
+        for (S32 i = 0; i < -delta.mClicks; ++i)
         {
             if (!selectPrevItem())
                 break;
@@ -1024,7 +1035,7 @@ void LLComboBox::setKeystrokeOnEsc(bool enable)
 
 void LLComboBox::onTextEntry(LLLineEditor* line_editor)
 {
-    if (mTextEntryCallback != NULL)
+    if (mTextEntryCallback != nullptr)
     {
         (mTextEntryCallback)(line_editor, LLSD());
     }
@@ -1044,7 +1055,7 @@ void LLComboBox::onTextEntry(LLLineEditor* line_editor)
             mList->deselectAllItems();
             mLastSelectedIndex = -1;
         }
-        if (mTextChangedCallback != NULL)
+        if (mTextChangedCallback != nullptr)
         {
             (mTextChangedCallback)(line_editor, LLSD());
         }
@@ -1092,7 +1103,7 @@ void LLComboBox::onTextEntry(LLLineEditor* line_editor)
         // RN: presumably text entry
         updateSelection();
     }
-    if (mTextChangedCallback != NULL)
+    if (mTextChangedCallback != nullptr)
     {
         (mTextChangedCallback)(line_editor, LLSD());
     }
@@ -1100,18 +1111,18 @@ void LLComboBox::onTextEntry(LLLineEditor* line_editor)
 
 void LLComboBox::updateSelection()
 {
-    LLWString left_wstring = mTextEntry->getWText().substr(0, mTextEntry->getCursor());
+    const std::string full_string = mTextEntry->getText();
+    const std::string left_string  = full_string.substr(0, mTextEntry->getCursor());
     // user-entered portion of string, based on assumption that any selected
     // text was a result of auto-completion
-    LLWString user_wstring = mHasAutocompletedText ? left_wstring : mTextEntry->getWText();
-    std::string full_string = mTextEntry->getText();
+    const std::string user_string  = mHasAutocompletedText ? left_string : full_string;
 
     // go ahead and arrange drop down list on first typed character, even
     // though we aren't showing it... some code relies on prearrange
     // callback to populate content
-    if( mTextEntry->getWText().size() == 1 )
+    if( utf8str_codepoint_count(full_string) == 1 )
     {
-        prearrangeList(mTextEntry->getText());
+        prearrangeList(full_string);
     }
 
     if (mList->selectItemByLabel(full_string, false))
@@ -1119,12 +1130,18 @@ void LLComboBox::updateSelection()
         mTextEntry->setTentative(false);
         mLastSelectedIndex = mList->getFirstSelectedIndex();
     }
-    else if (mList->selectItemByPrefix(left_wstring, false))
+    else if (mList->selectItemByPrefix(left_string, false))
     {
-        LLWString selected_item = utf8str_to_wstring(getSelectedItemLabel());
-        LLWString wtext = left_wstring + selected_item.substr(left_wstring.size(), selected_item.size());
-        mTextEntry->setText(wstring_to_utf8str(wtext));
-        mTextEntry->setSelection(static_cast<S32>(left_wstring.size()), static_cast<S32>(mTextEntry->getWText().size()));
+        const std::string selected_item = getSelectedItemLabel();
+        // Where the typed text ends and the completion begins. The prefix
+        // match is not case-sensitive and casing does not preserve length, so
+        // the join is nudged forward onto a character start rather than
+        // trusted to land on one.
+        const size_t join = utf8str_grapheme_align_forward(
+            selected_item, llmin(left_string.size(), selected_item.size()));
+        const std::string text = left_string + selected_item.substr(join);
+        mTextEntry->setText(text);
+        mTextEntry->setSelection(static_cast<S32>(left_string.size()), static_cast<S32>(text.size()));
         mTextEntry->endSelection();
         mTextEntry->setTentative(false);
         mHasAutocompletedText = true;
@@ -1133,7 +1150,7 @@ void LLComboBox::updateSelection()
     else // no matching items found
     {
         mList->deselectAllItems();
-        mTextEntry->setText(wstring_to_utf8str(user_wstring)); // removes text added by autocompletion
+        mTextEntry->setText(user_string); // removes text added by autocompletion
         mTextEntry->setTentative(mTextEntryTentative);
         mHasAutocompletedText = false;
         mLastSelectedIndex = -1;
@@ -1338,6 +1355,39 @@ bool LLComboBox::selectItemRange( S32 first, S32 last )
     return mList->selectItemRange(first, last);
 }
 
+void LLComboBox::addInfo(LLSD& info)
+{
+    LLUICtrl::addInfo(info);
+
+    if (mList && mList->getItemCount() > 0)
+    {
+        LLSD items_array;
+        std::vector<LLScrollListItem*> item_list = mList->getAllData();
+        for (std::vector<LLScrollListItem*>::iterator iter = item_list.begin(); iter != item_list.end(); ++iter)
+        {
+            if (LLScrollListItem* item = *iter)
+            {
+                LLSD item_info;
+                item_info["value"] = item->getValue();
+                if (item->getNumColumns() > 0)
+                {
+                    if (LLScrollListCell* cell = item->getColumn(0))
+                    {
+                        item_info["label"] = cell->getValue();
+                    }
+                }
+                items_array.append(item_info);
+            }
+        }
+        info["items"] = items_array;
+        info["item_count"] = mList->getItemCount();
+        info["current_selection"] = getSelectedItemLabel();
+    }
+    else
+    {
+        info["item_count"] = 0;
+    }
+}
 
 static LLDefaultChildRegistry::Register<LLIconsComboBox> register_icons_combo_box("icons_combo_box");
 

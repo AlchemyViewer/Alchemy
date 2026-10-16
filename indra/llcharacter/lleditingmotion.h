@@ -37,16 +37,14 @@
 #define EDITING_EASEIN_DURATION 0.0f
 #define EDITING_EASEOUT_DURATION 0.5f
 #define EDITING_PRIORITY LLJoint::HIGH_PRIORITY
-#define MIN_REQUIRED_PIXEL_AREA_EDITING 500.f
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_EDITING = 500.f;
 
 //-----------------------------------------------------------------------------
 // class LLEditingMotion
 //-----------------------------------------------------------------------------
-LL_ALIGN_PREFIX(16)
-class LLEditingMotion :
+class alignas(16) LLEditingMotion :
     public LLMotion
 {
-    LL_ALIGN_NEW
 public:
     // Constructor
     LLEditingMotion(const LLUUID &id);
@@ -101,7 +99,7 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();
@@ -110,11 +108,11 @@ public:
     //-------------------------------------------------------------------------
     // joint states to be animated
     //-------------------------------------------------------------------------
-    LL_ALIGN_16(LLJoint             mParentJoint);
-    LL_ALIGN_16(LLJoint             mShoulderJoint);
-    LL_ALIGN_16(LLJoint             mElbowJoint);
-    LL_ALIGN_16(LLJoint             mWristJoint);
-    LL_ALIGN_16(LLJoint             mTarget);
+    LLJoint             mParentJoint;
+    LLJoint             mShoulderJoint;
+    LLJoint             mElbowJoint;
+    LLJoint             mWristJoint;
+    LLJoint             mTarget;
     LLJointSolverRP3    mIKSolver;
 
     LLCharacter         *mCharacter;
@@ -129,7 +127,7 @@ public:
     static S32          sHandPose;
     static S32          sHandPosePriority;
     LLVector3           mLastSelectPt;
-} LL_ALIGN_POSTFIX(16);
+};
 
 #endif // LL_LLKEYFRAMEMOTION_H
 

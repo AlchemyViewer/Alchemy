@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Script Studio's Link tab, under the editor: the scripts of the objects
+     or prims chosen in the Explorer, each with the file on disk proposed
+     as its master, how it was found, and whether it is what the script
+     holds in-world. Shown while there is something to link. -->
+<panel
+ follows="all"
+ height="168"
+ layout="topleft"
+ name="link_tab"
+ width="574">
+    <text
+     follows="left|top|right"
+     height="18"
+     layout="topleft"
+     left="6"
+     name="link_head"
+     top="3"
+     use_ellipses="true"
+     width="562" />
+    <pane_list
+     draw_heading="true"
+     heading_height="18"
+     follows="all"
+     height="114"
+     layout="topleft"
+     left="0"
+     name="link_list"
+     tool_tip="The scripts found, and the file proposed for each. Tick those to link; Return or double-click chooses a file."
+     top_pad="3"
+     width="574">
+        <pane_list.columns label="" name="box" width="22" />
+        <pane_list.columns label="Script" name="script" width="150" />
+        <pane_list.columns dynamic_width="true" label="File" name="file" />
+        <pane_list.columns label="Found" name="how" width="120" />
+        <pane_list.columns label="In-world" name="world" width="100" />
+    </pane_list>
+    <check_box
+     follows="left|bottom"
+     height="18"
+     initial_value="true"
+     label="Send files that differ"
+     layout="topleft"
+     left="4"
+     name="link_send_differing"
+     tool_tip="Once linked, send each file found to differ from what its script holds in-world, keeping what the script held in History first. A file whose script could not be compared is not sent, nor one that does not expand cleanly: saving it sends it."
+     top_pad="5"
+     width="170" />
+    <button
+     follows="right|bottom"
+     height="22"
+     label="Choose File..."
+     layout="topleft"
+     left="316"
+     name="link_choose"
+     tool_tip="Choose the file for the chosen script: one of those found, or any on disk"
+     top_delta="-2"
+     width="96" />
+    <button
+     follows="right|bottom"
+     height="22"
+     label="Link"
+     layout="topleft"
+     left_pad="4"
+     name="link_do"
+     tool_tip="Link each ticked script to its file: from then on it is changed through the file, and saving the file sends it"
+     top_delta="0"
+     width="72" />
+    <button
+     follows="right|bottom"
+     height="22"
+     label="Cancel"
+     layout="topleft"
+     left_pad="4"
+     name="link_cancel"
+     tool_tip="Link nothing, and close this tab"
+     top_delta="0"
+     width="72" />
+</panel>

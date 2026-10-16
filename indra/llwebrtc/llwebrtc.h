@@ -38,16 +38,15 @@
 #ifndef LLWEBRTC_H
 #define LLWEBRTC_H
 
+#include <map>
 #include <string>
 #include <vector>
 
 #ifdef LL_MAKEDLL
 #ifdef WEBRTC_WIN
 #define LLSYMEXPORT __declspec(dllexport)
-#elif WEBRTC_LINUX
-#define LLSYMEXPORT __attribute__((visibility("default")))
 #else
-#define LLSYMEXPORT /**/
+#define LLSYMEXPORT __attribute__((visibility("default")))
 #endif
 #else
 #define LLSYMEXPORT /**/
@@ -55,6 +54,7 @@
 
 namespace llwebrtc
 {
+typedef std::map<std::string, std::map<std::string, std::string>> LLWebRTCStatsMap;
 
 class LLWebRTCLogCallback
 {
@@ -139,7 +139,7 @@ class LLWebRTCDeviceInterface
             NOISE_SUPPRESSION_LEVEL_HIGH,
             NOISE_SUPPRESSION_LEVEL_VERY_HIGH
         } ENoiseSuppressionLevel;
-        ENoiseSuppressionLevel mNoiseSuppressionLevel { NOISE_SUPPRESSION_LEVEL_VERY_HIGH };
+        ENoiseSuppressionLevel mNoiseSuppressionLevel { NOISE_SUPPRESSION_LEVEL_HIGH };
     };
 
     virtual void setAudioConfig(AudioConfig config) = 0;
@@ -151,6 +151,14 @@ class LLWebRTCDeviceInterface
     virtual void setCaptureDevice(const std::string& id) = 0;
     virtual void setRenderDevice(const std::string& id) = 0;
 
+    // Enable/disable the audio devices, set when voice is enabled/disabled.
+    // The capture (microphone) and playout (speaker) devices only run while this
+    // is enabled, so neither is held open when the user has voice off.  While
+    // enabled, capture stays running across calls and mute/unmute so the AEC
+    // never cold-starts (no unmute hiss); playout still only runs when there's a
+    // connection to render.
+    virtual void setVoiceEnabled(bool enable) = 0;
+
     // Device observers for device change callbacks.
     virtual void setDevicesObserver(LLWebRTCDevicesObserver *observer) = 0;
     virtual void unsetDevicesObserver(LLWebRTCDevicesObserver *observer) = 0;
@@ -159,7 +167,10 @@ class LLWebRTCDeviceInterface
     virtual void setTuningMode(bool enable) = 0;
     virtual float getTuningAudioLevel() = 0; // for use during tuning
     virtual float getPeerConnectionAudioLevel() = 0; // for use when not tuning
-    virtual void setPeerConnectionGain(float gain) = 0;
+    virtual void setMicGain(float gain) = 0;
+    virtual void setTuningMicGain(float gain)        = 0;
+
+    virtual void setMute(bool mute, int delay_ms = 0) = 0;
 };
 
 // LLWebRTCAudioInterface provides the viewer with a way
@@ -237,6 +248,8 @@ class LLWebRTCSignalingObserver
     // Called when the data channel has been established and data
     // transfer can begin.
     virtual void OnDataChannelReady(LLWebRTCDataInterface *data_interface) = 0;
+
+    virtual void OnStatsDelivered(const LLWebRTCStatsMap& stats_data) {}
 };
 
 // LLWebRTCPeerConnectionInterface representsd a connection to a peer,
@@ -270,6 +283,8 @@ class LLWebRTCPeerConnectionInterface
     virtual void unsetSignalingObserver(LLWebRTCSignalingObserver* observer) = 0;
 
     virtual void AnswerAvailable(const std::string &sdp) = 0;
+
+    virtual void gatherConnectionStats() = 0;
 };
 
 // The following define the dynamic linked library

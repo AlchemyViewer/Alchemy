@@ -1,0 +1,224 @@
+/**
+ * @file altextgotoline.cpp
+ * @brief Go to Line over a text: a line, or a line and a column, as it is typed
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "altextgotoline.h"
+
+#include "alquickopen.h"
+#include "altextview.h"
+
+#include <cctype>
+#include <charconv>
+#include <string_view>
+#include <system_error>
+#include <vector>
+
+namespace
+{
+    // What is typed, as a line of the text counted from one, and a
+    // column: false where it is no line of it, or no line's number at all.
+    bool placeOf(const ALTextView& text, S32 base, const std::string& typed, S32& line, S32& column)
+    {
+        S32 shown = 0;
+        line      = 0;
+        if (!ALTextGoToLine::placeTyped(typed, shown, column))
+        {
+            return false;
+        }
+        // Counted wide enough that no base takes it past what a number
+        // holds.
+        const S64 counted = static_cast<S64>(shown) - base;
+        if (counted < 1 || counted > text.document().lineCount())
+        {
+            return false;
+        }
+        line = static_cast<S32>(counted);
+        return true;
+    }
+
+    // A run of digits as a number, where it is not too long for one.
+    bool numberOf(std::string_view digits, S32& out)
+    {
+        return std::from_chars(digits.data(), digits.data() + digits.size(), out).ec == std::errc();
+    }
+
+    ALTextPos posOf(const ALTextView& text, S32 line, S32 column)
+    {
+        return column > 0 ? text.document().posAtDisplayColumn(line - 1, column - 1, text.getTabWidth()) : ALTextPos(line - 1, 0);
+    }
+
+    // The selections the text had as Go to Line was asked, the main one
+    // and those besides it, put back where anything has moved them since;
+    // nothing done where nothing has, so that opening it moves nothing.
+    void putBack(ALTextView& text, const ALTextRange& held, const std::vector<ALTextRange>& others)
+    {
+        if (text.selection() != held || text.otherSelections() != others)
+        {
+            text.setSelections(held, others);
+        }
+    }
+}
+
+void ALTextGoToLine::ask(const ask_t& ask, text_t text_of, S32 base, words_t words, went_t went)
+{
+    ALTextView* shown = text_of ? text_of() : nullptr;
+    if (!shown || !ask)
+    {
+        return;
+    }
+    const ALTextPos was = shown->caret();
+    // And every selection as it stood, the main one and those besides it,
+    // which a place gone to lets go of: what Escape puts back, and so do
+    // an emptied field and Return on what is no place.
+    const ALTextRange              held   = shown->selection();
+    const std::vector<ALTextRange> others = shown->otherSelections();
+    // The text at the place typed, while it is typed; return leaves it
+    // there, and so does looking away, escape puts it back.
+    ALQuickOpen* quick = ask(
+        [text_of, base, was, went, held, others](const std::string& typed) {
+            ALTextView* text = text_of();
+            if (!text)
+            {
+                return;
+            }
+            S32 line, column;
+            if (placeOf(*text, base, typed, line, column))
+            {
+                // Gone from where the caret was before the line was typed,
+                // which the preview has moved it from since.
+                if (went)
+                {
+                    went(was);
+                }
+                text->goTo(posOf(*text, line, column));
+            }
+            else
+            {
+                putBack(*text, held, others);
+            }
+            text->setFocus(true);
+        },
+        [text_of, held, others]() {
+            if (ALTextView* text = text_of())
+            {
+                putBack(*text, held, others);
+            }
+        },
+        // Looked away from: the line it went to stands, since that is
+        // what was looked at, and the way back from it is kept, as a
+        // line gone to by Return keeps it.
+        [text_of, was, went]() {
+            ALTextView* text = text_of();
+            if (text && went && text->caret() != was)
+            {
+                went(was);
+            }
+        });
+    if (!quick)
+    {
+        return;
+    }
+    quick->onQueryChanged([text_of, base, words, quick, held, others](const std::string& typed) {
+        ALTextView* text = text_of();
+        if (!text || !words)
+        {
+            return;
+        }
+        S32                        line, column;
+        const bool                 there = placeOf(*text, base, typed, line, column);
+        std::string                trimmed = typed;
+        LLStringUtil::trim(trimmed);
+        // The line as typed: its number, or what was typed where that is
+        // no number a line has.
+        S32                        typed_line = 0, typed_column = 0;
+        const bool                 numbered = ALTextGoToLine::placeTyped(typed, typed_line, typed_column);
+        LLStringUtil::format_map_t args;
+        // In the numbers the text shows: the first line's too, which is
+        // 0 where they count from 0.
+        args["[FIRST]"] = std::to_string(1 + base);
+        args["[COUNT]"] = std::to_string(text->document().lineCount() + base);
+        args["[LINE]"]  = numbered ? std::to_string(typed_line) : trimmed;
+        args["[COL]"]   = std::to_string(column);
+        if (trimmed.empty())
+        {
+            quick->setHint(words("GoToLineHint", args));
+            putBack(*text, held, others);
+        }
+        else if (there)
+        {
+            quick->setHint(words(column > 0 ? "GoToLineGoColumn" : "GoToLineGo", args));
+            text->goTo(posOf(*text, line, column));
+        }
+        else
+        {
+            quick->setHint(words("GoToLineNone", args));
+        }
+    });
+    quick->setQuery(std::string());
+}
+
+bool ALTextGoToLine::placeTyped(const std::string& text, S32& line, S32& column)
+{
+    line = column = 0;
+    std::string_view rest(text);
+    while (!rest.empty() && rest.front() == ' ')
+    {
+        rest.remove_prefix(1);
+    }
+    while (!rest.empty() && rest.front() == ':')
+    {
+        rest.remove_prefix(1);
+    }
+    size_t digits = 0;
+    while (digits < rest.size() && isdigit(static_cast<unsigned char>(rest[digits])))
+    {
+        ++digits;
+    }
+    if (digits == 0 || !numberOf(rest.substr(0, digits), line))
+    {
+        line = 0;
+        return false;
+    }
+    rest.remove_prefix(digits);
+    if (rest.empty() || (rest.front() != ':' && rest.front() != ','))
+    {
+        return true;
+    }
+    rest.remove_prefix(1);
+    while (!rest.empty() && rest.front() == ' ')
+    {
+        rest.remove_prefix(1);
+    }
+    digits = 0;
+    while (digits < rest.size() && isdigit(static_cast<unsigned char>(rest[digits])))
+    {
+        ++digits;
+    }
+    if (digits > 0 && !numberOf(rest.substr(0, digits), column))
+    {
+        column = 0;
+    }
+    return true;
+}

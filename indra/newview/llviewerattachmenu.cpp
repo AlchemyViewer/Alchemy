@@ -40,6 +40,8 @@
 #include "llmenugl.h"
 #include "lltrans.h"
 
+#include <fmt/format.h>
+
 // static
 void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, const std::string& attach_to_hud_menu_name)
 {
@@ -69,11 +71,11 @@ void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, c
 
         if (LLTrans::findString(translated_submenu_name, submenu_name))
         {
-            p.name = (" ") + translated_submenu_name + " ";
+            p.name = attachment->getIsHUDAttachment() ? translated_submenu_name : fmt::format(FMT_STRING("{} ({})"), translated_submenu_name, curiter->first);
         }
         else
         {
-            p.name = submenu_name;
+            p.name = attachment->getIsHUDAttachment() ? submenu_name : fmt::format(FMT_STRING("{} ({})"), submenu_name, curiter->first);
         }
 
         LLSD cbparams;
@@ -121,7 +123,7 @@ void LLViewerAttachMenu::attachObjects(const uuid_vec_t& items, const std::strin
         else if(item && item->isFinished())
         {
             // must be in library. copy it to our inventory and put it on.
-//          LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, attachmentp));
+//          LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, attachmentp, false));
 // [SL:KB] - Patch: Appearance-DnDWear | Checked: 2013-02-04 (Catznip-3.4)
             LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, attachmentp, false));
 // [/SL;KB]

@@ -34,7 +34,7 @@ class LLSurfacePatch;
 class LLViewerTexture;
 
 
-class LLVOGrass : public LLAlphaObject
+class LLVOGrass final : public LLAlphaObject
 {
 public:
     LLVOGrass(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
@@ -95,6 +95,7 @@ public:
 
         F32     mBladeSizeX;
         F32     mBladeSizeY;
+        std::string mName;
     };
 
     typedef std::map<U32, GrassSpeciesData*> SpeciesMap;
@@ -105,7 +106,7 @@ public:
 
     LLSurfacePatch           *mPatch;           //  Stores the land patch where the grass is centered
 
-    U64 mLastPatchUpdateTime;
+    U32 mLastPatchUpdateCount;  // mPatch's getUpdateCount() when the blades were last built
 
     LLVector3                 mGrassBend;       // Accumulated wind (used for blowing trees)
     LLVector3                 mGrassVel;
@@ -121,6 +122,7 @@ private:
     F32 mLastHeight;        // For cheap update hack
     S32 mNumBlades;
 
+public:
     static SpeciesMap sSpeciesTable;
 };
 #endif // LL_VO_GRASS_

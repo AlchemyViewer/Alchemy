@@ -78,17 +78,14 @@ protected:
     void setTargetObjectAndOffset(LLViewerObject *objp, LLVector3d offset);
     void setTargetPosGlobal(const LLVector3d &target_pos_global);
 
-public:
-    static bool sDebugLookAt;
-
 private:
     ELookAtType                 mTargetType;
     LLVector3d                  mTargetOffsetGlobal;
     LLVector3                   mLastSentOffsetGlobal;
-    F32                         mKillTime;
+    F64                         mKillTime;      // on mTimer, which runs as long as the effect
     LLFrameTimer                mTimer;
     LLVector3                   mTargetPos;
-    F32                         mLastSendTime;
+    F64                         mLastSendTime;  // on mTimer
     LLAttentionSet*             mAttentions;
 };
 

@@ -48,8 +48,9 @@
 #include "lltrace.h"
 #include "llsnapshotmodel.h"
 
-#include <boost/function.hpp>
 #include <boost/signals2.hpp>
+
+#include <functional>
 
 class LLView;
 class LLViewerObject;
@@ -60,6 +61,7 @@ class LLVelocityBar;
 class LLPanel;
 class LLImageRaw;
 class LLImageFormatted;
+struct ALSnapshotCutout;
 class LLHUDIcon;
 class LLWindow;
 class LLRootView;
@@ -68,6 +70,7 @@ class LLWindowListener;
 class LLViewerInventoryItem;
 // [/SL:KB]
 class LLViewerWindowListener;
+class LLStatsListener;
 class LLVOPartGroup;
 class LLPopupView;
 class LLCubeMap;
@@ -121,8 +124,6 @@ public:
     LLUUID          mParticleOwnerID;
     LLUUID          mParticleSourceID;
     S32             mObjectFace;
-    S32             mGLTFNodeIndex = -1;
-    S32             mGLTFPrimitiveIndex = -1;
     LLHUDIcon*      mHUDIcon;
     LLVector3       mIntersection;
     LLVector2       mUVCoords;
@@ -144,6 +145,11 @@ private:
 
     bool            mWantSurfaceInfo;   // do we populate mUVCoord, mNormal, mBinormal?
 
+};
+
+struct MainPanel final : public LLPanel
+{
+    AL_VIEW_TYPE(MainPanel, LLPanel);
 };
 
 static const U32 MAX_SNAPSHOT_IMAGE_SIZE = 7680; // max snapshot image size 7680 * 7680 UHDTV2
@@ -187,7 +193,7 @@ public:
     void            handlePieMenu(S32 x, S32 y, MASK mask);
 
     void            reshapeStatusBarContainer();
-    void            resetStatusBarContainer(); // undo changes done by resetStatusBarContainer on initWorldUI()
+    //void            resetStatusBarContainer(); // undo changes done by resetStatusBarContainer on initWorldUI()
 
     bool handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK mask, EMouseClickType clicktype, bool down, bool &is_toolmgr_action);
 
@@ -200,7 +206,11 @@ public:
     /*virtual*/ bool handleUnicodeChar(llwchar uni_char, MASK mask);    // NOT going to handle extended
     /*virtual*/ bool handleMouseDown(LLWindow *window,  LLCoordGL pos, MASK mask);
     /*virtual*/ bool handleMouseUp(LLWindow *window,  LLCoordGL pos, MASK mask);
-    /*virtual*/ bool handleCloseRequest(LLWindow *window);
+    /*virtual*/ void handlePreCloseRequest();
+    /*virtual*/ void handleCloseRequestCanceled();
+    /*virtual*/ void handleSuspendRequest();
+    /*virtual*/ bool handleCloseRequest(LLWindow *window, bool from_user);
+    /*virtual*/ bool handleSessionExit(LLWindow* window);
     /*virtual*/ void handleQuit(LLWindow *window);
     /*virtual*/ bool handleRightMouseDown(LLWindow *window,  LLCoordGL pos, MASK mask);
     /*virtual*/ bool handleRightMouseUp(LLWindow *window,  LLCoordGL pos, MASK mask);
@@ -221,20 +231,20 @@ public:
                 void handleMouseDragged(LLWindow *window,  LLCoordGL pos, MASK mask);
     /*virtual*/ void handleMouseLeave(LLWindow *window);
     /*virtual*/ void handleResize(LLWindow *window,  S32 x,  S32 y);
+    /*virtual*/ void handleRequestResolutionUpdate(LLWindow* window);
     /*virtual*/ void handleFocus(LLWindow *window);
     /*virtual*/ void handleFocusLost(LLWindow *window);
     /*virtual*/ bool handleActivate(LLWindow *window, bool activated);
     /*virtual*/ bool handleActivateApp(LLWindow *window, bool activating);
     /*virtual*/ void handleMenuSelect(LLWindow *window,  S32 menu_item);
-    /*virtual*/ bool handlePaint(LLWindow *window,  S32 x,  S32 y,  S32 width,  S32 height);
-    /*virtual*/ void handleScrollWheel(LLWindow *window,  S32 clicks);
-    /*virtual*/ void handleScrollHWheel(LLWindow *window,  S32 clicks);
+    /*virtual*/ void handleScrollWheel(LLWindow *window,  LLScrollDelta delta);
+    /*virtual*/ void handleScrollHWheel(LLWindow *window,  LLScrollDelta delta);
     /*virtual*/ bool handleDoubleClick(LLWindow *window,  LLCoordGL pos, MASK mask);
     /*virtual*/ void handleWindowBlock(LLWindow *window);
     /*virtual*/ void handleWindowUnblock(LLWindow *window);
     /*virtual*/ void handleDataCopy(LLWindow *window, S32 data_type, void *data);
     /*virtual*/ bool handleTimerEvent(LLWindow *window);
-    /*virtual*/ bool handleDeviceChange(LLWindow *window);
+    /*virtual*/ bool handleDeviceChange(LLWindow *window, const std::string& change_type);
     /*virtual*/ bool handleDPIChanged(LLWindow *window, F32 ui_scale_factor, S32 window_width, S32 window_height);
     /*virtual*/ bool handleDisplayChanged();
     /*virtual*/ bool handleWindowDidChangeScreen(LLWindow *window);
@@ -247,7 +257,7 @@ public:
                     const std::map<std::string, std::string>& args);
 
     // signal on update of WorldView rect
-    typedef boost::function<void (LLRect old_world_rect, LLRect new_world_rect)> world_rect_callback_t;
+    typedef std::function<void (LLRect old_world_rect, LLRect new_world_rect)> world_rect_callback_t;
     typedef boost::signals2::signal<void (LLRect old_world_rect, LLRect new_world_rect)> world_rect_signal_t;
     world_rect_signal_t mOnWorldViewRectUpdated;
     boost::signals2::connection setOnWorldViewRectUpdated(world_rect_callback_t cb) { return mOnWorldViewRectUpdated.connect(cb); }
@@ -256,6 +266,7 @@ public:
     // ACCESSORS
     //
     LLRootView*         getRootView()       const;
+    MainPanel*          getMainView()       const { return mMainView; }
 
     // 3D world area in scaled pixels (via UI scale), use for most UI computations
     LLRect          getWorldViewRectScaled() const;
@@ -347,8 +358,8 @@ public:
     LLView*         getLoginPanelHolder() { return mLoginPanelHolder.get(); }
     bool            handleKey(KEY key, MASK mask);
     bool            handleKeyUp(KEY key, MASK mask);
-    void            handleScrollWheel   (S32 clicks);
-    void            handleScrollHWheel  (S32 clicks);
+    void            handleScrollWheel   (LLScrollDelta delta);
+    void            handleScrollHWheel  (LLScrollDelta delta);
 
     // add and remove views from "popup" layer
     void            addPopup(LLView* popup);
@@ -359,7 +370,7 @@ public:
     void            setNormalControlsVisible( bool visible );
     void            setMenuBackgroundColor(bool god_mode = false, bool dev_grid = false);
 
-    void            reshape(S32 width, S32 height);
+    void            reshape(S32 width, S32 height, bool force_reshape = false);
     void            sendShapeToSim();
 
     void            draw();
@@ -375,9 +386,15 @@ public:
 
     bool saveSnapshot(const std::string&  filename, S32 image_width, S32 image_height, bool show_ui = true, bool show_hud = true, bool do_rebuild = false, bool show_balance = true,
                      LLSnapshotModel::ESnapshotLayerType type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR, LLSnapshotModel::ESnapshotFormat format = LLSnapshotModel::SNAPSHOT_FORMAT_BMP);
+    // With a cutout, only its subject is drawn, and raw comes back as the
+    // subject premultiplied by its coverage, RGBA at the size asked for: the
+    // caller lays it over the fill (ALCutoutImage::layOverFill), which takes no
+    // render. The interface, the HUD and the depth layers do not apply to a
+    // cutout. cutout_drawn, if given, is told whether any of the subject was drawn.
     bool rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_height, bool keep_window_aspect = true, bool is_texture = false,
                      bool show_ui = true, bool show_hud = true, bool do_rebuild = false, bool no_post = false, bool show_balance = true,
-                     LLSnapshotModel::ESnapshotLayerType type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR, S32 max_size = MAX_SNAPSHOT_IMAGE_SIZE);
+                     LLSnapshotModel::ESnapshotLayerType type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR, S32 max_size = MAX_SNAPSHOT_IMAGE_SIZE,
+                     const ALSnapshotCutout* cutout = nullptr, bool* cutout_drawn = nullptr);
 
     bool            simpleSnapshot(LLImageRaw *raw, S32 image_width, S32 image_height, const int num_render_passes);
 
@@ -412,6 +429,7 @@ public:
     void resetSnapshotLoc();
 
     void            playSnapshotAnimAndSound();
+    static void     onSnapshotNotificationClick(const LLSD& notification, const LLSD& response);
 
     // draws selection boxes around selected objects, must call displayObjects first
     void            renderSelections( bool for_gl_pick, bool pick_parcel_walls, bool for_hud );
@@ -438,8 +456,6 @@ public:
                                     bool pick_unselectable = true,
                                     bool pick_reflection_probe = true,
                                     S32* face_hit = NULL,
-                                    S32* gltf_node_hit = nullptr,
-                                    S32* gltf_primitive_hit = nullptr,
                                     LLVector4a *intersection = NULL,
                                     LLVector2 *uv = NULL,
                                     LLVector4a *normal = NULL,
@@ -508,6 +524,7 @@ private:
     LLRect          mWorldViewRectRaw;          // area of screen for 3D world
     LLRect          mWorldViewRectScaled;       // area of screen for 3D world scaled by UI size
     LLRootView*     mRootView;                  // a view of size mWindowRectRaw, containing all child views
+    MainPanel*      mMainView;                  // a view of size mWindowRectRaw, directly containing the base elements of the ui tree
     LLView*         mFloaterSnapRegion = nullptr;
     LLView*         mNavBarContainer = nullptr;
     LLPanel*        mStatusBarContainer = nullptr;
@@ -563,6 +580,7 @@ private:
 
     std::unique_ptr<LLWindowListener> mWindowListener;
     std::unique_ptr<LLViewerWindowListener> mViewerWindowListener;
+    std::unique_ptr<LLStatsListener> mStatsListener;
 
     // Object temporarily hovered over while dragging
     LLPointer<LLViewerObject>   mDragHoveredObject;

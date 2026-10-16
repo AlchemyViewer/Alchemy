@@ -32,22 +32,24 @@
 
 class LLPanelExperiences;
 
-class LLFloaterExperiences :
+class LLFloaterExperiences final :
     public LLFloater
 {
 public:
-    LLFloaterExperiences(const LLSD& data);
-    virtual void onClose(bool app_quitting);
+    AL_VIEW_TYPE(LLFloaterExperiences, LLFloater);
 
-    virtual void onOpen(const LLSD& key);
+    LLFloaterExperiences(const LLSD& data);
+    virtual void onClose(bool app_quitting) override;
+
+    virtual void onOpen(const LLSD& key) override;
     static LLFloaterExperiences* findInstance();
 protected:
     typedef std::map<std::string, std::string> NameMap_t;
-    typedef boost::function<void(LLPanelExperiences*, const LLSD&)> Callback_t;
+    typedef std::function<void(LLPanelExperiences*, const LLSD&)> Callback_t;
 
     void clearFromRecent(const LLSD& ids);
     void resizeToTabs();
-    /*virtual*/ bool    postBuild();
+    /*virtual*/ bool    postBuild() override;
     void refreshContents();
     void setupRecentTabs();
     LLPanelExperiences* addTab(const std::string& name, bool select);
@@ -65,12 +67,13 @@ protected:
         const std::string &errorNotify, Callback_t cback);
 
 private:
-    typedef boost::function < LLSD(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t, LLCore::HttpRequest::ptr_t,
+    typedef std::function<LLSD(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t, LLCore::HttpRequest::ptr_t,
         const std::string, LLCore::HttpOptions::ptr_t, LLCore::HttpHeaders::ptr_t) > invokationFn_t;
 
     static void retrieveExperienceListCoro(std::string url, LLHandle<LLFloaterExperiences> hparent,
         NameMap_t tabMapping, std::string errorNotify, Callback_t cback, invokationFn_t invoker);
     std::vector<LLUUID> mPrepurchaseIds;
+    boost::signals2::scoped_connection mCapsReceivedConnection;
 };
 
 #endif //LL_LLFLOATEREXPERIENCES_H

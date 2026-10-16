@@ -30,7 +30,6 @@ uniform float minimum_alpha;
 uniform sampler2D diffuseMap;
 
 vec3 atmosLighting(vec3 light);
-vec3 scaleSoftClip(vec3 light);
 
 in vec4 vertex_color;
 in vec2 vary_texcoord0;
@@ -48,7 +47,6 @@ void default_lighting()
 
     color.rgb = atmosLighting(color.rgb);
 
-    color.rgb = scaleSoftClip(color.rgb);
 
     frag_color = max(color, vec4(0));
 }

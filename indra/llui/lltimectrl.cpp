@@ -53,8 +53,10 @@ class LLTimeValidatorImpl : public LLTextValidate::ValidatorImpl
 {
 public:
     // virtual
-    bool validate(const std::string& str) override
+    bool validate(std::string_view view) override
     {
+        const std::string str(view);
+
         std::string hours = LLTimeCtrl::getHoursString(str);
         if (!LLTimeCtrl::isHoursStringValid(hours))
             return setError("ValidatorInvalidHours", LLSD().with("STR", hours));
@@ -68,14 +70,6 @@ public:
             return setError("ValidatorInvalidAMPM", LLSD().with("STR", ampm));
 
         return resetError();
-    }
-
-    // virtual
-    bool validate(const LLWString& wstr) override
-    {
-        std::string str = wstring_to_utf8str(wstr);
-
-        return validate(str);
     }
 } validateTimeImpl;
 LLTextValidate::Validator validateTime(validateTimeImpl);

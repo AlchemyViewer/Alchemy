@@ -30,36 +30,38 @@ in vec4 vary_fragcoord;
 
 vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 float getDepth(vec2 pos_screen);
+bool isFarDepth(float d);             // deferredUtil.glsl -- depth-convention aware
 
 vec4 getWaterFogView(vec3 pos);
 
 uniform int above_water;
 
-uniform sampler2D exclusionTex;
+// Void water has no floor. The sky behind it keeps the cleared far depth, which an infinite projection
+// reconstructs a thousand km out and a finite one at its far plane, wherever that falls relative to the surface;
+// it is fogged instead as water this deep past where the ray enters, at any distance.
+const float VOID_WATER_FOG_DEPTH = 1024.0;
+uniform vec4 waterPlane;
 
 void main()
 {
     vec2  tc           = vary_fragcoord.xy/vary_fragcoord.w*0.5+0.5;
     float depth        = getDepth(tc.xy);
-    float mask = texture(exclusionTex, tc.xy).r;
-
     if (above_water > 0)
     {
-        // Just discard if we're in the exclusion mask.
-        // The previous invisiprim hack we're replacing would also crank up water fog desntiy.
-        // But doing that makes exclusion surfaces very slow as we'd need to render even more into the mask.
-        // - Geenz 2025-02-06
-        if (mask < 1)
-        {
-            discard;
-        }
-
         // we want to depth test when the camera is above water, but some GPUs have a hard time
         // with depth testing against render targets that are bound for sampling in the same shader
         // so we do it manually here
 
+        // The matching hardware LLGLDepthTest in pipeline.cpp auto-translates its func under
+        // reverse-Z; keep this in sync. Under reverse-Z clip.z/clip.w is already the [0,1]
+        // ndc z (no *0.5+0.5), and "fragment behind stored geometry" is the smaller depth.
+#ifdef REVERSE_Z
+        float cur_depth = vary_fragcoord.z/vary_fragcoord.w;
+        if (cur_depth < depth)
+#else
         float cur_depth = vary_fragcoord.z/vary_fragcoord.w*0.5+0.5;
         if (cur_depth > depth)
+#endif
         {
             discard;
         }
@@ -67,6 +69,14 @@ void main()
     }
 
     vec4  pos          = getPositionWithDepth(tc, depth);
+
+    if (isFarDepth(depth))
+    {
+        vec3 dir = normalize(pos.xyz);
+        float es = -dot(dir, waterPlane.xyz);
+        float entry = (waterPlane.w > 0.0 && es > 0.0) ? waterPlane.w / es : 0.0;
+        pos.xyz = dir * (entry + VOID_WATER_FOG_DEPTH);
+    }
 
     vec4 fogged = getWaterFogView(pos.xyz);
     fogged.a = max(pow(fogged.a, 1.7), 0);

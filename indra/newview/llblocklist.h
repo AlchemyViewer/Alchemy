@@ -42,10 +42,12 @@ enum BlockListActionType {NONE, ADD, REMOVE};
  * Each change in LLMuteList leads to rebuilding this list, so
  * it's always in actual state.
  */
-class LLBlockList: public LLFlatListViewEx, public LLMuteListObserver
+class LLBlockList final: public LLFlatListViewEx, public LLMuteListObserver
 {
     LOG_CLASS(LLBlockList);
 public:
+    AL_VIEW_TYPE(LLBlockList, LLFlatListViewEx);
+
     struct Params : public LLInitParam::Block<Params, LLFlatListViewEx::Params>
     {
         Params(){};
@@ -54,13 +56,13 @@ public:
     LLBlockList(const Params& p);
     virtual ~LLBlockList();
 
-    virtual bool        handleRightMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool        handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     LLToggleableMenu*   getContextMenu() const { return mContextMenu.get(); }
     LLBlockedListItem*  getBlockedItem() const;
 
-    virtual void onChange() { }
-    virtual void onChangeDetailed(const LLMute& );
-    virtual void draw();
+    virtual void onChange() override;
+    virtual void onChangeDetailed(const LLMute& ) override;
+    virtual void draw() override;
 
     void setNameFilter(const std::string& filter);
     void sortByName();
@@ -68,6 +70,8 @@ public:
     void refresh();
 
     U32 getMuteListSize() { return mMuteListSize; }
+    void setLoadingItemsMsg(const std::string& msg) { mLoadingItemsMsg = msg; updateNoItemsCommentText(); }
+    void setFailedItemsMsg(const std::string& msg) { mFailedItemsMsg = msg; updateNoItemsCommentText(); }
 
 private:
 
@@ -83,6 +87,7 @@ private:
     bool isMenuItemVisible(const LLSD& userdata);
     void toggleMute(U32 flags);
     void createList();
+    void updateNoItemsCommentText();
 
     BlockListActionType getCurrentMuteListActionType();
 
@@ -100,6 +105,8 @@ private:
     LLMute::EType               mCurItemType;
     U32                         mCurItemFlags;
     std::string                 mPrevNameFilter;
+    std::string                 mLoadingItemsMsg;
+    std::string                 mFailedItemsMsg;
 
 };
 

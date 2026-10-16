@@ -555,21 +555,11 @@ El objeto debe de haber sido borrado o estar fuera de rango ('out of range').</n
 	<notification name="SaveNotecardFailObjectNotFound">No se ha podido guardar la nota porque no se pudo encontrar el objeto o el objeto asociado del inventario.
 El objeto debe de haber sido borrado o estar fuera de rango ('out of range').</notification>
 	<notification name="SaveNotecardFailReason">Al guardar una nota, hubo un problema por: [REASON]. Por favor, vuelve a intentar guardarla más tarde.</notification>
-	<notification name="ScriptCannotUndo">
-		No se han podido deshacer todos los cambios en tu versión del script.
-¿Quieres cargar la última versión guardada en el servidor?
-(**Cuidado** No podrás deshacer esta operación).
-		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="OK"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">No se ha podido guardar el script porque no se pudo encontrar el objeto que incluye.
-El objeto debe de haber sido borrado o estar fuera de rango ('out of range')..</notification>
 	<notification name="StartRegionEmpty">
 		No está definida tu región inicial.
 Por favor, escribe el nombre de la región en el cuadro de Posición inicial o elige para esa posición Mi Base o Mi última posición.
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
-	<notification name="CouldNotStartStopScript">No se ha podido correr o parar el script porque no se pudo encontrar el objeto que incluye.
-El objeto debe de haber sido borrado o estar fuera de rango ('out of range')..</notification>
 	<notification name="CannotDownloadFile">No se ha podido descargar el archivo.</notification>
 	<notification label="" name="MediaFileDownloadUnsupported">
 		Has solicitado descargar un archivo, pero [SECOND_LIFE] no lo admite.
@@ -858,10 +848,6 @@ Deberás reconfigurar el nombre y las opciones de la nueva parcela.
 ¿Unir el terreno?
 		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="OK"/>
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		Esta nota debe guardarse antes de que puedas copiarla o verla. ¿Guardar la nota?
-		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="OK"/>
-	</notification>
 	<notification name="ConfirmItemCopy">
 		¿Copiar este ítem a tu inventario?
 		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="Copiar"/>
@@ -1119,7 +1105,6 @@ Puedes revisar tu conexión a Internet y volver a intentarlo en unos minutos, pu
 		Tu personaje aparecerá en un momento.
 
 Para caminar, usa las teclas del cursor.
-En cualquier momento, puedes pulsar la tecla F1 para conseguir ayuda o para aprender más acerca de [SECOND_LIFE].
 Por favor, elige el avatar masculino o femenino.
 Puedes cambiar más adelante tu elección.
 		<usetemplate name="okcancelbuttons" notext="Mujer" yestext="Varón"/>
@@ -1459,7 +1444,6 @@ excediendo el límite de [LIMIT].
 	<notification label="Mensaje a todo el estado" name="MessageEstate">
 		Escribe un anuncio breve que se enviará a todo el que esté en tu estado.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -1705,7 +1689,6 @@ Se cambiarán miles de regiones, y se provocará un colapso en el espacio del se
 	<notification label="Mensaje a toda la región" name="MessageRegion">
 		Escribe un anuncio breve que se enviará a todo el que esté en esta región.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -1782,7 +1765,6 @@ Serán copiados a tu inventario.
 ¿Estás seguro de querer hacer esta compra?
 Por favor, vuelva a escribir tu contraseña y pulsa OK.
 		<form name="form">
-			<input name="message"/>
 			<button name="ConfirmPurchase" text="OK"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -2053,9 +2035,6 @@ Esto puede influir en tu contraseña.</notification>
 	<notification name="IMAcrossParentEstates">No se pueden enviar mensajes instantáneos entre propiedades principales.</notification>
 	<notification name="TransferInventoryAcrossParentEstates">No se puede transferir el inventario entre propiedades principales.</notification>
 	<notification name="UnableToLoadNotecard">En este momento no se puede cargar la nota.</notification>
-	<notification name="ScriptMissing">El script ha desaparecido de la base de datos.</notification>
-	<notification name="ScriptNoPermissions">No tienes permisos suficientes para ver el script.</notification>
-	<notification name="UnableToLoadScript">No se ha podido cargar el script. Por favor, vuelve a intentarlo.</notification>
 	<notification name="IncompleteInventory">Los contenidos que estás ofreciendo aún no están disponibles. Por favor, vuelve a ofrecerlos en un minuto.</notification>
 	<notification name="CannotModifyProtectedCategories">No puedes modificar categorías que están protegidas.</notification>
 	<notification name="CannotRemoveProtectedCategories">No puedes quitar categorías que están protegidas.</notification>
@@ -2379,12 +2358,10 @@ No autorices el acceso a tu cuenta si no conoces cuál es la razón exacta.
 	<notification name="ScriptDialog">
 		'&lt;nolink&gt;[TITLE]&lt;/nolink&gt;' de [NAME]
 [MESSAGE]
-		<form name="form"/>
 	</notification>
 	<notification name="ScriptDialogGroup">
 		&lt;nolink&gt;[GROUPNAME]&lt;/nolink&gt;'s '&lt;nolink&gt;[TITLE]&lt;/nolink&gt;' 
 [MESSAGE]
-		<form name="form"/>
 	</notification>
 	<notification name="BuyLindenDollarSuccess">¡Gracias por tu pago!
 
@@ -2540,7 +2517,6 @@ Consulta Alchemy.log para más detalles</notification>
 Con los siguientes Residentes:
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="OK"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		Sólo puedes compartir una carpeta en cada momento.
@@ -2807,9 +2783,6 @@ Algunos de los linksets seleccionados no pueden configurarse como '[REQUESTED_TY
 		El objeto que has seleccionado afecta al navmesh. Al cambiarlo a una Ruta flexible se eliminará del navmesh.
 		<usetemplate ignoretext="El objeto que has seleccionado afecta al navmesh. Al cambiarlo a una Ruta flexible se eliminará del navmesh." name="okcancelignore" notext="Cancelar" yestext="OK"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">Parece que no tienes el hardware apropiado para [APP_NAME]. [APP_NAME] requiere una tarjeta gráfica OpenGL que admita texturas múltiples ('multitexture support'). Si la tienes, comprueba que tienes los últimos 'drivers' para tu tarjeta gráfica, así como los últimos parches y 'service packs' para tu sistema operativo.
-
-Si los problemas persisten, por favor, acude a [SUPPORT_SITE].</global>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
 	<global name="UnsupportedGPU">- Tu tarjeta gráfica no cumple los requerimientos mínimos.</global>

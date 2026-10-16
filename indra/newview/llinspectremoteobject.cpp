@@ -29,8 +29,7 @@
 #include "llinspectremoteobject.h"
 #include "llinspect.h"
 #include "llmutelist.h"
-#include "llfloaterblocked.h"
-//#include "llpanelblockedlist.h"
+#include "alfloaterblocked.h"
 #include "llslurl.h"
 #include "lltrans.h"
 #include "llui.h"
@@ -47,16 +46,17 @@
 // Remote Object Inspector, a small information window used to
 // display information about potentially-remote objects. Used
 // to display details about objects sending messages to the user.
-class LLInspectRemoteObject : public LLInspect
+class LLInspectRemoteObject final : public LLInspect
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLInspectRemoteObject, LLInspect);
     LLInspectRemoteObject(const LLSD& object_id);
     virtual ~LLInspectRemoteObject() {};
 
-    /*virtual*/ bool postBuild(void);
-    /*virtual*/ void onOpen(const LLSD& avatar_id);
+    /*virtual*/ bool postBuild(void) override;
+    /*virtual*/ void onOpen(const LLSD& avatar_id) override;
 
     void onClickMap();
     void onClickBlock();
@@ -139,8 +139,7 @@ void LLInspectRemoteObject::onClickBlock()
 {
     LLMute mute(mObjectID, mName, LLMute::OBJECT);
     LLMuteList::getInstance()->add(mute);
-    LLFloaterBlocked::showMuteAndSelect(mute.mID);
-    //LLPanelBlockedList::showPanelAndSelect(mute.mID);
+    ALFloaterBlocked::showMuteAndSelect(mute.mID);
     closeFloater();
 }
 

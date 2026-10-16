@@ -268,7 +268,7 @@
      follows="left"
      font="Monospace"
      name="hex_value"
-     max_length_bytes="6"
+     max_length_bytes="16"
      left_delta="63"
      top_delta="0"
      height="20"

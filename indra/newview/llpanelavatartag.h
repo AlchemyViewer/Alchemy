@@ -41,9 +41,11 @@ class LLTextBox;
  * Contains avatar name
  * Provide methods for setting avatar id, state, muted status and speech power.
  */
-class LLPanelAvatarTag : public LLPanel
+class LLPanelAvatarTag final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelAvatarTag, LLPanel);
+
     LLPanelAvatarTag(const LLUUID& key, const std::string im_time);
     virtual ~LLPanelAvatarTag();
 
@@ -57,12 +59,12 @@ public:
 
     const LLUUID&   getAvatarId() const { return mAvatarId; }
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void draw();
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void draw() override;
 
     virtual boost::signals2::connection setLeftButtonClickCallback(
                                                                    const commit_callback_t& cb);
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
     void onClick();
 private:

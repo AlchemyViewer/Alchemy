@@ -43,6 +43,8 @@
 #include "llviewertexture.h"
 #include "llwindow.h"
 
+#include <boost/signals2/connection.hpp>
+
 class LLComboBox;
 class LLFloaterTexturePicker;
 class LLInventoryItem;
@@ -50,8 +52,8 @@ class LLViewerFetchedTexture;
 class LLFetchedGLTFMaterial;
 
 // used for setting drag & drop callbacks.
-typedef boost::function<bool (LLUICtrl*, LLInventoryItem*)> drag_n_drop_callback;
-typedef boost::function<void (LLInventoryItem*)> texture_selected_callback;
+typedef std::function<bool (LLUICtrl*, LLInventoryItem*)> drag_n_drop_callback;
+typedef std::function<void (LLInventoryItem*)> texture_selected_callback;
 
 // Helper functions for UI that work with picker
 bool get_is_predefined_texture(LLUUID asset_id);
@@ -93,10 +95,12 @@ enum LLPickerSource
 // LLTextureCtrl
 
 
-class LLTextureCtrl
+class LLTextureCtrl final
 : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLTextureCtrl, LLUICtrl);
+
     typedef enum e_texture_pick_op
     {
         TEXTURE_CHANGE,
@@ -303,14 +307,16 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // LLFloaterTexturePicker
-typedef boost::function<void(LLTextureCtrl::ETexturePickOp op, LLPickerSource source, const LLUUID& asset_id, const LLUUID& inventory_id, const LLUUID& tracking_id)> floater_commit_callback;
-typedef boost::function<void()> floater_close_callback;
-typedef boost::function<void(const LLUUID& asset_id)> set_image_asset_id_callback;
-typedef boost::function<void(LLPointer<LLViewerTexture> texture)> set_on_update_image_stats_callback;
+typedef std::function<void(LLTextureCtrl::ETexturePickOp op, LLPickerSource source, const LLUUID& asset_id, const LLUUID& inventory_id, const LLUUID& tracking_id)> floater_commit_callback;
+typedef std::function<void()> floater_close_callback;
+typedef std::function<void(const LLUUID& asset_id)> set_image_asset_id_callback;
+typedef std::function<void(LLPointer<LLViewerTexture> texture)> set_on_update_image_stats_callback;
 
-class LLFloaterTexturePicker : public LLFloater
+class LLFloaterTexturePicker final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterTexturePicker, LLFloater);
+
     LLFloaterTexturePicker(
         LLView* owner,
         LLUUID image_asset_id,
@@ -332,14 +338,14 @@ public:
     /*virtual*/ bool    handleDragAndDrop(S32 x, S32 y, MASK mask,
         bool drop, EDragAndDropType cargo_type, void *cargo_data,
         EAcceptance *accept,
-        std::string& tooltip_msg);
-    /*virtual*/ void    draw();
-    /*virtual*/ bool    handleKeyHere(KEY key, MASK mask);
+        std::string& tooltip_msg) override;
+    /*virtual*/ void    draw() override;
+    /*virtual*/ bool    handleKeyHere(KEY key, MASK mask) override;
 
     // LLFloater overrides
-    /*virtual*/ bool    postBuild();
-    /*virtual*/ void    onOpen(const LLSD& key);
-    /*virtual*/ void    onClose(bool app_settings);
+    /*virtual*/ bool    postBuild() override;
+    /*virtual*/ void    onOpen(const LLSD& key) override;
+    /*virtual*/ void    onClose(bool app_settings) override;
 
     // New functions
     void setImageID(const LLUUID& image_asset_id, bool set_selection = true);
@@ -382,7 +388,7 @@ public:
     static void     onApplyUUID(void* userdata);
     void            onSelectionChange(const std::deque<LLFolderViewItem*> &items, bool user_action);
     static void     onApplyImmediateCheck(LLUICtrl* ctrl, void* userdata);
-    void            onTextureSelect(const LLTextureEntry& te);
+    void            onTextureSelect(bool success, LLViewerObject* obj, S32 te_index, const LLTextureEntry& te);
 
     static void     onModeSelect(LLUICtrl* ctrl, void *userdata);
     static void     onBtnAdd(void* userdata);
@@ -403,6 +409,7 @@ public:
 protected:
     void changeMode();
     void refreshLocalList();
+    void onLocalAssetsChanged(); // refresh local list, then drop a now-deleted local selection
     void refreshInventoryFilter();
     void setImageIDFromItem(const LLInventoryItem* itemp, bool set_selection = true);
     LLViewerInventoryItem* findInvItem(const LLUUID& asset_id, bool copyable_only, bool ignore_library = false) const;
@@ -469,6 +476,12 @@ private:
 
     bool mBakeTextureEnabled;
     bool mLocalTextureEnabled;
+
+    // Keep the Local tab live as local units change anywhere -- the Local Assets
+    // floater, a mesh import, live-reload, or another picker -- not just after this
+    // picker's own add/remove. Scoped so they drop when the floater is destroyed.
+    boost::signals2::scoped_connection mLocalBitmapsChangedConn;
+    boost::signals2::scoped_connection mLocalMaterialsChangedConn;
 
     static S32 sLastPickerMode;
 };

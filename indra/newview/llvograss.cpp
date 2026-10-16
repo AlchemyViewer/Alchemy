@@ -70,7 +70,7 @@ LLVOGrass::LLVOGrass(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regi
 :   LLAlphaObject(id, pcode, regionp)
 {
     mPatch               = NULL;
-    mLastPatchUpdateTime = 0;
+    mLastPatchUpdateCount = 0;
     mGrassVel.clearVec();
     mGrassBend.clearVec();
     mbCanSelect          = true;
@@ -134,6 +134,7 @@ void LLVOGrass::initClass()
         }
         F32 F32_val;
         LLUUID id;
+        std::string name;
 
         bool success{ true };
 
@@ -166,6 +167,10 @@ void LLVOGrass::initClass()
         success &= grass_def->getFastAttributeF32(blade_sizey_string, F32_val);
         newGrass->mBladeSizeY = F32_val;
 
+        static LLStdStringHandle name_string = LLXmlTree::addAttributeString("name");
+        grass_def->getFastAttributeString(name_string, name);
+        newGrass->mName = std::move(name);
+
         if (sSpeciesTable.count(species))
         {
             LL_INFOS() << "Grass species " << species << " already defined! Duplicate discarded." << LL_ENDL;
@@ -181,9 +186,6 @@ void LLVOGrass::initClass()
 
         if (!success)
         {
-            std::string name;
-            static LLStdStringHandle name_string = LLXmlTree::addAttributeString("name");
-            grass_def->getFastAttributeString(name_string, name);
             LL_WARNS() << "Incomplete definition of grass " << name << LL_ENDL;
         }
     }
@@ -211,7 +213,8 @@ void LLVOGrass::initClass()
     {
         if (1)   //(i%2 == 0)           Uncomment for X blading
         {
-            F32 u = sqrt(-2.0f * log(ll_frand()));
+            // Box-Muller, over (0, 1]: log(0) would put the blade at infinity.
+            F32 u = sqrt(-2.0f * log(1.f - ll_frand()));
             F32 v = 2.0f * F_PI * ll_frand();
 
             x = u * sin(v) * GRASS_DISTRIBUTION_SD;
@@ -293,7 +296,7 @@ void LLVOGrass::idleUpdate(LLAgent &agent, const F64 &time)
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
         return;
     }
-    if (mPatch && (mLastPatchUpdateTime != mPatch->getLastUpdateTime()))
+    if (mPatch && (mLastPatchUpdateCount != mPatch->getUpdateCount()))
     {
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
     }
@@ -401,11 +404,9 @@ LLDrawable* LLVOGrass::createDrawable(LLPipeline *pipeline)
     return mDrawable;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_GRASS("Update Grass");
-
 bool LLVOGrass::updateGeometry(LLDrawable *drawable)
 {
-    LL_RECORD_BLOCK_TIME(FTM_UPDATE_GRASS);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
 
     dirtySpatialGroup();
 
@@ -477,7 +478,7 @@ void LLVOGrass::getGeometry(S32 idx,
 
     mPatch = mRegionp->getLand().resolvePatchRegion(getPositionRegion());
     if (mPatch)
-        mLastPatchUpdateTime = mPatch->getLastUpdateTime();
+        mLastPatchUpdateCount = mPatch->getUpdateCount();
 
     LLVector3 position;
     // Create random blades of grass with gaussian distribution
@@ -736,7 +737,7 @@ void LLGrassPartition::getGeometry(LLSpatialGroup* group)
 void LLVOGrass::updateDrawable(bool force_damped)
 {
     // Force an immediate rebuild on any update
-    if (mDrawable.notNull())
+    if (mDrawable.notNull() && mDrawable->getVObj())
     {
         mDrawable->updateXform(true);
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);

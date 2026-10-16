@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,30 +29,34 @@ void LLUIImage::draw(S32 x, S32 y, const LLColor4& color) const
     draw(x, y, getWidth(), getHeight(), color);
 }
 
+void LLUIImage::draw(S32 x, S32 y, S32 width, S32 height, const LLColor4& color, bool solid_color) const
+{
+    if (sEnableDisplayListsCollection)
+    {
+        drawCached(x, y, width, height, color, solid_color);
+    }
+    else
+    {
+        gl_draw_scaled_image_with_border(
+            x, y,
+            width, height,
+            mImage,
+            color,
+            solid_color,
+            mClipRegion,
+            mScaleRegion,
+            mScaleStyle == SCALE_INNER);
+    }
+}
+
 void LLUIImage::draw(S32 x, S32 y, S32 width, S32 height, const LLColor4& color) const
 {
-    gl_draw_scaled_image_with_border(
-        x, y,
-        width, height,
-        mImage,
-        color,
-        false,
-        mClipRegion,
-        mScaleRegion,
-        mScaleStyle == SCALE_INNER);
+    draw(x, y, width, height, color, false);
 }
 
 void LLUIImage::drawSolid(S32 x, S32 y, S32 width, S32 height, const LLColor4& color) const
 {
-    gl_draw_scaled_image_with_border(
-        x, y,
-        width, height,
-        mImage,
-        color,
-        true,
-        mClipRegion,
-        mScaleRegion,
-        mScaleStyle == SCALE_INNER);
+    draw(x, y, width, height, color, true);
 }
 
 void LLUIImage::drawBorder(S32 x, S32 y, S32 width, S32 height, const LLColor4& color, S32 border_width) const

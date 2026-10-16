@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<!-- What a comparison copies (ALDiffView), under the copy button of its
+     bar: the lines of the change the caret is in, on the side in front;
+     or the whole comparison as a unified diff, as diff -u writes one. -->
+<context_menu
+ layout="topleft"
+ name="menu_diff_copy">
+    <menu_item_call
+     label="Copy This Change"
+     name="copy_change">
+        <menu_item_call.on_click
+         function="DiffCopy.Do"
+         parameter="change" />
+        <menu_item_call.on_enable
+         function="DiffCopy.Enabled"
+         parameter="change" />
+    </menu_item_call>
+    <menu_item_call
+     label="Copy as Unified Diff"
+     name="copy_diff">
+        <menu_item_call.on_click
+         function="DiffCopy.Do"
+         parameter="diff" />
+        <menu_item_call.on_enable
+         function="DiffCopy.Enabled"
+         parameter="diff" />
+    </menu_item_call>
+</context_menu>

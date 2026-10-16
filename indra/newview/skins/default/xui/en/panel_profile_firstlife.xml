@@ -22,7 +22,6 @@
     <profile_image
      name="real_world_pic"
      image_name="Generic_Person_Large"
-     show_loading="false"
      follows="top|left"
      interactable="true"
      layout="topleft"
@@ -82,6 +81,7 @@
      parse_urls="true"
      word_wrap="true"
      show_emoji_helper="true"
+     use_color="true"
     />
     <button
      name="fl_save_changes"

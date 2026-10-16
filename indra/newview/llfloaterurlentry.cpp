@@ -105,7 +105,7 @@ void LLFloaterURLEntry::buildURLHistory()
 
 void LLFloaterURLEntry::headerFetchComplete(S32 status, const std::string& mime_type)
 {
-    LLPanelLandMedia* panel_media = dynamic_cast<LLPanelLandMedia*>(mPanelLandMediaHandle.get());
+    LLPanelLandMedia* panel_media = ALViewType::as<LLPanelLandMedia>(mPanelLandMediaHandle.get());
     if (panel_media)
     {
         // status is ignored for now -- error = "none/none"
@@ -201,10 +201,11 @@ void LLFloaterURLEntry::getMediaTypeCoro(std::string url, LLHandle<LLFloater> pa
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("getMediaTypeCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMediaTypeCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     httpOpts->setFollowRedirects(true);
     httpOpts->setHeadersOnly(true);
@@ -240,6 +241,16 @@ void LLFloaterURLEntry::getMediaTypeCoro(std::string url, LLHandle<LLFloater> pa
         if (!mimeType.empty())
         {
             resolvedMimeType = mimeType;
+        }
+    }
+    else if (resultHeaders.has(HTTP_IN_HEADER_X_CONTENT_TYPE_OPTIONS))
+    {
+        const std::string& val = resultHeaders[HTTP_IN_HEADER_X_CONTENT_TYPE_OPTIONS];
+        if (val == HTTP_NOSNIFF)
+        {
+            // Doesn't permit 'sniffing' mime type, default to either html or plain
+            // If this doesn't work user will have to choose something manually.
+            resolvedMimeType = HTTP_CONTENT_TEXT_HTML;
         }
     }
 

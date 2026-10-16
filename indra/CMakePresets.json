@@ -1,0 +1,9 @@
+{
+  "version": 10,
+  "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
+  "include": [
+    "cmake/presets/vs2026.json",
+    "cmake/presets/ninja.json",
+    "cmake/presets/xcode.json"
+  ]
+}

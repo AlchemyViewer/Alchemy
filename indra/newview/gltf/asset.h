@@ -27,16 +27,16 @@
  */
 
 #include "llvertexbuffer.h"
+#include "aluniformbuffer.h"
 #include "llvolumeoctree.h"
 #include "accessor.h"
 #include "primitive.h"
 #include "animation.h"
-#include "boost/json.hpp"
 #include "common.h"
 #include "../llviewertexture.h"
 #include "llglslshader.h"
 
-extern F32SecondsImplicit       gFrameTimeSeconds;
+extern F64SecondsImplicit       gFrameTimeSeconds;
 
 // wingdi defines OPAQUE, which conflicts with our enum
 #if defined(OPAQUE)
@@ -71,7 +71,7 @@ namespace LL
             void getPacked(vec4* dst) const;
 
             const TextureTransform& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class TextureInfo
@@ -90,7 +90,7 @@ namespace LL
             S32 getTexCoord() const;
 
             const TextureInfo& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class NormalTextureInfo : public TextureInfo
@@ -99,7 +99,7 @@ namespace LL
             F32 mScale = 1.0f;
 
             const NormalTextureInfo& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class OcclusionTextureInfo : public TextureInfo
@@ -108,7 +108,7 @@ namespace LL
             F32 mStrength = 1.0f;
 
             const OcclusionTextureInfo& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class Material
@@ -119,7 +119,7 @@ namespace LL
             {
             public:
                 const Unlit& operator=(const Value& src);
-                void serialize(boost::json::object& dst) const;
+                void serialize(JsonWriter& dst) const;
             };
 
             enum class AlphaMode
@@ -142,7 +142,7 @@ namespace LL
                 bool operator==(const PbrMetallicRoughness& rhs) const;
                 bool operator!=(const PbrMetallicRoughness& rhs) const;
                 const PbrMetallicRoughness& operator=(const Value& src);
-                void serialize(boost::json::object& dst) const;
+                void serialize(JsonWriter& dst) const;
             };
 
 
@@ -161,7 +161,7 @@ namespace LL
             bool isMultiUV() const;
 
             const Material& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class Mesh
@@ -172,7 +172,7 @@ namespace LL
             std::string mName;
 
             const Mesh& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
 
             bool prep(Asset& asset);
         };
@@ -180,12 +180,12 @@ namespace LL
         class Node
         {
         public:
-            mat4 mMatrix = glm::identity<mat4>(); //local transform
+            mat4 mMatrix = LLMatrix4a::identity(); //local transform
             mat4 mAssetMatrix; //transform from local to asset space
             mat4 mAssetMatrixInv; //transform from asset to local space
 
-            vec3  mTranslation = vec3(0,0,0);
-            quat mRotation = glm::identity<quat>();
+            vec3  mTranslation = vec3(0.f, 0.f, 0.f);
+            quat mRotation = LLQuaternion2::identity();
             vec3 mScale = vec3(1.f,1.f,1.f);
 
             // if true, mMatrix is valid and up to date
@@ -205,7 +205,7 @@ namespace LL
             std::string mName;
 
             const Node& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
 
             // update mAssetMatrix and mAssetMatrixInv
             void updateTransforms(Asset& asset, const mat4& parentMatrix);
@@ -232,12 +232,11 @@ namespace LL
         class Skin
         {
         public:
-            ~Skin();
-
             S32 mInverseBindMatrices = INVALID_INDEX;
             S32 mSkeleton = INVALID_INDEX;
 
-            U32 mUBO = 0;
+            // joint matrix-palette constant block (deleted with the Skin via RAII)
+            ALUniformBuffer mUBO;
             std::vector<S32> mJoints;
             std::string mName;
             std::vector<mat4> mInverseBindMatricesData;
@@ -246,7 +245,7 @@ namespace LL
             void uploadMatrixPalette(Asset& asset);
 
             const Skin& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class Scene
@@ -256,7 +255,7 @@ namespace LL
             std::string mName;
 
             const Scene& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
 
             void updateTransforms(Asset& asset);
             void updateRenderTransforms(Asset& asset, const mat4& modelview);
@@ -270,7 +269,7 @@ namespace LL
             std::string mName;
 
             const Texture& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class Sampler
@@ -283,7 +282,7 @@ namespace LL
             std::string mName;
 
             const Sampler& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         // Image is for images that we want to load for the given asset.  This acts as an interface into the viewer's texture pipe.
@@ -307,7 +306,7 @@ namespace LL
             LLPointer<LLViewerFetchedTexture> mTexture;
 
             const Image& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
 
             // save image to disk
             // may remove image data from bufferviews and convert to
@@ -320,32 +319,9 @@ namespace LL
             void clearData(Asset& asset);
 
             bool prep(Asset& asset, bool loadIntoVRAM);
+        private:
+            bool prepImpl(Asset& asset, const LLUUID& id);
         };
-
-        // Render Batch -- vertex buffer and list of primitives to render using
-        // said vertex buffer
-        class RenderBatch
-        {
-        public:
-            struct PrimitiveData
-            {
-                S32 mPrimitiveIndex = INVALID_INDEX;
-                S32 mNodeIndex = INVALID_INDEX;
-            };
-
-            LLPointer<LLVertexBuffer> mVertexBuffer;
-            std::vector<PrimitiveData> mPrimitives;
-        };
-
-        class RenderData
-        {
-        public:
-            // list of render batches
-            // indexed by [material index + 1](0 is reserved for default material)
-            // there should be exactly one render batch per material per variant
-            std::vector<RenderBatch> mBatches[LLGLSLShader::NUM_GLTF_VARIANTS];
-        };
-
 
         // C++ representation of a GLTF Asset
         class Asset
@@ -374,7 +350,8 @@ namespace LL
             std::string mCopyright;
 
             S32 mScene = INVALID_INDEX;
-            Value mExtras;
+            // "asset.extras" subtree preserved as minified JSON text
+            std::string mExtras;
 
             U32 mPendingBuffers = 0;
 
@@ -382,18 +359,13 @@ namespace LL
             std::string mFilename;
 
             // the last time update() was called according to gFrameTimeSeconds
-            F32 mLastUpdateTime = gFrameTimeSeconds;
-
-            // data used for rendering
-            // 0 - single sided
-            // 1 - double sided
-            RenderData mRenderData[2];
+            F64 mLastUpdateTime = gFrameTimeSeconds;
 
             // UBO for storing node transforms
-            U32 mNodesUBO = 0;
+            ALUniformBuffer mNodesUBO;
 
             // UBO for storing material data
-            U32 mMaterialsUBO = 0;
+            ALUniformBuffer mMaterialsUBO;
             bool mLoadIntoVRAM = false;
 
             std::vector<std::string> mUnsupportedExtensions;
@@ -443,7 +415,7 @@ namespace LL
             bool loadBinary(const std::string& data, bool loadIntoVRAM);
 
             const Asset& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
 
             // save the asset to the given .gltf file
             // saves images and bins alongside the gltf file

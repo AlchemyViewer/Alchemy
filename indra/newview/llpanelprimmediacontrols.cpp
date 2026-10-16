@@ -63,11 +63,6 @@
 #include "llfloatertools.h"  // to enable hide if build tools are up
 #include "llvector4a.h"
 
-#include <glm/gtx/transform2.hpp>
-
-// Functions pulled from llviewerdisplay.cpp
-bool get_hud_matrices(glm::mat4 &proj, glm::mat4 &model);
-
 // Warning: make sure these two match!
 const LLPanelPrimMediaControls::EZoomLevel LLPanelPrimMediaControls::kZoomLevels[] = { ZOOM_NONE, ZOOM_MEDIUM };
 const int LLPanelPrimMediaControls::kNumZoomLevels = 2;
@@ -645,26 +640,26 @@ void LLPanelPrimMediaControls::updateShape()
         vert_it = vect_face.begin();
         vert_end = vect_face.end();
 
-        glm::mat4 mat = glm::identity<glm::mat4>();
+        LLMatrix4a mat = LLMatrix4a::identity();
         if (!is_hud)
         {
-            mat = get_current_projection() * get_current_modelview();
+            mat.setMul(LLViewerCamera::getCurrent().getModelview(), LLViewerCamera::getCurrent().getProjection());
         }
         else {
-            glm::mat4 proj, modelview;
+            LLMatrix4a proj, modelview;
             if (get_hud_matrices(proj, modelview))
-                mat = proj * modelview;
+                mat.setMul(modelview, proj);
         }
         LLVector3 min = LLVector3(1,1,1);
         LLVector3 max = LLVector3(-1,-1,-1);
         for(; vert_it != vert_end; ++vert_it)
         {
             // project silhouette vertices into screen space
-            glm::vec3 screen_vert(*vert_it);
-            screen_vert = mul_mat4_vec3(mat, screen_vert);
+            LLVector4a screen_vert;
+            mat.perspectiveTransform(LLVector4a(vert_it->mV[0], vert_it->mV[1], vert_it->mV[2], 1.f), screen_vert);
 
             // add to screenspace bounding box
-            update_min_max(min, max, LLVector3(screen_vert));
+            update_min_max(min, max, LLVector3(screen_vert.getF32ptr()));
         }
 
         // convert screenspace bbox to pixels (in screen coords)
@@ -833,7 +828,7 @@ void LLPanelPrimMediaControls::draw()
     }
 }
 
-bool LLPanelPrimMediaControls::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLPanelPrimMediaControls::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     mInactivityTimer.start();
     bool res = false;
@@ -843,13 +838,13 @@ bool LLPanelPrimMediaControls::handleScrollWheel(S32 x, S32 y, S32 clicks)
     if (LLViewerMediaFocus::getInstance()->isHoveringOverFocused())
     {
         // either let toolpie handle this or expose mHoverPick.mUVCoords in some way
-        res = LLToolPie::getInstance()->handleScrollWheel(x, y, clicks);
+        res = LLToolPie::getInstance()->handleScrollWheel(x, y, delta);
     }
 
     return res;
 }
 
-bool LLPanelPrimMediaControls::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLPanelPrimMediaControls::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     mInactivityTimer.start();
     bool res = false;
@@ -857,7 +852,7 @@ bool LLPanelPrimMediaControls::handleScrollHWheel(S32 x, S32 y, S32 clicks)
     if (LLViewerMediaFocus::getInstance()->isHoveringOverFocused())
     {
         // either let toolpie handle this or expose mHoverPick.mUVCoords in some way
-        res = LLToolPie::getInstance()->handleScrollHWheel(x, y, clicks);
+        res = LLToolPie::getInstance()->handleScrollHWheel(x, y, delta);
     }
 
     return res;

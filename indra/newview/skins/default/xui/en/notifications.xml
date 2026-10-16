@@ -193,11 +193,21 @@ No tutorial is currently available.
    icon="alertmodal.tga"
    name="BadInstallation"
    type="alertmodal">
- An error occurred while updating [APP_NAME].  Please [http://get.secondlife.com download the latest version] of the Viewer.
+ An error occurred while updating [APP_NAME].  Please [https://www.alchemyviewer.org download the latest version] of the Viewer.
     <tag>fail</tag>
     <usetemplate
      name="okbutton"
      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="FoundLegacyNsisInstallation"
+   type="alertmodal">
+      [APP_NAME] found an installation of an older version [VERSION]. To uninstall the older version, please follow [https://community.secondlife.com/knowledgebase/english/how-to-uninstall-and-reinstall-second-life-r524 this manual].
+      <usetemplate
+       name="okbutton"
+       yestext="OK"/>
   </notification>
 
   <notification
@@ -412,6 +422,17 @@ Initialization with the Marketplace failed because of a system or network error.
         <usetemplate
         name="okbutton"
         yestext="OK"/>
+    </notification>
+
+    <notification
+        icon="alertmodal.tga"
+        name="CannotPasteFolderIntoSelf"
+        type="alertmodal">
+        You cannot paste a folder into itself or into one of its subfolders.
+        <tag>fail</tag>
+        <usetemplate
+          name="okbutton"
+          yestext="OK"/>
     </notification>
 
     <notification
@@ -651,7 +672,7 @@ Save all changes to clothing/body parts?
    icon="alertmodal.tga"
    name="AllowMultipleViewers"
    type="alertmodal">
-    Running multiple [APP_NAME] viewers is not supported. It can lead to texture cache collisions, corruption and degraded visuals and performance.
+    Running multiple Second Life viewers is not supported. It can lead to texture cache collisions, corruption and degraded visuals and performance.
     <usetemplate
      name="okbutton"
      yestext="OK"/>
@@ -1677,7 +1698,7 @@ Would you like to reset modified colors back to their defaults?
    icon="alertmodal.tga"
    name="ChangeLanguage"
    type="alertmodal">
-Changing language will take effect after you restart [APP_NAME].
+Changing language or time format will take effect after you restart [APP_NAME].
   </notification>
 
   <notification
@@ -1706,6 +1727,465 @@ Save Changes?
      name="yesnocancelbuttons"
      notext="Don&apos;t Save"
      yestext="Save"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSaveChanges"
+   type="alertmodal">
+Save changes to &quot;[NAME]&quot;?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Don&apos;t Save"
+     yestext="Save"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSaveChangesMany"
+   type="alertmodal">
+[COUNT] scripts have unsaved changes. Save them before closing?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Don&apos;t Save"
+     yestext="Save All"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="New Item"
+   name="ScriptStudioNewItem"
+   type="alertmodal">
+Enter a name for the new [KIND]:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="name" type="text" value="[NAME]" />
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Create"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="Description"
+   name="ScriptStudioDescribe"
+   type="alertmodal">
+Enter a description for [NAME]:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="description" type="text" value="[DESCRIPTION]" max_length_chars="127" />
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Save"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="Save Theme"
+   name="ScriptStudioSaveTheme"
+   type="alertmodal">
+Enter a name to save the current colors as a theme:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="name" type="text" value="[NAME]" />
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Save"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioThemeNotSaved"
+   type="alertmodal">
+Could not save the theme to [PATH].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioThemeNameShipped"
+   type="alertmodal">
+A built-in theme is already named &quot;[NAME]&quot;. Choose another name.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNone"
+   type="alertmodal">
+You have no snippets of your own to save. Make one with New, or Copy a built-in one, first.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsTooLarge"
+   type="alertmodal">
+Your snippets come to [SIZE] bytes, and a notecard holds [LIMIT]. Delete some, or keep them with Edit as XML instead.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNotSaved"
+   type="alertmodal">
+Your snippets could not be saved to the notecard &quot;[NAME]&quot;: [REASON].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ScriptStudioSnippetsSaved"
+   log_to_chat="false"
+   type="notifytip">
+Saved [COUNT] snippets to the notecard &quot;[NAME]&quot; in your Notecards folder.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNotRead"
+   type="alertmodal">
+The notecard &quot;[NAME]&quot; could not be read: [REASON].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNotSnippets"
+   type="alertmodal">
+The notecard &quot;[NAME]&quot; does not hold snippets. Save to Inventory on the Snippets tab makes a notecard that does.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ScriptStudioSnippetsAdded"
+   log_to_chat="false"
+   type="notifytip">
+Snippets from &quot;[NAME]&quot;: [ADDED] added, [RENAMED] added under a numbered name as theirs was taken, [SKIPPED] you had already.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioDeleteItems"
+   type="alertmodal">
+[QUESTION]
+    <tag>confirm</tag>
+    <form name="form">
+      <ignore name="ignore"
+       session_only="true"
+       text="Confirm before deleting items from an object in Script Studio"/>
+      <button
+       default="true"
+       index="0"
+       name="Delete"
+       text="Delete"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioQuitUnsaved"
+   type="alertmodal">
+&quot;[NAME]&quot; has unsaved changes. Save them, keep them to reopen next time, or discard them?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Save"
+       text="Save"/>
+      <button
+       index="1"
+       name="Keep"
+       text="Keep for Next Time"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Don&apos;t Save"/>
+      <button
+       index="3"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioQuitUnsavedMany"
+   type="alertmodal">
+[COUNT] scripts and notecards have unsaved changes. Save them, keep them to reopen next time, or discard them?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Save"
+       text="Save"/>
+      <button
+       index="1"
+       name="Keep"
+       text="Keep for Next Time"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Don&apos;t Save"/>
+      <button
+       index="3"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioKeptOne"
+   type="alertmodal">
+You kept unsaved changes to [NAMES] for next time. They reopen when Script Studio opens. Open it now?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Script Studio"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioKept"
+   type="alertmodal">
+You kept unsaved changes to [COUNT] scripts and notecards for next time: [NAMES]. They reopen when Script Studio opens. Open it now?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Script Studio"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+    </form>
+  </notification>
+
+
+  <notification
+   icon="alertmodal.tga"
+   name="RecoveredUnsavedOne"
+   type="alertmodal">
+Unsaved changes to [NAMES] were kept when the viewer last closed. Open them to review and save, or discard them. Until then, they are in Script Studio's File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Them"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Discard Them"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="RecoveredUnsaved"
+   type="alertmodal">
+Unsaved changes to [COUNT] scripts and notecards were kept when the viewer last closed: [NAMES]. Open them to review and save, or discard them. Until then, they are in Script Studio's File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Them"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Discard Them"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioDeleteItemOpen"
+   type="alertmodal">
+Delete &quot;[NAME]&quot; from the object? This cannot be undone. Its unsaved changes are kept for a week in File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Delete"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioDeleteItemsOpen"
+   type="alertmodal">
+Delete [COUNT] items from their objects? This cannot be undone. Unsaved changes in open items are kept for a week in File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Delete"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioReplaceAll"
+   type="alertmodal">
+Replace [PLACES] in [SCRIPTS] with &quot;[WITH]&quot;? You can undo each one's changes in one step. Those not open will open with the changes unsaved.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Replace"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioFixAll"
+   type="alertmodal">
+Apply [FIXES] in &quot;[NAME]&quot;, one per problem, such as &quot;[EXAMPLE]&quot;? You can undo them in one step, or preview them first.[LEFT]
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Preview"
+     yestext="Fix"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioPrefsChanged"
+   type="alertmodal">
+Keep the changes made to Script Studio&apos;s preferences?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Discard"
+     yestext="Keep"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioRevert"
+   type="alertmodal">
+Revert &quot;[NAME]&quot; to its last saved version? Your unsaved changes are kept for a week in File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Revert"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioResetScripts"
+   type="alertmodal">
+Reset [COUNT] scripts? Each one clears its variables and starts again from state_entry.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Reset"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioStopScripts"
+   type="alertmodal">
+Stop [COUNT] scripts? They stay stopped until you start them again.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Stop"/>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ScriptStudioMasters"
+   log_to_chat="false"
+   type="notifytip">
+[MESSAGE]
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioMastersSendUsers"
+   type="alertmodal">
+[FILES] changed on disk. That changes [COUNT] scripts in the world linked to files, [PLACES]. Send them now? Scripts not sent wait for Send from Files.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Don't Send"
+     yestext="Send All"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioFileChanged"
+   type="alertmodal">
+[NAME] changed on disk, and this tab has unsaved changes. Reload it from disk, or keep your changes?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Keep Mine"
+     yestext="Read from Disk"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioLinkUnsaved"
+   type="alertmodal">
+&quot;[NAME]&quot; has unsaved changes, and linking it to [FILE] makes the file what it holds. Write your changes to the file, replacing everything in it? Or discard them and take the file as it is? Discarded changes are kept for a week in File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Discard Changes"
+     yestext="Write to File"/>
   </notification>
 
   <notification
@@ -1786,28 +2266,7 @@ There was a problem saving a notecard due to the following reason: [REASON].  Pl
 <tag>fail</tag>
   </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="ScriptCannotUndo"
-   type="alertmodal">
-Could not undo all changes in your version of the script.
-Would you like to load the server&apos;s last saved version?
-(**Warning** This operation cannot be undone.)
-    <tag>confirm</tag>
-    <usetemplate
-     name="okcancelbuttons"
-     notext="Cancel"
-     yestext="OK"/>
-  </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="SaveScriptFailObjectNotFound"
-   type="alertmodal">
-Could not save the script because the object it is in could not be found.
-The object may be out of range or may have been deleted.
-<tag>fail</tag>
-  </notification>
 
   <notification
    icon="alertmodal.tga"
@@ -1821,14 +2280,6 @@ Please type the Region name in Start Location box or choose My Last Location or 
      yestext="OK"/>
   </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="CouldNotStartStopScript"
-   type="alertmodal">
-Could not start or stop the script because the object it is on could not be found.
-The object may be out of range or may have been deleted.
-  <tag>fail</tag>
-  </notification>
 
   <notification
    icon="alertmodal.tga"
@@ -1844,7 +2295,7 @@ The object may be out of range or may have been deleted.
   type="alert">
     <unique/>
     <tag>confirm</tag>
-    You have requested a file download, which is not supported within [APP_NAME].
+    You have requested a file download, which is not supported within [SECOND_LIFE].
     <usetemplate
      ignoretext="Warn about unsupported file downloads"
      name="okignore"
@@ -1910,6 +2361,23 @@ This is often the case with new hardware that hasn&apos;t been tested yet with [
        text="My graphics card could not be identified"/>
     </form>
   <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="SoftwareRenderer"
+   type="alertmodal">
+[APP_NAME] is drawing with [RENDERER], which renders on the CPU instead of the graphics card, so it will be very slow.
+
+This usually means the graphics driver did not load. Common causes:
+- NVIDIA&apos;s driver without its EGL platform library: egl-wayland on Wayland, egl-x11 on X11.
+- No Mesa driver installed for the graphics card, or no permission to open /dev/dri.
+- A virtual machine or container without access to the GPU, or WSL without its d3d12 driver.
+    <tag>fail</tag>
+    <usetemplate
+     ignoretext="Graphics are being drawn on the CPU"
+     name="okignore"
+     yestext="OK"/>
   </notification>
 
   <notification
@@ -2348,6 +2816,25 @@ Couldn&apos;t open uploaded sound file for reading:
 
   <notification
    icon="alertmodal.tga"
+   name="ModelUploaderMissingPhysicsApple"
+   type="alertmodal">
+Model upload is not yet available on Apple Silicon, but will be supported in an upcoming release.
+   
+Workaround: Right-click the Second Life app in Finder, select
+&apos;Get Info&apos;, then check &apos;Open using Rosetta&apos;
+  <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ModelUploaderMissingPhysics"
+   type="alertmodal">
+Physics library is not present, some of the model uploader's functionality might not work or might not work correctly.
+  <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="SoundFileNotRIFF"
    type="alertmodal">
 File does not appear to be a RIFF WAVE file:
@@ -2413,7 +2900,7 @@ Wrong chunk size in WAV file:
    icon="alertmodal.tga"
    name="SoundFileInvalidTooLong"
    type="alertmodal">
-Audio file is too long (60 second maximum):
+Audio file is too long (30 second maximum):
 [FILE]
   <tag>fail</tag>
   </notification>
@@ -2556,6 +3043,17 @@ You already have a landmark for this location.
   </notification>
 
   <notification
+   icon="alert.tga"
+   name="LandmarkLocationUnknown"
+   type="alert">
+Viewer wasn't able to get region's location. Region might be temporarily unavailable, was removed or landmark failed to load.
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  <tag>fail</tag>
+  </notification>
+
+  <notification
    icon="alertmodal.tga"
    name="CannotCreateLandmarkNotOwner"
    type="alertmodal">
@@ -2637,7 +3135,7 @@ Select objects with scripts.
 	
   <notification
    icon="alertmodal.tga"
-   name="CannotResetSelectObjectsNoPermission"
+   name="CannotDeleteSelectObjectsNoPermission"
    type="alertmodal">
 Not able to perform &apos;delete&apos;.
 
@@ -2701,9 +3199,9 @@ Your search terms were too short so no search was performed.
   <!-- Generic Teleport failure modes - strings will be inserted from
        teleport_strings.xml if available. -->
   <notification
-   icon="notify.tga"
+   icon="alertmodal.tga"
    name="CouldNotTeleportReason"
-   type="notify">
+   type="alertmodal">
     <unique/>
 Teleport failed.
 [REASON]
@@ -3133,17 +3631,6 @@ Join land?
      yestext="OK"/>
   </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="ConfirmNotecardSave"
-   type="alertmodal">
-This notecard needs to be saved before the item can be copied or viewed. Save notecard?
-    <tag>confirm</tag>
-    <usetemplate
-     name="okcancelbuttons"
-     notext="Cancel"
-     yestext="OK"/>
-  </notification>
 
   <notification
    icon="alertmodal.tga"
@@ -4039,7 +4526,6 @@ Local Data you are deleting is shared between multiple grids, are you sure you w
 Your character will appear in a moment.
 
 Use arrow keys to walk.
-Press the F1 key at any time for help or to learn more about [SECOND_LIFE].
 Please choose the male or female avatar. You can change your mind later.
     <usetemplate
      name="okcancelbuttons"
@@ -4522,6 +5008,14 @@ Click OK to download and install.
 
   <notification
    icon="alertmodal.tga"
+   name="DownloadingUpdate"
+   type="alertmodal">
+Downloading update [VERSION]...
+The viewer will restart once the download is complete.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="OptionalUpdateReady"
    type="alertmodal">
 Version [VERSION] has been downloaded and is ready to install.
@@ -4535,9 +5029,9 @@ Click OK to install.
   </notification>
 
   <notification
-   icon="alertmodal.tga"
+   icon="alert.tga"
    name="PromptOptionalUpdate"
-   type="alertmodal">
+   type="alert">
 Version [VERSION] has been downloaded and is ready to install.
 Release notes: [URL]
 
@@ -4894,7 +5388,7 @@ memberships allow up to [MAX_PREMIUM_PLUS]. [https://secondlife.com/my/account/m
    name="KickUser"
    type="alert">
    <tag>win</tag>
-Log out [AVATAR_NAME] with what message?
+Kick this Resident with what message?
     <tag>confirm</tag>
     <form name="form">
       <input name="message" type="text">
@@ -4941,7 +5435,7 @@ An administrator has logged you off.
    type="alert">
     <tag>win</tag>
     <tag>confirm</tag>
-Freeze [AVATAR_NAME] with what message?
+Freeze this Resident with what message?
     <form name="form">
       <input name="message" type="text">
 You have been frozen. You cannot move or chat. An administrator will contact you via instant message (IM).
@@ -4964,7 +5458,7 @@ You have been frozen. You cannot move or chat. An administrator will contact you
    type="alert">
    <tag>win</tag>
     <tag>confirm</tag>
-Unfreeze [AVATAR_NAME] with what message?
+Unfreeze this Resident with what message?
     <form name="form">
       <input name="message" type="text">
 You are no longer frozen.
@@ -5101,7 +5595,7 @@ Request a teleport to [NAME] with the following message
     <tag>confirm</tag>
     <form name="form">
       <input name="message" type="text">
-May I join you?
+
       </input>
       <button
        default="true"
@@ -5755,6 +6249,17 @@ You won't receive any more notifications that you're about to visit a region wit
    type="alertmodal">
     We were unable to change your preferences to view [PREFERRED_MATURITY] content at this time.  Your preferences have been reset to view [ACTUAL_MATURITY] content.  You may attempt to change your preferences again by using Me &gt; Preferences &gt; General from the menu bar.
     <tag>confirm</tag>
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="RegionTPAccessBlocked_NotifyAdultsOnly"
+   type="alertmodal">
+    <tag>fail</tag>
+    The region you are trying to visit is rated [REGIONMATURITY_CAP], which is not available on your account type.
     <usetemplate
      name="okbutton"
      yestext="OK"/>
@@ -6705,6 +7210,22 @@ Do you want to replace it with the selected object?
   </notification>
 
   <notification
+   icon="alertmodal.tga"
+   name="CantLinkNotecard"
+   type="alertmodal">
+    You must save the notecard before creating a link to it.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="CantLinkMaterial"
+   type="alertmodal">
+    You must save the material before creating a link to it.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
    icon="alert.tga"
    label="Do Not Disturb Mode Warning"
    name="DoNotDisturbModePay"
@@ -6779,8 +7300,7 @@ The folder &apos;[FOLDERNAME]&apos; is a system folder. Deleting system folders 
 [COUNT] item(s) will be permanently deleted. Are you sure you want to permanently delete selected item(s) from your Trash?
     <tag>confirm</tag>
     <usetemplate
-     ignoretext="Warn me before permanently deleting items from the Trash"
-     name="okcancelignore"
+     name="okcancelbuttons"
      notext="Cancel"
      yestext="OK"/>
   </notification>
@@ -6792,8 +7312,7 @@ The folder &apos;[FOLDERNAME]&apos; is a system folder. Deleting system folders 
 [COUNT] items and folders will be permanently deleted. Are you sure you want to permanently delete the contents of your Trash?
     <tag>confirm</tag>
     <usetemplate
-     ignoretext="Warn me before permanently deleting items and folders from the Trash"
-     name="okcancelignore"
+     name="okcancelbuttons"
      notext="Cancel"
      yestext="OK"/>
   </notification>
@@ -6808,6 +7327,14 @@ Your trash is overflowing. This may cause problems logging in.
          name="okcancelbuttons"
          notext="I will empty trash later"
          yestext="Check trash folder"/>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="InventoryLimitReachedAIS"
+   type="notifytip">
+Your inventory is experiencing issues. Please, contact support.
+  <tag>fail</tag>
   </notification>
 
   <notification
@@ -7123,6 +7650,27 @@ The string [STRING_NAME] is missing from strings.xml
    type="notifytip">
 [MESSAGE]
   </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ExternalEditorServerStarted"
+   type="notifytip">
+External editor server started on port [PORT].
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ExternalEditorServerFailed"
+   type="notifytip">
+Failed to start external editor server on port [PORT].
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ExternalEditorServerStopped"
+   type="notifytip">
+External editor server stopped.
+  </notification>
   
   <notification
    icon="notifytip.tga"
@@ -7386,29 +7934,8 @@ Please try again.
      yestext="OK"/>
   </notification>
 
-  <notification
-   icon="notifytip.tga"
-   name="ScriptMissing"
-   type="notifytip">
-Script is missing from database.
-  <tag>fail</tag>
-  </notification>
 
-  <notification
-   icon="notifytip.tga"
-   name="ScriptNoPermissions"
-   type="notifytip">
-Insufficient permissions to view script.
-  <tag>fail</tag>
-  </notification>
 
-  <notification
-   icon="notifytip.tga"
-   name="UnableToLoadScript"
-   type="notifytip">
-Unable to load script.  Please try again.
-  <tag>fail</tag>
-  </notification>
 
   <notification
    icon="notifytip.tga"
@@ -7753,7 +8280,7 @@ Message from [NAME]:
    type="notify">
     <unique/>
 This land has damage enabled.
-You can be hurt here. If you die, you will be teleported to your home location.
+You can be hurt here. If you die, you might be teleported to your home location, region telehub or parcel landing point.
   </notification>
 
   <notification
@@ -8693,10 +9220,10 @@ Scripts associated with this experience will be able to do the following on regi
    priority="critical"
    persist="true"
    type="notify">
-Warning: The object &apos;&lt;nolink&gt;[OBJECTNAME]&lt;/nolink&gt;&apos; wants total access to your Linden Dollars account. If you allow access, it can remove funds from your account at any time, or empty your account completely, on an ongoing basis with no additional warnings.
-  
-Do not allow access if you do not fully understand why it wants access to your account.
+Warning:
+[WARNINGS]
 
+Do not allow access if you do not fully understand why it wants access to your account.
   <tag>confirm</tag>
     <form name="form">
       <button
@@ -8709,9 +9236,7 @@ Do not allow access if you do not fully understand why it wants access to your a
        name="Deny"
        text="Deny"/>
     </form>
-    <footer>
-[FOOTERTEXT]
-    </footer>
+    <footer>[FOOTERTEXT]</footer>
   </notification>
 
 	<notification
@@ -8719,7 +9244,7 @@ Do not allow access if you do not fully understand why it wants access to your a
    name="ScriptDialog"
    show_toast="false"
    type="notify">
-[NAME]&apos;s &apos;&lt;nolink&gt;[TITLE]&lt;/nolink&gt;&apos; on channel [CHANNEL]
+[NAME]&apos;s &apos;&lt;nolink&gt;[TITLE]&lt;/nolink&gt;&apos; ([CHANNEL])
 [MESSAGE]
     <form name="form">
       <button
@@ -9226,6 +9751,24 @@ Failed to save snapshot to [PATH]: Disk is full. [NEED_MEMORY]KB is required but
 Failed to save snapshot to [PATH]: Directory does not exist.
   </notification>
 
+  <notification icon="notifytip.tga"
+    name="CutoutSnapshotSaved" type="notifytip">
+That snapshot was a cutout: only what Cutout is set to was drawn. It stays on until you uncheck Cutout in the snapshot window.
+  </notification>
+
+  <notification icon="notifytip.tga"
+    name="CutoutTargetMissing" type="notifytip">
+No snapshot was saved: what Cutout is set to is not in view. Turn the camera to it, pick it again, or uncheck Cutout in the snapshot window.
+  </notification>
+
+  <notification icon="notifytip.tga"
+    name="SnapshotSavedToComputer" type="notifytip">
+Screenshot saved to:
+    [FILEPATH]
+
+Click to open folder.
+  </notification>
+
   <notification
     icon="notifytip.tga"
     name="PresetNotSaved"
@@ -9238,6 +9781,34 @@ Error saving preset [NAME].
     name="DefaultPresetNotSaved"
     type="notifytip">
 Can not overwrite default preset.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxWhiteBalanceTooDark"
+    type="notifytip">
+That spot is too dark to read a color from. Pick something well lit that should look white or grey.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxWhiteBalanceUnreachable"
+    type="notifytip">
+Temperature and tint cannot neutralize that. It looks like a colored surface rather than a neutral one under colored light.
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookOverwrite"
+    type="alertmodal">
+A Look called &apos;[NAME]&apos; already exists. Replace it?
+
+This cannot be undone.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Replace"/>
   </notification>
 
   <notification
@@ -9300,6 +9871,23 @@ Your voice has been muted by moderator.
          yestext="OK"/>
     </notification>
 
+    <notification
+     icon="notifytip.tga"
+     name="NearbyVoiceMutedByModerator"
+     type="notifytip">
+        The moderator has muted your voice chat.
+People in this location will not hear you if you speak.
+     <tag>voice</tag>
+    </notification>
+
+    <notification
+     icon="notifytip.tga"
+     name="NearbyVoiceUnmutedByModerator"
+     type="notifytip">
+        Your voice chat can now be heard by people in this location.
+     <tag>voice</tag>
+    </notification>
+ 
     <notification
         icon="alertmodal.tga"
         name="FailedToGetBenefits"
@@ -9413,9 +10001,10 @@ With the following Residents:
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
   <tag>confirm</tag>
 	<usetemplate
-     name="okcancelbuttons"
+     name="okcancelignore"
      notext="Cancel"
-     yestext="OK"/>
+     yestext="OK"
+     ignoretext="Warn me before I share items"/>
   </notification>
   
   <notification
@@ -9776,6 +10365,22 @@ Are you sure you want to leave this call?
     <tag>voice</tag>
     <usetemplate
      ignoretext="Confirm before I leave call"
+     name="okcancelignore"
+     notext="No"
+     yestext="Yes">
+      <unique/>
+    </usetemplate>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ConfirmLeaveAdhoc"
+   type="alertmodal">
+Are you sure you want to leave this conference chat?
+    <tag>confirm</tag>
+    <tag>voice</tag>
+    <usetemplate
+     ignoretext="Confirm before I leave conference chat"
      name="okcancelignore"
      notext="No"
      yestext="Yes">
@@ -10403,6 +11008,13 @@ Disabling future updates for this file.
   </notification>
 
   <notification
+   icon="notifytip.tga"
+   name="LocalMeshNoUVs"
+   type="notifytip">
+[FNAME] has no UV coordinates, so textures and materials can't be previewed on it (it renders untextured/white). Re-export the mesh with a UV map.
+  </notification>
+
+  <notification
    icon="alertmodal.tga"
    name="LocalBitmapsUpdateFailedFinal"
    persist="true"
@@ -10714,6 +11326,22 @@ Not enough script resources available to attach object!
    type="notify">
    <tag>fail</tag>
 You died and have been teleported to your home location
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="YouDiedAndGotTPLanding"
+   type="notify">
+   <tag>fail</tag>
+You died and have been teleported to the parcel landing point
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="YouDiedAndGotTPTelehub"
+   type="notify">
+   <tag>fail</tag>
+You died and have been teleported to the region telehub
   </notification>
 
   <notification
@@ -12237,7 +12865,7 @@ An internal error prevented us from properly updating your viewer.  The L$ balan
    <tag>fail</tag>
 Cannot create large prims that intersect other residents.  Please re-try when other residents have moved.
   </notification>
-
+  
   <notification
    icon="alertmodal.tga"
    name="RLVaChangeStrings"
@@ -12763,72 +13391,6 @@ are wearing now.
 
   <notification
    icon="alertmodal.tga"
-   name="GLTFOpenSelection"
-   type="alert">
-    You must select an object to act as a handle to the GLTF asset you are previewing.
-    <tag>fail</tag>
-    <usetemplate
-      name="okbutton"
-      yestext="OK"/>
-  </notification>
-
-  <notification
-   icon="alertmodal.tga"
-   name="GLTFLoadFailed"
-   type="alert">
-    Failed to load GLTF file.  See log for details.
-    <tag>fail</tag>
-    <usetemplate
-      name="okbutton"
-      yestext="OK"/>
-  </notification>
-
-  <notification
-   icon="alertmodal.tga"
-   name="GLTFSaveFailed"
-   type="alert">
-    Failed to save GLTF file.  See log for details.
-    <tag>fail</tag>
-    <usetemplate
-      name="okbutton"
-      yestext="OK"/>
-  </notification>
-
-  <notification
-   icon="alertmodal.tga"
-   name="GLTFSaveSelection"
-   type="alert">
-    You must select an object that has a GLTF asset associated with it.
-    <tag>fail</tag>
-    <usetemplate
-      name="okbutton"
-      yestext="OK"/>
-  </notification>
-
-  <notification
-   icon="alertmodal.tga"
-   name="GLTFUploadSelection"
-   type="alert">
-    You must select an object that has local-only GLTF asset associated with it.
-    <tag>fail</tag>
-    <usetemplate
-      name="okbutton"
-      yestext="OK"/>
-  </notification>
-
-  <notification
- icon="alertmodal.tga"
- name="GLTFUploadInProgress"
- type="alert">
-    Upload is currently in progress.  Please try again later.
-    <tag>fail</tag>
-    <usetemplate
-      name="okbutton"
-      yestext="OK"/>
-  </notification>
-
-  <notification
-   icon="alertmodal.tga"
    name="NoSupportGLTFShader"
    type="notify">
      GLTF scenes are not yet supported on your graphics hardware.
@@ -12869,33 +13431,37 @@ are wearing now.
           name="okignore"
           yestext="OK"/>
   </notification>
- <!-- ALCHEMY BELOW THIS LINE -->
+  <!-- ALCHEMY BELOW THIS LINE -->
  
+  <notification
+   icon="notifytip.tga"
+   name="ChatCommandCalc"
+   type="notifytip"
+   log_to_im="true">
+   Calculation: [EXPRESSION] = [RESULT]
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ChatCommandCalcFailed"
+   type="notifytip"
+   log_to_im="true">
+   Calculation failed.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ChatCommandDiceRoll"
+   type="notifytip"
+   log_to_im="true">
+    Dice Roll: [RESULT]
+  </notification>
+
   <notification
    icon="notify.tga"
    name="DumpArchetypeSuccess"
    type="notify">
     Successfully saved appearance to [FILE_PATH].
-  </notification>
-  
-  <notification
-   icon="alertmodal.tga"
-   name="CannotDeleteSelectObjectsNoScripts"
-   type="alertmodal">
-Not able to perform &apos;delete&apos;.
-
-Select objects with scripts.
-  <tag>fail</tag>
-  </notification>
-	
-  <notification
-   icon="alertmodal.tga"
-   name="CannotResetSelectObjectsNoPermission"
-   type="alertmodal">
-Not able to perform &apos;delete&apos;.
-
-Select objects with scripts that you have permission to modify.
-  <tag>fail</tag>
   </notification>
 
   <notification
@@ -12909,6 +13475,13 @@ Select objects with scripts that you have permission to modify.
      name="okcancelignore"
      notext="Cancel"
      yestext="OK"/>
+  </notification>
+  <notification
+   icon="notify.tga"
+   name="AutoAcceptedInventory"
+   persist="true"
+   type="notify">
+    Auto-accepted [ITEM] from [NAME] and placed in inventory.
   </notification>
   <notification
    icon="alertmodal.tga"
@@ -12992,6 +13565,173 @@ the region &quot;[REGION]&quot;?
   </notification>
 
   <notification
+   icon="alertmodal.tga"
+   name="NewAOSet"
+   type="alertmodal">
+Specify a name for the new AO set:
+(The name may contain any ASCII character, except for ":" or "|")
+    <form name="form">
+      <input name="message" type="text" default="true">
+New AO Set
+      </input>
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="OK"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="NewAOCantContainNonASCII"
+   type="alertmodal">
+Could not create new AO set "[AO_SET_NAME]".
+The name may only contain ASCII characters, excluding ":" and "|".
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="RenameAOMustBeASCII"
+   type="alertmodal">
+Could not rename AO set "[AO_SET_NAME]".
+The name may only contain ASCII characters, excluding ":" and "|".
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+<notification
+   icon="alertmodal.tga"
+   name="RemoveAOSet"
+   type="alertmodal">
+Remove AO set "[AO_SET_NAME]" from the list?
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Remove"/>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOForeignItemsFound"
+   type="alertmodal">
+The animation overrider found at least one item that did not belong in the configuration. Please check your &quot;Lost and Found&quot; folder for items that were moved out of the animation overrider configuration.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportSetAlreadyExists"
+   type="notifytip">
+An animation set with this name already exists.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportPermissionDenied"
+   type="notifytip">
+Insufficient permissions to read notecard.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportComplete"
+   type="notifytip">
+Animation Overrider notecard import complete!
+  </notification>
+	
+  <notification
+   icon="notifytip.tga"
+   name="AOImportCreateSetFailed"
+   type="notifytip">
+Error while creating import set.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportDownloadFailed"
+   type="notifytip">
+Could not download notecard.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoText"
+   type="notifytip">
+Notecard is empty or unreadable.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoFolder"
+   type="notifytip">
+Couldn't find folder to read the animations.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoStatePrefix"
+   type="notifytip">
+Notecard line [LINE] has no valid [ state prefix.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoValidDelimiter"
+   type="notifytip">
+Notecard line [LINE] has no valid ] delimiter.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportStateNameNotFound"
+   type="notifytip">
+State name [NAME] not found.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportAnimationNotFound"
+   type="notifytip">
+Couldn't find animation [NAME]. Please make sure it's present in the same folder as the import notecard.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportInvalid"
+   type="notifytip">
+Notecard didn't contain any usable data. Aborting import.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportRetryCreateSet"
+   type="notifytip">
+Could not create import folder for animation set [NAME]. Retrying ...
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportAbortCreateSet"
+   type="notifytip">
+Could not create import folder for animation set [NAME]. Giving up.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportLinkFailed"
+   type="notifytip">
+Creating animation link for animation "[NAME]" failed!
+  </notification>
+
+  <notification
    icon="notifytip.tga"
    name="StreamInfo"
    log_to_chat="false"
@@ -13014,7 +13754,7 @@ Inject with particle script before closing?
     notext="Don&apos;t Inject"
     yestext="Inject"/>
   </notification>
-    
+
   <notification
    icon="alertmodal.tga"
    name="ParticleScriptFindFolderFailed"
@@ -13077,6 +13817,7 @@ Your privilege to find [NAME]&apos;s map location has been revoked.
     type="notify">
 [NAME] has given you permission to find their location on the map.
   </notification>
+
   <notification
    icon="notifytip.tga"
    name="ShapeImportGenericFail"
@@ -13122,7 +13863,7 @@ Always Run disabled.
   persist="true"
   log_to_chat="true"
   type="notifytip">
-	 I’m sorry Dave, I’m afraid I can’t do that.
+	 I’m sorry Dave, I’m afraid I can’t do that
  </notification>
 	
  <notification
@@ -13142,6 +13883,186 @@ Always Run disabled.
   type="notifytip">
 	 Irrevocably destroying object. Hope you didn't need that.
  </notification>
+
+ <notification
+  icon="alertmodal.tga"
+  name="AlchemyCrashReportConsent"
+  type="alertmodal">
+Send crash reports to the Alchemy developers?
+
+A report carries where the viewer crashed, its log, your settings and your avatar name. It goes to Sentry, where only the Alchemy developers can see it, and never without this permission. Preferences can change the answer later.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Don't send"
+     yestext="Send reports"/>
+ </notification>
+
+ <notification
+  icon="alert.tga"
+  name="AlchemyFeedbackAfterCrash"
+  type="alert">
+[WHAT] If you remember what you were doing, telling the developers helps them find the cause.
+    <form name="form">
+      <button
+       index="0"
+       name="tell"
+       text="Tell us what happened"/>
+      <button
+       default="true"
+       index="1"
+       name="not_now"
+       text="Not now"/>
+      <ignore text="Ask what happened after Alchemy crashes or stops responding"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackSent"
+  type="notify">
+Thanks. Your feedback reached the Alchemy developers.
+Reference: [REF]
+    <form name="form">
+      <button
+       index="0"
+       name="copy"
+       text="Copy reference"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyFeedbackQueued"
+  type="notifytip">
+Your feedback couldn't reach the server yet. It will be sent automatically.
+ </notification>
+
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyFeedbackQueuedDisconnected"
+  type="notifytip">
+You're disconnected, so your feedback will be sent the next time Alchemy starts.
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackKeptSent"
+  type="notify">
+Feedback you sent earlier has now reached the Alchemy developers.
+Reference: [REF]
+    <form name="form">
+      <button
+       index="0"
+       name="copy"
+       text="Copy reference"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackFailed"
+  type="notify">
+Your feedback was not sent. [REASON]
+
+Your message is saved in Send Feedback.
+    <form name="form">
+      <button
+       index="0"
+       name="open"
+       text="Open"/>
+      <button
+       default="true"
+       index="1"
+       name="dismiss"
+       text="Dismiss"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackGivenUpRestored"
+  type="notify">
+Feedback you wrote on [DATE] could not reach the Alchemy developers, and Alchemy has stopped trying. Your message is back in Send Feedback.
+    <form name="form">
+      <button
+       index="0"
+       name="open"
+       text="Open"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackGivenUp"
+  type="notify">
+Feedback you wrote on [DATE] could not reach the Alchemy developers, and Alchemy has stopped trying.
+    <form name="form">
+      <button
+       index="0"
+       name="copy"
+       text="Copy message"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="alertmodal.tga"
+  name="AlchemyFeedbackSendTest"
+  type="alertmodal">
+Send a test report to the Alchemy developers? It carries your system information and this session's log, and your avatar's name if Send Feedback is set to include it.
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Send"/>
+ </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="SceneExplorerFullRegion"
+   type="alertmodal">
+Full region coverage asks the simulator to stream every object in the region to your viewer, instead of only what your camera can see. On a busy region this is a lot of data and can take a while to settle.
+
+The simulator returns to normal when you turn this off or close the Scene Explorer.
+    <usetemplate
+     ignoretext="When enabling full region coverage in the Scene Explorer"
+     name="okignore"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="LoadCameraPositionNoneSaved"
+   type="notify">
+No camera view has been saved yet.
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="LoadCameraPositionOutsideDrawDistance"
+   type="notify">
+Can't restore the camera view because the camera position is beyond draw distance.
+  </notification>
+
   <notification
    icon="alertmodal.tga"
    name="CantRestoreToWorldNoCopy"
@@ -13207,5 +14128,35 @@ Incoming instant messages from anyone who is not your friend will now be answere
      ignoretext="I change my status to autorespond mode for non-friends"
      name="okignore"
      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="XUIStudioRemoveOrphans"
+   type="alertmodal">
+Take every orphaned value out of every file of [LANG]?
+
+An orphan is a value the language writes for something the base no longer has: an element whose name is gone, an element with no name, or an attribute the base's element does not carry. The merge applies none of them.
+
+This writes the files and cannot be undone from here.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Remove"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="XUIStudioCloseDocument"
+   type="alertmodal">
+[FILE] has edits that are not saved.
+Save them before letting it go?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Don&apos;t Save"
+     yestext="Save"/>
   </notification>
 </notifications>

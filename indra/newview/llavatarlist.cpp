@@ -53,7 +53,10 @@
 static LLDefaultChildRegistry::Register<LLAvatarList> r("avatar_list");
 
 // Last interaction time update period.
-static const F32 LIT_UPDATE_PERIOD = 2;
+static const F32 LIT_UPDATE_PERIOD = 5;
+
+// Distance update period.
+static const F32 DIST_UPDATE_PERIOD = 1;
 
 // Maximum number of avatars that can be added to a list in one pass.
 // Used to limit time spent for avatar list update per frame.
@@ -221,7 +224,7 @@ void LLAvatarList::draw()
     else if (mShowDistance && mLITUpdateTimer->hasExpired())
     {
         updateDistances();
-        mLITUpdateTimer->setTimerExpirySec(LIT_UPDATE_PERIOD);
+        mLITUpdateTimer->setTimerExpirySec(DIST_UPDATE_PERIOD); // restart the timer
     }
 }
 
@@ -288,7 +291,7 @@ void LLAvatarList::refresh()
 
     // Handle added items.
     unsigned nadded = 0;
-    static const std::string waiting_str = LLTrans::getString("AvatarNameWaiting");
+    const std::string waiting_str = LLTrans::getString("AvatarNameWaiting");
 
     for (uuid_vec_t::const_iterator it=added.begin(); it != added.end(); it++)
     {
@@ -582,6 +585,11 @@ void LLAvatarList::updateLastInteractionTimes()
 
 void LLAvatarList::updateDistances()
 {
+    if (gDisconnected)
+    {
+        return;
+    }
+
     std::vector<LLPanel*> items;
     getItems(items);
 
@@ -618,8 +626,8 @@ void LLAvatarList::onItemClicked(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
 
 bool LLAvatarItemComparator::compare(const LLPanel* item1, const LLPanel* item2) const
 {
-    const LLAvatarListItem* avatar_item1 = dynamic_cast<const LLAvatarListItem*>(item1);
-    const LLAvatarListItem* avatar_item2 = dynamic_cast<const LLAvatarListItem*>(item2);
+    const LLAvatarListItem* avatar_item1 = ALViewType::as<LLAvatarListItem>(item1);
+    const LLAvatarListItem* avatar_item2 = ALViewType::as<LLAvatarListItem>(item2);
 
     if (!avatar_item1 || !avatar_item2)
     {

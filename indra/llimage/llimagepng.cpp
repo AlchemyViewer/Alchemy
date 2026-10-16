@@ -105,8 +105,7 @@ bool LLImagePNG::decode(LLImageRaw* raw_image, F32 decode_time)
 
     resetLastError();
 
-    LLImageDataSharedLock lockIn(this);
-    LLImageDataLock lockOut(raw_image);
+    LLImageDataCopyLock lock(this, raw_image);
 
     // Check to make sure that this instance has been initialized with data
     if (!getData() || (0 == getDataSize()))
@@ -140,8 +139,7 @@ bool LLImagePNG::encode(const LLImageRaw* raw_image, F32 encode_time)
 
     resetLastError();
 
-    LLImageDataSharedLock lockIn(raw_image);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(raw_image, this);
 
     // Image logical size
     setSize(raw_image->getWidth(), raw_image->getHeight(), raw_image->getComponents());

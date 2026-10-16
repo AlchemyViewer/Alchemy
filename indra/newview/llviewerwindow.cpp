@@ -33,12 +33,10 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
-#include <boost/filesystem.hpp>
-#include <boost/lambda/core.hpp>
-#include <boost/regex.hpp>
 
 #include "llagent.h"
 #include "llagentcamera.h"
+#include "llcallbacklist.h"
 #include "llcommandhandler.h"
 #include "llcommunicationchannel.h"
 #include "llfloaterreg.h"
@@ -54,6 +52,7 @@
 #include "llxmltree.h"
 #include "llslurl.h"
 #include "llrender.h"
+#include "aluniformbuffer.h"
 
 #include "stringize.h"
 
@@ -86,7 +85,10 @@
 #include "raytrace.h"
 
 // newview includes
-#include "llagent.h"
+#include "alchatbar.h"
+#include "alfloaterprogressview.h"
+#include "alkeychord.h"
+#include "llaccordionctrl.h"
 // [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
 #include "llagentbenefits.h"
 // [/SL:KB]
@@ -114,7 +116,6 @@
 #include "llfloatermap.h"
 #include "llfloaternamedesc.h"
 #include "llfloaterpreference.h"
-#include "llfloaterprogressview.h"
 #include "llfloatersnapshot.h"
 #include "llfloatertools.h"
 #include "llfloaterworldmap.h"
@@ -131,6 +132,7 @@
 #include "llkeyboard.h"
 #include "lllineeditor.h"
 #include "lllocalbitmaps.h"
+#include "llfloaterlocalassets.h"
 #include "lllocalgltfmaterials.h"
 #include "llmenugl.h"
 #include "llmenuoptionpathfindingrebakenavmesh.h"
@@ -177,7 +179,6 @@
 #include "llviewerinventory.h"
 #include "llviewermedia.h"
 #include "llviewermediafocus.h"
-#include "llviewermenu.h"
 // [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
 #include "llviewermenufile.h"
 // [/SL:KB]
@@ -203,16 +204,18 @@
 #include "llagentui.h"
 #include "llwearablelist.h"
 
-#include "llviewereventrecorder.h"
 
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
 #include "llnotificationmanager.h"
 
-#include "llfloaternotificationsconsole.h"
 
 #include "llwindowlistener.h"
 #include "llviewerwindowlistener.h"
+#include "alcutoutimage.h"
+#include "alrenderisolation.h"
+#include "alsnapshotcutout.h"
+#include "llstatslistener.h"
 #include "llcleanup.h"
 
 // [RLVa:KB] - Checked: 2010-03-31 (RLVa-1.2.0c)
@@ -226,8 +229,6 @@
 #include "llwindowwin32.h" // For AltGr handling
 #endif
 
-void upload_single_file(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter type, const LLUUID& dest);
-void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter type, bool allow_2k, const LLUUID& dest);
 //
 // Globals
 //
@@ -256,8 +257,6 @@ LLVector2        gDebugRaycastTexCoord;
 LLVector4a       gDebugRaycastNormal;
 LLVector4a       gDebugRaycastTangent;
 S32             gDebugRaycastFaceHit;
-S32             gDebugRaycastGLTFNodeHit;
-S32             gDebugRaycastGLTFPrimitiveHit;
 LLVector4a       gDebugRaycastStart;
 LLVector4a       gDebugRaycastEnd;
 
@@ -271,11 +270,14 @@ static const U8 NO_FACE = 255;
 bool gQuietSnapshot = false;
 
 // Minimum value for UIScaleFactor, also defined in preferences, ui_scale_slider
-static const F32 MIN_UI_SCALE = 0.75f;
+static const F32 MIN_UI_SCALE = 0.5f;
 // 4.0 in preferences, but win10 supports larger scaling and value is used more as
 // sanity check, so leaving space for larger values from DPI updates.
 static const F32 MAX_UI_SCALE = 7.0f;
-static const F32 MIN_DISPLAY_SCALE = 0.75f;
+static const F32 MIN_DISPLAY_SCALE = 0.5f;
+
+static const char KEY_MOUSELOOK = 'M';
+
 LLTrace::SampleStatHandle<> LLViewerWindow::sMouseVelocityStat("Mouse Velocity");
 
 
@@ -420,8 +422,6 @@ void normalized_float_to_string(const float x, char *out_str)
 // LLDebugText
 //
 
-static LLTrace::BlockTimerStatHandle FTM_DISPLAY_DEBUG_TEXT("Display Debug Text");
-
 class LLDebugText
 {
 private:
@@ -504,7 +504,7 @@ public:
         static LLCachedControl<bool> debug_show_time(gSavedSettings, "DebugShowTime", false);
         if (debug_show_time())
         {
-            F32 time = gFrameTimeSeconds;
+            F64 time = gFrameTimeSeconds;
             S32 hours = (S32)(time / (60*60));
             S32 mins = (S32)((time - hours*(60*60)) / 60);
             S32 secs = (S32)((time - hours*(60*60) - mins*60));
@@ -617,8 +617,6 @@ public:
         static LLCachedControl<bool> debug_show_render_info(gSavedSettings, "DebugShowRenderInfo", false);
         if (debug_show_render_info())
         {
-            LLTrace::Recording& last_frame_recording = LLTrace::get_frame_recording().getLastRecording();
-
             //show streaming cost/triangle count of known prims in current region OR selection
             {
                 F32 cost = 0.f;
@@ -684,7 +682,22 @@ public:
             addText(xpos, ypos, llformat("%d Unique Textures", LLImageGL::sUniqueCount));
             ypos += y_inc;
 
-            addText(xpos, ypos, llformat("%d Render Calls", (U32)last_frame_recording.getSampleCount(LLPipeline::sStatBatchSize)));
+            // Sampler traffic. The ratio is the point: sampler objects cost a glBindSampler
+            // that baked texture state did not, but only when the sampler actually changes.
+            {
+                const U32 sampler_binds = ALTextureSlot::sSamplerBinds;
+                const U32 tex_binds     = ALTextureSlot::sTextureBinds;
+                addText(xpos, ypos, llformat("%d Sampler Binds (%d flushed, %d SPLIT BATCH, %d shadow-cycle, %d skipped, %.2f per tex bind)",
+                                             sampler_binds, ALTextureSlot::sSamplerBindsFlushed,
+                                             ALTextureSlot::sSamplerBindsSplitBatch,
+                                             ALTextureSlot::sSamplerBindsShadowCycle,
+                                             ALTextureSlot::sSamplerSkips,
+                                             tex_binds ? (F32)sampler_binds / (F32)tex_binds : 0.f));
+                ypos += y_inc;
+            }
+
+            addText(xpos, ypos, llformat("%d Render Calls (%.0f elements each)", LLRender::sDrawCalls,
+                                         LLRender::sDrawCalls ? (F64)LLRender::sDrawElements / LLRender::sDrawCalls : 0.0));
             ypos += y_inc;
 
             addText(xpos, ypos, llformat("%d/%d Objects Active", gObjectList.getNumActiveObjects(), gObjectList.getNumObjects()));
@@ -693,17 +706,16 @@ public:
             addText(xpos, ypos, llformat("%d Matrix Ops", gPipeline.mMatrixOpCount));
             ypos += y_inc;
 
-            addText(xpos, ypos, llformat("%d Texture Matrix Ops", gPipeline.mTextureMatrixOps));
+            addText(xpos, ypos, llformat("%d Texture Matrix Ops (%d shadow, %d probe, %d identity)",
+                gPipeline.mTextureMatrixOps, gPipeline.mTextureMatrixOpsShadow,
+                gPipeline.mTextureMatrixOpsProbe, gPipeline.mTextureMatrixOpsIdentity));
             ypos += y_inc;
 
             gPipeline.mTextureMatrixOps = 0;
+            gPipeline.mTextureMatrixOpsShadow = 0;
+            gPipeline.mTextureMatrixOpsProbe = 0;
+            gPipeline.mTextureMatrixOpsIdentity = 0;
             gPipeline.mMatrixOpCount = 0;
-
-            if (last_frame_recording.getSampleCount(LLPipeline::sStatBatchSize) > 0)
-            {
-                addText(xpos, ypos, llformat("Batch min/max/mean: %d/%d/%d", (U32)last_frame_recording.getMin(LLPipeline::sStatBatchSize), (U32)last_frame_recording.getMax(LLPipeline::sStatBatchSize), (U32)last_frame_recording.getMean(LLPipeline::sStatBatchSize)));
-            }
-            ypos += y_inc;
 
             addText(xpos, ypos, llformat("UI Verts/Calls: %d/%d", LLRender::sUIVerts, LLRender::sUICalls));
             LLRender::sUICalls = LLRender::sUIVerts = 0;
@@ -712,12 +724,6 @@ public:
             addText(xpos,ypos, llformat("%d/%d Nodes visible", gPipeline.mNumVisibleNodes, LLSpatialGroup::sNodeCount));
 
             ypos += y_inc;
-
-            if (!LLOcclusionCullingGroup::sPendingQueries.empty())
-            {
-                addText(xpos,ypos, llformat("%d Queries pending", LLOcclusionCullingGroup::sPendingQueries.size()));
-                ypos += y_inc;
-            }
 
 
             addText(xpos,ypos, llformat("%d Avatars visible", LLVOAvatar::sNumVisibleAvatars));
@@ -734,11 +740,11 @@ public:
 
                 ypos += y_inc;
 
-                addText(xpos, ypos, llformat("%d/%d Mesh HTTP Requests/Retries", LLMeshRepository::sHTTPRequestCount,
-                    LLMeshRepository::sHTTPRetryCount));
+                addText(xpos, ypos, llformat("%d/%d Mesh HTTP Requests/Retries", LLMeshRepository::sHTTPRequestCount.load(),
+                    LLMeshRepository::sHTTPRetryCount.load()));
                 ypos += y_inc;
 
-                addText(xpos, ypos, llformat("%d/%d Mesh LOD Pending/Processing", LLMeshRepository::sLODPending, LLMeshRepository::sLODProcessing));
+                addText(xpos, ypos, llformat("%d/%d Mesh LOD Pending/Processing", LLMeshRepository::sLODPending, LLMeshRepository::sLODProcessing.load()));
                 ypos += y_inc;
 
                 addText(xpos, ypos, llformat("%.3f/%.3f MB Mesh Cache Read/Write ", LLMeshRepository::sCacheBytesRead/(1024.f*1024.f), LLMeshRepository::sCacheBytesWritten/(1024.f*1024.f)));
@@ -793,31 +799,33 @@ public:
         {
             char camera_lines[8][32];
             memset(camera_lines, ' ', sizeof(camera_lines));
+            const F32* projection = LLViewerCamera::getCurrent().getProjection().getF32ptr();
+            const F32* modelview = LLViewerCamera::getCurrent().getModelview().getF32ptr();
 
             // Projection last column is always <0,0,-1.0001,0>
             // Projection last row is always <0,0,-0.2>
             mBackRectCamera1.mBottom = ypos - y_inc + 2;
-            MATRIX_ROW_N32_TO_STR(gGLProjection, 12,camera_lines[7]); addText(xpos, ypos, std::string(camera_lines[7])); ypos += y_inc;
-            MATRIX_ROW_N32_TO_STR(gGLProjection,  8,camera_lines[6]); addText(xpos, ypos, std::string(camera_lines[6])); ypos += y_inc;
-            MATRIX_ROW_N32_TO_STR(gGLProjection,  4,camera_lines[5]); addText(xpos, ypos, std::string(camera_lines[5])); ypos += y_inc; mBackRectCamera1.mTop    = ypos + 2;
-            MATRIX_ROW_N32_TO_STR(gGLProjection,  0,camera_lines[4]); addText(xpos, ypos, std::string(camera_lines[4])); ypos += y_inc; mBackRectCamera2.mBottom = ypos + 2;
+            MATRIX_ROW_N32_TO_STR(projection, 12,camera_lines[7]); addText(xpos, ypos, std::string(camera_lines[7])); ypos += y_inc;
+            MATRIX_ROW_N32_TO_STR(projection,  8,camera_lines[6]); addText(xpos, ypos, std::string(camera_lines[6])); ypos += y_inc;
+            MATRIX_ROW_N32_TO_STR(projection,  4,camera_lines[5]); addText(xpos, ypos, std::string(camera_lines[5])); ypos += y_inc; mBackRectCamera1.mTop    = ypos + 2;
+            MATRIX_ROW_N32_TO_STR(projection,  0,camera_lines[4]); addText(xpos, ypos, std::string(camera_lines[4])); ypos += y_inc; mBackRectCamera2.mBottom = ypos + 2;
 
             addText(xpos, ypos, "Projection Matrix");
             ypos += y_inc;
 
-#if LL_DARWIN
+#if LL_CLANG
 // For sprintf deprecation
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
             // View last column is always <0,0,0,1>
-            MATRIX_ROW_F32_TO_STR(gGLModelView, 12,camera_lines[3]); addText(xpos, ypos, std::string(camera_lines[3])); ypos += y_inc;
-#if LL_DARWIN
+            MATRIX_ROW_F32_TO_STR(modelview, 12,camera_lines[3]); addText(xpos, ypos, std::string(camera_lines[3])); ypos += y_inc;
+#if LL_CLANG
 #pragma clang diagnostic pop
 #endif
-            MATRIX_ROW_N32_TO_STR(gGLModelView,  8,camera_lines[2]); addText(xpos, ypos, std::string(camera_lines[2])); ypos += y_inc;
-            MATRIX_ROW_N32_TO_STR(gGLModelView,  4,camera_lines[1]); addText(xpos, ypos, std::string(camera_lines[1])); ypos += y_inc; mBackRectCamera2.mTop = ypos + 2;
-            MATRIX_ROW_N32_TO_STR(gGLModelView,  0,camera_lines[0]); addText(xpos, ypos, std::string(camera_lines[0])); ypos += y_inc;
+            MATRIX_ROW_N32_TO_STR(modelview,  8,camera_lines[2]); addText(xpos, ypos, std::string(camera_lines[2])); ypos += y_inc;
+            MATRIX_ROW_N32_TO_STR(modelview,  4,camera_lines[1]); addText(xpos, ypos, std::string(camera_lines[1])); ypos += y_inc; mBackRectCamera2.mTop = ypos + 2;
+            MATRIX_ROW_N32_TO_STR(modelview,  0,camera_lines[0]); addText(xpos, ypos, std::string(camera_lines[0])); ypos += y_inc;
 
             addText(xpos, ypos, "View Matrix");
             ypos += y_inc;
@@ -830,8 +838,8 @@ public:
             LLCoordGL coord = gViewerWindow->getCurrentMouse();
 
             // Convert x,y to raw pixel coords
-            S32 x_raw = (S32)llround(coord.mX * gViewerWindow->getWindowWidthRaw() / (F32) gViewerWindow->getWindowWidthScaled());
-            S32 y_raw = (S32)llround(coord.mY * gViewerWindow->getWindowHeightRaw() / (F32) gViewerWindow->getWindowHeightScaled());
+            S32 x_raw = (S32)ll_round(coord.mX * gViewerWindow->getWindowWidthRaw() / (F32)gViewerWindow->getWindowWidthScaled());
+            S32 y_raw = (S32)ll_round(coord.mY * gViewerWindow->getWindowHeightRaw() / (F32)gViewerWindow->getWindowHeightScaled());
 
             glReadPixels(x_raw, y_raw, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, color);
             addText(xpos, ypos, llformat("Pixel <%1d, %1d> R:%1d G:%1d B:%1d A:%1d", x_raw, y_raw, color[0], color[1], color[2], color[3]));
@@ -965,7 +973,7 @@ public:
 
     void draw()
     {
-        LL_RECORD_BLOCK_TIME(FTM_DISPLAY_DEBUG_TEXT);
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
         // Camera matrix text is hard to see again a white background
         // Add a dark background underneath the matrices for readability (contrast)
@@ -1119,11 +1127,6 @@ bool LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK m
             bool r = mouse_captor->handleAnyMouseClick(local_x, local_y, mask, clicktype, down);
             if (r) {
 
-                LL_DEBUGS() << "LLViewerWindow::handleAnyMouseClick viewer with mousecaptor calling updatemouseeventinfo - local_x|global x  "<< local_x << " " << x  << "local/global y " << local_y << " " << y << LL_ENDL;
-
-                LLViewerEventRecorder::instance().setMouseGlobalCoords(x,y);
-                LLViewerEventRecorder::instance().logMouseEvent(std::string(buttonstatestr),std::string(buttonname));
-
             }
             else if (down && clicktype == CLICK_RIGHT)
             {
@@ -1144,23 +1147,9 @@ bool LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK m
         if (r)
         {
 
-            LL_DEBUGS() << "LLViewerWindow::handleAnyMouseClick calling updatemouseeventinfo - global x  "<< " " << x   << "global y " << y  << "buttonstate: " << buttonstatestr << " buttonname " << buttonname << LL_ENDL;
-
-            LLViewerEventRecorder::instance().setMouseGlobalCoords(x,y);
-
-            // Clear local coords - this was a click on root window so these are not needed
-            // By not including them, this allows the test skeleton generation tool to be smarter when generating code
-            // the code generator can be smarter because when local coords are present it can try the xui path with local coords
-            // and fallback to global coordinates only if needed.
-            // The drawback to this approach is sometimes a valid xui path will appear to work fine, but NOT interact with the UI element
-            // (VITA support not implemented yet or not visible to VITA due to widget further up xui path not being visible to VITA)
-            // For this reason it's best to provide hints where possible here by leaving out local coordinates
-            LLViewerEventRecorder::instance().setMouseLocalCoords(-1,-1);
-            LLViewerEventRecorder::instance().logMouseEvent(buttonstatestr,buttonname);
-
             if (LLView::sDebugMouseHandling)
             {
-                LL_INFOS() << buttonname << " Mouse " << buttonstatestr << " " << LLViewerEventRecorder::instance().get_xui()   << LL_ENDL;
+                LL_INFOS() << buttonname << " Mouse " << buttonstatestr << LLView::sMouseHandlerMessage << LL_ENDL;
             }
             return true;
         } else if (LLView::sDebugMouseHandling)
@@ -1172,7 +1161,6 @@ bool LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK m
     // Do not allow tool manager to handle mouseclicks if we have disconnected
     if(!gDisconnected && LLToolMgr::getInstance()->getCurrentTool()->handleAnyMouseClick( x, y, mask, clicktype, down ) )
     {
-        LLViewerEventRecorder::instance().clear_xui();
         is_toolmgr_action = true;
         return true;
     }
@@ -1381,7 +1369,7 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDropDefault(LLWind
                                 // Check the whitelist, if there's media (otherwise just show it)
                                 if (te->getMediaData() == NULL || te->getMediaData()->checkCandidateUrl(url))
                                 {
-                                    if ( obj != mDragHoveredObject.get())
+                                    if (obj != mDragHoveredObject)
                                     {
                                         // Highlight the dragged object
                                         LLSelectMgr::getInstance()->unhighlightObjectOnly(mDragHoveredObject);
@@ -1424,6 +1412,7 @@ static dragdrop_type_lookup_t s_DragDropTypesLookup[] = {
     std::make_tuple("png", LLAssetType::AT_TEXTURE, LLFilePicker::FFLOAD_IMAGE),
     std::make_tuple("tga", LLAssetType::AT_TEXTURE, LLFilePicker::FFLOAD_IMAGE),
     std::make_tuple("webp", LLAssetType::AT_TEXTURE, LLFilePicker::FFLOAD_IMAGE),
+    std::make_tuple("avif", LLAssetType::AT_TEXTURE, LLFilePicker::FFLOAD_IMAGE),
     std::make_tuple("bvh", LLAssetType::AT_ANIMATION, LLFilePicker::FFLOAD_ANIM),
     std::make_tuple("anim", LLAssetType::AT_ANIMATION, LLFilePicker::FFLOAD_ANIM),
     std::make_tuple("wav", LLAssetType::AT_SOUND_WAV, LLFilePicker::FFLOAD_WAV),
@@ -1490,6 +1479,34 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDropFile(LLWindow 
         case LLWindowCallbacks::DNDA_TRACK:
         case LLWindowCallbacks::DNDA_DROPPED:
             {
+                // Route a file drop landing on the Local Assets floater into its tabs,
+                // ahead of the world/upload paths (works in or out of build mode). `pos`
+                // is in raw GL device pixels but UI rects are in scaled UI coords, so
+                // convert before the hit-test (mirrors the mouse path, see ~line 1032).
+                if (!mDragItems.empty())
+                {
+                    LLFloater* la = LLFloaterReg::findInstance("local_assets");
+                    const S32 ui_x = ll_round((F32)pos.mX / mDisplayScale.mV[VX]);
+                    const S32 ui_y = ll_round((F32)pos.mY / mDisplayScale.mV[VY]);
+                    if (la && la->isInVisibleChain() && la->calcScreenRect().pointInRect(ui_x, ui_y))
+                    {
+                        result = LLWindowCallbacks::DND_COPY;
+                        if (fDrop)
+                        {
+                            std::vector<std::string> files;
+                            for (const drag_item_t& dragItem : mDragItems)
+                            {
+                                files.push_back(dragItem.second);
+                            }
+                            if (LLFloaterLocalAssets* laf = la->as<LLFloaterLocalAssets>())
+                            {
+                                laf->dropFiles(files);
+                            }
+                        }
+                        break; // handled by the floater
+                    }
+                }
+
                 if (!LLToolMgr::getInstance()->inBuildMode())
                 {
                     if (!mDragItems.empty())
@@ -1558,7 +1575,7 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDropFile(LLWindow 
 
                                 if (LLAssetType::AT_TEXTURE == mDragItems.front().first->getType())
                                 {
-                                    LLUUID idLocalBitmap = LLLocalBitmapMgr::instance().getUnitID(strFilename);
+                                    LLUUID idLocalBitmap = LLLocalBitmapMgr::instance().getUnitID(strFilename, false);
                                     if (idLocalBitmap.isNull())
                                     {
                                         idLocalBitmap = LLLocalBitmapMgr::instance().addUnit(strFilename);
@@ -1572,7 +1589,7 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDropFile(LLWindow 
                                 }
                                 else if (LLAssetType::AT_MATERIAL == mDragItems.front().first->getType())
                                 {
-                                    LLUUID isLocalMat = LLLocalGLTFMaterialMgr::instance().getUnitID(strFilename, 0);
+                                    LLUUID isLocalMat = LLLocalGLTFMaterialMgr::instance().getUnitID(strFilename, 0, false);
                                     if (isLocalMat.isNull())
                                     {
                                         LLLocalGLTFMaterialMgr::instance().addUnit(strFilename, isLocalMat);
@@ -1697,22 +1714,94 @@ void LLViewerWindow::handleMouseDragged(LLWindow *window,  LLCoordGL pos, MASK m
 
 void LLViewerWindow::handleMouseLeave(LLWindow *window)
 {
-    // Note: we won't get this if we have captured the mouse.
-    llassert( gFocusMgr.getMouseCapture() == NULL );
+    // SDL3 delivers SDL_EVENT_WINDOW_MOUSE_LEAVE whenever the cursor crosses
+    // the window edge, including while we have capture (e.g. mid-drag). In
+    // that case the mouse is still logically ours, so don't drop the
+    // in-window state or block tooltips.
+    if (gFocusMgr.getMouseCapture() != NULL)
+    {
+        return;
+    }
     mMouseInWindow = false;
     LLToolTipMgr::instance().blockToolTips();
 }
 
-bool LLViewerWindow::handleCloseRequest(LLWindow *window)
+void LLViewerWindow::handlePreCloseRequest()
+{
+    // WINDOW THREAD! since we need this to act fast.
+    if (!LLApp::isExiting() && !LLApp::isStopped())
+    {
+        LLAppViewer::instance()->createCloseRequestMarker();
+    }
+}
+
+void LLViewerWindow::handleCloseRequestCanceled()
+{
+    // WINDOW THREAD! since we need this to act fast.
+    if (!LLApp::isExiting() && !LLApp::isStopped())
+    {
+        LLAppViewer::instance()->removeCloseRequestMarker();
+    }
+}
+
+void LLViewerWindow::handleSuspendRequest()
+{
+    LLAppViewer::instance()->sendViewerStatistics(false);
+    // Todo: this should send a disconnect request as viewer
+    // can't keep heartbeat up while suspended and will get
+    // disconnected within a minute.
+    // Add a disconnect here once 'prevent OS from sleeping'
+    // feature is ready.
+}
+
+bool LLViewerWindow::handleCloseRequest(LLWindow *window, bool from_user)
 {
     if (!LLApp::isExiting() && !LLApp::isStopped())
     {
-        // User has indicated they want to close, but we may need to ask
-        // about modified documents.
-        LLAppViewer::instance()->userQuit();
-        // Don't quit immediately
+        if (from_user)
+        {
+            // Task naamger kills viewer after 1 second, 3 seconds
+            // is overkill, but decided to be on a safe side.
+            doAfterInterval([]()
+            {
+                // if user quits, marker will be cleaned by cleanup,
+                // if user cancels quit, marker will be cleaned here,
+                // but if task manager kills us, marker stays.
+                LLAppViewer::instance()->removeCloseRequestMarker();
+            }, 3.0f);
+
+            // User has indicated they want to close, but we may need to ask
+            // about modified documents.
+            LLAppViewer::instance()->userQuit();
+            // Don't quit immediately
+        }
+        else
+        {
+            // OS is asking us to quit, assume we have time and start cleanup
+            LLAppViewer::instance()->requestQuit();
+        }
     }
     return false;
+}
+
+bool LLViewerWindow::handleSessionExit(LLWindow* window)
+{
+    if (!LLApp::isExiting() && !LLApp::isStopped())
+    {
+        // Viewer received WM_ENDSESSION and app will be killed soon if it doesn't respond
+        LLAppViewer* app = LLAppViewer::instance();
+        // Normally we'd include preferences, but serializing them can be expensive.
+        // There is also a chance this won't be processed if the logout request arrives first.
+        app->sendViewerStatistics(false /*no preferences*/);
+        app->sendSimpleLogoutRequest();
+        app->earlyExitNoNotify();
+
+        // Not viewer's fault, remove marker files so
+        // that statistics won't consider this to be a crash
+        app->removeMarkerFiles();
+        return false;
+    }
+    return true;
 }
 
 void LLViewerWindow::handleQuit(LLWindow *window)
@@ -1732,6 +1821,13 @@ void LLViewerWindow::handleResize(LLWindow *window,  S32 width,  S32 height)
 {
     reshape(width, height);
     mResDirty = true;
+    LL_DEBUGS("Window") << "handleResize, new width: " << width << " height: " << height << LL_ENDL;
+}
+
+void LLViewerWindow::handleRequestResolutionUpdate(LLWindow* window)
+{
+    requestResolutionUpdate();
+    LL_DEBUGS("Window") << "handleRequestResolutionUpdate: mResDirty set" << LL_ENDL;
 }
 
 // The top-level window has gained focus (e.g. via ALT-TAB)
@@ -1893,58 +1989,14 @@ void LLViewerWindow::handleMenuSelect(LLWindow *window,  S32 menu_item)
 }
 
 
-bool LLViewerWindow::handlePaint(LLWindow *window,  S32 x,  S32 y, S32 width,  S32 height)
+void LLViewerWindow::handleScrollWheel(LLWindow *window,  LLScrollDelta delta)
 {
-    // *TODO: Enable similar information output for other platforms?  DK 2011-02-18
-#if LL_WINDOWS
-    if (gHeadlessClient)
-    {
-        HWND window_handle = (HWND)window->getPlatformWindow();
-        PAINTSTRUCT ps;
-        HDC hdc;
-
-        RECT wnd_rect;
-        wnd_rect.left = 0;
-        wnd_rect.top = 0;
-        wnd_rect.bottom = 200;
-        wnd_rect.right = 500;
-
-        hdc = BeginPaint(window_handle, &ps);
-        //SetBKColor(hdc, RGB(255, 255, 255));
-        FillRect(hdc, &wnd_rect, CreateSolidBrush(RGB(255, 255, 255)));
-
-        std::string temp_str;
-        LLTrace::Recording& recording = LLViewerStats::instance().getRecording();
-        temp_str = llformat( "FPS %3.1f Phy FPS %2.1f Time Dil %1.3f",      /* Flawfinder: ignore */
-                recording.getPerSec(LLStatViewer::FPS), //mFPSStat.getMeanPerSec(),
-                recording.getLastValue(LLStatViewer::SIM_PHYSICS_FPS),
-                recording.getLastValue(LLStatViewer::SIM_TIME_DILATION));
-        int len = static_cast<int>(temp_str.length());
-        TextOutA(hdc, 0, 0, temp_str.c_str(), len);
-
-
-        LLVector3d pos_global = gAgent.getPositionGlobal();
-        temp_str = llformat( "Avatar pos %6.1lf %6.1lf %6.1lf", pos_global.mdV[0], pos_global.mdV[1], pos_global.mdV[2]);
-        len = static_cast<S32>(temp_str.length());
-        TextOutA(hdc, 0, 25, temp_str.c_str(), len);
-
-        TextOutA(hdc, 0, 50, "Set \"HeadlessClient FALSE\" in settings.ini file to reenable", 61);
-        EndPaint(window_handle, &ps);
-        return true;
-    }
-#endif
-    return false;
+    handleScrollWheel( delta );
 }
 
-
-void LLViewerWindow::handleScrollWheel(LLWindow *window,  S32 clicks)
+void LLViewerWindow::handleScrollHWheel(LLWindow *window,  LLScrollDelta delta)
 {
-    handleScrollWheel( clicks );
-}
-
-void LLViewerWindow::handleScrollHWheel(LLWindow *window,  S32 clicks)
-{
-    handleScrollHWheel(clicks);
+    handleScrollHWheel(delta);
 }
 
 void LLViewerWindow::handleWindowBlock(LLWindow *window)
@@ -1988,13 +2040,17 @@ bool LLViewerWindow::handleTimerEvent(LLWindow *window)
     return false;
 }
 
-bool LLViewerWindow::handleDeviceChange(LLWindow *window)
+bool LLViewerWindow::handleDeviceChange(LLWindow *window, const std::string& change_type)
 {
     // give a chance to use a joystick after startup (hot-plugging)
     if (!LLViewerJoystick::getInstance()->isJoystickInitialized() )
     {
         LLViewerJoystick::getInstance()->init(true);
         return true;
+    }
+    else
+    {
+        LL_INFOS("Window") << "Device change event: " << change_type << LL_ENDL;
     }
     return false;
 }
@@ -2017,6 +2073,7 @@ bool LLViewerWindow::handleDPIChanged(LLWindow *window, F32 ui_scale_factor, S32
 
 bool LLViewerWindow::handleDisplayChanged()
 {
+    LL_INFOS("Window") << "Display change event" << LL_ENDL;
     LLFontGL::sResolutionGeneration++;
     return false;
 }
@@ -2026,6 +2083,10 @@ bool LLViewerWindow::handleWindowDidChangeScreen(LLWindow *window)
     LLCoordScreen window_rect;
     mWindow->getSize(&window_rect);
     reshape(window_rect.mX, window_rect.mY);
+    // The window may still be transitioning between states,
+    // schedule an update at checkSettings()
+    mResDirty = true;
+    LL_DEBUGS("Window") << "Window did change screen, new size: " << window_rect.mX << "x" << window_rect.mY << LL_ENDL;
     return true;
 }
 
@@ -2095,8 +2156,10 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     // pass its value right now. Instead, pass it a nullary function that
     // will, when we later need it, return the value of gKeyboard.
     // boost::lambda::var() constructs such a functor on the fly.
-    mWindowListener.reset(new LLWindowListener(this, boost::lambda::var(gKeyboard)));
-    mViewerWindowListener.reset(new LLViewerWindowListener(this));
+    LLWindowListener::KeyboardGetter getter = [](){ return gKeyboard; };
+    mWindowListener = std::make_unique<LLWindowListener>(this, getter);
+    mViewerWindowListener = std::make_unique<LLViewerWindowListener>(this);
+    mStatsListener = std::make_unique<LLStatsListener>();
 
     mSystemChannel.reset(new LLNotificationChannel("System", "Visible", LLNotificationFilters::includeEverything));
     mCommunicationChannel.reset(new LLCommunicationChannel("Communication", "Visible"));
@@ -2107,7 +2170,7 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     LLNotifications::instance().setIgnoreAllNotifications(ignore);
     if (ignore)
     {
-    LL_INFOS() << "NOTE: ALL NOTIFICATIONS THAT OCCUR WILL GET ADDED TO IGNORE LIST FOR LATER RUNS." << LL_ENDL;
+        LL_INFOS("Window") << "NOTE: ALL NOTIFICATIONS THAT OCCUR WILL GET ADDED TO IGNORE LIST FOR LATER RUNS." << LL_ENDL;
     }
 
 
@@ -2130,11 +2193,11 @@ LLViewerWindow::LLViewerWindow(const Params& p)
         p.fullscreen,
         gHeadlessClient,
         gSavedSettings.getBOOL("RenderVSyncEnable"),
-        !gHeadlessClient,
+        gHeadlessClient ? ALWindowBackend::Hidden : ALWindowBackend::Native,
         p.ignore_pixel_depth,
         0,
         max_core_count,
-        max_gl_version); //don't use window level anti-aliasing
+        max_gl_version); //don't use window level anti-aliasing, windows only
 
     if (NULL == mWindow)
     {
@@ -2145,13 +2208,8 @@ LLViewerWindow::LLViewerWindow(const Params& p)
         ms_sleep(5000) ; //wait for 5 seconds.
 
         LLSplashScreen::update(LLTrans::getString("ShuttingDown"));
-#if LL_LINUX
-        LL_WARNS() << "Unable to create window, be sure screen is set at 32-bit color and your graphics driver is configured correctly.  See README-linux.txt for further information."
-                << LL_ENDL;
-#else
         LL_WARNS("Window") << "Unable to create window, be sure screen is set at 32-bit color in Control Panels->Display->Settings"
                 << LL_ENDL;
-#endif
         LLAppViewer::instance()->fastQuit(1);
     }
     else if (!LLViewerShaderMgr::sInitialized)
@@ -2180,6 +2238,23 @@ LLViewerWindow::LLViewerWindow(const Params& p)
             gSavedSettings.setF32("UIScaleFactor", 1.f);
         }
         gSavedSettings.setBOOL("ResetUIScaleOnFirstRun", false);
+        LL_DEBUGS("Window") << "ResetUIScaleOnFirstRun fired:"
+            << " system_ui_size=" << mWindow->getSystemUISize()
+            << " UIScaleFactor_after_reset=" << gSavedSettings.getF32("UIScaleFactor")
+            << " screen_size=" << scr.mX << "x" << scr.mY
+            << " pixel_aspect_ratio=" << mWindow->getPixelAspectRatio()
+            << " ResetUIScaleOnFirstRun=" << gSavedSettings.getBOOL("ResetUIScaleOnFirstRun")
+            << LL_ENDL;
+    }
+    else
+    {
+        LL_DEBUGS("Window") << "Display init:"
+            << " screen_size=" << scr.mX << "x" << scr.mY
+            << " system_ui_size=" << mWindow->getSystemUISize()
+            << " pixel_aspect_ratio=" << mWindow->getPixelAspectRatio()
+            << " saved_UIScaleFactor=" << gSavedSettings.getF32("UIScaleFactor")
+            << " ResetUIScaleOnFirstRun=" << gSavedSettings.getBOOL("ResetUIScaleOnFirstRun")
+            << LL_ENDL;
     }
 
     // Get the real window rect the window was created with (since there are various OS-dependent reasons why
@@ -2188,6 +2263,12 @@ LLViewerWindow::LLViewerWindow(const Params& p)
 
     mDisplayScale.setVec(llmax(1.f / mWindow->getPixelAspectRatio(), 1.f), llmax(mWindow->getPixelAspectRatio(), 1.f));
     mDisplayScale *= ui_scale_factor;
+    LL_DEBUGS("Window") << "Display scale computed:"
+        << " ui_scale_factor=" << ui_scale_factor
+        << " mDisplayScale=" << mDisplayScale
+        << " (clamped_to=[" << MIN_UI_SCALE << ", " << MAX_UI_SCALE << "])"
+        << LL_ENDL;
+
     LLUI::setScaleFactor(mDisplayScale);
     LLFontGL::sResolutionGeneration++;
 
@@ -2198,19 +2279,7 @@ LLViewerWindow::LLViewerWindow(const Params& p)
         mWindowRectScaled.set(0, ll_round((F32)size.mY / mDisplayScale.mV[VY]), ll_round((F32)size.mX / mDisplayScale.mV[VX]), 0);
     }
 
-    LLFontManager::initClass();
-
-    // fonts use an GL_UNSIGNED_BYTE image format,
-    // so they need convertion, init buffers if needed
-    LLImageGL::allocateConversionBuffer();
-
-    // Init font system, load default fonts and generate basic glyphs
-    // currently it takes aprox. 0.5 sec and we would load these fonts anyway
-    // before login screen.
-    LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
-        mDisplayScale.mV[VX],
-        mDisplayScale.mV[VY],
-        gDirUtilp->getAppRODataDir());
+    initFonts();
 
     //
     // We want to set this stuff up BEFORE we initialize the pipeline, so we can turn off
@@ -2269,6 +2338,17 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     // Can't have spaces in settings.ini strings, so use underscores instead and convert them.
     LLStringUtil::replaceChar(mOverlayTitle, '_', ' ');
 
+    // Sync the keyboard's numpad mode with the saved NumpadControl setting now
+    // that gKeyboard exists. settings_setup_listeners() only connects the change
+    // signal (and ran before the window/keyboard were created), so push the
+    // persisted value into LLKeyboard once here; handleNumpadControlChanged
+    // keeps it in sync on subsequent changes.
+    if (gKeyboard)
+    {
+        S32 numpad_mode = llclamp(gSavedSettings.getS32("NumpadControl"), (S32)LLKeyboard::ND_NEVER, (S32)LLKeyboard::ND_NUMLOCK_ON);
+        gKeyboard->setNumpadDistinct(static_cast<LLKeyboard::e_numpad_distinct>(numpad_mode));
+    }
+
     mDebugText = new LLDebugText(this);
 
     mWorldViewRectScaled = calcScaledRect(mWorldViewRectRaw, mDisplayScale);
@@ -2285,10 +2365,6 @@ void LLViewerWindow::initGLDefaults()
     // RN: Need this for translation and stretch manip.
     gBox.prerender();
 }
-
-struct MainPanel : public LLPanel
-{
-};
 
 void LLViewerWindow::initBase()
 {
@@ -2327,6 +2403,8 @@ void LLViewerWindow::initBase()
     }
     main_view->setShape(full_window);
     getRootView()->addChild(main_view);
+
+    mMainView = main_view;
 
     // placeholder widget that controls where "world" is rendered
     mWorldViewPlaceholder = main_view->getChildView("world_view_rect")->getHandle();
@@ -2484,7 +2562,8 @@ void LLViewerWindow::initWorldUI()
         mNavBarContainer->setVisible(true);
     }
 
-    if (!gSavedSettings.getBOOL("ShowNavbarNavigationPanel"))
+    const U32 location_bar = gSavedSettings.getU32("NavigationBarStyle");
+    if (location_bar != 2)
     {
         navbar->setVisible(false);
     }
@@ -2501,7 +2580,7 @@ void LLViewerWindow::initWorldUI()
     mTopInfoContainer->addChild(topinfo_bar);
     mTopInfoContainer->setVisible(true);
 
-    if (!gSavedSettings.getBOOL("ShowMiniLocationPanel"))
+    if (gSavedSettings.getU32("NavigationBarStyle") != 1)
     {
         topinfo_bar->setVisible(false);
     }
@@ -2539,35 +2618,30 @@ void LLViewerWindow::initWorldUI()
         gToolBarView->setVisible(true);
     }
 
+    // Don't preload cef instances on low end hardware
+    const F32Gigabytes MIN_PHYSICAL_MEMORY(8);
+    F32Gigabytes physical_mem = LLMemory::getMaxMemKB();
+    if (physical_mem <= 0)
+    {
+        LLMemory::updateMemoryInfo();
+        physical_mem = LLMemory::getMaxMemKB();
+    }
+
     if (!gNonInteractive)
     {
-        LLMediaCtrl* destinations = LLFloaterReg::getInstance("destinations")->getChild<LLMediaCtrl>("destination_guide_contents");
-        if (destinations)
+        if (physical_mem > MIN_PHYSICAL_MEMORY)
         {
-            destinations->setErrorPageURL(gSavedSettings.getString("GenericErrorPageURL"));
-            std::string url = gSavedSettings.getString("DestinationGuideURL");
-            url = LLWeb::expandURLSubstitutions(url, LLSD());
-            destinations->navigateTo(url, HTTP_CONTENT_TEXT_HTML);
+            LL_INFOS() << "Preloading cef instances" << LL_ENDL;
+
+            LLFloaterReg::getInstance("destinations");
+            LLFloaterReg::getInstance("avatar_welcome_pack");
+            LLFloaterReg::getInstance("search");
+            LLFloaterReg::getInstance("marketplace");
         }
-        LLMediaCtrl* avatar_welcome_pack = LLFloaterReg::getInstance("avatar_welcome_pack")->findChild<LLMediaCtrl>("avatar_picker_contents");
-        if (avatar_welcome_pack)
+        else if (gSavedSettings.getBOOL("FirstLoginThisInstall"))
         {
-            avatar_welcome_pack->setErrorPageURL(gSavedSettings.getString("GenericErrorPageURL"));
-            std::string url = gSavedSettings.getString("AvatarWelcomePack");
-            url = LLWeb::expandURLSubstitutions(url, LLSD());
-            avatar_welcome_pack->navigateTo(url, HTTP_CONTENT_TEXT_HTML);
-        }
-        LLMediaCtrl* search = LLFloaterReg::getInstance("search")->findChild<LLMediaCtrl>("search_contents");
-        if (search)
-        {
-            search->setErrorPageURL(gSavedSettings.getString("GenericErrorPageURL"));
-        }
-        LLMediaCtrl* marketplace = LLFloaterReg::getInstance("marketplace")->getChild<LLMediaCtrl>("marketplace_contents");
-        if (marketplace)
-        {
-            marketplace->setErrorPageURL(gSavedSettings.getString("GenericErrorPageURL"));
-            std::string url = gSavedSettings.getString("MarketplaceURL");
-            marketplace->navigateTo(url, HTTP_CONTENT_TEXT_HTML);
+            // Preload the welcome pack for first-time login even on low end hardware
+            LLFloaterReg::getInstance("avatar_welcome_pack");
         }
     }
 }
@@ -2675,10 +2749,12 @@ void LLViewerWindow::shutdownGL()
     LLViewerTextureManager::cleanup() ;
     SUBSYSTEM_CLEANUP(LLImageGL) ;
 
-    LL_INFOS() << "All textures and llimagegl images are destroyed!" << LL_ENDL ;
+    // The UI images' recorded draws hold vertex buffers, which go back to the pool while
+    // there is still one, and a context to delete their names in. LLUIImageList's own
+    // cleanUp comes after the window is gone.
+    LLUIImage::cleanupClass();
 
-    LL_INFOS() << "Cleaning up select manager" << LL_ENDL;
-    LLSelectMgr::getInstance()->cleanup();
+    LL_INFOS() << "All textures and llimagegl images are destroyed!" << LL_ENDL ;
 
     LL_INFOS() << "Stopping GL during shutdown" << LL_ENDL;
     stopGL();
@@ -2687,6 +2763,7 @@ void LLViewerWindow::shutdownGL()
     gGL.shutdown();
 
     SUBSYSTEM_CLEANUP(LLVertexBuffer);
+    ALUniformBuffer::cleanupClass();
 
     LL_INFOS() << "LLVertexBuffer cleaned." << LL_ENDL ;
 }
@@ -2748,7 +2825,7 @@ void LLViewerWindow::sendShapeToSim()
 
 // Must be called after window is created to set up agent
 // camera variables and UI variables.
-void LLViewerWindow::reshape(S32 width, S32 height)
+void LLViewerWindow::reshape(S32 width, S32 height, bool force_reshape)
 {
     // Destroying the window at quit time generates spurious
     // reshape messages.  We don't care about these, and we
@@ -2762,6 +2839,15 @@ void LLViewerWindow::reshape(S32 width, S32 height)
         mWindowRectRaw.mRight = mWindowRectRaw.mLeft + width;
         mWindowRectRaw.mTop = mWindowRectRaw.mBottom + height;
 
+        LL_DEBUGS("Window") << "reshape called:";
+        LLCoordWindow live_size;
+        mWindow->getSize(&live_size);
+        LL_CONT << " args=" << width << "x" << height
+            << " live_getSize=" << live_size.mX << "x" << live_size.mY
+            << " current_mDisplayScale=" << mDisplayScale
+            << " systemUISize=" << mWindow->getSystemUISize()
+            << LL_ENDL;
+
         //glViewport(0, 0, width, height );
 
         LLViewerCamera * camera = LLViewerCamera::getInstance(); // simpleton, might not exist
@@ -2773,7 +2859,7 @@ void LLViewerWindow::reshape(S32 width, S32 height)
 
         calcDisplayScale();
 
-        bool display_scale_changed = mDisplayScale != LLUI::getScaleFactor();
+        bool display_scale_changed = force_reshape || mDisplayScale != LLUI::getScaleFactor();
         LLUI::setScaleFactor(mDisplayScale);
         LLFontGL::sResolutionGeneration++;
 
@@ -2859,7 +2945,7 @@ void LLViewerWindow::setNormalControlsVisible( bool visible )
     {
         // when it's time to show navigation bar we need to ensure that the user wants to see it
         // i.e. ShowNavbarNavigationPanel option is true
-        mNavBarContainer->setVisible( visible && gSavedSettings.getBOOL("ShowNavbarNavigationPanel") );
+        mNavBarContainer->setVisible( visible && (gSavedSettings.getU32("NavigationBarStyle") == 2));
     }
 }
 
@@ -2882,30 +2968,13 @@ void LLViewerWindow::setMenuBackgroundColor(bool god_mode, bool dev_grid)
     }
     else
     {
-        switch (LLVersionInfo::instance().getViewerMaturity())
+        if (!LLGridManager::getInstance()->isInProductionGrid())
         {
-        case LLVersionInfo::TEST_VIEWER:
-            new_bg_color = LLUIColorTable::instance().getColor( "MenuBarTestBgColor" );
-            break;
-
-        case LLVersionInfo::PROJECT_VIEWER:
-            new_bg_color = LLUIColorTable::instance().getColor( "MenuBarProjectBgColor" );
-            break;
-
-        case LLVersionInfo::BETA_VIEWER:
-            new_bg_color = LLUIColorTable::instance().getColor( "MenuBarBetaBgColor" );
-            break;
-
-        case LLVersionInfo::RELEASE_VIEWER:
-            if(!LLGridManager::getInstance()->isInProductionGrid())
-            {
-                new_bg_color = LLUIColorTable::instance().getColor( "MenuNonProductionBgColor" );
-            }
-            else
-            {
-                new_bg_color = LLUIColorTable::instance().getColor( "MenuBarBgColor" );
-            }
-            break;
+            new_bg_color = LLUIColorTable::instance().getColor("MenuNonProductionBgColor");
+        }
+        else
+        {
+            new_bg_color = LLUIColorTable::instance().getColor("MenuBarBgColor");
         }
     }
 
@@ -2956,21 +3025,19 @@ void LLViewerWindow::draw()
 
     //S32 screen_x, screen_y;
 
-    if (!LLPipeline::RenderUIBuffer)
-    {
-        LLView::sDirtyRect = getWindowRectScaled();
-    }
+    LLView::sDirtyRect = getWindowRectScaled();
 
     // HACK for timecode debugging
-    static LLCachedControl<bool> displayTimecode(gSavedSettings, "DisplayTimecode", false);
-    if (displayTimecode)
+    if (gSavedSettings.getBOOL("DisplayTimecode"))
     {
         // draw timecode block
         std::string text;
 
         gGL.loadIdentity();
 
-        microsecondsToTimecodeString(gFrameTime,text);
+        // From the session's start: from the epoch's, the hours run past
+        // the three digits the timecode has for them.
+        microsecondsToTimecodeString(U64Microseconds(gFrameTimeSeconds), text);
         const LLFontGL* font = LLFontGL::getFontSansSerif();
         font->renderUTF8(text, 0,
                         ll_round((getWindowWidthScaled()/2)-100.f),
@@ -3012,7 +3079,7 @@ void LLViewerWindow::draw()
         // Draw tool specific overlay on world
         LLToolMgr::getInstance()->getCurrentTool()->draw();
 
-        if( gAgentCamera.cameraMouselook())
+        if (gAgentCamera.cameraMouselook())
         {
             drawMouselookInstructions();
             stop_glerror();
@@ -3070,7 +3137,6 @@ bool LLViewerWindow::handleKeyUp(KEY key, MASK mask)
     if (LLSetKeyBindDialog::recordKey(key, mask, false))
     {
         LL_DEBUGS() << "KeyUp handled by LLSetKeyBindDialog" << LL_ENDL;
-        LLViewerEventRecorder::instance().logKeyEvent(key, mask);
         return true;
     }
 
@@ -3096,12 +3162,12 @@ bool LLViewerWindow::handleKeyUp(KEY key, MASK mask)
     {
         if (keyboard_focus->handleKeyUp(key, mask, false))
         {
-            LL_DEBUGS() << "LLviewerWindow::handleKeyUp - in 'traverse up' - no loops seen... just called keyboard_focus->handleKeyUp an it returned true" << LL_ENDL;
-            LLViewerEventRecorder::instance().logKeyEvent(key, mask);
+            LL_DEBUGS() << "LLviewerWindow::handleKeyUp - in 'traverse up' - no loops seen... just called keyboard_focus->handleKeyUp and it returned true" << LL_ENDL;
             return true;
         }
-        else {
-            LL_DEBUGS() << "LLviewerWindow::handleKeyUp - in 'traverse up' - no loops seen... just called keyboard_focus->handleKeyUp an it returned false" << LL_ENDL;
+        else
+        {
+            LL_DEBUGS() << "LLviewerWindow::handleKeyUp - in 'traverse up' - no loops seen... just called keyboard_focus->handleKeyUp and it returned false" << LL_ENDL;
         }
     }
 
@@ -3109,7 +3175,6 @@ bool LLViewerWindow::handleKeyUp(KEY key, MASK mask)
     if (LLGestureMgr::instance().triggerGestureRelease(key, mask))
     {
         LL_DEBUGS() << "LLviewerWindow::handleKey new gesture release feature" << LL_ENDL;
-        LLViewerEventRecorder::instance().logKeyEvent(key,mask);
         return true;
     }
     //Old format gestures do not support this, so no need to implement it.
@@ -3131,8 +3196,27 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
     if (LLSetKeyBindDialog::recordKey(key, mask, true))
     {
         LL_DEBUGS() << "Key handled by LLSetKeyBindDialog" << LL_ENDL;
-        LLViewerEventRecorder::instance().logKeyEvent(key,mask);
         return true;
+    }
+
+    // The second of two keys, to the window waiting for it, before
+    // whatever has the keyboard would take it or type it.
+    if (ALKeyChords::takeKey(key, mask))
+    {
+        return true;
+    }
+
+    // Escape to a tool that holds the mouse -- an eyedropper waiting for its
+    // click, a drag under way -- before whatever has the keyboard: the window
+    // the tool was started from has it, and would take Escape only to drop
+    // its own focus, leaving the tool running.
+    if (key == KEY_ESCAPE && mask == MASK_NONE)
+    {
+        LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
+        if (tool && tool->hasMouseCapture() && tool->handleKey(key, mask))
+        {
+            return true;
+        }
     }
 
     LLFocusableElement* keyboard_focus = gFocusMgr.getKeyboardFocus();
@@ -3152,7 +3236,25 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
         if (cur_focus && cur_focus->acceptsTextInput())
 #endif
         {
-#if defined(LL_WINDOWS) && !LL_SDL_WINDOW
+#if LL_SDL_WINDOW
+            // SDL3: where AltGr arrives as an Alt (Right-Alt with no Ctrl,
+            // unlike Win32 where the AltGr generates a synthetic Ctrl too),
+            // LLKeyboardSDL folds it into MASK_ALT, so the menu/binding
+            // dispatch below would otherwise route an AltGr-modified
+            // printable key (AltGr+E for €, AltGr+S for ß, AltGr+W for the
+            // ł on Polish, etc.) to the in-world "Alt+letter" binding
+            // alongside SDL3's TEXT_INPUT delivering the composed character.
+            // Suppress the binding dispatch when AltGr is active and the
+            // key is a printable ASCII letter / digit / symbol. On Linux
+            // AltGr is xkb's level-three shift, which is never an Alt, so
+            // it doesn't reach the Alt bindings to begin with.
+            if (mWindow->isAltGrPressed() && (mask & MASK_ALT) && key >= 0x20 && key < 0x80)
+            {
+                return true;
+            }
+#endif
+
+#if LL_WINDOWS && !LL_SDL_WINDOW
             // On windows Alt Gr key generates additional Ctrl event, as result handling situations
             // like 'AltGr + D' will result in 'Alt+Ctrl+D'. If it results in WM_CHAR, don't let it
             // pass into menu or it will trigger 'develop' menu assigned to this combination on top
@@ -3195,7 +3297,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
             }
 #endif
 
-            if (!(mask & (MASK_CONTROL | MASK_ALT)))
+            if (!(mask & (MASK_CONTROL | MASK_ALT | MASK_MAC_CONTROL)))
             {
                 // We have keyboard focus, and it's not an accelerator
                 if (keyboard_focus && keyboard_focus->wantsKeyUpKeyDown())
@@ -3217,21 +3319,20 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
         ||(gMenuHolder && gMenuHolder->handleKey(key, mask, true)))
     {
         LL_DEBUGS() << "LLviewerWindow::handleKey handle nav keys for nav" << LL_ENDL;
-        LLViewerEventRecorder::instance().logKeyEvent(key,mask);
         return true;
     }
 
 
     // give menus a chance to handle modified (Ctrl, Alt) shortcut keys before current focus
     // as long as focus isn't locked
-    if (mask & (MASK_CONTROL | MASK_ALT) && !gFocusMgr.focusLocked())
+    // The Mac's own Control key too, which a menu item may ask for by name.
+    if (mask & (MASK_CONTROL | MASK_ALT | MASK_MAC_CONTROL) && !gFocusMgr.focusLocked())
     {
         // Check the current floater's menu first, if it has one.
         if (gFocusMgr.keyboardFocusHasAccelerators()
             && keyboard_focus
             && keyboard_focus->handleKey(key,mask,false))
         {
-            LLViewerEventRecorder::instance().logKeyEvent(key,mask);
             return true;
         }
 
@@ -3240,13 +3341,11 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
             && gMenuBarView
             && gMenuBarView->handleAcceleratorKey(key, mask))
         {
-            LLViewerEventRecorder::instance().logKeyEvent(key, mask);
             return true;
         }
 
         if (gLoginMenuBarView && gLoginMenuBarView->handleAcceleratorKey(key, mask))
         {
-            LLViewerEventRecorder::instance().logKeyEvent(key,mask);
             return true;
         }
     }
@@ -3254,13 +3353,16 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
     // give floaters first chance to handle TAB key
     // so frontmost floater gets focus
     // if nothing has focus, go to first or last UI element as appropriate
-    if (key == KEY_TAB && (mask & MASK_CONTROL || keyboard_focus == NULL))
+    // Control-Tab is Control-Tab on the Mac too, where Command-Tab is the
+    // system's.
+    const bool control_tab = key == KEY_TAB && (mask & (MASK_CONTROL | MASK_MAC_CONTROL)) != 0;
+    if (key == KEY_TAB && (control_tab || keyboard_focus == NULL))
     {
         LL_WARNS() << "LLviewerWindow::handleKey give floaters first chance at tab key " << LL_ENDL;
         if (gMenuHolder) gMenuHolder->hideMenus();
 
         // if CTRL-tabbing (and not just TAB with no focus), go into window cycle mode
-        gFloaterView->setCycleMode((mask & MASK_CONTROL) != 0);
+        gFloaterView->setCycleMode(control_tab);
 
         // do CTRL-TAB and CTRL-SHIFT-TAB logic
         if (mask & MASK_SHIFT)
@@ -3271,13 +3373,11 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
         {
             mRootView->focusNextRoot();
         }
-        LLViewerEventRecorder::instance().logKeyEvent(key,mask);
         return true;
     }
     // hidden edit menu for cut/copy/paste
     if (gEditMenu && gEditMenu->handleAcceleratorKey(key, mask))
     {
-        LLViewerEventRecorder::instance().logKeyEvent(key,mask);
         return true;
     }
 
@@ -3286,7 +3386,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
 
     if( keyboard_focus )
     {
-        if ((focusedFloaterName == "nearby_chat") || (focusedFloaterName == "im_container") || (focusedFloaterName == "impanel"))
+        if ((focusedFloaterName == "chatbar") || (focusedFloaterName == "nearby_chat") || (focusedFloaterName == "im_container") || (focusedFloaterName == "impanel"))
         {
             static LLCachedControl<bool> key_move(gSavedSettings, "ArrowKeysAlwaysMove");
             if (key_move())
@@ -3319,26 +3419,25 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
         if (keyboard_focus->handleKey(key, mask, false))
         {
 
-            LL_DEBUGS() << "LLviewerWindow::handleKey - in 'traverse up' - no loops seen... just called keyboard_focus->handleKey an it returned true" << LL_ENDL;
-            LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+            LL_DEBUGS("Window") << "LLViewerWindow::handleKey - in 'traverse up' - no loops seen... just called keyboard_focus->handleKey and it returned true" << LL_ENDL;
             return true;
-        } else {
-            LL_DEBUGS() << "LLviewerWindow::handleKey - in 'traverse up' - no loops seen... just called keyboard_focus->handleKey an it returned false" << LL_ENDL;
+        }
+        else
+        {
+            LL_DEBUGS("Window") << "LLViewerWindow::handleKey - in 'traverse up' - no loops seen... just called keyboard_focus->handleKey and it returned false" << LL_ENDL;
         }
     }
 
     if( LLToolMgr::getInstance()->getCurrentTool()->handleKey(key, mask) )
     {
-        LL_DEBUGS() << "LLviewerWindow::handleKey toolbar handling?" << LL_ENDL;
-        LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+        LL_DEBUGS("Window") << "LLViewerWindow::handleKey toolbar handling?" << LL_ENDL;
         return true;
     }
 
     // Try for a new-format gesture
     if (LLGestureMgr::instance().triggerGesture(key, mask))
     {
-        LL_DEBUGS() << "LLviewerWindow::handleKey new gesture feature" << LL_ENDL;
-        LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+        LL_DEBUGS("Window") << "LLViewerWindow::handleKey new gesture feature" << LL_ENDL;
         return true;
     }
 
@@ -3347,31 +3446,46 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
     if (gGestureList.trigger(key, mask))
     {
         LL_DEBUGS() << "LLviewerWindow::handleKey check gesture trigger" << LL_ENDL;
-        LLViewerEventRecorder::instance().logKeyEvent(key,mask);
         return true;
     }
 
     // If "Pressing letter keys starts local chat" option is selected, we are not in mouselook,
     // no view has keyboard focus, this is a printable character key (and no modifier key is
     // pressed except shift), then give focus to nearby chat (STORM-560)
+    static const LLCachedControl<bool> letter_keys_Focus_chat_bar(gSavedSettings, "LetterKeysFocusChatBar");
     if ( LLStartUp::getStartupState() >= STATE_STARTED &&
-        gSavedSettings.getS32("LetterKeysFocusChatBar") && !gAgentCamera.cameraMouselook() &&
+        letter_keys_Focus_chat_bar && !gAgentCamera.cameraMouselook() &&
         !keyboard_focus && key < 0x80 && (mask == MASK_NONE || mask == MASK_SHIFT) )
     {
-        // Initialize nearby chat if it's missing
-        LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
-        if (!nearby_chat)
+        static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+        if (!sChatInWindow)
         {
-            LLSD name("im_container");
-            LLFloaterReg::toggleInstanceOrBringToFront(name);
-        }
+            // Initialize nearby chat if it's missing
+            LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
+            if (!nearby_chat)
+            {
+                LLSD name("im_container");
+                LLFloaterReg::toggleInstanceOrBringToFront(name);
+                // Now try to find it again since container parent should be spawned
+                nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
+            }
 
-        LLChatEntry* chat_editor = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat")->getChatBox();
-        if (chat_editor)
+            LLChatEntry* chat_editor = nearby_chat ? nearby_chat->getChatBox() : nullptr;
+            if (chat_editor)
+            {
+                // passing nullptr here, character will be added later when it is handled by character handler.
+                nearby_chat->startChat(nullptr);
+                return true;
+            }
+        }
+        else
         {
-            // passing NULL here, character will be added later when it is handled by character handler.
-            nearby_chat->startChat(NULL);
-            return true;
+            ALChatBar* chat_bar = LLFloaterReg::findTypedInstance<ALChatBar>("chatbar");
+            if (!chat_bar)
+                LLFloaterReg::toggleInstanceOrBringToFront("chatbar");
+
+            ALChatBar::startChat(nullptr);
+            return TRUE;
         }
     }
 
@@ -3381,7 +3495,6 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
         && gMenuBarView
         && gMenuBarView->handleAcceleratorKey(key, mask))
     {
-        LLViewerEventRecorder::instance().logKeyEvent(key, mask);
         return true;
     }
 
@@ -3399,12 +3512,18 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
 
 bool LLViewerWindow::handleUnicodeChar(llwchar uni_char, MASK mask)
 {
+    // The character of a key taken as the second of two.
+    if (ALKeyChords::takeChar(uni_char))
+    {
+        return true;
+    }
+
     // HACK:  We delay processing of return keys until they arrive as a Unicode char,
     // so that if you're typing chat text at low frame rate, we don't send the chat
     // until all keystrokes have been entered. JC
     // HACK: Numeric keypad <enter> on Mac is Unicode 3
     // HACK: Control-M on Windows is Unicode 13
-    if ((uni_char == 13 && mask != MASK_CONTROL)
+    if ((uni_char == 13 && mask != MASK_CONTROL && mask != MASK_SHIFT)
         || (uni_char == 3 && mask == MASK_NONE) )
     {
         if (mask != MASK_ALT)
@@ -3436,9 +3555,14 @@ bool LLViewerWindow::handleUnicodeChar(llwchar uni_char, MASK mask)
 }
 
 
-void LLViewerWindow::handleScrollWheel(S32 clicks)
+void LLViewerWindow::handleScrollWheel(LLScrollDelta delta)
 {
     LLUI::getInstance()->resetMouseIdleTimer();
+
+    // Scale the precise (smooth) component by the user's sensitivity multiplier.
+    // Discrete consumers read delta.mClicks and are intentionally left untouched.
+    static LLCachedControl<F32> scroll_sensitivity(gSavedSettings, "MouseWheelScrollSensitivity", 1.f);
+    delta.mPrecise *= scroll_sensitivity;
 
     LLMouseHandler* mouse_captor = gFocusMgr.getMouseCapture();
     if( mouse_captor )
@@ -3446,10 +3570,10 @@ void LLViewerWindow::handleScrollWheel(S32 clicks)
         S32 local_x;
         S32 local_y;
         mouse_captor->screenPointToLocal( mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y );
-        mouse_captor->handleScrollWheel(local_x, local_y, clicks);
+        mouse_captor->handleScrollWheel(local_x, local_y, delta);
         if (LLView::sDebugMouseHandling)
         {
-            LL_INFOS() << "Scroll Wheel handled by captor " << mouse_captor->getName() << LL_ENDL;
+            LL_INFOS("Window") << "Scroll Wheel handled by captor " << mouse_captor->getName() << LL_ENDL;
         }
         return;
     }
@@ -3460,10 +3584,10 @@ void LLViewerWindow::handleScrollWheel(S32 clicks)
         S32 local_x;
         S32 local_y;
         top_ctrl->screenPointToLocal( mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y );
-        if (top_ctrl->handleScrollWheel(local_x, local_y, clicks)) return;
+        if (top_ctrl->handleScrollWheel(local_x, local_y, delta)) return;
     }
 
-    if (mRootView->handleScrollWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, clicks) )
+    if (mRootView->handleScrollWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, delta) )
     {
         if (LLView::sDebugMouseHandling)
         {
@@ -3473,7 +3597,7 @@ void LLViewerWindow::handleScrollWheel(S32 clicks)
     }
     else if (LLView::sDebugMouseHandling)
     {
-        LL_INFOS() << "Scroll Wheel not handled by view" << LL_ENDL;
+        LL_INFOS("Window") << "Scroll Wheel not handled by view" << LL_ENDL;
     }
 
     // Zoom the camera in and out behavior
@@ -3481,12 +3605,12 @@ void LLViewerWindow::handleScrollWheel(S32 clicks)
     if(top_ctrl == 0
         && getWorldViewRectScaled().pointInRect(mCurrentMousePoint.mX, mCurrentMousePoint.mY)
         && gAgentCamera.isInitialized())
-        gAgentCamera.handleScrollWheel(clicks);
+        gAgentCamera.handleScrollWheel(delta.mPrecise);
 
     return;
 }
 
-void LLViewerWindow::handleScrollHWheel(S32 clicks)
+void LLViewerWindow::handleScrollHWheel(LLScrollDelta delta)
 {
     if (LLAppViewer::instance()->quitRequested())
     {
@@ -3495,16 +3619,19 @@ void LLViewerWindow::handleScrollHWheel(S32 clicks)
 
     LLUI::getInstance()->resetMouseIdleTimer();
 
+    static LLCachedControl<F32> scroll_sensitivity(gSavedSettings, "MouseWheelScrollSensitivity", 1.f);
+    delta.mPrecise *= scroll_sensitivity;
+
     LLMouseHandler* mouse_captor = gFocusMgr.getMouseCapture();
     if (mouse_captor)
     {
         S32 local_x;
         S32 local_y;
         mouse_captor->screenPointToLocal(mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y);
-        mouse_captor->handleScrollHWheel(local_x, local_y, clicks);
+        mouse_captor->handleScrollHWheel(local_x, local_y, delta);
         if (LLView::sDebugMouseHandling)
         {
-            LL_INFOS() << "Scroll Horizontal Wheel handled by captor " << mouse_captor->getName() << LL_ENDL;
+            LL_INFOS("Window") << "Scroll Horizontal Wheel handled by captor " << mouse_captor->getName() << LL_ENDL;
         }
         return;
     }
@@ -3515,10 +3642,10 @@ void LLViewerWindow::handleScrollHWheel(S32 clicks)
         S32 local_x;
         S32 local_y;
         top_ctrl->screenPointToLocal(mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y);
-        if (top_ctrl->handleScrollHWheel(local_x, local_y, clicks)) return;
+        if (top_ctrl->handleScrollHWheel(local_x, local_y, delta)) return;
     }
 
-    if (mRootView->handleScrollHWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, clicks))
+    if (mRootView->handleScrollHWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, delta))
     {
         if (LLView::sDebugMouseHandling)
         {
@@ -3528,7 +3655,7 @@ void LLViewerWindow::handleScrollHWheel(S32 clicks)
     }
     else if (LLView::sDebugMouseHandling)
     {
-        LL_INFOS() << "Scroll Horizontal Wheel not handled by view" << LL_ENDL;
+        LL_INFOS("Window") << "Scroll Horizontal Wheel not handled by view" << LL_ENDL;
     }
 
     return;
@@ -3560,7 +3687,31 @@ void LLViewerWindow::clearPopups()
 
 void LLViewerWindow::moveCursorToCenter()
 {
-    if (! gSavedSettings.getBOOL("DisableMouseWarp"))
+    bool mouse_warp = false;
+    static LLCachedControl<S32> mouse_warp_mode(gSavedSettings, "MouseWarpMode", 1);
+
+    switch (mouse_warp_mode())
+    {
+    case 0:
+        // For Windows:
+        // Mouse usually uses 'delta' position since it isn't aware of own location, keep it centered.
+        // Touch screen reports absolute or virtual absolute position and warping a physical
+        // touch is pointless, so don't move it.
+        //
+        // MacOS
+        // If 'decoupled', CGAssociateMouseAndMouseCursorPosition can make mouse stay in
+        // one place and not move, do not move it (needs testing).
+        mouse_warp = mWindow->isWrapMouse();
+        break;
+    case 1:
+        mouse_warp = true;
+        break;
+    default:
+        mouse_warp = false;
+        break;
+    }
+
+    if (mouse_warp)
     {
         S32 x = getWorldViewWidthScaled() / 2;
         S32 y = getWorldViewHeightScaled() / 2;
@@ -3598,7 +3749,7 @@ void append_xui_tooltip(LLView* viewp, LLToolTip::Params& params)
 
             params.styled_message.add().text(viewp->getName());
 
-            LLPanel* panelp = dynamic_cast<LLPanel*>(viewp);
+            LLPanel* panelp = viewp->as<LLPanel>();
             if (panelp && !panelp->getXMLFilename().empty())
             {
                 params.styled_message.add()
@@ -3610,13 +3761,11 @@ void append_xui_tooltip(LLView* viewp, LLToolTip::Params& params)
     }
 }
 
-static LLTrace::BlockTimerStatHandle ftm("Update UI");
-
 // Update UI based on stored mouse position from mouse-move
 // event processing.
 void LLViewerWindow::updateUI()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI; //LL_RECORD_BLOCK_TIME(ftm);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     static std::string last_handle_msg;
 
@@ -3634,10 +3783,15 @@ void LLViewerWindow::updateUI()
         }
     }
 
-    LLConsole::updateClass();
+    {
+        LL_PROFILE_ZONE_NAMED("UI updateClass");
+        LLConsole::updateClass();
 
-    // animate layout stacks so we have up to date rect for world view
-    LLLayoutStack::updateClass();
+        // execute postponed arrange calls
+        LLAccordionCtrl::updateClass();
+        // animate layout stacks so we have up to date rect for world view
+        LLLayoutStack::updateClass();
+    }
 
     // use full window for world view when not rendering UI
     bool world_view_uses_full_window = gAgentCamera.cameraMouselook() || !gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI);
@@ -3650,13 +3804,14 @@ void LLViewerWindow::updateUI()
 
     MASK    mask = gKeyboard->currentMask(true);
 
+    static LLCachedControl<bool> focus_point_follows_pointer(gSavedSettings, "RenderFocusPointFollowsPointer", false);
+    static LLCachedControl<bool> focus_point_locked(gSavedSettings, "RenderFocusPointLocked", false);
+
     if (gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_RAYCAST))
     {
-        gDebugRaycastFaceHit = gDebugRaycastGLTFNodeHit = gDebugRaycastGLTFPrimitiveHit = -1;
+        gDebugRaycastFaceHit = -1;
         gDebugRaycastObject = cursorIntersect(-1, -1, 512.f, NULL, -1, false, false, true, false,
                                               &gDebugRaycastFaceHit,
-                                              &gDebugRaycastGLTFNodeHit,
-                                              &gDebugRaycastGLTFPrimitiveHit,
                                               &gDebugRaycastIntersection,
                                               &gDebugRaycastTexCoord,
                                               &gDebugRaycastNormal,
@@ -3666,6 +3821,18 @@ void LLViewerWindow::updateUI()
 
         gDebugRaycastParticle = gPipeline.lineSegmentIntersectParticle(gDebugRaycastStart, gDebugRaycastEnd, &gDebugRaycastParticleIntersection, NULL);
     }
+    else if (focus_point_follows_pointer && !focus_point_locked && LLPipeline::RenderDepthOfField)
+    { //keep the depth of field focus point under the pointer up to date. Picking is
+      //tool dependent and stops entirely while the pointer is over the UI, so the focus
+      //point needs its own raycast. cursorIntersect only writes gDebugRaycastIntersection
+      //when the ray hits something, so a miss holds the last focus point instead of
+      //throwing focus out to the far end of the ray. Rigged geometry is picked here
+      //because mesh avatars are the usual subject.
+        LLVector4a intersection;
+        intersection.clear();
+
+        cursorIntersect(-1, -1, 512.f, NULL, -1, false, true, true, false, NULL, &intersection);
+    }
 
     updateMouseDelta();
     updateKeyboardFocus();
@@ -3674,7 +3841,7 @@ void LLViewerWindow::updateUI()
 
     LLUICtrl* top_ctrl = gFocusMgr.getTopCtrl();
     LLMouseHandler* mouse_captor = gFocusMgr.getMouseCapture();
-    LLView* captor_view = dynamic_cast<LLView*>(mouse_captor);
+    LLView* captor_view = gFocusMgr.getMouseCaptureView();
 
     //FIXME: only include captor and captor's ancestors if mouse is truly over them --RN
 
@@ -3705,7 +3872,7 @@ void LLViewerWindow::updateUI()
         }
         if (child_count_timer.hasExpired())
         {
-            LL_INFOS() << "gMenuHolder child count: " << gMenuHolder->getChildCount() << LL_ENDL;
+            LL_INFOS("Window") << "gMenuHolder child count: " << gMenuHolder->getChildCount() << LL_ENDL;
             std::vector<std::string> local_child_vec;
             LLView::child_list_t child_list = *gMenuHolder->getChildList();
             for (auto child : child_list)
@@ -3720,7 +3887,7 @@ void LLViewerWindow::updateUI()
                 std::set_difference(child_vec.begin(), child_vec.end(), local_child_vec.begin(), local_child_vec.end(), std::inserter(out_vec, out_vec.begin()));
                 if (!out_vec.empty())
                 {
-                    LL_INFOS() << "gMenuHolder removal diff size: '"<<out_vec.size() <<"' begin_child_diff";
+                    LL_INFOS("Window") << "gMenuHolder removal diff size: '"<<out_vec.size() <<"' begin_child_diff";
                     for (auto str : out_vec)
                     {
                         LL_CONT << " : " << str;
@@ -3732,7 +3899,7 @@ void LLViewerWindow::updateUI()
                 std::set_difference(local_child_vec.begin(), local_child_vec.end(), child_vec.begin(), child_vec.end(), std::inserter(out_vec, out_vec.begin()));
                 if (!out_vec.empty())
                 {
-                    LL_INFOS() << "gMenuHolder addition diff size: '" << out_vec.size() << "' begin_child_diff";
+                    LL_INFOS("Window") << "gMenuHolder addition diff size: '" << out_vec.size() << "' begin_child_diff";
                     for (auto str : out_vec)
                     {
                         LL_CONT << " : " << str;
@@ -3973,12 +4140,12 @@ void LLViewerWindow::updateUI()
                     }
                     // only report xui names for LLUICtrls,
                     // and blacklist the various containers we don't care about
-                    else if (dynamic_cast<LLUICtrl*>(viewp)
+                    else if (viewp->as<LLUICtrl>()
                             && viewp != gMenuHolder
                             && viewp != gFloaterView
                             && viewp != gConsole)
                     {
-                        if (dynamic_cast<LLFloater*>(viewp))
+                        if (viewp->as<LLFloater>())
                         {
                             // constrain search to descendants of this (frontmost) floater
                             // by resetting iterator
@@ -4066,14 +4233,14 @@ void LLViewerWindow::updateUI()
 
 void LLViewerWindow::updateLayout()
 {
-    static LLCachedControl<bool> freeze_time(gSavedSettings, "FreezeTime", false);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
     if (gFloaterTools != NULL
         && tool != NULL
         && tool != gToolNull
         && tool != LLToolCompInspect::getInstance()
         && tool != LLToolDragAndDrop::getInstance()
-        && !freeze_time)
+        && !gSavedSettings.getBOOL("FreezeTime"))
     {
         // Suppress the toolbox view if our source tool was the pie tool,
         // and we've overridden to something else.
@@ -4090,7 +4257,7 @@ void LLViewerWindow::updateLayout()
                 && tool != LLToolCompGun::getInstance()                 // not coming out of mouselook
                 && !suppress_toolbox                                    // not override in third person
                 && LLToolMgr::getInstance()->getCurrentToolset()->isShowFloaterTools()
-                && (!captor || dynamic_cast<LLView*>(captor) != NULL)))                     // not dragging
+                && (!captor || gFocusMgr.getMouseCaptureView() != NULL)))                     // not dragging
         {
             // Force floater tools to be visible (unless minimized)
             if (!gFloaterTools->getVisible())
@@ -4120,8 +4287,13 @@ void LLViewerWindow::updateLayout()
 
 void LLViewerWindow::updateMouseDelta()
 {
-#if LL_WINDOWS && !LL_SDL_WINDOW
-    LLCoordCommon delta;
+#if LL_WINDOWS || LL_SDL_WINDOW
+    // Pull the accumulated per-event motion delta from the backend.
+    // Win32 sources this from raw input; SDL3 from SDL_EVENT_MOUSE_MOTION
+    // event.motion.xrel/yrel. Either way it captures every sub-frame
+    // motion event, which the position-difference fallback below truncates
+    // away at high frame rates where the per-frame motion is sub-pixel.
+    LLCoordCommon delta { 0, 0 };
     mWindow->getCursorDelta(&delta);
     S32 dx = delta.mX;
     S32 dy = delta.mY;
@@ -4147,8 +4319,7 @@ void LLViewerWindow::updateMouseDelta()
 
     LLVector2 mouse_vel;
 
-    static LLCachedControl<bool> mouseSmooth(gSavedSettings, "MouseSmooth");
-    if (mouseSmooth)
+    if (gSavedSettings.getBOOL("MouseSmooth"))
     {
         static F32 fdx = 0.f;
         static F32 fdy = 0.f;
@@ -4177,7 +4348,7 @@ void LLViewerWindow::updateKeyboardFocus()
     }
 
     // clean up current focus
-    LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl* cur_focus = gFocusMgr.getKeyboardFocusCtrl();
     if (cur_focus)
     {
         bool is_in_visible_chain = cur_focus->isInVisibleChain();
@@ -4267,14 +4438,16 @@ void LLViewerWindow::updateKeyboardFocus()
     }
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_WORLD_VIEW("Update World View");
 void LLViewerWindow::updateWorldViewRect(bool use_full_window)
 {
-    LL_RECORD_BLOCK_TIME(FTM_UPDATE_WORLD_VIEW);
+    LL_PROFILE_ZONE_SCOPED;
 
     // start off using whole window to render world
     LLRect new_world_rect = mWindowRectRaw;
 
+#if 0 // Disable dynamic world view resizing for now since it causes some peformance issues on large displays when entering/leaving
+      // mouselook or hiding UI. We can re-enable this in the future when we have a better solution for the performance issues, such as
+      // rendering to a smaller offscreen buffer and then upscaling to the window size.
     if (!use_full_window && mWorldViewPlaceholder.get())
     {
         new_world_rect = mWorldViewPlaceholder.get()->calcScreenRect();
@@ -4287,6 +4460,7 @@ void LLViewerWindow::updateWorldViewRect(bool use_full_window)
         new_world_rect.mBottom = ll_round((F32)new_world_rect.mBottom * mDisplayScale.mV[VY]);
         new_world_rect.mTop = ll_round((F32)new_world_rect.mTop * mDisplayScale.mV[VY]);
     }
+#endif
 
     if (mWorldViewRectRaw != new_world_rect)
     {
@@ -4348,8 +4522,19 @@ void LLViewerWindow::renderSelections( bool for_gl_pick, bool pick_parcel_walls,
     if (!for_hud && !for_gl_pick)
     {
         // Call this once and only once
-        LLSelectMgr::getInstance()->updateSilhouettes();
+        LLSelectMgr::getInstance()->updateHighlightedObjects();
     }
+
+    // <FS:Beq> render the poser manipulator guides
+    // if we have something selected those toosl should override
+    if (!for_hud && selection->isEmpty())
+    {
+        if (LLToolMgr::getInstance()->getCurrentTool() == FSToolCompPose::getInstance())
+            FSToolCompPose::getInstance()->render();
+        if (LLToolMgr::getInstance()->getCurrentTool() == FSToolCompPoseTranslate::getInstance())
+            FSToolCompPoseTranslate::getInstance()->render();
+    }
+    // </FS:Beq>
 
     // Draw fence around land selections
     if (for_gl_pick)
@@ -4358,12 +4543,19 @@ void LLViewerWindow::renderSelections( bool for_gl_pick, bool pick_parcel_walls,
         {
             LLViewerParcelMgr::getInstance()->renderParcelCollision();
         }
+        return;
     }
-    else if (( for_hud && selection->getSelectType() == SELECT_TYPE_HUD) ||
-             (!for_hud && selection->getSelectType() != SELECT_TYPE_HUD))
+
+    // The world's outlines every frame, for what the pointer is over glows in the world wherever the selection is;
+    // the HUD's while the selection is on it.
+    if (!for_hud || selection->getSelectType() == SELECT_TYPE_HUD)
     {
         LLSelectMgr::getInstance()->renderSilhouettes(for_hud);
+    }
 
+    if (( for_hud && selection->getSelectType() == SELECT_TYPE_HUD) ||
+        (!for_hud && selection->getSelectType() != SELECT_TYPE_HUD))
+    {
         stop_glerror();
 
         // setup HUD render
@@ -4388,7 +4580,7 @@ void LLViewerWindow::renderSelections( bool for_gl_pick, bool pick_parcel_walls,
         // Render light for editing
         if (LLSelectMgr::sRenderLightRadius && LLToolMgr::getInstance()->inEdit())
         {
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
             LLGLEnable gls_blend(GL_BLEND);
             LLGLEnable gls_cull(GL_CULL_FACE);
             LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
@@ -4528,11 +4720,11 @@ bool LLViewerWindow::clickPointOnSurfaceGlobal(const S32 x, const S32 y, LLViewe
     if (!intersect)
     {
         point_global = clickPointInWorldGlobal(x, y, objectp);
-        LL_INFOS() << "approx intersection at " <<  (objectp->getPositionGlobal() - point_global) << LL_ENDL;
+        LL_INFOS("Window") << "approx intersection at " <<  (objectp->getPositionGlobal() - point_global) << LL_ENDL;
     }
     else
     {
-        LL_INFOS() << "good intersection at " <<  (objectp->getPositionGlobal() - point_global) << LL_ENDL;
+        LL_INFOS("Window") << "good intersection at " <<  (objectp->getPositionGlobal() - point_global) << LL_ENDL;
     }
 
     return intersect;
@@ -4547,15 +4739,15 @@ void LLViewerWindow::pickAsync( S32 x,
                                 bool pick_unselectable,
                                 bool pick_reflection_probes)
 {
+    static LLCachedControl<bool> select_invisible_objects(gSavedSettings, "SelectInvisibleObjects");
     // "Show Debug Alpha" means no object actually transparent
     bool in_build_mode = LLFloaterReg::instanceVisible("build");
-    if (LLDrawPoolAlpha::sShowDebugAlpha
-        || (in_build_mode && gSavedSettings.getBOOL("SelectInvisibleObjects")))
+    if (LLDrawPoolAlpha::sShowDebugAlpha || (in_build_mode && select_invisible_objects))
     {
         pick_transparent = true;
     }
 
-    LLPickInfo pick_info(LLCoordGL(x, y_from_bot), mask, pick_transparent, pick_rigged, false, pick_reflection_probes, pick_unselectable, true, callback);
+    LLPickInfo pick_info(LLCoordGL(x, y_from_bot), mask, pick_transparent, pick_rigged, false, pick_reflection_probes, true, pick_unselectable, callback);
     schedulePick(pick_info);
 }
 
@@ -4578,7 +4770,6 @@ void LLViewerWindow::schedulePick(LLPickInfo& pick_info)
     // until the pick triggered in handleMouseDown has been processed, for example
     mWindow->delayInputProcessing();
 }
-
 
 void LLViewerWindow::performPick()
 {
@@ -4613,8 +4804,9 @@ void LLViewerWindow::returnEmptyPicks()
 // Performs the GL object/land pick.
 LLPickInfo LLViewerWindow::pickImmediate(S32 x, S32 y_from_bot, bool pick_transparent, bool pick_rigged, bool pick_particle, bool pick_unselectable, bool pick_reflection_probe)
 {
+    static LLCachedControl<bool> select_invisible_objects(gSavedSettings, "SelectInvisibleObjects");
     bool in_build_mode = LLFloaterReg::instanceVisible("build");
-    if ((in_build_mode && gSavedSettings.getBOOL("SelectInvisibleObjects")) || LLDrawPoolAlpha::sShowDebugAlpha)
+    if ((in_build_mode && select_invisible_objects) || LLDrawPoolAlpha::sShowDebugAlpha)
     {
         // build mode allows interaction with all transparent objects
         // "Show Debug Alpha" means no object actually transparent
@@ -4622,7 +4814,7 @@ LLPickInfo LLViewerWindow::pickImmediate(S32 x, S32 y_from_bot, bool pick_transp
     }
 
     // shortcut queueing in mPicks and just update mLastPick in place
-    MASK    key_mask = gKeyboard->currentMask(true);
+    MASK key_mask = gKeyboard->currentMask(true);
     mLastPick = LLPickInfo(LLCoordGL(x, y_from_bot), key_mask, pick_transparent, pick_rigged, pick_particle, pick_reflection_probe, true, false, NULL);
     mLastPick.fetchResults();
 
@@ -4663,8 +4855,6 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
                                                 bool pick_unselectable,
                                                 bool pick_reflection_probe,
                                                 S32* face_hit,
-                                                S32* gltf_node_hit,
-                                                S32* gltf_primitive_hit,
                                                 LLVector4a *intersection,
                                                 LLVector2 *uv,
                                                 LLVector4a *normal,
@@ -4702,9 +4892,10 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
     LLVector3 mouse_world_start = mouse_point_global;
     LLVector3 mouse_world_end   = mouse_point_global + mouse_direction_global * depth;
 
-    if (!LLViewerJoystick::getInstance()->getOverrideCamera())
+    static LLCachedControl<bool> focus_point_follows_pointer(gSavedSettings, "RenderFocusPointFollowsPointer", false);
+    if (!LLViewerJoystick::getInstance()->getOverrideCamera() && !focus_point_follows_pointer)
     { //always set raycast intersection to mouse_world_end unless
-        //flycam is on (for DoF effect)
+        //flycam is on or the focus point is following the pointer (for DoF effect)
         gDebugRaycastIntersection.load3(mouse_world_end.mV);
     }
 
@@ -4765,8 +4956,8 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
         if (!found) // if not found in HUD, look in world:
         {
             found = gPipeline.lineSegmentIntersectInWorld(mw_start, mw_end, pick_transparent, pick_rigged, pick_unselectable, pick_reflection_probe,
-                                                          face_hit, gltf_node_hit, gltf_primitive_hit, intersection, uv, normal, tangent);
-            if (found && !pick_transparent)
+                                                          face_hit, intersection, uv, normal, tangent);
+            if (found && !pick_transparent && intersection)
             {
                 gDebugRaycastIntersection = *intersection;
             }
@@ -4911,12 +5102,29 @@ bool LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
     F32         land_z;
     const F32   FIRST_PASS_STEP = 1.0f;     // meters
     const F32   SECOND_PASS_STEP = 0.1f;    // meters
-    const F32   draw_distance = ignore_distance ? MAX_FAR_CLIP : gAgentCamera.mDrawDistance;
+    const F32   draw_distance = ignore_distance ? llmax(FORWARD_Z_MAX_FAR_CLIP, gAgentCamera.mDrawDistance) : gAgentCamera.mDrawDistance;
     LLVector3d  camera_pos_global;
 
     camera_pos_global = gAgentCamera.getCameraPositionGlobal();
     LLVector3d      probe_point_global;
     LLVector3       probe_point_region;
+
+    // The walk probes every metre out to the draw distance, and a 2048 m draw distance loads up to some 200 regions,
+    // all of which LLWorld::resolveRegionGlobal scans. A probe almost always lies in the region the last one did, so
+    // that one is asked first; regions do not overlap, so the answer is the scan's.
+    LLViewerRegion* last_region = nullptr;
+    const auto resolve_region = [&last_region](LLVector3& pos_region, const LLVector3d& pos_global) -> LLViewerRegion*
+    {
+        if (!last_region || !last_region->pointInRegionGlobal(pos_global))
+        {
+            last_region = LLWorld::getInstance()->getRegionFromPosGlobal(pos_global);
+        }
+        if (last_region)
+        {
+            pos_region = last_region->getPosRegionFromGlobal(pos_global);
+        }
+        return last_region;
+    };
 
     // walk forwards to find the point
     for (mouse_dir_scale = FIRST_PASS_STEP; mouse_dir_scale < draw_distance; mouse_dir_scale += FIRST_PASS_STEP)
@@ -4925,7 +5133,7 @@ bool LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
         mouse_direction_global_d.setVec(mouse_direction_global * mouse_dir_scale);
         probe_point_global = camera_pos_global + mouse_direction_global_d;
 
-        regionp = LLWorld::getInstance()->resolveRegionGlobal(probe_point_region, probe_point_global);
+        regionp = resolve_region(probe_point_region, probe_point_global);
 
         if (!regionp)
         {
@@ -4972,7 +5180,7 @@ bool LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
             mouse_direction_global_d.setVec(mouse_direction_global * mouse_dir_scale);
             probe_point_global = camera_pos_global + mouse_direction_global_d;
 
-            regionp = LLWorld::getInstance()->resolveRegionGlobal(probe_point_region, probe_point_global);
+            regionp = resolve_region(probe_point_region, probe_point_global);
 
             if (!regionp)
             {
@@ -5037,6 +5245,10 @@ void LLViewerWindow::saveImageNumbered(LLImageFormatted *image, bool force_picke
             pick_type = LLFilePicker::FFSAVE_PNG;
         else if (extension == ".tga")
             pick_type = LLFilePicker::FFSAVE_TGA;
+        else if (extension == ".webp")
+            pick_type = LLFilePicker::FFSAVE_WEBP;
+        else if (extension == ".avif")
+            pick_type = LLFilePicker::FFSAVE_AVIF;
         else
             pick_type = LLFilePicker::FFSAVE_ALL;
 
@@ -5074,14 +5286,10 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
         return;
     }
 
-// Check if there is enough free space to save snapshot
-#ifdef LL_WINDOWS
-    boost::filesystem::path b_path(ll_convert<std::wstring>(lastSnapshotDir));
-#else
-    boost::filesystem::path b_path(lastSnapshotDir);
-#endif
-    boost::system::error_code ec;
-    if (!boost::filesystem::is_directory(b_path, ec) || ec.failed())
+    // Check if there is enough free space to save snapshot
+    std::filesystem::path b_path = fsyspath(lastSnapshotDir);
+    std::error_code ec;
+    if (!std::filesystem::is_directory(b_path, ec) || ec)
     {
         LLSD args;
         args["PATH"] = lastSnapshotDir;
@@ -5090,8 +5298,8 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
         failure_cb();
         return;
     }
-    boost::filesystem::space_info b_space = boost::filesystem::space(b_path, ec);
-    if (ec.failed())
+    std::filesystem::space_info b_space = std::filesystem::space(b_path, ec);
+    if (ec)
     {
         LLSD args;
         args["PATH"] = lastSnapshotDir;
@@ -5146,10 +5354,23 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
     while( -1 != err  // Search until the file is not found (i.e., stat() gives an error).
             && is_snapshot_name_loc_set); // Or stop if we are rewriting.
 
-    LL_INFOS() << "Saving snapshot to " << filepath << LL_ENDL;
+    LL_INFOS("Window") << "Saving snapshot to " << filepath << LL_ENDL;
     if (image->save(filepath))
     {
         playSnapshotAnimAndSound();
+
+        // Show clickable notification with filepath
+        LLSD args;
+        args["FILEPATH"] = filepath;
+
+        LLSD payload;
+        payload["filepath"] = filepath;
+
+        LLNotificationsUtil::add("SnapshotSavedToComputer",
+                                 args,
+                                 payload.with("respond_on_mousedown", true),
+                                 boost::bind(&LLViewerWindow::onSnapshotNotificationClick, _1, _2));
+
         success_cb();
     }
     else
@@ -5161,6 +5382,16 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
 void LLViewerWindow::resetSnapshotLoc()
 {
     gSavedPerAccountSettings.setString("SnapshotBaseDir", std::string());
+}
+
+// static
+void LLViewerWindow::onSnapshotNotificationClick(const LLSD& notification, const LLSD& response)
+{
+    std::string filepath = notification["payload"]["filepath"].asString();
+    if (!filepath.empty())
+    {
+        gDirUtilp->openDir(filepath);
+    }
 }
 
 // static
@@ -5177,10 +5408,19 @@ void LLViewerWindow::movieSize(S32 new_width, S32 new_height)
 
 bool LLViewerWindow::saveSnapshot(const std::string& filepath, S32 image_width, S32 image_height, bool show_ui, bool show_hud, bool do_rebuild, bool show_balance, LLSnapshotModel::ESnapshotLayerType type, LLSnapshotModel::ESnapshotFormat format)
 {
-    LL_INFOS() << "Saving snapshot to: " << filepath << LL_ENDL;
+    LL_INFOS("Window") << "Saving snapshot to: " << filepath << LL_ENDL;
 
     LLPointer<LLImageRaw> raw = new LLImageRaw;
-    bool success = rawSnapshot(raw, image_width, image_height, true, false, show_ui, show_hud, do_rebuild, show_balance);
+    // no_post is passed explicitly because it sits between do_rebuild and
+    // show_balance: when show_balance was added to this function the call site
+    // was not widened to match, so show_balance landed in the no_post slot and
+    // show_balance itself fell back to its default. Every snapshot saved
+    // through here has therefore been rendering with post-processing disabled,
+    // which for an HDR scene means no tonemapping at all. The layer type was
+    // stranded the same way, one slot further along: a depth snapshot asked
+    // for through here came back as colour.
+    bool success = rawSnapshot(raw, image_width, image_height, true, false, show_ui, show_hud, do_rebuild,
+                               false /* no_post */, show_balance, type);
 
     if (success)
     {
@@ -5192,6 +5432,13 @@ bool LLViewerWindow::saveSnapshot(const std::string& filepath, S32 image_width, 
             break;
         case LLSnapshotModel::SNAPSHOT_FORMAT_JPEG:
             image_codec = IMG_CODEC_JPEG;
+            break;
+        case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
+            image_codec = IMG_CODEC_WEBP;
+            break;
+        case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
+        case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
+            image_codec = IMG_CODEC_AVIF;
             break;
         default:
             image_codec = IMG_CODEC_BMP;
@@ -5244,26 +5491,112 @@ bool LLViewerWindow::thumbnailSnapshot(LLImageRaw *raw, S32 preview_width, S32 p
     return rawSnapshot(raw, preview_width, preview_height, false, false, show_ui, show_hud, do_rebuild, no_post, gSavedSettings.getBOOL("RenderBalanceInSnapshot"), type);
 }
 
+namespace
+{
+    // Runs a callable when the scope that declares it is left, however it is left.
+    template <typename F>
+    class OnScopeExit
+    {
+    public:
+        explicit OnScopeExit(F f) : mF(std::move(f)) {}
+        ~OnScopeExit() { mF(); }
+        OnScopeExit(const OnScopeExit&) = delete;
+        OnScopeExit& operator=(const OnScopeExit&) = delete;
+
+    private:
+        F mF;
+    };
+}
+
 // Saves the image from the screen to a raw image
 // Since the required size might be bigger than the available screen, this method rerenders the scene in parts (called subimages) and copy
 // the results over to the final raw image.
 bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_height,
-    bool keep_window_aspect, bool is_texture, bool show_ui, bool show_hud, bool do_rebuild, bool no_post, bool show_balance, LLSnapshotModel::ESnapshotLayerType type, S32 max_size)
+    bool keep_window_aspect, bool is_texture, bool show_ui, bool show_hud, bool do_rebuild, bool no_post, bool show_balance, LLSnapshotModel::ESnapshotLayerType type, S32 max_size,
+    const ALSnapshotCutout* cutout, bool* cutout_drawn)
 {
     if (!raw)
     {
         return false;
     }
 
+    // A cutout is colour without the interface. It renders offscreen, always:
+    // the tiled path reads the window's back buffer, which may have no alpha
+    // or two bits of it. It renders a whole multiple larger than the image it
+    // makes, and averages down after (ALCutoutImage::resolve) -- its edges
+    // cannot come from anti-aliasing, which blends the subject into what is
+    // to be left empty without telling the coverage.
+    S32 cutout_width = 0;
+    S32 cutout_height = 0;
+    if (cutout)
+    {
+        show_ui = false;
+        show_hud = false;
+        show_balance = false;
+        type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
+
+        // The image, within max_size as the rest of this function would keep it.
+        if (image_width > max_size || image_height > max_size)
+        {
+            const F32 fit = llmin((F32)max_size / image_width, (F32)max_size / image_height);
+            image_width = llmax(1, (S32)(image_width * fit));
+            image_height = llmax(1, (S32)(image_height * fit));
+        }
+        cutout_width = image_width;
+        cutout_height = image_height;
+
+        // Then the render, as many times larger as allowed, down to once. The
+        // read-back is the render's size, and the screen targets are that with
+        // RenderResolutionDivisor or RenderResolutionMultiplier applied, so a
+        // multiplier of 2 is already twice the render each way. Neither may have
+        // a side past what the GL can target, nor more pixels than the largest
+        // snapshot the floater offers anyway (MAX_SNAPSHOT_IMAGE_SIZE by 4320):
+        // every screen pixel carries the whole G-buffer, and the read-back has
+        // to fit LLImageBase's 256 MB allocation cap besides.
+        const S64 max_side = (S64)gGLManager.mGLMaxTextureSize;
+        constexpr S64 MAX_CUTOUT_RENDER_PIXELS = (S64)MAX_SNAPSHOT_IMAGE_SIZE * 4320;
+        const auto fits = [&](S32 supersample)
+        {
+            const U32 read_width = (U32)(image_width * supersample);
+            const U32 read_height = (U32)(image_height * supersample);
+            U32 screen_width = read_width;
+            U32 screen_height = read_height;
+            LLPipeline::scaleToRenderResolution(screen_width, screen_height);
+            return (S64)llmax(read_width, screen_width) <= max_side && (S64)llmax(read_height, screen_height) <= max_side &&
+                   llmax((S64)read_width * read_height, (S64)screen_width * screen_height) <= MAX_CUTOUT_RENDER_PIXELS;
+        };
+        S32 supersample = (S32)cutout->mSupersample;
+        while (supersample > 1 && !fits(supersample))
+        {
+            --supersample;
+        }
+        if (image_width > max_side || image_height > max_side)
+        {
+            LL_WARNS("Snapshot") << "A cutout at " << image_width << "x" << image_height
+                                 << " is larger than the GL can render in one pass." << LL_ENDL;
+            return false;
+        }
+        image_width *= supersample;
+        image_height *= supersample;
+        max_size = llmax(image_width, image_height);
+    }
+
     //check if there is enough memory for the snapshot image
     if(image_width * image_height > (1 << 22)) //if snapshot image is larger than 2K by 2K
     {
-        if(!LLMemory::tryToAlloc(NULL, image_width * image_height * 3))
+        if(!LLMemory::tryToAlloc(NULL, image_width * image_height * (cutout ? 4 : 3)))
         {
             LL_WARNS() << "No enough memory to take the snapshot with size (w : h): " << image_width << " : " << image_height << LL_ENDL ;
             return false ; //there is no enough memory for taking this snapshot.
         }
     }
+
+    // What the single-pass path below changes, recorded so the restore can undo it.
+    LLRenderTarget scratch_space;
+    S32 original_width = 0;
+    S32 original_height = 0;
+    bool reset_deferred = false;
+    LLRect window_rect;
 
     // PRE SNAPSHOT
     gSnapshotNoPost = no_post;
@@ -5273,18 +5606,58 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     setCursor(UI_CURSOR_WAIT);
 
     // Hide all the UI widgets first and draw a frame
-    bool prev_draw_ui = gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI);
+    const bool prev_draw_ui = gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI);
 
     if ( prev_draw_ui != show_ui)
     {
         LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
     }
 
-    bool hide_hud = !show_hud && LLPipeline::sShowHUDAttachments;
+    const bool hide_hud = !show_hud && LLPipeline::sShowHUDAttachments;
     if (hide_hud)
     {
         LLPipeline::sShowHUDAttachments = false;
     }
+
+    // POST SNAPSHOT, on every way out. The early returns below used to skip all
+    // of it: the UI stayed hidden, the wait cursor stayed up, and past the
+    // single-pass branch the screen buffers stayed at the snapshot's size with
+    // the scratch target still bound.
+    OnScopeExit restore([&]()
+    {
+        gDisplaySwapBuffers = false;
+        gSnapshotNoPost = false;
+        gDepthDirty = true;
+
+        // Put the UI back the way it was found, rather than forcing it on: a
+        // snapshot taken with the interface hidden should leave it hidden.
+        if (gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI) != prev_draw_ui)
+        {
+            LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
+        }
+
+        if (hide_hud)
+        {
+            LLPipeline::sShowHUDAttachments = true;
+        }
+
+        setCursor(UI_CURSOR_ARROW);
+
+        if (reset_deferred)
+        {
+            mWorldViewRectRaw = window_rect;
+            LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
+            LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
+            scratch_space.flush();
+            scratch_space.release();
+            gPipeline.allocateScreenBuffer(original_width, original_height);
+            // Reallocated, the SSR source holds whatever was in that memory,
+            // and the next live frame's reflections would trace it.
+            gPipeline.clearSceneMap();
+        }
+
+        setBalanceVisible(true);
+    });
 
     // if not showing ui, use full window to render world view
     updateWorldViewRect(!show_ui);
@@ -5292,7 +5665,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     // Copy screen to a buffer
     // crop sides or top and bottom, if taking a snapshot of different aspect ratio
     // from window
-    LLRect window_rect = show_ui ? getWindowRectRaw() : getWorldViewRectRaw();
+    window_rect = show_ui ? getWindowRectRaw() : getWorldViewRectRaw();
 
     S32 snapshot_width  = window_rect.getWidth();
     S32 snapshot_height = window_rect.getHeight();
@@ -5310,23 +5683,44 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         setBalanceVisible(show_balance);
     }
 
-    S32 original_width = 0;
-    S32 original_height = 0;
-    bool reset_deferred = false;
-
-    LLRenderTarget scratch_space;
-
     F32 scale_factor = 1.0f ;
-    if (!keep_window_aspect || (image_width > window_width) || (image_height > window_height))
+    if (cutout || !keep_window_aspect || (image_width > window_width) || (image_height > window_height))
     {
         if ((image_width <= gGLManager.mGLMaxTextureSize && image_height <= gGLManager.mGLMaxTextureSize) &&
-            (image_width > window_width || image_height > window_height) && LLPipeline::sRenderDeferred && !show_ui)
+            (cutout || image_width > window_width || image_height > window_height) && LLPipeline::sRenderDeferred && !show_ui)
         {
-            U32 color_fmt = type == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH ? GL_DEPTH_COMPONENT : GL_RGBA;
-            if (scratch_space.allocate(image_width, image_height, color_fmt, true))
+            // GL_RGBA8, not GL_RGBA, and not GL_DEPTH_COMPONENT for the depth layers.
+            //
+            // Storage is immutable, so this format reaches glTexStorage2D, which only accepts
+            // sized ones -- an unsized format comes back GL_INVALID_ENUM and the target fails to
+            // allocate. That failure is silent here: the block below is simply skipped, the
+            // screen buffers are never widened to the requested size, and the snapshot drops to
+            // the tiled path underneath, where the whole post chain runs once per window-sized
+            // tile. Bloom, chromatic aberration, vignette and DoF are then computed against a
+            // tile rather than the frame, which is visible as each effect restarting at the tile
+            // seams past the first.
+            //
+            // The depth layers ask for depth through the `true` below, which allocates the real
+            // (sized) depth attachment that the GL_DEPTH_COMPONENT readback further down reads.
+            // This is the colour attachment, and it needs a colour format whatever the layer is.
+            if (scratch_space.allocate(image_width, image_height, GL_RGBA8, true))
             {
-                original_width = gPipeline.mRT->deferredScreen.getWidth();
-                original_height = gPipeline.mRT->deferredScreen.getHeight();
+                // mRT->width/height, not the attachment's dimensions. allocateScreenBuffer
+                // takes a LOGICAL size, records it in mRT->width/height, and only then applies
+                // RenderResolutionDivisor / RenderResolutionMultiplier to arrive at the texture
+                // size. Reading the texture size back and handing it in as a logical size
+                // therefore applies the scale a second time, squaring it: at multiplier 2.0 the
+                // viewer comes back from a snapshot rendering four times the pixels, sixteen
+                // after the second, and at divisor 2 it halves away instead.
+                //
+                // Nothing corrects it afterwards either. resizeScreenTexture() would notice,
+                // but it is gated on gResizeScreenTexture, and the restore below assigns
+                // mWorldViewRectRaw directly rather than going through updateWorldViewRect(),
+                // which is what sets that flag. The wrong size survives until a window resize.
+                //
+                // resizeShadowTexture() already reads these two for the same reason.
+                original_width = (S32)gPipeline.mRT->width;
+                original_height = (S32)gPipeline.mRT->height;
 
                 if (gPipeline.allocateScreenBuffer(image_width, image_height))
                 {
@@ -5348,6 +5742,14 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             }
         }
 
+        if (!reset_deferred && cutout)
+        {
+            // No tiled fallback for a cutout: see above.
+            LL_WARNS("Snapshot") << "A cutout at " << image_width << "x" << image_height
+                                 << " could not get its offscreen target." << LL_ENDL;
+            return false;
+        }
+
         if (!reset_deferred)
         {
             // if image cropping or need to enlarge the scene, compute a scale_factor
@@ -5355,6 +5757,21 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             snapshot_width  = (S32)(ratio * image_width) ;
             snapshot_height = (S32)(ratio * image_height) ;
             scale_factor = llmax(1.0f, 1.0f / ratio) ;
+
+            // Above 1 the capture is tiled, and display() -- with the whole post chain behind
+            // it -- runs once per window-sized tile. Every screen-space effect is then computed
+            // against a tile rather than the frame and restarts at the seams, which looks like a
+            // rendering fault rather than the capacity decision it is. The single-pass path
+            // declines silently, so say so here.
+            //
+            // scale_factor cannot exceed 1 with the UI shown: image_width/height were clamped to
+            // the window above, which is what makes this a fallback notice rather than a
+            // to-be-expected one.
+            if (scale_factor > 1.f)
+            {
+                LL_WARNS("Snapshot") << "Single-pass snapshot at " << image_width << "x" << image_height
+                                     << " is unavailable; using tiled mode." << LL_ENDL;
+            }
         }
     }
 
@@ -5381,17 +5798,15 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
     if ((image_buffer_x > 0) && (image_buffer_y > 0))
     {
-        raw->resize(image_buffer_x, image_buffer_y, 3);
+        raw->resize(image_buffer_x, image_buffer_y, cutout ? 4 : 3);
     }
     else
     {
-        setBalanceVisible(true);
         return false;
     }
 
     if (raw->isBufferInvalid())
     {
-        setBalanceVisible(true);
         return false;
     }
 
@@ -5408,8 +5823,38 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
     S32 output_buffer_offset_y = 0;
 
-    F32 depth_conversion_factor_1 = (LLViewerCamera::getInstance()->getFar() + LLViewerCamera::getInstance()->getNear()) / (2.f * LLViewerCamera::getInstance()->getFar() * LLViewerCamera::getInstance()->getNear());
-    F32 depth_conversion_factor_2 = (LLViewerCamera::getInstance()->getFar() - LLViewerCamera::getInstance()->getNear()) / (2.f * LLViewerCamera::getInstance()->getFar() * LLViewerCamera::getInstance()->getNear());
+    // Depth-buffer sample -> linear eye distance.
+    //
+    // glReadPixels(GL_DEPTH_COMPONENT) yields WINDOW depth in [0,1], not NDC. Inverting a
+    // perspective projection from a forward window depth W gives
+    //
+    //     d_eye = f*n / (f - W*(f - n))            (W=0 -> near, W=1 -> far)
+    //
+    // Reverse-Z stores 1-W, so normalising the sample to a forward window depth first lets
+    // both conventions share the one expression. near/far are hoisted out of the per-pixel
+    // body; the subtraction is exact at both ends and the denominator cannot cancel, since
+    // W*(f-n) <= f-n < f for any W in range.
+    const bool reverse_z_snapshot = LLRender::sReverseZ;
+    const F32 snap_near = LLViewerCamera::getInstance()->getNear();
+    // The projection's far plane, which depth was stored against, not the draw distance (getFar()).
+    const F32 snap_far  = LLViewerCamera::getInstance()->getProjectionFar();
+    const bool infinite_snapshot = al_projection_is_infinite(LLViewerCamera::getInstance()->getProjection());
+    auto linearize_snapshot_depth = [&](F32 d) -> F32
+    {
+        // An infinite projection stores near / distance, and its cleared depth reads as MAX_RECONSTRUCT_DISTANCE.
+        if (infinite_snapshot)
+        {
+            return snap_near / llmax(d, snap_near / MAX_RECONSTRUCT_DISTANCE);
+        }
+        const F32 window_depth = reverse_z_snapshot ? (1.f - d) : d;
+        return (snap_far * snap_near) / (snap_far - window_depth * (snap_far - snap_near));
+    };
+
+    std::optional<ALRenderIsolation::Scope> isolation;
+    if (cutout)
+    {
+        isolation.emplace(cutout->mTarget, cutout->mIncludeSeated);
+    }
 
     // Subimages are in fact partial rendering of the final view. This happens when the final view is bigger than the screen.
     // In most common cases, scale_factor is 1 and there's no more than 1 iteration on x and y
@@ -5436,6 +5881,13 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             {
                 const U32 subfield = subimage_x+(subimage_y*llceil(scale_factor));
                 display(do_rebuild, scale_factor, subfield, true);
+
+                if (cutout)
+                {
+                    // The colour is the subject premultiplied by its coverage;
+                    // the coverage itself goes into alpha here.
+                    gPipeline.copyCutoutCoverageToAlpha();
+                }
 
                 if (!LLPipeline::sRenderDeferred)
                 {
@@ -5468,13 +5920,13 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                             glReadPixels(
                                      subimage_x_offset, out_y + subimage_y_offset,
                                      read_width, 1,
-                                     GL_RGB, GL_UNSIGNED_BYTE,
+                                     cutout ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE,
                                      raw->getData() + output_buffer_offset
                                      );
                         }
-                        else // LLSnapshotModel::SNAPSHOT_TYPE_DEPTH
+                        else if (type == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH24)
                         {
-                            LLPointer<LLImageRaw> depth_line_buffer = new LLImageRaw(read_width, 1, sizeof(GL_FLOAT)); // need to store floating point values
+                            LLPointer<LLImageRaw> depth_line_buffer = new LLImageRaw(read_width, 1, sizeof(GLfloat)); // need to store floating point values
                             glReadPixels(
                                          subimage_x_offset, out_y + subimage_y_offset,
                                          read_width, 1,
@@ -5486,7 +5938,37 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                             {
                                 F32 depth_float = *(F32*)(depth_line_buffer->getData() + (i * sizeof(F32)));
 
-                                F32 linear_depth_float = 1.f / (depth_conversion_factor_1 - (depth_float * depth_conversion_factor_2));
+                                F32 linear_depth_float = linearize_snapshot_depth(depth_float);
+                                U32 RGB24 = F32_to_U32(linear_depth_float, LLViewerCamera::instance().getNear(), LLViewerCamera::instance().getFar());
+                                //A max value of 16777215 for RGB24 evaluates to black when it shold be white.  The clamp assures that the divisions do not somehow become >=256.
+                                U8 depth_byteR = (U8)(llclamp(llfloor(RGB24 / 65536.f), 0, 255));
+                                U8 depth_byteG = (U8)(llclamp(llfloor((RGB24 - depth_byteR * 65536) / 256.f), 0, 255));
+                                U8 depth_byteB = (U8)(llclamp((RGB24 - depth_byteR * 65536 - depth_byteG * 256), 0u, 255u));
+                                // write converted scanline out to result image
+                                *(raw->getData() + output_buffer_offset + (i * raw->getComponents())) = depth_byteR;
+                                *(raw->getData() + output_buffer_offset + (i * raw->getComponents()) + 1) = depth_byteG;
+                                *(raw->getData() + output_buffer_offset + (i * raw->getComponents()) + 2) = depth_byteB;
+                                for (S32 j = 3; j < raw->getComponents(); j++)
+                                {
+                                    *(raw->getData() + output_buffer_offset + (i * raw->getComponents()) + j) = depth_byteR;
+                                }
+                            }
+                        }
+                        else // LLSnapshotModel::SNAPSHOT_TYPE_DEPTH
+                        {
+                            LLPointer<LLImageRaw> depth_line_buffer = new LLImageRaw(read_width, 1, sizeof(GLfloat)); // need to store floating point values
+                            glReadPixels(
+                                         subimage_x_offset, out_y + subimage_y_offset,
+                                         read_width, 1,
+                                         GL_DEPTH_COMPONENT, GL_FLOAT,
+                                         depth_line_buffer->getData()// current output pixel is beginning of buffer...
+                                         );
+
+                            for (S32 i = 0; i < (S32)read_width; i++)
+                            {
+                                F32 depth_float = *(F32*)(depth_line_buffer->getData() + (i * sizeof(F32)));
+
+                                F32 linear_depth_float = linearize_snapshot_depth(depth_float);
                                 U8 depth_byte = F32_to_U8(linear_depth_float, LLViewerCamera::getInstance()->getNear(), LLViewerCamera::getInstance()->getFar());
                                 // write converted scanline out to result image
                                 for (S32 j = 0; j < raw->getComponents(); j++)
@@ -5504,43 +5986,35 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         output_buffer_offset_y += subimage_y_offset;
     }
 
-    gDisplaySwapBuffers = false;
-    gSnapshotNoPost = false;
-    gDepthDirty = true;
-
-    // POST SNAPSHOT
-    if (!gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
-    {
-        LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
-    }
-
-    if (hide_hud)
-    {
-        LLPipeline::sShowHUDAttachments = true;
-    }
-
     /*if (high_res)
     {
         initFonts(1.f);
         LLHUDObject::reshapeAll();
     }*/
 
-    // Pre-pad image to number of pixels such that the line length is a multiple of 4 bytes (for BMP encoding)
-    // Note: this formula depends on the number of components being 3.  Not obvious, but it's correct.
-    image_width += (image_width * 3) % 4;
-
     bool ret = true ;
-    // Resize image
-    if(llabs(image_width - image_buffer_x) > 4 || llabs(image_height - image_buffer_y) > 4)
+    if (cutout)
     {
-        ret = raw->scale( image_width, image_height );
+        // Left premultiplied at the size asked for, not padded as below: the
+        // fill goes on after, and a BMP encoder pads its own rows.
+        ret = ALCutoutImage::resolve(*raw, cutout_width, cutout_height, cutout_drawn);
     }
-    else if(image_width != image_buffer_x || image_height != image_buffer_y)
+    else
     {
-        ret = raw->scale( image_width, image_height, false );
-    }
+        // Pre-pad image to number of pixels such that the line length is a multiple of 4 bytes (for BMP encoding)
+        // Note: this formula depends on the number of components being 3.  Not obvious, but it's correct.
+        image_width += (image_width * 3) % 4;
 
-    setCursor(UI_CURSOR_ARROW);
+        // Resize image
+        if(llabs(image_width - image_buffer_x) > 4 || llabs(image_height - image_buffer_y) > 4)
+        {
+            ret = raw->scale( image_width, image_height );
+        }
+        else if(image_width != image_buffer_x || image_height != image_buffer_y)
+        {
+            ret = raw->scale( image_width, image_height, false );
+        }
+    }
 
     if (do_rebuild)
     {
@@ -5552,22 +6026,10 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         gPipeline.resetDrawOrders();
     }
 
-    if (reset_deferred)
-    {
-        mWorldViewRectRaw = window_rect;
-        LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
-        LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
-        scratch_space.flush();
-        scratch_space.release();
-        gPipeline.allocateScreenBuffer(original_width, original_height);
-
-    }
-
     if (high_res)
     {
         send_agent_resume();
     }
-    setBalanceVisible(true);
 
     return ret;
 }
@@ -5594,12 +6056,17 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
 
     LLRect window_rect = getWorldViewRectRaw();
 
-    S32 original_width = LLPipeline::sRenderDeferred ? gPipeline.mRT->deferredScreen.getWidth() : gViewerWindow->getWorldViewWidthRaw();
-    S32 original_height = LLPipeline::sRenderDeferred ? gPipeline.mRT->deferredScreen.getHeight() : gViewerWindow->getWorldViewHeightRaw();
+    // The logical size, not the attachment's -- see rawSnapshot for why handing a scaled
+    // texture size back to allocateScreenBuffer squares the resolution scale.
+    S32 original_width = LLPipeline::sRenderDeferred ? (S32)gPipeline.mRT->width : gViewerWindow->getWorldViewWidthRaw();
+    S32 original_height = LLPipeline::sRenderDeferred ? (S32)gPipeline.mRT->height : gViewerWindow->getWorldViewHeightRaw();
 
     LLRenderTarget scratch_space;
-    U32 color_fmt = GL_RGBA;
-    if (scratch_space.allocate(image_width, image_height, color_fmt, true))
+    // Sized format, for the reason spelled out in rawSnapshot: immutable storage means
+    // glTexStorage2D sees this, and it rejects unsized formats. There is no tiled fallback on
+    // this path -- a failure here means the screen buffers are never resized and the readback
+    // below pulls image_width x image_height out of window-sized ones.
+    if (scratch_space.allocate(image_width, image_height, GL_RGBA8, true))
     {
         if (gPipeline.allocateScreenBuffer(image_width, image_height))
         {
@@ -5702,8 +6169,7 @@ bool LLViewerWindow::cubeSnapshot(const LLVector3& origin, LLCubeMapArray* cubea
     LLViewerCamera* camera = LLViewerCamera::getInstance();
 
     LLViewerCamera saved_camera = LLViewerCamera::instance();
-    glm::mat4 saved_proj = get_current_projection();
-    glm::mat4 saved_mod = get_current_modelview();
+    const LLCamera saved_current = LLViewerCamera::getCurrent();
 
     // camera constants for the square, cube map capture image
     camera->setAspect(1.0); // must set aspect ratio first to avoid undesirable clamping of vertical FoV
@@ -5827,8 +6293,7 @@ bool LLViewerWindow::cubeSnapshot(const LLVector3& origin, LLCubeMapArray* cubea
 
     // restore original view/camera/avatar settings settings
     *camera = saved_camera;
-    set_current_modelview(saved_mod);
-    set_current_projection(saved_proj);
+    LLViewerCamera::setCurrent(saved_current);
     setup3DViewport();
     LLPipeline::sUseOcclusion = old_occlusion;
 
@@ -5887,13 +6352,8 @@ void LLViewerWindow::drawMouselookInstructions()
             const bool allow_damage = vpm->allowAgentDamage(gAgent.getRegion(), vpm->getAgentParcel());
             if (allow_damage)
             {
-                S32 health = -1;
-                if (gStatusBar)
-                {
-                    health = gStatusBar->getHealth();
-                }
                 font->renderUTF8(
-                    llformat("HP: %d%%", health), 0,
+                    llformat("HP: %d%%", gAgent.getHealth()), 0,
                     text_pos_start + 300,
                     INSTRUCTIONS_TOP_PAD,
                     LLColor4(1.0f, 1.0f, 1.0f, 0.5f),
@@ -6002,7 +6462,7 @@ void LLViewerWindow::setup2DViewport(S32 x_offset, S32 y_offset)
 void LLViewerWindow::setup3DRender()
 {
     // setup perspective camera
-    LLViewerCamera::getInstance()->setPerspective(NOT_FOR_SELECTION, mWorldViewRectRaw.mLeft, mWorldViewRectRaw.mBottom,  mWorldViewRectRaw.getWidth(), mWorldViewRectRaw.getHeight(), false, LLViewerCamera::getInstance()->getNear(), MAX_FAR_CLIP*2.f);
+    LLViewerCamera::getInstance()->setPerspective(NOT_FOR_SELECTION, mWorldViewRectRaw.mLeft, mWorldViewRectRaw.mBottom,  mWorldViewRectRaw.getWidth(), mWorldViewRectRaw.getHeight(), false, LLViewerCamera::getInstance()->getNear(), LLViewerCamera::getInstance()->getProjectionFar());
     setup3DViewport();
 }
 
@@ -6079,7 +6539,7 @@ void LLViewerWindow::setProgressPercent(const F32 percent)
 
 void LLViewerWindow::setProgressCancelButtonVisible( bool b, const std::string& label )
 {
-    LLFloaterProgressView* pProgFloater = LLFloaterReg::findTypedInstance<LLFloaterProgressView>("progress_view");
+    ALFloaterProgressView* pProgFloater = LLFloaterReg::findTypedInstance<ALFloaterProgressView>("progress_view");
     if(pProgFloater)
     {
         pProgFloater->setProgressCancelButtonVisible(b, label);
@@ -6119,7 +6579,7 @@ void LLViewerWindow::stopGL()
     //especially be careful to put anything behind gTextureList.destroyGL(save_state);
     if (!gGLManager.mIsDisabled)
     {
-        LL_INFOS() << "Shutting down GL..." << LL_ENDL;
+        LL_INFOS("Window") << "Shutting down GL..." << LL_ENDL;
 
         // Pause texture decode threads (will get unpaused during main loop)
         LLAppViewer::getTextureCache()->pause();
@@ -6183,7 +6643,7 @@ void LLViewerWindow::restoreGL(const std::string& progress_message)
     //especially, be careful to put something before gTextureList.restoreGL();
     if (gGLManager.mIsDisabled)
     {
-        LL_INFOS() << "Restoring GL..." << LL_ENDL;
+        LL_INFOS("Window") << "Restoring GL..." << LL_ENDL;
         gGLManager.mIsDisabled = false;
 
         initGLDefaults();
@@ -6217,7 +6677,7 @@ void LLViewerWindow::restoreGL(const std::string& progress_message)
             setShowProgress(true);
             setProgressString(progress_message);
         }
-        LL_INFOS() << "...Restoring GL done" << LL_ENDL;
+        LL_INFOS("Window") << "...Restoring GL done" << LL_ENDL;
         if(!LLAppViewer::instance()->restoreErrorTrap())
         {
             LL_WARNS() << " Someone took over my signal/exception handler (post restoreGL)!" << LL_ENDL;
@@ -6228,15 +6688,27 @@ void LLViewerWindow::restoreGL(const std::string& progress_message)
 
 void LLViewerWindow::initFonts(F32 zoom_factor)
 {
-    LLFontGL::destroyAllGL();
-    // Initialize with possibly different zoom factor
-
+    // initClass internally decides between the heavy full-reload path
+    // (which needs destroyAllGL up front to clear stale face state) and
+    // the fast DPI-only reload, which keeps the existing GL atlases
+    // alive — so we no longer destroyAllGL unconditionally here.
     LLFontManager::initClass();
+
+    // Seed dark-palette flag before initClass so the freshly-loaded faces
+    // pick the right CPAL palette. The setting listener keeps it in sync
+    // afterward; without seeding here the first font load runs with the
+    // default (false) regardless of the persisted preference.
+    LLFontGL::sUseDarkEmojiPalette = gSavedSettings.getBOOL("EmojiUseDarkPalette");
+    // Same logic for the force-monochrome COLRv1 toggle: must be live before
+    // the first font load so the renderer sees the right glyph types from
+    // the start.
+    LLFontGL::sForceMonochromeEmoji = gSavedSettings.getBOOL("AlchemyForceMonochromeEmoji");
 
     LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
                                 mDisplayScale.mV[VX] * zoom_factor,
                                 mDisplayScale.mV[VY] * zoom_factor,
-                                gDirUtilp->getAppRODataDir());
+                                gDirUtilp->getAppRODataDir(),
+                                gSavedSettings.getLLSD("AlchemyUIFontOverrides"));
 }
 
 void LLViewerWindow::requestResolutionUpdate()
@@ -6244,11 +6716,9 @@ void LLViewerWindow::requestResolutionUpdate()
     mResDirty = true;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_WINDOW_CHECK_SETTINGS("Window Settings");
-
 void LLViewerWindow::checkSettings()
 {
-    LL_RECORD_BLOCK_TIME(FTM_WINDOW_CHECK_SETTINGS);
+    LL_PROFILE_ZONE_SCOPED;
     if (mStatesDirty)
     {
         gGL.refreshState();
@@ -6256,12 +6726,44 @@ void LLViewerWindow::checkSettings()
         mStatesDirty = false;
     }
 
-    // We want to update the resolution AFTER the states getting refreshed not before.
+    // Drain any pending font reload before doing anything else this frame.
+    // The setting listener for AlchemyUIFontOverrides defers the reload
+    // here so we never tear down LLFontFreetype state mid-render. Routes
+    // through initFonts(), which forwards the current overrides into
+    // LLFontGL::initClass — the single entry point for font system
+    // re-init (UI scale, font override, fonts.xml mtime).
+    if (LLFontGL::consumePendingReload())
+    {
+        initFonts();
+
+        // Force a reshape to update the font scaling for the new display resolution.
+        reshape(getWindowWidthRaw(), getWindowHeightRaw(), true);
+        mResDirty = false; // reshape will have already updated the resolution, so clear the dirty flag to avoid doing it again.
+    }
+
     if (mResDirty)
     {
-        reshape(getWindowWidthRaw(), getWindowHeightRaw());
+        // Deferred resolution update after states have been refreshed.
+        LLCoordWindow window_size;
+        if (mWindow->getSize(&window_size))
+        {
+            reshape(window_size.mX, window_size.mY);
+        }
+        else
+        {
+            S32 width = getWindowWidthRaw();
+            S32 height = getWindowHeightRaw();
+            LL_WARNS() << "Failed to get window size, using raw window size " << width << "x" << height << "  instead" << LL_ENDL;
+            reshape(width, height);
+        }
         mResDirty = false;
     }
+
+    // Per-frame glyph atlas eviction. Self-throttled inside each
+    // freetype, so most frames this is a cheap walk that does no real
+    // work. Was previously called from inside LLFontGL::render which
+    // forced the throttle check onto every glyph render.
+    LLFontGL::sweepGlyphCaches();
 }
 
 F32 LLViewerWindow::getWorldViewAspectRatio() const
@@ -6285,7 +6787,19 @@ void LLViewerWindow::calcDisplayScale()
 
     if (display_scale != mDisplayScale)
     {
-        LL_INFOS() << "Setting display scale to " << display_scale << " for ui scale: " << ui_scale_factor << LL_ENDL;
+        LL_INFOS("Window") << "Setting display scale to " << display_scale << " for ui scale: " << ui_scale_factor << LL_ENDL;
+
+        LL_DEBUGS("Window") << "calcDisplayScale changing:";
+
+        LLCoordWindow win_size;
+        mWindow->getSize(&win_size);
+        LL_CONT << " old=" << mDisplayScale
+            << " new=" << display_scale
+            << " UIScaleFactor=" << gSavedSettings.getF32("UIScaleFactor")
+            << " systemUISize=" << mWindow->getSystemUISize()
+            << " windowSize=" << win_size.mX << "x" << win_size.mY
+            << " mWindowRectRaw=" << mWindowRectRaw.getWidth() << "x" << mWindowRectRaw.getHeight()
+            << LL_ENDL;
 
         mDisplayScale = display_scale;
         // Init default fonts
@@ -6347,34 +6861,31 @@ LLRect LLViewerWindow::getChatConsoleRect()
 
 void LLViewerWindow::reshapeStatusBarContainer()
 {
-    S32 new_height = mStatusBarContainer->getRect().getHeight();
+    static S32 original_status_bar_height = mStatusBarContainer->getRect().getHeight();
+    S32 new_height = original_status_bar_height;
     S32 new_width = mStatusBarContainer->getRect().getWidth();
 
-    if (gSavedSettings.getBOOL("ShowNavbarNavigationPanel"))
+    if (gSavedSettings.getU32("NavigationBarStyle") == 2)
     {
         // Navigation bar is outside visible area, expand status_bar_container to show it
         new_height += mNavBarContainer->getRect().getHeight();
     }
-    else
-    {
-        // collapse status_bar_container
-        new_height -= mNavBarContainer->getRect().getHeight();
-    }
+
     mStatusBarContainer->reshape(new_width, new_height, true);
 }
 
-void LLViewerWindow::resetStatusBarContainer()
-{
-    LLNavigationBar* navbar = LLNavigationBar::getInstance();
-    if (gSavedSettings.getBOOL("ShowNavbarNavigationPanel") || navbar->getVisible())
-    {
-        // was previously showing navigation bar
-        S32 new_height = mStatusBarContainer->getRect().getHeight();
-        S32 new_width = mStatusBarContainer->getRect().getWidth();
-        new_height -= mNavBarContainer->getRect().getHeight();
-        mStatusBarContainer->reshape(new_width, new_height, true);
-    }
-}
+//void LLViewerWindow::resetStatusBarContainer()
+//{
+//    LLNavigationBar* navbar = LLNavigationBar::getInstance();
+//    if (gSavedSettings.getBOOL("ShowNavbarNavigationPanel") || navbar->getVisible())
+//    {
+//        // was previously showing navigation bar
+//        S32 new_height = mStatusBarContainer->getRect().getHeight();
+//        S32 new_width = mStatusBarContainer->getRect().getWidth();
+//        new_height -= mNavBarContainer->getRect().getHeight();
+//        mStatusBarContainer->reshape(new_width, new_height, true);
+//    }
+//}
 //----------------------------------------------------------------------------
 
 
@@ -6397,8 +6908,15 @@ void LLViewerWindow::setUIVisibility(bool visible)
         gToolBarView->setToolBarsVisible(visible);
     }
 
-    LLNavigationBar::getInstance()->setVisible(visible ? gSavedSettings.getBOOL("ShowNavbarNavigationPanel") : false);
-    LLPanelTopInfoBar::getInstance()->setVisible(visible? gSavedSettings.getBOOL("ShowMiniLocationPanel") : false);
+    const U32 location_bar = gSavedSettings.getU32("NavigationBarStyle");
+    if (LLNavigationBar::instanceExists())
+    {
+        LLNavigationBar::getInstance()->setVisible(visible ? (location_bar == 2) : false);
+    }
+    if (LLPanelTopInfoBar::instanceExists())
+    {
+        LLPanelTopInfoBar::getInstance()->setVisible(visible ? (location_bar == 1) : false);
+    }
     mStatusBarContainer->setVisible(visible);
 }
 
@@ -6413,7 +6931,7 @@ bool LLViewerWindow::getUIVisibility()
 //
 LLPickInfo::LLPickInfo()
     : mKeyMask(MASK_NONE),
-      mPickCallback(NULL),
+      mPickCallback(nullptr),
       mPickType(PICK_INVALID),
       mWantSurfaceInfo(false),
       mObjectFace(-1),
@@ -6424,7 +6942,7 @@ LLPickInfo::LLPickInfo()
       mNormal(),
       mTangent(),
       mBinormal(),
-      mHUDIcon(NULL),
+      mHUDIcon(nullptr),
       mPickTransparent(false),
       mPickRigged(false),
       mPickParticle(false)
@@ -6437,14 +6955,14 @@ LLPickInfo::LLPickInfo(const LLCoordGL& mouse_pos,
     bool pick_rigged,
     bool pick_particle,
     bool pick_reflection_probe,
-    bool pick_uv_coords,
+    bool pick_surface_info,
     bool pick_unselectable,
     void (*pick_callback)(const LLPickInfo& pick_info))
     : mMousePt(mouse_pos),
     mKeyMask(keyboard_mask),
     mPickCallback(pick_callback),
     mPickType(PICK_INVALID),
-    mWantSurfaceInfo(pick_uv_coords),
+    mWantSurfaceInfo(pick_surface_info),
     mObjectFace(-1),
     mUVCoords(-1.f, -1.f),
     mSTCoords(-1.f, -1.f),
@@ -6487,7 +7005,7 @@ void LLPickInfo::fetchResults()
     }
 
     LLViewerObject* hit_object = gViewerWindow->cursorIntersect(mMousePt.mX, mMousePt.mY, 512.f,
-                                    nullptr, -1, mPickTransparent, mPickRigged, mPickUnselectable, mPickReflectionProbe, &face_hit, &mGLTFNodeIndex, &mGLTFPrimitiveIndex,
+                                    nullptr, -1, mPickTransparent, mPickRigged, mPickUnselectable, mPickReflectionProbe, &face_hit,
                                 &intersection, &uv, &normal, &tangent, &start, &end);
 
     mPickPt = mMousePt;
@@ -6650,8 +7168,6 @@ void LLPickInfo::getSurfaceInfo()
         if (gViewerWindow->cursorIntersect(ll_round((F32)mMousePt.mX), ll_round((F32)mMousePt.mY), 1024.f,
                                            objectp, -1, mPickTransparent, mPickRigged, mPickUnselectable, mPickReflectionProbe,
                                            &mObjectFace,
-                                           &mGLTFNodeIndex,
-                                           &mGLTFPrimitiveIndex,
                                            &intersection,
                                            &mSTCoords,
                                            &normal,

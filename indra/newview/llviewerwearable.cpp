@@ -96,6 +96,7 @@ LLViewerWearable::~LLViewerWearable()
 // virtual
 LLWearable::EImportResult LLViewerWearable::importStream( std::istream& input_stream, LLAvatarAppearance* avatarp )
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // suppress texlayerset updates while wearables are being imported. Layersets will be updated
     // when the wearables are "worn", not loaded. Note state will be restored when this object is destroyed.
     LLOverrideBakedTextureUpdate stop_bakes(false);
@@ -110,8 +111,8 @@ LLWearable::EImportResult LLViewerWearable::importStream( std::istream& input_st
         return result;
     }
 
-    LLStringUtil::truncate(mName, DB_INV_ITEM_NAME_STR_LEN );
-    LLStringUtil::truncate(mDescription, DB_INV_ITEM_DESC_STR_LEN );
+    mName = utf8str_truncate(mName, DB_INV_ITEM_NAME_STR_LEN);
+    mDescription = utf8str_truncate(mDescription, DB_INV_ITEM_DESC_STR_LEN);
 
     te_map_t::const_iterator iter = mTEMap.begin();
     te_map_t::const_iterator end = mTEMap.end();
@@ -342,6 +343,17 @@ void LLViewerWearable::writeToAvatar(LLAvatarAppearance *avatarp)
             {
                 image_id = getDefaultTextureImageID((ETextureIndex) te);
             }
+
+            // The entry is written every frame and takes the same image every
+            // frame, and setLocalTextureTE drops an image the entry already
+            // holds. So the only reason to go and find the image is that it
+            // does not hold it.
+            const LLViewerTexture* current = viewer_avatar->getTEImage(te);
+            if (current && current->getID() == image_id)
+            {
+                continue;
+            }
+
             LLViewerTexture* image = LLViewerTextureManager::getFetchedTexture( image_id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE );
             // MULTI-WEARABLE: assume index 0 will be used when writing to avatar. TODO: eliminate the need for this.
             viewer_avatar->setLocalTextureTE(te, image, 0);
@@ -462,7 +474,7 @@ void LLViewerWearable::revertValues()
 {
     LLWearable::revertValues();
 
-    LLSidepanelAppearance *panel = dynamic_cast<LLSidepanelAppearance*>(LLFloaterSidePanelContainer::findPanel("appearance"));
+    LLSidepanelAppearance *panel = LLFloaterSidePanelContainer::findPanel<LLSidepanelAppearance>("appearance");
     if( panel )
     {
         panel->updateScrollingPanelList();
@@ -478,7 +490,7 @@ void LLViewerWearable::saveValues()
 {
     LLWearable::saveValues();
 
-    LLSidepanelAppearance *panel = dynamic_cast<LLSidepanelAppearance*>(LLFloaterSidePanelContainer::findPanel("appearance"));
+    LLSidepanelAppearance *panel = LLFloaterSidePanelContainer::findPanel<LLSidepanelAppearance>("appearance");
     if( panel )
     {
         panel->updateScrollingPanelList();

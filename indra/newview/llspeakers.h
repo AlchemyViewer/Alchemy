@@ -67,7 +67,7 @@ public:
     bool isInVoiceChannel();
 
     ESpeakerStatus  mStatus;            // current activity status in speech group
-    F32             mLastSpokeTime;     // timestamp when this speaker last spoke
+    F64             mLastSpokeTime;     // timestamp when this speaker last spoke, the speaker manager's mSpeechTimer elapsed
     F32             mSpeechVolume;      // current speech amplitude (timea average rms amplitude?)
     std::string     mDisplayName;       // cache user name for this speaker
     bool            mHasSpoken;         // has this speaker said anything this session?
@@ -80,6 +80,9 @@ public:
     bool            mIsModerator;
     bool            mModeratorMutedVoice;
     bool            mModeratorMutedText;
+
+private:
+    boost::signals2::scoped_connection mAvatarNameCacheConnection;
 };
 
 class LLSpeakerUpdateSpeakerEvent : public LLOldEvents::LLEvent
@@ -138,7 +141,7 @@ private:
 class LLSpeakerActionTimer : public LLEventTimer
 {
 public:
-    typedef boost::function<bool(const LLUUID&)>    action_callback_t;
+    typedef std::function<bool(const LLUUID&)>      action_callback_t;
     typedef std::map<LLUUID, LLSpeakerActionTimer*> action_timers_map_t;
     typedef action_timers_map_t::value_type         action_value_t;
     typedef action_timers_map_t::const_iterator     action_timer_const_iter_t;

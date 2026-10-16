@@ -104,7 +104,7 @@ class LLDiskCache :
          * so many things had to be pushed back there to accomodate it, that I
          * decided to move it here.  Still not sure that's completely right.
          */
-        static const std::string metaDataToFilepath(const LLUUID& id, LLAssetType::EType at);
+        static std::filesystem::path metaDataToFilepath(const LLUUID& id, LLAssetType::EType at);
 
         /**
          * Purge the oldest items in the cache so that the combined size of all files
@@ -139,7 +139,7 @@ class LLDiskCache :
          * directory. Primarily used here to determine the directory size
          * before and after the cache purge
          */
-        uintmax_t dirFileSize(const std::string& dir);
+        uintmax_t dirFileSize(const std::filesystem::path& dir);
 
     private:
         /**
@@ -155,7 +155,7 @@ class LLDiskCache :
          * setting could potentially point it at a non-cache directory (for example,
          * the Windows System dir) with disastrous results.
          */
-        static std::string sCacheDir;
+        static std::filesystem::path sCacheDir;
 
         /**
          * When enabled, displays additional debugging information in

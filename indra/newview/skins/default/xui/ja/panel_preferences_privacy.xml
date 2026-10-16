@@ -28,14 +28,20 @@
 				<combo_box.item label="ユーザ名" name="User_Name"/>
 			</combo_box>
 			<check_box label="視線ビーコンからその所有者までを線で表示する" name="lineslookat" tool_tip="カメラのフォーカスポイントとアバターを結ぶ線が表示されます。アバターの位置を確認するのに役立ちます。"/>
-			<text name="mylookat">
+			<text name="mylookat_label">
 				自分の視線：
 			</text>
 			<check_box label="視線のターゲットを表示しない" name="LookAtHideOwn" tool_tip="自分のカメラのクロスヘアーを表示しないようにします。"/>
 			<check_box label="視線のターゲットを他の人に送信しない" name="privatelookat" tool_tip="カメラのフォーカスポイントを他の人に表示しないようにします。"/>
-			<check_box label="視線の距離を制限する" name="privatelookat" tool_tip="目や頭の動きなどの装飾的な特徴を許可しますが、設定された距離を超えると特定のものを指さなくなります。"/>
+			<check_box label="視線の距離を制限する" name="limitlookat" tool_tip="目や頭の動きなどの装飾的な特徴を許可しますが、設定された距離を超えると特定のものを指さなくなります。"/>
 			<slider label="最大距離" name="Max Distance"/>
 			<button label="ブロックリスト" name="block_list"/>
+			<text name="inventory_header">
+				Inventory:
+			</text>
+			<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
+			<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
+			<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
 			<text name="block_list_label">
 				（ブロックした人物やオブジェクト）
 			</text>

@@ -3,11 +3,31 @@
 	<panel.string name="location_notice">
 		（儲存後將會更新）
 	</panel.string>
-	<line_editor name="pick_location">
+	<layout_stack name="main_pick_stack">
+		<layout_panel name="save_changes_lp">
+			<layout_stack name="save_changes_stack">
+				<layout_panel name="save_btn_lp">
+					<button label="儲存精選地點" name="save_changes_btn"/>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+		<layout_panel name="util_buttons_lp">
+			<layout_stack name="util_buttons_stack">
+				<layout_panel name="set_to_curr_location_btn_lp">
+					<button label="設定位置" name="set_to_curr_location_btn" tool_tip="設定為目前位置"/>
+				</layout_panel>
+				<layout_panel name="tp_btn_lp">
+					<button label="瞬間傳送" name="teleport_btn"/>
+				</layout_panel>
+				<layout_panel name="map_btn_lp">
+					<button label="顯示在地圖上" name="show_on_map_btn"/>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+		<layout_panel name="main_pick_lp">
+			<line_editor name="pick_location">
 		載入中…
 	</line_editor>
-	<button label="瞬間傳送" name="teleport_btn"/>
-	<button label="顯示在地圖上" name="show_on_map_btn"/>
-	<button label="設定位置" name="set_to_curr_location_btn" tool_tip="設定為目前位置"/>
-	<button label="儲存精選地點" name="save_changes_btn"/>
+		</layout_panel>
+	</layout_stack>
 </panel>

@@ -3,5 +3,4 @@
 	<text name="Camera Presets">
 		Ustawienia kamery
 	</text>
-	<button name="open_prefs_btn" label="Otwórz sterowanie kamerą" tool_tip="Otwiera okno sterowania kamerą" />
 </panel>

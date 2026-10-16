@@ -1,241 +1,570 @@
 # -*- cmake -*-
 #
-# Compilation options shared by all Second Life components.
+# Compiler, preprocessor and linker settings shared by every target in the
+# tree, carried by the al::flags interface target. Organised by decision, not
+# by platform: each section states one fact once and then says how each
+# toolchain spells it.
+#
+# Every buildable target links al::flags; al_check_flags_target() at the end
+# of the root CMakeLists.txt fails the configure if one does not. A target
+# that needs to deviate does not append a competing option -- interface
+# options come after a target's own on the command line, and the compiler
+# takes the last of a repeated switch -- it sets one of the properties below,
+# which al::flags reads for that target:
+#
+#   AL_SKIP_RELEASE_DEBUG_INFO   link Release without debug information
+#
+# Configurations:
+#   Debug          - no optimisation, debug CRT, debug third-party libraries
+#   OptDebug       - no optimisation, release CRT and third-party libraries
+#   RelWithDebInfo - optimised, asserts on, symbols
+#   Release        - optimised, asserts off, symbols kept aside for crash reports
 
-#*****************************************************************************
-#   It's important to realize that CMake implicitly concatenates
-#   CMAKE_CXX_FLAGS with (e.g.) CMAKE_CXX_FLAGS_RELEASE for Release builds. So
-#   set switches in CMAKE_CXX_FLAGS that should affect all builds, but in
-#   CMAKE_CXX_FLAGS_RELEASE or CMAKE_CXX_FLAGS_RELWITHDEBINFO for switches
-#   that should affect only that build variant.
-#
-#   Also realize that CMAKE_CXX_FLAGS may already be partially populated on
-#   entry to this file.
-#
-#   Additionally CMAKE_C_FLAGS is prepended to CMAKE_CXX_FLAGS_RELEASE and
-#   CMAKE_CXX_FLAGS_RELWITHDEBINFO which risks having flags overriden by cmake
-#   inserting additional options that are part of the build config type.
-#*****************************************************************************
 include_guard()
 
 include(Variables)
 include(Linking)
 
-# We go to some trouble to set LL_BUILD to the set of relevant compiler flags.
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} $ENV{LL_BUILD_RELEASE}")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} $ENV{LL_BUILD_RELWITHDEBINFO}")
+set(AL_OPTIMIZED_CONFIGS "RelWithDebInfo,Release")
 
-# Given that, all the flags you see added below are flags NOT present in
-# https://bitbucket.org/lindenlab/viewer-build-variables/src/tip/variables.
-# Before adding new ones here, it's important to ask: can this flag really be
-# applied to the viewer only, or should/must it be applied to all 3p libraries
-# as well?
+add_library(al_flags INTERFACE)
+add_library(al::flags ALIAS al_flags)
 
-# Portable compilation flags.
-add_compile_definitions( ADDRESS_SIZE=${ADDRESS_SIZE})
-# Because older versions of Boost.Bind dumped placeholders _1, _2 et al. into
-# the global namespace, Boost now requires either BOOST_BIND_NO_PLACEHOLDERS
-# to avoid that or BOOST_BIND_GLOBAL_PLACEHOLDERS to state that we require it
-# -- which we do. Without one or the other, we get a ton of Boost warnings.
-add_compile_definitions(BOOST_BIND_GLOBAL_PLACEHOLDERS)
+#------------------------------------------------------------------------------
+# Language and toolchain policy
+#------------------------------------------------------------------------------
+# These are target properties CMake initialises from variables; the variable is
+# the sanctioned way to set them for a whole tree.
 
-# Force enable SSE2 instructions in GLM per the manual
-# https://github.com/g-truc/glm/blob/master/manual.md#section2_10
-add_compile_definitions(GLM_FORCE_DEFAULT_ALIGNED_GENTYPES=1 GLM_ENABLE_EXPERIMENTAL=1)
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  if(WINDOWS)
+    set(CMAKE_CXX_STANDARD 20)
+  else()
+    set(CMAKE_CXX_STANDARD 23)
+  endif()
+endif()
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF) # C++20 module scanning; unused here and slow
 
-# SSE2NEON throws a pointless warning when compiler optimizations are enabled
-add_compile_definitions(SSE2NEON_SUPPRESS_WARNINGS=1)
+set(CMAKE_OPTIMIZE_DEPENDENCIES ON) # static libraries do not wait on their dependencies' links
+set(CMAKE_COLOR_DIAGNOSTICS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Configure crash reporting
-set(RELEASE_CRASH_REPORTING OFF CACHE BOOL "Enable use of crash reporting in release builds")
-set(NON_RELEASE_CRASH_REPORTING OFF CACHE BOOL "Enable use of crash reporting in developer builds")
-
-if(RELEASE_CRASH_REPORTING)
-  add_compile_definitions( LL_SEND_CRASH_REPORTS=1)
+# The property alone compiles an executable's sources with -fPIE; CMake links
+# it with -pie only once check_pie_supported() has cached that the linker
+# takes it (policy CMP0083). Without that, a toolchain that does not default
+# to PIE links the executable at a fixed address, where address space layout
+# randomisation cannot move it. macOS links every executable
+# position-independent already.
+if(LINUX)
+  include(CheckPIESupported)
+  check_pie_supported()
 endif()
 
-if(NON_RELEASE_CRASH_REPORTING)
-  add_compile_definitions( LL_SEND_CRASH_REPORTS=1)
+set(CMAKE_C_VISIBILITY_PRESET hidden)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+
+if(AL_USE_LTO)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 endif()
 
-set(USE_LTO OFF CACHE BOOL "Enable Link Time Optimization")
-if(USE_LTO)
-  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-endif()
-
-# Don't bother with a MinSizeRel or Debug builds.
-set(CMAKE_CONFIGURATION_TYPES "RelWithDebInfo;Release" CACHE STRING "Supported build types." FORCE)
-
-# Platform-specific compilation flags.
-
-if (WINDOWS)
-  # Don't build DLLs.
-  set(BUILD_SHARED_LIBS OFF)
-
-  # for "backwards compatibility", cmake sneaks in the Zm1000 option which royally
-  # screws incredibuild. this hack disables it.
-  # for details see: http://connect.microsoft.com/VisualStudio/feedback/details/368107/clxx-fatal-error-c1027-inconsistent-values-for-ym-between-creation-and-use-of-precompiled-headers
-  # http://www.ogre3d.org/forums/viewtopic.php?f=2&t=60015
-  # http://www.cmake.org/pipermail/cmake/2009-September/032143.html
-  string(REPLACE "/Zm1000" " " CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-
-  add_link_options(
-       /LARGEADDRESSAWARE
-       /NODEFAULTLIB:LIBCMT
-       /IGNORE:4099
+if(WINDOWS)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  set(CMAKE_MSVC_RUNTIME_CHECKS "$<$<CONFIG:Debug>:StackFrameErrorCheck;UninitializedVariable>")
+  set(
+    CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
+    $<IF:$<CONFIG:Debug,OptDebug>,EditAndContinue,ProgramDatabase>
   )
+endif()
 
-  add_compile_definitions(
+#------------------------------------------------------------------------------
+# Configurations
+#------------------------------------------------------------------------------
+
+# OptDebug compiles like Debug and links like Release: the release CRT on
+# Windows, and the release variant of every imported library.
+if(LL_GENERATOR_IS_MULTI_CONFIG OR CMAKE_BUILD_TYPE STREQUAL "OptDebug")
+  set(CMAKE_C_FLAGS_OPTDEBUG "${CMAKE_C_FLAGS_DEBUG}")
+  set(CMAKE_CXX_FLAGS_OPTDEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+  set(CMAKE_EXE_LINKER_FLAGS_OPTDEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+  set(CMAKE_MODULE_LINKER_FLAGS_OPTDEBUG "${CMAKE_MODULE_LINKER_FLAGS_DEBUG}")
+  set(CMAKE_SHARED_LINKER_FLAGS_OPTDEBUG "${CMAKE_SHARED_LINKER_FLAGS_DEBUG}")
+  set(CMAKE_STATIC_LINKER_FLAGS_OPTDEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG}")
+  if(WINDOWS)
+    set(CMAKE_MAP_IMPORTED_CONFIG_OPTDEBUG Release)
+  endif()
+endif()
+
+#------------------------------------------------------------------------------
+# Sanitizers
+#------------------------------------------------------------------------------
+
+# AL_SANITIZERS is a list drawn from address, undefined and thread, checked
+# and acted on before project() in the root CMakeLists.txt. GCC and Clang
+# only. A sanitized build trips warnings that are false positives, so it does
+# not make warnings errors. Every sanitizer reports and carries on where it
+# can: a test run fails on the report (ALAddTestBinary.cmake), not the exit.
+set(AL_SANITIZING OFF)
+if(AL_SANITIZERS AND (LINUX OR DARWIN))
+  set(AL_SANITIZING ON)
+  foreach(sanitizer IN LISTS AL_SANITIZERS)
+    target_compile_options(al_flags INTERFACE -fsanitize=${sanitizer})
+    target_link_options(al_flags INTERFACE -fsanitize=${sanitizer})
+  endforeach()
+  target_compile_options(
+    al_flags
+    INTERFACE -U_FORTIFY_SOURCE -fno-omit-frame-pointer -fno-common -fsanitize-recover=all
+  )
+  # Boost.Context tells ASan and TSan of each fiber switch, built for ucontext
+  # with these defines, as the sanitizer triplets build its ports; Boost's
+  # CMake package gives every consumer of Boost::context BOOST_USE_UCONTEXT.
+  # See triplets/alchemy-sanitizer.cmake.
+  if(LINUX)
+    if("address" IN_LIST AL_SANITIZERS)
+      target_compile_definitions(al_flags INTERFACE BOOST_USE_ASAN)
+    elseif("thread" IN_LIST AL_SANITIZERS)
+      target_compile_definitions(al_flags INTERFACE BOOST_USE_TSAN)
+    endif()
+  endif()
+endif()
+
+#------------------------------------------------------------------------------
+# Diagnostics
+#------------------------------------------------------------------------------
+
+if(AL_ENABLE_WARNINGS_AS_ERRORS AND NOT AL_SANITIZING)
+  set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+endif()
+
+if(WINDOWS)
+  target_compile_options(al_flags INTERFACE /W3)
+elseif(LINUX OR DARWIN)
+  target_compile_options(
+    al_flags
+    INTERFACE
+      -Wall
+      -Wno-sign-compare
+      -Wno-trigraphs
+      -Wno-reorder
+      -Wno-unused-but-set-variable
+      -Wno-unused-variable
+  )
+  if(COMPILER_IS_CLANG)
+    target_compile_options(
+      al_flags
+      INTERFACE -Wno-unused-private-field -Wno-unused-local-typedef -Wno-reorder-ctor
+    )
+  elseif(COMPILER_IS_GCC)
+    target_compile_options(
+      al_flags
+      INTERFACE
+        -Wstrict-aliasing=2
+        -Wno-stringop-truncation
+        -Wno-stringop-overflow
+        -Wno-parentheses
+        -Wno-maybe-uninitialized
+        -Wno-unused-local-typedefs
+        -Wno-array-bounds # false positives, including on libstdc++'s own headers
+        -Wno-switch
+    )
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 16)
+      target_compile_options(al_flags INTERFACE -Wno-sfinae-incomplete)
+    endif()
+  endif()
+endif()
+
+#------------------------------------------------------------------------------
+# Optimisation and code generation
+#------------------------------------------------------------------------------
+
+# Optimisation level per configuration. CMake's own defaults cover Debug
+# (/Od, -O0) and Release (/O2, -O3); OptDebug inherits Debug's flags and
+# wants a little optimisation on GCC and Clang, and RelWithDebInfo wants
+# -O3 where CMake gives -O2.
+if(LINUX OR DARWIN)
+  target_compile_options(
+    al_flags
+    INTERFACE $<$<CONFIG:OptDebug>:-Og> $<$<CONFIG:RelWithDebInfo>:-O3>
+  )
+endif()
+
+# Inlining. MSVC's optimised defaults are /Ob1 (RelWithDebInfo) and /Ob2
+# (Release); /Ob3 inlines aggressively enough to match GCC and Clang at -O3.
+# Rewriting the configuration flags rather than appending keeps the project
+# files truthful: an appended /Ob3 would override an /Ob1 the IDE still shows.
+if(WINDOWS)
+  foreach(lang C CXX)
+    foreach(config RELWITHDEBINFO RELEASE)
+      string(
+        REGEX REPLACE "/Ob[0-9]"
+        "/Ob3"
+        CMAKE_${lang}_FLAGS_${config}
+        "${CMAKE_${lang}_FLAGS_${config}}"
+      )
+      if(NOT CMAKE_${lang}_FLAGS_${config} MATCHES "/Ob3")
+        string(APPEND CMAKE_${lang}_FLAGS_${config} " /Ob3")
+      endif()
+    endforeach()
+  endforeach()
+endif()
+
+# Floating point. Optimised builds take MSVC's /fp:fast contract on every
+# compiler: reassociation, contraction and reciprocal transforms allowed,
+# signed zero, FP exceptions and errno not guaranteed -- and NaN and
+# infinity still treated as values that occur. GCC and Clang get that as
+# the component flags rather than -ffast-math, which adds
+# -ffinite-math-only (folding every isnan/isinf guard in the renderer to a
+# constant) and, on the link line, crtfastmath.o (FTZ/DAZ for every thread
+# in the process, including ones that are not ours). Compile options never
+# reach the link line, and these spellings never trigger crtfastmath.o.
+if(WINDOWS)
+  target_compile_options(al_flags INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:/fp:fast>)
+elseif(LINUX OR DARWIN)
+  target_compile_options(
+    al_flags
+    INTERFACE
+      -fno-math-errno
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-ffp-contract=fast>
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fno-trapping-math>
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fno-signed-zeros>
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fassociative-math>
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-freciprocal-math>
+  )
+endif()
+
+# Instruction set: the same table the triplets read, so the viewer and its
+# ports are built for one machine. AlchemyTarget.cmake says what each tier
+# means and why macOS x86_64 ignores it.
+#
+# Every target carries the tree's tier in its AL_ISA_TIER property and reads
+# its compiler flag and its AL_ISA_LEVEL definition from that, so one target
+# can build at another tier from the same configure by setting the property:
+# that is how a test of the SIMD layer builds once per tier against the one
+# set of ports. Such a target must not reuse the precompiled header, which
+# was compiled at the tree's tier.
+include(AlchemyTarget)
+define_property(
+  TARGET
+  PROPERTY AL_ISA_TIER
+  INITIALIZE_FROM_VARIABLE AL_ISA_TIER
+  BRIEF_DOCS "The x86-64 microarchitecture level this target is compiled for"
+)
+foreach(tier baseline v2 v3 v4)
+  al_isa_flags(${tier} ${CMAKE_SYSTEM_NAME} ${ARCH} al_isa_tier_flags)
+  al_isa_level(${tier} ${CMAKE_SYSTEM_NAME} ${ARCH} al_isa_tier_level)
+  set(al_isa_tier_selected "$<STREQUAL:$<TARGET_PROPERTY:AL_ISA_TIER>,${tier}>")
+  target_compile_options(al_flags INTERFACE "$<${al_isa_tier_selected}:${al_isa_tier_flags}>")
+  target_compile_definitions(
+    al_flags
+    INTERFACE "$<${al_isa_tier_selected}:AL_ISA_LEVEL=${al_isa_tier_level}>"
+  )
+endforeach()
+
+# Hardening, in the optimised configurations: a stack canary in every
+# function with a local array or an address-taken local; probes that keep a
+# large stack allocation from stepping over the guard page; and each
+# architecture's control-flow protection, landing pads for indirect branches
+# and protected returns (shadow-stack compatibility on x86, signed return
+# addresses on arm64).
+if(LINUX)
+  target_compile_options(
+    al_flags
+    INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fstack-protector-strong>
+  )
+  # Clang before 18 has no stack clash probes on arm64, and leaves the option
+  # unused with a warning that -Werror makes fatal.
+  if(
+    NOT (COMPILER_IS_CLANG AND BUILD_TARGET_IS_ARM64 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
+  )
+    target_compile_options(
+      al_flags
+      INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fstack-clash-protection>
+    )
+  endif()
+  if(BUILD_TARGET_IS_X86_64)
+    target_compile_options(al_flags INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fcf-protection>)
+  elseif(BUILD_TARGET_IS_ARM64)
+    target_compile_options(
+      al_flags
+      INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-mbranch-protection=standard>
+    )
+  endif()
+  # Fortified libc calls, at level 3, which also checks sizes known only at
+  # run time. Options, not a definition: definitions come before options on
+  # the command line, and the -U has to come first, so a _FORTIFY_SOURCE the
+  # toolchain defines itself is replaced rather than redefined.
+  if(NOT AL_SANITIZING)
+    target_compile_options(
+      al_flags
+      INTERFACE
+        $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-U_FORTIFY_SOURCE>
+        $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-D_FORTIFY_SOURCE=3>
+    )
+  endif()
+endif()
+
+# No hot/cold splitting where GCC links with a mold older than 2.42.1. GCC
+# moves a function's unlikely blocks into a part of their own ("[clone
+# .cold]"), and where they all optimise away it still emits the part, empty,
+# with an unwind entry covering no bytes at the address of whatever follows
+# it. Those mold versions (rui314/mold#1648) put that entry in .eh_frame_hdr's
+# search table beside the real function's, in an order their unstable sort
+# leaves to chance; where the empty one comes last the unwinder finds no
+# entry for the function, and an exception thrown through it ends the program
+# in std::terminate whatever would have caught it. Without splitting there
+# are no such parts. The link option is for LTO, which generates the code
+# there. The vcpkg ports keep their empty parts: only a mold that leaves them
+# out of the table mends those.
+if(
+  COMPILER_IS_GCC
+  AND CMAKE_CXX_COMPILER_LINKER_ID STREQUAL "MOLD"
+  AND CMAKE_CXX_COMPILER_LINKER_VERSION VERSION_LESS 2.42.1
+)
+  target_compile_options(al_flags INTERFACE -fno-reorder-blocks-and-partition)
+  target_link_options(al_flags INTERFACE -fno-reorder-blocks-and-partition)
+endif()
+
+# Toolchain conformance and miscellany.
+if(WINDOWS)
+  target_compile_options(
+    al_flags
+    INTERFACE
+      /utf-8 # source and execution character sets, as on the other platforms
+      /bigobj # generated template code exceeds the default section limit
+      /Gy # function-level linking in every configuration, not only under /O2
+      /Zc:wchar_t # documented as the default, but without it link.exe reports corrupted
+      # type records (LNK4020) in the PDB of objects built against the shared PCH
+      /MP
+      /permissive-
+      /Zc:preprocessor
+      /Zc:__cplusplus
+      /Zc:inline
+  )
+elseif(LINUX)
+  target_compile_options(al_flags INTERFACE -fsigned-char -pthread)
+elseif(DARWIN)
+  # The Xcode attribute is what the Xcode generator honours; the compile
+  # option covers Ninja and Makefile generators.
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES)
+  target_compile_options(al_flags INTERFACE $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
+endif()
+
+#------------------------------------------------------------------------------
+# Debug information
+#------------------------------------------------------------------------------
+
+# Every configuration carries symbols. CMake's Debug and RelWithDebInfo flags
+# already say -g (and OptDebug inherits Debug's); Release keeps symbols too,
+# for crash reports, and the packaging step strips them from the shipped
+# binary. Windows sets the format through CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
+# above, and links with full debug information unless the target opts out of
+# it for Release through AL_SKIP_RELEASE_DEBUG_INFO.
+if(LINUX)
+  target_compile_options(al_flags INTERFACE $<$<CONFIG:Release>:-g> -gz=zstd)
+elseif(DARWIN)
+  target_compile_options(al_flags INTERFACE $<$<CONFIG:Release>:-g>)
+elseif(WINDOWS)
+  target_link_options(
+    al_flags
+    INTERFACE
+      $<IF:$<AND:$<CONFIG:Release>,$<BOOL:$<TARGET_PROPERTY:AL_SKIP_RELEASE_DEBUG_INFO>>>,/DEBUG:NONE,/DEBUG:FULL>
+  )
+endif()
+
+#------------------------------------------------------------------------------
+# Preprocessor definitions
+#------------------------------------------------------------------------------
+
+# Per configuration. CMake's RelWithDebInfo and Release flags define NDEBUG
+# themselves; OptDebug inherits Debug's flags and must define it here.
+target_compile_definitions(
+  al_flags
+  INTERFACE
+    $<$<CONFIG:Debug>:LL_DEBUG=1>
+    $<$<CONFIG:Debug>:_DEBUG>
+    $<$<CONFIG:OptDebug>:LL_DEBUG=1>
+    $<$<CONFIG:OptDebug>:LL_OPTDEBUG=1>
+    $<$<CONFIG:OptDebug>:NDEBUG>
+    $<$<CONFIG:RelWithDebInfo>:LL_RELEASE=1>
+    $<$<CONFIG:RelWithDebInfo>:LL_RELEASE_WITH_DEBUG_INFO=1>
+    $<$<CONFIG:Release>:LL_RELEASE=1>
+    $<$<CONFIG:Release>:LL_RELEASE_FOR_DOWNLOAD=1>
+)
+
+# Portable.
+target_compile_definitions(
+  al_flags
+  INTERFACE
+    ADDRESS_SIZE=${ADDRESS_SIZE}
+    BOOST_BIND_GLOBAL_PLACEHOLDERS # Boost.Bind's _1, _2 in the global namespace, which the code relies on
+)
+
+if(AL_ENABLE_CRASH_REPORTING)
+  target_compile_definitions(al_flags INTERFACE LL_SEND_CRASH_REPORTS=1)
+endif()
+
+# Every library sees which crash reporter is in: llcommon's signal and
+# exception handling stands aside for it.
+if(AL_USE_SENTRY)
+  target_compile_definitions(al_flags INTERFACE AL_SENTRY=1)
+endif()
+
+if(NOT AL_ENABLE_RELEASE_DEBUG_LOGGING)
+  target_compile_definitions(al_flags INTERFACE $<$<CONFIG:Release>:LL_DISABLE_DEBUG_LOGGING=1>)
+endif()
+
+# Per platform.
+if(WINDOWS)
+  target_compile_definitions(
+    al_flags
+    INTERFACE
+      LL_WINDOWS=1
+      UNICODE
+      _UNICODE
+      WINVER=0x0A00
+      _WIN32_WINNT=0x0A00
       WIN32_LEAN_AND_MEAN
       NOMINMAX
-#     DOM_DYNAMIC                     # For shared library colladadom
-      _CRT_SECURE_NO_WARNINGS         # Allow use of sprintf etc
-      _CRT_NONSTDC_NO_DEPRECATE       # Allow use of sprintf etc
+      _CRT_SECURE_NO_WARNINGS # sprintf and friends
+      _CRT_NONSTDC_NO_DEPRECATE
       _CRT_OBSOLETE_NO_WARNINGS
-      _WINSOCK_DEPRECATED_NO_WARNINGS # Disable deprecated WinSock API warnings
-      )
-  add_compile_options(
-          /Zo
-          /GS
-          /TP
-          /W3
-          /c
-          /Zc:forScope
-          /nologo
-          /Oy-
-          /fp:fast
-          /MP
-          /permissive-
-      )
-
-  if("${simd_lower}" STREQUAL "avx2")
-    string(REPLACE "/arch:SSE4.2" "/arch:AVX2" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    string(REPLACE "/arch:SSE4.2" "/arch:AVX2" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-    string(REPLACE "/arch:SSE4.2" "/arch:AVX2" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
-    string(REPLACE "/arch:SSE4.2" "/arch:AVX2" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-    string(REPLACE "/arch:SSE4.2" "/arch:AVX2" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
-    # Also add previous SSE definitions
-    add_compile_definitions(
-        __SSE3__=1
-        __SSSE3__=1
-        __SSE4__=1
-        __SSE4_1__=1
-        __SSE4_2__=1
-        )
-  elseif("${simd_lower}" STREQUAL "arm64")
-    string(REPLACE "/arch:SSE4.2" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    string(REPLACE "/arch:SSE4.2" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-    string(REPLACE "/arch:SSE4.2" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
-    string(REPLACE "/arch:SSE4.2" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-    string(REPLACE "/arch:SSE4.2" "" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
-  else()
-    add_compile_definitions(
-        __SSE3__=1
-        __SSSE3__=1
-        __SSE4__=1
-        __SSE4_1__=1
-        __SSE4_2__=1
-        )
-  endif()
-
-  # We want aggressive inlining on MSVC to better match clang/gcc at O3
-  string(REPLACE "/Ob2" "/Ob3" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  string(REPLACE "/Ob2" "/Ob3" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-  string(REPLACE "/Ob2" "/Ob3" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
-
-  # Are we using the crummy Visual Studio KDU build workaround?
-  if (NOT VS_DISABLE_FATAL_WARNINGS)
-    add_compile_options(/WX)
-  endif (NOT VS_DISABLE_FATAL_WARNINGS)
-
-  #ND: When using something like buildcache (https://github.com/mbitsnbites/buildcache)
-  # to make those wrappers work /Zi must be changed to /Z7, as /Zi due to it's nature is not compatible with caching
-  if(${CMAKE_CXX_COMPILER_LAUNCHER} MATCHES ".*cache.*")
-    add_compile_options( /Z7 )
-    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-    string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
-    string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
-    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-  endif ()
-endif (WINDOWS)
-
-
-if (LINUX)
-  set(CMAKE_SKIP_RPATH TRUE)
-
-   # LL_IGNORE_SIGCHLD
-   # don't catch SIGCHLD in our base application class for the viewer - some of
-   # our 3rd party libs may need their *own* SIGCHLD handler to work. Sigh! The
-   # viewer doesn't need to catch SIGCHLD anyway.
-
-  add_compile_definitions(
-          _REENTRANT
-          APPID=secondlife
-          LL_IGNORE_SIGCHLD
-          $<$<CONFIG:Release>:_FORTIFY_SOURCE=2>
+      _WINSOCK_DEPRECATED_NO_WARNINGS
   )
-  add_compile_options(
-          $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-fstack-protector>
-          -fexceptions
-          -fno-math-errno
-          -fno-strict-aliasing
-          -fsigned-char
-          -g
-          -pthread
-          -fvisibility=hidden
+elseif(LINUX)
+  target_compile_definitions(
+    al_flags
+    INTERFACE
+      LL_LINUX=1
+      _REENTRANT
+      APPID=secondlife
+      LL_IGNORE_SIGCHLD # third-party libraries install their own SIGCHLD handlers; the viewer needs none
   )
+elseif(DARWIN)
+  target_compile_definitions(al_flags INTERFACE LL_DARWIN=1 GL_SILENCE_DEPRECATION=1)
+endif()
 
-  if("${simd_lower}" STREQUAL "avx2")
-    string(REPLACE "-march=x86-64-v2" "-march=x86-64-v3" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    string(REPLACE "-march=x86-64-v2" "-march=x86-64-v3" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-    string(REPLACE "-march=x86-64-v2" "-march=x86-64-v3" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
-    string(REPLACE "-march=x86-64-v2" "-march=x86-64-v3" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-    string(REPLACE "-march=x86-64-v2" "-march=x86-64-v3" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+#------------------------------------------------------------------------------
+# Linking
+#------------------------------------------------------------------------------
+
+if(WINDOWS)
+  target_link_options(
+    al_flags
+    INTERFACE
+      $<$<CONFIG:Release>:/OPT:REF>
+      $<$<CONFIG:Release>:/OPT:ICF>
+      /LARGEADDRESSAWARE
+      $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:/NODEFAULTLIB:LIBCMTD>
+      $<$<CONFIG:Debug>:/NODEFAULTLIB:LIBCMT>
+  )
+elseif(LINUX)
+  target_link_options(
+    al_flags
+    INTERFACE
+      "LINKER:-z,relro"
+      "LINKER:-z,now"
+      "LINKER:--build-id"
+      "LINKER:--as-needed"
+      "LINKER:--no-undefined"
+  )
+elseif(DARWIN)
+  # Under -dead_strip, ld only warns of a symbol defined both in an object and
+  # in an archive member it loads, and keeps the object's: a stub in a test, or
+  # a stray copy in the viewer, silently replaces the real one. An error, as
+  # GNU ld and MSVC make it.
+  target_link_options(
+    al_flags
+    INTERFACE
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:LINKER:-dead_strip>
+      "LINKER:-duplicate_symbols,error"
+      LINKER:-dead_strip_dylibs
+      "LINKER:-headerpad_max_install_names"
+      "LINKER:-search_paths_first"
+  )
+  # ld64 needs somewhere to keep LTO intermediates or dsymutil finds no symbols.
+  if(AL_USE_LTO AND NOT XCODE)
+    target_link_options(
+      al_flags
+      INTERFACE
+        "LINKER:-cache_path_lto,${CMAKE_BINARY_DIR}/LTOCache"
+        "LINKER:-object_path_lto,$<TARGET_PROPERTY:BINARY_DIR>/CMakeFiles/$<TARGET_PROPERTY:NAME>.dir/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>/,>$<TARGET_PROPERTY:NAME>_lto.o"
+    )
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/LTOCache")
+  endif()
+endif()
+
+#------------------------------------------------------------------------------
+# Xcode generator
+#------------------------------------------------------------------------------
+
+if(DARWIN)
+  set(CMAKE_XCODE_GENERATE_TOP_LEVEL_PROJECT_ONLY ON)
+  set(CMAKE_XCODE_GENERATE_SCHEME ON)
+  set(CMAKE_XCODE_SCHEME_LAUNCH_CONFIGURATION "RelWithDebInfo")
+  if("address" IN_LIST AL_SANITIZERS)
+    set(CMAKE_XCODE_SCHEME_ADDRESS_SANITIZER ON)
+  endif()
+  if("undefined" IN_LIST AL_SANITIZERS)
+    set(CMAKE_XCODE_SCHEME_UNDEFINED_BEHAVIOUR_SANITIZER ON)
+  endif()
+  if("thread" IN_LIST AL_SANITIZERS)
+    set(CMAKE_XCODE_SCHEME_THREAD_SANITIZER ON)
   endif()
 
-  if (USE_ASAN OR USE_LEAKSAN OR USE_UBSAN OR USE_THDSAN)
-    add_compile_options(-Og)
-  endif ()
+  set(CMAKE_XCODE_ATTRIBUTE_COMPILATION_CACHE_ENABLE_CACHING YES)
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS YES)
+  set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf") # the symbols target makes the dSYMs
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH NO)
+  # Xcode does not read -march; this is the Darwin row of AlchemyTarget.cmake
+  # in the spelling it does read.
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_X86_VECTOR_INSTRUCTIONS sse4.2)
+  # Xcode's own signing cannot handle the embedded CEF bundles; signing is an
+  # install step (ViewerCodeSign.cmake). Since Xcode 14.1 all three are needed
+  # to stop it signing implicitly. https://stackoverflow.com/a/54296008
+  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO)
+  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO)
+  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
+  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "")
+  set(CMAKE_XCODE_ATTRIBUTE_DISABLE_MANUAL_TARGET_ORDER_BUILD_WARNING YES)
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_64_TO_32_BIT_CONVERSION NO)
+endif()
 
-  # Enable these flags so we have a read only GOT and some linking opts
-  add_link_options("LINKER:-z,relro" "LINKER:-z,now" "LINKER:--as-needed" "LINKER:--build-id=uuid")
-endif (LINUX)
+#------------------------------------------------------------------------------
+# The guard
+#------------------------------------------------------------------------------
 
-if (DARWIN)
-  # Use rpath loading on macos
-  set(CMAKE_MACOSX_RPATH TRUE)
+# Fails the configure if any buildable target in the tree does not link
+# al::flags. Called from the root after the last add_subdirectory().
+function(_al_collect_targets dir out)
+  get_property(targets DIRECTORY "${dir}" PROPERTY BUILDSYSTEM_TARGETS)
+  get_property(subdirs DIRECTORY "${dir}" PROPERTY SUBDIRECTORIES)
+  foreach(sub IN LISTS subdirs)
+    _al_collect_targets("${sub}" sub_targets)
+    list(APPEND targets ${sub_targets})
+  endforeach()
+  set(${out} "${targets}" PARENT_SCOPE)
+endfunction()
 
-  # Warnings should be fatal -- thanks, Nicky Perian, for spotting reversed default
-  set(CLANG_DISABLE_FATAL_WARNINGS OFF)
-  set(CMAKE_CXX_LINK_FLAGS "-Wl,-headerpad_max_install_names,-search_paths_first")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
-
-  # Ensure debug symbols are always generated
-  add_compile_options(-g --debug) # --debug is a clang synonym for -g that bypasses cmake behaviors
-
-  # Silence GL deprecation warnings
-  add_compile_definitions(GL_SILENCE_DEPRECATION=1)
-endif(DARWIN)
-
-if (LINUX OR DARWIN)
-  add_compile_options(-Wall -Wno-sign-compare -Wno-trigraphs -Wno-reorder)
-
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-    # libstdc++ headers contain deprecated declarations that fail on clang
-    # macOS currently has many deprecated calls
-    add_compile_options(-Wno-unused-local-typedef)
+function(al_check_flags_target)
+  _al_collect_targets("${CMAKE_SOURCE_DIR}" targets)
+  set(missing)
+  foreach(target IN LISTS targets)
+    get_target_property(type ${target} TYPE)
+    if(
+      NOT type MATCHES "^(STATIC_LIBRARY|SHARED_LIBRARY|MODULE_LIBRARY|OBJECT_LIBRARY|EXECUTABLE)$"
+    )
+      continue()
+    endif()
+    get_target_property(libs ${target} LINK_LIBRARIES)
+    if(NOT libs OR NOT ("al::flags" IN_LIST libs OR "al_flags" IN_LIST libs))
+      list(APPEND missing ${target})
+    endif()
+  endforeach()
+  if(missing)
+    list(JOIN missing ", " missing_text)
+    message(FATAL_ERROR "These targets do not link al::flags: ${missing_text}")
   endif()
-
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    add_compile_options(-Wno-stringop-truncation -Wno-stringop-overflow -Wno-maybe-uninitialized)
-  endif()
-
-  if (NOT GCC_DISABLE_FATAL_WARNINGS AND NOT CLANG_DISABLE_FATAL_WARNINGS)
-    add_compile_options(-Werror)
-  endif ()
-
-  add_compile_options(${GCC_WARNINGS})
-  add_compile_options(-m${ADDRESS_SIZE})
-endif (LINUX OR DARWIN)
-
+endfunction()

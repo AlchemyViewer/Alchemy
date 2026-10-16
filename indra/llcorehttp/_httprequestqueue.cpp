@@ -36,6 +36,7 @@ namespace LLCore
 {
 
 HttpRequestQueue * HttpRequestQueue::sInstance(NULL);
+std::function<void(const HttpRequestQueue::opPtr_t &)> HttpRequestQueue::sMessageLogFunc = nullptr;
 
 
 HttpRequestQueue::HttpRequestQueue()
@@ -68,8 +69,12 @@ void HttpRequestQueue::term()
 }
 
 
-HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op)
+HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op, bool loggable /* = true */)
 {
+    // The op's handle is made before the worker can see the op. Made as the
+    // caller asks for it afterwards, the worker could be making it too.
+    op->getHandle();
+
     bool wake(false);
     {
         HttpScopedLock lock(mQueueMutex);
@@ -79,6 +84,7 @@ HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op)
             // Return op and error to caller
             return HttpStatus(HttpStatus::LLCORE, HE_SHUTTING_DOWN);
         }
+        if (loggable && sMessageLogFunc != nullptr ) { sMessageLogFunc(op); }
         wake = mQueue.empty();
         mQueue.push_back(op);
     }
@@ -92,7 +98,7 @@ HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op)
 
 HttpRequestQueue::opPtr_t HttpRequestQueue::fetchOp(bool wait)
 {
-    HttpOperation::ptr_t result;
+    HttpRequestQueue::opPtr_t result;
 
     {
         HttpScopedLock lock(mQueueMutex);
@@ -100,7 +106,7 @@ HttpRequestQueue::opPtr_t HttpRequestQueue::fetchOp(bool wait)
         while (mQueue.empty())
         {
             if (! wait || mQueueStopped)
-                return HttpOperation::ptr_t();
+                return {};
             mQueueCV.wait(lock);
         }
 

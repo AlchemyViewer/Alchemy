@@ -35,7 +35,6 @@
 //
 // class LLFolderViewModelInventory
 //
-static LLTrace::BlockTimerStatHandle FTM_INVENTORY_SORT("Inventory Sort");
 
 bool LLFolderViewModelInventory::startDrag(std::vector<LLFolderViewModelItem*>& items)
 {
@@ -64,7 +63,7 @@ bool LLFolderViewModelInventory::startDrag(std::vector<LLFolderViewModelItem*>& 
 
 void LLFolderViewModelInventory::sort( LLFolderViewFolder* folder )
 {
-    LL_RECORD_BLOCK_TIME(FTM_INVENTORY_SORT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     if (!folder->areChildrenInited() || !needsSort(folder->getViewModelItem())) return;
 
@@ -159,7 +158,7 @@ void LLFolderViewModelItemInventory::addChild(LLFolderViewModelItem* child)
 void LLFolderViewModelItemInventory::requestSort()
 {
     LLFolderViewModelItemCommon::requestSort();
-    LLFolderViewFolder* folderp = dynamic_cast<LLFolderViewFolder*>(mFolderViewItem);
+    LLFolderViewFolder* folderp = ALViewType::as<LLFolderViewFolder>(mFolderViewItem);
     if (folderp)
     {
         folderp->requestArrange();
@@ -314,7 +313,8 @@ bool LLFolderViewModelItemInventory::filter(LLFolderViewFilter& filter)
                 view_model = static_cast<LLFolderViewModelItemInventory*>(view_model->mParent);
             }
         }
-        setPassedFilter(passed_filter, filter_generation, filter.getStringMatchOffset(this), filter.getFilterStringSize());
+        const LLFolderViewFilter::Match match = filter.getFilterMatch(this);
+        setPassedFilter(passed_filter, filter_generation, match.mOffset, match.mLength);
         continue_filtering = !filter.isTimedOut();
     }
     return continue_filtering;

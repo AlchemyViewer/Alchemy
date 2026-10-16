@@ -32,7 +32,6 @@
 #ifndef LL_LLWORLD_H
 #define LL_LLWORLD_H
 
-#include "llpatchvertexarray.h"
 
 #include "llmath.h"
 #include "v3math.h"
@@ -40,7 +39,8 @@
 #include "llstring.h"
 #include "llviewerpartsim.h"
 #include "llviewertexture.h"
-#include "llvowater.h"
+
+#include <vector>
 
 class LLViewerRegion;
 class LLVector3d;
@@ -77,6 +77,7 @@ class LLWorld final : public LLSimpleton<LLWorld>
 {
 public:
     LLWorld();
+    ~LLWorld() = default;
 
     // Clear any objects, regions
     // Prepares class to be reused or destroyed
@@ -102,7 +103,10 @@ public:
     // All of these should be in the agent coordinate frame
     LLViewerRegion*         resolveRegionGlobal(LLVector3 &localpos, const LLVector3d &position);
     LLViewerRegion*         resolveRegionAgent(LLVector3 &localpos, const LLVector3 &position);
-    F32                     resolveLandHeightGlobal(const LLVector3d &position);
+    // regionp, when given, is where the caller expects the position to be -- usually the region of
+    // the object asking. It is checked first, so the region list is only searched when it misses;
+    // the answer is the same either way.
+    F32                     resolveLandHeightGlobal(const LLVector3d &position, LLViewerRegion* regionp = nullptr);
     F32                     resolveLandHeightAgent(const LLVector3 &position);
 
     // Return the lowest allowed Z point to prevent objects from being moved
@@ -150,9 +154,6 @@ public:
     F32 getLandFarClip() const;
     void setLandFarClip(const F32 far_clip);
 
-    LLViewerTexture *getDefaultWaterTexture();
-    void updateWaterObjects();
-
     void waterHeightRegionInfo(std::string const& sim_name, F32 water_height);
     void shiftRegions(const LLVector3& offset);
 
@@ -161,11 +162,10 @@ public:
 
     void getInfo(LLSD& info);
     U32  getNumOfActiveCachedObjects() const {return mNumOfActiveCachedObjects;}
+    void logObjectCacheInfo() const;
 
-    void clearAllVisibleObjects();
-
-    virtual CapUrlMatches getCapURLMatches(const std::string& cap_url);
-    virtual bool isCapURLMapped(const std::string& cap_url);
+    CapUrlMatches getCapURLMatches(const std::string& cap_url);
+    bool isCapURLMapped(const std::string& cap_url);
 
 public:
     typedef std::list<LLViewerRegion*> region_list_t;
@@ -208,9 +208,6 @@ public:
     F32 getNearbyAvatarsAndMaxGPUTime(std::vector<LLVOAvatar*> &valid_nearby_avs);
 
 private:
-    void clearHoleWaterObjects();
-    void clearEdgeWaterObjects();
-
     region_list_t   mActiveRegionList;
     region_list_t   mRegionList;
     region_list_t   mVisibleRegionList;
@@ -227,23 +224,11 @@ private:
     static const F32 mWidthInMeters;
 
     F32 mLandFarClip;                   // Far clip distance for land.
-    LLPatchVertexArray      mLandPatch;
     S32 mLastPacketsIn;
     S32 mLastPacketsOut;
     S32 mLastPacketsLost;
     U32 mNumOfActiveCachedObjects;
     U64MicrosecondsImplicit mSpaceTimeUSec;
-
-    ////////////////////////////
-    //
-    // Data for "Fake" objects
-    //
-
-    std::list<LLPointer<LLVOWater> > mHoleWaterObjects;
-    static const S32 EDGE_WATER_OBJECTS_COUNT = 8;
-    LLPointer<LLVOWater> mEdgeWaterObjects[EDGE_WATER_OBJECTS_COUNT];
-
-    LLPointer<LLViewerTexture> mDefaultWaterTexturep;
 };
 
 

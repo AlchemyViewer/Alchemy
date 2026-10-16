@@ -26,6 +26,7 @@
 #ifndef LL_LLPANELGROUP_H
 #define LL_LLPANELGROUP_H
 
+#include "llevent.h"
 #include "llgroupmgr.h"
 #include "llpanel.h"
 #include "lltimer.h"
@@ -42,28 +43,31 @@ class LLAccordionCtrl;
 class LLAgent;
 
 
-class LLPanelGroup : public LLPanel,
+class LLPanelGroup final : public LLPanel,
                      public LLGroupMgrObserver,
-                     public LLVoiceClientStatusObserver
+                     public LLVoiceClientStatusObserver,
+                     public LLOldEvents::LLSimpleListener
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroup, LLPanel);
+
     LLPanelGroup();
     virtual ~LLPanelGroup();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void setGroupID(const LLUUID& group_id);
 
-    void draw();
+    void draw() override;
 
-    void onOpen(const LLSD& key);
+    void onOpen(const LLSD& key) override;
 
     // Group manager observer trigger.
-    virtual void changed(LLGroupChange gc);
+    virtual void changed(LLGroupChange gc) override;
 
     // Implements LLVoiceClientStatusObserver::onChange() to enable the call
     // button when voice is available
-    /*virtual*/ void onChange(EStatusType status, const LLSD& channelInfo, bool proximal);
+    /*virtual*/ void onChange(EStatusType status, const LLSD& channelInfo, bool proximal) override;
 
     void showNotice(const std::string& subject,
                     const std::string& message,
@@ -78,7 +82,7 @@ public:
     void callGroup();
     void chatGroup();
 
-    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     static void showNotice(const std::string& subject,
                            const std::string& message,
@@ -87,12 +91,14 @@ public:
                            const std::string& inventory_name,
                            LLOfferInfo* inventory_offer);
 
+    void hideBackBtn();
 
 protected:
     virtual void update(LLGroupChange gc);
 
     void onBackBtnClick();
     void onBtnJoin();
+    void onBtnActivate();
 
     static void onBtnApply(void*);
     static void onBtnRefresh(void*);
@@ -120,16 +126,22 @@ protected:
 
     LLUICtrl*       mGroupNameCtrl = nullptr;
     LLButton*       mButtonJoin = nullptr;
+    LLButton*       mButtonActivate = nullptr;
     LLButton*       mButtonApply = nullptr;
     LLButton*       mButtonCall = nullptr;
     LLButton*       mButtonChat = nullptr;
     LLButton*       mButtonRefresh = nullptr;
     LLUICtrl*       mJoinText;
+
+private:
+    bool handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& userdata) override; // for agent group list changes
 };
 
 class LLPanelGroupTab : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupTab, LLPanel);
+
     LLPanelGroupTab();
     virtual ~LLPanelGroupTab();
 
@@ -157,7 +169,7 @@ public:
     virtual void update(LLGroupChange gc) { }
 
     // This just connects the help button callback.
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     virtual bool isVisibleByAgent(LLAgent* agentp);
 

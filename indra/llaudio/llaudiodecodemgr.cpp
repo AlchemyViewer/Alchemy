@@ -199,7 +199,7 @@ bool LLVorbisDecodeState::initDecode()
     LL_DEBUGS("AudioEngine") << "Initing decode from vfile: " << mUUID << LL_ENDL;
 
     mInFilep = new LLFileSystem(mUUID, LLAssetType::AT_SOUND);
-    if (!mInFilep || !mInFilep->getSize())
+    if (!mInFilep || mInFilep->getSize() <= 0)
     {
         LL_WARNS("AudioEngine") << "unable to open vorbis source vfile for reading" << LL_ENDL;
         delete mInFilep;
@@ -547,7 +547,7 @@ class LLAudioDecodeMgr::Impl
 
   protected:
     std::deque<LLUUID> mDecodeQueue;
-    boost::unordered_map<LLUUID, LLPointer<LLVorbisDecodeState>> mDecodes;
+    std::map<LLUUID, LLPointer<LLVorbisDecodeState>> mDecodes;
 };
 
 LLAudioDecodeMgr::Impl::Impl()
@@ -789,6 +789,7 @@ bool LLAudioDecodeMgr::addDecodeRequest(const LLUUID &uuid)
 {
     if (gAudiop && gAudiop->isCorruptSound(uuid))
         return false;
+
     if (gAudiop && gAudiop->hasDecodedFile(uuid))
     {
         // Already have a decoded version, don't need to decode it.

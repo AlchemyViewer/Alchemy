@@ -41,7 +41,6 @@
 #include "rlvhelper.h"
 // [/RLVa:KB]
 
-class LLPanelChatControlPanel;
 class LLChatEntry;
 class LLChatHistory;
 class LLPanelEmojiComplete;
@@ -57,6 +56,8 @@ class LLFloaterIMSessionTab
 // [/RLVa:KB]
 
 public:
+    AL_VIEW_TYPE(LLFloaterIMSessionTab, LLTransientDockableFloater);
+
     LOG_CLASS(LLFloaterIMSessionTab);
 
     LLFloaterIMSessionTab(const LLSD& session_id);
@@ -92,6 +93,8 @@ public:
     void closeFloater(bool app_quitting = false) override;
     void deleteAllChildren() override;
 
+    virtual void onClickCloseBtn(bool app_quitting = false) override;
+
     // Handle the left hand participant list widgets
     void addConversationViewParticipant(LLConversationItem* item, bool update_view = true);
     void removeConversationViewParticipant(const LLUUID& participant_id);
@@ -107,7 +110,7 @@ public:
     LLConversationItem* getCurSelectedViewModelItem();
     void forceReshape();
     virtual bool handleKeyHere( KEY key, MASK mask ) override;
-    bool isMessagePaneExpanded(){return mMessagePaneExpanded;}
+    bool isMessagePaneExpanded() const {return mMessagePaneExpanded;}
     void setMessagePaneExpanded(bool expanded){mMessagePaneExpanded = expanded;}
     void restoreFloater();
     void saveCollapsedState();
@@ -122,6 +125,8 @@ public:
     virtual void sessionRemoved(const LLUUID& session_id) override;
     virtual void sessionVoiceOrIMStarted(const LLUUID& session_id) override {};                              // Stub
     virtual void sessionIDUpdated(const LLUUID& old_session_id, const LLUUID& new_session_id) override {};   // Stub
+
+    bool isP2PSessionType() { return mIsP2PChat; }
 
 protected:
 
@@ -163,8 +168,13 @@ protected:
     std::string appendTime();
     void assignResizeLimits();
 
-    void updateUsedEmojis(LLWStringView text);
+public:
+    static void applyMUPose(std::string& text);
+    static void applyOOCClose(std::string& text);
 
+    void updateUsedEmojis(std::string_view text);
+
+protected:
     S32  mFloaterExtraWidth;
 
     bool mIsNearbyChat;
@@ -212,6 +222,9 @@ protected:
     LLButton* mGearBtn;
     LLButton* mAddBtn;
     LLButton* mVoiceButton;
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+    LLPanel* mExtendedButtonPanel = nullptr;
+// [/SL:KB]
 
     // Since mVoiceButton can work in one of two modes, "Start call" or "Hang up",
     // (with different images and tooltips depending on the currently chosen mode)

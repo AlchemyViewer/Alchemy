@@ -265,7 +265,7 @@ public:
 
     bool isSingleMemberNotOwner();
 
-    F32 getAccessTime() const { return mAccessTime; }
+    F64 getAccessTime() const { return mAccessTime; }
     void setAccessed();
 
     const LLUUID& getMemberVersion() const { return mMemberVersion; }
@@ -329,7 +329,7 @@ private:
     bool                mGroupPropertiesDataComplete;
 
     bool                mPendingRoleMemberRequest;
-    F32                 mAccessTime;
+    F64                 mAccessTime;
 
     // Generate a new ID every time mMembers
     LLUUID              mMemberVersion;

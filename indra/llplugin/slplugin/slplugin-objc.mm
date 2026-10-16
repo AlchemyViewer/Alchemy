@@ -34,6 +34,45 @@
 
 #include "slplugin-objc.h"
 
+// libobjc runtime entry points used by @autoreleasepool; declared here so we
+// can push/pop pools across the C++ event-loop function boundaries in
+// slplugin.cpp where lexical @autoreleasepool blocks don't fit.
+extern "C" {
+    void *objc_autoreleasePoolPush(void);
+    void  objc_autoreleasePoolPop(void *pool);
+}
+
+// CEF on macOS requires the running NSApplication to implement the
+// CrAppProtocol / CefAppProtocol selectors -isHandlingSendEvent and
+// -setHandlingSendEvent:. CEF's message pump (CefDoMessageLoopWork, driven by
+// the CEF media plugin) sends -isHandlingSendEvent to NSApp directly; if the
+// app object doesn't respond it crashes with:
+//
+//     -[NSApplication isHandlingSendEvent]: unrecognized selector
+//
+// SLPlugin's NSApp comes from NSApplicationLoad() - a vanilla NSApplication
+// that doesn't implement these - so add them via a category. The ObjC runtime
+// installs categories at image load, before the event loop runs, so the pump
+// can never hit an unrecognized selector. processEvents() brackets its
+// -sendEvent: call (below) to keep the reported state accurate.
+static BOOL sHandlingSendEvent = NO;
+
+@interface NSApplication (SLPluginCefAppProtocol)
+- (BOOL)isHandlingSendEvent;
+- (void)setHandlingSendEvent:(BOOL)handlingSendEvent;
+@end
+
+@implementation NSApplication (SLPluginCefAppProtocol)
+- (BOOL)isHandlingSendEvent
+{
+    return sHandlingSendEvent;
+}
+- (void)setHandlingSendEvent:(BOOL)handlingSendEvent
+{
+    sHandlingSendEvent = handlingSendEvent;
+}
+@end
+
 //Note: NSApp is a global defined by cocoa which is an id to the application.
 
 void LLCocoaPlugin::setupCocoa()
@@ -42,53 +81,57 @@ void LLCocoaPlugin::setupCocoa()
 
     if(!inited)
     {
-        createAutoReleasePool();
+        @autoreleasepool {
+            // The following prevents the Cocoa command line parser from trying to open 'unknown' arguements as documents.
+            // ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
+            // when init'ing the Cocoa App window.
+            [[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
 
-        // The following prevents the Cocoa command line parser from trying to open 'unknown' arguements as documents.
-        // ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
-        // when init'ing the Cocoa App window.
-        [[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
+            // This is a bit of voodoo taken from the Apple sample code "CarbonCocoa_PictureCursor":
+            //   http://developer.apple.com/samplecode/CarbonCocoa_PictureCursor/index.html
 
-        // This is a bit of voodoo taken from the Apple sample code "CarbonCocoa_PictureCursor":
-        //   http://developer.apple.com/samplecode/CarbonCocoa_PictureCursor/index.html
+            //  Needed for Carbon based applications which call into Cocoa
+            NSApplicationLoad();
 
-        //  Needed for Carbon based applications which call into Cocoa
-        NSApplicationLoad();
+            //  Must first allocate an NSWindow to get the NSWindow machinery set up so that NSCursor can use a window to cache the cursor image
+            (void)[[NSWindow alloc] init];
 
-        //  Must first call [[[NSWindow alloc] init] release] to get the NSWindow machinery set up so that NSCursor can use a window to cache the cursor image
-        [[[NSWindow alloc] init] release];
-
-        mPluginWindow = [NSApp mainWindow];
-
-        deleteAutoReleasePool();
+            mPluginWindow = [NSApp mainWindow];
+        }
 
         inited = true;
     }
 }
 
-static NSAutoreleasePool *sPool = NULL;
+// ARC autorelease pools are normally lexically scoped (@autoreleasepool { ... }),
+// but the C++ slplugin event loop pushes/pops pools across function boundaries,
+// so we go directly to the runtime entry points that back @autoreleasepool.
+static void *sPool = NULL;
 
 void LLCocoaPlugin::createAutoReleasePool()
 {
-    if(!sPool)
+    if (!sPool)
     {
-        sPool = [[NSAutoreleasePool alloc] init];
+        sPool = objc_autoreleasePoolPush();
     }
 }
 
 void LLCocoaPlugin::deleteAutoReleasePool()
 {
-    if(sPool)
+    if (sPool)
     {
-        [sPool release];
+        objc_autoreleasePoolPop(sPool);
         sPool = NULL;
     }
 }
 
-LLCocoaPlugin::LLCocoaPlugin():mHackState(0)
+LLCocoaPlugin::LLCocoaPlugin():mFrontWindow(nullptr), mPluginWindow(nullptr), mHackState(0)
 {
     NSArray* window_list = [NSApp orderedWindows];
-    mFrontWindow = [window_list objectAtIndex:0];
+    if ([window_list count] > 0)
+    {
+        mFrontWindow = [window_list objectAtIndex:0];
+    }
 }
 
 void LLCocoaPlugin::processEvents()
@@ -96,7 +139,12 @@ void LLCocoaPlugin::processEvents()
      // Some plugins (webkit at least) will want an event loop.  This qualifies.
     NSEvent * event;
     event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+    // Bracket the dispatch so CEF's -isHandlingSendEvent (see the category
+    // above) reports true while we're inside -sendEvent:, the way a hand-written
+    // CefAppProtocol app would.
+    [NSApp setHandlingSendEvent:YES];
     [NSApp sendEvent: event];
+    [NSApp setHandlingSendEvent:NO];
 }
 
 

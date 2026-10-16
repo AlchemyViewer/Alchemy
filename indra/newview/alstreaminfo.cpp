@@ -76,7 +76,7 @@ void ALStreamInfo::handleMetadataUpdate(const LLSD& metadata)
         // Some stations get a little ridiculous with the length.
         if (station.length() > 64)
         {
-            LLStringUtil::truncate(station, 64);
+            station = utf8str_truncate(station, 64);
             station.append("...");
         }
         LLSD args;
@@ -102,7 +102,7 @@ void ALStreamInfo::handleMetadataUpdate(const LLSD& metadata)
         notify_params.substitutions = args;
         if (!station_url.empty())
         {
-            notify_params.payload = payload.with("respond_on_mousedown", TRUE);
+            notify_params.payload = payload.with("respond_on_mousedown", true);
 
             LLNotification::Params::Functor functor_p;
             functor_p.function = [=](const LLSD&, const LLSD&) {LLUrlAction::openURL(station_url); };

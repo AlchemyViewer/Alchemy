@@ -27,7 +27,9 @@
 
 out vec4 frag_data[4];
 
-vec3 srgb_to_linear(vec3 c);
+// The disc textures are sampled and written straight through, encoded: softenLight's
+// SKIP_ATMOS branch is what linearises them, so they must reach it sRGB. That is why
+// nothing here converts -- the forward declaration that used to sit here was never used.
 
 uniform sampler2D diffuseMap;
 uniform sampler2D altDiffuseMap;

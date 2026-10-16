@@ -29,21 +29,186 @@
 #include "linden_common.h"
 #include "lldate.h"
 
-#include "apr_time.h"
-
 #include <time.h>
 #include <locale.h>
+#include <chrono>
 #include <string>
 #include <iomanip>
 #include <sstream>
 
 #include "lltimer.h"
 #include "llstring.h"
-#include "llfasttimer.h"
 
-static const F64 LL_APR_USEC_PER_SEC = 1000000.0;
-    // should be APR_USEC_PER_SEC, but that relies on INT64_C which
-    // isn't defined in glib under our build set up for some reason
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+
+namespace
+{
+    bool gmtime_utc(time_t secs, struct tm& out)
+    {
+#if LL_WINDOWS
+        return gmtime_s(&out, &secs) == 0;
+#else
+        return gmtime_r(&secs, &out) != nullptr;
+#endif
+    }
+
+    bool localtime_utc(time_t secs, struct tm& out)
+    {
+#if LL_WINDOWS
+        return localtime_s(&out, &secs) == 0;
+#else
+        return localtime_r(&secs, &out) != nullptr;
+#endif
+    }
+
+    time_t timegm_utc(struct tm& in)
+    {
+#if LL_WINDOWS
+        return _mkgmtime(&in);
+#else
+        return timegm(&in);
+#endif
+    }
+
+    // The widest form is "YYYY-MM-DDTHH:MM:SS.ffZ", 23 characters.
+    const size_t ISO8601_MAX = 23;
+
+    // operator>>(S32&) and istream::get() each build a sentry, and the integer
+    // extraction goes out through the locale's num_get. These read the same
+    // things off the streambuf, keeping the leniency operator>> gave the
+    // format: leading whitespace is skipped and a field may be any number of
+    // digits, so "2006-4-24T1:2:3Z" still parses.
+    typedef std::istream::traits_type date_traits;
+
+    int date_peek(std::istream& s)
+    {
+        if (!s.good())
+        {
+            s.setstate(std::ios::failbit);
+            return date_traits::eof();
+        }
+        const int c = s.rdbuf()->sgetc();
+        if (c == date_traits::eof())
+        {
+            s.setstate(std::ios::eofbit);
+        }
+        return c;
+    }
+
+    int date_bump(std::istream& s)
+    {
+        if (!s.good())
+        {
+            s.setstate(std::ios::failbit);
+            return date_traits::eof();
+        }
+        const int c = s.rdbuf()->sbumpc();
+        if (c == date_traits::eof())
+        {
+            s.setstate(std::ios::eofbit | std::ios::failbit);
+        }
+        return c;
+    }
+
+    // Reads what operator>>(S32&) would: optional whitespace, optional sign,
+    // then digits. Sets failbit when there is no digit, as the extractor does.
+    bool date_read_int(std::istream& s, S32& out)
+    {
+        int c = date_peek(s);
+        while (c != date_traits::eof() && isspace(c))
+        {
+            s.rdbuf()->sbumpc();
+            c = date_peek(s);
+        }
+        bool negative = false;
+        if (c == '+' || c == '-')
+        {
+            negative = (c == '-');
+            s.rdbuf()->sbumpc();
+            c = date_peek(s);
+        }
+        if (c == date_traits::eof() || c < '0' || c > '9')
+        {
+            s.setstate(std::ios::failbit);
+            return false;
+        }
+        S32 value = 0;
+        while (c >= '0' && c <= '9')
+        {
+            value = value * 10 + (c - '0');
+            s.rdbuf()->sbumpc();
+            c = date_peek(s);
+        }
+        out = negative ? -value : value;
+        return true;
+    }
+
+    inline char* put_2(char* p, int value)
+    {
+        *p++ = (char)('0' + (value / 10));
+        *p++ = (char)('0' + (value % 10));
+        return p;
+    }
+
+    // Format "YYYY-MM-DDTHH:MM:SS[.ff]Z" into buf and return the length.
+    // buf must hold at least 32 chars.
+    size_t format_iso8601(F64 seconds_since_epoch, char* buf, size_t cap)
+    {
+        S64 total_usec = (S64)(seconds_since_epoch * (F64)USEC_PER_SEC);
+        time_t secs = (time_t)(total_usec / 1000000);
+        int usec = (int)(total_usec % 1000000);
+
+        struct tm exp_time;
+        if (!gmtime_utc(secs, exp_time))
+        {
+            return snprintf(buf, cap, "1970-01-01T00:00:00Z");
+        }
+
+        // Six fixed-width fields do not need a format string parsed at run
+        // time; that snprintf was three quarters of the cost of asString().
+        // A year outside four digits has no fixed-width form, so it keeps the
+        // general path.
+        const int year = exp_time.tm_year + 1900;
+        if (year < 0 || year > 9999 || cap <= ISO8601_MAX)
+        {
+            size_t len = snprintf(buf, cap, "%04d-%02d-%02dT%02d:%02d:%02d",
+                                  year, exp_time.tm_mon + 1,
+                                  exp_time.tm_mday, exp_time.tm_hour,
+                                  exp_time.tm_min, exp_time.tm_sec);
+            if (usec > 0 && len + 4 <= cap)
+            {
+                len += snprintf(buf + len, cap - len, ".%02d", usec / 10000);
+            }
+            if (len < cap)
+            {
+                buf[len++] = 'Z';
+            }
+            return len;
+        }
+
+        char* p = buf;
+        p = put_2(p, year / 100);
+        p = put_2(p, year % 100);
+        *p++ = '-';
+        p = put_2(p, exp_time.tm_mon + 1);
+        *p++ = '-';
+        p = put_2(p, exp_time.tm_mday);
+        *p++ = 'T';
+        p = put_2(p, exp_time.tm_hour);
+        *p++ = ':';
+        p = put_2(p, exp_time.tm_min);
+        *p++ = ':';
+        p = put_2(p, exp_time.tm_sec);
+        if (usec > 0)
+        {
+            *p++ = '.';
+            p = put_2(p, usec / 10000);
+        }
+        *p++ = 'Z';
+        return (size_t)(p - buf);
+    }
+}
 
 
 LLDate::LLDate(F64SecondsImplicit seconds_since_epoch) :
@@ -62,9 +227,8 @@ LLDate::LLDate(const std::string& iso8601_date)
 
 std::string LLDate::asString() const
 {
-    std::ostringstream stream;
-    toStream(stream);
-    return stream.str();
+    char buffer[48];
+    return std::string(buffer, format_iso8601(mSecondsSinceEpoch, buffer, sizeof(buffer)));
 }
 
 //@ brief Converts time in seconds since EPOCH
@@ -82,8 +246,9 @@ std::string LLDate::toLocalDateString (std::string fmt) const
     LL_PROFILE_ZONE_SCOPED;
 
     time_t locSeconds = (time_t) mSecondsSinceEpoch;
-    struct tm * lt = localtime (&locSeconds);
-    return toHTTPDateString(lt, fmt);
+    struct tm lt = {};
+    if (!localtime_utc(locSeconds, lt)) return std::string();
+    return toHTTPDateString(&lt, fmt);
 }
 
 std::string LLDate::toHTTPDateString (std::string fmt) const
@@ -91,8 +256,9 @@ std::string LLDate::toHTTPDateString (std::string fmt) const
     LL_PROFILE_ZONE_SCOPED;
 
     time_t locSeconds = (time_t) mSecondsSinceEpoch;
-    struct tm * gmt = gmtime (&locSeconds);
-    return toHTTPDateString(gmt, fmt);
+    struct tm gmt = {};
+    if (!gmtime_utc(locSeconds, gmt)) return std::string();
+    return toHTTPDateString(&gmt, fmt);
 }
 
 std::string LLDate::toHTTPDateString (tm * gmt, std::string fmt)
@@ -121,42 +287,16 @@ std::string LLDate::toHTTPDateString (tm * gmt, std::string fmt)
 
 void LLDate::toStream(std::ostream& s) const
 {
-    apr_time_t time = (apr_time_t)(mSecondsSinceEpoch * LL_APR_USEC_PER_SEC);
-
-    apr_time_exp_t exp_time;
-    if (apr_time_exp_gmt(&exp_time, time) != APR_SUCCESS)
-    {
-        s << "1970-01-01T00:00:00Z";
-        return;
-    }
-
-    s << std::dec << std::setfill('0');
-#if( LL_WINDOWS || __GNUC__ > 2)
-    s << std::right;
-#else
-    s.setf(ios::right);
-#endif
-    s        << std::setw(4) << (exp_time.tm_year + 1900)
-      << '-' << std::setw(2) << (exp_time.tm_mon + 1)
-      << '-' << std::setw(2) << (exp_time.tm_mday)
-      << 'T' << std::setw(2) << (exp_time.tm_hour)
-      << ':' << std::setw(2) << (exp_time.tm_min)
-      << ':' << std::setw(2) << (exp_time.tm_sec);
-    if (exp_time.tm_usec > 0)
-    {
-        s << '.' << std::setw(2)
-          << (int)(exp_time.tm_usec / (LL_APR_USEC_PER_SEC / 100));
-    }
-    s << 'Z'
-      << std::setfill(' ');
+    char buffer[48];
+    s.write(buffer, format_iso8601(mSecondsSinceEpoch, buffer, sizeof(buffer)));
 }
 
 bool LLDate::split(S32 *year, S32 *month, S32 *day, S32 *hour, S32 *min, S32 *sec) const
 {
-    apr_time_t time = (apr_time_t)(mSecondsSinceEpoch * LL_APR_USEC_PER_SEC);
+    time_t secs = (time_t)mSecondsSinceEpoch;
 
-    apr_time_exp_t exp_time;
-    if (apr_time_exp_gmt(&exp_time, time) != APR_SUCCESS)
+    struct tm exp_time;
+    if (!gmtime_utc(secs, exp_time))
     {
         return false;
     }
@@ -184,56 +324,49 @@ bool LLDate::split(S32 *year, S32 *month, S32 *day, S32 *hour, S32 *min, S32 *se
 
 bool LLDate::fromString(const std::string& iso8601_date)
 {
-    std::istringstream stream(iso8601_date);
+    boost::iostreams::stream<boost::iostreams::array_source> stream(iso8601_date.data(), iso8601_date.size());
     return fromStream(stream);
 }
 
 bool LLDate::fromStream(std::istream& s)
 {
-    struct apr_time_exp_t exp_time;
-    apr_int32_t tm_part;
+    struct tm exp_time = {};
+    S32 tm_part;
     int c;
 
-    s >> tm_part;
+    if (!date_read_int(s, tm_part)) { return false; }
     exp_time.tm_year = tm_part - 1900;
-    c = s.get(); // skip the hypen
+    c = date_bump(s); // skip the hypen
     if (c != '-') { return false; }
-    s >> tm_part;
+    if (!date_read_int(s, tm_part)) { return false; }
     exp_time.tm_mon = tm_part - 1;
-    c = s.get(); // skip the hypen
+    c = date_bump(s); // skip the hypen
     if (c != '-') { return false; }
-    s >> tm_part;
+    if (!date_read_int(s, tm_part)) { return false; }
     exp_time.tm_mday = tm_part;
 
-    c = s.get(); // skip the T
+    c = date_bump(s); // skip the T
     if (c != 'T') { return false; }
 
-    s >> tm_part;
+    if (!date_read_int(s, tm_part)) { return false; }
     exp_time.tm_hour = tm_part;
-    c = s.get(); // skip the :
+    c = date_bump(s); // skip the :
     if (c != ':') { return false; }
-    s >> tm_part;
+    if (!date_read_int(s, tm_part)) { return false; }
     exp_time.tm_min = tm_part;
-    c = s.get(); // skip the :
+    c = date_bump(s); // skip the :
     if (c != ':') { return false; }
-    s >> tm_part;
+    if (!date_read_int(s, tm_part)) { return false; }
     exp_time.tm_sec = tm_part;
 
-    // zero out the unused fields
-    exp_time.tm_usec = 0;
-    exp_time.tm_wday = 0;
-    exp_time.tm_yday = 0;
-    exp_time.tm_isdst = 0;
-    exp_time.tm_gmtoff = 0;
-
     // generate a time_t from that
-    apr_time_t time;
-    if (apr_time_exp_gmt_get(&time, &exp_time) != APR_SUCCESS)
+    time_t time = timegm_utc(exp_time);
+    if (time == (time_t)-1)
     {
         return false;
     }
 
-    F64 seconds_since_epoch = time / LL_APR_USEC_PER_SEC;
+    F64 seconds_since_epoch = (F64)time;
 
     // check for fractional
     c = s.peek();
@@ -271,7 +404,7 @@ bool LLDate::fromStream(std::istream& s)
 
 bool LLDate::fromYMDHMS(S32 year, S32 month, S32 day, S32 hour, S32 min, S32 sec)
 {
-    struct apr_time_exp_t exp_time;
+    struct tm exp_time = {};
 
     exp_time.tm_year = year - 1900;
     exp_time.tm_mon = month - 1;
@@ -280,44 +413,25 @@ bool LLDate::fromYMDHMS(S32 year, S32 month, S32 day, S32 hour, S32 min, S32 sec
     exp_time.tm_min = min;
     exp_time.tm_sec = sec;
 
-    // zero out the unused fields
-    exp_time.tm_usec = 0;
-    exp_time.tm_wday = 0;
-    exp_time.tm_yday = 0;
-    exp_time.tm_isdst = 0;
-    exp_time.tm_gmtoff = 0;
-
     // generate a time_t from that
-    apr_time_t time;
-    if (apr_time_exp_gmt_get(&time, &exp_time) != APR_SUCCESS)
+    time_t time = timegm_utc(exp_time);
+    if (time == (time_t)-1)
     {
         return false;
     }
 
-    mSecondsSinceEpoch = time / LL_APR_USEC_PER_SEC;
+    mSecondsSinceEpoch = (F64)time;
 
     return true;
 }
 
-F64 LLDate::secondsSinceEpoch() const
-{
-    return mSecondsSinceEpoch;
-}
-
-void LLDate::secondsSinceEpoch(F64 seconds)
-{
-    mSecondsSinceEpoch = seconds;
-}
-
 /* static */ LLDate LLDate::now()
 {
-    // time() returns seconds, we want fractions of a second, which LLTimer provides --RN
-    return LLDate(LLTimer::getTotalSeconds());
-}
-
-bool LLDate::operator<(const LLDate& rhs) const
-{
-    return mSecondsSinceEpoch < rhs.mSecondsSinceEpoch;
+    // The calendar clock, to a fraction of a second. LLTimer's total time is
+    // anchored to the epoch once and counts on its own after that, so it
+    // drifts from the calendar over a session.
+    const std::chrono::system_clock::duration since_epoch = std::chrono::system_clock::now().time_since_epoch();
+    return LLDate(std::chrono::duration<F64>(since_epoch).count());
 }
 
 std::ostream& operator<<(std::ostream& s, const LLDate& date)

@@ -30,9 +30,10 @@
 #include "../llframetimer.h"
 #include "../llsd.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
-namespace tut
+namespace
 {
     struct frametimer_test
     {
@@ -41,48 +42,36 @@ namespace tut
             LLFrameTimer::updateFrameTime();
         }
     };
-    typedef test_group<frametimer_test> frametimer_group_t;
-    typedef frametimer_group_t::object frametimer_object_t;
-    tut::frametimer_group_t frametimer_instance("LLFrameTimer");
 
-    template<> template<>
-    void frametimer_object_t::test<1>()
+    TEST_CASE_METHOD(frametimer_test, "LLFrameTimer: expiresAt returns the time setExpiryAt set", "[LLFrameTimer]")
     {
         F64 seconds_since_epoch = LLFrameTimer::getTotalSeconds();
         LLFrameTimer timer;
         timer.setExpiryAt(seconds_since_epoch);
         F64 expires_at = timer.expiresAt();
-        ensure_distance(
-            "set expiry matches get expiry",
-            expires_at,
-            seconds_since_epoch,
-            0.001);
+        CHECK_THAT(expires_at,
+            ll_test::WithinDistance<double>(seconds_since_epoch,
+            0.001));
     }
 
-    template<> template<>
-    void frametimer_object_t::test<2>()
+    TEST_CASE_METHOD(frametimer_test, "LLFrameTimer: setExpiryAt moves an expiry already set", "[LLFrameTimer]")
     {
         F64 seconds_since_epoch = LLFrameTimer::getTotalSeconds();
         seconds_since_epoch += 10.0;
         LLFrameTimer timer;
         timer.setExpiryAt(seconds_since_epoch);
         F64 expires_at = timer.expiresAt();
-        ensure_distance(
-            "set expiry matches get expiry 1",
-            expires_at,
-            seconds_since_epoch,
-            0.001);
+        CHECK_THAT(expires_at,
+            ll_test::WithinDistance<double>(seconds_since_epoch,
+            0.001));
         seconds_since_epoch += 10.0;
         timer.setExpiryAt(seconds_since_epoch);
         expires_at = timer.expiresAt();
-        ensure_distance(
-            "set expiry matches get expiry 2",
-            expires_at,
-            seconds_since_epoch,
-            0.001);
+        CHECK_THAT(expires_at,
+            ll_test::WithinDistance<double>(seconds_since_epoch,
+            0.001));
     }
-    template<> template<>
-    void frametimer_object_t::test<3>()
+    TEST_CASE_METHOD(frametimer_test, "LLFrameTimer: an expiry two seconds out passes within ten 200 ms sleeps", "[LLFrameTimer]")
     {
         clock_t t1 = clock();
         ms_sleep(200);
@@ -109,13 +98,71 @@ namespace tut
             LLFrameTimer::updateFrameTime();
             iterations_until_expiration++;
         }
-        ensure("timer took too long to expire", iterations_until_expiration <= 10);
+        CHECK(iterations_until_expiration <= 10);
     }
 
-/*
-    template<> template<>
-    void frametimer_object_t::test<4>()
+    TEST_CASE_METHOD(frametimer_test, "LLFrameTimer: an expiry counts from now and not from the timer's last reset", "[LLFrameTimer]")
     {
+        LLFrameTimer timer;
+        // Longer than the expiry passes between the timer starting and the
+        // expiry being set.
+        ms_sleep(300);
+        LLFrameTimer::updateFrameTime();
+        timer.setTimerExpirySec(0.2f);
+        UNSCOPED_INFO("not expired the moment it is set");
+        CHECK_FALSE(timer.hasExpired());
+        UNSCOPED_INFO("the whole expiry still to run");
+        CHECK(timer.getTimeToExpireF32() > 0.19f);
     }
-*/
+
+    TEST_CASE_METHOD(frametimer_test, "LLFrameTimer: a stopped timer keeps the time it ran and resumes from it", "[LLFrameTimer]")
+    {
+        // Far enough from the start of the run that the absolute start time
+        // cannot pass for the time run.
+        ms_sleep(300);
+        LLFrameTimer::updateFrameTime();
+        LLFrameTimer timer;
+        timer.start();
+        ms_sleep(200);
+        LLFrameTimer::updateFrameTime();
+        const F32 ran = timer.getElapsedTimeF32();
+        timer.stop();
+        CHECK_FALSE(timer.getStarted());
+        UNSCOPED_INFO("the time it ran");
+        CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(ran, 12));
+        ms_sleep(100);
+        LLFrameTimer::updateFrameTime();
+        UNSCOPED_INFO("not running while stopped");
+        CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(ran, 12));
+        timer.unpause();
+        UNSCOPED_INFO("resumed from where it stopped");
+        CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(ran, 12));
+    }
+
+    TEST_CASE_METHOD(frametimer_test, "LLFrameTimer: a reset while paused zeroes the time run and leaves it paused", "[LLFrameTimer]")
+    {
+        ms_sleep(300);
+        LLFrameTimer::updateFrameTime();
+        LLFrameTimer timer;
+        timer.start();
+        ms_sleep(100);
+        LLFrameTimer::updateFrameTime();
+        timer.pause();
+        timer.reset();
+        CHECK_FALSE(timer.getStarted());
+        UNSCOPED_INFO("no time run");
+        CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(0.f, 12));
+        ms_sleep(100);
+        LLFrameTimer::updateFrameTime();
+        UNSCOPED_INFO("not running while paused");
+        CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(0.f, 12));
+        timer.unpause();
+        UNSCOPED_INFO("runs on from zero");
+        CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(0.f, 12));
+        timer.pause();
+        timer.start();
+        CHECK(timer.getStarted());
+        UNSCOPED_INFO("start() runs from zero, paused or not");
+        CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(0.f, 12));
+    }
 }

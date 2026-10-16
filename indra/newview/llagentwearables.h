@@ -97,6 +97,7 @@ public:
 // [/RLVa:KB]
     const LLUUID        getWearableItemID(LLWearableType::EType type, U32 index /*= 0*/) const;
     const LLUUID        getWearableAssetID(LLWearableType::EType type, U32 index /*= 0*/) const;
+    const S32 getWearableIdxFromItem(const LLViewerInventoryItem* item) const;
     const LLViewerWearable* getWearableFromItemID(const LLUUID& item_id) const;
     LLViewerWearable*   getWearableFromItemID(const LLUUID& item_id);
     LLViewerWearable*   getWearableFromAssetID(const LLUUID& asset_id);
@@ -138,6 +139,7 @@ public:
     static void     createWearable(LLWearableType::EType type, bool wear = false, const LLUUID& parent_id = LLUUID::null, std::function<void(const LLUUID&)> created_cb = nullptr);
     static void     editWearable(const LLUUID& item_id);
     bool            moveWearable(const LLViewerInventoryItem* item, bool closer_to_body);
+    bool            moveWearableToIndex(const LLViewerInventoryItem* item, U32 new_index);
 
     void            requestEditingWearable(const LLUUID& item_id);
     void            editWearableIfRequested(const LLUUID& item_id);
@@ -201,11 +203,11 @@ public:
     // Signals
     //--------------------------------------------------------------------
 public:
-    typedef boost::function<void()>         loading_started_callback_t;
+    typedef std::function<void()>           loading_started_callback_t;
     typedef boost::signals2::signal<void()> loading_started_signal_t;
     boost::signals2::connection             addLoadingStartedCallback(loading_started_callback_t cb);
 
-    typedef boost::function<void()>         loaded_callback_t;
+    typedef std::function<void()>           loaded_callback_t;
     typedef boost::signals2::signal<void()> loaded_signal_t;
     boost::signals2::connection             addLoadedCallback(loaded_callback_t cb);
 // [SL:KB] - Patch: Appearance-InitialWearablesLoadedCallback | Checked: 2010-08-14 (Catznip-2.1)

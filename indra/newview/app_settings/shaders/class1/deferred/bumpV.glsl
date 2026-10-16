@@ -23,10 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 modelview_matrix;
-uniform mat3 normal_matrix;
-uniform mat4 texture_matrix0;
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 in vec3 position;
 in vec4 diffuse_color;
@@ -42,22 +41,26 @@ out vec2 vary_texcoord0;
 out vec3 vary_position;
 
 #ifdef HAS_SKIN
-mat4 getObjectSkinnedTransform();
-uniform mat4 projection_matrix;
+mat3x4 getSkinBlend();
+vec3 skinDirection(mat3x4 b, vec3 dir);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #endif
+
+// Linearises an sRGB prim tint for a pass that shades in linear. Defined in
+// deferred/textureUtilV.glsl, which every vertex stage attaches.
+vec4 linearizeVertexTint(vec4 tint);
 
 void main()
 {
     //transform vertex
 #ifdef HAS_SKIN
-    mat4 mat = getObjectSkinnedTransform();
-    mat = modelview_matrix * mat;
-    vec3 pos = (mat*vec4(position.xyz, 1.0)).xyz;
+    mat3x4 skin = getSkinBlend();
+    vec3 pos = skinTransformH(skin, position.xyz, modelview_matrix).xyz;
     vary_position = pos;
     gl_Position = projection_matrix*vec4(pos, 1.0);
 
-    vec3 n = normalize((mat * vec4(normal.xyz+position.xyz, 1.0)).xyz-pos.xyz);
-    vec3 t = normalize((mat * vec4(tangent.xyz+position.xyz, 1.0)).xyz-pos.xyz);
+    vec3 n = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
+    vec3 t = normalize(mat3(modelview_matrix) * skinDirection(skin, tangent.xyz));
 #else
     vary_position = (modelview_matrix*vec4(position.xyz, 1.0)).xyz;
     gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);
@@ -72,5 +75,13 @@ void main()
     vary_mat1 = vec3(t.y, b.y, n.y);
     vary_mat2 = vec3(t.z, b.z, n.z);
 
+    // Tint arrives sRGB. A pass that decodes its diffuse on the sampler and shades in linear
+    // wants the tint linearised to match; one that keeps the encoded texel does not. Keyed on
+    // the same define LLGLSLShader::mLinearDiffuse is derived from, so the shader and the bind
+    // cannot disagree about which space the multiply happens in.
+#ifdef LINEAR_DIFFUSE
+    vertex_color = linearizeVertexTint(diffuse_color);
+#else
     vertex_color = diffuse_color;
+#endif
 }

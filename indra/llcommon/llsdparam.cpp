@@ -30,21 +30,17 @@
 // Project includes
 #include "llsdparam.h"
 #include "llsdutil.h"
-#include "boost/bind.hpp"
 
 static  LLInitParam::Parser::parser_read_func_map_t sReadFuncs;
 static  LLInitParam::Parser::parser_write_func_map_t sWriteFuncs;
-static  LLInitParam::Parser::parser_inspect_func_map_t sInspectFuncs;
 static const LLSD NO_VALUE_MARKER;
 
 //
 // LLParamSDParser
 //
 LLParamSDParser::LLParamSDParser()
-: Parser(sReadFuncs, sWriteFuncs, sInspectFuncs)
+: Parser(sReadFuncs, sWriteFuncs)
 {
-    using boost::bind;
-
     if (sReadFuncs.empty())
     {
         registerParserFuncs<LLInitParam::Flag>(readFlag, &LLParamSDParser::writeFlag);
@@ -97,7 +93,7 @@ void LLParamSDParser::readSD(const LLSD& sd, LLInitParam::BaseBlock& block, bool
     mNameStack.clear();
     setParseSilently(silent);
 
-    LLParamSDParserUtilities::readSDValues(boost::bind(&LLParamSDParser::submit, this, boost::ref(block), _1, _2), sd, mNameStack);
+    LLParamSDParserUtilities::readSDValues(std::bind(&LLParamSDParser::submit, this, std::ref(block), std::placeholders::_1, std::placeholders::_2), sd, mNameStack);
     //readSDValues(sd, block);
 }
 
@@ -115,7 +111,10 @@ void LLParamSDParser::writeSDImpl(LLSD& sd, const LLInitParam::BaseBlock& block,
     std::string full_name = "sd";
     for (name_stack_t::value_type& stack_pair : mNameStack)
     {
-        full_name += llformat("[%s]", stack_pair.first.c_str());
+        // A view is not NUL terminated; this runs only when reporting a
+        // parse problem, so building a string for it costs nothing that
+        // matters.
+        full_name += llformat("[%.*s]", (int)stack_pair.first.size(), stack_pair.first.data());
     }
 
     return full_name;
@@ -258,7 +257,7 @@ void LLParamSDParserUtilities::readSDValues(read_sd_cb_t cb, const LLSD& sd, LLI
             it != sd.endMap();
             ++it)
         {
-            stack.push_back(make_pair(it->first, true));
+            stack.emplace_back(std::string_view(it->first), true);
             readSDValues(cb, it->second, stack);
             stack.pop_back();
         }
@@ -269,21 +268,21 @@ void LLParamSDParserUtilities::readSDValues(read_sd_cb_t cb, const LLSD& sd, LLI
             it != sd.endArray();
             ++it)
         {
-            stack.push_back(make_pair(std::string(), true));
+            stack.emplace_back(std::string_view(), true);
             readSDValues(cb, *it, stack);
             stack.pop_back();
         }
     }
     else if (sd.isUndefined())
     {
-        if (!cb.empty())
+        if (cb != nullptr)
         {
             cb(NO_VALUE_MARKER, stack);
         }
     }
     else
     {
-        if (!cb.empty())
+        if (cb != nullptr)
         {
             cb(sd, stack);
         }
@@ -309,13 +308,14 @@ namespace LLInitParam
             return true;
         }
 
-        LLSD& sd = LLParamSDParserUtilities::getSDWriteNode(mValue, name_stack);
-
+        // Read before reaching for somewhere to put it. getSDWriteNode
+        // creates every node on the path and clears the "new" flag on the
+        // names it walks, so calling it first left a stray key behind on
+        // every value that turned out not to be readable.
         LLSD::String string;
-
         if (p.readValue<LLSD::String>(string))
         {
-            sd = string;
+            LLParamSDParserUtilities::getSDWriteNode(mValue, name_stack) = string;
             return true;
         }
         return false;
@@ -333,7 +333,7 @@ namespace LLInitParam
         if (!p.writeValue<LLSD>(mValue, name_stack_range))
         {
             // otherwise read from LLSD value and serialize out to parser (which could be LLSD, XUI, etc)
-            LLParamSDParserUtilities::readSDValues(boost::bind(&serializeElement, boost::ref(p), _1, _2), mValue, name_stack_range);
+            LLParamSDParserUtilities::readSDValues(std::bind(&serializeElement, std::ref(p), std::placeholders::_1, std::placeholders::_2), mValue, name_stack_range);
         }
         return true;
     }

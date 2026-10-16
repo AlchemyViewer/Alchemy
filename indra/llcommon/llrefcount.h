@@ -26,9 +26,10 @@
 #ifndef LLREFCOUNT_H
 #define LLREFCOUNT_H
 
-#include <boost/noncopyable.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include "llatomic.h"
+
+#include <atomic>
 
 class LLMutex;
 
@@ -97,19 +98,34 @@ public:
     LLThreadSafeRefCount(const LLThreadSafeRefCount&);
     LLThreadSafeRefCount& operator=(const LLThreadSafeRefCount& ref)
     {
-        mRef = 0;
+        mRef.store(0, std::memory_order_relaxed);
         return *this;
     }
 
-    void ref()
+    // const, as on LLRefCount: reference counting says nothing about the logical
+    // constness of the object, and LLConstPointer<T> refcounts through a const pointer.
+    void ref() const
     {
-        mRef++;
+        // Relaxed is sufficient for the increment: it only has to be atomic. The caller
+        // necessarily already holds a reference, so this cannot race the count to zero,
+        // and the increment itself publishes nothing that another thread must observe.
+        mRef.fetch_add(1, std::memory_order_relaxed);
     }
 
-    void unref()
+    void unref() const
     {
-        llassert(mRef >= 1);
-        if ((--mRef) == 0)
+        llassert(mRef.load(std::memory_order_relaxed) >= 1);
+
+        // Release, so that every write made through this reference happens-before the
+        // destructor; acquire, so that the thread making the final decrement, which
+        // deletes, observes every other thread's writes. Do not weaken it to relaxed,
+        // or the destructor can race the last writer's stores. A release decrement
+        // with an acquire fence on the final one alone orders the same, and is a
+        // little cheaper on ARM, but ThreadSanitizer does not follow fences: it
+        // reported every object shared between threads as raced at its deletion.
+        // libc++'s shared_ptr decrements acq_rel too, and on x86 both compile to the
+        // same locked subtraction.
+        if (mRef.fetch_sub(1, std::memory_order_acq_rel) == 1)
         {
             // If we hit zero, the caller should be the only smart pointer owning the object and we can delete it.
             // It is technically possible for a vanilla pointer to mess this up, or another thread to
@@ -121,12 +137,15 @@ public:
 
     S32 getNumRefs() const
     {
-        const S32 currentVal = mRef.CurrentValue();
-        return currentVal;
+        return mRef.load(std::memory_order_relaxed);
     }
 
 private:
-    LLAtomicS32 mRef;
+    // Deliberately a bare std::atomic rather than LLAtomicS32: the orderings above are
+    // chosen per-operation for refcounting. LLAtomicBase is seq_cst on every operation
+    // and is used elsewhere for cross-thread flags that depend on that -- see the note
+    // in llatomic.h.
+    mutable std::atomic<S32> mRef;
 };
 
 /**

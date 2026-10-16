@@ -1,32 +1,17 @@
 # -*- cmake -*-
-include(Prebuilt)
-
-set(NDOF ON CACHE BOOL "Use NDOF space navigator joystick library.")
-
 include_guard()
-add_library( ll::ndof INTERFACE IMPORTED )
+add_library(ll::ndof INTERFACE IMPORTED)
 
-if (NDOF)
-  if (WINDOWS OR DARWIN)
-    use_prebuilt_binary(libndofdev)
-  elseif (LINUX)
-    use_prebuilt_binary(open-libndofdev)
-  endif (WINDOWS OR DARWIN)
-
-  find_library(NDOF_LIBRARY
-      NAMES
-      libndofdev
-      ndofdev
-      PATHS "${ARCH_PREBUILT_DIRS_RELEASE}" REQUIRED NO_DEFAULT_PATH)
-
-  if (LINUX)
-    include(SDL3)
-    target_link_libraries(ll::ndof INTERFACE ${NDOF_LIBRARY} ll::SDL3)
-  else()
-    target_link_libraries(ll::ndof INTERFACE ${NDOF_LIBRARY})
-  endif()
-
+if(AL_USE_NDOF)
   target_compile_definitions(ll::ndof INTERFACE LIB_NDOF=1)
-endif (NDOF)
 
+  # libndofdev on Windows and macOS, open-libndofdev on Linux; both ship the
+  # same package and target.
+  find_package(unofficial-libndofdev CONFIG REQUIRED)
+  target_link_libraries(ll::ndof INTERFACE unofficial::libndofdev::ndofdev)
 
+  if(LINUX)
+    include(SDL3)
+    target_link_libraries(ll::ndof INTERFACE ll::SDL3)
+  endif()
+endif()

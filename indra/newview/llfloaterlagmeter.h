@@ -31,13 +31,15 @@
 
 class LLTextBox;
 
-class LLFloaterLagMeter : public LLFloater
+class LLFloaterLagMeter final : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
-    /*virtual*/ void draw();
-    /*virtual*/ bool postBuild();
+    AL_VIEW_TYPE(LLFloaterLagMeter, LLFloater);
+
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool postBuild() override;
 private:
 
     LLFloaterLagMeter(const LLSD& key);

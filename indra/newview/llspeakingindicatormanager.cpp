@@ -165,9 +165,10 @@ void SpeakingIndicatorManager::registerSpeakingIndicator(const LLUUID& speaker_i
 void SpeakingIndicatorManager::unregisterSpeakingIndicator(const LLUUID& speaker_id, const LLSpeakingIndicator* const speaking_indicator)
 {
     LL_DEBUGS("SpeakingIndicator") << "Unregistering indicator: " << speaker_id << "|"<< speaking_indicator << LL_ENDL;
-    speaking_indicators_mmap_t::iterator it;
-    it = mSpeakingIndicators.find(speaker_id);
-    for (;it != mSpeakingIndicators.end(); ++it)
+    // Several indicators can watch one speaker, and multimap::find promises
+    // only some entry with the key, so walk the whole run under it.
+    auto [it, end] = mSpeakingIndicators.equal_range(speaker_id);
+    for (; it != end; ++it)
     {
         if (it->second == speaking_indicator)
         {
@@ -200,8 +201,17 @@ void SpeakingIndicatorManager::cleanupSingleton()
 
 void SpeakingIndicatorManager::sOnCurrentChannelChanged(const LLUUID& /*session_id*/)
 {
-    switchSpeakerIndicators(mSwitchedIndicatorsOn, false);
-    mSwitchedIndicatorsOn.clear();
+    if (LLVoiceChannel::isSuspended())
+    {
+        switchSpeakerIndicators(mSwitchedIndicatorsOn, false);
+        mSwitchedIndicatorsOn.clear();
+    }
+    else
+    {
+        // Multiple onParticipantsChanged can arrive at the same time
+        // from different sources, might want to filter by some factor.
+        onParticipantsChanged();
+    }
 }
 
 void SpeakingIndicatorManager::onParticipantsChanged()

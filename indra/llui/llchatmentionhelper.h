@@ -42,7 +42,8 @@ class LLChatMentionHelper : public LLSingleton<LLChatMentionHelper>
 public:
 
     bool isActive(const LLUICtrl* ctrl) const;
-    bool isCursorInNameMention(const LLWString& wtext, S32 cursor_pos, S32* mention_start_pos = nullptr) const;
+    // `text` is UTF-8 and every offset here is a byte offset into it.
+    bool isCursorInNameMention(std::string_view text, S32 cursor_pos, S32* mention_start_pos = nullptr) const;
     void showHelper(LLUICtrl* host_ctrl, S32 local_x, S32 local_y, const std::string& av_name, std::function<void(std::string)> commit_cb);
     void hideHelper(const LLUICtrl* ctrl = nullptr);
 

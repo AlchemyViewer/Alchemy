@@ -31,10 +31,14 @@
 #include "lltextbox.h"
 #include "llviewerchat.h"
 
+class LLHighlightEntry;
+
 //Chat log widget allowing addition of a message as a widget
-class LLChatHistory : public LLUICtrl
+class LLChatHistory final : public LLUICtrl
 {
     public:
+    AL_VIEW_TYPE(LLChatHistory, LLUICtrl);
+
         struct Params : public LLInitParam::Block<Params, LLTextEditor::Params>
         {
             //Message header filename
@@ -82,7 +86,7 @@ class LLChatHistory : public LLUICtrl
         LLChatHistory(const Params&);
         friend class LLUICtrlFactory;
 
-        /*virtual*/ void draw();
+        /*virtual*/ void draw() override;
         /**
          * Redefinition of LLTextEditor::updateTextRect() to considerate text
          * left/right padding params.
@@ -104,7 +108,7 @@ class LLChatHistory : public LLUICtrl
         LLView* getHeader(const LLChat& chat,const LLStyle::Params& style_params, const LLSD& args);
     public:
         ~LLChatHistory();
-        LLSD getValue() const;
+        LLSD getValue() const override;
         void initFromParams(const Params&);
 
         /**
@@ -119,12 +123,31 @@ class LLChatHistory : public LLUICtrl
          * @param input_append_params - font style.
          */
         void appendMessage(const LLChat& chat, const LLSD &args = LLSD(), const LLStyle::Params& input_append_params = LLStyle::Params());
-        /*virtual*/ void clear();
+        /*virtual*/ void clear() override;
+
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-27 (Catznip-3.3)
+    public:
+        enum EParseHighlightType
+        {
+            PARSE_NONE  = 0x00,
+            PARSE_FLASH = 0x01,
+            PARSE_SOUND = 0x02,
+            PARSE_ALL   = 0xFF
+        };
+
+        U32  getParseHighlightTypeMask() const        { return mParseHighlightTypeMask; }
+        void setParseHighlightTypeMask(U32 type_mask) { mParseHighlightTypeMask = type_mask; }
+    protected:
+        void onTextHighlight(const std::string& strText, const LLHighlightEntry* pEntry);
+// [/SL:KB]
 
     private:
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-27 (Catznip-3.3)
+        U32 mParseHighlightTypeMask;
+// [/SL:KB]
         std::string mLastFromName;
         LLUUID mLastFromID;
-        LLDate mLastMessageTime;
+        F64 mLastMessageTime = 0.0;    // LLFrameTimer::getTotalSeconds(), for the one-minute run of a sender's lines
         bool mIsLastMessageFromLog;
         bool mNotifyAboutUnreadMsg;
         //std::string mLastMessageTimeStr;

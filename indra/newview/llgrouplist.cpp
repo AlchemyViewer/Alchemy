@@ -194,9 +194,10 @@ bool LLGroupList::handleDoubleClick(S32 x, S32 y, MASK mask)
     // Handle double click only for the selected item in the list, skip clicks on empty space.
     if (handled)
     {
-        if (mDoubleClickSignal && getItemsRect().pointInRect(x, y))
+        mouse_signal_t* signal = doubleClickSignal();
+        if (signal && getItemsRect().pointInRect(x, y))
         {
-            (*mDoubleClickSignal)(this, x, y, mask);
+            (*signal)(this, x, y, mask);
         }
     }
 
@@ -323,7 +324,7 @@ void LLGroupList::addNewItem(const LLUUID& id, const std::string& name, const LL
 // virtual
 bool LLGroupList::handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& userdata)
 {
-    // Why is "new group" sufficient?
+    // "new group" is sufficient because update_group_floaters always calls that on group changes
     if (event->desc() == "new group")
     {
         setDirty();
@@ -342,7 +343,7 @@ bool LLGroupList::handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD&
             getItems(items);
             for (std::vector<LLPanel*>::iterator it = items.begin(); it != items.end(); ++it)
             {
-                LLGroupListItem* item = dynamic_cast<LLGroupListItem*>(*it);
+                LLGroupListItem* item = (*it)->as<LLGroupListItem>();
                 if (item && item->getGroupID() == group_id)
                 {
                     item->setVisibleInProfile(visible);
@@ -385,19 +386,17 @@ bool LLGroupList::onContextMenuItemClick(const LLSD& userdata)
     {
         std::string group_name;
         gCacheName->getGroupName(LLUUID(selected_group), group_name);
-        LLWString wstr = utf8str_to_wstring(group_name);
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+        LLClipboard::instance().copyToClipboard(group_name, 0, narrow(group_name.size()));
     }
     else if (action == "copy_slurl")
     {
         std::string slurl = LLSLURL("group", selected_group, "about").getSLURLString();
-        LLWString wstr = utf8str_to_wstring(slurl);
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+        LLClipboard::instance().copyToClipboard(slurl, 0, narrow(slurl.size()));
     }
     else if (action == "copy_uuid")
     {
-        LLWString wstr = utf8str_to_wstring(selected_group.asString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+        const std::string id_str = selected_group.asString();
+        LLClipboard::instance().copyToClipboard(id_str, 0, narrow(id_str.size()));
     }
 
     return true;

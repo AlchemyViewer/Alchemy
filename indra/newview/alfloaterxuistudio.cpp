@@ -1,0 +1,9967 @@
+/**
+ * @file alfloaterxuistudio.cpp
+ * @brief The XUI Studio: catalog, preview, hierarchy, inspectors and diagnostics for XUI files.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "llviewerprecompiledheaders.h"
+
+#include "alfloaterxuistudio.h"
+
+#include "alpanelist.h"
+
+#include "allinebreaks.h"
+#include "alwatchedfile.h"
+#include "alxmldocument.h"
+#include "alxmllayermerge.h"
+#include "alcolorfield.h"
+#include "alfollowscontrol.h"
+#include "alpopover.h"
+#include "alquickopen.h"
+#include "aljumpbar.h"
+#include "alscopebar.h"
+#include "alspecimenlist.h"
+#include "alstringmatch.h"
+#include "altabstrip.h"
+#include "alpropertygrid.h"
+#include "alxuifields.h"
+#include "alxuinotes.h"
+#include "alxuischema.h"
+#include "alxuishellbuild.h"
+#include "alxuitranslate.h"
+#include "llbutton.h"
+#include "llcheckboxctrl.h"
+#include "llclipboard.h"
+#include "llcombobox.h"
+#include "lldir.h"
+#include "llexternaleditor.h"
+#include "llfile.h"
+#include "llfiltereditor.h"
+#include "alviewcapture.h"
+#include "llfloaterreg.h"
+#include "llviewertexturelist.h"
+#include "llfocusmgr.h"
+#include "llfolderview.h"
+#include "llkeyboard.h"
+#include "lllayoutstack.h"
+#include "lllineeditor.h"
+#include "llmenugl.h"
+#include "lltooldraganddrop.h"
+#include "llnotificationsutil.h"
+#include "llnotifications.h"
+#include "llnotificationtemplate.h"
+#include "llsdparam.h"
+#include "llrender2dutils.h"
+#include "llaccordionctrltab.h"
+#include "alcanvasview.h"
+#include "aldockpanel.h"
+#include "llscrollcontainer.h"
+#include "llscrolllistctrl.h"
+#include "llspinctrl.h"
+#include "lltabcontainer.h"
+#include "lltextbox.h"
+#include "alcodeeditor.h"
+#include "alxuiservice.h"
+#include "lltexteditor.h"
+#include "lltimer.h"
+#include "lltoastalertpanel.h"
+#include "lltoastnotifypanel.h"
+#include "lluicolortable.h"
+#include "lluictrlfactory.h"
+#include "llviewercontrol.h"
+#include "llviewermenufile.h"
+#include "llviewerwindow.h"
+#include "llwindow.h"
+
+#include <boost/unordered_set.hpp>
+
+#include <algorithm>
+#include <cctype>
+#include <iterator>
+#include <set>
+
+// ===========================================================================
+// The pieces the floater builds on
+// ===========================================================================
+
+// The skin and language the directory object answers with, switched for a
+// build and switched back after it. The factory's cached defaults are keyed
+// by parameter block type, so they are dropped on both sides of the switch.
+class ALXUISkinScope
+{
+public:
+    ALXUISkinScope(const std::string& skin, const std::string& language)
+    :   mSkin(gDirUtilp->getSkinFolder()),
+        mLanguage(gDirUtilp->getLanguage()),
+        mSwitched(skin != mSkin || language != mLanguage)
+    {
+        if (mSwitched)
+        {
+            gDirUtilp->setSkinFolder(skin, language);
+            LLUICtrlFactory::instance().flushDefaults();
+        }
+    }
+
+    ~ALXUISkinScope()
+    {
+        if (mSwitched)
+        {
+            gDirUtilp->setSkinFolder(mSkin, mLanguage);
+            LLUICtrlFactory::instance().flushDefaults();
+        }
+    }
+
+    ALXUISkinScope(const ALXUISkinScope&) = delete;
+    ALXUISkinScope& operator=(const ALXUISkinScope&) = delete;
+
+private:
+    std::string mSkin;
+    std::string mLanguage;
+    bool        mSwitched;
+};
+
+// The words two dozen status lines share: a file by its name alone, and a
+// layer by the skin and language it is.
+static std::string fileNameOf(const std::string& path)
+{
+    return path.substr(path.find_last_of("/\\") + 1);
+}
+
+static std::string layerName(const ALXUICatalog::Layer& layer)
+{
+    return layer.skin + "/" + layer.language;
+}
+
+namespace
+{
+    // What a canvas keeps around what it shows, so a preview is not
+    // drawn hard against the edge of the surface it is on.
+    constexpr S32 CANVAS_MARGIN = 4;
+
+    // Every colour the canvas draws over a preview, each named in colors.xml
+    // so a skin can say what the tool looks like, and gathered here so there
+    // is one place to read what those names are. Asked for once, the first
+    // time anything is drawn.
+    struct Ink
+    {
+        LLUIColor selection;        // the one the handles are on
+        LLUIColor also;             // the rest of a selection, which alignment moves
+        LLUIColor hover;
+        LLUIColor grip;             // the eight handles and the ninth in the middle
+        LLUIColor gripEdge;
+        LLUIColor anchorHeld;       // an edge this element is tied to
+        LLUIColor anchorFree;
+        LLUIColor dropTarget;       // where a held element would land
+        LLUIColor absorbing;        // the sibling a stack takes the room from
+        LLUIColor dragged;          // where a drag has got to
+        LLUIColor guide;            // what the numbers mean, drawn to the edges
+        LLUIColor guideSibling;     // and to the element before it
+        LLUIColor grid;
+
+        Ink()
+        {
+            const LLUIColorTable& table = LLUIColorTable::instance();
+            selection    = table.getColor("XUIStudioSelection", LLColor4::red);
+            also         = table.getColor("XUIStudioSelectionAlso", LLColor4(1.f, 0.4f, 0.4f, 0.7f));
+            hover        = table.getColor("XUIStudioHover", LLColor4::yellow);
+            grip         = table.getColor("XUIStudioGrip", LLColor4::white);
+            gripEdge     = table.getColor("XUIStudioGripEdge", LLColor4::black);
+            anchorHeld   = table.getColor("XUIStudioAnchorHeld", LLColor4::yellow);
+            anchorFree   = table.getColor("XUIStudioAnchorFree", LLColor4::black);
+            dropTarget   = table.getColor("XUIStudioDropTarget", LLColor4::green);
+            absorbing    = table.getColor("XUIStudioAbsorbing", LLColor4::cyan);
+            dragged      = table.getColor("XUIStudioDragged", LLColor4::white);
+            guide        = table.getColor("XUIStudioGuide", LLColor4::yellow);
+            guideSibling = table.getColor("XUIStudioGuideSibling", LLColor4::cyan);
+            grid         = table.getColor("XUIStudioGrid", LLColor4(0.3f, 0.82f, 1.f, 0.12f));
+        }
+    };
+
+    const Ink& ink()
+    {
+        static const Ink held;
+        return held;
+    }
+
+    // How much bigger than life a preview may be drawn, as the canvas
+    // bounds it; the spinner in the canvas bar says the same two numbers.
+    constexpr S32 ZOOM_LEAST = (S32)(ALCanvasView::MIN_ZOOM * 100.f);
+    constexpr S32 ZOOM_MOST = (S32)(ALCanvasView::MAX_ZOOM * 100.f);
+
+
+    // A layout stack gives its children three of their four numbers and
+    // reads the fourth from the file: the width of a panel in a stack
+    // that runs across, the height of one in a stack that runs down. The
+    // axis, or -1 where the parent is not a stack.
+    S32 stackAxisOf(const LLView* view)
+    {
+        const LLLayoutStack* stack = view ? ALViewType::as<LLLayoutStack>(view->getParent()) : nullptr;
+        return stack ? (S32)stack->getOrientation() : -1;
+    }
+
+    // Which of the eight handles a stack leaves any meaning in: the two on
+    // its axis. A move has none at all, since where the panel goes is the
+    // stack's answer and not the file's.
+    bool gripLive(S32 index, S32 axis)
+    {
+        if (axis < 0)
+        {
+            return true;
+        }
+        static const bool across[8] = { false, false, false, true,  true,  false, false, false };
+        static const bool down[8]   = { false, true,  false, false, false, false, true,  false };
+        return axis == LLView::HORIZONTAL ? across[index] : down[index];
+    }
+
+    // What the stack takes the change out of: the nearest panel beside
+    // this one that sizes itself, since those are the ones sharing what
+    // is left over. Null where every sibling holds its size, which is a
+    // stack that will simply be short of room.
+    LLView* absorbingSibling(const LLView* view)
+    {
+        const LLView* parent = view ? view->getParent() : nullptr;
+        if (!ALViewType::as<LLLayoutStack>(parent))
+        {
+            return nullptr;
+        }
+        const std::vector<LLView*> siblings(parent->getChildList()->begin(), parent->getChildList()->end());
+        auto here = std::find(siblings.begin(), siblings.end(), view);
+        if (here == siblings.end())
+        {
+            return nullptr;
+        }
+        const S32 at = (S32)std::distance(siblings.begin(), here);
+        const S32 count = (S32)siblings.size();
+        const auto absorbs = [](LLView* sibling)
+        {
+            LLLayoutPanel* panel = ALViewType::as<LLLayoutPanel>(sibling);
+            return panel && panel->getVisible() && panel->getAutoResize() ? panel : nullptr;
+        };
+        for (S32 step = 1; step < count; ++step)
+        {
+            if (at + step < count)
+            {
+                if (LLView* found = absorbs(siblings[at + step])) { return found; }
+            }
+            if (at - step >= 0)
+            {
+                if (LLView* found = absorbs(siblings[at - step])) { return found; }
+            }
+        }
+        return nullptr;
+    }
+}
+
+// The surface a file is previewed on: it holds the built view tree, draws
+// the tool's hover, selection, grips, anchors, rulers and guides over it,
+// and answers a modifier click with a selection. It is a panel, so it can
+// be a region of a window as readily as the contents of a floater -- what
+// it needs is a root view and a rect, and nothing else it does is about
+// being a window.
+class ALXUICanvas final : public ALCanvasView
+{
+public:
+    AL_VIEW_TYPE(ALXUICanvas, ALCanvasView);
+
+    ALXUICanvas(ALFloaterXUIStudio* tool, S32 which, const LLPanel::Params& p)
+    :   ALCanvasView(p),
+        mTool(tool),
+        mWhich(which)
+    {
+    }
+
+    void detach() { mTool = nullptr; }
+
+    // Rules are the canvas's own furniture: they stay their own size at
+    // the edges of what can be seen, and it is the numbers on them that
+    // follow the preview. They are the canvas's; what they show, whether
+    // they show and what they step by is the tool's.
+    void drawChrome() override
+    {
+        drawRulers();
+    }
+
+    bool rulersShown() const override
+    {
+        return mTool && root() && mTool->showRulers();
+    }
+
+    S32 rulerStep() const override
+    {
+        return mTool ? llmax(mTool->gridSize(), 2) : 2;
+    }
+
+    // The selection's edges, on both rules.
+    bool rulerHighlight(LLRect& content) const override
+    {
+        LLView* selected = mTool ? ALXUISelection::resolve(root(), mTool->selection().selection()) : nullptr;
+        if (!selected)
+        {
+            return false;
+        }
+        content = localRectOf(selected);
+        return true;
+    }
+
+    // Everything that lives in the preview's own coordinates: the preview,
+    // and every mark drawn over it.
+    void drawContent() override
+    {
+        LLPanel::draw();
+        if (!mTool || !root())
+        {
+            return;
+        }
+        // Only while a handle is held: the grid answers "where will this
+        // land", which is a question nobody is asking the rest of the time,
+        // and a preview under a permanent mesh is a preview of the mesh.
+        if (mTool->snapToGrid() && grabbed())
+        {
+            drawGrid();
+        }
+        const ALXUISelection& selection = mTool->selection();
+        if (selection.hasHover() && mTool->hoverHighlight())
+        {
+            if (LLView* view = ALXUISelection::resolve(root(), selection.hover()))
+            {
+                drawBox(view, ink().hover.get(), true);
+            }
+        }
+        if (selection.hasSelection())
+        {
+            // The others in the selection, in a quieter ink: they are what
+            // an alignment moves, and the one with the handles on it is
+            // what they are moved to.
+            for (const ALXUISelection::path_t& path : selection.also())
+            {
+                if (LLView* other = ALXUISelection::resolve(root(), path))
+                {
+                    drawBox(other, ink().also.get(), false);
+                }
+            }
+            if (LLView* view = ALXUISelection::resolve(root(), selection.selection()))
+            {
+                drawBox(view, ink().selection.get(), true);
+                if (gKeyboard && (gKeyboard->currentMask(false) & MASK_ALT))
+                {
+                    drawGuides(view);
+                }
+                if (editable(view))
+                {
+                    const LLRect r = localRectOf(view);
+                    // A panel in a layout stack is given three of its four
+                    // numbers by the stack, so the handles and the anchors
+                    // that would write the other three are not offered.
+                    const S32 axis = stackAxisOf(view);
+                    drawGrips(r, axis);
+                    if (axis < 0)
+                    {
+                        drawAnchors(view, r);
+                    }
+                    if (!dragging() && mDropFrame + 1 >= LLFrameTimer::getFrameCount())
+                    {
+                        if (LLView* into = mDrop.get())
+                        {
+                            drawLabelledBox(into, ink().dropTarget.get(), named("CanvasDropInto", into));
+                        }
+                    }
+                    if (dragging())
+                    {
+                        LLRect dragged(r);
+                        dragged.mLeft += mDelta[EDGE_L];
+                        dragged.mBottom += mDelta[EDGE_B];
+                        dragged.mRight += mDelta[EDGE_R];
+                        dragged.mTop += mDelta[EDGE_T];
+                        gl_rect_2d(dragged, ink().dragged.get(), false);
+                        if (LLView* into = mDrop.get())
+                        {
+                            drawLabelledBox(into, ink().dropTarget.get(), named("CanvasDropInto", into));
+                        }
+                        else if (axis >= 0)
+                        {
+                            if (LLView* absorbs = absorbingSibling(view))
+                            {
+                                drawLabelledBox(absorbs, ink().absorbing.get(), named("CanvasRoomFrom", absorbs));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    bool handleKeyHere(KEY key, MASK mask) override
+    {
+        if (mTool && mWhich == ALFloaterXUIStudio::PRIMARY)
+        {
+            if (key == 'Z' && mask == MASK_CONTROL && mTool->undoEdit())
+            {
+                return true;
+            }
+            if (mTool->nudge(key, mask))
+            {
+                return true;
+            }
+        }
+        // The way out of a selection, answered here rather than left to the
+        // window that owns it. A panel's own answer to escape is to give up
+        // the keyboard and say it handled it, and every view between the one
+        // holding the keyboard and this window is a panel -- so a canvas that
+        // passed escape on would be the last view ever to see it.
+        if (mTool && key == KEY_ESCAPE && mask == MASK_NONE && mTool->selection().hasSelection())
+        {
+            mTool->canvasDeselect();
+            return true;
+        }
+        return LLPanel::handleKeyHere(key, mask);
+    }
+
+    // A plain click belongs to the preview: its tabs turn and its lists
+    // scroll, which is half of what a preview is for. Control selects the
+    // element under the pointer, and held through a drag it moves what it
+    // selected.
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override
+    {
+        const S32 drawn_x = x;
+        const S32 drawn_y = y;
+        toContent(x, y);
+        mLetGo = false;
+        if (!mTool || !root() || panGesture())
+        {
+            return ALCanvasView::handleMouseDown(drawn_x, drawn_y, mask);
+        }
+
+        // A handle answers before the widget under it does, with or
+        // without the modifier: a button in a preview is a picture of a
+        // button, and the handle on its corner is a handle.
+        LLView* selected = ALXUISelection::resolve(root(), mTool->selection().selection());
+        if (editable(selected))
+        {
+            // An anchor is a click and not a drag: it says which edge of
+            // its parent the element is tied to, and that is on or off.
+            const S32 anchor = anchorAt(x, y, localRectOf(selected));
+            if (anchor >= 0)
+            {
+                setFocus(true);
+                mTool->toggleFollows(anchor);
+                return true;
+            }
+            const S32 grip = gripAt(x, y, localRectOf(selected), mask);
+            if (grip != GRIP_NONE)
+            {
+                setFocus(true);
+                return beginDrag(grip, x, y);
+            }
+        }
+        if (mask & MASK_CONTROL)
+        {
+            // Whatever this click turns out to be, the canvas is where the
+            // keyboard now is: choosing an element here is how a person says
+            // that the arrows are about to be about that element. Taken
+            // before the branches, because every one of them used to be able
+            // to return without it and the commonest one did.
+            setFocus(true);
+            LLView* view = hitTest(x, y);
+            // Shift adds to the selection rather than replacing it, and a
+            // second shift-click takes it out again. What is added is not
+            // dragged: a drag moves the one thing the handles are on, and
+            // the rest are there to be lined up with it.
+            if (mask & MASK_SHIFT)
+            {
+                mTool->canvasSelectAlso(mWhich, view);
+                setFocus(true);
+                return true;
+            }
+            // Control on what is already selected lets it go again -- but
+            // control held through a drag moves it, and which of the two
+            // this is is not known until the button comes up. So the
+            // selection stands for now and the answer waits.
+            mLetGo = view && view == ALXUISelection::resolve(root(), mTool->selection().selection());
+            if (!mLetGo)
+            {
+                mTool->canvasSelect(mWhich, view);
+            }
+            if (editable(view))
+            {
+                return beginDrag(GRIP_MOVE, x, y);
+            }
+            if (mLetGo)
+            {
+                // Nothing here drags, so there is nothing to wait for.
+                mLetGo = false;
+                mTool->canvasDeselect();
+            }
+            setFocus(true);
+            return true;
+        }
+        return ALCanvasView::handleMouseDown(drawn_x, drawn_y, mask);
+    }
+
+    bool handleHover(S32 x, S32 y, MASK mask) override
+    {
+        const S32 drawn_x = x;
+        const S32 drawn_y = y;
+        if (panning())
+        {
+            return ALCanvasView::handleHover(drawn_x, drawn_y, mask);
+        }
+        toContent(x, y);
+        if (grabbed())
+        {
+            // Followed only where the pointer went somewhere: the captor is
+            // hovered every frame, and a hit test a frame is for nothing.
+            if (mDrag.moved(x, y))
+            {
+                track(x, y);
+                trackDrop(x, y);
+            }
+            setGripCursor(mGrip);
+            return true;
+        }
+        if (mTool && root())
+        {
+            mTool->canvasHover(mWhich, hitTest(x, y));
+            LLView* selected = ALXUISelection::resolve(root(), mTool->selection().selection());
+            if (editable(selected))
+            {
+                const S32 grip = gripAt(x, y, localRectOf(selected), mask);
+                if (grip != GRIP_NONE)
+                {
+                    setGripCursor(grip);
+                    return true;
+                }
+            }
+        }
+        return ALCanvasView::handleHover(drawn_x, drawn_y, mask);
+    }
+
+    // A panel that names a file of its own is one element here and a
+    // document elsewhere; opening it is what a double click on it means.
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override
+    {
+        const S32 drawn_x = x;
+        const S32 drawn_y = y;
+        toContent(x, y);
+        if (mTool && root() && (mask & MASK_CONTROL))
+        {
+            LLView* view = hitTest(x, y);
+            mTool->canvasSelect(mWhich, view);
+            if (mWhich == ALFloaterXUIStudio::PRIMARY && !mTool->nestedFile(view).empty())
+            {
+                mTool->openNestedFile();
+                return true;
+            }
+            return true;
+        }
+        return ALCanvasView::handleDoubleClick(drawn_x, drawn_y, mask);
+    }
+
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override
+    {
+        const S32 drawn_x = x;
+        const S32 drawn_y = y;
+        if (panning())
+        {
+            return ALCanvasView::handleMouseUp(drawn_x, drawn_y, mask);
+        }
+        toContent(x, y);
+        if (grabbed())
+        {
+            mDrag.moved(x, y);
+            track(x, y);
+            trackDrop(x, y);
+            const S32 grip = mGrip;
+            LLView* into = mDrop.get();
+            const bool let_go = mLetGo && !dragging();
+            const S32 moved[EDGE_COUNT] = { mDelta[EDGE_L], mDelta[EDGE_B],
+                                            mDelta[EDGE_R], mDelta[EDGE_T] };
+            // The drag is over, so the drag's numbers are over: what is left
+            // in them is what the outline of it goes on being drawn at, one
+            // whole drag away from the element it is supposed to be around.
+            endDrag();
+            if (let_go)
+            {
+                // A control click on what was already selected, and the hand
+                // did not move: it was a click and not the start of a drag.
+                mTool->canvasDeselect();
+                return true;
+            }
+            if (mTool && grip != GRIP_NONE)
+            {
+                // One operation for the whole drag, written when the
+                // button comes up rather than on every pixel of it. A
+                // drop into another container is the same drag with
+                // somewhere else to land.
+                if (into)
+                {
+                    mTool->canvasReparent(mWhich, into, moved[EDGE_L], moved[EDGE_B]);
+                }
+                else
+                {
+                    mTool->canvasDrag(mWhich, moved[EDGE_L], moved[EDGE_B], moved[EDGE_R], moved[EDGE_T]);
+                }
+            }
+            return true;
+        }
+        return ALCanvasView::handleMouseUp(drawn_x, drawn_y, mask);
+    }
+
+    // Whoever took the pointer is why this is being called, so by now it is
+    // theirs. The drag goes down without touching it: letting go of a
+    // pointer that is somebody else's takes it off them on the very click
+    // that gave it to them, and a title bar grabbed that way is held by
+    // nothing -- the window does not move, and does not until something
+    // clears the tangle by hiding a view.
+    void onMouseCaptureLost() override
+    {
+        dropDrag();
+        ALCanvasView::onMouseCaptureLost();
+    }
+
+    void onMouseLeave(S32 x, S32 y, MASK mask) override
+    {
+        LLPanel::onMouseLeave(x, y, mask);
+        if (mTool)
+        {
+            mTool->canvasHover(mWhich, nullptr);
+        }
+    }
+
+private:
+    // The four edges, the eight grips that move them, and the ninth in the
+    // middle that moves all four at once.
+    enum Edge : S32 { EDGE_L, EDGE_B, EDGE_R, EDGE_T, EDGE_COUNT };
+    static constexpr S32 GRIP_NONE = -1;
+    static constexpr S32 GRIP_MOVE = -2;
+
+    static constexpr S32 GRIP_SIZE = 7;
+    static constexpr S32 ANCHOR_SIZE = 7;
+    static constexpr S32 MOVE_GRIP_SIZE = 13;
+    // A click is not a drag: the hand moves a little on the way down.
+    static constexpr S32 DEAD_ZONE = 2;      // pixels either way, past which it is
+
+    // The root of a floater preview is the preview window: its corners
+    // are the window's own, and dragging its bar is how the window is
+    // moved out of the way. The second preview is another language of the
+    // same file, shown beside the first and not written to.
+    bool editable(const LLView* view) const
+    {
+        return view && view != this && mWhich == ALFloaterXUIStudio::PRIMARY;
+    }
+
+    // Past the dead zone since the press, however near it the hand has
+    // come back: a drag out and back is a drag that came to nothing, not a
+    // click.
+    bool dragging() const
+    {
+        return mDrag.dragging();
+    }
+
+    // A handle is held: the button went down on one and has not come up.
+    // True from the grab rather than from the first pixel of movement,
+    // because what the grid is for is saying where a move will land.
+    bool grabbed()
+    {
+        return mGrip != GRIP_NONE && hasMouseCapture();
+    }
+
+    // Nothing is being dragged, and nothing is left over saying it is.
+    void dropDrag()
+    {
+        mLetGo = false;
+        mDrag.cancel();
+        mGrip = GRIP_NONE;
+        mDrop.markDead();
+        for (S32& d : mDelta)
+        {
+            d = 0;
+        }
+    }
+
+    // The drag over and the pointer let go with it, which is what the button
+    // coming up means.
+    void endDrag()
+    {
+        dropDrag();
+        gFocusMgr.setMouseCapture(nullptr);
+    }
+
+    bool beginDrag(S32 grip, S32 x, S32 y)
+    {
+        mGrip = grip;
+        mDrag.press(x, y);
+        for (S32& d : mDelta)
+        {
+            d = 0;
+        }
+        gFocusMgr.setMouseCapture(this);
+        setFocus(true);
+        return true;
+    }
+
+    // A sentence of the floater's about one element, for the labels drawn
+    // over the canvas.
+    std::string named(const char* key, const LLView* view) const
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = view->getName();
+        return mTool->getString(key, args);
+    }
+
+    // The eight squares, as rects in this floater's space.
+    static void gripRects(const LLRect& r, LLRect (&out)[8])
+    {
+        const S32 h = GRIP_SIZE / 2;
+        const S32 mid_x = (r.mLeft + r.mRight) / 2;
+        const S32 mid_y = (r.mBottom + r.mTop) / 2;
+        const S32 xs[8] = { r.mLeft, mid_x, r.mRight, r.mLeft, r.mRight, r.mLeft, mid_x, r.mRight };
+        const S32 ys[8] = { r.mBottom, r.mBottom, r.mBottom, mid_y, mid_y, r.mTop, r.mTop, r.mTop };
+        for (S32 i = 0; i < 8; ++i)
+        {
+            out[i] = LLRect(xs[i] - h, ys[i] + h, xs[i] + h, ys[i] - h);
+        }
+    }
+
+    // The middle of the part of the element that can be seen, since an
+    // element that hangs over the edge, or is scrolled half off, is drawn
+    // there but the mouse never reaches past it -- and that element is the
+    // one most in need of being dragged back.
+    LLRect moveGripRect(const LLRect& r) const
+    {
+        LLRect visible(r);
+        visible.intersectWith(viewportRect());
+        if (visible.isEmpty())
+        {
+            visible = r;
+        }
+        const S32 h = MOVE_GRIP_SIZE / 2;
+        const S32 mid_x = (visible.mLeft + visible.mRight) / 2;
+        const S32 mid_y = (visible.mBottom + visible.mTop) / 2;
+        return LLRect(mid_x - h, mid_y + h, mid_x + h, mid_y - h);
+    }
+
+    void setGripCursor(S32 grip) const
+    {
+        static const ECursorType cursors[8] = {
+            UI_CURSOR_SIZENESW, UI_CURSOR_SIZENS, UI_CURSOR_SIZENWSE,
+            UI_CURSOR_SIZEWE,                     UI_CURSOR_SIZEWE,
+            UI_CURSOR_SIZENWSE, UI_CURSOR_SIZENS, UI_CURSOR_SIZENESW };
+        getWindow()->setCursor(grip >= 0 && grip < 8 ? cursors[grip] : UI_CURSOR_SIZEALL);
+    }
+
+    // Which edges each of the eight moves, in the order gripRects builds
+    // them: the corners move two.
+    static void gripEdges(S32 index, bool (&edges)[EDGE_COUNT])
+    {
+        static const bool table[8][EDGE_COUNT] = {
+            { true,  true,  false, false },     // bottom left
+            { false, true,  false, false },     // bottom
+            { false, true,  true,  false },     // bottom right
+            { true,  false, false, false },     // left
+            { false, false, true,  false },     // right
+            { true,  false, false, true  },     // top left
+            { false, false, false, true  },     // top
+            { false, false, true,  true  },     // top right
+        };
+        for (S32 i = 0; i < EDGE_COUNT; ++i)
+        {
+            edges[i] = table[index][i];
+        }
+    }
+
+    // The four anchors, just outside each edge: filled where the element
+    // follows that edge of its parent. Outside, because the eight resize
+    // grips are already on the edges and an anchor is not a size.
+    static void anchorRects(const LLRect& r, LLRect (&out)[EDGE_COUNT])
+    {
+        const S32 h = ANCHOR_SIZE / 2;
+        const S32 mid_x = (r.mLeft + r.mRight) / 2;
+        const S32 mid_y = (r.mBottom + r.mTop) / 2;
+        const S32 away = GRIP_SIZE + 2;
+        out[EDGE_L] = LLRect(r.mLeft - away - h, mid_y + h, r.mLeft - away + h, mid_y - h);
+        out[EDGE_B] = LLRect(mid_x - h, r.mBottom - away + h, mid_x + h, r.mBottom - away - h);
+        out[EDGE_R] = LLRect(r.mRight + away - h, mid_y + h, r.mRight + away + h, mid_y - h);
+        out[EDGE_T] = LLRect(mid_x - h, r.mTop + away + h, mid_x + h, r.mTop + away - h);
+    }
+
+    void drawAnchors(const LLView* view, const LLRect& r) const
+    {
+        static const U32 flags[EDGE_COUNT] = { FOLLOWS_LEFT, FOLLOWS_BOTTOM, FOLLOWS_RIGHT, FOLLOWS_TOP };
+
+        LLRect anchors[EDGE_COUNT];
+        anchorRects(r, anchors);
+        for (S32 i = 0; i < EDGE_COUNT; ++i)
+        {
+            const bool held = (view->getFollows() & flags[i]) != 0;
+            gl_rect_2d(anchors[i], held ? ink().anchorHeld.get() : ink().anchorFree.get(), true);
+            gl_rect_2d(anchors[i], ink().grip.get(), false);
+        }
+    }
+
+    S32 anchorAt(S32 x, S32 y, const LLRect& r) const
+    {
+        LLRect anchors[EDGE_COUNT];
+        anchorRects(r, anchors);
+        for (S32 i = 0; i < EDGE_COUNT; ++i)
+        {
+            if (anchors[i].pointInRect(x, y))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    void drawGrips(const LLRect& r, S32 axis) const
+    {
+        LLRect grips[8];
+        gripRects(r, grips);
+        for (S32 i = 0; i < 8; ++i)
+        {
+            if (!gripLive(i, axis))
+            {
+                continue;
+            }
+            gl_rect_2d(grips[i], ink().grip.get(), true);
+            gl_rect_2d(grips[i], ink().gripEdge.get(), false);
+        }
+
+        if (axis >= 0)
+        {
+            return;
+        }
+
+        // The one in the middle moves the element, and says so with the
+        // four arrows a move cursor has.
+        const LLRect move = moveGripRect(r);
+        gl_rect_2d(move, ink().grip.get(), true);
+        gl_rect_2d(move, ink().gripEdge.get(), false);
+        const S32 mid_x = (move.mLeft + move.mRight) / 2;
+        const S32 mid_y = (move.mBottom + move.mTop) / 2;
+        gl_line_2d(move.mLeft + 2, mid_y, move.mRight - 2, mid_y, ink().gripEdge.get());
+        gl_line_2d(mid_x, move.mBottom + 2, mid_x, move.mTop - 2, ink().gripEdge.get());
+    }
+
+    S32 gripAt(S32 x, S32 y, const LLRect& r, MASK mask) const
+    {
+        const S32 axis = stackAxisOf(ALXUISelection::resolve(root(), mTool->selection().selection()));
+        LLRect grips[8];
+        gripRects(r, grips);
+        for (S32 i = 0; i < 8; ++i)
+        {
+            if (gripLive(i, axis) && grips[i].pointInRect(x, y))
+            {
+                return i;
+            }
+        }
+        if (axis >= 0)
+        {
+            return GRIP_NONE;
+        }
+        if (moveGripRect(r).pointInRect(x, y))
+        {
+            return GRIP_MOVE;
+        }
+        return (mask & MASK_ALT) && r.pointInRect(x, y) ? GRIP_MOVE : GRIP_NONE;
+    }
+
+    void track(S32 x, S32 y)
+    {
+        S32 dx = x - mDrag.pressX();
+        S32 dy = y - mDrag.pressY();
+        if (!dragging())
+        {
+            // The hand moves a little on the way down; a click that
+            // selects an element is not a move of it.
+            dx = 0;
+            dy = 0;
+        }
+        bool edges[EDGE_COUNT] = { true, true, true, true };
+        if (mGrip != GRIP_MOVE)
+        {
+            gripEdges(mGrip, edges);
+        }
+
+        // The grid is the element's own coordinates -- the ones the file
+        // writes -- so an edge lands where a number in the file lands,
+        // not where a pixel of this window happens to be.
+        if (mTool && mTool->snapToGrid())
+        {
+            LLView* view = ALXUISelection::resolve(root(), mTool->selection().selection());
+            const LLView* parent = view ? view->getParent() : nullptr;
+            if (view && parent)
+            {
+                const S32 grid = mTool->gridSize();
+                const LLRect& r = view->getRect();
+                const S32 top = parent->getRect().getHeight() - r.mTop;
+                if (mGrip == GRIP_MOVE)
+                {
+                    // A move keeps its size: the edges the file counts
+                    // from decide, and the others follow.
+                    dx = snapped(r.mLeft + dx, grid) - r.mLeft;
+                    dy = -(snapped(top - dy, grid) - top);
+                }
+                else
+                {
+                    // A resize lands each edge it moves on the grid.
+                    if (edges[EDGE_L]) { dx = snapped(r.mLeft + dx, grid) - r.mLeft; }
+                    else if (edges[EDGE_R]) { dx = snapped(r.mRight + dx, grid) - r.mRight; }
+                    if (edges[EDGE_T]) { dy = -(snapped(top - dy, grid) - top); }
+                    else if (edges[EDGE_B]) { dy = snapped(r.mBottom + dy, grid) - r.mBottom; }
+                }
+            }
+        }
+
+        mDelta[EDGE_L] = edges[EDGE_L] ? dx : 0;
+        mDelta[EDGE_R] = edges[EDGE_R] ? dx : 0;
+        mDelta[EDGE_B] = edges[EDGE_B] ? dy : 0;
+        mDelta[EDGE_T] = edges[EDGE_T] ? dy : 0;
+    }
+
+    static S32 snapped(S32 value, S32 grid)
+    {
+        return grid > 1 ? ((value + (value >= 0 ? grid / 2 : -grid / 2)) / grid) * grid : value;
+    }
+
+    // Something carried by the drag tool -- a row of the outline, or a tag
+    // from the Library -- over the canvas, or let go on it. The container
+    // under the pointer that takes it is marked while it hovers, the way
+    // a held element's landing is marked, and takes it when it drops.
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
+                           void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override
+    {
+        toContent(x, y);
+        *accept = ACCEPT_NO;
+        if (!mTool || !root())
+        {
+            return false;
+        }
+        LLView* into = mTool->canvasDrop(mWhich, hitTest(x, y), x, y, drop, cargo_type, cargo_data, tooltip_msg);
+        if (into && !drop)
+        {
+            mDrop = into->getHandle();
+            mDropFrame = LLFrameTimer::getFrameCount();
+            *accept = ACCEPT_YES_SINGLE;
+        }
+        return true;
+    }
+
+    // Where a held element would land if the button came up here: the
+    // container under the pointer that takes its tag, and nothing while
+    // an edge is being dragged, since a resize goes nowhere.
+    void trackDrop(S32 x, S32 y)
+    {
+        mDrop.markDead();
+        if (mGrip != GRIP_MOVE || !mTool || !dragging())
+        {
+            return;
+        }
+        LLView* moving = ALXUISelection::resolve(root(), mTool->selection().selection());
+        if (LLView* into = mTool->dropTarget(mWhich, hitTest(x, y), moving))
+        {
+            mDrop = into->getHandle();
+        }
+    }
+
+    void drawLabelledBox(const LLView* view, const LLColor4& color, const std::string& label)
+    {
+        const LLRect r = localRectOf(view);
+        gl_rect_2d(r, color, false);
+        LLRect inner(r);
+        inner.stretch(-1);
+        gl_rect_2d(inner, color, false);
+        LLFontGL::getFontSansSerifSmall()->renderUTF8(label, 0, (F32)r.mLeft + 2.f, (F32)r.mBottom + 2.f, color,
+                                                      LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL,
+                                                      LLFontGL::DROP_SHADOW);
+    }
+
+    // The topmost view drawn over a point, taking the deepest before its
+    // parent. Drawing is not clipped to a parent's rect: a widget
+    // positioned outside its panel is drawn outside it, and that is
+    // exactly the widget someone opens this tool to drag back, so the
+    // search is over what is on screen rather than over what contains
+    // what.
+    static LLView* pickDrawn(LLView* view, S32 screen_x, S32 screen_y)
+    {
+        if (!view->getVisible())
+        {
+            return nullptr;
+        }
+        for (LLView* child : *view->getChildList())
+        {
+            if (LLView* hit = pickDrawn(child, screen_x, screen_y))
+            {
+                return hit;
+            }
+        }
+        return view->calcScreenRect().pointInRect(screen_x, screen_y) ? view : nullptr;
+    }
+
+    // What was hit, and then the nearest view above it that the file
+    // describes, since a widget's own children are not what an author is
+    // pointing at.
+    LLView* hitTest(S32 x, S32 y)
+    {
+        LLRect screen;
+        localRectToScreen(LLRect(x, y, x, y), &screen);
+        LLView* view = root() ? pickDrawn(root(), screen.mLeft, screen.mBottom) : nullptr;
+        const ALXUISourceMap& map = mTool->sourceMap(mWhich);
+        while (view && view != root() && !map.isFromXML(view))
+        {
+            view = view->getParent();
+        }
+        return view;
+    }
+
+    // The lines a drag lands on, drawn where the file's own numbers put
+    // them: from the previewed root's corner, since that is where its
+    // children are measured from.
+    void drawGrid() const
+    {
+        const S32 grid = mTool->gridSize();
+        const LLRect r = root() == this ? getLocalRect() : localRectOf(root());
+        if (grid < 2 || r.getWidth() <= 0)
+        {
+            return;
+        }
+        const LLColor4 faint = ink().grid.get();
+        // A two pixel grid drawn whole is a wash, so a fine grid is drawn
+        // every few of itself: the lines a drag lands on are still the grid.
+        const S32 step = grid >= 4 ? grid : grid * ((8 + grid - 1) / grid);
+        for (S32 x = r.mLeft; x <= r.mRight; x += step)
+        {
+            gl_line_2d(x, r.mBottom, x, r.mTop, faint);
+        }
+        for (S32 y = r.mTop; y >= r.mBottom; y -= step)
+        {
+            gl_line_2d(r.mLeft, y, r.mRight, y, faint);
+        }
+    }
+
+    void drawBox(const LLView* view, const LLColor4& color, bool label)
+    {
+        const LLRect r = localRectOf(view);
+        gl_rect_2d(r, color, false);
+        LLRect outer(r);
+        outer.stretch(1);
+        LLColor4 faint(color);
+        faint.mV[VALPHA] = 0.5f;
+        gl_rect_2d(outer, faint, false);
+        if (label)
+        {
+            const std::string text = std::to_string(r.getWidth()) + " x " + std::to_string(r.getHeight());
+            LLFontGL::getFontSansSerifSmall()->renderUTF8(text, 0, (F32)r.mLeft, (F32)r.mTop + 2.f, color,
+                                                          LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL,
+                                                          LLFontGL::DROP_SHADOW);
+        }
+    }
+
+    void drawDistance(S32 x1, S32 y1, S32 x2, S32 y2, S32 value, const LLColor4& color)
+    {
+        if (value <= 0)
+        {
+            return;
+        }
+        gl_line_2d(x1, y1, x2, y2, color);
+        const std::string text = std::to_string(value);
+        LLFontGL::getFontSansSerifSmall()->renderUTF8(text, 0, (F32)((x1 + x2) / 2), (F32)((y1 + y2) / 2), color,
+                                                      LLFontGL::HCENTER, LLFontGL::VCENTER, LLFontGL::NORMAL,
+                                                      LLFontGL::DROP_SHADOW);
+    }
+
+    // The numbers left, top, right and bottom mean, drawn from the view to
+    // its parent's edges, and left_pad and top_pad from the sibling created
+    // before it.
+    void drawGuides(const LLView* view)
+    {
+        const LLView* parent = view->getParent();
+        if (!parent)
+        {
+            return;
+        }
+        const LLColor4 color = ink().guide.get();
+        const LLRect r = localRectOf(view);
+        const LLRect p = localRectOf(parent);
+        const S32 mid_y = (r.mTop + r.mBottom) / 2;
+        const S32 mid_x = (r.mLeft + r.mRight) / 2;
+        drawDistance(p.mLeft, mid_y, r.mLeft, mid_y, r.mLeft - p.mLeft, color);
+        drawDistance(r.mRight, mid_y, p.mRight, mid_y, p.mRight - r.mRight, color);
+        drawDistance(mid_x, r.mTop, mid_x, p.mTop, p.mTop - r.mTop, color);
+        drawDistance(mid_x, p.mBottom, mid_x, r.mBottom, r.mBottom - p.mBottom, color);
+
+        const LLView::child_list_t& siblings = *parent->getChildList();
+        auto it = std::find(siblings.begin(), siblings.end(), view);
+        if (it != siblings.end() && std::next(it) != siblings.end())
+        {
+            const LLRect s = localRectOf(*std::next(it));
+            const LLColor4 sibling_color = ink().guideSibling.get();
+            drawDistance(s.mRight, mid_y, r.mLeft, mid_y, r.mLeft - s.mRight, sibling_color);
+            drawDistance(mid_x, r.mTop, mid_x, s.mBottom, s.mBottom - r.mTop, sibling_color);
+        }
+    }
+
+    ALFloaterXUIStudio* mTool;
+    S32                 mWhich;
+
+    bool                mLetGo = false;         // a control press on what was selected
+    S32                 mGrip = GRIP_NONE;      // the handle the button went down on
+    ALDragGesture       mDrag{ DEAD_ZONE, ALDragGesture::Zone::EitherAxis };
+    S32                 mDelta[EDGE_COUNT] = { 0, 0, 0, 0 };
+    LLHandle<LLView>    mDrop;                  // the container a held element would land in
+    U32                 mDropFrame = 0;         // the frame a drag tool hover last said so
+};
+
+// The variants, side by side: each a surface of its own, with its own skin
+// and its own language, sharing one selection -- what is selected is an
+// element of the file and not of any one build of it, so a click on the
+// German one puts the marks round the same element of the English one.
+//
+// What a row is and how it shares its room is `ALCanvasRow`; nothing about
+// it is about XUI.
+
+// A canvas in a window of its own, which is where a preview lives until the
+// studio has a region to put one in -- and afterwards, for the developer
+// with a second monitor. It owns the canvas, sizes itself around it, and
+// tells the tool when it goes.
+class ALXUIPreviewHost final : public LLFloater
+{
+public:
+    AL_VIEW_TYPE(ALXUIPreviewHost, LLFloater);
+
+    ALXUIPreviewHost(ALFloaterXUIStudio* tool, S32 which, const LLFloater::Params& p)
+    :   LLFloater(LLSD(), p),
+        mTool(tool),
+        mWhich(which)
+    {
+        LLPanel::Params cp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        cp.name = "canvas";
+        cp.rect = contentRect(getRect().getWidth(), getRect().getHeight());
+        cp.follows.flags = FOLLOWS_ALL;
+        cp.background_visible = false;
+        mCanvas = new ALXUICanvas(tool, which, cp);
+        mCanvas->initFromParams(cp);
+        mCanvas->setSizable(true);
+        // By handle: a host that has been detached -- the gallery, a
+        // secondary preview -- is a window of its own and can outlive the
+        // studio. Let go of on detach, so a detached canvas's wheel zooms
+        // itself and not the studio.
+        mZoomConnection = mCanvas->onZoomChange(
+            [held = tool->getDerivedHandle<ALFloaterXUIStudio>(), canvas = mCanvas](F32 zoom)
+            {
+                if (ALFloaterXUIStudio* studio = held.get())
+                {
+                    studio->zoomChanged(zoom, canvas);
+                }
+            });
+        addChild(mCanvas);
+    }
+
+    ~ALXUIPreviewHost() override
+    {
+        if (mTool)
+        {
+            mTool->hostClosed(mWhich);
+        }
+    }
+
+    ALXUICanvas* canvas() const { return mCanvas; }
+
+    void detach()
+    {
+        mTool = nullptr;
+        mZoomConnection.disconnect();
+        mCanvas->detach();
+    }
+
+    // The window around a canvas of this size. Everything a file asks for is
+    // the size of what it describes; the header is the tool's own.
+    void sizeToCanvas(S32 width, S32 height)
+    {
+        reshape(width, height + getHeaderHeight());
+        mCanvas->setShape(contentRect(width, height + getHeaderHeight()));
+    }
+
+private:
+    LLRect contentRect(S32 width, S32 height) const
+    {
+        return LLRect(0, height - getHeaderHeight(), width, 0);
+    }
+
+    ALFloaterXUIStudio* mTool;
+    ALXUICanvas*        mCanvas = nullptr;
+    S32                 mWhich;
+    boost::signals2::scoped_connection mZoomConnection;
+};
+
+namespace
+{
+    constexpr S32 MAX_FIND_ROWS = 500;
+
+    S32 countViews(const LLView* view)
+    {
+        S32 n = 1;
+        for (const LLView* child : *view->getChildList())
+        {
+            n += countViews(child);
+        }
+        return n;
+    }
+
+    const char* KIND_FIELDS[] = { "any", "tag", "attribute", "value", "name", "text" };
+
+    ALXUICatalog::Field fieldFrom(const std::string& value)
+    {
+        if (value == "tag") return ALXUICatalog::Field::Tag;
+        if (value == "attribute") return ALXUICatalog::Field::Attribute;
+        if (value == "value") return ALXUICatalog::Field::Value;
+        if (value == "name") return ALXUICatalog::Field::Name;
+        if (value == "text") return ALXUICatalog::Field::Text;
+        return ALXUICatalog::Field::Any;
+    }
+
+    // Where the specimen sits in its row, past the label.
+    constexpr S32 SPECIMEN_LEFT = 130;
+    constexpr S32 SPECIMEN_WIDTH = 150;
+    constexpr S32 SPECIMEN_HEIGHT = 22;
+    // The Library's cells, when it is cells: room for a specimen as it
+    // is built, its name under it, and the cell's own margins.
+    constexpr S32 PALETTE_CELL_WIDTH = SPECIMEN_WIDTH + 12;
+    constexpr S32 PALETTE_CELL_HEIGHT = SPECIMEN_HEIGHT + 14 + 12;
+
+    // Which heading a tag sits under in the Library. Five kinds, read off the
+    // name: a guess over a vocabulary, and a wrong one costs a reader one
+    // heading of looking rather than anything at all.
+    // The core tags the gallery shows: the ones that stand on their own
+    // with defaults.
+    bool galleryTag(const std::string& tag)
+    {
+        return ALXUICatalog::isCoreWidgetTag(tag) && ALXUISchema::buildsAlone(tag);
+    }
+}
+
+// ===========================================================================
+// ALFloaterXUIStudio
+// ===========================================================================
+// How close together two edits to the same field have to be to be put back
+// as one: a number stepped with an arrow, an element nudged along.
+static constexpr F64 COALESCE_SECONDS = 1.0;
+
+ALFloaterXUIStudio::ALFloaterXUIStudio(const LLSD& key)
+:   ALStudioFloater(key, "ALXUIStudioState")
+{
+    mDocuments.setCoalesceWindow(COALESCE_SECONDS);
+    mCommitCallbackRegistrar.add("XUIStudio.Tree", boost::bind(&ALFloaterXUIStudio::onTreeAction, this, _2));
+    mEnableCallbackRegistrar.add("XUIStudio.TreeEnabled", boost::bind(&ALFloaterXUIStudio::onTreeActionEnabled, this, _2));
+    mCommitCallbackRegistrar.add("XUIStudio.Menu", boost::bind(&ALFloaterXUIStudio::onMenuAction, this, _2));
+    mEnableCallbackRegistrar.add("XUIStudio.MenuCheck", boost::bind(&ALFloaterXUIStudio::onMenuCheck, this, _2));
+    mEnableCallbackRegistrar.add("XUIStudio.MenuEnable", boost::bind(&ALFloaterXUIStudio::onMenuEnable, this, _2));
+}
+
+ALFloaterXUIStudio::~ALFloaterXUIStudio()
+{
+    // The channels outlive this, and each holds a slot bound to it.
+    for (LLBoundListener& listener : mChannelListeners)
+    {
+        listener.disconnect();
+    }
+    closePreviews();
+}
+
+bool ALFloaterXUIStudio::postBuild()
+{
+    addKeys();
+    mCatalogFilter = getChild<LLFilterEditor>("catalog_filter");
+    mFileList = getChild<ALPaneList>("file_list");
+    mSkinCombo = getChild<LLComboBox>("skin_combo");
+    mLanguageCombo = getChild<LLComboBox>("language_combo");
+    mLanguageCombo2 = getChild<LLComboBox>("language_combo_2");
+    mSecondaryCheck = getChild<LLCheckBoxCtrl>("secondary_check");
+    // The lint's words and the notes, read now, in this viewer's language:
+    // a preview built under another one would otherwise be the first to
+    // ask, and get that.
+    ALXUILint::readWords();
+    ALXUINotes::get();
+    mScopeBar = getChild<ALScopeBar>("scope_bar");
+    mFindResults = getChild<ALPaneList>("find_results");
+    mTreeFilter = getChild<LLFilterEditor>("tree_filter");
+    mTreePanel = getChild<LLPanel>("tree_host");
+    mBreadcrumb = getChild<ALJumpBar>("breadcrumb");
+    mFindings = getChild<ALPaneList>("findings");
+    mHistory = getChild<ALHistoryList>("history");
+    mDocumentList = getChild<ALPaneList>("documents");
+    mSourceLayerList = getChild<ALPaneList>("source_layer_list");
+    mOverrideField = getChild<LLTextBox>("override_field");
+    mFindingScope = getChild<LLComboBox>("finding_scope");
+    mFindingRule = getChild<LLComboBox>("finding_rule");
+    mFindingSeverity = getChild<LLComboBox>("finding_severity");
+    mFindingFixable = getChild<LLCheckBoxCtrl>("finding_fixable");
+    mFindingFilter = getChild<LLFilterEditor>("finding_filter");
+    mFindingCount = getChild<LLTextBox>("finding_count");
+    // A combo nobody has chosen in answers with whatever it feels like, and
+    // what these two answer decides what the list is showing.
+    mFindingScope->selectFirstItem();
+    mFindingSeverity->selectFirstItem();
+    mFixButton = getChild<LLButton>("finding_fix");
+    mFixAllButton = getChild<LLButton>("finding_fix_all");
+    mInspectors = getChild<LLTabContainer>("inspector_tabs");
+    {
+        // Built here rather than named in the file: a tag a library registers
+        // is only there if the linker kept the object it sits in, and a widget
+        // the factory cannot name comes back as a stray that is in no tree
+        // and draws nowhere. It holds an accordion of its own, so it goes
+        // straight into the tab: what scrolls the sections is the accordion.
+        LLPanel* tab = getChild<LLPanel>("attributes_tab");
+        ALPropertyGrid::Params p;
+        p.name = "attributes_grid";
+        p.rect = LLRect(0, tab->getRect().getHeight() - 48, tab->getRect().getWidth(), 0);
+        p.label_width = 150;
+        p.follows.flags = FOLLOWS_ALL;
+        mAttributeGrid = LLUICtrlFactory::create<ALPropertyGrid>(p);
+        tab->addChild(mAttributeGrid);
+        // One heading per group, in the order the groups are numbered.
+        mAttributeGrid->setGroups({ getString("SectionIdentity"), getString("SectionGeometry"),
+                                    getString("SectionAppearance"), getString("SectionBehaviour"),
+                                    getString("SectionOther"), getString("SectionIgnored"),
+                                    getString("SectionUnknown") });
+        mAttributeGrid->setNotices(
+            { getString("AttributeNothingSelected"), getString("AttributeNothingSelectedHow"), "" },
+            { getString("AttributeNothingWritten"), getString("AttributeNothingWrittenHow"),
+              getString("AttributeShowEvery") },
+            { getString("AttributeNoMatch"), getString("AttributeNoMatchHow"), "" });
+        // The one thing that would fix an element that writes nothing is to
+        // stop asking only for what the files write.
+        mAttributeGrid->onNoticeAction([this]()
+        {
+            if (LLCheckBoxCtrl* box = findChild<LLCheckBoxCtrl>("attributes_authored", true))
+            {
+                box->set(false);
+            }
+            mAttributeGrid->setAuthoredOnly(false);
+        });
+        // The words the rows explain themselves in. They live in the skin
+        // rather than in llui, which has no file for a translator to open.
+        ALPropertyGrid::Tips tips;
+        tips.field = getString("AttributeTipField");
+        tips.fieldTyped = getString("AttributeTipTyped");
+        tips.ignored = getString("AttributeTipIgnored");
+        tips.unknown = getString("AttributeTipUnknown");
+        tips.source = getString("AttributeTipSource");
+        tips.unwritten = getString("AttributeTipUnwritten");
+        tips.deprecated = getString("AttributeTipDeprecated");
+        tips.deprecatedFor = getString("AttributeTipDeprecatedFor");
+        tips.remove = getString("AttributeTipRemove");
+        mAttributeGrid->setTips(tips);
+        mAttributeGrid->setEdgeTips({ getString("FollowsTipLeft"), getString("FollowsTipBottom"),
+                                      getString("FollowsTipRight"), getString("FollowsTipTop"),
+                                      getString("FollowsTipAcross"), getString("FollowsTipDown") });
+        // A picture row offers every picture the skin names.
+        mAttributeGrid->setImageChoices([textures = getString("ImageChoicesTextures")]()
+        {
+            std::vector<ALImageField::Choice> choices;
+            for (const auto& [name, image] : LLUIImageList::instance().getUIImages())
+            {
+                choices.push_back({ name, textures });
+            }
+            std::sort(choices.begin(), choices.end(),
+                      [](const ALImageField::Choice& a, const ALImageField::Choice& b) { return a.name < b.name; });
+            return choices;
+        });
+    }
+    mAttributeWhat = getChild<LLTextBox>("attributes_what");
+    mAttributeFilter = getChild<LLFilterEditor>("attributes_filter");
+    mAttributeFilter->setCommitCallback(
+        [this](LLUICtrl* ctrl, const LLSD&)
+        {
+            mAttributeGrid->setFilter(ctrl->getValue().asString());
+        });
+    getChild<LLCheckBoxCtrl>("attributes_nested")->setCommitCallback(
+        [this](LLUICtrl* ctrl, const LLSD&)
+        {
+            mAttributeGrid->setNested(ctrl->getValue().asBoolean());
+        });
+    mLayout = getChild<ALPaneList>("layout");
+    mSourceLayers = getChild<LLTextBox>("source_layers");
+    mSourceText = getChild<ALCodeEditor>("source_text");
+    // The source as an editor: what could go here from the schema, what
+    // this is, and what is typed put into the document once it pauses.
+    mSourceText->setCompletionProvider([this](const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+        ALXUIService::complete(mSourceText->document(), at, prefix, out);
+    });
+    mSourceText->setHoverProvider([this](const ALTextPos& at, std::string_view, std::string& text) {
+        text = ALXUIService::hover(mSourceText->document(), at);
+        return !text.empty();
+    });
+    mSourceText->onTextChanged([this]() { onSourceTyped(); });
+    mSourceText->onCaretMoved([this]() { onSourceCaret(); });
+    mSourceLayerList->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        if (LLScrollListItem* item = mSourceLayerList->getFirstSelected())
+        {
+            mSourceChosen = item->getValue().asString();
+            refreshSource(selectedView());
+        }
+    });
+    mBindings = getChild<ALPaneList>("bindings");
+    mState = getChild<ALPaneList>("state");
+    mSelectionFindings = getChild<ALPaneList>("selection_findings");
+    setMenuBar(getChild<LLMenuBarGL>("studio_menu"));
+    // Two strips, split by what each mode needs rather than by what it is
+    // about. The navigator holds the ones that are a list of names and read
+    // well narrow; the band under the canvas holds the tables, which are
+    // unreadable in a column and want the width of the middle of the window.
+    mModes = getChild<LLTabContainer>("navigator_tabs");
+    mBottom = getChild<LLTabContainer>("bottom_tabs");
+    // A navigator mode and an inspector are a picture and a name in a
+    // strip. The file gives each its name and, in the tooltip its page
+    // carries, says what it is; which picture stands for it is named here,
+    // because a tab's icon is not something a XUI file can ask for. The
+    // band's tabs are names alone.
+    static constexpr std::pair<const char*, const char*> MODE_ICONS[] = {
+        { "files_mode",     "Command_Scripts_Icon" },
+        { "documents_mode", "Command_LocalAssets_Icon" },
+        { "outline_mode",   "Command_Inventory_Icon" },
+        { "find_mode",      "Command_Search_Icon" },
+        { "palette_mode",   "Command_Build_Icon" },
+    };
+    for (const auto& [page, icon] : MODE_ICONS)
+    {
+        if (LLPanel* panel = mModes->getPanelByName(page))
+        {
+            mModes->setTabImage(panel, icon);
+        }
+    }
+    static constexpr std::pair<const char*, const char*> INSPECTOR_ICONS[] = {
+        { "attributes_tab", "Command_Preferences_Icon" },
+        { "layout_tab",     "Command_Move_Icon" },
+        { "source_tab",     "Command_Scripts_Icon" },
+        { "bindings_tab",   "Command_Gestures_Icon" },
+        { "state_tab",      "Command_View_Icon" },
+        { "findings_tab",   "Command_Report_Abuse_Icon" },
+    };
+    for (const auto& [page, icon] : INSPECTOR_ICONS)
+    {
+        if (LLPanel* panel = mInspectors->getPanelByName(page))
+        {
+            mInspectors->setTabImage(panel, icon);
+        }
+    }
+    mNotifications = getChild<ALPaneList>("notifications");
+    mNotificationFilter = getChild<LLFilterEditor>("notification_filter");
+    mAttributeGrid->onFieldCommit(boost::bind(&ALFloaterXUIStudio::onFieldCommit, this, _1, _2));
+    mAttributeGrid->onFieldRemove(boost::bind(&ALFloaterXUIStudio::onFieldRemove, this, _1));
+    mAttributeGrid->onFieldGutter(boost::bind(&ALFloaterXUIStudio::onFieldGutter, this, _1));
+    getChild<LLCheckBoxCtrl>("attributes_authored")->setCommitCallback(
+        [this](LLUICtrl* ctrl, const LLSD&)
+        {
+            mAttributeGrid->setAuthoredOnly(ctrl->getValue().asBoolean());
+        });
+    mChannels = getChild<ALPaneList>("channels");
+    mChannelResponse = getChild<LLComboBox>("channel_response");
+    mPalette = getChild<ALSpecimenList>("palette");
+    getChild<LLButton>("palette_cells")->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
+    {
+        mPaletteCells = ctrl->getValue().asBoolean();
+        mPalette->setCellSize(mPaletteCells ? PALETTE_CELL_WIDTH : 0, mPaletteCells ? PALETTE_CELL_HEIGHT : 0);
+        saveState();
+    });
+    mPaletteAttributes = getChild<ALPaneList>("palette_attributes");
+    // The tag chosen above decides what is listed below it.
+    mPalette->onChose([this](const std::string&) { fillPaletteAttributes(); });
+    mPalette->setDragStarter(boost::bind(&ALFloaterXUIStudio::startPaletteDrag, this, _1));
+    getChild<LLButton>("palette_insert")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onInsertFromPalette, this));
+    getChild<LLButton>("library_btn")->setClickedCallback([](LLUICtrl*, const LLSD&)
+    {
+        LLFloaterReg::showInstance("xui_library");
+    });
+    // Each region put into a pane that knows it can be somewhere else, with
+    // the button that folds it. The canvas is not among them: it holds a
+    // built view tree with hit-testing of its own, and one mechanism must
+    // not serve both. Nothing in this window asks for anything inside a
+    // region by name after this point, which is the whole of why a region
+    // may leave.
+    mFolds.bind(this, { { "navigator", "navigator_panel", "fold_navigator", getString("PaneNavigator") },
+                        { "inspectors", "inspector_panel", "fold_inspectors", getString("PaneInspectors") },
+                        { "bottom", "bottom_panel", "fold_bottom", getString("PaneBottom") } });
+    mFolds.onChanged([this]() { saveState(); });
+    getChild<LLButton>("tree_up")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_up"));
+    getChild<LLButton>("tree_down")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_down"));
+    getChild<LLButton>("tree_in")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_in"));
+    getChild<LLButton>("tree_out")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_out"));
+    mTranslateLanguage = getChild<LLComboBox>("translate_language");
+    mTranslateList = getChild<ALPaneList>("translate_list");
+    mTranslateValue = getChild<LLTextEditor>("translate_value");
+    mTranslateCounts = getChild<LLTextBox>("translate_counts");
+    mEditTarget = getChild<LLTextBox>("edit_target");
+    setStatusLine(getChild<LLTextBox>("status"));
+
+    // The canvases are built here rather than declared in the XUI because
+    // they are the tool's own view of a preview, not a widget a file can
+    // ask for. Each is as big as what it shows and the container scrolls
+    // the row of them, so a file larger than the region is scrolled to
+    // rather than cut off.
+    if (LLScrollContainer* area = findChild<LLScrollContainer>("canvas_area", true))
+    {
+        mCanvasArea = area;
+        LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        rp.name = "canvas_row";
+        rp.rect = area->getLocalRect();
+        rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        rp.background_visible = false;
+        mCanvasRow = new ALCanvasRow(rp);
+        mCanvasRow->initFromParams(rp);
+        area->addChild(mCanvasRow);
+
+        for (S32 i = 0; i < PREVIEWS; ++i)
+        {
+            LLPanel::Params cp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+            cp.name = i == PRIMARY ? "canvas" : "canvas_variant";
+            cp.rect = area->getLocalRect();
+            cp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+            cp.background_visible = false;
+            mCanvases[i] = new ALXUICanvas(this, i, cp);
+            mCanvases[i]->initFromParams(cp);
+            mCanvases[i]->setSizable(true);
+            mCanvases[i]->setBackdrop(mBackdrop);
+            mCanvases[i]->onZoomChange([this, i](F32 zoom) { zoomChanged(zoom, mCanvases[i]); });
+            // A canvas with nothing on it takes no room on the row.
+            mCanvases[i]->setVisible(false);
+            mCanvasRow->addCanvas(mCanvases[i]);
+        }
+    }
+
+    mCanvasTabs = getChild<ALTabStrip>("canvas_tabs");
+    mCanvasTabs->onChosen(boost::bind(&ALFloaterXUIStudio::onTabChosen, this, _1));
+    mCanvasTabs->onClosed(boost::bind(&ALFloaterXUIStudio::closeDocument, this, _1));
+    mCanvasShown = getChild<LLButton>("canvas_shown");
+    mCanvasPinned = getChild<LLButton>("canvas_pinned");
+    mCanvasShown->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCanvasShown, this));
+    mCanvasPinned->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCanvasPinned, this));
+
+    loadState();
+    scanCatalog();
+
+    mCatalogFilter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onCatalogFilter, this));
+    mFileList->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onFileSelected, this));
+    mFileList->setCommitOnSelectionChange(true);
+    mSkinCombo->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onSkinOrLanguage, this));
+    mLanguageCombo->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onSkinOrLanguage, this));
+    mLanguageCombo2->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onSkinOrLanguage, this));
+    mSecondaryCheck->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleSecondary, this));
+    buildScopeBar();
+    // The summary under the sentence, in the slot at its right end.
+    LLTextBox::Params cp(LLUICtrlFactory::getDefaultParams<LLTextBox>());
+    cp.name = "find_count";
+    cp.rect = LLRect(0, 22, 110, 0);
+    cp.font_halign = LLFontGL::RIGHT;
+    cp.tool_tip = getString("FindCountTip");
+    mFindCount = LLUICtrlFactory::create<LLTextBox>(cp);
+    mScopeBar->setAdornment(mFindCount);
+    // Return runs it; changing a dropdown re-runs whatever is already typed,
+    // since a sentence with a word changed is a different question about the
+    // same words.
+    mBreadcrumb->onChose(boost::bind(&ALFloaterXUIStudio::onBreadcrumb, this, _1, _2));
+    mScopeBar->onRun(boost::bind(&ALFloaterXUIStudio::onFind, this));
+    mScopeBar->onChanged(boost::bind(&ALFloaterXUIStudio::onFindScope, this));
+    mFindResults->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindResult, this));
+    mTreeFilter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTreeFilter, this));
+    mFindings->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindingSelected, this));
+    mFindings->setCommitOnSelectionChange(true);
+    mFindings->setCommitCallback(boost::bind(&ALFloaterXUIStudio::refreshFixButtons, this));
+    mHistory->onGoTo(boost::bind(&ALFloaterXUIStudio::onHistoryGoTo, this, _1));
+    mHistory->onStepChosen(boost::bind(&ALFloaterXUIStudio::onHistoryStepChosen, this, _1));
+    mDocumentList->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onDocumentSelected, this));
+    getChild<LLButton>("write_override")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onWriteOverride, this));
+    getChild<LLButton>("document_save")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onDocumentSave, this));
+    getChild<LLButton>("document_revert")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onDocumentRevert, this));
+    getChild<LLButton>("document_close")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onDocumentClose, this));
+    getChild<LLButton>("document_save_all")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::saveAllDocuments, this));
+    mFixButton->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onFixSelected, this));
+    mFixAllButton->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onFixAll, this));
+    for (LLUICtrl* filter : { (LLUICtrl*)mFindingScope, (LLUICtrl*)mFindingRule,
+                              (LLUICtrl*)mFindingSeverity, (LLUICtrl*)mFindingFixable,
+                              (LLUICtrl*)mFindingFilter })
+    {
+        filter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onFindingFilter, this));
+    }
+
+    // Every table in the tool is one someone will want in a message or a
+    // bug report, and copies the same way: a line saying which file and
+    // which element it is about, then the rows as a table (ALPaneList).
+    for (ALPaneList* list : { mFileList, mFindResults, mFindings, mDocumentList, mSourceLayerList,
+                              mLayout, mBindings, mState, mSelectionFindings, mTranslateList })
+    {
+        list->setCopyable(true);
+        list->setCopyCaption([this, list]() { return listCaption(list); });
+    }
+    mInspectors->setCommitCallback(boost::bind(&ALFloaterXUIStudio::refreshInspectors, this));
+    mModes->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onMode, this));
+    mBottom->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onMode, this));
+    mNotifications->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onNotificationSelected, this));
+    mNotificationFilter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::fillNotifications, this));
+    getChild<LLButton>("notification_post")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onPostNotification, this));
+    mChannels->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onChannelSelected, this));
+    getChild<LLButton>("channel_respond")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRespondToNotification, this));
+    getChild<LLButton>("channel_clear")->setClickedCallback([this](LLUICtrl*, const LLSD&)
+    {
+        mChannels->deleteAllItems();
+        mChannelNotifications.clear();
+        mChannelResponse->removeall();
+        refreshModeCounts();
+    });
+    watchChannels();
+    mTranslateLanguage->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationLanguage, this));
+    mTranslateList->setCommitOnSelectionChange(true);
+    mTranslateList->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationSelected, this));
+    // The button and nothing else: a translation may run to several lines --
+    // the About box's credits do -- so return in the box puts a line in it
+    // rather than writing what is there.
+    getChild<LLButton>("translate_write")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTranslationWrite, this));
+    getChild<LLButton>("translate_remove")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTranslationRemove, this));
+    getChild<LLButton>("translate_repair_file")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairFile, this));
+    getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startRepairAll, this));
+    getChild<LLButton>("translate_repair_roots")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairRoots, this));
+    getChild<LLButton>("translate_remove_orphans")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRemoveOrphans, this));
+
+    // The bar under the canvas: what the canvas is measured and drawn with,
+    // where the canvas is. These were on the View menu, which is not where
+    // anybody looks for a grid size, and they are no longer in both places.
+    getChild<LLButton>("canvas_rulers")->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
+    {
+        mRulers = ctrl->getValue().asBoolean();
+        saveState();
+    });
+    getChild<LLButton>("canvas_snap")->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
+    {
+        mSnap = ctrl->getValue().asBoolean();
+        saveState();
+    });
+    for (const auto& [button, how] : {
+             std::pair<const char*, const char*>{ "align_left",   "left" },
+             { "align_centre", "centre" },
+             { "align_right",  "right" },
+             { "align_top",    "top" },
+             { "align_middle", "middle" },
+             { "align_bottom", "bottom" } })
+    {
+        getChild<LLButton>(button)->setClickedCallback(
+            [this, how = how](LLUICtrl*, const LLSD&) { alignSelection(how); });
+    }
+    mZoomSpin = getChild<LLSpinCtrl>("canvas_zoom");
+    mZoomSpin->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
+    {
+        setZoom(ctrl->getValue().asInteger());
+        saveState();
+    });
+    mGridCombo = getChild<LLComboBox>("canvas_grid");
+    mGridCombo->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
+    {
+        mGrid = llmax(1, ctrl->getValue().asInteger());
+        saveState();
+    });
+
+    getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::showPreviews, this));
+    getChild<LLButton>("hide_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::closePreviews, this));
+    getChild<LLButton>("reload_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::reloadAll, this));
+    getChild<LLButton>("edit_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onJumpToSource, this));
+    getChild<LLButton>("jump_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onJumpToSource, this));
+
+    mSecondaryCheck->setValue(mShowSecondary);
+    mLanguageCombo2->setEnabled(mShowSecondary);
+    // The bar shows what the state says, once, after it has been read.
+    getChild<LLButton>("canvas_rulers")->setToggleState(mRulers);
+    getChild<LLButton>("canvas_snap")->setToggleState(mSnap);
+    mGridCombo->setValue(mGrid);
+    setZoom(mZoom);
+    setCanvasBackdrop(mBackdrop);
+
+    mSelection.onSelectionChanged(boost::bind(&ALFloaterXUIStudio::onSelectionChanged, this));
+    mSelection.onHoverChanged(boost::bind(&ALFloaterXUIStudio::onHoverChanged, this));
+    mModel.setHoverHandler(boost::bind(&ALFloaterXUIStudio::onTreeHover, this, _1));
+    mModel.setDragStarter(boost::bind(&ALFloaterXUIStudio::startTreeDrag, this, _1));
+    mModel.setContainerTest(boost::bind(&ALFloaterXUIStudio::treeTakesChildren, this, _1));
+    mModel.setDropHandler(boost::bind(&ALFloaterXUIStudio::treeDrop, this, _1, _2, _3, _4, _5, _6));
+    mModel.setBadgeProvider([this](const ALXUISelection::path_t& path)
+                            { return mPreviews[PRIMARY].lint.countUnder(path); });
+    mModel.getFilter().setShowCodeBuilt(mShowCodeBuilt);
+    mModel.getFilter().setEmptyLookupMessage(getString("NoResults"));
+
+    if (!mFile.empty())
+    {
+        showPreviews();
+    }
+    else
+    {
+        setStatus(getString("NoFile"));
+        refreshCanvasHead();
+    }
+    // The mode the tool was left in is the mode it opens in, and it fills
+    // itself the same way choosing it would.
+    onMode();
+    return true;
+}
+
+void ALFloaterXUIStudio::onOpen(const LLSD& key)
+{
+    if (!key.isMap() || !key.has("find") || !mScopeBar || !mModes)
+    {
+        return;
+    }
+    mModes->selectTabByName("find_mode");
+    mScopeBar->setValue("query", key["find"].asString());
+    mScopeBar->setValue("field", "value");
+    mScopeBar->setValue("how", "matching");
+    mScopeBar->setValue("scope", "");
+    onFind();
+    onMode();
+
+    // Asked to go where it is found: the first place, with the widget
+    // selected, as a result pressed would.
+    if (key["go"].asBoolean() && mFindResults && mFindResults->getItemCount() > 0)
+    {
+        mFindResults->selectFirstItem();
+        onFindResult();
+    }
+}
+
+void ALFloaterXUIStudio::onClose(bool app_quitting)
+{
+    ALStudioFloater::onClose(app_quitting);
+    closePreviews();
+}
+
+void ALFloaterXUIStudio::draw()
+{
+    if (!mLintQueue.empty())
+    {
+        stepLintAll();
+    }
+    if (!mSweep.queue.empty())
+    {
+        stepSweep();
+    }
+    if (!mCensusQueue.empty())
+    {
+        stepCensus();
+    }
+    // The file is not what the lint, the findings and the translation table
+    // were read from any more. They are read again once the typing stops,
+    // rather than between one press of an arrow and the next.
+    if (mRereadPending && mRereadAt.hasExpired())
+    {
+        mRereadPending = false;
+        runLint();
+        refreshTreeSuffixes();
+        fillFindings();
+        fillTranslation();
+        decorateSource();
+    }
+    pumpSource();
+    if (mReloadPending)
+    {
+        mReloadPending = false;
+        mRereadPending = false;
+        if (mReloadEntryOnly)
+        {
+            // One file changed; the rest of the tree is as it was.
+            mCatalog.reload(mFile);
+        }
+        else
+        {
+            scanCatalog();
+        }
+        mReloadEntryOnly = false;
+        // A rebuild is not a new preview: it stays where it was put, and it
+        // keeps the keyboard, wherever the keyboard was -- a window of its
+        // own, the canvas in this one, or the outline, which is made again
+        // with the preview. An arrow key moves an element by way of a
+        // rebuild, and the next arrow has to reach the same place.
+        const LLFloater* was_host = mPreviews[PRIMARY].host.get();
+        const LLView* was_canvas = mCanvases[PRIMARY];
+        const bool host_had = was_host && gFocusMgr.childHasKeyboardFocus(was_host);
+        const bool canvas_had = was_canvas && gFocusMgr.childHasKeyboardFocus(was_canvas);
+        const bool tree_had = mTree && gFocusMgr.childHasKeyboardFocus(mTree);
+        mKeepPlace = true;
+        showPreviews();
+        mKeepPlace = false;
+        if (host_had)
+        {
+            if (LLFloater* host = mPreviews[PRIMARY].host.get())
+            {
+                host->setFocus(true);
+            }
+        }
+        else if (canvas_had)
+        {
+            if (ALXUICanvas* canvas = mCanvases[PRIMARY])
+            {
+                canvas->setFocus(true);
+            }
+        }
+        else if (tree_had && mTree)
+        {
+            mTree->setFocus(true);
+        }
+        if (mReloadFromDisk)
+        {
+            setStatus(getString("Reloaded"));
+        }
+        else if (!mPendingStatus.empty())
+        {
+            setStatus(mPendingStatus);
+        }
+        mReloadFromDisk = false;
+        mPendingStatus.clear();
+    }
+    if (mTree)
+    {
+        mTree->update();
+    }
+    if (mInspectors->getCurrentPanel() && mInspectors->getCurrentPanel()->getName() == "state_tab"
+        && mStateTimer.getElapsedTimeF32() > 0.25f)
+    {
+        mStateTimer.reset();
+        refreshState(selectedView());
+    }
+    ALStudioFloater::draw();
+}
+
+void ALFloaterXUIStudio::addKeys()
+{
+    addCommand({ "find", 'F', MASK_CONTROL, false }, [this]() { findInFront(); return true; });
+    addCommand({ "open_file", 'O', MASK_CONTROL, false }, [this]()
+    {
+        if (mModes)
+        {
+            mModes->selectTabByName("files_mode");
+        }
+        mCatalogFilter->setFocus(true);
+        return true;
+    });
+    // Control-tab and control-shift-tab go round the documents, as they go
+    // round Script Studio's -- the Mac's own Control key there, Command-Tab
+    // being the system's.
+    for (const MASK control : { MASK_CONTROL, MASK_MAC_CONTROL })
+    {
+        addCommand({ "next_document", KEY_TAB, control, false }, [this]() { cycleDocument(1); return true; });
+        addCommand({ "previous_document", KEY_TAB, control | MASK_SHIFT, false }, [this]() { cycleDocument(-1); return true; });
+    }
+    // F6 between the outline and the canvas, as it goes between panes in
+    // most editors.
+    addCommand({ "switch_pane", KEY_F6, MASK_NONE, false }, [this]() { switchPane(); return true; });
+    // Nothing selected, which is the way out of a selection rather than a
+    // way to another one -- and the way to see the whole of a preview with
+    // no marks over it.
+    addCommand({ "clear_selection", KEY_ESCAPE, MASK_NONE, false }, [this]()
+    {
+        if (!mSelection.hasSelection())
+        {
+            return false;
+        }
+        mSelection.clearSelection();
+        return true;
+    });
+}
+
+// Control-F finds in what is in front: the source's text where the source
+// is the inspector's tab showing, and otherwise the tree's filter.
+void ALFloaterXUIStudio::findInFront()
+{
+    const LLPanel* shown = mInspectors ? mInspectors->getCurrentPanel() : nullptr;
+    if (mSourceText && shown && shown->getName() == "source_tab" && !mFolds.collapsed("inspector_panel"))
+    {
+        mSourceText->setFocus(true);
+        mSourceText->perform(ALEditorCommand::Find);
+        return;
+    }
+    mTreeFilter->setFocus(true);
+}
+
+// The next document or the one before, round the canvas's tabs; a tab
+// waiting on a pin is a file, not a document, and is passed over.
+void ALFloaterXUIStudio::cycleDocument(S32 direction)
+{
+    std::vector<std::string> documents;
+    for (const ALTabStrip::Tab& tab : mCanvasTabs->tabs())
+    {
+        if (mDocuments.find(tab.value))
+        {
+            documents.push_back(tab.value);
+        }
+    }
+    if (documents.size() < 2)
+    {
+        return;
+    }
+    const auto   here  = std::find(documents.begin(), documents.end(), mCanvasTabs->chosen());
+    const size_t count = documents.size();
+    const size_t at    = here == documents.end() ? 0 : static_cast<size_t>(here - documents.begin());
+    onTabChosen(documents[(at + count + (direction > 0 ? 1 : count - 1)) % count]);
+}
+
+// Between the two places an element is worked on: the outline, where it is
+// found and moved in the tree, and the canvas, where it is dragged and its
+// handles are.
+void ALFloaterXUIStudio::switchPane()
+{
+    ALXUICanvas* canvas    = mCanvases[PRIMARY];
+    const bool   on_canvas = canvas && canvas->getVisible() && gFocusMgr.childHasKeyboardFocus(canvas);
+    if (on_canvas || !mTree)
+    {
+        if (mModes)
+        {
+            mModes->selectTabByName("outline_mode");
+        }
+        if (mTree)
+        {
+            mTree->setFocus(true);
+        }
+    }
+    else if (canvas && canvas->getVisible())
+    {
+        canvas->setFocus(true);
+    }
+}
+
+bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
+{
+    if (handleStudioKeys(key, mask))
+    {
+        return true;
+    }
+    // A developer who works in one region reaches it without the mouse, and
+    // the number is its place in the strip rather than a name to learn:
+    // the nth of the tabs that show, since a hidden tab is not on the strip
+    // to be counted. Control for the navigator's modes, and control with
+    // shift for the inspectors, which are the two strips a developer moves
+    // between. A pane that is folded is unfolded, since a tab was asked
+    // for in it.
+    const auto pick = [this](LLTabContainer* tabs, S32 which, const char* pane)
+    {
+        if (!tabs)
+        {
+            return false;
+        }
+        for (S32 i = 0; i < tabs->getTabCount(); ++i)
+        {
+            if (!tabs->getTabVisibility(tabs->getPanelByIndex(i)))
+            {
+                continue;
+            }
+            if (which-- == 0)
+            {
+                if (!tabs->selectTab(i))
+                {
+                    return false;
+                }
+                if (mFolds.collapsed(pane))
+                {
+                    mFolds.toggle(pane);
+                }
+                return true;
+            }
+        }
+        return false;
+    };
+    // Selecting a tab commits the strip, which is what fills the mode or
+    // the inspector chosen; nothing is asked of them twice.
+    if (key >= '1' && key <= '9')
+    {
+        if (mask == MASK_CONTROL && pick(mModes, key - '1', "navigator_panel"))
+        {
+            return true;
+        }
+        if (mask == (MASK_CONTROL | MASK_SHIFT) && pick(mInspectors, key - '1', "inspector_panel"))
+        {
+            return true;
+        }
+        if (mask == (MASK_CONTROL | MASK_ALT) && pick(mBottom, key - '1', "bottom_panel"))
+        {
+            return true;
+        }
+    }
+    // The outline keys, which are the buttons over the tree. Held down
+    // they repeat, which is how a row is walked several places at once.
+    if (mask == MASK_CONTROL && mSelection.hasSelection())
+    {
+        switch (key)
+        {
+        case KEY_UP:    onTreeMove("move_up");   return true;
+        case KEY_DOWN:  onTreeMove("move_down"); return true;
+        case KEY_RIGHT: onTreeMove("move_in");   return true;
+        case KEY_LEFT:  onTreeMove("move_out");  return true;
+        case 'D':       onTreeMove("duplicate"); return true;
+        default: break;
+        }
+    }
+    // The panes keep their own keys: the hierarchy walks itself with the
+    // arrows and a list scrolls with them, and a list that happens to
+    // ignore one is not asking for a file to be written. The arrows move
+    // the element when the tool itself holds the keyboard, and when the
+    // preview does, which is where they are wanted -- and the second of
+    // those is what this used to say and not do.
+    const LLFocusableElement* focus = gFocusMgr.getKeyboardFocus();
+    bool ours = !focus || focus == static_cast<const LLFocusableElement*>(this);
+    for (S32 which = 0; !ours && which < PREVIEWS; ++which)
+    {
+        // A widget in a preview is a picture of a widget: the arrows over it
+        // move the element rather than its contents.
+        ours = mCanvases[which] && gFocusMgr.childHasKeyboardFocus(mCanvases[which]);
+    }
+    if (ours && nudge(key, mask))
+    {
+        return true;
+    }
+    // And Delete takes the element out, from the same places the arrows
+    // move it and from the outline, which has no delete of its own.
+    const bool in_tree = mTree && gFocusMgr.childHasKeyboardFocus(mTree);
+    if (key == KEY_DELETE && mask == MASK_NONE && (ours || in_tree) && mSelection.hasSelection())
+    {
+        onTreeMove("delete");
+        return true;
+    }
+    return LLFloater::handleKeyHere(key, mask);
+}
+
+// ---------------------------------------------------------------------------
+// The catalog pane
+// ---------------------------------------------------------------------------
+void ALFloaterXUIStudio::scanCatalog()
+{
+    mCatalog.scan(gDirUtilp->getSkinBaseDir());
+    fillSkinsAndLanguages();
+    fillCatalog();
+}
+
+void ALFloaterXUIStudio::fillSkinsAndLanguages()
+{
+    mSkinCombo->removeall();
+    for (const std::string& skin : mCatalog.skins())
+    {
+        mSkinCombo->add(skin, LLSD(skin));
+    }
+    if (std::find(mCatalog.skins().begin(), mCatalog.skins().end(), mSkin) == mCatalog.skins().end())
+    {
+        mSkin = "default";
+    }
+    mSkinCombo->setValue(mSkin);
+
+    for (LLComboBox* combo : { mLanguageCombo, mLanguageCombo2, mTranslateLanguage })
+    {
+        combo->removeall();
+        for (const std::string& language : mCatalog.languages())
+        {
+            combo->add(language, LLSD(language));
+        }
+    }
+    const std::vector<std::string>& languages = mCatalog.languages();
+    if (std::find(languages.begin(), languages.end(), mLanguage) == languages.end())
+    {
+        mLanguage = "en";
+    }
+    if (std::find(languages.begin(), languages.end(), mLanguage2) == languages.end())
+    {
+        mLanguage2 = "en";
+    }
+    mLanguageCombo->setValue(mLanguage);
+    mLanguageCombo2->setValue(mLanguage2);
+    mTranslateLanguage->setValue(mLanguage2);
+}
+
+// static
+// A row of a list is one line, and a value with a line break in it is drawn
+// with a box where the break was -- a font has no glyph for a newline, so it
+// falls back to the one it draws for anything it has no glyph for. The text
+// of a `<text>` element runs to several lines often enough that a table of
+// them was mostly boxes.
+//
+// So a break becomes a space here, on the way into the cell. It is the cell
+// that is one line; what a row is about keeps every byte it had, and every
+// table in this tool goes through here.
+LLSD ALFloaterXUIStudio::row(const LLSD& id, std::initializer_list<std::pair<const char*, std::string>> cells)
+{
+    LLSD r;
+    r["id"] = id;
+    S32 i = 0;
+    for (const auto& [column, value] : cells)
+    {
+        r["columns"][i]["column"] = column;
+        r["columns"][i]["value"] = ALLineBreaks::oneLine(value);
+        ++i;
+    }
+    return r;
+}
+
+void ALFloaterXUIStudio::fillCatalog()
+{
+    const std::string filter = mCatalogFilter->getText();
+    mFileList->deleteAllItems();
+    for (const ALXUICatalog::Entry& e : mCatalog.entries())
+    {
+        const char* kind = ALXUICatalog::kindName(e.kind);
+        if (!ALStringMatch::containsNoCase(e.name, filter) && !ALStringMatch::containsNoCase(e.title, filter)
+            && !ALStringMatch::equalsNoCase(filter, kind))
+        {
+            continue;
+        }
+        const bool has_language = mLanguage != "en"
+            && (e.layer(mSkin, mLanguage) || e.layer("default", mLanguage));
+        const bool has_skin = mSkin != "default"
+            && (e.layer(mSkin, "en") || e.layer(mSkin, mLanguage));
+        mFileList->addElement(row(e.name, {
+            { "kind", kind },
+            { "name", e.name },
+            { "lang", has_language ? "x" : "" },
+            { "skin", has_skin ? "x" : "" } }));
+    }
+    if (!mFile.empty())
+    {
+        mFileList->setSelectedByValue(mFile, true);
+    }
+}
+
+void ALFloaterXUIStudio::onCatalogFilter()
+{
+    fillCatalog();
+}
+
+void ALFloaterXUIStudio::onFileSelected()
+{
+    const std::string file = mFileList->getSelectedValue().asString();
+    if (file.empty())
+    {
+        return;
+    }
+    // Held, the canvas keeps the file it has and this one waits for the pin
+    // to come off. The catalog goes where it was sent either way: reading
+    // the list of files is the point of being able to hold the canvas.
+    if (mPinned)
+    {
+        mPendingFile = file == mFile ? std::string() : file;
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = mFile;
+        args["[PENDING]"] = file;
+        setStatus(getString(mPendingFile.empty() ? "CanvasPinnedHere" : "CanvasHeld", args));
+        refreshCanvasHead();
+        return;
+    }
+    if (file == mFile)
+    {
+        return;
+    }
+    mFile = file;
+    mSelection.clearSelection();
+    saveState();
+    showPreviews();
+}
+
+void ALFloaterXUIStudio::onSkinOrLanguage()
+{
+    const bool renamed = mSkin != mSkinCombo->getValue().asString()
+                      || mLanguage != mLanguageCombo->getValue().asString();
+    mSkin = mSkinCombo->getValue().asString();
+    mLanguage = mLanguageCombo->getValue().asString();
+    mLanguage2 = mLanguageCombo2->getValue().asString();
+    if (renamed && mScopeBar)
+    {
+        // Two of the scopes are named after this skin and this language;
+        // the sentence keeps what is chosen and says the new names.
+        buildScopeBar();
+    }
+    saveState();
+    fillCatalog();
+    if (!mFile.empty())
+    {
+        showPreviews();
+    }
+}
+
+// Find, said as a sentence rather than as a form:
+//
+//     Find [Anything] [containing] `close` in [every skin]
+//
+// A form of the same query is four labelled boxes and a reader working out
+// which applies to which. The sentence says how they compose by being one,
+// and it fits in a pane a form would not.
+void ALFloaterXUIStudio::buildScopeBar()
+{
+    std::vector<ALScopeBar::Segment> said;
+
+    ALScopeBar::Segment find;
+    find.kind = ALScopeBar::Segment::Kind::Word;
+    find.text = getString("FindWord");
+    said.push_back(find);
+
+    ALScopeBar::Segment what;
+    what.kind = ALScopeBar::Segment::Kind::Choice;
+    what.name = "field";
+    what.toolTip = getString("FindFieldTip");
+    what.choices = { { getString("FindAny"), "any" },
+                     { getString("FindTag"), "tag" },
+                     { getString("FindAttribute"), "attribute" },
+                     { getString("FindValue"), "value" },
+                     { getString("FindName"), "name" },
+                     { getString("FindText"), "text" } };
+    said.push_back(what);
+
+    ALScopeBar::Segment how;
+    how.kind = ALScopeBar::Segment::Kind::Choice;
+    how.name = "how";
+    how.toolTip = getString("FindHowTip");
+    how.choices = { { getString("FindContaining"), "containing" },
+                    { getString("FindMatching"), "matching" },
+                    { getString("FindStarting"), "starting" },
+                    { getString("FindEnding"), "ending" } };
+    said.push_back(how);
+
+    ALScopeBar::Segment query;
+    query.kind = ALScopeBar::Segment::Kind::Field;
+    query.name = "query";
+    query.text = getString("FindPlaceholder");
+    query.toolTip = getString("FindQueryTip");
+    said.push_back(query);
+
+    ALScopeBar::Segment in;
+    in.kind = ALScopeBar::Segment::Kind::Word;
+    in.text = getString("FindIn");
+    said.push_back(in);
+
+    // Which layers are looked at. The two that name this skin and this
+    // language are what a developer working in one of them means; every skin
+    // is what somebody asking where a name is used means.
+    ALScopeBar::Segment where;
+    where.kind = ALScopeBar::Segment::Kind::Choice;
+    where.name = "scope";
+    where.toolTip = getString("FindScopeTip");
+    LLStringUtil::format_map_t args;
+    args["[SKIN]"] = mSkin;
+    args["[LANG]"] = mLanguage;
+    where.choices = { { getString("FindEverywhere"), "all" },
+                      { getString("FindThisSkin", args), "skin" },
+                      { getString("FindThisLanguage", args), "language" },
+                      { getString("FindThisFile"), "file" } };
+    said.push_back(where);
+
+    mScopeBar->setSentence(std::move(said));
+}
+
+namespace
+{
+    ALXUICatalog::Match matchFrom(const std::string& value)
+    {
+        if (value == "matching") return ALXUICatalog::Match::Matching;
+        if (value == "starting") return ALXUICatalog::Match::Starting;
+        if (value == "ending")   return ALXUICatalog::Match::Ending;
+        return ALXUICatalog::Match::Containing;
+    }
+}
+
+// A dropdown moved. Whatever is already typed is asked again, since a
+// sentence with one word changed is a different question about the same
+// words -- and an empty field asks nothing, so it costs nothing to try.
+void ALFloaterXUIStudio::onFindScope()
+{
+    if (!mScopeBar->valueOf("query").empty())
+    {
+        onFind();
+    }
+}
+
+void ALFloaterXUIStudio::onFind()
+{
+    const std::string query = mScopeBar->valueOf("query");
+    mFindResults->deleteAllItems();
+    if (query.empty())
+    {
+        mFindCount->setText(LLStringUtil::null);
+        refreshModeCounts();
+        return;
+    }
+
+    // What the scope names, in the terms the catalog takes: a skin, a
+    // language, both or neither.
+    const std::string scope = mScopeBar->valueOf("scope");
+    const std::string skin = scope == "skin" || scope == "file" ? mSkin : std::string();
+    const std::string language = scope == "language" || scope == "file" ? mLanguage : std::string();
+
+    std::vector<ALXUICatalog::Hit> hits =
+        mCatalog.find(query, fieldFrom(mScopeBar->valueOf("field")),
+                      matchFrom(mScopeBar->valueOf("how")), skin, language);
+
+    // One file is not a thing the catalog searches by, since a search over
+    // one file is a search over its layers: it is the scope, applied here.
+    if (scope == "file")
+    {
+        std::erase_if(hits, [this](const ALXUICatalog::Hit& hit)
+        {
+            return !hit.entry || hit.entry->name != mFile;
+        });
+    }
+
+    boost::unordered_set<std::string> files;
+    S32 shown = 0;
+    for (const ALXUICatalog::Hit& hit : hits)
+    {
+        files.insert(hit.entry->name);
+        if (shown++ >= MAX_FIND_ROWS)
+        {
+            continue;
+        }
+        LLSD id;
+        id["file"] = hit.entry->name;
+        id["skin"] = hit.layer->skin;
+        id["language"] = hit.layer->language;
+        id["line"] = hit.line;
+        id["path"] = hit.path;
+        mFindResults->addElement(row(id, {
+            { "file", hit.entry->name },
+            { "line", std::to_string(hit.line) },
+            { "layer", layerName(*hit.layer) },
+            { "snippet", hit.snippet } }));
+    }
+
+    // The summary under the sentence: how many, and in how many files, which
+    // is the question a search over six hundred files is really asking.
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string((S32)hits.size());
+    args["[FILES]"] = std::to_string((S32)files.size());
+    args["[SHOWN]"] = std::to_string(MAX_FIND_ROWS);
+    const std::string said = getString(hits.size() > (size_t)MAX_FIND_ROWS
+                                       ? "FindSomeResults" : "FindResults", args);
+    mFindCount->setText(said);
+    setStatus(said);
+    refreshModeCounts();
+}
+
+void ALFloaterXUIStudio::onFindResult()
+{
+    LLScrollListItem* item = mFindResults->getFirstSelected();
+    if (!item)
+    {
+        return;
+    }
+    const LLSD id = item->getValue();
+    const std::string file = id["file"].asString();
+    const std::string language = id["language"].asString();
+    // A result is a place, not a browse: the canvas goes there whether it
+    // is pinned or not, and holds that file afterwards. A hit in another
+    // language's file is a place in that language, and the preview is
+    // built under it -- whether or not the file is the one already shown.
+    const bool other_file = file != mFile;
+    const bool other_language = language != "en" && language != mLanguage;
+    if (other_file)
+    {
+        mFile = file;
+        mPendingFile.clear();
+        mFileList->setSelectedByValue(mFile, true);
+    }
+    if (other_language)
+    {
+        mLanguageCombo->setValue(language);
+        onSkinOrLanguage();
+    }
+    else if (other_file)
+    {
+        saveState();
+        showPreviews();
+    }
+    mSelection.select(ALXUISelection::fromString(id["path"].asString()));
+    if (!selectedView())
+    {
+        // Not a built element: the Source inspector shows the file at the
+        // line instead.
+        const ALXUICatalog::Entry* entry = mCatalog.find(file);
+        if (const ALXUICatalog::Layer* layer = entry ? entry->layer(id["skin"].asString(), language) : nullptr)
+        {
+            mSourcePath = layer->path;
+            mSourceLine = id["line"].asInteger();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Previews
+// ---------------------------------------------------------------------------
+// The canvas a preview is drawn on, or nothing where it has gone: a canvas
+// in a floater dies with the floater, and a raw pointer to one outlives it.
+ALXUICanvas* ALFloaterXUIStudio::canvasOf(const Preview& pv) const
+{
+    LLView* view = pv.canvas.get();
+    return view ? view->as<ALXUICanvas>() : nullptr;
+}
+
+void ALFloaterXUIStudio::closePreview(S32 which)
+{
+    Preview& pv = mPreviews[which];
+    if (LLFloater* host = pv.host.get())
+    {
+        if (which == PRIMARY)
+        {
+            const LLRect r = host->calcScreenRect();
+            mLastX = r.mLeft;
+            mLastY = r.mBottom;
+        }
+        detachHost(host);
+        host->closeFloater();
+    }
+    else if (ALXUICanvas* canvas = canvasOf(pv))
+    {
+        // The window's own canvas outlives the preview on it, so what was
+        // built on it has to go, and the room it took on the row goes with
+        // it. A canvas belonging to a floater went with the floater, and
+        // its handle says so.
+        canvas->clear();
+        mCanvasRow->show(canvas, false);
+        layoutCanvases();
+    }
+    pv.host.markDead();
+    pv.canvas.markDead();
+    pv.root = nullptr;
+    pv.node = nullptr;
+    pv.sourceMap.clear();
+    pv.overlay.clear();
+    pv.liveFiles.clear();
+    pv.diagnostics.clear();
+    pv.lint.clear();
+    if (which == PRIMARY)
+    {
+        clearTree();
+    }
+}
+
+void ALFloaterXUIStudio::closePreviews()
+{
+    for (S32 i = 0; i < PREVIEWS; ++i)
+    {
+        closePreview(i);
+    }
+}
+
+// How much bigger than life the canvas draws. The spinner, the wheel and
+// what was saved from last time all arrive here, so one place knows the
+// limits and what moves when the number does. The canvases share one
+// scrolled row, so one of them decides where it scrolls to: the primary
+// zooms about the middle of what can be seen of it, and the rest only
+// take the number.
+void ALFloaterXUIStudio::setZoom(S32 percent)
+{
+    applyZoom(percent, nullptr);
+}
+
+// A canvas zoomed itself about the pointer, and the row is scrolled for
+// it already: the rest take the number.
+void ALFloaterXUIStudio::zoomChanged(F32 zoom, ALXUICanvas* zoomed)
+{
+    applyZoom(ll_round(zoom * 100.f), zoomed);
+    saveState();
+}
+
+void ALFloaterXUIStudio::applyZoom(S32 percent, ALXUICanvas* zoomed)
+{
+    mZoom = llclamp(percent, ZOOM_LEAST, ZOOM_MOST);
+    if (mZoomSpin && mZoomSpin->getValue().asInteger() != mZoom)
+    {
+        mZoomSpin->setValue(mZoom);
+    }
+    const F32 zoom = (F32)mZoom / 100.f;
+    ALXUICanvas* about = zoomed ? zoomed : mCanvases[PRIMARY];
+    for (ALXUICanvas* canvas : mCanvases)
+    {
+        if (!canvas)
+        {
+            continue;
+        }
+        if (canvas == about && !zoomed)
+        {
+            const LLRect seen = canvas->viewportRect();
+            canvas->zoomAbout(zoom, seen.getCenterX(), seen.getCenterY());
+        }
+        else
+        {
+            canvas->setZoom(zoom);
+        }
+    }
+    layoutCanvases();
+}
+
+// Every canvas there is, the ones in the row and any in a window of its
+// own, and the ones made later take it when they are made.
+void ALFloaterXUIStudio::setCanvasBackdrop(ALCanvasView::Backdrop backdrop)
+{
+    mBackdrop = backdrop;
+    for (ALXUICanvas* canvas : mCanvases)
+    {
+        if (canvas)
+        {
+            canvas->setBackdrop(backdrop);
+        }
+    }
+    for (const Preview& pv : mPreviews)
+    {
+        if (ALXUICanvas* canvas = canvasOf(pv))
+        {
+            canvas->setBackdrop(backdrop);
+        }
+    }
+}
+
+void ALFloaterXUIStudio::layoutCanvases()
+{
+    if (mCanvasRow)
+    {
+        mCanvasRow->layout();
+    }
+}
+
+// What is on the canvas, said above the canvas: the tabs, and the two
+// buttons in the state they are in.
+void ALFloaterXUIStudio::refreshCanvasHead()
+{
+    fillTabs();
+    if (mCanvasShown)
+    {
+        mCanvasShown->setToggleState(!mPreviewHidden);
+    }
+    if (mCanvasPinned)
+    {
+        mCanvasPinned->setToggleState(mPinned);
+    }
+}
+
+// The eye. What it hides is the surface rather than the previews on it: the
+// tree, the inspectors and the findings are all about a build that is still
+// there, and a hidden canvas that had thrown its build away would take them
+// with it.
+void ALFloaterXUIStudio::onToggleCanvasShown()
+{
+    mPreviewHidden = !mCanvasShown->getToggleState();
+    if (mCanvasArea)
+    {
+        // The container rather than the row: a hidden row leaves the
+        // container measuring the room it took and drawing bars for it.
+        mCanvasArea->setVisible(!mPreviewHidden);
+    }
+    saveState();
+    refreshCanvasHead();
+}
+
+// The pin. Held, the canvas keeps the file it has while the catalog is
+// read; released, it takes whichever file was chosen in the meantime. The
+// tool's edit target goes with the canvas and not with the catalog, because
+// what is written is written through the tree and the inspectors, and those
+// are of the build that is on the canvas.
+void ALFloaterXUIStudio::onToggleCanvasPinned()
+{
+    mPinned = mCanvasPinned->getToggleState();
+    if (!mPinned && !mPendingFile.empty())
+    {
+        const std::string file = mPendingFile;
+        mPendingFile.clear();
+        mFile = file;
+        mSelection.clearSelection();
+        showPreviews();
+    }
+    saveState();
+    refreshCanvasHead();
+}
+
+// One tab per document held, in the order they were opened, and the file on
+// the canvas as a tab in the other face where no document of it is held:
+// looked at, not kept, and replaced by the next file chosen. A pinned
+// canvas with a file waiting shows that file the same way, since the
+// catalog has moved on by then and the tab is what says the two differ.
+//
+// A tab is the file's name. Two documents of one file -- a base and an
+// overlay -- say which layer each is as well, and only then, because a
+// layer said on every tab is a word repeated across the whole strip.
+void ALFloaterXUIStudio::fillTabs()
+{
+    if (!mCanvasTabs)
+    {
+        return;
+    }
+    std::vector<ALTabStrip::Tab> tabs;
+    boost::unordered_map<std::string, S32> named;
+    for (const std::string& path : mDocuments.paths())
+    {
+        std::string file;
+        std::string layer;
+        describeDocument(path, file, layer);
+        ++named[file];
+    }
+
+    std::string chosen;
+    for (const std::string& path : mDocuments.paths())
+    {
+        const ALXUIEdit* held = mDocuments.find(path);
+        if (!held)
+        {
+            continue;
+        }
+        ALTabStrip::Tab tab;
+        std::string layer;
+        describeDocument(path, tab.label, layer);
+        tab.value = path;
+        tab.dirty = held->dirty();
+        if (named[tab.label] > 1)
+        {
+            tab.detail = layer;
+        }
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = tab.label;
+        args["[LAYER]"] = layer;
+        tab.toolTip = getString(tab.dirty ? "CanvasTabDirtyTip" : "CanvasTabTip", args);
+        // The tab shown is the active document, where it is a layer of the
+        // file on the canvas.
+        if (path == mDocuments.activePath() && tab.label == mFile)
+        {
+            chosen = path;
+        }
+        tabs.push_back(std::move(tab));
+    }
+
+    if (chosen.empty() && !mFile.empty())
+    {
+        // Shown without being held. Where some document of the file is held
+        // but is not the active one, that document is the tab rather than a
+        // second tab of the same name.
+        for (const ALTabStrip::Tab& tab : tabs)
+        {
+            if (tab.label == mFile)
+            {
+                chosen = tab.value;
+                break;
+            }
+        }
+        if (chosen.empty())
+        {
+            ALTabStrip::Tab tab;
+            tab.label = mFile;
+            tab.value = mFile;
+            tab.preview = true;
+            LLStringUtil::format_map_t args;
+            args["[FILE]"] = mFile;
+            args["[SKIN]"] = mSkin;
+            args["[LANG]"] = mLanguage;
+            tab.toolTip = getString("CanvasTabPreviewTip", args);
+            chosen = mFile;
+            tabs.push_back(std::move(tab));
+        }
+    }
+    if (mPinned && !mPendingFile.empty())
+    {
+        ALTabStrip::Tab tab;
+        tab.label = mPendingFile;
+        tab.detail = getString("CanvasTabWaiting");
+        tab.value = mPendingFile;
+        tab.preview = true;
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = mPendingFile;
+        tab.toolTip = getString("CanvasTabWaitingTip", args);
+        tabs.push_back(std::move(tab));
+    }
+    mCanvasTabs->setTabs(std::move(tabs), chosen);
+}
+
+// A tab pressed: a document is looked at in the skin and language of the
+// layer it is, and made the one an operation with no path of its own
+// means; the file waiting on a pin is taken by taking the pin off.
+void ALFloaterXUIStudio::onTabChosen(const std::string& value)
+{
+    if (mPinned && value == mPendingFile)
+    {
+        mCanvasPinned->setToggleState(false);
+        onToggleCanvasPinned();
+        return;
+    }
+    if (!mDocuments.find(value))
+    {
+        return;
+    }
+    mDocuments.makeActive(value);
+    std::string file;
+    std::string layer;
+    describeDocument(value, file, layer);
+    if (mDocumentList)
+    {
+        mDocumentList->setSelectedByValue(LLSD(value), true);
+    }
+
+    // The layer is "skin/language"; the canvas shows that variant.
+    const size_t slash = layer.find('/');
+    const std::string skin = slash == std::string::npos ? mSkin : layer.substr(0, slash);
+    const std::string language = slash == std::string::npos ? mLanguage : layer.substr(slash + 1);
+    const bool other_variant = skin != mSkin || language != mLanguage;
+    const bool other_file = !file.empty() && file != mFile;
+    if (other_file)
+    {
+        mFile = file;
+        mPendingFile.clear();
+        mSelection.clearSelection();
+        mFileList->setSelectedByValue(mFile, true);
+    }
+    if (other_variant)
+    {
+        mSkinCombo->setValue(skin);
+        mLanguageCombo->setValue(language);
+        onSkinOrLanguage();
+    }
+    else if (other_file)
+    {
+        saveState();
+        showPreviews();
+    }
+    else
+    {
+        fillTabs();
+    }
+}
+
+void ALFloaterXUIStudio::hostClosed(S32 which)
+{
+    Preview& pv = mPreviews[which];
+    if (which == PRIMARY && pv.root)
+    {
+        const LLRect r = pv.root->calcScreenRect();
+        mLastX = r.mLeft;
+        mLastY = r.mBottom;
+    }
+    pv.host.markDead();
+    pv.root = nullptr;
+    pv.node = nullptr;
+    pv.sourceMap.clear();
+    pv.overlay.clear();
+    pv.liveFiles.clear();
+    if (which == PRIMARY)
+    {
+        clearTree();
+        refreshBreadcrumb();
+        refreshInspectors();
+    }
+}
+
+void ALFloaterXUIStudio::showPreviews()
+{
+    showPreview(PRIMARY);
+    if (mShowSecondary)
+    {
+        showPreview(SECONDARY);
+    }
+    else
+    {
+        closePreview(SECONDARY);
+    }
+    refreshCanvasHead();
+}
+
+// A preview opens beside the tool, since the two are read together. A
+// rebuild is not an opening: a preview someone has moved stays where they
+// moved it.
+void ALFloaterXUIStudio::placeHost(S32 which, LLFloater* host)
+{
+    const LLRect tool = calcScreenRect();
+    if (which == PRIMARY)
+    {
+        if (mKeepPlace && mLastX >= 0)
+        {
+            host->setOrigin(mLastX, mLastY);
+        }
+        else
+        {
+            host->setOrigin(tool.mRight + 8, tool.mTop - host->getRect().getHeight());
+        }
+    }
+    else if (LLFloater* primary = mPreviews[PRIMARY].host.get())
+    {
+        const LLRect p = primary->getRect();
+        host->setOrigin(p.mRight + 8, p.mTop - host->getRect().getHeight());
+    }
+    else
+    {
+        host->setOrigin(tool.mRight + 8, tool.mTop - host->getRect().getHeight());
+    }
+    gFloaterView->adjustToFitScreen(host, false);
+}
+
+LLView* ALFloaterXUIStudio::buildRoot(S32 which, const ALXUICatalog::Entry& entry, ALXUICanvas* canvas, LLXMLNodePtr& node)
+{
+    LLUICtrlFactory& factory = LLUICtrlFactory::instance();
+    const std::string& file = entry.name;
+
+    if (entry.kind == ALXUICatalog::Kind::Template)
+    {
+        // The widget the template is for, with nothing but its defaults.
+        std::string tag = file.substr(file.rfind('/') + 1);
+        tag = tag.substr(0, tag.size() - 4);
+        const std::string xml = "<" + tag + " name=\"" + tag + "\" label=\"" + tag
+                              + "\" layout=\"topleft\" left=\"8\" top=\"8\" width=\"200\" height=\"24\"/>";
+        if (!LLXMLNode::parseBuffer(xml.data(), xml.size(), node))
+        {
+            return nullptr;
+        }
+    }
+    else
+    {
+        // The viewer's own layers in the viewer's own order, merged by
+        // its own call, with the tool's observer recording what each
+        // layer wrote and what it dropped -- and the layer under edit
+        // taken from the document rather than from the disk, so the
+        // preview is of what has been done to it and not of what was
+        // last written.
+        if (!ALXmlLayerMerge::loadSources(sourcesFor(file), node, &mPreviews[which].overlay))
+        {
+            return nullptr;
+        }
+    }
+    return buildFromNode(entry, canvas, node);
+}
+
+// The node as a view, by the kind of file it is. Every kind lands on the
+// canvas, floaters included: a file that describes a floater describes its
+// chrome, and the chrome is worth seeing -- but a preview must not drag
+// itself out of the surface it is being previewed on, so its own dragging,
+// sizing and closing go off and the canvas's grips do that work.
+LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXUICanvas* canvas, LLXMLNodePtr node)
+{
+    LLUICtrlFactory& factory = LLUICtrlFactory::instance();
+    const std::string& file = entry.name;
+
+    // The canvas is sized before anything is placed on it, because a panel
+    // carries its children when its own height changes and a child placed
+    // first would be carried away from where it was put. A canvas that is a
+    // region of a window keeps its size and takes the number as what it is
+    // showing, so `top` below is the canvas's own height either way.
+    const auto fit = [canvas](S32 width, S32 height)
+    {
+        canvas->fitContent(width, height);
+    };
+
+    // Where what is built goes: at the corner the first time, and where the
+    // last one was left every time after. An edit rebuilds what is on the
+    // canvas, and a preview that went back to the corner on every field
+    // written would be one nobody could work on and move. The same for a
+    // floater, a panel and a widget, since all three can be moved.
+    const auto placed = [this, canvas](S32& left, S32& down)
+    {
+        if (mKeepPlace)
+        {
+            canvas->keptPlace(left, down);
+        }
+    };
+
+    LLView* root = nullptr;
+    factory.pushFileName(file);
+    switch (entry.kind)
+    {
+    case ALXUICatalog::Kind::Floater:
+    {
+        // Parented before the XML is read: the last thing LLFloater::initFloater
+        // does is give itself to the floater view if nobody else has claimed it.
+        LLFloater* floater = new LLFloater(LLSD(), LLFloater::getDefaultParams());
+        canvas->addChild(floater);
+        if (floater->initFloaterXML(node, canvas, file))
+        {
+            floater->setCanResize(false);
+            floater->enableResizeCtrls(false);
+            floater->setCanClose(false);
+            floater->setCanMinimize(false);
+            floater->setCanCollapse(false);
+            floater->setCanTearOff(false);
+            floater->setVisible(true);
+            const LLRect r = floater->getRect();
+            fit(r.getWidth() + 2 * CANVAS_MARGIN, r.getHeight() + 2 * CANVAS_MARGIN);
+            S32 left = CANVAS_MARGIN;
+            S32 down = CANVAS_MARGIN;
+            placed(left, down);
+            floater->setOrigin(left, canvas->surfaceHeight() - r.getHeight() - down);
+            root = floater;
+        }
+        else
+        {
+            canvas->removeChild(floater);
+            delete floater;
+        }
+        break;
+    }
+
+    case ALXUICatalog::Kind::Panel:
+    {
+        LLPanel::Params pp;
+        LLPanel* panel = LLUICtrlFactory::create<LLPanel>(pp);
+        if (panel->initPanelXML(node, canvas, LLUICtrlFactory::getDefaultParams<LLPanel>()))
+        {
+            panel->setOrigin(CANVAS_MARGIN, CANVAS_MARGIN);
+            panel->setUseBoundingRect(true);
+            panel->updateBoundingRect();
+            LLRect box = panel->getRect();
+            box.unionWith(panel->getBoundingRect());
+            fit(box.getWidth() + 2 * CANVAS_MARGIN, box.getHeight() + 2 * CANVAS_MARGIN);
+            // A child positioned past its parent's edge is drawn past it,
+            // so the surface starts where the drawing does and not where
+            // the panel says it does: the panel's own corner sits in from
+            // the surface's by the margin and by what is drawn past it.
+            const LLRect& own = panel->getRect();
+            S32 left = CANVAS_MARGIN + llmax(0, own.mLeft - box.mLeft);
+            S32 down = CANVAS_MARGIN + llmax(0, box.mTop - own.mTop);
+            placed(left, down);
+            panel->setOrigin(left, canvas->surfaceHeight() - down - own.getHeight());
+            root = panel;
+        }
+        else
+        {
+            delete panel;
+        }
+        break;
+    }
+
+    case ALXUICatalog::Kind::Menu:
+    {
+        LLMenuHolderGL::Params hp;
+        hp.name = "menu_holder";
+        hp.rect = canvas->surfaceRect();
+        hp.follows.flags = FOLLOWS_ALL;
+        LLMenuHolderGL* holder = LLUICtrlFactory::create<LLMenuHolderGL>(hp);
+        holder->setCanHide(false);
+        canvas->addChild(holder);
+        LLView* view = factory.createFromXML(node, holder, file, LLMenuHolderGL::child_registry_t::instance());
+        if (LLMenuGL* menu = view ? view->as<LLMenuGL>() : nullptr)
+        {
+            menu->setVisible(true);
+            if (!menu->as<LLMenuBarGL>())
+            {
+                menu->needsArrange();
+                menu->arrangeAndClear();
+            }
+            const LLRect r = menu->getRect();
+            fit(r.getWidth() + 8, r.getHeight() + 8);
+            holder->setShape(canvas->surfaceRect());
+            menu->setOrigin(4, holder->getRect().getHeight() - r.getHeight() - 4);
+            root = menu;
+        }
+        else if (view)
+        {
+            root = view;
+        }
+        break;
+    }
+
+    case ALXUICatalog::Kind::Notifications:
+        root = buildNotification(canvas);
+        break;
+
+    case ALXUICatalog::Kind::Widget:
+    case ALXUICatalog::Kind::Template:
+    {
+        LLView* view = factory.createFromXML(node, canvas, file, LLDefaultChildRegistry::instance());
+        if (view)
+        {
+            const LLRect r = view->getRect();
+            fit(r.getWidth() + 16, r.getHeight() + 16);
+            S32 left = 8;
+            S32 down = 8;
+            placed(left, down);
+            view->setOrigin(left, canvas->surfaceHeight() - r.getHeight() - down);
+            root = view;
+        }
+        break;
+    }
+
+    default:
+        break;
+    }
+    factory.popFileName();
+    return root;
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+// A template as the panel it would produce. A notification can be built
+// without being posted -- its constructor is public and touches no channel
+// -- so nothing here reaches the queues, the history, or what the viewer
+// remembers about "do not show me this again".
+//
+// No substitutions are supplied. A template's [PLACEHOLDER] left standing is
+// what a XUI author wants to see: it says where the text will grow, which is
+// the question a preview of a notification is being asked.
+LLView* ALFloaterXUIStudio::buildNotification(ALXUICanvas* canvas)
+{
+    if (mNotification.empty() || !LLNotifications::instance().templateExists(mNotification))
+    {
+        return nullptr;
+    }
+    const LLNotificationTemplatePtr tmpl = LLNotifications::instance().getTemplate(mNotification);
+    if (!tmpl)
+    {
+        return nullptr;
+    }
+
+    LLSDParamAdapter<LLNotification::Params> params;
+    params.name = mNotification;
+    const LLNotificationPtr note(new LLNotification(params));
+
+    // The panel the viewer would route this type to.
+    LLPanel* panel = (tmpl->mType == "alertmodal" || tmpl->mType == "alert")
+                   ? (LLPanel*)new LLToastAlertPanel(note, false)
+                   : (LLPanel*)new LLToastNotifyPanel(note);
+
+    const LLRect r = panel->getRect();
+    canvas->addChild(panel);
+    canvas->fitContent(r.getWidth() + 16, r.getHeight() + 16);
+    panel->setOrigin(8, canvas->surfaceHeight() - r.getHeight() - 8);
+    return panel;
+}
+
+// Every template the notification system knows, which is notifications.xml
+// as the viewer read it rather than as the file says it: the layers are
+// merged and the language applied by the time it is here.
+void ALFloaterXUIStudio::fillNotifications()
+{
+    if (!mNotifications)
+    {
+        return;
+    }
+    const std::string selected = mNotification;
+    mNotifications->deleteAllItems();
+
+    const std::string filter = mNotificationFilter ? mNotificationFilter->getText() : std::string();
+
+    for (auto it = LLNotifications::instance().templatesBegin();
+         it != LLNotifications::instance().templatesEnd(); ++it)
+    {
+        const LLNotificationTemplatePtr& tmpl = it->second;
+        if (!ALStringMatch::containsNoCase(tmpl->mName, filter))
+        {
+            continue;
+        }
+        std::string message = tmpl->mMessage;
+        LLStringUtil::replaceChar(message, '\n', ' ');
+        mNotifications->addElement(row(tmpl->mName, {
+            { "name", tmpl->mName },
+            { "type", tmpl->mType },
+            { "buttons", std::to_string(tmpl->mForm ? tmpl->mForm->getNumElements() : 0) },
+            { "message", message } }));
+    }
+    mNotifications->sortByColumn("name", true);
+    if (!selected.empty())
+    {
+        mNotifications->selectByValue(selected);
+    }
+}
+
+// Sending one for real, which is the other half of the question: the
+// preview says what it looks like, and this says where it goes. It is a
+// button rather than the selection, so nobody posts a notification to the
+// whole viewer by arrowing down a list.
+void ALFloaterXUIStudio::onPostNotification()
+{
+    const LLSD value = mNotifications->getSelectedValue();
+    if (!value.isDefined())
+    {
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = value.asString();
+    setStatus(getString("NotificationPosted", args));
+    LLNotifications::instance().add(value.asString(), LLSD(), LLSD());
+}
+
+// ---------------------------------------------------------------------------
+// Channels
+// ---------------------------------------------------------------------------
+// Every notification through every channel, in the order the channels
+// process them. The first four decide whether a notification is seen at
+// all; the rest hang off Visible and are the kinds it can be seen as. A
+// notification that appears in one and not the next was stopped between
+// them, which is the question this pane exists to answer.
+void ALFloaterXUIStudio::watchChannels()
+{
+    static const char* CHANNELS[] = {
+        "Unexpired", "Ignore", "VisibilityRules", "Visible",
+        "Persistent", "Alerts", "AlertModal",
+        "Group Notifications", "Notifications", "NotificationTips" };
+
+    for (const char* name : CHANNELS)
+    {
+        LLNotificationChannelPtr channel = LLNotifications::instance().getChannel(name);
+        if (!channel)
+        {
+            continue;
+        }
+        const std::string label(name);
+        mChannelListeners.push_back(channel->connectChanged(
+            [this, label](const LLSD& payload) { return onChannelChanged(label, payload); }));
+    }
+}
+
+bool ALFloaterXUIStudio::onChannelChanged(const std::string& channel, const LLSD& payload)
+{
+    const LLNotificationPtr note = LLNotifications::instance().find(payload["id"].asUUID());
+    if (note && mChannels)
+    {
+        // Held by pointer rather than copied: the notification may be
+        // answered and dropped while its row is still on screen, and a row
+        // that outlives what it is about is what the console it replaces
+        // used a raw new and a destructor to avoid.
+        const std::string id = note->getID().asString();
+        mChannelNotifications[id] = note;
+
+        std::string message = note->getMessage();
+        LLStringUtil::replaceChar(message, '\n', ' ');
+        mChannels->addElement(row(id, {
+            { "channel", channel },
+            { "name", note->getName() },
+            { "time", LLDate::now().toHTTPDateString("%H:%M:%S") },
+            { "message", message } }));
+        // A session's worth of notifications through ten channels is not a
+        // list anybody reads to the bottom of, and the pointers held for
+        // the rows would otherwise be held for the rest of the session. The
+        // oldest row goes, and its notification with it once no row is
+        // about it any more.
+        constexpr S32 CHANNEL_ROWS = 500;
+        while (mChannels->getItemCount() > CHANNEL_ROWS)
+        {
+            const std::string gone = mChannels->getFirstData()->getValue().asString();
+            mChannels->deleteSingleItem(0);
+            // The same notification is a row in every channel it passed
+            // through; the pointer goes when the last of those has.
+            if (!mChannels->getItem(LLSD(gone)))
+            {
+                mChannelNotifications.erase(gone);
+            }
+        }
+        refreshModeCounts();
+    }
+    return false;
+}
+
+void ALFloaterXUIStudio::onChannelSelected()
+{
+    mChannelResponse->removeall();
+    const LLNotificationPtr note = selectedChannelNotification();
+    if (!note)
+    {
+        return;
+    }
+    const LLNotificationFormPtr form = note->getForm();
+    if (!form)
+    {
+        return;
+    }
+    const LLSD elements = form->asLLSD();
+    for (LLSD::array_const_iterator it = elements.beginArray(); it != elements.endArray(); ++it)
+    {
+        if ((*it)["type"].asString() == "button")
+        {
+            mChannelResponse->add((*it)["text"].asString());
+        }
+    }
+}
+
+void ALFloaterXUIStudio::onRespondToNotification()
+{
+    const LLNotificationPtr note = selectedChannelNotification();
+    const std::string button = mChannelResponse->getSelectedValue().asString();
+    if (!note || button.empty())
+    {
+        return;
+    }
+    LLSD response = note->getResponseTemplate();
+    response[button] = true;
+    note->respond(response);
+
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = note->getName();
+    args["[BUTTON]"] = button;
+    setStatus(getString("NotificationAnswered", args));
+}
+
+LLNotificationPtr ALFloaterXUIStudio::selectedChannelNotification() const
+{
+    const LLSD value = mChannels->getSelectedValue();
+    if (!value.isDefined())
+    {
+        return LLNotificationPtr();
+    }
+    const auto found = mChannelNotifications.find(value.asString());
+    return found == mChannelNotifications.end() ? LLNotificationPtr() : found->second;
+}
+
+// ---------------------------------------------------------------------------
+// The palette
+// ---------------------------------------------------------------------------
+// What may go under the selected element: the registry that element names
+// as its children, which is what the factory will accept there and nothing
+// wider. A tag that takes text or holds other widgets says so, since that
+// is what decides which of them is wanted.
+// The tags the selected element may contain, each row carrying the widget
+// rather than its name. Where a catalogue would ship a thumbnail we can build
+// the thing: it is in this process, it draws itself, and it is a truer picture
+// of what the file will get than a screenshot of an older version of it.
+//
+// A tag whose widget will not build in a shell -- a viewer class wants a
+// notification, an agent, a plugin -- keeps its row and shows its name, which
+// is the honest answer rather than an empty box.
+void ALFloaterXUIStudio::fillPalette()
+{
+    if (!mPalette)
+    {
+        return;
+    }
+    const std::string chosen = mPalette->chosen();
+
+    LLView* view = selectedView();
+    const std::string* tag = view ? LLUICtrlFactory::widgetTag(view->viewType()) : nullptr;
+    const ALXUISchema::Tag* declared = tag ? ALXUISchema::get().tag(*tag) : nullptr;
+    if (!declared)
+    {
+        mPalette->setSpecimens({});
+        fillPaletteAttributes();
+        return;
+    }
+
+    std::vector<ALSpecimenList::Specimen> specimens;
+    {
+        // Built in the skin the preview is in, so that a specimen looks like
+        // what the file would get, and inside a shell build so that a widget
+        // that asks the viewer for something is refused rather than obeyed.
+        ALXUISkinScope scope(mSkin, mLanguage);
+        ALXUIShellBuild shell;
+        ALXUIDiagnostics sink;
+
+        // Under the kinds the schema sorts tags into, in the schema's order
+        // of them: a list read down finds a tag by what kind of thing it is
+        // before it finds it by name.
+        std::vector<std::string> children(declared->children);
+        std::stable_sort(children.begin(), children.end(),
+                         [](const std::string& a, const std::string& b)
+                         {
+                             return ALXUISchema::groupOf(a) < ALXUISchema::groupOf(b);
+                         });
+        for (const std::string& child : children)
+        {
+            ALSpecimenList::Specimen specimen;
+            specimen.label = child;
+            specimen.value = child;
+            specimen.group = getString(ALXUISchema::groupKey(ALXUISchema::groupOf(child)));
+
+            // What it is for, in the sentence the notes have for it, and
+            // then what it takes.
+            const ALXUISchema::Tag* what = ALXUISchema::get().tag(child);
+            std::string takes;
+            if (what)
+            {
+                takes = what->note;
+                if (what->text)
+                {
+                    takes += takes.empty() ? "" : "\n";
+                    takes += getString("PaletteTakesText");
+                }
+                if (!what->children.empty())
+                {
+                    LLStringUtil::format_map_t args;
+                    args["[COUNT]"] = std::to_string((S32)what->children.size());
+                    takes += takes.empty() ? "" : (what->text ? ", " : "\n");
+                    takes += getString("PaletteTakesChildren", args);
+                }
+            }
+            specimen.toolTip = takes;
+
+            if (galleryTag(child))
+            {
+                const std::string xml = "<" + child + " name=\"" + child + "\" label=\"" + child
+                    + "\" layout=\"topleft\" left=\"0\" top=\"0\" width=\"" + std::to_string(SPECIMEN_WIDTH)
+                    + "\" height=\"" + std::to_string(SPECIMEN_HEIGHT) + "\"/>";
+                LLXMLNodePtr node;
+                if (LLXMLNode::parseBuffer(xml.data(), xml.size(), node))
+                {
+                    LLUICtrlFactory& factory = LLUICtrlFactory::instance();
+                    factory.pushFileName("palette");
+                    specimen.view = factory.createFromXML(node, nullptr, "palette",
+                                                          LLDefaultChildRegistry::instance());
+                    factory.popFileName();
+                    if (specimen.view)
+                    {
+                        specimen.view->setShape(LLRect(SPECIMEN_LEFT, 26,
+                                                       SPECIMEN_LEFT + SPECIMEN_WIDTH, 4));
+                    }
+                }
+            }
+            specimens.push_back(std::move(specimen));
+        }
+    }
+
+    mPalette->setSpecimens(std::move(specimens));
+    if (!chosen.empty())
+    {
+        mPalette->choose(chosen);
+    }
+    fillPaletteAttributes();
+}
+void ALFloaterXUIStudio::fillPaletteAttributes()
+{
+    if (!mPaletteAttributes)
+    {
+        return;
+    }
+    mPaletteAttributes->deleteAllItems();
+
+    const std::string chosen = mPalette ? mPalette->chosen() : std::string();
+    const ALXUISchema::Tag* declared = chosen.empty() ? nullptr : ALXUISchema::get().tag(chosen);
+    // What the chosen tag is for, over the table of what it takes: the one
+    // sentence the notes have for it, which is the prose a reference is
+    // read for.
+    if (LLTextBox* note = findChild<LLTextBox>("palette_note"))
+    {
+        note->setText(declared ? declared->note : LLStringUtil::null);
+        note->setToolTip(declared ? declared->note : LLStringUtil::null);
+    }
+    if (!declared)
+    {
+        return;
+    }
+    for (const ALXUISchema::Attribute& attribute : declared->attributes)
+    {
+        // A reference lists the names to write. A name that works and
+        // should not be used is kept out of it, since the one to use is
+        // here already and this is where an author finds it.
+        if (attribute.ignored || attribute.deprecated)
+        {
+            continue;
+        }
+        // Only where somebody chose it for this widget: every number starts
+        // at nought, and saying so of all of them says nothing about any.
+        const std::string carries = attribute.declared ? attribute.held : std::string();
+        mPaletteAttributes->addElement(row(attribute.name, { { "attribute", attribute.name },
+                                                            { "type", attribute.type },
+                                                            { "carries", carries } }));
+    }
+}
+
+// A new element carrying its name, where it goes, and nothing else: the
+// widget's own template supplies the rest, and writing what the template
+// already says is what makes a file hard to read.
+void ALFloaterXUIStudio::onInsertFromPalette()
+{
+    const std::string chosen = mPalette->chosen();
+    if (chosen.empty() || !mSelection.hasSelection())
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/false);
+    if (!held)
+    {
+        return;
+    }
+
+    const std::string& tag = chosen;
+    if (!held->insertElement(mSelection.selection(), newElementXml(tag, *held, mSelection.selection(), 8, 8)))
+    {
+        setStatus(held->error());
+        return;
+    }
+
+    documentChanged(saidWrite("EditWrote", tag, *layer));
+}
+
+// A name of its own, since a name is identity to the merge, to getChild and
+// to every overlay, and two of one name is a defect the lint already
+// reports. Where it goes is the caller's: a drop knows where the pointer
+// was, and the Insert button does not.
+std::string ALFloaterXUIStudio::newElementXml(const std::string& tag, const ALXUIEdit& held,
+                                              const ALXUISelection::path_t& parent,
+                                              S32 left, S32 top) const
+{
+    // Among the children it will have: a name is what getChild and the
+    // merge look a sibling up by, so it is siblings that must differ.
+    std::string name = tag;
+    ALXUISelection::path_t as_child(parent);
+    as_child.push_back(name);
+    for (S32 n = 2; held.resolve(as_child) && n < 100; ++n)
+    {
+        name = tag + "_" + std::to_string(n);
+        as_child.back() = name;
+    }
+    return "<" + tag + " name=\"" + name + "\" layout=\"topleft\""
+           " left=\"" + std::to_string(left) + "\" top=\"" + std::to_string(top) + "\""
+           " width=\"100\" height=\"20\"/>";
+}
+
+// ---------------------------------------------------------------------------
+// Drag and drop
+// ---------------------------------------------------------------------------
+// The viewer's drag tool carries inventory; what it carries here is an id
+// this window made a moment ago, and what the id stands for -- an element
+// of the file, or a tag to make one from -- is held here. A drop that
+// arrives with anything else is somebody else's.
+bool ALFloaterXUIStudio::startTreeDrag(const ALXUISelection::path_t& path)
+{
+    if (path.empty())
+    {
+        return false;
+    }
+    mDragPath = path;
+    mDragTag.clear();
+    mDragId.generate();
+    LLToolDragAndDrop::getInstance()->beginMultiDrag({ DAD_WIDGET }, { mDragId },
+                                                     LLToolDragAndDrop::SOURCE_VIEWER);
+    return true;
+}
+
+bool ALFloaterXUIStudio::startPaletteDrag(const std::string& tag)
+{
+    if (tag.empty())
+    {
+        return false;
+    }
+    mDragPath.clear();
+    mDragTag = tag;
+    mDragId.generate();
+    LLToolDragAndDrop::getInstance()->beginMultiDrag({ DAD_WIDGET }, { mDragId },
+                                                     LLToolDragAndDrop::SOURCE_VIEWER);
+    return true;
+}
+
+bool ALFloaterXUIStudio::carrying(EDragAndDropType type, const void* cargo) const
+{
+    return type == DAD_WIDGET && cargo && *static_cast<const LLUUID*>(cargo) == mDragId
+        && (!mDragPath.empty() || !mDragTag.empty());
+}
+
+// What the tag being carried is: the new one's, or the moved element's as
+// the file wrote it, which the map that paired the view with its element
+// remembers. Asked on every frame of a drag, so nothing is read for it.
+std::string ALFloaterXUIStudio::carriedTag() const
+{
+    if (!mDragTag.empty())
+    {
+        return mDragTag;
+    }
+    const Preview& pv = mPreviews[PRIMARY];
+    const LLView* moving = pv.root ? ALXUISelection::resolve(pv.root, mDragPath) : nullptr;
+    const ALXUISourceMap::Origin* origin = moving ? pv.sourceMap.find(moving) : nullptr;
+    return origin ? origin->tag : std::string();
+}
+
+// The tag a container answers to is the class that was built, since that
+// is whose child registry the parser would consult; where nothing was
+// built at the path -- a widget the shell build does not run -- the word
+// the file wrote is what there is.
+bool ALFloaterXUIStudio::accepts(const ALXUISelection::path_t& parent, std::string_view tag) const
+{
+    const Preview& pv = mPreviews[PRIMARY];
+    std::string container;
+    if (LLView* view = pv.root ? ALXUISelection::resolve(pv.root, parent) : nullptr)
+    {
+        if (const std::string* built = LLUICtrlFactory::widgetTag(view->viewType()))
+        {
+            container = *built;
+        }
+    }
+    if (container.empty())
+    {
+        const pugi::xml_node node = document().resolve(parent);
+        container = node ? node.name() : std::string();
+    }
+    return !container.empty() && ALXUISchema::get().acceptsChild(container, tag);
+}
+
+bool ALFloaterXUIStudio::treeTakesChildren(const ALXUISelection::path_t& path) const
+{
+    const Preview& pv = mPreviews[PRIMARY];
+    LLView* view = pv.root ? ALXUISelection::resolve(pv.root, path) : nullptr;
+    const std::string* tag = view ? LLUICtrlFactory::widgetTag(view->viewType()) : nullptr;
+    const ALXUISchema::Tag* declared = tag ? ALXUISchema::get().tag(*tag) : nullptr;
+    return declared && !declared->children.empty();
+}
+
+// A drag over a row of the outline, or a drop on one. Before or after the
+// row makes the carried element its sibling; into it, its child. An
+// element cannot land in itself or under itself, the root has no
+// siblings, and whichever element would become the parent has to take
+// the tag.
+bool ALFloaterXUIStudio::treeDrop(const ALXUISelection::path_t& target, ALXUITreeModel::DropZone zone,
+                                  bool drop, EDragAndDropType type, void* cargo, std::string& tip)
+{
+    if (!carrying(type, cargo) || target.empty())
+    {
+        return false;
+    }
+    const bool into = zone == ALXUITreeModel::DropZone::Into;
+    if (!into && target.size() < 2)
+    {
+        return false;
+    }
+    const ALXUISelection::path_t parent = into ? target
+                                              : ALXUISelection::path_t(target.begin(), target.end() - 1);
+    if (!mDragPath.empty())
+    {
+        // Not onto itself, and not under itself.
+        if (target.size() >= mDragPath.size()
+            && std::equal(mDragPath.begin(), mDragPath.end(), target.begin()))
+        {
+            return false;
+        }
+    }
+
+    const ALXUICatalog::Layer* layer = baseLayer();
+    if (!layer)
+    {
+        return false;
+    }
+    const std::string tag = carriedTag();
+    if (tag.empty() || !accepts(parent, tag))
+    {
+        return false;
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[WHAT]"] = tag;
+    args["[WHERE]"] = target.back();
+    tip = getString(into ? "DropInto" : zone == ALXUITreeModel::DropZone::Before ? "DropBefore" : "DropAfter", args);
+    if (!drop)
+    {
+        return true;
+    }
+
+    ALXUIEdit* held = document(*layer);
+    if (!held)
+    {
+        return false;
+    }
+    bool ok;
+    if (!mDragPath.empty())
+    {
+        ok = into ? held->moveElement(mDragPath, target)
+           : zone == ALXUITreeModel::DropZone::Before ? held->moveBefore(mDragPath, target)
+                                                       : held->moveAfter(mDragPath, target);
+    }
+    else
+    {
+        const std::string xml = newElementXml(mDragTag, *held, parent, 8, 8);
+        ok = into ? held->insertElement(target, xml)
+           : zone == ALXUITreeModel::DropZone::Before ? held->insertBefore(target, xml)
+                                                       : held->insertAfter(target, xml);
+    }
+    if (!ok)
+    {
+        setStatus(held->error());
+        return false;
+    }
+
+    const ALXUISelection::path_t moved = landing(*held);
+    if (!moved.empty())
+    {
+        mSelection.select(moved);
+    }
+    mDragPath.clear();
+    mDragTag.clear();
+    documentChanged(saidWrite("EditWrote", tag, *layer));
+    return true;
+}
+
+// The same cargo over the canvas. The container is the one under the
+// pointer that takes the tag, found the way a held element finds its
+// landing -- except that an empty container takes a new element, since a
+// drop from the Library is how an empty container is filled. What lands
+// is put where the pointer was, in the container's own coordinates.
+LLView* ALFloaterXUIStudio::canvasDrop(S32 which, LLView* under, S32 x, S32 y, bool drop,
+                                       EDragAndDropType type, void* cargo, std::string& tip)
+{
+    const Preview& pv = mPreviews[PRIMARY];
+    if (which != PRIMARY || !under || !pv.root || !carrying(type, cargo))
+    {
+        return nullptr;
+    }
+    const ALXUICatalog::Layer* layer = baseLayer();
+    if (!layer)
+    {
+        return nullptr;
+    }
+
+    LLView* into = nullptr;
+    std::string tag;
+    if (!mDragPath.empty())
+    {
+        LLView* moving = ALXUISelection::resolve(pv.root, mDragPath);
+        into = dropTarget(which, under, moving);
+        const ALXUISourceMap::Origin* mine = moving ? pv.sourceMap.find(moving) : nullptr;
+        tag = mine ? mine->tag : std::string();
+    }
+    else
+    {
+        tag = mDragTag;
+        const ALXUISchema& schema = ALXUISchema::get();
+        for (LLView* view = under; view; view = view->getParent())
+        {
+            if (view != pv.root && !pv.sourceMap.isFromXML(view))
+            {
+                continue;
+            }
+            const std::string* container = LLUICtrlFactory::widgetTag(view->viewType());
+            if (container && schema.acceptsChild(*container, tag))
+            {
+                into = view;
+                break;
+            }
+            if (view == pv.root)
+            {
+                break;
+            }
+        }
+    }
+    if (!into || tag.empty())
+    {
+        return nullptr;
+    }
+    LLStringUtil::format_map_t args;
+    args["[WHAT]"] = tag;
+    args["[WHERE]"] = into->getName();
+    tip = getString("DropInto", args);
+    if (!drop)
+    {
+        return into;
+    }
+
+    ALXUISelection::path_t target;
+    if (!ALXUISelection::pathOf(into, pv.root, target))
+    {
+        return nullptr;
+    }
+    ALXUIEdit* held = document(*layer);
+    if (!held)
+    {
+        return nullptr;
+    }
+
+    // Where the pointer was, from the container's top left, which is
+    // where the file counts from. The point is in the surface's
+    // coordinates, so the container is measured in those too.
+    const ALCanvasView* surface = under->getParentByType<ALCanvasView>();
+    const LLRect frame = surface ? surface->localRectOf(into) : into->getRect();
+    const S32 left = llmax(0, x - frame.mLeft);
+    const S32 top = llmax(0, frame.mTop - y);
+
+    if (!mDragPath.empty())
+    {
+        // The move and the rect written for the new parent are one drop,
+        // and one undo puts back both.
+        ALXUIDocuments::Action dropping(mDocuments);
+        LLView* moving = ALXUISelection::resolve(pv.root, mDragPath);
+        if (!moving || !held->moveElement(mDragPath, target))
+        {
+            setStatus(held ? held->error() : getString("EditNoTarget"));
+            return nullptr;
+        }
+        const ALXUISelection::path_t moved = landing(*held);
+        // The rect is written outright for the new parent, since no
+        // positioning form survives a change of parent; it keeps its size.
+        ALXUIEdit::Anchor want;
+        want.left = left;
+        want.top = top;
+        want.width = moving->getRect().getWidth();
+        want.height = moving->getRect().getHeight();
+        want.bottom = frame.getHeight() - top - want.height;
+        want.topLeft = true;
+        const bool stacked = into->as<LLLayoutStack>() != nullptr;
+        if (!moved.empty()
+            && !held->reauthor(moved, want, stacked ? ALXUIEdit::AUTHOR_SIZE : ALXUIEdit::AUTHOR_RECT))
+        {
+            setStatus(held->error());
+            return nullptr;
+        }
+        if (!moved.empty())
+        {
+            mSelection.select(moved);
+        }
+    }
+    else
+    {
+        if (!held->insertElement(target, newElementXml(tag, *held, target, left, top)))
+        {
+            setStatus(held->error());
+            return nullptr;
+        }
+        const ALXUISelection::path_t made = landing(*held);
+        if (!made.empty())
+        {
+            mSelection.select(made);
+        }
+    }
+    mDragPath.clear();
+    mDragTag.clear();
+    documentChanged(saidWrite("EditWrote", tag, *layer));
+    return into;
+}
+
+// The two tabs that fill themselves from something other than the preview.
+// A mode is chosen. Each fills what it shows when it is looked at rather
+// than on every rebuild -- the translation table is a whole language's
+// worth of rows -- and the one that was open is the one that opens next
+// time the tool does.
+void ALFloaterXUIStudio::onMode()
+{
+    // Either strip: which one the mode came from does not change what it
+    // has to fill, and only the one that is showing is worth filling.
+    for (const std::string& mode : { modeName(mModes), modeName(mBottom) })
+    {
+        if (mode == "translation_mode")
+        {
+            fillTranslation();
+        }
+        else if (mode == "palette_mode")
+        {
+            fillPalette();
+        }
+        else if (mode == "notifications_mode" && mNotifications->getItemCount() == 0)
+        {
+            fillNotifications();
+        }
+    }
+    saveState();
+}
+
+std::string ALFloaterXUIStudio::modeName(LLTabContainer* tabs)
+{
+    const LLPanel* current = tabs ? tabs->getCurrentPanel() : nullptr;
+    return current ? current->getName() : std::string();
+}
+
+// What each mode has to show, on the mode's own button. A count nobody
+// needs is not written: a file list is as long as the catalog and saying
+// so tells the developer nothing.
+void ALFloaterXUIStudio::refreshModeCounts()
+{
+    // A channel can report before the window has finished being built, and
+    // a count of a list that does not exist yet is not one to take.
+    if (!mModes || !mBottom || !mFindResults || !mFindings || !mChannels)
+    {
+        return;
+    }
+    const auto count = [](LLTabContainer* tabs, std::string_view page, S32 n)
+    {
+        LLPanel* panel = tabs->getPanelByName(page);
+        if (!panel)
+        {
+            return;
+        }
+        // A tab with a name says how many beside it, and grows to fit: a
+        // badge there would sit on the half of the name that says which tab
+        // it is. A tab that is only a picture has nowhere to put a number
+        // beside it, so the number goes on it.
+        const std::string label = panel->getLabel();
+        if (label.empty())
+        {
+            tabs->setTabBadge(panel, n > 0 ? std::to_string(n) : std::string());
+        }
+        else
+        {
+            tabs->setPanelTitle(tabs->getIndexForPanel(panel),
+                                n > 0 ? label + " " + std::to_string(n) : label);
+        }
+    };
+    count(mModes, "find_mode", mFindResults->getItemCount());
+    // Not how many are open but how many have work in them: an open document
+    // is a fact and an unsaved one is a thing to do something about.
+    count(mModes, "documents_mode", mDocuments.dirtyCount());
+    count(mBottom, "findings_mode", mFindings->getItemCount());
+    count(mBottom, "history_mode", mHistory ? (S32)mHistory->count() : 0);
+    count(mBottom, "channels_mode", mChannels->getItemCount());
+}
+
+void ALFloaterXUIStudio::onNotificationSelected()
+{
+    const LLSD value = mNotifications->getSelectedValue();
+    if (!value.isDefined())
+    {
+        return;
+    }
+    mNotification = value.asString();
+    showPreviews();
+}
+
+// ---------------------------------------------------------------------------
+// The document under edit
+// ---------------------------------------------------------------------------
+// The layers a file is built from, with the one being edited taken from
+// memory. Every preview goes through here, so an edit shows on the screen
+// without the disk hearing about it.
+std::vector<ALXmlLayerMerge::Source> ALFloaterXUIStudio::sourcesFor(const std::string& file) const
+{
+    std::vector<std::string> paths = gDirUtilp->findSkinnedFilenames(LLDir::XUI, file);
+    if (paths.empty())
+    {
+        paths.push_back(file);
+    }
+
+    std::vector<ALXmlLayerMerge::Source> sources;
+    sources.reserve(paths.size());
+    for (const std::string& path : paths)
+    {
+        // Every layer this file is built from, and for each of them the
+        // text if it is one of the files being worked on: what is in hand
+        // is what the preview shows, whichever of them it is in.
+        sources.push_back({ path, mDocuments.textFor(path) });
+    }
+    return sources;
+}
+
+// The document for a layer, read from the file the first time it is asked
+// for and held afterwards. Asking for one is what working on it looks like,
+// so it becomes the one an operation with no path of its own means.
+ALXUIEdit* ALFloaterXUIStudio::document(const ALXUICatalog::Layer& layer)
+{
+    ALXUIEdit* held = mDocuments.open(layer.path);
+    if (!held)
+    {
+        setStatus(mDocuments.error());
+    }
+    return held;
+}
+
+// The document an edit goes into, opened: the file's own base layer, or --
+// for an edit that positions the element -- the layer that already does,
+// whose numbers are the ones on screen. Null, with the status saying so,
+// where the file has no layer to write.
+ALXUIEdit* ALFloaterXUIStudio::editDocument(const ALXUICatalog::Layer*& layer, bool positioned)
+{
+    layer = positioned ? writeLayer() : baseLayer();
+    if (!layer)
+    {
+        setStatus(getString("EditNoTarget"));
+        return nullptr;
+    }
+    return document(*layer);
+}
+
+// The status after a write: what was written, to which file, in which
+// layer, in the floater's words.
+std::string ALFloaterXUIStudio::saidWrite(const char* key, const std::string& attrs,
+                                          const ALXUICatalog::Layer& layer) const
+{
+    LLStringUtil::format_map_t args;
+    args["[ATTRS]"] = attrs;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layerName(layer);
+    return getString(key, args);
+}
+
+// What an operation does once it has changed the document: the preview is
+// rebuilt from what is now in memory, next frame.
+void ALFloaterXUIStudio::documentChanged(const std::string& status)
+{
+    // Whatever was just done is done: from here it is one thing that can be
+    // put back, however many files it wrote to.
+    mDocuments.settle();
+    fillDocuments();
+    fillHistory();
+    mPendingStatus = status;
+    setStatus(status);
+    mReloadEntryOnly = true;
+    mReloadPending = true;
+}
+
+// How long the tool waits before reading the file over again for what it
+// says about it. Long enough that a person stepping a number with an arrow
+// or holding one down is not re-linting the file between presses.
+static constexpr F32 REREAD_SECONDS = 0.75f;
+
+// One element built again from its own node and put back where it was, for a
+// field no built view can be told about -- a label, a name, a colour, an
+// image. Everything else on the canvas stays as it was: the window keeps its
+// place, the rest of the tree keeps whatever state it holds, and only what
+// the field is about is made twice.
+bool ALFloaterXUIStudio::rebuildElement(const ALXUISelection::path_t& path, const std::string& field)
+{
+    // A path is made of names, so an element's name is its identity here.
+    // Change it and every path at and under it names something the document
+    // no longer has: the selection, the rows and the map all point at an
+    // element that is not there to be found again.
+    if (field == "name")
+    {
+        return false;
+    }
+
+    Preview& pv = mPreviews[PRIMARY];
+    LLView* old = pv.root ? ALXUISelection::resolve(pv.root, path) : nullptr;
+    if (!old || old == pv.root)
+    {
+        // A file's root is the preview, and building it again is building the
+        // preview: there is nothing smaller to do.
+        return false;
+    }
+    LLView* parent = old->getParent();
+    const ALXUISourceMap::Origin* origin = pv.sourceMap.find(old);
+    if (!parent || !origin || origin->node.isNull())
+    {
+        return false;
+    }
+
+    // What the parent takes as children, which is a thing about its tag
+    // rather than about it: a container with a registry of its own refuses
+    // every tag the registry does not name.
+    const std::string* tag = LLUICtrlFactory::widgetTag(parent->viewType());
+    const widget_registry_t* const* held =
+        tag ? LLChildRegistryRegistry::instance().getValue(*tag) : nullptr;
+    const widget_registry_t* registry = held ? *held : nullptr;
+    if (!registry)
+    {
+        return false;
+    }
+    // A container that names its own children is one that keeps track of
+    // them: a stack holds its panels, a tab container holds its tabs, and a
+    // menu holds its items. Putting one of those back is not a matter of
+    // adding a child, so those are built the long way.
+    if (registry != &LLDefaultChildRegistry::instance())
+    {
+        return false;
+    }
+
+    // Where it sits among what the file put in this parent. A build adds
+    // each child to the front of the list, so the list reads backwards from
+    // the file and the new one arrives at the wrong end of it.
+    std::vector<LLView*> children;
+    for (LLView* child : *parent->getChildList())
+    {
+        children.push_back(child);
+    }
+    const size_t at = std::distance(children.begin(), std::find(children.begin(), children.end(), old));
+    if (at >= children.size())
+    {
+        return false;
+    }
+
+    const LLXMLNodePtr node = origin->node;
+    parent->removeChild(old);
+    delete old;
+
+    // Built the way the whole preview was: in the preview's skin and
+    // language, as a shell, with the parser's complaints kept out of the
+    // log. An element built any other way is a class with the viewer's
+    // side effects, or a widget with this viewer's images in it.
+    LLView* fresh = nullptr;
+    {
+        ALXUISkinScope scope(pv.skin, pv.language);
+        ALXUIShellBuild shell;
+        ALXUIDiagnostics sink;
+        LLUICtrlFactory& factory = LLUICtrlFactory::instance();
+        factory.pushFileName(mFile);
+        fresh = factory.createFromXML(node, parent, mFile, *registry);
+        factory.popFileName();
+    }
+    if (!fresh)
+    {
+        // The parent is now short an element, so the preview no longer says
+        // what the file says. Only a build puts that right.
+        return false;
+    }
+
+    // Put back in the order the file has them, which is the order everything
+    // that reads this list depends on.
+    children[at] = fresh;
+    for (auto one = children.rbegin(); one != children.rend(); ++one)
+    {
+        parent->sendChildToFront(*one);
+    }
+
+    // What was paired with the views that have gone: the map first, since
+    // the rows are re-pointed by resolving paths through it.
+    pv.sourceMap.build(pv.root, pv.node);
+    if (!mModel.rebind(path, pv.root))
+    {
+        // A row is left showing a view that has gone, and the only way out of
+        // that is to make the rows again. The preview itself is sound: what
+        // follows is a build the tool did not need but is safe to do.
+        return false;
+    }
+    for (const auto& [row_path, widget] : mRows)
+    {
+        if (widget)
+        {
+            widget->refreshSuffix();
+        }
+    }
+    liveShape(fresh, node);
+    return true;
+}
+
+// An undo or a redo of one field of one element is that field written again,
+// and the preview can be told about it the same way the edit was. Anything
+// else -- an element added, moved or taken out, or a step from before the
+// document said what its steps did -- is a document of a different shape.
+// A step said in words. The document says what it did in its own terms and
+// leaves the words to whoever shows them, which is here: a library that put
+// English in it would be a library nobody could translate.
+std::string ALFloaterXUIStudio::describeStep(const ALXUIEdit::Change& change) const
+{
+    static const std::map<ALXUIEdit::Did, const char*> said = {
+        { ALXUIEdit::Did::WroteField,       "StepWroteField" },
+        { ALXUIEdit::Did::TookFieldOut,     "StepTookFieldOut" },
+        { ALXUIEdit::Did::SpeltFieldAgain,  "StepSpeltFieldAgain" },
+        { ALXUIEdit::Did::WroteText,        "StepWroteText" },
+        { ALXUIEdit::Did::Renamed,          "StepRenamed" },
+        { ALXUIEdit::Did::AddedElement,     "StepAddedElement" },
+        { ALXUIEdit::Did::MovedElement,     "StepMovedElement" },
+        { ALXUIEdit::Did::RemovedElement,   "StepRemovedElement" },
+    };
+    const auto it = said.find(change.did);
+    if (it == said.end())
+    {
+        return LLStringUtil::null;
+    }
+    // The element by the last step of its path, which is what it is called:
+    // a person reading this is looking at the outline, where that is the row.
+    const ALXUISelection::path_t& path = change.path;
+    LLStringUtil::format_map_t args;
+    args["[WHAT]"] = change.field;
+    args["[WHERE]"] = path.empty() ? mFile : path.back();
+    return getString(it->second, args);
+}
+
+void ALFloaterXUIStudio::replayChange(const std::string& status)
+{
+    // The set's answer rather than a document's: an action over more than one
+    // step or more than one file says so by saying nothing, and a preview
+    // built again is the only honest way to show that.
+    const ALXUIEdit::Change& change = mDocuments.lastChange();
+    const ALXUISelection::path_t& where = mDocuments.lastPath();
+
+    // A step that wrote a name moved the element, so a step put back or put
+    // on again moves it too. What is selected is the same element either way,
+    // and goes with it rather than being let go of.
+    if (change.oneField && change.field == "name" && mSelection.hasSelection())
+    {
+        const ALXUISelection::path_t& from = where == change.path ? change.after : change.path;
+        if (mSelection.selection() == from)
+        {
+            mSelection.select(where);
+        }
+    }
+
+    std::string value;
+    // The element as the document now reads it is what to show, whether the
+    // field can be put onto the view or the element has to be made again --
+    // and an undo that leaves the element writing nothing is the second, since
+    // what it falls back to is known only to a build.
+    if (change.oneField
+        && ((!change.field.empty()
+             && document().fieldText(where, change.field, value)
+             && applyLive(where, change.field, value))
+            || rebuildElement(where, change.field)))
+    {
+        documentRead(status);
+        // The row the value is shown on is not always the row it was written
+        // from: an undo reaches back to whatever the step was about.
+        refreshInspectors();
+        return;
+    }
+    documentChanged(status);
+}
+
+void ALFloaterXUIStudio::documentRead(const std::string& status)
+{
+    mDocuments.settle();
+    fillDocuments();
+    fillHistory();
+    setStatus(status);
+    mRereadPending = true;
+    mRereadAt.reset();
+    mRereadAt.setTimerExpirySec(REREAD_SECONDS);
+}
+
+// Which of these a built view can be told about, and how. Everything else
+// is read once, when the widget is made, and there is no way to say it
+// afterwards: those are the fields the preview has to be built again for.
+bool ALFloaterXUIStudio::applyLive(const ALXUISelection::path_t& path,
+                                   const std::string& name, const std::string& value)
+{
+    Preview& pv = mPreviews[PRIMARY];
+    if (!pv.root)
+    {
+        return false;
+    }
+    LLView* view = ALXUISelection::resolve(pv.root, path);
+    if (!view)
+    {
+        return false;
+    }
+    const ALXUISourceMap::Origin* origin = pv.sourceMap.find(view);
+    if (!origin || origin->node.isNull())
+    {
+        return false;
+    }
+
+    // A field more than one layer writes is a field the merge decides, and
+    // what was just written to one of them is not always what the merge would
+    // take. Those go back through a build, which is the thing that knows.
+    for (const auto& [entry, attribute] : origin->node->mAttributes)
+    {
+        if (entry->mString == name)
+        {
+            if (pv.overlay.writersOf(attribute.get()).size() > 1)
+            {
+                return false;
+            }
+            break;
+        }
+    }
+
+    // The tool's copy of the document, brought into step with the write
+    // whether or not the preview is about to be made again from it: a rect
+    // is worked out from every number on the element, not from the one that
+    // just changed.
+    origin->node->setAttributeString(name.c_str(), value);
+
+    bool done = false;
+    if (name == "visible" || name == "enabled")
+    {
+        // Read back off the node, so that a value is read the way the
+        // parser reads one rather than as the one spelling of it.
+        bool on = false;
+        origin->node->getAttributeBOOL(name.c_str(), on);
+        if (name == "visible")
+        {
+            view->setVisible(on);
+        }
+        else
+        {
+            view->setEnabled(on);
+        }
+        done = true;
+    }
+    else if (name == "tool_tip")
+    {
+        view->setToolTip(value);
+        done = true;
+    }
+    else if (name == "follows")
+    {
+        view->setFollows(ALFollowsControl::followsFlags(value));
+        done = true;
+    }
+    else if (ALXUIEdit::isGeometryAttribute(name))
+    {
+        done = liveShape(view, origin->node);
+    }
+
+    // A row in the outline says how big its element is and whether it is
+    // shown, so the row that changed is told. Only that row, and only its
+    // suffix, which is the part the folder view says costs no filtering.
+    if (done)
+    {
+        if (const auto it = mRows.find(ALXUISelection::toString(path));
+            it != mRows.end() && it->second)
+        {
+            it->second->refreshSuffix();
+        }
+    }
+    return done;
+}
+
+bool ALFloaterXUIStudio::liveShape(LLView* view, const LLXMLNodePtr& node)
+{
+    LLView* parent = view->getParent();
+    if (!parent)
+    {
+        return false;
+    }
+
+    // The corner the element hangs from, and its size read off the element as
+    // it now stands. Both are wanted whichever way it is positioned.
+    const auto sized = [&node, view](LLRect& out)
+    {
+        S32 width = view->getRect().getWidth();
+        S32 height = view->getRect().getHeight();
+        node->getAttributeS32("width", width);
+        node->getAttributeS32("height", height);
+        std::string layout;
+        node->getAttributeString("layout", layout);
+        // Placed from the top unless the file places it from the bottom, and
+        // the corner it is placed from is the one a change of size holds.
+        const bool from_bottom = layout == "bottomleft"
+                              || node->hasAttribute("bottom")
+                              || node->hasAttribute("bottom_delta");
+        out = view->getRect();
+        out.mRight = out.mLeft + width;
+        if (from_bottom)
+        {
+            out.mTop = out.mBottom + height;
+        }
+        else
+        {
+            out.mBottom = out.mTop - height;
+        }
+    };
+
+    // What is on a canvas is put there by the canvas, not laid out against
+    // it: the numbers that mean anything to it are its size. A root that
+    // grew or shrank is a surface of a different size as well.
+    if (ALXUICanvas* canvas = ALViewType::as<ALXUICanvas>(parent); canvas && canvas->root() == view)
+    {
+        LLRect r;
+        sized(r);
+        view->setShape(r);
+        canvas->rememberRoot();
+        return true;
+    }
+
+    // A stack answers three of a panel's four numbers, so none of them is a
+    // rect this can work out on its own.
+    if (ALViewType::as<LLLayoutStack>(parent))
+    {
+        return false;
+    }
+
+    // The positioning form the file writes, read off the element.
+    const auto positioning = [](const LLXMLNodePtr& from, LLView::Params& p)
+    {
+        std::string layout;
+        if (from->getAttributeString("layout", layout))  { p.layout = layout; }
+        S32 value = 0;
+        if (from->getAttributeS32("left", value))         { p.rect.left = value; }
+        if (from->getAttributeS32("top", value))          { p.rect.top = value; }
+        if (from->getAttributeS32("right", value))        { p.rect.right = value; }
+        if (from->getAttributeS32("bottom", value))       { p.rect.bottom = value; }
+        if (from->getAttributeS32("width", value))        { p.rect.width = value; }
+        if (from->getAttributeS32("height", value))       { p.rect.height = value; }
+        if (from->getAttributeS32("left_pad", value))     { p.left_pad = value; }
+        if (from->getAttributeS32("top_pad", value))      { p.top_pad = value; }
+        if (from->getAttributeS32("left_delta", value))   { p.left_delta = value; }
+        if (from->getAttributeS32("top_delta", value))    { p.top_delta = value; }
+        if (from->getAttributeS32("bottom_delta", value)) { p.bottom_delta = value; }
+    };
+
+    // Everything the file put in this parent, in the order it put them. A
+    // build adds each child to the front of the list, so the list reads
+    // backwards from the file.
+    const Preview& pv = mPreviews[PRIMARY];
+    std::vector<LLView*> children;
+    for (LLView* child : *parent->getChildList())
+    {
+        if (child->getFromXUI() && pv.sourceMap.find(child))
+        {
+            children.push_back(child);
+        }
+    }
+    std::reverse(children.begin(), children.end());
+
+    // Walked forwards from the one that changed, placing it and every one
+    // after it against the one before. A pad and a delta are measured from
+    // the widget built before, so an element that changed size or moved
+    // carries the rest of its parent's children with it -- which is what a
+    // build does, and what makes this the same answer as building.
+    LLRect against = parent->getLocalRect();
+    against.translate(0, against.getHeight());
+    bool reached = false;
+    for (LLView* child : children)
+    {
+        if (!reached && child != view)
+        {
+            against = child->getRect();
+            continue;
+        }
+        reached = true;
+        const ALXUISourceMap::Origin* origin = pv.sourceMap.find(child);
+        LLView::Params p;
+        positioning(origin->node, p);
+        const LLRect measured_from = against;
+        LLView::applyXUILayout(p, parent, parent->getLocalRect(), &measured_from);
+        const LLRect placed = p.rect;
+        if (child == view && placed.isEmpty())
+        {
+            return false;
+        }
+        if (!placed.isEmpty())
+        {
+            child->setShape(placed);
+        }
+        against = child->getRect();
+    }
+    if (!reached)
+    {
+        return false;
+    }
+    // How far a surface reaches is decided by what is drawn on it, and an
+    // element that just changed size may have moved that.
+    if (ALXUICanvas* canvas = view->getParentByType<ALXUICanvas>())
+    {
+        canvas->rememberRoot();
+    }
+    return true;
+}
+
+// What the unsaved edits would do to the translations, before they are
+// written. A translation applies because the base has an element of that
+// name at that place; rename it, move it, or take it away, and the
+// language's value stops arriving without a word being said to anyone.
+// This is the word: the base as the disk has it and the base as it now
+// stands, each scanned against every language, and the difference is what
+// the edit costs.
+//
+// Only when the document is the file's base layer. Editing a language's
+// own overlay changes that translation and no other.
+S32 ALFloaterXUIStudio::translationImpact(std::vector<Impact>& out) const
+{
+    out.clear();
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || documentPath().empty() || !document().dirty())
+    {
+        return 0;
+    }
+    const std::vector<const ALXUICatalog::Layer*> layers =
+        mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
+    if (layers.empty() || layers.front()->path != documentPath())
+    {
+        return 0;
+    }
+
+    ALXUIEdit before;
+    if (!before.loadBuffer(document().saved()) || !before.root() || !document().root())
+    {
+        return 0;
+    }
+
+    S32 total = 0;
+    for (const std::string& language : mCatalog.languages())
+    {
+        if (language == mLanguage)
+        {
+            continue;
+        }
+        const ALXUICatalog::Layer* overlay = overlayLayer(*entry, language);
+        if (!overlay || !overlay->root())
+        {
+            continue;
+        }
+
+        ALXUITranslate was;
+        ALXUITranslate now;
+        was.scan(before.root(), overlay->root());
+        now.scan(document().root(), overlay->root());
+
+        // A value the language wrote, keyed by where it sits in the
+        // language's own file: the base paths are what the edit moves, so
+        // they are the one thing that cannot be compared across the two
+        // scans, and the overlay's line does not move at all.
+        boost::unordered_set<std::string> applied;
+        for (const ALXUITranslate::Unit& unit : was.units())
+        {
+            if (unit.applies())
+            {
+                applied.insert(std::to_string(unit.overlayLine) + "\n" + unit.field);
+            }
+        }
+        for (const ALXUITranslate::Unit& unit : now.units())
+        {
+            if (unit.applies())
+            {
+                applied.erase(std::to_string(unit.overlayLine) + "\n" + unit.field);
+            }
+        }
+        if (applied.empty())
+        {
+            continue;
+        }
+
+        Impact impact;
+        impact.language = language;
+        impact.stranded = (S32)applied.size();
+        for (const ALXUITranslate::Unit& unit : was.units())
+        {
+            if (unit.applies() && applied.count(std::to_string(unit.overlayLine) + "\n" + unit.field)
+                && impact.what.size() < 8)
+            {
+                impact.what.push_back(ALXUISelection::toString(unit.path)
+                                      + (unit.field.empty() ? "" : "/" + unit.field));
+            }
+        }
+        total += impact.stranded;
+        out.push_back(std::move(impact));
+    }
+    return total;
+}
+
+void ALFloaterXUIStudio::reportTranslationImpact()
+{
+    std::vector<Impact> impacts;
+    const S32 total = translationImpact(impacts);
+    if (!total)
+    {
+        setStatus(getString("TranslateImpactNone"));
+        return;
+    }
+
+    std::string languages;
+    for (const Impact& impact : impacts)
+    {
+        languages += (languages.empty() ? "" : ", ") + impact.language
+                   + " " + std::to_string(impact.stranded);
+        for (const std::string& what : impact.what)
+        {
+            LL_INFOS("XUIStudio") << impact.language << "/" << mFile << ": " << what
+                                  << " stops applying" << LL_ENDL;
+        }
+    }
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(total);
+    args["[LANGS]"] = languages;
+    setStatus(getString("TranslateImpact", args));
+}
+
+// Save, then put the translations back where the saved base wants them.
+// The repair moves what a language wrote to the path the base now gives
+// it, so it has to run against the base as written and not as held.
+void ALFloaterXUIStudio::saveAndRepair()
+{
+    std::vector<Impact> impacts;
+    if (!translationImpact(impacts))
+    {
+        saveDocument();
+        return;
+    }
+
+    // A base and every language beside it, written because of one thing the
+    // developer asked for. What that costs the languages is what the repair
+    // is, so putting half of it back is putting back something nobody did.
+    ALXUIDocuments::Action repairing(mDocuments);
+
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || !document().save())
+    {
+        setStatus(document().error());
+        return;
+    }
+    sawOwnWrites();
+    mCatalog.reload(mFile);
+
+    S32 moved = 0;
+    std::string error;
+    for (const Impact& impact : impacts)
+    {
+        const S32 count = repairFile(*entry, impact.language, error);
+        if (count > 0)
+        {
+            moved += count;
+        }
+    }
+    sawOwnWrites();
+    mCatalog.reload(mFile);
+    repairing.close();
+
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = fileNameOf(documentPath());
+    args["[MOVES]"] = std::to_string(moved);
+    documentChanged(getString("EditSavedAndRepaired", args));
+}
+
+void ALFloaterXUIStudio::saveDocument()
+{
+    if (documentPath().empty() || !document().dirty())
+    {
+        setStatus(getString("EditNothingToSave"));
+        return;
+    }
+    if (!document().save())
+    {
+        setStatus(document().error());
+        return;
+    }
+    sawOwnWrites();
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = fileNameOf(documentPath());
+    documentChanged(getString("EditSaved", args));
+}
+
+// Every file with work in it, written. The set stops at the first that
+// refuses, so what is said is how many went and what stopped it: a developer
+// told "three written" with no word about the fourth has been told nothing to
+// act on.
+void ALFloaterXUIStudio::saveAllDocuments()
+{
+    const S32 unsaved = mDocuments.dirtyCount();
+    if (!unsaved)
+    {
+        setStatus(getString("EditNothingToSave"));
+        return;
+    }
+    const S32 written = mDocuments.saveAll();
+    sawOwnWrites();
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(written);
+    if (written < unsaved)
+    {
+        args["[ERROR]"] = mDocuments.error();
+        setStatus(getString("EditSavedSomeAll", args));
+        return;
+    }
+    documentChanged(getString("EditSavedAll", args));
+}
+
+// ---------------------------------------------------------------------------
+// The history
+// ---------------------------------------------------------------------------
+
+// An action said in words. One step of one document is what that step did;
+// anything larger is said by its size, because a repair that wrote five files
+// is not any of the five things it wrote.
+std::string ALFloaterXUIStudio::describeAction(const ALXUIDocuments::Entry& entry) const
+{
+    // A run of steps to one field is that field, the same as one step to it.
+    if ((entry.steps == 1 || entry.sameField) && entry.documents == 1)
+    {
+        const std::string said = describeStep(entry.change);
+        if (!said.empty())
+        {
+            return said;
+        }
+    }
+    LLStringUtil::format_map_t args;
+    args["[STEPS]"] = std::to_string(entry.steps);
+    args["[FILES]"] = std::to_string(entry.documents);
+    return getString(entry.documents > 1 ? "StepManyFiles" : "StepManySteps", args);
+}
+
+void ALFloaterXUIStudio::fillHistory()
+{
+    if (!mHistory)
+    {
+        return;
+    }
+    // Whatever is still open has to be settled first, or the edit just made
+    // is not an action yet and the list is one behind.
+    mDocuments.settle();
+
+    const std::vector<ALXUIDocuments::Entry> history = mDocuments.history();
+    std::vector<ALHistoryList::Step> steps;
+    for (const ALXUIDocuments::Entry& entry : history)
+    {
+        ALHistoryList::Step step;
+        step.what = describeAction(entry);
+        std::string file;
+        std::string layer;
+        if (!entry.document.empty() && describeDocument(entry.document, file, layer))
+        {
+            step.where = file;
+        }
+        steps.push_back(std::move(step));
+    }
+    showHistory(mHistory, std::move(steps), mDocuments.inForce());
+    refreshModeCounts();
+}
+
+// A step chosen: put the documents back to just after it, however many undos
+// or redos that is. The set knows what each action touched, so this only has
+// to say how far.
+void ALFloaterXUIStudio::onHistoryGoTo(size_t in_force)
+{
+    // Bounded by the history, so that a set that stops answering does not
+    // spin here.
+    goToStep(in_force, [this]() { return mDocuments.inForce(); }, [this]() { return mDocuments.undo(); },
+             [this]() { return mDocuments.redo(); }, mDocuments.history().size() + 1);
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string((S32)mDocuments.inForce());
+    replayChange(getString("HistoryWentTo", args));
+    fillHistory();
+}
+
+// A row pointed at: the element that step was about, selected, so that
+// reading the list is also looking at what it is a list of.
+void ALFloaterXUIStudio::onHistoryStepChosen(size_t at)
+{
+    const std::vector<ALXUIDocuments::Entry> all = mDocuments.history();
+    if (at >= all.size())
+    {
+        return;
+    }
+    const ALXUIDocuments::Entry& entry = all[at];
+    // Only where the step named one element of the file being looked at:
+    // selecting in a file nobody has open would be a jump nobody asked for.
+    if ((entry.steps != 1 && !entry.sameField) || entry.documents != 1 || entry.change.path.empty())
+    {
+        return;
+    }
+    std::string file;
+    std::string layer;
+    if (describeDocument(entry.document, file, layer) && file == mFile)
+    {
+        mSelection.select(at < mDocuments.inForce() ? entry.change.after : entry.change.path);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The documents this tool has open
+// ---------------------------------------------------------------------------
+
+// A document is a layer of a file, and its path says so in a form nobody
+// reads: the catalog knows which file the layer belongs to and which layer it
+// is, so the row says that instead.
+bool ALFloaterXUIStudio::describeDocument(const std::string& path, std::string& file,
+                                          std::string& layer) const
+{
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        for (const ALXUICatalog::Layer& one : entry.layers)
+        {
+            if (one.path == path)
+            {
+                file = entry.name;
+                layer = layerName(one);
+                return true;
+            }
+        }
+    }
+    // A file the catalog does not have -- one written since it was read, or
+    // one from outside the skins -- is still a document, and its own name is
+    // the best thing to call it.
+    file = fileNameOf(path);
+    layer.clear();
+    return false;
+}
+
+void ALFloaterXUIStudio::fillDocuments()
+{
+    if (!mDocumentList)
+    {
+        return;
+    }
+    const std::string was = selectedDocument();
+    mDocumentList->deleteAllItems();
+    for (const std::string& path : mDocuments.paths())
+    {
+        const ALXUIEdit* held = mDocuments.find(path);
+        if (!held)
+        {
+            continue;
+        }
+        std::string file;
+        std::string layer;
+        describeDocument(path, file, layer);
+        mDocumentList->addElement(row(path, {
+            { "dirty", held->dirty() ? getString("DocumentDirtyMark") : std::string() },
+            { "file", file },
+            { "layer", layer },
+            { "steps", held->undoDepth() ? std::to_string((S32)held->undoDepth()) : std::string() } }));
+    }
+    // Whatever was selected stays selected; with nothing selected the row is
+    // the one an operation with no path of its own would mean.
+    const std::string& show = was.empty() ? mDocuments.activePath() : was;
+    if (!show.empty())
+    {
+        mDocumentList->setSelectedByValue(LLSD(show), true);
+    }
+    refreshModeCounts();
+    fillTabs();
+}
+
+std::string ALFloaterXUIStudio::selectedDocument() const
+{
+    const LLScrollListItem* item = mDocumentList ? mDocumentList->getFirstSelected() : nullptr;
+    return item ? item->getValue().asString() : std::string();
+}
+
+// Looking at a document is looking at the file it is a layer of, in the skin
+// and language that layer is: the set holds it either way, and what the canvas
+// shows is what a person means by which one they are working on.
+void ALFloaterXUIStudio::onDocumentSelected()
+{
+    // The same choice as a tab over the canvas, made from the list.
+    onTabChosen(selectedDocument());
+}
+
+void ALFloaterXUIStudio::onDocumentSave()
+{
+    const std::string path = selectedDocument();
+    ALXUIEdit* held = path.empty() ? nullptr : mDocuments.find(path);
+    if (!held || !held->dirty())
+    {
+        setStatus(getString("EditNothingToSave"));
+        return;
+    }
+    if (!held->save())
+    {
+        setStatus(held->error());
+        return;
+    }
+    sawOwnWrites();
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = fileNameOf(path);
+    documentChanged(getString("EditSaved", args));
+}
+
+void ALFloaterXUIStudio::onDocumentRevert()
+{
+    const std::string path = selectedDocument();
+    ALXUIEdit* held = path.empty() ? nullptr : mDocuments.find(path);
+    if (!held || !held->dirty())
+    {
+        setStatus(getString("EditNothingToSave"));
+        return;
+    }
+    if (!held->loadFile(path))
+    {
+        setStatus(held->error());
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = fileNameOf(path);
+    documentChanged(getString("EditReverted", args));
+}
+
+// Letting go of one takes its edits with it, and takes the whole history with
+// it as well -- an action naming a document that has gone cannot be put back.
+// So a document with work in it is not one to let go of on a single click:
+// save it or revert it, and then it is only a file.
+void ALFloaterXUIStudio::onDocumentClose()
+{
+    closeDocument(selectedDocument());
+}
+
+// Let go of a document. Edits not yet saved would go with it, so a document
+// with any asks first, with the answer that keeps them offered first.
+void ALFloaterXUIStudio::closeDocument(const std::string& path)
+{
+    ALXUIEdit* held = path.empty() ? nullptr : mDocuments.find(path);
+    if (!held)
+    {
+        return;
+    }
+    if (!held->dirty())
+    {
+        letGoOf(path);
+        return;
+    }
+    LLSD args;
+    args["FILE"] = fileNameOf(path);
+    LLSD payload;
+    payload["path"] = path;
+    LLNotificationsUtil::add("XUIStudioCloseDocument", args, payload,
+        [handle = getDerivedHandle<ALFloaterXUIStudio>()](const LLSD& notification, const LLSD& response)
+        {
+            if (ALFloaterXUIStudio* self = handle.get())
+            {
+                self->closeDocumentAnswered(notification["payload"]["path"].asString(),
+                                            LLNotificationsUtil::getSelectedOption(notification, response));
+            }
+            return false;
+        });
+}
+
+void ALFloaterXUIStudio::closeDocumentAnswered(const std::string& path, S32 option)
+{
+    ALXUIEdit* held = mDocuments.find(path);
+    if (!held)
+    {
+        return;
+    }
+    switch (option)
+    {
+    case 0:
+        // Save, then let go. A save that fails keeps the document, since
+        // its edits are then the only copy.
+        if (!held->save())
+        {
+            setStatus(held->error());
+            return;
+        }
+        sawOwnWrites();
+        letGoOf(path);
+        break;
+    case 1:
+        // The edits go with it, and what is on disk is what is shown.
+        letGoOf(path);
+        break;
+    default:
+        break;
+    }
+}
+
+void ALFloaterXUIStudio::letGoOf(const std::string& path)
+{
+    const bool dirty = mDocuments.find(path) && mDocuments.find(path)->dirty();
+    if (!mDocuments.close(path))
+    {
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = fileNameOf(path);
+    if (dirty)
+    {
+        // The file as the disk has it is not what the canvas was built
+        // from any more, so the build is made again from the disk.
+        documentChanged(getString("DocumentClosed", args));
+        return;
+    }
+    setStatus(getString("DocumentClosed", args));
+    fillDocuments();
+    fillHistory();
+}
+
+void ALFloaterXUIStudio::revertDocument()
+{
+    if (documentPath().empty() || !document().dirty())
+    {
+        setStatus(getString("EditNothingToSave"));
+        return;
+    }
+    if (!document().loadFile(documentPath()))
+    {
+        setStatus(document().error());
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = fileNameOf(documentPath());
+    documentChanged(getString("EditReverted", args));
+}
+
+// A preview the tool did not make has no handles to let go of.
+void ALFloaterXUIStudio::detachHost(LLFloater* host)
+{
+    if (ALXUIPreviewHost* preview = host ? host->as<ALXUIPreviewHost>() : nullptr)
+    {
+        preview->detach();
+    }
+}
+
+// The name a file is registered under, when the real floater is what the
+// author asked to see and this one may be built.
+//
+// A shell build shows what the file describes. It is the right answer for
+// reading a layout and the wrong one for anything the class does: the
+// callbacks a floater registers in its own constructor are not there, so
+// every one of them reads as unregistered, and a panel the file names by
+// class is a plain panel. The real floater answers all of that, and pays
+// for it -- a constructor that wants an agent, a region or an inventory
+// gets none of them at the login screen. So it is asked for, per file, and
+// a name the deny list carries is never built.
+std::string ALFloaterXUIStudio::realFloaterName(const ALXUICatalog::Entry& entry) const
+{
+    if (!mRealFloater || entry.kind != ALXUICatalog::Kind::Floater)
+    {
+        return LLStringUtil::null;
+    }
+    const std::string name = LLFloaterReg::findNameForFile(entry.name);
+    if (name.empty() || !LLFloaterReg::getBuildData(name))
+    {
+        return LLStringUtil::null;
+    }
+
+    // The viewer's own gate first: a floater it would refuse to show now is
+    // one this has no business building either.
+    if (!LLFloaterReg::canShowInstance(name))
+    {
+        return LLStringUtil::null;
+    }
+
+    const std::string deny = gSavedSettings.getString("ALXUIStudioRealFloaterDenyList");
+    for (size_t start = 0; start < deny.size();)
+    {
+        const size_t end = deny.find_first_of(" ,", start);
+        const std::string one = deny.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        if (one == name)
+        {
+            return LLStringUtil::null;
+        }
+        if (end == std::string::npos)
+        {
+            break;
+        }
+        start = end + 1;
+    }
+    return name;
+}
+
+// The floater the registrar builds, made fresh rather than fetched: the
+// instance the rest of the viewer shares is one the author may have open,
+// and a preview must not move it, retitle it or close it.
+LLFloater* ALFloaterXUIStudio::buildRealFloater(S32 which, const ALXUICatalog::Entry& entry,
+                                                const std::string& name, LLXMLNodePtr& node)
+{
+    // The layers as the tool reads them, which is also what the floater is
+    // built from: sending it to the file for a second read of its own would
+    // build the version on the disk, and what is being worked on here has
+    // not been written to the disk yet.
+    if (!ALXmlLayerMerge::loadSources(sourcesFor(entry.name), node, &mPreviews[which].overlay))
+    {
+        return nullptr;
+    }
+
+    const LLFloaterReg::BuildData* data = LLFloaterReg::getBuildData(name);
+    LLFloater* floater = data->mFunc ? data->mFunc(LLSD()) : nullptr;
+    if (!floater)
+    {
+        return nullptr;
+    }
+    if (!floater->buildFromXML(node, data->mFile))
+    {
+        floater->closeFloater();
+        return nullptr;
+    }
+    return floater;
+}
+
+void ALFloaterXUIStudio::showPreview(S32 which)
+{
+    closePreview(which);
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry)
+    {
+        setStatus(getString("NoFile"));
+        return;
+    }
+    Preview& pv = mPreviews[which];
+    pv.skin = mSkin;
+    pv.language = which == PRIMARY ? mLanguage : mLanguage2;
+
+    // A widget file or template names its tag in its root or its name;
+    // a viewer widget's constructor is not run by a shell build.
+    std::string widget_tag;
+    if (entry->kind == ALXUICatalog::Kind::Widget)
+    {
+        widget_tag = entry->rootTag;
+    }
+    else if (entry->kind == ALXUICatalog::Kind::Template)
+    {
+        widget_tag = mFile.substr(mFile.rfind('/') + 1);
+        widget_tag = widget_tag.substr(0, widget_tag.size() - 4);
+    }
+    const bool viewer_widget = !widget_tag.empty() && !ALXUICatalog::isCoreWidgetTag(widget_tag);
+    // A template is built from nothing but its tag, and a tag that wants a
+    // model, a parent or children it is not given asserts in its own
+    // building rather than showing anything.
+    const bool template_alone = entry->kind == ALXUICatalog::Kind::Template && !viewer_widget
+                             && !ALXUISchema::buildsAlone(widget_tag);
+
+    // notifications.xml is a file of templates rather than a view tree; it
+    // is built once one of them has been chosen on the Notifications tab.
+    const bool notification = entry->kind == ALXUICatalog::Kind::Notifications && !mNotification.empty();
+    if ((!ALXUICatalog::isBuilt(entry->kind) && !notification) || viewer_widget || template_alone)
+    {
+        if (which == PRIMARY)
+        {
+            LLStringUtil::format_map_t args;
+            args["[TAG]"] = widget_tag;
+            setStatus(viewer_widget ? getString("ViewerWidget", args)
+                    : template_alone ? getString("TemplateAlone", args)
+                                     : getString("NotBuilt"));
+            runLint();
+            fillFindings();
+            refreshBreadcrumb();
+            refreshInspectors();
+        }
+        return;
+    }
+
+    LLFloater* host = nullptr;
+    LLView* root = nullptr;
+    LLXMLNodePtr node;
+    LLTimer timer;
+    if (const std::string registered = realFloaterName(*entry); !registered.empty())
+    {
+        ALXUISkinScope scope(pv.skin, pv.language);
+        ALXUIDiagnostics sink;
+        host = buildRealFloater(which, *entry, registered, node);
+        root = host;
+        pv.diagnostics = sink.entries();
+    }
+    else
+    {
+        ALXUISkinScope scope(pv.skin, pv.language);
+        ALXUIShellBuild shell;
+        ALXUIDiagnostics sink;
+
+        // Every variant is drawn in the window, on the row, where the
+        // developer is already looking. Only a preview the developer asked
+        // to float gets a window of its own.
+        if (ALXUICanvas* canvas = mFloatPreview ? nullptr : mCanvases[which])
+        {
+            pv.canvas = canvas->getHandle();
+            mCanvasRow->show(canvas, true);
+            root = buildRoot(which, *entry, canvas, node);
+        }
+        else
+        {
+            LLFloater::Params p(LLFloater::getDefaultParams());
+            p.min_height = p.header_height;
+            p.min_width = 10;
+            p.can_resize = true;
+            ALXUIPreviewHost* preview = new ALXUIPreviewHost(this, which, p);
+            host = preview;
+            preview->canvas()->setBackdrop(mBackdrop);
+            pv.canvas = preview->canvas()->getHandle();
+            root = buildRoot(which, *entry, preview->canvas(), node);
+            if (root)
+            {
+                preview->sizeToCanvas(preview->canvas()->contentWidth(),
+                                      preview->canvas()->contentHeight());
+            }
+        }
+        pv.diagnostics = sink.entries();
+    }
+    pv.seconds = timer.getElapsedTimeF32();
+
+    if (!root)
+    {
+        if (host)
+        {
+            detachHost(host);
+            host->closeFloater();
+        }
+        if (ALXUICanvas* canvas = mCanvases[which])
+        {
+            mCanvasRow->show(canvas, false);
+        }
+        layoutCanvases();
+        if (which == PRIMARY)
+        {
+            LLStringUtil::format_map_t args;
+            args["[FILE]"] = mFile;
+            setStatus(getString("BuildFailed", args));
+            runLint();
+            fillFindings();
+        }
+        return;
+    }
+
+    if (ALXUICanvas* canvas = canvasOf(pv))
+    {
+        canvas->setRoot(root);
+    }
+    layoutCanvases();
+    // A floater file has a title of its own, and it is the useful one; a
+    // registered floater is its own host and so is the same case.
+    const LLFloater* titled = root == host ? host : (root ? root->as<LLFloater>() : nullptr);
+    std::string title = titled ? titled->getTitle() : mFile;
+    title += " [" + pv.skin + "/" + pv.language + (which == PRIMARY ? "" : ", second") + "]";
+    if (host)
+    {
+        host->setTitle(title);
+        pv.host = host->getHandle();
+    }
+    pv.root = root;
+    pv.node = node;
+    pv.views = countViews(root);
+    // A notification's panel comes from its own XUI, not from the file the
+    // template is in: there is no element in notifications.xml that any of
+    // those widgets was built from, so nothing is paired with one.
+    pv.sourceMap.build(root, entry->kind == ALXUICatalog::Kind::Notifications ? LLXMLNodePtr() : node);
+    if (host)
+    {
+        placeHost(which, host);
+        host->openFloater();
+    }
+
+    if (which == PRIMARY)
+    {
+        watchFiles(*entry);
+        // Before the tree: a row shows the findings under it, and the
+        // rows are made once.
+        runLint();
+        rebuildTree();
+        fillFindings();
+        const S32 findings = (S32)pv.lint.findings().size();
+        LLStringUtil::format_map_t args;
+        args["[VIEWS]"] = std::to_string(pv.views);
+        args["[MS]"] = std::to_string((S32)(pv.seconds * 1000.f));
+        args["[DIAG]"] = std::to_string(findings);
+        args["[SKIN]"] = pv.skin;
+        args["[LANG]"] = pv.language;
+        // Which build this was, since the answer to almost every other
+        // question the tool gives depends on it.
+        setStatus(getString(!host || host->as<ALXUIPreviewHost>() ? "Built" : "BuiltReal", args));
+        fillTranslation();
+        // The selection is a path; it may name something in the new tree.
+        onSelectionChanged();
+    }
+}
+
+void ALFloaterXUIStudio::watchFiles(const ALXUICatalog::Entry& entry)
+{
+    Preview& pv = mPreviews[PRIMARY];
+    pv.liveFiles.clear();
+    for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(entry, pv.skin, pv.language))
+    {
+        // Watched from as it stands: only a change after this reloads.
+        auto live = std::make_unique<ALWatchedFile>(layer->path, [this](const std::string&) { fileChanged(); });
+        live->poll(1.f);
+        pv.liveFiles.push_back(std::move(live));
+    }
+}
+
+void ALFloaterXUIStudio::sawOwnWrites()
+{
+    for (const std::unique_ptr<ALWatchedFile>& live : mPreviews[PRIMARY].liveFiles)
+    {
+        live->seen();
+    }
+}
+
+// Only the layers of the previewed file are watched, so a change on disk
+// is a change to what is on screen: that one entry is read again rather
+// than the whole tree. The tool's own writes are marked seen as they are
+// made (sawOwnWrites), and the watchers are made afresh by the rebuild
+// that follows them.
+void ALFloaterXUIStudio::fileChanged()
+{
+    // Not while there is work in hand. A rebuild reads the layers again,
+    // and the layer under edit would come back as the disk has it: the
+    // author is told instead, and chooses which of the two to keep.
+    if (documentDirty())
+    {
+        // Named for the file with the work in it, which is not always the
+        // one an operation with no path of its own means.
+        std::string dirty = documentPath();
+        for (const std::string& path : mDocuments.paths())
+        {
+            if (const ALXUIEdit* held = mDocuments.find(path); held && held->dirty())
+            {
+                dirty = path;
+                break;
+            }
+        }
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = fileNameOf(dirty);
+        setStatus(getString("EditChangedOnDisk", args));
+        return;
+    }
+
+    // What is held clean is the disk's copy, and the disk has moved on:
+    // read again, or the build that follows would be of the old text.
+    if (mDocuments.rereadClean() > 0)
+    {
+        fillDocuments();
+        fillHistory();
+    }
+    // The check runs from a timer; the rebuild waits for the next frame.
+    mReloadEntryOnly = true;
+    mReloadFromDisk = true;
+    mReloadPending = true;
+}
+
+void ALFloaterXUIStudio::reloadAll()
+{
+    mReloadEntryOnly = false;
+    mReloadFromDisk = true;
+    mReloadPending = true;
+}
+
+void ALFloaterXUIStudio::showGallery()
+{
+    ALXUIPreviewHost* host = nullptr;
+    LLScrollContainer* scroller = nullptr;
+    LLPanel* content = nullptr;
+    S32 built = 0;
+    {
+        ALXUISkinScope scope(mSkin, mLanguage);
+        ALXUIShellBuild shell;
+        ALXUIDiagnostics sink;
+
+        LLFloater::Params p(LLFloater::getDefaultParams());
+        p.min_height = 100;
+        p.min_width = 200;
+        host = new ALXUIPreviewHost(this, SECONDARY, p);
+        host->sizeToCanvas(900, 640);
+        host->setCanResize(true);
+        LLStringUtil::format_map_t title_args;
+        title_args["[SKIN]"] = mSkin;
+        title_args["[LANG]"] = mLanguage;
+        host->setTitle(getString("GalleryTitle", title_args));
+
+        // A child registry keeps its static registrations in a scope of
+        // their own; the widget type registry lists every tag, and the
+        // default child registry says which of them it builds.
+        std::vector<std::string> tags;
+        const auto& registrar = LLWidgetTypeRegistry::instance().defaultRegistrar();
+        for (auto it = registrar.beginItems(); it != registrar.endItems(); ++it)
+        {
+            if (galleryTag(it->first) && LLDefaultChildRegistry::instance().getValue(it->first))
+            {
+                tags.push_back(it->first);
+            }
+        }
+        std::sort(tags.begin(), tags.end());
+
+        constexpr S32 COLUMNS = 4;
+        constexpr S32 CELL_W = 220;
+        constexpr S32 CELL_H = 64;
+        const S32 rows = ((S32)tags.size() + COLUMNS - 1) / COLUMNS;
+        const S32 content_h = rows * CELL_H + 8;
+
+        LLScrollContainer::Params sp(LLUICtrlFactory::getDefaultParams<LLScrollContainer>());
+        sp.name = "gallery_scroller";
+        sp.rect = host->canvas()->getLocalRect();
+        sp.follows.flags = FOLLOWS_ALL;
+        scroller = LLUICtrlFactory::create<LLScrollContainer>(sp);
+        host->canvas()->addChild(scroller);
+
+        LLPanel::Params cp;
+        cp.name = "gallery";
+        cp.rect = LLRect(0, content_h, COLUMNS * CELL_W + 8, 0);
+        content = LLUICtrlFactory::create<LLPanel>(cp);
+        scroller->addChild(content);
+
+        LLUICtrlFactory& factory = LLUICtrlFactory::instance();
+        S32 i = 0;
+        for (const std::string& tag : tags)
+        {
+            const S32 col = i % COLUMNS;
+            const S32 r = i / COLUMNS;
+            const S32 left = 8 + col * CELL_W;
+            const S32 top = 4 + r * CELL_H;
+            ++i;
+
+            const std::string label_xml = "<text name=\"label_" + tag + "\" layout=\"topleft\" left=\"" + std::to_string(left)
+                + "\" top=\"" + std::to_string(top) + "\" width=\"" + std::to_string(CELL_W - 16) + "\" height=\"14\" font=\"SansSerifSmall\">"
+                + tag + "</text>";
+            LLXMLNodePtr label_node;
+            if (LLXMLNode::parseBuffer(label_xml.data(), label_xml.size(), label_node))
+            {
+                factory.createFromXML(label_node, content, "gallery", LLDefaultChildRegistry::instance());
+            }
+
+            const std::string xml = "<" + tag + " name=\"" + tag + "\" label=\"" + tag + "\" layout=\"topleft\" left=\""
+                + std::to_string(left) + "\" top=\"" + std::to_string(top + 16) + "\" width=\"" + std::to_string(CELL_W - 16)
+                + "\" height=\"24\"/>";
+            LLXMLNodePtr node;
+            if (LLXMLNode::parseBuffer(xml.data(), xml.size(), node))
+            {
+                factory.pushFileName("gallery");
+                built += factory.createFromXML(node, content, "gallery", LLDefaultChildRegistry::instance()) != nullptr;
+                factory.popFileName();
+            }
+        }
+    }
+    host->canvas()->setRoot(content);
+    host->detach();
+    host->center();
+    gFloaterView->adjustToFitScreen(host, false);
+    host->openFloater();
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(built);
+    args["[SKIN]"] = mSkin;
+    args["[LANG]"] = mLanguage;
+    setStatus(getString("GalleryBuilt", args));
+}
+
+// ---------------------------------------------------------------------------
+// The canvas
+// ---------------------------------------------------------------------------
+void ALFloaterXUIStudio::canvasHover(S32 which, const LLView* view)
+{
+    ALXUISelection::path_t path;
+    if (view && ALXUISelection::pathOf(view, mPreviews[which].root, path))
+    {
+        mSelection.setHover(path);
+    }
+    else
+    {
+        mSelection.clearHover();
+    }
+}
+
+void ALFloaterXUIStudio::canvasSelect(S32 which, const LLView* view)
+{
+    ALXUISelection::path_t path;
+    if (view && ALXUISelection::pathOf(view, mPreviews[which].root, path))
+    {
+        mSelection.select(path);
+    }
+}
+
+// Letting go of what was selected. Every region follows the selection, so
+// the outline, the inspectors and the marks on every canvas go with it.
+void ALFloaterXUIStudio::canvasDeselect()
+{
+    mSelection.clearSelection();
+}
+
+void ALFloaterXUIStudio::canvasSelectAlso(S32 which, const LLView* view)
+{
+    ALXUISelection::path_t path;
+    if (view && ALXUISelection::pathOf(view, mPreviews[which].root, path))
+    {
+        mSelection.selectAlso(path);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The tree pane
+// ---------------------------------------------------------------------------
+void ALFloaterXUIStudio::clearTree()
+{
+    mRows.clear();
+    mModel.setCanvasHover(nullptr);
+    mModel.clear();
+    if (mTree)
+    {
+        mTreePanel->deleteAllChildren();
+        mTree = nullptr;
+    }
+}
+
+void ALFloaterXUIStudio::refreshTreeSuffixes()
+{
+    for (const auto& [path, widget] : mRows)
+    {
+        if (widget)
+        {
+            widget->refreshSuffix();
+        }
+    }
+}
+
+void ALFloaterXUIStudio::rebuildTree()
+{
+    // What the outline looked like before, since an edit rebuilds it and the
+    // developer did not ask for it to be rebuilt. Rows are made from views,
+    // and a rebuilt preview is a tree of different views, so the rows have
+    // to go -- what does not have to go is which of them were open and where
+    // the list had been scrolled to.
+    boost::unordered_set<std::string> was_open;
+    S32 was_scrolled = 0;
+    const bool remembering = !mRows.empty();
+    if (remembering)
+    {
+        for (const auto& [path, widget] : mRows)
+        {
+            if (const LLFolderViewFolder* folder = widget ? widget->as<LLFolderViewFolder>() : nullptr;
+                folder && folder->isOpen())
+            {
+                // A row that was open is named by the path it had, and a
+                // rename since then moved that path: brought along here, so
+                // that renaming an element does not close it and everything
+                // under it.
+                ALXUISelection::path_t open = ALXUISelection::fromString(path);
+                if (!mRenamedFrom.empty())
+                {
+                    ALXUIEdit::afterRenaming(mRenamedFrom, mRenamedTo, open);
+                }
+                was_open.insert(ALXUISelection::toString(open));
+            }
+        }
+        if (mTree)
+        {
+            if (const LLScrollContainer* scroller = mTree->getParentByType<LLScrollContainer>())
+            {
+                was_scrolled = scroller->getDocPosVertical();
+            }
+        }
+    }
+
+    clearTree();
+    Preview& pv = mPreviews[PRIMARY];
+    ALXUITreeItem* root_item = mModel.build(pv.root, pv.sourceMap);
+    if (!root_item)
+    {
+        return;
+    }
+
+    // A folder view never draws its own root, so the file's root cannot be
+    // it: that left the one element nobody could select, the floater or the
+    // panel whose own attributes say how big it is. The view gets a
+    // container of its own that stands for the document, and the file's root
+    // is a row under it.
+    //
+    // The two have to be different objects. A folder adopts a row by telling
+    // its own item to take the row's as a child, and an item told to take
+    // itself becomes its own parent -- after which every walk up the parents
+    // from anywhere under it runs for ever, which is a window that opens and
+    // never comes back.
+    LLPointer<ALXUITreeItem> document = new ALXUITreeItem(pv.root, root_item->getTag(), false, 0,
+                                                          ALXUISelection::path_t(), mModel);
+
+    LLFolderView::Params p(LLUICtrlFactory::getDefaultParams<LLFolderView>());
+    p.name = "xui_tree";
+    p.title = root_item->getName();
+    p.rect = LLRect(0, 0, mTreePanel->getRect().getWidth(), 0);
+    p.parent_panel = mTreePanel;
+    p.listener = document.get();
+    p.view_model = &mModel;
+    p.root = nullptr;
+    p.use_ellipses = true;
+    // A row says more than a name: its tag, how big it is, whether it is
+    // shown, and how many findings are on it and everything under it. The
+    // model composes all of that, and a folder view says none of it unless
+    // it is told to -- the parameter carries no default.
+    p.use_label_suffix = true;
+    p.options_menu = "menu_xui_studio_tree.xml";
+    mTree = LLUICtrlFactory::create<LLFolderView>(p);
+    mTree->setCallbackRegistrar(&mCommitCallbackRegistrar);
+    mTree->setEnableRegistrar(&mEnableCallbackRegistrar);
+
+    LLRect scroller_rect = mTreePanel->getLocalRect();
+    LLScrollContainer::Params sp(LLUICtrlFactory::getDefaultParams<LLFolderViewScrollContainer>());
+    sp.rect(scroller_rect);
+    LLScrollContainer* scroller = LLUICtrlFactory::create<LLFolderViewScrollContainer>(sp);
+    scroller->setFollowsAll();
+    mTreePanel->addChild(scroller);
+    scroller->addChild(mTree);
+    mTree->setScrollContainer(scroller);
+    mTree->setFollowsAll();
+    mTree->addChild(mTree->mStatusTextBox);
+    mTree->setSelectCallback(boost::bind(&ALFloaterXUIStudio::onTreeSelection, this, _1, _2));
+    mModel.setFolderView(mTree);
+
+    // The file's root is a row like any other, and its attributes -- the
+    // size, the title, whether it can be resized -- are edited where every
+    // other element's are.
+    LLFolderViewItem* root_row = createRow(root_item, mTree);
+    if (root_item->hasChildren())
+    {
+        createRows(root_item, static_cast<LLFolderViewFolder*>(root_row));
+    }
+    // Everything open the first time a file is shown, and afterwards exactly
+    // what was open before: a rebuild the developer did not ask for should
+    // leave the list reading the way they left it.
+    mTree->setOpenArrangeRecursively(true, LLFolderViewFolder::RECURSE_DOWN);
+    if (remembering)
+    {
+        for (const auto& [path, widget] : mRows)
+        {
+            if (LLFolderViewFolder* folder = widget ? widget->as<LLFolderViewFolder>() : nullptr;
+                folder && !was_open.count(path))
+            {
+                folder->setOpen(false);
+            }
+        }
+    }
+    mTree->arrangeAll();
+    mModel.getFilter().setModified();
+    mRenamedFrom.clear();
+    mRenamedTo.clear();
+    if (was_scrolled > 0)
+    {
+        if (LLScrollContainer* scroller = mTree->getParentByType<LLScrollContainer>())
+        {
+            scroller->setDocPosVertical(was_scrolled);
+        }
+    }
+}
+
+// One widget for one item, in the folder it belongs to. A row that holds
+// nothing is a row; anything else is a folder, because that is what can be
+// opened.
+LLFolderViewItem* ALFloaterXUIStudio::createRow(ALXUITreeItem* item, LLFolderViewFolder* parent_widget)
+{
+    static const LLUIColor from_xml_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", LLColor4::white);
+    static const LLUIColor code_built_color = LLUIColorTable::instance().getColor("MenuItemDisabledColor", LLColor4::grey);
+    static const LLUIColor highlight_color = LLUIColorTable::instance().getColor("MenuItemHighlightColor", LLColor4::white);
+
+    LLFolderViewItem::Params params(LLUICtrlFactory::getDefaultParams<LLFolderViewItem>());
+    params.name = item->getName();
+    params.root = mTree;
+    params.listener = item;
+    params.tool_tip = ALXUISelection::toString(item->getPath());
+    params.text_pad_right = ALXUITreeEye::WIDTH + 4;
+    params.font_color = item->isFromXML() ? from_xml_color : code_built_color;
+    params.font_highlight_color = highlight_color;
+
+    LLFolderViewItem* widget;
+    if (item->hasChildren())
+    {
+        ALXUITreeFolder* folder = LLUICtrlFactory::create<ALXUITreeFolder>(params);
+        folder->setChildrenInited(true);
+        widget = folder;
+    }
+    else
+    {
+        widget = LLUICtrlFactory::create<ALXUITreeRow>(params);
+    }
+    widget->addToFolder(parent_widget);
+    mRows[ALXUISelection::toString(item->getPath())] = widget;
+    return widget;
+}
+
+void ALFloaterXUIStudio::createRows(ALXUITreeItem* item, LLFolderViewFolder* parent_widget)
+{
+    for (auto it = item->getChildrenBegin(); it != item->getChildrenEnd(); ++it)
+    {
+        ALXUITreeItem* child = static_cast<ALXUITreeItem*>(it->get());
+        LLFolderViewItem* widget = createRow(child, parent_widget);
+        if (child->hasChildren())
+        {
+            createRows(child, static_cast<LLFolderViewFolder*>(widget));
+        }
+    }
+}
+
+void ALFloaterXUIStudio::onTreeFilter()
+{
+    mModel.getFilter().setWords(mTreeFilter->getText());
+}
+
+void ALFloaterXUIStudio::onTreeSelection(const std::deque<LLFolderViewItem*>& items, bool user_action)
+{
+    if (mSyncingTree)
+    {
+        return;
+    }
+    // Nothing chosen in the outline is nothing selected. Taking the last row
+    // out of the selection is how a reader says they are done with it, and
+    // the marks on the canvas go with it -- but only when a reader did it: a
+    // rebuild or a filter empties the outline too, and neither of those is
+    // anybody saying anything.
+    if (items.empty() || !items.front())
+    {
+        if (user_action)
+        {
+            mSyncingTree = true;
+            mSelection.clearSelection();
+            mSyncingTree = false;
+        }
+        return;
+    }
+    ALXUITreeItem* item = static_cast<ALXUITreeItem*>(items.front()->getViewModelItem());
+    if (!item)
+    {
+        return;
+    }
+    mSyncingTree = true;
+    // The outline can hold several rows at once, and the first of them is
+    // the one every pane is about. The rest come along as the others in the
+    // selection, which is the same thing a shift-click on the canvas makes.
+    mSelection.select(item->getPath());
+    for (auto it = std::next(items.begin()); it != items.end(); ++it)
+    {
+        if (const LLFolderViewItem* row = *it)
+        {
+            if (const ALXUITreeItem* also = static_cast<const ALXUITreeItem*>(row->getViewModelItem()))
+            {
+                mSelection.selectAlso(also->getPath());
+            }
+        }
+    }
+    mSyncingTree = false;
+}
+
+void ALFloaterXUIStudio::onTreeHover(const ALXUITreeItem* item)
+{
+    if (item)
+    {
+        mSelection.setHover(item->getPath());
+    }
+    else
+    {
+        mSelection.clearHover();
+    }
+}
+
+ALXUITreeItem* ALFloaterXUIStudio::selectedItem() const
+{
+    return mSelection.hasSelection() ? mModel.itemFor(mSelection.selection()) : nullptr;
+}
+
+bool ALFloaterXUIStudio::onTreeActionEnabled(const LLSD& param)
+{
+    const std::string action = param.asString();
+    if (action == "reveal")
+    {
+        ALXUITreeItem* item = selectedItem();
+        return item && item->isFromXML();
+    }
+    if (action == "paste")
+    {
+        return !mCutPath.empty();
+    }
+    if (action == "open_nested")
+    {
+        return !nestedFile(selectedView()).empty();
+    }
+    return true;
+}
+
+void ALFloaterXUIStudio::onTreeAction(const LLSD& param)
+{
+    const std::string action = param.asString();
+    ALXUITreeItem* item = selectedItem();
+    if (action == "expand_all" || action == "collapse_all")
+    {
+        if (mTree)
+        {
+            mTree->setOpenArrangeRecursively(action == "expand_all", LLFolderViewFolder::RECURSE_DOWN);
+            mTree->arrangeAll();
+        }
+        return;
+    }
+    if (!item)
+    {
+        return;
+    }
+    if (action == "reveal")
+    {
+        onJumpToSource();
+    }
+    else if (action == "copy_path")
+    {
+        const std::string text = ALXUISelection::toString(item->getPath());
+        LLClipboard::instance().copyToClipboard(text, 0, (S32)text.size());
+    }
+    else if (action == "copy_getchild")
+    {
+        std::string type = item->getView()->viewType()->mName;
+        const std::string text = "getChild<" + type + ">(\"" + item->getName() + "\")";
+        LLClipboard::instance().copyToClipboard(text, 0, (S32)text.size());
+    }
+    else if (action == "toggle_visible")
+    {
+        item->toggleShown();
+    }
+    else if (action == "open_nested")
+    {
+        openNestedFile();
+    }
+    else if (action == "move_up" || action == "move_down" || action == "move_in"
+          || action == "move_out" || action == "cut" || action == "paste"
+          || action == "delete" || action == "duplicate")
+    {
+        restructure(action, item->getPath());
+    }
+}
+
+// Which edge of its parent an element is tied to, written as the file
+// writes it. The flags in force are the merged document's answer, whatever
+// layer or widget template put them there, so a first click on an element
+// that says nothing writes what it already does with one edge changed --
+// which is what the overlay was showing.
+void ALFloaterXUIStudio::toggleFollows(S32 edge)
+{
+    static const U32 flags[] = { FOLLOWS_LEFT, FOLLOWS_BOTTOM, FOLLOWS_RIGHT, FOLLOWS_TOP };
+    if (edge < 0 || edge >= (S32)LL_ARRAY_SIZE(flags))
+    {
+        return;
+    }
+    LLView* view = selectedView();
+    if (!view)
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry)
+    {
+        return;
+    }
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/false);
+    if (!held)
+    {
+        return;
+    }
+
+    const std::string text = ALFollowsControl::followsText(view->getFollows() ^ flags[edge]);
+    if (!held->setAttribute(mSelection.selection(), "follows", text))
+    {
+        setStatus(held->error());
+        return;
+    }
+    const std::string said = saidWrite("EditWrote", "follows=\"" + text + "\"", *layer);
+    if (applyLive(mSelection.selection(), "follows", text))
+    {
+        documentRead(said);
+        refreshInspectors();
+        return;
+    }
+    documentChanged(said);
+}
+
+// A selection inside a tab, an accordion or a scroll container is not on
+// screen until its container shows it, and an author selecting a row in
+// the tree means to look at the thing. So the containers are told.
+void ALFloaterXUIStudio::revealInContainers(LLView* view)
+{
+    if (!view)
+    {
+        return;
+    }
+    for (LLView* child = view; child && child->getParent(); child = child->getParent())
+    {
+        LLView* parent = child->getParent();
+        if (LLTabContainer* tabs = parent->as<LLTabContainer>())
+        {
+            if (LLPanel* panel = child->as<LLPanel>())
+            {
+                tabs->selectTabPanel(panel);
+            }
+        }
+        else if (LLAccordionCtrlTab* tab = parent->as<LLAccordionCtrlTab>())
+        {
+            if (!tab->getDisplayChildren())
+            {
+                tab->setDisplayChildren(true);
+            }
+        }
+        else if (LLScrollContainer* scroll = parent->as<LLScrollContainer>())
+        {
+            scroll->scrollToShowRect(child->getRect());
+        }
+    }
+}
+
+// The four buttons over the tree, and the keys that do the same: an
+// outline is edited by moving a line up, down, in and out, and a tree of
+// widgets is an outline.
+void ALFloaterXUIStudio::onTreeMove(const std::string& action)
+{
+    if (ALXUITreeItem* item = selectedItem())
+    {
+        restructure(action, item->getPath());
+    }
+    else
+    {
+        setStatus(getString("EditNoSelection"));
+    }
+}
+
+// The four things an editor does to the shape of a file: order among
+// siblings, take an element somewhere else, and take it away.
+//
+// Reparenting is two steps rather than a drag, because the tree is where
+// the hierarchy is legible and a drag in it would have to mean three
+// things at once -- before, after, or into. Cut names the element; the
+// next selection is where it goes.
+void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelection::path_t& path)
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || path.empty())
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+
+    if (action == "cut")
+    {
+        mCutPath = path;
+        LLStringUtil::format_map_t args;
+        args["[WHAT]"] = ALXUISelection::toString(path);
+        setStatus(getString("EditCut", args));
+        return;
+    }
+
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/false);
+    if (!held)
+    {
+        return;
+    }
+
+    bool ok = false;
+    std::string what;
+    // Where the element is afterwards, so that what pointed at it points
+    // at it still: an element moved has left the path it had, and one
+    // removed leaves what held it.
+    ALXUISelection::path_t afterwards;
+    if (action == "delete")
+    {
+        ok = held->removeElement(path);
+        what = "EditRemoved";
+        if (ok)
+        {
+            afterwards.assign(path.begin(), path.end() - 1);
+            if (mCutPath == path
+                || (mCutPath.size() > path.size()
+                    && std::equal(path.begin(), path.end(), mCutPath.begin())))
+            {
+                mCutPath.clear();
+            }
+            else
+            {
+                ALXUIEdit::afterRemoving(path, mCutPath);
+            }
+        }
+    }
+    else if (action == "duplicate")
+    {
+        // A copy after the original, which is where the selection goes: a
+        // copy is made to be changed, and the change is the next thing.
+        ok = held->duplicateElement(path);
+        what = "EditDuplicated";
+        if (ok)
+        {
+            afterwards = landing(*held);
+        }
+    }
+    else if (action == "paste")
+    {
+        if (mCutPath.empty())
+        {
+            setStatus(getString("EditNothingCut"));
+            return;
+        }
+        // Into the element the tree has now, which is where the author is
+        // pointing; a cut of the very thing pointed at goes nowhere, and
+        // neither does a cut of anything it is inside.
+        if (mCutPath == path
+            || (path.size() > mCutPath.size()
+                && std::equal(mCutPath.begin(), mCutPath.end(), path.begin())))
+        {
+            setStatus(getString("EditNothingCut"));
+            return;
+        }
+        ok = held->moveElement(mCutPath, path);
+        mCutPath.clear();
+        what = "EditMoved";
+        if (ok)
+        {
+            afterwards = landing(*held);
+        }
+    }
+    else if (action == "move_in")
+    {
+        // Into the element above it, which is the outline gesture: what is
+        // above a thing is what it would become part of.
+        ALXUISelection::path_t sibling;
+        if (!siblingOf(*held, path, /*before=*/true, sibling))
+        {
+            setStatus(getString("EditNoSibling"));
+            return;
+        }
+        ok = held->moveElement(path, sibling);
+        what = "EditMoved";
+        if (ok)
+        {
+            afterwards = landing(*held);
+        }
+    }
+    else if (action == "move_out")
+    {
+        // Out to sit after its parent among that parent's siblings, which
+        // is where a thing goes when it stops being part of one.
+        if (path.size() < 2)
+        {
+            setStatus(getString("EditNoSibling"));
+            return;
+        }
+        ALXUISelection::path_t parent(path.begin(), path.end() - 1);
+        ok = held->moveAfter(path, parent);
+        what = "EditMoved";
+        if (ok)
+        {
+            afterwards = landing(*held);
+        }
+    }
+    else
+    {
+        // Among the siblings, which is what a menu, a tab container and a
+        // layout stack are: the element before or after this one in the
+        // file, which the document knows and the built tree does not.
+        ALXUISelection::path_t sibling;
+        if (!siblingOf(*held, path, action == "move_up", sibling))
+        {
+            setStatus(getString("EditNoSibling"));
+            return;
+        }
+        ok = action == "move_up" ? held->moveBefore(path, sibling)
+                                 : held->moveAfter(path, sibling);
+        what = "EditMoved";
+        if (ok)
+        {
+            afterwards = landing(*held);
+        }
+    }
+
+    if (!ok)
+    {
+        setStatus(held->error());
+        return;
+    }
+    if (mSelection.hasSelection() && mSelection.selection() == path)
+    {
+        if (afterwards.empty())
+        {
+            mSelection.clearSelection();
+        }
+        else
+        {
+            mSelection.select(afterwards);
+        }
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[WHERE]"] = path.back();
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layerName(*layer);
+    documentChanged(getString(what, args));
+}
+
+// Where an element came to rest, as the document says: the path it had
+// names a place it has left, and a path is what the selection and
+// everything else the tool holds is. The document knows because it read
+// the element off the file after the splice, which is the only place the
+// answer is right when the element shares its name with a sibling.
+ALXUISelection::path_t ALFloaterXUIStudio::landing(const ALXUIEdit& held)
+{
+    const ALXUIEdit::Change* step = held.nextUndo();
+    return step ? step->after : ALXUISelection::path_t();
+}
+
+// The element before or after this one among its parent's children, in
+// the document rather than in the built tree: the file's order is what a
+// move changes, and a widget may build children of its own that no
+// element describes.
+bool ALFloaterXUIStudio::siblingOf(const ALXUIEdit& document, const ALXUISelection::path_t& path,
+                                   bool before, ALXUISelection::path_t& out) const
+{
+    pugi::xml_node node = document.resolve(path);
+    pugi::xml_node found = before ? node.previous_sibling() : node.next_sibling();
+    while (found && found.type() != pugi::node_element)
+    {
+        found = before ? found.previous_sibling() : found.next_sibling();
+    }
+    if (!found)
+    {
+        return false;
+    }
+    out = ALXUICatalog::namePath(found, /*any_tag=*/true);
+    return !out.empty();
+}
+
+// The preview as it stands on screen, cropped out of a snapshot of the
+// window with the UI drawn. The preview is brought to the front first,
+// since what is over it is what would be captured.
+void ALFloaterXUIStudio::capturePreview()
+{
+    // What is captured: the preview's own window where it has one, else
+    // the preview as it is drawn on the canvas in this window -- through
+    // the zoom, and only what of it can be seen, since a snapshot is of
+    // the screen.
+    const Preview& pv = mPreviews[PRIMARY];
+    LLFloater* host = pv.host.get();
+    LLRect screen;
+    if (host)
+    {
+        host->setFrontmost(false);
+        screen = host->calcScreenRect();
+    }
+    else if (ALXUICanvas* canvas = pv.root ? mCanvases[PRIMARY] : nullptr; canvas && canvas->getVisible())
+    {
+        const F32 zoom = canvas->zoom();
+        const LLRect content = canvas->localRectOf(pv.root);
+        LLRect drawn(ll_round((F32)content.mLeft * zoom), ll_round((F32)content.mTop * zoom),
+                     ll_round((F32)content.mRight * zoom), ll_round((F32)content.mBottom * zoom));
+        drawn.intersectWith(canvas->viewportRect());
+        canvas->localRectToScreen(drawn, &screen);
+    }
+    else
+    {
+        setStatus(getString("CaptureNoPreview"));
+        return;
+    }
+
+    LLPointer<LLImageRaw> capture;
+    switch (ALViewCapture::captureScreenRect(screen, capture))
+    {
+    case ALViewCapture::Outcome::NoSnapshot:
+        setStatus(getString("CaptureNoSnapshot"));
+        return;
+    case ALViewCapture::Outcome::OffScreen:
+        setStatus(getString("CaptureOffScreen"));
+        return;
+    case ALViewCapture::Outcome::Captured:
+        break;
+    }
+
+    std::string name = mFile;
+    for (char& c : name)
+    {
+        if (c == '/' || c == '\\' || c == '.')
+        {
+            c = '_';
+        }
+    }
+    name += "_" + pv.skin + "_" + pv.language + ".png";
+    ALViewCapture::saveThroughPicker(capture, name,
+        [handle = getDerivedHandle<ALFloaterXUIStudio>()](const std::string& path, S32 width, S32 height, bool written)
+        {
+            ALFloaterXUIStudio* self = handle.get();
+            if (!self)
+            {
+                return;
+            }
+            LLStringUtil::format_map_t args;
+            args["[PATH]"] = path;
+            args["[WIDTH]"] = std::to_string(width);
+            args["[HEIGHT]"] = std::to_string(height);
+            self->setStatus(self->getString(written ? "CaptureWritten" : "CaptureWriteFailed", args));
+        });
+}
+
+// Every file in the catalog, checked a few per frame. What each of them said
+// goes into the store under its own name, so the pass fills in around the
+// file being worked on rather than replacing what is known about it; the
+// report beside the log is written from the store at the end.
+void ALFloaterXUIStudio::startLintAll()
+{
+    if (!mLintQueue.empty())
+    {
+        mLintQueue.clear();
+        setStatus(getString("LintStopped"));
+        return;
+    }
+    mLintFiles = 0;
+    mLintFindings = 0;
+    mLintCatalogFindings.clear();
+    // Everything that was known before this is from an older reading of the
+    // tree, and a pass that leaves some of it behind is a store nobody can
+    // trust a count from.
+    mFindingStore.clear();
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        mLintQueue.push_back(entry.name);
+    }
+    mLintTotal = (S32)mLintQueue.size();
+
+    // The rules that need no build, once, before the files are walked. They
+    // name the layer they are about and the store is keyed by the file that
+    // layer belongs to, so each finding is put with the rest of what is known
+    // about its file.
+    boost::unordered_map<std::string, std::string> owner;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        for (const ALXUICatalog::Layer& layer : entry.layers)
+        {
+            owner[layer.path] = entry.name;
+        }
+    }
+    for (const ALXUILint::Finding& f : ALXUILint::checkCatalog(mCatalog))
+    {
+        const auto named = owner.find(f.file);
+        mLintCatalogFindings[named == owner.end() ? f.file : named->second].push_back(f);
+        ++mLintFindings;
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[TOTAL]"] = std::to_string(mLintTotal);
+    setStatus(getString("LintStarted", args));
+}
+
+void ALFloaterXUIStudio::stepLintAll()
+{
+    // A budget per frame rather than a count of files: the largest file
+    // takes as long as twenty small ones.
+    constexpr F32 BUDGET = 0.015f;
+    LLTimer timer;
+    while (!mLintQueue.empty() && timer.getElapsedTimeF32() < BUDGET)
+    {
+        const std::string name = mLintQueue.front();
+        mLintQueue.pop_front();
+        if (const ALXUICatalog::Entry* entry = mCatalog.find(name))
+        {
+            ++mLintFiles;
+            mLintFindings += lintOneFile(*entry);
+        }
+    }
+
+    if (mLintQueue.empty())
+    {
+        finishLintAll();
+    }
+    else
+    {
+        LLStringUtil::format_map_t args;
+        args["[DONE]"] = std::to_string(mLintTotal - (S32)mLintQueue.size());
+        args["[TOTAL]"] = std::to_string(mLintTotal);
+        args["[FOUND]"] = std::to_string(mLintFindings);
+        setStatus(getString("LintStepped", args));
+    }
+}
+
+S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry)
+{
+    // What the rules that need no build already said about this file, which
+    // is everything known about one that cannot be built at all.
+    std::vector<ALXUILint::Finding> found;
+    if (const auto already = mLintCatalogFindings.find(entry.name);
+        already != mLintCatalogFindings.end())
+    {
+        found = already->second;
+    }
+
+    // A widget file is built from what it holds; a template is built from
+    // nothing but its tag, a name and a size, which only a tag that builds
+    // alone survives: a folder view item made with no model to show
+    // asserts in its own postBuild.
+    std::string widget_tag;
+    bool buildable = ALXUICatalog::isBuilt(entry.kind);
+    if (entry.kind == ALXUICatalog::Kind::Widget)
+    {
+        widget_tag = entry.rootTag;
+        buildable = buildable && ALXUICatalog::isCoreWidgetTag(widget_tag);
+    }
+    else if (entry.kind == ALXUICatalog::Kind::Template)
+    {
+        widget_tag = entry.name.substr(entry.name.rfind('/') + 1);
+        widget_tag = widget_tag.substr(0, widget_tag.size() - 4);
+        buildable = buildable && ALXUICatalog::isCoreWidgetTag(widget_tag) && ALXUISchema::buildsAlone(widget_tag);
+    }
+    if (!buildable)
+    {
+        // Looked at and nothing more to say, which is not the same answer as
+        // never looked at: the store keeps the difference.
+        const S32 counted = (S32)found.size();
+        mFindingStore.replace(entry.name, std::move(found));
+        return counted;
+    }
+
+    ALXUIPreviewHost* host = nullptr;
+    LLView* root = nullptr;
+    LLXMLNodePtr node;
+    ALXUIOverlay overlay;
+    std::vector<ALXUIDiagnostics::Entry> entries;
+    {
+        ALXUISkinScope scope(mSkin, mLanguage);
+        ALXUIShellBuild shell;
+        ALXUIDiagnostics sink;
+
+        std::vector<std::string> paths = gDirUtilp->findSkinnedFilenames(LLDir::XUI, entry.name);
+        if (paths.empty())
+        {
+            paths.push_back(entry.name);
+        }
+        if (entry.kind == ALXUICatalog::Kind::Template)
+        {
+            const std::string xml = "<" + widget_tag + " name=\"" + widget_tag + "\" layout=\"topleft\""
+                                  + " left=\"8\" top=\"8\" width=\"200\" height=\"24\"/>";
+            LLXMLNode::parseBuffer(xml.data(), xml.size(), node);
+        }
+        else
+        {
+            ALXmlLayerMerge::load(paths, node, &overlay);
+        }
+
+        if (node.notNull())
+        {
+            LLFloater::Params p(LLFloater::getDefaultParams());
+            p.min_height = p.header_height;
+            p.min_width = 10;
+            host = new ALXUIPreviewHost(this, SECONDARY, p);
+            host->detach();
+            root = buildFromNode(entry, host->canvas(), node);
+        }
+        entries = sink.entries();
+    }
+
+    if (root)
+    {
+        ALXUISourceMap map;
+        map.build(root, node);
+
+        ALXUILint lint;
+        ALXUILint::Input input;
+        input.root = root;
+        input.sourceMap = &map;
+        input.diagnostics = &entries;
+        input.overlay = &overlay;
+        input.catalog = &mCatalog;
+        input.file = entry.name;
+        input.callbacksAreDecisive = entry.kind == ALXUICatalog::Kind::Menu;
+        std::vector<const ALXUICatalog::Layer*> layers = mCatalog.layersFor(entry, mSkin, mLanguage);
+        if (!layers.empty())
+        {
+            input.authored = layers.front()->root();
+        }
+        lint.run(input);
+        found.insert(found.end(), lint.findings().begin(), lint.findings().end());
+    }
+    // Everything said about the file, the catalog's part included: the
+    // count stepping across the status is the count the store ends with.
+    const S32 counted = (S32)found.size();
+    mFindingStore.replace(entry.name, std::move(found));
+    if (host)
+    {
+        host->closeFloater();
+    }
+    return counted;
+}
+
+// The pass is over. What it found is in the store, where the list can be
+// asked about it; the text file beside the log is written out of the store
+// as well, because a whole tree's worth of findings is also a thing to read
+// somewhere that is not this window.
+void ALFloaterXUIStudio::finishLintAll()
+{
+    mLintCatalogFindings.clear();
+
+    const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "xui_lint.txt");
+    llofstream out(path, std::ios::binary);
+    out << mLintFiles << " files built in " << mSkin << "/" << mLanguage << ", "
+        << mFindingStore.size() << " findings over " << mFindingStore.files().size()
+        << " files checked\n\n";
+    for (const auto& [rule, count] : mFindingStore.byRule())
+    {
+        out << "  " << count << "\t" << sayRule(rule) << "\n";
+    }
+    out << "\n";
+    for (const ALXUILint::Finding* f : mFindingStore.select(ALXUIFindings::Query()).found)
+    {
+        out << ALXUILint::severityLabel(f->severity) << " " << ALXUILint::ruleLabel(f->rule)
+            << " " << f->file << ":" << f->line << " " << ALXUISelection::toString(f->path)
+            << " " << sayFinding(*f) << "\n";
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[FOUND]"] = std::to_string((S32)mFindingStore.size());
+    args["[FILES]"] = std::to_string(mLintFiles);
+    args["[PATH]"] = path;
+    setStatus(getString("LintFinished", args));
+    LL_INFOS("XUIStudio") << "lint all: " << mFindingStore.size() << " findings over " << mLintFiles
+                        << " files, report at " << path << LL_ENDL;
+
+    // And the list, which had only this file behind it, now has a tree.
+    fillFindings();
+}
+
+std::string ALFloaterXUIStudio::listCaption(const LLScrollListCtrl* list) const
+{
+    LLStringUtil::format_map_t args;
+    if (list == mFileList)
+    {
+        const std::string filter = mCatalogFilter->getText();
+        args["[FILTER]"] = filter;
+        return getString(filter.empty() ? "CaptionFiles" : "CaptionFilesMatching", args);
+    }
+    if (list == mFindResults)
+    {
+        args["[QUERY]"] = mScopeBar->valueOf("query");
+        args["[FIELD]"] = mScopeBar->valueOf("field");
+        args["[SKIN]"] = mSkin;
+        args["[LANG]"] = mLanguage;
+        return getString("CaptionSearch", args);
+    }
+
+    const Preview& pv = mPreviews[PRIMARY];
+    args["[FILE]"] = mFile.empty() ? getString("CaptionNoFile") : mFile;
+    args["[SKIN]"] = pv.skin;
+    args["[LANG]"] = pv.language;
+    args["[WHERE]"] = getString(pv.skin.empty() ? "CaptionWhereFile" : "CaptionWhere", args);
+    if (list == mFindings)
+    {
+        return getString("CaptionFindings", args);
+    }
+
+    const char* what = "CaptionRows";
+    if (list == mLayout)                  { what = "CaptionLayout"; }
+    else if (list == mBindings)           { what = "CaptionBindings"; }
+    else if (list == mState)              { what = "CaptionState"; }
+    else if (list == mSelectionFindings)  { what = "CaptionSelectionFindings"; }
+    args["[WHAT]"] = getString(what);
+    if (mSelection.hasSelection())
+    {
+        args["[PATH]"] = ALXUISelection::toString(mSelection.selection());
+        args["[WHAT]"] = getString("CaptionOf", args);
+    }
+    return getString("CaptionIn", args);
+}
+
+// ---------------------------------------------------------------------------
+// The translation table
+// ---------------------------------------------------------------------------
+const ALXUICatalog::Layer* ALFloaterXUIStudio::overlayLayer(const ALXUICatalog::Entry& entry,
+                                                          const std::string& language) const
+{
+    // The language's own file in the chosen skin, or in the default skin,
+    // which is the order the merge reads them in.
+    if (const ALXUICatalog::Layer* layer = entry.layer(mSkin, language))
+    {
+        return layer;
+    }
+    return entry.layer("default", language);
+}
+
+// Where a translation for this language goes when the language has no
+// file for it yet: beside the base file, under the language's directory,
+// with a root the merge will match.
+bool ALFloaterXUIStudio::overlayPath(const ALXUICatalog::Entry& entry, const std::string& language,
+                                   std::string& path, bool& created, std::string& error) const
+{
+    created = false;
+    if (const ALXUICatalog::Layer* layer = overlayLayer(entry, language))
+    {
+        path = layer->path;
+        return true;
+    }
+    created = true;
+
+    const ALXUICatalog::Layer* base = entry.layer(mSkin, "en");
+    if (!base)
+    {
+        base = entry.layer("default", "en");
+    }
+    if (!base)
+    {
+        error = getString("OverlayNoBase");
+        return false;
+    }
+
+    // <skins>/<skin>/xui/<lang>/<name>, which is the base's path with the
+    // language directory changed.
+    const std::string delim = gDirUtilp->getDirDelimiter();
+    const size_t file_at = base->path.find_last_of("/\\");
+    if (file_at == std::string::npos)
+    {
+        error = getString("OverlayNoDirectory");
+        return false;
+    }
+    std::string dir = base->path.substr(0, file_at);
+    const std::string tail = base->path.substr(file_at + 1);
+    std::string prefix;
+    if (const size_t widgets_at = dir.find_last_of("/\\"); widgets_at != std::string::npos
+        && dir.substr(widgets_at + 1) == "widgets")
+    {
+        prefix = "widgets";
+        dir = dir.substr(0, widgets_at);
+    }
+    const size_t lang_at = dir.find_last_of("/\\");
+    if (lang_at == std::string::npos)
+    {
+        error = getString("OverlayNoLanguageDirectory");
+        return false;
+    }
+    // The language's directory first, since a skin may have no directory
+    // for this language at all, and then the widgets directory under it.
+    dir = dir.substr(0, lang_at) + delim + language;
+    for (S32 level = 0; level < (prefix.empty() ? 1 : 2); ++level)
+    {
+        if (level == 1)
+        {
+            dir += delim + prefix;
+        }
+        if (LLFile::mkdir(dir) != 0 && !gDirUtilp->fileExists(dir))
+        {
+            LLStringUtil::format_map_t args;
+            args["[DIR]"] = dir;
+            error = getString("OverlayMkdirFailed", args);
+            return false;
+        }
+    }
+
+    // A file with nothing in it but the root the base names, which is
+    // what the merge matches the whole file on.
+    const pugi::xml_node root = base->root();
+    const std::string text = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>\n<"
+                           + std::string(root.name()) + " name=\"" + root.attribute("name").as_string()
+                           + "\">\n</" + std::string(root.name()) + ">\n";
+    path = dir + delim + tail;
+    return ALXUIEdit::writeFile(path, text, error);
+}
+
+// One row per unit: where it is, which field it is, the English, the
+// language's own, what the merge does with it, and whether it fits in the
+// second preview, which is the language this table is about.
+void ALFloaterXUIStudio::fillTranslation()
+{
+    mTranslateList->deleteAllItems();
+    mTranslateValue->setText(LLStringUtil::null);
+    mTranslate.clear();
+
+    const std::string language = mTranslateLanguage->getValue().asString();
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || language.empty())
+    {
+        mTranslateCounts->setText(getString("TranslateNoFile"));
+        return;
+    }
+    if (language == mLanguage)
+    {
+        mTranslateCounts->setText(getString("TranslateSameLanguage"));
+        return;
+    }
+
+    std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(*entry, mSkin, mLanguage);
+    if (base_layers.empty())
+    {
+        mTranslateCounts->setText(getString("TranslateNoFile"));
+        return;
+    }
+    const ALXUICatalog::Layer* overlay = overlayLayer(*entry, language);
+    mTranslate.scan(base_layers.front()->root(), overlay ? overlay->root() : pugi::xml_node());
+
+    // What does not fit is known from the second preview, when it is the
+    // language this table is about.
+    const Preview& second = mPreviews[SECONDARY];
+    const bool measured = mShowSecondary && second.root && second.language == language;
+    // The elements whose text does not fit, gathered once: a row per unit
+    // against a walk of every finding is the two lists multiplied.
+    boost::unordered_set<std::string> truncated;
+    if (measured)
+    {
+        for (const ALXUILint::Finding& f : second.lint.findings())
+        {
+            if (f.rule == ALXUILint::Rule::Truncation)
+            {
+                truncated.insert(ALXUISelection::toString(f.path));
+            }
+        }
+    }
+
+    S32 index = 0;
+    for (const ALXUITranslate::Unit& unit : mTranslate.units())
+    {
+        std::string where = ALXUISelection::toString(unit.path);
+        if (where.empty())
+        {
+            where = entry->rootTag;
+        }
+        const char* state = "TranslateStateNotApplied";
+        switch (unit.state)
+        {
+        case ALXUITranslate::State::Translated:   state = "TranslateStateTranslated"; break;
+        case ALXUITranslate::State::Missing:      state = "TranslateStateMissing"; break;
+        case ALXUITranslate::State::Placeholders: state = "TranslateStatePlaceholders"; break;
+        case ALXUITranslate::State::Forbidden:    state = "TranslateStateForbidden"; break;
+        case ALXUITranslate::State::Rescued:      state = "TranslateStateRescued"; break;
+        case ALXUITranslate::State::NotApplied:
+            switch (unit.miss)
+            {
+            case ALXUITranslate::Miss::Moved:           state = "TranslateStateMoved"; break;
+            case ALXUITranslate::Miss::Absent:          state = "TranslateStateAbsent"; break;
+            case ALXUITranslate::Miss::Unnamed:         state = "TranslateStateUnnamed"; break;
+            case ALXUITranslate::Miss::Ambiguous:       state = "TranslateStateAmbiguous"; break;
+            case ALXUITranslate::Miss::AttributeAbsent: state = "TranslateStateNoSuchField"; break;
+            default:                                    break;
+            }
+            break;
+        }
+        std::string fits;
+        if (measured && unit.applies())
+        {
+            fits = getString(truncated.count(where) ? "No" : "Yes");
+        }
+        mTranslateList->addElement(row(index++, {
+            { "path", where },
+            { "field", unit.field.empty() ? std::string("text") : unit.field },
+            { "english", unit.english },
+            { "translation", unit.translation },
+            { "state", getString(state) },
+            { "fits", fits } }));
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[TRANSLATED]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Translated));
+    args["[RESCUED]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Rescued));
+    args["[MISSING]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Missing));
+    args["[NOTAPPLIED]"] = std::to_string(mTranslate.count(ALXUITranslate::State::NotApplied));
+    args["[PLACEHOLDERS]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Placeholders));
+    args["[FORBIDDEN]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Forbidden));
+    mTranslateCounts->setText(getString("TranslateCounts", args));
+}
+
+void ALFloaterXUIStudio::onTranslationSelected()
+{
+    LLScrollListItem* item = mTranslateList->getFirstSelected();
+    if (!item)
+    {
+        return;
+    }
+    const S32 index = item->getValue().asInteger();
+    if (index < 0 || index >= (S32)mTranslate.units().size())
+    {
+        return;
+    }
+    const ALXUITranslate::Unit& unit = mTranslate.units()[index];
+    // What is being translated goes in the placeholder and what the language
+    // says goes in the field. Filling the field with the English when there
+    // was no translation meant Write, pressed without touching it, wrote
+    // English into the language's file -- and the census then counted that
+    // as translated.
+    mTranslateValue->setText(unit.translation);
+    mTranslateValue->setLabel(unit.english);
+    if (!unit.path.empty())
+    {
+        mSelection.select(unit.path);
+    }
+}
+
+void ALFloaterXUIStudio::onTranslationWrite()
+{
+    LLScrollListItem* item = mTranslateList->getFirstSelected();
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!item || !entry)
+    {
+        return;
+    }
+    const S32 index = item->getValue().asInteger();
+    if (index < 0 || index >= (S32)mTranslate.units().size())
+    {
+        return;
+    }
+    const ALXUITranslate::Unit unit = mTranslate.units()[index];
+    const std::string language = mTranslateLanguage->getValue().asString();
+
+    std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(*entry, mSkin, mLanguage);
+    if (base_layers.empty())
+    {
+        return;
+    }
+
+    std::string path;
+    std::string error;
+    bool created = false;
+    if (!overlayPath(*entry, language, path, created, error))
+    {
+        setStatus(error);
+        return;
+    }
+
+    // Through the document set, as every other edit and as a repair: the
+    // write is a step in the language file's history, and the file is
+    // saved at once, since a cell answered is a cell written and what
+    // reads the table back is the catalog. Opening the language's file
+    // does not make it the one being worked on, so what was active stays.
+    const std::string was_active = mDocuments.activePath();
+    ALXUIEdit* held = mDocuments.open(path);
+    if (!held)
+    {
+        setStatus(mDocuments.error());
+        return;
+    }
+    if (!was_active.empty())
+    {
+        mDocuments.makeActive(was_active);
+    }
+    if (!ALXUITranslate::write(*held, base_layers.front()->root(), unit, mTranslateValue->getText(), error))
+    {
+        setStatus(error);
+        return;
+    }
+    if (!held->save())
+    {
+        setStatus(held->error());
+        return;
+    }
+    sawOwnWrites();
+    mDocuments.settle();
+    fillDocuments();
+    fillHistory();
+    LLStringUtil::format_map_t args;
+    args["[FIELD]"] = unit.field.empty() ? getString("TranslateTheText") : unit.field;
+    args["[FILE]"] = language + "/" + mFile;
+    mPendingStatus = getString("TranslateWrote", args);
+    setStatus(mPendingStatus);
+    if (created)
+    {
+        // A file that did not exist a moment ago is not in the catalog,
+        // and reloading an entry re-reads the layers it already knows:
+        // the second write into a new language would create the file
+        // again over the first.
+        scanCatalog();
+    }
+    else
+    {
+        mCatalog.reload(mFile);
+    }
+    fillTranslation();
+    // The second preview is this language, so it shows what was written.
+    if (mShowSecondary && mLanguage2 == language)
+    {
+        mReloadEntryOnly = true;
+        mReloadPending = true;
+    }
+}
+
+// The language's value for a row, taken out of its file: the way a value
+// that names nothing the base has leaves the file, which no repair can do
+// for it. Through the document set and saved at once, as a write is.
+void ALFloaterXUIStudio::onTranslationRemove()
+{
+    LLScrollListItem* item = mTranslateList->getFirstSelected();
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!item || !entry)
+    {
+        return;
+    }
+    const S32 index = item->getValue().asInteger();
+    if (index < 0 || index >= (S32)mTranslate.units().size())
+    {
+        return;
+    }
+    const ALXUITranslate::Unit unit = mTranslate.units()[index];
+    const std::string language = mTranslateLanguage->getValue().asString();
+    const ALXUICatalog::Layer* layer = overlayLayer(*entry, language);
+    if (unit.state == ALXUITranslate::State::Missing || !layer)
+    {
+        setStatus(getString("TranslateNothingToRemove"));
+        return;
+    }
+
+    const std::string was_active = mDocuments.activePath();
+    ALXUIEdit* held = mDocuments.open(layer->path);
+    if (!held)
+    {
+        setStatus(mDocuments.error());
+        return;
+    }
+    if (!was_active.empty())
+    {
+        mDocuments.makeActive(was_active);
+    }
+    std::string error;
+    if (!ALXUITranslate::remove(*held, unit, error))
+    {
+        setStatus(error);
+        return;
+    }
+    if (!held->save())
+    {
+        setStatus(held->error());
+        return;
+    }
+    sawOwnWrites();
+    mDocuments.settle();
+    fillDocuments();
+    fillHistory();
+    LLStringUtil::format_map_t args;
+    args["[FIELD]"] = unit.field.empty() ? getString("TranslateTheText") : unit.field;
+    args["[FILE]"] = language + "/" + mFile;
+    mPendingStatus = getString("TranslateRemoved", args);
+    setStatus(mPendingStatus);
+    mCatalog.reload(mFile);
+    fillTranslation();
+    if (mShowSecondary && mLanguage2 == language)
+    {
+        mReloadEntryOnly = true;
+        mReloadPending = true;
+    }
+}
+
+// The language this table is about is the one the second preview shows,
+// so choosing it here turns that preview on.
+void ALFloaterXUIStudio::onTranslationLanguage()
+{
+    mLanguage2 = mTranslateLanguage->getValue().asString();
+    mLanguageCombo2->setValue(mLanguage2);
+    if (!mShowSecondary && mLanguage2 != mLanguage)
+    {
+        mShowSecondary = true;
+        mSecondaryCheck->setValue(true);
+        mLanguageCombo2->setEnabled(true);
+    }
+    saveState();
+    showPreviews();
+    fillTranslation();
+}
+
+// Every value this file writes at a path the base has moved on from,
+// moved to where the base has it. Nothing else is touched: the value is
+// the language's own, written back where it will be read.
+S32 ALFloaterXUIStudio::repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error,
+                                   bool through_set)
+{
+    return writeOverlay(entry, language, error, through_set, &ALXUITranslate::repair);
+}
+
+S32 ALFloaterXUIStudio::writeOverlay(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error,
+                                     bool through_set, OverlayOp op)
+{
+    std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(entry, mSkin, mLanguage);
+    const ALXUICatalog::Layer* overlay_layer = overlayLayer(entry, language);
+    if (base_layers.empty() || !overlay_layer || !overlay_layer->root())
+    {
+        return 0;
+    }
+
+    // Through the set rather than a document of its own, so that the change
+    // is a step of the action that asked for it: a change nobody can put
+    // back is a change nobody can try. Opening a document makes it the one
+    // an operation with no path of its own means, and this is not a change
+    // of what is being worked on: the one that was stays. A file already
+    // held goes through its document whatever was asked, since a disk
+    // written under a held document is a disk its next save writes over.
+    ALXUIEdit local;
+    ALXUIEdit* overlay = mDocuments.find(overlay_layer->path);
+    if (!overlay && through_set)
+    {
+        const std::string was_active = mDocuments.activePath();
+        overlay = mDocuments.open(overlay_layer->path);
+        if (!overlay)
+        {
+            error = mDocuments.error();
+            return 0;
+        }
+        if (!was_active.empty())
+        {
+            mDocuments.makeActive(was_active);
+        }
+    }
+    else if (!overlay)
+    {
+        if (!local.loadFile(overlay_layer->path))
+        {
+            error = local.error();
+            return 0;
+        }
+        overlay = &local;
+    }
+    const S32 done = op(*overlay, base_layers.front()->root(), error);
+    if (done && !overlay->save())
+    {
+        error = overlay->error();
+        return 0;
+    }
+    return done;
+}
+
+void ALFloaterXUIStudio::onRepairFile()
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    const std::string language = mTranslateLanguage->getValue().asString();
+    if (!entry || language.empty() || language == mLanguage)
+    {
+        return;
+    }
+    std::string error;
+    const S32 moves = repairFile(*entry, language, error);
+    LLStringUtil::format_map_t args;
+    args["[MOVES]"] = std::to_string(moves);
+    args["[FILE]"] = language + "/" + mFile;
+    setStatus(moves ? getString("TranslateRepaired", args)
+                    : (error.empty() ? getString("TranslateNothingToRepair", args) : error));
+    if (moves)
+    {
+        // The repair went through a held document, and is a thing to undo.
+        mDocuments.settle();
+        fillDocuments();
+        fillHistory();
+        mCatalog.reload(mFile);
+        fillTranslation();
+    }
+}
+
+// A file whose root carries another name, or none, is repaired by giving
+// it the base's -- when the file is this file under that name, which is
+// what its own values say.
+void ALFloaterXUIStudio::onRepairRoots()
+{
+    const std::string language = mTranslateLanguage->getValue().asString();
+    if (language.empty() || language == mLanguage)
+    {
+        return;
+    }
+
+    S32 named = 0;
+    S32 left = 0;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        const ALXUICatalog::Layer* overlay = overlayLayer(entry, language);
+        if (!overlay || !overlay->root())
+        {
+            continue;
+        }
+        std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(entry, mSkin, mLanguage);
+        if (base_layers.empty() || !base_layers.front()->root())
+        {
+            continue;
+        }
+        const pugi::xml_node base = base_layers.front()->root();
+        const std::string over_root = overlay->root().attribute("name").as_string();
+        const std::string base_root = base.attribute("name").as_string();
+        if (over_root == base_root)
+        {
+            continue;
+        }
+
+        ALXUITranslate units;
+        units.scan(base, overlay->root());
+        if (!units.sameFileRenamed(over_root))
+        {
+            LL_INFOS("XUIStudio") << language << "/" << entry.name << ": left the root \"" << over_root
+                                << "\" alone; almost nothing in it names what the base has" << LL_ENDL;
+            ++left;
+            continue;
+        }
+
+        // Through the document where the file is one of those held, as the
+        // translation table writes: a disk written under a held document is
+        // a disk the document's next save writes over.
+        ALXUIEdit* held = mDocuments.find(overlay->path);
+        ALXUIEdit local;
+        ALXUIEdit& edit = held ? *held : local;
+        if ((!held && !edit.loadFile(overlay->path))
+            || !edit.setAttribute({}, "name", base_root) || !edit.save())
+        {
+            setStatus(edit.error());
+            return;
+        }
+        sawOwnWrites();
+        LL_INFOS("XUIStudio") << language << "/" << entry.name << ": root \"" << over_root
+                            << "\" -> \"" << base_root << "\"" << LL_ENDL;
+        ++named;
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[FILES]"] = std::to_string(named);
+    args["[LEFT]"] = std::to_string(left);
+    args["[LANG]"] = language;
+    setStatus(getString("TranslateRoots", args));
+    if (named)
+    {
+        mDocuments.settle();
+        fillDocuments();
+        fillHistory();
+        scanCatalog();
+        fillTranslation();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The census
+// ---------------------------------------------------------------------------
+// What the merge does with every overlay of every language, counted: the
+// same instrument the console check gates on, run from here over the
+// catalog the tool already holds.
+void ALFloaterXUIStudio::startCensus()
+{
+    mCensusQueue.clear();
+    mCensus.clear();
+    mCensusFiles = 0;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        mCensusQueue.push_back(entry.name);
+    }
+    setStatus(getString("CensusStarted"));
+}
+
+void ALFloaterXUIStudio::stepCensus()
+{
+    LLTimer timer;
+    while (!mCensusQueue.empty() && timer.getElapsedTimeF32() < 0.015f)
+    {
+        const std::string name = mCensusQueue.front();
+        mCensusQueue.pop_front();
+        const ALXUICatalog::Entry* entry = mCatalog.find(name);
+        if (!entry)
+        {
+            continue;
+        }
+        // The base is the same for every language of the file.
+        const std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(*entry, mSkin, mLanguage);
+        const pugi::xml_node base = base_layers.empty() ? pugi::xml_node() : base_layers.front()->root();
+        for (const std::string& language : mCatalog.languages())
+        {
+            if (language == mLanguage)
+            {
+                continue;
+            }
+            const ALXUICatalog::Layer* overlay = overlayLayer(*entry, language);
+            if (!overlay || !overlay->root())
+            {
+                continue;
+            }
+            if (!base)
+            {
+                ++mCensus[language]["orphan_file"];
+                continue;
+            }
+
+            std::map<std::string, S32>& counts = mCensus[language];
+            ++counts["files"];
+            if (std::string_view(overlay->root().attribute("name").as_string())
+                != std::string_view(base.attribute("name").as_string()))
+            {
+                ++counts["root_name_differs"];
+            }
+
+            ALXUITranslate units;
+            units.scan(base, overlay->root());
+            for (const ALXUITranslate::Unit& unit : units.units())
+            {
+                switch (unit.state)
+                {
+                case ALXUITranslate::State::Translated:   ++counts["covered"]; break;
+                case ALXUITranslate::State::Missing:      ++counts["missing"]; break;
+                case ALXUITranslate::State::Placeholders: ++counts["placeholders_differ"]; break;
+                case ALXUITranslate::State::Forbidden:    ++counts["translated_despite_false"]; break;
+                case ALXUITranslate::State::Rescued:      ++counts["rescued"]; break;
+                case ALXUITranslate::State::NotApplied:
+                    ++counts["applies_to_nothing"];
+                    switch (unit.miss)
+                    {
+                    case ALXUITranslate::Miss::Moved:           ++counts["moved"]; break;
+                    case ALXUITranslate::Miss::Absent:          ++counts["absent"]; break;
+                    case ALXUITranslate::Miss::Unnamed:         ++counts["unnamed"]; break;
+                    case ALXUITranslate::Miss::Ambiguous:       ++counts["ambiguous"]; break;
+                    case ALXUITranslate::Miss::AttributeAbsent: ++counts["field_absent"]; break;
+                    default: break;
+                    }
+                    break;
+                }
+            }
+        }
+        ++mCensusFiles;
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[DONE]"] = std::to_string(mCensusFiles);
+    args["[TOTAL]"] = std::to_string(mCensusFiles + (S32)mCensusQueue.size());
+    setStatus(getString("CensusProgress", args));
+    if (mCensusQueue.empty())
+    {
+        finishCensus();
+    }
+}
+
+void ALFloaterXUIStudio::finishCensus()
+{
+    // The columns every language has a number for, in the order they read
+    // best: what arrived, what did not, and why not.
+    static const char* COLUMNS[] = { "files", "covered", "rescued", "missing", "applies_to_nothing",
+                                     "moved", "absent", "unnamed", "ambiguous", "field_absent",
+                                     "placeholders_differ", "translated_despite_false",
+                                     "root_name_differs", "orphan_file" };
+    std::vector<std::string> lines;
+    std::string header = "language   ";
+    for (const char* column : COLUMNS)
+    {
+        header += " " + std::string(column);
+    }
+    lines.push_back(header);
+
+    std::map<std::string, S32> totals;
+    for (const std::string& language : mCatalog.languages())
+    {
+        const auto it = mCensus.find(language);
+        if (it == mCensus.end())
+        {
+            continue;
+        }
+        std::string line = language;
+        line.resize(11, ' ');
+        for (const char* column : COLUMNS)
+        {
+            const auto found = it->second.find(column);
+            const S32 value = found == it->second.end() ? 0 : found->second;
+            totals[column] += value;
+            line += " " + std::to_string(value);
+        }
+        lines.push_back(line);
+    }
+    std::string all = "all        ";
+    for (const char* column : COLUMNS)
+    {
+        all += " " + std::to_string(totals[column]);
+    }
+    lines.push_back(all);
+
+    const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "xui_census.txt");
+    llofstream out(path);
+    for (const std::string& line : lines)
+    {
+        out << line << "\n";
+        LL_INFOS("XUIStudio") << line << LL_ENDL;
+    }
+    out.close();
+
+    LLStringUtil::format_map_t args;
+    args["[COVERED]"] = std::to_string(totals["covered"]);
+    args["[NOTHING]"] = std::to_string(totals["applies_to_nothing"]);
+    args["[FILE]"] = path;
+    setStatus(getString("CensusDone", args));
+}
+
+// ---------------------------------------------------------------------------
+// The schema
+// ---------------------------------------------------------------------------
+// Every widget the viewer registers, and what a file may write under it.
+// The viewer is the only place the whole vocabulary exists: llui's console
+// utility can only see the widgets llui itself registers, and the rest are
+// registered by static registrars in the viewer's own translation units.
+void ALFloaterXUIStudio::onExportSchema()
+{
+    const ALXUISchema& schema = ALXUISchema::get();
+    const std::string path = gDirUtilp->getSkinBaseDir() + gDirUtilp->getDirDelimiter() + "xui.xsd";
+
+    llofstream out(path);
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = path;
+    if (!out.is_open())
+    {
+        setStatus(getString("SchemaFailed", args));
+        return;
+    }
+    out << schema.asXSD();
+    out.close();
+
+    args["[SUMMARY]"] = schema.summary();
+    setStatus(getString("SchemaWritten", args));
+}
+
+// The same over every file the language has, a few per frame so the
+// viewer keeps drawing.
+void ALFloaterXUIStudio::startSweep(OverlayOp op, const char* said, const char* logged)
+{
+    const std::string language = mTranslateLanguage->getValue().asString();
+    if (language.empty() || language == mLanguage)
+    {
+        return;
+    }
+    mSweep = Sweep();
+    mSweep.op = op;
+    mSweep.said = said;
+    mSweep.logged = logged;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        if (overlayLayer(entry, language))
+        {
+            mSweep.queue.push_back(entry.name);
+        }
+    }
+}
+
+void ALFloaterXUIStudio::stepSweep()
+{
+    const std::string language = mTranslateLanguage->getValue().asString();
+    LLTimer timer;
+    while (!mSweep.queue.empty() && timer.getElapsedTimeF32() < 0.015f)
+    {
+        const std::string name = mSweep.queue.front();
+        mSweep.queue.pop_front();
+        if (const ALXUICatalog::Entry* entry = mCatalog.find(name))
+        {
+            std::string error;
+            const S32 changed = writeOverlay(*entry, language, error, /*through_set=*/false, mSweep.op);
+            if (changed)
+            {
+                ++mSweep.files;
+                mSweep.count += changed;
+                mCatalog.reload(name);
+            }
+            else if (!error.empty())
+            {
+                // A file that would not be read or written is said so in
+                // the log, once: a sweep over seven hundred files that
+                // stopped at the first would never finish.
+                ++mSweep.failed;
+                LL_WARNS("XUIStudio") << mSweep.logged << " " << language << ": " << name << ": " << error << LL_ENDL;
+            }
+        }
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(mSweep.count);
+    args["[FILES]"] = std::to_string(mSweep.files);
+    args["[LANG]"] = language;
+    setStatus(getString(mSweep.said, args));
+    if (mSweep.queue.empty())
+    {
+        LL_INFOS("XUIStudio") << mSweep.logged << " " << language << ": " << mSweep.count << " values across "
+                            << mSweep.files << " files, " << mSweep.failed << " files not written" << LL_ENDL;
+        // A file that was held went through its document, and that is a
+        // step in its history.
+        mDocuments.settle();
+        fillDocuments();
+        fillHistory();
+        fillTranslation();
+    }
+}
+
+void ALFloaterXUIStudio::startRepairAll()
+{
+    startSweep(&ALXUITranslate::repair, "TranslateRepairedAll", "repair");
+}
+
+// Asked first: what goes cannot be put back from here, since a pass over
+// every file of a language does not go through the document set.
+void ALFloaterXUIStudio::onRemoveOrphans()
+{
+    const std::string language = mTranslateLanguage->getValue().asString();
+    if (language.empty() || language == mLanguage)
+    {
+        return;
+    }
+    LLSD args;
+    args["LANG"] = language;
+    LLNotificationsUtil::add("XUIStudioRemoveOrphans", args, LLSD(),
+        [handle = getDerivedHandle<ALFloaterXUIStudio>()](const LLSD& notification, const LLSD& response)
+        {
+            if (ALFloaterXUIStudio* self = handle.get())
+            {
+                self->removeOrphansAnswered(LLNotificationsUtil::getSelectedOption(notification, response));
+            }
+            return false;
+        });
+}
+
+void ALFloaterXUIStudio::removeOrphansAnswered(S32 option)
+{
+    if (option == 0)
+    {
+        startSweep(&ALXUITranslate::removeOrphans, "TranslateRemovedOrphans", "remove orphans");
+    }
+}
+
+void ALFloaterXUIStudio::runLint()
+{
+    Preview& pv = mPreviews[PRIMARY];
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    ALXUILint::Input input;
+    input.root = pv.root;
+    input.sourceMap = &pv.sourceMap;
+    input.diagnostics = &pv.diagnostics;
+    input.overlay = &pv.overlay;
+    input.catalog = &mCatalog;
+    input.file = mFile;
+    // A menu file's functions are registered at startup, so a name no
+    // registry knows is decisive there and nowhere else in a shell build.
+    input.callbacksAreDecisive = entry && entry->kind == ALXUICatalog::Kind::Menu;
+    if (entry)
+    {
+        // The file as written, which is where the parameter elements the
+        // parser consumed still are.
+        std::vector<const ALXUICatalog::Layer*> layers = mCatalog.layersFor(*entry, pv.skin, pv.language);
+        if (!layers.empty())
+        {
+            input.authored = layers.front()->root();
+        }
+    }
+    pv.lint.run(input);
+    // The file in front of the developer, re-checked on every build; the
+    // rest of the tree is whatever a pass has filled in around it.
+    mFindingStore.replace(mFile, pv.lint.findings());
+}
+
+// One row per finding: the severity and rule, where it is, and what it
+// says. The path is what a double-click selects by, since a finding from
+// a layer carries that layer's line and not the base's.
+// How many rows the list will take. A pass over the tree finds tens of
+// thousands; a scroll list asked to hold them all spends a second building
+// rows nobody will reach, and the answer to "there are more than this" is a
+// narrower filter rather than a longer list.
+static constexpr size_t FINDINGS_SHOWN = 2000;
+
+ALXUIFindings::Query ALFloaterXUIStudio::findingQuery() const
+{
+    ALXUIFindings::Query query;
+    query.limit = FINDINGS_SHOWN;
+    // The scope combo says which file, and the file it means is this one:
+    // the value is empty for every file that has been checked.
+    if (mFindingScope && mFindingScope->getValue().asString() == "file")
+    {
+        query.file = mFile;
+    }
+    if (mFindingRule)
+    {
+        query.rule = mFindingRule->getValue().asString();
+    }
+    if (mFindingSeverity)
+    {
+        const std::string want = mFindingSeverity->getValue().asString();
+        query.errors = true;
+        query.warnings = want != "errors";
+        query.notes = want.empty();
+    }
+    if (mFindingFixable)
+    {
+        query.fixable = mFindingFixable->get();
+    }
+    if (mFindingFilter)
+    {
+        query.text = mFindingFilter->getText();
+    }
+    return query;
+}
+
+void ALFloaterXUIStudio::fillFindings()
+{
+    refreshFindingRules();
+
+    const ALXUIFindings::Selected selected = mFindingStore.select(findingQuery());
+    mFindings->deleteAllItems();
+    mShownFindings.clear();
+    mShownFindings.reserve(selected.found.size());
+    for (const ALXUILint::Finding* found : selected.found)
+    {
+        mShownFindings.push_back(*found);
+    }
+
+    for (S32 at = 0; at < (S32)mShownFindings.size(); ++at)
+    {
+        const ALXUILint::Finding& f = mShownFindings[at];
+        std::string where = ALXUISelection::toString(f.path);
+        std::string file = f.file;
+        const size_t slash = file.find_last_of("/\\");
+        if (slash != std::string::npos)
+        {
+            file = file.substr(slash + 1);
+        }
+        if (where.empty())
+        {
+            where = f.what;
+        }
+        if (!file.empty() && file != mFile)
+        {
+            where = file + ": " + where;
+        }
+        LLSD id;
+        id["at"] = at;
+        id["path"] = ALXUISelection::toString(f.path);
+        id["line"] = f.line;
+        mFindings->addElement(row(id, {
+            { "severity", ALXUILint::severityLabel(f.severity) },
+            { "rule", ALXUILint::ruleLabel(f.rule) },
+            { "line", f.line > 0 ? std::to_string(f.line) : std::string() },
+            { "where", where },
+            { "message", sayFinding(f) },
+            { "fix", fixWords(f, nullptr) } }));
+    }
+
+    if (mFindingCount)
+    {
+        LLStringUtil::format_map_t args;
+        args["[SHOWN]"] = std::to_string((S32)mShownFindings.size());
+        args["[TOTAL]"] = std::to_string((S32)selected.total);
+        args["[FILES]"] = std::to_string((S32)mFindingStore.files().size());
+        args["[HELD]"] = std::to_string((S32)mFindingStore.size());
+        mFindingCount->setText(getString(selected.total > mShownFindings.size()
+                                         ? "FindingsSome" : "FindingsAll", args));
+    }
+    refreshFixButtons();
+    refreshModeCounts();
+}
+
+// The rules that have said something, with how many of each, so that a
+// filter offers what is there rather than the whole list of nineteen. The
+// one in force is kept where it is still one of them.
+void ALFloaterXUIStudio::refreshFindingRules()
+{
+    if (!mFindingRule)
+    {
+        return;
+    }
+    const std::vector<std::pair<std::string, S32> > rules = mFindingStore.byRule();
+    std::string signature;
+    for (const auto& [rule, count] : rules)
+    {
+        signature += rule + std::to_string(count) + ",";
+    }
+    if (signature == mFindingRulesShown)
+    {
+        return;     // the same rules and the same counts: nothing to rebuild
+    }
+    mFindingRulesShown = signature;
+
+    const std::string was = mFindingRule->getValue().asString();
+    mFindingRule->removeall();
+    mFindingRule->add(getString("FindingsEveryRule"), LLSD(std::string()));
+    for (const auto& [rule, count] : rules)
+    {
+        LLStringUtil::format_map_t args;
+        args["[RULE]"] = sayRule(rule);
+        args["[COUNT]"] = std::to_string(count);
+        mFindingRule->add(getString("FindingsRuleCount", args), LLSD(rule));
+    }
+    if (!was.empty() && !mFindingRule->setSelectedByValue(LLSD(was), true))
+    {
+        mFindingRule->selectFirstItem();
+    }
+    else if (was.empty())
+    {
+        mFindingRule->selectFirstItem();
+    }
+}
+
+void ALFloaterXUIStudio::onFindingFilter()
+{
+    fillFindings();
+}
+
+void ALFloaterXUIStudio::onFindingSelected()
+{
+    LLScrollListItem* item = mFindings->getFirstSelected();
+    if (!item)
+    {
+        return;
+    }
+    // Read before anything moves: going to another file rebuilds the list,
+    // and the row this came from goes with it.
+    const LLSD id = item->getValue();
+    const ALXUILint::Finding* about = findingForRow(item);
+    const std::string in_file = about ? about->file : std::string();
+
+    // A list over the whole tree names findings in files nobody is looking
+    // at, and going to one means going to its file first.
+    if (!in_file.empty() && in_file != mFile && mCatalog.find(in_file))
+    {
+        mFile = in_file;
+        mPendingFile.clear();
+        mFileList->setSelectedByValue(mFile, true);
+        showPreviews();
+    }
+
+    const Preview& pv = mPreviews[PRIMARY];
+    const std::string path = id["path"].asString();
+    if (!path.empty())
+    {
+        mSelection.select(ALXUISelection::fromString(path));
+        return;
+    }
+    const LLView* view = pv.sourceMap.viewAtLine(id["line"].asInteger());
+    ALXUISelection::path_t found;
+    if (view && ALXUISelection::pathOf(view, pv.root, found))
+    {
+        mSelection.select(found);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Findings that put themselves right
+// ---------------------------------------------------------------------------
+
+const ALXUILint::Finding* ALFloaterXUIStudio::findingForRow(const LLScrollListItem* item) const
+{
+    if (!item)
+    {
+        return nullptr;
+    }
+    const LLSD id = item->getValue();
+    if (!id.has("at"))
+    {
+        return nullptr;
+    }
+    const S32 at = id["at"].asInteger();
+    return at >= 0 && at < (S32)mShownFindings.size() ? &mShownFindings[at] : nullptr;
+}
+
+// What is wrong, as the lint says it, with the name at fault in front
+// where there is one, since the sentence is about it.
+std::string ALFloaterXUIStudio::sayFinding(const ALXUILint::Finding& f) const
+{
+    return f.what.empty() ? f.message : f.what + ": " + f.message;
+}
+
+// A rule by the name the store files it under, as the lint says it.
+std::string ALFloaterXUIStudio::sayRule(const std::string& rule_name) const
+{
+    ALXUILint::Rule rule;
+    return ALXUILint::ruleNamed(rule_name, rule) ? ALXUILint::ruleLabel(rule) : rule_name;
+}
+
+// What pressing it would do, said in this tool's words. The library says
+// which operation, because that is what a document works in; what a person
+// reads about it is chosen here, where the strings file is.
+// What a fix offers, and what the tool says once it has done it. The words
+// are chosen here for the same reason the operation is named in the
+// library: a document says what it did in its own terms, and English is not
+// one of them. Given a layer the sentence is the one for what was done, in
+// which file and layer; given none it is the offer.
+std::string ALFloaterXUIStudio::fixWords(const ALXUILint::Finding& f, const ALXUICatalog::Layer* layer) const
+{
+    LLStringUtil::format_map_t args;
+    args["[ATTR]"] = f.what;
+    args["[NAME]"] = f.fix.spelling;
+    args["[DX]"] = std::to_string(f.fix.dx);
+    args["[DY]"] = std::to_string(f.fix.dy);
+    if (layer)
+    {
+        args["[WHERE]"] = f.path.empty() ? mFile : f.path.back();
+        args["[FILE]"] = mFile;
+        args["[LAYER]"] = layerName(*layer);
+    }
+    const char* key = nullptr;
+    switch (f.fix.did)
+    {
+    case ALXUILint::Fix::Do::TakeAttributeOut: key = layer ? "FixDidTakeOut" : "FixTakeOut"; break;
+    case ALXUILint::Fix::Do::SpellAttribute:   key = layer ? "FixDidSpell" : "FixSpell"; break;
+    case ALXUILint::Fix::Do::MoveInside:       key = layer ? "FixDidMove" : "FixMoveInside"; break;
+    case ALXUILint::Fix::Do::WidenBy:          key = layer ? "FixDidWiden" : "FixWidenBy"; break;
+    case ALXUILint::Fix::Do::Nothing:          break;
+    }
+    return key ? getString(key, args) : std::string();
+}
+
+// One finding, put right. The element it is about is selected first: an edit
+// nobody watched happen is one they have to go and find. The operation itself
+// belongs to the finding, so what is pressed here is what the tests watch
+// write bytes; this chooses the layer it is written into and says what
+// happened, which are the two things a library has no business deciding.
+bool ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
+{
+    if (f.fix.did == ALXUILint::Fix::Do::Nothing)
+    {
+        return false;
+    }
+    // A finding from another file names an element of that file, and this
+    // tool is looking at this one. Opening it is the way to fix it.
+    if (!f.file.empty() && f.file != mFile)
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = f.file;
+        setStatus(getString("FixOtherFile", args));
+        return false;
+    }
+    mSelection.select(f.path);
+
+    // Where it is written: the layer that already positions the element when
+    // there is one, else the file's own base layer. The same choice a hand
+    // edit makes, because a fix is a hand edit the tool typed out.
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/true);
+    if (!held)
+    {
+        return false;
+    }
+
+    // What the element occupies now, which is what a move or a resize is
+    // measured from. The rules do not offer either where the element's place
+    // is not the file's to write, so a fix that needs this has a view.
+    ALXUIEdit::Anchor now;
+    if (LLView* view = selectedView(); view && view->getParent())
+    {
+        now = anchorOf(view);
+    }
+
+    if (!f.applyFix(*held, now))
+    {
+        setStatus(held->error().empty() ? getString("FixGone") : held->error());
+        return false;
+    }
+    documentChanged(fixWords(f, layer));
+    return true;
+}
+
+void ALFloaterXUIStudio::onFixSelected()
+{
+    // Copied: applying it is what fills the list again, and the finding is
+    // in the list.
+    if (const ALXUILint::Finding* f = findingForRow(mFindings->getFirstSelected()))
+    {
+        const ALXUILint::Finding held = *f;
+        applyFix(held);
+    }
+}
+
+// Every finding in the file that offers one. A step per finding rather than
+// one step for the file: a pass over a file is the developer's to take back
+// piece by piece, since the reason to look at each of these was that some of
+// them are on purpose.
+//
+// One pass, and then the file is built again and checked again: an edit moves
+// what the next finding was measured against, so what still stands after this
+// is what the rules say about the file as it is now.
+void ALFloaterXUIStudio::onFixAll()
+{
+    // Copied, because applying one rebuilds and refills the list under it.
+    std::vector<ALXUILint::Finding> offered;
+    boost::unordered_set<std::string> moved;
+    for (const ALXUILint::Finding& f : mShownFindings)
+    {
+        if (f.fix.did == ALXUILint::Fix::Do::Nothing || (!f.file.empty() && f.file != mFile))
+        {
+            continue;
+        }
+        // A move and a widening are both worked out from where the element
+        // is now, and nothing is built again between one fix and the next:
+        // the second of them on one element would be measured against a rect
+        // that has already moved. One each per pass, and the pass repeats.
+        const bool geometry = f.fix.did == ALXUILint::Fix::Do::MoveInside
+                           || f.fix.did == ALXUILint::Fix::Do::WidenBy;
+        if (geometry && !moved.insert(ALXUISelection::toString(f.path)).second)
+        {
+            continue;
+        }
+        offered.push_back(f);
+    }
+    if (offered.empty())
+    {
+        setStatus(getString("FixNone"));
+        return;
+    }
+
+    const ALXUISelection::path_t was = mSelection.hasSelection() ? mSelection.selection()
+                                                                : ALXUISelection::path_t();
+    // Counted as they land: a fix whose element an earlier one moved away
+    // from under it is not one that was applied.
+    S32 applied = 0;
+    for (const ALXUILint::Finding& f : offered)
+    {
+        applied += applyFix(f) ? 1 : 0;
+    }
+    if (!was.empty())
+    {
+        mSelection.select(was);
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(applied);
+    args["[FILE]"] = mFile;
+    setStatus(getString("FixApplied", args));
+}
+
+void ALFloaterXUIStudio::refreshFixButtons()
+{
+    S32 offered = 0;
+    for (const ALXUILint::Finding& f : mShownFindings)
+    {
+        offered += f.fix.did != ALXUILint::Fix::Do::Nothing && (f.file.empty() || f.file == mFile);
+    }
+    if (mFixAllButton)
+    {
+        mFixAllButton->setEnabled(offered > 0);
+    }
+    if (mFixButton)
+    {
+        const ALXUILint::Finding* f = findingForRow(mFindings->getFirstSelected());
+        mFixButton->setEnabled(f && f->fix.did != ALXUILint::Fix::Do::Nothing
+                               && (f->file.empty() || f->file == mFile));
+    }
+}
+
+// The findings on the selected element and everything below it.
+void ALFloaterXUIStudio::refreshSelectionFindings()
+{
+    mSelectionFindings->deleteAllItems();
+    if (!mSelection.hasSelection())
+    {
+        return;
+    }
+    const ALXUISelection::path_t& selected = mSelection.selection();
+    for (const ALXUILint::Finding& f : mPreviews[PRIMARY].lint.findings())
+    {
+        if (f.path.size() < selected.size()
+            || !std::equal(selected.begin(), selected.end(), f.path.begin()))
+        {
+            continue;
+        }
+        const bool here = f.path.size() == selected.size();
+        mSelectionFindings->addElement(row(ALXUISelection::toString(f.path), {
+            { "severity", ALXUILint::severityLabel(f.severity) },
+            { "rule", ALXUILint::ruleLabel(f.rule) },
+            { "where", here ? getString("FindingsHere")
+                            : ALXUISelection::toString(ALXUISelection::path_t(f.path.begin() + selected.size(), f.path.end())) },
+            { "message", sayFinding(f) } }));
+    }
+}
+
+// One crumb per ancestor from the root down, and on each of them what that
+// step could have been: its siblings in the tree. Walking back up was all a
+// breadcrumb ever did here; the useful direction is sideways, and the view
+// tree knows the answer at every level.
+void ALFloaterXUIStudio::refreshBreadcrumb()
+{
+    const Preview& pv = mPreviews[PRIMARY];
+    if (!pv.root || !mSelection.hasSelection())
+    {
+        mBreadcrumb->setPath({});
+        mBreadcrumb->setTrailer(LLStringUtil::null);
+        return;
+    }
+
+    const ALXUISelection::path_t& path = mSelection.selection();
+    std::vector<ALJumpBar::Crumb> crumbs;
+    for (size_t i = 0; i <= path.size(); ++i)
+    {
+        ALJumpBar::Crumb crumb;
+        crumb.label = i == 0 ? pv.root->getName() : path[i - 1];
+        LLStringUtil::format_map_t crumb_args;
+        crumb_args["[NAME]"] = crumb.label;
+        crumb.toolTip = getString(i == 0 ? "CrumbRootTip" : "CrumbTip", crumb_args);
+        // The value is the path to it, said as text: what a crumb chosen
+        // means is "select this", and a path is what a selection is.
+        const ALXUISelection::path_t prefix(path.begin(), path.begin() + i);
+        crumb.value = ALXUISelection::toString(prefix);
+
+        // What else is in that parent. The root has no siblings, and a step
+        // whose parent has only it has none worth offering.
+        if (i > 0)
+        {
+            const ALXUISelection::path_t up(path.begin(), path.begin() + i - 1);
+            if (const LLView* parent = ALXUISelection::resolve(pv.root, up))
+            {
+                // Every sibling counts towards an ordinal, as a path counts
+                // them; only the ones the file wrote are offered.
+                boost::unordered_map<std::string, S32> seen;
+                for (auto it = parent->getChildList()->rbegin();
+                     it != parent->getChildList()->rend(); ++it)
+                {
+                    const std::string& name = (*it)->getName();
+                    const S32 ordinal = seen[name]++;
+                    if (!pv.sourceMap.isFromXML(*it))
+                    {
+                        continue;
+                    }
+                    ALXUISelection::path_t beside(up);
+                    beside.push_back(ALXUISelection::step(name, ordinal));
+                    crumb.alternatives.emplace_back(name, ALXUISelection::toString(beside));
+                }
+                if (crumb.alternatives.size() < 2)
+                {
+                    crumb.alternatives.clear();
+                }
+                else
+                {
+                    crumb_args["[COUNT]"] = std::to_string(crumb.alternatives.size() - 1);
+                    crumb.toolTip = getString("CrumbSiblingsTip", crumb_args);
+                }
+            }
+        }
+        crumbs.push_back(std::move(crumb));
+    }
+    mBreadcrumb->setPath(std::move(crumbs));
+
+    // Which layer the element came from, said past the end of the path: it is
+    // about where this element is written rather than about the way to it.
+    const ALXUICatalog::Layer* layer = nullptr;
+    authoredElement(layer);
+    mBreadcrumb->setTrailer(layer ? layerName(*layer)
+                                  : getString("BreadcrumbCodeBuilt"));
+}
+
+void ALFloaterXUIStudio::onBreadcrumb(size_t at, const std::string& value)
+{
+    mSelection.select(ALXUISelection::fromString(value));
+}
+
+// ---------------------------------------------------------------------------
+// The selection
+// ---------------------------------------------------------------------------
+LLView* ALFloaterXUIStudio::selectedView() const
+{
+    const Preview& pv = mPreviews[PRIMARY];
+    if (!pv.root || !mSelection.hasSelection())
+    {
+        return nullptr;
+    }
+    return ALXUISelection::resolve(pv.root, mSelection.selection());
+}
+
+// ---------------------------------------------------------------------------
+// Edits
+// ---------------------------------------------------------------------------
+
+// The file's base layer as the canvas shows it. Structure is written there:
+// a language overlay says what a value is, not where an element lives.
+const ALXUICatalog::Layer* ALFloaterXUIStudio::baseLayer() const
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry)
+    {
+        return nullptr;
+    }
+    const std::vector<const ALXUICatalog::Layer*> layers =
+        mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
+    return layers.empty() ? nullptr : layers.front();
+}
+
+// The layer a field is written to: the one that already positions the
+// element when there is one, else the file's own base layer, which is
+// where an author working in English means it to go.
+const ALXUICatalog::Layer* ALFloaterXUIStudio::writeLayer() const
+{
+    const ALXUICatalog::Layer* layer = editTarget();
+    return layer ? layer : baseLayer();
+}
+
+// The layer a move is written into: the most specific one that positions
+// the element, since that is the one whose numbers are on screen, and the
+// first that has the element at all when none of them positions it, since
+// that is where a position has to be written.
+const ALXUICatalog::Layer* ALFloaterXUIStudio::editTarget() const
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || !mSelection.hasSelection())
+    {
+        return nullptr;
+    }
+    const Preview& pv = mPreviews[PRIMARY];
+    const ALXUICatalog::Layer* base = nullptr;
+    const ALXUICatalog::Layer* target = nullptr;
+    for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, pv.skin, pv.language))
+    {
+        // As held, where the layer is one of the documents open: an
+        // attribute taken out a moment ago is not still on the disk's say-so.
+        pugi::xml_node node;
+        S32 line = 0;
+        elementIn(*layer, mSelection.selection(), node, line);
+        if (!node)
+        {
+            continue;
+        }
+        if (!base)
+        {
+            base = layer;
+        }
+        for (pugi::xml_attribute attribute : node.attributes())
+        {
+            if (ALXUIEdit::isGeometryAttribute(attribute.name()))
+            {
+                target = layer;
+                break;
+            }
+        }
+    }
+    return target ? target : base;
+}
+
+void ALFloaterXUIStudio::refreshEditTarget()
+{
+    if (!mEditTarget)
+    {
+        return;
+    }
+    const ALXUICatalog::Layer* layer = editTarget();
+    if (!layer)
+    {
+        mEditTarget->setText(getString("EditNoTarget"));
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layerName(*layer);
+    mEditTarget->setText(getString("EditTarget", args));
+}
+
+// A move or a resize as the movement of the four edges. The near edges
+// are the move, since they are what the file positions from, and what is
+// left over is the size.
+bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
+{
+    if (!dl && !db && !dr && !dt)
+    {
+        return false;
+    }
+    LLView* view = selectedView();
+    if (!view || !view->getParent())
+    {
+        setStatus(getString("EditNoSelection"));
+        return false;
+    }
+    const ALXUICatalog::Layer* layer = editTarget();
+    if (!layer)
+    {
+        setStatus(getString("EditNoTarget"));
+        return false;
+    }
+
+    const ALXUIEdit::Anchor now = anchorOf(view);
+
+    ALXUIEdit* held = document(*layer);
+    if (!held)
+    {
+        return false;
+    }
+    ALXUIEdit& edit = *held;
+
+    const ALXUISelection::path_t& path = mSelection.selection();
+    S32 dx = dl;
+    S32 dy = now.topLeft ? dt : db;
+    S32 dw = dr - dl;
+    S32 dh = dt - db;
+
+    // The root sits where the tool put it: a floater preview is placed
+    // beside this window and a panel preview is placed in its host, so
+    // the numbers a move would write are the tool's and not the file's.
+    // Its size is the file's, and that is still editable.
+    bool root_move = false;
+    if (view == mPreviews[PRIMARY].root && (dx || dy))
+    {
+        dx = 0;
+        dy = 0;
+        root_move = true;
+        if (!dw && !dh)
+        {
+            setStatus(getString("EditRootMove"));
+            return false;
+        }
+    }
+
+    // A layout stack lays its children out itself and reads one dimension
+    // of each from the file: the width in a stack that runs across, the
+    // height in one that runs down. That dimension is the only number a
+    // drag there can write, and the change comes out of whichever sibling
+    // sizes itself.
+    std::string absorbs;
+    const S32 axis = stackAxisOf(view);
+    if (axis >= 0)
+    {
+        dx = 0;
+        dy = 0;
+        if (axis == LLView::HORIZONTAL) { dh = 0; } else { dw = 0; }
+        if (!dw && !dh)
+        {
+            setStatus(getString("EditStackAxis"));
+            return false;
+        }
+        if (const LLView* sibling = absorbingSibling(view))
+        {
+            absorbs = sibling->getName();
+        }
+    }
+    std::vector<std::string> written;
+    if ((dx || dy) && !edit.translate(path, dx, dy, now))
+    {
+        setStatus(edit.error());
+        return false;
+    }
+    written = edit.lastWritten();
+    if ((dw || dh) && !edit.resize(path, dw, dh, now))
+    {
+        setStatus(edit.error());
+        return false;
+    }
+    written.insert(written.end(), edit.lastWritten().begin(), edit.lastWritten().end());
+    if (written.empty())
+    {
+        setStatus(edit.error());
+        return false;
+    }
+
+    std::string names;
+    for (const std::string& name : written)
+    {
+        names += names.empty() ? name : ", " + name;
+    }
+    LLStringUtil::format_map_t args;
+    args["[ATTRS]"] = names;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layerName(*layer);
+    args["[SIBLING]"] = absorbs;
+    const char* said = "EditWrote";
+    if (root_move)
+    {
+        said = "EditWroteNotMoved";
+    }
+    else if (!absorbs.empty())
+    {
+        said = "EditWroteStack";
+    }
+    // The rebuild says what it built; this has to come after it. It waits
+    // for the next frame: this can be the tail of a mouse-up in the very
+    // floater it would take down.
+    documentChanged(getString(said, args));
+    return true;
+}
+
+// Line the selection up with the one the handles are on. Everything else in
+// the selection moves; the anchor does not, which is what makes it the
+// anchor. Screen rects are compared, because two elements being lined up
+// need not share a parent, and a translation is the same number in either
+// space.
+void ALFloaterXUIStudio::alignSelection(const std::string& how)
+{
+    if (mSelection.selectedCount() < 2)
+    {
+        setStatus(getString("AlignNeedsTwo"));
+        return;
+    }
+    LLView* anchor = selectedView();
+    if (!anchor)
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Layer* layer = editTarget();
+    if (!layer)
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+    ALXUIEdit* held = document(*layer);
+    if (!held)
+    {
+        return;
+    }
+
+    const LLRect a = anchor->calcScreenRect();
+    LLView* root = mPreviews[PRIMARY].root;
+    S32 moved = 0;
+    // Lining up a selection writes an attribute on each of several elements,
+    // and it is one thing the developer asked for: undoing it a step at a
+    // time would leave a selection half lined up, which nobody asked for.
+    // The action closes before the history is filled, or the list is one
+    // behind what was just done.
+    ALXUIDocuments::Action lining_up(mDocuments);
+    for (const ALXUISelection::path_t& path : mSelection.also())
+    {
+        LLView* view = ALXUISelection::resolve(root, path);
+        if (!view || !view->getParent() || view == root)
+        {
+            continue;
+        }
+        // A layout stack places its own children: a move written for one of
+        // them is a number the stack overrules on its next pass.
+        if (stackAxisOf(view) >= 0)
+        {
+            continue;
+        }
+        const LLRect r = view->calcScreenRect();
+        S32 dx = 0;
+        S32 dy = 0;
+        if (how == "left")          { dx = a.mLeft - r.mLeft; }
+        else if (how == "right")    { dx = a.mRight - r.mRight; }
+        else if (how == "centre")   { dx = (a.mLeft + a.mRight) / 2 - (r.mLeft + r.mRight) / 2; }
+        else if (how == "top")      { dy = a.mTop - r.mTop; }
+        else if (how == "bottom")   { dy = a.mBottom - r.mBottom; }
+        else if (how == "middle")   { dy = (a.mTop + a.mBottom) / 2 - (r.mTop + r.mBottom) / 2; }
+        if (!dx && !dy)
+        {
+            continue;
+        }
+
+        if (!held->translate(path, dx, dy, anchorOf(view)))
+        {
+            setStatus(held->error());
+            return;
+        }
+        ++moved;
+    }
+    lining_up.close();
+
+    if (!moved)
+    {
+        setStatus(getString("AlignNothingToDo"));
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(moved);
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layerName(*layer);
+    documentChanged(getString("EditAligned", args));
+}
+
+// One action of the set, which is one thing done as it was asked for
+// however many steps and files it took, and nothing on disk to put back
+// because nothing went there. A translation written and a repair are
+// saved as they are made, so undoing one leaves its file dirty against
+// the disk, with Save the way to write the undo out.
+bool ALFloaterXUIStudio::undo()
+{
+    return undoEdit();
+}
+
+bool ALFloaterXUIStudio::redo()
+{
+    return redoEdit();
+}
+
+bool ALFloaterXUIStudio::undoEdit()
+{
+    flushSourceEdit();
+    // What is about to be put back, asked before it is, since afterwards the
+    // step has moved to the other stack. The set's last action rather than
+    // the active document's last step: they differ whenever the last edit
+    // was to another document, and the words have to be about what goes.
+    std::string what;
+    {
+        mDocuments.settle();
+        const std::vector<ALXUIDocuments::Entry> history = mDocuments.history();
+        const size_t in_force = mDocuments.inForce();
+        if (in_force > 0 && in_force <= history.size())
+        {
+            what = describeAction(history[in_force - 1]);
+        }
+    }
+    if (mDocuments.undo())
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = fileNameOf(documentPath());
+        args["[WHAT]"] = what;
+        replayChange(getString(what.empty() ? "EditUndone" : "EditUndoneWhat", args));
+        return true;
+    }
+    return false;
+}
+
+bool ALFloaterXUIStudio::redoEdit()
+{
+    flushSourceEdit();
+    if (!mDocuments.redo())
+    {
+        return false;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = fileNameOf(documentPath());
+    const std::string what = describeStep(mDocuments.lastChange());
+    args["[WHAT]"] = what;
+    replayChange(getString(what.empty() ? "EditRedone" : "EditRedoneWhat", args));
+    return true;
+}
+
+void ALFloaterXUIStudio::canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt)
+{
+    if (which != PRIMARY)
+    {
+        return;
+    }
+    // Moving the root moves the preview on its canvas and writes nothing:
+    // where a file sits on the surface it is shown on is the tool's business
+    // and not the file's. Refusing the drag outright, which is what this did,
+    // left the gesture doing nothing at all. Its size is the file's, and that
+    // still goes through the document.
+    Preview& pv = mPreviews[PRIMARY];
+    const bool move_only = dl == dr && db == dt && (dl || db);
+    if (pv.root && move_only && selectedView() == pv.root)
+    {
+        pv.root->translate(dl, db);
+        // The surface has to be told, or it puts the preview back where it
+        // was built the next time it changes size -- and a preview moved
+        // towards an edge is a surface that has to grow to keep it.
+        if (ALXUICanvas* canvas = canvasOf(pv))
+        {
+            canvas->rememberRoot();
+            layoutCanvases();
+        }
+        setStatus(getString("EditRootMoved"));
+        return;
+    }
+    applyEdges(dl, db, dr, dt);
+}
+
+namespace
+{
+    // A container is something that already holds an element the file
+    // wrote. A widget that builds its own children -- a combo box's list,
+    // a scroll list's columns -- holds none, and neither does a button,
+    // which is what keeps a drag across a row of buttons from making one
+    // of them a parent. An empty container holds none either, so it is
+    // filled from the tree rather than by a drop.
+    bool holdsAuthoredChild(const ALXUISourceMap& map, const LLView* view)
+    {
+        for (const LLView* child : *view->getChildList())
+        {
+            if (map.isFromXML(child))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+LLView* ALFloaterXUIStudio::dropTarget(S32 which, LLView* under, const LLView* moving) const
+{
+    const Preview& pv = mPreviews[PRIMARY];
+    if (which != PRIMARY || !under || !moving || moving == pv.root || !moving->getParent())
+    {
+        return nullptr;
+    }
+    const ALXUISourceMap::Origin* mine = pv.sourceMap.find(moving);
+    if (!mine)
+    {
+        return nullptr;
+    }
+
+    // A point inside the thing being carried is not a drop: an element
+    // cannot land in itself, and landing in its own parent is the move it
+    // already is.
+    for (const LLView* view = under; view; view = view->getParent())
+    {
+        if (view == moving)
+        {
+            return nullptr;
+        }
+    }
+
+    const ALXUISchema& schema = ALXUISchema::get();
+    for (LLView* view = under; view; view = view->getParent())
+    {
+        if (view != pv.root && !pv.sourceMap.isFromXML(view))
+        {
+            continue;
+        }
+        if (!holdsAuthoredChild(pv.sourceMap, view))
+        {
+            continue;
+        }
+        // The tag a container answers to is the class that was built, since
+        // that is whose child registry the parser would consult; the tag
+        // being carried is the word the file wrote.
+        const std::string* container = LLUICtrlFactory::widgetTag(view->viewType());
+        if (!container || !schema.acceptsChild(*container, mine->tag))
+        {
+            continue;
+        }
+        return view == moving->getParent() ? nullptr : view;
+    }
+    return nullptr;
+}
+
+// The element lands where it was dropped. Its rect is read out of the
+// window it is drawn in and read back in the new parent's coordinates,
+// which is the only part of its old form that survives: `left_delta`
+// counts from a sibling it no longer has, `top` counts from a parent of
+// another height, and `left_pad` from a widget in another file altogether.
+// So nothing is carried -- the rect is written outright, in the layout the
+// new parent lays its children out under.
+void ALFloaterXUIStudio::canvasReparent(S32 which, LLView* parent, S32 dx, S32 dy)
+{
+    if (which != PRIMARY || !parent)
+    {
+        return;
+    }
+    LLView* view = selectedView();
+    if (!view || !view->getParent())
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    const Preview& pv = mPreviews[PRIMARY];
+    ALXUISelection::path_t target;
+    if (!entry || !pv.root || !ALXUISelection::pathOf(parent, pv.root, target))
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/false);
+    if (!held)
+    {
+        return;
+    }
+
+    // Where it would sit, in the coordinates the new parent counts in.
+    LLRect landed = view->calcScreenRect();
+    landed.translate(dx, dy);
+    const LLRect into = parent->calcScreenRect();
+    ALXUIEdit::Anchor want;
+    want.left = landed.mLeft - into.mLeft;
+    want.top = into.mTop - landed.mTop;
+    want.bottom = landed.mBottom - into.mBottom;
+    want.width = landed.getWidth();
+    want.height = landed.getHeight();
+    // Its own word for it if it has one, and otherwise the new parent's,
+    // which is what LLView::applyXUILayout would give it there.
+    const ALXUISelection::path_t& path = mSelection.selection();
+    const pugi::xml_node node = held->resolve(path);
+    const pugi::xml_attribute layout = node.attribute("layout");
+    want.topLeft = layout ? std::string_view(layout.value()) == "topleft" : parent->isLayoutTopLeft();
+
+    // The move and the rect written for the new parent are one gesture,
+    // and one undo puts back both.
+    ALXUIDocuments::Action reparenting(mDocuments);
+    if (!held->moveElement(path, target))
+    {
+        setStatus(held->error());
+        return;
+    }
+
+    // The move puts it last among the target's children, and the document
+    // says where that is: the old path names a place it has left.
+    ALXUISelection::path_t moved = landing(*held);
+    if (moved.empty())
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+    // A layout stack reads one dimension of a panel and decides the rest,
+    // so that is all it is given.
+    const bool stacked = parent->as<LLLayoutStack>() != nullptr;
+    if (!held->reauthor(moved, want, stacked ? ALXUIEdit::AUTHOR_SIZE : ALXUIEdit::AUTHOR_RECT))
+    {
+        setStatus(held->error());
+        return;
+    }
+    reparenting.close();
+
+    mSelection.select(moved);
+    LLStringUtil::format_map_t args;
+    args["[WHAT]"] = ALXUISelection::toString(path);
+    args["[INTO]"] = parent->getName();
+    documentChanged(getString("EditReparented", args));
+}
+
+// --- nested files -----------------------------------------------------------
+// A panel that carries `filename=` is one element on this canvas and a
+// whole file of its own: the outer document says where it goes and the
+// inner one says what is in it, so editing what is in it is editing the
+// other file, with the undo stack that file has.
+std::string ALFloaterXUIStudio::nestedFile(const LLView* view) const
+{
+    const ALXUISourceMap::Origin* origin = view ? mPreviews[PRIMARY].sourceMap.find(view) : nullptr;
+    std::string file;
+    if (origin && origin->node.notNull() && origin->node->getAttributeString("filename", file))
+    {
+        return file;
+    }
+    return std::string();
+}
+
+void ALFloaterXUIStudio::openNestedFile()
+{
+    const std::string file = nestedFile(selectedView());
+    if (file.empty())
+    {
+        setStatus(getString("EditNoNestedFile"));
+        return;
+    }
+    if (!mCatalog.find(file))
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = file;
+        setStatus(getString("EditNestedMissing", args));
+        return;
+    }
+    // The file this one names stays open beside it, edits and all: a panel
+    // that carries a file of its own is one element here and a document
+    // elsewhere, and looking at the second is not giving up the first.
+    mFile = file;
+    mSelection.clearSelection();
+    fillCatalog();
+    saveState();
+    showPreviews();
+}
+
+// What an element occupies now, as the document measures a move or a
+// resize from: its rect in its parent, from the top where the file counts
+// from the top.
+ALXUIEdit::Anchor ALFloaterXUIStudio::anchorOf(const LLView* view)
+{
+    const LLRect& rect = view->getRect();
+    ALXUIEdit::Anchor now;
+    now.left = rect.mLeft;
+    now.top = view->getParent()->getRect().getHeight() - rect.mTop;
+    now.bottom = rect.mBottom;
+    now.width = rect.getWidth();
+    now.height = rect.getHeight();
+    now.topLeft = view->isLayoutTopLeft();
+    return now;
+}
+
+bool ALFloaterXUIStudio::nudge(KEY key, MASK mask)
+{
+    if (mask & (MASK_CONTROL | MASK_ALT))
+    {
+        return false;
+    }
+    const S32 step = (mask & MASK_SHIFT) ? 10 : 1;
+    S32 dx = 0;
+    S32 dy = 0;
+    switch (key)
+    {
+    case KEY_LEFT:  dx = -step; break;
+    case KEY_RIGHT: dx = step;  break;
+    case KEY_DOWN:  dy = -step; break;
+    case KEY_UP:    dy = step;  break;
+    default:        return false;
+    }
+    return applyEdges(dx, dy, dx, dy);
+}
+
+// The element the selection names, in the most specific layer that has
+// it, which is the one whose values the built view shows.
+pugi::xml_node ALFloaterXUIStudio::authoredElement(const ALXUICatalog::Layer*& layer) const
+{
+    layer = nullptr;
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || !mSelection.hasSelection())
+    {
+        return pugi::xml_node();
+    }
+    const Preview& pv = mPreviews[PRIMARY];
+    std::vector<const ALXUICatalog::Layer*> layers = mCatalog.layersFor(*entry, pv.skin, pv.language);
+    for (auto it = layers.rbegin(); it != layers.rend(); ++it)
+    {
+        if (pugi::xml_node node = ALXUICatalog::resolve((*it)->root(), mSelection.selection()))
+        {
+            layer = *it;
+            return node;
+        }
+    }
+    return pugi::xml_node();
+}
+
+void ALFloaterXUIStudio::onSelectionChanged()
+{
+    if (mTree && !mSyncingTree)
+    {
+        mSyncingTree = true;
+        mTree->clearSelection();
+        if (mSelection.hasSelection())
+        {
+            auto it = mRows.find(ALXUISelection::toString(mSelection.selection()));
+            if (it != mRows.end())
+            {
+                mTree->setSelection(it->second, false, false);
+                mTree->scrollToShowSelection();
+            }
+        }
+        mSyncingTree = false;
+    }
+    revealInContainers(selectedView());
+    refreshBreadcrumb();
+    refreshEditTarget();
+    refreshInspectors();
+    fillPalette();
+}
+
+void ALFloaterXUIStudio::onHoverChanged()
+{
+    mModel.setCanvasHover(mSelection.hasHover() ? mModel.itemFor(mSelection.hover()) : nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// The inspectors
+// ---------------------------------------------------------------------------
+// Only the inspectors that mean something for what is selected. Bindings are
+// what a file wrote, so an element no file wrote has none to show and is not
+// offered a page that would be empty every time. The findings page says how
+// many are about this element, since a page that is usually empty is worth
+// looking at on the occasions it is not.
+void ALFloaterXUIStudio::refreshInspectorStrip()
+{
+    LLView* view = selectedView();
+    const bool authored = view && mPreviews[PRIMARY].sourceMap.isFromXML(view);
+    if (LLPanel* bindings = mInspectors->getPanelByName("bindings_tab"))
+    {
+        mInspectors->setTabVisibility(bindings, authored);
+    }
+    if (LLPanel* findings = mInspectors->getPanelByName("findings_tab"))
+    {
+        // The page shows what is at the selection and under it, so the count
+        // beside its name counts the same thing.
+        const S32 n = mSelection.hasSelection()
+                    ? (S32)mPreviews[PRIMARY].lint.countUnder(mSelection.selection()) : 0;
+        mInspectors->setPanelTitle(mInspectors->getIndexForPanel(findings),
+                                   n > 0 ? findings->getLabel() + " " + std::to_string(n)
+                                         : findings->getLabel());
+    }
+}
+
+void ALFloaterXUIStudio::refreshInspectors()
+{
+    refreshInspectorStrip();
+    LLView* view = selectedView();
+    LLPanel* current = mInspectors->getCurrentPanel();
+    const std::string tab = current ? current->getName() : std::string();
+    if (tab == "attributes_tab")
+    {
+        refreshAttributes(view);
+    }
+    else if (tab == "layout_tab")
+    {
+        refreshLayout(view);
+    }
+    else if (tab == "source_tab")
+    {
+        refreshSource(view);
+    }
+    else if (tab == "bindings_tab")
+    {
+        refreshBindings(view);
+    }
+    else if (tab == "state_tab")
+    {
+        refreshState(view);
+    }
+    else if (tab == "findings_tab")
+    {
+        refreshSelectionFindings();
+    }
+}
+
+// Every field the selected widget answers to, with what is in force and
+// which layer put it there. The schema says what the fields are and what
+// each one is, so the grid gets a check box for a flag and a list of names
+// for an enumeration without either of them knowing what a widget is.
+void ALFloaterXUIStudio::refreshAttributes(LLView* view)
+{
+    mAttributeGrid->clearFields();
+    if (!view)
+    {
+        mAttributeWhat->setText(getString("AttributeWhatNone"));
+        return;
+    }
+    const Preview& pv = mPreviews[PRIMARY];
+    const ALXUISourceMap::Origin* origin = pv.sourceMap.find(view);
+
+    // What the widget answers to, which is the class that was built and not
+    // the tag the file wrote: <panel class="foo"> is foo's parameters.
+    const std::string* tag = LLUICtrlFactory::widgetTag(view->viewType());
+    const ALXUISchema& schema = ALXUISchema::get();
+    const ALXUISchema::Tag* declared = tag ? schema.tag(*tag) : nullptr;
+
+    // What is selected, in the three words that say it: what it is called,
+    // the tag the file wrote, and the class that was built from it. The
+    // last two differ often enough that showing one is not showing the
+    // other, and a view no element describes has only the last.
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = view->getName();
+        args["[TAG]"] = origin ? origin->tag : std::string();
+        args["[CLASS]"] = view->viewType()->mName;
+        mAttributeWhat->setText(getString(origin ? "AttributeWhat" : "AttributeWhatCodeBuilt", args));
+    }
+
+    if (!origin)
+    {
+        return;
+    }
+
+    std::vector<ALPropertyGrid::Field> fields;
+    boost::unordered_set<std::string> written;
+
+    const auto describe = [&](ALPropertyGrid::Field& field, const std::string& name)
+    {
+        if (const ALXUISchema::Attribute* attribute = tag ? schema.attribute(*tag, name) : nullptr)
+        {
+            field.kind = attribute->value;
+            field.values = attribute->values;
+            field.type = attribute->type;
+            field.ignored = attribute->ignored;
+            field.deprecated = attribute->deprecated;
+            field.instead = attribute->instead;
+            // What the element carries when the file says nothing about it,
+            // which is the thing a row about an unwritten field is for. A
+            // field with nothing in it read as a chosen nought, which is a
+            // different statement about the element than the true one.
+            if (!field.authored && attribute->holds)
+            {
+                field.value = attribute->held;
+            }
+        }
+        else if (declared)
+        {
+            field.type = getString("AttributeUnknown");
+            field.unknown = true;
+        }
+        // What a field does outranks what its name suggests: an attribute
+        // that is thrown away is not a position however it is spelled.
+        field.group = field.ignored ? ALXUIFields::IGNORED
+                    : field.unknown ? ALXUIFields::UNKNOWN
+                                    : ALXUIFields::sectionOf(name, declared ? declared->name : std::string_view());
+        ALXUIFields::vocabularyFor(field);
+        // A field drawn as a picture is drawn in the proportions of the
+        // element it is about: a rect and the rect it sits in, which are
+        // the same coordinates.
+        if (!field.edges.empty() && view->getParent())
+        {
+            field.subject = view->getRect();
+            field.subjectParent = view->getParent()->getLocalRect();
+        }
+    };
+
+    // Which layer last wrote each attribute, as the merge's observer
+    // recorded it; the base wrote the rest.
+    for (const auto& [name_entry, attribute] : origin->node->mAttributes)
+    {
+        ALPropertyGrid::Field field;
+        field.name = name_entry->mString;
+        field.value = attribute->getValue();
+        const ALXUIOverlay::Origin* from = pv.overlay.originOf(attribute.get());
+        field.source = layerLabel(PRIMARY, from ? from->layer : 0);
+        field.authored = true;
+        // Every layer that writes it, not only the one that won: a value
+        // some skin or language disagrees about is marked in the gutter,
+        // and this is what the mark says.
+        for (const ALXUIOverlay::Origin& writer : pv.overlay.writersOf(attribute.get()))
+        {
+            field.alsoWritten.push_back(layerLabel(PRIMARY, writer.layer)
+                                        + (writer.value.empty() ? std::string() : " = " + writer.value));
+        }
+        describe(field, field.name);
+        written.insert(field.name);
+        fields.push_back(std::move(field));
+    }
+
+    if (origin->node->hasTextContents())
+    {
+        ALPropertyGrid::Field field;
+        field.name = "value";
+        field.value = origin->node->getTextContents();
+        const ALXUIOverlay::Origin* from = pv.overlay.originOf(origin->node.get());
+        field.source = layerLabel(PRIMARY, from ? from->layer : 0);
+        field.authored = true;
+        field.kind = ALParamType::STRING;
+        field.group = ALXUIFields::sectionOf(field.name, declared ? declared->name : std::string_view());
+        written.insert(field.name);
+        fields.push_back(std::move(field));
+    }
+
+    // And everything else the tag takes, for an author looking for the
+    // name of a thing rather than changing one they can already see.
+    if (declared)
+    {
+        for (const ALXUISchema::Attribute& attribute : declared->attributes)
+        {
+            // A name that works and should not be used is shown where a file
+            // uses it and offered nowhere: the name to write is in the list
+            // already, and a list offering both is telling an author that
+            // either will do.
+            if (written.count(attribute.name) || attribute.deprecated)
+            {
+                continue;
+            }
+            ALPropertyGrid::Field field;
+            field.name = attribute.name;
+            field.kind = attribute.value;
+            field.values = attribute.values;
+            field.type = attribute.type;
+            field.ignored = attribute.ignored;
+            field.group = field.ignored ? ALXUIFields::IGNORED
+                                        : ALXUIFields::sectionOf(field.name, declared->name);
+            ALXUIFields::vocabularyFor(field);
+            fields.push_back(std::move(field));
+        }
+    }
+
+    // The four numbers everybody reads two at a time. Which fields are the
+    // same thought is a fact about the vocabulary, so it is said here and
+    // not in the grid, which knows about types and nothing about widgets.
+    static const std::pair<const char*, const char*> PAIRS[] = {
+        { "left", "top" },
+        { "width", "height" },
+        { "min_width", "min_height" },
+        { "left_pad", "top_pad" },
+        { "left_delta", "top_delta" },
+    };
+    for (ALPropertyGrid::Field& field : fields)
+    {
+        for (const auto& [first, second] : PAIRS)
+        {
+            if (field.name == first)
+            {
+                field.pairWith = second;
+                break;
+            }
+        }
+    }
+
+    mAttributeGrid->setFields(std::move(fields));
+}
+
+// A field committed in the grid is one operation on the document, at the
+// element the selection names.
+void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::string& value)
+{
+    if (!mSelection.hasSelection())
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    // A name is not a field: it is what every path to the element is made of.
+    if (name == "name")
+    {
+        renameSelected(value);
+        return;
+    }
+
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry)
+    {
+        return;
+    }
+
+    // Where a field is written: the layer that already writes the geometry
+    // when there is one, else the file's own base layer, which is where an
+    // author working in English means it to go.
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/true);
+    if (!held)
+    {
+        return;
+    }
+    // A value is written in whichever form the element already uses. The
+    // parser reads the text between the tags over a value attribute, so
+    // text written onto an element that carries the attribute leaves the
+    // attribute in the file with nothing reading it.
+    bool ok;
+    if (name == "value")
+    {
+        const pugi::xml_node element = held->resolve(mSelection.selection());
+        ok = element && element.attribute("value")
+           ? held->setAttribute(mSelection.selection(), name, value)
+           : held->setText(mSelection.selection(), value);
+    }
+    else
+    {
+        ok = held->setAttribute(mSelection.selection(), name, value);
+    }
+    if (!ok)
+    {
+        setStatus(held->error());
+        return;
+    }
+
+    const std::string said = saidWrite("EditWrote", name, *layer);
+    // A field the preview can be told about is told, and nothing is made
+    // again: the window keeps its place, the outline keeps its rows, and
+    // the keyboard stays in the box the number was typed into. The row is
+    // told as well, since a field this layer writes now is one it may not
+    // have written a moment ago.
+    if (applyLive(mSelection.selection(), name, value)
+        || rebuildElement(mSelection.selection(), name))
+    {
+        mAttributeGrid->setAuthored(name, true, layerName(*layer));
+        documentRead(said);
+        return;
+    }
+    documentChanged(said);
+}
+
+// Naming an element is not writing a field of it: a path is made of names, so
+// this moves the element and everything under it, and every path the tool is
+// holding has to come along or name something that is not there.
+//
+// It is also the most destructive thing anybody can do to a translation. A
+// language's overlay applies because the base has an element of that name at
+// that place, and renaming it stops that without a word being said -- so the
+// word is said here, before the write, in the same terms Save and Repair uses
+// afterwards.
+void ALFloaterXUIStudio::renameSelected(const std::string& name)
+{
+    const ALXUISelection::path_t was = mSelection.selection();
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/true);
+    if (!held)
+    {
+        return;
+    }
+
+    // What this costs, counted before it is done: every language whose own
+    // file has an element at this path is a language that stops applying.
+    const S32 stranded = translationsAt(was);
+
+    ALXUISelection::path_t moved;
+    if (!held->rename(was, name, moved))
+    {
+        setStatus(held->error());
+        return;
+    }
+
+    // Everything the tool is holding a path with.
+    ALXUISelection::path_t selected = mSelection.selection();
+    ALXUIEdit::afterRenaming(was, moved, selected);
+    if (mSelection.hasSelection())
+    {
+        mSelection.select(selected);
+    }
+    ALXUIEdit::afterRenaming(was, moved, mCutPath);
+    mRenamedFrom = was;
+    mRenamedTo = moved;
+
+    std::string said = saidWrite("EditWrote", "name", *layer);
+    if (stranded > 0)
+    {
+        LLStringUtil::format_map_t cost;
+        cost["[COUNT]"] = std::to_string(stranded);
+        said += "  " + getString("RenameStrands", cost);
+    }
+    documentChanged(said);
+}
+
+// How many languages write something about the element at that path. Read
+// off the layers as the catalog has them, which is the disk: a language the
+// developer has not touched is the case this is about.
+S32 ALFloaterXUIStudio::translationsAt(const ALXUISelection::path_t& path) const
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || path.empty())
+    {
+        return 0;
+    }
+    S32 count = 0;
+    for (const ALXUICatalog::Layer& layer : entry->layers)
+    {
+        if (layer.language == mLanguage || !layer.doc)
+        {
+            continue;
+        }
+        if (ALXUICatalog::resolve(layer.root(), path, /*any_tag=*/true))
+        {
+            ++count;
+        }
+    }
+    return count;
+}
+
+// The way back: this file writes this field, take it out again. What was in
+// force before the file wrote it is in force after, which is the whole point
+// -- an attribute removed is not an attribute set to its default, and the
+// grid says so by turning the row back to the quiet ink.
+void ALFloaterXUIStudio::onFieldRemove(const std::string& name)
+{
+    if (!mSelection.hasSelection())
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/true);
+    if (!held)
+    {
+        return;
+    }
+    // A value the element carries as its text rather than as an attribute
+    // comes off by emptying the text: an element with nothing between its
+    // tags says nothing to the parser, as one without the attribute does.
+    const pugi::xml_node element = held->resolve(mSelection.selection());
+    const bool as_text = name == "value" && element && !element.attribute("value")
+                      && element.first_child() && !element.first_child().next_sibling()
+                      && element.first_child().type() == pugi::node_pcdata;
+    if (!(as_text ? held->setText(mSelection.selection(), std::string())
+                  : held->removeAttribute(mSelection.selection(), name)))
+    {
+        setStatus(held->error());
+        return;
+    }
+    documentChanged(saidWrite("EditTookOut", name, *layer));
+}
+
+// The mark beside a row, clicked. The row is marked because more than one
+// layer writes the field, and what each of them says about the element is
+// already laid out, layer by layer, in the Source inspector: the click is
+// the way from noticing that they disagree to reading how.
+void ALFloaterXUIStudio::onFieldGutter(const std::string& name)
+{
+    mGutterField = name;
+    openGutterPopover(name);
+    // And the Source inspector, which is the same rows with the file under
+    // them, for the times the popover is not enough.
+    fillSourceLayers();
+}
+
+// Open quickly: every file in the catalog, ranked against a few letters, with
+// the one meant at the top and return to take it. Over the window rather than
+// in a pane, because it is a gesture and not a place -- it is gone as soon as
+// it has answered.
+void ALFloaterXUIStudio::openQuickly()
+{
+    std::vector<ALQuickOpen::Candidate> candidates;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        ALQuickOpen::Candidate one;
+        // The file's own name is what a person types, and the folders it is
+        // under are how they tell two of a name apart.
+        const size_t slash = entry.name.find_last_of('/');
+        one.label = slash == std::string::npos ? entry.name : entry.name.substr(slash + 1);
+        one.detail = slash == std::string::npos ? std::string(ALXUICatalog::kindName(entry.kind))
+                                                : entry.name.substr(0, slash);
+        one.value = entry.name;
+        candidates.push_back(std::move(one));
+    }
+    quickOpen(std::move(candidates), getString("QuickOpenPlaceholder"), getString("QuickOpenTitle"),
+              [this](const std::string& file) { goToFile(file); });
+}
+
+// The file, opened, with the canvas going there whether it is pinned or not:
+// asking for a file by name is asking to be looking at it.
+void ALFloaterXUIStudio::goToFile(const std::string& file)
+{
+    if (file.empty() || file == mFile || !mCatalog.find(file))
+    {
+        return;
+    }
+    mFile = file;
+    mPendingFile.clear();
+    mSelection.clearSelection();
+    if (mModes)
+    {
+        mModes->selectTabByName("files_mode");
+    }
+    mFileList->setSelectedByValue(mFile, true);
+    saveState();
+    showPreviews();
+}
+
+// The mark beside a row, clicked. The row is marked because more than one
+// layer writes the field; this is where a person reads which, and adds one of
+// their own -- beside the mark rather than in a pane somewhere else, because
+// the question was asked by pointing at that row.
+void ALFloaterXUIStudio::openGutterPopover(const std::string& field)
+{
+    mGutterPopover.close();
+    mGutterList = nullptr;
+
+    LLView* mark = mAttributeGrid ? mAttributeGrid->gutterFor(field) : nullptr;
+    if (!mark)
+    {
+        return;
+    }
+
+    constexpr S32 WIDTH = 320;
+    constexpr S32 ROWS = 110;
+    constexpr S32 FOOT = 26;
+
+    LLPanel::Params pp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+    pp.name = "gutter_layers";
+    pp.rect = LLRect(0, ROWS + FOOT, WIDTH, 0);
+    LLPanel* content = LLUICtrlFactory::create<LLPanel>(pp);
+
+    ALPaneList::Params lp(LLUICtrlFactory::getDefaultParams<ALPaneList>());
+    lp.name = "layers";
+    lp.rect = LLRect(0, ROWS + FOOT, WIDTH, FOOT);
+    lp.follows.flags = FOLLOWS_ALL;
+    lp.draw_heading = true;
+    lp.multi_select = false;
+    lp.column_padding = 0;
+    LLStringUtil::format_map_t tip_args;
+    tip_args["[ATTR]"] = field;
+    lp.tool_tip = getString("GutterListTip", tip_args);
+    mGutterList = LLUICtrlFactory::create<ALPaneList>(lp);
+    content->addChild(mGutterList);
+
+    LLScrollListColumn::Params force;
+    force.name = "force";
+    force.tool_tip = getString("GutterForceTip");
+    force.width.pixel_width = 16;
+    mGutterList->addColumn(force);
+    LLScrollListColumn::Params layer;
+    layer.name = "layer";
+    layer.header.label = getString("GutterLayer");
+    layer.tool_tip = getString("GutterLayerTip");
+    layer.width.pixel_width = 110;
+    mGutterList->addColumn(layer);
+    LLScrollListColumn::Params value;
+    value.name = "value";
+    value.header.label = getString("GutterSays");
+    value.tool_tip = getString("GutterSaysTip", tip_args);
+    value.width.dynamic_width = true;
+    mGutterList->addColumn(value);
+    LLScrollListColumn::Params line;
+    line.name = "line";
+    line.tool_tip = getString("GutterLineTip");
+    line.width.pixel_width = 40;
+    mGutterList->addColumn(line);
+
+    LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+    bp.name = "write_here";
+    bp.label = getString("GutterWriteHere");
+    bp.tool_tip = getString("GutterWriteHereTip", tip_args);
+    bp.rect = LLRect(0, FOOT - 2, 100, 2);
+    bp.follows.flags = FOLLOWS_LEFT | FOLLOWS_BOTTOM;
+    LLButton* write = LLUICtrlFactory::create<LLButton>(bp);
+    content->addChild(write);
+
+    mGutterField = field;
+    fillLayerList(mGutterList, field);
+
+    LLStringUtil::format_map_t args;
+    args["[ATTR]"] = field;
+    ALPopover* popover = ALPopover::show(mark, content, getString("GutterTitle", args));
+    if (!popover)
+    {
+        mGutterList = nullptr;
+        return;
+    }
+    mGutterPopover.hold(popover, [this](bool) { mGutterList = nullptr; });
+
+    // Chosen and gone: the popover is a question about one row, and it has
+    // been answered.
+    write->setClickedCallback([this](LLUICtrl*, const LLSD&)
+    {
+        onWriteOverride();
+        mGutterPopover.close(false);
+        mGutterList = nullptr;
+    });
+}
+
+// Every layer of the file against one field of the selected element, in the
+// order the merge applies them.
+//
+// Read off the layers themselves rather than off the attribute grid: only the
+// inspector on top is refreshed, so the grid can still be holding whichever
+// element was selected the last time it was the one showing.
+std::vector<ALFloaterXUIStudio::LayerSays>
+ALFloaterXUIStudio::layersSaying(const std::string& field) const
+{
+    std::vector<LayerSays> said;
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || !mSelection.hasSelection())
+    {
+        return said;
+    }
+    const Preview& pv = mPreviews[PRIMARY];
+    for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, pv.skin, pv.language))
+    {
+        LayerSays one;
+        one.layer = layer;
+        pugi::xml_node node;
+        elementIn(*layer, mSelection.selection(), node, one.line);
+        one.has = (bool)node;
+        if (node && !field.empty())
+        {
+            const pugi::xml_attribute attribute = node.attribute(field.c_str());
+            one.writes = (bool)attribute;
+            one.value = attribute.value();
+        }
+        said.push_back(one);
+    }
+    return said;
+}
+
+// The merge takes the last that writes it, so the mark goes on the last and
+// not on the first. Past the end where nobody writes it at all.
+// static
+size_t ALFloaterXUIStudio::inForce(const std::vector<LayerSays>& said)
+{
+    size_t at = said.size();
+    for (size_t i = 0; i < said.size(); ++i)
+    {
+        if (said[i].writes)
+        {
+            at = i;
+        }
+    }
+    return at;
+}
+
+void ALFloaterXUIStudio::fillLayerList(LLScrollListCtrl* list, const std::string& field) const
+{
+    if (!list)
+    {
+        return;
+    }
+    const std::string was = list->getFirstSelected()
+        ? list->getFirstSelected()->getValue().asString() : std::string();
+    list->deleteAllItems();
+
+    const std::vector<LayerSays> said = layersSaying(field);
+    const size_t winner = inForce(said);
+    for (size_t i = 0; i < said.size(); ++i)
+    {
+        list->addElement(row(said[i].layer->path, {
+            { "force", i == winner ? getString("DocumentDirtyMark") : std::string() },
+            { "layer", layerName(*said[i].layer) },
+            { "value", said[i].writes ? said[i].value
+                                      : (said[i].has ? std::string() : getString("LayerMissing")) },
+            { "line", said[i].line > 0 ? std::to_string(said[i].line) : std::string() } }));
+    }
+    if (!was.empty())
+    {
+        list->setSelectedByValue(LLSD(was), true);
+    }
+}
+
+// Which field the layer table is about: whichever gutter was last clicked,
+// while it is still a field of this element; failing that, the first field
+// the layers disagree about, since that is the one the table exists to
+// explain.
+std::string ALFloaterXUIStudio::firstDisputedField() const
+{
+    const std::vector<LayerSays> layers = layersSaying(std::string());
+    for (const LayerSays& one : layers)
+    {
+        if (!one.has)
+        {
+            continue;
+        }
+        const pugi::xml_node node = ALXUICatalog::resolve(one.layer->root(), mSelection.selection());
+        for (pugi::xml_attribute attribute : node.attributes())
+        {
+            S32 writers = 0;
+            for (const LayerSays& other : layers)
+            {
+                const pugi::xml_node theirs =
+                    ALXUICatalog::resolve(other.layer->root(), mSelection.selection());
+                writers += theirs && theirs.attribute(attribute.name());
+            }
+            if (writers > 1)
+            {
+                return attribute.name();
+            }
+        }
+    }
+    return std::string();
+}
+
+// A gutter mark says the layers disagree about a field. This is how: one row
+// per layer, with what each one says about it and a mark on the one in force.
+void ALFloaterXUIStudio::fillSourceLayers()
+{
+    if (!mSourceLayerList)
+    {
+        return;
+    }
+    if (!mGutterField.empty())
+    {
+        const std::vector<LayerSays> said = layersSaying(mGutterField);
+        if (inForce(said) >= said.size())
+        {
+            mGutterField.clear();   // no layer writes it: it is not this element's
+        }
+    }
+    if (mGutterField.empty())
+    {
+        mGutterField = firstDisputedField();
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[ATTR]"] = mGutterField;
+    if (mOverrideField)
+    {
+        mOverrideField->setText(mGutterField.empty() ? getString("OverrideNoField")
+                                                     : getString("OverrideField", args));
+    }
+    fillLayerList(mSourceLayerList, mGutterField);
+}
+
+// An override is the value in force, written into a layer that did not have
+// the last word about it. Into a layer that already writes it, that is the
+// layer changing its mind, which is the same operation.
+//
+// A layer that does not carry the element gets the way down to it first, each
+// ancestor carrying nothing but its name -- which is all the merge matches on,
+// and exactly what a language overlay is written as. The chain and the value
+// are one thing done, so one undo takes both back.
+void ALFloaterXUIStudio::writeOverrideInto(const ALXUICatalog::Layer& layer, const std::string& field)
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (field.empty() || !entry || !mSelection.hasSelection())
+    {
+        setStatus(getString("OverrideNoField"));
+        return;
+    }
+
+    const std::vector<LayerSays> said = layersSaying(field);
+    const size_t winner = inForce(said);
+    if (winner >= said.size())
+    {
+        setStatus(getString("OverrideNothingInForce"));
+        return;
+    }
+    const std::string value = said[winner].value;
+
+    ALXUIEdit* held = document(layer);
+    if (!held)
+    {
+        return;
+    }
+
+    ALXUIDocuments::Action together(mDocuments);
+    if (!held->resolve(mSelection.selection()))
+    {
+        const std::vector<const ALXUICatalog::Layer*> layers =
+            mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mPreviews[PRIMARY].language);
+        std::string error;
+        if (layers.empty()
+            || !ALXUITranslate::ensureChain(*held, layers.front()->root(),
+                                            mSelection.selection(), error))
+        {
+            setStatus(error.empty() ? held->error() : error);
+            return;
+        }
+    }
+    if (!held->setAttribute(mSelection.selection(), field, value))
+    {
+        setStatus(held->error());
+        return;
+    }
+    together.close();
+    documentChanged(saidWrite("EditWrote", field, layer));
+}
+
+// The layer chosen in whichever of the two lists asked.
+void ALFloaterXUIStudio::onWriteOverride()
+{
+    LLScrollListCtrl* list = mGutterList && mGutterList->getFirstSelected()
+                           ? mGutterList : mSourceLayerList;
+    const LLScrollListItem* item = list ? list->getFirstSelected() : nullptr;
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!item || !entry)
+    {
+        setStatus(getString("OverrideNoLayer"));
+        return;
+    }
+    const std::string path = item->getValue().asString();
+    for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin,
+                                                              mPreviews[PRIMARY].language))
+    {
+        if (layer->path == path)
+        {
+            writeOverrideInto(*layer, mGutterField);
+            return;
+        }
+    }
+    setStatus(getString("OverrideNoLayer"));
+}
+
+// A layer's skin and language, read off its path: the segments around
+// the xui directory.
+std::string ALFloaterXUIStudio::layerLabel(S32 which, S32 layer) const
+{
+    const std::string& path = mPreviews[which].overlay.layerPath(layer);
+    if (path.empty())
+    {
+        return std::string();
+    }
+    std::vector<std::string> segments;
+    size_t start = 0;
+    while (start <= path.size())
+    {
+        const size_t end = path.find_first_of("/\\", start);
+        segments.push_back(path.substr(start, end == std::string::npos ? std::string::npos : end - start));
+        if (end == std::string::npos)
+        {
+            break;
+        }
+        start = end + 1;
+    }
+    for (size_t i = 1; i + 1 < segments.size(); ++i)
+    {
+        if (segments[i] == "xui")
+        {
+            return segments[i - 1] + "/" + segments[i + 1];
+        }
+    }
+    return path;
+}
+
+void ALFloaterXUIStudio::refreshLayout(LLView* view)
+{
+    mLayout->deleteAllItems();
+    if (!view)
+    {
+        return;
+    }
+    // Each row is a property named in the floater's strings and a value
+    // said the same way, so the table reads in whatever language the
+    // rest of the window does.
+    auto add = [&](const char* property, const std::string& value)
+    {
+        const std::string name = getString(property);
+        mLayout->addElement(row(name, { { "property", name }, { "value", value } }));
+    };
+    auto size_of = [&](S32 width, S32 height)
+    {
+        LLStringUtil::format_map_t args;
+        args["[WIDTH]"] = std::to_string(width);
+        args["[HEIGHT]"] = std::to_string(height);
+        return getString("LayoutSizeValue", args);
+    };
+    auto pair_of = [&](S32 a, S32 b)
+    {
+        LLStringUtil::format_map_t args;
+        args["[A]"] = std::to_string(a);
+        args["[B]"] = std::to_string(b);
+        return getString("LayoutPairValue", args);
+    };
+    auto rect_of = [&](const LLRect& rect)
+    {
+        LLStringUtil::format_map_t args;
+        args["[LEFT]"] = std::to_string(rect.mLeft);
+        args["[TOP]"] = std::to_string(rect.mTop);
+        args["[RIGHT]"] = std::to_string(rect.mRight);
+        args["[BOTTOM]"] = std::to_string(rect.mBottom);
+        args["[WIDTH]"] = std::to_string(rect.getWidth());
+        args["[HEIGHT]"] = std::to_string(rect.getHeight());
+        return getString("LayoutRectValue", args);
+    };
+
+    const LLRect& r = view->getRect();
+    const LLView* parent = view->getParent();
+    add("LayoutSize", size_of(r.getWidth(), r.getHeight()));
+    if (parent)
+    {
+        const S32 ph = parent->getRect().getHeight();
+        const S32 pw = parent->getRect().getWidth();
+        add("LayoutLeftTop", pair_of(r.mLeft, ph - r.mTop));
+        add("LayoutRightBottom", pair_of(r.mRight, ph - r.mBottom));
+        add("LayoutGap", pair_of(pw - r.mRight, r.mBottom));
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = parent->getName();
+        args["[SIZE]"] = size_of(pw, ph);
+        add("LayoutParent", getString("LayoutParentValue", args));
+    }
+    add("LayoutRect", rect_of(r));
+    add("LayoutRectScreen", rect_of(view->calcScreenRect()));
+    if (view->getUseBoundingRect() && view->getBoundingRect() != r)
+    {
+        add("LayoutBoundingRect", rect_of(view->getBoundingRect()));
+    }
+    add("LayoutFollows", ALFollowsControl::followsText(view->getFollows()));
+
+    const ALXUICatalog::Layer* layer = nullptr;
+    pugi::xml_node element = authoredElement(layer);
+    if (element)
+    {
+        std::string form;
+        for (const char* attr : { "left", "left_pad", "left_delta", "right", "top", "top_pad", "top_delta", "bottom", "width", "height" })
+        {
+            if (pugi::xml_attribute a = element.attribute(attr))
+            {
+                if (!form.empty())
+                {
+                    form += "  ";
+                }
+                form += std::string(attr) + "=\"" + a.value() + "\"";
+            }
+        }
+        add("LayoutAuthored", form.empty() ? getString("LayoutAuthoredNone") : form);
+        add("LayoutLayout", element.attribute("layout").as_string(getString("LayoutDefault").c_str()));
+        add("LayoutFollowsAuthored", element.attribute("follows").as_string(getString("LayoutNone").c_str()));
+        if (element.attribute("left_pad") || element.attribute("left_delta")
+            || element.attribute("top_pad") || element.attribute("top_delta"))
+        {
+            // The sibling the pads and deltas are measured from is the
+            // widget element before this one.
+            pugi::xml_node sibling = element.previous_sibling();
+            while (sibling && (sibling.type() != pugi::node_element || !ALXUICatalog::isWidgetTag(sibling.name())))
+            {
+                sibling = sibling.previous_sibling();
+            }
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = sibling.attribute("name").as_string(getString("LayoutUnnamed").c_str());
+            args["[TAG]"] = sibling.name();
+            add("LayoutRelativeTo", sibling ? getString("LayoutRelativeToValue", args)
+                                            : getString("LayoutRelativeToParent"));
+        }
+    }
+
+    if (const LLFloater* floater = view->as<LLFloater>())
+    {
+        add("LayoutResizable", getString(floater->isResizable() ? "Yes" : "No"));
+        add("LayoutMinSize", size_of(floater->getMinWidth(), floater->getMinHeight()));
+    }
+}
+
+// The selected element in one layer of the file, and the line it starts
+// on: out of the document where the layer is held, since that is the text
+// the preview was built from, and out of the catalog where it is not.
+void ALFloaterXUIStudio::elementIn(const ALXUICatalog::Layer& layer, const ALXUISelection::path_t& path,
+                                   pugi::xml_node& node, S32& line) const
+{
+    if (const ALXUIEdit* held = mDocuments.find(layer.path))
+    {
+        node = held->resolve(path);
+        line = held->lineOf(node);
+        return;
+    }
+    // In the vocabulary the held document uses, so a layer answers the
+    // same whether or not it is one of the documents open.
+    node = ALXUICatalog::resolve(layer.root(), path, /*any_tag=*/true);
+    line = node ? ALXUICatalog::lineOf(layer, node) : 0;
+}
+
+void ALFloaterXUIStudio::refreshSource(LLView* view)
+{
+    mSourceLayers->setText(std::string());
+    mSourcePath.clear();
+    mSourceLine = 0;
+    fillSourceLayers();
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry)
+    {
+        mSourceShown.clear();
+        mSourceText->setText(std::string());
+        return;
+    }
+    const Preview& pv = mPreviews[PRIMARY];
+
+    // Every layer of the file, with the line the element is on in each.
+    // A layer held as a document is read from the document: the disk is
+    // what it was before the edits, and the lines have moved since.
+    std::string layers_text;
+    std::string chosen_path;
+    S32         chosen_line = 0;
+    std::string first_path;
+    for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, pv.skin, pv.language))
+    {
+        if (first_path.empty())
+        {
+            first_path = layer->path;
+        }
+        pugi::xml_node node;
+        S32 line = 0;
+        if (view)
+        {
+            elementIn(*layer, mSelection.selection(), node, line);
+        }
+        if (!layers_text.empty())
+        {
+            layers_text += "   ";
+        }
+        layers_text += layerName(*layer) + ": " + (node ? std::to_string(line) : getString("LayerMissing"));
+        if (node)
+        {
+            mSourcePath = layer->path;
+            mSourceLine = line;
+        }
+        if (layer->path == mSourceChosen)
+        {
+            chosen_path = layer->path;
+            chosen_line = node ? line : 0;
+        }
+    }
+    mSourceLayers->setText(layers_text);
+    // The file shown: the one chosen, else the last layer that writes the
+    // element, else the file's first.
+    if (chosen_path.empty())
+    {
+        chosen_path = mSourcePath.empty() ? first_path : mSourcePath;
+        chosen_line = mSourcePath.empty() ? 0 : mSourceLine;
+    }
+    showSourceFile(chosen_path, chosen_line);
+}
+
+void ALFloaterXUIStudio::showSourceFile(const std::string& path, S32 line)
+{
+    if (path.empty())
+    {
+        mSourceShown.clear();
+        mSourceText->setText(std::string());
+        return;
+    }
+    ALXUIEdit* document = mDocuments.find(path);
+    std::string text = document ? document->text() : LLFile::getContents(path);
+    // What was typed into this file and does not parse yet stands in for
+    // the document's text until it does.
+    if (const auto draft = mSourceDrafts.find(path); draft != mSourceDrafts.end())
+    {
+        text = draft->second;
+    }
+    if (mSourceShown != path || (!mSourceEditPending && mSourceText->text() != text))
+    {
+        // Leaving a file: what was typed and not yet taken is taken, or
+        // kept as a draft where it does not parse.
+        if (mSourceEditPending && !mSourceShown.empty())
+        {
+            flushSourceEdit();
+            if (mSourceEditPending)
+            {
+                mSourceDrafts[mSourceShown] = mSourceText->text();
+                mSourceEditPending          = false;
+            }
+        }
+        const bool      same   = mSourceShown == path;
+        const ALTextPos caret  = mSourceText->caret();
+        const S32       scroll = mSourceText->scrollY();
+        mSourceSyncing         = true;
+        mSourceText->setText(text);
+        mSourceSyncing = false;
+        mSourceShown   = path;
+        if (same)
+        {
+            mSourceText->setCaret(mSourceText->document().clamp(caret));
+            mSourceText->setScrollY(scroll);
+        }
+        if (mSourceDrafts.count(path))
+        {
+            // Shown as the draft it is: taken once it parses.
+            mSourceEditPending = true;
+            mSourceEditTimer.reset();
+            mSourceEditTimer.setTimerExpirySec(REREAD_SECONDS);
+        }
+    }
+    mSourceText->setReadOnly(false);
+    // The element's line in sight, when it was the tree that chose it
+    // rather than the caret.
+    if (line > 0 && !mSourceCaretPending && !sourceEditorFocused())
+    {
+        mSourceText->goToLine(line - 1);
+    }
+    decorateSource();
+}
+
+void ALFloaterXUIStudio::decorateSource()
+{
+    if (mSourceShown.empty())
+    {
+        return;
+    }
+    static const LLUIColor error_color   = LLUIColorTable::instance().getColor("CodeMarkError", LLColor4::red);
+    static const LLUIColor warning_color = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
+    static const LLUIColor note_color    = LLUIColorTable::instance().getColor("CodeMarkNote", LLColor4::blue);
+    const ALTextDocument&                 text = mSourceText->document();
+    std::vector<ALCodeEditor::Decoration> decorations;
+    mSourceText->clearMarks();
+    auto squiggle = [&](S32 line, S32 column, const std::string& message, ALXUILint::Severity severity) {
+        if (line < 0 || line >= text.lineCount())
+        {
+            return;
+        }
+        const std::string& row   = text.line(line);
+        S32                begin = 0;
+        while (begin < static_cast<S32>(row.size()) && (row[begin] == ' ' || row[begin] == '\t'))
+        {
+            ++begin;
+        }
+        S32 end = static_cast<S32>(row.size());
+        while (end > begin && (row[end - 1] == ' ' || row[end - 1] == '\t' || row[end - 1] == '\r'))
+        {
+            --end;
+        }
+        if (column > begin && column < end)
+        {
+            begin = column;
+        }
+        if (end <= begin)
+        {
+            end = begin + 1;
+        }
+        ALCodeEditor::Decoration d;
+        d.range   = ALTextRange(ALTextPos(line, begin), ALTextPos(line, end));
+        d.message = message;
+        d.color   = severity == ALXUILint::Severity::Error ? error_color.get() : severity == ALXUILint::Severity::Warning ? warning_color.get() : note_color.get();
+        decorations.push_back(std::move(d));
+        const ALCodeEditor::Mark mark = severity == ALXUILint::Severity::Error ? ALCodeEditor::Mark::Error
+                                        : severity == ALXUILint::Severity::Warning ? ALCodeEditor::Mark::Warning
+                                                                                    : ALCodeEditor::Mark::Note;
+        if (static_cast<U8>(mark) > static_cast<U8>(mSourceText->markAt(line)))
+        {
+            mSourceText->setMark(line, mark);
+        }
+    };
+    // Whether the text parses at all, first: a parse error is the one
+    // finding the lint cannot make, since there is nothing to lint.
+    ALTextPos   where;
+    std::string message;
+    if (!ALXUIService::parses(mSourceText->text(), where, message))
+    {
+        squiggle(where.line, where.column, message, ALXUILint::Severity::Error);
+    }
+    // Then what the lint said of this file's elements: each finding on
+    // the line its element starts on in the layer shown, where that layer
+    // writes the element; a finding that names a layer rather than an
+    // element -- a layer applied to nothing -- on the line it names.
+    ALXUIEdit* shown = mDocuments.find(mSourceShown);
+    for (const ALXUILint::Finding* f : mFindingStore.select(ALXUIFindings::Query()).found)
+    {
+        if (!f->file.empty() && f->file != mFile && f->file != mSourceShown)
+        {
+            continue;
+        }
+        S32 line = 0;
+        if (shown && !f->path.empty())
+        {
+            if (const pugi::xml_node node = shown->resolve(f->path))
+            {
+                line = shown->lineOf(node);
+            }
+        }
+        else if (f->file == mSourceShown || (f->path.empty() && mSourceShown == mSourcePath))
+        {
+            line = f->line;
+        }
+        if (line <= 0)
+        {
+            continue;
+        }
+        squiggle(line - 1, 0, f->message, f->severity);
+    }
+    mSourceText->setDecorations(std::move(decorations));
+}
+
+void ALFloaterXUIStudio::onSourceTyped()
+{
+    if (mSourceSyncing || mSourceShown.empty())
+    {
+        return;
+    }
+    // Taken into the document once the typing pauses, as the file is
+    // read again once the property grid's typing pauses.
+    mSourceEditPending = true;
+    mSourceEditTimer.reset();
+    mSourceEditTimer.setTimerExpirySec(REREAD_SECONDS);
+    decorateSource();
+}
+
+void ALFloaterXUIStudio::onSourceCaret()
+{
+    if (mSourceSyncing || mSourceShown.empty() || !sourceEditorFocused())
+    {
+        return;
+    }
+    mSourceCaretPending = true;
+}
+
+void ALFloaterXUIStudio::flushSourceEdit()
+{
+    if (!mSourceEditPending)
+    {
+        return;
+    }
+    ALXUIEdit* document = mDocuments.open(mSourceShown);
+    if (!document)
+    {
+        mSourceEditPending = false;
+        return;
+    }
+    const std::string text = mSourceText->text();
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = fileNameOf(mSourceShown);
+    // Text that does not parse is not the document's yet: the last text
+    // that did stays in force, the tree and the preview with it, and the
+    // editor keeps what was typed until it parses. Still pending, so the
+    // next pause tries again.
+    ALTextPos   where;
+    std::string message;
+    if (!ALXUIService::parses(text, where, message))
+    {
+        args["[LINE]"]    = std::to_string(where.line + 1);
+        args["[MESSAGE]"] = message;
+        setStatus(getString("SourceEditedBroken", args), true);
+        mSourceEditTimer.reset();
+        mSourceEditTimer.setTimerExpirySec(REREAD_SECONDS * 4.f);
+        return;
+    }
+    mSourceEditPending = false;
+    mSourceDrafts.erase(mSourceShown);
+    if (text == document->text())
+    {
+        return;
+    }
+    document->setSource(text);
+    documentChanged(getString("SourceEdited", args));
+}
+
+void ALFloaterXUIStudio::pumpSource()
+{
+    if (mSourceEditPending && mSourceEditTimer.hasExpired())
+    {
+        flushSourceEdit();
+    }
+    // The document moved on under the editor -- an edit from the tree, an
+    // undo, a reload -- and the editor is in sight: its text follows.
+    if (!mSourceEditPending && !mSourceShown.empty() && mSourceText->isInVisibleChain() && mSourceSyncTimer.hasExpired())
+    {
+        mSourceSyncTimer.reset();
+        mSourceSyncTimer.setTimerExpirySec(0.25f);
+        if (const ALXUIEdit* document = mDocuments.find(mSourceShown); document && document->text() != mSourceText->text())
+        {
+            showSourceFile(mSourceShown, 0);
+        }
+    }
+    if (mSourceCaretPending)
+    {
+        mSourceCaretPending = false;
+        // The element the caret is on, chosen in the tree, from the text
+        // as the document has it -- a text still being typed may not
+        // parse, and then the last parse stands.
+        if (ALXUIEdit* document = mDocuments.find(mSourceShown))
+        {
+            ALXUIEdit::path_t path;
+            if (document->elementAtLine(mSourceText->caret().line + 1, path) && path != mSelection.selection())
+            {
+                mSourceCaretPending = true;  // so that the selection's own refresh keeps the caret where it is
+                mSelection.select(path);
+                mSourceCaretPending = false;
+            }
+        }
+    }
+}
+
+bool ALFloaterXUIStudio::sourceEditorFocused() const
+{
+    return mSourceText && gFocusMgr.childHasKeyboardFocus(mSourceText);
+}
+
+void ALFloaterXUIStudio::refreshBindings(LLView* view)
+{
+    mBindings->deleteAllItems();
+    if (!view)
+    {
+        return;
+    }
+    const ALXUICatalog::Layer* layer = nullptr;
+    pugi::xml_node element = authoredElement(layer);
+    if (!element)
+    {
+        return;
+    }
+    S32 n = 0;
+    auto add = [&](const std::string& kind, const std::string& name, const std::string& status)
+    {
+        mBindings->addElement(row(n++, { { "kind", kind }, { "name", name }, { "status", status } }));
+    };
+
+    // A floater's own registrar is a scope pushed around its build and
+    // popped after it, so nothing global can be asked about a name it
+    // holds. The registrar object outlives the scope, though, and the real
+    // floater is the one that filled it: where the preview is that floater,
+    // "not global" becomes an answer instead of a shrug.
+    LLFloater* real = mPreviews[PRIMARY].host.get();
+    if (real && real->as<ALXUIPreviewHost>())
+    {
+        real = nullptr;
+    }
+
+    // Callbacks are child elements with a function attribute.
+    for (pugi::xml_node child = element.first_child(); child; child = child.next_sibling())
+    {
+        if (child.type() != pugi::node_element)
+        {
+            continue;
+        }
+        pugi::xml_attribute function = child.attribute("function");
+        if (!function)
+        {
+            continue;
+        }
+        std::string kind = child.name();
+        const size_t dot = kind.rfind('.');
+        if (dot != std::string::npos)
+        {
+            kind = kind.substr(dot + 1);
+        }
+        const bool commit = LLUICtrl::CommitCallbackRegistry::instance().getValue(function.value()) != nullptr;
+        const bool enable = LLUICtrl::EnableCallbackRegistry::instance().getValue(function.value()) != nullptr;
+        const bool own = real
+                      && (real->getCommitCallbackRegistrar().getValueFromScope(function.value()) != nullptr
+                       || real->getEnableCallbackRegistrar().getValueFromScope(function.value()) != nullptr);
+        const std::string status = getString(commit ? "BindingCommitRegistry"
+                                           : enable ? "BindingEnableRegistry"
+                                           : own    ? "BindingFloaterOwn"
+                                           : real   ? "BindingNowhere"
+                                                    : "BindingNotGlobal");
+        std::string name = function.value();
+        if (pugi::xml_attribute parameter = child.attribute("parameter"))
+        {
+            name += "  (" + std::string(parameter.value()) + ")";
+        }
+        add(kind, name, status);
+    }
+
+    auto control = [&](const char* attr)
+    {
+        if (pugi::xml_attribute a = element.attribute(attr))
+        {
+            const bool global = gSavedSettings.controlExists(a.value());
+            const bool account = gSavedPerAccountSettings.controlExists(a.value());
+            add(attr, a.value(), getString(global ? "BindingConfig" : account ? "BindingAccount" : "BindingNoControl"));
+        }
+    };
+    control("control_name");
+    control("control");
+    control("enabled_control");
+    control("disabled_control");
+    control("visibility_control");
+    control("invisibility_control");
+
+    auto file = [&](const char* attr)
+    {
+        if (pugi::xml_attribute a = element.attribute(attr))
+        {
+            add(attr, a.value(), getString(mCatalog.find(a.value()) ? "BindingInCatalog" : "BindingNoFile"));
+        }
+    };
+    file("menu_filename");
+    file("filename");
+    if (pugi::xml_attribute a = element.attribute("help_topic"))
+    {
+        add("help_topic", a.value(), "");
+    }
+}
+
+void ALFloaterXUIStudio::refreshState(LLView* view)
+{
+    // Rebuilt on a timer while the tab shows; the scroll position is kept.
+    const S32 scroll = mState->getScrollPos();
+    mState->deleteAllItems();
+    if (!view)
+    {
+        return;
+    }
+    auto add = [&](const char* property, const std::string& value)
+    {
+        const std::string name = getString(property);
+        mState->addElement(row(name, { { "property", name }, { "value", value } }));
+    };
+    auto yes = [&](bool b) { return getString(b ? "Yes" : "No"); };
+
+    add("StateVisible", yes(view->getVisible()));
+    add("StateInVisibleChain", yes(view->isInVisibleChain()));
+    add("StateEnabled", yes(view->getEnabled()));
+    S32 mx, my;
+    LLUI::getInstance()->getMousePositionLocal(view, &mx, &my);
+    add("StateMouseOver", yes(view->pointInView(mx, my)));
+    if (LLUICtrl* ctrl = view->as<LLUICtrl>())
+    {
+        add("StateFocus", yes(ctrl->hasFocus()));
+        add("StateValue", ctrl->getValue().asString());
+    }
+    // Measured the way the lint measures it, so the two never disagree.
+    std::string text;
+    S32 needed = 0;
+    S32 room = 0;
+    if (ALXUILint::measuresText(view, text, needed, room))
+    {
+        add("StateText", text);
+        add("StateTruncated", yes(needed > room));
+    }
+    add("StateTooltip", view->getToolTip());
+    add("StateName", view->getName());
+    add("StateClass", view->viewType()->mName);
+    mState->setScrollPos(scroll);
+}
+
+void ALFloaterXUIStudio::onJumpToSource()
+{
+    // Worked out again every time. The Source tab's path is where it last
+    // looked, and a file chosen since then is the one the button means:
+    // keeping the old one opened whatever had been looked at first.
+    refreshSource(selectedView());
+    if (mSourcePath.empty())
+    {
+        const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+        if (entry && !entry->layers.empty())
+        {
+            const ALXUICatalog::Layer* layer = entry->layer("default", "en");
+            mSourcePath = (layer ? layer : &entry->layers.front())->path;
+            mSourceLine = 1;
+        }
+    }
+    if (!mSourcePath.empty())
+    {
+        openInEditor(mSourcePath, mSourceLine);
+    }
+}
+
+void ALFloaterXUIStudio::openInEditor(const std::string& path, S32 line)
+{
+    if (path.empty())
+    {
+        return;
+    }
+    LLExternalEditor editor;
+    LLExternalEditor::EErrorCode status = editor.setCommand("LL_XUI_EDITOR");
+    if (status != LLExternalEditor::EC_SUCCESS)
+    {
+        setStatus(status == LLExternalEditor::EC_NOT_SPECIFIED ? getString("ExternalEditorNotSet")
+                                                               : LLExternalEditor::getErrorMessage(status));
+        return;
+    }
+    status = editor.run(path, line);
+    if (status != LLExternalEditor::EC_SUCCESS)
+    {
+        setStatus(LLExternalEditor::getErrorMessage(status));
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[PATH]"] = path;
+    args["[LINE]"] = std::to_string(line);
+    setStatus(getString("EditorOpened", args));
+}
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
+// Everything the menu bar does, by the name the item carries. The actions
+// are the methods the toolbar's own buttons call; the switches are the
+// members the drawing and the tree already read, so a menu item is the whole
+// of the control rather than a second copy of the state.
+void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
+{
+    const std::string action = param.asString();
+
+    if (action == "show")               { showPreviews(); }
+    else if (action == "hide")          { closePreviews(); }
+    else if (action == "reload")        { reloadAll(); }
+    else if (action == "edit")          { onJumpToSource(); }
+    else if (action == "open_nested")   { openNestedFile(); }
+    else if (action == "quick_open")    { openQuickly(); }
+    else if (action == "capture")       { capturePreview(); }
+    else if (action == "save")          { saveDocument(); }
+    else if (action == "save_all")      { saveAllDocuments(); }
+    else if (action == "save_repair")   { saveAndRepair(); }
+    else if (action == "impact")        { reportTranslationImpact(); }
+    else if (action == "revert")        { revertDocument(); }
+    else if (action == "undo")          { undo(); }
+    else if (action == "redo")          { redo(); }
+    else if (action == "gallery")       { showGallery(); }
+    else if (action == "library")       { LLFloaterReg::showInstance("xui_library"); }
+    else if (action == "lint_all")      { startLintAll(); }
+    else if (action == "census")        { startCensus(); }
+    else if (action == "schema")        { onExportSchema(); }
+    else if (action == "colors")        { LLFloaterReg::showInstance("settings_color"); }
+    else if (action == "repair_roots")  { onRepairRoots(); }
+    else if (action == "repair_all")    { startRepairAll(); }
+    else if (action == "remove_orphans") { onRemoveOrphans(); }
+    else if (action == "hover")         { mHoverHighlight = !mHoverHighlight; saveState(); }
+    else if (action == "real_floater")
+    {
+        mRealFloater = !mRealFloater;
+        saveState();
+        if (!mFile.empty())
+        {
+            showPreviews();
+        }
+    }
+    else if (action.starts_with("backdrop_"))
+    {
+        setCanvasBackdrop(ALCanvasView::backdropNamed(action.substr(9)));
+    }
+    else if (action == "pane_navigator")    { mFolds.toggle("navigator"); }
+    else if (action == "pane_inspectors")   { mFolds.toggle("inspectors"); }
+    else if (action == "pane_bottom")       { mFolds.toggle("bottom"); }
+    else if (action == "out_navigator")     { mFolds.toggleOut("navigator"); }
+    else if (action == "out_inspectors")    { mFolds.toggleOut("inspectors"); }
+    else if (action == "out_bottom")        { mFolds.toggleOut("bottom"); }
+    else if (action == "float_preview")
+    {
+        // A preview changes home rather than moving, so what is on the one
+        // it is leaving goes first.
+        mFloatPreview = !mFloatPreview;
+        saveState();
+        closePreviews();
+        if (!mFile.empty())
+        {
+            showPreviews();
+        }
+    }
+    else if (action == "code_built")
+    {
+        mShowCodeBuilt = !mShowCodeBuilt;
+        mModel.getFilter().setShowCodeBuilt(mShowCodeBuilt);
+        saveState();
+    }
+}
+
+// Whether an item can be chosen at all: what the document has to say
+// about itself, which is the only state the menu asks about.
+bool ALFloaterXUIStudio::onMenuEnable(const LLSD& param)
+{
+    const std::string what = param.asString();
+
+    if (what == "dirty")    { return documentDirty(); }
+    // The set's history rather than the active document's: the last thing
+    // done may have been to another file, and the label beside this says so.
+    if (what == "undo")     { return mDocuments.canUndo(); }
+    if (what == "redo")     { return mDocuments.canRedo(); }
+    if (what == "nested")   { return !nestedFile(selectedView()).empty(); }
+    return true;
+}
+
+bool ALFloaterXUIStudio::onMenuCheck(const LLSD& param)
+{
+    const std::string flag = param.asString();
+
+    if (flag == "hover")        { return mHoverHighlight; }
+    if (flag == "code_built")   { return mShowCodeBuilt; }
+    if (flag == "real_floater") { return mRealFloater; }
+    if (flag == "float_preview") { return mFloatPreview; }
+    if (flag.starts_with("backdrop_")) { return flag.substr(9) == ALCanvasView::backdropName(mBackdrop); }
+    // The switch is on when the pane is showing, so the menu reads as a list
+    // of what is on screen rather than a list of what is hidden.
+    if (flag == "pane_navigator")   { return !mFolds.collapsed("navigator"); }
+    if (flag == "pane_inspectors")  { return !mFolds.collapsed("inspectors"); }
+    if (flag == "pane_bottom")      { return !mFolds.collapsed("bottom"); }
+    if (flag == "out_navigator")    { return mFolds.out("navigator"); }
+    if (flag == "out_inspectors")   { return mFolds.out("inspectors"); }
+    if (flag == "out_bottom")       { return mFolds.out("bottom"); }
+    return false;
+}
+
+void ALFloaterXUIStudio::onToggleSecondary()
+{
+    mShowSecondary = mSecondaryCheck->getValue().asBoolean();
+    mLanguageCombo2->setEnabled(mShowSecondary);
+    saveState();
+    if (!mFile.empty())
+    {
+        if (mShowSecondary)
+        {
+            showPreview(SECONDARY);
+        }
+        else
+        {
+            closePreview(SECONDARY);
+        }
+    }
+    refreshCanvasHead();
+}
+
+void ALFloaterXUIStudio::writeState(LLSD& state) const
+{
+    state["file"] = mFile;
+    state["skin"] = mSkin;
+    state["language"] = mLanguage;
+    state["language2"] = mLanguage2;
+    state["secondary"] = mShowSecondary;
+    state["preview_hidden"] = mPreviewHidden;
+    state["pinned"] = mPinned;
+    state["float_preview"] = mFloatPreview;
+    state["hover"] = mHoverHighlight;
+    state["code_built"] = mShowCodeBuilt;
+    state["snap"] = mSnap;
+    state["rulers"] = mRulers;
+    state["palette_cells"] = mPaletteCells;
+    state["real_floater"] = mRealFloater;
+    state["grid"] = mGrid;
+    state["zoom"] = mZoom;
+    state["backdrop"] = ALCanvasView::backdropName(mBackdrop);
+    if (LLPanel* current = mInspectors ? mInspectors->getCurrentPanel() : nullptr)
+    {
+        state["tab"] = current->getName();
+    }
+    if (LLPanel* current = mModes ? mModes->getCurrentPanel() : nullptr)
+    {
+        state["mode"] = current->getName();
+    }
+    if (LLPanel* current = mBottom ? mBottom->getCurrentPanel() : nullptr)
+    {
+        state["bottom"] = current->getName();
+    }
+}
+
+void ALFloaterXUIStudio::readState(const LLSD& state)
+{
+    mFile = state["file"].asString();
+    if (state.has("skin"))
+    {
+        mSkin = state["skin"].asString();
+    }
+    if (state.has("language"))
+    {
+        mLanguage = state["language"].asString();
+    }
+    if (state.has("language2"))
+    {
+        mLanguage2 = state["language2"].asString();
+    }
+    mShowSecondary = state["secondary"].asBoolean();
+    mPreviewHidden = state["preview_hidden"].asBoolean();
+    mPinned = state["pinned"].asBoolean();
+    mFloatPreview = state["float_preview"].asBoolean();
+    if (mCanvasArea)
+    {
+        mCanvasArea->setVisible(!mPreviewHidden);
+    }
+    mSnap = state["snap"].asBoolean();
+    mRulers = state["rulers"].asBoolean();
+    mPaletteCells = state["palette_cells"].asBoolean();
+    if (mPalette)
+    {
+        getChild<LLButton>("palette_cells")->setToggleState(mPaletteCells);
+        mPalette->setCellSize(mPaletteCells ? PALETTE_CELL_WIDTH : 0, mPaletteCells ? PALETTE_CELL_HEIGHT : 0);
+    }
+    mRealFloater = state["real_floater"].asBoolean();
+    if (state.has("grid"))
+    {
+        mGrid = llmax(1, state["grid"].asInteger());
+    }
+    if (state.has("backdrop"))
+    {
+        mBackdrop = ALCanvasView::backdropNamed(state["backdrop"].asString());
+    }
+    if (state.has("zoom"))
+    {
+        mZoom = llclamp(state["zoom"].asInteger(), ZOOM_LEAST, ZOOM_MOST);
+    }
+    if (state.has("hover"))
+    {
+        mHoverHighlight = state["hover"].asBoolean();
+    }
+    if (state.has("code_built"))
+    {
+        mShowCodeBuilt = state["code_built"].asBoolean();
+    }
+    if (state.has("tab") && mInspectors)
+    {
+        mInspectors->selectTabByName(state["tab"].asString());
+    }
+    if (state.has("mode") && mModes)
+    {
+        mModes->selectTabByName(state["mode"].asString());
+    }
+    if (state.has("bottom") && mBottom)
+    {
+        mBottom->selectTabByName(state["bottom"].asString());
+    }
+}

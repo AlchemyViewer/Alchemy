@@ -30,6 +30,8 @@
 #include <map>
 #include <set>
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include "llstring.h"
 #include "llxmlnode.h"
 
@@ -86,6 +88,10 @@ public:
     // may have different plurals for 0, 1, 2 and > 2.
     // See "AgeWeeksA", "AgeWeeksB", etc. in strings.xml for examples.
     static std::string getCountString(std::string_view language, std::string_view xml_desc, S32 count);
+    // The form a count takes in a language: the suffix -- "A", "B", "C" --
+    // of the string that says it, as getCountString picks it; for whoever
+    // keeps the strings for the forms and only needs to know which.
+    static const char* countForm(std::string_view language, S32 count);
 
     /**
      * @brief Returns a translated string
@@ -125,7 +131,13 @@ public:
     }
 
 private:
-    typedef std::map<std::string, LLTransTemplate, std::less<>> template_map_t;
+    // Substitute into `text` using the default arguments with `msg_args`
+    // layered over them, skipping the merge whenever it cannot matter.
+    static void formatWithDefaults(std::string& text, const LLStringUtil::format_map_t& msg_args);
+
+    // Flat: a lookup is a hash and a probe, and every string a widget
+    // shows comes through one.
+    typedef boost::unordered_flat_map<std::string, LLTransTemplate, ll::string_hash, std::equal_to<>> template_map_t;
     static template_map_t sStringTemplates;
     static template_map_t sDefaultStringTemplates;
     static LLStringUtil::format_map_t sDefaultArgs;

@@ -48,6 +48,8 @@
 #include "llfloaterimnearbychat.h"
 #include "llgroupiconctrl.h"
 #include "lllayoutstack.h"
+#include "lllogchat.h"
+#include "llnotificationsutil.h"
 #include "llpanelemojicomplete.h"
 #include "lltoolbarview.h"
 
@@ -380,7 +382,8 @@ bool LLFloaterIMSessionTab::postBuild()
     mFloaterExtraWidth =
             getRect().getWidth()
             - mParticipantListAndHistoryStack->getRect().getWidth()
-            - (mParticipantListPanel->isCollapsed()? 0 : LLPANEL_BORDER_WIDTH);
+            - (mParticipantListPanel->isCollapsed()? 0 : LLPANEL_BORDER_WIDTH)
+            + (mExtendedButtonPanel ? mExtendedButtonPanel->getRect().getWidth() : 0);
 
     assignResizeLimits();
 
@@ -559,7 +562,7 @@ void LLFloaterIMSessionTab::onEmojiPickerClosed()
 
 void LLFloaterIMSessionTab::initEmojiRecentPanel()
 {
-    std::list<llwchar>& recentlyUsed = LLFloaterEmojiPicker::getRecentlyUsed();
+    std::list<std::string>& recentlyUsed = LLFloaterEmojiPicker::getRecentlyUsed();
     if (recentlyUsed.empty())
     {
         mEmojiRecentEmptyText->setVisible(true);
@@ -567,11 +570,10 @@ void LLFloaterIMSessionTab::initEmojiRecentPanel()
     }
     else
     {
-        LLWString emojis;
-        for (llwchar emoji : recentlyUsed)
-        {
-            emojis += emoji;
-        }
+        // Pass as a list-of-clusters so setEmojis can keep ZWJ sequences
+        // intact. A single concatenated string would collapse the groups
+        // back into ambiguous codepoints.
+        std::vector<std::string> emojis(recentlyUsed.begin(), recentlyUsed.end());
         mEmojiRecentIconsCtrl->setEmojis(emojis);
         mEmojiRecentEmptyText->setVisible(false);
         mEmojiRecentContainer->setVisible(true);
@@ -595,11 +597,10 @@ void LLFloaterIMSessionTab::onRecentEmojiPicked(const LLSD& value)
     LLSD::String str = value.asString();
     if (str.size())
     {
-        LLWString wstr = utf8string_to_wstring(str);
-        if (wstr.size())
+        if (!str.empty())
         {
-            llwchar emoji = wstr[0];
-            mInputEditor->insertEmoji(emoji);
+            // The whole string, so ZWJ / flag / keycap / tag clusters stay together.
+            mInputEditor->insertEmoji(str);
         }
     }
 }
@@ -618,14 +619,8 @@ void LLFloaterIMSessionTab::deleteAllChildren()
 
 std::string LLFloaterIMSessionTab::appendTime()
 {
-    std::string timeStr = "[" + LLTrans::getString("TimeHour") + "]:"
-                          "[" + LLTrans::getString("TimeMin") + "]";
-
-    LLSD substitution;
-    substitution["datetime"] = (S32)time_corrected();
-    LLStringUtil::format(timeStr, substitution);
-
-    return timeStr;
+    // Keep the original precision so the display preference can change later.
+    return LLLogChat::timestamp2LogString(0, false, true);
 }
 
 void LLFloaterIMSessionTab::appendMessage(const LLChat& chat, const LLSD& args)
@@ -648,8 +643,7 @@ void LLFloaterIMSessionTab::appendMessage(const LLChat& chat, const LLSD& args)
     tmp_chat.mFromName = chat.mFromName;
 
     LLSD chat_args = args;
-    chat_args["use_plain_text_chat_history"] =
-            gSavedSettings.getBOOL("PlainTextChatHistory");
+    chat_args["chat_history_style"] = gSavedSettings.getS32("AlchemyChatHistoryStyle");
     chat_args["show_time"] = gSavedSettings.getBOOL("IMShowTime");
     chat_args["show_names_for_p2p_conv"] = !mIsP2PChat ||
             gSavedSettings.getBOOL("IMShowNamesForP2PConv");
@@ -658,19 +652,38 @@ void LLFloaterIMSessionTab::appendMessage(const LLChat& chat, const LLSD& args)
     mChatHistory->appendMessage(chat, chat_args, input_append_params);
 }
 
-void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
+void LLFloaterIMSessionTab::updateUsedEmojis(std::string_view text)
 {
     LLEmojiDictionary* dictionary = LLEmojiDictionary::getInstance();
     llassert_always(dictionary);
 
     bool emojiSent = false;
-    for (const llwchar& c : text)
+
+    // Walk emoji clusters first: each cluster is a multi-codepoint sequence
+    // (ZWJ family, flag pair, keycap, tag subdivision) that must be
+    // recorded as a single emoji. Codepoints outside any cluster are
+    // handled with the single-codepoint path below.
+    const auto clusters = utf8str_find_emoji_clusters(text);
+    auto next_run = clusters.begin();
+    for (size_t i = 0; i < text.size(); )
     {
-        if (dictionary->isEmoji(c))
+        if (next_run != clusters.end() && next_run->first == i)
         {
-            LLFloaterEmojiPicker::onEmojiUsed(c);
+            LLFloaterEmojiPicker::onEmojiUsed(
+                std::string(text.substr(next_run->first, next_run->second - next_run->first)));
+            emojiSent = true;
+            i = next_run->second;
+            ++next_run;
+            continue;
+        }
+
+        const LLCodepointAt at = utf8str_decode_at(text, i);
+        if (dictionary->isEmoji(at.cp))
+        {
+            LLFloaterEmojiPicker::onEmojiUsed(utf8str_from_cp(at.cp));
             emojiSent = true;
         }
+        i = at.next;
     }
 
     if (!emojiSent)
@@ -684,10 +697,9 @@ void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
     }
 }
 
-static LLTrace::BlockTimerStatHandle FTM_BUILD_CONVERSATION_VIEW_PARTICIPANT("Build Conversation View");
 void LLFloaterIMSessionTab::buildConversationViewParticipant()
 {
-    LL_RECORD_BLOCK_TIME(FTM_BUILD_CONVERSATION_VIEW_PARTICIPANT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // Clear the widget list since we are rebuilding afresh from the model
     conversations_widgets_map::iterator widget_it = mConversationsWidgets.begin();
     while (widget_it != mConversationsWidgets.end())
@@ -871,9 +883,14 @@ void LLFloaterIMSessionTab::onIMSessionMenuItemClicked(const LLSD& userdata)
 {
     std::string item = userdata.asString();
 
-    if (item == "compact_view" || item == "expanded_view")
+    if (item == "fancy_compact_view" || item == "compact_view" || item == "expanded_view")
     {
-        gSavedSettings.setBOOL("PlainTextChatHistory", item == "compact_view");
+        S32 newset = 0;
+        if (item == "fancy_compact_view")
+            newset = 2;
+        else if (item == "compact_view")
+            newset = 1;
+        gSavedSettings.setS32("AlchemyChatHistoryStyle", newset);
     }
     else
     {
@@ -887,9 +904,17 @@ void LLFloaterIMSessionTab::onIMSessionMenuItemClicked(const LLSD& userdata)
 bool LLFloaterIMSessionTab::onIMCompactExpandedMenuItemCheck(const LLSD& userdata)
 {
     std::string item = userdata.asString();
-    bool is_plain_text_mode = gSavedSettings.getBOOL("PlainTextChatHistory");
-
-    return is_plain_text_mode? item == "compact_view" : item == "expanded_view";
+    S32 chat_history_mode = gSavedSettings.getS32("AlchemyChatHistoryStyle");
+    switch (chat_history_mode)
+    {
+    default:
+    case 0:
+        return item == "expanded_view";
+    case 1:
+        return item == "compact_view";
+    case 2:
+        return item == "fancy_compact_view";
+    }
 }
 
 
@@ -902,7 +927,12 @@ bool LLFloaterIMSessionTab::onIMShowModesMenuItemCheck(const LLSD& userdata)
 bool LLFloaterIMSessionTab::onIMShowModesMenuItemEnable(const LLSD& userdata)
 {
     std::string item = userdata.asString();
-    bool plain_text = gSavedSettings.getBOOL("PlainTextChatHistory");
+    bool plain_text = gSavedSettings.getS32("AlchemyChatHistoryStyle") >= 1;
+    if (item == "AlchemyIMShowSeconds")
+    {
+        // Expanded headers always show the time; plain text only when asked.
+        return !plain_text || gSavedSettings.getBOOL("IMShowTime");
+    }
     bool is_not_names = (item != "IMShowNamesForP2PConv");
     return (plain_text && (is_not_names || mIsP2PChat));
 }
@@ -923,7 +953,7 @@ void LLFloaterIMSessionTab::hideOrShowTitle()
 
 void LLFloaterIMSessionTab::updateSessionName(const std::string& name)
 {
-    mInputEditor->setLabel(LLTrans::getString("IM_to_label") + " " + name);
+    mInputEditor->setLabel(name);
 }
 
 void LLFloaterIMSessionTab::updateChatIcon(const LLUUID& id)
@@ -1044,7 +1074,7 @@ void LLFloaterIMSessionTab::processChatHistoryStyleUpdate(bool clean_messages/* 
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin();
             iter != inst_list.end(); ++iter)
     {
-        LLFloaterIMSession* floater = dynamic_cast<LLFloaterIMSession*>(*iter);
+        LLFloaterIMSession* floater = (*iter)->as<LLFloaterIMSession>();
         if (floater)
         {
             floater->reloadMessages(clean_messages);
@@ -1065,7 +1095,7 @@ void LLFloaterIMSessionTab::reloadEmptyFloaters()
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin();
         iter != inst_list.end(); ++iter)
     {
-        LLFloaterIMSession* floater = dynamic_cast<LLFloaterIMSession*>(*iter);
+        LLFloaterIMSession* floater = (*iter)->as<LLFloaterIMSession>();
         if (floater && floater->getLastChatMessageIndex() == -1)
         {
             floater->reloadMessages(true);
@@ -1090,7 +1120,7 @@ void LLFloaterIMSessionTab::updateCallBtnState(bool callIsActive)
 
 void LLFloaterIMSessionTab::onSlide(LLFloaterIMSessionTab* self)
 {
-    LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(self->getHost());
+    LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(self->getHost());
     bool should_be_expanded = false;
     if (host_floater)
     {
@@ -1122,7 +1152,7 @@ void LLFloaterIMSessionTab::onSlide(LLFloaterIMSessionTab* self)
 
 void LLFloaterIMSessionTab::onCollapseToLine(LLFloaterIMSessionTab* self)
 {
-    LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(self->getHost());
+    LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(self->getHost());
     if (!host_floater)
     {
         bool expand = self->isMessagePaneExpanded();
@@ -1189,9 +1219,11 @@ void LLFloaterIMSessionTab::onOpen(const LLSD& key)
 {
     if (!checkIfTornOff())
     {
-        LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(getHost());
-        // Show the messages pane when opening a floater hosted in the Conversations
-        host_floater->collapseMessagesPane(false);
+        if(LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(getHost()))
+        {
+            // Show the messages pane when opening a floater hosted in the Conversations
+            host_floater->collapseMessagesPane(false);
+        }
     }
 
     mInputButtonPanel->setVisible(isTornOff());
@@ -1238,6 +1270,9 @@ void LLFloaterIMSessionTab::updateGearBtn()
         LLRect gear_btn_rect =  mGearBtn->getRect();
         LLRect add_btn_rect = mAddBtn->getRect();
         LLRect call_btn_rect = mVoiceButton->getRect();
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+        LLRect extended_toolbar_rect = (mExtendedButtonPanel) ? mExtendedButtonPanel->getRect() : LLRect();
+// [/SL:KB]
         S32 gap_width = call_btn_rect.mLeft - add_btn_rect.mRight;
         S32 right_shift = gear_btn_rect.getWidth() + gap_width;
         if(mGearBtn->getVisible())
@@ -1245,14 +1280,24 @@ void LLFloaterIMSessionTab::updateGearBtn()
             // Move buttons to the right to give space for Gear button
             add_btn_rect.translate(right_shift,0);
             call_btn_rect.translate(right_shift,0);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+            extended_toolbar_rect.translate(right_shift,0);
+// [/SL:KB]
         }
         else
         {
             add_btn_rect.translate(-right_shift,0);
             call_btn_rect.translate(-right_shift,0);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+            extended_toolbar_rect.translate(-right_shift,0);
+// [/SL:KB]
         }
         mAddBtn->setRect(add_btn_rect);
         mVoiceButton->setRect(call_btn_rect);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+        if (mExtendedButtonPanel)
+            mExtendedButtonPanel->setRect(extended_toolbar_rect);
+// [/SL:KB]
     }
 }
 
@@ -1261,14 +1306,22 @@ void LLFloaterIMSessionTab::initBtns()
     LLRect gear_btn_rect =  mGearBtn->getRect();
     LLRect add_btn_rect = mAddBtn->getRect();
     LLRect call_btn_rect = mVoiceButton->getRect();
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+    LLRect extended_toolbar_rect = (mExtendedButtonPanel) ? mExtendedButtonPanel->getRect() : LLRect();
+// [/SL:KB]
     S32 gap_width = call_btn_rect.mLeft - add_btn_rect.mRight;
     S32 right_shift = gear_btn_rect.getWidth() + gap_width;
 
     add_btn_rect.translate(-right_shift,0);
     call_btn_rect.translate(-right_shift,0);
+    extended_toolbar_rect.translate(-right_shift, 0);
 
     mAddBtn->setRect(add_btn_rect);
     mVoiceButton->setRect(call_btn_rect);
+// [SL:KB] - Patch: Chat-Misc | Checked: Catznip-5.2
+    if (mExtendedButtonPanel)
+        mExtendedButtonPanel->setRect(extended_toolbar_rect);
+// [/SL:KB]
 }
 
 // static
@@ -1381,6 +1434,75 @@ void LLFloaterIMSessionTab::sessionRemoved(const LLUUID& session_id)
     }
 }
 
+void LLFloaterIMSessionTab::applyMUPose(std::string& text)
+{
+    if (!gSavedSettings.getBOOL("EnableMUPoseChat"))
+    {
+        return;
+    }
+    if (text.at(0) == ':'
+        && text.length() > 3)
+    {
+        if (text.find(":'") == 0)
+        {
+            text.replace(0, 1, "/me");
+        }
+        // Account for emotes and smilies
+        // Through LLStringOps rather than <cctype> directly: char is signed,
+        // so the lead byte of anything above ASCII arrives negative and lands
+        // outside the domain those take, which is undefined and asserts in a
+        // debug CRT. Typing a colon in front of an accented word is enough.
+        else if (!LLStringOps::isDigit(text.at(1))
+                 && !LLStringOps::isPunct(text.at(1))
+                 && !LLStringOps::isSpace(text.at(1)))
+        {
+            text.replace(0, 1, "/me ");
+        }
+    }
+}
+
+void LLFloaterIMSessionTab::applyOOCClose(std::string& message)
+{
+    if (!gSavedSettings.getBOOL("EnableAutoCloseOOC"))
+    {
+        return;
+    }
+
+    // Try to find any unclosed OOC chat (i.e. an opening
+    // double parenthesis without a matching closing double
+    // parenthesis.
+    if (message.find("(( ") != std::string::npos && message.find("))") == std::string::npos)
+    {
+        // add the missing closing double parenthesis.
+        message.append(" ))");
+    }
+    else if (message.find("((") != std::string::npos && message.find("))") == std::string::npos)
+    {
+        if (message.at(message.length() - 1) == ')')
+        {
+            // cosmetic: add a space first to avoid a closing triple parenthesis
+            message.append(" ");
+        }
+        // add the missing closing double parenthesis.
+        message.append("))");
+    }
+    else if (message.find("[[ ") != std::string::npos && message.find("]]") == std::string::npos)
+    {
+        // add the missing closing double parenthesis.
+        message.append(" ]]");
+    }
+    else if (message.find("[[") != std::string::npos && message.find("]]") == std::string::npos)
+    {
+        if (message.at(message.length() - 1) == ']')
+        {
+            // cosmetic: add a space first to avoid a closing triple parenthesis
+            message.append(" ");
+        }
+            // add the missing closing double parenthesis.
+        message.append("]]");
+    }
+}
+
 bool LLFloaterIMSessionTab::handleKeyHere(KEY key, MASK mask )
 {
     bool handled = false;
@@ -1405,4 +1527,21 @@ bool LLFloaterIMSessionTab::handleKeyHere(KEY key, MASK mask )
         }
     }
     return handled;
+}
+
+void LLFloaterIMSessionTab::onClickCloseBtn(bool app_quitting)
+{
+    bool is_ad_hoc = (mSession ? mSession->isAdHocSessionType() : false);
+    if (is_ad_hoc && !app_quitting)
+    {
+        LLNotificationsUtil::add("ConfirmLeaveAdhoc", LLSD(), LLSD(), [this](const LLSD& notification, const LLSD& response)
+        {
+            if (0 == LLNotificationsUtil::getSelectedOption(notification, response))
+                closeFloater();
+        });
+    }
+    else
+    {
+        closeFloater();
+    }
 }

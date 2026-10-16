@@ -45,6 +45,30 @@ with the same filename but different name
   <texture name="AddItem_Off" file_name="icons/AddItem_Off.png" preload="false" />
   <texture name="AddItem_Press" file_name="icons/AddItem_Press.png" preload="false" />
 
+  <texture name="AlignBottom_Disabled" file_name="icons/AlignBottom_Disabled.png" preload="false" />
+  <texture name="AlignBottom_Off" file_name="icons/AlignBottom_Off.png" preload="false" />
+  <texture name="AlignBottom_Press" file_name="icons/AlignBottom_Press.png" preload="false" />
+
+  <texture name="AlignCenter_Disabled" file_name="icons/AlignCenter_Disabled.png" preload="false" />
+  <texture name="AlignCenter_Off" file_name="icons/AlignCenter_Off.png" preload="false" />
+  <texture name="AlignCenter_Press" file_name="icons/AlignCenter_Press.png" preload="false" />
+
+  <texture name="AlignLeft_Disabled" file_name="icons/AlignLeft_Disabled.png" preload="false" />
+  <texture name="AlignLeft_Off" file_name="icons/AlignLeft_Off.png" preload="false" />
+  <texture name="AlignLeft_Press" file_name="icons/AlignLeft_Press.png" preload="false" />
+
+  <texture name="AlignMiddle_Disabled" file_name="icons/AlignMiddle_Disabled.png" preload="false" />
+  <texture name="AlignMiddle_Off" file_name="icons/AlignMiddle_Off.png" preload="false" />
+  <texture name="AlignMiddle_Press" file_name="icons/AlignMiddle_Press.png" preload="false" />
+
+  <texture name="AlignRight_Disabled" file_name="icons/AlignRight_Disabled.png" preload="false" />
+  <texture name="AlignRight_Off" file_name="icons/AlignRight_Off.png" preload="false" />
+  <texture name="AlignRight_Press" file_name="icons/AlignRight_Press.png" preload="false" />
+
+  <texture name="AlignTop_Disabled" file_name="icons/AlignTop_Disabled.png" preload="false" />
+  <texture name="AlignTop_Off" file_name="icons/AlignTop_Off.png" preload="false" />
+  <texture name="AlignTop_Press" file_name="icons/AlignTop_Press.png" preload="false" />
+
   <texture name="add_payment_image_center"  file_name="windows/add_payment_image_center.png" preload="true" />
   <texture name="add_payment_image_left"  file_name="windows/add_payment_image_left.png" preload="true" />
   <texture name="add_payment_image_right"  file_name="windows/add_payment_image_right.png" preload="true" />
@@ -128,7 +152,9 @@ with the same filename but different name
   <texture name="Checkbox_Off_Disabled" file_name="widgets/Checkbox_Disabled.png" preload="true" />
   <texture name="Checkbox_On_Disabled" file_name="widgets/Checkbox_On_Disabled.png" preload="true" />
   <texture name="Checkbox_Off" file_name="widgets/Checkbox_Off.png" preload="true" />
+  <texture name="Checkbox_Slim_Off" file_name="widgets/Checkbox_Slim_Off.png" preload="true" />
   <texture name="Checkbox_On" file_name="widgets/Checkbox_On.png" preload="true" />
+  <texture name="Checkbox_Slim_On" file_name="widgets/Checkbox_Slim_On.png" preload="true" />
   <texture name="Checkbox_On_Press" file_name="widgets/Checkbox_On_Press.png" preload="true" />
   <texture name="Checkbox_Press" file_name="widgets/Checkbox_Press.png" preload="true" />
   <texture name="Check_Mark" file_name="icons/check_mark.png" preload="true" />
@@ -144,11 +170,12 @@ with the same filename but different name
   <texture name="Command_Compass_Icon"      file_name="toolbar_icons/land.png"         preload="true" />
   <texture name="Command_Debug_Icon"        file_name="toolbar_icons/debug.png"        preload="true" />
   <texture name="Command_Destinations_Icon" file_name="toolbar_icons/destinations.png" preload="true" />
+  <texture name="Command_Feedback_Icon"     file_name="toolbar_icons/outbox.png"       preload="true" />
   <texture name="Command_Gestures_Icon"     file_name="toolbar_icons/gestures.png"     preload="true" />
   <texture name="Command_Grid_Status_Icon"  file_name="toolbar_icons/grid_status.png"  preload="true" />
-  <texture name="Command_HowTo_Icon"        file_name="toolbar_icons/howto.png"        preload="true" />
   <texture name="Command_Inventory_Icon"    file_name="toolbar_icons/inventory.png"    preload="true" />
   <texture name="Command_Lightbox_Icon"     file_name="toolbar_icons/lightbox.png"     preload="true" />
+  <texture name="Command_LocalAssets_Icon"  file_name="toolbar_icons/local_assets.png" preload="true" />
   <texture name="Command_Map_Icon"          file_name="toolbar_icons/map.png"          preload="true" />
   <texture name="Command_Marketplace_Icon"  file_name="toolbar_icons/marketplace.png"  preload="true" />
   <texture name="Command_MktListings_Icon"  file_name="toolbar_icons/mktlistings.png"  preload="true" />
@@ -162,20 +189,22 @@ with the same filename but different name
   <texture name="Command_PersonalLighting_Icon"  file_name="toolbar_icons/personal_lighting.png"  preload="true" />
   <texture name="Command_Picks_Icon"        file_name="toolbar_icons/picks.png"        preload="true" />
   <texture name="Command_Places_Icon"       file_name="toolbar_icons/places.png"       preload="true" />
+  <texture name="Command_Poser_Icon"        file_name="toolbar_icons/poser.png"        preload="true" />
   <texture name="Command_Preferences_Icon"  file_name="toolbar_icons/preferences.png"  preload="true" />
   <texture name="Command_Profile_Icon"      file_name="toolbar_icons/profile.png"      preload="true" />
   <texture name="Command_RegionTracker_Icon" file_name="toolbar_icons/regiontracker.png"       preload="true" />
   <texture name="Command_Report_Abuse_Icon" file_name="toolbar_icons/report_abuse.png" preload="true" />
   <texture name="Command_Scripts_Icon"      file_name="toolbar_icons/script.png"       preload="true" />
+  <texture name="Command_ScriptStudio_Icon" file_name="toolbar_icons/script_studio.png" preload="true" />
   <texture name="Command_Stats_Icon"        file_name="toolbar_icons/stats.png"        preload="true" />
   <texture name="Command_Search_Icon"       file_name="toolbar_icons/search.png"       preload="true" />
   <texture name="Command_Snapshot_Icon"     file_name="toolbar_icons/snapshot.png"     preload="true" />
   <texture name="Command_Snapshot_Disk_Icon" file_name="toolbar_icons/snapshot_disk.png"     preload="true" />
   <texture name="Command_Speak_Icon"        file_name="toolbar_icons/speak.png"        preload="true" />
+  <texture name="Command_ToggleHUD_Icon"    file_name="toolbar_icons/toggle_hud.png"  preload="true" />
   <texture name="Command_View_Icon"         file_name="toolbar_icons/view.png"         preload="true" />
   <texture name="Command_Voice_Icon"        file_name="toolbar_icons/nearbyvoice.png"  preload="true" />
   <texture name="Command_Webbrowser_Icon"   file_name="toolbar_icons/web.png"          preload="true" />
-  <texture name="Command_Poser_Icon"        file_name="toolbar_icons/poser.png"        preload="true" />
   <texture name="Caret_Top_Icon"            file_name="toolbar_icons/caret_top.png"    preload="true" scale.left="1" scale.top="28" scale.right="15" scale.bottom="5" />
   <texture name="Caret_Bottom_Icon"         file_name="toolbar_icons/caret_bottom.png" preload="true" scale.left="1" scale.top="23" scale.right="15" scale.bottom="1" />
   <texture name="Caret_Right_Icon"          file_name="toolbar_icons/caret_right.png"  preload="true" scale.left="5" scale.top="15" scale.right="28" scale.bottom="1" />
@@ -187,6 +216,8 @@ with the same filename but different name
   <texture name="ComboButton_On" file_name="widgets/ComboButton_On.png" preload="true" scale.left="2" scale.top="19" scale.right="18" scale.bottom="2" />
   <texture name="ComboButton_Off" file_name="widgets/ComboButton_Off.png" preload="true" scale.left="2" scale.top="19" scale.right="18" scale.bottom="2" />
   <texture name="ComboButton_UpOff" file_name="widgets/ComboButton_UpOff.png" preload="true" scale.left="2" scale.top="19" scale.right="18" scale.bottom="2" />
+  <texture name="ComboButton_Arrow" file_name="widgets/ComboButton_Arrow.png" preload="true" scale.left="2" scale.top="19" scale.right="18" scale.bottom="2" />
+  <texture name="ComboButton_Transparent" file_name="widgets/ComboButton_Transparent.png" preload="true" scale.left="2" scale.top="19" scale.right="18" scale.bottom="2" />
 
   <texture name="Container" file_name="containers/Container.png" preload="false" />
 
@@ -207,6 +238,7 @@ with the same filename but different name
   <texture name="Conv_toolbar_snooze" file_name="icons/Conv_toolbar_snooze.png" preload="true" />
   <texture name="Conv_toolbar_teleport" file_name="icons/Conv_toolbar_teleport.png" preload="true" />
   <texture name="Conv_log_inbox" file_name="icons/Conv_log_inbox.png" preload="false" />
+  <texture name="Conv_typing" file_name="icons/Conv_typing.png" preload="false" />
 
   <texture name="Copy" file_name="icons/Copy.png" preload="false" />
   <texture name="CopyBright" file_name="icons/CopyBright.png" preload="false" />
@@ -331,11 +363,7 @@ with the same filename but different name
   <texture name="Inv_Favorite_Star_Content" file_name="icons/Inv_Favorite_Star_Content.png" preload="false" />
   <texture name="Inv_Favorite_Star_Full" file_name="icons/Inv_Favorite_Star_Full.png" preload="false" />
   <texture name="Inv_FolderClosed" file_name="icons/Inv_FolderClosed.png" preload="false" />
-  <texture name="Inv_FolderClosedToxic" file_name="icons/Inv_FolderClosedToxic.png" preload="false" />
   <texture name="Inv_FolderOpen" file_name="icons/Inv_FolderOpen.png" preload="false" />
-  <texture name="Inv_FolderOpenToxic" file_name="icons/Inv_FolderOpenToxic.png" preload="false" />
-  <texture name="Inv_FolderClosed_WT" file_name="icons/Inv_FolderClosed_WT.png" preload="false" />
-  <texture name="Inv_FolderOpen_WT" file_name="icons/Inv_FolderOpen_WT.png" preload="false" />
   <texture name="Inv_Gesture" file_name="icons/Inv_Gesture.png" preload="false" />
   <texture name="Inv_Gloves" file_name="icons/Inv_Gloves.png" preload="false" />
   <texture name="Inv_Hair" file_name="icons/Inv_Hair.png" preload="false" />
@@ -354,6 +382,7 @@ with the same filename but different name
   <texture name="Inv_Object_Multi" file_name="icons/Inv_Object_Multi.png" preload="false" />
   <texture name="Inv_Pants" file_name="icons/Inv_Pants.png" preload="false" />
   <texture name="Inv_Script" file_name="icons/Inv_Script.png" preload="false" />
+  <texture name="Inv_Script_Luau" file_name="icons/Inv_Script_Luau.png" preload="false" />
   <texture name="Inv_Shape" file_name="icons/Inv_Shape.png"  preload="false" />
   <texture name="Inv_Shirt" file_name="icons/Inv_Shirt.png" preload="false" />
   <texture name="Inv_Shoe" file_name="icons/Inv_Shoe.png" preload="false" />
@@ -590,15 +619,16 @@ with the same filename but different name
   <texture name="PushButton_On" file_name="widgets/PushButton_On.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
   <texture name="PushButton_On_Selected" file_name="widgets/PushButton_On_Selected.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
   <texture name="PushButton_Over" file_name="widgets/PushButton_Over.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
-  <texture name="PushButton_Press" file_name="widgets/PushButton_Press.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
-  <texture name="PushButton_Selected" file_name="widgets/PushButton_Selected.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
+  <texture name="PushButton_Selected" file_name="widgets/PushButton_Press.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
   <texture name="PushButton_Selected_Press" file_name="widgets/PushButton_Selected_Press.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
   <texture name="PushButton_Selected_Disabled" file_name="widgets/PushButton_Selected_Disabled.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
 
   <texture name="PushButton_Login" file_name="widgets/PushButton_Login.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
   <texture name="PushButton_Login_Over" file_name="widgets/PushButton_Login_Over.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
   <texture name="PushButton_Login_Pressed" file_name="widgets/PushButton_Login_Pressed.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
-
+  <texture name="PushButton_Sign" file_name="widgets/PushButton_Sign.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
+  <texture name="PushButton_Sign_Over" file_name="widgets/PushButton_Sign_Over.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
+  <texture name="PushButton_Sign_Pressed" file_name="widgets/PushButton_Sign_Pressed.png" preload="true" scale.left="4" scale.top="19" scale.right="28" scale.bottom="4" />
 
   <texture name="RadioButton_Press" file_name="widgets/RadioButton_Press.png" preload="true" />
   <texture name="RadioButton_On_Press" file_name="widgets/RadioButton_On_Press.png" preload="true" />
@@ -664,6 +694,18 @@ with the same filename but different name
   <texture name="Sidebar_Icon_Undock_Foreground" file_name="taskpanel/Sidebar_Icon_Undock_Foreground.png" preload="false" />
   <texture name="Sidebar_Icon_Undock_Press" file_name="taskpanel/Sidebar_Icon_Undock_Press.png" preload="false" />
 
+  <texture name="SidebarBottom_Disabled" file_name="icons/SidebarBottom_Disabled.png" preload="false" />
+  <texture name="SidebarBottom_Off" file_name="icons/SidebarBottom_Off.png" preload="false" />
+  <texture name="SidebarBottom_Press" file_name="icons/SidebarBottom_Press.png" preload="false" />
+
+  <texture name="SidebarLeft_Disabled" file_name="icons/SidebarLeft_Disabled.png" preload="false" />
+  <texture name="SidebarLeft_Off" file_name="icons/SidebarLeft_Off.png" preload="false" />
+  <texture name="SidebarLeft_Press" file_name="icons/SidebarLeft_Press.png" preload="false" />
+
+  <texture name="SidebarRight_Disabled" file_name="icons/SidebarRight_Disabled.png" preload="false" />
+  <texture name="SidebarRight_Off" file_name="icons/SidebarRight_Off.png" preload="false" />
+  <texture name="SidebarRight_Press" file_name="icons/SidebarRight_Press.png" preload="false" />
+
   <texture name="Shop" file_name="icons/Shop.png" preload="false" />
 
   <texture name="SkipBackward_Off" file_name="icons/SkipBackward_Off.png" preload="false" />
@@ -680,6 +722,8 @@ with the same filename but different name
   <texture name="OBJECT_Icon" file_name="icons/object_icon.png" preload="true" />
   <texture name="Unknown_Icon" file_name="icons/unknown_icon.png" preload="true" />
 
+  <texture name="Square_Selection" file_name="square_selection.png" preload="true" scale.left="16" scale.top="16" scale.right="112" scale.bottom="16" />
+
   <texture name="Snapshot_Off" file_name="bottomtray/Snapshot_Off.png" preload="true" scale.left="4" scale.top="19" scale.right="22" scale.bottom="4" />
   <texture name="Snapshot_Download" file_name="snapshot_download.png" preload="false" />
   <texture name="Snapshot_Email" file_name="snapshot_email.png" preload="false" />
@@ -688,6 +732,7 @@ with the same filename but different name
   <texture name="startup_logo"  file_name="windows/startup_logo.png" preload="true" />
 
   <texture name="login_sl_logo"  file_name="windows/login_sl_logo.png" preload="true" />
+  <texture name="login_sl_logo_horizontal"  file_name="windows/login_sl_logo_horizontal.png" preload="true" />
   <texture name="login_sl_logo_small"  file_name="windows/login_sl_logo_small.png" preload="true" />
   <texture name="first_login_image"  file_name="windows/first_login_image.jpg" preload="true" />
 
@@ -717,6 +762,15 @@ with the same filename but different name
   <texture name="TabIcon_Places_Off" file_name="taskpanel/TabIcon_Places_Off.png" preload="false" />
   <texture name="TabIcon_Things_Off" file_name="taskpanel/TabIcon_Things_Off.png" preload="false" />
 
+  <texture name="TabLeft_Flat_Off" file_name="containers/TabLeft_Flat_Off.png" preload="true" scale.left="4" scale.top="19" scale.right="22" scale.bottom="4" />
+  <texture name="TabLeft_Flat_Selected" file_name="containers/TabLeft_Flat_Selected.png" preload="true" scale.left="4" scale.top="19" scale.right="22" scale.bottom="4" />
+  <texture name="TabTop_First_Flat_Off" file_name="containers/TabTop_First_Flat_Off.png" preload="false"  scale.left="8" scale.top="8" scale.right="62" scale.bottom="9" />
+  <texture name="TabTop_Last_Flat_Off" file_name="containers/TabTop_Last_Flat_Off.png" preload="false"  scale.left="8" scale.top="8" scale.right="62" scale.bottom="9" />
+  <texture name="TabTop_Middle_Flat_Off" file_name="containers/TabTop_Middle_Flat_Off.png" preload="false"  scale.left="8" scale.top="8" scale.right="62" scale.bottom="9" />
+  <texture name="TabTop_First_Flat_Selected" file_name="containers/TabTop_First_Flat_Selected.png" preload="false"  scale.left="8" scale.top="8" scale.right="62" scale.bottom="9" />
+  <texture name="TabTop_Last_Flat_Selected" file_name="containers/TabTop_Last_Flat_Selected.png" preload="false"  scale.left="8" scale.top="8" scale.right="62" scale.bottom="9" />
+  <texture name="TabTop_Middle_Flat_Selected" file_name="containers/TabTop_Middle_Flat_Selected.png" preload="false"  scale.left="8" scale.top="8" scale.right="62" scale.bottom="9" />
+
   <texture name="TabTop_Right_Off" file_name="containers/TabTop_Right_Off.png" preload="false"  scale.left="8" scale.top="8" scale.right="62" scale.bottom="9" />
   <texture name="TabTop_Right_Selected" file_name="containers/TabTop_Right_Selected.png" preload="false"  scale.left="8" scale.top="8" scale.right="62" scale.bottom="9" />
   <texture name="TabTop_Right_Flashing" file_name="containers/TabTop_Right_Flashing.png" preload="false"  scale.left="8" scale.top="8" scale.right="62" scale.bottom="9" />
@@ -734,7 +788,9 @@ with the same filename but different name
   <texture name="TextField_Search_Off" file_name="widgets/TextField_Search_Off.png" preload="true" scale.left="9" scale.top="12" scale.right="248" scale.bottom="12" />
   <texture name="TextField_Disabled" file_name="widgets/TextField_Disabled.png" preload="true" scale.left="9" scale.top="12" scale.right="248" scale.bottom="12" />
   <texture name="TextField_Active" file_name="widgets/TextField_Active.png" preload="true" scale.left="9" scale.top="12" scale.right="248" scale.bottom="12" />
+  <texture name="TextField_Highlight" file_name="widgets/TextField_Highlight.png" preload="true" scale.left="9" scale.top="12" scale.right="248" scale.bottom="12" />
   <texture name="TextField_Search_Highlight" file_name="widgets/TextField_Search_Highlight.png" preload="true" scale.left="9" scale.top="12" scale.right="248" scale.bottom="12" />
+  <texture name="TextField_Transparent" file_name="widgets/TextField_Transparent.png" preload="true" scale.left="2" scale.top="19" scale.right="18" scale.bottom="2" />
 
   <texture name="Thumbnail_Fallback" file_name="icons/thumbnail_fallback_icon.png" preload="true" />
 
@@ -874,11 +930,16 @@ with the same filename but different name
   <texture name="icon_avatar_online.tga" />
   <texture name="icon_diurnal.tga" />
   <texture name="icon_for_sale.tga" file_name="icons/Icon_For_Sale.png" />
+  <texture name="icon_auction.tga"/>
+  <texture name="icon_place.tga"/>
   <texture name="icon_top_pick.tga" />
   <texture name="Icon_Place" file_name="icon_place.tga" preload="false" />
   <texture name="Icon_Auction" file_name="icon_auction.tga" preload="false" />
   <texture name="Icon_Group" file_name="icon_group.tga" preload="false" />
 
+  <texture name="icon_event.tga"/>
+  <texture name="icon_event_adult.tga"/>
+  <texture name="icon_event_mature.tga" />
 
   <texture name="lag_status_critical.tga" />
   <texture name="lag_status_good.tga" />
@@ -905,6 +966,7 @@ with the same filename but different name
   <texture name="badge_warn.j2c" />
   <texture name="badge_ok.j2c" />
   <texture name="materials_ui_x_24.png" />
+  <texture name="locked_image" file_name="locked_image_dark.png" preload="true"/>
 
   <texture name="Progress_1" file_name="icons/Progress_1.png" preload="true" />
   <texture name="Progress_2" file_name="icons/Progress_2.png" preload="true" />
@@ -964,12 +1026,51 @@ with the same filename but different name
   <texture name="AlchemyProject128" file_name="alchemy/alchemyproject_128.png" preload="false" />
   <texture name="AlchemyTest128" file_name="alchemy/alchemytest_128.png" preload="false" />
 
-  <texture name="social_discord" file_name="alchemy/discord_32.png" preload="false" />
-  <texture name="social_mastodon" file_name="alchemy/mastodon_32.png" preload="false" />
-    <texture name="social_bluesky" file_name="alchemy/bluesky.png" preload="false" />
-    <texture name="social_github" file_name="alchemy/github.png" preload="false" />
-
   <texture name="Cam_Recall" file_name="icons/Cam_Recall.png"/>
   <texture name="Cam_Save" file_name="icons/Cam_Save.png"/>
+
   <texture name="Icon_Pointer" file_name="icons/Icon_Pointer.png" preload="false"/>
+
+  <texture name="Script_Undo" file_name="script_editor/script_undo.png" preload="false" />
+  <texture name="Script_Redo" file_name="script_editor/script_redo.png" preload="false" />
+  <texture name="Script_Save" file_name="script_editor/script_save.png" preload="false" />
+	<texture name="Poser_Visual_On"			file_name="icons/visual_pose_enabled.png" />
+	<texture name="Edit_Flip_X"			file_name="icons/visual_pose_enabled.png" />
+  <texture name="Script_Running" file_name="script_editor/green_square.png" preload="false" />
+  <texture name="Script_NotRunning" file_name="script_editor/yellow_square.png" preload="false" />
+  <texture name="Script_Error" file_name="script_editor/red_square.png" preload="false" />
+
+  <!-- The Script Studio's marks, drawn by scripts/content_tools/generate_studio_icons.py:
+       the kinds of symbol on the completion list and in the outline, the
+       toolbar, and the tabs and the explorer. -->
+  <texture name="Symbol_Function" file_name="studio/Symbol_Function.png" preload="false" />
+  <texture name="Symbol_Event" file_name="studio/Symbol_Event.png" preload="false" />
+  <texture name="Symbol_Constant" file_name="studio/Symbol_Constant.png" preload="false" />
+  <texture name="Symbol_Keyword" file_name="studio/Symbol_Keyword.png" preload="false" />
+  <texture name="Symbol_Type" file_name="studio/Symbol_Type.png" preload="false" />
+  <texture name="Symbol_Variable" file_name="studio/Symbol_Variable.png" preload="false" />
+  <texture name="Symbol_Parameter" file_name="studio/Symbol_Parameter.png" preload="false" />
+  <texture name="Symbol_Field" file_name="studio/Symbol_Field.png" preload="false" />
+  <texture name="Symbol_Label" file_name="studio/Symbol_Label.png" preload="false" />
+  <texture name="Symbol_Snippet" file_name="studio/Symbol_Snippet.png" preload="false" />
+  <texture name="Symbol_Word" file_name="studio/Symbol_Word.png" preload="false" />
+  <texture name="Symbol_Deprecated" file_name="studio/Symbol_Deprecated.png" preload="false" />
+  <texture name="Symbol_Module" file_name="studio/Symbol_Module.png" preload="false" />
+  <texture name="Studio_SaveAll" file_name="studio/Studio_SaveAll.png" preload="false" />
+  <texture name="Studio_Find" file_name="studio/Studio_Find.png" preload="false" />
+  <texture name="Studio_Format" file_name="studio/Studio_Format.png" preload="false" />
+  <texture name="Studio_Expanded" file_name="studio/Studio_Expanded.png" preload="false" />
+  <texture name="Studio_File" file_name="studio/Studio_File.png" preload="false" />
+  <texture name="Studio_Prim" file_name="studio/Studio_Prim.png" preload="false" />
+  <texture name="Studio_Config" file_name="studio/Studio_Config.png" preload="false" />
+  <texture name="Studio_Save" file_name="studio/Studio_Save.png" preload="false" />
+  <texture name="Studio_Undo" file_name="studio/Studio_Undo.png" preload="false" />
+  <texture name="Studio_Redo" file_name="studio/Studio_Redo.png" preload="false" />
+  <texture name="Studio_PaneLeft" file_name="studio/Studio_PaneLeft.png" preload="false" />
+  <texture name="Studio_PaneBottom" file_name="studio/Studio_PaneBottom.png" preload="false" />
+  <texture name="Studio_PaneRight" file_name="studio/Studio_PaneRight.png" preload="false" />
+  <texture name="Studio_Pinned" file_name="studio/Studio_Pinned.png" preload="false" />
+  <texture name="Problem_Error" file_name="studio/Problem_Error.png" preload="false" />
+  <texture name="Problem_Warning" file_name="studio/Problem_Warning.png" preload="false" />
+  <texture name="Problem_Note" file_name="studio/Problem_Note.png" preload="false" />
 </textures>

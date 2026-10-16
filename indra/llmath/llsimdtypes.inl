@@ -24,136 +24,116 @@
  * $/LicenseInfo$
  */
 
-
-
-
 //////////////////
 // LLSimdScalar
 //////////////////
 
 inline LLSimdScalar operator+(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    LLSimdScalar t(a);
-    t += b;
-    return t;
+    return alsimd::add(a, b);
 }
 
 inline LLSimdScalar operator-(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    LLSimdScalar t(a);
-    t -= b;
-    return t;
+    return alsimd::sub(a, b);
 }
 
 inline LLSimdScalar operator*(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    LLSimdScalar t(a);
-    t *= b;
-    return t;
+    return alsimd::mul(a, b);
 }
 
 inline LLSimdScalar operator/(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    LLSimdScalar t(a);
-    t /= b;
-    return t;
+    return alsimd::div(a, b);
 }
 
 inline LLSimdScalar operator-(const LLSimdScalar& a)
 {
-    static LL_ALIGN_16(const U32 signMask[4]) = {0x80000000, 0x80000000, 0x80000000, 0x80000000 };
-    ll_assert_aligned(signMask,16);
-    return _mm_xor_ps(*reinterpret_cast<const LLQuad*>(signMask), a);
+    return alsimd::neg(a);
 }
 
-inline LLBool32 operator==(const LLSimdScalar& a, const LLSimdScalar& b)
+inline bool operator==(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    return _mm_comieq_ss(a, b);
+    return a.getF32() == b.getF32();
 }
 
-inline LLBool32 operator!=(const LLSimdScalar& a, const LLSimdScalar& b)
+inline bool operator!=(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    return _mm_comineq_ss(a, b);
+    return a.getF32() != b.getF32();
 }
 
-inline LLBool32 operator<(const LLSimdScalar& a, const LLSimdScalar& b)
+inline bool operator<(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    return _mm_comilt_ss(a, b);
+    return a.getF32() < b.getF32();
 }
 
-inline LLBool32 operator<=(const LLSimdScalar& a, const LLSimdScalar& b)
+inline bool operator<=(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    return _mm_comile_ss(a, b);
+    return a.getF32() <= b.getF32();
 }
 
-inline LLBool32 operator>(const LLSimdScalar& a, const LLSimdScalar& b)
+inline bool operator>(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    return _mm_comigt_ss(a, b);
+    return a.getF32() > b.getF32();
 }
 
-inline LLBool32 operator>=(const LLSimdScalar& a, const LLSimdScalar& b)
+inline bool operator>=(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    return _mm_comige_ss(a, b);
+    return a.getF32() >= b.getF32();
 }
 
-inline LLBool32 LLSimdScalar::isApproximatelyEqual(const LLSimdScalar& rhs, F32 tolerance /* = F_APPROXIMATELY_ZERO */) const
+inline bool LLSimdScalar::isApproximatelyEqual(const LLSimdScalar& rhs, F32 tolerance /* = F_APPROXIMATELY_ZERO */) const
 {
-    const LLSimdScalar tol( tolerance );
-    const LLSimdScalar diff = _mm_sub_ss( mQ, rhs.mQ );
-    const LLSimdScalar absDiff = diff.getAbs();
-    return absDiff <= tol;
+    return alsimd::lane<0>(alsimd::abs(alsimd::sub(mQ, rhs.mQ))) <= tolerance;
 }
 
-inline void LLSimdScalar::setMax( const LLSimdScalar& a, const LLSimdScalar& b )
+inline void LLSimdScalar::setMax(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    mQ = _mm_max_ss( a, b );
+    mQ = alsimd::max(a, b);
 }
 
-inline void LLSimdScalar::setMin( const LLSimdScalar& a, const LLSimdScalar& b )
+inline void LLSimdScalar::setMin(const LLSimdScalar& a, const LLSimdScalar& b)
 {
-    mQ = _mm_min_ss( a, b );
+    mQ = alsimd::min(a, b);
 }
 
 inline LLSimdScalar& LLSimdScalar::operator=(F32 rhs)
 {
-    mQ = _mm_set_ss(rhs);
+    mQ = alsimd::set1(rhs);
     return *this;
 }
 
 inline LLSimdScalar& LLSimdScalar::operator+=(const LLSimdScalar& rhs)
 {
-    mQ = _mm_add_ss( mQ, rhs );
+    mQ = alsimd::add(mQ, rhs);
     return *this;
 }
 
 inline LLSimdScalar& LLSimdScalar::operator-=(const LLSimdScalar& rhs)
 {
-    mQ = _mm_sub_ss( mQ, rhs );
+    mQ = alsimd::sub(mQ, rhs);
     return *this;
 }
 
 inline LLSimdScalar& LLSimdScalar::operator*=(const LLSimdScalar& rhs)
 {
-    mQ = _mm_mul_ss( mQ, rhs );
+    mQ = alsimd::mul(mQ, rhs);
     return *this;
 }
 
 inline LLSimdScalar& LLSimdScalar::operator/=(const LLSimdScalar& rhs)
 {
-    mQ = _mm_div_ss( mQ, rhs );
+    mQ = alsimd::div(mQ, rhs);
     return *this;
 }
 
 inline LLSimdScalar LLSimdScalar::getAbs() const
 {
-    static const LL_ALIGN_16(U32 F_ABS_MASK_4A[4]) = { 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF };
-    ll_assert_aligned(F_ABS_MASK_4A,16);
-    return _mm_and_ps( mQ, *reinterpret_cast<const LLQuad*>(F_ABS_MASK_4A));
+    return alsimd::abs(mQ);
 }
 
 inline F32 LLSimdScalar::getF32() const
 {
-    F32 ret;
-    _mm_store_ss(&ret, mQ);
-    return ret;
+    return alsimd::lane<0>(mQ);
 }

@@ -1,90 +1,39 @@
 # -*- cmake -*-
+#
+# The build system's own files, listed so they show in the IDE. Nothing is
+# built; a new module joins the list on the next configure.
 
-include(00-Common)
+file(GLOB cmake_MODULES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cmake)
+file(GLOB cmake_TRIPLETS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/triplets/*.cmake)
+file(
+  GLOB cmake_PRESETS
+  CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/presets/*.json
+  ${CMAKE_CURRENT_SOURCE_DIR}/presets/*.py
+)
 
-project(cmake)
+source_group("Shared Rules" FILES ${cmake_MODULES})
+source_group("Triplets" FILES ${cmake_TRIPLETS})
+source_group("Presets" FILES ${cmake_PRESETS})
+source_group("CMake Rules" FILES CMakeLists.txt)
+source_group(
+  "Master Rules"
+  FILES
+    ${CMAKE_SOURCE_DIR}/CMakeLists.txt
+    ${CMAKE_SOURCE_DIR}/CMakePresets.json
+    ${CMAKE_SOURCE_DIR}/vcpkg.json
+    ${CMAKE_SOURCE_DIR}/vcpkg-configuration.json
+)
 
-set(cmake_SOURCE_FILES
-        CMakeLists.txt
-        00-Common.cmake
-        APR.cmake
-        Audio.cmake
-        Boost.cmake
-        Brotli.cmake
-        bugsplat.cmake
-        BuildPackagesInfo.cmake
-        BuildVersion.cmake
-        CEFPlugin.cmake
-        CEFPlugin.cmake
-        CMakeCopyIfDifferent.cmake
-        Copy3rdPartyLibs.cmake
-        CURL.cmake
-        DeploySharedLibs.cmake
-        Discord.cmake
-        DragDrop.cmake
-        EXPAT.cmake
-        FindAutobuild.cmake
-        FindPipeWire.cmake
-        FMODSTUDIO.cmake
-        FreeType.cmake
-        GLEXT.cmake
-        GLIB.cmake
-        GLM.cmake
-        GStreamer10Plugin.cmake
-        Havok.cmake
-        Hunspell.cmake
-        LLAddBuildTest.cmake
-        LLAppearance.cmake
-        LLAudio.cmake
-        LLCommon.cmake
-        LLImage.cmake
-        LLKDU.cmake
-        LLPhysicsExtensions.cmake
-        LLPrimitive.cmake
-        LLSharedLibs.cmake
-        LLTestCommand.cmake
-        LLWindow.cmake
-        Linking.cmake
-        Meshoptimizer.cmake
-        NDOF.cmake
-        OPENAL.cmake
-        OpenGL.cmake
-        OpenJPEG.cmake
-        OpenSSL.cmake
-        PNG.cmake
-        PluginAPI.cmake
-        Prebuilt.cmake
-        PulseAudio.cmake
-        Python.cmake
-        SDL3.cmake
-        SSE2NEON.cmake
-        TemplateCheck.cmake
-        TinyEXR.cmake
-        TinyGLTF.cmake
-        Tracy.cmake
-        Tut.cmake
-        UI.cmake
-        UnixInstall.cmake
-        Variables.cmake
-        VHACD.cmake
-        ViewerMiscLibs.cmake
-        VisualLeakDetector.cmake
-        LibVLCPlugin.cmake
-        WebRTC.cmake
-        xxHash.cmake
-        ZLIBNG.cmake
-        )
-
-source_group("Shared Rules" FILES ${cmake_SOURCE_FILES})
-
-set(master_SOURCE_FILES
-        ../CMakeLists.txt
-        )
-
-source_group("Master Rules" FILES ${master_SOURCE_FILES})
-
-add_library(cmake
-        cmake_dummy.cpp
-        ${cmake_SOURCE_FILES}
-        ${master_SOURCE_FILES}
-        )
+add_custom_target(
+  cmake_rules
+  SOURCES
+    ${cmake_MODULES}
+    ${cmake_TRIPLETS}
+    ${cmake_PRESETS}
+    CMakeLists.txt
+    ${CMAKE_SOURCE_DIR}/CMakeLists.txt
+    ${CMAKE_SOURCE_DIR}/CMakePresets.json
+    ${CMAKE_SOURCE_DIR}/vcpkg.json
+    ${CMAKE_SOURCE_DIR}/vcpkg-configuration.json
+)

@@ -156,7 +156,7 @@ void LLFloaterLandHoldings::refresh()
 void LLFloaterLandHoldings::processPlacesReply(LLMessageSystem* msg, void**)
 {
     LLFloaterLandHoldings* self = LLFloaterReg::findTypedInstance<LLFloaterLandHoldings>("land_holdings");
-    S32 count = msg->getNumberOfBlocks("QueryData");
+    S32 count = msg->getNumberOfBlocksFast(_PREHASH_QueryData);
     std::string land_sku;
     sHasLindenHome = false;
     if (!self)
@@ -200,15 +200,15 @@ void LLFloaterLandHoldings::processPlacesReply(LLMessageSystem* msg, void**)
 
     for (S32 i = 0; i < count; i++)
     {
-        msg->getUUID("QueryData", "OwnerID", owner_id, i);
-        msg->getString("QueryData", "Name", name, i);
-        msg->getString("QueryData", "Desc", desc, i);
-        msg->getS32("QueryData", "ActualArea", actual_area, i);
-        msg->getS32("QueryData", "BillableArea", billable_area, i);
-        msg->getU8("QueryData", "Flags", flags, i);
-        msg->getF32("QueryData", "GlobalX", global_x, i);
-        msg->getF32("QueryData", "GlobalY", global_y, i);
-        msg->getString("QueryData", "SimName", sim_name, i);
+        msg->getUUIDFast(_PREHASH_QueryData, _PREHASH_OwnerID, owner_id, i);
+        msg->getStringFast(_PREHASH_QueryData, _PREHASH_Name, name, i);
+        msg->getStringFast(_PREHASH_QueryData, _PREHASH_Desc, desc, i);
+        msg->getS32Fast(_PREHASH_QueryData, _PREHASH_ActualArea, actual_area, i);
+        msg->getS32Fast(_PREHASH_QueryData, _PREHASH_BillableArea, billable_area, i);
+        msg->getU8Fast(_PREHASH_QueryData, _PREHASH_Flags, flags, i);
+        msg->getF32Fast(_PREHASH_QueryData, _PREHASH_GlobalX, global_x, i);
+        msg->getF32Fast(_PREHASH_QueryData, _PREHASH_GlobalY, global_y, i);
+        msg->getStringFast(_PREHASH_QueryData, _PREHASH_SimName, sim_name, i);
 
         if ( msg->getSizeFast(_PREHASH_QueryData, i, _PREHASH_ProductSKU) > 0 )
         {

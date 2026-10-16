@@ -35,24 +35,25 @@
 /// Class LLFloaterSimpleSnapshot
 ///----------------------------------------------------------------------------
 
-class LLFloaterSimpleSnapshot : public LLFloaterSnapshotBase
+class LLFloaterSimpleSnapshot final : public LLFloaterSnapshotBase
 {
     LOG_CLASS(LLFloaterSimpleSnapshot);
 
 public:
+    AL_VIEW_TYPE(LLFloaterSimpleSnapshot, LLFloaterSnapshotBase);
 
     LLFloaterSimpleSnapshot(const LLSD& key);
     ~LLFloaterSimpleSnapshot();
 
-    bool postBuild();
-    void onOpen(const LLSD& key);
-    void draw();
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void draw() override;
 
     static void update();
 
     static LLFloaterSimpleSnapshot* getInstance(const LLSD &key);
     static LLFloaterSimpleSnapshot* findInstance(const LLSD &key);
-    void saveTexture();
+    void saveTexture() override;
 
     const LLRect& getThumbnailPlaceholderRect() { return mThumbnailPlaceholder->getRect(); }
 
@@ -63,7 +64,7 @@ public:
 
     void postSave();
 
-    typedef boost::function<void(const LLUUID& asset_id)> completion_t;
+    typedef std::function<void(const LLUUID& asset_id)> completion_t;
     void setComplectionCallback(completion_t callback) { mUploadCompletionCallback = callback; }
     static void uploadThumbnail(const std::string &file_path,
                                 const LLUUID &inventory_id,
@@ -132,9 +133,11 @@ private:
 /// Class LLSimpleOutfitSnapshotFloaterView
 ///----------------------------------------------------------------------------
 
-class LLSimpleSnapshotFloaterView : public LLFloaterView
+class LLSimpleSnapshotFloaterView final : public LLFloaterView
 {
 public:
+    AL_VIEW_TYPE(LLSimpleSnapshotFloaterView, LLFloaterView);
+
     struct Params
         : public LLInitParam::Block<Params, LLFloaterView::Params>
     {

@@ -36,6 +36,7 @@
 #include "llsliderctrl.h"
 #include "lltextbox.h"
 #include "lltrans.h"
+#include "llviewercontrol.h"
 #include "llviewershadermgr.h"
 #include "llviewertexturelist.h"
 #include "llvoavatar.h"
@@ -84,7 +85,7 @@ bool LLFloaterPreferenceGraphicsAdvanced::postBuild()
         }
     }
 
-#if !LL_DARWIN
+#if !LL_DARWIN && !LL_SDL_WINDOW
     LLCheckBoxCtrl *use_HiDPI = getChild<LLCheckBoxCtrl>("use HiDPI");
     use_HiDPI->setVisible(false);
 #endif
@@ -138,19 +139,11 @@ void LLFloaterPreferenceGraphicsAdvanced::onRenderOptionEnable()
     refreshEnabledGraphics();
 }
 
-void LLFloaterPreferenceGraphicsAdvanced::onAdvancedAtmosphericsEnable()
-{
-    LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
-    if (instance)
-    {
-        instance->refresh();
-    }
-
-    refreshEnabledGraphics();
-}
-
 void LLFloaterPreferenceGraphicsAdvanced::refresh()
 {
+    LLSliderCtrl* draw_distance = getChild<LLSliderCtrl>("DrawDistance");
+    cap_draw_distance_control(draw_distance, draw_distance);
+
     // sliders and their text boxes
     //  mPostProcess = gSavedSettings.getS32("RenderGlowResolutionPow");
     // slider text boxes
@@ -161,7 +154,7 @@ void LLFloaterPreferenceGraphicsAdvanced::refresh()
     updateSliderText(getChild<LLSliderCtrl>("AvatarPhysicsDetail",  true), getChild<LLTextBox>("AvatarPhysicsDetailText",       true));
     updateSliderText(getChild<LLSliderCtrl>("TerrainMeshDetail",    true), getChild<LLTextBox>("TerrainMeshDetailText",     true));
     updateSliderText(getChild<LLSliderCtrl>("RenderPostProcess",    true), getChild<LLTextBox>("PostProcessText",           true));
-    updateSliderText(getChild<LLSliderCtrl>("SkyMeshDetail",        true), getChild<LLTextBox>("SkyMeshDetailText",         true));
+    updateSliderText(getChild<LLSliderCtrl>("GlowResolution",        true), getChild<LLTextBox>("GlowResolutionText",         true));
     LLAvatarComplexityControls::setIndirectControls();
     setMaxNonImpostorsText(
         gSavedSettings.getU32("RenderAvatarMaxNonImpostors"),
@@ -280,16 +273,11 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
     LLTextBox* shadows_text = getChild<LLTextBox>("RenderShadowDetailText");
     LLCheckBoxCtrl* ctrl_ssao = getChild<LLCheckBoxCtrl>("UseSSAO");
     LLCheckBoxCtrl* ctrl_dof = getChild<LLCheckBoxCtrl>("UseDoF");
-    LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
-    LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
     LLSliderCtrl* cas_slider = getChild<LLSliderCtrl>("RenderSharpness");
 
     // disabled windlight
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))
     {
-        sky->setEnabled(false);
-        sky_text->setEnabled(false);
-
         //deferred needs windlight, disable deferred
         ctrl_shadows->setEnabled(false);
         ctrl_shadows->setValue(0);
@@ -353,12 +341,6 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
 
 void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
 {
-    // WindLight
-    LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
-    LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
-    sky->setEnabled(true);
-    sky_text->setEnabled(true);
-
     bool enabled = true;
 
     LLCheckBoxCtrl* ctrl_ssao = getChild<LLCheckBoxCtrl>("UseSSAO");
@@ -384,11 +366,6 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderVBOEnable"))
     {
         getChildView("vbo")->setEnabled(false);
-    }
-
-    if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderCompressTextures"))
-    {
-        getChildView("texture compression")->setEnabled(false);
     }
 
     getChildView("antialiasing restart")->setVisible(!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred"));

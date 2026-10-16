@@ -27,6 +27,15 @@ LLHeteroMap::~LLHeteroMap()
         // pair.second is the std::pair; pair.second.first is the void*;
         // pair.second.second points to the deleter function
         (pair.second.second)(pair.second.first);
-        pair.second.first = NULL;
+        pair.second.first = nullptr;
     }
+}
+
+void LLHeteroMap::clear()
+{
+    for (TypeMap::value_type& pair : mMap)
+    {
+        (pair.second.second)(pair.second.first);
+    }
+    mMap.clear();
 }

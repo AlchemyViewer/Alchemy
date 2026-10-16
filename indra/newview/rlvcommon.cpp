@@ -1,5 +1,6 @@
 /**
  *
+ * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Copyright (c) 2009-2020, Kitty Barnett
  *
  * The source code in this file is provided to you under the terms of the
@@ -15,6 +16,7 @@
  */
 
 #include "llviewerprecompiledheaders.h"
+#include "alregex.h"
 #include "llagent.h"
 #include "llagentui.h"
 #include "llavatarnamecache.h"
@@ -22,11 +24,14 @@
 #include "llimview.h"
 #include "llinstantmessage.h"
 #include "llnotificationsutil.h"
-#include "llregex.h"
 #include "llregionhandle.h"
 #include "llscriptruntimeperms.h"
 #include "llsdserialize.h"
+#include "llstl.h"
+#include "lluri.h"
 #include "lltrans.h"
+#include "llurlentry.h"
+#include "llurlregistry.h"
 #include "llversioninfo.h"
 #include "llviewerparcelmgr.h"
 #include "llviewermenu.h"
@@ -42,8 +47,7 @@
 #include "rlvlocks.h"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/regex.hpp>
-
+#include <boost/unordered/unordered_flat_map.hpp>
 
 // ============================================================================
 // Forward declarations
@@ -91,7 +95,7 @@ bool RlvSettings::s_fNoSetEnv = false;
 bool RlvSettings::s_fTempAttach = true;
 std::list<std::string> RlvSettings::s_BlockedExperiences;
 std::list<LLUUID> RlvSettings::s_CompatItemCreators;
-std::list<std::string> RlvSettings::s_CompatItemNames;
+std::list<ALRegex> RlvSettings::s_CompatItemNames;
 
 // Checked: 2010-02-27 (RLVa-1.2.0a) | Modified: RLVa-1.1.0i
 void RlvSettings::initClass()
@@ -197,7 +201,15 @@ void RlvSettings::initCompatibilityMode(std::string strCompatList)
         else if (boost::starts_with(strCompatEntry, "name:"))
         {
             if (strCompatEntry.size() > 5)
-                s_CompatItemNames.push_back(strCompatEntry.substr(5));
+            {
+                // Compiled once here rather than at every check; the list is the resident's own, so a pattern of theirs that
+                // does not compile is said and passed over
+                ALRegex regexCompatName(strCompatEntry.substr(5), ALRegex::ICASE);
+                if (regexCompatName.ok())
+                    s_CompatItemNames.push_back(std::move(regexCompatName));
+                else
+                    LL_WARNS("RLV") << "Ignoring compatibility entry '" << strCompatEntry << "': " << regexCompatName.error() << LL_ENDL;
+            }
         }
     }
 }
@@ -217,10 +229,9 @@ bool RlvSettings::isCompatibilityModeObject(const LLUUID& idRlvObject)
                 if (!fCompatMode)
                 {
                     const std::string& strAttachName = pItem->getName();
-                    for (const std::string& strCompatName : s_CompatItemNames)
+                    for (const ALRegex& regexCompatName : s_CompatItemNames)
                     {
-                        boost::regex regexp(strCompatName, boost::regex::perl | boost::regex::icase);
-                        if (ll_regex_match(strAttachName, regexp))
+                        if (regexCompatName.match(strAttachName))
                         {
                             fCompatMode = true;
                             break;
@@ -379,11 +390,7 @@ const std::string& RlvStrings::getAnonym(const std::string& strName)
 }
 
 // Checked: 2011-11-08 (RLVa-1.5.0)
-#ifdef CATZNIP_STRINGVIEW
-const std::string& RlvStrings::getString(const boost::string_view& strStringName)
-#else
-const std::string& RlvStrings::getString(const std::string& strStringName)
-#endif // CATZNIP_STRINGVIEW
+const std::string& RlvStrings::getString(std::string_view strStringName)
 {
     static const std::string strMissing = "(Missing RLVa string)";
     string_map_t::const_iterator itString = m_StringMap.find(strStringName);
@@ -496,24 +503,77 @@ void RlvStrings::setCustomString(const std::string& strStringName, const std::st
 
 bool RlvUtil::m_fForceTp = false;
 
+namespace
+{
+    std::string asciiLowered(std::string_view text)
+    {
+        std::string lowered(text);
+        for (char& ch : lowered)
+        {
+            if (ch >= 'A' && ch <= 'Z')
+                ch = static_cast<char>(ch - 'A' + 'a');
+        }
+        return lowered;
+    }
+
+    // A name as a whole word in any case, compiled once for as long as it is about, and the name ASCII lowered: a line
+    // has to hold that for the regex to find anything in it, and a plain find passes over the names it does not hold far
+    // sooner than the regex, whose leading \b keeps RE2 from looking ahead for the name's first letters.
+    struct RlvWordFilter
+    {
+        ALRegex     regex;
+        std::string lowered;
+    };
+
+    const RlvWordFilter& wordFilterFor(const std::string& strName)
+    {
+        llassert(on_main_thread());
+        static boost::unordered_flat_map<std::string, RlvWordFilter, ll::string_hash, std::equal_to<>> s_Filters;
+        auto itFilter = s_Filters.find(strName);
+        if (s_Filters.end() == itFilter)
+        {
+            // Nearby names come and go; the ones kept are held to a number
+            if (s_Filters.size() >= 256)
+                s_Filters.clear();
+            itFilter = s_Filters.emplace(strName, RlvWordFilter{ ALRegex("\\b" + ALRegex::escape(strName) + "\\b", ALRegex::ICASE), asciiLowered(strName) }).first;
+        }
+        return itFilter->second;
+    }
+
+    // Every mention of the name in the text, as a whole word in any case, replaced; strLowered is the text ASCII lowered,
+    // and is kept so
+    void hideWord(std::string& strUTF8Text, std::string& strLowered, const std::string& strName, const std::string& strReplacement)
+    {
+        if (strName.empty())
+            return;
+        const RlvWordFilter& filter = wordFilterFor(strName);
+        if ( (std::string::npos != strLowered.find(filter.lowered)) && (filter.regex.replaceAll(strUTF8Text, strReplacement) > 0) )
+            strLowered = asciiLowered(strUTF8Text);
+    }
+}
+
 // Checked: 2009-07-04 (RLVa-1.0.0a) | Modified: RLVa-1.0.0a
 void RlvUtil::filterLocation(std::string& strUTF8Text)
 {
+    std::string strLowered = asciiLowered(strUTF8Text);
+
     // Filter any mention of the surrounding region names
     LLWorld::region_list_t regions = LLWorld::getInstance()->getRegionList();
     const std::string& strHiddenRegion = RlvStrings::getString(RlvStringKeys::Hidden::Region);
     for (LLWorld::region_list_t::const_iterator itRegion = regions.begin(); itRegion != regions.end(); ++itRegion)
-        boost::ireplace_all(strUTF8Text, (*itRegion)->getName(), strHiddenRegion);
+        hideWord(strUTF8Text, strLowered, (*itRegion)->getName(), strHiddenRegion);
 
     // Filter any mention of the parcel name
     LLViewerParcelMgr* pParcelMgr = LLViewerParcelMgr::getInstance();
     if (pParcelMgr)
-        boost::ireplace_all(strUTF8Text, pParcelMgr->getAgentParcelName(), RlvStrings::getString(RlvStringKeys::Hidden::Parcel));
+        hideWord(strUTF8Text, strLowered, pParcelMgr->getAgentParcelName(), RlvStrings::getString(RlvStringKeys::Hidden::Parcel));
 }
 
 // Checked: 2010-12-08 (RLVa-1.2.2c) | Modified: RLVa-1.2.2c
 void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fClearMatches)
 {
+    std::string strLowered = asciiLowered(strUTF8Text);
+
     uuid_vec_t idAgents;
     LLWorld::getInstance()->getAvatars(&idAgents, NULL);
     for (size_t idxAgent = 0, cntAgent = idAgents.size(); idxAgent < cntAgent; idxAgent++)
@@ -532,26 +592,95 @@ void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fCl
             if (boost::icontains(strLegacyName, strDisplayName))
             {
                 if (fFilterLegacy)
-                    boost::ireplace_all(strUTF8Text, strLegacyName, strAnonym);
+                    hideWord(strUTF8Text, strLowered, strLegacyName, strAnonym);
                 if (fFilterDisplay)
-                    boost::ireplace_all(strUTF8Text, strDisplayName, strAnonym);
+                    hideWord(strUTF8Text, strLowered, strDisplayName, strAnonym);
             }
             else
             {
                 if (fFilterDisplay)
-                    boost::ireplace_all(strUTF8Text, strDisplayName, strAnonym);
+                    hideWord(strUTF8Text, strLowered, strDisplayName, strAnonym);
                 if (fFilterLegacy)
-                    boost::ireplace_all(strUTF8Text, strLegacyName, strAnonym);
+                    hideWord(strUTF8Text, strLowered, strLegacyName, strAnonym);
             }
         }
     }
+
+    filterMentions(strUTF8Text);
+}
+
+// Checked: 2026-02-09 (RLVa-2.6.2) | Added: RLVa-2.6.2
+void RlvUtil::filterMentions(std::string& strUTF8Text)
+{
+    if (!RlvActions::isRlvEnabled())
+        return;
+    if (RlvActions::canShowName(RlvActions::SNC_DEFAULT))
+        return;
+
+    // The mention's URL is group 1; what follows it is only read, as ending it
+    static const ALRegex mention_regex("(" APP_HEADER_REGEX
+                                       "/agent/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+                                       "/mention)(?:/|\\?|$)");
+
+    std::string result;
+    size_t last_pos = 0;
+
+    const size_t mentions = mention_regex.forEach(strUTF8Text, [&](const ALRegexMatch& match)
+    {
+        if (result.empty())
+            result.reserve(strUTF8Text.size());
+
+        const size_t start = match.begin(1);
+        const size_t length = match.length(1);
+
+        result.append(strUTF8Text, last_pos, start - last_pos);
+
+        const std::string match_url = match.str(1);
+        std::string agent_id_str;
+        {
+            LLURI uri(match_url);
+            LLSD path_array = uri.pathArray();
+            if (path_array.size() == 4)
+            {
+                agent_id_str = path_array.get(2).asString();
+            }
+        }
+        const LLUUID agent_id(agent_id_str);
+        const bool can_show =
+            agent_id.notNull() &&
+            (RlvActions::canShowName(RlvActions::SNC_DEFAULT, agent_id));
+
+        if (can_show)
+        {
+            // Preserve the original mention URI for exceptions so URL-aware floaters keep it clickable.
+            result.append(strUTF8Text, start, length);
+        }
+        else
+        {
+            // Remove the URI and replace with anonymized name if names are hidden
+            LLAvatarName av_name;
+            const std::string anonym = (agent_id.notNull() && LLAvatarNameCache::get(agent_id, &av_name))
+                                           ? RlvStrings::getAnonym(av_name)
+                                           : RlvStrings::getAnonym(agent_id_str.empty() ? LLUUID::null.asString() : agent_id_str);
+            result += "@" + anonym;
+        }
+
+        last_pos = start + length;
+        return true;
+    }, 1);
+
+    if (0 == mentions)
+        return;
+
+    result.append(strUTF8Text, last_pos, std::string::npos);
+    strUTF8Text.swap(result);
 }
 
 // Checked: 2012-08-19 (RLVa-1.4.7)
 void RlvUtil::filterScriptQuestions(S32& nQuestions, LLSD& sdPayload)
 {
     // Check SCRIPT_PERMISSION_ATTACH
-    if ((!gRlvAttachmentLocks.canAttach()) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_ATTACH].permbit & nQuestions))
+    if ( (!gRlvAttachmentLocks.canAttach()) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_ATTACH].permbit & nQuestions) )
     {
         // Notify the user that we blocked it since they're not allowed to wear any new attachments
         sdPayload["rlv_blocked"] = RlvStringKeys::Blocked::PermissionAttach;
@@ -559,7 +688,7 @@ void RlvUtil::filterScriptQuestions(S32& nQuestions, LLSD& sdPayload)
     }
 
     // Check SCRIPT_PERMISSION_TELEPORT
-    if ((gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TELEPORT].permbit & nQuestions))
+    if ( (gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TELEPORT].permbit & nQuestions) )
     {
         // Notify the user that we blocked it since they're not allowed to teleport
         sdPayload["rlv_blocked"] = RlvStringKeys::Blocked::PermissionTeleport;
@@ -604,11 +733,7 @@ bool RlvUtil::isNearbyRegion(const std::string& strRegion)
 }
 
 // Checked: 2011-04-11 (RLVa-1.3.0h) | Modified: RLVa-1.3.0h
-#ifdef CATZNIP_STRINGVIEW
-void RlvUtil::notifyBlocked(const boost::string_view& strNotifcation, const LLSD& sdArgs, bool fLogToChat)
-#else
-void RlvUtil::notifyBlocked(const std::string& strNotifcation, const LLSD& sdArgs, bool fLogToChat)
-#endif // CATZNIP_STRINGVIEW
+void RlvUtil::notifyBlocked(std::string_view strNotifcation, const LLSD& sdArgs, bool fLogToChat)
 {
     std::string strMsg = RlvStrings::getString(strNotifcation);
     LLStringUtil::format(strMsg, sdArgs);
@@ -667,7 +792,7 @@ bool RlvUtil::sendChatReply(S32 nChannel, const std::string& strUTF8Text)
     gMessageSystem->nextBlockFast(_PREHASH_ChatData);
     gMessageSystem->addStringFast(_PREHASH_Message, utf8str_truncate(strUTF8Text, MAX_MSG_STR_LEN));
     gMessageSystem->addU8Fast(_PREHASH_Type, CHAT_TYPE_SHOUT);
-    gMessageSystem->addS32("Channel", nChannel);
+    gMessageSystem->addS32Fast(_PREHASH_Channel, nChannel);
     gAgent.sendReliableMessage();
     add(LLStatViewer::CHAT_COUNT, 1);
 
@@ -721,7 +846,7 @@ void RlvUtil::sendIMMessage(const LLUUID& idRecipient, const std::string& strMsg
 // Checked: 2015-05-25 (RLVa-1.5.0)
 bool rlvMenuMainToggleVisible(LLUICtrl* pMenuCtrl)
 {
-    LLMenuItemCheckGL* pMenuItem = dynamic_cast<LLMenuItemCheckGL*>(pMenuCtrl);
+    LLMenuItemCheckGL* pMenuItem = ALViewType::as<LLMenuItemCheckGL>(pMenuCtrl);
     if (pMenuItem)
     {
         static std::string strLabel = pMenuItem->getLabel();
@@ -790,16 +915,19 @@ bool rlvMenuEnableIfNot(const LLSD& sdParam)
 // Checked: 2011-05-28 (RLVa-1.4.6) | Modified: RLVa-1.4.0
 bool rlvCanDeleteOrReturn(const LLViewerObject* pObj)
 {
-    // Block if: @rez=n restricted and owned by us or a group *or* @unsit=n restricted and being sat on by us
+    // Block right here if this specific object is edit blocked
+    if (!RlvActions::canEdit(pObj)) return false;
+
+    // Block if: @rez=n or @edit=n restricted and owned/editable by us or a group *or* @unsit=n restricted and being sat on by us
     return
-        ( (!gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || ((!pObj->permYouOwner()) && (!pObj->permGroupOwner())) ) &&
+        ( (!gRlvHandler.hasBehaviour(RLV_BHVR_EDIT) && !gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || ((!pObj->permYouOwner()) && (!pObj->permModify()) && (!pObj->permGroupOwner())) ) &&
         ( (!gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (!isAgentAvatarValid()) || (!pObj->getRootEdit()->isChild(gAgentAvatarp)) );
 }
 
 // Checked: 2011-05-28 (RLVa-1.4.6) | Modified: RLVa-1.4.0
 bool rlvCanDeleteOrReturn()
 {
-    if ( (gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || (gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) )
+    if ( (gRlvHandler.hasBehaviour(RLV_BHVR_EDIT)) || (gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || (gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (gRlvHandler.hasException(RLV_BHVR_EDITOBJ)) )
     {
         struct RlvCanDeleteOrReturn : public LLSelectedObjectFunctor
         {

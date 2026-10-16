@@ -35,9 +35,15 @@ void setAdditiveColor(vec3 c);
 
 void main()
 {
-    //transform vertex
+    // Level with the depth the sky leaves cleared, as the haze's triangle is (hazeV.glsl): the geometry draw passes
+    // only in front of the far plane and the sky's draw only on it (LLPipeline::renderDeferredLighting), so each
+    // pixel is shaded once, by the program for what it is. Reverse-Z puts the far plane at ndc z 0.
+#ifdef REVERSE_Z
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+#else
+    gl_Position = vec4(position.xy, 1.0, 1.0);
+#endif
     vec4 pos = vec4(position.xyz, 1.0);
-    gl_Position = pos;
 
     // appease OSX GLSL compiler/linker by touching all the varyings we said we would
     setAtmosAttenuation(vec3(1));

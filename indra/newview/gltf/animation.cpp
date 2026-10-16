@@ -31,7 +31,6 @@
 #include "../llskinningutil.h"
 
 using namespace LL::GLTF;
-using namespace boost::json;
 
 bool Animation::prep(Asset& asset)
 {
@@ -84,6 +83,13 @@ bool Animation::prep(Asset& asset)
 void Animation::update(Asset& asset, F32 dt)
 {
     mTime += dt;
+    // apply() plays the time modulo the loop, so keeping it to one loop changes nothing it
+    // shows, and an F32 that grew for hours would round each frame's dt away.
+    const F32 loop_length = mMaxTime - mMinTime;
+    if (loop_length > 0.f)
+    {
+        mTime = fmodf(mTime, loop_length);
+    }
 
     apply(asset, mTime);
 }
@@ -139,7 +145,7 @@ bool Animation::Sampler::prep(Asset& asset)
 }
 
 
-void Animation::Sampler::serialize(object& obj) const
+void Animation::Sampler::serialize(JsonWriter& obj) const
 {
     write(mInput, "input", obj, INVALID_INDEX);
     write(mOutput, "output", obj, INVALID_INDEX);
@@ -171,7 +177,7 @@ bool Animation::Channel::Target::operator!=(const Channel::Target& rhs) const
     return !(*this == rhs);
 }
 
-void Animation::Channel::Target::serialize(object& obj) const
+void Animation::Channel::Target::serialize(JsonWriter& obj) const
 {
     write(mNode, "node", obj, INVALID_INDEX);
     write(mPath, "path", obj);
@@ -187,7 +193,7 @@ const Animation::Channel::Target& Animation::Channel::Target::operator=(const Va
     return *this;
 }
 
-void Animation::Channel::serialize(object& obj) const
+void Animation::Channel::serialize(JsonWriter& obj) const
 {
     write(mSampler, "sampler", obj, INVALID_INDEX);
     write(mTarget, "target", obj);
@@ -269,9 +275,10 @@ void Animation::RotationChannel::apply(Asset& asset, Sampler& sampler, F32 time)
         sampler.getFrameInfo(asset, time, frameIndex, t);
 
         // interpolate
-        quat qf = glm::slerp(mRotations[frameIndex], mRotations[frameIndex + 1], t);
+        quat qf;
+        qf.setSlerp(mRotations[frameIndex], mRotations[frameIndex + 1], t);
 
-        qf = glm::normalize(qf);
+        qf.normalize();
 
         node.setRotation(qf);
     }
@@ -345,7 +352,7 @@ void Animation::ScaleChannel::apply(Asset& asset, Sampler& sampler, F32 time)
     }
 }
 
-void Animation::serialize(object& obj) const
+void Animation::serialize(JsonWriter& obj) const
 {
     write(mName, "name", obj);
     write(mSamplers, "samplers", obj);
@@ -360,10 +367,9 @@ void Animation::serialize(object& obj) const
 
 const Animation& Animation::operator=(const Value& src)
 {
-    if (src.is_object())
+    simdjson::dom::object obj;
+    if (src.get_object().get(obj) == simdjson::SUCCESS)
     {
-        const object& obj = src.as_object();
-
         copy(obj, "name", mName);
         copy(obj, "samplers", mSamplers);
 
@@ -391,25 +397,12 @@ const Animation& Animation::operator=(const Value& src)
     return *this;
 }
 
-Skin::~Skin()
-{
-    if (mUBO)
-    {
-        glDeleteBuffers(1, &mUBO);
-    }
-}
-
 void Skin::uploadMatrixPalette(Asset& asset)
 {
     // prepare matrix palette
     LL_PROFILE_ZONE_SCOPED_CATEGORY_GLTF;
 
     U32 max_joints = LLSkinningUtil::getMaxGLTFJointCount();
-
-    if (mUBO == 0)
-    {
-        glGenBuffers(1, &mUBO);
-    }
 
     size_t joint_count = llmin<size_t>(max_joints, mJoints.size());
 
@@ -421,7 +414,8 @@ void Skin::uploadMatrixPalette(Asset& asset)
     {
         Node& joint = asset.mNodes[mJoints[i]];
         // build matrix palette in asset space
-        t_mp[i] = joint.mAssetMatrix * mInverseBindMatricesData[i];
+        // out of the bind pose, then into asset space
+        t_mp[i].setMul(mInverseBindMatricesData[i], joint.mAssetMatrix);
     }
 
     std::vector<F32> glmp;
@@ -432,7 +426,7 @@ void Skin::uploadMatrixPalette(Asset& asset)
 
     for (U32 i = 0; i < joint_count; ++i)
     {
-        F32* m = glm::value_ptr(t_mp[i]);
+        const F32* m = t_mp[i].getF32ptr();
 
         U32 idx = i * 12;
 
@@ -452,9 +446,7 @@ void Skin::uploadMatrixPalette(Asset& asset)
         mp[idx + 11] = m[14];
     }
 
-    glBindBuffer(GL_UNIFORM_BUFFER, mUBO);
-    glBufferData(GL_UNIFORM_BUFFER, glmp.size() * sizeof(F32), glmp.data(), GL_STREAM_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    mUBO.update(glmp.data(), glmp.size() * sizeof(F32));
 }
 
 bool Skin::prep(Asset& asset)
@@ -480,7 +472,7 @@ const Skin& Skin::operator=(const Value& src)
     return *this;
 }
 
-void Skin::serialize(object& obj) const
+void Skin::serialize(JsonWriter& obj) const
 {
     write(mInverseBindMatrices, "inverseBindMatrices", obj, INVALID_INDEX);
     write(mJoints, "joints", obj);

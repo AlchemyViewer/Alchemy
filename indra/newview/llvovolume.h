@@ -39,6 +39,7 @@
 
 
 class LLViewerTextureAnim;
+class LLTextureAnim;
 class LLDrawPool;
 class LLMaterialID;
 class LLSelectNode;
@@ -94,7 +95,7 @@ public:
     virtual bool isVolumeUnique() const = 0; // Do we need a unique LLVolume instance?
     virtual bool isVolumeGlobal() const = 0; // Are we in global space?
     virtual bool isActive() const = 0; // Is this object currently active?
-    virtual const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const = 0;
+    virtual const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const = 0;
     virtual void updateRelativeXform(bool force_identity = false) = 0;
     virtual U32 getID() const = 0;
     virtual void preRebuild() = 0;
@@ -137,15 +138,15 @@ public:
     bool isRootEdit() const override; // overridden for sake of attachments treating themselves as a root object
     bool isHUDAttachment() const override;
 
-                void    generateSilhouette(LLSelectNode* nodep, const LLVector3& view_point);
     /*virtual*/ bool    setParent(LLViewerObject* parent) override;
                 S32     getLOD() const override             { return mLOD; }
                 void    setNoLOD()                          { mLOD = NO_LOD; mLODChanged = true; }
+                void    setLOD(S32 lod)                     { mLOD = lod; mLODChanged = true; }
                 bool    isNoLOD() const                     { return NO_LOD == mLOD; }
     const LLVector3     getPivotPositionAgent() const override;
     const LLMatrix4&    getRelativeXform() const                { return mRelativeXform; }
     const LLMatrix3&    getRelativeXformInvTrans() const        { return mRelativeXformInvTrans; }
-    /*virtual*/ const LLMatrix4 getRenderMatrix() const override;
+    /*virtual*/ const LLMatrix4a& getRenderMatrix() const override;
                 typedef boost::unordered_set<const LLViewerTexture*> texture_cost_t;
                 static S32 getTextureCost(const LLViewerTexture* img);
                 U32     getRenderCost(texture_cost_t &textures) const;
@@ -155,6 +156,7 @@ public:
     /*virtual*/ bool getCostData(LLMeshCostData& costs) const override;
 
     /*virtual*/ U32     getTriangleCount(S32* vcount = NULL) const override;
+    /*virtual*/ U32     getLODTriangleCount(S32 lod) override;
     /*virtual*/ U32     getHighLODTriangleCount() override;
     /*virtual*/ bool lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
                                           S32 face = -1,                        // which face to check, -1 = ALL_SIDES
@@ -180,7 +182,7 @@ public:
                 bool    getVolumeChanged() const                { return mVolumeChanged; }
 
     F32 getVObjRadius() const override              { return mVObjRadius; };
-                const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const override;
+                const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const override;
 
                 void    markForUpdate() override;
                 void    faceMappingChanged() override           { mFaceMappingChanged=true; }
@@ -200,6 +202,14 @@ public:
 
     /*virtual*/ void    setSelected(bool sel) override;
     /*virtual*/ bool    setDrawableParent(LLDrawable* parentp) override;
+
+    // Whether a face draws nothing: blended at an alpha of 0, its colour's or, under a GLTF material, its base
+    // colour's, and without glow. An invisible prim. Such a face is given geometry, in
+    // LLRenderPass::PASS_ALPHA_INVISIBLE, only for Highlight Transparent, a scripted beacon or, while its object is
+    // selected, the selection outline (ALSelectionOutline), which draws faces from their vertex buffers.
+    static bool isInvisibleFace(const LLTextureEntry* te);
+    // Whether any of this object's faces is (isInvisibleFace).
+    bool hasInvisibleFace() const;
 
     /*virtual*/ void    setScale(const LLVector3 &scale, bool damped) override;
 
@@ -230,6 +240,7 @@ public:
 
                 void    setTexture(const S32 face);
                 S32     getIndexInTex(U32 ch) const {return mIndexInTex[ch];}
+                void    unregisterOldMeshAndSkin();
     /*virtual*/ bool    setVolume(const LLVolumeParams &volume_params, const S32 detail, bool unique_volume = false) override;
                 void    updateSculptTexture();
                 void    setIndexInTex(U32 ch, S32 index) { mIndexInTex[ch] = index ;}
@@ -286,9 +297,9 @@ public:
     // Get the light color in sRGB color space scaled by intensity.
     LLColor3 getLightSRGBColor() const;
 
-    LLUUID  getLightTextureID() const;
+    const LLUUID&  getLightTextureID() const;
     bool isLightSpotlight() const;
-    LLVector3 getSpotLightParams() const;
+    const LLVector3& getSpotLightParams() const;
     void    updateSpotLightPriority();
     F32     getSpotLightPriority() const;
 
@@ -440,6 +451,12 @@ protected:
 
 private:
     bool lodOrSculptChanged(LLDrawable *drawable, bool &compiled, bool &shouldUpdateOctreeBounds);
+
+    // TextureAnim block handling for processUpdateMessage; a block without ANIM_ON
+    // is treated as no animation at all (see applyTextureAnim in llvovolume.cpp)
+    void applyTextureAnim(const LLTextureAnim &ta);
+    void clearTextureAnim();
+    void clearUntargetedTextureMatrices(S8 target_face);
 
 public:
 

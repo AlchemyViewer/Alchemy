@@ -41,7 +41,6 @@
 #include "llwearabledata.h"
 #include "llvertexbuffer.h"
 #include "llviewervisualparam.h"
-#include "llfasttimer.h"
 
 //#include "../tools/imdebug/imdebug.h"
 
@@ -378,7 +377,7 @@ bool LLTexLayerSet::render( S32 x, S32 y, S32 width, S32 height, LLRenderTarget*
     {
         gGL.flush();
         gAlphaMaskProgram.setMinimumAlpha(0.0f);
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         gGL.color4f( 0.f, 0.f, 0.f, 1.f );
 
         gl_rect_2d_simple( width, height );
@@ -411,7 +410,7 @@ bool LLTexLayerSet::render( S32 x, S32 y, S32 width, S32 height, LLRenderTarget*
         gGL.setSceneBlendType(LLRender::BT_REPLACE);
         gAlphaMaskProgram.setMinimumAlpha(0.f);
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         gGL.color4f( 0.f, 0.f, 0.f, 0.f );
 
         gl_rect_2d_simple( width, height );
@@ -434,6 +433,31 @@ const std::string LLTexLayerSet::getBodyRegionName() const
 {
     return mInfo->mBodyRegion;
 }
+
+// virtual
+void LLTexLayerSet::asLLSD(LLSD& sd) const
+{
+    sd["visible"] = LLSD::Boolean(isVisible());
+    LLSD layer_list_sd;
+    layer_list_t::const_iterator layer_iter = mLayerList.begin();
+    layer_list_t::const_iterator layer_end  = mLayerList.end();
+    for(; layer_iter != layer_end; ++layer_iter)
+    {
+        LLSD layer_sd;
+        LLTexLayerInterface* layer = (*layer_iter);
+        if (layer)
+        {
+            layer->asLLSD(layer_sd);
+        }
+        layer_list_sd.append(layer_sd);
+    }
+    LLSD mask_list_sd;
+    LLSD info_sd;
+    sd["layers"] = layer_list_sd;
+    sd["masks"] = mask_list_sd;
+    sd["info"] = info_sd;
+}
+
 
 void LLTexLayerSet::destroyComposite()
 {
@@ -488,7 +512,8 @@ void LLTexLayerSet::renderAlphaMaskTextures(S32 x, S32 y, S32 width, S32 height,
             if( tex )
             {
                 LLGLSUIDefault gls_ui;
-                gGL.getTexUnit(0)->bind(tex);
+                // Static layer images are loaded TAM_CLAMP; see LLTexLayerStaticImageList.
+                gGL.getTextureSlot(0)->bindSampled(tex, ALSamplers::AnisoClamp);
                 gl_rect_2d_simple_tex( width, height );
             }
         }
@@ -499,7 +524,7 @@ void LLTexLayerSet::renderAlphaMaskTextures(S32 x, S32 y, S32 width, S32 height,
         // Set the alpha channel to one (clean up after previous blending)
         gGL.flush();
         gAlphaMaskProgram.setMinimumAlpha(0.f);
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         gGL.color4f( 0.f, 0.f, 0.f, 1.f );
 
         gl_rect_2d_simple( width, height );
@@ -522,7 +547,7 @@ void LLTexLayerSet::renderAlphaMaskTextures(S32 x, S32 y, S32 width, S32 height,
 
     }
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     gGL.setColorMask(true, true);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -1113,15 +1138,13 @@ bool LLTexLayer::render(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* bou
                         gAlphaMaskProgram.setMinimumAlpha(0.f);
                     }
 
-                    LLTexUnit::eTextureAddressMode old_mode = tex->getAddressMode();
-
-                    gGL.getTexUnit(0)->bind(tex, true);
-                    gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                    // Clamps this binding only, so the save/restore of the texture's own
+                    // mode that used to bracket this draw is no longer needed.
+                    gGL.getTextureSlot(0)->bindSampled(tex, ALSamplers::AnisoClamp);
 
                     gl_rect_2d_simple_tex( width, height );
 
-                    gGL.getTexUnit(0)->setTextureAddressMode(old_mode);
-                    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                    gGL.getTextureSlot(0)->unbind();
                     if (no_alpha_test)
                     {
                         gAlphaMaskProgram.setMinimumAlpha(0.004f);
@@ -1141,9 +1164,9 @@ bool LLTexLayer::render(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* bou
             LLGLTexture* tex = LLTexLayerStaticImageList::getInstance()->getTexture(getInfo()->mStaticImageFileName, getInfo()->mStaticImageIsMask);
             if( tex )
             {
-                gGL.getTexUnit(0)->bind(tex, true);
+                gGL.getTextureSlot(0)->bindSampled(tex, ALSamplers::AnisoClamp, true);
                 gl_rect_2d_simple_tex( width, height );
-                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(0)->unbind();
             }
             else
             {
@@ -1159,7 +1182,7 @@ bool LLTexLayer::render(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* bou
     {
         gAlphaMaskProgram.setMinimumAlpha(0.000f);
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         gGL.color4fv( net_color.mV );
         gl_rect_2d_simple( width, height );
         gAlphaMaskProgram.setMinimumAlpha(0.004f);
@@ -1255,9 +1278,9 @@ bool LLTexLayer::blendAlphaTexture(S32 x, S32 y, S32 width, S32 height)
         if( tex )
         {
             gAlphaMaskProgram.setMinimumAlpha(0.f);
-            gGL.getTexUnit(0)->bind(tex, true);
+            gGL.getTextureSlot(0)->bindSampled(tex, ALSamplers::AnisoClamp, true);
             gl_rect_2d_simple_tex( width, height );
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
             gAlphaMaskProgram.setMinimumAlpha(0.004f);
         }
         else
@@ -1273,9 +1296,10 @@ bool LLTexLayer::blendAlphaTexture(S32 x, S32 y, S32 width, S32 height)
             if (tex)
             {
                 gAlphaMaskProgram.setMinimumAlpha(0.f);
-                gGL.getTexUnit(0)->bind(tex);
+                // A local wearable layer, not a static image: carries LLImageGL's defaults.
+                gGL.getTextureSlot(0)->bindSampled(tex, ALSamplers::AnisoWrap);
                 gl_rect_2d_simple_tex( width, height );
-                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(0)->unbind();
                 gAlphaMaskProgram.setMinimumAlpha(0.004f);
             }
         }
@@ -1308,7 +1332,7 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
     // Note: if the first param is a mulitply, multiply against the current buffer's alpha
     if( !first_param || !first_param->getMultiplyBlend() )
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         // Clear the alpha
         gGL.flush();
@@ -1340,15 +1364,12 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
         LLGLTexture* tex = mLocalTextureObject->getImage();
         if( tex && (tex->getComponents() == 4) )
         {
-            LLTexUnit::eTextureAddressMode old_mode = tex->getAddressMode();
-
-            gGL.getTexUnit(0)->bind(tex, true);
-            gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+            // Per-binding clamp; see the matching call in renderMorphMasks.
+            gGL.getTextureSlot(0)->bindSampled(tex, ALSamplers::AnisoClamp);
 
             gl_rect_2d_simple_tex( width, height );
 
-            gGL.getTexUnit(0)->setTextureAddressMode(old_mode);
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
         }
     }
 
@@ -1359,9 +1380,9 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
         {
             if( (tex->getComponents() == 4) || (tex->getComponents() == 1) )
             {
-                gGL.getTexUnit(0)->bind(tex, true);
+                gGL.getTextureSlot(0)->bindSampled(tex, ALSamplers::AnisoClamp, true);
                 gl_rect_2d_simple_tex( width, height );
-                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(0)->unbind();
             }
             else
             {
@@ -1375,7 +1396,7 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
     // Note: we're still using gGL.blendFunc( GL_DST_ALPHA, GL_ZERO );
     if ( !is_approx_equal(layer_color.mV[VALPHA], 1.f) )
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         gGL.color4fv(layer_color.mV);
         gl_rect_2d_simple( width, height );
     }
@@ -1405,6 +1426,15 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
                 // We should only be doing this when we believe something has changed with respect to the user's appearance.
         {
             LL_DEBUGS("Morph") << "gl alpha cache of morph mask not found, doing readback: " << getName() << LL_ENDL;
+
+            // Replace the cached mask without leaking its old allocation.
+            alpha_cache_t::iterator cached = mAlphaCache.find(cache_index);
+            if (cached != mAlphaCache.end())
+            {
+                ll_aligned_free_32(cached->second);
+                mAlphaCache.erase(cached);
+            }
+
             // clear out a slot if we have filled our cache
             S32 max_cache_entries = getTexLayerSet()->getAvatarAppearance()->isSelf() ? 4 : 1;
             while ((S32)mAlphaCache.size() >= max_cache_entries)
@@ -1424,6 +1454,12 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
             size_t mem_size        = pixels * bytes_per_pixel;
 
             alpha_data = (U8*)ll_aligned_malloc_32(mem_size);
+            if (!alpha_data)
+            {
+                LLError::LLUserWarningMsg::showOutOfMemory();
+                LL_ERRS() << "Failed to allocate memory for morph texture: " << (S32)(mem_size) << LL_ENDL;
+                return;
+            }
 
             bool skip_readback = LLRender::sNsightDebugSupport; // nSight doesn't support use of glReadPixels
 
@@ -1433,17 +1469,24 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
                 { // work-around for broken intel drivers which cannot do glReadPixels on an RGBA FBO
                   // returning only the alpha portion without locking up downstream
                     U8* temp = (U8*)ll_aligned_malloc_32(mem_size << 2); // allocate same size, but RGBA
+                    if (!temp)
+                    {
+                        ll_aligned_free_32(alpha_data);
+                        LLError::LLUserWarningMsg::showOutOfMemory();
+                        LL_ERRS() << "Failed to allocate temporary memory for morph texture readback: " << (S32)(mem_size << 2) << LL_ENDL;
+                        return;
+                    }
 
                     if (bound_target)
                     {
-                        gGL.getTexUnit(0)->bind(bound_target);
+                        gGL.getTextureSlot(0)->bind(bound_target);
                     }
                     else
                     {
-                        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, 0);
+                        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, 0);
                     }
 
-                    glGetTexImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGBA, GL_UNSIGNED_BYTE, temp);
+                    glGetTexImage(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), 0, GL_RGBA, GL_UNSIGNED_BYTE, temp);
                     GLenum error = glGetError();
                     if (error != GL_NO_ERROR)
                     {
@@ -1460,7 +1503,7 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
                         }
                     }
 
-                    gGL.getTexUnit(0)->disable();
+                    gGL.getTextureSlot(0)->unbind();
 
                     ll_aligned_free_32(temp);
                 }
@@ -1469,6 +1512,13 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
                     // We just want GL_ALPHA, but that isn't supported in OGL core profile 4.
                     static const size_t TEMP_BYTES_PER_PIXEL = 4;
                     U8* temp_data = (U8*)ll_aligned_malloc_32(mem_size * TEMP_BYTES_PER_PIXEL);
+                    if (!temp_data)
+                    {
+                        ll_aligned_free_32(alpha_data);
+                        LLError::LLUserWarningMsg::showOutOfMemory();
+                        LL_ERRS() << "Failed to allocate temporary memory for morph texture: " << (S32)(mem_size * TEMP_BYTES_PER_PIXEL) << LL_ENDL;
+                        return;
+                    }
                     glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, temp_data);
                     for (size_t pixel = 0; pixel < pixels; pixel++) {
                         alpha_data[pixel] = temp_data[(pixel * TEMP_BYTES_PER_PIXEL) + 3];
@@ -1766,23 +1816,25 @@ LLTexLayerInterface*  LLTexLayerSet::findLayerByName(const std::string& name)
 
 void LLTexLayerSet::cloneTemplates(LLLocalTextureObject *lto, LLAvatarAppearanceDefines::ETextureIndex tex_index, LLWearable *wearable)
 {
-    // initialize all texlayers with this texture type for this LTO
-    for(LLTexLayerInterface* layer : mLayerList)
+    // mLayerList / mMaskLayerList hold a mix of LLTexLayerTemplate* and LLTexLayer*
+    // (chosen by isUserSettable() in setInfo). Dispatch to the correct addTexLayer
+    // overload by actual type instead of an unconditional downcast.
+    auto cloneList = [&](const layer_list_t& list)
     {
-        LLTexLayerTemplate* layer_template = (LLTexLayerTemplate*)layer;
-        if (layer_template->getInfo()->getLocalTexture() == (S32)tex_index)
+        for (LLTexLayerInterface* layer : list)
         {
-            lto->addTexLayer(layer_template, wearable);
+            if (layer->getInfo()->getLocalTexture() != (S32)tex_index)
+            {
+                continue;
+            }
+            if (LLTexLayerTemplate* layer_template = dynamic_cast<LLTexLayerTemplate*>(layer))
+            {
+                lto->addTexLayer(layer_template, wearable);
+            }
         }
-    }
-    for(LLTexLayerInterface* layer : mMaskLayerList)
-    {
-        LLTexLayerTemplate* layer_template = (LLTexLayerTemplate*)layer;
-        if (layer_template->getInfo()->getLocalTexture() == (S32)tex_index)
-        {
-            lto->addTexLayer(layer_template, wearable);
-        }
-    }
+    };
+    cloneList(mLayerList);
+    cloneList(mMaskLayerList);
 }
 //-----------------------------------------------------------------------------
 // LLTexLayerStaticImageList
@@ -1890,10 +1942,14 @@ LLGLTexture* LLTexLayerStaticImageList::getTexture(const std::string& file_name,
 
                 image_raw->copyUnscaledAlphaMask(alpha_image_raw, LLColor4U::black);
             }
-            tex->createGLTexture(0, image_raw, 0, true, LLGLTexture::LOCAL);
+            if (!tex->createGLTexture(0, image_raw, 0, true, LLGLTexture::LOCAL))
+            {
+                LL_WARNS() << "Failed to create GL texture for image: " << file_name << LL_ENDL;
+            }
 
-            gGL.getTexUnit(0)->bind(tex);
-            tex->setAddressMode(LLTexUnit::TAM_CLAMP);
+            // Clamp is named at every bind of these images (ALSamplers::AnisoClamp), not
+            // recorded here -- a static layer image is shared, and how it is read is the
+            // compositing pass's call.
 
             mStaticImageList [ namekey ] = tex;
             mGLBytes += (S32)tex->getWidth() * tex->getHeight() * tex->getComponents();

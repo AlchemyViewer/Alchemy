@@ -36,10 +36,12 @@ class LLSpinCtrl;
 class LLLineEditor;
 class LLPanelLandSelectObserver;
 
-class LLPanelLandInfo
+class LLPanelLandInfo final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandInfo, LLPanel);
+
     LLPanelLandInfo();
     virtual ~LLPanelLandInfo();
 

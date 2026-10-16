@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "lltoastimpanel.h"
 
+#include "alchattimestamp.h"
 #include "llagent.h"
 #include "llavatarnamecache.h"
 #include "llfloaterreg.h"
@@ -38,6 +39,10 @@
 #include "lltooltip.h"
 
 #include "llviewerchat.h"
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+#include "lltextparser.h"
+#include "llviewercontrol.h"
+// [/SL:KB]
 
 const S32 LLToastIMPanel::DEFAULT_MESSAGE_MAX_LINE_COUNT    = 6;
 
@@ -68,32 +73,62 @@ LLToastIMPanel::LLToastIMPanel(LLToastIMPanel::Params &p) : LLToastPanel(p.notif
     std::string title = mIsGroupMsg ? im_session->mName : p.from;
     mAvatarName->setValue(title);
 
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+    mMessage->clear();
+
     //Handle IRC styled /me messages.
     std::string prefix = p.message.substr(0, 4);
+    std::string message;
     if (prefix == "/me " || prefix == "/me'")
     {
-        //style_params.font.style = "UNDERLINE";
-        mMessage->clear();
-
-        style_params.font.style ="ITALIC";
-        mMessage->appendText(p.from, false, style_params);
-
+        // Append the name first without chat-alert parsing so the actor's name can't
+        // satisfy a keyword. The body that follows runs through chat-alert parsing.
         style_params.font.style = "ITALIC";
-        mMessage->appendText(p.message.substr(3), false, style_params);
+        mMessage->appendText(p.from, false, style_params);
+        message = p.message.substr(3);
     }
     else
     {
+        message = p.message;
+        style_params.font.style = "NORMAL";
+
         if (mIsGroupMsg)
         {
             LLAvatarName avatar_name;
             LLAvatarNameCache::get(p.avatar_id, &avatar_name);
-            p.message = "[From " + avatar_name.getDisplayName() + "]\n" + p.message;
+            mMessage->appendText("[From " + avatar_name.getDisplayName() + "]\n", false, style_params);
         }
-        style_params.font.style =  "NORMAL";
-        mMessage->setText(p.message, style_params);
     }
 
-    mTime->setValue(p.time);
+    static LLCachedControl<bool> sEnableChatAlerts(gSavedSettings, "ChatAlerts", false);
+    if (sEnableChatAlerts && im_session)
+    {
+        const S32 nHighlightMask = mMessage->getHighlightsMask();
+        S32 nMask = nHighlightMask;
+        switch (im_session->mSessionType)
+        {
+            case LLIMModel::LLIMSession::P2P_SESSION:
+                nMask = nHighlightMask | LLHighlightEntry::CAT_IM;
+                break;
+            case LLIMModel::LLIMSession::GROUP_SESSION:
+            case LLIMModel::LLIMSession::ADHOC_SESSION:
+                nMask = nHighlightMask | LLHighlightEntry::CAT_GROUP;
+                break;
+            default:
+                break;
+        }
+
+        mMessage->setHighlightsMask(nMask);
+        mMessage->appendText(message, false, style_params);
+        mMessage->setHighlightsMask(nHighlightMask);
+    }
+    else
+    {
+        mMessage->appendText(message, false, style_params);
+    }
+// [/SL:KB]
+
+    mTime->setValue(ALChatTimestamp::format(p.time, gSavedSettings.getBOOL("AlchemyIMShowSeconds")));
     mSessionID = p.session_id;
     mAvatarID = p.avatar_id;
     mNotification = p.notification;
