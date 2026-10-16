@@ -66,10 +66,17 @@ void LLGenericStreamingMessage::unpack(LLMessageSystem* msg)
     char buffer[MAX_SIZE];
 
     // NOTE: don't use getStringFast to avoid 1200 byte truncation
-    U32 size = msg->getSizeFast(_PREHASH_DataBlock, _PREHASH_Data);
+    // A negative size is an error code: no such block or variable.
+    const S32 size = msg->getSizeFast(_PREHASH_DataBlock, _PREHASH_Data);
+    if (size <= 0)
+    {
+        mData.clear();
+        return;
+    }
     msg->getBinaryDataFast(_PREHASH_DataBlock, _PREHASH_Data, buffer, size, 0, MAX_SIZE);
 
-    mData.assign(buffer, size);
+    // getBinaryData() copies no more than MAX_SIZE, and the sender sets size
+    mData.assign(buffer, llmin(size, MAX_SIZE));
 }
 
 
