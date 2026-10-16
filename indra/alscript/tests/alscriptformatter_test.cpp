@@ -166,6 +166,11 @@ namespace
         CHECK(lsl("\n\nx = 1;   \n\n\n\n\ny = 2;\n\n\n") == std::string("x = 1;\n\n\ny = 2;\n"));
         UNSCOPED_INFO("a newline added");
         CHECK(lsl("x = 1;") == std::string("x = 1;\n"));
+        UNSCOPED_INFO("a newline added to a comment left open at the end, which takes it in, and the same again");
+        CHECK(lsl("x = 1; /* open   ") == std::string("x = 1; /* open\n"));
+        CHECK(lsl("x = 1; /* open\n") == std::string("x = 1; /* open\n"));
+        CHECK(lua("x = 1 --[[ open   ") == std::string("x = 1 --[[ open\n"));
+        CHECK(lua("x = 1 --[[ open\n") == std::string("x = 1 --[[ open\n"));
         UNSCOPED_INFO("tabs");
         CHECK([] {
             ALScriptFormatter::Options options;

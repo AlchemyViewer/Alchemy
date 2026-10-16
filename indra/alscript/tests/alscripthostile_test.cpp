@@ -75,7 +75,8 @@ namespace
 
     // A script's tokens but for its layout, which is all the formatter may
     // change: no blanks or breaks, and a comment without the trailing
-    // blanks that go with its line's.
+    // blanks that go with its line's, nor the break the text ends with,
+    // which a comment left open at the end takes in.
     using Tokens = std::vector<std::pair<ALPreprocessor::Token::Kind, std::string>>;
     Tokens tokensOf(std::string_view text, bool lua)
     {
@@ -89,7 +90,7 @@ namespace
             }
             if (t.kind == Kind::Comment)
             {
-                t.text.erase(t.text.find_last_not_of(" \t\r") + 1);
+                t.text.erase(t.text.find_last_not_of(" \t\r\n") + 1);
             }
             out.emplace_back(t.kind, std::move(t.text));
         }

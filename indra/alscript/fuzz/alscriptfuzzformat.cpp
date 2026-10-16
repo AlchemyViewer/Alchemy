@@ -57,7 +57,8 @@ namespace
 
     // A script's tokens but for its layout, which is all the formatter may
     // change (alscriptformatter.h): no blanks or breaks, and a comment
-    // without the trailing blanks that go with its line's.
+    // without the trailing blanks that go with its line's, nor the break
+    // the text ends with, which a comment left open at the end takes in.
     std::vector<std::pair<ALPreprocessor::Token::Kind, std::string>> tokensOf(std::string_view text, bool lua)
     {
         using Kind = ALPreprocessor::Token::Kind;
@@ -70,7 +71,7 @@ namespace
             }
             if (t.kind == Kind::Comment)
             {
-                t.text.erase(t.text.find_last_not_of(" \t\r") + 1);
+                t.text.erase(t.text.find_last_not_of(" \t\r\n") + 1);
             }
             out.emplace_back(t.kind, std::move(t.text));
         }
