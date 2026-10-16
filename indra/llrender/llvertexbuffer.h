@@ -327,6 +327,11 @@ private:
     void _mapBuffer();
     bool mMapped = false;
 
+    // Apple's path only: whether mMappedData / mMappedIndexData hold writes GL has not been
+    // given. An upload sends those stores, and any GL has no buffer for yet, and no others.
+    bool mVerticesWritten = false;
+    bool mIndicesWritten = false;
+
 public:
 
     static U64 getBytesAllocated();
