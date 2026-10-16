@@ -540,6 +540,25 @@ namespace
         CHECK(std::memcmp(dst->getData(), sd, (size_t)W * H * 4) == 0);
     }
 
+    // An upload of another component count works its format out on the main thread as it
+    // begins, and the image goes on answering for the texture on screen until the new one
+    // publishes: its format, and the alpha a format without one clears.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: an upload in flight answers with the format on screen", "[LLImageGL]")
+    {
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, makeRaw(16, 16, 4, 0x00).get()));
+        REQUIRE(img->getPrimaryFormat() == (LLGLenum)GL_RGBA);
+        REQUIRE(img->getMaxAlpha() == 0);
+
+        img->beginUpload(3);
+        UNSCOPED_INFO("the RGBA texture on screen, not the RGB one being built");
+        CHECK(img->getPrimaryFormat() == (LLGLenum)GL_RGBA);
+        CHECK(img->getMaxAlpha() == 0);
+        img->endUpload();
+        UNSCOPED_INFO("an upload that never published leaves the alpha alone");
+        CHECK(img->getMaxAlpha() == 0);
+    }
+
     // The pick mask of a texture still being uploaded waits for that texture:
     // getMask answers for the one on screen, and off the main thread building the
     // mask in place freed the buffer getMask was reading. It publishes with the

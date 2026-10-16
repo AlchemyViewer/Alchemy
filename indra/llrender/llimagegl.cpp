@@ -2280,12 +2280,15 @@ void LLImageGL::beginUpload()
 void LLImageGL::beginUpload(S8 components)
 {
     llassert(on_main_thread());
-    // With no upload of this image under way, nothing reads the format while it is set.
-    if (!mUploadInFlight && !mHasExplicitFormat)
+    // With no upload of this image under way, nothing reads the format while it is set. It
+    // is set once the snapshot has the format of the texture mTexName still names, which the
+    // getters answer with until the new one publishes.
+    const bool resolve = !mUploadInFlight && !mHasExplicitFormat;
+    beginUpload();
+    if (resolve)
     {
         resolveComponentFormat(components);
     }
-    beginUpload();
 }
 
 void LLImageGL::endUpload()
@@ -2758,8 +2761,10 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
     case GL_RED:
     case GL_RGB:
     case GL_SRGB:
+        // The texture the format is for has no alpha. Staged while an upload is in flight:
+        // the texture on screen keeps its own until the new one publishes.
         mNeedsAlphaAndPickMask = false;
-        clearAlphaAnalysis();
+        setAlphaAnalysis(AlphaAnalysis());
         return; //no alpha channel.
     case GL_RED_INTEGER:
     case GL_RG_INTEGER:
@@ -2769,7 +2774,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
     case GL_BGRA_INTEGER:
         // Integers: even a fourth channel is a value, not coverage.
         mNeedsAlphaAndPickMask = false;
-        clearAlphaAnalysis();
+        setAlphaAnalysis(AlphaAnalysis());
         return;
     case GL_RGBA:
     case GL_SRGB_ALPHA:
@@ -2817,7 +2822,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
         LL_WARNS() << "Cannot analyze alpha for image with format type " << std::hex << mFormatType << std::dec << LL_ENDL;
 
         mNeedsAlphaAndPickMask = false ;
-        clearAlphaAnalysis();
+        setAlphaAnalysis(AlphaAnalysis());
     }
 }
 
