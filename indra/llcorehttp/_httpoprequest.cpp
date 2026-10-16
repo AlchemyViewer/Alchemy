@@ -423,7 +423,8 @@ HttpStatus HttpOpRequest::setupMove(HttpRequest::policy_t policy_id,
     return HttpStatus();
 }
 
-static U64 sRequestId = 0;
+// Requests are made on whatever thread wants one: the texture fetch, the coroutines.
+static std::atomic<U64> sRequestId{0};
 
 void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
                                 const std::string & url,
@@ -432,7 +433,7 @@ void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
                                 const HttpHeaders::ptr_t & headers)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
-    mRequestId = sRequestId++;
+    mRequestId = sRequestId.fetch_add(1, std::memory_order_relaxed);
     mProcFlags = 0U;
     mReqPolicy = policy_id;
     mReqURL = url;

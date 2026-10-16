@@ -1054,7 +1054,6 @@ public:
     LLFaceID generateFaceMask();
 
     bool isFaceMaskValid(LLFaceID face_mask);
-    static S32 sNumMeshPoints;
 
     friend std::ostream& operator<<(std::ostream &s, const LLVolume &volume);
     friend std::ostream& operator<<(std::ostream &s, const LLVolume *volumep);      // HACK to bypass Windoze confusion over
