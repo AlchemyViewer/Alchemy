@@ -563,9 +563,10 @@ namespace
         S32 mDepth = 0;
     };
 
-    // What a loop's body does to strings, not looking into the functions
-    // it makes: each append, s ..= x or s = s .. x, what it appends and to
-    // what; every read of each local; and whether it returns.
+    // What a loop does to strings, not looking into the functions it
+    // makes: each append, s ..= x or s = s .. x, what it appends and to
+    // what; every read of each local, in its condition or its bounds as
+    // in its body; and whether it returns.
     class Appends final : public Luau::AstVisitor
     {
     public:
@@ -889,17 +890,18 @@ namespace
         // read in it only by its appends, and the loop never returns: a
         // table before the loop, table.insert for each append, and s joined
         // to table.concat of it after. Not safe: an error part way round
-        // leaves s without what the table holds.
+        // leaves s without what the table holds. The reads are counted
+        // over the whole loop, since a condition that reads s -- while #s
+        // < 3 -- would never see it grow once the appends went to a table.
         void stringBuild(Luau::AstStatBlock* block, size_t index)
         {
-            Luau::AstStat*      loop = block->body.data[index];
-            Luau::AstStatBlock* body = loopBody(loop);
-            if (!body)
+            Luau::AstStat* loop = block->body.data[index];
+            if (!loopBody(loop))
             {
                 return;
             }
             Appends appends;
-            body->visit(&appends);
+            loop->visit(&appends);
             for (const Appends::Append& each : appends.appends)
             {
                 const auto*       local  = each.var->as<Luau::AstExprLocal>();
@@ -1188,13 +1190,52 @@ namespace
             }
             const auto* table = node->expr->as<Luau::AstExprLocal>();
             if (on("SlZeroIndex") && constant(node->index, 0) && !mLocals.written.contains(node) &&
-                !(table && mLocals.zeroKeyed.contains(table->local)) && is(node->expr, Kind::List))
+                !(table && mLocals.zeroKeyed.contains(table->local)) && builtAsList(node->expr))
             {
                 const std::string list  = bracketed(node->expr);
                 ALScriptProblem&  said  = problem(node->location, "LuauLintSlZeroIndex",
                                                   "[1][0] is nothing: Luau's lists count from 1, where LSL's counted from 0. [1][1] is the first",
                                                   { list }, "SlZeroIndex");
                 offer(said, list + "[1]", { edit(node->index->location, "1") }, false);
+            }
+            return true;
+        }
+
+        // A table that is a list by how it was built, which [0] is nothing
+        // of: a local given only tables written out as lists, {1, 2}, or
+        // typed {T}; or, where it is not a local, what the check says is a
+        // list, as the definitions type a function's answer. Not a local
+        // typed {[number]: T}, which the check types the same, nor one
+        // given {}: a map whose keys may well begin at 0.
+        bool builtAsList(Luau::AstExpr* e)
+        {
+            const auto* local = unbracketed(e)->as<Luau::AstExprLocal>();
+            if (!local)
+            {
+                return is(e, Kind::List);
+            }
+            if (const Luau::AstType* annotation = local->local->annotation)
+            {
+                // The parser gives {T}'s index type, which nothing wrote,
+                // an empty location.
+                const auto* table = annotation->as<Luau::AstTypeTable>();
+                return table && table->props.size == 0 && table->indexer &&
+                       table->indexer->indexType->location.begin == table->indexer->indexType->location.end;
+            }
+            const auto given = mLocals.given.find(local->local);
+            if (mLocals.unknown.contains(local->local) || given == mLocals.given.end() || given->second.empty())
+            {
+                return false;
+            }
+            for (Luau::AstExpr* value : given->second)
+            {
+                const auto* built = unbracketed(value)->as<Luau::AstExprTable>();
+                if (!built || built->items.size == 0 ||
+                    std::any_of(built->items.begin(), built->items.end(),
+                                [](const Luau::AstExprTable::Item& item) { return item.kind != Luau::AstExprTable::Item::Kind::List; }))
+                {
+                    return false;
+                }
             }
             return true;
         }
@@ -1349,6 +1390,15 @@ namespace
                     given = callee->expr;
                 }
                 else if (from.empty() || !onlyAnswers(from, name))
+                {
+                    return;
+                }
+                // gsub's replacement may be a function, called for each
+                // match, or a table read for each: the call's point, with
+                // its answer or without. Only a string replaces and no more.
+                const size_t replacement = callee->op == ':' ? 1 : 2;
+                if (name == "gsub" &&
+                    (call->args.size <= replacement || !unbracketed(call->args.data[replacement])->is<Luau::AstExprConstantString>()))
                 {
                     return;
                 }
@@ -2060,9 +2110,11 @@ namespace
                 {
                     return;
                 }
-                // Whether it holds where the condition does.
+                // Whether it holds where the condition does. Bracketed as
+                // an operand either way: x and (if a or b then 1 else 0)
+                // == 1 is not x and a or b.
                 const bool        with = (*yes == *value) == equal;
-                const std::string now  = with ? text(choice->condition->location) : "not " + bracketed(choice->condition);
+                const std::string now  = with ? bracketed(choice->condition) : "not " + bracketed(choice->condition);
                 ALScriptProblem&  said = problem(node->location, "LuauLintSlBooleanNumberChoice",
                                                  "[1] asks no more than [2]: its 1 or 0 is made only to be compared", { text(node->location), now },
                                                  "SlBooleanNumber", Severity::Note);

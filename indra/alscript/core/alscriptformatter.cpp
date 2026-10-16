@@ -330,19 +330,44 @@ namespace
                 {
                     say(!(a.kind == Kind::Punct && a.text == "{") && (!lua || options.braceSpaces));
                 }
-                else if (p == "." || p == "++" || p == "--")
+                else if (p == ".")
                 {
                     say(false);
+                }
+                else if (p == "++" || p == "--")
+                {
+                    if (aOperand)
+                    {
+                        // After its operand, i++.
+                        say(false);
+                    }
+                    else if (a.kind == Kind::Punct &&
+                             (a.text == "(" || a.text == "[" || (a.text == "<" && openedVector) || a.text == "{" || a.text == "!" || a.text == "~"))
+                    {
+                        // Before its operand, against the bracket or the
+                        // sign before it: (++i), !++i.
+                        say(false);
+                    }
+                    else
+                    {
+                        // Before its operand, after an operator: x = ++i,
+                        // i + ++j, a - --b. Spaced from it, since LSL
+                        // lexes the longest token it can, and i +++j is
+                        // (i++) + j.
+                        say(true);
+                    }
                 }
                 else if (p == "<" && !lua)
                 {
                     // A vector or rotation opens where no operand stands
-                    // before it; a comparison follows one.
+                    // before it; a comparison follows one. Spaced from a <
+                    // before it, a vector's or a comparison's, since << is
+                    // a shift.
                     if (!aOperand)
                     {
                         ++vector;
                         vectorOpened = true;
-                        say(!(a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == "<" || a.text == "{")));
+                        say(!(a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == "{")));
                     }
                     else
                     {
@@ -351,8 +376,10 @@ namespace
                 }
                 else if (p == ">" && !lua && vector > 0)
                 {
+                    // Against the last part, but for a vector's > it closes
+                    // after: >> is a shift.
                     --vector;
-                    say(false);
+                    say(a.kind == Kind::Punct && a.text == ">");
                 }
                 else if (isOperator(lua, p))
                 {
@@ -1199,11 +1226,16 @@ namespace
     // and spaced wider than one somewhere to get there. Each goes to that
     // column again, or just past the longest line where it no longer
     // fits. A run of comments none of whose lines' code changed is left
-    // as it was, its blanks as written. `code` holds each line written
-    // out where it is the formatter's to write.
+    // as it was, its blanks as written. A line that would go past the
+    // width once lined up is broken there instead, spaced afresh in
+    // pieces: it lines up with nothing, and the lines on either side of
+    // it line up among themselves, as they will again once it is broken,
+    // so that the formatter writes its own output out the same. `code`
+    // holds each line written out where it is the formatter's to write.
     void lineUp(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, std::vector<std::optional<std::string>>& code)
     {
-        const S32          tab = options.indent > 0 ? options.indent : 4;
+        const S32          tab  = options.indent > 0 ? options.indent : 4;
+        const S32          wide = options.tabs ? options.indent : 1;
         std::vector<Marks> marks;
         marks.reserve(lines.size());
         for (const Line& line : lines)
@@ -1247,6 +1279,32 @@ namespace
             }
         };
         const auto lead = [&](size_t i) { return indentText(options, lines[i].indent).size(); };
+        // Whether a line written `width` columns wide goes past the width
+        // it would be broken at.
+        const auto past = [&](S32 width) { return options.width > 0 && width > options.width; };
+        // Each stretch of a run between the lines that would go past the
+        // width, `lined` telling which lines have their mark and `breaks`
+        // which go past: those of a stretch of two or more lined up by
+        // `pad`, the rest left as spaced.
+        const auto stretches = [](size_t from, size_t to, auto&& lined, auto&& breaks, auto&& pad) {
+            for (size_t start = from; start < to;)
+            {
+                size_t end    = start;
+                size_t marked = 0;
+                for (; end < to && !breaks(end); ++end)
+                {
+                    marked += lined(end) ? 1 : 0;
+                }
+                for (size_t i = start; marked >= 2 && i < end; ++i)
+                {
+                    if (lined(i))
+                    {
+                        pad(i);
+                    }
+                }
+                start = end + 1;
+            }
+        };
         runs([](const Marks& m) { return m.equals; },
              [&](size_t from, size_t to, S32 column) {
                  // Where each = is now: past its code as spaced, which is
@@ -1273,13 +1331,11 @@ namespace
                          most         = std::max(most, at[i - from].second);
                      }
                  }
-                 for (size_t i = from; i < to; ++i)
-                 {
-                     if (at[i - from].first != std::string::npos)
-                     {
-                         code[i]->insert(at[i - from].first, static_cast<size_t>(most - at[i - from].second), ' ');
-                     }
-                 }
+                 const auto lined  = [&](size_t i) { return at[i - from].first != std::string::npos; };
+                 const auto breaks = [&](size_t i) { return lined(i) && past(columns(*code[i], wide) + most - at[i - from].second); };
+                 stretches(from, to, lined, breaks, [&](size_t i) {
+                     code[i]->insert(at[i - from].first, static_cast<size_t>(most - at[i - from].second), ' ');
+                 });
              });
         runs([](const Marks& m) { return m.comment; },
              [&](size_t from, size_t to, S32 column) {
@@ -1332,16 +1388,14 @@ namespace
                  {
                      return;
                  }
-                 for (size_t i = from; i < to; ++i)
-                 {
-                     if (at[i - from].end != std::string::npos)
-                     {
-                         std::string& text    = *code[i];
-                         const size_t comment = text.find_first_not_of(" \t", at[i - from].end);
-                         text                 = text.substr(0, at[i - from].end) +
-                                std::string(static_cast<size_t>(most - at[i - from].columns), ' ') + text.substr(comment);
-                     }
-                 }
+                 const auto lined = [&](size_t i) { return at[i - from].end != std::string::npos; };
+                 const auto padded = [&](size_t i) {
+                     const std::string& text    = *code[i];
+                     const size_t       comment = text.find_first_not_of(" \t", at[i - from].end);
+                     return text.substr(0, at[i - from].end) + std::string(static_cast<size_t>(most - at[i - from].columns), ' ') + text.substr(comment);
+                 };
+                 const auto breaks = [&](size_t i) { return lined(i) && past(columns(padded(i), wide)); };
+                 stretches(from, to, lined, breaks, [&](size_t i) { *code[i] = padded(i); });
              });
     }
 

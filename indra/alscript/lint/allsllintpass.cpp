@@ -268,14 +268,27 @@ namespace
             {
                 return std::nullopt;
             }
-            // Back over the comma before the next, and the blanks.
+            // Up to the comma before the next: the last one that is code
+            // before it, not one a comment or a string between them holds,
+            // f(a, // b, c -- nor a vector's, which the argument's own
+            // come before.
             if (i + 1 < args.size())
             {
-                end = source.rfind(',', end);
-                if (end == std::string_view::npos || end < begin)
+                size_t comma = std::string_view::npos;
+                for (size_t at = begin; at < end;)
+                {
+                    const ALScriptLexicon::Stretch run = ALScriptLexicon::stretchAt(source, at, false);
+                    if (run.kind == ALScriptLexicon::Kind::Code && source[at] == ',')
+                    {
+                        comma = at;
+                    }
+                    at = std::max(run.end, at + 1);
+                }
+                if (comma == std::string_view::npos)
                 {
                     return std::nullopt;
                 }
+                end = comma;
             }
             while (end > begin && std::isspace(static_cast<unsigned char>(source[end - 1])))
             {
