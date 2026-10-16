@@ -201,6 +201,7 @@ if(AL_BUILD_TESTS)
       tests/io_test.cpp
       tests/llavatarnamecache_test.cpp
       tests/llbuffer_test.cpp
+      tests/llcorehttputil_test.cpp
       tests/lldatapacker_test.cpp
       tests/llhost_test.cpp
       tests/llhttpnode_test.cpp
