@@ -41,9 +41,9 @@
 #include <string>
 #include <vector>
 
-// Each case lays a row of pixels down with a depth apiece, written into the depth texture as stored, so every depth is
-// exactly what the case asked for, then draws one triangle over the row and reads back which pixels it reached. The
-// stored depths are worked out here from the projection's own formula, not by the code under test.
+// Each case lays a row of pixels down with a depth apiece, uploaded into the depth texture, so every depth is the one
+// the case asked for, then draws one triangle over the row and reads back which pixels it reached. The stored depths
+// are worked out here from the projection's own formula, not by the code under test.
 namespace
 {
     constexpr F32 NEAR_PLANE = 0.1f;
@@ -190,38 +190,41 @@ namespace
             LLGLDepthTest::rebase();
         }
 
-        // Pixel i holds depths[i], uploaded as the texture stores it. Not by scissored clears: a driver that cannot
-        // clear a rectangle draws a quad at the clear depth instead (Mesa's llvmpipe), whose transform to window depth,
-        // worked in float through ndc, rounds a reverse-Z depth of 1e-9 to the clear's 0.
+        // Pixel i holds depths[i], uploaded as a float under either convention, and only the sky holds the clear's
+        // depth. Not by scissored clears: a driver that cannot clear a rectangle draws a quad at the clear depth
+        // instead (Mesa's llvmpipe), whose transform to window depth, worked in float through ndc, rounds a reverse-Z
+        // depth of 1e-9 to the clear's 0. Not as 24-bit integers forward: AMD's and Intel's Windows drivers take one
+        // through a float, multiplying by 1 / (2^24 - 1) in single precision, which rounds 2^24 - 2, the last step
+        // short of the clear, up onto it. The last step's float, 1 - 2^-24, is stored as 2^24 - 2 where the depth is
+        // 24-bit, and as itself by AMD's driver, which keeps a 24-bit depth in float.
         void lay(const std::vector<F64>& depths)
         {
             REQUIRE((S32)depths.size() == mWidth);
+            struct Texel
+            {
+                F32 mDepth;
+                U32 mStencil;
+            };
+            std::vector<Texel> texels((size_t)mWidth);
+            for (S32 i = 0; i < mWidth; ++i)
+            {
+                texels[i] = { (F32)depths[i], 0 };
+            }
             glBindTexture(GL_TEXTURE_2D, mDepth);
-            if (mReverse)
-            {
-                struct Texel
-                {
-                    F32 mDepth;
-                    U32 mStencil;
-                };
-                std::vector<Texel> texels((size_t)mWidth);
-                for (S32 i = 0; i < mWidth; ++i)
-                {
-                    texels[i] = { (F32)depths[i], 0 };
-                }
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mWidth, 1, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, texels.data());
-            }
-            else
-            {
-                // Depth in the top 24 bits, stencil in the low 8.
-                std::vector<U32> texels((size_t)mWidth);
-                for (S32 i = 0; i < mWidth; ++i)
-                {
-                    texels[i] = (U32)(depths[i] * 16777215.0 + 0.5) << 8;
-                }
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mWidth, 1, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, texels.data());
-            }
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mWidth, 1, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, texels.data());
+
+            // Read back packed as the texture's format is: the float's bits under reverse-Z, the top 24 bits forward.
+            std::vector<U32> stored((size_t)mWidth * 2);
+            const GLenum type = mReverse ? GL_FLOAT_32_UNSIGNED_INT_24_8_REV : GL_UNSIGNED_INT_24_8;
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_STENCIL, type, stored.data());
             glBindTexture(GL_TEXTURE_2D, 0);
+            const F64 clear = mReverse ? 0.0 : 1.0;
+            for (S32 i = 0; i < mWidth; ++i)
+            {
+                const bool holds_clear = mReverse ? stored[(size_t)i * 2] == 0u : (stored[i] >> 8) == 0xFFFFFFu;
+                INFO("pixel " << i << " as laid");
+                REQUIRE(holds_clear == (depths[i] == clear));
+            }
         }
 
         // The far-plane triangle over the row, under whatever depth state the caller holds; which pixels it reached.
