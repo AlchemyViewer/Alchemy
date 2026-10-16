@@ -389,10 +389,13 @@ namespace
         CHECK(missing.isUndefined());
         CHECK(blob["also absent"].isUndefined());
 
-        // drill_ref() on a mutable blob still makes the path it names
+        // drill_ref() on a mutable blob still makes the path it names, an
+        // array index as far as the array's end
         LLSD target;
-        llsd::drill_ref(target, llsd::array("made", 2)) = 5;
-        CHECK(target["made"][2].asInteger() == 5);
+        llsd::drill_ref(target, llsd::array("made", 0)) = 5;
+        CHECK(target["made"][0].asInteger() == 5);
+        llsd::drill_ref(target, llsd::array("made", 2)) = 6;
+        CHECK(target["made"].size() == 1);
     }
 
 }

@@ -102,18 +102,12 @@ LLSD LlsdFromJson(const simdjson::dom::element& val)
         break;
     case simdjson::dom::element_type::ARRAY:
     {
-        result = LLSD::emptyArray();
         simdjson::dom::array array = val.get_array().value_unsafe();
-        size_t size = array.size();
-        // allocate elements 0 .. (size() - 1) to avoid incremental allocation
-        if (size > 0)
-        {
-            result[size - 1] = LLSD();
-        }
-        size_t i = 0;
+        // reserved to avoid incremental allocation
+        result = LLSD::emptyReservedArray(array.size());
         for (const simdjson::dom::element& element : array)
         {
-            result[i++] = LlsdFromJson(element);
+            result.append(LlsdFromJson(element));
         }
         break;
     }

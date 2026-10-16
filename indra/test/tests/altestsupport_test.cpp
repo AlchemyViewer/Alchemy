@@ -61,6 +61,7 @@ namespace
     LLSD nested(F64 leaf)
     {
         LLSD sd;
+        sd["a"].resize(3);
         sd["a"][2] = leaf;
         sd["b"] = "text";
         return sd;
