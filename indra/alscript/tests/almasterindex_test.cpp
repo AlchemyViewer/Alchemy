@@ -143,14 +143,14 @@ namespace
         std::string text() const
         {
             std::string out;
-            ALFileRead::whole(file, out, ALDiskIncludes::MAX_BYTES);
+            ALFileRead::whole(file, out, ALMasterIndex::MAX_BYTES);
             return out;
         }
         ALMasterLinks onDisk() const { return onDisk(file); }
         static ALMasterLinks onDisk(const std::string& path)
         {
             std::string body;
-            if (!ALFileRead::whole(path, body, ALDiskIncludes::MAX_BYTES))
+            if (!ALFileRead::whole(path, body, ALMasterIndex::MAX_BYTES))
             {
                 return ALMasterLinks();
             }
@@ -368,7 +368,7 @@ namespace
         ALMasterLink sent = *linked;
         sent.hash         = "h1";
         sent.base         = almasterindex_data::key(50);
-        CHECK(made.finished(almasterindex_data::key(1), almasterindex_data::key(2), sent));
+        CHECK(made.finished(*linked, sent));
         const std::optional<ALMasterLink> left = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
         REQUIRE(left.has_value());
         UNSCOPED_INFO("with what the send left");
@@ -379,7 +379,7 @@ namespace
         ALMasterLink rekeyed = sent;
         rekeyed.item         = almasterindex_data::key(3);
         rekeyed.hash         = "h2";
-        CHECK(made.finished(almasterindex_data::key(1), almasterindex_data::key(2), rekeyed));
+        CHECK(made.finished(*linked, rekeyed));
         UNSCOPED_INFO("not the old item's");
         REQUIRE_FALSE(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2)));
         const std::optional<ALMasterLink> moved = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(3));
@@ -390,8 +390,238 @@ namespace
 
         // Let go of while it was on its way: stays let go of.
         made.unlink(almasterindex_data::key(1), almasterindex_data::key(3));
-        CHECK_FALSE(made.finished(almasterindex_data::key(1), almasterindex_data::key(3), rekeyed));
+        CHECK_FALSE(made.finished(rekeyed, rekeyed));
         REQUIRE(made.empty());
+
+        // A target and an experience picked while a send was on its way
+        // stand, and the send's bookkeeping goes in beside them.
+        made.link(almasterindex_data::link(1, 4, "/s/lamp.lsl"));
+        const std::optional<ALMasterLink> began = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(4));
+        REQUIRE(began.has_value());
+        ALMasterLink after = *began;
+        after.hash         = "h3";
+        after.base         = almasterindex_data::key(51);
+        after.target       = "mono";
+        CHECK(made.chosen(almasterindex_data::key(1), almasterindex_data::key(4), std::string("lsl2"), std::optional<LLUUID>(almasterindex_data::key(70))));
+        CHECK(made.finished(*began, after));
+        const std::optional<ALMasterLink> picked = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(4));
+        REQUIRE(picked.has_value());
+        {
+            INFO("picked meanwhile: as picked");
+            CHECK(picked->target == std::string("lsl2"));
+            REQUIRE(picked->experience.has_value());
+            CHECK(*picked->experience == almasterindex_data::key(70));
+        }
+        {
+            INFO("and what the send learned");
+            CHECK(picked->hash == std::string("h3"));
+            CHECK(picked->base == almasterindex_data::key(51));
+        }
+
+        // Linked meanwhile to another file: the new link stands, knowing
+        // nothing of what the old master sent but the item's asset.
+        made.link(almasterindex_data::link(1, 4, "/s/lamp2.lsl"));
+        after.hash  = "h4";
+        after.base  = almasterindex_data::key(52);
+        after.uses  = { "disk:/s/util.lsl" };
+        after.stamp = 99;
+        CHECK(made.finished(*picked, after));
+        const std::optional<ALMasterLink> relinked = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(4));
+        REQUIRE(relinked.has_value());
+        {
+            INFO("the re-link stands");
+            CHECK(relinked->master == std::string("/s/lamp2.lsl"));
+            CHECK(relinked->hash.empty());
+            CHECK(relinked->uses.empty());
+            CHECK(relinked->stamp == S64(0));
+            CHECK(relinked->target == std::string("mono"));
+            CHECK_FALSE(relinked->experience.has_value());
+        }
+        UNSCOPED_INFO("with the asset the send left");
+        CHECK(relinked->base == almasterindex_data::key(52));
+        REQUIRE(made.mastering("/s/lamp.lsl").empty());
+        REQUIRE(made.mastering("/s/lamp2.lsl").size() == size_t(1));
+    }
+
+    TEST_CASE_METHOD(almasterindex_data, "almasterindex: a send's link renamed or moved meanwhile keeps the name and goes where the item went", "[almasterindex]")
+    {
+        ALMasterIndex& made = open();
+        ALMasterLink   door = almasterindex_data::link(1, 2, "/s/door.lsl");
+        door.itemName       = "door";
+        made.link(door);
+        const std::optional<ALMasterLink> began = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
+        REQUIRE(began.has_value());
+
+        // The send found the item named otherwise, and nobody renamed it
+        // meanwhile: the send's name is the newer.
+        ALMasterLink after = *began;
+        after.itemName     = "Door";
+        after.hash         = "h1";
+        CHECK(made.finished(*began, after));
+        const std::optional<ALMasterLink> found = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
+        REQUIRE(found.has_value());
+        CHECK(found->itemName == std::string("Door"));
+
+        // Renamed meanwhile: the rename is the newer.
+        CHECK(made.renamed(almasterindex_data::key(1), almasterindex_data::key(2), "front door"));
+        after.hash = "h2";
+        CHECK(made.finished(*found, after));
+        const std::optional<ALMasterLink> renamed = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
+        REQUIRE(renamed.has_value());
+        CHECK(renamed->itemName == std::string("front door"));
+        CHECK(renamed->hash == std::string("h2"));
+
+        // Re-linked meanwhile, and the send saved as another item and found
+        // the old one gone: the new link goes with the item, and is gone
+        // with it.
+        made.link(almasterindex_data::link(1, 2, "/s/door2.lsl"));
+        ALMasterLink moved  = *renamed;
+        moved.item          = almasterindex_data::key(3);
+        moved.hash          = "h3";
+        moved.state         = ALMasterLink::State::Orphaned;
+        moved.orphanedSince = LLDate(1800000000.0);
+        CHECK(made.finished(*renamed, moved));
+        REQUIRE_FALSE(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2)));
+        const std::optional<ALMasterLink> gone = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(3));
+        REQUIRE(gone.has_value());
+        CHECK(gone->master == std::string("/s/door2.lsl"));
+        CHECK(gone->hash.empty());
+        CHECK(gone->state == ALMasterLink::State::Orphaned);
+        CHECK(gone->orphanedSince == LLDate(1800000000.0));
+        REQUIRE(made.size() == size_t(1));
+    }
+
+    TEST_CASE_METHOD(almasterindex_data, "almasterindex: an index past the include bound opens with its links", "[almasterindex]")
+    {
+        // Thousands of links in pretty XML pass the bound an include is read
+        // under; the index is read under its own.
+        ALMasterLinks links;
+        for (int n = 0; n < 5000; ++n)
+        {
+            ALMasterLink one = almasterindex_data::link(1 + n / 100, 100000 + n, "/home/scripter/scripts/project" + std::to_string(n % 50) + "/door.lsl");
+            one.uses         = { "disk:/home/scripter/scripts/lib/common.lsl", "disk:/home/scripter/scripts/lib/part" + std::to_string(n % 7) + ".lsl" };
+            one.hash         = "xxh128:0123456789abcdef0123456789abcdef";
+            one.objectName   = "Front Door of the Grand Hall";
+            one.itemName     = "door controller " + std::to_string(n);
+            one.regionName   = "Ahern";
+            links.put(one);
+        }
+        std::ostringstream out;
+        LLSDSerialize::toPrettyXML(links.toLLSD(), out);
+        UNSCOPED_INFO("past the include bound");
+        REQUIRE(out.str().size() > ALDiskIncludes::MAX_BYTES);
+        almasterindex_data::put(file, out.str());
+
+        ALMasterIndex& read = open();
+        UNSCOPED_INFO("every link");
+        REQUIRE(read.size() == size_t(5000));
+        UNSCOPED_INFO("nothing to write");
+        CHECK_FALSE(read.dirty());
+        read.link(almasterindex_data::link(1, 1, "/s/new.lsl"));
+        index.reset();
+        UNSCOPED_INFO("and all written back");
+        REQUIRE(onDisk().size() == size_t(5001));
+    }
+
+    TEST_CASE_METHOD(almasterindex_data, "almasterindex: a file that cannot be read is kept as it is until it reads", "[almasterindex]")
+    {
+        // A folder in the file's place: there, and not to be read.
+        std::error_code ec;
+        std::filesystem::create_directories(fsyspath(file), ec);
+        REQUIRE_FALSE(ec);
+        {
+            ALMasterIndex& looked = open();
+            REQUIRE(looked.empty());
+            CHECK_FALSE(looked.dirty());
+            looked.link(almasterindex_data::link(1, 2, "/s/door.lsl"));
+            UNSCOPED_INFO("not written over");
+            CHECK(looked.dirty());
+            CHECK(std::filesystem::is_directory(fsyspath(file), ec));
+            looked.flush();
+            UNSCOPED_INFO("nor at a flush");
+            CHECK(looked.dirty());
+            CHECK(std::filesystem::is_directory(fsyspath(file), ec));
+            pass(10.0);
+            index.reset();
+            UNSCOPED_INFO("nor as the index goes");
+            CHECK(std::filesystem::is_directory(fsyspath(file), ec));
+        }
+
+        // Readable again, holding links of its own: the session's go in
+        // over them at the next write.
+        std::filesystem::create_directories(fsyspath(file), ec);
+        ALMasterIndex& held = open();
+        REQUIRE(held.empty());
+        held.link({ almasterindex_data::link(1, 2, "/s/door.lsl"), almasterindex_data::link(1, 3, "/s/lamp.lsl") });
+        CHECK(held.dirty());
+        std::filesystem::remove(fsyspath(file), ec);
+        ALMasterLinks theirs;
+        theirs.put(almasterindex_data::link(1, 3, "/s/old-lamp.lsl"));
+        theirs.put(almasterindex_data::link(1, 4, "/s/window.lsl"));
+        std::ostringstream out;
+        LLSDSerialize::toPrettyXML(theirs.toLLSD(), out);
+        almasterindex_data::put(file, out.str());
+        told = 0;
+        held.flush();
+        UNSCOPED_INFO("written now");
+        CHECK_FALSE(held.dirty());
+        REQUIRE(held.size() == size_t(3));
+        const std::optional<ALMasterLink> lamp = held.linkOf(almasterindex_data::key(1), almasterindex_data::key(3));
+        REQUIRE(lamp.has_value());
+        UNSCOPED_INFO("the session's over the file's");
+        CHECK(lamp->master == std::string("/s/lamp.lsl"));
+        UNSCOPED_INFO("the file's kept");
+        REQUIRE(held.linkOf(almasterindex_data::key(1), almasterindex_data::key(4)).has_value());
+        pass(ALMasterIndex::TELL_SOON + 0.01);
+        UNSCOPED_INFO("and told of");
+        CHECK(told == 1);
+        const ALMasterLinks disk = onDisk();
+        REQUIRE(disk.size() == size_t(3));
+        REQUIRE(disk.of(almasterindex_data::key(1), almasterindex_data::key(2)));
+        REQUIRE(disk.of(almasterindex_data::key(1), almasterindex_data::key(4)));
+    }
+
+    TEST_CASE_METHOD(almasterindex_data, "almasterindex: a write that fails keeps the change and the next flush writes it", "[almasterindex]")
+    {
+        ALMasterIndex& made = open();
+        made.link(almasterindex_data::link(1, 1, "/s/a.lsl"));
+        made.awaitWrites();
+        CHECK_FALSE(made.dirty());
+        REQUIRE(onDisk().size() == size_t(1));
+
+        // A folder where the file was: nothing can be written over it.
+        std::error_code ec;
+        std::filesystem::remove(fsyspath(file), ec);
+        std::filesystem::create_directories(fsyspath(file), ec);
+        REQUIRE_FALSE(ec);
+        made.link(almasterindex_data::link(1, 2, "/s/b.lsl"));
+        made.awaitWrites();
+        UNSCOPED_INFO("not written: still to be");
+        CHECK(made.dirty());
+        made.flush();
+        UNSCOPED_INFO("a flush tries again, and it is still to be");
+        CHECK(made.dirty());
+        CHECK(std::filesystem::is_directory(fsyspath(file), ec));
+
+        // Writable again: the next flush writes it, with what changed since.
+        std::filesystem::remove(fsyspath(file), ec);
+        made.flush();
+        CHECK_FALSE(made.dirty());
+        const ALMasterLinks written = onDisk();
+        REQUIRE(written.size() == size_t(2));
+        REQUIRE(written.of(almasterindex_data::key(1), almasterindex_data::key(2)));
+
+        // Failing again, a change after it carries it.
+        std::filesystem::remove(fsyspath(file), ec);
+        std::filesystem::create_directories(fsyspath(file), ec);
+        made.link(almasterindex_data::link(1, 3, "/s/c.lsl"));
+        made.awaitWrites();
+        CHECK(made.dirty());
+        std::filesystem::remove(fsyspath(file), ec);
+        made.link(almasterindex_data::link(1, 4, "/s/d.lsl"));
+        made.awaitWrites();
+        CHECK_FALSE(made.dirty());
+        REQUIRE(onDisk().size() == size_t(4));
     }
 
     TEST_CASE_METHOD(almasterindex_data, "almasterindex: a linked item renamed is said by its new name and that is written", "[almasterindex]")
@@ -536,12 +766,12 @@ namespace
         ALMasterLink sent = *linked;
 
         sent.hash = "h1";
-        made.finished(almasterindex_data::key(1), almasterindex_data::key(2), sent);
+        made.finished(*linked, sent);
         UNSCOPED_INFO("waiting");
         CHECK(made.dirty());
         pass(0.5);
         sent.hash = "h2";
-        made.finished(almasterindex_data::key(1), almasterindex_data::key(2), sent);
+        made.finished(*linked, sent);
         pass(0.6);
         UNSCOPED_INFO("a second after the first, not after the last: waiting still");
         CHECK(made.dirty());
@@ -570,7 +800,7 @@ namespace
         for (int i = 0; i < 6; ++i)
         {
             sent.hash = "run" + std::to_string(i);
-            made.finished(almasterindex_data::key(1), almasterindex_data::key(2), sent);
+            made.finished(*linked, sent);
             pass(0.8);
         }
         UNSCOPED_INFO("4.8 s on: waiting");
@@ -597,7 +827,7 @@ namespace
         REQUIRE(linked.has_value());
         ALMasterLink sent = *linked;
         sent.hash         = "last";
-        first.finished(almasterindex_data::key(1), almasterindex_data::key(2), sent);
+        first.finished(*linked, sent);
         UNSCOPED_INFO("waiting");
         CHECK(first.dirty());
 
@@ -647,7 +877,7 @@ namespace
         sent.hash         = "h1";
         sent.base         = almasterindex_data::key(10);
         sent.uses         = { "disk:/s/util.lsl" };
-        made.finished(almasterindex_data::key(1), almasterindex_data::key(1), sent);
+        made.finished(*linked, sent);
         UNSCOPED_INFO("a send's bookkeeping waits");
         CHECK(made.dirty());
         const std::optional<ALMasterLink> waits = on_disk(1);
@@ -672,14 +902,14 @@ namespace
         REQUIRE(again.has_value());
         sent       = *again;
         sent.state = ALMasterLink::State::Suspended;
-        made.finished(almasterindex_data::key(1), almasterindex_data::key(1), sent);
+        made.finished(*again, sent);
         UNSCOPED_INFO("suspended: at once");
         CHECK_FALSE(made.dirty());
         const std::optional<ALMasterLink> suspended = on_disk(1);
         REQUIRE(suspended.has_value());
         CHECK(suspended->state == ALMasterLink::State::Suspended);
         sent.state = ALMasterLink::State::Active;
-        made.finished(almasterindex_data::key(1), almasterindex_data::key(1), sent);
+        made.finished(*again, sent);
         {
             INFO("active again: at once");
             CHECK_FALSE(made.dirty());
@@ -691,7 +921,7 @@ namespace
         // A send saved as another item: at once, or the link is lost with it.
         ALMasterLink moved = sent;
         moved.item         = almasterindex_data::key(3);
-        made.finished(almasterindex_data::key(1), almasterindex_data::key(1), moved);
+        made.finished(*again, moved);
         UNSCOPED_INFO("moved: at once");
         CHECK_FALSE(made.dirty());
         {
@@ -705,7 +935,7 @@ namespace
         REQUIRE(under.has_value());
         sent      = *under;
         sent.hash = ALUploadHeader::hashOfPlain("mono", "default {}");
-        made.finished(almasterindex_data::key(1), almasterindex_data::key(3), sent);
+        made.finished(*under, sent);
         made.flush();
         made.heardSaved(almasterindex_data::key(1), almasterindex_data::key(3), almasterindex_data::key(11), "default {}");
         UNSCOPED_INFO("the same: later");

@@ -32,6 +32,7 @@
 
 #include <boost/signals2.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -48,14 +49,21 @@ class ALSerialWorker;
 // Read tolerantly: a file that is not there is no links; one that will not
 // read is no links, said in the log, and not written over until a link
 // changes, so that a file a later version wrote, or one somebody is
-// mending, is not lost to a session that merely looked. Links orphaned
+// mending, is not lost to a session that merely looked. One that cannot be
+// read at all -- held by another program, past MAX_BYTES -- is no links
+// either, said, and never written over: it is read again before each
+// write, and until it reads nothing is written, so that the links it holds
+// are not lost to a session that could not see them; once it reads, what
+// the session linked meanwhile goes in over what it holds. Links orphaned
 // long ago are let go of as it is read (ALMasterLinks::prune).
 //
 // Written on a thread of the index's own, forced out to the disk, one write
 // after another, the newest only where several wait; the links are put into
 // words on the thread that changed them. Whatever waits is written on that
 // thread as the index goes, the writer's own write finished first, so that
-// nothing changed is lost with it.
+// nothing changed is lost with it. A write that fails is said, and what it
+// would have written is kept to be tried again: with the next change, which
+// carries it, and as the index is flushed or goes.
 //
 // What a person did, or what could not be found again, is handed to the
 // writer at once: a link made or let go of, links marked pending, a link's
@@ -107,6 +115,10 @@ public:
     static constexpr F64 WRITE_QUIET  = 1.0;
     static constexpr F64 WRITE_LATEST = 5.0;
     static constexpr F32 TELL_SOON    = 0.25f;
+    // The most the file is read at: some seventy thousand links in pretty
+    // XML, read whole into memory as the index is made. Past it, the file
+    // is kept as it is.
+    static constexpr std::uintmax_t MAX_BYTES = 64u * 1024u * 1024u;
 
     // An item, by the object it is in -- a null one for the agent's own
     // inventory -- and its own id.
@@ -180,12 +192,17 @@ public:
     bool chosen(const LLUUID& object, const LLUUID& item, const std::optional<std::string>& target,
                 const std::optional<std::optional<LLUUID>>& experience);
 
-    // A send's link as it stands after the send, put back over the item's,
-    // where the item is linked still: one let go of while its send was on
-    // its way stays let go of. Saved as another item, one that could not be
-    // changed in place, the link is that item's now. False where nothing
-    // was put.
-    bool finished(const LLUUID& object, const LLUUID& item, const ALMasterLink& updated);
+    // A send's link as it stands after the send -- `updated`, from the link
+    // as the send began, `began` -- put over the item's, where the item is
+    // linked still: one let go of while its send was on its way stays let
+    // go of. What the send learned goes over what the link holds now; what
+    // was done to the link meanwhile -- a target or an experience picked,
+    // the item renamed -- stands. Linked meanwhile to another master, the
+    // link is the new master's, and takes from the send only what it
+    // learned of the item: its asset, its name, that it is gone. Saved as
+    // another item, one that could not be changed in place, the link is
+    // that item's now. False where nothing was put.
+    bool finished(const ALMasterLink& began, const ALMasterLink& updated);
 
     // Whether a link knows nothing of what a send through it would know:
     // nothing went up through it, and nothing of its master's expansion is
@@ -201,8 +218,10 @@ public:
     bool adopted(const LLUUID& object, const LLUUID& item, const std::string& master, const std::vector<std::string>& uses, bool missed,
                  const std::string& hash, S64 stamp);
 
-    // Whether a change waits to be handed to the writer.
-    bool dirty() const { return mDirty; }
+    // Whether a change is not on the disk: not yet handed to the writer, or
+    // handed over and not written, the file being unreadable or the write
+    // having failed. A write on its way is waited for.
+    bool dirty() const;
     // What changed handed to the writer, and that and whatever else it has
     // waiting written, on this thread where the writer has not taken it,
     // before this returns.
@@ -215,7 +234,22 @@ public:
 private:
     struct Writer;
 
+    // What reading the file comes to: nothing there, its links, text that is
+    // not an index, or a file that cannot be read -- held by another
+    // program, past MAX_BYTES.
+    enum class Read : U8
+    {
+        None,
+        Links,
+        Garbage,
+        Unreadable
+    };
+    Read readFile(ALMasterLinks& out) const;
     void read();
+    // The file read again, where it could not be, and what the session
+    // linked meanwhile put over what it holds; false where it still cannot
+    // be.
+    bool readAgain();
     // A change to the links: the index handed to the writer at once, or
     // written a moment from now with what else changes by then; and whoever
     // listens told at once, or a moment from now, or not at all.
@@ -250,6 +284,9 @@ private:
     // Whether a change is not yet handed over, since when, and when the last
     // was; whether a write is coming, and whether a telling is.
     bool                            mDirty       = false;
+    // Whether the file is there and could not be read: not written over
+    // until it reads.
+    bool                            mUnread      = false;
     F64                             mDirtySince  = 0.0;
     F64                             mDirtyLast   = 0.0;
     bool                            mWriteComing = false;
