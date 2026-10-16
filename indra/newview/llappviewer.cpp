@@ -5616,11 +5616,21 @@ void LLAppViewer::idle()
     F32 qas = gSavedSettings.getF32("QuitAfterSeconds");
     if (qas > 0.f)
     {
-        if (gRenderStartTime.getElapsedTimeF32() > qas && !mQuitRequested)
+        // The logout waits on any modal dialog and on each floater that asks before it closes,
+        // which a run quitting itself has nobody to answer: past this, it quits without one.
+        constexpr F32 QUIT_AFTER_LOGOUT_SECONDS = 60.f;
+        const F32 elapsed = gRenderStartTime.getElapsedTimeF32();
+        if (elapsed > qas && !mQuitRequested)
         {
             LL_INFOS() << "Quitting after " << qas << " seconds. See setting \"QuitAfterSeconds\"." << LL_ENDL;
             // As File > Quit does: in world, this logs out first.
             requestQuit();
+        }
+        else if (elapsed > qas + QUIT_AFTER_LOGOUT_SECONDS && mQuitRequested && !isQuitting())
+        {
+            LL_WARNS() << "The logout \"QuitAfterSeconds\" asked for has not finished in "
+                       << QUIT_AFTER_LOGOUT_SECONDS << " seconds; quitting without it." << LL_ENDL;
+            forceQuit();
         }
     }
 

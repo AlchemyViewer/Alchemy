@@ -184,7 +184,7 @@ ctest --test-dir build-Linux-ninja-os-asan -C RelWithDebInfo -LE benchmark --out
     wait
     ```
 
-    `--quitafter` counts from the start until the world is reached, and from there again; in world it quits as File > Quit does, logging out first.
+    `--quitafter` counts from the start until the world is reached, and from there again; in world it quits as File > Quit does, logging out first. The logout waits on any modal dialog and on a floater asking to save, so a run whose logout has not finished a minute later quits without it.
   - **On the GPU:** keep `WAYLAND_DISPLAY` and give `SDL_VIDEO_DRIVER=wayland` for the offscreen driver and `LIBGL_ALWAYS_SOFTWARE`. The window is drawn by the system's Mesa driver, which the sanitizers do not see into. Where the compositor leaves a window's frame to the client, as GNOME's does, SDL draws it through libdecor's GTK plugin, which brings GTK, Pango and the system's fontconfig into the process; `SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR=0` leaves them out.
 
 ## Fuzzing
