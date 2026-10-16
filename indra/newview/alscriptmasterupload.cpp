@@ -636,5 +636,5 @@ void ALScriptMasterUpload::end(Outcome::What what, const std::string& why, std::
     outcome.result       = std::move(result);
     outcome.preprocessed = mPrepared.errors;
     outcome.why          = why;
-    ALScriptDiskMasters::instance().finished(outcome, mChanged ? std::optional<ALMasterLink>(mUpdated) : std::nullopt);
+    ALScriptDiskMasters::instance().finished(outcome, mLink, mChanged ? std::optional<ALMasterLink>(mUpdated) : std::nullopt);
 }

@@ -288,7 +288,7 @@ namespace
         REQUIRE(links.size() == size_t(2));
     }
 
-    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: the LLSD is versioned and every field round-trips through notation", "[almasterlinks]")
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: the LLSD is versioned and every field round-trips through XML", "[almasterlinks]")
     {
         ALMasterLinks links;
         ALMasterLink  full;
@@ -327,10 +327,10 @@ namespace
         REQUIRE(llsd["links"].size() == 5);
 
         std::ostringstream out;
-        LLSDSerialize::toNotation(llsd, out);
+        LLSDSerialize::toPrettyXML(llsd, out);
         std::istringstream in(out.str());
         LLSD               back;
-        REQUIRE(LLSDSerialize::fromNotation(back, in, static_cast<llssize>(out.str().size())) > 0);
+        REQUIRE(LLSDSerialize::fromXML(back, in) > 0);
 
         const ALMasterLinks read = ALMasterLinks::fromLLSD(back);
         UNSCOPED_INFO("all read");
@@ -507,7 +507,7 @@ namespace
         REQUIRE(links.of(almasterlinks_data::key(1 + 4999 / 100), almasterlinks_data::key(104999)) != nullptr);
     }
 
-    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: the missed flag round-trips through the LLSD and is written only where set", "[almasterlinks]")
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: the missed flag round-trips through XML and is written only where set", "[almasterlinks]")
     {
         ALMasterLinks links;
         ALMasterLink  missing = almasterlinks_data::link(1, 10, "/s/door.lsl");
@@ -524,10 +524,10 @@ namespace
         REQUIRE_FALSE(llsd["links"][1].has("missed"));
 
         std::ostringstream out;
-        LLSDSerialize::toNotation(llsd, out);
+        LLSDSerialize::toPrettyXML(llsd, out);
         std::istringstream in(out.str());
         LLSD               back;
-        REQUIRE(LLSDSerialize::fromNotation(back, in, static_cast<llssize>(out.str().size())) > 0);
+        REQUIRE(LLSDSerialize::fromXML(back, in) > 0);
         const ALMasterLinks       read  = ALMasterLinks::fromLLSD(back);
         const ALMasterLink* const set   = read.of(almasterlinks_data::key(1), almasterlinks_data::key(10));
         const ALMasterLink* const unset = read.of(almasterlinks_data::key(1), almasterlinks_data::key(11));
@@ -709,5 +709,54 @@ namespace
         CHECK(card->notecard);
         UNSCOPED_INFO("and a script's");
         CHECK_FALSE(script->notecard);
+    }
+
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: a name XML would not carry round-trips through XML as its bytes", "[almasterlinks]")
+    {
+        // A control character in a name -- anyone may give an object one --
+        // written as it is would leave the file unreadable at the next
+        // start, and every link lost with it.
+        ALMasterLinks     links;
+        const std::string odd("a\x01" "b\x1f" "c", 5);
+        ALMasterLink      link = almasterlinks_data::link(1, 10, "/s/door.lsl");
+        link.objectName        = odd;
+        link.itemName          = "tab\tnewline\nfine";
+        link.regionName        = "return\rback";
+        link.uses              = { "disk:/s/lib/" + odd + ".lsl" };
+        links.put(link);
+        ALMasterLink plain = almasterlinks_data::link(1, 11, "/s/lamp.lsl");
+        plain.objectName   = "Lamp <&> \"it's\"";
+        links.put(plain);
+
+        const LLSD llsd = links.toLLSD();
+        {
+            INFO("as bytes only where XML would not carry it");
+            CHECK(llsd["links"][0]["object_name"].isBinary());
+            CHECK(llsd["links"][0]["item_name"].isString());
+            CHECK(llsd["links"][0]["region_name"].isBinary());
+            CHECK(llsd["links"][0]["uses"][0].isBinary());
+            CHECK(llsd["links"][1]["object_name"].isString());
+        }
+        std::ostringstream out;
+        LLSDSerialize::toPrettyXML(llsd, out);
+        std::istringstream in(out.str());
+        LLSD               back;
+        UNSCOPED_INFO("read back whole");
+        REQUIRE(LLSDSerialize::fromXML(back, in) > 0);
+        const ALMasterLinks       read   = ALMasterLinks::fromLLSD(back);
+        const ALMasterLink* const got    = read.of(almasterlinks_data::key(1), almasterlinks_data::key(10));
+        const ALMasterLink* const simple = read.of(almasterlinks_data::key(1), almasterlinks_data::key(11));
+        REQUIRE(got);
+        REQUIRE(simple);
+        {
+            INFO("as they were");
+            CHECK(got->objectName == odd);
+            CHECK(got->itemName == std::string("tab\tnewline\nfine"));
+            CHECK(got->regionName == std::string("return\rback"));
+            CHECK(almasterlinks_data::joined(got->uses) == "disk:/s/lib/" + odd + ".lsl");
+            CHECK(simple->objectName == std::string("Lamp <&> \"it's\""));
+        }
+        UNSCOPED_INFO("found by the use still");
+        REQUIRE(read.usersOf("disk:/s/lib/" + odd + ".lsl").size() == size_t(1));
     }
 }

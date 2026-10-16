@@ -176,9 +176,9 @@ public:
     // studio's own send is, which a change in the world holds.
     void send(const ALScriptRef& ref, ALMasterPlan::Send kind);
 
-    // What a send found, the link as it stands after it: called by
-    // ALScriptMasterUpload as each one ends.
-    void finished(const Outcome& outcome, const std::optional<ALMasterLink>& updated);
+    // What a send found, and the link as it stands after it, from the link
+    // as the send began: called by ALScriptMasterUpload as each one ends.
+    void finished(const Outcome& outcome, const ALMasterLink& began, const std::optional<ALMasterLink>& updated);
     // What was said with no studio window to hear it, for the window opened
     // next to list; given once.
     std::vector<Outcome> takeUnheard();
