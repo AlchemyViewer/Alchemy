@@ -31,3 +31,18 @@ leak:libnvidia-eglcore
 # pattern that does leak is still reported by its own (FcPatternCreate). Not
 # a fontconfig bug to report: the offsets are its cache's format.
 leak:FcPatternObjectInsertElt
+
+# The same offsets in the system's fontconfig, which GTK loads for libdecor's
+# GTK plugin: SDL has libdecor draw a Wayland window's frame where the
+# compositor leaves that to the client, as GNOME's does. Pango caches the font
+# sets GTK measures the title with, for the process, and their patterns'
+# arrays read as leaked, but the system's library is stripped, so
+# FcPatternObjectInsertElt has no name there to match. Matched instead through
+# Pango's fontconfig backend, which nothing of ours calls.
+leak:libpangoft2-1.0.so
+
+# libdecor's GTK plugin, the system's, leaves a Wayland proxy it made while
+# committing a frame's configuration (wl_proxy_marshal_flags, from
+# libdecor_frame_commit) when SDL destroys the frame: 96 bytes, now and then,
+# as the window goes. Not ours, and the plugin is stripped.
+leak:libdecor-gtk.so
