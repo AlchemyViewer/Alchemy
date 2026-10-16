@@ -1357,10 +1357,14 @@ U8* LLVertexBuffer::mapVertexBuffer(LLVertexBuffer::AttributeType type, U32 inde
     }
 
 #if LL_DARWIN || LL_ARM64
-    // Region tracking not needed on apple silicon - it gives GL the entire store again
-    // While mIsApple can be encountered under windows, this is a
+    // Apple's path gives GL whole stores, never ranges (see _unmapBuffer), so it marks only that
+    // the vertices were written. While mIsApple can be encountered under windows, this is a
     // macOS OpenGL behavior workaround. LL_ARM64 check might be not needed
-    if (!gGLManager.mIsApple)
+    if (gGLManager.mIsApple)
+    {
+        mVerticesWritten = true;
+    }
+    else
 #endif
     {
         U32 start = mOffsets[type] + sTypeSize[type] * index;
@@ -1399,7 +1403,11 @@ U8* LLVertexBuffer::mapIndexBuffer(U32 index, S32 count)
     }
 
 #if LL_DARWIN || LL_ARM64
-    if (!gGLManager.mIsApple)
+    if (gGLManager.mIsApple)
+    {
+        mIndicesWritten = true;
+    }
+    else
 #endif
     {
         U32 start = sizeof(U16) * index;
@@ -1447,6 +1455,14 @@ void LLVertexBuffer::flush_vbo(GLenum target, U32 start, U32 end, void* data, U8
         // on OS X, flush_vbo doesn't actually write to the GL buffer, so be sure to call
         // _mapBuffer to tag the buffer for flushing to GL
         _mapBuffer();
+        if (target == GL_ELEMENT_ARRAY_BUFFER)
+        {
+            mIndicesWritten = true;
+        }
+        else
+        {
+            mVerticesWritten = true;
+        }
         LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb memcpy");
         STOP_GLERROR;
         // copy into mapped buffer
@@ -1513,8 +1529,12 @@ void LLVertexBuffer::_unmapBuffer()
         // each upload, as this path once made, waits for nothing either, but pays to make and
         // delete names and keeps every old store the frames delete_buffers holds it. Keep
         // GL_STATIC_DRAW: a store given again as GL_DYNAMIC_DRAW takes many times as long.
+        //
+        // Only the stores the map wrote are sent, and any GL has no buffer for yet, which it is
+        // given whatever they hold: a rebuild of the vertices alone leaves the indices as GL has
+        // them. Like the other path, a store not sent is not bound either.
         STOP_GLERROR;
-        if (mMappedData)
+        if (mMappedData && (mVerticesWritten || !mGLBuffer))
         {
             if (!mGLBuffer)
             {
@@ -1527,14 +1547,10 @@ void LLVertexBuffer::_unmapBuffer()
             }
             glBufferData(GL_ARRAY_BUFFER, mSize, mMappedData, GL_STATIC_DRAW);
         }
-        else if (mGLBuffer != sGLRenderBuffer)
-        {
-            glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
-            sGLRenderBuffer = mGLBuffer;
-        }
+        mVerticesWritten = false;
         STOP_GLERROR;
 
-        if (mMappedIndexData)
+        if (mMappedIndexData && (mIndicesWritten || !mGLIndices))
         {
             if (!mGLIndices)
             {
@@ -1547,11 +1563,7 @@ void LLVertexBuffer::_unmapBuffer()
             }
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, mIndicesSize, mMappedIndexData, GL_STATIC_DRAW);
         }
-        else if (mGLIndices != sGLRenderIndices)
-        {
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mGLIndices);
-            sGLRenderIndices = mGLIndices;
-        }
+        mIndicesWritten = false;
         STOP_GLERROR;
     }
     else

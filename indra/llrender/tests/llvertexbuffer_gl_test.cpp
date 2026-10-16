@@ -225,4 +225,55 @@ namespace
 
         CHECK(at(RIGHT) == packed(blue));
     }
+
+    // Only what a map wrote is sent again. The indices' copy is changed here behind the map's back, which no
+    // upload of the vertices may carry to GL: the draw still has the indices GL was last given.
+    TEST_CASE_METHOD(llvertexbuffer_gl_data, "llvertexbuffer_gl: writing only the vertices leaves the indices GL holds", "[llvertexbuffer_gl]")
+    {
+        setUp();
+        const LLColor4U green(0, 255, 0, 255);
+        const LLColor4U blue(0, 0, 255, 255);
+
+        LLPointer<LLVertexBuffer> vb = makeBuffer(4, 6);
+        writeQuad(*vb, 0, 0.f, 1.f, green);
+        writeIndices(*vb, 0, 0);
+        uploadAndDrawFromScratch(*vb);
+        REQUIRE(at(RIGHT) == packed(green));
+
+        U16* indices = reinterpret_cast<U16*>(vb->getMappedIndices());
+        REQUIRE(indices);
+        std::fill(indices, indices + 6, U16(0)); // every triangle degenerate, were it sent
+
+        writeColours(*vb, 0, blue);
+        mTarget.clear();
+        uploadAndDrawFromScratch(*vb);
+
+        CHECK(at(RIGHT) == packed(blue));
+    }
+
+    // As above, the other way about: the vertices' copy is changed behind the map's back, and an upload of the
+    // indices alone leaves GL drawing the vertices it was last given.
+    TEST_CASE_METHOD(llvertexbuffer_gl_data, "llvertexbuffer_gl: writing only the indices leaves the vertices GL holds", "[llvertexbuffer_gl]")
+    {
+        setUp();
+        const LLColor4U red(255, 0, 0, 255);
+        const LLColor4U green(0, 255, 0, 255);
+
+        LLPointer<LLVertexBuffer> vb = makeBuffer(4, 6);
+        writeQuad(*vb, 0, 0.f, 1.f, green);
+        writeIndices(*vb, 0, 0);
+        uploadAndDrawFromScratch(*vb);
+        REQUIRE(at(RIGHT) == packed(green));
+
+        U8* vertices = vb->getMappedData();
+        REQUIRE(vertices);
+        LLColor4U* colours = reinterpret_cast<LLColor4U*>(vertices + vb->getOffset(LLVertexBuffer::TYPE_COLOR));
+        std::fill(colours, colours + 4, red);
+
+        writeIndices(*vb, 0, 0);
+        mTarget.clear();
+        uploadAndDrawFromScratch(*vb);
+
+        CHECK(at(RIGHT) == packed(green));
+    }
 }
