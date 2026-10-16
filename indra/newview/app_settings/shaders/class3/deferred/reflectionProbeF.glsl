@@ -1027,7 +1027,10 @@ void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 no
     fresnel *= fresnel;
     fresnel *= spec.a;
     glossenv *= spec.rgb*fresnel;
-    glossenv *= vec3(1.0) - color; // fake energy conservation
+    // fake energy conservation: less of the probe where the surface is already lit bright. The
+    // colour here is HDR -- a sun highlight alone peaks far past 1 -- and past 1 this weight
+    // went negative and took light away from the highlight it sat on.
+    glossenv *= max(vec3(1.0) - color, vec3(0.0));
     color.rgb += glossenv*0.5;
 }
 
