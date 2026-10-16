@@ -519,8 +519,15 @@ namespace
             LSLStatement*     yes  = stmt->getTrueBranch();
             LSLStatement*     no   = stmt->getFalseBranch();
             const std::string was  = report.wanted() ? render(stmt) : std::string();
+            // What is taken out from under the if: in a function, not a
+            // state change, which the compiler takes only under one.
+            const auto hoistable = [&](LSLASTNode* x) { return !inFunction(stmt) || !bareStateChange(x); };
             if (render(yes) == render(no))
             {
+                if (!hoistable(yes))
+                {
+                    return false;
+                }
                 const Uncounted uncounted(*ctx.context);
                 Statements      made;
                 if (!changesNothing(c))
@@ -544,7 +551,7 @@ namespace
                 return false;
             }
             const auto movable = [&](LSLASTNode* x) {
-                return !isStatement(x, NODE_DECLARATION) && !isStatement(x, NODE_LABEL) && namesFromOutside(x, stmt);
+                return !isStatement(x, NODE_DECLARATION) && !isStatement(x, NODE_LABEL) && namesFromOutside(x, stmt) && hoistable(x);
             };
             // The last of each, after the if.
             if (render(a.back()) == render(b.back()) && movable(a.back()))

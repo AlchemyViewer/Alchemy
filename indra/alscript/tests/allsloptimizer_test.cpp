@@ -3577,4 +3577,74 @@ namespace
         UNSCOPED_INFO("a length no single is, which the simulator gives by a way not known, left: " + luau);
         CHECK(in(luau, "llVecMag("));
     }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a JSON literal nested past reason is left to the simulator, not read down the stack", "[allsloptimizer]")
+    {
+        const std::string deep(40000, '[');
+        const std::string source = wrap("", "        string t = llJsonValueType(\"" + deep + "\", []);\n        string v = llJsonGetValue(\"" + deep + "\", [0]);\n"
+                                            "        if (llFrand(1) < 0.5)\n        {\n            t = v = \"\";\n        }\n        llSay(0, t + v);\n");
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        UNSCOPED_INFO("optimized: " + notes(r));
+        CHECK(r.optimized);
+        CHECK(in(r.text, "llJsonValueType("));
+        CHECK(in(r.text, "llJsonGetValue("));
+    }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a list literal of many hundreds of elements stays one rather than a sum too deep to walk", "[allsloptimizer]")
+    {
+        std::string elements;
+        for (int i = 1; i <= 1100; ++i)
+        {
+            elements += (i > 1 ? ", " : "") + std::to_string(i);
+        }
+        ALLSLOptimizer::Options lso = options();
+        lso.target                  = ALLSLOptimizer::Target::LSO;
+        const ALLSLOptimizer::Result r =
+            ALLSLOptimizer::run(wrap("", "        list l = [" + elements + "];\n        integer i = (integer)llFrand(1100);\n        llSay(0, (string)llList2Integer(l, i));\n"), lso);
+        UNSCOPED_INFO("optimized: " + notes(r));
+        CHECK(r.optimized);
+        CHECK_FALSE(has(r, "please report it"));
+        CHECK(in(r.text, "[1, 2, 3"));
+        CHECK_FALSE(in(r.text, "(list)1 + 2"));
+        // A short one is a sum there still.
+        const ALLSLOptimizer::Result s =
+            ALLSLOptimizer::run(wrap("", "        integer i = (integer)llFrand(3);\n        list l = [1, 2, 3];\n        llSay(0, (string)llList2Integer(l, i));\n"), lso);
+        UNSCOPED_INFO("short: " + s.text);
+        CHECK(in(s.text, "(list)1 + 2 + 3"));
+    }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: ways the same or ending the same keep a state change under the if in a function", "[allsloptimizer]")
+    {
+        const std::string source = "f(integer x)\n{\n    if (x) state other;\n    else state other;\n}\n"
+                                   "g(integer x)\n{\n    if (x)\n    {\n        llOwnerSay(\"a\");\n        state other;\n    }\n"
+                                   "    else\n    {\n        llOwnerSay(\"b\");\n        state other;\n    }\n}\n"
+                                   "default\n{\n    state_entry()\n    {\n        f(1);\n        g(1);\n    }\n"
+                                   "    touch_start(integer n)\n    {\n        f(n);\n        g(n);\n        if (n) state other;\n        else state other;\n    }\n}\n"
+                                   "state other\n{\n    state_entry()\n    {\n    }\n}\n";
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        UNSCOPED_INFO("optimized: " + notes(r));
+        CHECK(r.optimized);
+        ALLSLService service;
+        for (const ALScriptProblem& p : service.check(r.text))
+        {
+            UNSCOPED_INFO("what was written compiles: " + p.message + "\n" + r.text);
+            REQUIRE(p.severity != ALScriptProblem::Severity::Error);
+        }
+        const auto body = [&r](const char* head) {
+            const size_t at = r.text.find(std::string(head) + "\n{");
+            return at == std::string::npos ? std::string() : r.text.substr(at, r.text.find("\n}", at) - at);
+        };
+        UNSCOPED_INFO("f keeps its if, its ways the same: " + r.text);
+        CHECK(body("f(integer x)").find("if (") != std::string::npos);
+        UNSCOPED_INFO("g keeps its if, its ways ending the same: " + r.text);
+        CHECK(body("g(integer x)").find("if (") != std::string::npos);
+        CHECK(body("g(integer x)").find("state other;") != std::string::npos);
+        const size_t touch = r.text.find("touch_start(");
+        {
+            INFO("an event changes state as it likes: its if goes: " + r.text);
+            REQUIRE(touch != std::string::npos);
+            CHECK(r.text.find("if (", touch) == std::string::npos);
+            CHECK(r.text.find("state other;", touch) != std::string::npos);
+        }
+    }
 } // anonymous namespace

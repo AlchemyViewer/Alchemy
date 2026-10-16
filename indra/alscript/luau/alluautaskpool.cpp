@@ -29,6 +29,7 @@
 #include "alscriptstack.h"
 
 #include <algorithm>
+#include <utility>
 
 ALLuauTaskPool::ALLuauTaskPool(unsigned threads)
 {
@@ -90,6 +91,30 @@ void ALLuauTaskPool::work()
         // A module's check and lint recurse on how it nests, as the
         // script's own do on the lane, so on as deep a stack: this thread's
         // is the platform's, half a megabyte on macOS.
-        alScriptOnLargeStack(task);
+        // What a task throws past Luau's own catch -- it keeps an internal
+        // compiler error with the module, for the check to throw again on
+        // its thread -- would end this thread, and the process with it.
+        // Kept instead, for whoever runs the pool to take; the module it
+        // was checking is never marked checked, which nothing here can
+        // mend, so the check waiting for it waits on.
+        try
+        {
+            alScriptOnLargeStack(task);
+        }
+        catch (...)
+        {
+            LL_WARNS("ScriptLuau") << "A module's check threw past Luau's own catch" << LL_ENDL;
+            const std::lock_guard<std::mutex> lock(mMutex);
+            if (!mFailed)
+            {
+                mFailed = std::current_exception();
+            }
+        }
     }
+}
+
+std::exception_ptr ALLuauTaskPool::takeFailure()
+{
+    const std::lock_guard<std::mutex> lock(mMutex);
+    return std::exchange(mFailed, nullptr);
 }

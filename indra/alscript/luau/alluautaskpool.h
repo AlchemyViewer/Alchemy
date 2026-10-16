@@ -26,6 +26,7 @@
 
 #include <condition_variable>
 #include <deque>
+#include <exception>
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -50,6 +51,10 @@ public:
     // How many threads one has here: a few, leaving the machine the rest.
     static unsigned threadsWanted();
 
+    // What a task threw out of its thread, the first time, taken once;
+    // nothing where none did.
+    std::exception_ptr takeFailure();
+
 private:
     void work();
 
@@ -57,5 +62,6 @@ private:
     std::condition_variable           mReady;
     std::deque<std::function<void()>> mTasks;
     bool                              mStopping = false;
+    std::exception_ptr                mFailed;
     std::vector<std::thread>          mThreads;
 };

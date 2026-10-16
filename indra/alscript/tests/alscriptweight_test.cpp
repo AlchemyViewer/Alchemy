@@ -1419,4 +1419,13 @@ namespace
             CHECK(found->name.find('\r') == std::string::npos);
         }
     }
+
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: a method line cut before its closing bracket is weighed to its end", "[ALScriptWeight]")
+    {
+        const ALScriptWeight weight = ALScriptWeigh::monoOfCIL(".method public hidebysig static void foo(int32 a, int32 b\n    ret\n"
+                                                               ".method public hidebysig static void bar(\n    ret\n"
+                                                               ".method public hidebysig static void baz()\n    ret\n");
+        CHECK(weight.target == ALScriptWeight::Target::Mono);
+        CHECK(weight.total > 0);
+    }
 }

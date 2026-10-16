@@ -108,15 +108,41 @@ Luau::FrontendOptions ALLuauFrontend::limited() const
     // Each module as Luau checks it, for its lints: noted as the script's
     // whose check it is, and nothing more, since it may be on a thread of
     // the pool's.
+    // Nothing may leave it: a task of the pool's that throws past Luau's
+    // own catch never marks its module checked, and the check waiting for
+    // it would wait for ever. What it throws is kept for the check to tell.
     options.customModuleCheck = [this, script = moduleName](const Luau::SourceModule& source, const Luau::Module&) {
-        const std::lock_guard<std::mutex> lock(checkedMutex);
-        std::vector<std::string>&         noted = checkedNow[script];
-        if (std::find(noted.begin(), noted.end(), source.name) == noted.end())
+        try
         {
-            noted.push_back(source.name);
+            {
+                const std::lock_guard<std::mutex> lock(checkedMutex);
+                std::vector<std::string>&         noted = checkedNow[script];
+                if (std::find(noted.begin(), noted.end(), source.name) == noted.end())
+                {
+                    noted.push_back(source.name);
+                }
+            }
+            if (moduleChecked)
+            {
+                moduleChecked(source.name);
+            }
+        }
+        catch (...)
+        {
+            const std::lock_guard<std::mutex> lock(checkedMutex);
+            if (!checkFailure)
+            {
+                checkFailure = std::current_exception();
+            }
         }
     };
     return options;
+}
+
+std::exception_ptr ALLuauFrontend::takeCheckFailure()
+{
+    const std::lock_guard<std::mutex> lock(checkedMutex);
+    return std::exchange(checkFailure, nullptr);
 }
 
 std::vector<std::string> ALLuauFrontend::takeChecked()
@@ -223,6 +249,16 @@ Luau::CheckResult ALLuauFrontend::checkWithModules(const Luau::FrontendOptions& 
     frontend->queueModuleCheck(moduleName);
     const std::vector<Luau::ModuleName> checked =
         frontend->checkQueuedModules(options, [this](std::vector<std::function<void()>> tasks) { modulePool->run(std::move(tasks)); });
+    // What a task threw out of its thread is the check's to tell, as the
+    // hook's own is.
+    if (const std::exception_ptr failed = modulePool->takeFailure())
+    {
+        const std::lock_guard<std::mutex> lock(checkedMutex);
+        if (!checkFailure)
+        {
+            checkFailure = failed;
+        }
+    }
     // What each module checked now found, as Luau's check reports it.
     Luau::CheckResult              result;
     Luau::FrontendModuleResolver& resolver = autocomplete ? frontend->moduleResolverForAutocomplete : frontend->moduleResolver;

@@ -528,4 +528,32 @@ namespace
         UNSCOPED_INFO("which, as itself, it may name");
         CHECK(blessed.mayFromConfig(s.at("lib/net"), s.at("lib")));
     }
+
+    TEST_CASE("aldiskincludes: a DOS device's name under a blessed folder is refused before the disk is asked", "[aldiskincludes]")
+    {
+#if LL_WINDOWS
+        // Windows opens CON, PRN, AUX, NUL, COM1 to COM9 and LPT1 to LPT9
+        // as the device wherever the name stands in a path, extension or
+        // not, so even asking how such a path stands opens it. Nothing
+        // here can see that the disk was not asked -- NUL answers, and
+        // COM3 may wait on a port -- so this says only what is answered.
+        Scratch           s;
+        const std::string script = s.write("lib/a.lsl", "integer a;\n");
+        ALDiskIncludes    blessed;
+        blessed.bless(s.at("lib"));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/NUL")));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/nul.lsl")));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/COM3.lsl")));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/lpt1")));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/con/a.lsl")));
+        REQUIRE_FALSE(blessed.mayFromConfig(s.at("lib/aux"), s.at("lib")));
+        UNSCOPED_INFO("a file is still a file");
+        CHECK(blessed.admits(script).value_or("") == script);
+        // A name that only begins like one is a file.
+        const std::string console = s.write("lib/console.lsl", "integer c;\n");
+        CHECK(blessed.admits(console).value_or("") == console);
+        const std::string com = s.write("lib/com10.lsl", "integer c;\n");
+        CHECK(blessed.admits(com).value_or("") == com);
+#endif
+    }
 }

@@ -34,6 +34,8 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <exception>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -105,6 +107,12 @@ struct ALLuauFrontend
     // whose check it was, each module once.
     mutable std::mutex checkedMutex;
     mutable boost::unordered_flat_map<std::string, std::vector<std::string>, ll::string_hash, std::equal_to<>> checkedNow;
+    // What the hook threw, the first time, under the same mutex: the
+    // check that follows takes it and tells it (takeCheckFailure).
+    mutable std::exception_ptr checkFailure;
+    // Run by the hook with each module's name, on the thread that checked
+    // it (ALLuauService::setModuleCheckedHook).
+    std::function<void(const std::string& module)> moduleChecked;
 
     ScriptResolver                  files;
     ModeResolver                    configs;
@@ -231,6 +239,8 @@ struct ALLuauFrontend
     // forgotten with a script let go of.
     std::vector<std::string> takeChecked();
     void                     forgetChecked(const std::string& name);
+    // What a module's check hook threw, if anything, taken once.
+    std::exception_ptr       takeCheckFailure();
 
     // The module a question reads, checked where it is not the text's
     // yet; none where the check was stopped. Under the new solver there is
