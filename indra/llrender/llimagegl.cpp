@@ -45,6 +45,7 @@
 #include "llwindow.h"
 #include "llframetimer.h"
 #include <atomic>
+#include <chrono>
 #include <bit>
 #include <boost/unordered_map.hpp>
 
@@ -2227,6 +2228,19 @@ void LLImageGL::afterPublish(std::function<void()> fn)
 }
 
 // static
+void LLImageGL::finishUploads()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    llassert(on_main_thread());
+    const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (publishUploads() > 0 && std::chrono::steady_clock::now() < give_up)
+    {
+        // The oldest is the first to signal, its context's fences signalling in order.
+        constexpr GLuint64 WAIT_NS = 10'000'000;
+        glClientWaitSync(sPendingPublishes.front().mFence, 0, WAIT_NS);
+    }
+}
+
 U32 LLImageGL::publishUploads()
 {
     if (sPendingPublishes.empty())

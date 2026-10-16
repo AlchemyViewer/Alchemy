@@ -252,7 +252,8 @@ std::string responseToString(LLCore::HttpResponse * response)
 //========================================================================
 
 HttpCoroHandler::HttpCoroHandler(LLEventStream &reply) :
-    mReplyPump(reply)
+    mReplyPump(reply),
+    mReplyPumpName(reply.getName())
 {
 }
 
@@ -305,19 +306,22 @@ void HttpCoroHandler::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRespons
         // main thread.
         if (response->getBodySize() > MAX_BODY_SIZE_THRESHOLD)
         {
+            // Held by both halves of the work, so the last of them to go releases it, run or
+            // not: queues closed at shutdown drop the work they still hold unrun.
             response->addRef();
+            std::shared_ptr<LLCore::HttpResponse> held(response, [](LLCore::HttpResponse* r) { r->release(); });
 
             LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
             LL::WorkQueue::ptr_t general_queue = LL::WorkQueue::getInstance("General");
             posted  = main_queue->postTo(
                 general_queue,
-                [handler = shared_from_this(), response, status]() // Work done on general queue
+                [handler = shared_from_this(), response = held, status]() // Work done on general queue
                 {
                     std::pair<LLSD, LLCore::HttpStatus> result;
                     result.second = status;
                     try
                     {
-                        result.first = handler->handleSuccess(response, result.second);
+                        result.first = handler->handleSuccess(response.get(), result.second);
                     }
                     catch (std::bad_alloc&)
                     {
@@ -327,10 +331,9 @@ void HttpCoroHandler::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRespons
                     // LLSD is not thread safe! Be carefull with moving the result around.
                     return result;
                 },
-                [handler = shared_from_this(), response](std::pair<LLSD, LLCore::HttpStatus> result) mutable // Callback to main thread
+                [handler = shared_from_this(), response = held](std::pair<LLSD, LLCore::HttpStatus> result) mutable // Callback to main thread
                 {
-                    handler->replyPost(response, result.second, result.first);
-                    response->release();
+                    handler->replyPost(response.get(), result.second, result.first);
                 });
 
             if (posted)
@@ -338,12 +341,8 @@ void HttpCoroHandler::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRespons
                 // Thread will do the cleanup and notify the pump. Done.
                 return;
             }
-            else
-            {
-                // For whatever reason, failed to post, clean up and
-                // do the work on the main thread.
-                response->release();
-            }
+            // For whatever reason, failed to post: held lets the work's reference go as it
+            // goes, and the work is done on the main thread below.
         }
 
         if (!posted)
@@ -413,7 +412,7 @@ void HttpCoroHandler::replyPost(LLCore::HttpResponse* response, LLCore::HttpStat
         }
     }
 
-    mReplyPump.post(result);
+    LLEventPumps::instance().post(mReplyPumpName, result);
 }
 
 void HttpCoroHandler::writeStatusCodes(LLCore::HttpStatus status, const std::string &url, LLSD &result)

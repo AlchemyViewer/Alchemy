@@ -1843,6 +1843,24 @@ bool LLAppViewer::cleanup()
     velopack_cleanup();
 #endif
 
+    // Finish what the workers have in flight before anything they finish with is torn down.
+    // The General pool and the LLImageGL thread drain as they close, replying to the main
+    // loop's queue, which no frame services any more, and the uploads then publish once the
+    // GPU has done with them: one last frame's worth. Left unrun, the references those
+    // replies hold -- on a texture being uploaded or having its alpha analysed, a material's
+    // asset, an HTTP response -- are never let go.
+    if (mGeneralThreadPool)
+    {
+        mGeneralThreadPool->close();
+    }
+    if (LLImageGLThread::instanceExists())
+    {
+        LLImageGLThread::instance().close();
+    }
+    gMainloopWork.runPending();
+    LLImageGL::finishUploads();
+    gMainloopWork.runPending();
+
     //ditch LLVOAvatarSelf instance
     gAgentAvatarp = NULL;
 

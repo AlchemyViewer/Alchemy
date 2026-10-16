@@ -2546,6 +2546,14 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, bool threaded, bool qa_mod
 
 LLTextureFetch::~LLTextureFetch()
 {
+    // A texture that outlives the fetcher, as one LLWearableList holds does (see
+    // ~LLViewerFetchedTexture), never asks for its worker to be deleted, and with the
+    // thread stopped nothing else will.
+    for (const auto& [id, worker] : mRequestMap)
+    {
+        worker->scheduleDelete();
+    }
+    mRequestMap.clear();
     clearDeleteList();
 
     while (! mCommands.empty())

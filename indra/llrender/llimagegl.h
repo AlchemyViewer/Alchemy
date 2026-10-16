@@ -81,6 +81,11 @@ public:
     // updateClass does this; a loop waiting on texture creation can call it too.
     static U32 publishUploads();
 
+    // Main thread, as the viewer shuts down: wait for the GPU on every upload handed over, a
+    // second at most in all, and publish them, since nothing will poll again. What has not
+    // signalled by then goes unpublished with the rest in cleanupClass.
+    static void finishUploads();
+
     // Get an estimate of how many bytes have been allocated in vram for
     // textures. Allocations recorded via alloc_tex_image with has_mips=true
     // include the full mip pyramid (driver-padded via dataFormatVRAMBytes);
@@ -618,6 +623,9 @@ public:
     // Joins the thread first: run() uses the window and context after the
     // queue closes.
     ~LLImageGLThread() override;
+
+    // Finish the uploads posted and stop the thread, as the destructor does.
+    using LL::ThreadPool::close;
 
     // post a function to be executed on the LLImageGL background thread
     template <typename CALLABLE>

@@ -287,6 +287,10 @@ private:
     void replyPost(LLCore::HttpResponse* response, LLCore::HttpStatus& status, LLSD& result);
 
     LLEventStream &mReplyPump;
+    // The pump is the waiting coroutine's, gone with it if it ends first -- killed as the
+    // viewer quits, say -- while a reply parsed on the General queue is still on its way.
+    // Found again by name, it is posted to only while it is there.
+    std::string mReplyPumpName;
 };
 
 //=========================================================================
