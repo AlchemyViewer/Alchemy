@@ -217,7 +217,8 @@ if(AL_BUILD_TESTS)
   #   refused, results read once their frame has ended, spans, release and
   #   conditional draws;
   # - ALImageSlot: what a unit issues, re-issues and forgets as LLRender keeps
-  #   it, and integer images.
+  #   it, and integer images;
+  # - LLVertexBuffer: what a buffer draws after a second upload.
   al_add_test_binary(
     llrender_gl_shared_tests
     PROJECT llrender
@@ -238,6 +239,7 @@ if(AL_BUILD_TESTS)
       tests/llrender2dutils_gl_test.cpp
       tests/llrendertarget_gl_test.cpp
       tests/lluiimage_test.cpp
+      tests/llvertexbuffer_gl_test.cpp
     LIBRARIES llrender
     SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${font_defines}

@@ -1357,7 +1357,7 @@ U8* LLVertexBuffer::mapVertexBuffer(LLVertexBuffer::AttributeType type, U32 inde
     }
 
 #if LL_DARWIN || LL_ARM64
-    // Region tracking not needed on apple silicon - it recreates entire buffer
+    // Region tracking not needed on apple silicon - it gives GL the entire store again
     // While mIsApple can be encountered under windows, this is a
     // macOS OpenGL behavior workaround. LL_ARM64 check might be not needed
     if (!gGLManager.mIsApple)
@@ -1506,16 +1506,25 @@ void LLVertexBuffer::_unmapBuffer()
 #if LL_DARWIN || LL_ARM64
     if (gGLManager.mIsApple)
     {
+        // Apple's GL-on-Metal is given the whole store again, under the name the buffer already
+        // has. glBufferData on a name the GPU may still be reading gives the name a new store and
+        // leaves the old one to the draws already queued, so nothing waits. glBufferSubData into
+        // that store makes the CPU wait for those draws, and frames slow with it. A new name for
+        // each upload, as this path once made, waits for nothing either, but pays to make and
+        // delete names and keeps every old store the frames delete_buffers holds it. Keep
+        // GL_STATIC_DRAW: a store given again as GL_DYNAMIC_DRAW takes many times as long.
         STOP_GLERROR;
         if (mMappedData)
         {
-            if (mGLBuffer)
+            if (!mGLBuffer)
             {
-                delete_buffers(1, &mGLBuffer);
+                mGLBuffer = gen_buffer();
             }
-            mGLBuffer = gen_buffer();
-            glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
-            sGLRenderBuffer = mGLBuffer;
+            if (mGLBuffer != sGLRenderBuffer)
+            {
+                glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
+                sGLRenderBuffer = mGLBuffer;
+            }
             glBufferData(GL_ARRAY_BUFFER, mSize, mMappedData, GL_STATIC_DRAW);
         }
         else if (mGLBuffer != sGLRenderBuffer)
@@ -1527,15 +1536,15 @@ void LLVertexBuffer::_unmapBuffer()
 
         if (mMappedIndexData)
         {
-            if (mGLIndices)
+            if (!mGLIndices)
             {
-                delete_buffers(1, &mGLIndices);
+                mGLIndices = gen_buffer();
             }
-
-            mGLIndices = gen_buffer();
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mGLIndices);
-            sGLRenderIndices = mGLIndices;
-
+            if (mGLIndices != sGLRenderIndices)
+            {
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mGLIndices);
+                sGLRenderIndices = mGLIndices;
+            }
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, mIndicesSize, mMappedIndexData, GL_STATIC_DRAW);
         }
         else if (mGLIndices != sGLRenderIndices)
