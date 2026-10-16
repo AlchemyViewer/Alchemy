@@ -10226,7 +10226,7 @@ void dump_visual_param(LLFile* file, LLVisualParam* viewer_param, F32 value)
     S32 u8_value = F32_to_U8(value,viewer_param->getMinWeight(),viewer_param->getMaxWeight());
     file->printf("\t\t<param id=\"%d\" name=\"%s\" display=\"%s\" value=\"%.3f\" u8=\"%d\" type=\"%s\" wearable=\"%s\" group=\"%d\"/>\n",
                     viewer_param->getID(), viewer_param->getName().c_str(), viewer_param->getDisplayName().c_str(), value, u8_value, type_string.c_str(),
-                    LLWearableType::getInstance()->getTypeName(LLWearableType::EType(wtype)).c_str(),
+                    std::string(LLWearableType::getTypeName(LLWearableType::EType(wtype))).c_str(),
                     viewer_param->getGroup());
     }
 
@@ -11107,7 +11107,6 @@ void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_weara
 void LLVOAvatar::dumpArchetypeXMLCallback(const std::vector<std::string>& filenames, bool group_by_wearables)
 {
     LLFile outfile;
-    LLWearableType *wr_inst = LLWearableType::getInstance();
     std::string fullpath = filenames[0];
 
     std::error_code ec;
@@ -11125,7 +11124,7 @@ void LLVOAvatar::dumpArchetypeXMLCallback(const std::vector<std::string>& filena
         {
             for (S32 type = LLWearableType::WT_SHAPE; type < LLWearableType::WT_COUNT; type++)
             {
-                const std::string& wearable_name = wr_inst->getTypeName((LLWearableType::EType)type);
+                const std::string wearable_name(LLWearableType::getTypeName((LLWearableType::EType)type));
                 outfile.printf("\n\t\t<!-- wearable: %s -->\n", wearable_name.c_str());
 
                 for (LLVisualParam* param = getFirstVisualParam(); param; param = getNextVisualParam())

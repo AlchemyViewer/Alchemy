@@ -275,7 +275,7 @@ LLViewerWearable* LLWearableList::createNewWearable( LLWearableType::EType type,
     wearable->setType( type, avatarp );
 
     // LLWearableType has pre-translated getTypeLabel(), but it returns 'name', not 'New Name'.
-    std::string name = LLTrans::getString( LLWearableType::getInstance()->getTypeDefaultNewName(wearable->getType()) );
+    std::string name = LLTrans::getString( LLWearableType::getTypeDefaultNewName(wearable->getType()) );
     wearable->setName( name );
 
     LLPermissions perm;

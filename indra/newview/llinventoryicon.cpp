@@ -203,7 +203,7 @@ const std::string& LLInventoryIcon::getIconName(LLInventoryType::EIconName idx)
 LLInventoryType::EIconName LLInventoryIcon::assignWearableIcon(U32 misc_flag)
 {
     const LLWearableType::EType wearable_type = LLWearableType::inventoryFlagsToWearableType(misc_flag);
-    return LLWearableType::getInstance()->getIconName(wearable_type);
+    return LLWearableType::getIconName(wearable_type);
 }
 
 LLInventoryType::EIconName LLInventoryIcon::assignSettingsIcon(U32 misc_flag)

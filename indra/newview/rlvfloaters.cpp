@@ -37,6 +37,8 @@
 #include "rlvhandler.h"
 #include "rlvlocks.h"
 
+#include <fmt/format.h>
+
 // ============================================================================
 // Helper functions
 //
@@ -46,7 +48,7 @@ std::string rlvGetItemName(const LLViewerInventoryItem* pItem)
 {
     if ( (pItem) && ((LLAssetType::AT_BODYPART == pItem->getType()) || (LLAssetType::AT_CLOTHING == pItem->getType())) )
     {
-        return llformat("%s (%s)", pItem->getName().c_str(), LLWearableType::instance().getTypeName(pItem->getWearableType()).c_str());
+        return fmt::format("{} ({})", pItem->getName(), LLWearableType::getTypeName(pItem->getWearableType()));
     }
     else if ( (pItem) && (LLAssetType::AT_OBJECT == pItem->getType()) && (isAgentAvatarValid()) )
     {
@@ -193,8 +195,7 @@ std::string rlvFolderLockSourceToTarget(RlvFolderLocks::folderlock_source_t lock
             }
         case RlvFolderLocks::ST_WEARABLETYPE:
             {
-                const std::string& strTypeName = LLWearableType::instance().getTypeName(boost::get<LLWearableType::EType>(lockSource.second));
-                return llformat("Wearable type (%s)", strTypeName.c_str());
+                return fmt::format("Wearable type ({})", LLWearableType::getTypeName(boost::get<LLWearableType::EType>(lockSource.second)));
             }
         default:
             {
@@ -543,7 +544,7 @@ void RlvFloaterLocks::refreshAll()
     for (RlvWearableLocks::rlv_wearabletypelock_map_t::const_iterator itWearableType = wearableTypeRem.begin();
             itWearableType != wearableTypeRem.end(); ++itWearableType)
     {
-        sdColumns[2]["value"] = LLWearableType::instance().getTypeName(itWearableType->first);
+        sdColumns[2]["value"] = LLWearableType::getTypeName(itWearableType->first);
         sdColumns[3]["value"] = rlvGetItemNameFromObjID(itWearableType->second);
 
         pLockList->addElement(sdRow, ADD_BOTTOM);

@@ -185,7 +185,7 @@ LLSD LLBakingTexLayerSet::computeTextureIDs() const
     {
         entry = LLAvatarAppearance::getDictionary()->getTexture((*idx_iter));
         idx_str << (*idx_iter) << " (" << entry->mDefaultImageName
-                << ";" << LLWearableType::getInstance()->getTypeName( entry->mWearableType )
+                << ";" << LLWearableType::getTypeName( entry->mWearableType )
                 << "), ";
     }
     LL_DEBUGS() << "BakedEntry::mLocalTextures: " << idx_str.str() << LL_ENDL;
@@ -195,7 +195,7 @@ LLSD LLBakingTexLayerSet::computeTextureIDs() const
     for (; type_iter != type_end; ++type_iter)
     {
         type_str << (S32) (*type_iter)  << " ("
-                << LLWearableType::getInstance()->getTypeName( (*type_iter) )
+                << LLWearableType::getTypeName( (*type_iter) )
                 << "), ";
     }
     LL_DEBUGS() << "BakedEntry::mWearables: " << type_str.str() << LL_ENDL;
@@ -280,16 +280,16 @@ bool LLBakingTexLayerSet::computeLayerListTextureIDs(LLMD5& hash,
         {
             LL_DEBUGS() << "LLTexLayerInterface(" << layer_template->getName() << ") type = "
                     << (S32) wearable_type << " ("
-                    << LLWearableType::getInstance()->getTypeName( wearable_type ) << ") te = "
+                    << LLWearableType::getTypeName( wearable_type ) << ") te = "
                     << (S32) te << " ("<< entry->mDefaultImageName
-                    << ";" << LLWearableType::getInstance()->getTypeName( entry->mWearableType )
+                    << ";" << LLWearableType::getTypeName( entry->mWearableType )
                     << ") wearable_count = " << num_wearables << LL_ENDL;
         }
         else
         {
             LL_DEBUGS() << "LLTexLayerInterface(" << layer_template->getName() << ") type = "
                     << (S32) wearable_type << " ("
-                    << LLWearableType::getInstance()->getTypeName( wearable_type )
+                    << LLWearableType::getTypeName( wearable_type )
                     << ") wearable_count = " << num_wearables << LL_ENDL;
         }
 #endif
