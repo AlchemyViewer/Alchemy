@@ -2,8 +2,10 @@ name: Sanitizers
 
 # The tests built and run under the sanitizers, on Linux x64 with Clang:
 # AddressSanitizer with UndefinedBehaviorSanitizer on every pull request,
-# ThreadSanitizer too in the nightly run. Every row is advisory: it reports
-# and never fails the run. See doc/TESTING.md.
+# ThreadSanitizer too in the nightly run, and the libFuzzer drivers built in
+# an AddressSanitizer tree and run over their corpora on every pull request.
+# Every row is advisory: it reports and never fails the run. See
+# doc/TESTING.md.
 
 on:
   workflow_dispatch:
@@ -32,18 +34,26 @@ concurrency:
 
 jobs:
   test:
-    name: test (${{ matrix.sanitizer }})
+    name: test (${{ matrix.job }})
     strategy:
       fail-fast: false
       matrix:
         # ThreadSanitizer runs many times slower than the tests do, so it
-        # waits for the nightly run, or one started by hand.
-        sanitizer: ${{ fromJSON(github.event_name == 'pull_request' && '["asan"]' || '["asan", "tsan"]') }}
+        # waits for the nightly run, or one started by hand. The fuzz row is
+        # an AddressSanitizer tree configured with AL_BUILD_FUZZERS, so that
+        # the drivers compile and their corpus runs (the entries labelled
+        # fuzz) pass, which nothing else builds: a driver that stopped
+        # compiling would otherwise be found by whoever next fuzzes by hand.
+        job: ${{ fromJSON(github.event_name == 'pull_request' && '["asan", "fuzz"]' || '["asan", "tsan", "fuzz"]') }}
     runs-on: ubuntu-26.04
     continue-on-error: true
-    timeout-minutes: ${{ matrix.sanitizer == 'tsan' && 340 || 180 }}
+    timeout-minutes: ${{ matrix.job == 'tsan' && 340 || 180 }}
     env:
-      BUILD_DIRECTORY: build-Linux-ninja-os-${{ matrix.sanitizer }}
+      # The sanitizer preset the row builds with: the fuzz row's is the
+      # AddressSanitizer one, which libFuzzer runs on.
+      SANITIZER: ${{ matrix.job == 'fuzz' && 'asan' || matrix.job }}
+      FUZZERS: ${{ matrix.job == 'fuzz' }}
+      BUILD_DIRECTORY: build-Linux-ninja-os-${{ matrix.job == 'fuzz' && 'asan' || matrix.job }}
       # The tests that render on a hidden window, on Mesa's llvmpipe.
       LIBGL_ALWAYS_SOFTWARE: 1
       LOGFAIL: DEBUG
@@ -105,30 +115,46 @@ jobs:
         run: sudo apt install -y clang lld llvm libclang-rt-dev
 
       # The preset turns the tests on and picks the sanitizer triplet, whose
-      # ports the cache holds once a protected run has built them.
+      # ports the cache holds once a protected run has built them. LL's LSL
+      # compiler, whose tests and fuzzers are much of what runs here, is
+      # required rather than left out when something it needs is missing.
       - name: Configure
         shell: bash
-        env:
-          SANITIZER: ${{ matrix.sanitizer }}
         run: |
           set -x
           cmake -S indra --preset "ninja-os-$SANITIZER" \
             -DVCPKG_INSTALL_OPTIONS=--clean-after-build \
             -DAL_BUILD_VIEWER:BOOL=OFF \
             -DAL_ENABLE_GL_TESTS:BOOL=ON \
+            -DAL_REQUIRE_LSCRIPT:BOOL=ON \
+            -DAL_BUILD_FUZZERS:BOOL="$FUZZERS" \
             "-DAL_TEMPLATE_VERIFIER_MASTER_URL=file://$master_message_template_checkout/message_template.msg"
 
+      # The fuzz row builds the drivers alone: the tests they would share the
+      # tree with run on the asan row.
       - name: Build
         shell: bash
-        run: cmake --build "$BUILD_DIRECTORY" --config RelWithDebInfo --target BUILD_TESTS --parallel "$(nproc)"
+        run: |
+          if [[ "$FUZZERS" == "true" ]]; then
+            targets=(lscript_fuzz_source lscript_fuzz_program alscript_fuzz_lsl alscript_fuzz_format)
+          else
+            targets=(BUILD_TESTS)
+          fi
+          cmake --build "$BUILD_DIRECTORY" --config RelWithDebInfo --target "${targets[@]}" --parallel "$(nproc)"
 
       # Every entry but the benchmarks: the default run and each binary's run
-      # of all its files in one process, combined_pending or not. An entry
-      # fails on a sanitizer's report whatever its exit code.
+      # of all its files in one process, combined_pending or not. On the fuzz
+      # row, the drivers' corpus runs. An entry fails on a sanitizer's report
+      # whatever its exit code.
       - name: Test
         shell: bash
         run: |
-          ctest --test-dir "$BUILD_DIRECTORY" -C RelWithDebInfo -LE benchmark \
+          if [[ "$FUZZERS" == "true" ]]; then
+            chosen=(-L fuzz)
+          else
+            chosen=(-LE benchmark)
+          fi
+          ctest --test-dir "$BUILD_DIRECTORY" -C RelWithDebInfo "${chosen[@]}" \
             --parallel "$(nproc)" --output-on-failure \
             --output-junit Testing/test-results.xml
 
@@ -138,11 +164,11 @@ jobs:
         if: ${{ !cancelled() }}
         shell: bash
         env:
-          SANITIZER: ${{ matrix.sanitizer }}
+          JOB: ${{ matrix.job }}
         run: |
           log="$BUILD_DIRECTORY/Testing/Temporary/LastTest.log"
           {
-            echo "### $SANITIZER"
+            echo "### $JOB"
             if [[ ! -f "$log" ]]; then
               echo "No test log: the tests did not run."
               exit 0
@@ -163,7 +189,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
-          name: "sanitizer-results-${{ matrix.sanitizer }}"
+          name: "sanitizer-results-${{ matrix.job }}"
           path: |
             ${{ env.BUILD_DIRECTORY }}/Testing/test-results.xml
             ${{ env.BUILD_DIRECTORY }}/Testing/Temporary/LastTest*.log

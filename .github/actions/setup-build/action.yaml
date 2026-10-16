@@ -121,6 +121,32 @@ runs:
           nohup sudo rm -rf "${doomed[@]}" > /dev/null 2>&1 &
         fi
 
+    # bison 3 and flex for LL's LSL compiler (indra/lscript), which the tests
+    # build as a reference, as the Linux and macOS steps above install them:
+    # winflexbison's win_bison and win_flex, which CMake's FindBISON and
+    # FindFLEX look for under those names. The release vcpkg's own
+    # vcpkg_find_acquire_program(BISON) takes, pinned by its hash; 2.5.24
+    # rather than 2.5.25, whose win_bison races in %TEMP%
+    # (lexxmark/winflexbison#86).
+    - name: Windows winflexbison install
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $version = "2.5.24"
+        $sha512 = "dc89fcdaa7071fbbf88b0755b799d69223240c28736924b4c30968c08e7e0b116c7e05ae98a9257be26a1dfb4aa70a628808a6b6018706bf857555c5b4335018"
+        $archive = Join-Path $env:RUNNER_TEMP "win_flex_bison-$version.zip"
+        $tools = Join-Path $env:RUNNER_TEMP "winflexbison"
+        Invoke-WebRequest -Uri "https://github.com/lexxmark/winflexbison/releases/download/v$version/win_flex_bison-$version.zip" -OutFile $archive
+        $hash = (Get-FileHash -Algorithm SHA512 -Path $archive).Hash.ToLowerInvariant()
+        if ($hash -ne $sha512) {
+          throw "win_flex_bison-$version.zip: SHA-512 $hash, expected $sha512"
+        }
+        Expand-Archive -Path $archive -DestinationPath $tools -Force
+        Remove-Item $archive
+        Add-Content -Path $env:GITHUB_PATH -Value $tools
+        & (Join-Path $tools "win_bison.exe") --version
+        & (Join-Path $tools "win_flex.exe") --version
+
     - name: Setup python
       uses: actions/setup-python@v7
       with:

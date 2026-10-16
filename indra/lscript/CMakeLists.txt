@@ -219,11 +219,9 @@ al_add_test_binary(
 # inputs from a fixed seed, the source fuzzer over the scripts of alscript's
 # tests and the regression scripts (tests/regressions), each a fault one of
 # them found, which lscript_tests runs as well. doc/TESTING.md says how to
-# run them for longer.
+# run them for longer. That the compiler is Clang with AddressSanitizer is
+# checked before alscript is added (indra/CMakeLists.txt).
 if(AL_BUILD_FUZZERS)
-  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR NOT "address" IN_LIST AL_SANITIZERS)
-    message(FATAL_ERROR "AL_BUILD_FUZZERS needs Clang and address in AL_SANITIZERS")
-  endif()
   target_compile_options(lscript PRIVATE -fsanitize=fuzzer-no-link)
   foreach(fuzzer IN ITEMS source program)
     add_executable(lscript_fuzz_${fuzzer} fuzz/allsofuzz${fuzzer}.cpp)
@@ -240,11 +238,17 @@ if(AL_BUILD_FUZZERS)
     NAME lscript_fuzz_program
     COMMAND lscript_fuzz_program -runs=3000 -seed=1 -close_fd_mask=1
   )
+  # libFuzzer writes the inputs it keeps into the first corpus directory it
+  # is given, so that is a scratch one in the build tree: the directories
+  # after it are the tests' own scripts, which other tests hold to exactly
+  # the files they have.
+  set(fuzz_corpus ${CMAKE_CURRENT_BINARY_DIR}/fuzz_corpus/source)
+  file(MAKE_DIRECTORY ${fuzz_corpus})
   add_test(
     NAME lscript_fuzz_source
     COMMAND
       lscript_fuzz_source -runs=0 -close_fd_mask=1 -dict=${CMAKE_CURRENT_SOURCE_DIR}/fuzz/lsl.dict
-      ${INDRA_SOURCE_DIR}/alscript/tests/tailslide/scripts
+      ${fuzz_corpus} ${INDRA_SOURCE_DIR}/alscript/tests/tailslide/scripts
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/regressions
   )
   set_tests_properties(

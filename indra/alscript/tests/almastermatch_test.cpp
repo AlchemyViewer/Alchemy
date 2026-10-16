@@ -26,6 +26,7 @@
 
 #include "../masters/almastermatch.h"
 
+#include "altestlinks.h"
 #include "fsyspath.h"
 #include "llfile.h"
 
@@ -241,26 +242,33 @@ namespace
         CHECK(almastermatch_data::resolved("~/door.lsl", blessed, false) ==
                       std::string("- '~/door.lsl' is from a home folder, which a hint is not followed to"));
 
+#if LL_WINDOWS
+        // Windows' own link to a folder, which any user may make, so it is
+        // tried on every Windows machine, where a symlink may not be.
+        UNSCOPED_INFO("a junction to a folder outside");
+        REQUIRE(!ll_test::createDirectoryJunction(s.root / "private", s.root / "a" / "hatch"));
+        CHECK(almastermatch_data::resolved("hatch/secret.lsl", blessed, false).substr(0, 1) == std::string("-"));
+        UNSCOPED_INFO("a junction to another blessed folder is followed");
+        REQUIRE(!ll_test::createDirectoryJunction(s.root / "b", s.root / "a" / "within"));
+        CHECK(almastermatch_data::resolved("within/other.lsl", blessed, false) == other);
+#endif
         std::error_code ec;
         fs::create_symlink(fsyspath(secret), s.root / "a" / "innocent.lsl", ec);
-        if (!ec)
+        if (ec)
         {
-            UNSCOPED_INFO("a link out of the folder");
-            CHECK(almastermatch_data::resolved("innocent.lsl", blessed, false).substr(0, 1) == std::string("-"));
+            SKIP("no symlinks here: " << ec.message());
         }
+        UNSCOPED_INFO("a link out of the folder");
+        CHECK(almastermatch_data::resolved("innocent.lsl", blessed, false).substr(0, 1) == std::string("-"));
         fs::create_directory_symlink(s.root / "private", s.root / "a" / "door", ec);
-        if (!ec)
-        {
-            UNSCOPED_INFO("nor a file through a linked folder");
-            CHECK(almastermatch_data::resolved("door/secret.lsl", blessed, false).substr(0, 1) ==
-                          std::string("-"));
-        }
+        REQUIRE(!ec);
+        UNSCOPED_INFO("nor a file through a linked folder");
+        CHECK(almastermatch_data::resolved("door/secret.lsl", blessed, false).substr(0, 1) ==
+                      std::string("-"));
         fs::create_symlink(fsyspath(other), s.root / "a" / "inward.lsl", ec);
-        if (!ec)
-        {
-            UNSCOPED_INFO("a link to another blessed folder is followed");
-            CHECK(almastermatch_data::resolved("inward.lsl", blessed, false) == other);
-        }
+        REQUIRE(!ec);
+        UNSCOPED_INFO("a link to another blessed folder is followed");
+        CHECK(almastermatch_data::resolved("inward.lsl", blessed, false) == other);
     }
 
     TEST_CASE_METHOD(almastermatch_data, "almastermatch: only a script of the item's language and a sensible size", "[almastermatch]")
@@ -305,12 +313,13 @@ namespace
 
         std::error_code ec;
         fs::create_symlink(fsyspath(notes), s.root / "a" / "fake.lsl", ec);
-        if (!ec)
+        if (ec)
         {
-            UNSCOPED_INFO("a script's name for another kind of file");
-            CHECK(almastermatch_data::resolved("fake.lsl", blessed, false) ==
-                          std::string("- 'fake.lsl' leads to a file that is not an LSL script (.lsl, .lslh or .lsli)"));
+            SKIP("no symlinks here: " << ec.message());
         }
+        UNSCOPED_INFO("a script's name for another kind of file");
+        CHECK(almastermatch_data::resolved("fake.lsl", blessed, false) ==
+                      std::string("- 'fake.lsl' leads to a file that is not an LSL script (.lsl, .lslh or .lsli)"));
     }
 
     TEST_CASE_METHOD(almastermatch_data, "almastermatch: an alias names a folder but is held to the blessed folders all the same", "[almastermatch]")

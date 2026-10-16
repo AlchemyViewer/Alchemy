@@ -313,6 +313,8 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 | `AL_BUILD_APPEARANCE_UTILITY` | OFF     | Build the appearance utility                                          |
 | `AL_BUILD_TESTS`         | OFF     | Build and run unit + integration tests                                |
 | `AL_ENABLE_GL_TESTS`     | ON      | Run the tests that render on a hidden window; off, they are built and registered disabled (needs `AL_BUILD_TESTS`) |
+| `AL_REQUIRE_LSCRIPT`     | OFF     | Fail to configure when LL's LSL compiler (`indra/lscript`, a test-only reference needing bison 3, flex and Python with `yaml` and `llsd`) cannot be built, rather than leave it out; CI's test rows set it (needs `AL_BUILD_TESTS`) |
+| `AL_BUILD_FUZZERS`       | OFF     | Build the libFuzzer drivers on LL's LSL compiler and Script Studio's analysis: Clang with `address` in `AL_SANITIZERS`; see [`TESTING.md`](TESTING.md#fuzzing) (needs `AL_BUILD_TESTS`) |
 | `AL_BUILD_DOCS`          | OFF     | Add the `doc` target (API documentation with Doxygen)                 |
 | `AL_VCPKG_INSTALL`       | ON      | Let configure run `vcpkg install` when the manifest, the registry configuration, the triplets or the feature list changed; off leaves the ports to you |
 | `AL_BUILD_PACKAGE`       | ON      | Add the `package` target: the CPack archive of the installed tree (zip, tar.xz, dmg), and on Linux the .deb and .rpm |

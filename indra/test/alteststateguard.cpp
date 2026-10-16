@@ -133,6 +133,10 @@ namespace ll_test
         // current on each drive: a change of directory makes one for its
         // drive, as a font or GL driver lookup on the system drive does from
         // a tree on another, and the working directory has its own check.
+        // Nor _NT_SYMBOL_PATH, dbghelp's: Tracy's profiler thread appends
+        // the executable's folder to it as it starts (TracyCallstack.cpp),
+        // on its own time, so whichever case was running when it did would
+        // be blamed for it.
         std::string environment()
         {
             std::vector<std::string> variables;
@@ -142,6 +146,10 @@ namespace ll_test
                 for (const wchar_t* entry = block; *entry; entry += wcslen(entry) + 1)
                 {
                     if (entry[0] == L'=' && std::iswalpha(entry[1]) && entry[2] == L':')
+                    {
+                        continue;
+                    }
+                    if (_wcsnicmp(entry, L"_NT_SYMBOL_PATH=", 16) == 0)
                     {
                         continue;
                     }

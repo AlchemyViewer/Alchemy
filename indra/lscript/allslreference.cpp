@@ -132,11 +132,24 @@ ALLSLReference::Result ALLSLReference::compile(const std::string& text, Target t
     static std::mutex one_at_a_time;
     std::lock_guard   lock(one_at_a_time);
 
+    // A folder of this compile's own for the files LL's compiler reads and
+    // writes, gone however the compile ends: an LL_ERRS inside it is thrown
+    // through here in a test (ll_test::FatalError), and left the folder
+    // behind when the removal was the last statement.
+    struct TempDir
+    {
+        std::filesystem::path path;
+        ~TempDir()
+        {
+            std::error_code ignored;
+            std::filesystem::remove_all(path, ignored);
+        }
+    };
     static std::atomic<U32> made{ 0 };
     std::error_code         ec;
-    const std::filesystem::path dir =
-        std::filesystem::temp_directory_path(ec) /
-        ("allslreference-" + std::to_string(LLApp::getPid()) + "-" + std::to_string(made++));
+    const TempDir           temp{ std::filesystem::temp_directory_path(ec) /
+                        ("allslreference-" + std::to_string(LLApp::getPid()) + "-" + std::to_string(made++)) };
+    const std::filesystem::path& dir = temp.path;
     std::filesystem::create_directories(dir, ec);
     const std::filesystem::path source = dir / "script.lsl";
     const std::filesystem::path image  = dir / "script.out.bin";
@@ -165,6 +178,5 @@ ALLSLReference::Result ALLSLReference::compile(const std::string& text, Target t
     {
         r.image.assign(written.begin(), written.end());
     }
-    std::filesystem::remove_all(dir, ec);
     return r;
 }

@@ -30,6 +30,7 @@
 #include "../lsl/optimizer/allsloptimizer.h"
 #include "../lsl/allslservice.h"
 #include "../lsl/allsltraits.h"
+#include "alteststateguard.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -1307,6 +1308,9 @@ namespace
         after.join();
         UNSCOPED_INFO("another, once it is out: nothing");
         CHECK(al_script_engine::clashes().load() == before + 1);
+        // The clash was this case's on purpose: the guard's check on the
+        // count, which names a case that clashed by mistake, takes it.
+        ll_test::StateGuard::accept("Tailslide's clashes");
     }
 
     TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: list literal sums bracket elements and stay literals where order shows", "[allsloptimizer]")

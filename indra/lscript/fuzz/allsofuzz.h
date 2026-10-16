@@ -50,17 +50,20 @@ namespace ll_fuzz_lso
     // never stops.
     constexpr U32 STEPS = 50000;
 
-    // Until idle, as the tests' settle() is (tests/allsovmrun.h).
-    inline void steps(LLScriptExecuteLSL2& vm, const char*& error, U32& events)
+    // Until idle, as the tests' settle() is (tests/allsovmrun.h): true when
+    // the VM settled or faulted, false when STEPS ran out, a script that
+    // spins.
+    [[nodiscard]] inline bool steps(LLScriptExecuteLSL2& vm, const char*& error, U32& events)
     {
         for (U32 i = 0; i < STEPS && !error; ++i)
         {
             vm.runInstructions(FALSE, LLUUID::null, &error, events, 1.f);
             if (vm.isFinished() && !vm.isStateChangePending() && vm.getEventCount() == 0 && (vm.getCurrentEvents() & vm.getEventHandlers()) == 0)
             {
-                return;
+                return true;
             }
         }
+        return error != nullptr;
     }
 
     // An event's arguments, ended by one of no type as the VM reads them.
@@ -111,40 +114,46 @@ namespace ll_fuzz_lso
         { LSTT_TOUCH_START, { LST_INTEGER }, 1 },
     };
 
+    // What came of a script: what the compiler said if it would not compile
+    // it, the fault that ended its run if one did, and whether the run was
+    // stopped by its steps running out rather than settling. A script that
+    // spins is no finding -- its author may write one, and the grid gives
+    // it time slices for ever -- but a run that was cut short is not a clean
+    // one, and is said so.
+    struct Outcome
+    {
+        bool        compiled = false;
+        std::string messages;
+        std::string fault;
+        bool        capped = false;
+    };
+
     // The image run: state_entry, then each of KINDS its state handles,
-    // each until the VM settles or its steps run out. The fault that ended
-    // it, if one did.
-    inline std::string run(const U8* image, U32 size)
+    // each until the VM settles or its steps run out, after which no more
+    // are sent. The fault that ended it, if one did, and whether the steps
+    // ran out, into the outcome.
+    inline void run(const U8* image, U32 size, Outcome& outcome)
     {
         ll_rand_seed(0);
         LLScriptExecuteLSL2 vm(image, size);
         const char*         error  = nullptr;
         U32                 events = 0;
-        steps(vm, error, events);
+        outcome.capped             = !steps(vm, error, events);
         for (const Kind& kind : KINDS)
         {
-            if (error)
+            if (error || outcome.capped)
             {
                 break;
             }
             if (vm.getEventHandlers() & LSCRIPTStateBitField[kind.type])
             {
                 vm.addEvent(new LLScriptDataCollection(kind.type, arguments(kind.args, kind.count)));
-                steps(vm, error, events);
+                outcome.capped = !steps(vm, error, events);
             }
         }
         ll_test_lso::gSaid.clear();
-        return error ? error : "";
+        outcome.fault = error ? error : "";
     }
-
-    // What came of a script: what the compiler said if it would not compile
-    // it, and the fault that ended its run if one did.
-    struct Outcome
-    {
-        bool        compiled = false;
-        std::string messages;
-        std::string fault;
-    };
 
     // The script as the grid takes it: compiled to LSO and run, and compiled
     // to CIL, which no VM here runs but whose emitting is LL's code too.
@@ -158,7 +167,7 @@ namespace ll_fuzz_lso
             outcome.messages = lso.messages;
             return outcome;
         }
-        outcome.fault = run(lso.image.data(), static_cast<U32>(lso.image.size()));
+        run(lso.image.data(), static_cast<U32>(lso.image.size()), outcome);
         ALLSLReference::compile(text, ALLSLReference::Target::CIL);
         return outcome;
     }
