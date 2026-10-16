@@ -1627,6 +1627,7 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
 #endif
             mNeedsCreateTexture = true;
             auto mainq = LLImageGLThread::sEnabledTextures ? mMainQueue.lock() : nullptr;
+            bool posted = false;
             if (mainq)
             {
                 // Until the worker's texture publishes, the image goes on reporting the one
@@ -1635,8 +1636,7 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
                 // callback below, whether or not a texture came of it.
                 LLPointer<LLImageGL> gl_image = mGLTexturep;
                 gl_image->beginUpload(mRawImage->getComponents());
-                ref();
-                mainq->postTo(
+                posted = mainq->postTo(
                     mImageQueue,
                     // work to be done on LLImageGL worker thread
 #if LL_IMAGEGL_THREAD_CHECK
@@ -1687,9 +1687,26 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
                             unref();
                         });
                     });
+                if (posted)
+                {
+                    // Taken once the post has succeeded, as LLImageGL::analyzeAlpha takes its
+                    // own: the callback that lets it go runs on this thread's queue, so not
+                    // before this returns, and no reference is taken and dropped again when
+                    // the post fails.
+                    ref();
+                }
+                else
+                {
+                    // The LLImageGL thread has closed, as the viewer quits: nothing will run
+                    // the upload or end it.
+                    gl_image->endUpload();
+                }
             }
-            else
+            if (!posted)
             {
+#if LL_IMAGEGL_THREAD_CHECK
+                delete[] data_copy;
+#endif
                 if (!mCreatePending)
                 {
                     mCreatePending = true;

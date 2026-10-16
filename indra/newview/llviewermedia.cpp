@@ -3114,17 +3114,15 @@ void LLViewerMediaImpl::update()
     {
         // Push update to worker thread
         auto main_queue = LLImageGLThread::sEnabledMedia ? mMainQueue.lock() : nullptr;
+        bool posted = false;
         if (main_queue)
         {
-            mTextureUpdatePending = true;
-            ref();  // protect texture from deletion while active on bg queue
-            media_tex->ref();
             // The texture reports the frame it shows until the worker's publishes: see
             // LLImageGL::beginUpload, taken here on the main thread before the post and
             // released in the callback.
             LLPointer<LLImageGL> gl_image = media_tex->getGLTexture();
             gl_image->beginUpload();
-            main_queue->postTo(
+            posted = main_queue->postTo(
                 mTexUpdateQueue, // Worker thread queue
                 [=, this]() // work done on update worker thread
                 {
@@ -3149,8 +3147,21 @@ void LLViewerMediaImpl::update()
                         unref();
                     });
                 });
+            if (posted)
+            {
+                // Taken once the post has succeeded: the callback that lets them go runs
+                // on this thread's queue, so not before this returns.
+                mTextureUpdatePending = true;
+                ref();  // protect texture from deletion while active on bg queue
+                media_tex->ref();
+            }
+            else
+            {
+                // The LLImageGL thread has closed, as the viewer quits.
+                gl_image->endUpload();
+            }
         }
-        else
+        if (!posted)
         {
             doMediaTexUpdate(media_tex, data, data_width, data_height, x_pos, y_pos, width, height, false); // otherwise, update on main thread
         }
