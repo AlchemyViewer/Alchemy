@@ -4851,4 +4851,41 @@ namespace
         CHECK(has(r, "\n    print(s)\n"));
         require_checks_clean(r);
     }
+
+    // A call in brackets is a value whatever its strings hold: a bracket in
+    // a template's text, or after an expression in it, closes nothing.
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a bracket in a template's text does not make a value a call", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    llStringLength(\"))\" + (string)n);\n"
+                                                        "    llStringLength(\"(\" + (string)n + \"})`)\");\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        CHECK(has(r, "local _ = (utf8.len(`)){n}`) :: number)\n"));
+        CHECK(has(r, "local _ = (utf8.len(`({n}})\\`)`) :: number)\n"));
+        UNSCOPED_INFO("no line opens with what is no call");
+        CHECK_FALSE(has(r, "\n    ("));
+        require_checks_clean(r);
+    }
+
+    // A value nothing reads is named apart from the script's own `_`, which
+    // `local _` would hide from the reads after it.
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a value nothing reads does not hide the script's own _", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    list l = [1, 2]; integer _ = 2;\n"
+                                                        "    llGetListLength(l);\n"
+                                                        "    llListen(n, \"\", \"\", \"\") + 1;\n"
+                                                        "    llOwnerSay((string)_);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        CHECK(has(r, "local _ = 2\n"));
+        UNSCOPED_INFO("a call written as other than one");
+        CHECK(has(r, "local _2 = #l\n"));
+        UNSCOPED_INFO("an expression for what it does");
+        CHECK(has(r, "local _2 = ll.Listen(n, "));
+        UNSCOPED_INFO("the script's _ read after them");
+        CHECK(has(r, "print(tostring(_))\n"));
+        require_checks_clean(r);
+    }
 }

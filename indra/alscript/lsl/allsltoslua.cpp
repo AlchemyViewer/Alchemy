@@ -205,6 +205,41 @@ namespace
         return e.bare.empty() ? e : Expr{ e.bare, PRIMARY, e.boolean };
     }
 
+    // Where a string of Luau's that opens at `at` ends: past its closing
+    // quote. Between backticks each {expression} is passed whole, whatever
+    // strings and brackets it holds.
+    size_t pastString(std::string_view text, size_t at)
+    {
+        const char quote = text[at];
+        for (++at; at < text.size() && text[at] != quote; ++at)
+        {
+            if (text[at] == '\\')
+            {
+                ++at;
+            }
+            else if (quote == '`' && text[at] == '{')
+            {
+                for (int depth = 0; at < text.size(); ++at)
+                {
+                    const char c = text[at];
+                    if (c == '"' || c == '\'' || c == '`')
+                    {
+                        at = pastString(text, at) - 1;
+                    }
+                    else if (c == '{')
+                    {
+                        ++depth;
+                    }
+                    else if (c == '}' && --depth == 0)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        return std::min(at + 1, text.size());
+    }
+
     // Whether Luau takes it as a statement: a call, and not one in
     // brackets, `(f(x))`, which is a value.
     bool callText(const Expr& e)
@@ -218,17 +253,15 @@ namespace
         {
             return true;
         }
-        // Whether the bracket it opens with closes at its end.
+        // Whether the bracket it opens with closes at its end, the brackets
+        // in its strings, or in a template's text, counted for nothing.
         int depth = 0;
         for (size_t at = 0; at < text.size(); ++at)
         {
             const char c = text[at];
-            if (c == '"' || c == '\'')
+            if (c == '"' || c == '\'' || c == '`')
             {
-                for (++at; at < text.size() && text[at] != c; ++at)
-                {
-                    at += text[at] == '\\';
-                }
+                at = pastString(text, at) - 1;
             }
             else if (c == '(')
             {
@@ -907,6 +940,9 @@ namespace
         std::string freshName(const std::string& base);
         // Every name the script has, and those made fresh, in mTaken.
         void takeNames();
+        // The name of a value nothing reads, `_` as Luau writes one, unless
+        // the script has a name that it would hide.
+        const std::string& unreadName();
 
         // --- steps as statements -----------------------------------------------------
 
@@ -1102,6 +1138,7 @@ namespace
         // name. A name for each depth of such loops, made once.
         boost::unordered_flat_map<LSLSymbol*, std::string>    mEach;
         std::vector<std::string>                              mItemNames;
+        // unreadName's, made once.
         std::string                                           mUnread;
         // What a step inside an expression was, made once.
         std::string                                           mWas;
@@ -4848,7 +4885,7 @@ namespace
                 // A call, as it is; one written as something else -- #l,
                 // a ^ b, an index -- in what Luau takes as a statement.
                 const Expr called = oneValue(expr(e));
-                line(callText(called) ? called.text : "local _ = " + called.text);
+                line(callText(called) ? called.text : "local " + unreadName() + " = " + called.text);
                 return;
             }
             case NODE_PRINT_EXPRESSION:
@@ -4861,7 +4898,7 @@ namespace
         // anything, in what Luau takes as a statement.
         if (!ALLSLTraits::sideEffectFree(e))
         {
-            line("local _ = " + value(e).text);
+            line("local " + unreadName() + " = " + value(e).text);
         }
     }
 
@@ -5727,14 +5764,9 @@ namespace
             {
                 mItemNames.push_back(freshName("item"));
             }
-            // The index unread, as Luau writes one, unless the script has
-            // a name that would be hidden by it.
-            if (mUnread.empty())
-            {
-                takeNames();
-                mUnread = mTaken.contains("_") ? freshName("_") : std::string("_");
-            }
-            line("for " + mUnread + ", " + mItemNames[depth] + " in " + lvalue(static_cast<LSLLValueExpression*>(unwrapped(listed))).text + " do");
+            // The index unread.
+            line("for " + unreadName() + ", " + mItemNames[depth] + " in " + lvalue(static_cast<LSLLValueExpression*>(unwrapped(listed))).text +
+                 " do");
             mEach[c.var] = mItemNames[depth];
         }
         else
@@ -7208,6 +7240,16 @@ namespace
         }
         mTaken.insert(name);
         return name;
+    }
+
+    const std::string& Writer::unreadName()
+    {
+        if (mUnread.empty())
+        {
+            takeNames();
+            mUnread = mTaken.contains("_") ? freshName("_") : std::string("_");
+        }
+        return mUnread;
     }
 
     // --- steps as statements --------------------------------------------------------
