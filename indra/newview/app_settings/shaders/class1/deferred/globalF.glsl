@@ -47,6 +47,18 @@ void mirrorClip(vec3 pos)
 #endif
 }
 
+// mirrorClip's test without the discard, for a shader that takes derivatives or implicit-LOD
+// samples after it and so discards at its end instead: a lane that discards takes no further part
+// in the quad's derivatives, which GLSL then leaves undefined for its neighbours.
+bool mirrorClipped(vec3 pos)
+{
+#ifdef MIRROR_CLIP
+    return (dot(pos.xyz, clipPlane.xyz) + clipPlane.w) < 0.0;
+#else
+    return false;
+#endif
+}
+
  // Octahedron normal vector encoding
  // https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
  //

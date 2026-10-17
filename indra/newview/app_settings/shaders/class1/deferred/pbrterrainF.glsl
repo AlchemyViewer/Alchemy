@@ -194,7 +194,7 @@ in vec3 vary_region_position;
 in vec2 vary_composition; // composition value, alpha-ramp noise
 #endif
 
-void mirrorClip(vec3 position);
+bool mirrorClipped(vec3 position);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 vec4 encodeNormalGeo(vec3 n, vec3 geometric_normal, float gbuffer_flag);
 vec4 packORM(vec3 orm);
@@ -237,10 +237,11 @@ vec3 terrain_geometric_normal()
 
 void main()
 {
-    // Ahead of mirrorClip: a discard can leave the quad without the neighbouring lanes a
-    // derivative needs, so every derivative this shader takes is taken while all four are live.
-    // The region position's are the ones every projection's uv derivatives come from; the
-    // material and projection switches below are then free to branch.
+    // Nothing discards before the end of main: a discard can leave the quad without the
+    // neighbouring lanes a derivative needs, and filterSpecularRoughness, the alpha ramp and
+    // the paint map take theirs late. The region position's derivatives are the ones every
+    // projection's uv derivatives come from; the material and projection switches below are
+    // then free to branch.
     geom_normal = terrain_geometric_normal();
     TerrainPoint pt;
     pt.p = vary_region_position;
@@ -261,14 +262,22 @@ void main()
     vec3 geom_normal_region = transpose(normal_matrix) * geom_normal;
 #endif
 
-    // Make sure we clip the terrain if we're in a mirror.
-    mirrorClip(vary_position);
+    // Make sure we clip the terrain if we're in a mirror -- at the end of main.
+    bool clipped = mirrorClipped(vary_position);
 
     TerrainMix tm;
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
     tm = terrain_ramp_mix(alpha_ramp, vary_composition);
 #elif TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_PBR_PAINTMAP
     tm = get_terrain_usage_from_weight3(texture(paint_map, region_uv).xyz);
+#endif
+#ifdef MIRROR_CLIP
+    // A fragment the mirror clips fetches no material. Every material read is a textureGrad from
+    // the derivatives taken above, so its lanes may skip them without costing the quad's others.
+    if (clipped)
+    {
+        tm.type = 0;
+    }
 #endif
 
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_OCCLUSION)
@@ -462,10 +471,7 @@ void main()
     // Coverage and cutoff blended alike, so where one material lies alone the test is that
     // material's own: alpha against its cutoff for MASK, always kept otherwise.
     float minimum_alpha = terrain_mix(tm, max(minimum_alphas, vec4(0.0)));
-    if (coverage < minimum_alpha)
-    {
-        discard;
-    }
+    clipped = clipped || (coverage < minimum_alpha);
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     // The materials' normals were composed and blended in region space; one transform brings
@@ -505,6 +511,16 @@ void main()
         vec4 overlay = texture(parcel_overlay, region_uv);
         base_color = mix(base_color, srgb_to_linear(overlay.rgb), overlay.a);
     }
+
+    // Compiled only where something can clip: mirrorClipped is false outside the mirror
+    // variant, but it is defined in another object, and a discard the compiler cannot see is
+    // dead costs every terrain fragment its early depth test.
+#if defined(MIRROR_CLIP) || defined(HAS_ALPHA_MASK)
+    if (clipped)
+    {
+        discard;
+    }
+#endif
 
     frag_data[0] = max(vec4(base_color, 0.0), vec4(0));                                                   // Diffuse
     // Alpha is zero, as every other PBR GBuffer writer leaves it. Nothing reads this channel for

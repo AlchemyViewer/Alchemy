@@ -45,7 +45,7 @@ in vec2 vary_region_uv;
 in vec4 vary_texcoord_side;
 #endif
 
-void mirrorClip(vec3 position);
+bool mirrorClipped(vec3 position);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 vec3 srgb_to_linear(vec3 cs);
 
@@ -152,8 +152,9 @@ vec4 detail_sample(sampler2D tex, TerrainTriplanar tw, float sx, float sy
 
 void main()
 {
-    // Every derivative this shader takes, taken here in uniform control flow and ahead of
-    // mirrorClip's discard, which can cost the quad the lanes a derivative needs.
+    // The detail fetches' derivatives, taken here in uniform control flow. The mirror clip's
+    // discard waits for the end of main: it can cost the quad the lanes a derivative needs, and
+    // the alpha ramp is sampled with implicit LOD after it.
     vec2 uv_ddx = dFdx(vary_texcoord0.xy);
     vec2 uv_ddy = dFdy(vary_texcoord0.xy);
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
@@ -161,11 +162,19 @@ void main()
     vec4 side_ddy = dFdy(vary_texcoord_side);
 #endif
 
-    mirrorClip(pos);
+    bool clipped = mirrorClipped(pos);
 
     // The ramp's four-way mix, as weights, with the ones under the threshold dropped and the
     // rest renormalised, so a texture that would barely show is not fetched at all.
     TerrainMix tm = terrain_ramp_mix(alpha_ramp, vary_composition);
+#ifdef MIRROR_CLIP
+    // A fragment the mirror clips fetches no detail. The fetches are textureGrad from the
+    // derivatives taken above, so its lanes may skip them without costing the quad's others.
+    if (clipped)
+    {
+        tm.type = 0;
+    }
+#endif
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     // By the surface's normal under the fragment, in region space where the projection planes
     // are the axes; see terrain_facet.
@@ -202,6 +211,15 @@ void main()
     }
 
     outColor.a = 0.0; // yes, downstream atmospherics
+
+    // Only the mirror variant can clip; see pbrterrainF for why the discard is compiled out
+    // elsewhere rather than left to a test that is false.
+#if defined(MIRROR_CLIP)
+    if (clipped)
+    {
+        discard;
+    }
+#endif
 
     frag_data[0] = max(outColor, vec4(0));
     frag_data[1] = vec4(0.0,0.0,0.0,-1.0);
