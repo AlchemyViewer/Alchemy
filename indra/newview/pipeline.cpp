@@ -839,7 +839,7 @@ void LLPipeline::cleanup()
     delete mWaterExclusionPool;
     mWaterExclusionPool = nullptr;
 
-    releaseGLBuffers();
+    releaseAllGLResources();
 
     mFaceSelectImagep = NULL;
 
@@ -869,7 +869,7 @@ void LLPipeline::destroyGL()
 
     resetDrawOrders();
 
-    releaseGLBuffers();
+    releaseAllGLResources();
 }
 
 void LLPipeline::requestResizeScreenTexture()
@@ -1416,18 +1416,52 @@ void LLPipeline::refreshCachedSettings()
     LLUIImage::enableDisplayListsCollection(enable_buffers);
 }
 
-void LLPipeline::releaseGLBuffers()
+void LLPipeline::releaseAllGLResources()
 {
     assertInitialized();
 
+    releaseRenderTargets();
+    releaseDerivedState();
+
+    mGLResourcesLive = false;
+}
+
+void LLPipeline::releaseRenderTargets()
+{
+    mWaterDis.release();
+    mSkyBehind.release();
+    mSkyBehindFrame = 0;
+    mSkyBehindQuery = {};
+    mSkyBehindQueryFrame = 0;
+
+    mSceneMap.release();
+
+    mSMAAEdgeMap.release();
+    mSMAABlendBuffer.release();
+
+    mDownResMap.release();
+
+    mPreviewMap.release();
+    mBakeMap.release();
+
+    for (U32 i = 0; i < 3; i++)
+    {
+        mGlow[i].release();
+    }
+
+    releaseScreenBuffers();
+    releaseProbeBuffers();
+    releaseShadowBuffers();
+}
+
+void LLPipeline::releaseDerivedState()
+{
     mTerrainPrimitives.release();
     mWaterPrimitives.release();
     mWaterPatchPrimitives.release();
     mWaterSurface.release();
     mDepthPyramid.release();
-    mSkyBehindQuery = {};
     mAttachmentSpans.clear();
-    mSkyBehindQueryFrame = 0;
 
     if (mNoiseMap)
     {
@@ -1467,25 +1501,6 @@ void LLPipeline::releaseGLBuffers()
 
     releaseLUTBuffers();
 
-    mWaterDis.release();
-    mSkyBehind.release();
-    mSkyBehindFrame = 0;
-
-    mSceneMap.release();
-
-    mSMAAEdgeMap.release();
-    mSMAABlendBuffer.release();
-
-    mDownResMap.release();
-
-    mPreviewMap.release();
-    mBakeMap.release();
-
-    for (U32 i = 0; i < 3; i++)
-    {
-        mGlow[i].release();
-    }
-
     ALFarPlaneOverlay::release();
     if (ALSelectionOutline::instanceExists())
     {
@@ -1502,14 +1517,84 @@ void LLPipeline::releaseGLBuffers()
         LLEnvironment::instance().releaseGLBuffers();
     }
 
-    releaseScreenBuffers();
-    releaseProbeBuffers();
-    releaseShadowBuffers();
     releaseScopeBuffers();
     clearReferenceStill();
 
     gBumpImageList.destroyGL();
     LLVOAvatar::resetImpostors();
+}
+
+LLPipeline::RenderBuildState LLPipeline::renderBuildState() const
+{
+    return { mMainRT.deferredScreen.desc(), mAuxillaryRT.deferredScreen.desc(), mHeroProbeRT.deferredScreen.desc(),
+             mBuiltHDR, mGLResourcesLive };
+}
+
+void LLPipeline::rebuildGLBuffers(bool relinked)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    assertInitialized();
+
+    const RenderBuildState before = renderBuildState();
+
+    // Comma-separated, for the log line.
+    const auto add = [](std::string& list, std::string_view what)
+    {
+        if (!list.empty())
+        {
+            list += ", ";
+        }
+        list += what;
+    };
+    std::string invalidated;
+
+    releaseRenderTargets();
+    releaseDerivedState();
+    add(invalidated, "all derived state");
+
+    createGLBuffers();
+    mBuiltHDR = hdrEnabled();
+    mGLResourcesLive = true;
+
+    const RenderBuildState after = renderBuildState();
+    std::string changed;
+    if (!before.mLive)
+    {
+        add(changed, "new context");
+    }
+    else
+    {
+        if (before.mMain.width != after.mMain.width || before.mMain.height != after.mMain.height)
+        {
+            add(changed, "main size");
+        }
+        if (before.mMain.color != after.mMain.color)
+        {
+            add(changed, "G-buffer formats");
+        }
+        if (before.mMain.depth != after.mMain.depth)
+        {
+            add(changed, "depth format");
+        }
+        if (before.mHDR != after.mHDR)
+        {
+            add(changed, "HDR");
+        }
+        if (before.mProbe != after.mProbe)
+        {
+            add(changed, "probe pack");
+        }
+        if (before.mHero != after.mHero)
+        {
+            add(changed, "hero pack");
+        }
+    }
+
+    LL_INFOS("RenderResources") << "Render targets rebuilt at " << after.mMain.width << "x" << after.mMain.height
+                                << (relinked ? " after a shader reload" : " for a setting")
+                                << "; changed: " << (changed.empty() ? std::string_view("nothing") : changed)
+                                << "; invalidated: " << (invalidated.empty() ? std::string_view("nothing") : invalidated)
+                                << LL_ENDL;
 }
 
 void LLPipeline::releaseLUTBuffers()

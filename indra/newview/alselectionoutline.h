@@ -147,7 +147,7 @@ class LLVOAvatar;
 /// and TARGET_KEEP_SECONDS have passed without a call drawing with them (the world calls render every frame and the
 /// HUD while the selection is on it, so one call can have nothing to draw while the other draws; and the pointer
 /// passes from one glowing object to the next with frames between), and given up with the pipeline's own
-/// (LLPipeline::releaseGLBuffers).
+/// (LLPipeline::releaseDerivedState).
 class ALSelectionOutline : public LLSingleton<ALSelectionOutline>
 {
     LLSINGLETON(ALSelectionOutline);

@@ -92,7 +92,13 @@ public:
     void resizeScreenTexture();
     void resizeShadowTexture();
 
-    void releaseGLBuffers();
+    /// Every GL resource the pipeline holds, and the state derived from them: on context teardown and at shutdown.
+    void releaseAllGLResources();
+    /// Rebuilds the render targets for the current settings, and logs what changed and what it dropped.
+    /// @a relinked: the programs were reloaded just before.
+    void rebuildGLBuffers(bool relinked);
+    /// The render targets createGLBuffers allocates.
+    void releaseRenderTargets();
     void releaseLUTBuffers();
     /// The main pack's screen targets, which follow the window, the resolution scale and snapshots.
     void releaseScreenBuffers();
@@ -133,6 +139,25 @@ public:
 private:
     //implementation of above, wrapped for easy error handling
     eFBOStatus doAllocateScreenBuffer(U32 resX, U32 resY);
+
+    // The state derived from the render targets that every rebuild drops.
+    void releaseDerivedState();
+
+    // What the render targets are and were built for: rebuildGLBuffers takes one before it builds and one after.
+    struct RenderBuildState
+    {
+        ALRenderTargetDesc mMain;
+        ALRenderTargetDesc mProbe;
+        ALRenderTargetDesc mHero;
+        bool mHDR = false;
+        bool mLive = false;
+    };
+    RenderBuildState renderBuildState() const;
+
+    // Whether the targets have been built since releaseAllGLResources last ran, and the RenderHDREnabled they were
+    // built for.
+    bool mGLResourcesLive = false;
+    bool mBuiltHDR = false;
 public:
 
     //attempt to allocate screen buffers at resX, resY
@@ -1189,7 +1214,7 @@ public:
     // Tone curve LUT: a 512x1 RGBA16 row (ALToneCurveSet::LUT_SIZE) whose R, G
     // and B texels hold master(channel(x)) for each channel. A raw GL name
     // like the SMAA maps above: created empty in createGLBuffers, filled by
-    // bakeToneCurveLut, released in releaseGLBuffers.
+    // bakeToneCurveLut, released in releaseDerivedState.
     U32                 mToneCurveLut = 0;
     bool                mToneCurveLutDirty = true;   // settings changed, or the texture was recreated, since the last bake
     bool                mToneCurveIdentity = true;   // the last bake found all four curves on the diagonal

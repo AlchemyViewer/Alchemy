@@ -656,7 +656,6 @@ void LLViewerShaderMgr::setShaders()
     clearShaderObjects();
 
     initAttribsAndUniforms();
-    gPipeline.releaseGLBuffers();
 
     unloadShaders();
 
@@ -816,7 +815,7 @@ void LLViewerShaderMgr::setShaders()
     {
         gViewerWindow->setCursor(UI_CURSOR_ARROW);
     }
-    gPipeline.createGLBuffers();
+    gPipeline.rebuildGLBuffers(true);
 
     finalizeShaderList();
 

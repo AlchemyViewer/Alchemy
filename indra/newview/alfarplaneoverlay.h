@@ -36,7 +36,7 @@ namespace ALFarPlaneOverlay
 /// Draws the overlay while it is on, and gives up its render target once it is off.
 void render();
 
-/// Gives up the overlay's render target with the pipeline's own (LLPipeline::releaseGLBuffers).
+/// Gives up the overlay's render target with the pipeline's own (LLPipeline::releaseDerivedState).
 void release();
 
 } // namespace ALFarPlaneOverlay
