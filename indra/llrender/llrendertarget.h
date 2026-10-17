@@ -29,6 +29,7 @@
 
 // LLRenderTarget is unavailible on the mapserver since it uses FBOs.
 
+#include "alrendertargetdesc.h"
 #include "llgl.h"
 #include "llrender.h"
 
@@ -87,6 +88,14 @@ public:
         MIPS_MANUAL,        // Levels allocated; the owner regenerates them when it chooses.
     };
 
+    // What ensure did.
+    enum class EnsureResult : U8
+    {
+        Kept,   // The target already matched: no GL call was made, and every name is the one it had.
+        Built,  // The target was built from the description.
+        Failed, // The target could not be built, and is released.
+    };
+
     LLRenderTarget();
     ~LLRenderTarget();
 
@@ -101,6 +110,23 @@ public:
     // usage - deprecated, should always be TT_TEXTURE
     // depth_fmt - bit depth for the depth component (ignored unless depth is true)
     bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, bool stencil = false, ALTextureSlot::eTextureType usage = ALTextureSlot::TT_TEXTURE, eMipGeneration generateMipMaps = MIPS_NONE, eDepthFormat depth_fmt = DEPTH_FMT_24);
+
+    // What this target's own storage is: its size, the formats of the colour attachments it allocated, the depth it
+    // allocated, and its mips. A released target is the default description. A depth attachment shared from another
+    // target is not part of it, nor is a texture lent by setColorAttachment.
+    ALRenderTargetDesc desc() const;
+
+    // Make this target what `desc` describes, with a depth attachment of its own where the description has one.
+    //
+    // A target that already is what `desc` describes, and holds nothing else -- no shared depth, no lent texture --
+    // returns Kept, without a GL call. Any other is released and built from the description, as allocate and
+    // addColorAttachment would build it, and returns Built. The size is held to the context's largest texture before
+    // comparing, as allocate holds it, so a description past that size is kept rather than built again on every call.
+    //
+    // A description no target can be built from -- no size, no attachment, a format after a 0 in the colour list,
+    // stencil without depth, generated mips of an integer first attachment or of none -- and one GL cannot build, return
+    // Failed and leave the target released.
+    EnsureResult ensure(const ALRenderTargetDesc& desc);
 
     //resize existing attachments to use new resolution and color format
     // CAUTION: if the GL runs out of memory attempting to resize, this render target will be undefined
@@ -271,8 +297,8 @@ protected:
     bool mUseDepth;
     bool mStencil;
     eDepthFormat mDepthFormat;
-    eMipGeneration mGenerateMipMaps;
-    U32 mMipLevels;
+    eMipGeneration mGenerateMipMaps = MIPS_NONE;
+    U32 mMipLevels = 0;
 
     ALTextureSlot::eTextureType mUsage;
 
@@ -282,6 +308,9 @@ protected:
 
     // Clear each colour draw buffer to the clear colour by the call its attachment's kind takes, float or integer.
     void clearColorBuffers();
+
+    // Release what the target holds and allocate what `desc` describes, depth included. False leaves it released.
+    bool build(const ALRenderTargetDesc& desc);
 };
 
 #endif

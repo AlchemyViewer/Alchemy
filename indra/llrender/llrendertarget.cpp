@@ -154,6 +154,71 @@ namespace
         return { GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 4 };
     }
 
+    LLRenderTarget::eMipGeneration mip_generation(ALRenderTargetDesc::Mips mips)
+    {
+        switch (mips)
+        {
+            case ALRenderTargetDesc::Mips::Auto: return LLRenderTarget::MIPS_AUTO;
+            case ALRenderTargetDesc::Mips::Manual: return LLRenderTarget::MIPS_MANUAL;
+            case ALRenderTargetDesc::Mips::None: break;
+        }
+        return LLRenderTarget::MIPS_NONE;
+    }
+
+    ALRenderTargetDesc::Mips desc_mips(LLRenderTarget::eMipGeneration mips)
+    {
+        switch (mips)
+        {
+            case LLRenderTarget::MIPS_AUTO: return ALRenderTargetDesc::Mips::Auto;
+            case LLRenderTarget::MIPS_MANUAL: return ALRenderTargetDesc::Mips::Manual;
+            case LLRenderTarget::MIPS_NONE: break;
+        }
+        return ALRenderTargetDesc::Mips::None;
+    }
+
+    // `desc` as allocate builds it, its size held to the context's largest texture.
+    ALRenderTargetDesc held_to_context(ALRenderTargetDesc desc)
+    {
+        const U32 max_size = (U32)gGLManager.mGLMaxTextureSize;
+        desc.width         = llmin(desc.width, max_size);
+        desc.height        = llmin(desc.height, max_size);
+        return desc;
+    }
+
+    // Why no target can be built from `desc`, or null when one can.
+    const char* unbuildable(const ALRenderTargetDesc& desc)
+    {
+        if (desc.width == 0 || desc.height == 0)
+        {
+            return "it has no size";
+        }
+        const U32 colors = desc.colorCount();
+        for (U32 attachment = colors; attachment < ALRenderTargetDesc::MAX_COLOR; ++attachment)
+        {
+            if (desc.color[attachment] != 0)
+            {
+                return "a colour format follows a 0 in its colour list";
+            }
+        }
+        if (colors == 0 && desc.depth == ALRenderTargetDesc::Depth::None)
+        {
+            return "it has no attachment";
+        }
+        if (desc.stencil && desc.depth == ALRenderTargetDesc::Depth::None)
+        {
+            return "it has stencil without depth";
+        }
+        if (desc.mips == ALRenderTargetDesc::Mips::Auto && colors == 0)
+        {
+            return "flush generates its first attachment's mips, and it has no colour attachment";
+        }
+        if (desc.mips == ALRenderTargetDesc::Mips::Auto && LLImageGL::isIntegerFormat(desc.color[0]))
+        {
+            return "flush generates its first attachment's mips, and GL generates none of an integer texture's";
+        }
+        return nullptr;
+    }
+
     void check_framebuffer_status()
     {
         if (gDebugGL)
@@ -311,6 +376,72 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
     {
         release();
         return false;
+    }
+    return true;
+}
+
+ALRenderTargetDesc LLRenderTarget::desc() const
+{
+    if (!mFBO)
+    {
+        return {};
+    }
+
+    ALRenderTargetDesc desc{ .width = mResX, .height = mResY, .mips = desc_mips(mGenerateMipMaps) };
+    for (size_t attachment = 0; attachment < mInternalFormat.size() && attachment < ALRenderTargetDesc::MAX_COLOR;
+         ++attachment)
+    {
+        desc.color[attachment] = mInternalFormat[attachment];
+    }
+    if (mDepth)
+    {
+        desc.depth   = mDepthFormat == DEPTH_FMT_32F ? ALRenderTargetDesc::Depth::D32F : ALRenderTargetDesc::Depth::D24;
+        desc.stencil = mStencil;
+    }
+    return desc;
+}
+
+LLRenderTarget::EnsureResult LLRenderTarget::ensure(const ALRenderTargetDesc& wanted)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    llassert(!isBoundInStack());
+
+    const ALRenderTargetDesc held = held_to_context(wanted);
+    if (const char* reason = unbuildable(held))
+    {
+        LL_WARNS("RenderTarget") << "No render target can be built from the description: " << reason << LL_ENDL;
+        release();
+        return EnsureResult::Failed;
+    }
+
+    // A depth attachment shared from another target, and a lent colour texture, are storage the description says
+    // nothing of, so a target holding either is built again.
+    const bool holds_only_its_own = !(mUseDepth && !mDepth) && mTex.size() == mInternalFormat.size();
+    if (holds_only_its_own && held == desc())
+    {
+        return EnsureResult::Kept;
+    }
+
+    return build(held) ? EnsureResult::Built : EnsureResult::Failed;
+}
+
+bool LLRenderTarget::build(const ALRenderTargetDesc& desc)
+{
+    const bool         depth     = desc.depth != ALRenderTargetDesc::Depth::None;
+    const eDepthFormat depth_fmt = desc.depth == ALRenderTargetDesc::Depth::D32F ? DEPTH_FMT_32F : DEPTH_FMT_24;
+    if (!allocate(desc.width, desc.height, desc.color[0], depth, desc.stencil, ALTextureSlot::TT_TEXTURE,
+                  mip_generation(desc.mips), depth_fmt))
+    {
+        return false;
+    }
+
+    for (U32 attachment = 1; attachment < desc.colorCount(); ++attachment)
+    {
+        if (!addColorAttachment(desc.color[attachment]))
+        {
+            release();
+            return false;
+        }
     }
     return true;
 }

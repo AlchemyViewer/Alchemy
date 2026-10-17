@@ -35,6 +35,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <bit>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -111,6 +113,156 @@ namespace
             }
         }
 
+        using Depth        = ALRenderTargetDesc::Depth;
+        using Mips         = ALRenderTargetDesc::Mips;
+        using EnsureResult = LLRenderTarget::EnsureResult;
+
+        // Two colour attachments over a depth-stencil buffer, at a size neither square nor a power of two.
+        constexpr ALRenderTargetDesc GBUFFER{ .width = 6, .height = 5, .color = { GL_RGBA8, GL_RGBA16F },
+                                              .depth = Depth::D24, .stencil = true };
+
+        // A description, and what a case calls it.
+        struct NamedDesc
+        {
+            const char*        what;
+            ALRenderTargetDesc desc;
+        };
+
+        // The GL objects a target is made of.
+        struct Names
+        {
+            U32              framebuffer = 0;
+            std::vector<U32> color;
+            U32              depth = 0;
+
+            bool operator==(const Names&) const = default;
+        };
+
+        Names names_of(LLRenderTarget& target)
+        {
+            Names names;
+            target.bindTarget();
+            GLint framebuffer = 0;
+            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &framebuffer);
+            target.flush();
+            names.framebuffer = (U32)framebuffer;
+            for (U32 attachment = 0; attachment < target.getNumTextures(); ++attachment)
+            {
+                names.color.push_back(target.getTexture(attachment));
+            }
+            names.depth = target.getDepth();
+            return names;
+        }
+
+        // What LLRenderTarget counts for a target `desc` describes, from the bytes each format takes a pixel.
+        U32 bytes_of(const ALRenderTargetDesc& desc)
+        {
+            U32 per_pixel = 0;
+            for (U32 attachment = 0; attachment < desc.colorCount(); ++attachment)
+            {
+                switch (desc.color[attachment])
+                {
+                    case GL_RGBA16F: per_pixel += 8; break;
+                    case GL_R8: per_pixel += 1; break;
+                    default: per_pixel += 4; break;
+                }
+            }
+            if (desc.depth != Depth::None)
+            {
+                per_pixel += desc.depth == Depth::D32F && desc.stencil ? 8 : 4;
+            }
+            return desc.width * desc.height * per_pixel;
+        }
+
+        // The storage GL holds for the texture `name`.
+        struct Storage
+        {
+            S32 width  = 0;
+            S32 height = 0;
+            S32 format = 0;
+            S32 levels = 0;
+        };
+
+        Storage storage_of(U32 name)
+        {
+            Storage storage;
+            gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, name);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &storage.width);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &storage.height);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &storage.format);
+            // The levels with an image, counted by their widths: GL_TEXTURE_IMMUTABLE_LEVELS would say it in one query,
+            // but it is GL 4.3's, past the floor's 4.1.
+            for (S32 width = storage.width; width > 0; ++storage.levels)
+            {
+                width = 0;
+                glGetTexLevelParameteriv(GL_TEXTURE_2D, storage.levels + 1, GL_TEXTURE_WIDTH, &width);
+            }
+            gGL.getTextureSlot(0)->unbind();
+            return storage;
+        }
+
+        // The sized format GL allocates depth as, for what a description asks.
+        S32 depth_format_of(const ALRenderTargetDesc& desc)
+        {
+            if (desc.depth == Depth::D32F)
+            {
+                return desc.stencil ? GL_DEPTH32F_STENCIL8 : GL_DEPTH_COMPONENT32F;
+            }
+            return desc.stencil ? GL_DEPTH24_STENCIL8 : GL_DEPTH_COMPONENT24;
+        }
+
+        // Each of the target's textures holds the storage `desc` describes.
+        void require_storage(LLRenderTarget& target, const ALRenderTargetDesc& desc)
+        {
+            const S32 levels = desc.mips == Mips::None ? 1 : (S32)std::bit_width(std::max(desc.width, desc.height));
+            REQUIRE(target.getNumTextures() == desc.colorCount());
+            for (U32 attachment = 0; attachment < desc.colorCount(); ++attachment)
+            {
+                CAPTURE(attachment);
+                const Storage storage = storage_of(target.getTexture(attachment));
+                CHECK(storage.width == (S32)desc.width);
+                CHECK(storage.height == (S32)desc.height);
+                CHECK(storage.format == (S32)desc.color[attachment]);
+                CHECK(storage.levels == levels);
+            }
+            if (desc.depth == Depth::None)
+            {
+                CHECK(target.getDepth() == 0u);
+                return;
+            }
+            REQUIRE(target.getDepth() != 0u);
+            const Storage depth = storage_of(target.getDepth());
+            CHECK(depth.width == (S32)desc.width);
+            CHECK(depth.height == (S32)desc.height);
+            CHECK(depth.format == depth_format_of(desc));
+        }
+
+        // The target holds nothing: no textures, no framebuffer, and the description of no target.
+        void require_released(const LLRenderTarget& target)
+        {
+            CHECK(target.getNumTextures() == 0u);
+            CHECK(target.getDepth() == 0u);
+            CHECK_FALSE(target.isComplete());
+            CHECK(target.desc() == ALRenderTargetDesc{});
+        }
+
+        // The colour of the target's first attachment at its middle.
+        LLColor4U pixel_of(LLRenderTarget& target)
+        {
+            target.bindTarget();
+            U8 pixel[4] = { 0 };
+            glReadPixels(target.getWidth() / 2, target.getHeight() / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+            target.flush();
+            return LLColor4U(pixel[0], pixel[1], pixel[2], pixel[3]);
+        }
+
+        // Puts back the context's largest texture size, however the case ends.
+        struct MaxTextureSizeRestore
+        {
+            S32 mSaved = gGLManager.mGLMaxTextureSize;
+            ~MaxTextureSizeRestore() { gGLManager.mGLMaxTextureSize = mSaved; }
+        };
+
     // The program, vertex array and clear colour the test sets go back with
     // mGL.
     struct llrendertarget_data
@@ -127,6 +279,8 @@ namespace
             mMixed.release();
             mLent.release();
             mCopy.release();
+            mOwner.release();
+            mWide.release();
             mLentImage = nullptr;
             if (mVAO)
             {
@@ -215,6 +369,8 @@ namespace
         LLRenderTarget mMixed;
         LLRenderTarget mLent;
         LLRenderTarget mCopy;
+        LLRenderTarget mOwner;
+        LLRenderTarget mWide;
         LLPointer<LLImageGL> mLentImage;
         GLuint mVAO = 0;
         GLuint mProgram = 0;
@@ -410,6 +566,125 @@ namespace
         CHECK(red_at(1, 0) == 0u);
         UNSCOPED_INFO("copied outside the scissor too");
         CHECK(blue_at(HALF - 1, HALF - 1) == 0u);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // ensure builds a target once and keeps it after: the same description again keeps every GL name and what the
+    // target holds, and counts no more bytes. A description wider than the context's largest texture is kept as the
+    // size allocate holds it to, and a target allocate built is kept by the description it was built as.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: ensure keeps a target that already matches its description", "[llrendertarget_gl]")
+    {
+        const U32 bytes = LLRenderTarget::sBytesAllocated;
+        REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+        CHECK(mOwner.desc() == GBUFFER);
+        require_storage(mOwner, GBUFFER);
+        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
+
+        const Names built = names_of(mOwner);
+        mOwner.bindTarget();
+        gGL.setClearColor(LLColor4(1.f, 0.f, 1.f, 1.f));
+        mOwner.clear(GL_COLOR_BUFFER_BIT);
+        mOwner.flush();
+
+        CHECK(mOwner.ensure(GBUFFER) == EnsureResult::Kept);
+        UNSCOPED_INFO("the same names");
+        CHECK(names_of(mOwner) == built);
+        UNSCOPED_INFO("what the target held");
+        CHECK(pixel_of(mOwner) == LLColor4U(255, 0, 255, 255));
+        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
+
+        const U32 max_size = (U32)gGLManager.mGLMaxTextureSize;
+        const ALRenderTargetDesc too_wide{ .width = max_size + 3, .height = 1, .color = { GL_R8 } };
+        REQUIRE(mWide.ensure(too_wide) == EnsureResult::Built);
+        CHECK(mWide.getWidth() == max_size);
+        UNSCOPED_INFO("a width past the largest texture, held to it");
+        CHECK(mWide.ensure(too_wide) == EnsureResult::Kept);
+
+        REQUIRE(mTarget.allocate(SIZE, SIZE, GL_RGBA8, /*depth=*/true, /*stencil=*/true, ALTextureSlot::TT_TEXTURE,
+                                 LLRenderTarget::MIPS_AUTO, LLRenderTarget::DEPTH_FMT_32F));
+        REQUIRE(mTarget.addColorAttachment(GL_RGBA16F));
+        const ALRenderTargetDesc allocated{ .width = SIZE, .height = SIZE, .color = { GL_RGBA8, GL_RGBA16F },
+                                            .depth = Depth::D32F, .stencil = true, .mips = Mips::Auto };
+        CHECK(mTarget.desc() == allocated);
+        CHECK(mTarget.ensure(allocated) == EnsureResult::Kept);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A description that differs in any field builds the target again, to that description: its storage is what the
+    // description says and the byte count follows it. Asked again, it is kept.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: ensure builds a target again when its size or a format changes", "[llrendertarget_gl]")
+    {
+        const U32 bytes = LLRenderTarget::sBytesAllocated;
+        REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+
+        const NamedDesc changes[] = {
+            { "width", { .width = 9, .height = 5, .color = { GL_RGBA8, GL_RGBA16F }, .depth = Depth::D24, .stencil = true } },
+            { "height", { .width = 9, .height = 7, .color = { GL_RGBA8, GL_RGBA16F }, .depth = Depth::D24, .stencil = true } },
+            { "a colour format", { .width = 9, .height = 7, .color = { GL_RGBA8, GL_RGB10_A2 }, .depth = Depth::D24, .stencil = true } },
+            { "a colour attachment more", { .width = 9, .height = 7, .color = { GL_RGBA8, GL_RGB10_A2, GL_R32F }, .depth = Depth::D24, .stencil = true } },
+            { "a colour attachment fewer", { .width = 9, .height = 7, .color = { GL_RGBA8 }, .depth = Depth::D24, .stencil = true } },
+            { "the depth format", { .width = 9, .height = 7, .color = { GL_RGBA8 }, .depth = Depth::D32F, .stencil = true } },
+            { "stencil", { .width = 9, .height = 7, .color = { GL_RGBA8 }, .depth = Depth::D32F } },
+            { "mips", { .width = 9, .height = 7, .color = { GL_RGBA8 }, .depth = Depth::D32F, .mips = Mips::Manual } },
+            { "no depth", { .width = 9, .height = 7, .color = { GL_RGBA8 }, .mips = Mips::Manual } },
+            { "no colour", { .width = 9, .height = 7, .depth = Depth::D24 } },
+        };
+        for (const auto& [what, desc] : changes)
+        {
+            CAPTURE(what);
+            REQUIRE(mOwner.ensure(desc) == EnsureResult::Built);
+            CHECK(mOwner.desc() == desc);
+            require_storage(mOwner, desc);
+            CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(desc));
+            CHECK(mOwner.ensure(desc) == EnsureResult::Kept);
+        }
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A description GL cannot build -- wider than the context's largest texture, which allocate is let past here --
+    // and one no target can be built from, both leave the target released and the byte count where it was before the
+    // target was built. After either, the target builds as before.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: a failed ensure leaves the target released and the byte count right", "[llrendertarget_gl]")
+    {
+        const U32 bytes = LLRenderTarget::sBytesAllocated;
+        {
+            MaxTextureSizeRestore restore;
+            const U32 max_size = (U32)restore.mSaved;
+            gGLManager.mGLMaxTextureSize = restore.mSaved * 2;
+            const NamedDesc refused[] = {
+                { "depth too wide", { .width = max_size + 1, .height = 1, .color = { GL_RGBA8, GL_RGBA8 }, .depth = Depth::D24, .stencil = true } },
+                { "colour too wide", { .width = max_size + 1, .height = 1, .color = { GL_RGBA8, GL_RGBA8 } } },
+            };
+            for (const auto& [what, desc] : refused)
+            {
+                CAPTURE(what);
+                REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+                CHECK(mOwner.ensure(desc) == EnsureResult::Failed);
+                require_released(mOwner);
+                CHECK(LLRenderTarget::sBytesAllocated == bytes);
+            }
+        }
+
+        const NamedDesc unbuildable[] = {
+            { "no size", { .color = { GL_RGBA8 } } },
+            { "no attachment", { .width = 4, .height = 4 } },
+            { "a format after a 0", { .width = 4, .height = 4, .color = { GL_RGBA8, 0, GL_RGBA8 } } },
+            { "stencil without depth", { .width = 4, .height = 4, .color = { GL_RGBA8 }, .stencil = true } },
+            { "generated mips of an integer format", { .width = 4, .height = 4, .color = { GL_R32UI }, .mips = Mips::Auto } },
+            { "generated mips with no colour", { .width = 4, .height = 4, .depth = Depth::D24, .mips = Mips::Auto } },
+        };
+        for (const auto& [what, desc] : unbuildable)
+        {
+            CAPTURE(what);
+            REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+            CHECK(mOwner.ensure(desc) == EnsureResult::Failed);
+            require_released(mOwner);
+            CHECK(LLRenderTarget::sBytesAllocated == bytes);
+        }
+
+        REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+        require_storage(mOwner, GBUFFER);
+        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 }
