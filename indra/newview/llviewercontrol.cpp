@@ -312,8 +312,6 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
     if (gPipeline.isInit())
     {
         gPipeline.updateRenderTransparentWater();
-        gPipeline.releaseGLBuffers();
-        gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
     }
     return true;
@@ -336,26 +334,25 @@ static bool handleReleaseGLBufferChanged(const LLSD& newvalue)
     return true;
 }
 
-static bool handleEnableEmissiveChanged(const LLSD& newvalue)
+static bool handleRenderGlowChanged(const LLSD& newvalue)
 {
-    return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
+    // The glow programs load whatever this says, and glowing faces register for the glow passes
+    // whatever it says, so a toggle reloads, allocates and rebuilds nothing. It is the latch the glow
+    // passes and generateGlow read, set as setShaders sets it.
+    LLPipeline::sRenderGlow = newvalue.asBoolean() && gGlowProgram.isComplete() && gGlowExtractProgram.isComplete();
+    return true;
 }
 
 static bool handleReverseZChanged(const LLSD& newvalue)
 {
     // setShaders() latches the reverse-Z state (LLPipeline::updateReverseZ) and then
-    // releases + recreates the GL buffers at the new depth format itself, so -- unlike the
-    // emissive case -- do NOT release buffers up front (that would rebuild them at the old
-    // format only to have setShaders rebuild them again).
+    // releases + recreates the GL buffers at the new depth format itself, so do NOT release
+    // buffers up front (that would rebuild them at the old format only to have setShaders
+    // rebuild them again).
     const bool handled = handleSetShaderChanged(newvalue);
     // The draw distance ceiling follows the convention setShaders latched; controls already shown take it now.
     recap_draw_distance_controls();
     return handled;
-}
-
-static bool handleHalationChanged(const LLSD& newvalue)
-{
-    return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
 }
 
 static bool handleDisableVintageMode(const LLSD& newvalue)
@@ -367,9 +364,11 @@ static bool handleDisableVintageMode(const LLSD& newvalue)
 
 static bool handleEnableHDR(const LLSD& newvalue)
 {
+    // setShaders latches the G-buffer's normal layout before it compiles and rebuilds the GL
+    // buffers after, as it does reverse-Z's. The probes' cube arrays change format as well.
     gPipeline.mReflectionMapManager.reset();
     gPipeline.mHeroProbeManager.reset();
-    return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
+    return handleSetShaderChanged(newvalue);
 }
 
 static bool handleAnisotropicFilteringChanged(const LLSD& newval)
@@ -663,7 +662,7 @@ static bool handleRenderDynamicLODChanged(const LLSD& newvalue)
     return true;
 }
 
-static bool handleReflectionProbeDetailChanged(const LLSD& newvalue)
+static bool handleReflectionProbesChanged(const LLSD& newvalue)
 {
     gPipeline.mReflectionMapManager.refreshSettings();
     if (gPipeline.isInit())
@@ -671,14 +670,14 @@ static bool handleReflectionProbeDetailChanged(const LLSD& newvalue)
         LLPipeline::refreshCachedSettings();
         gPipeline.mReflectionMapManager.reset();
         gPipeline.mHeroProbeManager.reset();
-        gPipeline.releaseGLBuffers();
-        gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
     }
     return true;
 }
 
-static bool handleReflectionProbeCountChanged(const LLSD& newvalue)
+// Read by the probe manager's update, which applies them from the next frame: which probes update
+// and how often (the detail), and how many cube slots there are (the count).
+static bool handleReflectionProbeSettingsChanged(const LLSD& newvalue)
 {
     gPipeline.mReflectionMapManager.refreshSettings();
     return true;
@@ -1055,8 +1054,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "OctreeMaxNodeCapacity", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAlphaDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAttachmentSizeFactor", handleRepartition);
-    setting_setup_signal_listener(gSavedSettings, "RenderMaxTextureIndex", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderDepthOfField", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAUseStencil", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredication", handleSetShaderChanged);
@@ -1067,19 +1064,17 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleShadowsResized);
-    setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleRenderGlowChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowResolutionPow", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowHDR", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderBloomMipCount", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderBloomResolutionScale", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderBloomHalation", handleHalationChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderEnableEmissiveBuffer", handleEnableEmissiveChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderBloomHalation", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderEnableEmissiveBuffer", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderReverseZ", handleReverseZChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDisableVintageMode", handleDisableVintageMode);
     setting_setup_signal_listener(gSavedSettings, "RenderHDREnabled", handleEnableHDR);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowNoise", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderGammaFull", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderVolumeLODFactor", handleVolumeLODChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarComplexityMode", handleUserImpostorByDistEnabledChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarLODFactor", handleAvatarLODChanged);
@@ -1096,16 +1091,16 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResolutionDivisorChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderUBOUpdateMode", handleRenderUBOUpdateModeChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbeDetailChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeCount", handleReflectionProbeCountChanged);
-    setting_setup_signal_listener(gSavedSettings, "ALProbeSuperSample", handleReflectionProbeDetailChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbeDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbesChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeSettingsChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeCount", handleReflectionProbeSettingsChanged);
+    setting_setup_signal_listener(gSavedSettings, "ALProbeSuperSample", handleReflectionProbesChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbesChanged);
 #if LL_DARWIN
     setting_setup_signal_listener(gSavedSettings, "RenderAppleUseMultGL", handleAppleUseMultGLChanged);
 #endif
-    setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbeDetailChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleReflectionProbeDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbesChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleReflectionProbesChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleHeroProbeResolutionChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowFilterQuality", handleSetShaderChanged);

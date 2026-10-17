@@ -322,11 +322,9 @@ void LLReflectionMapManager::update()
 
     initReflectionMaps();
 
-    static LLCachedControl<bool> render_hdr(gSavedSettings, "RenderHDREnabled", true);
-
     if (!mRenderTarget.isComplete())
     {
-        U32 color_fmt = render_hdr ? GL_R11F_G11F_B10F : GL_RGB8;
+        U32 color_fmt = mHDR ? GL_R11F_G11F_B10F : GL_RGB8;
         U32 targetRes = mProbeResolution * mSuperSample; // super sample
         mRenderTarget.allocate(targetRes, targetRes, color_fmt, true);
     }
@@ -339,7 +337,7 @@ void LLReflectionMapManager::update()
         mMipChain.resize(count);
         for (U32 i = 0; i < count; ++i)
         {
-            mMipChain[i].allocate(res, res, render_hdr ? GL_R11F_G11F_B10F : GL_RGB8);
+            mMipChain[i].allocate(res, res, mHDR ? GL_R11F_G11F_B10F : GL_RGB8);
             res /= 2;
         }
     }
@@ -1706,7 +1704,7 @@ void LLReflectionMapManager::initReflectionMaps()
 
     // The supersample factor sizes the scratch target and, through LLPipeline, the aux pack a
     // face renders into; a change is applied like a resolution change, by the listener that
-    // rebuilds the GL buffers (handleReflectionProbeDetailChanged), so here it only has to be
+    // rebuilds the GL buffers (handleReflectionProbesChanged), so here it only has to be
     // read. 1, 2 or 4: the blur and downsample below assume a power of two.
     static LLCachedControl<S32> super_sample(gSavedSettings, "ALProbeSuperSample", 4);
     const U32 supersample = super_sample >= 4 ? 4u : (super_sample >= 2 ? 2u : 1u);
@@ -1715,10 +1713,23 @@ void LLReflectionMapManager::initReflectionMaps()
         mSuperSample = supersample;
         mRenderTarget.release();
     }
+
+    // HDR picks the colour format of the cube array, the scratch target and the mip chain, so a
+    // change rebuilds all three, and with the cube array every probe's contents.
+    static LLCachedControl<bool> render_hdr(gSavedSettings, "RenderHDREnabled", true);
+    const bool hdr = render_hdr();
+    const bool hdr_changed = hdr != mHDR;
+    if (hdr_changed)
+    {
+        mHDR = hdr;
+        mRenderTarget.release();
+        mMipChain.clear();
+    }
+
     // No irradiance resolution to size any more: irradiance is nine SH coefficients whatever
     // the environment looks like, so the setting that used to pick a cubemap edge length is gone.
     if (mTexture.isNull() || mReflectionProbeCount != mDynamicProbeCount || mProbeResolution != probe_resolution ||
-        !mSHCoeffs.isComplete() || mReset)
+        !mSHCoeffs.isComplete() || mReset || hdr_changed)
     {
         if(mProbeResolution != probe_resolution)
         {
@@ -1737,7 +1748,8 @@ void LLReflectionMapManager::initReflectionMaps()
         mSHCoeffs.release();
         mSHCoeffs.allocate(LL_SH_COEFF_COUNT, mReflectionProbeCount + 2, GL_RGBA16F);
 
-        if (mTexture.isNull() ||
+        bool new_texture = false;
+        if (mTexture.isNull() || hdr_changed ||
             mTexture->getWidth() != mProbeResolution ||
             mReflectionProbeCount + 2 != mTexture->getCount())
         {
@@ -1751,11 +1763,10 @@ void LLReflectionMapManager::initReflectionMaps()
             {
                 mTexture = new LLCubeMapArray();
 
-                static LLCachedControl<bool> render_hdr(gSavedSettings, "RenderHDREnabled", true);
-
                 // store mReflectionProbeCount+2 cube maps, final two cube maps are used for render target and radiance map generation
                 // source)
-                mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, render_hdr);
+                mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, mHDR);
+                new_texture = true;
             }
         }
 
@@ -1765,8 +1776,9 @@ void LLReflectionMapManager::initReflectionMaps()
         mRadiancePass = false;
         mRealtimeRadiancePass = false;
 
-        // if default probe already exists, remember whether or not it's complete (SL-20498)
-        bool default_complete = mDefaultProbe.isNull() ? false : mDefaultProbe->mComplete;
+        // if default probe already exists, remember whether or not it's complete (SL-20498). Not over
+        // a new cube array, whose storage holds nothing until the default probe renders into it again.
+        bool default_complete = !new_texture && mDefaultProbe.notNull() && mDefaultProbe->mComplete;
 
         for (auto& probe : mProbes)
         {

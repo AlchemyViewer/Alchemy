@@ -5718,8 +5718,6 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                 // but it is gated on gResizeScreenTexture, and the restore below assigns
                 // mWorldViewRectRaw directly rather than going through updateWorldViewRect(),
                 // which is what sets that flag. The wrong size survives until a window resize.
-                //
-                // resizeShadowTexture() already reads these two for the same reason.
                 original_width = (S32)gPipeline.mRT->width;
                 original_height = (S32)gPipeline.mRT->height;
 

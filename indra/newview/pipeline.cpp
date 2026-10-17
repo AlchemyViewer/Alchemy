@@ -374,19 +374,21 @@ bool addDeferredAttachments(LLRenderTarget& target)
     U32 emissive = GL_R11F_G11F_B10F;
 
     static LLCachedControl<bool> has_emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
-    static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
-    bool hdr = has_hdr();
 
-    if (!hdr)
+    // The normal's layout is the one the shaders were compiled against. GBUFFER_NORM_HDR tells them
+    // how much room the packed geometric normal has in the attachment's blue channel, and setShaders
+    // latches it from RenderHDREnabled before it compiles anything, so the format follows that latch
+    // -- as mainDepthFormat follows reverse-Z's -- rather than the setting. Nothing compiles against
+    // the emissive format, which follows the setting with the rest of the HDR targets (mSkyBehind
+    // matches it).
+    if (!LLRender::sGBufferNormHDR)
     {
         norm = GL_RGB10_A2;
+    }
+    if (!LLPipeline::hdrEnabled())
+    {
         emissive = GL_RGB8;
     }
-
-    // Tell the shader compiler how much room the packed geometric normal has in the normal
-    // attachment's blue channel. Shaders rebuild when RenderHDREnabled changes (handleEnableHDR),
-    // so this is latched before anything compiles against it.
-    LLRender::sGBufferNormHDR = hdr;
 
     bool valid = true;
     valid      = valid && target.addColorAttachment(orm);    // frag-data[1] specular OR PBR ORM
@@ -824,11 +826,48 @@ void LLPipeline::requestResizeShadowTexture()
     gResizeShadowTexture = true;
 }
 
+// Every pack's shadow maps, sun and spot. 32-bit float depth is the same 4 bytes/texel as DEPTH24
+// here but distributes precision differently (float, denser near the near plane). Opt-in; toggling
+// it re-runs resizeShadowTexture via handleShadowsResized. The compare sampler and PCF read it the
+// same either way.
+//
+// Reverse-Z forces it on regardless of the setting: reversed depth puts the dense end of the float
+// mantissa where the perspective spot cascades need it, and it is memory-free (DEPTH24 pads to 4
+// bytes anyway).
+static LLRenderTarget::eDepthFormat shadow_depth_format()
+{
+    static LLCachedControl<bool> shadow_depth_32f(gSavedSettings, "AlchemyRenderShadowDepth32F", false);
+    return (shadow_depth_32f || LLRender::sReverseZ) ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
+}
+
 void LLPipeline::resizeShadowTexture()
 {
+    // Each pack's shadows at the size allocateScreenBufferInternal gives them, which is its G-buffer's:
+    // after RenderResolutionDivisor or RenderResolutionMultiplier, not the logical size in mRT->width.
+    // Without a G-buffer there is no size to give them and nothing that would render with them: the
+    // next screen allocation that succeeds allocates the shadows with it.
     releaseSunShadowTargets();
     releaseSpotShadowTargets();
-    allocateShadowBuffer(mRT->width, mRT->height);
+    if (mRT->deferredScreen.isComplete())
+    {
+        allocateShadowBuffer(mRT->deferredScreen.getWidth(), mRT->deferredScreen.getHeight());
+    }
+
+    // The probe and hero packs' sun shadows ignore RenderShadowResolutionScale, but take the depth format
+    // the main pack's do (AlchemyRenderShadowDepth32F), so they are rebuilt only when that changed under
+    // them. allocateShadowBuffer keeps their scale at 1 and the spot shadows out, as for any capture pack.
+    const LLRenderTarget::eDepthFormat depth_fmt = shadow_depth_format();
+    RenderTargetPack* const main_rt = mRT;
+    for (RenderTargetPack* rt : { &mAuxillaryRT, &mHeroProbeRT })
+    {
+        if (rt->deferredScreen.isComplete() && rt->shadow[0].isComplete() && rt->shadow[0].getDepthFormat() != depth_fmt)
+        {
+            mRT = rt;
+            allocateShadowBuffer(rt->deferredScreen.getWidth(), rt->deferredScreen.getHeight());
+        }
+    }
+    mRT = main_rt;
+
     gResizeShadowTexture = false;
 }
 
@@ -928,43 +967,52 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
     return ret;
 }
 
+void LLPipeline::allocateProbeBuffers()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    llassert(mRT == &mMainRT);
+
+    if (sReflectionProbesEnabled)
+    {
+        mReflectionMapManager.initReflectionMaps();
+    }
+
+    mRT = &mAuxillaryRT;
+    // faces render supersampled (ALProbeSuperSample, 4 = the original 16x) and are downsampled to the probe
+    U32 res = mReflectionMapManager.mProbeResolution * mReflectionMapManager.superSample();
+    allocateScreenBufferInternal(res, res);
+
+    if (RenderMirrors)
+    {
+        mHeroProbeManager.initReflectionMaps();
+        res = mHeroProbeManager.mProbeResolution;  // We also scale the hero probe RT to the probe res since we don't super sample it.
+        mRT = &mHeroProbeRT;
+        allocateScreenBufferInternal(res, res);
+    }
+
+    mRT = &mMainRT;
+}
+
 bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
-    bool hdr = gSavedSettings.getBOOL("RenderHDREnabled");
+    const bool hdr = hdrEnabled();
 
-    if (mRT == &mMainRT)
-    { // hacky -- allocate auxillary buffer
-
-        gCubeSnapshot = true;
-
-        if (sReflectionProbesEnabled)
-        {
-            mReflectionMapManager.initReflectionMaps();
-        }
-
-        mRT = &mAuxillaryRT;
-        // faces render supersampled (ALProbeSuperSample, 4 = the original 16x) and are downsampled to the probe
-        U32 res = mReflectionMapManager.mProbeResolution * mReflectionMapManager.superSample();
-        allocateScreenBufferInternal(res, res);
-
-        if (RenderMirrors)
-        {
-            mHeroProbeManager.initReflectionMaps();
-            res = mHeroProbeManager.mProbeResolution;  // We also scale the hero probe RT to the probe res since we don't super sample it.
-            mRT = &mHeroProbeRT;
-            allocateScreenBufferInternal(res, res);
-        }
-
-        mRT = &mMainRT;
-        gCubeSnapshot = false;
-    }
+    // The pack mRT points at decides what this allocates, not gCubeSnapshot, which says a capture is
+    // rendering: the probe and hero packs are allocated by allocateProbeBuffers, outside any capture.
+    const bool main_pack = mRT == &mMainRT;
 
     // remember these dimensions
     mRT->width = resX;
     mRT->height = resY;
 
-    scaleToRenderResolution(resX, resY);
+    // The main pack renders at the scaled size. A probe or hero pack is the size of the capture it
+    // takes, which LLViewerWindow::cubeSnapshot reads back from its G-buffer and the managers
+    // downsample to their probes from.
+    if (main_pack)
+    {
+        scaleToRenderResolution(resX, resY);
+    }
 
     S32 shadow_detail = RenderShadowDetail;
     bool ssao = RenderDeferredSSAO;
@@ -1045,29 +1093,31 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
     allocateShadowBuffer(resX, resY);
 
-    if (!gCubeSnapshot) // hack to not re-allocate various targets for cube snapshots
+    if (main_pack) // the targets only the main view has
     {
-        if (RenderFSAAType > 0)
+        // SMAA's intermediates: its edges in mSMAAEdgeMap and its blend weights. FXAA has none; it reads
+        // the post chain's target directly (applyFXAA).
+        if (RenderFSAAType == 2)
         {
             // SMAA benefits from a stencil buffer shared across its passes so the
             // blend-weights pass can skip non-edge pixels marked during edge detect.
             // Deliberately DEPTH_FMT_24 even under reverse-Z: this depth-stencil is a pure
             // SMAA stencil carrier, never receives scene depth nor blit-pairs with it, and
             // DEPTH32F_STENCIL8 would double it to 8 bytes/px for no benefit.
-            bool smaa_stencil = (RenderFSAAType == 2) && gSavedSettings.getBOOL("RenderSMAAUseStencil");
-            if (!mFXAAMap.allocate(resX, resY, post_color_fmt, smaa_stencil, smaa_stencil)) return false;
-            if (RenderFSAAType == 2)
+            //
+            // GL_RGBA8 whatever post_color_fmt is: SMAA's neighborhood blend reads the right edge's
+            // weight from the blend buffer's .a, which RGB10_A2 would leave with four levels.
+            bool smaa_stencil = gSavedSettings.getBOOL("RenderSMAAUseStencil");
+            if (!mSMAAEdgeMap.allocate(resX, resY, GL_RGBA8, smaa_stencil, smaa_stencil)) return false;
+            if (!mSMAABlendBuffer.allocate(resX, resY, GL_RGBA8, false)) return false;
+            if (smaa_stencil)
             {
-                if (!mSMAABlendBuffer.allocate(resX, resY, post_color_fmt, false)) return false;
-                if (smaa_stencil)
-                {
-                    mFXAAMap.shareDepthBuffer(mSMAABlendBuffer);
-                }
+                mSMAAEdgeMap.shareDepthBuffer(mSMAABlendBuffer);
             }
         }
         else
         {
-            mFXAAMap.release();
+            mSMAAEdgeMap.release();
             mSMAABlendBuffer.release();
         }
 
@@ -1122,8 +1172,11 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     S32 shadow_detail = RenderShadowDetail;
 
-    F32 scale = gCubeSnapshot ? 1.0f : llmax(0.f, RenderShadowResolutionScale); // Don't scale probe shadow maps
-    if (gCubeSnapshot && mRT == &mAuxillaryRT)
+    // The probe and hero packs' shadows: never scaled, and no spot shadows (those are the main view's).
+    const bool capture_pack = mRT != &mMainRT;
+
+    F32 scale = capture_pack ? 1.0f : llmax(0.f, RenderShadowResolutionScale); // Don't scale probe shadow maps
+    if (mRT == &mAuxillaryRT)
     {
         // The probe pack's colour target follows ALProbeSuperSample, its shadow maps stay at
         // the size the full supersample gave them: a coarser capture is not a reason for
@@ -1133,16 +1186,7 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
     U32 sun_shadow_map_width = BlurHappySize(resX, scale);
     U32 sun_shadow_map_height = BlurHappySize(resY, scale);
 
-    // 32-bit float depth is the same 4 bytes/texel as DEPTH24 here but distributes precision
-    // differently (float, denser near the near plane). Opt-in; toggling it re-runs this via
-    // handleShadowsResized. The compare sampler and PCF read it the same either way.
-    //
-    // Reverse-Z forces it on regardless of the setting: reversed depth puts the dense end of
-    // the float mantissa where the perspective spot cascades need it, and it is memory-free
-    // (DEPTH24 pads to 4 bytes anyway).
-    static LLCachedControl<bool> shadow_depth_32f(gSavedSettings, "AlchemyRenderShadowDepth32F", false);
-    const LLRenderTarget::eDepthFormat depth_fmt =
-        (shadow_depth_32f || LLRender::sReverseZ) ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
+    const LLRenderTarget::eDepthFormat depth_fmt = shadow_depth_format();
 
     if (shadow_detail > 0)
     { //allocate 4 sun shadow maps
@@ -1163,7 +1207,7 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
         }
     }
 
-    if (!gCubeSnapshot) // hack to not allocate spot shadow maps during ReflectionMapManager init
+    if (!capture_pack)
     {
         U32 width = (U32)(resX * scale);
         U32 height = width;
@@ -1373,7 +1417,7 @@ void LLPipeline::releaseGLBuffers()
 
     mSceneMap.release();
 
-    mFXAAMap.release();
+    mSMAAEdgeMap.release();
     mSMAABlendBuffer.release();
 
     mDownResMap.release();
@@ -1403,6 +1447,7 @@ void LLPipeline::releaseGLBuffers()
     }
 
     releaseScreenBuffers();
+    releaseProbeBuffers();
     releaseShadowBuffers();
     releaseScopeBuffers();
     clearReferenceStill();
@@ -1446,27 +1491,32 @@ void LLPipeline::releaseShadowBuffers()
     releaseSpotShadowTargets();
 }
 
+static void release_screen_pack(LLPipeline::RenderTargetPack& rt)
+{
+    rt.screen.release();
+    rt.deferredScreen.release();
+    rt.deferredLight.release();
+    rt.postPingMap.release();
+    rt.postPongMap.release();
+    for (U32 i = 0; i < LLPipeline::BLOOM_MAX_MIPS; i++)
+    {
+        rt.bloomMip[i].release();
+    }
+    rt.bloomMipCount = 0;
+    rt.crossFilterReady = false;
+    rt.crossFilterWidth = 0;
+    rt.crossFilterHeight = 0;
+}
+
 void LLPipeline::releaseScreenBuffers()
 {
-    auto release_pack = [](RenderTargetPack& rt)
-    {
-        rt.screen.release();
-        rt.deferredScreen.release();
-        rt.deferredLight.release();
-        rt.postPingMap.release();
-        rt.postPongMap.release();
-        for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
-        {
-            rt.bloomMip[i].release();
-        }
-        rt.bloomMipCount = 0;
-        rt.crossFilterReady = false;
-        rt.crossFilterWidth = 0;
-        rt.crossFilterHeight = 0;
-    };
-    release_pack(mMainRT);
-    release_pack(mAuxillaryRT);
-    release_pack(mHeroProbeRT);
+    release_screen_pack(mMainRT);
+}
+
+void LLPipeline::releaseProbeBuffers()
+{
+    release_screen_pack(mAuxillaryRT);
+    release_screen_pack(mHeroProbeRT);
 }
 
 void LLPipeline::releaseSunShadowTarget(U32 index)
@@ -1485,7 +1535,7 @@ void LLPipeline::releaseSunShadowTargets()
 
 void LLPipeline::releaseSpotShadowTargets()
 {
-    if (!gCubeSnapshot) // hack to avoid freeing spot shadows during ReflectionMapManager init
+    if (mRT == &mMainRT) // the spot shadows are the main view's, whichever pack allocateShadowBuffer is filling
     {
         for (U32 i = 0; i < 2; i++)
         {
@@ -1505,7 +1555,7 @@ void LLPipeline::createGLBuffers()
     GLuint resX = gViewerWindow->getWorldViewWidthRaw();
     GLuint resY = gViewerWindow->getWorldViewHeightRaw();
 
-    bool hdr = gSavedSettings.getBOOL("RenderHDREnabled");
+    const bool hdr = hdrEnabled();
     if (!hdr)
     {
         // allocate screen space glow buffers
@@ -1520,10 +1570,13 @@ void LLPipeline::createGLBuffers()
 
     allocateScreenBuffer(resX, resY);
     // Do not zero out mRT dimensions here. allocateScreenBuffer() above
-    // already sets the correct dimensions. Zeroing them caused resizeShadowTexture()
-    // to fail if called immediately after createGLBuffers (e.g., post graphics change).
+    // already sets the correct dimensions, and the snapshot paths read them back
+    // as the logical size to restore (LLViewerWindow::rawSnapshot).
     // mRT->width = 0;
     // mRT->height = 0;
+
+    // After allocateScreenBuffer, which refreshes the cached settings these packs read.
+    allocateProbeBuffers();
 
 
     if (!mNoiseMap)
@@ -3062,6 +3115,13 @@ bool LLPipeline::isWaterClip()
 }
 
 // static
+// static
+bool LLPipeline::hdrEnabled()
+{
+    static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
+    return has_hdr();
+}
+
 LLRenderTarget::eDepthFormat LLPipeline::mainDepthFormat()
 {
     return LLRender::sReverseZ ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
@@ -9593,7 +9653,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
     LL_PROFILE_GPU_ZONE("FXAA");
     {
         llassert(!gCubeSnapshot);
-        bool multisample = RenderFSAAType == 1 && gFXAAProgram[0].isComplete() && mFXAAMap.isComplete();
+        bool multisample = RenderFSAAType == 1 && gFXAAProgram[0].isComplete();
 
         // Present everything.
         if (multisample)
@@ -9602,50 +9662,29 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
             S32 width = dst->getWidth();
             S32 height = dst->getHeight();
 
-            // bake out texture2D with RGBL for FXAA shader
-            mFXAAMap.bindTarget();
-            mFXAAMap.clear(GL_COLOR_BUFFER_BIT);
-
-            LLGLSLShader* shader = &gGlowCombineFXAAProgram;
-            shader->bind();
-
-            S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
-            if (channel > -1)
-            {
-                src->bindTexture(0, channel, ALSamplers::BilinearMirror);
-            }
-
-            {
-                LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);
-                mScreenTriangleVB->setBuffer();
-                mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-            }
-
-            shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
-            shader->unbind();
-
-            mFXAAMap.flush();
-
             dst->bindTarget();
 
             static LLCachedControl<U32> aa_quality(gSavedSettings, "RenderFSAASamples", 0U);
             U32 fsaa_quality = std::clamp(aa_quality(), 0U, 3U);
 
-            shader = &gFXAAProgram[fsaa_quality];
+            LLGLSLShader* shader = &gFXAAProgram[fsaa_quality];
             shader->bind();
 
-            channel = shader->enableTexture(LLShaderMgr::DIFFUSE_MAP);
+            // Straight from the source, with no luma baked into an intermediate first: FXAA computes
+            // each tap's luma from its colour (FXAA_LUMA_FROM_RGB), so it reads the post chain's
+            // target at that target's precision, RGB10_A2 under HDR.
+            S32 channel = shader->enableTexture(LLShaderMgr::DIFFUSE_MAP);
             if (channel > -1)
             {
-                mFXAAMap.bindTexture(0, channel, ALSamplers::BilinearMirror);
+                src->bindTexture(0, channel, ALSamplers::BilinearMirror);
             }
 
             // The destination is an FBO; bindTarget already set its viewport.
             // Forcing the full world-view viewport here makes RenderResolutionDivisor
             // write only the lower-left fraction of the reduced-size target.
 
-            F32 scale_x = (F32)width / mFXAAMap.getWidth();
-            F32 scale_y = (F32)height / mFXAAMap.getHeight();
+            F32 scale_x = (F32)width / src->getWidth();
+            F32 scale_y = (F32)height / src->getHeight();
             shader->uniform2f(LLShaderMgr::FXAA_TC_SCALE, scale_x, scale_y);
             shader->uniform2f(LLShaderMgr::FXAA_RCP_SCREEN_RES, 1.f / width * scale_x, 1.f / height * scale_y);
             shader->uniform4f(LLShaderMgr::FXAA_RCP_FRAME_OPT, -0.5f / width * scale_x, -0.5f / height * scale_y,
@@ -9674,7 +9713,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
 void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
 {
     llassert(!gCubeSnapshot);
-    bool multisample = RenderFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mFXAAMap.isComplete() && mSMAABlendBuffer.isComplete();
+    bool multisample = RenderFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mSMAAEdgeMap.isComplete() && mSMAABlendBuffer.isComplete();
 
     // Present everything.
     if (multisample)
@@ -9694,11 +9733,11 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
         static LLCachedControl<bool> use_predication(gSavedSettings, "RenderSMAAPredication", true);
         static LLCachedControl<bool> use_stencil_setting(gSavedSettings, "RenderSMAAUseStencil", true);
         // Stencil optimization requires all three passes to share the same stencil attachment.
-        bool use_stencil = use_stencil_setting && mFXAAMap.hasStencil() && mSMAABlendBuffer.hasStencil();
+        bool use_stencil = use_stencil_setting && mSMAAEdgeMap.hasStencil() && mSMAABlendBuffer.hasStencil();
         LLGLState stencil(GL_STENCIL_TEST, use_stencil);
         {
             // Bind setup:
-            LLRenderTarget& dest = mFXAAMap;
+            LLRenderTarget& dest = mSMAAEdgeMap;
             LLGLSLShader& edge_shader = gSMAAEdgeDetectProgram[fsaa_quality];
 
             dest.bindTarget();
@@ -9771,7 +9810,7 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
             S32 edge_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_EDGE_TEX);
             if (edge_tex_channel > -1)
             {
-                mFXAAMap.bindTexture(0, edge_tex_channel, ALSamplers::BilinearClamp);
+                mSMAAEdgeMap.bindTexture(0, edge_tex_channel, ALSamplers::BilinearClamp);
             }
             S32 area_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_AREA_TEX);
             if (area_tex_channel > -1)
@@ -9811,7 +9850,7 @@ void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst)
 {
     LL_PROFILE_GPU_ZONE("SMAA");
     llassert(!gCubeSnapshot);
-    bool multisample = RenderFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mFXAAMap.isComplete() && mSMAABlendBuffer.isComplete();
+    bool multisample = RenderFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mSMAAEdgeMap.isComplete() && mSMAABlendBuffer.isComplete();
 
     // Present everything.
     if (multisample)
@@ -9965,8 +10004,7 @@ void LLPipeline::renderDoF()
             // (RGBA8, idle until the AA chain). Together this is what keeps DoF
             // at zero full-frame targets of its own: two would be 44 MB at
             // 1440p.
-            static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
-            const bool hdr = has_hdr();
+            const bool hdr = hdrEnabled();
 
             LLRenderTarget* sharp = &mWaterDis;
             LLRenderTarget* blur  = hdr ? (bloomHDRReady() ? &mRT->bloomMip[0] : nullptr)
@@ -10307,8 +10345,7 @@ void LLPipeline::renderFinalize()
     gGL.setColorMask(true, true);
     gGL.setClearColor(LLColor4::transparent);
 
-    static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
-    bool hdr = has_hdr();
+    const bool hdr = hdrEnabled();
 
     // A cutout frame measures nothing and leaves nothing behind. It is mostly
     // empty, so metering it would brighten the subject, and the next live frame
@@ -10469,9 +10506,9 @@ void LLPipeline::renderFinalize()
             break;
         case 5:
         {
-            if (RenderFSAAType > 0)
+            if (RenderFSAAType == 2)
             {
-                visualizeBuffers(&mFXAAMap, sourceBuffer, 0);
+                visualizeBuffers(&mSMAAEdgeMap, sourceBuffer, 0);
             }
             break;
         }

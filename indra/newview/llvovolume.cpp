@@ -7427,7 +7427,9 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 }
             }
 
-            if (!is_alpha && LLPipeline::sRenderGlow && te->getGlow() > 0.f)
+            // Whatever RenderGlow says: the glow passes check LLPipeline::sRenderGlow when they draw,
+            // so turning glow on or off rebuilds nothing.
+            if (!is_alpha && te->getGlow() > 0.f)
             {
                 if (gltf_mat)
                 {

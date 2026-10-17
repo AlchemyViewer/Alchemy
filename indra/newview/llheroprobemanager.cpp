@@ -101,11 +101,9 @@ void LLHeroProbeManager::update()
 
     initReflectionMaps();
 
-    static LLCachedControl<bool> render_hdr(gSavedSettings, "RenderHDREnabled", true);
-
     if (!mRenderTarget.isComplete())
     {
-        U32 color_fmt = render_hdr ? GL_RGBA16F : GL_RGBA8;
+        U32 color_fmt = mHDR ? GL_RGBA16F : GL_RGBA8;
         mRenderTarget.allocate(mProbeResolution, mProbeResolution, color_fmt, true);
     }
 
@@ -117,7 +115,7 @@ void LLHeroProbeManager::update()
         mMipChain.resize(count);
         for (U32 i = 0; i < count; ++i)
         {
-            mMipChain[i].allocate(res, res, render_hdr ? GL_RGBA16F : GL_RGBA8);
+            mMipChain[i].allocate(res, res, mHDR ? GL_RGBA16F : GL_RGBA8);
             res /= 2;
         }
     }
@@ -530,6 +528,14 @@ void LLHeroProbeManager::initReflectionMaps()
 {
     U32 count = LL_MAX_HERO_PROBE_COUNT;
 
+    // HDR picks the colour format of the cube array, the scratch target and the mip chain, so a
+    // change rebuilds all three as a reset does.
+    static LLCachedControl<bool> render_hdr(gSavedSettings, "RenderHDREnabled", true);
+    if (mTexture.notNull() && render_hdr() != mHDR)
+    {
+        mReset = true;
+    }
+
     if ((mTexture.isNull() || mReflectionProbeCount != count || mReset) && LLPipeline::RenderMirrors)
     {
 
@@ -544,11 +550,10 @@ void LLHeroProbeManager::initReflectionMaps()
         mMaxProbeLOD = log2f((F32)mProbeResolution) - 1.f; // number of mips - 1
 
         mTexture = new LLCubeMapArray();
-
-        static LLCachedControl<bool> render_hdr(gSavedSettings, "RenderHDREnabled", true);
+        mHDR = render_hdr;
 
         // store mReflectionProbeCount+2 cube maps, final two cube maps are used for render target and radiance map generation source)
-        mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, render_hdr);
+        mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, mHDR);
 
         if (mDefaultProbe.isNull())
         {
@@ -567,8 +572,6 @@ void LLHeroProbeManager::initReflectionMaps()
         mDefaultProbe->mRadius = 4096.f;
         mDefaultProbe->mProbeIndex = 0;
         touch_default_probe(mDefaultProbe);
-
-        mProbes.push_back(mDefaultProbe);
     }
 
     if (mVertexBuffer.isNull())

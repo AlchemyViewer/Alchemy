@@ -145,7 +145,6 @@ LLGLSLShader    gHeroRadianceGenProgram;
 LLGLSLShader    gSHProjectionProgram;
 LLGLSLShader    gSHProjectionRowsProgram;
 LLGLSLShader    gSHProjectionReduceProgram;
-LLGLSLShader    gGlowCombineFXAAProgram;
 LLGLSLShader    gTwoTextureCompareProgram;
 LLGLSLShader    gOneTextureFilterProgram;
 LLGLSLShader    gDebugProgram;
@@ -316,7 +315,7 @@ LLGLSLShader            gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
 LLGLSLShader            gDeferredPBRTerrainAlphaMaskProgram[TERRAIN_PAINT_TYPE_COUNT];
 
 // Mirror corners are only reachable during the hero-probe mirror pass, which RenderMirrors
-// gates entirely; toggling it re-runs setShaders (handleReflectionProbeDetailChanged), so
+// gates entirely; toggling it re-runs setShaders (handleReflectionProbesChanged), so
 // building them while it is off would be dozens of programs nothing can bind.
 static U32 mirror_variant()
 {
@@ -592,6 +591,11 @@ void LLViewerShaderMgr::setShaders()
     // whole next frame.
     LLPipeline::updateReverseZ();
 
+    // The same for the G-buffer's normal layout: every compile below injects GBUFFER_NORM_HDR from this latch,
+    // the cache key folds it in, and addDeferredAttachments takes the normal attachment's format from it when this
+    // call reallocates the GL buffers.
+    LLRender::sGBufferNormHDR = LLPipeline::hdrEnabled();
+
     // The same for compute: the shared objects compiled for its stage and every program built on it follow the switch
     // as it stands for this load.
     LLRender::sCompute = compute_enabled();
@@ -618,8 +622,6 @@ void LLViewerShaderMgr::setShaders()
             current_cache_version,
             LLAppViewer::instance()->isSecondInstance());
     }
-
-    static LLCachedControl<U32> max_texture_index(gSavedSettings, "RenderMaxTextureIndex", 16);
 
     // when using indexed texture rendering, leave some texture units available for shadow and reflection maps
     // We assume we always have atleast 16 texunits available, but we clamp the reserved units to ensure we don't end up with a negative
@@ -4109,16 +4111,6 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gGlowCombineProgram.mShaderFiles.push_back(make_pair("interface/glowcombineF.glsl", GL_FRAGMENT_SHADER));
         gGlowCombineProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gGlowCombineProgram.createShader();
-    }
-
-    if (success)
-    {
-        gGlowCombineFXAAProgram.mName = "Glow CombineFXAA Shader";
-        gGlowCombineFXAAProgram.mShaderFiles.clear();
-        gGlowCombineFXAAProgram.mShaderFiles.push_back(make_pair("interface/glowcombineFXAAV.glsl", GL_VERTEX_SHADER));
-        gGlowCombineFXAAProgram.mShaderFiles.push_back(make_pair("interface/glowcombineFXAAF.glsl", GL_FRAGMENT_SHADER));
-        gGlowCombineFXAAProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gGlowCombineFXAAProgram.createShader();
     }
 
 #ifdef LL_WINDOWS
