@@ -116,10 +116,12 @@ float calcAmbientOcclusion(vec4 pos, vec3 norm, vec2 pos_screen)
         points = points + diffz_val;
     }
 
-    angle_hidden = min(ssao_factor*angle_hidden/points, 1.0);
+    // With every sample blocked there is no data, so no occlusion: a comparison, since the
+    // division would make that 0/0 whenever nothing occluded either, and a NaN reaches the
+    // light map's blur and spreads.
+    angle_hidden = (points > 0.0) ? min(ssao_factor*angle_hidden/points, 1.0) : 0.0;
 
-    float points_val = (points > 0.0) ? 1.0 : 0.0;
-    ret = (1.0 - (points_val * angle_hidden));
+    ret = 1.0 - angle_hidden;
 
     ret = max(ret, 0.0);
     return min(ret, 1.0);
