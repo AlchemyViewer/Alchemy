@@ -129,6 +129,10 @@ private:
     // resolution of reflection probes
     U32 mProbeResolution = 1024;
 
+    // RenderHDREnabled as the cube array, the scratch target and the mip chain were allocated
+    // under: float colour or 8-bit. initReflectionMaps rebuilds all three when it changes.
+    bool mHDR = true;
+
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;
 
