@@ -1699,10 +1699,14 @@ namespace
     // paired with a trailing scalar (fills the vec3's std140 tail), so the C++ float[3]+float
     // packing reproduces std140 with no manual padding; only the round to 16 bytes before
     // eyeToSky needs it, a mat3's columns being vec4-aligned.
-    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 208,
-                  "Environment UBO layout must match std140 (208 bytes)");
+    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 256,
+                  "Environment UBO layout must match std140 (256 bytes)");
     static_assert(offsetof(LLEnvironment::EnvironmentUBOData, eyeToSky) == 160,
                   "eyeToSky must start on a 16-byte boundary, as a std140 mat3 does");
+    static_assert(offsetof(LLEnvironment::EnvironmentUBOData, haze_extinction) == 208 &&
+                  offsetof(LLEnvironment::EnvironmentUBOData, blue_weight) == 224 &&
+                  offsetof(LLEnvironment::EnvironmentUBOData, haze_weight) == 240,
+                  "the haze terms are vec3s after the mat3, each on a 16-byte boundary, as std140 lays them");
 
     // LLShaderMgr uniform enum -> (byte offset in the block, float component count). The pack
     // walks the per-frame LLShaderUniforms buckets and writes any setting whose enum appears
@@ -1735,6 +1739,9 @@ namespace
         LL_ENV_FIELD(GAMMA,                     gamma),
         LL_ENV_FIELD(WATER_FOGKS,               waterFogKS),
         LL_ENV_FIELD(WATER_FOGDENSITY,          waterFogDensity),
+        LL_ENV_FIELD(HAZE_EXTINCTION,           haze_extinction),
+        LL_ENV_FIELD(BLUE_WEIGHT,               blue_weight),
+        LL_ENV_FIELD(HAZE_WEIGHT,               haze_weight),
     };
 #undef LL_ENV_FIELD
 

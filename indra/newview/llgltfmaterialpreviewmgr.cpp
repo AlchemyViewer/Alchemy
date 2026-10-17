@@ -425,6 +425,8 @@ void fixup_shader_constants(LLGLSLShader& shader)
     shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, 1);
     shader.uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, LLColor3::white.mV);
     shader.uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, 0.0f);
+    // The sun's attenuation on its way down, worked from that density (LLSettingsVOSky::applySpecial)
+    shader.uniform3fv(LLShaderMgr::SUNLIGHT_ATTEN, 1, LLColor3::white.mV);
 
     // Ignore shadows (if enabled): the preview has none of the maps, the sun's four cascades and the spot pair, so each
     // reads lit without a sample. Their units keep the depth maps bindShadowMaps put there, under the sampler the

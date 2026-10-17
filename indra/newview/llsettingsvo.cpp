@@ -684,36 +684,35 @@ void LLSettingsVOSky::updateSettings()
     gSky.setMoonScale(getMoonScale());
 }
 
+// A sky colour as an irradiance pass takes it under RenderDesaturateIrradiance: grey at its
+// lightness, so the sky does not tint the probes' irradiance.
+static LLColor3 irradiance_grey(const LLColor3& color)
+{
+    F32 h, s, l;
+    color.calcHSL(&h, &s, &l);
+    return LLColor3(l, l, l);
+}
+
 void draw_color(LLShaderUniforms* shader, const LLColor3& col, S32 shader_key)
 {
     // always identify as a radiance pass if desaturating irradiance is disabled
     static LLCachedControl<bool> desaturate_irradiance(gSavedSettings, "RenderDesaturateIrradiance", true);
 
-    LLVector4 vect4(col.mV[0], col.mV[1], col.mV[2]);
+    LLColor3 color = col;
 
     if (desaturate_irradiance && gCubeSnapshot && !gPipeline.mReflectionMapManager.isRadiancePass())
     { // maximize and remove tinting if this is an irradiance map render pass and the parameter feeds into the sky background color
-        auto max_vec = [](LLVector4 col)
-        {
-            LLColor3 color(col);
-            F32 h, s, l;
-            color.calcHSL(&h, &s, &l);
-
-            col.mV[0] = col.mV[1] = col.mV[2] = l;
-            return col;
-        };
-
         switch (shader_key)
         {
         case LLShaderMgr::BLUE_HORIZON:
         case LLShaderMgr::BLUE_DENSITY:
-            vect4 = max_vec(vect4);
+            color = irradiance_grey(color);
             break;
         }
     }
 
-    //_WARNS("RIDER") << "pushing '" << (*it).first << "' as " << vect4 << LL_ENDL;
-    shader->uniform3fv(shader_key, LLVector3(vect4.mV));
+    //_WARNS("RIDER") << "pushing '" << (*it).first << "' as " << color << LL_ENDL;
+    shader->uniform3fv(shader_key, LLVector3(color.mV));
 }
 
 inline void draw_real(LLShaderUniforms* shader, F32 value, S32 shader_key)
@@ -821,10 +820,15 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 
     F32 probe_ambiance = getReflectionProbeAmbiance();
 
+    // The blue density the block carries: applyToUniforms', grey in an irradiance pass as it
+    // pushes it, unless auto-adjust scales it below.
+    LLColor3 blue_density = getBlueDensity();
+
     static LLCachedControl<bool> desaturate_irradiance(gSavedSettings, "RenderDesaturateIrradiance", true);
     if (irradiance_pass && desaturate_irradiance)
     { // during an irradiance map update, disable ambient lighting (direct lighting only) and desaturate sky color (avoid tinting the world blue)
         shader->uniform3fv(LLShaderMgr::AMBIENT, LLVector3::zero.mV);
+        blue_density = irradiance_grey(blue_density);
     }
     else
     {
@@ -842,7 +846,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
             shader->uniform3fv(LLShaderMgr::AMBIENT, (ambient * auto_adjust_ambient_scale).mV);
             shader->uniform1f(LLShaderMgr::SKY_HDR_SCALE, auto_adjust_hdr_scale);
             LLColor3 blue_horizon = getBlueHorizon() * auto_adjust_blue_horizon_scale;
-            LLColor3 blue_density = getBlueDensity() * auto_adjust_blue_density_scale;
+            blue_density = getBlueDensity() * auto_adjust_blue_density_scale;
             sun_light_color = sun_light_color * auto_adjust_sun_color_scale;
 
             shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, sun_light_color.mV);
@@ -864,6 +868,43 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
     shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, getSunMoonGlowFactor());
     shader->uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, getDensityMultiplier());
     shader->uniform1f(LLShaderMgr::DISTANCE_MULTIPLIER, getDistanceMultiplier());
+
+    // The WindLight haze's terms that take nothing per pixel, worked here once rather than at every
+    // pixel of every lit pass, in the arithmetic the shaders did them in. Keep in step with
+    // calcAtmosphericVars (windlight/atmosphericsFuncs.glsl), skyF.glsl and cloudsF.glsl.
+    {
+        const F32 haze_density = getHazeDensity();
+
+        // The extinction the haze's transparency is worked from, and each density's share of it.
+        // Floored as the shaders floored it, so a channel with both densities 0 does not weigh
+        // 0 / 0. The densities are validated non-negative; the absolute values are the sky's.
+        LLVector3 haze_extinction;
+        LLVector3 blue_weight;
+        LLVector3 haze_weight;
+        for (S32 c = 0; c < 3; ++c)
+        {
+            haze_extinction.mV[c] = llmax(fabsf(blue_density.mV[c]) + fabsf(haze_density), 1e-6f);
+            blue_weight.mV[c]     = blue_density.mV[c] / haze_extinction.mV[c];
+            haze_weight.mV[c]     = haze_density / haze_extinction.mV[c];
+        }
+        shader->uniform3fv(LLShaderMgr::HAZE_EXTINCTION, haze_extinction);
+        shader->uniform3fv(LLShaderMgr::BLUE_WEIGHT, blue_weight);
+        shader->uniform3fv(LLShaderMgr::HAZE_WEIGHT, haze_weight);
+
+        // The sun's or moon's attenuation on its way down to a surface: light_atten over the
+        // sine of the light's elevation, lightnorm's y (OGL order). Loose rather than in the
+        // block, beside the density_multiplier it is worked from, which the GLTF material
+        // preview overrides along with it.
+        const F32 density_mult         = getDensityMultiplier();
+        const F32 above_horizon_factor = 1.f / llmax(1e-6f, light_direction.mV[1]);
+        LLVector3 sunlight_atten;
+        for (S32 c = 0; c < 3; ++c)
+        {
+            const F32 light_atten = (blue_density.mV[c] + haze_density * 0.25f) * (density_mult * getMaxY());
+            sunlight_atten.mV[c]  = expf(-light_atten * above_horizon_factor);
+        }
+        shader->uniform3fv(LLShaderMgr::SUNLIGHT_ATTEN, sunlight_atten);
+    }
 
     shader->uniform1f(LLShaderMgr::GAMMA, g);
 }

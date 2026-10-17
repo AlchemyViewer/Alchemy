@@ -12,11 +12,15 @@
  *
  * The member order/types MUST byte-match (std140) the C++
  * LLEnvironment::EnvironmentUBOData, packed by packEnvironmentUBO and registered
- * for debug validation from the same offsetof table. Each vec3 is paired with a
- * scalar that fills its std140 tail.
+ * for debug validation from the same offsetof table. Each vec3 before eyeToSky is
+ * paired with a scalar that fills its std140 tail; the C++ pads the ones after it.
  *
  * eyeToSky is the camera's, not the sky settings': the rotation from this view's
  * eye space to the sky dome's frame (north, up, east), ALFarPlane::eyeToSkyFrame.
+ *
+ * haze_extinction, blue_weight and haze_weight are the WindLight haze's terms of
+ * blue_density and haze_density alone, worked once in LLSettingsVOSky::applySpecial:
+ * max(|blue_density| + |haze_density|, 1e-6) and each density over it.
  */
 
 layout (std140) uniform Environment
@@ -36,4 +40,7 @@ layout (std140) uniform Environment
     float waterFogKS;
     float waterFogDensity;
     mat3  eyeToSky;
+    vec3  haze_extinction;
+    vec3  blue_weight;
+    vec3  haze_weight;
 };

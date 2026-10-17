@@ -267,7 +267,8 @@ public:
     // across every shader in a frame. Per-pass / light-state uniforms (ambient/sunlight/
     // moonlight, lightnorm, camPosLocal, water/clip plane, mirror flag, sky_hdr_scale,
     // sun_up_factor, moisture/droplet/ice/moon_brightness/cloud_variance/sun_moon_glow_factor,
-    // density_multiplier) are deliberately re-pushed per context and STAY on the loose apply()
+    // density_multiplier and the sunlight_atten worked from it, both of which the GLTF material
+    // preview overrides) are deliberately re-pushed per context and STAY on the loose apply()
     // path. (classic_mode is a compile-time program variant -- see CLASSIC_MODE.) One member
     // is the camera's rather than the settings': eyeToSky, the rotation from the view's eye
     // space to the sky dome's frame, taken from the camera update() is given -- the main view,
@@ -278,6 +279,7 @@ public:
     // offset+12) -- which is exactly how float[3]+float pack in C++, so this struct mirrors
     // std140 with no manual inter-member padding among them. Only the round to a 16-byte
     // multiple before eyeToSky needs explicit padding: a mat3 is three vec4-aligned columns.
+    // The haze terms after it are vec3s with no scalar to pair, so each carries a pad.
     // See packEnvironmentUBO() and the sEnvBlockFields table in llenvironment.cpp.
     struct alignas(16) EnvironmentUBOData
     {
@@ -297,6 +299,10 @@ public:
         F32 waterFogDensity;
         F32 _pad0[2];
         F32 eyeToSky[12];              // mat3: three columns, each padded to a vec4
+        // calcAtmosphericVars' terms of blue_density and haze_density alone (applySpecial)
+        F32 haze_extinction[3];        F32 _pad1;
+        F32 blue_weight[3];            F32 _pad2;
+        F32 haze_weight[3];            F32 _pad3;
     };
 
     // Pack mSky/mWaterUniforms into the CPU-side block and mark it for upload (no GL calls).

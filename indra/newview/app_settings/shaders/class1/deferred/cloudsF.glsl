@@ -124,12 +124,9 @@ void main()
     // this is used later for sunlight modulation at various altitudes
     light_atten = (blue_density + vec3(haze_density * 0.25)) * (density_multiplier * max_y);
 
-    // Calculate relative weights
-    // Floored as skyF and calcAtmosphericVars floor it: a channel with both densities 0, which
-    // the settings allow, would otherwise weigh 0 / 0.
-    vec3 combined_haze = max(abs(blue_density) + vec3(abs(haze_density)), vec3(1e-6));
-    vec3 blue_weight   = blue_density / combined_haze;
-    vec3 haze_weight   = haze_density / combined_haze;
+    // The relative weights, blue_weight and haze_weight, and the haze_extinction they are shares
+    // of, are the Environment block's (LLSettingsVOSky::applySpecial), floored there so a channel
+    // with both densities 0, which the settings allow, does not weigh 0 / 0.
 
     // Compute sunlight from rel_pos & lightnorm (for long rays like sky)
     float off_axis = 1.0 / max(1e-6, max(0., rel_pos_norm.y) + lightnorm.y);
@@ -141,7 +138,7 @@ void main()
     // Transparency (-> combined_haze)
     // ATI Bugfix -- can't store combined_haze*density_dist in a variable because the ati
     // compiler gets confused.
-    combined_haze = exp(-combined_haze * density_dist);
+    vec3 combined_haze = exp(-haze_extinction * density_dist);
 
     // Compute haze glow
     float haze_glow = 1.0 - dot(rel_pos_norm, lightnorm.xyz);
