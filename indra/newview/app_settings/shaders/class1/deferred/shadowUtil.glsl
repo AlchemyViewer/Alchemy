@@ -488,14 +488,12 @@ float filterShadow(AL_SHADOW_SAMPLER shadowMap, vec4 lpos, vec4 dLdx, vec4 dLdy,
 
 #endif // SUN_SHADOW || SPOT_SHADOW
 
-float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
-{
 #if defined(SUN_SHADOW)
-    // Receiver derivatives, taken here in uniform control flow (before the cascade branches
-    // below diverge) so the per-cascade receiver-plane bias is well-defined.
-    vec3 dpos_dx = dFdx(pos);
-    vec3 dpos_dy = dFdy(pos);
-
+// The sun's cascades for a receiver whose screen-space derivatives the caller took in uniform
+// control flow, before anything it branches on, so the per-cascade receiver-plane bias is
+// well-defined.
+float directionalShadow(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy)
+{
     float shadow = 0.0;
     vec3 light_dir = normalize((sun_up_factor == 1) ? sun_dir : moon_dir);
 
@@ -588,6 +586,13 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
         return 1.0; // lit beyond the far split...
     }
     return shadow;
+}
+#endif
+
+float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
+{
+#if defined(SUN_SHADOW)
+    return directionalShadow(pos, norm, pos_screen, dFdx(pos), dFdy(pos));
 #else
     return 1.0;
 #endif
@@ -673,6 +678,25 @@ float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
 // Set by the sun pass: 1 for each spot shadow map a shadowing spot light (mShadowSpotLight) owns.
 // No spot light reads the other's channel.
 uniform vec2 spot_shadow_live;
+
+// A surface turned from the light (by the shading normal softenLightF lights it with) receives
+// none of it there whatever its shadow, so it takes 0 unfiltered.
+float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec2 pos_screen)
+{
+#if defined(SUN_SHADOW)
+    vec3 dpos_dx = dFdx(pos);
+    vec3 dpos_dy = dFdy(pos);
+
+    vec3 light_dir = (sun_up_factor == 1) ? sun_dir : moon_dir;
+    if (dot(norm, light_dir) <= 0.0)
+    {
+        return 0.0;
+    }
+    return directionalShadow(pos, norm, pos_screen, dpos_dx, dpos_dy);
+#else
+    return 1.0;
+#endif
+}
 
 // A map no spot light owns, or a receiver outside its frustum, takes 1 unfiltered. The frustum is
 // the cookie's (setupSpotLight builds both from one origin, field of view and aspect), outside
