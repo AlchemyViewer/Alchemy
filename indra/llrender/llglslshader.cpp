@@ -2814,10 +2814,12 @@ LLUUID LLGLSLShader::hash()
         hash_obj.update(define_pair.second);
 
     }
-    // Injected by loadShaderFile() rather than carried in either defines map, so it has to be
-    // folded in by hand -- otherwise a reverse-Z toggle would hand back binaries compiled under
-    // the other depth convention.
+    // Injected by loadShaderFile() rather than carried in either defines map, so they have to be
+    // folded in by hand -- otherwise a reverse-Z or HDR toggle would hand back binaries compiled
+    // under the other depth convention, or unpacking the other normal attachment layout
+    // (GBUFFER_NORM_HDR).
     hash_obj.update(&LLRender::sReverseZ, sizeof(LLRender::sReverseZ));
+    hash_obj.update(&LLRender::sGBufferNormHDR, sizeof(LLRender::sGBufferNormHDR));
     hash_obj.update(&mFeatures, sizeof(LLShaderFeatures));
     // Not the raw renderer: radeonsi's carries the kernel release, and a kernel update would
     // orphan every binary.
