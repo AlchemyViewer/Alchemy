@@ -281,7 +281,9 @@ void main()
     // straight behind the camera, where pow would take a negative base.
     float vh = sqrt(max(0.5 + 0.5 * dot(v, l), 0.0));
     float fresnel = 0.02 + 0.98 * pow(max(1.0 - vh, 0.0), 5.0);
-    vec3 punctual = min(glint * fresnel, 10.0) * sunlit_linear * shadow * atten;
+    // Not dimmed by the eye path's haze here: the haze pass dims every water pixel by it
+    // afterwards (doAtmospherics), the glint along with the reflection and refraction.
+    vec3 punctual = min(glint * fresnel, 10.0) * sunlit_linear * shadow;
 
     // The glint's glow, as WindLight's water wrote it: the lobe at its peak of 1, by 0.1 rising to 0.3 as the light
     // climbs, which the glow and bloom spread into a soft halo about the sparkles. Shadowed glints have none.
