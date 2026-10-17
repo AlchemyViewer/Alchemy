@@ -374,16 +374,20 @@ bool addDeferredAttachments(LLRenderTarget& target)
     U32 emissive = GL_R11F_G11F_B10F;
 
     static LLCachedControl<bool> has_emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
+    static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
 
-    // The layout the shaders were compiled against. GBUFFER_NORM_HDR tells them how much room the
-    // packed geometric normal has in the normal attachment's blue channel, and setShaders latches it
-    // from RenderHDREnabled before it compiles anything, so the format follows that latch -- as
-    // mainDepthFormat follows reverse-Z's -- rather than the setting.
-    const bool hdr = LLRender::sGBufferNormHDR;
-
-    if (!hdr)
+    // The normal's layout is the one the shaders were compiled against. GBUFFER_NORM_HDR tells them
+    // how much room the packed geometric normal has in the attachment's blue channel, and setShaders
+    // latches it from RenderHDREnabled before it compiles anything, so the format follows that latch
+    // -- as mainDepthFormat follows reverse-Z's -- rather than the setting. Nothing compiles against
+    // the emissive format, which follows the setting with the rest of the HDR targets (mSkyBehind
+    // matches it).
+    if (!LLRender::sGBufferNormHDR)
     {
         norm = GL_RGB10_A2;
+    }
+    if (!has_hdr())
+    {
         emissive = GL_RGB8;
     }
 
