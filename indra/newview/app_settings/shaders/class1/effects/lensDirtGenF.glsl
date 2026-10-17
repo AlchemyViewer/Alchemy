@@ -222,12 +222,14 @@ void main()
     float img = 0.0;
 
     // Motes, large relative to their spacing so they overlap into a mottled
-    // field rather than reading as separate blobs.
-    img = screenBlend(img, dirtMotes(uv, 4.5 / mscale, 0.050, 0.140, 0.45,
+    // field rather than reading as separate blobs. The scale moves radius and
+    // spacing together: a mote's largest radius stays at most 0.63 of its
+    // cell's height, inside the one-cell neighbourhood dirtMotes searches.
+    img = screenBlend(img, dirtMotes(uv, 4.5 / mscale, 0.050 * mscale, 0.140 * mscale, 0.45,
                                      seed, aspect, 0.80 * grime, 1.7) * 0.46 * clump);
-    img = screenBlend(img, dirtMotes(uv, 9.0 / mscale, 0.022, 0.064, 0.42,
+    img = screenBlend(img, dirtMotes(uv, 9.0 / mscale, 0.022 * mscale, 0.064 * mscale, 0.42,
                                      seed + 3.0, aspect, 0.75 * grime, 1.9) * 0.50 * clump);
-    img = screenBlend(img, dirtMotes(uv, 20.0 / mscale, 0.009, 0.028, 0.40,
+    img = screenBlend(img, dirtMotes(uv, 20.0 / mscale, 0.009 * mscale, 0.028 * mscale, 0.40,
                                      seed + 5.0, aspect, 0.60 * grime, 2.1) * 0.44 * clump);
 
     // Fine grit. Small and sharp, and the layer most easily overdone: too much
