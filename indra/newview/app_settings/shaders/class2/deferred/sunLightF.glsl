@@ -38,7 +38,9 @@ vec4 getNorm(vec2 pos_screen);
 vec4 getPosition(vec2 pos_screen);
 
 float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
-float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen);
+// The sun pass's entry point (shadowUtil.glsl): it skips the filter where no reader of the
+// light map uses it.
+float sampleSpotShadowInFrustum(vec3 pos, vec3 norm, int index, vec2 pos_screen);
 
 void main()
 {
@@ -49,8 +51,8 @@ void main()
     vec4 col;
     col.r = sampleDirectionalShadow(pos.xyz, norm.xyz, pos_screen);
     col.g = 1.0f;
-    col.b = sampleSpotShadow(pos.xyz, norm.xyz, 0, pos_screen);
-    col.a = sampleSpotShadow(pos.xyz, norm.xyz, 1, pos_screen);
+    col.b = sampleSpotShadowInFrustum(pos.xyz, norm.xyz, 0, pos_screen);
+    col.a = sampleSpotShadowInFrustum(pos.xyz, norm.xyz, 1, pos_screen);
 
     frag_color = clamp(col, vec4(0), vec4(1));
 }

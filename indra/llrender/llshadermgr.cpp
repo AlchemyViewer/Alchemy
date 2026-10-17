@@ -1778,8 +1778,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("norm_cutoff");
     mReservedUniforms.push_back("shadow_target_width");
     mReservedUniforms.push_back("shadow_stipple");
+    mReservedUniforms.push_back("spot_shadow_live");
 
-    llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SHADOW_STIPPLE + 1);
+    llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SPOT_SHADOW_LIVE + 1);
 
     mReservedUniforms.push_back("iterationCount");
     mReservedUniforms.push_back("rayStep");

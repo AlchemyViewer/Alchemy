@@ -593,16 +593,28 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 #endif
 }
 
-float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
-{
 #if defined(SPOT_SHADOW)
+// Spot map `index` for a receiver whose derivatives the caller took in uniform control flow.
+// With frustum_lit, a receiver the map's frustum does not hold (outside its unit square, or
+// behind the light) takes 1 without the filter: the receiver itself, as spotLightF tests the
+// cookie on it, not the point the normal offset moves it to, which the narrowing cone can put
+// outside while the receiver is still lit.
+float spotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy, bool frustum_lit)
+{
     if (!shadowMapBuilt(4 + index))
     {
         return 1.0;
     }
 
-    vec3 dpos_dx = dFdx(pos);
-    vec3 dpos_dy = dFdy(pos);
+    if (frustum_lit)
+    {
+        // The map's texture space: in its frustum where 0 <= xy <= w and w > 0.
+        vec4 rpos = shadow_matrix[4 + index] * vec4(pos, 1.0);
+        if (rpos.w <= 0.0 || any(lessThan(rpos.xy, vec2(0.0))) || any(greaterThan(rpos.xy, rpos.ww)))
+        {
+            return 1.0;
+        }
+    }
 
     float shadow = 0.0;
     pos += norm * spot_shadow_offset;
@@ -614,23 +626,19 @@ float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
 
     if (spos.z > -shadow_clip.w)
     {
-        vec4 lpos;
+        vec4 lpos = shadow_matrix[4 + index] * spos;
+        vec4 dLdx = shadow_matrix[4 + index] * ddx4;
+        vec4 dLdy = shadow_matrix[4 + index] * ddy4;
 
         // A sampler2DShadow cannot live in a local or a ternary (GLSL opaque type), so pick
         // the map by branch and pass it straight in.
         float filtered;
         if (index == 0)
         {
-            lpos = shadow_matrix[4] * spos;
-            vec4 dLdx = shadow_matrix[4] * ddx4;
-            vec4 dLdy = shadow_matrix[4] * ddy4;
             filtered = filterShadow(shadowMap4, lpos, dLdx, dLdy, proj_shadow_res, const_bias, pos_screen);
         }
         else
         {
-            lpos = shadow_matrix[5] * spos;
-            vec4 dLdx = shadow_matrix[5] * ddx4;
-            vec4 dLdy = shadow_matrix[5] * ddy4;
             filtered = filterShadow(shadowMap5, lpos, dLdx, dLdy, proj_shadow_res, const_bias, pos_screen);
         }
 
@@ -645,6 +653,39 @@ float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
         shadow = 1.0;
     }
     return shadow;
+}
+#endif
+
+float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
+{
+#if defined(SPOT_SHADOW)
+    return spotShadow(pos, norm, index, pos_screen, dFdx(pos), dFdy(pos), false);
+#else
+    return 1.0;
+#endif
+}
+
+// The sun pass's (sunLightF, sunLightSSAOF), which fills the light map the deferred lights read:
+// each takes its derivatives as the shared samplers do, then leaves out the filter where no
+// reader of the map uses what it would give. The forward passes read sampleDirectionalShadow's
+// raw value and keep it; no pass reads sampleSpotShadow's now, which shadowutil_gl_test checks.
+
+// Set by the sun pass: 1 for each spot shadow map a shadowing spot light (mShadowSpotLight) owns.
+// No spot light reads the other's channel.
+uniform vec2 spot_shadow_live;
+
+// A map no spot light owns, or a receiver outside its frustum, takes 1 unfiltered. The frustum is
+// the cookie's (setupSpotLight builds both from one origin, field of view and aspect), outside
+// which spotLightF lights nothing but a legacy surface's reflection of the projector; that is left
+// unshadowed there, where the map holds nothing for it and the filter read its clamped edge.
+float sampleSpotShadowInFrustum(vec3 pos, vec3 norm, int index, vec2 pos_screen)
+{
+#if defined(SPOT_SHADOW)
+    if (spot_shadow_live[index] <= 0.0)
+    {
+        return 1.0;
+    }
+    return spotShadow(pos, norm, index, pos_screen, dFdx(pos), dFdy(pos), true);
 #else
     return 1.0;
 #endif

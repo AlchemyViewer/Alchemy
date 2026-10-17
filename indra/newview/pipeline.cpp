@@ -11720,6 +11720,12 @@ void LLPipeline::renderDeferredLighting()
                                               (GLfloat)deferred_light_target->getWidth(),
                                               (GLfloat)deferred_light_target->getHeight());
 
+                // A spot shadow channel only a shadowing spot light reads (setupSpotLight's
+                // proj_shadow_idx): the program leaves the other's filter out.
+                sun_shader.uniform2f(LLShaderMgr::DEFERRED_SPOT_SHADOW_LIVE,
+                                     mShadowSpotLight[0].notNull() ? 1.f : 0.f,
+                                     mShadowSpotLight[1].notNull() ? 1.f : 0.f);
+
                 {
                     // The triangle lies on the far plane (sunLightV.glsl) and the target shares the scene's
                     // depth: only geometry is shadowed and occluded, and the sky keeps the clear's white, which

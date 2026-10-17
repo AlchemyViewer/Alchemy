@@ -196,6 +196,7 @@ public:
         DEFERRED_NORM_CUTOFF,               //  "norm_cutoff"
         DEFERRED_SHADOW_TARGET_WIDTH,       //  "shadow_target_width"
         DEFERRED_SHADOW_STIPPLE,            //  "shadow_stipple"
+        DEFERRED_SPOT_SHADOW_LIVE,          //  "spot_shadow_live"
 
         DEFERRED_SSR_ITR_COUNT,             //  "iterationCount"
         DEFERRED_SSR_RAY_STEP,              //  "rayStep"
