@@ -149,14 +149,19 @@ namespace
             s.setstate(std::ios::failbit);
             return false;
         }
-        // A field holds at most nine digits' worth and saturates past it, so
-        // neither the digits nor the "- 1900" a year takes can overflow; no
-        // date has such a field, and timegm() turns it down.
+        // A field past nine digits' worth is no date, and is turned down before
+        // the digits or the "- 1900" a year takes can overflow. timegm() would
+        // carry it into the fields above rather than refuse it.
         constexpr S32 FIELD_MAX = 999999999;
         S32 value = 0;
         while (c >= '0' && c <= '9')
         {
-            value = (value > (FIELD_MAX - (c - '0')) / 10) ? FIELD_MAX : value * 10 + (c - '0');
+            if (value > (FIELD_MAX - (c - '0')) / 10)
+            {
+                s.setstate(std::ios::failbit);
+                return false;
+            }
+            value = value * 10 + (c - '0');
             s.rdbuf()->sbumpc();
             c = date_peek(s);
         }

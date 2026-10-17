@@ -729,7 +729,7 @@ namespace
             REQUIRE(a.size() == 3);
             require_type_and_value("appended", a[2], 3);
 
-            a[0x7ffffffe] = 4;
+            a[1000] = 4;
             a[-1] = 9;
             a.set(10, 5);
             a.set(-1, 5);
@@ -757,6 +757,12 @@ namespace
             a.resize(2);
             REQUIRE(a.size() == 2);
             require_type_and_value("resize keeps what it does not cut", a[1], 2);
+
+            LLSD undefined;
+            undefined[3] = 1;
+            UNSCOPED_INFO("a value that is not an array still becomes an empty one");
+            REQUIRE(undefined.isArray());
+            REQUIRE(undefined.size() == 0);
         });
     }
 

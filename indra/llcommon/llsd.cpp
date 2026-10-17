@@ -507,16 +507,18 @@ namespace
     // write further out, or at a negative index (an Integer below zero
     // arrives as a size_t past INT_MAX), changes nothing. Padding to the index
     // would let one integer from the wire commit 16 bytes an element up to
-    // it; resize() is how a caller pads on purpose.
+    // it; resize() is how a caller pads on purpose. A non-const read that far
+    // out comes here as well, since operator[] cannot tell it from a write.
     void refuse(size_t i, size_t size)
     {
-        LL_WARNS_ONCE("LLSD") << "array write past the end dropped" << LL_ENDL;
+        LL_WARNS_ONCE("LLSD") << "array index past the end or negative: a write there is dropped" << LL_ENDL;
         LL_DEBUGS("LLSD") << "index " << static_cast<std::ptrdiff_t>(i) << ", size " << size << LL_ENDL;
     }
 
     // What operator[] gives for such an index: Undefined, as the const lookup
-    // reads, and a write into it is lost at the next refusal. One a thread,
-    // since each thread's LLSDs are its own.
+    // reads, and a write into it is lost at the next refusal, which is as long
+    // as it holds what was written. One a thread, since each thread's LLSDs
+    // are its own.
     LLSD& sink()
     {
         static thread_local LLSD sd;
