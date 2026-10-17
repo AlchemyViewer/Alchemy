@@ -15,12 +15,10 @@ on:
         - "Project"
         - "Beta"
         - "Release"
-        - "Release edu"
       project:
         description: "Project Name (used for channel name in Project builds)"
-        required: true
+        required: false
         type: string
-        default: "hippo"
   pull_request:
     # Everything but documentation and the GitHub files no build reads;
     # later patterns win.
@@ -123,7 +121,6 @@ jobs:
           # never pasted into it, so no input can become a command.
           INPUT_CHANNEL: ${{ inputs.channel }}
           INPUT_PROJECT: ${{ inputs.project }}
-          IS_EDU_TAG: ${{ github.ref_type == 'tag' && contains(github.ref_name, 'edu') }}
           R2_ENABLED: ${{ vars.VCPKG_R2_ENABLED }}
           # FMOD Studio and the Discord Social SDK come from the private vcpkg
           # registry, which a proprietary build cannot fetch without it.
@@ -189,22 +186,38 @@ jobs:
           fi
           echo "r2_cache_mode=$r2_cache_mode" >> "$GITHUB_OUTPUT"
 
-          # determine the viewer channel from the branch or tag name
-          # trigger an EDU build by including "edu" in the tag
-          edu=$IS_EDU_TAG
-          echo "ref_type=$GITHUB_REF_TYPE, ref_name=$GITHUB_REF_NAME, edu='$edu'"
+          # determine the viewer channel: from the dispatch's inputs (tag-release
+          # passes its own), else from the tag name, else from the branch
+          echo "ref_type=$GITHUB_REF_TYPE, ref_name=$GITHUB_REF_NAME"
           branch=$BUILD_VCS_BRANCH
+          # A tag as tag-release names it: Alchemy_<Channel>#<sha>-<suffix>,
+          # where a Project tag's suffix is the project, underscores for spaces.
+          tag_re='^Alchemy_(Test|Develop|Project|Beta|Release)#[0-9a-fA-F]+(-(.+))?$'
           if [[ "$INPUT_CHANNEL" != "" && "$INPUT_CHANNEL" != "Auto" ]];
           then
               if [[ "$INPUT_CHANNEL" == "Project" ]];
               then
+                  if [[ -z "$INPUT_PROJECT" ]]; then
+                      echo "::error::A Project build needs a project name"
+                      exit 1
+                  fi
                   export viewer_channel="$VIEWER_CHANNEL_BASE Project $INPUT_PROJECT"
               else
                   export viewer_channel="$VIEWER_CHANNEL_BASE $INPUT_CHANNEL"
               fi
-          elif [[ "$edu" == "true" ]];
+          elif [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" =~ $tag_re ]];
           then
-              export viewer_channel="$VIEWER_CHANNEL_BASE Release edu"
+              if [[ "${BASH_REMATCH[1]}" == "Project" ]];
+              then
+                  project="${BASH_REMATCH[3]//_/ }"
+                  if [[ -z "$project" ]]; then
+                      echo "::error::Project tag $GITHUB_REF_NAME names no project"
+                      exit 1
+                  fi
+                  export viewer_channel="$VIEWER_CHANNEL_BASE Project $project"
+              else
+                  export viewer_channel="$VIEWER_CHANNEL_BASE ${BASH_REMATCH[1]}"
+              fi
           elif  [[ "$branch" == "develop" ]];
           then
               export viewer_channel="$VIEWER_CHANNEL_BASE Develop"
