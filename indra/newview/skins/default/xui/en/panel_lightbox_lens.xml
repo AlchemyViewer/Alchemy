@@ -1354,12 +1354,12 @@ wired.)
 				 right="-8"
 				 height="18"
 				 label="Min luminance"
-				 decimal_digits="0"
-				 increment="100"
+				 decimal_digits="2"
+				 increment="0.01"
 				 min_val="0"
-				 max_val="10000"
+				 max_val="1"
 				 name="glow_min_lum"
-				 tool_tip="Minimum luminance for an object to auto-glow; 9999 effectively disables auto-glow"
+				 tool_tip="Luminance above which a surface starts to glow by itself, fading in over the next unit; at 1 or more (the default is 9999) nothing does"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowMinLuminance" />
 				<setting_row

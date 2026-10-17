@@ -9432,7 +9432,11 @@ LLRenderTarget* LLPipeline::generateGlow(LLRenderTarget* src, ALTransientTargets
         LLVector3 lumWeights = RenderGlowLumWeights;
         LLVector3 warmthWeights = RenderGlowWarmthWeights;
 
-        gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_MIN_LUMINANCE, 9999);
+        // 9999, the default, leaves glow to alpha alone: the source is the 8-bit
+        // post target, so luminance never reaches 1 and only a threshold below
+        // 1 makes anything glow by brightness.
+        static LLCachedControl<F32> glow_min_luminance(gSavedSettings, "RenderGlowMinLuminance", 9999.f);
+        gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_MIN_LUMINANCE, glow_min_luminance());
         gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_MAX_EXTRACT_ALPHA, maxAlpha);
         gGlowExtractProgram.uniform3f(LLShaderMgr::GLOW_LUM_WEIGHTS, lumWeights.mV[0], lumWeights.mV[1],
             lumWeights.mV[2]);
