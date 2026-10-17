@@ -94,7 +94,10 @@ public:
 
     void releaseGLBuffers();
     void releaseLUTBuffers();
+    /// The main pack's screen targets, which follow the window, the resolution scale and snapshots.
     void releaseScreenBuffers();
+    /// The probe and hero packs' screen targets (allocateProbeBuffers).
+    void releaseProbeBuffers();
     void releaseShadowBuffers();
 
     void createGLBuffers();
@@ -109,6 +112,12 @@ public:
     //allocate the largest screen buffer possible up to resX, resY
     //returns true if full size buffer allocated, false if some other size is allocated
     bool allocateScreenBuffer(U32 resX, U32 resY);
+
+    /// Allocate the reflection probe (mAuxillaryRT) and hero probe (mHeroProbeRT) packs at the
+    /// sizes their captures render at: the probe resolution times ALProbeSuperSample, and
+    /// RenderHeroProbeResolution. Neither follows the window, the resolution scale or a snapshot,
+    /// so allocateScreenBuffer leaves them alone and createGLBuffers calls this.
+    void allocateProbeBuffers();
 
     /// The size of the screen targets allocateScreenBuffer() makes for a view of
     /// @a resX by @a resY: RenderResolutionDivisor applied, or else

@@ -946,43 +946,52 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
     return ret;
 }
 
+void LLPipeline::allocateProbeBuffers()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    llassert(mRT == &mMainRT);
+
+    // gCubeSnapshot keeps the main pack's spot shadows and screen-only targets out of these packs.
+    gCubeSnapshot = true;
+
+    if (sReflectionProbesEnabled)
+    {
+        mReflectionMapManager.initReflectionMaps();
+    }
+
+    mRT = &mAuxillaryRT;
+    // faces render supersampled (ALProbeSuperSample, 4 = the original 16x) and are downsampled to the probe
+    U32 res = mReflectionMapManager.mProbeResolution * mReflectionMapManager.superSample();
+    allocateScreenBufferInternal(res, res);
+
+    if (RenderMirrors)
+    {
+        mHeroProbeManager.initReflectionMaps();
+        res = mHeroProbeManager.mProbeResolution;  // We also scale the hero probe RT to the probe res since we don't super sample it.
+        mRT = &mHeroProbeRT;
+        allocateScreenBufferInternal(res, res);
+    }
+
+    mRT = &mMainRT;
+    gCubeSnapshot = false;
+}
+
 bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     bool hdr = gSavedSettings.getBOOL("RenderHDREnabled");
 
-    if (mRT == &mMainRT)
-    { // hacky -- allocate auxillary buffer
-
-        gCubeSnapshot = true;
-
-        if (sReflectionProbesEnabled)
-        {
-            mReflectionMapManager.initReflectionMaps();
-        }
-
-        mRT = &mAuxillaryRT;
-        // faces render supersampled (ALProbeSuperSample, 4 = the original 16x) and are downsampled to the probe
-        U32 res = mReflectionMapManager.mProbeResolution * mReflectionMapManager.superSample();
-        allocateScreenBufferInternal(res, res);
-
-        if (RenderMirrors)
-        {
-            mHeroProbeManager.initReflectionMaps();
-            res = mHeroProbeManager.mProbeResolution;  // We also scale the hero probe RT to the probe res since we don't super sample it.
-            mRT = &mHeroProbeRT;
-            allocateScreenBufferInternal(res, res);
-        }
-
-        mRT = &mMainRT;
-        gCubeSnapshot = false;
-    }
-
     // remember these dimensions
     mRT->width = resX;
     mRT->height = resY;
 
-    scaleToRenderResolution(resX, resY);
+    // The main pack renders at the scaled size. A probe or hero pack is the size of the capture it
+    // takes, which LLViewerWindow::cubeSnapshot reads back from its G-buffer and the managers
+    // downsample to their probes from.
+    if (!gCubeSnapshot)
+    {
+        scaleToRenderResolution(resX, resY);
+    }
 
     S32 shadow_detail = RenderShadowDetail;
     bool ssao = RenderDeferredSSAO;
@@ -1425,6 +1434,7 @@ void LLPipeline::releaseGLBuffers()
     }
 
     releaseScreenBuffers();
+    releaseProbeBuffers();
     releaseShadowBuffers();
     releaseScopeBuffers();
     clearReferenceStill();
@@ -1468,27 +1478,32 @@ void LLPipeline::releaseShadowBuffers()
     releaseSpotShadowTargets();
 }
 
+static void release_screen_pack(LLPipeline::RenderTargetPack& rt)
+{
+    rt.screen.release();
+    rt.deferredScreen.release();
+    rt.deferredLight.release();
+    rt.postPingMap.release();
+    rt.postPongMap.release();
+    for (U32 i = 0; i < LLPipeline::BLOOM_MAX_MIPS; i++)
+    {
+        rt.bloomMip[i].release();
+    }
+    rt.bloomMipCount = 0;
+    rt.crossFilterReady = false;
+    rt.crossFilterWidth = 0;
+    rt.crossFilterHeight = 0;
+}
+
 void LLPipeline::releaseScreenBuffers()
 {
-    auto release_pack = [](RenderTargetPack& rt)
-    {
-        rt.screen.release();
-        rt.deferredScreen.release();
-        rt.deferredLight.release();
-        rt.postPingMap.release();
-        rt.postPongMap.release();
-        for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
-        {
-            rt.bloomMip[i].release();
-        }
-        rt.bloomMipCount = 0;
-        rt.crossFilterReady = false;
-        rt.crossFilterWidth = 0;
-        rt.crossFilterHeight = 0;
-    };
-    release_pack(mMainRT);
-    release_pack(mAuxillaryRT);
-    release_pack(mHeroProbeRT);
+    release_screen_pack(mMainRT);
+}
+
+void LLPipeline::releaseProbeBuffers()
+{
+    release_screen_pack(mAuxillaryRT);
+    release_screen_pack(mHeroProbeRT);
 }
 
 void LLPipeline::releaseSunShadowTarget(U32 index)
@@ -1546,6 +1561,9 @@ void LLPipeline::createGLBuffers()
     // as the logical size to restore (LLViewerWindow::rawSnapshot).
     // mRT->width = 0;
     // mRT->height = 0;
+
+    // After allocateScreenBuffer, which refreshes the cached settings these packs read.
+    allocateProbeBuffers();
 
 
     if (!mNoiseMap)
