@@ -45,7 +45,10 @@ void LLDrawPoolGlow::renderPostDeferred(S32 pass)
     // that channel is the subject's coverage, and the coverage seeded after
     // the opaque pools (LLPipeline::seedCutoutCoverageFromDepth) writes over
     // whatever this put there, so it would be work for nothing.
-    if (LLPipeline::cullingToCutoutSubject())
+    //
+    // RenderGlow off is decided here rather than at registration, so the faces stay registered and
+    // a toggle takes effect on the next frame.
+    if (!LLPipeline::sRenderGlow || LLPipeline::cullingToCutoutSubject())
     {
         return;
     }

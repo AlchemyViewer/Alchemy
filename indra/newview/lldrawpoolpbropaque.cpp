@@ -120,7 +120,9 @@ void LLDrawPoolGLTFPBR::renderPostDeferred(S32 pass)
         gHUDPBROpaqueProgram.bind();
         pushGLTFBatches(mRenderType);
     }
-    else if (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR) // HACK -- don't render glow except for the non-alpha masked implementation
+    // HACK -- don't render glow except for the non-alpha masked implementation. RenderGlow off is
+    // decided here, as in LLDrawPoolGlow, rather than at registration.
+    else if (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR && LLPipeline::sRenderGlow)
     {
         gGL.setColorMask(false, true);
 
