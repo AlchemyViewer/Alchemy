@@ -342,7 +342,10 @@ void LLHeroProbeManager::updateProbeFace(LLReflectionMap* probe, U32 face, bool 
         LLRenderTarget *screen_rt = &gPipeline.mHeroProbeRT.screen;
         LLRenderTarget *depth_rt  = &gPipeline.mHeroProbeRT.deferredScreen;
 
-        // perform a gaussian blur on the super sampled render before downsampling
+        // perform a gaussian blur on the super sampled render before downsampling. A capture the
+        // size of mip 0, which the hero pack is, has nothing to downsample, and the blur would
+        // only soften it.
+        if (screen_rt->getWidth() != mMipChain[0].getWidth())
         {
             gGaussianProgram.bind();
             gGaussianProgram.uniform1f(LLShaderMgr::RES_SCALE, 1.f / (mProbeResolution * 2));
