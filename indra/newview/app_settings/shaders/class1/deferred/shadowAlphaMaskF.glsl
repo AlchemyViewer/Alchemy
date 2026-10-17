@@ -32,6 +32,9 @@ in float target_pos_x;
 in vec4 vertex_color;
 in vec2 vary_texcoord0;
 uniform float minimum_alpha;
+// 1 for blended content, whose semi-transparent part casts a stippled half shadow; 0 for
+// masked content, opaque wherever it is drawn at all. The same program serves both passes.
+uniform float shadow_stipple;
 
 void main()
 {
@@ -51,7 +54,7 @@ void main()
         discard;
     }
 
-    if (alpha < 0.88) // treat as semi-transparent
+    if (shadow_stipple > 0.0 && alpha < 0.88) // treat as semi-transparent
     {
         if (fract(0.5*floor(target_pos_x / post_pos.w )) < 0.25)
         {

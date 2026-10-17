@@ -7944,6 +7944,26 @@ void LLPipeline::renderAlphaObjects(bool rigged)
     auto* begin = gPipeline.beginRenderMap(type);
     auto* end = gPipeline.endRenderMap(type);
 
+    // The caster's uniforms, set when a draw binds a different program from the last draw's: nothing
+    // the batches push between them changes these.
+    LLGLSLShader* configured = nullptr;
+    const auto bind_caster = [&](LLGLSLShader& program, bool legacy)
+    {
+        program.bind(rigged);
+        LLGLSLShader* bound = LLGLSLShader::sCurBoundShaderPtr;
+        if (bound != configured)
+        {
+            configured = bound;
+            bound->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+            bound->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+            if (legacy)
+            {
+                bound->uniform1f(LLShaderMgr::DEFERRED_SHADOW_STIPPLE, 1.f); // blended
+            }
+            bound->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
+        }
+    };
+
     for (LLCullResult::drawinfo_iterator i = begin; i != end; )
     {
         LLDrawInfo* pparams = *i;
@@ -7960,18 +7980,12 @@ void LLPipeline::renderAlphaObjects(bool rigged)
         {
             if (pparams->mGLTFMaterial)
             {
-                gDeferredShadowGLTFAlphaBlendProgram.bind(rigged);
-                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
-                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
+                bind_caster(gDeferredShadowGLTFAlphaBlendProgram, false);
                 LLRenderPass::pushRiggedGLTFBatch(*pparams, lastAvatarGLTF, lastMeshIdGLTF, skipLastSkinGLTF, lastMatGLTF, lastTexGLTF);
             }
             else
             {
-                gDeferredShadowAlphaMaskProgram.bind(rigged);
-                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
-                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
+                bind_caster(gDeferredShadowAlphaMaskProgram, true);
                 lastMatGLTF = nullptr; // pushBatch clobbers texture units
                 lastTexGLTF = nullptr;
                 if (mSimplePool->uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
@@ -7984,18 +7998,12 @@ void LLPipeline::renderAlphaObjects(bool rigged)
         {
             if (pparams->mGLTFMaterial)
             {
-                gDeferredShadowGLTFAlphaBlendProgram.bind(rigged);
-                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
-                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
+                bind_caster(gDeferredShadowGLTFAlphaBlendProgram, false);
                 LLRenderPass::pushGLTFBatch(*pparams, lastMatGLTF, lastTexGLTF);
             }
             else
             {
-                gDeferredShadowAlphaMaskProgram.bind(rigged);
-                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
-                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
+                bind_caster(gDeferredShadowAlphaMaskProgram, true);
                 lastMatGLTF = nullptr; // pushBatch clobbers texture units
                 lastTexGLTF = nullptr;
                 mSimplePool->pushBatch(*pparams, true, true);
@@ -12852,6 +12860,9 @@ void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LL
                 gDeferredShadowAlphaMaskProgram.bind(rigged);
                 LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
                 LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                // Masked: opaque wherever it draws, so solid where it casts. The blended pass below
+                // shares the program and stipples.
+                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_STIPPLE, 0.f);
                 renderMaskedObjects(LLRenderPass::PASS_ALPHA_MASK, true, true, rigged);
             }
 
@@ -12867,6 +12878,7 @@ void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LL
                 gDeferredShadowFullbrightAlphaMaskProgram.bind(rigged);
                 LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
                 LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_STIPPLE, 0.f); // masked
                 renderFullbrightMaskedObjects(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, true, true, rigged);
             }
 
