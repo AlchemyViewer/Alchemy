@@ -38,7 +38,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
 #endif
 
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
-vec4 applyWaterFogViewLinear(vec3 pos, vec4 color);
+vec4 applyWaterFogViewLinearNoClip(vec3 pos, vec4 color);
 
 void mirrorClip(vec3 pos);
 
@@ -236,7 +236,11 @@ void main()
     vec4 fb = texture(screenTex, distort2);
 
 #else
-    vec4 fb = applyWaterFogViewLinear(viewVec*2048.0, vec4(1.0));
+    // Opaque water: the "refraction" is the fog of 2048 m of water behind the surface, as
+    // waterHazeF fogs the void past the field. Measured from the surface, not from the eye: a
+    // point 2048 m from the eye lies above the plane wherever the surface is farther than that,
+    // and there the clipping fog returned its input, white.
+    vec4 fb = applyWaterFogViewLinearNoClip(pos + viewVec*2048.0, vec4(1.0));
 #endif
 
     // The environment's blur, for the reflections and refractions alone.
