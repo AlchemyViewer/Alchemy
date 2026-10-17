@@ -918,8 +918,6 @@ void ll_close_fail_log()
 
 std::list<LLGLUpdate*> LLGLUpdate::sGLQ;
 
-#if LL_GL_FUNC_POINTER
-
 #if LL_WINDOWS
 // WGL_ARB_pixel_format
 PFNWGLGETPIXELFORMATATTRIBIVARBPROC wglGetPixelFormatAttribivARB = nullptr;
@@ -1681,8 +1679,6 @@ PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC glImportSemaphoreWin32HandleEXT = nullptr
 // GL_EXT_depth_bounds_test
 PFNGLDEPTHBOUNDSEXTPROC                glDepthBoundsEXT                = nullptr;
 
-#endif
-
 LLGLManager gGLManager;
 
 LLGLManager::LLGLManager() :
@@ -1983,7 +1979,6 @@ bool LLGLManager::initGL()
         LL_ERRS("RenderInit") << "Calling init on LLGLManager after already initialized!" << LL_ENDL;
     }
 
-#if LL_GL_FUNC_POINTER
     // OpenGL 1.0 and 1.1 always exist
     // GL_VERSION_1_0
     glClearColor = (PFNGLCLEARCOLORPROC)LL_GET_PROC_ADDRESS("glClearColor");
@@ -2050,7 +2045,6 @@ bool LLGLManager::initGL()
     glDeleteTextures = (PFNGLDELETETEXTURESPROC)LL_GET_PROC_ADDRESS("glDeleteTextures");
     glGenTextures = (PFNGLGENTEXTURESPROC)LL_GET_PROC_ADDRESS("glGenTextures");
     glIsTexture = (PFNGLISTEXTUREPROC)LL_GET_PROC_ADDRESS("glIsTexture");
-#endif
 
     // Extract video card strings and convert to upper case to
     // work around driver-to-driver variation in capitalization.
@@ -2483,7 +2477,6 @@ void LLGLManager::reloadExtensionsString()
 
     //reload extensions string
     // I am deeply sorry for how ugly this is. - Rye
-#if LL_GL_FUNC_POINTER
     PFNGLGETSTRINGIPROC llglGetStringi = (PFNGLGETSTRINGIPROC)LL_GET_PROC_ADDRESS("glGetStringi");
     PFNGLGETINTEGERVPROC llglGetIntegerv = (PFNGLGETINTEGERVPROC)LL_GET_PROC_ADDRESS("glGetIntegerv");
     if (llglGetStringi && llglGetIntegerv)
@@ -2494,23 +2487,6 @@ void LLGLManager::reloadExtensionsString()
             mGLExtensions.insert(ll_safe_string((char const*)llglGetStringi(GL_EXTENSIONS, i)));
         }
     }
-#else
-    {
-        GLint num_extensions = 0;
-        glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
-        for (GLint i = 0; i < num_extensions; ++i) {
-            mGLExtensions.insert(ll_safe_string((char const*)glGetStringi(GL_EXTENSIONS, i)));
-        }
-#if LL_DARWIN
-        if (num_extensions > 0)
-        {
-            mGLExtensions.insert("GL_ARB_multitexture");
-            mGLExtensions.insert("GL_ARB_texture_cube_map");
-            mGLExtensions.insert("GL_ARB_texture_compression");
-        }
-#endif
-    }
-#endif
 
 #if LL_WINDOWS
     {
@@ -2590,7 +2566,6 @@ void LLGLManager::initExtensions()
 
     mInited = true;
 
-#if LL_GL_FUNC_POINTER
     // Load the OpenGL API through GetProcAddress: all of it to 4.1, the floor, and leaving the
     // sections beyond mGLVersion unloaded.
     LL_DEBUGS("RenderInit") << "GL Probe: Getting symbols" << LL_ENDL;
@@ -3463,8 +3438,6 @@ void LLGLManager::initExtensions()
     glMultiDrawArraysIndirectCount = (PFNGLMULTIDRAWARRAYSINDIRECTCOUNTPROC)LL_GET_PROC_ADDRESS("glMultiDrawArraysIndirectCount");
     glMultiDrawElementsIndirectCount = (PFNGLMULTIDRAWELEMENTSINDIRECTCOUNTPROC)LL_GET_PROC_ADDRESS("glMultiDrawElementsIndirectCount");
     glPolygonOffsetClamp = (PFNGLPOLYGONOFFSETCLAMPPROC)LL_GET_PROC_ADDRESS("glPolygonOffsetClamp");
-
-#endif // LL_GL_FUNC_POINTER
 }
 
 void rotate_quat(LLQuaternion& rotation)

@@ -27,8 +27,6 @@
 #ifndef LL_LLGLHEADERS_H
 #define LL_LLGLHEADERS_H
 
-#define LL_GL_FUNC_POINTER 1
-
  // windows gl headers depend on things like APIENTRY, so include windows.
 #include "llwin32headers.h"
 
@@ -244,8 +242,6 @@ GLAPI void APIENTRY glImportSemaphoreWin32NameEXT(GLuint semaphore, GLenum handl
 #define GL_COMPRESSED_ALPHA               0x84E9
 #define GL_COMPRESSED_LUMINANCE           0x84EA
 #define GL_COMPRESSED_LUMINANCE_ALPHA     0x84EB
-
-#if LL_GL_FUNC_POINTER
 
 #if LL_WINDOWS
 // WGL_AMD_gpu_association
@@ -1008,8 +1004,6 @@ extern PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC glImportSemaphoreWin32HandleEXT;
 
 // GL_EXT_depth_bounds_test
 extern PFNGLDEPTHBOUNDSEXTPROC                glDepthBoundsEXT;
-
-#endif
 
 #if defined(TRACY_ENABLE) && LL_PROFILER_ENABLE_TRACY_OPENGL
     #include <tracy/TracyOpenGL.hpp>
