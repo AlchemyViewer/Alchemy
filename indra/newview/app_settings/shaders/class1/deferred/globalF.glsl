@@ -109,7 +109,10 @@ float packGeoNormal(vec3 g)
 
 vec3 unpackGeoNormal(float v)
 {
-    float f = v * GEO_OCT_RANGE;
+    // Rounded to the integer the channel stores before it is split: a UNORM read can land an
+    // ulp below k / RANGE, and floor would then take the code below for x and leave y near
+    // LEVELS + 1, a normal from the far side of the octahedron.
+    float f = floor(v * GEO_OCT_RANGE + 0.5);
     float x = floor(f / (GEO_OCT_LEVELS + 1.0));
     float y = f - x * (GEO_OCT_LEVELS + 1.0);
     return octDecode(vec2(x, y) / GEO_OCT_LEVELS);
