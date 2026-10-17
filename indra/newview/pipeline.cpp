@@ -8765,7 +8765,15 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
         shader->bind();
 
-        S32 diffuse_channel = shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::PointMirror);
+        // Point sampled, except under chromatic aberration: its red and blue
+        // taps fall between texels, where point sampling would step the fringe
+        // a whole pixel at a time. Its centre tap, and the only tap without it,
+        // land on texel centres either way, src being the size of dst.
+        static LLCachedControl<F32> chromatic_aberration_strength(gSavedSettings, "RenderChromaticAberrationStrength", 0.f);
+        const bool suppress_effects = suppressesLensAndPrintEffects();
+        const F32  ca_strength      = suppress_effects ? 0.f : llclamp(chromatic_aberration_strength(), 0.f, 1.f);
+        S32 diffuse_channel = shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src,
+                                                  ca_strength > 0.f ? ALSamplers::BilinearMirror : ALSamplers::PointMirror);
         S32 exposure_channel = shader->bindTexture(LLShaderMgr::EXPOSURE_MAP, &mExposureMap);
 
         // HDR bloom pyramid is folded into the tonemap variants of this shader
@@ -8840,15 +8848,14 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // the final blit are gated in renderFinalize -- but chromatic
         // aberration and the lens flare are applied *inside* this program, in
         // every variant including the no-post ones, so their strengths have to
-        // be silenced here or a clean plate still carries both.
-        const bool suppress_effects = suppressesLensAndPrintEffects();
+        // be silenced here or a clean plate still carries both (suppress_effects,
+        // above).
         // The material preview renders through here too, inside the auxiliary
         // target pack. The flare state was measured for the world frame, so
         // only the main pack gets the flare; aberration is left as it was.
         const bool world_frame = (mRT == &mMainRT);
 
         // Chromatic aberration parameters
-        static LLCachedControl<F32> chromatic_aberration_strength(gSavedSettings, "RenderChromaticAberrationStrength", 0.f);
         static LLCachedControl<F32> chromatic_aberration_falloff(gSavedSettings, "RenderChromaticAberrationFalloff", 1.f);
         static LLCachedControl<F32> chromatic_aberration_angle(gSavedSettings, "RenderChromaticAberrationAngle", 0.f);
         static LLCachedControl<F32> chromatic_aberration_offset_r_x(gSavedSettings, "RenderChromaticAberrationOffsetRX", -1.f);
@@ -8860,7 +8867,6 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // strength (and pre-apply the 0.02 peak-offset scale), take the
         // reciprocal of falloff, and turn the angle into a (sin, cos) pair.
         // Saves one mul, one div, and one sincos per fragment.
-        F32 ca_strength = suppress_effects ? 0.f : llclamp(chromatic_aberration_strength(), 0.f, 1.f);
         F32 ca_falloff  = llclamp(chromatic_aberration_falloff(),  0.5f, 4.f);
         F32 ca_angle_rad = llclamp(chromatic_aberration_angle(), 0.f, 360.f) * 0.01745329252f;
         shader->uniform1f(LLShaderMgr::CA_AMOUNT, ca_strength * ca_strength * 0.02f);
