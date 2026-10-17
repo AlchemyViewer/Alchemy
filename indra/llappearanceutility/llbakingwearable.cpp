@@ -58,7 +58,7 @@ void LLBakingWearable::addToBakedTextureHash(LLMD5& hash) const
 LLUUID LLBakingWearable::getDefaultTextureImageID(ETextureIndex index) const
 {
     const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = LLAvatarAppearance::getDictionary()->getTexture(index);
-    const std::string &default_image_name = texture_dict->mDefaultImageName;
+    const std::string_view default_image_name = texture_dict->mDefaultImageName;
     if (default_image_name == "")
     {
         return IMG_DEFAULT_AVATAR;
