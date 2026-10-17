@@ -1423,6 +1423,8 @@ void LLPipeline::releaseAllGLResources()
     releaseRenderTargets();
     releaseDerivedState();
 
+    LLVOAvatar::resetImpostors();
+
     mGLResourcesLive = false;
 }
 
@@ -1521,7 +1523,6 @@ void LLPipeline::releaseDerivedState()
     clearReferenceStill();
 
     gBumpImageList.destroyGL();
-    LLVOAvatar::resetImpostors();
 }
 
 LLPipeline::RenderBuildState LLPipeline::renderBuildState() const
@@ -1550,7 +1551,9 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
 
     releaseRenderTargets();
     releaseDerivedState();
-    add(invalidated, "all derived state");
+    add(invalidated, "bump cache, hero probes, exposure and flare history, lens dirt, colour-grade LUT, noise, SMAA "
+                     "tables, tone curve, UBOs, query plots, BRDF LUT, reference still, scopes, depth pyramid, water "
+                     "surface maps, selection outline, far-plane overlay");
 
     createGLBuffers();
     mBuiltHDR = hdrEnabled();
@@ -1587,6 +1590,19 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
         if (before.mHero != after.mHero)
         {
             add(changed, "hero pack");
+        }
+
+        // An impostor is G-buffer channels and depth in the main G-buffer's formats (generateImpostor), so those
+        // are what make one stale; its size is its own.
+        if (before.mMain.color != after.mMain.color || before.mMain.depth != after.mMain.depth)
+        {
+            U32 baked = 0;
+            for (LLCharacter* character : LLCharacter::sInstances)
+            {
+                baked += ((LLVOAvatar*)character)->mImpostor.isComplete() ? 1 : 0;
+            }
+            LLVOAvatar::resetImpostors();
+            add(invalidated, fmt::format("avatar impostors ({} baked)", baked));
         }
     }
 
