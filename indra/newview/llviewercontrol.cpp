@@ -334,6 +334,19 @@ static bool handleReleaseGLBufferChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleRenderGlowChanged(const LLSD& newvalue)
+{
+    // The glow programs load whatever this says, so a toggle reloads and allocates nothing. It changes
+    // the latch generateGlow reads, as setShaders sets it, and which faces register for the glow
+    // passes, which stands until their groups rebuild.
+    LLPipeline::sRenderGlow = newvalue.asBoolean() && gGlowProgram.isComplete() && gGlowExtractProgram.isComplete();
+    if (gPipeline.isInit())
+    {
+        gPipeline.rebuildDrawInfo();
+    }
+    return true;
+}
+
 static bool handleReverseZChanged(const LLSD& newvalue)
 {
     // setShaders() latches the reverse-Z state (LLPipeline::updateReverseZ) and then
@@ -653,7 +666,7 @@ static bool handleRenderDynamicLODChanged(const LLSD& newvalue)
     return true;
 }
 
-static bool handleReflectionProbeDetailChanged(const LLSD& newvalue)
+static bool handleReflectionProbesChanged(const LLSD& newvalue)
 {
     gPipeline.mReflectionMapManager.refreshSettings();
     if (gPipeline.isInit())
@@ -666,7 +679,9 @@ static bool handleReflectionProbeDetailChanged(const LLSD& newvalue)
     return true;
 }
 
-static bool handleReflectionProbeCountChanged(const LLSD& newvalue)
+// Read by the probe manager's update, which applies them from the next frame: which probes update
+// and how often (the detail), and how many cube slots there are (the count).
+static bool handleReflectionProbeSettingsChanged(const LLSD& newvalue)
 {
     gPipeline.mReflectionMapManager.refreshSettings();
     return true;
@@ -1043,8 +1058,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "OctreeMaxNodeCapacity", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAlphaDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAttachmentSizeFactor", handleRepartition);
-    setting_setup_signal_listener(gSavedSettings, "RenderMaxTextureIndex", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderDepthOfField", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAUseStencil", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredication", handleSetShaderChanged);
@@ -1055,8 +1068,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleShadowsResized);
-    setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleRenderGlowChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowResolutionPow", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowHDR", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderBloomMipCount", handleReleaseGLBufferChanged);
@@ -1067,7 +1079,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderDisableVintageMode", handleDisableVintageMode);
     setting_setup_signal_listener(gSavedSettings, "RenderHDREnabled", handleEnableHDR);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowNoise", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderGammaFull", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderVolumeLODFactor", handleVolumeLODChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarComplexityMode", handleUserImpostorByDistEnabledChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarLODFactor", handleAvatarLODChanged);
@@ -1084,16 +1095,16 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResolutionDivisorChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderUBOUpdateMode", handleRenderUBOUpdateModeChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbeDetailChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeCount", handleReflectionProbeCountChanged);
-    setting_setup_signal_listener(gSavedSettings, "ALProbeSuperSample", handleReflectionProbeDetailChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbeDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbesChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeSettingsChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeCount", handleReflectionProbeSettingsChanged);
+    setting_setup_signal_listener(gSavedSettings, "ALProbeSuperSample", handleReflectionProbesChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbesChanged);
 #if LL_DARWIN
     setting_setup_signal_listener(gSavedSettings, "RenderAppleUseMultGL", handleAppleUseMultGLChanged);
 #endif
-    setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbeDetailChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleReflectionProbeDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbesChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleReflectionProbesChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleHeroProbeResolutionChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowFilterQuality", handleSetShaderChanged);

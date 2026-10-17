@@ -1706,7 +1706,7 @@ void LLReflectionMapManager::initReflectionMaps()
 
     // The supersample factor sizes the scratch target and, through LLPipeline, the aux pack a
     // face renders into; a change is applied like a resolution change, by the listener that
-    // rebuilds the GL buffers (handleReflectionProbeDetailChanged), so here it only has to be
+    // rebuilds the GL buffers (handleReflectionProbesChanged), so here it only has to be
     // read. 1, 2 or 4: the blur and downsample below assume a power of two.
     static LLCachedControl<S32> super_sample(gSavedSettings, "ALProbeSuperSample", 4);
     const U32 supersample = super_sample >= 4 ? 4u : (super_sample >= 2 ? 2u : 1u);
