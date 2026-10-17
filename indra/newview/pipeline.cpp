@@ -12874,7 +12874,9 @@ void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LL
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha grass");
                 LL_PROFILE_GPU_ZONE("shadow alpha grass");
                 gDeferredTreeShadowProgram.bind(rigged);
-                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
+                // Grass's own cutoff, LLDrawPoolGrass::renderDeferred's, so what draws casts. The
+                // masked passes below set each batch's.
+                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(0.5f);
 
                 if (i == 0)
                 {
