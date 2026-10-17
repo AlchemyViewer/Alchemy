@@ -555,8 +555,10 @@ void LLDrawPoolAlpha::renderPbrEmissives(std::vector<LLDrawInfo*>& emissives)
         llassert(draw->mGLTFMaterial);
         LLGLDisable cull_face(draw->mGLTFMaterial->mDoubleSided ? GL_CULL_FACE : 0);
         draw->mGLTFMaterial->bind(draw->mTexture);
+        setup_texture_matrix(*draw);
         draw->mVertexBuffer->setBuffer();
         draw->mVertexBuffer->drawRange(LLRender::TRIANGLES, draw->mStart, draw->mEnd, draw->mCount, draw->mOffset);
+        teardown_texture_matrix(*draw);
     }
 }
 
@@ -602,8 +604,10 @@ void LLDrawPoolAlpha::renderRiggedPbrEmissives(std::vector<LLDrawInfo*>& emissiv
 
         LLGLDisable cull_face(draw->mGLTFMaterial->mDoubleSided ? GL_CULL_FACE : 0);
         draw->mGLTFMaterial->bind(draw->mTexture);
+        setup_texture_matrix(*draw);
         draw->mVertexBuffer->setBuffer();
         draw->mVertexBuffer->drawRange(LLRender::TRIANGLES, draw->mStart, draw->mEnd, draw->mCount, draw->mOffset);
+        teardown_texture_matrix(*draw);
     }
 }
 
