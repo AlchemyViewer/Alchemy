@@ -8759,7 +8759,8 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         }
         else
         {
-            shader = legacy_gamma ? &gCGLegacyGammaProgram : &gCGGammaProgram;
+            shader = legacy_gamma ? color_grade ? &gCGColorgradeLegacyGammaProgram : &gCGLegacyGammaProgram
+                                  : color_grade ? &gCGColorgradeGammaProgram : &gCGGammaProgram;
         }
 
         shader->bind();
