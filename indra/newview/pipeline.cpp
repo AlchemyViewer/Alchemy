@@ -1074,7 +1074,9 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
     if (!gCubeSnapshot) // hack to not re-allocate various targets for cube snapshots
     {
-        if (RenderFSAAType > 0)
+        // SMAA's intermediates: its edges in mSMAAEdgeMap and its blend weights. FXAA has none; it reads
+        // the post chain's target directly (applyFXAA).
+        if (RenderFSAAType == 2)
         {
             // SMAA benefits from a stencil buffer shared across its passes so the
             // blend-weights pass can skip non-edge pixels marked during edge detect.
@@ -1082,23 +1084,19 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
             // SMAA stencil carrier, never receives scene depth nor blit-pairs with it, and
             // DEPTH32F_STENCIL8 would double it to 8 bytes/px for no benefit.
             //
-            // GL_RGBA8 whatever post_color_fmt is, because both carry data in alpha: FXAA reads its luma
-            // from the alpha the bake writes (FXAA_GREEN_AS_LUMA is 0), and SMAA's neighborhood blend reads
-            // the right edge's weight from .a. RGB10_A2 would leave either four levels there.
-            bool smaa_stencil = (RenderFSAAType == 2) && gSavedSettings.getBOOL("RenderSMAAUseStencil");
-            if (!mFXAAMap.allocate(resX, resY, GL_RGBA8, smaa_stencil, smaa_stencil)) return false;
-            if (RenderFSAAType == 2)
+            // GL_RGBA8 whatever post_color_fmt is: SMAA's neighborhood blend reads the right edge's
+            // weight from the blend buffer's .a, which RGB10_A2 would leave with four levels.
+            bool smaa_stencil = gSavedSettings.getBOOL("RenderSMAAUseStencil");
+            if (!mSMAAEdgeMap.allocate(resX, resY, GL_RGBA8, smaa_stencil, smaa_stencil)) return false;
+            if (!mSMAABlendBuffer.allocate(resX, resY, GL_RGBA8, false)) return false;
+            if (smaa_stencil)
             {
-                if (!mSMAABlendBuffer.allocate(resX, resY, GL_RGBA8, false)) return false;
-                if (smaa_stencil)
-                {
-                    mFXAAMap.shareDepthBuffer(mSMAABlendBuffer);
-                }
+                mSMAAEdgeMap.shareDepthBuffer(mSMAABlendBuffer);
             }
         }
         else
         {
-            mFXAAMap.release();
+            mSMAAEdgeMap.release();
             mSMAABlendBuffer.release();
         }
 
@@ -1404,7 +1402,7 @@ void LLPipeline::releaseGLBuffers()
 
     mSceneMap.release();
 
-    mFXAAMap.release();
+    mSMAAEdgeMap.release();
     mSMAABlendBuffer.release();
 
     mDownResMap.release();
@@ -9633,7 +9631,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
     LL_PROFILE_GPU_ZONE("FXAA");
     {
         llassert(!gCubeSnapshot);
-        bool multisample = RenderFSAAType == 1 && gFXAAProgram[0].isComplete() && mFXAAMap.isComplete();
+        bool multisample = RenderFSAAType == 1 && gFXAAProgram[0].isComplete();
 
         // Present everything.
         if (multisample)
@@ -9642,50 +9640,29 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
             S32 width = dst->getWidth();
             S32 height = dst->getHeight();
 
-            // bake out texture2D with RGBL for FXAA shader
-            mFXAAMap.bindTarget();
-            mFXAAMap.clear(GL_COLOR_BUFFER_BIT);
-
-            LLGLSLShader* shader = &gGlowCombineFXAAProgram;
-            shader->bind();
-
-            S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
-            if (channel > -1)
-            {
-                src->bindTexture(0, channel, ALSamplers::BilinearMirror);
-            }
-
-            {
-                LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);
-                mScreenTriangleVB->setBuffer();
-                mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-            }
-
-            shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
-            shader->unbind();
-
-            mFXAAMap.flush();
-
             dst->bindTarget();
 
             static LLCachedControl<U32> aa_quality(gSavedSettings, "RenderFSAASamples", 0U);
             U32 fsaa_quality = std::clamp(aa_quality(), 0U, 3U);
 
-            shader = &gFXAAProgram[fsaa_quality];
+            LLGLSLShader* shader = &gFXAAProgram[fsaa_quality];
             shader->bind();
 
-            channel = shader->enableTexture(LLShaderMgr::DIFFUSE_MAP);
+            // Straight from the source, with no luma baked into an intermediate first: FXAA computes
+            // each tap's luma from its colour (FXAA_LUMA_FROM_RGB), so it reads the post chain's
+            // target at that target's precision, RGB10_A2 under HDR.
+            S32 channel = shader->enableTexture(LLShaderMgr::DIFFUSE_MAP);
             if (channel > -1)
             {
-                mFXAAMap.bindTexture(0, channel, ALSamplers::BilinearMirror);
+                src->bindTexture(0, channel, ALSamplers::BilinearMirror);
             }
 
             // The destination is an FBO; bindTarget already set its viewport.
             // Forcing the full world-view viewport here makes RenderResolutionDivisor
             // write only the lower-left fraction of the reduced-size target.
 
-            F32 scale_x = (F32)width / mFXAAMap.getWidth();
-            F32 scale_y = (F32)height / mFXAAMap.getHeight();
+            F32 scale_x = (F32)width / src->getWidth();
+            F32 scale_y = (F32)height / src->getHeight();
             shader->uniform2f(LLShaderMgr::FXAA_TC_SCALE, scale_x, scale_y);
             shader->uniform2f(LLShaderMgr::FXAA_RCP_SCREEN_RES, 1.f / width * scale_x, 1.f / height * scale_y);
             shader->uniform4f(LLShaderMgr::FXAA_RCP_FRAME_OPT, -0.5f / width * scale_x, -0.5f / height * scale_y,
@@ -9714,7 +9691,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
 void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
 {
     llassert(!gCubeSnapshot);
-    bool multisample = RenderFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mFXAAMap.isComplete() && mSMAABlendBuffer.isComplete();
+    bool multisample = RenderFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mSMAAEdgeMap.isComplete() && mSMAABlendBuffer.isComplete();
 
     // Present everything.
     if (multisample)
@@ -9734,11 +9711,11 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
         static LLCachedControl<bool> use_predication(gSavedSettings, "RenderSMAAPredication", true);
         static LLCachedControl<bool> use_stencil_setting(gSavedSettings, "RenderSMAAUseStencil", true);
         // Stencil optimization requires all three passes to share the same stencil attachment.
-        bool use_stencil = use_stencil_setting && mFXAAMap.hasStencil() && mSMAABlendBuffer.hasStencil();
+        bool use_stencil = use_stencil_setting && mSMAAEdgeMap.hasStencil() && mSMAABlendBuffer.hasStencil();
         LLGLState stencil(GL_STENCIL_TEST, use_stencil);
         {
             // Bind setup:
-            LLRenderTarget& dest = mFXAAMap;
+            LLRenderTarget& dest = mSMAAEdgeMap;
             LLGLSLShader& edge_shader = gSMAAEdgeDetectProgram[fsaa_quality];
 
             dest.bindTarget();
@@ -9811,7 +9788,7 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
             S32 edge_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_EDGE_TEX);
             if (edge_tex_channel > -1)
             {
-                mFXAAMap.bindTexture(0, edge_tex_channel, ALSamplers::BilinearClamp);
+                mSMAAEdgeMap.bindTexture(0, edge_tex_channel, ALSamplers::BilinearClamp);
             }
             S32 area_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_AREA_TEX);
             if (area_tex_channel > -1)
@@ -9851,7 +9828,7 @@ void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst)
 {
     LL_PROFILE_GPU_ZONE("SMAA");
     llassert(!gCubeSnapshot);
-    bool multisample = RenderFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mFXAAMap.isComplete() && mSMAABlendBuffer.isComplete();
+    bool multisample = RenderFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mSMAAEdgeMap.isComplete() && mSMAABlendBuffer.isComplete();
 
     // Present everything.
     if (multisample)
@@ -10509,9 +10486,9 @@ void LLPipeline::renderFinalize()
             break;
         case 5:
         {
-            if (RenderFSAAType > 0)
+            if (RenderFSAAType == 2)
             {
-                visualizeBuffers(&mFXAAMap, sourceBuffer, 0);
+                visualizeBuffers(&mSMAAEdgeMap, sourceBuffer, 0);
             }
             break;
         }
