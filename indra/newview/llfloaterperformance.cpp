@@ -470,10 +470,10 @@ void LLFloaterPerformance::populateNearbyList()
             row[1]["value"] = llformat( "%.f", render_av_gpu_ms * 1000.f);
             row[1]["font"]["name"] = "SANSSERIF";
 
-            row[3]["column"] = "name";
-            row[3]["type"] = "text";
-            row[3]["value"] = avatar->getFullname();
-            row[3]["font"]["name"] = "SANSSERIF";
+            row[2]["column"] = "name";
+            row[2]["type"] = "text";
+            row[2]["value"] = avatar->getFullname();
+            row[2]["font"]["name"] = "SANSSERIF";
 
             LLScrollListItem* av_item = mNearbyList->addElement(item);
             if(av_item)

@@ -156,13 +156,10 @@ LLEventDispatcher::LLSDArgsMapper::LLSDArgsMapper(LLEventDispatcher* parent,
         _indexes[_names[ni]] = ni;
     }
 
-    // Presize _defaults() array so we don't have to resize it more than once.
-    // All entries are initialized to LLSD(); but since _has_dft is still all
-    // 0, they're all "holes" for now.
-    if (nparams)
-    {
-        _defaults[nparams - 1] = LLSD();
-    }
+    // Presize _defaults() array: the defaults below land at their params'
+    // positions, not in order. All entries are initialized to LLSD(); but
+    // since _has_dft is still all 0, they're all "holes" for now.
+    _defaults.resize(nparams);
 
     if (defaults.isUndefined() || defaults.isArray())
     {
@@ -222,18 +219,16 @@ LLSD LLEventDispatcher::LLSDArgsMapper::map(const LLSD& argsmap) const
     {
         callFail(" map() needs a map or array, not ", argsmap);
     }
-    // Initialize the args array. Indexing a non-const LLSD array grows it
-    // to appropriate size, but we don't want to resize this one on each
-    // new operation. Just make it as big as we need before we start
-    // stuffing values into it.
+    // Initialize the args array. Make it as big as we need before we start
+    // stuffing values into it: a map's values land at their params'
+    // positions, not in order.
     LLSD args(LLSD::emptyArray());
     if (_defaults.size() == 0)
     {
-        // If this function requires no arguments, fast exit. (Don't try to
-        // assign to args[-1].)
+        // If this function requires no arguments, fast exit.
         return args;
     }
-    args[_defaults.size() - 1] = LLSD();
+    args.resize(_defaults.size());
 
     // Get a vector of chars to indicate holes. It's tempting to just scan
     // for LLSD::isUndefined() values after filling the args array from
@@ -488,9 +483,7 @@ struct LLEventDispatcher::ArrayParamsDispatchEntry: public LLEventDispatcher::Pa
     {
         LLSD array(LLSD::emptyArray());
         // Resize to number of arguments required
-        if (mArity)
-            array[mArity - 1] = LLSD();
-        llassert_always(array.size() == mArity);
+        array.resize(mArity);
         return llsd::map("required", array);
     }
 };

@@ -384,7 +384,16 @@ public:
         void erase(Integer);
         LLSD& with(Integer, const LLSD&);
         LLSD& with(Integer, LLSD&&);
+        // Pads with Undefined, or cuts, to size elements: the one way to
+        // leave a gap, since a write past the end is dropped.
+        void resize(size_t size);
 
+        // An array is written at an index it has or at size(), which
+        // appends. A non-const lookup further out, or at a negative index,
+        // leaves the array as it was and gives an Undefined that a write is
+        // lost into; set() drops it too, and insert() past the end appends.
+        // A value that is not an array still becomes an empty one first, as
+        // for any array write.
         // accept size_t so we can index relative to size()
         const LLSD& operator[](size_t) const;
         LLSD& operator[](size_t);

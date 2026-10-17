@@ -235,7 +235,7 @@ LLSD& LLParamSDParserUtilities::getSDWriteNode(LLSD& input, LLInitParam::Parser:
             else
             {
                 // write to last of existing elements, or first element if empty
-                sd_to_write = &(*child_sd)[llmax(0, child_sd->size() - 1)];
+                sd_to_write = &(*child_sd)[child_sd->size() ? child_sd->size() - 1 : 0];
             }
         }
         else
