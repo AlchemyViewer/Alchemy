@@ -328,6 +328,15 @@ static bool handleReleaseGLBufferChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleDeferredNoiseChanged(const LLSD& newvalue)
+{
+    if (gPipeline.isInit())
+    {
+        gPipeline.regenerateNoiseMap();
+    }
+    return true;
+}
+
 static bool handleRenderGlowChanged(const LLSD& newvalue)
 {
     // The glow programs load whatever this says, and glowing faces register for the glow passes
@@ -1080,7 +1089,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderMaxPartCount", handleMaxPartCountChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDynamicLOD", handleRenderDynamicLODChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderVSyncEnable", handleVSyncChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderDeferredNoise", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderDeferredNoise", handleDeferredNoiseChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResolutionDivisorChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderUBOUpdateMode", handleRenderUBOUpdateModeChanged);

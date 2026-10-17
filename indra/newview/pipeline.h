@@ -111,6 +111,10 @@ public:
     void createBrdfLut();
     /// Whichever of the auto-exposure's targets and the lens flare's are missing, at their starting values.
     void createExposureBuffers();
+    /// Whichever of the two noise maps is missing.
+    void createNoiseMaps();
+    /// The deferred passes' noise map (DEFERRED_NOISE) again, at the current RenderDeferredNoise.
+    void regenerateNoiseMap();
     void setupGradingLUT();
     void generateLensDirt();
     /// Re-bake the tone curve lookup row from the four RenderColorGradeCurve*
@@ -1217,7 +1221,7 @@ public:
     // Tone curve LUT: a 512x1 RGBA16 row (ALToneCurveSet::LUT_SIZE) whose R, G
     // and B texels hold master(channel(x)) for each channel. A raw GL name
     // like the SMAA maps above: created empty in createGLBuffers, filled by
-    // bakeToneCurveLut, released in releaseDerivedState.
+    // bakeToneCurveLut, released in releaseAllGLResources.
     U32                 mToneCurveLut = 0;
     bool                mToneCurveLutDirty = true;   // settings changed, or the texture was recreated, since the last bake
     bool                mToneCurveIdentity = true;   // the last bake found all four curves on the diagonal

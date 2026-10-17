@@ -1441,6 +1441,51 @@ void LLPipeline::releaseAllGLResources()
 
     mCGLut = nullptr;
 
+    if (mNoiseMap)
+    {
+        LLImageGL::deleteTextures(1, &mNoiseMap);
+        mNoiseMap = 0;
+    }
+
+    if (mTrueNoiseMap)
+    {
+        LLImageGL::deleteTextures(1, &mTrueNoiseMap);
+        mTrueNoiseMap = 0;
+    }
+
+    if (mSMAAAreaMap)
+    {
+        LLImageGL::deleteTextures(1, &mSMAAAreaMap);
+        mSMAAAreaMap = 0;
+    }
+
+    if (mSMAASearchMap)
+    {
+        LLImageGL::deleteTextures(1, &mSMAASearchMap);
+        mSMAASearchMap = 0;
+    }
+
+    if (mToneCurveLut)
+    {
+        LLImageGL::deleteTextures(1, &mToneCurveLut);
+        mToneCurveLut = 0;
+    }
+    mToneCurveLutDirty = true;
+
+    mDeferredUBO.release(); // shared shadow/SSAO block (UB_DEFERRED); re-created lazily on next use
+    mDeferredUBODirty = true;
+
+    if (LLEnvironment::instanceExists())
+    {   // shared environment block (UB_ENVIRONMENT); re-created lazily on next bind
+        LLEnvironment::instance().releaseGLBuffers();
+    }
+
+    // Spans of gGL's query pool, whose queries go with the context.
+    mTerrainPrimitives.release();
+    mWaterPrimitives.release();
+    mWaterPatchPrimitives.release();
+    mAttachmentSpans.clear();
+
     mGLResourcesLive = false;
 }
 
@@ -1474,43 +1519,8 @@ void LLPipeline::releaseRenderTargets()
 
 void LLPipeline::releaseDerivedState()
 {
-    mTerrainPrimitives.release();
-    mWaterPrimitives.release();
-    mWaterPatchPrimitives.release();
     mWaterSurface.release();
     mDepthPyramid.release();
-    mAttachmentSpans.clear();
-
-    if (mNoiseMap)
-    {
-        LLImageGL::deleteTextures(1, &mNoiseMap);
-        mNoiseMap = 0;
-    }
-
-    if (mTrueNoiseMap)
-    {
-        LLImageGL::deleteTextures(1, &mTrueNoiseMap);
-        mTrueNoiseMap = 0;
-    }
-
-    if (mSMAAAreaMap)
-    {
-        LLImageGL::deleteTextures(1, &mSMAAAreaMap);
-        mSMAAAreaMap = 0;
-    }
-
-    if (mSMAASearchMap)
-    {
-        LLImageGL::deleteTextures(1, &mSMAASearchMap);
-        mSMAASearchMap = 0;
-    }
-
-    if (mToneCurveLut)
-    {
-        LLImageGL::deleteTextures(1, &mToneCurveLut);
-        mToneCurveLut = 0;
-    }
-    mToneCurveLutDirty = true;
 
     mPbrBrdfLut.release();
 
@@ -1518,14 +1528,6 @@ void LLPipeline::releaseDerivedState()
     if (ALSelectionOutline::instanceExists())
     {
         ALSelectionOutline::instance().release();
-    }
-
-    mDeferredUBO.release(); // shared shadow/SSAO block (UB_DEFERRED); re-created lazily on next use
-    mDeferredUBODirty = true;
-
-    if (LLEnvironment::instanceExists())
-    {   // shared environment block (UB_ENVIRONMENT); re-created lazily on next bind
-        LLEnvironment::instance().releaseGLBuffers();
     }
 
     releaseScopeBuffers();
@@ -1558,8 +1560,7 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
 
     releaseRenderTargets();
     releaseDerivedState();
-    add(invalidated, "noise, SMAA "
-                     "tables, tone curve, UBOs, query plots, BRDF LUT, reference still, scopes, depth pyramid, water "
+    add(invalidated, "BRDF LUT, reference still, scopes, depth pyramid, water "
                      "surface maps, selection outline, far-plane overlay");
 
     createGLBuffers();
@@ -1763,39 +1764,7 @@ void LLPipeline::createGLBuffers()
     // After allocateScreenBuffer, which refreshes the cached settings these packs read.
     allocateProbeBuffers();
 
-
-    if (!mNoiseMap)
-    {
-        const U32 noiseRes = 128;
-        LLVector3 noise[noiseRes*noiseRes];
-
-        F32 scaler = gSavedSettings.getF32("RenderDeferredNoise")/100.f;
-        for (U32 i = 0; i < noiseRes*noiseRes; ++i)
-        {
-            noise[i] = LLVector3(ll_frand()-0.5f, ll_frand()-0.5f, 0.f);
-            noise[i].normVec();
-            noise[i].mV[2] = ll_frand()*scaler+1.f-scaler/2.f;
-        }
-
-        LLImageGL::generateTextures(1, &mNoiseMap);
-
-        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mNoiseMap);
-        LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise);
-    }
-
-    if (!mTrueNoiseMap)
-    {
-        const U32 noiseRes = 128;
-        F32 noise[noiseRes*noiseRes*3];
-        for (U32 i = 0; i < noiseRes*noiseRes*3; i++)
-        {
-            noise[i] = ll_frand()*2.0f-1.0f;
-        }
-
-        LLImageGL::generateTextures(1, &mTrueNoiseMap);
-        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mTrueNoiseMap);
-        LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise);
-    }
+    createNoiseMaps();
 
     if (!mSMAAAreaMap)
     {
@@ -1881,6 +1850,55 @@ void LLPipeline::createGLBuffers()
 
     createBrdfLut();
     createExposureBuffers();
+}
+
+void LLPipeline::createNoiseMaps()
+{
+    if (!mNoiseMap)
+    {
+        const U32 noiseRes = 128;
+        LLVector3 noise[noiseRes*noiseRes];
+
+        F32 scaler = gSavedSettings.getF32("RenderDeferredNoise")/100.f;
+        for (U32 i = 0; i < noiseRes*noiseRes; ++i)
+        {
+            noise[i] = LLVector3(ll_frand()-0.5f, ll_frand()-0.5f, 0.f);
+            noise[i].normVec();
+            noise[i].mV[2] = ll_frand()*scaler+1.f-scaler/2.f;
+        }
+
+        LLImageGL::generateTextures(1, &mNoiseMap);
+
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mNoiseMap);
+        LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise);
+    }
+
+    if (!mTrueNoiseMap)
+    {
+        const U32 noiseRes = 128;
+        F32 noise[noiseRes*noiseRes*3];
+        for (U32 i = 0; i < noiseRes*noiseRes*3; i++)
+        {
+            noise[i] = ll_frand()*2.0f-1.0f;
+        }
+
+        LLImageGL::generateTextures(1, &mTrueNoiseMap);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mTrueNoiseMap);
+        LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise);
+    }
+}
+
+void LLPipeline::regenerateNoiseMap()
+{
+    if (mNoiseMap)
+    {
+        LLImageGL::deleteTextures(1, &mNoiseMap);
+        mNoiseMap = 0;
+    }
+    createNoiseMaps();
+    gGL.getTextureSlot(0)->unbind();
+    LL_INFOS("RenderResources") << "Noise map regenerated at RenderDeferredNoise "
+                                << gSavedSettings.getF32("RenderDeferredNoise") << LL_ENDL;
 }
 
 F32 lerpf(F32 a, F32 b, F32 w)
