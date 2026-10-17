@@ -825,9 +825,28 @@ void LLPipeline::requestResizeShadowTexture()
 
 void LLPipeline::resizeShadowTexture()
 {
+    // Each pack's shadows at the size allocateScreenBufferInternal gives them, which is its G-buffer's:
+    // after RenderResolutionDivisor or RenderResolutionMultiplier, not the logical size in mRT->width.
     releaseSunShadowTargets();
     releaseSpotShadowTargets();
-    allocateShadowBuffer(mRT->width, mRT->height);
+    allocateShadowBuffer(mRT->deferredScreen.getWidth(), mRT->deferredScreen.getHeight());
+
+    // The probe and hero packs' sun shadows ignore RenderShadowResolutionScale, but take the depth format
+    // the main pack's do (AlchemyRenderShadowDepth32F), so they are rebuilt with them. gCubeSnapshot
+    // keeps their scale at 1 and the spot shadows out, as for any capture pack.
+    RenderTargetPack* const main_rt = mRT;
+    gCubeSnapshot = true;
+    for (RenderTargetPack* rt : { &mAuxillaryRT, &mHeroProbeRT })
+    {
+        if (rt->deferredScreen.isComplete())
+        {
+            mRT = rt;
+            allocateShadowBuffer(rt->deferredScreen.getWidth(), rt->deferredScreen.getHeight());
+        }
+    }
+    mRT = main_rt;
+    gCubeSnapshot = false;
+
     gResizeShadowTexture = false;
 }
 
@@ -1523,8 +1542,8 @@ void LLPipeline::createGLBuffers()
 
     allocateScreenBuffer(resX, resY);
     // Do not zero out mRT dimensions here. allocateScreenBuffer() above
-    // already sets the correct dimensions. Zeroing them caused resizeShadowTexture()
-    // to fail if called immediately after createGLBuffers (e.g., post graphics change).
+    // already sets the correct dimensions, and the snapshot paths read them back
+    // as the logical size to restore (LLViewerWindow::rawSnapshot).
     // mRT->width = 0;
     // mRT->height = 0;
 
