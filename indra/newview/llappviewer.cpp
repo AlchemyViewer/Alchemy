@@ -1094,9 +1094,6 @@ bool LLAppViewer::init()
     // writeSystemInfo can be called after window is initialized (gViewerWindow non-null)
     writeSystemInfo();
 
-    // initWindow also initializes the Feature List, so now we can initialize this global.
-    LLCubeMap::sUseCubeMaps = LLFeatureManager::getInstance()->isFeatureAvailable("RenderCubeMap");
-
     // call all self-registered classes
     LLInitClassList::instance().fireCallbacks();
 

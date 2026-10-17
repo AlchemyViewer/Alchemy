@@ -380,19 +380,11 @@ bool ALTextureSlot::bind(LLCubeMap* cubeMap, ALSampler key)
 
     if (mCurrTexture != cubeMap->mImages[0]->getTexName())
     {
-        if (LLCubeMap::sUseCubeMaps)
-        {
-            activate();
-            setTarget(ALTextureSlot::TT_CUBE_MAP);
-            mCurrTexture = cubeMap->mImages[0]->getTexName();
-            glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
-            cubeMap->mImages[0]->updateBindStats();
-        }
-        else
-        {
-            LL_WARNS() << "Using cube map without extension!" << LL_ENDL;
-            return false;
-        }
+        activate();
+        setTarget(ALTextureSlot::TT_CUBE_MAP);
+        mCurrTexture = cubeMap->mImages[0]->getTexName();
+        glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
+        cubeMap->mImages[0]->updateBindStats();
     }
 
     // Named by the caller, not read off face 0. A cube map is as much a shared

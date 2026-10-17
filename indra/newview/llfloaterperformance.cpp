@@ -695,7 +695,7 @@ void LLFloaterPerformance::changeQualityLevel(const std::string& notif)
 
 bool is_ALM_available()
 {
-    bool bumpshiny = LLCubeMap::sUseCubeMaps && LLFeatureManager::getInstance()->isFeatureAvailable("RenderObjectBump") && gSavedSettings.getBOOL("RenderObjectBump");
+    bool bumpshiny = LLFeatureManager::getInstance()->isFeatureAvailable("RenderObjectBump") && gSavedSettings.getBOOL("RenderObjectBump");
     bool shaders = gSavedSettings.getBOOL("WindLightUseAtmosShaders");
 
     return LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred") &&
