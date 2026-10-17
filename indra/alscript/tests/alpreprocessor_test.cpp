@@ -2128,21 +2128,17 @@ namespace
             };
         };
         {
-            INFO("enveloped first, its text not read");
-            CHECK(P::wanted(true, directives(true), true) == P::Wanted::Enveloped);
-            CHECK_FALSE(asked);
-        }
-        {
-            INFO("then its directives, the setting on or off");
-            CHECK(P::wanted(false, directives(true), true) == P::Wanted::Directives);
-            CHECK(P::wanted(false, directives(true), false) == P::Wanted::Directives);
+            INFO("its directives first, the setting on or off");
+            CHECK(P::wanted(directives(true), true) == P::Wanted::Directives);
+            CHECK(P::wanted(directives(true), false) == P::Wanted::Directives);
+            CHECK(asked);
         }
         UNSCOPED_INFO("then the setting");
-        CHECK(P::wanted(false, directives(false), true) == P::Wanted::Setting);
-        UNSCOPED_INFO("else not");
-        CHECK(P::wanted(false, directives(false), false) == P::Wanted::No);
+        CHECK(P::wanted(directives(false), true) == P::Wanted::Setting);
+        UNSCOPED_INFO("else not, wrapped before or not: Tapple's");
+        CHECK(P::wanted(directives(false), false) == P::Wanted::No);
         UNSCOPED_INFO("by text");
-        CHECK(P::wanted("#define X 1\n", false, false, false) == P::Wanted::Directives);
+        CHECK(P::wanted("#define X 1\n", false, false) == P::Wanted::Directives);
     }
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a require only the old search found is said with a fix each way", "[alpreprocessor]")
@@ -2478,4 +2474,187 @@ namespace
             CHECK(said[0]->args[0] == "inner");
         }
     }
+    TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a do without its while is said at the do; a whole one is lowered still", "[alpreprocessor]")
+    {
+        // Half typed: the body's end, found past the block, is held to
+        // the block, and the loop is no loop.
+        ALPreprocessor::Result r = ALPreprocessor::run("#define USE_EXTENSIONS\ndefault { state_entry() { do } }\n", options());
+        CHECK(messages(r) == std::string("E 1: ill formed do loop\n"));
+        UNSCOPED_INFO("left as written: " << r.text);
+        CHECK(r.text == std::string("\ndefault { state_entry() { do } }\n"));
+        r = ALPreprocessor::run("#define USE_EXTENSIONS\ndefault { state_entry() { do llSay(0, \"\"); } }\n", options());
+        UNSCOPED_INFO("a body with no tail after it");
+        CHECK(messages(r) == std::string("E 1: ill formed do loop\n"));
+        CHECK(r.text == std::string("\ndefault { state_entry() { do llSay(0, \"\"); } }\n"));
+        r = ALPreprocessor::run("#define USE_EXTENSIONS\ndefault { state_entry() { do { if (x) break; } while (y); } }\n", options());
+        UNSCOPED_INFO("whole: lowered");
+        CHECK(messages(r) == std::string());
+        CHECK(r.text == std::string("\ndefault { state_entry() { do { if (x) jump _brk1; } while (y);@_brk1; } }\n"));
+    }
+
+    TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a directive joined over many spaced backslashes; lexing stops when superseded", "[alpreprocessor]")
+    {
+        // Each backslash and newline parted by a space is a look at
+        // whether the line is a directive's: kept as the lexer goes, not
+        // found back over the whole of the joined line each time.
+        const S32   lines  = 100000;
+        std::string source = "#define LONG 1 \\ \n";
+        for (S32 i = 0; i < lines; ++i)
+        {
+            source += "+ 1 \\ \n";
+        }
+        source += "+ 0\nLONG\n";
+        const ALPreprocessor::Result r = ALPreprocessor::run(source, options());
+        // The directive's newline stands for every line joined into it,
+        // so that the lines after keep their numbers.
+        const size_t first = r.text.find_first_not_of('\n');
+        UNSCOPED_INFO("the lines after keep their numbers");
+        CHECK(first == size_t(lines + 2));
+        UNSCOPED_INFO("the macro made, over every line");
+        CHECK(r.text.compare(first, 13, "1 + 1 + 1 + 1") == 0);
+        CHECK(r.text.find("+ 0\n") != std::string::npos);
+        UNSCOPED_INFO("a warning for each spaced join");
+        CHECK(r.problems.size() == size_t(lines + 1));
+        CHECK(std::all_of(r.problems.begin(), r.problems.end(), [](const ALScriptProblem& p) { return p.key == "PreprocBackslashSpace"; }));
+
+        // No longer wanted before the file is lexed through: stopped in
+        // the lexer, not after it.
+        std::atomic<bool>       later{ true };
+        ALPreprocessor::Options unwanted = options();
+        unwanted.superseded              = &later;
+        const ALPreprocessor::Result stopped = ALPreprocessor::run(source, unwanted);
+        CHECK(stopped.superseded);
+        CHECK(stopped.overran);
+        UNSCOPED_INFO("the source as it was, nothing said");
+        CHECK(stopped.text == source);
+        CHECK(stopped.problems.empty());
+    }
+
+    TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a byte order mark hides no directive on a file's first line", "[alpreprocessor]")
+    {
+        const std::string bom = "\xEF\xBB\xBF";
+        add("guarded.lsl", bom + "#ifndef GUARDED\n#define GUARDED\ninteger helper() { return 1; }\n#endif\n");
+        ALPreprocessor::Result r =
+            ALPreprocessor::run("#include \"guarded.lsl\"\n#include \"guarded.lsl\"\ndefault { state_entry() { helper(); } }\n", options());
+        CHECK(messages(r) == std::string());
+        UNSCOPED_INFO("the guard seen: once");
+        CHECK(r.text.find("integer helper()") == r.text.rfind("integer helper()"));
+        UNSCOPED_INFO("no mark in the text");
+        CHECK(r.text.find(bom) == std::string::npos);
+
+        add("once.lsl", bom + "#pragma once\ninteger once;\n");
+        r = ALPreprocessor::run("#include \"once.lsl\"\n#include \"once.lsl\"\n", options());
+        CHECK(messages(r) == std::string());
+        UNSCOPED_INFO("#pragma once seen: once");
+        CHECK(r.text.find("integer once;") == r.text.rfind("integer once;"));
+
+        // The mark's bytes are the line's: the columns after it are the
+        // file's own.
+        add("marked.lsl", bom + "integer marked;\n");
+        r = ALPreprocessor::run("#include \"marked.lsl\"\n", options());
+        REQUIRE(r.map.toSource(1, 0).found());
+        CHECK(r.map.toSource(1, 0).file == 1);
+        CHECK(r.map.toSource(1, 0).line == 0);
+        CHECK(r.map.toSource(1, 0).column == 3);
+
+        // The script's own first line, and SLua's `--#`.
+        r = ALPreprocessor::run(bom + "#define A 1\nA\n", options());
+        CHECK(messages(r) == std::string());
+        CHECK(r.text == std::string("\n1\n"));
+        UNSCOPED_INFO("and seen by the probe that asks whether a script has directives at all");
+        CHECK(ALPreprocessor::directiveName(bom + "#define A 1", false) == size_t(4));
+        CHECK(ALPreprocessor::directiveName(bom + "--#define A 1", true) == size_t(6));
+        CHECK(ALPreprocessor::usesDirectives(bom + "#define A 1\nA\n", false));
+        add("lib.luau", bom + "--#ifndef LIB\n--#define LIB\nlocal lib = 1\n--#endif\n");
+        r = ALPreprocessor::run("--#include \"lib.luau\"\n--#include \"lib.luau\"\nprint(lib)\n", options(true));
+        CHECK(faults(r) == std::string());
+        UNSCOPED_INFO("SLua's guard seen: once");
+        CHECK(r.text.find("local lib = 1") == r.text.rfind("local lib = 1"));
+    }
+
+    TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a string rewritten over lines maps as the file's own only to its first newline", "[alpreprocessor]")
+    {
+        const ALPreprocessor::Result r = ALPreprocessor::run("string s = \"a\nb\";\n", options());
+        CHECK(messages(r) == std::string());
+        REQUIRE(r.text == std::string("string s = \"a\\nb\"\n;\n"));
+        {
+            INFO("before the newline: the file's, column for column");
+            CHECK(r.map.toSource(0, 11).line == 0);
+            CHECK(r.map.toSource(0, 11).column == 11);
+            CHECK(r.map.toSource(0, 12).column == 12);
+        }
+        {
+            INFO("past it: the string's next line, where the rest of it is");
+            CHECK(r.map.toSource(0, 15).line == 1);
+            CHECK(r.map.toSource(0, 15).column == 0);
+            CHECK(r.map.toSource(0, 16).line == 1);
+        }
+        ALSourceMap::Loc begin, end;
+        UNSCOPED_INFO("nothing edited through the string");
+        CHECK_FALSE(r.map.verbatimSpan(0, 11, 17, begin, end));
+        CHECK_FALSE(r.map.verbatimSpan(0, 13, 16, begin, end));
+        UNSCOPED_INFO("the code before it still is");
+        CHECK(r.map.verbatimSpan(0, 0, 8, begin, end));
+        UNSCOPED_INFO("and the semicolon on its own line after");
+        CHECK(r.map.toSource(1, 0).line == 1);
+        CHECK(r.map.toSource(1, 0).column == 2);
+    }
+
+    TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a defined that a macro makes is evaluated, its operand the name as written", "[alpreprocessor]")
+    {
+        const std::string source = "#define HAS(m) defined(m)\n"
+                                   "#define IS_X defined X\n"
+                                   "#define IS_Y defined(Y)\n"
+                                   "#define X 1\n"
+                                   "#if HAS(Y)\nhas_y\n#else\nno_y\n#endif\n"
+                                   "#if IS_X\nis_x\n#else\nnot_x\n#endif\n"
+                                   "#if IS_Y\nis_y\n#else\nnot_y\n#endif\n"
+                                   "#if HAS(Z) || IS_X\neither\n#endif\n";
+        const ALPreprocessor::Result r = ALPreprocessor::run(source, options());
+        CHECK(messages(r) == std::string());
+        UNSCOPED_INFO("undefined through a function-like macro");
+        CHECK(squeeze(r.text).find("no_y\n") != std::string::npos);
+        CHECK(squeeze(r.text).find("has_y") == std::string::npos);
+        UNSCOPED_INFO("defined through an object-like one, the name not expanded to its 1 first");
+        CHECK(squeeze(r.text).find("is_x\n") != std::string::npos);
+        UNSCOPED_INFO("undefined, in parentheses");
+        CHECK(squeeze(r.text).find("not_y\n") != std::string::npos);
+        UNSCOPED_INFO("in an expression");
+        CHECK(squeeze(r.text).find("either\n") != std::string::npos);
+    }
+
+    TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a directive inside a macro's arguments ends them, said at the directive", "[alpreprocessor]")
+    {
+        const ALPreprocessor::Result r = ALPreprocessor::run("#define F(a) [a]\nF(1,\n#ifdef Z\n2)\n#endif\ninteger i;\n", options());
+        CHECK(messages(r) == std::string("E 2: unterminated argument list invoking macro 'F'\n"));
+        UNSCOPED_INFO("the directive read as one, not as argument text: " << r.text);
+        CHECK(r.text.find("#ifdef") == std::string::npos);
+        CHECK(r.text.find("2)") == std::string::npos);
+        CHECK(r.text.find("integer i;") != std::string::npos);
+        UNSCOPED_INFO("what was read, as it was");
+        CHECK(r.text.find("F(1,\n") != std::string::npos);
+    }
+
+    TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: the lazy lists' helper maps nowhere, as the module table does", "[alpreprocessor]")
+    {
+        ALPreprocessor::Options o = options();
+        o.lazyLists               = true;
+        const ALPreprocessor::Result r = ALPreprocessor::run("list l;\ndefault { state_entry() { l[0] = 1; } }\n", o);
+        CHECK(messages(r) == std::string());
+        REQUIRE(r.usedLazyLists);
+        const size_t at = r.text.find("list l;");
+        REQUIRE(at != std::string::npos);
+        const S32 line = S32(std::count(r.text.begin(), r.text.begin() + static_cast<std::ptrdiff_t>(at), '\n'));
+        UNSCOPED_INFO("the script's first line is after the helper");
+        CHECK(line > 0);
+        CHECK(r.map.toExpanded(0, 0, 0).line == line);
+        CHECK(r.map.toExpanded(0, 0, 0).column == 0);
+        UNSCOPED_INFO("the helper's lines map to no line of the script");
+        CHECK_FALSE(r.map.toSource(0, 0).found());
+        CHECK_FALSE(r.map.toSource(1, 0).found());
+        UNSCOPED_INFO("the script's own map back");
+        CHECK(r.map.toSource(line, 0).line == 0);
+        CHECK(r.map.toSource(line + 1, 0).line == 1);
+    }
 }
+

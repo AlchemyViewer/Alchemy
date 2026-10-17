@@ -41,6 +41,8 @@
 #pragma once
 
 #include "alsamplerstate.h"
+
+#include <atomic>
 #include "llglheaders.h"
 
 class LLCubeMap;
@@ -55,7 +57,9 @@ class ALTextureSlot
 {
     friend class LLRender;
 public:
-    static U32 sWhiteTexture;
+    // The white texture's name, which every context shares: set on the main thread, read
+    // where a slot is unbound on any thread with a context.
+    static std::atomic<U32> sWhiteTexture;
 
     // --- sampler traffic, per frame ---------------------------------------------------
     //
@@ -66,29 +70,32 @@ public:
     // sSamplerBinds / sTextureBinds is the number to look at. Near zero means the redundancy
     // check is doing its job and samplers are close to free; near one means nearly every
     // texture bind drags a sampler bind with it.
-    static U32 sSamplerBinds;   // glBindSampler calls ISSUED
-    static U32 sSamplerSkips;   // suppressed by the mCurrSampler check
-    static U32 sTextureBinds;   // texture binds through bindFast/bindImpl, for the ratio
+    //
+    // Each thread counts its own binds, as each has its own gGL: the frame's are the main
+    // thread's, and a thread that makes textures neither races them nor adds to them.
+    static thread_local U32 sSamplerBinds;   // glBindSampler calls ISSUED
+    static thread_local U32 sSamplerSkips;   // suppressed by the mCurrSampler check
+    static thread_local U32 sTextureBinds;   // texture binds through bindFast/bindImpl, for the ratio
 
     // ... of sSamplerBinds, the ones that went through bindSampler() and therefore forced a
     // gGL.flush(). Those are the expensive ones by a wide margin: the call itself is a state
     // change, but the flush SPLITS THE DRAW BATCH. bindFastImpl deliberately skips the flush,
     // so a high total with a low flushed count is cheap and the reverse is not.
-    static U32 sSamplerBindsFlushed;
+    static thread_local U32 sSamplerBindsFlushed;
 
     // ... of sSamplerBindsFlushed, the ones where the flush found geometry actually queued
     // (gGL.mCount > 0) and emitted a draw. An empty flush is a branch and a return; THIS is
     // the real batch-split count, and where it comes from is the question that matters --
     // immediate-mode UI alternating glyph-atlas and image samplers on one slot is the usual
     // suspect, since scene geometry draws from VBOs with nothing queued in gGL.
-    static U32 sSamplerBindsSplitBatch;
+    static thread_local U32 sSamplerBindsSplitBatch;
 
     // ... of sSamplerBinds, the ones issued by the shadow-map compare-sampler cycle:
     // releaseCompareSamplerUnits dropping slots to sampler 0 plus bindShadowMaps putting the
     // compare sampler back. Scene-dependent through the alpha pass's emissive groups (each
     // costs a release + restore), which makes it the prime suspect for a large standing
     // total that UI toggles barely move.
-    static U32 sSamplerBindsShadowCycle;
+    static thread_local U32 sSamplerBindsShadowCycle;
 
     // What KIND of resource a slot holds. A property of the resource, not of the slot -- this
     // is D3D11's SRV dimension, and it lives here only because the slot has to name a target

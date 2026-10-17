@@ -768,12 +768,12 @@ namespace
             REQUIRE(view);
             CHECK(view->toolTip.find("it has directives") != std::string::npos);
         }
-        told().wanted = ALPreprocessor::Wanted::Enveloped;
+        told().wanted = ALPreprocessor::Wanted::Setting;
         crumbs->showTrailer(doc);
         {
-            INFO("saved with it before");
+            INFO("the setting's");
             REQUIRE(part("Preprocessed"));
-            CHECK(part("Preprocessed")->toolTip.find("saved with the preprocessor before") != std::string::npos);
+            CHECK(part("Preprocessed")->toolTip.find("it has directives") == std::string::npos);
         }
         told().wanted = ALPreprocessor::Wanted::No;
         crumbs->showTrailer(doc);

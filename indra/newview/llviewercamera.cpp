@@ -28,6 +28,7 @@
 
 #define LLVIEWERCAMERA_CPP
 #include "llviewercamera.h"
+#include "pipeline.h"
 
 // Viewer includes
 #include "alfarplane.h"

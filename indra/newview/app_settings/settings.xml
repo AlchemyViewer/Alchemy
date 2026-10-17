@@ -10947,79 +10947,13 @@
     <key>SelectionHighlightAlpha</key>
     <map>
       <key>Comment</key>
-      <string>Opacity of selection highlight (0.0 = completely transparent, 1.0 = completely opaque)</string>
+      <string>Half the opacity of selection outlines: 0.0 transparent, 0.5 and over opaque. Applies live.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
       <real>0.40000000596</real>
-    </map>
-    <key>SelectionHighlightAlphaTest</key>
-    <map>
-      <key>Comment</key>
-      <string>Alpha value below which pixels are displayed on selection highlight line (0.0 = show all pixels, 1.0 = show now pixels)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.1</real>
-    </map>
-    <key>SelectionHighlightThickness</key>
-    <map>
-      <key>Comment</key>
-      <string>Thickness of selection highlight line (fraction of view distance)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.00999999977648</real>
-    </map>
-    <key>SelectionHighlightUAnim</key>
-    <map>
-      <key>Comment</key>
-      <string>Rate at which texture animates along U direction in selection highlight line (fraction of texture per second)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.0</real>
-    </map>
-    <key>SelectionHighlightUScale</key>
-    <map>
-      <key>Comment</key>
-      <string>Scale of texture display on selection highlight line (fraction of texture size)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.1</real>
-    </map>
-    <key>SelectionHighlightVAnim</key>
-    <map>
-      <key>Comment</key>
-      <string>Rate at which texture animates along V direction in selection highlight line (fraction of texture per second)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.5</real>
-    </map>
-    <key>SelectionHighlightVScale</key>
-    <map>
-      <key>Comment</key>
-      <string>Scale of texture display on selection highlight line (fraction of texture size)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>1.0</real>
     </map>
     <key>ServerChoice</key>
     <map>
@@ -13671,17 +13605,6 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
-  <key>RenderOcclusionTimeout</key>
-  <map>
-    <key>Comment</key>
-    <string>Maximum number of frames to wait on an occlusion query before forcibly reading it back</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>8</integer>
-  </map>
   <key>UseObjectCacheOcclusion</key>
   <map>
     <key>Comment</key>

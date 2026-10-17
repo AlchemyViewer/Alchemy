@@ -686,4 +686,34 @@ namespace
             CHECK(asked == std::vector<std::string>{ "f" });
         }
     }
+
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: rows set by key that are fewer end where the last one does", "[alpanelist]")
+    {
+        ALPaneList& l   = make();
+        const auto  row = [](S32 i) {
+            ALPaneList::Row one;
+            one.key   = llformat("k%d", i);
+            one.value = LLSD(one.key);
+            LLScrollListCell::Params cell;
+            cell.column = "text";
+            cell.value  = one.key;
+            one.cells.push_back(cell);
+            return one;
+        };
+        std::vector<ALPaneList::Row> many;
+        for (S32 i = 0; i < 40; ++i)
+        {
+            many.push_back(row(i));
+        }
+        l.setRows(many);
+        l.setScrollPos(30);
+        REQUIRE(l.getScrollPos() > 0);
+        // Tapple's: the problems filtered to a few, the list kept in place.
+        l.setRows({ row(0), row(1), row(2), row(3), row(4) });
+        {
+            INFO("the same rows kept, scrolled back to the first");
+            CHECK(l.getItemCount() == 5);
+            CHECK(l.getScrollPos() == 0);
+        }
+    }
 }

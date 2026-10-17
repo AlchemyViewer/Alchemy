@@ -43,7 +43,6 @@
 #include "lldir.h"
 #include "lldrawpoolalpha.h"
 #include "lldrawpoolbump.h"
-#include "lldrawpoolwater.h"
 #include "lldynamictexture.h"
 #include "llenvironment.h"
 #include "llfeaturemanager.h"
@@ -241,12 +240,6 @@ void display_update_camera()
     static LLCachedControl<S32> force_projection(gSavedSettings, "AlchemyRenderFarPlaneForce", ALFarPlane::FORCE_AUTOMATIC);
     LLViewerCamera* camera = LLViewerCamera::getInstance();
     camera->setProjectionFar(ALFarPlane::projectionFar(reverse_z, gCubeSnapshot, force_projection(), gAgentCamera.mDrawDistance));
-    // Edge water stretches with the main view's projection, which reverse-Z or the debug force can switch at runtime.
-    if (!gCubeSnapshot && ALFarPlane::isInfinite(camera->getProjectionFar()) != camera->isMainViewInfinite())
-    {
-        camera->setMainViewInfinite(!camera->isMainViewInfinite());
-        LLWorld::getInstance()->updateWaterObjects();
-    }
     LLVOAvatar::sRenderDistance = llclamp(final_far, 16.f, 256.f);
     gViewerWindow->setup3DRender();
 
@@ -732,6 +725,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     if (!gDisconnected && !LLApp::isExiting())
     {
+        // The water's field around the main camera, before the mirrors, the shadow fit and the probes read it.
+        gPipeline.mWaterSurface.update();
+
         // Render mirrors and associated hero probes before we render the rest of the scene.
         // This ensures the scene state in the hero probes are exactly the same as the rest of the scene before we render it.
         if (gPipeline.RenderMirrors && !gSnapshot)
@@ -801,6 +797,11 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         gDepthDirty = false;
 
         LLGLState::checkStates();
+
+        // The queries of the frames the GPU has finished, read just before the cull asks for them: as late as they can
+        // be, so that the GPU has had the mirrors and the geometry updates above to finish the last frame.
+        gGL.queries().retire();
+        gPipeline.readAttachmentTimes();
 
         static LLCullResult result;
         LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
@@ -1022,7 +1023,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
                 gOcclusionProgram.bind();
                 for (U32 i = 0; i < num_types; i++)
                 {
-                    gPipeline.renderObjects(types[i], LLVertexBuffer::MAP_VERTEX, false);
+                    gPipeline.renderObjects(types[i], false, false);
                 }
 
                 gOcclusionProgram.unbind();
@@ -1074,11 +1075,11 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     stop_glerror();
 
-    // Close out the UBO streaming rings' per-frame counters (slices, wraps, GPU stalls) and let
-    // them resize. Here rather than in resetFrameStats(): a resize deletes and remaps a ring and
-    // invalidates every outstanding slice, which must land past this frame's draws, not before its
-    // heaviest passes. See ALUniformBuffer::endFrame.
-    ALUniformBuffer::endFrame();
+    // Fence the frame's queries, and close out the UBO streaming rings' per-frame counters (slices,
+    // wraps, GPU stalls) and let them resize. Here rather than in resetFrameStats(): a resize deletes
+    // and remaps a ring and invalidates every outstanding slice, which must land past this frame's
+    // draws, not before its heaviest passes. See ALUniformBuffer::endFrame.
+    gGL.endFrame();
 
     display_stats();
 
@@ -1547,6 +1548,8 @@ bool setup_hud_matrices(const LLRect& screen_region)
     return true;
 }
 
+static void render_ui_over_world();
+
 void render_ui(F32 zoom_factor, int subfield)
 {
     LLPerfStats::RecordSceneTime T ( LLPerfStats::StatType_t::RENDER_UI ); // render time capture - Primary UI stat can have HUD time overlap (TODO)
@@ -1576,6 +1579,25 @@ void render_ui(F32 zoom_factor, int subfield)
     // apply gamma correction and post effects
     gPipeline.renderFinalize();
 
+    // A cutout frame is its subject and nothing else. Nothing drawn over the
+    // frame belongs to that, and the coverage the subject is lifted out by
+    // knows nothing of what would be drawn here.
+    if (!LLPipeline::sCutoutRender)
+    {
+        render_ui_over_world();
+    }
+
+    if (!gSnapshot)
+    {
+        LLViewerCamera::setCurrent(saved_camera);
+        gGL.popMatrix();
+    }
+}
+
+// Everything render_ui draws over the finished world frame: HUD elements and
+// attachments, the interface, and the debug text.
+static void render_ui_over_world()
+{
     {
         LLGLState::checkStates();
 
@@ -1630,12 +1652,6 @@ void render_ui(F32 zoom_factor, int subfield)
         gViewerWindow->setup2DRender();
         gViewerWindow->updateDebugText();
         gViewerWindow->drawDebugText();
-    }
-
-    if (!gSnapshot)
-    {
-        LLViewerCamera::setCurrent(saved_camera);
-        gGL.popMatrix();
     }
 }
 

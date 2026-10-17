@@ -98,6 +98,18 @@ namespace
     std::string device_name(const FAudioDeviceDetails& d)
     { return utf16_buf_to_utf8(d.DisplayName, 256); }
 
+    // FAudioLinkedVersion() is decimal-encoded (FAUDIO_COMPILED_VERSION =
+    // major * 10000 + minor * 100 + patch, e.g. 26.10.0 -> 261000), not
+    // packed into bytes, so splitting it with shifts and masks yields
+    // nonsense like "3.251.136".
+    std::string faudio_version_string()
+    {
+        const uint32_t v = FAudioLinkedVersion();
+        std::ostringstream o;
+        o << (v / 10000) << "." << ((v / 100) % 100) << "." << (v % 100);
+        return o.str();
+    }
+
     // FAudioFXReverb's DspReverb_Create asserts (in_channels == 1 || 2 || 6)
     // and likewise for out_channels. Asserts compile out under NDEBUG, after
     // which the FAPO indexes a fixed 5-slot channel array with up to 8 — UB.
@@ -679,9 +691,7 @@ bool LLAudioEngine_FAudio::initFAudioDevice()
     }
 
     LL_INFOS() << "LLAudioEngine_FAudio::init() FAudio "
-               << ((FAudioLinkedVersion() >> 16) & 0xFF) << "."
-               << ((FAudioLinkedVersion() >>  8) & 0xFF) << "."
-               <<  (FAudioLinkedVersion()        & 0xFF)
+               << faudio_version_string()
                << " — " << mOutputChannels << "ch @ " << mSampleRate << "Hz" << LL_ENDL;
 
     return true;
@@ -692,8 +702,7 @@ std::string LLAudioEngine_FAudio::getDriverName(bool verbose)
     if (!verbose) return "FAudio";
 
     std::ostringstream o;
-    uint32_t v = FAudioLinkedVersion();
-    o << "FAudio " << ((v >> 16) & 0xFF) << "." << ((v >> 8) & 0xFF) << "." << (v & 0xFF);
+    o << "FAudio " << faudio_version_string();
 
     // Prefer the name we resolved at init() if available — that's the
     // device the mastering voice is actually running on, which may

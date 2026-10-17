@@ -39,7 +39,6 @@
 #include "llviewercontrol.h"
 #include "llviewertexture.h"
 #include "llsurfacepatch.h"
-#include "llvowater.h"
 #include "pipeline.h"
 #include "llviewerregion.h"
 #include "lldrawpoolterrain.h"
@@ -82,8 +81,6 @@ LLSurface::LLSurface(U32 type, LLViewerRegion *regionp) :
     // "uninitialized" min/max z
     mMinZ = 10000.f;
     mMaxZ = -10000.f;
-
-    mWaterObjp = nullptr;
 
     // In here temporarily.
     mSurfacePatchUpdateCount = 0;
@@ -130,7 +127,6 @@ void LLSurface::initClasses()
 void LLSurface::setRegion(LLViewerRegion *regionp)
 {
     mRegionp = regionp;
-    mWaterObjp = nullptr; // depends on regionp, needs recreating
 }
 
 // Assumes that arguments are powers of 2, and that
@@ -223,19 +219,6 @@ void LLSurface::initTextures()
     // Main surface texture
     //
     createSTexture();
-
-    ///////////////////////
-    //
-    // Water object
-    //
-    if (gSavedSettings.getBOOL("RenderWater") )
-    {
-        mWaterObjp = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_WATER, mRegionp);
-        gPipeline.createObject(mWaterObjp);
-        LLVector3d water_pos_global = from_region_handle(mRegionp->getHandle());
-        water_pos_global += LLVector3d(128.0, 128.0, DEFAULT_WATER_HEIGHT);     // region doesn't have a valid water height yet
-        mWaterObjp->setPositionGlobal(water_pos_global);
-    }
 }
 
 
@@ -258,18 +241,6 @@ void LLSurface::setOriginGlobal(const LLVector3d &origin_global)
             new_origin_global.mdV[1] = mOriginGlobal.mdV[1] + j * mMetersPerGrid * mGridsPerPatchEdge;
             patchp->setOriginGlobal(new_origin_global);
         }
-    }
-
-    // Hack!
-    if (mWaterObjp.notNull() && mWaterObjp->mDrawable.notNull())
-    {
-        const F64 x = origin_global.mdV[VX] + 128.0;
-        const F64 y = origin_global.mdV[VY] + 128.0;
-        const F64 z = mWaterObjp->getPositionGlobal().mdV[VZ];
-
-        LLVector3d water_origin_global(x, y, z);
-
-        mWaterObjp->setPositionGlobal(water_origin_global);
     }
 }
 
@@ -1169,33 +1140,7 @@ void LLSurface::dirtySurfaceMaps()
 
 void LLSurface::setWaterHeight(F32 height)
 {
-    if (!mWaterObjp.isNull())
-    {
-        LLVector3 water_pos_region = mWaterObjp->getPositionRegion();
-        bool changed = water_pos_region.mV[VZ] != height;
-        water_pos_region.mV[VZ] = height;
-        mWaterObjp->setPositionRegion(water_pos_region);
-        if (changed)
-        {
-            LLWorld::getInstance()->requestWaterObjectsUpdate();
-        }
-    }
-    else
-    {
-        LL_WARNS() << "LLSurface::setWaterHeight with no water object!" << LL_ENDL;
-    }
+    mWaterHeight = height;
 }
 
-F32 LLSurface::getWaterHeight() const
-{
-    if (!mWaterObjp.isNull())
-    {
-        // we have a water object, the usual case
-        return mWaterObjp->getPositionRegion().mV[VZ];
-    }
-    else
-    {
-        return DEFAULT_WATER_HEIGHT;
-    }
-}
 

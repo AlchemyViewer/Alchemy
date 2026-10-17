@@ -356,7 +356,7 @@ void ALScriptStudioSaving::save(Doc& doc)
     tab.version          = doc.editor->document().version();
     tab.file             = !doc.file.empty();
     tab.notecard         = doc.notecard;
-    tab.preprocessed     = !tab.file && !tab.notecard && mAnalysis.preprocessed(doc);
+    tab.preprocessed     = !tab.file && !tab.notecard && !doc.savePlain && mAnalysis.preprocessed(doc);
     tab.preprocessorBusy = doc.preprocessing;
     tab.holdOnErrors     = options.holdOnErrors;
     tab.checked          = doc.check->analysisVersion == tab.version;
@@ -469,7 +469,15 @@ void ALScriptStudioSaving::save(Doc& doc)
     {
         return;
     }
+    // As written: no envelope round it once it is up, and no expansion of
+    // one to show.
+    doc.savePlain      = false;
     doc.uploaded.valid = false;
+    if (doc.envelope)
+    {
+        doc.envelope.reset();
+        mWindow.dropExpanded(doc);
+    }
     weighForSave(doc);
     upload(doc, doc.editor->wholeText());
 }
@@ -558,6 +566,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
     }
     // With the map the compiler's lines are read back through.
     doc.save.sent(at, map ? std::optional<ALSourceMap>(*map) : std::nullopt, {}, options.sender.request);
+    doc.assetSending = std::make_shared<const std::string>(text);
     doc.problems.clear();
     mAnalysis.refreshProblems(doc);
     LLStringUtil::format_map_t args;
@@ -767,6 +776,17 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
         // Nothing picked waits on a save any more.
         mTabs.fillTabs();
         mWeighing.keepSaved(doc);
+        // What it sent, the asset now.
+        if (doc.assetSending)
+        {
+            doc.asset = std::move(doc.assetSending);
+        }
+        // The compiled half that did not match the source is replaced.
+        if (doc.compiledDiffers)
+        {
+            doc.compiledDiffers.reset();
+            mTabs.refreshNotice();
+        }
     }
     if (result.newAssetId.notNull())
     {
@@ -873,6 +893,7 @@ bool ALScriptStudioSaving::sendQueuedSave(Doc& doc)
 
 void ALScriptStudioSaving::stopped(Doc& doc)
 {
+    doc.savePlain = false;
     doc.save.stopped();
     mWindow.stopClosing();
 }

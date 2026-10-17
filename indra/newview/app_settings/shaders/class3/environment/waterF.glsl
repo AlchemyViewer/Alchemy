@@ -29,6 +29,10 @@
 
 out vec4 frag_color;
 
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
+
 #ifdef HAS_SUN_SHADOW
 float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
 #endif
@@ -44,13 +48,11 @@ vec2 BRDF(float NoV, float roughness);
 
 uniform sampler2D bumpMap;
 uniform sampler2D bumpMap2;
-uniform float     blend_factor;
 #ifdef TRANSPARENT_WATER
 uniform sampler2D screenTex;
 uniform sampler2D depthMap;
 #endif
 
-uniform sampler2D exclusionTex;
 
 // Classic (legacy pre-PBR) sky lighting is a per-program compile-time variant, not a runtime
 // uniform: the two paths differ by whole blocks of maths and a probe sample, and only one of
@@ -71,30 +73,16 @@ uniform float fresnelScale;
 uniform float waterGlintRoughness;
 uniform float fresnelOffset;
 
-// waterFar.x is the wave clamp distance and .y the edge water stretch, 0 unless the projection is infinite
-// (ALFarPlane::WaterFar); waterRim is the edge water's outer rectangle relative to the camera, min xy then max xy.
+// waterFar.x is the wave clamp distance and .y the edge stretch, 0 unless the projection is infinite
+// (ALFarPlane::WaterFar); waterRim is the field's outer rectangle relative to the camera, min xy then max xy.
 uniform vec2 waterFar;
 uniform vec4 waterRim;
-// The wave coordinates, rebuilt per fragment under the infinite projection: interpolated from edge water vertices
-// hundreds of km out, waterV's world-space coordinates lose the precision the normal maps need, and far water goes flat.
-uniform vec3 eyeVec;
-uniform vec2 bigWaveScroll;
-uniform vec4 littleWaveScroll;
 
-//bigWave is (refCoord.w, view.w);
-in vec4 refCoord;
-in vec4 littleWave;
-in vec4 view;
+// The pack's screen, which the water is drawn into and whose copy screenTex and depthMap hold, stretched to theirs.
+uniform vec2 screen_res;
+
+in vec3 view;
 in vec3 vary_position;
-in vec3 vary_normal;
-in vec3 vary_tangent;
-in vec3 vary_light_dir;
-
-vec3 BlendNormal(vec3 bump1, vec3 bump2)
-{
-    vec3 n = mix(bump1, bump2, blend_factor);
-    return n;
-}
 
 vec3 srgb_to_linear(vec3 col);
 vec3 linear_to_srgb(vec3 col);
@@ -119,38 +107,7 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
 vec3 getPositionWithNDC(vec3 ndc);
 float ndcZFromScreenDepth(float d);   // deferredUtil.glsl -- depth-convention aware
 
-void generateWaveNormals(out vec3 wave1, out vec3 wave2, out vec3 wave3)
-{
-    // Generate all of our wave normals.
-    // We layer these back and forth.
-
-    vec2 bigwave = vec2(refCoord.w, view.w);
-    vec4 little = littleWave;
-
-    // waterV's wave coordinates from the camera-relative view vector, which interpolates precisely, and the eye
-    // position (see eyeVec above).
-    if (waterFar.y > 0.0)
-    {
-        float d = max(length(view.xy), 0.001);
-        vec2 v = eyeVec.xy + view.xy / d * min(d, waterFar.x);
-        v.x += (cos(v.x*0.08)+sin(v.y*0.02))*6.0;
-        bigwave = v * vec2(0.04,0.04) + bigWaveScroll;
-        little.xy = v * vec2(0.45, 0.9) + littleWaveScroll.xy;
-        little.zw = v * vec2(0.1, 0.2) + littleWaveScroll.zw;
-    }
-
-    vec3 wave1_a = texture(bumpMap, bigwave).xyz * 2.0 - 1.0;
-    vec3 wave2_a = texture(bumpMap, little.xy).xyz * 2.0 - 1.0;
-    vec3 wave3_a = texture(bumpMap, little.zw).xyz * 2.0 - 1.0;
-
-    vec3 wave1_b = texture(bumpMap2, bigwave).xyz * 2.0 - 1.0;
-    vec3 wave2_b = texture(bumpMap2, little.xy).xyz * 2.0 - 1.0;
-    vec3 wave3_b = texture(bumpMap2, little.zw).xyz * 2.0 - 1.0;
-
-    wave1 = BlendNormal(wave1_a, wave1_b);
-    wave2 = BlendNormal(wave2_a, wave2_b);
-    wave3 = BlendNormal(wave3_a, wave3_b);
-}
+void water_wave_normals(sampler2D map_a, sampler2D map_b, vec2 r, out vec3 big, out vec3 little_xy, out vec3 little_zw);
 
 void calculateFresnelFactors(out vec3 df3, out vec2 df2, vec3 viewVec, vec3 wave1, vec3 wave2, vec3 wave3, vec3 wavef)
 {
@@ -175,9 +132,11 @@ void main()
 {
     mirrorClip(vary_position);
 
-    vec3 vN = vary_normal;
-    vec3 vT = vary_tangent;
+    // The plane's frame and the light in eye space, the same at every point: agent z and x through the view.
+    vec3 vN = normal_matrix[2];
+    vec3 vT = normal_matrix[0];
     vec3 vB = cross(vN, vT);
+    vec3 vary_light_dir = normal_matrix * lightDir;
 
     vec3 pos = vary_position.xyz;
     float linear_depth = 1 / -pos.z;
@@ -185,15 +144,13 @@ void main()
     //normalize view vector
     vec3 viewVec = normalize(pos.xyz);
 
-    // Setup our waves.
+    // The wave layers, from the camera-relative view vector, which interpolates precisely however far the quad reaches.
+    vec3 wave1;
+    vec3 wave2;
+    vec3 wave3;
+    water_wave_normals(bumpMap, bumpMap2, view.xy, wave1, wave2, wave3);
 
-    vec3 wave1 = vec3(0, 0, 1);
-    vec3 wave2 = vec3(0, 0, 1);
-    vec3 wave3 = vec3(0, 0, 1);
-
-    generateWaveNormals(wave1, wave2, wave3);
-
-    vec2 distort = (refCoord.xy/refCoord.z) * 0.5 + 0.5;
+    vec2 distort = gl_FragCoord.xy / screen_res;
 
     vec3 wavef = (wave1 + wave2 * 0.4 + wave3 * 0.6) * 0.5;
 
@@ -249,8 +206,6 @@ void main()
 
     float shadow = 1.0f;
 
-    float water_mask = texture(exclusionTex, distort).r;
-
 #ifdef HAS_SUN_SHADOW
     shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, distort);
 #endif
@@ -268,7 +223,6 @@ void main()
 #else
     fade = 1;
 #endif
-    fade *= water_mask;
     distort2 = mix(distort, distort2, min(1, fade * 10));
     depth = texture(depthMap, distort2).r;
 
@@ -283,9 +237,6 @@ void main()
 
 #else
     vec4 fb = applyWaterFogViewLinear(viewVec*2048.0, vec4(1.0));
-
-    if (water_mask < 1)
-        discard;
 #endif
 
     // The environment's blur, for the reflections and refractions alone.
@@ -307,7 +258,6 @@ void main()
 
     vec3 colorEmissive = vec3(0);
     float ao = 1.0;
-    vec3 light_dir = transform_normal(vN, vT, vB, lightDir);
 
     float NdotV = clamp(abs(dot(norm, v)), 0.001, 1.0);
 
@@ -317,15 +267,16 @@ void main()
     // long tail lit every face within a few tens of degrees, and on the steepened slopes drew each crest across the path
     // as a streak. Water is a dielectric with no diffuse surface of its own: the glint is the light's own colour at the
     // Fresnel reflectance of the angle between the view and the light, 2% looking down at it and most of it at grazing.
-    vec3 l = normalize(light_dir);
+    vec3 l = transform_normal(vN, vT, vB, lightDir);
     float glint_alpha = waterGlintRoughness * waterGlintRoughness;
     float glint_exp = max(2.0 / (glint_alpha * glint_alpha) - 2.0, 1.0);
     float lobe = pow(clamp(dot(reflect(-v, sun_norm), l), 0.0, 1.0), glint_exp);
     float glint = lobe * (glint_exp + 2.0) / 6.2831853;
     // The half vector's cosine with the view, sqrt((1 + v.l) / 2), which needs no half vector: v and l are opposite at
-    // the horizon under a setting sun, and theirs would not normalize.
+    // the horizon under a setting sun, and theirs would not normalize. Rounding can carry it a hair past 1 with the sun
+    // straight behind the camera, where pow would take a negative base.
     float vh = sqrt(max(0.5 + 0.5 * dot(v, l), 0.0));
-    float fresnel = 0.02 + 0.98 * pow(1.0 - vh, 5.0);
+    float fresnel = 0.02 + 0.98 * pow(max(1.0 - vh, 0.0), 5.0);
     vec3 punctual = min(glint * fresnel, 10.0) * sunlit_linear * shadow * atten;
 
     // The glint's glow, as WindLight's water wrote it: the lobe at its peak of 1, by 0.1 rising to 0.3 as the light

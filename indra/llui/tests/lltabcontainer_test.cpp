@@ -304,9 +304,12 @@ namespace
         }
 
         LLTabContainer* tabs = build();
-        tabs->addTabPanel(page("a", std::string()));
-        tabs->addTabPanel(page("b", std::string()));
-        tabs->addTabPanel(page("c", std::string()));
+        LLPanel* a = page("a", std::string());
+        LLPanel* b = page("b", std::string());
+        LLPanel* c = page("c", std::string());
+        tabs->addTabPanel(a);
+        tabs->addTabPanel(b);
+        tabs->addTabPanel(c);
         tabs->lockTabs();
         CHECK(tabs->getNumLockedTabs() == 3);
         CHECK(tabs->getTotalTabWidth() > 0);
@@ -315,6 +318,11 @@ namespace
         CHECK(tabs->getNumLockedTabs() == 0);
         CHECK(tabs->getTotalTabWidth() == 0);
         CHECK(tabs->getCurrentPanelIndex() == -1);
+        // deleteAllTabs lets the pages go without deleting them: they are
+        // the test's again.
+        a->die();
+        b->die();
+        c->die();
 
         LLPanel* front = page("front", std::string());
         tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(front).insert_at(LLTabContainer::START));
@@ -352,6 +360,9 @@ namespace
         CHECK(commits == 0);
 
         tabs->deleteAllTabs();
+        // Let go, not deleted: the test's again.
+        first->die();
+        second->die();
         tabs->addTabPanel(page("third", std::string()));
         tabs->addTabPanel(page("fourth", std::string()));
         tabs->enableTabButton(0, false);

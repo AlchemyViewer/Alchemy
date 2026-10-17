@@ -27,7 +27,10 @@
 
 out vec4 frag_data[4];
 
+// Only the program for the faces whose texture can fall below the cutoff can discard, as in pbropaqueF.
+#ifdef HAS_ALPHA_MASK
 uniform float minimum_alpha;
+#endif
 uniform sampler2D diffuseMap;
 uniform sampler2D bumpMap;
 
@@ -49,10 +52,12 @@ void main()
 
     vec4 col = texture(diffuseMap, vary_texcoord0.xy);
 
+#ifdef HAS_ALPHA_MASK
     if(col.a < minimum_alpha)
     {
         discard;
     }
+#endif
     col *= vertex_color;
 
     vec3 norm = texture(bumpMap, vary_texcoord0.xy).rgb * 2.0 - 1.0;

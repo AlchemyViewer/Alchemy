@@ -973,7 +973,7 @@
 <!-- Color Changed -->
   <color
       name="SilhouetteChildColor"
-     reference="SL-MidBlue" />
+     value="0.581 0.784 1 1" />
   <color
       name="SilhouetteParentColor"
       reference="Yellow" />

@@ -880,6 +880,7 @@ void LLImageGL::init(bool usemipmaps)
     mHasExplicitFormat = false;
 
     mIsMask = false;
+    mMaxAlpha = 255;
     mNeedsAlphaAndPickMask = true ;
     mAlphaAnalysisSerial = 0;
     mAlphaStride = 0 ;
@@ -2368,16 +2369,23 @@ void LLImageGL::setPickMask(U8* mask, U16 width, U16 height)
     mPickMaskHeight = height;
 }
 
-void LLImageGL::setIsMask(bool is_mask)
+void LLImageGL::setAlphaAnalysis(const AlphaAnalysis& analysis)
 {
     if (stagesAlpha())
     {
-        mPendingAlpha.mIsMask    = is_mask;
-        mPendingAlpha.mHasIsMask = true;
+        mPendingAlpha.mAnalysis    = analysis;
+        mPendingAlpha.mHasAnalysis = true;
         return;
     }
 
-    mIsMask = is_mask;
+    mIsMask = analysis.mIsMask;
+    mMaxAlpha = analysis.mMaxAlpha;
+}
+
+void LLImageGL::clearAlphaAnalysis()
+{
+    mIsMask = false;
+    mMaxAlpha = 255;
 }
 
 void LLImageGL::publishPendingAlpha()
@@ -2390,9 +2398,10 @@ void LLImageGL::publishPendingAlpha()
         mPickMaskHeight = mPendingAlpha.mPickMaskHeight;
         mPendingAlpha.mPickMask = nullptr;
     }
-    if (mPendingAlpha.mHasIsMask)
+    if (mPendingAlpha.mHasAnalysis)
     {
-        mIsMask = mPendingAlpha.mIsMask;
+        mIsMask = mPendingAlpha.mAnalysis.mIsMask;
+        mMaxAlpha = mPendingAlpha.mAnalysis.mMaxAlpha;
     }
     mPendingAlpha = PendingAlpha();
 }
@@ -2733,7 +2742,7 @@ void LLImageGL::setNeedsAlphaAndPickMask(bool need_mask)
         else //do not need alpha mask
         {
             mAlphaOffset = INVALID_OFFSET ;
-            mIsMask = false;
+            clearAlphaAnalysis();
 
             // Invalidate pending jobs
             ++mAlphaAnalysisSerial;
@@ -2762,7 +2771,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
     case GL_RGB:
     case GL_SRGB:
         mNeedsAlphaAndPickMask = false;
-        mIsMask = false;
+        clearAlphaAnalysis();
         return; //no alpha channel.
     case GL_RED_INTEGER:
     case GL_RG_INTEGER:
@@ -2772,7 +2781,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
     case GL_BGRA_INTEGER:
         // Integers: even a fourth channel is a value, not coverage.
         mNeedsAlphaAndPickMask = false;
-        mIsMask = false;
+        clearAlphaAnalysis();
         return;
     case GL_RGBA:
     case GL_SRGB_ALPHA:
@@ -2820,7 +2829,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
         LL_WARNS() << "Cannot analyze alpha for image with format type " << std::hex << mFormatType << std::dec << LL_ENDL;
 
         mNeedsAlphaAndPickMask = false ;
-        mIsMask = false;
+        clearAlphaAnalysis();
     }
 }
 
@@ -2892,7 +2901,7 @@ void LLImageGL::resolveDeprecatedFormat()
     }
 }
 
-bool LLImageGL::analyzeAlphaData(
+LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
     const void* data_in,
     U32 w,
     U32 h,
@@ -2901,13 +2910,14 @@ bool LLImageGL::analyzeAlphaData(
 {
     if (!data_in || alpha_stride < 1)
     {
-        return false;
+        return AlphaAnalysis();
     }
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
     U32 length = w * h;
     U32 alphatotal = 0;
+    U32 max_alpha = 0;
 
     U32 sample[16];
     memset(sample, 0, sizeof(U32) * 16);
@@ -2952,12 +2962,32 @@ bool LLImageGL::analyzeAlphaData(
                 const U32 asum = (s1 + s2 + s3 + s4);
                 alphatotal += asum;
                 sample[asum / (16 * 4)] += 4;
+
+                max_alpha = llmax(max_alpha, llmax(llmax(s1, s2), llmax(s3, s4)));
             }
 
             rowstart += 2 * w * alpha_stride;
         }
         // Two histogram entries per source texel over the paired region.
         length = 2 * paired_w * paired_h;
+
+        // The trailing odd row and column are left out of the histogram, but one of their texels may be the only
+        // one with any alpha.
+        const GLubyte* alpha = ((const GLubyte*)data_in) + alpha_offset;
+        if (paired_w < w)
+        {
+            for (U32 y = 0; y < h; ++y)
+            {
+                max_alpha = llmax(max_alpha, (U32)alpha[((size_t)y * w + paired_w) * alpha_stride]);
+            }
+        }
+        if (paired_h < h)
+        {
+            for (U32 x = 0; x < w; ++x)
+            {
+                max_alpha = llmax(max_alpha, (U32)alpha[((size_t)paired_h * w + x) * alpha_stride]);
+            }
+        }
     }
     else
     {
@@ -2967,6 +2997,7 @@ bool LLImageGL::analyzeAlphaData(
             const U32 s1 = *current;
             alphatotal += s1;
             ++sample[s1 / 16];
+            max_alpha = llmax(max_alpha, s1);
             current += alpha_stride;
         }
     }
@@ -2994,16 +3025,19 @@ bool LLImageGL::analyzeAlphaData(
         upperhalftotal += sample[i];
     }
 
+    AlphaAnalysis analysis;
+    analysis.mMaxAlpha = (U8)max_alpha;
     if (midrangetotal > length / 48 ||
         (lowerhalftotal == length && alphatotal != 0) ||
         (upperhalftotal == length && alphatotal != 255 * length))
     {
-        return false; // not suitable for masking
+        analysis.mIsMask = false; // not suitable for masking
     }
     else
     {
-        return true; // is a mask
+        analysis.mIsMask = true; // is a mask
     }
+    return analysis;
 }
 
 void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
@@ -3020,7 +3054,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         // but increment either way, for extra safety.
         ++mAlphaAnalysisSerial;
 
-        setIsMask(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
+        setAlphaAnalysis(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
         return;
     }
 
@@ -3038,7 +3072,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
     if (!data_copy)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-        setIsMask(analyzeAlphaData(data_in, w, h, alpha_offset, alpha_stride));
+        setAlphaAnalysis(analyzeAlphaData(data_in, w, h, alpha_offset, alpha_stride));
         return;
     }
     memcpy(data_copy, static_cast<const U8*>(data_in), data_size);
@@ -3060,20 +3094,21 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         posted_job = mainq->postTo(
             workerq,
             // Worker thread: analyze alpha
-            [data_copy, w, h, alpha_offset, alpha_stride]() -> bool
+            [data_copy, w, h, alpha_offset, alpha_stride]() -> AlphaAnalysis
         {
             LL_PROFILE_ZONE_NAMED("Deffered alpha mask analysis");
-            bool is_mask = LLImageGL::analyzeAlphaData(data_copy, w, h, alpha_offset, alpha_stride);
+            const AlphaAnalysis analysis = LLImageGL::analyzeAlphaData(data_copy, w, h, alpha_offset, alpha_stride);
             delete[] data_copy;
-            return is_mask;
+            return analysis;
         },
             // Main thread: apply result
-            [this, request_serial](bool is_mask)
+            [this, request_serial](AlphaAnalysis analysis)
         {
             // Only apply if no newer analysis has been requested
             if (mAlphaAnalysisSerial == request_serial)
             {
-                mIsMask = is_mask;
+                mIsMask = analysis.mIsMask;
+                mMaxAlpha = analysis.mMaxAlpha;
             }
             unref();
         }
@@ -3092,7 +3127,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
             ref();
 
             // Conservative default until analysis completes
-            mIsMask = false;
+            clearAlphaAnalysis();
         }
     }
     if (!posted_job)
@@ -3100,7 +3135,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
         // Queues not available - fall back to synchronous analysis
         delete[] data_copy;
-        setIsMask(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
+        setAlphaAnalysis(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
     }
 }
 
@@ -3520,6 +3555,11 @@ LLImageGLThread::LLImageGLThread(LLWindow* window)
 
     mContext = mWindow->createSharedContext();
     LL::ThreadPool::start();
+}
+
+LLImageGLThread::~LLImageGLThread()
+{
+    close();
 }
 
 void LLImageGLThread::run()

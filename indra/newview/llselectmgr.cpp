@@ -231,12 +231,9 @@ constexpr S32 MAX_CHILDREN_PER_TASK = 255;
 bool LLSelectMgr::sRectSelectInclusive = true;
 bool LLSelectMgr::sRenderHiddenSelections = true;
 bool LLSelectMgr::sRenderLightRadius = false;
-F32 LLSelectMgr::sHighlightAlpha = 0.f;
 LLUIColor LLSelectMgr::sSilhouetteParentColor;
 LLUIColor LLSelectMgr::sSilhouetteChildColor;
 LLUIColor LLSelectMgr::sHighlightInspectColor;
-LLUIColor LLSelectMgr::sHighlightParentColor;
-LLUIColor LLSelectMgr::sHighlightChildColor;
 LLUIColor LLSelectMgr::sContextSilhouetteColor;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -326,14 +323,10 @@ LLSelectMgr::LLSelectMgr()
     mTEMode = false;
     mTextureChannel = LLRender::DIFFUSE_MAP;
 
-    sHighlightAlpha     = gSavedSettings.getF32("SelectionHighlightAlpha") * 2;
-
     sSilhouetteParentColor =LLUIColorTable::instance().getColor("SilhouetteParentColor");
     sSilhouetteChildColor = LLUIColorTable::instance().getColor("SilhouetteChildColor");
-    sHighlightParentColor = LLUIColorTable::instance().getColor("HighlightParentColor");
-    sHighlightChildColor = LLUIColorTable::instance().getColor("HighlightChildColor");
     sHighlightInspectColor = LLUIColorTable::instance().getColor("HighlightInspectColor");
-    sContextSilhouetteColor = LLUIColorTable::instance().getColor("ContextSilhouetteColor")*0.5f;
+    sContextSilhouetteColor = LLUIColorTable::instance().getColor("ContextSilhouetteColor");
 
     sRenderLightRadius = gSavedSettings.getBOOL("RenderLightRadius");
 
@@ -6696,6 +6689,13 @@ void LLSelectMgr::updateHighlightedObjects()
 // `parts` (ALSelectionOutline::EPart).
 void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud, U32 parts)
 {
+    // The outline's opacity, live: the setting's half its old silhouette's opacity at the line, where it drew
+    // doubled.
+    static LLCachedControl<F32> highlight_alpha(gSavedSettings, "SelectionHighlightAlpha", 0.4f);
+    const F32 alpha = llclamp(highlight_alpha * 2.f, 0.f, 1.f);
+    // What a rect-select's preview keeps of the selection's opacity, so it reads as a preview.
+    constexpr F32 PREVIEW_OPACITY = 0.6f;
+
     if (mSelectedObjects->getNumNodes())
     {
         LLUUID inspect_item_id = LLUUID::null;
@@ -6757,7 +6757,7 @@ void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud, U32 par
                 colour = sSilhouetteChildColor;
                 priority = ALSelectionOutline::PRIORITY_CHILD;
             }
-            colour.mV[VALPHA] = sHighlightAlpha;
+            colour.mV[VALPHA] = alpha;
             outline.add(objectp, (U32)node->getTESelectMask(), colour, show_hidden, priority, parts);
         }
     }
@@ -6776,7 +6776,9 @@ void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud, U32 par
                 continue;
             }
 
+            // What a drag would add, in the colours it would be selected in, root and child, more faintly.
             LLColor4 colour;
+            F32 opacity = alpha;
             ALSelectionOutline::EPriority priority;
             if (subtracting_from_selection)
             {
@@ -6785,14 +6787,15 @@ void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud, U32 par
             }
             else if (!objectp->isSelected())
             {
-                colour = objectp->isRoot() ? sHighlightParentColor : sHighlightChildColor;
+                colour = objectp->isRoot() ? sSilhouetteParentColor : sSilhouetteChildColor;
                 priority = objectp->isRoot() ? ALSelectionOutline::PRIORITY_ROOT : ALSelectionOutline::PRIORITY_CHILD;
+                opacity *= PREVIEW_OPACITY;
             }
             else
             {
                 continue;
             }
-            colour.mV[VALPHA] = sHighlightAlpha;
+            colour.mV[VALPHA] = opacity;
             outline.add(objectp, (U32)node->getTESelectMask(), colour, sRenderHiddenSelections, priority, parts);
         }
     }

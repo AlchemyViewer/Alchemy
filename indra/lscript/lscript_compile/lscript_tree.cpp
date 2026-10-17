@@ -526,7 +526,11 @@ void LLScriptSAIdentifier::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCom
     case LSCP_LIST_BUILD_SIMPLE:
         {
             mIdentifier->recurse(fp, tabs, tabsize, pass, ptype, prunearg, scope, type, basetype, count, chunk, heap, stacksize, entry, entrycount, ldata);
-            if (mNextp)
+            // An identifier the pass refused, unset or a list, made no
+            // entry: the error is written, and every recursion after it
+            // returns at once on it, but the rest are not pointed at a
+            // null entry's next either way.
+            if (mNextp && *ldata)
             {
                 mNextp->recurse(fp, tabs, tabsize, pass, ptype, prunearg, scope, type, basetype, count, chunk, heap, stacksize, entry, entrycount, &(*ldata)->mListp);
             }
@@ -783,6 +787,16 @@ LSCRIPTType get_type(LLScriptSimpleAssignable* sa)
     return result;
 }
 
+// A component of a vector or rotation constant in a list, read back from
+// the chunk it was just written to as the VM reads one, a component that is
+// not finite zero, but without the VM's math fault: set_fault writes to the
+// registers of a VM image, past the end of the chunk, which has none.
+static F32 constant_component(const U8 *chunk, S32 &offset)
+{
+    F32 value = std::bit_cast<F32>(bytestream2integer(chunk, offset));
+    return llfinite(value) ? value : 0.f;
+}
+
 void LLScriptSAVector::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompilePass pass, LSCRIPTPruneType ptype, BOOL &prunearg, LLScriptScope *scope, LSCRIPTType &type, LSCRIPTType basetype, U64 &count, LLScriptByteCodeChunk *chunk, LLScriptByteCodeChunk *heap, S32 stacksize, LLScriptScopeEntry *entry, S32 entrycount, LLScriptLibData **ldata)
 {
     if (gErrorToText.getErrors())
@@ -876,7 +890,9 @@ void LLScriptSAVector::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompile
             }
             LLVector3 vec;
             S32 offset = 0;
-            bytestream2vector(vec, list->mCodeChunk, offset);
+            vec.mV[VZ] = constant_component(list->mCodeChunk, offset);
+            vec.mV[VY] = constant_component(list->mCodeChunk, offset);
+            vec.mV[VX] = constant_component(list->mCodeChunk, offset);
             *ldata = new LLScriptLibData(vec);
             delete list;
             if (mNextp)
@@ -1042,7 +1058,10 @@ void LLScriptSAQuaternion::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCom
             }
             LLQuaternion quat;
             S32 offset = 0;
-            bytestream2quaternion(quat, list->mCodeChunk, offset);
+            quat.mQ[VS] = constant_component(list->mCodeChunk, offset);
+            quat.mQ[VZ] = constant_component(list->mCodeChunk, offset);
+            quat.mQ[VY] = constant_component(list->mCodeChunk, offset);
+            quat.mQ[VX] = constant_component(list->mCodeChunk, offset);
             *ldata = new LLScriptLibData(quat);
             delete list;
             if (mNextp)
@@ -10703,8 +10722,12 @@ void LLScriptGlobalFunctions::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPT
         {
             entrycount = 0;
             mStatements->recurse(fp, tabs, tabsize, pass, ptype, prunearg, scope, type, basetype, count, chunk, heap, stacksize, mIdentifier->mScopeEntry, entrycount, NULL);
-            fprintf(fp, "Function Args: %s\n", mIdentifier->mScopeEntry->mFunctionArgs.mString);
-            fprintf(fp, "Local List: %s\n", mIdentifier->mScopeEntry->mLocals.mString);
+            // Either is null for a function with no parameters or no
+            // locals, as the event handler's print has it.
+            const char *function_args = mIdentifier->mScopeEntry->mFunctionArgs.mString;
+            fprintf(fp, "Function Args: %s\n", function_args?function_args:"");
+            const char *local_list = mIdentifier->mScopeEntry->mLocals.mString;
+            fprintf(fp, "Local List: %s\n", local_list?local_list:"");
             if (mIdentifier->mScopeEntry)
             {
                 mIdentifier->mScopeEntry->mSize = (S32)count;
@@ -11305,7 +11328,7 @@ void LLScriptScript::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompilePa
 
             // now, put it all together and spit it out
             // we need
-            LLFILE* bcfp = LLFile::fopen(mBytecodeDest, "wb");      /*Flawfinder: ignore*/
+            LLFILE* bcfp = LLFile::fopen(mBytecodeDest, LLFILE_MODE("wb"));      /*Flawfinder: ignore*/
 
             code->build(fp, bcfp);
             fclose(bcfp);
@@ -11315,7 +11338,7 @@ void LLScriptScript::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompilePa
         break;
     case LSCP_EMIT_CIL_ASSEMBLY:
         {
-            LLFILE *bcfp = LLFile::fopen(mBytecodeDest, "wb");
+            LLFILE *bcfp = LLFile::fopen(mBytecodeDest, LLFILE_MODE("wb"));
 
             // Output dependencies.
             fprintf(bcfp, ".assembly extern mscorlib {.ver 1:0:5000:0}\n");

@@ -541,8 +541,7 @@ bool LLImageJ2CKDU::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 deco
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
-    LLImageDataLock lockIn(&base);
-    LLImageDataLock lockOut(&raw_image);
+    LLImageDataLockPair lock(&base, &raw_image);
 
     ECodeStreamMode mode = MODE_FAST;
 
@@ -684,6 +683,8 @@ bool LLImageJ2CKDU::encodeImpl(LLImageJ2C &base, const LLImageRaw &raw_image, co
     bool transpose = false;
     bool vflip = true;
     bool hflip = false;
+
+    LLImageDataCopyLock lock(&raw_image, &base);
 
     if (raw_image.isBufferInvalid())
     {

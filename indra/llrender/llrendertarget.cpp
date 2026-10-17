@@ -34,6 +34,7 @@
 #include "llimagegl.h"
 #include "llrender.h"
 #include "llgl.h"
+#include "llglslshader.h"
 #include "llglstates.h"
 
 #include <algorithm>
@@ -602,6 +603,10 @@ void LLRenderTarget::bindTarget()
     llassert(mFBO);
     llassert(!isBoundInStack());
 
+    // The pass drawing into the framebuffer bound before ends here, and a shader profile's queries with it; they count
+    // on for the pass that follows.
+    LLGLSLShader* profiled = LLGLSLShader::suspendProfileQuery();
+    gGL.queries().checkPassBoundary();
     glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
     sCurFBO = mFBO;
 
@@ -633,6 +638,8 @@ void LLRenderTarget::bindTarget()
 
     mPreviousRT = sBoundTarget;
     sBoundTarget = this;
+
+    LLGLSLShader::resumeProfileQuery(profiled);
 }
 
 void LLRenderTarget::clear(U32 mask_in)
@@ -808,6 +815,8 @@ void LLRenderTarget::flush()
     else
     {
         sBoundTarget = nullptr;
+        LLGLSLShader* profiled = LLGLSLShader::suspendProfileQuery();
+        gGL.queries().checkPassBoundary();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         sCurFBO = 0;
         glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
@@ -815,6 +824,7 @@ void LLRenderTarget::flush()
         sCurResY = gGLViewport[3];
         glReadBuffer(GL_BACK);
         glDrawBuffer(GL_BACK);
+        LLGLSLShader::resumeProfileQuery(profiled);
     }
 }
 
@@ -903,6 +913,28 @@ void LLRenderTarget::copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
         stop_glerror();
     }
+}
+
+void LLRenderTarget::copyFromBound(S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0, S32 dstX1, S32 dstY1,
+                                   U32 filter)
+{
+    // What gGL has batched is drawn into the bound framebuffer before the blit reads it.
+    gGL.flush();
+
+    if (!mFBO)
+    {
+        LL_WARNS() << "Cannot copy into a render target without a framebuffer." << LL_ENDL;
+        return;
+    }
+
+    LL_PROFILE_GPU_ZONE("LLRenderTarget::copyFromBound");
+    // glBlitFramebuffer writes only where the scissor test passes.
+    LLGLDisable scissor(GL_SCISSOR_TEST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, sCurFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFBO);
+    glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, GL_COLOR_BUFFER_BIT, filter);
+    stop_glerror();
+    glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
 }
 
 bool LLRenderTarget::isComplete() const

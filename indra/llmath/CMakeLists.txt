@@ -118,6 +118,7 @@ if(AL_BUILD_TESTS)
       tests/llmatrix3a_test.cpp
       tests/llmatrix4a_test.cpp
       tests/llmodularmath_test.cpp
+      tests/lloctree_test.cpp
       tests/llquaternion2_test.cpp
       tests/llquaternion_test.cpp
       tests/llrect_test.cpp
@@ -138,6 +139,22 @@ if(AL_BUILD_TESTS)
     BENCH_SOURCES tests/llsimd_bench.cpp
     LIBRARIES llmath llcommon
   )
+
+  # The kernel test compares kernels, instantiated in it, bit for bit with each
+  # other and with the vector types' own operations. Built with the tree's
+  # reassociation and contraction, the compiler may round the same sum
+  # differently at each place it inlines it, and Clang's sanitizers move
+  # those places, so the file is built strict, where the same operations in
+  # the same order round the same. MSVC's /fp:fast does not reorder the
+  # intrinsics, and the file passes there as it is. Accuracy against a double
+  # reference, and the library's own entry built as the viewer has it, are
+  # checked to a tolerance.
+  if(NOT COMPILER_IS_MSVC AND NOT COMPILER_IS_CLANG_CL)
+    set_source_files_properties(
+      tests/alsimdkernels_test.cpp
+      PROPERTIES COMPILE_OPTIONS "-ffp-contract=off;-fno-associative-math;-fno-reciprocal-math"
+    )
+  endif()
 
   # llcommon's SIMD ops layer and the batch kernels again at each other
   # x86-64 tier, one binary a tier: code the linker folds across files would

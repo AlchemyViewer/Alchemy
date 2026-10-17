@@ -35,6 +35,7 @@
 #include "llrender.h"
 #include "llvertexbuffer.h"
 #include "llrendertarget.h"
+#include "llthread.h"
 
 #include "hbxxh.h"
 #include "llsdserialize.h"
@@ -66,7 +67,6 @@ bool LLGLSLShader::sIndexedLegacyMaterials = false;
 U32 LLGLSLShader::sMaxGLTFMaterials = 0;
 U32 LLGLSLShader::sMaxGLTFNodes = 0;
 bool LLGLSLShader::sProfileEnabled = false;
-bool LLGLSLShader::sCanProfile = true;
 std::set<LLGLSLShader*>& LLGLSLShader::sInstances = *(new std::set<LLGLSLShader*>());
 LLGLSLShader::defines_map_t LLGLSLShader::sGlobalDefines;
 // Starts at 1, and a default-constructed program starts level with it (see the member's
@@ -78,6 +78,86 @@ U32 LLGLSLShader::sTotalTrianglesDrawn = 0;
 U64 LLGLSLShader::sTotalSamplesDrawn = 0;
 U32 LLGLSLShader::sTotalBinds = 0;
 LLSD LLGLSLShader::sDefaultStats;
+
+namespace
+{
+    // One bind of a profile: the program's time and counts over the draws until the next bind, from gGL's pool, read
+    // when the profile finishes.
+    struct ProfileRecord
+    {
+        LLGLSLShader* mShader = nullptr; // null once the program has gone
+        ALQuerySpan   mTime;
+        ALQueryTicket mStatistics;       // the pipeline statistics, where the profile counts them
+        ALQueryTicket mSamples;          // samples passed, elsewhere
+        ALQueryTicket mPrimitives;       // primitives generated, elsewhere
+        bool          mBind = true;      // false for the rest of a bind, after a render pass ended its first record
+    };
+
+    // Leaked, as sInstances is: a program destroyed at static destruction, in whatever translation unit, still
+    // forgets its records here.
+    std::vector<ProfileRecord>& profile_records()
+    {
+        static std::vector<ProfileRecord>* records = new std::vector<ProfileRecord>();
+        return *records;
+    }
+
+    constexpr size_t NO_RECORD   = size_t(-1);
+    size_t           sOpenRecord = NO_RECORD;
+
+    // What this profile counts: the pipeline statistics, where the context has them and its caller did not ask for
+    // samples. The occlusion targets and the primitives target stay free to the frame's own queries then.
+    bool sProfileStatistics = false;
+
+    // Holds the targets the profile counts with for its whole length, since each bind opens them again: the frame's
+    // other queries of the same targets are refused until it finishes. Or gives them back.
+    void reserve_profile_targets(bool reserved)
+    {
+        ALQueryPool& queries = gGL.queries();
+        if (sProfileStatistics)
+        {
+            queries.reserve(ALQueryKind::Statistics, reserved);
+        }
+        else
+        {
+            queries.reserve(ALQueryKind::Samples, reserved);
+            queries.reserve(ALQueryKind::Primitives, reserved);
+        }
+    }
+
+    void open_profile_record(LLGLSLShader& shader, bool bind)
+    {
+        ALQueryPool& queries = gGL.queries();
+        ProfileRecord record;
+        record.mShader = &shader;
+        record.mBind   = bind;
+        record.mTime   = queries.beginSpan();
+        if (sProfileStatistics)
+        {
+            record.mStatistics = queries.beginReserved(ALQueryKind::Statistics);
+        }
+        else
+        {
+            record.mSamples = queries.beginReserved(ALQueryKind::Samples);
+            if (gGLManager.canQueryPrimitives(shader.isTessellated()))
+            {
+                record.mPrimitives = queries.beginReserved(ALQueryKind::Primitives);
+            }
+        }
+        sOpenRecord = profile_records().size();
+        profile_records().push_back(record);
+    }
+
+    void forget_profile_records(const LLGLSLShader* shader)
+    {
+        for (ProfileRecord& record : profile_records())
+        {
+            if (record.mShader == shader)
+            {
+                record.mShader = nullptr;
+            }
+        }
+    }
+}
 
 //UI shader -- declared here so llui_libtest will link properly
 LLGLSLShader    gUIProgram;
@@ -324,8 +404,18 @@ static void validateEngineBlockLayouts(GLuint program)
 //===============================
 
 //static
-void LLGLSLShader::initProfile()
+void LLGLSLShader::initProfile(bool count_samples)
 {
+    // One still open would leave its queries counting, and its targets held, for the rest of the session.
+    if (sProfileEnabled)
+    {
+        abandonProfile();
+    }
+    sProfileStatistics = !count_samples && ALQueryPool::supports(ALQueryKind::Statistics);
+    reserve_profile_targets(true);
+    profile_records().clear();
+    sOpenRecord = NO_RECORD;
+
     sProfileEnabled = true;
     sTotalTimeElapsed = 0;
     sTotalTrianglesDrawn = 0;
@@ -350,10 +440,54 @@ struct LLGLSLShaderCompareTimeElapsed
 //static
 void LLGLSLShader::finishProfile(LLSD& stats)
 {
+    // The bind still open ends here, then every bind's queries are read: the first wait is for the GPU to finish the
+    // profile's draws, and the rest are in by then.
+    endProfileQuery();
+    ALQueryPool& queries = gGL.queries();
+    for (const ProfileRecord& record : profile_records())
+    {
+        if (!record.mShader)
+        {
+            continue;
+        }
+        U64 time       = 0;
+        U64 fragments  = 0;
+        U64 primitives = 0;
+        queries.wait(record.mTime, time);
+        ALStatistics statistics;
+        if (queries.wait(record.mStatistics, statistics))
+        {
+            fragments  = statistics[ALStatistic::FragmentInvocations];
+            primitives = statistics[ALStatistic::ClippingPrimitives];
+        }
+        queries.wait(record.mSamples, fragments);
+        queries.wait(record.mPrimitives, primitives);
+
+        LLGLSLShader& shader = *record.mShader;
+        shader.mTimeElapsed += time;
+        sTotalTimeElapsed += time;
+        shader.mSamplesDrawn += fragments;
+        sTotalSamplesDrawn += fragments;
+        shader.mTrianglesDrawn += (U32)primitives;
+        sTotalTrianglesDrawn += (U32)primitives;
+        if (record.mBind)
+        {
+            ++shader.mBinds;
+            ++sTotalBinds;
+        }
+    }
+    profile_records().clear();
+    reserve_profile_targets(false);
+
     sProfileEnabled = false;
 
     if (stats.isDefined())
     {
+        // Which counters the samples and triangles are: they differ, invocations counting fragments a depth test or a
+        // discard then dropped.
+        stats["counters"] = sProfileStatistics ? "fragment shader invocations, clipping input primitives"
+                                                : "samples passed, primitives generated";
+
         std::vector<LLGLSLShader*> sorted(sInstances.begin(), sInstances.end());
         std::sort(sorted.begin(), sorted.end(), LLGLSLShaderCompareTimeElapsed());
 
@@ -453,112 +587,67 @@ void LLGLSLShader::dumpStats(LLSD& stats)
     stats["triangles"] = LLSD::Integer(mTrianglesDrawn);
 }
 
-//static
-void LLGLSLShader::startProfile()
+bool LLGLSLShader::isTessellated() const
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
-    if (sProfileEnabled && sCurBoundShaderPtr)
-    {
-        sCurBoundShaderPtr->placeProfileQuery();
-    }
-
+    return std::any_of(mShaderFiles.begin(), mShaderFiles.end(), [](const auto& file)
+                       { return file.second == GL_TESS_CONTROL_SHADER || file.second == GL_TESS_EVALUATION_SHADER; });
 }
 
 //static
-void LLGLSLShader::stopProfile()
+void LLGLSLShader::abandonProfile()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
-
-    if (sProfileEnabled && sCurBoundShaderPtr)
-    {
-        sCurBoundShaderPtr->unbind();
-    }
+    endProfileQuery();
+    profile_records().clear();
+    reserve_profile_targets(false);
+    sProfileEnabled = false;
 }
 
-void LLGLSLShader::placeProfileQuery(bool for_runtime)
+void LLGLSLShader::placeProfileQuery()
 {
-    if (sProfileEnabled || for_runtime)
+    // A profile is the main thread's: a worker's binds are on another context, with its own gGL and pool.
+    if (!sProfileEnabled || !on_main_thread())
     {
-        if (mTimerQuery == 0)
-        {
-            glGenQueries(1, &mSamplesQuery);
-            glGenQueries(1, &mTimerQuery);
-            glGenQueries(1, &mPrimitivesQuery);
-        }
-
-        glBeginQuery(GL_TIME_ELAPSED, mTimerQuery);
-
-        if (!for_runtime)
-        {
-            glBeginQuery(GL_SAMPLES_PASSED, mSamplesQuery);
-            if (gGLManager.canQueryPrimitives(mFeatures.hasTessellatedTerrain))
-            {
-                glBeginQuery(GL_PRIMITIVES_GENERATED, mPrimitivesQuery);
-            }
-        }
+        return;
     }
+    endProfileQuery();
+    open_profile_record(*this, true);
 }
 
-bool LLGLSLShader::readProfileQuery(bool for_runtime, bool force_read)
+//static
+void LLGLSLShader::endProfileQuery()
 {
-    if ((sProfileEnabled || for_runtime) && sCanProfile)
+    if (sOpenRecord == NO_RECORD || !on_main_thread())
     {
-        if (!mProfilePending)
-        {
-            glEndQuery(GL_TIME_ELAPSED);
-            if (!for_runtime)
-            {
-                glEndQuery(GL_SAMPLES_PASSED);
-                if (gGLManager.canQueryPrimitives(mFeatures.hasTessellatedTerrain))
-                {
-                    glEndQuery(GL_PRIMITIVES_GENERATED);
-                }
-            }
-            mProfilePending = for_runtime;
-        }
-
-        if (mProfilePending && for_runtime && !force_read)
-        {
-            GLuint64 result = 0;
-            glGetQueryObjectui64v(mTimerQuery, GL_QUERY_RESULT_AVAILABLE, &result);
-
-            if (result != GL_TRUE)
-            {
-                return false;
-            }
-        }
-
-        GLuint64 time_elapsed = 0;
-        glGetQueryObjectui64v(mTimerQuery, GL_QUERY_RESULT, &time_elapsed);
-        mTimeElapsed += time_elapsed;
-        mProfilePending = false;
-
-        if (!for_runtime)
-        {
-            GLuint64 samples_passed = 0;
-            glGetQueryObjectui64v(mSamplesQuery, GL_QUERY_RESULT, &samples_passed);
-
-            GLuint64 primitives_generated = 0;
-            if (gGLManager.canQueryPrimitives(mFeatures.hasTessellatedTerrain))
-            {
-                glGetQueryObjectui64v(mPrimitivesQuery, GL_QUERY_RESULT, &primitives_generated);
-            }
-            sTotalTimeElapsed += time_elapsed;
-
-            sTotalSamplesDrawn += samples_passed;
-            mSamplesDrawn += samples_passed;
-
-            U32 tri_count = (U32)primitives_generated / 3;
-
-            mTrianglesDrawn += tri_count;
-            sTotalTrianglesDrawn += tri_count;
-
-            sTotalBinds++;
-            mBinds++;
-        }
+        return;
     }
+    ProfileRecord& record = profile_records()[sOpenRecord];
+    sOpenRecord = NO_RECORD;
+    ALQueryPool& queries = gGL.queries();
+    queries.endSpan(record.mTime);
+    queries.end(record.mStatistics);
+    queries.end(record.mSamples);
+    queries.end(record.mPrimitives);
+}
 
-    return true;
+//static
+LLGLSLShader* LLGLSLShader::suspendProfileQuery()
+{
+    if (sOpenRecord == NO_RECORD || !on_main_thread())
+    {
+        return nullptr;
+    }
+    LLGLSLShader* shader = profile_records()[sOpenRecord].mShader;
+    endProfileQuery();
+    return shader;
+}
+
+//static
+void LLGLSLShader::resumeProfileQuery(LLGLSLShader* shader)
+{
+    if (shader && sProfileEnabled && sOpenRecord == NO_RECORD && on_main_thread())
+    {
+        open_profile_record(*shader, false);
+    }
 }
 
 
@@ -570,10 +659,7 @@ LLGLSLShader::LLGLSLShader()
     mActiveTextureChannels(0),
     mShaderLevel(0),
     mShaderGroup(SG_DEFAULT),
-    mFeatures(),
-    mTimerQuery(0),
-    mSamplesQuery(0),
-    mPrimitivesQuery(0)
+    mFeatures()
 {
 
 }
@@ -586,6 +672,7 @@ LLGLSLShader::~LLGLSLShader()
     // dangle. It is walked for name uniqueness, so a stale entry is a use-after-free rather
     // than a leak. Recursion covers the subtree: each child erases itself on the way out.
     sInstances.erase(this);
+    forget_profile_records(this);
 
     // Nor may the bound-program statics name this object. They are cleared without a GL call,
     // for the reason below.
@@ -777,6 +864,8 @@ void LLGLSLShader::unloadInternal()
     {
         unbind();
     }
+    // Its profile binds, ended by the unbind, count for no program.
+    forget_profile_records(this);
 
     stop_glerror();
     mAttribute.clear();
@@ -807,24 +896,6 @@ void LLGLSLShader::unloadInternal()
         glDeleteProgram(mProgramObject);
 
         mProgramObject = 0;
-    }
-
-    if (mTimerQuery)
-    {
-        glDeleteQueries(1, &mTimerQuery);
-        mTimerQuery = 0;
-    }
-
-    if (mSamplesQuery)
-    {
-        glDeleteQueries(1, &mSamplesQuery);
-        mSamplesQuery = 0;
-    }
-
-    if (mPrimitivesQuery)
-    {
-        glDeleteQueries(1, &mPrimitivesQuery);
-        mPrimitivesQuery = 0;
     }
 
     stop_glerror();
@@ -1652,10 +1723,7 @@ void LLGLSLShader::bind()
 
     if (sCurBoundShader != mProgramObject)  // Don't re-bind current shader
     {
-        if (sCurBoundShaderPtr)
-        {
-            sCurBoundShaderPtr->readProfileQuery();
-        }
+        endProfileQuery();
         // A compute program reads no vertex arrays, so the ones the last draw set up stay for the next: the program
         // bound for it sets up its own whatever this one did.
         if (!mIsCompute)
@@ -1741,10 +1809,7 @@ void LLGLSLShader::unbind(void)
     gGL.flush();
     LLVertexBuffer::unbind();
 
-    if (sCurBoundShaderPtr)
-    {
-        sCurBoundShaderPtr->readProfileQuery();
-    }
+    endProfileQuery();
 
     glUseProgram(0);
     sCurBoundShader = 0;

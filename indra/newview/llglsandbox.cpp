@@ -880,9 +880,10 @@ void LLSky::renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& di
 // a struct rather than a class simply because every member is public.
 struct ShaderProfileHelper
 {
+    // The benchmark turns samples drawn into bandwidth, so it counts the samples themselves.
     ShaderProfileHelper()
     {
-        LLGLSLShader::initProfile();
+        LLGLSLShader::initProfile(true);
     }
     ~ShaderProfileHelper()
     {
@@ -993,11 +994,6 @@ F32 shader_timer_benchmark(std::vector<LLRenderTarget> & dest, TextureHolder & t
 //-----------------------------------------------------------------------------
 F32 gpu_benchmark()
 {
-    if (gGLManager.mGLVersion < 3.3f)
-    { // don't bother benchmarking venerable drivers which don't support accurate timing anyway
-        return -1.f;
-    }
-
     if (gBenchmarkProgram.mProgramObject == 0)
     {
         LLViewerShaderMgr::instance()->initAttribsAndUniforms();

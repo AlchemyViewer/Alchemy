@@ -36,6 +36,7 @@
 #include "alserialworker.h"
 #include "alsourcemap.h"
 #include "aluploadheader.h"
+#include "llagent.h"
 #include "llinventory.h"
 #include "llinventorydefines.h"
 #include "llsingleton.h"
@@ -43,6 +44,8 @@
 #include "llviewercontrol.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
+#include "llviewerregion.h"
+#include "llvocache.h"
 #include "workqueue.h"
 
 namespace
@@ -223,6 +226,16 @@ void ALScriptMasterUpload::find()
     LLViewerObject* object = gObjectList.findObject(mRef.object);
     if (!object)
     {
+        // Said in the log with what may have sent it out of sight: the
+        // object cache short of memory, and how much it has let go of.
+        U32 cached = 0, active = 0, waiting = 0;
+        U64 bytes = 0, evicted = 0, built = 0;
+        if (const LLViewerRegion* region = gAgent.getRegion())
+        {
+            region->getObjectCacheFootprint(cached, active, waiting, bytes, evicted, built);
+        }
+        LL_INFOS("ScriptMasters") << "Not sent to " << mRef.object << ": not in the object list; cache memory factor "
+                                  << LLVOCacheEntry::sMemoryAdjustFactor << ", objects evicted here " << evicted << LL_ENDL;
         mUpdated.state = ALMasterLink::State::Pending;
         mChanged       = true;
         end(Outcome::What::Pending, LLTrans::getString("ScriptMasterOutOfReach"));
@@ -556,6 +569,9 @@ void ALScriptMasterUpload::upload()
     }
     ALScriptSaveOptions options;
     options.compileTarget = mTarget;
+    // The experience picked in the file's tab; none picked, the one it runs
+    // under, which the save asks the region for.
+    options.experience    = mLink.experience;
     options.sender        = ALScriptSender(ALScriptOrigin::Disk);
     options.sourceMap     = mPrepared.map;
     options.codeLine      = mPrepared.codeLine;
@@ -620,5 +636,5 @@ void ALScriptMasterUpload::end(Outcome::What what, const std::string& why, std::
     outcome.result       = std::move(result);
     outcome.preprocessed = mPrepared.errors;
     outcome.why          = why;
-    ALScriptDiskMasters::instance().finished(outcome, mChanged ? std::optional<ALMasterLink>(mUpdated) : std::nullopt);
+    ALScriptDiskMasters::instance().finished(outcome, mLink, mChanged ? std::optional<ALMasterLink>(mUpdated) : std::nullopt);
 }

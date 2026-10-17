@@ -573,9 +573,16 @@ public:
     // caret's is the one it is on or at the end of.
     ALTextRange identifierAt(const ALTextPos& pos) const;
     ALTextRange identifierAtCaret() const;
-    // Whether what was typed just before a position is in a comment or a
-    // string, by the grammar's tokens: prose, which nothing completes.
+    // Whether a position is in a comment or a string, as the grammar lexes
+    // the line up to it: prose, which nothing completes. Not after a
+    // string's interpolation closes -- `{id}` in SLua's backticks -- which
+    // leaves the string open, nor after a string closes.
     bool        inProse(const ALTextPos& at);
+    // The kind the grammar gives a byte typed at a position, the line up
+    // to it lexed from where the line starts: `typed`, or for '\0' a byte
+    // no rule matches, which takes the kind of whatever the text before it
+    // left open.
+    ALSyntaxKind kindTypedAt(const ALTextPos& at, char typed);
     // Whether what is typed at a position completes all the same, where
     // the grammar says (ALSyntaxGrammar::completesIn).
     bool        completesInProse(const ALTextPos& at);

@@ -31,7 +31,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "alfloaterlightbox.h"
 
-#include "alcolorpicker.h"
+#include "alcolorpopover.h"
 #include "alemptystate.h"
 #include "alhistorylist.h"
 #include "alpopover.h"
@@ -108,89 +108,6 @@ struct ScopedTrue
 /// find on a busy page, short enough not to be mistaken for a state.
 constexpr F32 LIT_CAPTION_SECONDS = 2.5f;
 
-/// The inline picker for a colour row: XUI Studio's hue ring, shade square and
-/// channel tracks, under the row's name, with a way on to the viewer's full
-/// picker for typed numbers and the eyedropper.
-///
-/// The picker is a child of the popover itself and not of a panel inside it,
-/// and that is load-bearing: a panel takes Escape for itself and drops the
-/// keyboard, which closes the popover as *settled*, and Escape here has to
-/// mean "put the colour back".
-class ALLightboxColorPopover final : public ALPopover
-{
-public:
-    // The picker gives its channel sliders 218px and the ring the rest of the
-    // width, up to its height. So its width is the ring plus 218: 440 by 220
-    // is a ring as tall as the picker. Narrower, and the ring is what shrinks
-    // -- at 300 it is 74px across.
-    static constexpr S32 PICKER_WIDTH = 440;
-    static constexpr S32 PICKER_HEIGHT = 220;
-    // As small as it may be dragged: the sliders and a ring still worth
-    // aiming at.
-    static constexpr S32 MIN_PICKER_WIDTH = 330;
-    static constexpr S32 MIN_PICKER_HEIGHT = 150;
-    static constexpr S32 BUTTON_HEIGHT = 20;
-    static constexpr S32 BUTTON_WIDTH = 110;
-    static constexpr S32 GAP = 4;
-
-    /// The popover around a picker of @a picker_width by @a picker_height,
-    /// laid out under the title, which is drawn across the top of the rect.
-    static S32 widthFor(S32 picker_width) { return GAP + picker_width + GAP; }
-    static S32 heightFor(S32 header, S32 picker_height)
-    {
-        return header + GAP + picker_height + GAP + BUTTON_HEIGHT + GAP;
-    }
-
-    /// What the popover remembers its size as, for the next colour.
-    static constexpr const char* SIZE_KIND = "lightbox_color";
-
-    ALLightboxColorPopover(const LLFloater::Params& p, const LLColor4& start,
-                           std::function<void(const LLColor4&)> on_change,
-                           std::function<void()> on_full_picker,
-                           const std::string& full_picker_label, const std::string& full_picker_tooltip)
-    :   ALPopover(p)
-    {
-        const S32 width = getRect().getWidth();
-        const S32 top = getRect().getHeight() - getHeaderHeight();
-
-        ALColorPicker::Params pp(LLUICtrlFactory::getDefaultParams<ALColorPicker>());
-        pp.name = "picker";
-        // Everything between the title and the button row, so a popover
-        // dragged bigger is a bigger wheel.
-        pp.rect = LLRect(GAP, top - GAP, width - GAP, GAP + BUTTON_HEIGHT + GAP);
-        pp.follows.flags = FOLLOWS_ALL;
-        // Every colour row here is a Color3 setting: an alpha track would be a
-        // control that does nothing.
-        pp.show_alpha = false;
-        ALColorPicker* picker = LLUICtrlFactory::create<ALColorPicker>(pp);
-        picker->setColor(start);
-        // Its value is text, "r, g, b, a"; the colour is what is wanted.
-        picker->setCommitCallback([picker, on_change](LLUICtrl*, const LLSD&)
-        {
-            if (on_change)
-            {
-                on_change(picker->color());
-            }
-        });
-        addChild(picker);
-
-        LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
-        bp.name = "full_picker";
-        bp.label = full_picker_label;
-        bp.tool_tip = full_picker_tooltip;
-        bp.rect = LLRect(width - GAP - BUTTON_WIDTH, GAP + BUTTON_HEIGHT, width - GAP, GAP);
-        bp.follows.flags = FOLLOWS_RIGHT | FOLLOWS_BOTTOM;
-        LLButton* full = LLUICtrlFactory::create<LLButton>(bp);
-        full->setCommitCallback([on_full_picker](LLUICtrl*, const LLSD&)
-        {
-            if (on_full_picker)
-            {
-                on_full_picker();
-            }
-        });
-        addChild(full);
-    }
-};
 } // namespace
 
 ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
@@ -949,21 +866,12 @@ bool ALFloaterLightBox::openColorPopover(LLColorSwatchCtrl* swatch, const std::s
     mColorOriginal = control->getValue();
 
     LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
-    LLHandle<LLView> swatch_handle = swatch->getHandle();
-    // Resizable, and opening at the size the last one was left at: the wheel
-    // is what grows.
-    using Popover = ALLightboxColorPopover;
-    const S32 header = LLFloater::getDefaultParams().header_height;
-    LLFloater::Params params = ALPopover::paramsRemembered(
-        Popover::SIZE_KIND,
-        Popover::widthFor(Popover::PICKER_WIDTH),
-        Popover::heightFor(header, Popover::PICKER_HEIGHT),
-        mDirectory.captionFor(key));
-    params.min_width = Popover::widthFor(Popover::MIN_PICKER_WIDTH);
-    params.min_height = Popover::heightFor(header, Popover::MIN_PICKER_HEIGHT);
-    ALLightboxColorPopover* popover = new ALLightboxColorPopover(
-        params,
+    // Every colour row here is a Color3 setting: an alpha track would be a
+    // control that does nothing.
+    ALColorPopover* popover = new ALColorPopover(
+        ALColorPopover::params(mDirectory.captionFor(key)),
         start,
+        false,
         [self](const LLColor4& color)
         {
             if (ALFloaterLightBox* floater = self.get())
@@ -971,19 +879,7 @@ bool ALFloaterLightBox::openColorPopover(LLColorSwatchCtrl* swatch, const std::s
                 floater->onColorPicked(color);
             }
         },
-        [self, swatch_handle]()
-        {
-            // Settled rather than escaped: the full picker starts from what
-            // was picked here, and keeps it if it is closed.
-            if (ALFloaterLightBox* floater = self.get())
-            {
-                floater->closePopover(false);
-            }
-            if (LLColorSwatchCtrl* swatch = ALViewType::as<LLColorSwatchCtrl>(swatch_handle.get()))
-            {
-                swatch->showClassicPicker(true);
-            }
-        },
+        swatch,
         getString("color_full_picker"), getString("color_full_picker_tooltip"));
     adoptPopover(PopoverKind::Color, popover, swatch);
     return true;

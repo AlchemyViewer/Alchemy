@@ -141,7 +141,10 @@ void LLLoginInstance::reconnect()
     std::vector<std::string> uris;
     LLGridManager::getInstance()->getLoginURIs(uris);
     mLoginModule->connect(uris.front(), mRequestData);
-    gViewerWindow->setShowProgress(true);
+    if (gViewerWindow)
+    {
+        gViewerWindow->setShowProgress(true);
+    }
 }
 
 void LLLoginInstance::disconnect()

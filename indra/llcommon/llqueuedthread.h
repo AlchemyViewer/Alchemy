@@ -117,6 +117,12 @@ public:
     virtual ~LLQueuedThread();
     virtual void shutdown();
 
+    // Starts the thread, unless the queue is run on the main thread. Its owner
+    // calls this once the object is made; a constructor cannot, since the
+    // thread calls run(), and run() the rest, through the vtable each derived
+    // constructor writes in its turn.
+    void start();
+
     // No copy constructor or copy assignment
     LLQueuedThread(const LLQueuedThread&) = delete;
     LLQueuedThread& operator=(const LLQueuedThread&) = delete;
@@ -161,7 +167,7 @@ public:
 
 protected:
     bool mThreaded;  // if false, run on main thread and do updates during update()
-    bool mStarted;  // required when mThreaded is false to call startThread() from update()
+    bool mStarted;  // when mThreaded is false, whether update() has called startThread(); main thread only
     LLAtomicBool mIdleThread; // request queue is empty (or we are quitting) and the thread is idle
 
     //typedef std::set<QueuedRequest*, queued_request_less> request_queue_t;

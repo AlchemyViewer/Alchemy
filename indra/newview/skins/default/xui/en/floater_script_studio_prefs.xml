@@ -610,6 +610,17 @@ end</floater.string>
              tool_tip="Reopen last session's tabs when the window opens; off, open only what you asked for"
              top_pad="2"
              width="370" />
+            <check_box
+             control_name="ALScriptStudioPanesWiden"
+             follows="left|top"
+             height="20"
+             label="Widen the window as the Explorer or Inspector opens"
+             layout="topleft"
+             left="412"
+             name="panes_widen"
+             tool_tip="Opening the Explorer or the Inspector widens the window by its width, and folding it narrows the window again; off, the pane takes its room from the editor"
+             top_pad="2"
+             width="370" />
             <text
              follows="left|top"
              font="SansSerifBold"

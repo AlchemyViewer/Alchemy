@@ -40,6 +40,10 @@
 #include "lldrawpoolmaterials.h"
 #include "llgl.h"
 #include "lldrawable.h"
+#include "aldepthpyramid.h"
+#include "alprimitiveplot.h"
+#include "alquerypool.h"
+#include "alwatersurface.h"
 #include "altexture3d.h"
 #include "aluniformbuffer.h"
 #include "llrendertarget.h"
@@ -106,6 +110,11 @@ public:
     //returns true if full size buffer allocated, false if some other size is allocated
     bool allocateScreenBuffer(U32 resX, U32 resY);
 
+    /// The size of the screen targets allocateScreenBuffer() makes for a view of
+    /// @a resX by @a resY: RenderResolutionDivisor applied, or else
+    /// RenderResolutionMultiplier.
+    static void scaleToRenderResolution(U32& resX, U32& resY);
+
     typedef enum {
         FBO_SUCCESS_FULLRES = 0,
         FBO_SUCCESS_LOWRES,
@@ -133,6 +142,9 @@ public:
     // perform a profile of the given avatar
     // if profile_attachments is true, run a profile for each attachment
     void profileAvatar(LLVOAvatar* avatar, bool profile_attachments = false);
+    // Gives each attachment a profile timed its GPU time once its frame has been read, waiting for nothing. Once a
+    // frame, after the pool retires.
+    void readAttachmentTimes();
 
     // generate an impostor for the given avatar
     //  preview_avatar - if true, a preview window render is being performed
@@ -140,9 +152,34 @@ public:
     //  specific_attachment - specific attachment to profile, or nullptr to profile entire avatar
     void generateImpostor(LLVOAvatar* avatar, bool preview_avatar = false, bool for_profile = false, LLViewerObject* specific_attachment = nullptr);
 
+    // A full-screen quad at the far plane, depth-tested against the bound
+    // target's depth and never writing it: GL_GREATER reaches every texel that
+    // geometry covers, GL_LEQUAL every texel that nothing does. Drawn with
+    // gDebugProgram in `color`, or in the current diffuse colour where it is
+    // null. Blend and colour mask are the caller's to set.
+    void drawFarPlaneQuad(U32 depth_func, const LLColor4* color = nullptr);
+
+    // A cutout frame's coverage, laid into the scene target's alpha once the
+    // opaque forward pools have drawn and before the blended ones, as an
+    // impostor bake lays its own: nothing over the background, colour and
+    // alpha both, and full coverage wherever opaque geometry sits.
+    void seedCutoutCoverageFromDepth();
+    // After the frame is finished: the scene target's alpha -- the cutout's
+    // coverage -- into the alpha of whatever is bound, colour untouched. The
+    // post chain carries no alpha a cutout could use (glow tags, FXAA luma,
+    // 2-bit ping-pong buffers), so it comes from the scene target directly.
+    void copyCutoutCoverageToAlpha();
+    // The screen-space reflection source emptied: no colour, depth at the far
+    // plane, so a march through it finds nothing.
+    void clearSceneMap();
+
     void bindScreenToTexture();
     void renderFinalize();
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);
+    // The current pack's scene depth (mRT->deferredScreen's, which mRT->screen shares) over the whole of `dst`'s,
+    // stretched as a nearest blit would, through gCopyDepthProgram: mWaterDis and mSceneMap keep depth without the
+    // screen's stencil, which a blit's matching formats would make them carry.
+    void copySceneDepth(LLRenderTarget& dst);
     void generateLuminance(LLRenderTarget* src, LLRenderTarget* dst);
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
     void generateLensFlareState(LLRenderTarget* src);
@@ -426,8 +463,9 @@ public:
     // should be called just before rendering pre-water alpha objects
     void doWaterHaze();
 
-    // Generate the water exclusion surface mask.
-    void doWaterExclusionMask();
+    // Mark where the PASS_INVISIBLE prims remove the water in the bound screen target's stencil
+    // (ALWaterStencil::EXCLUDE_BIT), against the scene's depth, before the water draws.
+    void doWaterExclusion();
 
     void postDeferredGammaCorrect(LLRenderTarget* screen_target);
 
@@ -437,7 +475,9 @@ public:
 
     void renderHighlight(const LLViewerObject* obj, F32 fade);
 
-    void renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp, bool do_cull = true);
+    // `occlusion` is the sUseOcclusion level the pass culls with: 0 for none, 2 to ask the shadow camera's own
+    // occlusion queries and draw them after the opaque casters.
+    void renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp, bool do_cull = true, S32 occlusion = 0);
     void renderSelectedFaces(const LLColor4& color);
     void renderHighlights();
     void renderDebug();
@@ -776,6 +816,8 @@ public:
     static bool             sDynamicLOD;
     static bool             sPickAvatar;
     static bool             sImpostorRender;
+    // Set for the frames of a snapshot cutout (ALRenderIsolation::Scope).
+    static bool             sCutoutRender;
     static bool             sUnderWaterRender;
     static bool             sRenderGlow;
     static bool             sTextureBindTest;
@@ -802,6 +844,23 @@ public:
     /// released at the wrong moment could save the comparison as the look.
     static bool             sGradeBypass;
 
+    /// The main camera's pass of a cutout frame: the one pass whose view is
+    /// cut down to the cutout's subject. Shadows, impostor bakes, probes and
+    /// HUDs in the same frame still see the whole world, which is what keeps
+    /// the subject lit where it stands.
+    static bool cullingToCutoutSubject() { return sCutoutRender && isMainWorldPass(); }
+
+    /// Whether the alpha channel accumulates coverage rather than glow: in an
+    /// impostor bake, and in a cutout frame's main pass. Blended geometry adds
+    /// its coverage and glow writes are left out.
+    static bool alphaWritesCoverage() { return sImpostorRender || cullingToCutoutSubject(); }
+
+    /// A frame without the lens and print effects: a "No post-processing"
+    /// snapshot, and every cutout frame, since each of those effects reaches
+    /// past the subject's edge into what is to be left empty. Grading is not
+    /// part of this -- only "No post-processing" drops the grade.
+    static bool suppressesLensAndPrintEffects();
+
     /// One bit per grading group, for comparing a single section against the
     /// rest of the grade rather than against nothing at all.
     enum EGradeBypass : U32
@@ -824,8 +883,6 @@ public:
     /// and let the comparison itself be saved as the look. It follows that
     /// whoever sets a bit owns clearing it -- see ~ALFloaterLightBox.
     static U32              sGradeBypassMask;
-
-    static LLTrace::EventStatHandle<S64> sStatBatchSize;
 
     class RenderTargetPack
     {
@@ -883,7 +940,6 @@ public:
     LLRenderTarget          mSpotShadow[2];
 
     LLRenderTarget          mPbrBrdfLut;
-    LLRenderTarget          mWaterExclusionMask;
 
     // copy of the color/depth buffer just before gamma correction
     // for use by SSR
@@ -1018,6 +1074,27 @@ public:
     // haze pass converges far water on it (hazeF.glsl). Holds the main view's sky for mSkyBehindFrame only.
     LLRenderTarget              mSkyBehind;
     U32                         mSkyBehindFrame = 0;
+    // Whether any water was in front of the sky's depth when the sky pool drew: the sky behind is drawn only then, and
+    // the haze shades the water's pixels only then. An occlusion query of gGL's, asked in mSkyBehindQueryFrame.
+    ALQueryTicket               mSkyBehindQuery;
+    U32                         mSkyBehindQueryFrame = 0;
+
+    // The attachments profileAvatar() timed, with their spans of gGL's pool, until readAttachmentTimes() has them.
+    std::vector<std::pair<LLPointer<LLViewerObject>, ALQuerySpan>> mAttachmentSpans;
+
+    // The water's layout around the main camera and its map of cell heights, laid out at the start of each main frame.
+    ALWaterSurface              mWaterSurface;
+
+    // The farthest depth under each texel of the main view's depth, built where a GPU cull asks for it.
+    ALDepthPyramid              mDepthPyramid;
+
+    // Profiling tracks, plotted at the start of each main frame for a frame a few before: the primitives the main view's
+    // terrain and water passes draw, the water's flat field and its waves' patches apart, and the draws of water
+    // geometry in every view and pass.
+    ALPrimitivePlot             mTerrainPrimitives{ "terrain primitives", true };
+    ALPrimitivePlot             mWaterPrimitives{ "water primitives", false };
+    ALPrimitivePlot             mWaterPatchPrimitives{ "water patch primitives", true };
+    U32                         mWaterDraws = 0;
 
     static const U32 MAX_PREVIEW_WIDTH;
 
@@ -1398,6 +1475,29 @@ public:
     static S32 RenderHeroProbeUpdateRate;
     static S32 RenderHeroProbeConservativeUpdateMultiplier;
     static bool RenderAvatarCloth;
+
+private:
+    // The main camera's view of the world: not a shadow map, an impostor
+    // bake, the HUD or a probe's cube face.
+    static bool isMainWorldPass();
+};
+
+// Occlusion culling off for as long as this lives.
+class LLDisableOcclusionCulling
+{
+public:
+    S32 mUseOcclusion;
+
+    LLDisableOcclusionCulling()
+    {
+        mUseOcclusion = LLPipeline::sUseOcclusion;
+        LLPipeline::sUseOcclusion = 0;
+    }
+
+    ~LLDisableOcclusionCulling()
+    {
+        LLPipeline::sUseOcclusion = mUseOcclusion;
+    }
 };
 
 void render_bbox(const LLVector3 &min, const LLVector3 &max);

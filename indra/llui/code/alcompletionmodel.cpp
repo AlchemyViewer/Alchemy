@@ -318,6 +318,7 @@ namespace
             have.path = c.path;
         }
         have.folder = have.folder || c.folder;
+        have.table  = have.table || c.table;
     }
 }
 

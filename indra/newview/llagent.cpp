@@ -1161,10 +1161,6 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
     // with a server request.
     LLUrlEntryParcel::setRegionHost(getRegionHost());
 
-    // Must shift hole-covering water object locations because local
-    // coordinate frame changed.
-    LLWorld::getInstance()->updateWaterObjects();
-
     // keep a list of regions we've been too
     // this is just an interesting stat, logged at the dataserver
     // we could trake this at the dataserver side, but that's harder

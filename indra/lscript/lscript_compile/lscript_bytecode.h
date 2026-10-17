@@ -65,6 +65,11 @@ public:
     U8                  *mCodeChunk;
     S32                 mCurrentOffset;
     LLScriptJumpTable   *mJumpTable;
+
+private:
+    void reserve(S32 size);
+
+    S32                 mCapacity;  // what mCodeChunk holds, past mCurrentOffset too
 };
 
 class LLScriptScriptCodeChunk

@@ -250,6 +250,17 @@ namespace
         require_unfixed("local t = {1}\nfor i = 0, #t - 1 do print(i, t[i]) end\n", "LuauLintSlZeroIndexLoop");
         require_unfixed("local s = \"abc\"\nlocal n = 2\nprint(s:sub(0, n))\n", "LuauLintSlZeroIndexSub");
         require_unfixed("local s = \"abc\"\nprint(ll.GetSubString(s, 0, #s))\n", "LuauLintSlZeroIndexArg");
+        UNSCOPED_INFO("only a table built as a list: not a map keyed by number, whose [0] may well be something, nor one given {}");
+        CHECK(found("local handlers: {[number]: () -> ()} = {}\n"
+                    "local function first(t: {string}) return t[0] end\n"
+                    "local m = {}\n"
+                    "local l = {\"a\"}\n"
+                    "l = {\"b\", \"c\"}\n"
+                    "print(handlers[0], m[0], l[0], string.split(\"a,b\", \",\")[0])\n",
+                    "SlZeroIndex", ALScriptProblem::Severity::Warning) ==
+              std::string("1 LuauLintSlZeroIndex|t\n"
+                          "5 LuauLintSlZeroIndex|l\n"
+                          "5 LuauLintSlZeroIndex|string.split(\"a,b\", \",\")\n"));
     }
 
     TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlCompatCall: llcompat's where ll's means the same; not where it differs", "[ALScriptLintPass]")
@@ -343,6 +354,12 @@ namespace
             INFO("a choice");
             CHECK(require_fixed("local n = 1\nprint((if n > 2 then 0 else 1) ~= 0)\n", "LuauLintSlBooleanNumberChoice", "Write it not (n > 2)", false) ==
                   std::string("local n = 1\nprint(not (n > 2))\n"));
+        }
+        {
+            INFO("an operand of what is around it, bracketed");
+            CHECK(require_fixed("local x = true\nlocal a = false\nlocal b = true\nprint(x and (if a or b then 1 else 0) == 1)\n",
+                                "LuauLintSlBooleanNumberChoice", "Write it (a or b)", false) ==
+                  std::string("local x = true\nlocal a = false\nlocal b = true\nprint(x and (a or b))\n"));
         }
         require_unfixed("local n = 1\nprint((n > 2) == 5)\n", "LuauLintSlBooleanNumber");
     }
@@ -507,6 +524,16 @@ namespace
         }
         require_unfixed("local s = \"abc\"\nstring.len(s)\n", "LuauLintSlMustUse");
         require_unfixed("string.upper(\"abc\")\n", "LuauLintSlMustUse");
+        UNSCOPED_INFO("gsub given a function or a table is called for each match: its answer is not its point");
+        CHECK(found("local text = \"a b\"\n"
+                    "text:gsub(\"%S+\", function(w) print(w) end)\n"
+                    "string.gsub(text, \"%S+\", print)\n"
+                    "text:gsub(\"%S+\", { a = \"b\" })\n"
+                    "text:gsub(\"a\", \"b\")\n"
+                    "string.gsub(text, \"a\", (\"b\"))\n",
+                    "SlMustUse", ALScriptProblem::Severity::Warning) ==
+              std::string("4 LuauLintSlMustUse|text:gsub\n"
+                          "5 LuauLintSlMustUse|string.gsub\n"));
     }
 
     TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlGeneralizedFor: pairs and ipairs and next in a for become the table", "[ALScriptLintPass]")
@@ -716,6 +743,12 @@ namespace
                                 "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"])", false, false) ==
                   std::string("default { state_entry() { llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"]); } }\n"));
         }
+        {
+            INFO("a comment with a comma after an argument is no comma");
+            CHECK(require_fixed("default { state_entry() { llSetLinkRenderMaterial(LINK_THIS, // m, sides\n    \"m\", ALL_SIDES); } }\n", "LSLSlSleepingCall",
+                                "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"])", false, false) ==
+                  std::string("default { state_entry() { llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"]); } }\n"));
+        }
         require_unfixed("default { state_entry() { llSetRenderMaterial(llGetInventoryName(INVENTORY_MATERIAL, 0), 0); } }\n", "LSLSlSleepingCall", false);
     }
 
@@ -784,6 +817,17 @@ namespace
                                 "LSLSlMergeablePrimParams", "Write it llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5, PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0])",
                                 false, false) ==
                   std::string("default { state_entry() { llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5, PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0]); } }\n"));
+        }
+        {
+            INFO("a comment with a comma after an argument is no comma");
+            CHECK(require_fixed("default { state_entry() {\n    llSetLinkPrimitiveParamsFast(LINK_THIS, // colour, alpha\n"
+                                "        [PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0]);\n"
+                                "    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5]);\n} }\n",
+                                "LSLSlMergeablePrimParams",
+                                "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0, PRIM_GLOW, ALL_SIDES, 0.5])",
+                                false, false) ==
+                  std::string("default { state_entry() {\n    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0, "
+                              "PRIM_GLOW, ALL_SIDES, 0.5]);\n} }\n"));
         }
     }
 
@@ -870,6 +914,9 @@ namespace
         require_unfixed("local t = \"\"\nfor i = 1, 3 do t = t .. i; print(t) end\n", "LuauLintSlStringBuild");
         require_unfixed("local function f()\n    local s = \"\"\n    for i = 1, 3 do\n        s ..= i\n        if i > 1 then return s end\n    end\n    return s\nend\nprint(f())\n",
                 "LuauLintSlStringBuild");
+        UNSCOPED_INFO("read by the loop's condition, which would never see it grow");
+        require_unfixed("local s = \"\"\nwhile #s < 3 do s ..= \"x\" end\nprint(s)\n", "LuauLintSlStringBuild");
+        require_unfixed("local r = \"\"\nrepeat r ..= \"x\" until #r >= 3\nprint(r)\n", "LuauLintSlStringBuild");
         UNSCOPED_INFO("LSL");
         CHECK(found("default {\n"
                                    "    state_entry() {\n"

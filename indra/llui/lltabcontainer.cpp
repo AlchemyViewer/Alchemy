@@ -1156,9 +1156,10 @@ void LLTabContainer::enableTabButton(S32 which, bool enable)
     mDragAndDropDelayTimer.stop();
 }
 
-void LLTabContainer::deleteAllTabs()
+void LLTabContainer::deleteAllTabs(bool delete_panels)
 {
-    // Remove all the tab buttons and delete them.  Also, unlink all the child panels.
+    // Remove all the tab buttons and delete them.  Also, unlink all the child
+    // panels, and where asked, have them die.
     for(std::vector<LLTabTuple*>::iterator iter = mTabList.begin(); iter != mTabList.end(); ++iter)
     {
         LLTabTuple* tuple = *iter;
@@ -1168,7 +1169,10 @@ void LLTabContainer::deleteAllTabs()
         tuple->mButton = NULL;
 
         removeChild( tuple->mTabPanel );
-//      delete tuple->mTabPanel;
+        if (delete_panels)
+        {
+            tuple->mTabPanel->die();
+        }
         tuple->mTabPanel = NULL;
     }
 

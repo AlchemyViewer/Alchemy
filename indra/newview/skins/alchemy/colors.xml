@@ -852,7 +852,7 @@
      reference="White" />
     <color
      name="SilhouetteChildColor"
-     reference="EmphasisColor" /> <!-- Child Prim highlight color (Edit mode) -->
+     value="0.473 0.809 1 1" /> <!-- Child Prim highlight color (Edit mode) -->
     <color
      name="SilhouetteParentColor"
      reference="Yellow" /> <!-- Root Prim highlight color (Edit mode) -->

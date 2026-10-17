@@ -102,20 +102,15 @@ endif()
 # Sanitizers
 #------------------------------------------------------------------------------
 
-# AL_SANITIZERS is a list drawn from address, undefined and thread. GCC and
-# Clang only. A sanitized build cannot link libwebrtc and trips warnings that
-# are false positives, so it disables both.
+# AL_SANITIZERS is a list drawn from address, undefined and thread, checked
+# and acted on before project() in the root CMakeLists.txt. GCC and Clang
+# only. A sanitized build trips warnings that are false positives, so it does
+# not make warnings errors. Every sanitizer reports and carries on where it
+# can: a test run fails on the report (ALAddTestBinary.cmake), not the exit.
 set(AL_SANITIZING OFF)
 if(AL_SANITIZERS AND (LINUX OR DARWIN))
   set(AL_SANITIZING ON)
-  set(AL_USE_WEBRTC OFF)
   foreach(sanitizer IN LISTS AL_SANITIZERS)
-    if(NOT sanitizer MATCHES "^(address|undefined|thread)$")
-      message(
-        FATAL_ERROR
-        "AL_SANITIZERS: unknown sanitizer '${sanitizer}' (address, undefined, thread)"
-      )
-    endif()
     target_compile_options(al_flags INTERFACE -fsanitize=${sanitizer})
     target_link_options(al_flags INTERFACE -fsanitize=${sanitizer})
   endforeach()
@@ -123,6 +118,17 @@ if(AL_SANITIZERS AND (LINUX OR DARWIN))
     al_flags
     INTERFACE -U_FORTIFY_SOURCE -fno-omit-frame-pointer -fno-common -fsanitize-recover=all
   )
+  # Boost.Context tells ASan and TSan of each fiber switch, built for ucontext
+  # with these defines, as the sanitizer triplets build its ports; Boost's
+  # CMake package gives every consumer of Boost::context BOOST_USE_UCONTEXT.
+  # See triplets/alchemy-sanitizer.cmake.
+  if(LINUX)
+    if("address" IN_LIST AL_SANITIZERS)
+      target_compile_definitions(al_flags INTERFACE BOOST_USE_ASAN)
+    elseif("thread" IN_LIST AL_SANITIZERS)
+      target_compile_definitions(al_flags INTERFACE BOOST_USE_TSAN)
+    endif()
+  endif()
 endif()
 
 #------------------------------------------------------------------------------

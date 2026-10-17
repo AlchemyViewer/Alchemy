@@ -57,6 +57,7 @@
 #include "allslconstantglobals.h"
 #include "allslcosts.h"
 #include "allsldeadcode.h"
+#include "allsldepth.h"
 #include "allsleffects.h"
 #include "allslflowvalues.h"
 #include "allslfolder.h"
@@ -363,7 +364,7 @@ namespace
         };
 
         ScopedScriptParser parser(nullptr);
-        LSLScript*         script = parser.parseLSLBytes(source.data(), static_cast<int>(source.size()));
+        LSLScript*         script = ALLSLDepth::parse(parser, source.data(), static_cast<int>(source.size()));
         if (!script || parser.logger.getErrors())
         {
             collectMessages(parser.logger, result.problems);
@@ -751,7 +752,7 @@ std::optional<ALScriptProblem> ALLSLOptimizer::checkWritten(std::string_view wri
     AL_SCRIPT_ENGINE_HELD;
     ScopedScriptParser check(nullptr);
     const std::string  text(written);
-    LSLScript*         again = check.parseLSLBytes(text.data(), static_cast<int>(text.size()));
+    LSLScript*         again = ALLSLDepth::parse(check, text.data(), static_cast<int>(text.size()));
     if (again && !check.logger.getErrors())
     {
         again->collectSymbols();

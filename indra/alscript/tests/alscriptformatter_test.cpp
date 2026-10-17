@@ -166,6 +166,11 @@ namespace
         CHECK(lsl("\n\nx = 1;   \n\n\n\n\ny = 2;\n\n\n") == std::string("x = 1;\n\n\ny = 2;\n"));
         UNSCOPED_INFO("a newline added");
         CHECK(lsl("x = 1;") == std::string("x = 1;\n"));
+        UNSCOPED_INFO("a newline added to a comment left open at the end, which takes it in, and the same again");
+        CHECK(lsl("x = 1; /* open   ") == std::string("x = 1; /* open\n"));
+        CHECK(lsl("x = 1; /* open\n") == std::string("x = 1; /* open\n"));
+        CHECK(lua("x = 1 --[[ open   ") == std::string("x = 1 --[[ open\n"));
+        CHECK(lua("x = 1 --[[ open\n") == std::string("x = 1 --[[ open\n"));
         UNSCOPED_INFO("tabs");
         CHECK([] {
             ALScriptFormatter::Options options;
@@ -446,6 +451,31 @@ namespace
                       std::string("default { state_entry() { integer x = -(a); vector v = <-1, 0, 0>; if (i < -1) x = !(b); } }\n"));
         UNSCOPED_INFO("a list of vectors");
         CHECK(lsl("list l = [<-1, 0, 0>, < -2, 0, 0 >];\n") == std::string("list l = [<-1, 0, 0>, <-2, 0, 0>];\n"));
+        UNSCOPED_INFO("a vector in a vector: its brackets spaced from the outer's, which together would be shifts");
+        CHECK(lsl("v = < <v.x, 1, 2> * <1,2,3>, 2, <1,2,3> >;\nrotation c = <1,2,3,<1,2,3> >;\nif (a < <1,2,3>) x = 1;\n") ==
+              std::string("v = < <v.x, 1, 2> * <1, 2, 3>, 2, <1, 2, 3> >;\nrotation c = <1, 2, 3, <1, 2, 3> >;\nif (a < <1, 2, 3>) x = 1;\n"));
+    }
+
+    // LSL's ++ and -- before their operand: spaced from the operator before
+    // them, since the lexer takes the longest token it can and `i +++j` is
+    // `(i++) + j`; against the bracket or sign before them, and against
+    // their operand. After their operand, against it as ever.
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: LSL: a ++ or -- before its operand is spaced from the operator before it", "[alscriptformatter]")
+    {
+        for (const char* text : { "x = i + ++j;\n", "x = a - --b;\n", "x = i++ + ++j;\n", "x = ++i;\n", "x = (++i) * -(--j);\n", "x = !++i;\n",
+                                  "x = i++ - --j;\n", "v = <++i, --j, 0>;\n" })
+        {
+            INFO(text);
+            CHECK(lsl(text) == std::string(text));
+            CHECK(lsl(lsl(text)) == lsl(text));
+        }
+        UNSCOPED_INFO("spaced afresh");
+        CHECK(lsl("x=i+ ++j;\n") == std::string("x = i + ++j;\n"));
+        CHECK(lsl("x=a- --b;\n") == std::string("x = a - --b;\n"));
+        CHECK(lsl("x=i+++ ++j;\n") == std::string("x = i++ + ++j;\n"));
+        CHECK(lsl("x= ++ i;\n") == std::string("x = ++i;\n"));
+        UNSCOPED_INFO("what the lexer makes of it is kept: i+++j is (i++) + j");
+        CHECK(lsl("x=i+++j;\n") == std::string("x = i++ + j;\n"));
     }
 
     TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: what the author lined up stays lined up: runs of = and trailing comments", "[alscriptformatter]")
@@ -476,6 +506,32 @@ namespace
         UNSCOPED_INFO("again");
         CHECK(lua(lua("local a   =1      -- one\nlocal bbb = {2,3} -- two\n")) ==
                       std::string("local a   = 1        -- one\nlocal bbb = { 2, 3 } -- two\n"));
+    }
+
+    // A line lined up with a run and then broken at the width lost what
+    // lined it up, and formatted again the lines it had been lined up with
+    // stood alone: the run is lined up in stretches between the lines
+    // that would go past the width, which are broken instead.
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: a line that would go past the width once lined up is broken and lines up with nothing", "[alscriptformatter]")
+    {
+        ALScriptFormatter::Options options;
+        options.width = 40;
+        const std::string in = "a     = f(1, 2);\n"
+                               "bb    = f(2, 3);\n"
+                               "ccc   = f(aVeryLongArgument, anotherLongArgument, more);\n"
+                               "dddd  = f(3, 4);\n";
+        const std::string want = "a     = f(1, 2);\n"
+                                 "bb    = f(2, 3);\n"
+                                 "ccc = f(\n"
+                                 "    aVeryLongArgument,\n"
+                                 "    anotherLongArgument,\n"
+                                 "    more\n"
+                                 ");\n"
+                                 "dddd = f(3, 4);\n";
+        const std::string out = ALScriptFormatter::format(in, options);
+        CHECK(out == want);
+        UNSCOPED_INFO("the same again");
+        CHECK(ALScriptFormatter::format(out, options) == want);
     }
 
     TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: a comment before elseif or else or until or end keeps the author's depth", "[alscriptformatter]")

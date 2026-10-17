@@ -309,6 +309,34 @@
         "clang",
         "mold"
       ]
+    },
+    {
+      "name": "ninja-os-asan",
+      "displayName": "Ninja Multi-Config (AddressSanitizer and UndefinedBehaviorSanitizer)",
+      "inherits": [
+        "ninja-os",
+        "linux",
+        "clang",
+        "lld"
+      ],
+      "cacheVariables": {
+        "AL_SANITIZERS": "address;undefined",
+        "AL_BUILD_TESTS": true
+      }
+    },
+    {
+      "name": "ninja-os-tsan",
+      "displayName": "Ninja Multi-Config (ThreadSanitizer)",
+      "inherits": [
+        "ninja-os",
+        "linux",
+        "clang",
+        "lld"
+      ],
+      "cacheVariables": {
+        "AL_SANITIZERS": "thread",
+        "AL_BUILD_TESTS": true
+      }
     }
   ],
   "buildPresets": [
@@ -1315,6 +1343,70 @@
     {
       "name": "ninja-fullopt-clang-mold-release",
       "configurePreset": "ninja-fullopt-clang-mold",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-asan-debug",
+      "configurePreset": "ninja-os-asan",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-asan-optdebug",
+      "configurePreset": "ninja-os-asan",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-asan-relwithdebinfo",
+      "configurePreset": "ninja-os-asan",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-asan-release",
+      "configurePreset": "ninja-os-asan",
+      "inherits": [
+        "linux",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-tsan-debug",
+      "configurePreset": "ninja-os-tsan",
+      "inherits": [
+        "linux",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-tsan-optdebug",
+      "configurePreset": "ninja-os-tsan",
+      "inherits": [
+        "linux",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-tsan-relwithdebinfo",
+      "configurePreset": "ninja-os-tsan",
+      "inherits": [
+        "linux",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-tsan-release",
+      "configurePreset": "ninja-os-tsan",
       "inherits": [
         "linux",
         "release"

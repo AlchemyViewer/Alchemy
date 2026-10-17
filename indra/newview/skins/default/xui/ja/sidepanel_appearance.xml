@@ -5,8 +5,8 @@
 	<string name="Now Wearing" value="着用しています…"/>
 	<string name="Changing outfits" value="アウトフィット変更中"/>
 	<panel name="panel_currentlook">
-		<button label="Ｅ" name="editappearance_btn"/>
-		<button label="Ｏ" name="openoutfit_btn"/>
+		<button label="編" name="editappearance_btn"/>
+		<button label="開" name="openoutfit_btn"/>
 		<text name="currentlook_status">
 			（ステータス）
 		</text>

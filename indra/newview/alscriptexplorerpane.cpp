@@ -81,8 +81,15 @@ namespace
     constexpr S32 BUTTON_PAD = 12;
     constexpr S32 BUTTON_GAP = 2;
 
-    // The roots selected in world, in their order.
-    std::vector<LLUUID> selectedRoots()
+    LLViewerObject* rootOf(LLViewerObject* object)
+    {
+        return object && object->getRootEdit() ? object->getRootEdit() : object;
+    }
+
+    // The roots selected in world, in their order: a whole linkset's, and
+    // the linkset of a prim selected on its own -- Edit Linked Parts --
+    // which `parts` has.
+    std::vector<LLUUID> selectedRoots(std::vector<LLUUID>& parts)
     {
         std::vector<LLUUID>     roots;
         LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
@@ -93,12 +100,21 @@ namespace
                 roots.push_back(object->getID());
             }
         }
+        for (auto it = selection->valid_begin(); it != selection->valid_end(); ++it)
+        {
+            LLViewerObject* object = (*it)->getObject();
+            if (!(*it)->mIndividualSelection || !object || object->isAvatar())
+            {
+                continue;
+            }
+            parts.push_back(object->getID());
+            const LLUUID root = rootOf(object)->getID();
+            if (std::find(roots.begin(), roots.end(), root) == roots.end())
+            {
+                roots.push_back(root);
+            }
+        }
         return roots;
-    }
-
-    LLViewerObject* rootOf(LLViewerObject* object)
-    {
-        return object && object->getRootEdit() ? object->getRootEdit() : object;
     }
 
     // The legacy queues over whole prims, which walk their contents and
@@ -369,13 +385,30 @@ void ALScriptExplorerPane::pump()
     {
         return;
     }
-    mSelectionChanged         = false;
-    mPolled                   = now;
-    std::vector<LLUUID> roots = selectedRoots();
-    if (roots != mRoots)
+    mSelectionChanged = false;
+    mPolled           = now;
+    std::vector<LLUUID> parts;
+    std::vector<LLUUID> roots = selectedRoots(parts);
+    if (roots != mRoots || parts != mParts)
     {
         mRoots = std::move(roots);
         relist();
+        // A prim newly selected on its own shown, unfolded in a large
+        // linkset, and asked what it holds where it never was.
+        bool unfolded = false;
+        for (const LLUUID& part : parts)
+        {
+            if (std::find(mParts.begin(), mParts.end(), part) == mParts.end())
+            {
+                mModel.unfoldTo(part);
+                unfolded = true;
+            }
+        }
+        mParts = std::move(parts);
+        if (unfolded)
+        {
+            relist();
+        }
     }
 }
 
@@ -1427,9 +1460,10 @@ void ALScriptExplorerPane::renamed(const Choice& row, const std::string& was, st
             mServices->report(error, true);
             return;
         }
-        // The tab, if it is open, and the list, once the tree is done with
-        // the name typed.
+        // The tab, if it is open, the link to a file, if it has one, and the
+        // list, once the tree is done with the name typed.
         mWindow->itemRenamed(ref, name);
+        ALScriptDiskMasters::instance().named(ref, name);
         relistSoon(true);
         return;
     }

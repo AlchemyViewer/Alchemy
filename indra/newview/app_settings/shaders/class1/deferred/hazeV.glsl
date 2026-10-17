@@ -32,8 +32,9 @@ void setAdditiveColor(vec3 c);
 
 void main()
 {
-    // Level with the depth the sky leaves cleared, so a depth test that passes only in front of the far plane
-    // (LLPipeline::doAtmospherics) rejects the sky before it is shaded. Reverse-Z puts the far plane at ndc z 0.
+    // Level with the depth the sky leaves cleared, so where no depth bounds hold the pass off it, a depth test that
+    // passes only in front of the far plane (ALDrawnOnly, LLPipeline::doAtmospherics) rejects the sky before it is
+    // shaded. Reverse-Z puts the far plane at ndc z 0.
 #ifdef REVERSE_Z
     gl_Position = vec4(position.xy, 0.0, 1.0);
 #else

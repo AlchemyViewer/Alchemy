@@ -3595,16 +3595,28 @@ ALTextRange ALCodeEditor::identifierAt(const ALTextPos& at) const
 
 bool ALCodeEditor::inProse(const ALTextPos& at)
 {
-    // The byte before the position: what was just typed, where a string
-    // or a comment runs to the end of its line and a position past the
-    // end is at no token.
-    const S32 column = at.column - 1;
-    if (column < 0 || at.line < 0 || at.line >= document().lineCount())
+    return alSyntaxKindIsQuiet(kindTypedAt(at, '\0'));
+}
+
+ALSyntaxKind ALCodeEditor::kindTypedAt(const ALTextPos& at, char typed)
+{
+    const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
+    if (!grammar || at.line < 0 || at.line >= document().lineCount() || at.column < 0)
     {
-        return false;
+        return ALSyntaxKind::Text;
     }
-    const ALSyntaxToken* token = alSyntaxTokenAt(highlighter().tokens(at.line), column);
-    return token && alSyntaxKindIsQuiet(token->kind);
+    // The line cut there, so that what the line goes on with -- a closer
+    // put in already -- does not count, and the byte after the cut before
+    // its end, so that a rule at a line's end -- a comment's, an unclosed
+    // string's -- does not close what is open.
+    const std::string& line = document().line(at.line);
+    std::string        text = line.substr(0, std::min(line.size(), static_cast<size_t>(at.column)));
+    text += typed ? typed : '\x01';
+    ALSyntaxState              state = highlighter().startState(at.line);
+    std::vector<ALSyntaxToken> tokens;
+    grammar->lexLine(text, state, tokens, highlighter().words());
+    const ALSyntaxToken* token = alSyntaxTokenAt(tokens, static_cast<S32>(text.size()) - 1);
+    return token ? token->kind : ALSyntaxKind::Text;
 }
 
 bool ALCodeEditor::completesInProse(const ALTextPos& at)
@@ -3845,6 +3857,21 @@ void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
         setFocus(true);
         return;
     }
+    // A library's table: a dot after it, or past the one there, and the
+    // list of what it holds.
+    if (chosen.table)
+    {
+        const std::string& line   = document().line(range.end.line);
+        const bool         dotted = range.end.column < static_cast<S32>(line.size()) && line[range.end.column] == '.';
+        insertText(dotted ? chosen.text : chosen.text + ".");
+        if (dotted)
+        {
+            setCaret(ALTextPos(caret().line, caret().column + 1));
+        }
+        setFocus(true);
+        openCompletion(true);
+        return;
+    }
     // A function called: its brackets, unless they are there already,
     // with the caret between them where it takes anything, and the
     // signature asked for.
@@ -3901,6 +3928,16 @@ ALTextEditing::Change ALCodeEditor::completionAt(const Completion& chosen, const
         one.selects = true;
         one.anchor  = land.begin;
         one.caret   = land.end;
+        return one;
+    }
+    // A library's table, as complete() has it: a dot after it, or past the
+    // one there.
+    if (chosen.table)
+    {
+        const std::string& line   = document().line(over.end.line);
+        const bool         dotted = over.end.column < static_cast<S32>(line.size()) && line[over.end.column] == '.';
+        one.replacements.push_back({ over, dotted ? chosen.text : chosen.text + "." });
+        one.caret = ALTextEditing::endOf(over.begin, chosen.text + ".");
         return one;
     }
     // A function called, as complete() calls it: its first parameter
@@ -5117,17 +5154,20 @@ std::optional<ALCodeEditor::Paired> ALCodeEditor::pairAt(const ALTextRange& sele
             paired.change.caret   = ALTextEditing::endOf(sel.begin, inner);
             return paired;
         }
-        // Not in a comment or a string, where it is prose; and only before
-        // a blank, the line's end, or what closes or ends -- a bracket
-        // opened before a word is about that word.
-        if (inProse(at))
+        // Not in a comment or a string, where it is prose -- but for one
+        // that opens code there, as `{` does in SLua's backticks; and only
+        // before a blank, the line's end, or what closes or ends -- a
+        // bracket opened before a word is about that word -- which in a
+        // string is its closing quote too.
+        const bool prose = inProse(at);
+        if (prose && alSyntaxKindIsQuiet(kindTypedAt(at, open)))
         {
             return std::nullopt;
         }
         bool room = next == '\0' || isspace(static_cast<unsigned char>(next)) || strchr(";,", next) != nullptr;
         for (const auto& [o, closer] : pairs)
         {
-            room = room || (next == closer && o != closer);
+            room = room || (next == closer && (o != closer || prose));
         }
         if (!room)
         {

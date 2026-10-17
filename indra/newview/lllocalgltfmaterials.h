@@ -69,6 +69,8 @@ public:
 
 private:
     bool loadMaterial();
+    // Rebuilds every object a face of which wears this material.
+    void rebuildObjectsUsing();
 
 private: /* private enums */
     enum ELinkStatus

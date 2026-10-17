@@ -134,6 +134,7 @@
 #include "llavatarnamecache.h"
 #include "alrecovery.h"
 #include "alregex.h"
+#include "alsanitizer.h"
 #include "alscriptstudio.h"
 #include "alxmlmergelog.h"
 #include "lldiriterator.h"
@@ -2370,9 +2371,11 @@ bool LLAppViewer::initThreads()
     // Image decoding
     LLAppViewer::sImageDecodeThread = new LLImageDecodeThread(enable_threads && true);
     LLAppViewer::sTextureCache = new LLTextureCache(enable_threads && true);
+    LLAppViewer::sTextureCache->start();
     LLAppViewer::sTextureFetch = new LLTextureFetch(LLAppViewer::getTextureCache(),
                                                     enable_threads && true,
                                                     app_metrics_qa_mode);
+    LLAppViewer::sTextureFetch->start();
 
     // general task background thread (LLPerfStats, etc)
     LLAppViewer::instance()->initGeneralThread();
@@ -3567,6 +3570,13 @@ bool LLAppViewer::initWindow()
     gViewerWindow = new LLViewerWindow(window_params);
 
     LL_INFOS("AppInit") << "gViewerwindow created." << LL_ENDL;
+
+    // With the GL driver loaded, what it keeps for the process is still its
+    // own when LeakSanitizer looks at exit, as in the gl tests.
+    if constexpr (LL::LEAK_SANITIZER)
+    {
+        LL::pinLoadedLibraries();
+    }
 
     // Need to load feature table before cheking to start watchdog.
     bool use_watchdog = false;
@@ -5881,7 +5891,6 @@ void LLAppViewer::idle()
 
         average_wind = regionp->mWind.getAverage();
         gSky.setWind(average_wind);
-        //LLVOWater::setWind(average_wind);
     }
     else
     {

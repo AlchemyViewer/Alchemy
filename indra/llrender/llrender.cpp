@@ -103,7 +103,9 @@ S32 gGLViewport[4];
 
 U32 LLRender::sUICalls = 0;
 U32 LLRender::sUIVerts = 0;
-U32 ALTextureSlot::sWhiteTexture = 0;
+U32 LLRender::sDrawCalls = 0;
+U64 LLRender::sDrawElements = 0;
+std::atomic<U32> ALTextureSlot::sWhiteTexture = 0;
 F32 LLRender::sAnisotropicFilteringLevel = 0.f;
 bool LLRender::sGLCoreProfile = false;
 bool LLRender::sNsightDebugSupport = false;
@@ -535,6 +537,15 @@ void LLRender::shutdown()
         mMatricesUBOHash[i] = 0xFFFFFFFFu;
     }
     mMatricesUBOBound = false;
+
+    // Its queries and fences, which it deletes only while the context is up.
+    mQueries.release();
+}
+
+void LLRender::endFrame()
+{
+    mQueries.endFrame();
+    ALUniformBuffer::endFrame();
 }
 
 void LLRender::clearSamplers()
@@ -1912,6 +1923,8 @@ void LLRender::drawArraysInstanced(eGeomModes mode, U32 first, U32 count, U32 in
     STOP_GLERROR;
     glDrawArraysInstanced(LLVertexBuffer::sGLMode[mode], first, count, instances);
     STOP_GLERROR;
+    ++sDrawCalls;
+    sDrawElements += (U64)count * instances;
 }
 
 void LLRender::drawArraysIndirect(eGeomModes mode, const ALGPUBuffer& buffer, size_t offset)
@@ -1932,6 +1945,7 @@ void LLRender::drawArraysIndirect(eGeomModes mode, const ALGPUBuffer& buffer, si
     bindIndirectBuffer(GL_DRAW_INDIRECT_BUFFER, mDrawIndirectBuffer, buffer.getGLName());
     glDrawArraysIndirect(LLVertexBuffer::sGLMode[mode], reinterpret_cast<const void*>(offset));
     STOP_GLERROR;
+    ++sDrawCalls; // its count is the GPU's to know
 }
 
 void LLRender::memoryBarrier(U32 barriers)

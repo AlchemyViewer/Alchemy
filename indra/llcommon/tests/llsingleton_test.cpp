@@ -57,8 +57,6 @@ public:                                             \
                                                     \
 CLS::dep_flag CLS::sDepFlag = DEP_NONE
 
-DECLARE_CLASS(A);
-DECLARE_CLASS(B);
 
 #define DEFINE_MEMBERS(CLS, OTHER)              \
 CLS::CLS()                                      \
@@ -89,8 +87,26 @@ CLS::~CLS()                                     \
     sLog.append("~" #CLS);                      \
 }
 
+// Each order a pair of its own: an LLSingleton holds its slot's lock while it
+// makes another it depends on, and a program's singletons depend on each
+// other one way. One pair made A-first in some cases and B-first in others
+// would take the two locks in both orders, the lock-order inversion
+// ThreadSanitizer reports.
+namespace a_first
+{
+DECLARE_CLASS(A);
+DECLARE_CLASS(B);
 DEFINE_MEMBERS(A, B)
 DEFINE_MEMBERS(B, A)
+}
+
+namespace b_first
+{
+DECLARE_CLASS(A);
+DECLARE_CLASS(B);
+DEFINE_MEMBERS(A, B)
+DEFINE_MEMBERS(B, A)
+}
 
 } // anonymous namespace
 
@@ -148,42 +164,42 @@ namespace
 
     TEST_CASE_METHOD(singleton, "LLSingleton: A alone is made and deleted in order", "[LLSingleton]")
     {
-        require_order<A, B>(A::DEP_NONE, B::DEP_NONE, "AiA", "xA~A");
+        require_order<a_first::A, a_first::B>(a_first::A::DEP_NONE, a_first::B::DEP_NONE, "AiA", "xA~A");
     }
 
     TEST_CASE_METHOD(singleton, "LLSingleton: A needing B in its constructor is deleted before B", "[LLSingleton]")
     {
-        require_order<A, B>(A::DEP_CTOR, B::DEP_NONE, "ABiBiA", "xA~AxB~B");
+        require_order<a_first::A, a_first::B>(a_first::A::DEP_CTOR, a_first::B::DEP_NONE, "ABiBiA", "xA~AxB~B");
     }
 
     TEST_CASE_METHOD(singleton, "LLSingleton: A needing B in initSingleton is deleted before B", "[LLSingleton]")
     {
-        require_order<A, B>(A::DEP_INIT, B::DEP_NONE, "AiABiB", "xA~AxB~B");
+        require_order<a_first::A, a_first::B>(a_first::A::DEP_INIT, a_first::B::DEP_NONE, "AiABiB", "xA~AxB~B");
     }
 
     TEST_CASE_METHOD(singleton, "LLSingleton: A needing B in initSingleton and B needing A is deleted before B", "[LLSingleton]")
     {
-        require_order<A, B>(A::DEP_INIT, B::DEP_CTOR, "AiABiB", "xA~AxB~B");
+        require_order<a_first::A, a_first::B>(a_first::A::DEP_INIT, a_first::B::DEP_CTOR, "AiABiB", "xA~AxB~B");
     }
 
     TEST_CASE_METHOD(singleton, "LLSingleton: B alone is made and deleted in order", "[LLSingleton]")
     {
-        require_order<B, A>(B::DEP_NONE, A::DEP_NONE, "BiB", "xB~B");
+        require_order<b_first::B, b_first::A>(b_first::B::DEP_NONE, b_first::A::DEP_NONE, "BiB", "xB~B");
     }
 
     TEST_CASE_METHOD(singleton, "LLSingleton: B needing A in its constructor is deleted before A", "[LLSingleton]")
     {
-        require_order<B, A>(B::DEP_CTOR, A::DEP_NONE, "BAiAiB", "xB~BxA~A");
+        require_order<b_first::B, b_first::A>(b_first::B::DEP_CTOR, b_first::A::DEP_NONE, "BAiAiB", "xB~BxA~A");
     }
 
     TEST_CASE_METHOD(singleton, "LLSingleton: B needing A in initSingleton is deleted before A", "[LLSingleton]")
     {
-        require_order<B, A>(B::DEP_INIT, A::DEP_NONE, "BiBAiA", "xB~BxA~A");
+        require_order<b_first::B, b_first::A>(b_first::B::DEP_INIT, b_first::A::DEP_NONE, "BiBAiA", "xB~BxA~A");
     }
 
     TEST_CASE_METHOD(singleton, "LLSingleton: B needing A in initSingleton and A needing B is deleted before A", "[LLSingleton]")
     {
-        require_order<B, A>(B::DEP_INIT, A::DEP_CTOR, "BiBAiA", "xB~BxA~A");
+        require_order<b_first::B, b_first::A>(b_first::B::DEP_INIT, b_first::A::DEP_CTOR, "BiBAiA", "xB~BxA~A");
     }
 
 #define PARAMSINGLETON(cls)                                             \

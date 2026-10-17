@@ -38,6 +38,7 @@
 #include "raytrace.h"
 
 #include "alavatargroups.h"
+#include "alrenderisolation.h"
 #include "aoengine.h"
 #include "llagent.h" //  Get state values from here
 #include "llagentbenefits.h"
@@ -2854,6 +2855,8 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
         return;
     }
 
+    readProfileQuery();
+
     static LLCachedControl<bool> friends_only(gSavedSettings, "RenderAvatarFriendsOnly", false);
     if (friends_only()
         && !isUIAvatar()
@@ -4808,10 +4811,13 @@ void LLVOAvatar::computeUpdatePeriod()
             mUpdatePeriod = UPDATE_RATE_SLOW;
         }
         else if (!shouldImpostorByRank()
-            || mDrawable->mDistanceWRTCamera < 1.f + mag)
+            || mDrawable->mDistanceWRTCamera < 1.f + mag
+            || ALRenderIsolation::isArmedAvatar(this))
         {   // first 25% of max visible avatars are not impostored
             // also, don't impostor avatars whose bounding box may be penetrating the
             // impostor camera near clip plane
+            // nor the one a snapshot cutout is waiting to take: an impostor has
+            // no attachments and is a billboard
             mUpdatePeriod = 1;
         }
         else if (shouldImpostorByRank(4.0))
@@ -12827,54 +12833,22 @@ bool LLVOAvatar::isTextureVisible(LLAvatarAppearanceDefines::ETextureIndex type,
 
 void LLVOAvatar::placeProfileQuery()
 {
-    if (mGPUTimerQuery == 0)
-    {
-        glGenQueries(1, &mGPUTimerQuery);
-    }
-
-    glBeginQuery(GL_TIME_ELAPSED, mGPUTimerQuery);
+    mGPUTimer.begin();
 }
 
-void LLVOAvatar::readProfileQuery(S32 retries)
+void LLVOAvatar::endProfileQuery()
 {
-    if (!mGPUProfilePending)
+    mGPUTimer.end();
+}
+
+void LLVOAvatar::readProfileQuery()
+{
+    U64 time_elapsed = 0;
+    if (mGPUTimer.poll(time_elapsed))
     {
-        glEndQuery(GL_TIME_ELAPSED);
-        mGPUProfilePending = true;
-    }
-
-    GLuint64 result = 0;
-    glGetQueryObjectui64v(mGPUTimerQuery, GL_QUERY_RESULT_AVAILABLE, &result);
-
-    if (result == GL_TRUE || --retries <= 0)
-    { // query available, readback result
-        GLuint64 time_elapsed = 0;
-        glGetQueryObjectui64v(mGPUTimerQuery, GL_QUERY_RESULT, &time_elapsed);
         mGPURenderTime = time_elapsed / 1000000.f;
-        mGPUProfilePending = false;
 
         setDebugText(llformat("%d", (S32)(mGPURenderTime * 1000.f)));
-
-    }
-    else
-    {
-        // wait until next frame
-        const LLUUID id = getID();
-
-        LL::WorkQueue::getInstance("mainloop")->post([id, retries]
-        {
-            LLViewerObject* object = gObjectList.findObject(id);
-            if (object
-                && !object->isDead()
-                && object->isAvatar()) // probably excessive, pcode isn't supposed to change
-            {
-                LLVOAvatar* avatar = (LLVOAvatar*)object;
-                if (avatar)
-                {
-                    avatar->readProfileQuery(retries);
-                }
-            }
-        });
     }
 }
 

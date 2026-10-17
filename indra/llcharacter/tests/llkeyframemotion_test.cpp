@@ -376,6 +376,12 @@ namespace
 
     void pack_animation(LLDataPackerBinaryBuffer& dp, const AssetAnimation& anim)
     {
+        // Key times are quantized against the duration, or against one where
+        // it is no span at all: a case that packs a duration that is not a
+        // number, or nothing, would quantize its times to NaN, and NaN made
+        // an integer is undefined. Every duration the loader takes is a span,
+        // and quantizes as it did.
+        const F32 time_span = std::isfinite(anim.mDuration) && anim.mDuration > 0.f ? anim.mDuration : 1.f;
         dp.packU16(anim.mVersion, "version");
         dp.packU16(anim.mSubVersion, "sub_version");
         dp.packS32(anim.mBasePriority, "base_priority");
@@ -397,7 +403,7 @@ namespace
             dp.packS32(joint.mClaimedRotationKeys.value_or((S32)joint.mRotations.size()), "num_rot_keys");
             for (const auto& key : joint.mRotations)
             {
-                dp.packU16(F32_to_U16(key.first, 0.f, anim.mDuration), "time");
+                dp.packU16(F32_to_U16(key.first, 0.f, time_span), "time");
                 LLVector3 packed = key.second.packToVector3();
                 packed.quantize16(-1.f, 1.f, -1.f, 1.f);
                 dp.packU16(F32_to_U16(packed.mV[VX], -1.f, 1.f), "rot_angle_x");
@@ -408,7 +414,7 @@ namespace
             dp.packS32(joint.mClaimedPositionKeys.value_or((S32)joint.mPositions.size()), "num_pos_keys");
             for (const auto& key : joint.mPositions)
             {
-                dp.packU16(F32_to_U16(key.first, 0.f, anim.mDuration), "time");
+                dp.packU16(F32_to_U16(key.first, 0.f, time_span), "time");
                 dp.packU16(F32_to_U16(key.second.mV[VX], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET), "pos_x");
                 dp.packU16(F32_to_U16(key.second.mV[VY], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET), "pos_y");
                 dp.packU16(F32_to_U16(key.second.mV[VZ], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET), "pos_z");

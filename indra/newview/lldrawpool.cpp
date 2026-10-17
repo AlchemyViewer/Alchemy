@@ -104,7 +104,6 @@ LLDrawPool *LLDrawPool::createPool(const U32 type, LLViewerTexture *tex0)
     case POOL_SKY:
         poolp = new LLDrawPoolSky();
         break;
-    case POOL_VOIDWATER:
     case POOL_WATER:
         poolp = new LLDrawPoolWater();
         break;
@@ -323,14 +322,6 @@ void LLFacePool::addFaceReference(LLFace *facep)
     {
         facep->setReferenceIndex(static_cast<S32>(mReferences.size()));
         mReferences.push_back(facep);
-    }
-}
-
-void LLFacePool::pushFaceGeometry()
-{
-    for (LLFace* const& face : mDrawFace)
-    {
-        face->renderIndexed();
     }
 }
 

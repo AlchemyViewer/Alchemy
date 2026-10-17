@@ -35,6 +35,7 @@
 #include "llsdserialize.h"
 #include "stringize.h"
 
+#include <atomic>
 #include <charconv>
 #include <limits>
 
@@ -157,8 +158,13 @@ public:
 
     static const LLSD& undef();
 
-    static U32 sAllocationCount;
-    static U32 sOutstandingCount;
+#if !defined(LL_RELEASE_FOR_DOWNLOAD)
+    // Counted on whichever thread makes or frees an Impl, so atomic. Relaxed:
+    // a count orders nothing else. Left out of a release for download
+    // (llsd::COUNTS_IMPLS), which pays for nothing that reads them.
+    static std::atomic<U32> sAllocationCount;
+    static std::atomic<U32> sOutstandingCount;
+#endif
 };
 
 #ifdef NAME_UNNAMED_NAMESPACE
@@ -605,13 +611,17 @@ namespace
 LLSD::Impl::Impl()
     : mUseCount(0)
 {
-    ++sAllocationCount;
-    ++sOutstandingCount;
+#if !defined(LL_RELEASE_FOR_DOWNLOAD)
+    sAllocationCount.fetch_add(1, std::memory_order_relaxed);
+    sOutstandingCount.fetch_add(1, std::memory_order_relaxed);
+#endif
 }
 
 LLSD::Impl::~Impl()
 {
-    --sOutstandingCount;
+#if !defined(LL_RELEASE_FOR_DOWNLOAD)
+    sOutstandingCount.fetch_sub(1, std::memory_order_relaxed);
+#endif
 }
 
 void LLSD::Impl::retain(Impl* impl)
@@ -730,8 +740,8 @@ void LLSD::Impl::dumpStats(const LLSD& sd)
     std::cout << "LLSD Net Objects: " << llsd::sLLSDNetObjects << std::endl;
     std::cout << "LLSD allocations: " << llsd::sLLSDAllocationCount << std::endl;
 
-    std::cout << "LLSD::Impl Net Objects: " << sOutstandingCount << std::endl;
-    std::cout << "LLSD::Impl allocations: " << sAllocationCount << std::endl;
+    std::cout << "LLSD::Impl Net Objects: " << llsd::outstandingCount() << std::endl;
+    std::cout << "LLSD::Impl allocations: " << llsd::allocationCount() << std::endl;
 
     S32 type_counts[LLSD::TypeLLSDNumTypes + 1];
     memset(&type_counts, 0, sizeof(type_counts));
@@ -752,8 +762,10 @@ void LLSD::Impl::dumpStats(const LLSD& sd)
     }
 }
 
-U32 LLSD::Impl::sAllocationCount = 0;
-U32 LLSD::Impl::sOutstandingCount = 0;
+#if !defined(LL_RELEASE_FOR_DOWNLOAD)
+std::atomic<U32> LLSD::Impl::sAllocationCount{0};
+std::atomic<U32> LLSD::Impl::sOutstandingCount{0};
+#endif
 
 
 void LLSD::releaseValue()
@@ -1317,8 +1329,13 @@ LLSD::Real string_to_real(std::string_view in_string)
     return (ptr == last && ec == std::errc()) ? v : 0.0;
 }
 
-U32 allocationCount()                               { return LLSD::Impl::sAllocationCount; }
-U32 outstandingCount()                              { return LLSD::Impl::sOutstandingCount; }
+#if !defined(LL_RELEASE_FOR_DOWNLOAD)
+U32 allocationCount()                               { return LLSD::Impl::sAllocationCount.load(std::memory_order_relaxed); }
+U32 outstandingCount()                              { return LLSD::Impl::sOutstandingCount.load(std::memory_order_relaxed); }
+#else
+U32 allocationCount()                               { return 0; }
+U32 outstandingCount()                              { return 0; }
+#endif
 
 // Diagnostic dump of contents in an LLSD object
 void dumpStats(const LLSD& llsd)                    { LLSD::Impl::dumpStats(llsd); }

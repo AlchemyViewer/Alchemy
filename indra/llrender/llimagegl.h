@@ -159,10 +159,19 @@ public:
     // with caution: nothing here deletes it.
     LLImageGL(LLGLuint mTexName, U32 components, LLGLenum target, LLGLint  formatInternal, LLGLenum formatPrimary, LLGLenum formatType);
 
+    // What analyzeAlphaData finds in a level's alpha.
+    struct AlphaAnalysis
+    {
+        // Whether it is near enough to 0 or 1 everywhere to be tested as a mask rather than blended.
+        bool mIsMask = false;
+        // The highest alpha of any texel.
+        U8 mMaxAlpha = 255;
+    };
+
 protected:
     virtual ~LLImageGL();
 
-    static bool analyzeAlphaData(const void* data_in, U32 w, U32 h, S8 alpha_offset, S8 alpha_stride);
+    static AlphaAnalysis analyzeAlphaData(const void* data_in, U32 w, U32 h, S8 alpha_offset, S8 alpha_stride);
     void analyzeAlpha(const void* data_in, U32 w, U32 h);
     void calcAlphaChannelOffsetAndStride();
 
@@ -290,6 +299,9 @@ public:
     LLGLuint getTexName() const { return mTexName; }
 
     bool getIsAlphaMask() const;
+    // The highest alpha of the level its alpha was last analysed at (analyzeAlpha), or 255 where it was not: no
+    // alpha channel, an alpha it cannot read, or an analysis not yet back.
+    U8 getMaxAlpha() const { return mMaxAlpha; }
 
     bool getIsResident(bool test_now = false); // not const
 
@@ -377,7 +389,10 @@ private:
     // setPickMask takes ownership of mask, which may be null for "no pick mask".
     bool stagesAlpha() const;
     void setPickMask(U8* mask, U16 width, U16 height);
-    void setIsMask(bool is_mask);
+    void setAlphaAnalysis(const AlphaAnalysis& analysis);
+
+    // Sets the published analysis to what a texture without a readable alpha holds: no mask, and opaque.
+    void clearAlphaAnalysis();
     void publishPendingAlpha();
     void discardPendingAlpha();
 
@@ -394,12 +409,13 @@ private:
     bool mAutoGenMips = false;
 
     bool mIsMask;
+    U8   mMaxAlpha;
     bool mNeedsAlphaAndPickMask;
     LLAtomicU32 mAlphaAnalysisSerial; // for request tracking.
     S8   mAlphaStride ;
     S8   mAlphaOffset ;
 
-    // The pick mask and mask verdict of a texture that has not published yet.
+    // The pick mask and alpha analysis of a texture that has not published yet.
     //
     // getMask and getIsAlphaMask answer for the texture mTexName names, and the main thread
     // asks them every frame (hover picking, the alpha pool). An off-thread upload building
@@ -411,8 +427,8 @@ private:
         U16  mPickMaskWidth  = 0;
         U16  mPickMaskHeight = 0;
         bool mHasPickMask    = false; // a result is waiting, possibly "no pick mask"
-        bool mIsMask         = false;
-        bool mHasIsMask      = false;
+        AlphaAnalysis mAnalysis;
+        bool mHasAnalysis    = false;
     };
     PendingAlpha mPendingAlpha;
 
@@ -599,6 +615,9 @@ public:
     static bool sEnabledMedia;
 
     LLImageGLThread(LLWindow* window);
+    // Joins the thread first: run() uses the window and context after the
+    // queue closes.
+    ~LLImageGLThread() override;
 
     // post a function to be executed on the LLImageGL background thread
     template <typename CALLABLE>

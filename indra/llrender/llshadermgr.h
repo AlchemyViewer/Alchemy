@@ -242,11 +242,11 @@ public:
         SKIN_ORIGIN,                        //  "skin_origin" (rigged path: agent-space rebase origin the palette translations were made relative to)
 
         WATER_SCREENTEX,                    //  "screenTex"
-        WATER_EXCLUSIONTEX,                 //  "exclusionTex"
+        WATER_EXCLUSION_DISTORT,            //  "exclusionDistort"  1 where the water below is distorted, 0 where an exclusion prim covers it
         WATER_EYEVEC,                       //  "eyeVec"
         WATER_TIME,                         //  "time"
-        WATER_BIG_WAVE_SCROLL,              //  "bigWaveScroll"
-        WATER_LITTLE_WAVE_SCROLL,           //  "littleWaveScroll"
+        WATER_BIG_PHASE,                    //  "waterBigPhase"  the big wave layer's phase at the camera (ALWaterField::wavePhases)
+        WATER_LITTLE_PHASE,                 //  "waterLittlePhase"  the little map's two reads' phases at the camera
         WATER_LIGHT_DIR,                    //  "lightDir"
         WATER_SPECULAR,                     //  "specular"
         WATER_SPECULAR_EXP,                 //  "lightExp"
@@ -255,7 +255,6 @@ public:
         WATER_FOGDENSITY,                   //  "waterFogDensity"
         WATER_FOGKS,                        //  "waterFogKS"
         WATER_REFSCALE,                     //  "refScale"
-        WATER_WATERHEIGHT,                  //  "waterHeight"
         WATER_WATERPLANE,                   //  "waterPlane"
         WATER_WATERSIGN,                    //  "waterSign"
         WATER_NORM_SCALE,                   //  "normScale"
@@ -598,6 +597,8 @@ public:
 
         CROSS_FILTER_MAP,                   //  "crossFilterMap"       streak accumulator, composited in colorCorrect
 
+        CUTOUT_PREMULTIPLIED,               //  "uCutoutPremultiplied" 1 in a snapshot cutout frame: scene colour is premultiplied by coverage
+
         // End Alchemy Effects Stack
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 
@@ -609,7 +610,6 @@ public:
 
         EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
         SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
-        SKY_BEHIND_WEIGHT,                  //  "skyBehindWeight"  1 while skyBehindMap holds this view's sky
 
         MOON_QUAD_CENTER,                   //  "moonQuadCenter"  the moon quad's centre direction, for the stars it covers
         MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length
@@ -633,8 +633,44 @@ public:
         SELECTION_PALETTE,                  //  "selectionPalette"  each id's visible and hidden colours
         SELECTION_GLOW_REACH_MAP,           //  "selectionGlowReachMap"  the glowing ids within the glow's reach of each tile
         SELECTION_GLOW_ROW_MAP,             //  "selectionGlowRowMap"  the nearest glowing texel along each texel's row
+        SELECTION_BACKDROP_MAP,             //  "selectionBackdrop"  the window behind the lines, at half its resolution
+        SELECTION_CONTRAST,                 //  "selection_contrast"  how lines are kept apart from the backdrop (EContrast)
+        SELECTION_KEEP_CUT,                 //  "selection_keep_cut"  1 where texels the alpha test cuts are kept as unshown surface
+        SELECTION_TILE_DEPTH_MAP,           //  "selectionTileDepthMap"  each tile's nearest eye distance not glowing
+        OUTLINE_RIM_WIDTH,                  //  "outline_rim_width"  the contour's rim in pixels, 0 for none
 
+        WATER_CELL_MAP,                     //  "waterCellMap"  the cells' water heights and flags (ALWaterSurface)
+        WATER_CELL_SQUARE,                  //  "waterCellSquare"  the cell square: its south-west corner in agent space, a cell's width, the cells a side
+        WATER_DEFAULT_HEIGHT,               //  "waterDefaultHeight"  the water height past the cell square, the agent region's
+        WATER_RINGS,                        //  "waterRings"  the rings: the square's half-size, their count, the rim, and whether the void is drawn
+        WATER_SWEEP_PHASE,                  //  "waterSweepPhase"  LL's wave sweep's phase at the camera
+        WATER_LAYOUT,                       //  "waterLayout"  which part of the field a draw places (ALWaterField::Draw)
         WATER_GLINT_ROUGHNESS,              //  "waterGlintRoughness"  the roughness of the sun's reflection on each wave face
+        WATER_LATTICE_FRAC,                 //  "waterLatticeFrac"  the camera's place on the tiled layers' lattices, its fraction
+        WATER_LATTICE_BASE,                 //  "waterLatticeBase"  and the low 32 bits of its floor
+        WATER_MAP_MEAN,                     //  "waterMapMean"  the two wave maps' mean normal xy
+        WATER_PATCH_RECT,                   //  "waterPatchRect"  the cells drawn as wave patches, square-local, max exclusive
+        WATER_TESS_DENSITY,                 //  "waterTessDensity"  the waves' tessellation density
+        WATER_MAX_DISPLACEMENT,             //  "waterMaxDisplacement"  the most the waves move the surface, in metres
+        WATER_CULL_PLANES,                  //  "waterCullPlanes"  the view's frustum planes but the far one, agent space
+        WATER_HEIGHT_MAP,                   //  "waterHeightMap"  the current wave map's baked heights
+        WATER_HEIGHT_MAP2,                  //  "waterHeightMap2"  the next wave map's
+        WATER_WAVE_AMP,                     //  "waterWaveAmp"  each map's wave height: the dial times its rise
+        WATER_WAVE_REACH,                   //  "waterWaveReach"  the tessellation reach, and the most the waves move the surface
+        WATER_WAVE_EYE,                     //  "waterWaveEye"  the camera the waves were laid out around, in agent space
+        WATER_RAISE,                        //  "waterRaise"  how far the field a draw places is raised
+
+        // The depth pyramid (ALDepthPyramid): each level the farthest scene depth under its texels
+        DEPTH_PYRAMID,                      //  "depthPyramid"  sampler2D, a built pyramid for its readers
+        DEPTH_PYRAMID_SOURCE,               //  "depthPyramidSource"  sampler2D the build reads: scene depth for level 0, the pyramid's previous level after
+        DEPTH_PYRAMID_TARGET,               //  "depthPyramidTarget"  image2D[5] (r32f), the levels a build dispatch writes
+        DEPTH_PYRAMID_LEVEL,                //  "depthPyramidLevel"  int, the pyramid lod a build dispatch reads, -1 for the depth
+        DEPTH_PYRAMID_SIZE,                 //  "depthPyramidSize"  ivec4, the depth's size in pixels (xy) and the pyramid's levels (z)
+        DEPTH_PYRAMID_COUNT,                //  "depthPyramidCount"  int, the levels a build dispatch writes
+
+        // The waves' patches
+        WATER_OCCLUSION,                    //  "waterOcclusion"  int, whether the control stage culls against the depth pyramid
+        WATER_PATCH_ORDER,                  //  "waterPatchOrder"  ivec4, the order the patches are drawn in
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;

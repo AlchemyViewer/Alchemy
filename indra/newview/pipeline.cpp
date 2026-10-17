@@ -52,6 +52,8 @@
 #include "v3color.h"
 #include "llui.h"
 #include "llglheaders.h"
+#include "aldepthbounds.h"
+#include "alrenderisolation.h"
 #include "alsamplerstate.h"
 #include "aluniformbuffer.h"
 #include "alwhitebalancesolver.h"
@@ -59,6 +61,7 @@
 #include "alfarplane.h"
 #include "alfarplaneoverlay.h"
 #include "alselectionoutline.h"
+#include "alwaterstencil.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -107,7 +110,6 @@
 #include "llvotree.h"
 #include "llvovolume.h"
 #include "llvosurfacepatch.h"
-#include "llvowater.h"
 #include "llvotree.h"
 #include "llvopartgroup.h"
 #include "llworld.h"
@@ -251,7 +253,6 @@ bool LLPipeline::RenderMirrors;
 S32 LLPipeline::RenderHeroProbeUpdateRate;
 S32 LLPipeline::RenderHeroProbeConservativeUpdateMultiplier;
 bool LLPipeline::RenderAvatarCloth;
-LLTrace::EventStatHandle<S64> LLPipeline::sStatBatchSize("renderbatchsize");
 
 const U32 LLPipeline::MAX_PREVIEW_WIDTH = 512;
 
@@ -319,6 +320,7 @@ bool    LLPipeline::sUseFarClip = true;
 bool    LLPipeline::sShadowRender = false;
 bool    LLPipeline::sRenderGlow = false;
 bool    LLPipeline::sImpostorRender = false;
+bool    LLPipeline::sCutoutRender = false;
 bool    LLPipeline::sUnderWaterRender = false;
 bool    LLPipeline::sTextureBindTest = false;
 bool    LLPipeline::sRenderAttachedLights = true;
@@ -337,6 +339,19 @@ bool    LLPipeline::sUseDepthTexture = false;
 bool    LLPipeline::sScopeCapture = false;
 bool    LLPipeline::sGradeBypass = false;
 U32     LLPipeline::sGradeBypassMask = 0;
+
+// static
+bool LLPipeline::isMainWorldPass()
+{
+    return !sShadowRender && !sImpostorRender && !sRenderingHUDs && !gCubeSnapshot
+        && LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD;
+}
+
+// static
+bool LLPipeline::suppressesLensAndPrintEffects()
+{
+    return gSnapshotNoPost || sCutoutRender;
+}
 
 // EventHost API LLPipeline listener.
 static LLPipelineListener sPipelineListener;
@@ -475,6 +490,7 @@ void LLPipeline::init()
 
     //create render pass pools
     getPool(LLDrawPool::POOL_WATEREXCLUSION);
+    getPool(LLDrawPool::POOL_WATER);
     getPool(LLDrawPool::POOL_ALPHA_PRE_WATER);
     getPool(LLDrawPool::POOL_ALPHA_POST_WATER);
     getPool(LLDrawPool::POOL_SIMPLE);
@@ -826,16 +842,7 @@ void LLPipeline::resizeScreenTexture()
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
         GLuint scaledResX = resX;
         GLuint scaledResY = resY;
-        if ( (RenderResolutionDivisor > 1) && (RenderResolutionDivisor < resX) && (RenderResolutionDivisor < resY) )
-        {
-            scaledResX /= RenderResolutionDivisor;
-            scaledResY /= RenderResolutionDivisor;
-        }
-        else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier != 1.f)
-        {
-            scaledResX = (GLuint)(scaledResX * RenderResolutionMultiplier);
-            scaledResY = (GLuint)(scaledResY * RenderResolutionMultiplier);
-        }
+        scaleToRenderResolution(scaledResX, scaledResY);
 // [/SL:KB]
 
 //      if (gResizeScreenTexture || (resX != mRT->screen.getWidth()) || (resY != mRT->screen.getHeight()))
@@ -858,6 +865,23 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY)
     eFBOStatus ret = doAllocateScreenBuffer(resX, resY);
 
     return ret == FBO_SUCCESS_FULLRES;
+}
+
+// static
+void LLPipeline::scaleToRenderResolution(U32& resX, U32& resY)
+{
+    if (RenderResolutionDivisor > 1 && RenderResolutionDivisor < resX && RenderResolutionDivisor < resY)
+    {
+        resX /= RenderResolutionDivisor;
+        resY /= RenderResolutionDivisor;
+    }
+// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
+    else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier != 1.f)
+    {
+        resX = (U32)(resX * RenderResolutionMultiplier);
+        resY = (U32)(resY * RenderResolutionMultiplier);
+    }
+// [/SL:KB]
 }
 
 
@@ -941,28 +965,17 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
     mRT->width = resX;
     mRT->height = resY;
 
-    U32 res_mod = RenderResolutionDivisor;
-
-    if (res_mod > 1 && res_mod < resX && res_mod < resY)
-    {
-        resX /= res_mod;
-        resY /= res_mod;
-    }
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-    else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier != 1.f)
-    {
-        resX = (GLuint)(resX * RenderResolutionMultiplier);
-        resY = (GLuint)(resY * RenderResolutionMultiplier);
-    }
-// [/SL:KB]
+    scaleToRenderResolution(resX, resY);
 
     S32 shadow_detail = RenderShadowDetail;
     bool ssao = RenderDeferredSSAO;
 
     //allocate deferred rendering color buffers
     // Main scene depth flips to float32 under reverse-Z (mRT->screen inherits it below via
-    // shareDepthBuffer); same 4 bytes/px as DEPTH24 on desktop GPUs.
-    if (!mRT->deferredScreen.allocate(resX, resY, GL_SRGB8_ALPHA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat())) return false;
+    // shareDepthBuffer). It carries stencil, where the water keeps its per-pixel facts
+    // (alwaterstencil.h): DEPTH32F_STENCIL8, 8 bytes/px, under reverse-Z, DEPTH24_STENCIL8 under
+    // forward-Z. The G-buffer clear empties it each frame.
+    if (!mRT->deferredScreen.allocate(resX, resY, GL_SRGB8_ALPHA8, true, true, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat())) return false;
     if (!addDeferredAttachments(mRT->deferredScreen)) return false;
 
     GLuint screenFormat = hdr ? GL_RGBA16F : GL_RGBA8;
@@ -1060,8 +1073,8 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         }
 
         //water reflection texture (always needed as scratch space whether or not transparent water is enabled)
-        // mWaterDis and mSceneMap receive depth blits from mRT->screen, so their depth format
-        // must match it -- flip together via mainDepthFormat().
+        // mWaterDis and mSceneMap take every pack's scene depth, which copySceneDepth draws in rather than blits: they
+        // keep the depth's format, flipped with it via mainDepthFormat(), and none of its stencil.
         mWaterDis.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
 
         // The format the sky's colour lands in (addDeferredAttachments), so the sky behind clamps and quantizes as the sky
@@ -1079,15 +1092,6 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         {
             mSceneMap.release();
         }
-
-        // The water exclusion mask needs its own depth buffer so we can take care of the problem of multiple water planes.
-        // Should we ever make water not just a plane, it also aids with that as well as the water planes will be rendered into the mask.
-        // Why do we do this? Because it saves us some janky logic in the exclusion shader when we generate the mask.
-        // Regardless, this should always only be an R8 texture unless we choose to start having multiple kinds of exclusion that 8 bits can't handle.
-        // - Geenz 2025-02-06
-        bool success = mWaterExclusionMask.allocate(resX, resY, GL_R8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
-
-        assert(success);
 
         // used to scale down textures
         // See LLViwerTextureList::updateImagesCreateTextures and LLImageGL::scaleDown
@@ -1317,6 +1321,15 @@ void LLPipeline::releaseGLBuffers()
 {
     assertInitialized();
 
+    mTerrainPrimitives.release();
+    mWaterPrimitives.release();
+    mWaterPatchPrimitives.release();
+    mWaterSurface.release();
+    mDepthPyramid.release();
+    mSkyBehindQuery = {};
+    mAttachmentSpans.clear();
+    mSkyBehindQueryFrame = 0;
+
     if (mNoiseMap)
     {
         LLImageGL::deleteTextures(1, &mNoiseMap);
@@ -1360,8 +1373,6 @@ void LLPipeline::releaseGLBuffers()
     mSkyBehindFrame = 0;
 
     mSceneMap.release();
-
-    mWaterExclusionMask.release();
 
     mFXAAMap.release();
     mSMAABlendBuffer.release();
@@ -2571,6 +2582,8 @@ void LLPipeline::resetFrameStats()
 
     sCompiles        = 0;
     mNumVisibleFaces = 0;
+    LLRender::sDrawCalls    = 0;
+    LLRender::sDrawElements = 0;
 
     if (mOldRenderDebugMask != mRenderDebugMask)
     {
@@ -3029,6 +3042,15 @@ bool LLPipeline::getVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& 
         }
     }
 
+    // The water has no partition: its field, whole, with its lowest and highest water, and a receiver wherever the
+    // camera meets it. Left out, a view of open sea, or a shadow split holding nothing but water, finds no receivers
+    // and its split is left empty.
+    if (hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.inView(camera))
+    {
+        mWaterSurface.addExtents(min, max);
+        res = false;
+    }
+
     LLViewerCamera::sCurCameraID = saved_camera_id;
     return res;
 }
@@ -3163,7 +3185,12 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result)
         }
     }
 
-    if (hasRenderType(LLPipeline::RENDER_TYPE_SKY) &&
+    // Neither sky is part of a cutout's subject, and both come in here rather
+    // than through a partition the cutout's choke points see.
+    const bool cutout = cullingToCutoutSubject();
+
+    if (!cutout &&
+        hasRenderType(LLPipeline::RENDER_TYPE_SKY) &&
         gSky.mVOSkyp.notNull() &&
         gSky.mVOSkyp->mDrawable.notNull())
     {
@@ -3173,7 +3200,8 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result)
         stop_glerror();
     }
 
-    if (hasRenderType(LLPipeline::RENDER_TYPE_WL_SKY) &&
+    if (!cutout &&
+        hasRenderType(LLPipeline::RENDER_TYPE_WL_SKY) &&
         gPipeline.canUseWindLightShaders() &&
         gSky.mVOWLSkyp.notNull() &&
         gSky.mVOWLSkyp->mDrawable.notNull())
@@ -3203,8 +3231,12 @@ void LLPipeline::markNotCulled(LLSpatialGroup* group, LLCamera& camera)
     { //render by drawable
         sCull->pushDrawableGroup(group);
     }
-    else
+    else if (!cullingToCutoutSubject() || ALRenderIsolation::includes(group))
     {   //render by group
+        // A cutout frame's main pass draws only its subject's groups. The rest
+        // were marked visible above all the same: what one snapshot leaves out
+        // must not read as out of view to object-cache eviction, LOD or
+        // texture priority.
         sCull->pushVisibleGroup(group);
     }
 
@@ -3229,12 +3261,18 @@ void LLPipeline::markOccluder(LLSpatialGroup* group)
             sCull->pushOcclusionGroup(group);
             group->setOcclusionState(LLSpatialGroup::ACTIVE_OCCLUSION);
 
+            // An empty parent's bounds are its children's, so one query can cull them all; with one child they are that
+            // child's (LLViewerOctreeGroup::rebound), and the query would be the child's again. Never the root, which
+            // the cull never culls (LLOctreeCull::earlyFail): its children would take its OCCLUDED, and only an
+            // earlyFail re-queries an occluded group, so nothing would bring the partition back.
             if (parent &&
+                parent->getParent() &&
                 !parent->isOcclusionState(LLSpatialGroup::ACTIVE_OCCLUSION) &&
                 parent->getElementCount() == 0 &&
+                parent->getOctreeNode()->getChildCount() > 1 &&
                 parent->needsUpdate())
             {
-                sCull->pushOcclusionGroup(group);
+                sCull->pushOcclusionGroup(parent);
                 parent->setOcclusionState(LLSpatialGroup::ACTIVE_OCCLUSION);
             }
         }
@@ -3246,6 +3284,27 @@ void LLPipeline::doOcclusion(LLCamera& camera)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("doOcclusion");
     llassert(!gCubeSnapshot);
+
+    // Not while a shader profile holds the occlusion targets, which would refuse every box drawn for a query. The
+    // groups the cull marked to be asked are let go, so that the next cull marks them again: one left marked is never
+    // marked, and so never asked, again.
+    if (!gGL.queries().canBegin(ALQueryKind::Occlusion))
+    {
+        for (LLCullResult::sg_iterator iter = sCull->beginOcclusionGroups(); iter != sCull->endOcclusionGroups(); ++iter)
+        {
+            (*iter)->clearOcclusionState(LLSpatialGroup::ACTIVE_OCCLUSION);
+        }
+        // The object cache's are the world camera's, which a shadow pass leaves to the main one.
+        for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+        {
+            LLVOCachePartition* vo_part = region->getVOCachePartition();
+            if (vo_part && LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD)
+            {
+                vo_part->resetOccluders();
+            }
+        }
+        return;
+    }
 
     if (sReflectionProbesEnabled && sUseOcclusion > 1 && !LLPipeline::sShadowRender && !gCubeSnapshot)
     {
@@ -3485,6 +3544,15 @@ void LLPipeline::markVisible(LLDrawable *drawablep, LLCamera& camera)
 {
     if(drawablep && !drawablep->isDead())
     {
+        if (cullingToCutoutSubject() && !ALRenderIsolation::includes(drawablep))
+        {
+            // Left out of a cutout's frame, but seen, for the same reason as in
+            // markNotCulled. A bridge culls its own octree here, and each of its
+            // groups is turned away there in turn.
+            drawablep->setVisible(camera);
+            return;
+        }
+
         if (drawablep->isSpatialBridge())
         {
             const LLDrawable* root = ((LLSpatialBridge*) drawablep)->mDrawable;
@@ -3891,6 +3959,13 @@ void LLPipeline::stateSort(LLDrawable* drawablep, LLCamera& camera)
     if (!drawablep
         || drawablep->isDead()
         || !hasRenderType(drawablep->getRenderType()))
+    {
+        return;
+    }
+
+    // markVisible turned everything else away; this is the backstop for
+    // anything that reaches the visible list some other way.
+    if (cullingToCutoutSubject() && !ALRenderIsolation::includes(drawablep))
     {
         return;
     }
@@ -4607,9 +4682,25 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
     {   // the start of the main render frame: from the last frame's camera
         // space to this one's
         LLViewerCamera::getInstance()->calcDeltaModelview();
+
+        // Probe and mirror captures move the camera singleton and come through here too; the frame starts with the
+        // main view. The water's field was laid out as the frame began (display).
+        if (!gCubeSnapshot)
+        {
+            mTerrainPrimitives.plot();
+            mWaterPrimitives.plot();
+            mWaterPatchPrimitives.plot();
+            LL_PROFILE_PLOT("water draws", (int64_t)mWaterDraws);
+            mWaterDraws = 0;
+            // The waves this frame: their patches before the cull, and A in centimetres.
+            LL_PROFILE_PLOT("water patches", (int64_t)mWaterSurface.patchCount());
+            LL_PROFILE_PLOT("water waves cm", (int64_t)(mWaterSurface.maxDisplacement() * 100.f));
+            LL_PROFILE_PLOT("render target MB", (int64_t)(LLRenderTarget::sBytesAllocated >> 20));
+        }
     }
 
-    bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion && !LLGLSLShader::sProfileEnabled;
+    // doOcclusion() stands down itself while a shader profile holds the occlusion targets.
+    bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion;
 
     setupHWLights();
 
@@ -4743,10 +4834,15 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     LLGLEnable cull(GL_CULL_FACE);
 
     bool done_atmospherics = LLPipeline::sRenderingHUDs; //skip atmospherics on huds
-    bool done_water_haze = done_atmospherics;
+
+    // The water haze and the exclusion serve the water this view draws: from above, the haze fogs what lies under the
+    // surface and the exclusion cuts the surface, so neither runs where none is drawn -- the Water render type off, or
+    // the view missing the sea (LLDrawPoolWater::getNumPostDeferredPasses). From below, the haze fills the screen.
+    const bool water_drawn = mWaterPool && hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterPool->getNumPostDeferredPasses() > 0;
+    bool done_water_haze = done_atmospherics || (!sUnderWaterRender && !water_drawn);
     // and the water exclusion mask: the water pool and water haze, which read it, do not run
     // on huds, and every pass that runs them builds the mask first
-    bool done_water_exclusion = LLPipeline::sRenderingHUDs;
+    bool done_water_exclusion = LLPipeline::sRenderingHUDs || !water_drawn;
 
     // do water exclusion just before water pass.
     U32 water_exclusion_pass = LLDrawPool::POOL_WATEREXCLUSION;
@@ -4761,6 +4857,13 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
 
     // do water haze just before pre water alpha
     U32 water_haze_pass = LLDrawPool::POOL_ALPHA_PRE_WATER;
+
+    // A cutout's coverage is seeded once every opaque pool has laid down its
+    // depth -- fullbright, shiny and alpha-masked fullbright draw here, after
+    // lighting, and would otherwise be left uncovered -- and before the first
+    // blended pool adds to it.
+    U32 cutout_seed_pass = LLDrawPool::POOL_ALPHA_PRE_WATER;
+    bool done_cutout_seed = !cullingToCutoutSubject();
 
     calcNearbyLights(camera);
     setupHWLights();
@@ -4781,6 +4884,12 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     done_atmospherics = done_atmospherics || low_detail_probe;
     done_water_haze   = done_water_haze || low_detail_probe;
 
+    // Underwater, the water haze is a full-screen pass, and it would fog the
+    // empty background of a cutout frame -- which then bleeds into whatever
+    // blended geometry is composited over it. Above water it has nothing to
+    // draw there, the water being left out.
+    done_water_haze = done_water_haze || cullingToCutoutSubject();
+
 
     while ( iter1 != mPools.end() )
     {
@@ -4790,7 +4899,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
 
         if (cur_type >= water_exclusion_pass && !done_water_exclusion)
         { // do water exclusion against depth buffer before rendering alpha
-            doWaterExclusionMask();
+            doWaterExclusion();
             done_water_exclusion = true;
         }
 
@@ -4798,6 +4907,12 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         { // do atmospherics against depth buffer before rendering alpha
             doAtmospherics();
             done_atmospherics = true;
+        }
+
+        if (cur_type >= cutout_seed_pass && !done_cutout_seed)
+        {
+            seedCutoutCoverageFromDepth();
+            done_cutout_seed = true;
         }
 
         if (cur_type >= water_haze_pass && !done_water_haze)
@@ -4868,6 +4983,11 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         stop_glerror();
     }
 
+    if (!done_cutout_seed)
+    {
+        seedCutoutCoverageFromDepth();
+    }
+
     gGLLastMatrix = NULL;
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
@@ -4875,8 +4995,8 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     // An impostor is a billboard: baking selection highlights or debug geometry into its
     // texture freezes them there for the life of the impostor and replays them into the scene
     // G-buffer, which is not what either is for. They belong to the frame that draws the
-    // billboard, where they are already drawn.
-    if (!gCubeSnapshot && !sImpostorRender)
+    // billboard, where they are already drawn. Nor are they part of a cutout's subject.
+    if (!gCubeSnapshot && !sImpostorRender && !sCutoutRender)
     {
         // debug displays
         renderHighlights();
@@ -6166,6 +6286,40 @@ static F32 light_fade_brightness(F32 fade)
         return 1.f;
     }
     return llclamp(fade >= 0.f ? fade / LIGHT_FADE_TIME : 1.f + fade / LIGHT_FADE_TIME, 0.f, 1.f);
+}
+
+// The stored depths a view-space span of lit points can hold, from ALDepthBounds::viewSpan's: under forward-Z the 24-bit
+// depth stores the step nearest a point's depth, as much as half a step past the span's ends, which far off is more than
+// any margin in view space (a step is about 15 cm at 500 m), so the span is let out by two steps, kept off the
+// clear. A float depth's rounding lies far inside the view-space margin.
+static void widen_for_storage(F64& zmin, F64& zmax)
+{
+    if (!LLRender::sReverseZ)
+    {
+        constexpr F64 STEP = 1.0 / 16777215.0;
+        F64 drawn_min, drawn_max;
+        ALDepthBounds::drawn(drawn_min, drawn_max);
+        zmin = llmax(zmin - 2.0 * STEP, drawn_min);
+        zmax = llmin(zmax + 2.0 * STEP, drawn_max);
+    }
+}
+
+// Holds a light's draw to the stored depths its light reaches: its sphere, `size` around its view-space centre (the
+// light shaders' cutoff), widened a little for what reconstruction loses and for the depth's storage. To everything
+// drawn where the projection cannot say.
+static void bound_to_light(ALDepthBounds& bounds, const LLMatrix4a& proj, F32 view_z, F32 size)
+{
+    const F32 reach = size * 1.01f + 0.01f;
+    F64 zmin, zmax;
+    if (ALDepthBounds::viewSpan(proj, view_z + reach, view_z - reach, zmin, zmax))
+    {
+        widen_for_storage(zmin, zmax);
+    }
+    else
+    {
+        ALDepthBounds::drawn(zmin, zmax);
+    }
+    bounds.set(zmin, zmax);
 }
 
 void LLPipeline::calcNearbyLights(LLCamera& camera)
@@ -8091,7 +8245,7 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
     static LLCachedControl<F32> lens_flare_occlusion_scale(gSavedSettings, "RenderLensFlareOcclusionScale", 1.f);
     static LLCachedControl<F32> lens_flare_fade_time(gSavedSettings, "RenderLensFlareFadeTime", 0.35f);
 
-    if (gSnapshotNoPost)
+    if (suppressesLensAndPrintEffects())
     {
         // A clean-plate render: colorCorrect zeroes the strength for this
         // frame, so hold the history rather than clear it, or the flare would
@@ -8339,7 +8493,9 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 // Pyramid needs at least 3 mips for the downsample/upsample chain
                 // to be meaningful; otherwise gate the signal to zero so a partial
                 // allocation doesn't leak an unfiltered mip into the scene.
-                const F32 strength_gate = (mRT->bloomMipCount >= 3) ? 1.0f : 0.0f;
+                // A cutout frame builds no pyramid, so what is in it is an
+                // earlier frame's.
+                const F32 strength_gate = (mRT->bloomMipCount >= 3 && !sCutoutRender) ? 1.0f : 0.0f;
                 shader->uniform1f(LLShaderMgr::BLOOM_STRENGTH,    llmax(bloom_strength(), 0.0f)    * strength_gate);
                 shader->uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f) * strength_gate);
                 const LLColor3& tint = halation_tint();
@@ -8361,7 +8517,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 // quadrant of mWaterDis, whose completeness says nothing about
                 // what is in it.
                 const bool streaks_live = mRT->crossFilterReady && mWaterDis.isComplete();
-                const F32  streaks      = (streaks_live && !gSnapshotNoPost)
+                const F32  streaks      = (streaks_live && !suppressesLensAndPrintEffects())
                                         ? llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH) * strength_gate
                                         : 0.f;
                 shader->uniform1f(LLShaderMgr::CROSS_STRENGTH, streaks);
@@ -8382,6 +8538,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         }
 
         shader->uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (GLfloat)src->getWidth(), (GLfloat)src->getHeight());
+        shader->uniform1f(LLShaderMgr::CUTOUT_PREMULTIPLIED, sCutoutRender ? 1.f : 0.f);
 
         // The other half of the "No post-processing" contract. The grade is
         // gated where this pass's program is chosen and the print effects in
@@ -8389,7 +8546,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // aberration and the lens flare are applied *inside* this program, in
         // every variant including the no-post ones, so their strengths have to
         // be silenced here or a clean plate still carries both.
-        const bool clean_plate = gSnapshotNoPost;
+        const bool suppress_effects = suppressesLensAndPrintEffects();
         // The material preview renders through here too, inside the auxiliary
         // target pack. The flare state was measured for the world frame, so
         // only the main pack gets the flare; aberration is left as it was.
@@ -8408,7 +8565,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // strength (and pre-apply the 0.02 peak-offset scale), take the
         // reciprocal of falloff, and turn the angle into a (sin, cos) pair.
         // Saves one mul, one div, and one sincos per fragment.
-        F32 ca_strength = clean_plate ? 0.f : llclamp(chromatic_aberration_strength(), 0.f, 1.f);
+        F32 ca_strength = suppress_effects ? 0.f : llclamp(chromatic_aberration_strength(), 0.f, 1.f);
         F32 ca_falloff  = llclamp(chromatic_aberration_falloff(),  0.5f, 4.f);
         F32 ca_angle_rad = llclamp(chromatic_aberration_angle(), 0.f, 360.f) * 0.01745329252f;
         shader->uniform1f(LLShaderMgr::CA_AMOUNT, ca_strength * ca_strength * 0.02f);
@@ -8443,7 +8600,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
             // Zeroing the master strength both hits the shader's early-out and
             // skips the whole detail block below.
-            F32 strength = (clean_plate || !world_frame) ? 0.f : llclamp(lens_flare_strength(), 0.f, 1.f);
+            F32 strength = (suppress_effects || !world_frame) ? 0.f : llclamp(lens_flare_strength(), 0.f, 1.f);
             shader->uniform1f(LLShaderMgr::LENS_FLARE_STRENGTH, strength);
 
             if (strength > 0.f)
@@ -8507,7 +8664,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             static LLCachedControl<F32> lens_dirt_bloom(gSavedSettings, "RenderLensDirtBloomResponse", 1.f);
             static LLCachedControl<F32> lens_dirt_flare(gSavedSettings, "RenderLensDirtFlareResponse", 1.f);
 
-            const F32 dirt_strength = (clean_plate || !world_frame || !mLensDirtMap.isComplete())
+            const F32 dirt_strength = (suppress_effects || !world_frame || !mLensDirtMap.isComplete())
                                     ? 0.f
                                     : llclamp(lens_dirt_strength(), 0.f, 2.f);
 
@@ -8842,10 +8999,39 @@ void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget*
     if (RenderScreenSpaceReflections && !gCubeSnapshot)
     {
         LL_PROFILE_GPU_ZONE("ssr copy");
-        LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
         dst->copyContents(*src, 0, 0, src->getWidth(), src->getHeight(), 0, 0, dst->getWidth(), dst->getHeight(),
-                         GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        copySceneDepth(*dst);
     }
+}
+
+void LLPipeline::copySceneDepth(LLRenderTarget& dst)
+{
+    LL_PROFILE_GPU_ZONE("depth copy");
+    LLRenderTarget& src = mRT->deferredScreen;
+    if (!gCopyDepthProgram.isComplete())
+    {
+        // Unstretched, where the two differ in size, but the depth all the same.
+        dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
+                         GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        return;
+    }
+
+    dst.bindTarget();
+    {
+        LLGLSColorMask no_color(false, false);
+        LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
+        LLGLDisable no_blend(GL_BLEND);
+        LLGLDisable no_cull(GL_CULL_FACE);
+
+        gCopyDepthProgram.bind();
+        gCopyDepthProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &src, ALSamplers::PointClamp);
+        mScreenTriangleVB->setBuffer();
+        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+        gCopyDepthProgram.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
+        gCopyDepthProgram.unbind();
+    }
+    dst.flush();
 }
 
 void LLPipeline::generateGlow(LLRenderTarget* src)
@@ -10124,7 +10310,20 @@ void LLPipeline::renderFinalize()
 
     static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
     bool hdr = gGLManager.mGLVersion > 4.05f && has_hdr();
-    if (hdr)
+
+    // A cutout frame measures nothing and leaves nothing behind. It is mostly
+    // empty, so metering it would brighten the subject, and the next live frame
+    // would reflect and meter a world with everything but the subject cut out.
+    // The last live frame's exposure serves, as it does for the scopes.
+    //
+    // Everything that spreads past a pixel is left out as well -- depth of
+    // field, bloom, glow, anti-aliasing and sharpening -- since each carries
+    // the subject's edge into what is to be left empty, where the coverage
+    // written after the frame (copyCutoutCoverageToAlpha) knows nothing of it.
+    // Edges come from rendering the cutout larger and averaging it down.
+    const bool cutout = sCutoutRender;
+
+    if (hdr && !cutout)
     {
         copyScreenSpaceReflections(&mRT->screen, &mSceneMap);
 
@@ -10142,7 +10341,11 @@ void LLPipeline::renderFinalize()
     // rather than the scene -- which is no use to a tool whose whole job is to
     // decide what the grade should be. It has to precede DoF for the same
     // reason: a sample from a defocused pixel describes the blur, not the scene.
-    serviceScenePixelProbe(&mRT->screen);
+    // Nor from a cutout, which describes one subject on nothing.
+    if (!cutout)
+    {
+        serviceScenePixelProbe(&mRT->screen);
+    }
 
     // Depth of field, in place on mRT->screen.
     //
@@ -10165,7 +10368,7 @@ void LLPipeline::renderFinalize()
     // SSR, luminance and exposure stay above deliberately: reflections keep
     // their detail, and a blur conserves mean energy so metering is unaffected.
     static LLCachedControl<bool> RenderDepthOfFieldInEditMode(gSavedSettings, "RenderDepthOfFieldInEditMode", false);
-    if (RenderDepthOfField && (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) && !gCubeSnapshot)
+    if (RenderDepthOfField && (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) && !gCubeSnapshot && !cutout)
     {
         renderDoF();
 
@@ -10178,7 +10381,7 @@ void LLPipeline::renderFinalize()
         glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
     }
 
-    if (hdr)
+    if (hdr && !cutout)
     {
         // HDR bloom runs pre-tonemap against the linear scene buffer -- now the
         // defocused one. The pyramid is generated here; the additive composite
@@ -10202,7 +10405,7 @@ void LLPipeline::renderFinalize()
 
     // Legacy glow for non-HDR path.  In the HDR path, glow is extracted as part of the
     // bloom process and composited back in after tonemapping.
-    if (!hdr)
+    if (!hdr && !cutout)
     {
         generateGlow(&mRT->postPingMap);
     }
@@ -10210,12 +10413,14 @@ void LLPipeline::renderFinalize()
     LLRenderTarget* sourceBuffer = &mRT->postPingMap;
     LLRenderTarget* targetBuffer = &mRT->postPongMap;
 
-    if (RenderFSAAType == 1)
+    // Anti-aliasing and sharpening both spread past a pixel, so a cutout
+    // frame skips them (see above).
+    if (RenderFSAAType == 1 && !cutout)
     {
         applyFXAA(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
-    else if (RenderFSAAType == 2)
+    else if (RenderFSAAType == 2 && !cutout)
     {
         generateSMAABuffers(sourceBuffer);
         applySMAA(sourceBuffer, targetBuffer);
@@ -10223,13 +10428,13 @@ void LLPipeline::renderFinalize()
     }
 
     static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
-    if (cas_sharpness > 0.0f && gCASProgram.isComplete())
+    if (cas_sharpness > 0.0f && gCASProgram.isComplete() && !cutout)
     {
         applyCAS(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
 
-    if (!hdr)
+    if (!hdr && !cutout)
     {
         combineGlow(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
@@ -10250,7 +10455,7 @@ void LLPipeline::renderFinalize()
     }
 // [/RLVa:KB]
 
-    if (RenderBufferVisualization > -1)
+    if (RenderBufferVisualization > -1 && !cutout)
     {
         switch (RenderBufferVisualization)
         {
@@ -10286,12 +10491,16 @@ void LLPipeline::renderFinalize()
 
     // Measure what is about to be presented. After every post pass, before
     // the vignette/grain/dither the final blit adds -- those are print
-    // effects, deliberately outside the measurement.
-    captureScopeSample(sourceBuffer);
+    // effects, deliberately outside the measurement. A cutout frame is not
+    // what the scopes describe.
+    if (!cutout)
+    {
+        captureScopeSample(sourceBuffer);
 
-    // Same point, same reason: a still and the scopes must agree about what a
-    // frame is, or the numbers will not describe the picture beside them.
-    captureReferenceStill(sourceBuffer);
+        // Same point, same reason: a still and the scopes must agree about what a
+        // frame is, or the numbers will not describe the picture beside them.
+        captureReferenceStill(sourceBuffer);
+    }
 
     // Present the screen target.
     {
@@ -10318,7 +10527,7 @@ void LLPipeline::renderFinalize()
         // Dither is not in the list on purpose. It is a quantisation aid rather
         // than a look, and an 8-bit PNG wants it whether or not the rest is
         // wanted.
-        const bool clean_plate = gSnapshotNoPost;
+        const bool suppress_effects = suppressesLensAndPrintEffects();
 
         // Lens distortion
         //
@@ -10343,7 +10552,7 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<LLVector3> distort_center(gSavedSettings, "RenderLensDistortionCenter", LLVector3(0.f, 0.f, 0.f));
         static LLCachedControl<LLVector3> distort_tangential(gSavedSettings, "RenderLensDistortionTangential", LLVector3(0.f, 0.f, 0.f));
 
-        const F32 distort = clean_plate ? 0.f : llclamp(distort_amount(), 0.f, 1.f);
+        const F32 distort = suppress_effects ? 0.f : llclamp(distort_amount(), 0.f, 1.f);
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::LENS_DISTORT_AMOUNT, distort);
 
         // Zeroing the master both hits the shader's early-out and skips the
@@ -10530,7 +10739,7 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<LLVector3> vignette_center(gSavedSettings, "RenderVignetteCenter", LLVector3(0.0f, 0.0f, 0.0f));
         static LLCachedControl<bool>      vignette_correct_aspect(gSavedSettings, "RenderVignetteCorrectAspect", false);
         static LLCachedControl<F32>       vignette_feather(gSavedSettings, "RenderVignetteFeather", 1.0f);
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_AMOUNT, clean_plate ? 0.0f : llclamp(vignette_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_AMOUNT, suppress_effects ? 0.0f : llclamp(vignette_amount(), 0.0f, 1.0f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_RADIUS, llclamp(vignette_radius(), 0.25f, 1.5f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_SOFT, llclamp(vignette_soft(), 0.05f, 1.0f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_SHAPE, llclamp(vignette_shape(), 0.0f, 1.0f));
@@ -10551,8 +10760,8 @@ void LLPipeline::renderFinalize()
         // CVD Compensation
         static LLCachedControl<S32> cvd_mode(gSavedSettings, "RenderCVDMode", 0);
         static LLCachedControl<F32> cvd_amount(gSavedSettings, "RenderCVDAmount", 0.0f);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::CVD_MODE, clean_plate ? 0 : llclamp(cvd_mode(), 0, 3));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::CVD_AMOUNT, clean_plate ? 0.0f : llclamp(cvd_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::CVD_MODE, suppress_effects ? 0 : llclamp(cvd_mode(), 0, 3));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::CVD_AMOUNT, suppress_effects ? 0.0f : llclamp(cvd_amount(), 0.0f, 1.0f));
 
         // Film Grain
         static LLCachedControl<bool>     film_grain_animated(gSavedSettings, "RenderFilmGrainAnimated", true);
@@ -10561,7 +10770,7 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<F32>      film_grain_size(gSavedSettings, "RenderFilmGrainSize", 1.0f);
         static LLCachedControl<F32>      film_grain_range(gSavedSettings, "RenderFilmGrainRange", 0.5f);
         static LLCachedControl<LLColor3> film_grain_tint(gSavedSettings, "RenderFilmGrainTint", LLColor3(1.0f, 1.0f, 1.0f));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_AMOUNT, clean_plate ? 0.0f : llclamp(film_grain_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_AMOUNT, suppress_effects ? 0.0f : llclamp(film_grain_amount(), 0.0f, 1.0f));
         gBlitWithEffectsProgram.uniform1i(LLShaderMgr::GRAIN_STYLE, llclamp(film_grain_style(), 0, 3));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_SIZE, llclamp(film_grain_size(), 1.0f, 8.0f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_RANGE, llclamp(film_grain_range(), 0.0f, 1.0f));
@@ -10577,7 +10786,7 @@ void LLPipeline::renderFinalize()
 
         // Previews
         static LLCachedControl<S32> preview_mode(gSavedSettings, "RenderEffectPreviewMode", 0);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::PREVIEW_MODE, clean_plate ? 0 : llclamp(preview_mode(), 0, 7));
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::PREVIEW_MODE, suppress_effects ? 0 : llclamp(preview_mode(), 0, 7));
 
         // Reference still. The mode is forced off unless a still actually
         // exists, which is what lets the shader read the sampler without
@@ -10587,7 +10796,7 @@ void LLPipeline::renderFinalize()
         // not a snapshot of the image.
         static LLCachedControl<S32> ref_wipe_mode(gSavedSettings, "RenderReferenceWipeMode", 0);
         static LLCachedControl<F32> ref_wipe_pos(gSavedSettings, "RenderReferenceWipePosition", 0.5f);
-        const S32 wipe_mode = (hasReferenceStill() && !clean_plate) ? llclamp(ref_wipe_mode(), 0, 2) : 0;
+        const S32 wipe_mode = (hasReferenceStill() && !suppress_effects) ? llclamp(ref_wipe_mode(), 0, 2) : 0;
         gBlitWithEffectsProgram.uniform1i(LLShaderMgr::REFERENCE_WIPE_MODE, wipe_mode);
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::REFERENCE_WIPE_POS, llclamp(ref_wipe_pos(), 0.f, 1.f));
         if (wipe_mode != 0)
@@ -10606,7 +10815,7 @@ void LLPipeline::renderFinalize()
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
-    if (hasRenderDebugMask(LLPipeline::RENDER_DEBUG_PHYSICS_SHAPES))
+    if (hasRenderDebugMask(LLPipeline::RENDER_DEBUG_PHYSICS_SHAPES) && !cutout)
     {
         renderPhysicsDisplay();
     }
@@ -11025,6 +11234,10 @@ void LLPipeline::renderDeferredLighting()
 
     llassert(!sRenderingHUDs);
 
+    // Read here, ahead of every pass that holds to it: the lighting and, through renderGeomPostDeferred, the haze.
+    static LLCachedControl<bool> depth_bounds(gSavedSettings, "AlchemyRenderDepthBoundsTest", true);
+    ALDepthBounds::sEnabled = depth_bounds;
+
     F32 light_scale = 1.f;
 
     if (gCubeSnapshot)
@@ -11099,7 +11312,7 @@ void LLPipeline::renderDeferredLighting()
                     // depth: only geometry is shadowed and occluded, and the sky keeps the clear's white, which
                     // nothing reads there (the soften pass's sky program lights nothing).
                     LLGLDisable   blend(GL_BLEND);
-                    LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+                    ALDrawnOnly   drawn;
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 }
 
@@ -11148,7 +11361,7 @@ void LLPipeline::renderDeferredLighting()
             // in either target.
             {
                 LLGLDisable   blend(GL_BLEND);
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+                ALDrawnOnly   drawn;
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
@@ -11164,7 +11377,7 @@ void LLPipeline::renderDeferredLighting()
 
             {
                 LLGLDisable   blend(GL_BLEND);
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+                ALDrawnOnly   drawn;
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
@@ -11202,7 +11415,7 @@ void LLPipeline::renderDeferredLighting()
             // not, so no sky pixel pays for the G-buffer decode and atmospherics it would throw away.
             LLGLDisable blend(GL_BLEND);
             {
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+                ALDrawnOnly drawn;
 
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -11252,6 +11465,8 @@ void LLPipeline::renderDeferredLighting()
 
             LLVertexBuffer::unbind();
 
+            // Each pass binds a deferred program, the G-buffer and the probes: none where it has no light to draw.
+            if (!mNearbyLights.empty())
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - local lights");
                 LL_PROFILE_GPU_ZONE("local lights");
@@ -11266,6 +11481,16 @@ void LLPipeline::renderDeferredLighting()
                 mCubeVB->setBuffer();
 
                 LLGLDepthTest depth(GL_TRUE, GL_FALSE);
+                // Each volume is held to the depths its light reaches as well: its depth test passes everything
+                // behind it, which the light does not.
+                const LLMatrix4a& proj = LLViewerCamera::getCurrent().getProjection();
+                std::optional<ALDepthBounds> bounds;
+                if (ALDepthBounds::available())
+                {
+                    F64 zmin, zmax;
+                    ALDepthBounds::drawn(zmin, zmax);
+                    bounds.emplace(zmin, zmax);
+                }
                 // mNearbyLights already includes distance calculation and excludes muted avatars.
                 // It is calculated from mLights
                 // mNearbyLights also provides fade value to gracefully fade-out out of range lights
@@ -11339,6 +11564,13 @@ void LLPipeline::renderDeferredLighting()
                         light_shader.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, col.mV);
                         light_shader.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
 
+                        if (bounds)
+                        {
+                            LLVector4a view;
+                            mat.affineTransform(center, view);
+                            bound_to_light(*bounds, proj, view[2], s);
+                        }
+
                         gGL.syncMatrices();
 
                         mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
@@ -11371,6 +11603,15 @@ void LLPipeline::renderDeferredLighting()
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - projectors");
                 LL_PROFILE_GPU_ZONE("projectors");
                 LLGLDepthTest depth(GL_TRUE, GL_FALSE);
+                // Held to the depths each projector reaches, as the point lights are.
+                const LLMatrix4a& proj = LLViewerCamera::getCurrent().getProjection();
+                std::optional<ALDepthBounds> bounds;
+                if (ALDepthBounds::available())
+                {
+                    F64 zmin, zmax;
+                    ALDepthBounds::drawn(zmin, zmax);
+                    bounds.emplace(zmin, zmax);
+                }
                 LLGLSLShader& spot_shader = *gDeferredSpotLightProgram.selectVariant();
                 bindDeferredShader(spot_shader);
 
@@ -11397,6 +11638,13 @@ void LLPipeline::renderDeferredLighting()
                     spot_shader.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, spot.col.mV);
                     spot_shader.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
 
+                    if (bounds)
+                    {
+                        LLVector4a view;
+                        mat.affineTransform(center, view);
+                        bound_to_light(*bounds, proj, view[2], s);
+                    }
+
                     gGL.syncMatrices();
 
                     mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
@@ -11405,11 +11653,15 @@ void LLPipeline::renderDeferredLighting()
                 unbindDeferredShader(spot_shader);
             }
 
+            if (!fullscreen_lights.empty() || !fullscreen_spot_lights.empty())
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - fullscreen lights");
                 // On the far plane (multiPointLightV.glsl): only where the world drew something, so no light is
-                // shaded over the sky.
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+                // shaded over the sky. Under the depth bounds test each draw is held as well to the depths its lights
+                // reach, from the eye, which they surround, out to the farthest of them.
+                ALDrawnOnly drawn;
+                ALDepthBounds* bounds = drawn.bounds();
+                const LLMatrix4a& proj = LLViewerCamera::getCurrent().getProjection();
                 LL_PROFILE_GPU_ZONE("fullscreen lights");
 
                 U32 count = 0;
@@ -11440,6 +11692,19 @@ void LLPipeline::renderDeferredLighting()
                         multi_light_shader.uniform4fv(LLShaderMgr::MULTI_LIGHT, count, light[0].mV);
                         multi_light_shader.uniform4fv(LLShaderMgr::MULTI_LIGHT_COL, count, col[0].mV);
                         multi_light_shader.uniform1f(LLShaderMgr::MULTI_LIGHT_FAR_Z, far_z);
+                        if (bounds)
+                        {   // far_z is the farthest of the lights' spheres, as the shader's cut is
+                            F64 zmin, zmax;
+                            if (ALDepthBounds::viewSpan(proj, 0.f, far_z * 1.01f - 0.01f, zmin, zmax))
+                            {
+                                widen_for_storage(zmin, zmax);
+                            }
+                            else
+                            {
+                                ALDepthBounds::drawn(zmin, zmax);
+                            }
+                            bounds->set(zmin, zmax);
+                        }
                         far_z = 0.f;
                         count = 0;
                         mScreenTriangleVB->setBuffer();
@@ -11449,11 +11714,12 @@ void LLPipeline::renderDeferredLighting()
                 }
 
                 LLGLSLShader& multi_spot_shader = *gDeferredMultiSpotLightProgram.selectVariant();
-                bindDeferredShader(multi_spot_shader);
-
-                multi_spot_shader.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
-
-                mScreenTriangleVB->setBuffer();
+                if (!fullscreen_spot_lights.empty())
+                {
+                    bindDeferredShader(multi_spot_shader);
+                    multi_spot_shader.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
+                    mScreenTriangleVB->setBuffer();
+                }
 
                 for (const SpotLight& spot : fullscreen_spot_lights)
                 {
@@ -11468,6 +11734,11 @@ void LLPipeline::renderDeferredLighting()
                     LLVector4a tc;
                     mat.affineTransform(LLVector4a(center.mV[0], center.mV[1], center.mV[2], 1.f), tc);
 
+                    if (bounds)
+                    {
+                        bound_to_light(*bounds, proj, tc[2], light_size_final);
+                    }
+
                     setupSpotLight(multi_spot_shader, drawablep);
 
                     multi_spot_shader.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, tc.getF32ptr());
@@ -11478,8 +11749,11 @@ void LLPipeline::renderDeferredLighting()
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 }
 
-                multi_spot_shader.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
-                unbindDeferredShader(multi_spot_shader);
+                if (!fullscreen_spot_lights.empty())
+                {
+                    multi_spot_shader.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
+                    unbindDeferredShader(multi_spot_shader);
+                }
             }
 
             // Clear does not free internal vector storage, so this is more efficient than creating new vectors each frame
@@ -11549,9 +11823,9 @@ bool LLPipeline::skyBehindWanted() const
     {
         return false;
     }
-    // stateSort fills the water pool with this view's visible water, edge water included, before the sky pool draws.
-    const LLFacePool* water = static_cast<const LLFacePool*>(mWaterPool);
-    return water && !water->mDrawFace.empty();
+    // The water's slab, rim to rim, against the frustum. What the frustum holds but the world hides, as water under the
+    // land, the sky pool's query finds (LLDrawPoolWLSky::renderSkyHazeDeferred).
+    return mWaterPool && hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.inView(*LLViewerCamera::getInstance());
 }
 
 void LLPipeline::doAtmospherics()
@@ -11567,54 +11841,77 @@ void LLPipeline::doAtmospherics()
     {
         {
             // copy depth buffer for use in haze shader (use water displacement map as temp storage)
-            LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
-
-            LLRenderTarget& src = gPipeline.mRT->screen;
-            LLRenderTarget& dst = gPipeline.mWaterDis;
-
-            src.flush();
-            dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
-                             GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            mRT->screen.flush();
+            copySceneDepth(mWaterDis);
             mRT->screen.bindTarget();
         }
 
         LLGLEnable blend(GL_BLEND);
-        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO, LLRender::BF_SOURCE_ALPHA);
+        // The haze dims the glow in the alpha as it dims what is lit. In a cutout frame the alpha is the subject's
+        // coverage, seeded before this pass, and haze in front of the subject leaves it no less covered.
+        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO,
+                      alphaWritesCoverage() ? LLRender::BF_ONE : LLRender::BF_SOURCE_ALPHA);
         // The caller's mask comes back for the pools drawn after the haze.
         LLGLSColorMask color_mask(true, true);
 
-        // apply haze
-        LLGLSLShader& haze_shader = *gHazeProgram.selectVariant();
-
         LL_PROFILE_GPU_ZONE("haze");
-        bindDeferredShader(haze_shader, nullptr, &mWaterDis);
 
-        LLEnvironment& environment = LLEnvironment::instance();
-        haze_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
-        haze_shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
+        // The triangle lies on the far plane (hazeV.glsl), level with the depth the sky leaves cleared: it passes
+        // only where the world drew something, so the sky is rejected before it is shaded. The screen target shares
+        // the G-buffer's depth; the shader reads its copy in mWaterDis.
+        ALDrawnOnly drawn;
 
-        haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
+        const auto apply_haze = [this](LLGLSLShader& haze_shader, bool on_water)
+        {
+            bindDeferredShader(haze_shader, nullptr, &mWaterDis);
+
+            LLEnvironment& environment = LLEnvironment::instance();
+            haze_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
+            haze_shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
+
+            haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
+
+            if (on_water)
+            {
+                haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, &mSkyBehind, ALSamplers::BilinearClamp);
+            }
+
+            // full screen blit
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+            if (on_water)
+            {
+                haze_shader.disableTexture(LLShaderMgr::SKY_BEHIND_MAP);
+            }
+            unbindDeferredShader(haze_shader);
+        };
 
         // Far water converges on the sky drawn behind it when this view's is there: the main view's alone, once the
-        // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit).
+        // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit). The water
+        // marked its own pixels in the stencil, so the two draws shade each pixel once. The water's draw runs only if
+        // the sky pool's query saw water: its field covers every pixel the water marked, and inland none is.
         const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind.isComplete() && mSkyBehindFrame == gFrameCount;
-        haze_shader.uniform1f(LLShaderMgr::SKY_BEHIND_WEIGHT, sky_behind ? 1.f : 0.f);
         if (sky_behind)
         {
-            haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, &mSkyBehind, ALSamplers::BilinearClamp);
+            {
+                ALWaterStencil::OffWater stencil;
+                apply_haze(*gHazeProgram.selectVariant(), false);
+            }
+            {
+                ALWaterStencil::OnWater stencil;
+                std::optional<ALConditionalRender> if_water;
+                if (mSkyBehindQueryFrame == gFrameCount)
+                {
+                    if_water.emplace(gGL.queries(), mSkyBehindQuery);
+                }
+                apply_haze(*gHazeOnWaterProgram.selectVariant(), true);
+            }
         }
-
-        // The triangle lies on the far plane (hazeV.glsl), level with the depth the sky leaves cleared: the test
-        // passes only where the world drew something, so the sky is rejected before it is shaded. The screen
-        // target shares the G-buffer's depth; the shader reads its copy in mWaterDis.
-        LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
-
-        // full screen blit
-        mScreenTriangleVB->setBuffer();
-        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-
-        haze_shader.disableTexture(LLShaderMgr::SKY_BEHIND_MAP);
-        unbindDeferredShader(haze_shader);
+        else
+        {
+            apply_haze(*gHazeProgram.selectVariant(), false);
+        }
 
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
@@ -11632,14 +11929,8 @@ void LLPipeline::doWaterHaze()
     {
         // copy depth buffer for use in haze shader (use water displacement map as temp storage)
         {
-            LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
-
-            LLRenderTarget& src = gPipeline.mRT->screen;
-            LLRenderTarget& dst = gPipeline.mWaterDis;
-
-            src.flush();
-            dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
-                    GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            mRT->screen.flush();
+            copySceneDepth(mWaterDis);
             mRT->screen.bindTarget();
         }
 
@@ -11652,36 +11943,34 @@ void LLPipeline::doWaterHaze()
         // apply haze
         LLGLSLShader& haze_shader = gHazeWaterProgram;
 
-        LL_PROFILE_GPU_ZONE("haze");
+        LL_PROFILE_GPU_ZONE("water haze");
         bindDeferredShader(haze_shader, nullptr, &mWaterDis);
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
         haze_shader.uniform1i(LLShaderMgr::WATER_ABOVE_WATER, sUnderWaterRender ? -1 : 1);
-        haze_shader.bindTexture(LLShaderMgr::WATER_EXCLUSIONTEX, &mWaterExclusionMask);
 
         if (LLPipeline::sUnderWaterRender)
         {
             LLGLDepthTest depth(GL_FALSE);
 
-            // full screen blit
-            mScreenTriangleVB->setBuffer();
-            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            // full screen blit, the triangle worked from the vertex id (waterHazeV.glsl)
+            gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
         }
         else
         {
-            //render water patches like LLDrawPoolWater does
+            // The field as LLDrawPoolWater draws it, flat.
             // Default LEQUAL auto-translates to GEQUAL under reverse-Z, mirroring the manual
             // above-water depth test in waterHazeF.glsl (which flips its compare direction).
             LLGLDepthTest depth(GL_TRUE, GL_FALSE);
             LLGLDisable   cull(GL_CULL_FACE);
+            // Not where an exclusion prim removed the water.
+            ALWaterStencil::NotExcluded stencil;
 
             gGLLastMatrix = NULL;
             gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
-            if (mWaterPool)
-            {
-                mWaterPool->pushFaceGeometry();
-            }
+            mWaterSurface.bind(haze_shader);
+            mWaterSurface.draw(haze_shader, false);
         }
 
         unbindDeferredShader(haze_shader);
@@ -11691,7 +11980,7 @@ void LLPipeline::doWaterHaze()
     }
 }
 
-void LLPipeline::doWaterExclusionMask()
+void LLPipeline::doWaterExclusion()
 {
     if (sImpostorRender)
     {   // No water in an impostor bake -- generateImpostor clears every water render type --
@@ -11702,17 +11991,12 @@ void LLPipeline::doWaterExclusionMask()
         return;
     }
 
-    mWaterExclusionMask.bindTarget();
-    gGL.setClearColor(LLColor4::white);
-    mWaterExclusionMask.clear();
-    // Made in init and kept to cleanup. Without it the mask stays cleared, excluding nothing.
+    LL_PROFILE_GPU_ZONE("water exclusion");
+    // Made in init and kept to cleanup. Without it nothing marks the stencil, which excludes nothing.
     if (mWaterExclusionPool)
     {
         mWaterExclusionPool->render();
     }
-
-    mWaterExclusionMask.flush();
-    gGL.setClearColor(LLColor4::transparent);
 }
 
 // The map from clip space to a texture: x and y from [-1, 1] to [0, 1], z by
@@ -12029,16 +12313,16 @@ inline float sgn(float a)
     return (0.0F);
 }
 
-void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp, bool do_cull)
+void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp, bool do_cull, S32 occlusion)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("renderShadow");
 
     LLPipeline::sShadowRender = true;
 
-    // disable occlusion culling during shadow render
+    // Occlusion culling as the caller asks, by the shadow camera's own queries: none unless it does.
     U32 saved_occlusion = sUseOcclusion;
-    sUseOcclusion = 0;
+    sUseOcclusion = occlusion;
 
     // List of render pass types that use the prim volume as the shadow,
     // ignoring textures.
@@ -12487,24 +12771,6 @@ LLRenderTarget* LLPipeline::getSpotShadowTarget(U32 i)
     return &mSpotShadow[i];
 }
 
-// helper class for disabling occlusion culling for the current stack frame
-class LLDisableOcclusionCulling
-{
-public:
-    S32 mUseOcclusion;
-
-    LLDisableOcclusionCulling()
-    {
-        mUseOcclusion = LLPipeline::sUseOcclusion;
-        LLPipeline::sUseOcclusion = 0;
-    }
-
-    ~LLDisableOcclusionCulling()
-    {
-        LLPipeline::sUseOcclusion = mUseOcclusion;
-    }
-};
-
 // Re-bucket a shared sun-shadow cull (produced by a single union octree walk) down to one
 // cascade: copy the union's visible/drawable groups whose object bounds intersect this
 // cascade's frustum into `dst` (the same AABBInFrustumObjectBounds test the per-cascade
@@ -12799,6 +13065,32 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         static LLCachedControl<S32> sShadowCullMode(gSavedSettings, "RenderShadowCullMode", 0);
         bool have_union_cull = false;
         static LLCullResult sUnionShadowResult;
+
+        // Occlusion culling of the cascades' casters, where it is asked for: a caster the sun cannot see past the ones
+        // nearer it leaves no depth in a map. Not with the union cull, whose groups each cascade takes without their
+        // occlusion state, nor in probe captures, nor in a frame whose depth the main view does not trust either.
+        static LLCachedControl<bool> shadow_occlusion(gSavedSettings, "AlchemyRenderShadowOcclusion", false);
+        const S32 sun_occlusion =
+            shadow_occlusion() && no_occlusion.mUseOcclusion > 1 && sShadowCullMode() == 0 && !gCubeSnapshot ? 2 : 0;
+        if (!gCubeSnapshot)
+        {
+            // What the cascades' queries found holds along the direction they were asked: it is forgotten once that has
+            // turned by a degree, as it does at once from the sun to the moon or under an edit, and when the culling
+            // comes back on.
+            constexpr F32    TURNED = 0.99985f; // cos 1 degree
+            static bool      occluding = false;
+            static LLVector3 occluding_along;
+            if (sun_occlusion && (!occluding || occluding_along * lightDir < TURNED))
+            {
+                for (U32 j = 0; j < 4; ++j)
+                {
+                    LLOcclusionCullingGroup::forgetOcclusion(LLViewerCamera::CAMERA_SUN_SHADOW0 + j);
+                }
+                occluding_along = lightDir;
+            }
+            occluding = sun_occlusion != 0;
+        }
+
         if (sShadowCullMode() == 1 && !gCubeSnapshot)
         {
             LLCamera ucam = camera;
@@ -13252,7 +13544,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 {   // re-bucket the shared union cull down to this cascade's frustum
                     bucketShadowCull(sUnionShadowResult, shadow_cam, result[j]);
                 }
-                renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull);
+                renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull, sun_occlusion);
             }
 
             mRT->shadow[j].flush();
@@ -13475,8 +13767,8 @@ void LLPipeline::renderRiggedGroups(LLRenderPass* pass, U32 type, bool texture)
 
 void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
 {
-    if (gGLManager.mGLVersion < 3.25f)
-    { // profiling requires GL 3.3 or later
+    if (profile_attachments ? !mAttachmentSpans.empty() : avatar->isProfilePending())
+    { // the last profile's times are still on their way; another would throw them away
         return;
     }
 
@@ -13524,11 +13816,14 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
 
         avatar->mCPURenderTime = (F32)cpu_timer.getElapsedTimeF32() * 1000.f;
 
-        avatar->readProfileQuery(5); // allow up to 5 frames of latency
+        // read by the avatar's idleUpdate() once its frame has been
+        avatar->endProfileQuery();
     }
     else
     {
-        // profile attachments one at a time
+        // profile attachments one at a time, each in a span of gGL's pool, read by readAttachmentTimes() once their
+        // frame has been
+        ALQueryPool& queries = gGL.queries();
         LLVOAvatar::attachment_map_t::iterator iter;
         LLVOAvatar::attachment_map_t::iterator begin = avatar->mAttachmentPoints.begin();
         LLVOAvatar::attachment_map_t::iterator end = avatar->mAttachmentPoints.end();
@@ -13545,14 +13840,10 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
                 LLViewerObject* attached_object = attachment_iter->get();
                 if (attached_object)
                 {
-                    // use gDebugProgram to do the GPU queries
-                    gDebugProgram.clearStats();
-                    gDebugProgram.placeProfileQuery(true);
-
+                    ALQuerySpan span = queries.beginSpan();
                     generateImpostor(avatar, false, true, attached_object);
-                    gDebugProgram.readProfileQuery(true, true);
-
-                    attached_object->mGPURenderTime = gDebugProgram.mTimeElapsed / 1000000.f;
+                    queries.endSpan(span);
+                    mAttachmentSpans.emplace_back(attached_object, span);
                 }
             }
         }
@@ -13572,6 +13863,136 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
     {
         cur_shader->bind();
     }
+}
+
+void LLPipeline::drawFarPlaneQuad(U32 depth_func, const LLColor4* color)
+{
+    gGL.getTextureSlot(0)->unbind();
+
+    // Both directions auto-translate under reverse-Z (via LLGLDepthTest::remap),
+    // and the quad sits at the reverse-Z far plane (~0) instead of ~1.
+    LLGLDepthTest depth(GL_TRUE, GL_FALSE, depth_func);
+
+    gGL.flush();
+
+    gGL.pushMatrix();
+    gGL.loadIdentity();
+    gGL.matrixMode(LLRender::MM_PROJECTION);
+    gGL.pushMatrix();
+    gGL.loadIdentity();
+
+    // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO),
+    // consistent with the sunDisc/moon far pins.
+    const F32 clip_plane = LLRender::sReverseZ ? 0.000005f : 0.99999f;
+
+    gDebugProgram.bind();
+
+    if (color)
+    {
+        gGL.diffuseColor4fv(color->mV);
+    }
+
+    gGL.begin(LLRender::TRIANGLES);
+    {
+        gGL.vertex3f(-1.f, -1.f, clip_plane);
+        gGL.vertex3f(1.f, -1.f, clip_plane);
+        gGL.vertex3f(1.f, 1.f, clip_plane);
+
+        gGL.vertex3f(-1.f, -1.f, clip_plane);
+        gGL.vertex3f(1.f, 1.f, clip_plane);
+        gGL.vertex3f(-1.f, 1.f, clip_plane);
+    }
+    gGL.end();
+    gGL.flush();
+
+    gDebugProgram.unbind();
+
+    gGL.popMatrix();
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.popMatrix();
+}
+
+void LLPipeline::seedCutoutCoverageFromDepth()
+{
+    LL_PROFILE_GPU_ZONE("cutout coverage seed");
+
+    LLGLDisable blend(GL_BLEND);
+
+    // Nothing covers the background, so it is cleared to nothing, colour and
+    // alpha both. Lighting left it the sky's emissive copy (magenta, with the
+    // emissive buffer on) or black; the blended geometry drawn over it next has
+    // to be composited over black for the colour to come out premultiplied by
+    // the coverage accumulated alongside it.
+    {
+        LLGLSColorMask mask(true, true);
+        drawFarPlaneQuad(GL_LEQUAL, &LLColor4::transparent);
+    }
+
+    // Opaque geometry covers its texel whole. The alpha pool's blend adds to
+    // this (alphaWritesCoverage), so a blended surface over opaque stays at 1
+    // and over the background becomes its own coverage.
+    {
+        LLGLSColorMask mask(false, true);
+        drawFarPlaneQuad(GL_GREATER, &LLColor4::white);
+    }
+}
+
+void LLPipeline::copyCutoutCoverageToAlpha()
+{
+    LL_PROFILE_GPU_ZONE("cutout coverage copy");
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable blend(GL_BLEND);
+    LLGLSColorMask mask(false, true);
+
+    // Across the whole frame, sampled as the final blit sampled the colour, so
+    // the two agree texel for texel whatever the scene target's resolution.
+    const LLRect& rect = gViewerWindow->getWorldViewRectRaw();
+    glViewport(rect.mLeft, rect.mBottom, rect.getWidth(), rect.getHeight());
+
+    gCopyProgram.bind();
+    gCopyProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mRT->screen);
+    mScreenTriangleVB->setBuffer();
+    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+    gCopyProgram.unbind();
+}
+
+void LLPipeline::clearSceneMap()
+{
+    if (mSceneMap.isComplete())
+    {
+        // The depth clear value is the reverse-Z latch's far plane. Clears obey
+        // the write masks, so both are opened for it.
+        LLGLSColorMask mask(true, true);
+        LLGLDepthTest depth(GL_TRUE, GL_TRUE);
+        mSceneMap.bindTarget();
+        glClearColor(0.f, 0.f, 0.f, 0.f);
+        mSceneMap.clear();
+        mSceneMap.flush();
+    }
+}
+
+void LLPipeline::readAttachmentTimes()
+{
+    if (mAttachmentSpans.empty())
+    {
+        return;
+    }
+    const ALQueryPool& queries = gGL.queries();
+    std::erase_if(mAttachmentSpans, [&queries](const auto& timed)
+    {
+        U64 nanoseconds = 0;
+        switch (queries.result(timed.second, nanoseconds))
+        {
+        case ALQueryPool::Status::Ready:
+            timed.first->mGPURenderTime = nanoseconds / 1000000.f;
+            return true;
+        case ALQueryPool::Status::Expired:
+            return true;
+        default:
+            return false;
+        }
+    });
 }
 
 void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool for_profile, LLViewerObject* specific_attachment)
@@ -13933,56 +14354,21 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
             // caller, so every morph preview after the first in a frame lost its background.
             LLGLSColorMask mask(visually_muted || too_complex, true);
 
-            gGL.getTextureSlot(0)->unbind();
-
-            // GL_GREATER auto-translates to LESS under reverse-Z (via LLGLDepthTest::remap), and
-            // the background fill sits at the reverse-Z far plane (~0) instead of ~1.
-            LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
-
-            gGL.flush();
-
-            gGL.pushMatrix();
-            gGL.loadIdentity();
-            gGL.matrixMode(LLRender::MM_PROJECTION);
-            gGL.pushMatrix();
-            gGL.loadIdentity();
-
-            // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO),
-            // consistent with the sunDisc/moon far pins.
-            const F32 clip_plane = LLRender::sReverseZ ? 0.000005f : 0.99999f;
-
-            gDebugProgram.bind();
-
+            LLColor4 fill_color;
+            const LLColor4* fill = nullptr;
             if (visually_muted)
             {   // Visually muted avatar
-                LLColor4 muted_color(avatar->getMutedAVColor());
-                LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set solid color " << muted_color << LL_ENDL;
-                gGL.diffuseColor4fv( muted_color.mV );
+                fill_color = LLColor4(avatar->getMutedAVColor());
+                fill = &fill_color;
+                LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set solid color " << fill_color << LL_ENDL;
             }
             else if (!preview_avatar)
             { //grey muted avatar
+                fill = &LLColor4::pink;
                 LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set grey" << LL_ENDL;
-                gGL.diffuseColor4fv(LLColor4::pink.mV );
             }
 
-            gGL.begin(LLRender::TRIANGLES);
-            {
-                gGL.vertex3f(-1.f, -1.f, clip_plane);
-                gGL.vertex3f(1.f, -1.f, clip_plane);
-                gGL.vertex3f(1.f, 1.f, clip_plane);
-
-                gGL.vertex3f(-1.f, -1.f, clip_plane);
-                gGL.vertex3f(1.f, 1.f, clip_plane);
-                gGL.vertex3f(-1.f, 1.f, clip_plane);
-            }
-            gGL.end();
-            gGL.flush();
-
-            gDebugProgram.unbind();
-
-            gGL.popMatrix();
-            gGL.matrixMode(LLRender::MM_MODELVIEW);
-            gGL.popMatrix();
+            drawFarPlaneQuad(GL_GREATER, fill);
         }
     };
 

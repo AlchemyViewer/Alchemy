@@ -376,8 +376,21 @@ namespace
         const std::string& in;
         size_t             at = 0;
         bool               ok = true;
+        // How deep in objects and arrays the value being read stands: a
+        // level is a frame of value()'s, and a literal of thousands of
+        // `[` would run off the stack. Past MOST_NESTED the fold is
+        // refused, and the call left to the simulator.
+        int                  depth = 0;
+        static constexpr int MOST_NESTED = 64;
 
         explicit JsonReader(const std::string& text) : in(text) {}
+
+        struct Deeper
+        {
+            int& depth;
+            explicit Deeper(int& d) : depth(d) { ++depth; }
+            ~Deeper() { --depth; }
+        };
 
         void space()
         {
@@ -479,8 +492,14 @@ namespace
                 return false;
             }
             const char c = in[at];
+            if ((c == '{' || c == '[') && depth >= MOST_NESTED)
+            {
+                ok = false;
+                return false;
+            }
             if (c == '{')
             {
+                const Deeper deeper(depth);
                 ++at;
                 out.kind = JsonValue::Kind::Object;
                 space();
@@ -524,6 +543,7 @@ namespace
             }
             if (c == '[')
             {
+                const Deeper deeper(depth);
                 ++at;
                 out.kind = JsonValue::Kind::Array;
                 space();

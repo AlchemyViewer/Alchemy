@@ -31,6 +31,7 @@
 #include "lltextureinfodetails.h"
 #include "lltracerecording.h"
 #include <map>
+#include <memory>
 
 class LLTextureInfo
 {
@@ -59,7 +60,8 @@ public:
 private:
     void addRequest(const LLUUID& id);
 
-    std::map<LLUUID, LLTextureInfoDetails *>    mTextures;
+    // Owned: an entry erased, or replaced, frees its details.
+    std::map<LLUUID, std::unique_ptr<LLTextureInfoDetails>> mTextures;
     LLSD                                        mAverages;
     bool                                        mLoggingEnabled;
     std::string                                 mTextureDownloadProtocol;

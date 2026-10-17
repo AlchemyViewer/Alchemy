@@ -247,8 +247,7 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
     //enable writing to alpha for emissive effects
     gGL.setColorMask(true, true);
 
-    bool write_depth = rigged ||
-        LLDrawPoolWater::sSkipScreenCopy
+    bool write_depth = rigged
         || getType() == LLDrawPoolAlpha::POOL_ALPHA_PRE_WATER; // needed for accurate water fog
 
 
@@ -265,11 +264,15 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
     // surface's coverage). Depth writing is untouched by any of that -- the stamp runs before
     // this pass, so blended geometry occludes normally again.
     //
+    // A snapshot cutout's main pass keeps coverage the same way, seeded by a pass of its
+    // own (LLPipeline::seedCutoutCoverageFromDepth), so its subject can be lifted off the
+    // frame.
+    //
     // Everywhere else the alpha channel carries glow, and this suppresses source alpha so a
     // blended surface does not erase the glow already accumulated behind it.
     mColorSFactor = LLRender::BF_SOURCE_ALPHA;           // } regular alpha blend
     mColorDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA; // }
-    mAlphaSFactor = LLPipeline::sImpostorRender                 // } glow suppression /
+    mAlphaSFactor = LLPipeline::alphaWritesCoverage()          // } glow suppression /
                         ? LLRender::BF_ONE                      // } bake coverage
                         : LLRender::BF_ZERO;                    // }
     mAlphaDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;       // }
@@ -888,13 +891,13 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
             // render emissive faces into alpha channel for bloom effects
             //
-            // Skipped in an impostor bake. These batches write ONLY alpha (their blend mode
-            // leaves colour untouched), and in a bake that channel is coverage -- glow
-            // accumulated into it would read back as extra opacity. Nothing is lost: the
-            // coverage stamp overwrote this glow before the impostor was ever sampled, so it
-            // has never reached the screen. It also saves the whole excursion, including the
-            // shader rebind that follows it.
-            if (!depth_only && !LLPipeline::sImpostorRender)
+            // Skipped in an impostor bake and a cutout frame. These batches write ONLY alpha
+            // (their blend mode leaves colour untouched), and in both that channel is
+            // coverage -- glow accumulated into it would read back as extra opacity. Nothing
+            // is lost in a bake: the coverage stamp overwrote this glow before the impostor
+            // was ever sampled, so it has never reached the screen. It also saves the whole
+            // excursion, including the shader rebind that follows it.
+            if (!depth_only && !LLPipeline::alphaWritesCoverage())
             {
                 gPipeline.enableLightsDynamic();
 

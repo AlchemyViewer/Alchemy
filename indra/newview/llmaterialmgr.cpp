@@ -32,6 +32,7 @@
 #include "llagent.h"
 #include "llcallbacklist.h"
 #include "llmaterialmgr.h"
+#include "llappviewer.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"

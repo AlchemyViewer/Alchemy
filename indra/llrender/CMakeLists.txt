@@ -2,8 +2,12 @@
 
 set(
   llrender_SOURCES
+  aldepthbounds.cpp
   algpubuffer.cpp
+  algputimer.cpp
   alimageslot.cpp
+  alprimitiveplot.cpp
+  alquerypool.cpp
   alsamplerstate.cpp
   altexture3d.cpp
   altextureslot.cpp
@@ -37,8 +41,12 @@ set(
 
 set(
   llrender_HEADERS
+  aldepthbounds.h
   algpubuffer.h
+  algputimer.h
   alimageslot.h
+  alprimitiveplot.h
+  alquerypool.h
   alsamplerstate.h
   altexture3d.h
   altextureslot.h
@@ -189,6 +197,8 @@ if(AL_BUILD_TESTS)
   # - tessellation stages and the quad conventions the terrain relies on;
   # - the infinite reverse-Z projection: stored depth, round trip and depth
   #   order out to 100 km;
+  # - the depth bounds test against the depth test it stands in for, and the
+  #   depths a light's sphere spans;
   # - which fragment output reaches a render target's colour attachment, and
   #   integer attachments cleared and drawn;
   # - LLRender's cached clear colour and scissor box, and LLGLSScissor;
@@ -201,16 +211,24 @@ if(AL_BUILD_TESTS)
   #   by the matrices the draw syncs;
   # - ALGPUBuffer's store, LLRender's indirect buffer bindings over its
   #   lifetime, and the readback and stream rings;
+  # - ALGPUTimer: one span timed at a time, as timestamps and as Elapsed
+  #   queries;
+  # - ALQueryPool: each kind's names kept to its target, a held target
+  #   refused, results read once their frame has ended, spans, release and
+  #   conditional draws;
   # - ALImageSlot: what a unit issues, re-issues and forgets as LLRender keeps
   #   it, and integer images.
   al_add_test_binary(
     llrender_gl_shared_tests
     PROJECT llrender
     SOURCES
+      tests/aldepthbounds_gl_test.cpp
       tests/algpubuffer_gl_test.cpp
+      tests/algputimer_gl_test.cpp
       tests/alimageslot_gl_test.cpp
       tests/alinfiniteprojection_gl_test.cpp
       tests/alinstanceddraw_gl_test.cpp
+      tests/alquerypool_gl_test.cpp
       tests/alrenderstate_gl_test.cpp
       tests/altessellation_gl_test.cpp
       tests/alwindowsdlheadless_test.cpp

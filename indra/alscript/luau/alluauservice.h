@@ -28,6 +28,7 @@
 #include "alscriptproblem.h"
 #include "alscriptsymbol.h"
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -231,6 +232,10 @@ public:
     // requires alike, since it was built: for the test that says a module
     // unchanged is not checked again.
     size_t modulesChecked() const;
+    // Run as each module is checked, on whatever thread checks it, with
+    // the module's name: for the test that says what it throws is a
+    // problem the next check reports, not a thread lost.
+    void setModuleCheckedHook(std::function<void(const std::string& module)> hook);
 
 private:
     // What is kept between questions (alluaufrontend.h), whose Luau

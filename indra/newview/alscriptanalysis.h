@@ -64,6 +64,10 @@ namespace Luau
 // Words keyed as the library keys them, in the skin's language where it has
 // the key, else the English they came with.
 std::string alScriptKeyedWords(const std::string& key, const std::vector<std::string>& args, const std::string& english);
+// The same, for work off the main thread -- a conversion on Tailslide's
+// lane -- where alSaidTemplate's cache may not be touched: a key the skin
+// lacks gives the English with the words put in.
+std::string alScriptKeyedWordsAnyThread(const std::string& key, const std::vector<std::string>& args, const std::string& english);
 // A problem's words in the viewer's language: where the problem carries a
 // key -- one of this code's own messages -- the skin's string for the
 // key with the problem's words put in for [1], [2] and so on, else the

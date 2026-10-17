@@ -55,7 +55,10 @@ in vec2 emissive_texcoord;
 uniform float gltf_roughness_factor[GLTF_INDEXED_CHANNELS];
 uniform float gltf_metallic_factor[GLTF_INDEXED_CHANNELS];
 uniform vec3  gltf_emissive_color[GLTF_INDEXED_CHANNELS];
+// Only the alpha-mask pass's program can discard, as in pbropaqueF.
+#ifdef HAS_ALPHA_MASK
 uniform float gltf_minimum_alpha[GLTF_INDEXED_CHANNELS]; // PBR alphaMode MASK cutoff, -1 for opaque
+#endif
 
 uniform sampler2D basecolor0;    // always in sRGB space
 uniform sampler2D normalmap0;
@@ -209,10 +212,12 @@ void main()
 
     basecolor *= vertex_color;
 
+#ifdef HAS_ALPHA_MASK
     if (basecolor.a < gltf_minimum_alpha[mi])
     {
         discard;
     }
+#endif
 
     vec3 col = basecolor.rgb;
 

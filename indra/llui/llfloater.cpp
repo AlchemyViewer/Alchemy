@@ -1793,6 +1793,18 @@ void LLFloater::addDependentFloater(LLFloater* floaterp, bool reposition, bool r
         return;
     }
 
+    // And the view the dependent lives in too. A floater is made in the global
+    // one, but a window can live in a view of its own -- the snapshot floater's
+    // is drawn over every other, and takes every click while it freezes the
+    // frame -- and would cover, or keep the mouse from, what it opened. Only a
+    // floater that stands on its own is moved; one hosted in a tab stays put.
+    LLView* dependent_parent = floaterp->getParent();
+    if (dependent_parent != floater_view && ALViewType::as<LLFloaterView>(dependent_parent))
+    {
+        dependent_parent->removeChild(floaterp);
+        floater_view->addChild(floaterp);
+    }
+
     if (reposition)
     {
         LLRect rect = floater_view->findNeighboringPosition(this, floaterp);

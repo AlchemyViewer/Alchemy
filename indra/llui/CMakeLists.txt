@@ -27,6 +27,7 @@ target_sources(
     fields/aloffsetpad.cpp
     fields/alpicturefield.cpp
     studio/alpanefolds.cpp
+    studio/alpaneroom.cpp
     fsvirtualtrackpad.cpp
     llaccordionctrl.cpp
     llaccordionctrltab.cpp
@@ -246,6 +247,7 @@ target_sources(
         fields/aloffsetpad.h
         fields/alpicturefield.h
         studio/alpanefolds.h
+        studio/alpaneroom.h
         text/altextcaret.h
         base/alviewtype.h
         fsvirtualtrackpad.h
@@ -636,6 +638,7 @@ if(AL_BUILD_TESTS)
       tests/aloutputview_test.cpp
       tests/alpanefolds_test.cpp
       tests/alpanelist_test.cpp
+      tests/alpaneroom_test.cpp
       tests/alplace_test.cpp
       tests/alpopover_test.cpp
       tests/alprefixsums_test.cpp
@@ -690,6 +693,7 @@ if(AL_BUILD_TESTS)
       tests/llaccordionctrltab_test.cpp
       tests/llchatautocompletemodel_test.cpp
       tests/llcombobox_test.cpp
+      tests/llconsole_test.cpp
       tests/llemojidictionary_test.cpp
       tests/llfloater_test.cpp
       tests/llfocusmgr_test.cpp

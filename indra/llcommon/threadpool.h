@@ -64,7 +64,9 @@ namespace LL
 
         /**
          * Override run() if you need special processing. The default run()
-         * implementation simply calls WorkQueue::runUntilClose().
+         * implementation simply calls WorkQueue::runUntilClose(). A class
+         * that overrides it calls close() in its own destructor, so that its
+         * threads are done with it before any of it is destroyed.
          */
         virtual void run();
 
@@ -130,7 +132,10 @@ namespace LL
                         bool fixed_width = false):
             ThreadPoolBase(name, threads, new queue_t(name, capacity, false), auto_shutdown, fixed_width)
         {}
-        ~ThreadPoolUsing() override {}
+        // Closes, and joins the threads, before any of the pool is destroyed:
+        // until then they run its virtual run(). ~ThreadPoolBase closes too,
+        // but by then the vptr is reset and whatever derives from it is gone.
+        ~ThreadPoolUsing() override { close(); }
 
         /**
          * obtain a non-const reference to the specific WorkQueue subclass to

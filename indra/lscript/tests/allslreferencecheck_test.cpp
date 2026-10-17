@@ -245,7 +245,9 @@ namespace
         // LL's lets a list into a local's list, and takes print() as giving
         // a string; it reads `foo` after `@foo` as the label, which Tailslide
         // takes as the global with a warning.
-        const std::set<std::string> ONLY_LL        = { "bugs/0019.lsl", "print_type_bug.lsl" };
+        // And Tailslide's own test of nesting, 9990 brackets deep, deeper
+        // than the studio walks a tree (alscript's allsldepth.h).
+        const std::set<std::string> ONLY_LL        = { "bugs/0019.lsl", "parserstackdepth2.lsl", "print_type_bug.lsl" };
         const std::set<std::string> ONLY_TAILSLIDE = { "label_shadowing.lsl" };
         std::set<std::string>       parted, only_ll, only_tailslide;
         size_t                      same = 0;
@@ -294,8 +296,9 @@ namespace
         // What only LSO's image building refuses: a list in a global's list.
         // Its constants are LL's since the port's mono-constants-as-ll.patch:
         // an integer literal by ldc.i4 alone, and a minus before a number in
-        // a global's initializer one constant.
-        const std::set<std::string> ONLY_LL        = { "bugs/0019.lsl", "nested_lists.lsl", "print_type_bug.lsl" };
+        // a global's initializer one constant. And Tailslide's own test of
+        // nesting, deeper than the studio walks a tree (allsldepth.h).
+        const std::set<std::string> ONLY_LL        = { "bugs/0019.lsl", "nested_lists.lsl", "parserstackdepth2.lsl", "print_type_bug.lsl" };
         const std::set<std::string> ONLY_TAILSLIDE = { "label_shadowing.lsl" };
         std::set<std::string>       only_ll, only_tailslide, parted;
         size_t                      both = 0;

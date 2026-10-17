@@ -1260,15 +1260,15 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="296"
+		 height="373"
 		 name="atab_sec_perf_adv"
 		 title="Performance - Advanced"
-		 header_tool_tip="Detail for avatars, terrain, trees, flexible prims and particles, and how the avatar complexity limit is applied."
+		 header_tool_tip="Detail for avatars, terrain, water, trees, flexible prims and particles, and how the avatar complexity limit is applied."
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="267"
+			 height="344"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -1388,6 +1388,81 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Show each terrain texture at a different offset and rotation in every cell of a hexagonal lattice, so its repeat does not show. Up to three fetches per texture instead of one. Rebuilds the terrain shaders."
 				 name="perf_terrain_hex_tiling"
 				 control_name="AlchemyRenderTerrainHexTiling" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="perf_water_hextile_label"
+				 value="Water anti-repeat" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="perf_water_hextile_combo"
+				 tool_tip="Show the water's wave maps at a different offset in every cell of a hexagonal lattice, so their repeat does not show. Up to three reads per tiled layer instead of one. Rebuilds the water shaders."
+				 control_name="AlchemyRenderWaterHextile">
+					<combo_box.item
+					 label="Off"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Large waves"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Large and medium waves"
+					 name="2"
+					 value="2" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_water_hextile_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="AlchemyRenderWaterHextile" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="9"
+				 width="300"
+				 label="Water waves"
+				 tool_tip="Displace the water near the camera into waves, their heights integrated from the normal maps that shade it, so the crests lie where the shading's are. Needs OpenGL 4.0."
+				 name="perf_water_waves"
+				 control_name="AlchemyRenderWaterWaves" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Wave height"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="4"
+				 name="perf_water_wave_height"
+				 tool_tip="Height of the water's waves over what its normal maps integrate to: 1 raises the surface as its shading says it slopes"
+				 enabled_control="AlchemyRenderWaterWaves"
+				 control_name="AlchemyRenderWaterWaveHeight" />
 				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"

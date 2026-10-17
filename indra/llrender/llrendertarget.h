@@ -238,6 +238,11 @@ public:
     static void copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0,
                                           S32 dstX1, S32 dstY1, U32 mask, U32 filter);
 
+    // Copies the colour of the rect srcX0..srcX1, srcY0..srcY1 of the framebuffer bound now (the window's where no
+    // target is) into this target's rect dstX0..dstX1, dstY0..dstY1, scaled with `filter`, GL_NEAREST or GL_LINEAR.
+    // The scissor does not clip it, and what is bound stays bound.
+    void copyFromBound(S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0, S32 dstX1, S32 dstY1, U32 filter);
+
     //Returns TRUE if target is ready to be rendered into.
     //That is, if the target has been allocated with at least
     //one renderable attachment (i.e. color buffer, depth buffer).

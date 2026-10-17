@@ -5,7 +5,7 @@
  can_minimize="true"
  can_resize="false"
  can_close="true"
- height="475"
+ height="531"
  layout="topleft"
  name="Snapshot"
  single_instance="true"
@@ -14,7 +14,7 @@
  save_visibility="false"
  title="SNAPSHOT"
  width="624"
- min_height="455">
+ min_height="511">
     <floater.string
      name="unknown">
         unknown
@@ -67,6 +67,17 @@
  	 name="local_failed_str">
  	    Failed to save to computer.
  	</string>
+    <string name="cutout_nothing">Nothing picked</string>
+    <string name="cutout_picking">Click an avatar or object</string>
+    <string name="cutout_retrieving">Retrieving...</string>
+    <string name="cutout_not_found">Not in view</string>
+    <string name="cutout_not_drawn">Not in view: [NAME]</string>
+    <string name="cutout_muted">Not drawn in full: [NAME]</string>
+    <string name="cutout_mouselook">Not drawn in mouselook: [NAME]</string>
+    <string name="cutout_rlv">Unavailable while vision is restricted</string>
+    <string name="cutout_fill_title">Cutout fill</string>
+    <string name="cutout_full_picker">More...</string>
+    <string name="cutout_full_picker_tooltip">The full colour picker, for typed values and the eyedropper</string>
     <button
      follows="left|top"
      height="25"
@@ -115,7 +126,7 @@
 	   top_delta="0"
        width="31" />
 	<panel
-     height="179"
+     height="235"
      layout="topleft"
 	 follows="top|left"
      left="0"
@@ -217,6 +228,62 @@
          top_pad="1"
          width="180"
          name="no_post_check" />
+        <check_box
+         label="Cutout"
+         layout="topleft"
+         height="16"
+         left="10"
+         top_pad="1"
+         width="180"
+         tool_tip="Draw only the picked avatar or object. Everything else is filled with the colour beside the picker: transparent where its alpha is 0. Take Snapshot to Disk cuts out too while this is on."
+         name="cutout_check" />
+        <button
+         follows="left|top"
+         height="19"
+         width="20"
+         layout="topleft"
+         left="30"
+         top_pad="2"
+         image_selected="eye_button_active.tga"
+         image_unselected="eye_button_inactive.tga"
+         tab_stop="false"
+         tool_tip="Pick what to cut out: click this, then the avatar or object. Anything worn picks its wearer. Esc cancels."
+         name="cutout_pick_btn" />
+        <color_swatch
+         follows="left|top"
+         height="19"
+         width="30"
+         layout="topleft"
+         left_pad="4"
+         top_delta="0"
+         label_height="0"
+         can_apply_immediately="true"
+         control_name="ALSnapshotCutoutFill"
+         tool_tip="What fills everything but the subject. Alpha 0 leaves it transparent. JPEG, BMP and postcards have no transparency and use the colour solid."
+         name="cutout_fill_swatch" />
+        <text
+         type="string"
+         length="1"
+         follows="left|top|right"
+         height="16"
+         layout="topleft"
+         left_pad="6"
+         top_delta="2"
+         right="-2"
+         use_ellipses="true"
+         name="cutout_target_text">
+            Nothing picked
+        </text>
+        <check_box
+         label="Include seated avatars"
+         layout="topleft"
+         height="16"
+         left="30"
+         top_pad="3"
+         width="180"
+         control_name="ALSnapshotCutoutIncludeSeated"
+         tool_tip="A cutout of an object takes the avatars sitting on it too, and what they wear."
+         name="cutout_seated_check" />
         <text
          type="string"
          length="1"

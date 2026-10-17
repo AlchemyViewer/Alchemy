@@ -424,8 +424,13 @@ namespace
         val3 = z1 + (z2 - z1)* val;
         val4 = w1 + (w2 - w1)* val;
         LLVector4 vec4b = lerp(vec4,vec4a,val);
-        LLVector4 check(val1, val2, val3, val4);
-        CHECK(check == vec4b);
+        // Within the rounding of the larger of the two terms each sums, which
+        // the library's lerp and this working of it may round differently.
+        auto terms = [&](F32 a, F32 b) { return llmax(fabsf(a), fabsf((b - a) * val)); };
+        CHECK_THAT(vec4b.mV[VX], ll_test::WithinRounding(val1, terms(x1, x2)));
+        CHECK_THAT(vec4b.mV[VY], ll_test::WithinRounding(val2, terms(y1, y2)));
+        CHECK_THAT(vec4b.mV[VZ], ll_test::WithinRounding(val3, terms(z1, z2)));
+        CHECK_THAT(vec4b.mV[VW], ll_test::WithinRounding(val4, terms(w1, w2)));
     }
 
     TEST_CASE("v4math_h: vec4to3 and vec3to4", "[v4math_h]")

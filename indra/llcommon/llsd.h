@@ -571,12 +571,17 @@ namespace llsd
 //@{
     LL_COMMON_API void dumpStats(const LLSD&);  ///< Output information on object and usage
 
-    /// @warn THE FOLLOWING COUNTS WILL NOT BE ACCURATE IN A MULTI-THREADED
-    /// ENVIRONMENT.
-    ///
-    /// These counts track LLSD::Impl (hidden) objects. They are always
-    /// maintained, so a benchmark or a leak hunt can read them without
+    /// These counts track LLSD::Impl (hidden) objects, made and freed on any
+    /// thread. They cost two atomic writes to shared globals per Impl, so a
+    /// release for download leaves them out, and both are 0 there:
+    /// COUNTS_IMPLS says whether they are kept. Every other build keeps them,
+    /// so a test, a benchmark or a leak hunt can read them without
     /// rebuilding.
+#ifdef LL_RELEASE_FOR_DOWNLOAD
+    inline constexpr bool COUNTS_IMPLS = false;
+#else
+    inline constexpr bool COUNTS_IMPLS = true;
+#endif
     LL_COMMON_API U32 allocationCount();    ///< how many Impls have been made
     LL_COMMON_API U32 outstandingCount();   ///< how many Impls are still alive
 

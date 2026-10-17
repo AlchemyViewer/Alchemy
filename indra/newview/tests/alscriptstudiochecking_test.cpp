@@ -922,12 +922,12 @@ namespace
         checking.ask(directive, Kind::Check, ALTextPos(), ALTextPos());
         UNSCOPED_INFO("expanded, not read as code");
         REQUIRE(expansions.size() == expanded + 1);
-        UNSCOPED_INFO("an envelope first");
+        UNSCOPED_INFO("an envelope no reason of its own: its directives still");
         CHECK([&] {
             directive.envelope = ALScriptEnvelope();
-            const bool first   = checking.preprocessedWhy(directive) == ALPreprocessor::Wanted::Enveloped;
+            const bool why     = checking.preprocessedWhy(directive) == ALPreprocessor::Wanted::Directives;
             directive.envelope.reset();
-            return first;
+            return why;
         }());
 
         // A # line that is no directive, the script not preprocessed: the

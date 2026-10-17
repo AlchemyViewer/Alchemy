@@ -88,6 +88,10 @@ public:
 
     static void updateChatFont();
 
+    // True if nearby chat should be typed into the standalone chat bar rather
+    // than the nearby chat input hosted by the Conversations floater.
+    static bool shouldUseChatBar();
+
 protected:
     ~ALChatBar();
 

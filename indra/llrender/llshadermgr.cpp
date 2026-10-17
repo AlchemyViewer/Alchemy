@@ -277,6 +277,14 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
+    if (features->hasWaterSurface)
+    {
+        if (!shader->attachVertexObject("environment/waterSurface.glsl"))
+        {
+            return false;
+        }
+    }
+
     if (!shader->attachVertexObject("deferred/textureUtilV.glsl"))
     {
         return false;
@@ -306,6 +314,26 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
+    if (features->hasWaterWaves)
+    {
+        // The waves' control stage culls the patches the scene's depth hides, through the depth pyramid.
+        if (!shader->attachStageObject(GL_TESS_CONTROL_SHADER, "deferred/depthPyramidUtil.glsl"))
+        {
+            return false;
+        }
+
+        // The waves' evaluation stage displaces the surface by heights read through the lattice the fragment stage
+        // reads the normals through. atmosphericsVarsV declares the outputs the fragment side's atmosphericsVarsF
+        // expects to find in the stage before it, which with tessellation is this one, as for the terrain.
+        for (const char* object : { "environment/waterSurface.glsl", "deferred/hexLatticeUtil.glsl", "windlight/atmosphericsVarsV.glsl" })
+        {
+            if (!shader->attachStageObject(GL_TESS_EVALUATION_SHADER, object))
+            {
+                return false;
+            }
+        }
+    }
+
     ///////////////////////////////////////
     // Attach Fragment Shader Features Next
     ///////////////////////////////////////
@@ -322,6 +350,18 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         if (!shader->attachFragmentObject("environment/srgbF.glsl"))
         {
             return false;
+        }
+    }
+
+    if (features->hasWaterSurface)
+    {
+        // The water's wave reads hex-tile on the lattice terrain shares.
+        for (const char* object : { "environment/waterSurface.glsl", "deferred/hexLatticeUtil.glsl" })
+        {
+            if (!shader->attachFragmentObject(object))
+            {
+                return false;
+            }
         }
     }
 
@@ -404,9 +444,12 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->isPBRTerrain)
     {
-        if (!shader->attachFragmentObject("deferred/pbrterrainUtilF.glsl"))
+        for (const char* object : { "deferred/pbrterrainUtilF.glsl", "deferred/hexLatticeUtil.glsl" })
         {
-            return false;
+            if (!shader->attachFragmentObject(object))
+            {
+                return false;
+            }
         }
     }
 
@@ -1822,11 +1865,11 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("skin_origin");
 
     mReservedUniforms.push_back("screenTex");
-    mReservedUniforms.push_back("exclusionTex");
+    mReservedUniforms.push_back("exclusionDistort");
     mReservedUniforms.push_back("eyeVec");
     mReservedUniforms.push_back("time");
-    mReservedUniforms.push_back("bigWaveScroll");
-    mReservedUniforms.push_back("littleWaveScroll");
+    mReservedUniforms.push_back("waterBigPhase");
+    mReservedUniforms.push_back("waterLittlePhase");
     mReservedUniforms.push_back("lightDir");
     mReservedUniforms.push_back("specular");
     mReservedUniforms.push_back("lightExp");
@@ -1835,7 +1878,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterFogDensity");
     mReservedUniforms.push_back("waterFogKS");
     mReservedUniforms.push_back("refScale");
-    mReservedUniforms.push_back("waterHeight");
     mReservedUniforms.push_back("waterPlane");
     mReservedUniforms.push_back("waterSign");
     mReservedUniforms.push_back("normScale");
@@ -2175,6 +2217,8 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("crossFilterMap");
 
+    mReservedUniforms.push_back("uCutoutPremultiplied");
+
     // Text Shadow
     mReservedUniforms.push_back("textShadowMode");
 
@@ -2187,7 +2231,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("eyeToSky");
     mReservedUniforms.push_back("skyBehindMap");
-    mReservedUniforms.push_back("skyBehindWeight");
 
     mReservedUniforms.push_back("moonQuadCenter");
     mReservedUniforms.push_back("moonQuadU");
@@ -2211,8 +2254,44 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("selectionPalette");
     mReservedUniforms.push_back("selectionGlowReachMap");
     mReservedUniforms.push_back("selectionGlowRowMap");
+    mReservedUniforms.push_back("selectionBackdrop");
+    mReservedUniforms.push_back("selection_contrast");
+    mReservedUniforms.push_back("selection_keep_cut");
+    mReservedUniforms.push_back("selectionTileDepthMap");
+    mReservedUniforms.push_back("outline_rim_width");
 
+    mReservedUniforms.push_back("waterCellMap");
+    mReservedUniforms.push_back("waterCellSquare");
+    mReservedUniforms.push_back("waterDefaultHeight");
+    mReservedUniforms.push_back("waterRings");
+    mReservedUniforms.push_back("waterSweepPhase");
+    mReservedUniforms.push_back("waterLayout");
     mReservedUniforms.push_back("waterGlintRoughness");
+    mReservedUniforms.push_back("waterLatticeFrac");
+    mReservedUniforms.push_back("waterLatticeBase");
+    mReservedUniforms.push_back("waterMapMean");
+    mReservedUniforms.push_back("waterPatchRect");
+    mReservedUniforms.push_back("waterTessDensity");
+    mReservedUniforms.push_back("waterMaxDisplacement");
+    mReservedUniforms.push_back("waterCullPlanes");
+    mReservedUniforms.push_back("waterHeightMap");
+    mReservedUniforms.push_back("waterHeightMap2");
+    mReservedUniforms.push_back("waterWaveAmp");
+    mReservedUniforms.push_back("waterWaveReach");
+    mReservedUniforms.push_back("waterWaveEye");
+    mReservedUniforms.push_back("waterRaise");
+
+    // The depth pyramid
+    mReservedUniforms.push_back("depthPyramid");
+    mReservedUniforms.push_back("depthPyramidSource");
+    mReservedUniforms.push_back("depthPyramidTarget");
+    mReservedUniforms.push_back("depthPyramidLevel");
+    mReservedUniforms.push_back("depthPyramidSize");
+    mReservedUniforms.push_back("depthPyramidCount");
+
+    // The waves' patches
+    mReservedUniforms.push_back("waterOcclusion");
+    mReservedUniforms.push_back("waterPatchOrder");
 
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a

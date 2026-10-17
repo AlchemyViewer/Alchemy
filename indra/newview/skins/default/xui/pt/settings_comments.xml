@@ -2003,8 +2003,6 @@
   <string>Desativar recursos que impedem o uso do nVidia nSight com o SL. Requer reinício.</string>
   <key>RenderObjectBump</key>
   <string>OBSOLETO (apenas TRUE é suportado) Mostrar bumpmapping em primitivas.</string>
-  <key>RenderOcclusionTimeout</key>
-  <string>Número máximo de quadros a aguardar em uma consulta de oclusão antes de lê-la de volta à força.</string>
   <key>RenderParcelSelection</key>
   <string>Exibir o contorno da parcela selecionada.</string>
   <key>RenderPerformanceTest</key>
@@ -2295,18 +2293,6 @@
   <string>Selecionar probes de reflexão.</string>
   <key>SelectionHighlightAlpha</key>
   <string>Opacidade do destaque de seleção (0,0 = totalmente transparente, 1,0 = totalmente opaco).</string>
-  <key>SelectionHighlightAlphaTest</key>
-  <string>Valor de alpha abaixo do qual os pixels são exibidos na linha de destaque de seleção (0,0 = mostrar todos os pixels, 1,0 = não mostrar nenhum pixel).</string>
-  <key>SelectionHighlightThickness</key>
-  <string>Espessura da linha de destaque de seleção (fração da distância de visão).</string>
-  <key>SelectionHighlightUAnim</key>
-  <string>Taxa na qual a textura anima na direção U na linha de destaque de seleção (fração de textura por segundo).</string>
-  <key>SelectionHighlightUScale</key>
-  <string>Escala da exibição da textura na linha de destaque de seleção (fração do tamanho da textura).</string>
-  <key>SelectionHighlightVAnim</key>
-  <string>Taxa na qual a textura anima na direção V na linha de destaque de seleção (fração de textura por segundo).</string>
-  <key>SelectionHighlightVScale</key>
-  <string>Escala da exibição da textura na linha de destaque de seleção (fração do tamanho da textura).</string>
   <key>ServerChoice</key>
   <string>[NÃO MODIFICAR] Controla a qual grade você se conecta.</string>
   <key>SessionSettingsFile</key>
