@@ -145,7 +145,6 @@ LLGLSLShader    gHeroRadianceGenProgram;
 LLGLSLShader    gSHProjectionProgram;
 LLGLSLShader    gSHProjectionRowsProgram;
 LLGLSLShader    gSHProjectionReduceProgram;
-LLGLSLShader    gGlowCombineFXAAProgram;
 LLGLSLShader    gTwoTextureCompareProgram;
 LLGLSLShader    gOneTextureFilterProgram;
 LLGLSLShader    gDebugProgram;
@@ -4112,16 +4111,6 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gGlowCombineProgram.mShaderFiles.push_back(make_pair("interface/glowcombineF.glsl", GL_FRAGMENT_SHADER));
         gGlowCombineProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gGlowCombineProgram.createShader();
-    }
-
-    if (success)
-    {
-        gGlowCombineFXAAProgram.mName = "Glow CombineFXAA Shader";
-        gGlowCombineFXAAProgram.mShaderFiles.clear();
-        gGlowCombineFXAAProgram.mShaderFiles.push_back(make_pair("interface/glowcombineFXAAV.glsl", GL_VERTEX_SHADER));
-        gGlowCombineFXAAProgram.mShaderFiles.push_back(make_pair("interface/glowcombineFXAAF.glsl", GL_FRAGMENT_SHADER));
-        gGlowCombineFXAAProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gGlowCombineFXAAProgram.createShader();
     }
 
 #ifdef LL_WINDOWS
