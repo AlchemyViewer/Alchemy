@@ -126,7 +126,8 @@ in vec2 vary_texcoord2;
 uniform float env_intensity;
 uniform vec4 specular_color;  // specular color RGB and specular exponent (glossiness) in alpha
 
-#if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_MASK)
+// The mask cutoff, or for BLEND the alpha pool's coverage cutoff (prepare_alpha_shader).
+#if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_MASK) || (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
 uniform float minimum_alpha;
 #endif
 
@@ -253,6 +254,17 @@ void main()
     // encoded, matching the deferred writer.
     spec.a = glossiness; // pack glossiness into spec alpha for lighting functions
 
+    // A texel the output alpha below would leave under minimum_alpha is not drawn: it would
+    // neither show nor be kept out of the depth a depth-writing alpha pass lays down. That
+    // alpha is max(diffcol.a, glare) * vertex_color.a with glare at most 1, and glare stays 0
+    // unless the surface is glossy or carries an environment, so both tests are exact here,
+    // before the lighting is paid for. The rest is caught once glare is known.
+    if (vertex_color.a < minimum_alpha ||
+        (diffcol.a * vertex_color.a < minimum_alpha && glossiness <= 0.0 && env <= 0.0))
+    {
+        discard;
+    }
+
     vec3 pos = vary_position;
 
     float shadow = getShadow(pos, norm);
@@ -365,6 +377,10 @@ void main()
     glare *= 1.0-emissive;
     glare = min(glare, 1.0);
     float al = max(diffcol.a, glare) * vertex_color.a;
+    if (al < minimum_alpha)
+    {
+        discard;
+    }
     float final_scale = 1;
     if (classic_mode > 0)
         final_scale = 1.1;
