@@ -138,7 +138,7 @@ namespace
             for (const LLSD& sd : items)
             {
                 item->fromLLSD(sd);
-                sum += item->getType() + item->getInventoryType();
+                sum += S32(item->getType()) + S32(item->getInventoryType());
             }
             return sum;
         };
