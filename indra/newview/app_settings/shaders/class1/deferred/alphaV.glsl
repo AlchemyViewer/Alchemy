@@ -52,6 +52,7 @@ vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 #ifdef IS_AVATAR_SKIN
 mat4 getSkinnedTransform();
+vec3 getSkinnedNormal(mat4 trans, vec3 normal);
 #endif
 #endif
 
@@ -93,10 +94,7 @@ void main()
     pos.z = dot(trans[2], pos_in);
     pos.w = 1.0;
 
-    norm.x = dot(trans[0].xyz, normal);
-    norm.y = dot(trans[1].xyz, normal);
-    norm.z = dot(trans[2].xyz, normal);
-    norm = normalize(norm);
+    norm = normalize(getSkinnedNormal(trans, normal));
 
     vec4 frag_pos = projection_matrix * pos;
     gl_Position = frag_pos;

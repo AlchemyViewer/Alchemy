@@ -28,6 +28,7 @@
 //[ENGINE_BLOCK Matrices]
 
 mat4 getSkinnedTransform();
+vec3 getSkinnedNormal(mat4 trans, vec3 normal);
 #ifdef AVATAR_CLOTH
 vec4 getClothedPosition(mat4 trans, vec4 pos_in, inout vec3 norm);
 #endif
@@ -47,10 +48,7 @@ void main()
     vec4 pos_in = vec4(position.xyz, 1.0);
     mat4 trans = getSkinnedTransform();
 
-    norm.x = dot(trans[0].xyz, normal);
-    norm.y = dot(trans[1].xyz, normal);
-    norm.z = dot(trans[2].xyz, normal);
-    norm = normalize(norm);
+    norm = normalize(getSkinnedNormal(trans, normal));
 
 #ifdef AVATAR_CLOTH
     pos = getClothedPosition(trans, pos_in, norm);

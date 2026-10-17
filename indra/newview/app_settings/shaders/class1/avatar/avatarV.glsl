@@ -38,6 +38,7 @@ uniform vec4 color;
 
 vec4 calcLighting(vec3 pos, vec3 norm, vec4 color);
 mat4 getSkinnedTransform();
+vec3 getSkinnedNormal(mat4 trans, vec3 normal);
 void calcAtmospherics(vec3 inPositionEye);
 
 void main()
@@ -55,10 +56,7 @@ void main()
     pos.z = dot(trans[2], pos_in);
     pos.w = 1.0;
 
-    norm.x = dot(trans[0].xyz, normal);
-    norm.y = dot(trans[1].xyz, normal);
-    norm.z = dot(trans[2].xyz, normal);
-    norm = normalize(norm);
+    norm = normalize(getSkinnedNormal(trans, normal));
 
     gl_Position = projection_matrix * pos;
 

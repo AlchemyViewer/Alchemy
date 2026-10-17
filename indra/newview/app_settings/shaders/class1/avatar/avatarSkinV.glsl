@@ -50,6 +50,17 @@ mat4 getSkinnedTransform()
     return ret;
 }
 
+// A skinned normal: through the cofactor of the transform's rotation and scale, whose rows are trans[0..2].xyz, its
+// inverse transpose times its determinant, so a joint a shape scales unevenly tilts the normal as it tilts the
+// surface. Not unit length.
+vec3 getSkinnedNormal(mat4 trans, vec3 normal)
+{
+    vec3 r0 = trans[0].xyz;
+    vec3 r1 = trans[1].xyz;
+    vec3 r2 = trans[2].xyz;
+    return vec3(dot(cross(r1, r2), normal), dot(cross(r2, r0), normal), dot(cross(r0, r1), normal));
+}
+
 in vec4 clothing;
 
 uniform vec4 gWindDir;
