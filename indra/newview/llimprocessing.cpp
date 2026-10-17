@@ -266,8 +266,8 @@ void inventory_offer_handler(LLOfferInfo* info)
 
     LLSD payload;
 
-    // must protect against a NULL return from lookupHumanReadable()
-    std::string typestr = ll_safe_string(LLAssetType::lookupHumanReadable(info->mType));
+    // AT_UNKNOWN and AT_NONE have no human readable name
+    std::string typestr(LLAssetType::lookupHumanReadable(info->mType));
     if (!typestr.empty())
     {
         // human readable matches string name from strings.xml
@@ -276,7 +276,7 @@ void inventory_offer_handler(LLOfferInfo* info)
     }
     else
     {
-        LL_WARNS("Messaging") << "LLAssetType::lookupHumanReadable() returned NULL - probably bad asset type: " << info->mType << LL_ENDL;
+        LL_WARNS("Messaging") << "LLAssetType::lookupHumanReadable() returned no name - probably bad asset type: " << info->mType << LL_ENDL;
         args["OBJECTTYPE"] = "";
 
         // This seems safest, rather than propagating bogosity

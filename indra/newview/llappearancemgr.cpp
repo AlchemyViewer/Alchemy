@@ -1067,7 +1067,7 @@ void LLWearableHoldingPattern::recoverMissingWearable(LLWearableType::EType type
 
         // Try to recover by replacing missing wearable with a new one.
     LLNotificationsUtil::add("ReplacedMissingWearable");
-    LL_DEBUGS("Avatar") << "Wearable of type '" << LLWearableType::getInstance()->getTypeName(type)
+    LL_DEBUGS("Avatar") << "Wearable of type '" << LLWearableType::getTypeName(type)
                 << "' could not be downloaded.  Replaced inventory item with default wearable." << LL_ENDL;
     LLViewerWearable* wearable = LLWearableList::instance().createNewWearable(type, gAgentAvatarp);
 
@@ -2187,7 +2187,7 @@ void LLAppearanceMgr::filterWearableItems(
                 continue;
 //            S32 start_index = llmax(0,size-max_per_type);
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2010-05-11 (Catznip-2.0)
-            S32 start_index = llmax(0, size - ((LLWearableType::instance().getAllowMultiwear((LLWearableType::EType)i)) ? max_per_type : 1));
+            S32 start_index = llmax(0, size - ((LLWearableType::getAllowMultiwear((LLWearableType::EType)i)) ? max_per_type : 1));
 // [/SL:KB[
             for (S32 j = start_index; j<size; j++)
             {

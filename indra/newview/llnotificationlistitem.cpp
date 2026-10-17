@@ -408,7 +408,7 @@ bool LLGroupNoticeNotificationListItem::postBuild()
         mAttachmentTextBox->setVisible(true);
         mAttachmentIcon->setVisible(true);
 
-        std::string icon_name = LLInventoryIcon::getIconName(mInventoryOffer->mType,
+        std::string_view icon_name = LLInventoryIcon::getIconName(mInventoryOffer->mType,
           LLInventoryType::IT_TEXTURE);
         mAttachmentIconExp->setValue(icon_name);
         mAttachmentIconExp->setVisible(true);

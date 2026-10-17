@@ -782,7 +782,7 @@ void LLXferManager::processFileRequest (LLMessageSystem *mesgsys, void ** /*user
 
     if (uuid != LLUUID::null)
     {   // Request for an asset - use a cache file
-        if(NULL == LLAssetType::lookup(type))
+        if (!LLAssetType::isKnown(type))
         {
             LL_WARNS("Xfer") << "Invalid type for xfer request: " << uuid << ":"
                     << type_s16 << " to " << mesgsys->getSender() << LL_ENDL;

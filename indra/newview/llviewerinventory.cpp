@@ -75,6 +75,8 @@
 #include "llviewerassetupload.h"
 // [RLVa:KB] - Checked: 2014-11-02 (RLVa-1.4.11)
 #include "rlvcommon.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
 // [/RLVa:KB]
 
 LLInventoryListener sInventoryListener;
@@ -108,7 +110,9 @@ class LLLocalizedInventoryItemsDictionary : public LLSingleton<LLLocalizedInvent
 {
     LLSINGLETON(LLLocalizedInventoryItemsDictionary);
 public:
-    std::map<std::string, std::string> mInventoryItemsDict;
+    // Every item and category name is looked up as it is unpacked, and most
+    // miss: a hash map, so a miss is a hash and a probe.
+    boost::unordered_flat_map<std::string, std::string> mInventoryItemsDict;
 
     /**
      * Finds passed name in dictionary and replaces it with found localized value.
@@ -120,7 +124,7 @@ public:
     {
         LL_DEBUGS(LOG_LOCAL) << "Searching for localization: " << object_name << LL_ENDL;
 
-        std::map<std::string, std::string>::const_iterator dictionary_iter = mInventoryItemsDict.find(object_name);
+        const auto dictionary_iter = mInventoryItemsDict.find(object_name);
 
         bool found = dictionary_iter != mInventoryItemsDict.end();
         if(found)
@@ -136,16 +140,22 @@ public:
     {
         LL_DEBUGS("InventoryLocalize") << "Searching for localization: " << object_name << LL_ENDL;
 
-        for (auto itDict = mInventoryItemsDict.cbegin(); itDict != mInventoryItemsDict.cend(); ++itDict)
+        // Of two names localized alike, the one first in alphabetical order.
+        const std::string* system_name = nullptr;
+        for (const auto& [name, localized] : mInventoryItemsDict)
         {
-            if (itDict->second == object_name)
+            if (localized == object_name && (!system_name || name < *system_name))
             {
-                object_name = itDict->first;
-                LL_DEBUGS("InventoryLocalize") << "Found, new name is: " << object_name << LL_ENDL;
-                return true;
+                system_name = &name;
             }
         }
-        return false;
+        if (!system_name)
+        {
+            return false;
+        }
+        object_name = *system_name;
+        LL_DEBUGS("InventoryLocalize") << "Found, new name is: " << object_name << LL_ENDL;
+        return true;
     }
 // [/SL:KB]
 
@@ -1183,17 +1193,18 @@ void create_inventory_item(
     std::string server_name = name;
 
     {
-        std::map<std::string, std::string>::const_iterator dictionary_iter;
-
-        for (dictionary_iter = LLLocalizedInventoryItemsDictionary::getInstance()->mInventoryItemsDict.begin();
-             dictionary_iter != LLLocalizedInventoryItemsDictionary::getInstance()->mInventoryItemsDict.end();
-             dictionary_iter++)
+        // Of two names localized alike, the one last in alphabetical order.
+        const std::string* system_name = nullptr;
+        for (const auto& [dictionary_name, localized_name] : LLLocalizedInventoryItemsDictionary::getInstance()->mInventoryItemsDict)
         {
-            const std::string& localized_name = dictionary_iter->second;
-            if(localized_name == name)
+            if (localized_name == name && (!system_name || *system_name < dictionary_name))
             {
-                server_name = dictionary_iter->first;
+                system_name = &dictionary_name;
             }
+        }
+        if (system_name)
+        {
+            server_name = *system_name;
         }
     }
 
@@ -2084,7 +2095,7 @@ void menu_create_inventory_item(LLInventoryPanel* panel, LLUUID dest_id, const L
     else
     {
         // Use for all clothing and body parts.  Adding new wearable types requires updating LLWearableDictionary.
-        LLWearableType::EType wearable_type = LLWearableType::getInstance()->typeNameToType(type_name);
+        LLWearableType::EType wearable_type = LLWearableType::typeNameToType(type_name);
         if (wearable_type >= LLWearableType::WT_SHAPE && wearable_type < LLWearableType::WT_COUNT)
         {
             const LLUUID parent_id = dest_id;

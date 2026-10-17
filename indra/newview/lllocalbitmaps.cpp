@@ -1363,7 +1363,7 @@ void LLLocalBitmapMgr::feedScrollList(LLScrollListCtrl* ctrl)
 {
     if (ctrl)
     {
-        std::string icon_name = LLInventoryIcon::getIconName(
+        std::string_view icon_name = LLInventoryIcon::getIconName(
             LLAssetType::AT_TEXTURE,
             LLInventoryType::IT_NONE);
 

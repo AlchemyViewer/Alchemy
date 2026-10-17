@@ -439,7 +439,7 @@ bool LLPanelWearing::populateAttachmentsList(bool update)
         mAttachmentsMap.clear();
         std::vector<LLViewerObject*> attachs = LLAgentWearables::getTempAttachments();
 
-        std::string icon_name = LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT, LLInventoryType::IT_OBJECT);
+        std::string_view icon_name = LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT, LLInventoryType::IT_OBJECT);
         for (std::vector<LLViewerObject*>::iterator iter = attachs.begin();
                 iter != attachs.end(); ++iter)
         {

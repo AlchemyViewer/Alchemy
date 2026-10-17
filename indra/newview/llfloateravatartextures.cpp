@@ -39,6 +39,8 @@
 #include "llvoavatarself.h"
 #include "lllocaltextureobject.h"
 
+#include <fmt/format.h>
+
 using namespace LLAvatarAppearanceDefines;
 
 LLFloaterAvatarTextures::LLFloaterAvatarTextures(const LLSD& id)
@@ -55,7 +57,7 @@ bool LLFloaterAvatarTextures::postBuild()
 {
     for (U32 i=0; i < TEX_NUM_INDICES; i++)
     {
-        const std::string tex_name = LLAvatarAppearance::getDictionary()->getTexture(ETextureIndex(i))->mName;
+        const std::string_view tex_name = LLAvatarAppearance::getDictionary()->getTexture(ETextureIndex(i))->mName;
         mTextures[i] = getChild<LLTextureCtrl>(tex_name);
     }
     mTitle = getTitle();
@@ -102,12 +104,12 @@ static void update_texture_ctrl(LLVOAvatar* avatarp,
     if (id == IMG_DEFAULT_AVATAR)
     {
         ctrl->setImageAssetID(LLUUID::null);
-        ctrl->setToolTip(tex_entry->mName + " : " + std::string("IMG_DEFAULT_AVATAR"));
+        ctrl->setToolTip(fmt::format("{} : IMG_DEFAULT_AVATAR", tex_entry->mName));
     }
     else
     {
         ctrl->setImageAssetID(id);
-        ctrl->setToolTip(tex_entry->mName + " : " + id.asString());
+        ctrl->setToolTip(fmt::format("{} : {}", tex_entry->mName, id.asString()));
     }
 }
 

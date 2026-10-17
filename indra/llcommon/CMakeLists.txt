@@ -46,7 +46,6 @@ target_sources(
     lldate.cpp
     lldeadmantimer.cpp
     lldependencies.cpp
-    lldictionary.cpp
     llerror.cpp
     llevent.cpp
     lleventapi.cpp
@@ -121,6 +120,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alenumtable.h
         alfilewrite.h
         allinebreaks.h
         almainloop.h
@@ -164,7 +164,6 @@ target_sources(
         lldefs.h
         lldependencies.h
         lldepthstack.h
-        lldictionary.h
         lldoubledispatch.h
         llendianswizzle.h
         llerror.h
@@ -306,6 +305,7 @@ if(AL_BUILD_TESTS)
     llcommon_tests
     PROJECT llcommon
     SOURCES
+      tests/alenumtable_test.cpp
       tests/alfilewrite_test.cpp
       tests/alrecoverystore_test.cpp
       tests/alregex_test.cpp
@@ -318,6 +318,7 @@ if(AL_BUILD_TESTS)
       tests/classic_callback_test.cpp
       tests/commonmisc_test.cpp
       tests/lazyeventapi_test.cpp
+      tests/llassettype_test.cpp
       tests/llbase64_test.cpp
       tests/llcallbacklist_test.cpp
       tests/llcond_test.cpp

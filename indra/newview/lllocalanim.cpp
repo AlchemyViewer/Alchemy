@@ -330,7 +330,7 @@ void LLLocalAnimMgr::feedScrollList(LLScrollListCtrl* ctrl)
         return;
     }
 
-    const std::string icon_name = LLInventoryIcon::getIconName(LLAssetType::AT_ANIMATION, LLInventoryType::IT_ANIMATION);
+    const std::string_view icon_name = LLInventoryIcon::getIconName(LLAssetType::AT_ANIMATION, LLInventoryType::IT_ANIMATION);
 
     for (const auto& entry : mAnims)
     {

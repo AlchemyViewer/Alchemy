@@ -29,66 +29,38 @@
 #include "llinventorysettings.h"
 #include "llinventorytype.h"
 #include "llinventorydefines.h"
-#include "lldictionary.h"
-#include "llsingleton.h"
-#include "llinvtranslationbrdg.h"
-
+#include "alenumtable.h"
 
 //=========================================================================
-struct SettingsEntry : public LLDictionaryEntry
+namespace
 {
-    SettingsEntry(const std::string &name,
-        const std::string& default_new_name,
-        LLInventoryType::EIconName iconName) :
-        LLDictionaryEntry(name),
-        mDefaultNewName(default_new_name),
-        mLabel(name),
-        mIconName(iconName)
+    struct SettingsRow
     {
-        std::string transdname = LLSettingsType::getInstance()->mTranslator->getString(mLabel);
-        if (!transdname.empty())
-        {
-            mLabel = transdname;
-        }
+        LLSettingsType::type_e     mType;
+        std::string_view           mDefaultNewName;
+        LLInventoryType::EIconName mIconName;
+    };
+
+    // In key order, which the table enforces. A default name is the key of
+    // its translation in strings.xml.
+    constexpr SettingsRow SETTINGS_ROWS[] = {
+        { LLSettingsType::ST_NONE,     "New Settings", LLInventoryType::ICONNAME_SETTINGS },
+        { LLSettingsType::ST_SKY,      "New Sky",      LLInventoryType::ICONNAME_SETTINGS_SKY },
+        { LLSettingsType::ST_WATER,    "New Water",    LLInventoryType::ICONNAME_SETTINGS_WATER },
+        { LLSettingsType::ST_DAYCYCLE, "New Daycycle", LLInventoryType::ICONNAME_SETTINGS_DAY },
+        { LLSettingsType::ST_INVALID,  "New Settings", LLInventoryType::ICONNAME_SETTINGS },
+    };
+
+    using Settings = ALEnumTable<SETTINGS_ROWS, &SettingsRow::mType>;
+
+    const SettingsRow& rowOrInvalid(LLSettingsType::type_e type)
+    {
+        const SettingsRow* row = Settings::find(type);
+        return row ? *row : *Settings::find(LLSettingsType::ST_INVALID);
     }
-
-    std::string mLabel;
-    std::string mDefaultNewName; //keep mLabel for backward compatibility
-    LLInventoryType::EIconName mIconName;
-};
-
-class LLSettingsDictionary : public LLSingleton<LLSettingsDictionary>,
-    public LLDictionary<LLSettingsType::type_e, SettingsEntry>
-{
-    LLSINGLETON(LLSettingsDictionary);
-
-    void initSingleton() override;
-};
-
-LLSettingsDictionary::LLSettingsDictionary()
-{
-}
-
-void LLSettingsDictionary::initSingleton()
-{
-    addEntry(LLSettingsType::ST_SKY,        new SettingsEntry("sky",        "New Sky",      LLInventoryType::ICONNAME_SETTINGS_SKY));
-    addEntry(LLSettingsType::ST_WATER,      new SettingsEntry("water",      "New Water",    LLInventoryType::ICONNAME_SETTINGS_WATER));
-    addEntry(LLSettingsType::ST_DAYCYCLE,   new SettingsEntry("day",        "New Day",      LLInventoryType::ICONNAME_SETTINGS_DAY));
-    addEntry(LLSettingsType::ST_NONE,       new SettingsEntry("none",       "New Settings", LLInventoryType::ICONNAME_SETTINGS));
-    addEntry(LLSettingsType::ST_INVALID,    new SettingsEntry("invalid",    "New Settings", LLInventoryType::ICONNAME_SETTINGS));
-}
+} // namespace
 
 //=========================================================================
-
-LLSettingsType::LLSettingsType(LLTranslationBridge::ptr_t &trans)
-{
-    mTranslator = trans;
-}
-
-LLSettingsType::~LLSettingsType()
-{
-    mTranslator.reset();
-}
 
 LLSettingsType::type_e LLSettingsType::fromInventoryFlags(U32 flags)
 {
@@ -97,16 +69,10 @@ LLSettingsType::type_e LLSettingsType::fromInventoryFlags(U32 flags)
 
 LLInventoryType::EIconName LLSettingsType::getIconName(LLSettingsType::type_e type)
 {
-    const SettingsEntry *entry = LLSettingsDictionary::instance().lookup(type);
-    if (!entry)
-        return getIconName(ST_INVALID);
-    return entry->mIconName;
+    return rowOrInvalid(type).mIconName;
 }
 
-std::string LLSettingsType::getDefaultName(LLSettingsType::type_e type)
+std::string_view LLSettingsType::getDefaultName(LLSettingsType::type_e type)
 {
-    const SettingsEntry *entry = LLSettingsDictionary::instance().lookup(type);
-    if (!entry)
-        return getDefaultName(ST_INVALID);
-    return entry->mDefaultNewName;
+    return rowOrInvalid(type).mDefaultNewName;
 }

@@ -168,7 +168,7 @@ LLSD LLBakingTexLayerSet::computeTextureIDs() const
     const LLAvatarAppearanceDictionary::BakedEntry *baked_dict =
             LLAvatarAppearance::getDictionary()->getBakedTexture(getBakedTexIndex());
 #ifdef DEBUG_TEXTURE_IDS
-    const std::string& slot_name = LLAvatarAppearance::getDictionary()->getTexture(
+    const std::string_view slot_name = LLAvatarAppearance::getDictionary()->getTexture(
         LLAvatarAppearance::getDictionary()->bakedToLocalTextureIndex(getBakedTexIndex()) )->mDefaultImageName;
     const LLAvatarAppearanceDictionary::TextureEntry* entry = LLAvatarAppearance::getDictionary()->getTexture(baked_dict->mTextureIndex);
     LL_DEBUGS() << "-----------------------------------------------------------------" << LL_ENDL;
@@ -178,24 +178,24 @@ LLSD LLBakingTexLayerSet::computeTextureIDs() const
             << ")" << LL_ENDL;
     //LL_DEBUGS() << "LLAvatarAppearanceDictionary::getTEWearableType(" << baked_dict->mTextureIndex << ") = " << (S32) LLAvatarAppearanceDictionary::getTEWearableType(baked_dict->mTextureIndex) << LL_ENDL;
 
-    texture_vec_t::const_iterator idx_iter = baked_dict->mLocalTextures.begin();
-    texture_vec_t::const_iterator idx_end = baked_dict->mLocalTextures.end();
+    auto idx_iter = baked_dict->mLocalTextures.begin();
+    auto idx_end = baked_dict->mLocalTextures.end();
     std::ostringstream idx_str;
     for (; idx_iter != idx_end; ++idx_iter)
     {
         entry = LLAvatarAppearance::getDictionary()->getTexture((*idx_iter));
         idx_str << (*idx_iter) << " (" << entry->mDefaultImageName
-                << ";" << LLWearableType::getInstance()->getTypeName( entry->mWearableType )
+                << ";" << LLWearableType::getTypeName( entry->mWearableType )
                 << "), ";
     }
     LL_DEBUGS() << "BakedEntry::mLocalTextures: " << idx_str.str() << LL_ENDL;
-    wearables_vec_t::const_iterator type_iter = baked_dict->mWearables.begin();
-    wearables_vec_t::const_iterator type_end = baked_dict->mWearables.end();
+    auto type_iter = baked_dict->mWearables.begin();
+    auto type_end = baked_dict->mWearables.end();
     std::ostringstream type_str;
     for (; type_iter != type_end; ++type_iter)
     {
         type_str << (S32) (*type_iter)  << " ("
-                << LLWearableType::getInstance()->getTypeName( (*type_iter) )
+                << LLWearableType::getTypeName( (*type_iter) )
                 << "), ";
     }
     LL_DEBUGS() << "BakedEntry::mWearables: " << type_str.str() << LL_ENDL;
@@ -280,16 +280,16 @@ bool LLBakingTexLayerSet::computeLayerListTextureIDs(LLMD5& hash,
         {
             LL_DEBUGS() << "LLTexLayerInterface(" << layer_template->getName() << ") type = "
                     << (S32) wearable_type << " ("
-                    << LLWearableType::getInstance()->getTypeName( wearable_type ) << ") te = "
+                    << LLWearableType::getTypeName( wearable_type ) << ") te = "
                     << (S32) te << " ("<< entry->mDefaultImageName
-                    << ";" << LLWearableType::getInstance()->getTypeName( entry->mWearableType )
+                    << ";" << LLWearableType::getTypeName( entry->mWearableType )
                     << ") wearable_count = " << num_wearables << LL_ENDL;
         }
         else
         {
             LL_DEBUGS() << "LLTexLayerInterface(" << layer_template->getName() << ") type = "
                     << (S32) wearable_type << " ("
-                    << LLWearableType::getInstance()->getTypeName( wearable_type )
+                    << LLWearableType::getTypeName( wearable_type )
                     << ") wearable_count = " << num_wearables << LL_ENDL;
         }
 #endif
