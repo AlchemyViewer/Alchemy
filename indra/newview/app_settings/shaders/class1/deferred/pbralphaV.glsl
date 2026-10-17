@@ -84,13 +84,9 @@ void main()
 #endif
     gl_Position = vert;
 
-    // FS derives a screen UV as vary_fragcoord.xy / .z; carry true clip w under reverse-Z
-    // so the divide stays clip.xy/clip.w == ndc.xy (clip.z -> ~0 at the far plane).
-#ifdef REVERSE_Z
+    // FS derives a screen UV as vary_fragcoord.xy / .z, so z carries clip w: clip.xy / clip.w
+    // is the NDC position under either depth convention.
     vary_fragcoord.xyz = vec3(vert.xy, vert.w);
-#else
-    vary_fragcoord.xyz = vert.xyz;
-#endif
 
     base_color_texcoord = texture_transform(texcoord0, texture_base_color_transform, texture_matrix0);
     normal_texcoord = texture_transform(texcoord0, texture_normal_transform, texture_matrix0);
