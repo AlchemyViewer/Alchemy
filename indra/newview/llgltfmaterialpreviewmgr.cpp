@@ -196,7 +196,12 @@ LLGLTFPreviewTexture::LLGLTFPreviewTexture(LLPointer<LLFetchedGLTFMaterial> mate
 // static
 LLPointer<LLGLTFPreviewTexture> LLGLTFPreviewTexture::create(LLPointer<LLFetchedGLTFMaterial> material)
 {
-    return new LLGLTFPreviewTexture(material, LLPipeline::MAX_PREVIEW_WIDTH);
+    // No larger than the probe pack the preview renders through (render()): the probe resolution
+    // times ALProbeSuperSample, which is below MAX_PREVIEW_WIDTH at a supersample under 4, and a
+    // larger viewport would render only the corner of the sphere that fits.
+    const U32 pack_width = gPipeline.mAuxillaryRT.deferredScreen.getWidth();
+    const U32 width = pack_width > 0 ? llmin(LLPipeline::MAX_PREVIEW_WIDTH, pack_width) : LLPipeline::MAX_PREVIEW_WIDTH;
+    return new LLGLTFPreviewTexture(material, (S32)width);
 }
 
 bool LLGLTFPreviewTexture::needsRender()
