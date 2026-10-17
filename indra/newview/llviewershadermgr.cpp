@@ -316,7 +316,7 @@ LLGLSLShader            gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
 LLGLSLShader            gDeferredPBRTerrainAlphaMaskProgram[TERRAIN_PAINT_TYPE_COUNT];
 
 // Mirror corners are only reachable during the hero-probe mirror pass, which RenderMirrors
-// gates entirely; toggling it re-runs setShaders (handleReflectionProbeDetailChanged), so
+// gates entirely; toggling it re-runs setShaders (handleReflectionProbesChanged), so
 // building them while it is off would be dozens of programs nothing can bind.
 static U32 mirror_variant()
 {
@@ -623,8 +623,6 @@ void LLViewerShaderMgr::setShaders()
             current_cache_version,
             LLAppViewer::instance()->isSecondInstance());
     }
-
-    static LLCachedControl<U32> max_texture_index(gSavedSettings, "RenderMaxTextureIndex", 16);
 
     // when using indexed texture rendering, leave some texture units available for shadow and reflection maps
     // We assume we always have atleast 16 texunits available, but we clamp the reserved units to ensure we don't end up with a negative
