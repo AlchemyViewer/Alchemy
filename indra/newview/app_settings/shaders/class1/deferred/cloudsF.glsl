@@ -59,12 +59,17 @@ uniform float density_multiplier;
 uniform float sun_moon_glow_factor;
 
 
-vec4 cloudNoise(vec2 uv)
+// Only the red channel is read. The next texture is fetched only while the sky blends
+// toward it: blend_factor is 0 whenever the two match, one is missing or the clouds do not
+// scroll (LLDrawPoolWLSky), and the branch is on a uniform.
+float cloudNoise(vec2 uv)
 {
-   vec4 a = texture(cloud_noise_texture, uv);
-   vec4 b = texture(cloud_noise_texture_next, uv);
-   vec4 cloud_noise_sample = mix(a, b, blend_factor);
-   return cloud_noise_sample;
+    float cloud_noise_sample = texture(cloud_noise_texture, uv).x;
+    if (blend_factor > 0.0)
+    {
+        cloud_noise_sample = mix(cloud_noise_sample, texture(cloud_noise_texture_next, uv).x, blend_factor);
+    }
+    return cloud_noise_sample;
 }
 
 // Hides the R11F_G11F_B10F emissive attachment's 6/6/5-mantissa banding in this writer's
@@ -187,8 +192,8 @@ void main()
     cloudColorAmbient += oHazeColorBelowCloud;
 
     // Cloud Fragment
-    vec2 disturbance  = vec2(cloudNoise(uv1 / 8.0f).x, cloudNoise((uv3 + uv1) / 16.0f).x) * cloud_variance * (1.0f - cloud_scale * 0.25f);
-    vec2 disturbance2 = vec2(cloudNoise((uv1 + uv3) / 4.0f).x, cloudNoise((uv4 + uv2) / 8.0f).x) * cloud_variance * (1.0f - cloud_scale * 0.25f);
+    vec2 disturbance  = vec2(cloudNoise(uv1 / 8.0f), cloudNoise((uv3 + uv1) / 16.0f)) * cloud_variance * (1.0f - cloud_scale * 0.25f);
+    vec2 disturbance2 = vec2(cloudNoise((uv1 + uv3) / 4.0f), cloudNoise((uv4 + uv2) / 8.0f)) * cloud_variance * (1.0f - cloud_scale * 0.25f);
 
     // Offset texture coords
     uv1 += cloud_pos_density1.xy + (disturbance * 0.2);    //large texture, visible density
@@ -202,7 +207,7 @@ void main()
 
     // Compute alpha1, the main cloud opacity
 
-    float alpha1 = (cloudNoise(uv1).x - 0.5) + (cloudNoise(uv3).x - 0.5) * cloud_pos_density2.z;
+    float alpha1 = (cloudNoise(uv1) - 0.5) + (cloudNoise(uv3) - 0.5) * cloud_pos_density2.z;
     alpha1 = min(max(alpha1 + cloudDensity, 0.) * 10 * cloud_pos_density1.z, 1.);
 
     // And smooth
@@ -214,7 +219,7 @@ void main()
 
     // Compute alpha2, for self shadowing effect
     // (1 - alpha2) will later be used as percentage of incoming sunlight
-    float alpha2 = (cloudNoise(uv2).x - 0.5);
+    float alpha2 = (cloudNoise(uv2) - 0.5);
     alpha2 = min(max(alpha2 + cloudDensity, 0.) * 2.5 * cloud_pos_density1.z, 1.);
 
     // And smooth
