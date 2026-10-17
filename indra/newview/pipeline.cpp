@@ -10800,7 +10800,12 @@ void LLPipeline::renderFinalize()
     {
         LLShaderEffectParams params(sourceBuffer, targetBuffer, false);
         LLVfxManager::instance().runEffect(EVisualEffect::RlvSphere, &params);
-        std::swap(sourceBuffer, targetBuffer);
+        // The frame is wherever the last pass left it: still sourceBuffer if no sphere is
+        // enabled or the passes were even in number (one per effect, two per blur).
+        if (params.m_pDstBuffer == targetBuffer)
+        {
+            std::swap(sourceBuffer, targetBuffer);
+        }
     }
 // [/RLVa:KB]
 
