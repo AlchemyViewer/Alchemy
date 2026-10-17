@@ -312,8 +312,6 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
     if (gPipeline.isInit())
     {
         gPipeline.updateRenderTransparentWater();
-        gPipeline.releaseGLBuffers();
-        gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
     }
     return true;
@@ -336,26 +334,16 @@ static bool handleReleaseGLBufferChanged(const LLSD& newvalue)
     return true;
 }
 
-static bool handleEnableEmissiveChanged(const LLSD& newvalue)
-{
-    return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
-}
-
 static bool handleReverseZChanged(const LLSD& newvalue)
 {
     // setShaders() latches the reverse-Z state (LLPipeline::updateReverseZ) and then
-    // releases + recreates the GL buffers at the new depth format itself, so -- unlike the
-    // emissive case -- do NOT release buffers up front (that would rebuild them at the old
-    // format only to have setShaders rebuild them again).
+    // releases + recreates the GL buffers at the new depth format itself, so do NOT release
+    // buffers up front (that would rebuild them at the old format only to have setShaders
+    // rebuild them again).
     const bool handled = handleSetShaderChanged(newvalue);
     // The draw distance ceiling follows the convention setShaders latched; controls already shown take it now.
     recap_draw_distance_controls();
     return handled;
-}
-
-static bool handleHalationChanged(const LLSD& newvalue)
-{
-    return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
 }
 
 static bool handleDisableVintageMode(const LLSD& newvalue)
@@ -367,9 +355,11 @@ static bool handleDisableVintageMode(const LLSD& newvalue)
 
 static bool handleEnableHDR(const LLSD& newvalue)
 {
+    // setShaders latches the G-buffer's normal layout before it compiles and rebuilds the GL
+    // buffers after, as it does reverse-Z's. The probes' cube arrays change format as well.
     gPipeline.mReflectionMapManager.reset();
     gPipeline.mHeroProbeManager.reset();
-    return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
+    return handleSetShaderChanged(newvalue);
 }
 
 static bool handleAnisotropicFilteringChanged(const LLSD& newval)
@@ -671,8 +661,6 @@ static bool handleReflectionProbeDetailChanged(const LLSD& newvalue)
         LLPipeline::refreshCachedSettings();
         gPipeline.mReflectionMapManager.reset();
         gPipeline.mHeroProbeManager.reset();
-        gPipeline.releaseGLBuffers();
-        gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
     }
     return true;
@@ -1073,8 +1061,8 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderGlowHDR", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderBloomMipCount", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderBloomResolutionScale", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderBloomHalation", handleHalationChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderEnableEmissiveBuffer", handleEnableEmissiveChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderBloomHalation", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderEnableEmissiveBuffer", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderReverseZ", handleReverseZChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDisableVintageMode", handleDisableVintageMode);
     setting_setup_signal_listener(gSavedSettings, "RenderHDREnabled", handleEnableHDR);
