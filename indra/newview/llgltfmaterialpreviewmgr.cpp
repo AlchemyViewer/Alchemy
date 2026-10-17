@@ -605,13 +605,6 @@ LLPointer<LLViewerTexture> LLGLTFMaterialPreviewMgr::getPreview(LLPointer<LLFetc
         return nullptr;
     }
 
-    static LLCachedControl<bool> sUIPreviewMaterial(gSavedSettings, "UIPreviewMaterial", false);
-    if (!sUIPreviewMaterial)
-    {
-        fetch_texture_for_ui(material->mBaseColorTexture, material->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR]);
-        return material->mBaseColorTexture;
-    }
-
     if (!is_material_loaded_enough_for_ui(*material))
     {
         return nullptr;

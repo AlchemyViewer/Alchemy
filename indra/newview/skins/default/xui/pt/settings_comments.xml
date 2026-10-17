@@ -697,8 +697,6 @@
   <string>Proporção de tela da exibição em tela cheia (largura / altura).</string>
   <key>FullScreenAutoDetectAspectRatio</key>
   <string>Detectar automaticamente a proporção de tela correta para exibição em tela cheia.</string>
-  <key>GLTFEnabled</key>
-  <string>Ativar suporte a GLTF. Definido como verdadeiro pelo simulador se o simulador ao qual você está conectado suportar upload de assets GLTF. AVISO: definir manualmente como verdadeiro ativará botões que podem esgotar seu saldo de L$ ao fazer upload implícito de texturas sem perguntar.</string>
   <key>GenericErrorPageURL</key>
   <string>URL a definir como propriedade no LLMediaControl para navegar caso a página finalize com um status HTTP 400-499.</string>
   <key>GesturesEveryoneCopy</key>
@@ -2683,8 +2681,6 @@
   <string>Posição do destaque de pré-edição da interface.</string>
   <key>UIPreeditStandoutThickness</key>
   <string>Espessura do destaque de pré-edição da interface.</string>
-  <key>UIPreviewMaterial</key>
-  <string>Se a amostra de material PBR está ou não ativada.</string>
   <key>UIResizeBarHeight</key>
   <string>Tamanho da altura da barra de redimensionamento da interface.</string>
   <key>UIScaleFactor</key>
