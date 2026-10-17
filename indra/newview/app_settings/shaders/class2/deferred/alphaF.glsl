@@ -115,12 +115,6 @@ void main()
     // scaled by an accident of where it sat within its triangle.
     vec3 norm = normalize(vary_norm);
 
-    float shadow = 1.0f;
-
-#ifdef HAS_SUN_SHADOW
-    shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
-#endif
-
 #ifdef USE_DIFFUSE_TEX
     vec4 diffuse_tap = texture(diffuseMap,vary_texcoord0.xy);
 #endif
@@ -196,6 +190,14 @@ void main()
     diffuse_linear.rgb = srgb_to_linear(diffuse_linear.rgb);
 #endif
 #endif // USE_VERTEX_COLOR
+
+    // Below the discards, as pbralphaF samples it, so a fragment they drop filters no shadow.
+    // The impostor branch above is unlit and takes none.
+    float shadow = 1.0f;
+
+#ifdef HAS_SUN_SHADOW
+    shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
+#endif
 
     vec3 sunlit;
     vec3 amblit;
