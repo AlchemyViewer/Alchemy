@@ -255,7 +255,14 @@ void dofAccumulate(inout vec4 diff, inout float w, vec4 s, float radius_norm, fl
 void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc, float radius_norm, float cof_sign, float shape_w)
 {
     vec4 s = texture(diffuseRect, tc);
+#if FRONT_BLUR
     float sc = abs(dofCoF(tc));
+#else
+    // Without the near blur the near field stays sharp (dofCombineF), so its
+    // pixels must not be gathered into the background's blur either: only a
+    // sample behind the focal plane (negative CoF) counts.
+    float sc = -dofCoF(tc);
+#endif
 
     // Sampled pixel is more "out of focus" than current sample radius. The centre's circle and this one are worked out
     // in copies the compiler optimises apart, so a tap on the centre's own depth can come out a rounding error past

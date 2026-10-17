@@ -109,6 +109,7 @@ void main()
             std::string gather = LLFile::getContents(std::string(AL_TEST_SHADER_DIR) + "/class1/deferred/postDeferredF.glsl", read_ec);
             REQUIRE_FALSE(read_ec);
             replaceOnce(gather, "    float sc = abs(dofCoF(tc));\n", "    float sc = abs(s.a);\n");
+            replaceOnce(gather, "    float sc = -dofCoF(tc);\n", "    float sc = -s.a;\n");
             replaceOnce(gather, "        float sc = dofCoF(tc);\n", "        float sc = diff.a;\n");
             REQUIRE(write("deferred/refPostDeferredF.glsl", gather));
         }
