@@ -160,14 +160,14 @@ LLSD ll_binary_from_string(const LLSD& sd)
 char* ll_print_sd(const LLSD& sd)
 {
     const U32 bufferSize = 10 * 1024;
-    static char buffer[bufferSize];
+    thread_local auto buffer = std::make_unique<char[]>(bufferSize);
     std::ostringstream stream;
     //stream.rdbuf()->pubsetbuf(buffer, bufferSize);
     stream << LLSDOStreamer<LLSDXMLFormatter>(sd);
     stream << std::ends;
-    strncpy(buffer, stream.str().c_str(), bufferSize);
+    strncpy(buffer.get(), stream.str().c_str(), bufferSize);
     buffer[bufferSize - 1] = '\0';
-    return buffer;
+    return buffer.get();
 }
 
 char* ll_pretty_print_sd_ptr(const LLSD* sd)
@@ -182,14 +182,14 @@ char* ll_pretty_print_sd_ptr(const LLSD* sd)
 char* ll_pretty_print_sd(const LLSD& sd)
 {
     const U32 bufferSize = 100 * 1024;
-    static char buffer[bufferSize];
+    thread_local auto buffer = std::make_unique<char[]>(bufferSize);
     std::ostringstream stream;
     //stream.rdbuf()->pubsetbuf(buffer, bufferSize);
     stream << LLSDOStreamer<LLSDXMLFormatter>(sd, LLSDFormatter::OPTIONS_PRETTY);
     stream << std::ends;
-    strncpy(buffer, stream.str().c_str(), bufferSize);
+    strncpy(buffer.get(), stream.str().c_str(), bufferSize);
     buffer[bufferSize - 1] = '\0';
-    return buffer;
+    return buffer.get();
 }
 
 std::string ll_stream_notation_sd(const LLSD& sd)
