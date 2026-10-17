@@ -547,6 +547,10 @@ public:
     // convention flip (clip control, clear depth, RT formats, shader define) is atomic.
     static void updateReverseZ();
 
+    /// RenderHDREnabled: what every HDR-dependent target and pass decides by. The G-buffer's normal
+    /// layout follows LLRender::sGBufferNormHDR, which setShaders latches from this.
+    static bool hdrEnabled();
+
     void setRenderTypeMask(U32 type, ...);
     // This is equivalent to 'setRenderTypeMask'
     //void orRenderTypeMask(U32 type, ...);

@@ -594,7 +594,7 @@ void LLViewerShaderMgr::setShaders()
     // The same for the G-buffer's normal layout: every compile below injects GBUFFER_NORM_HDR from this latch,
     // the cache key folds it in, and addDeferredAttachments takes the normal attachment's format from it when this
     // call reallocates the GL buffers.
-    LLRender::sGBufferNormHDR = gSavedSettings.getBOOL("RenderHDREnabled");
+    LLRender::sGBufferNormHDR = LLPipeline::hdrEnabled();
 
     // The same for compute: the shared objects compiled for its stage and every program built on it follow the switch
     // as it stands for this load.

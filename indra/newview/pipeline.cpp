@@ -374,7 +374,6 @@ bool addDeferredAttachments(LLRenderTarget& target)
     U32 emissive = GL_R11F_G11F_B10F;
 
     static LLCachedControl<bool> has_emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
-    static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
 
     // The normal's layout is the one the shaders were compiled against. GBUFFER_NORM_HDR tells them
     // how much room the packed geometric normal has in the attachment's blue channel, and setShaders
@@ -386,7 +385,7 @@ bool addDeferredAttachments(LLRenderTarget& target)
     {
         norm = GL_RGB10_A2;
     }
-    if (!has_hdr())
+    if (!LLPipeline::hdrEnabled())
     {
         emissive = GL_RGB8;
     }
@@ -997,7 +996,7 @@ void LLPipeline::allocateProbeBuffers()
 bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
-    bool hdr = gSavedSettings.getBOOL("RenderHDREnabled");
+    const bool hdr = hdrEnabled();
 
     // The pack mRT points at decides what this allocates, not gCubeSnapshot, which says a capture is
     // rendering: the probe and hero packs are allocated by allocateProbeBuffers, outside any capture.
@@ -1556,7 +1555,7 @@ void LLPipeline::createGLBuffers()
     GLuint resX = gViewerWindow->getWorldViewWidthRaw();
     GLuint resY = gViewerWindow->getWorldViewHeightRaw();
 
-    bool hdr = gSavedSettings.getBOOL("RenderHDREnabled");
+    const bool hdr = hdrEnabled();
     if (!hdr)
     {
         // allocate screen space glow buffers
@@ -3116,6 +3115,13 @@ bool LLPipeline::isWaterClip()
 }
 
 // static
+// static
+bool LLPipeline::hdrEnabled()
+{
+    static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
+    return has_hdr();
+}
+
 LLRenderTarget::eDepthFormat LLPipeline::mainDepthFormat()
 {
     return LLRender::sReverseZ ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
@@ -9998,8 +10004,7 @@ void LLPipeline::renderDoF()
             // (RGBA8, idle until the AA chain). Together this is what keeps DoF
             // at zero full-frame targets of its own: two would be 44 MB at
             // 1440p.
-            static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
-            const bool hdr = has_hdr();
+            const bool hdr = hdrEnabled();
 
             LLRenderTarget* sharp = &mWaterDis;
             LLRenderTarget* blur  = hdr ? (bloomHDRReady() ? &mRT->bloomMip[0] : nullptr)
@@ -10340,8 +10345,7 @@ void LLPipeline::renderFinalize()
     gGL.setColorMask(true, true);
     gGL.setClearColor(LLColor4::transparent);
 
-    static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
-    bool hdr = has_hdr();
+    const bool hdr = hdrEnabled();
 
     // A cutout frame measures nothing and leaves nothing behind. It is mostly
     // empty, so metering it would brighten the subject, and the next live frame
