@@ -566,6 +566,13 @@ vec3 applyFilmGrain(vec3 color, vec2 fragCoord)
 // grounded and slightly more accurate than Brettel/Viénot, especially for
 // tritanopia. Monochromacy/achromatomaly modes are implemented as
 // desaturation toward Rec.709 luma.
+//
+// Machado's matrices act on linear RGB and the blit's input is display
+// encoded, so both entry points below decode before simulating and encode
+// after.
+
+vec3 srgb_to_linear(vec3 cs);
+vec3 linear_to_srgb(vec3 cl);
 
 // ---- Compensation (daltonization, output path) -----------------------------
 uniform int   uCompensateMode;           // [0, 3] — 0 off, 1 protan, 2 deutan, 3 tritan
@@ -611,6 +618,9 @@ vec3 simulateCVD(vec3 c, int mode)
         return mix(c, vec3(dot(c, LUMA)), 0.8);
     }
 
+    // Each literal row below is one of Machado's rows. GLSL fills a mat3
+    // column by column, so m is the transpose of Machado's matrix and c * m
+    // is his M * c. Every row sums to 1, so white stays white.
     mat3 m;
     if (mode == 1)
     {
@@ -629,11 +639,11 @@ vec3 simulateCVD(vec3 c, int mode)
     else
     {
         // Tritanopia (Machado 2009, severity 1.0)
-        m = mat3(1.255528,-0.078441, -0.004733,
-                -0.076749, 0.930809,  0.691367,
-                 0.178779,-0.147632,  0.303900);
+        m = mat3(1.255528,-0.076749, -0.178779,
+                -0.078411, 0.930809,  0.147602,
+                 0.004733, 0.691367,  0.303900);
     }
-    return m * c;
+    return c * m;
 }
 
 // Daltonization: compute the error between original and CVD-simulated
@@ -681,7 +691,8 @@ vec3 applyCVDCompensation(vec3 color)
 {
     if (uCompensateMode <= 0 || uCompensateAmount <= 0.0)
         return color;
-    return clamp(daltonize(color, uCompensateMode, uCompensateAmount), 0.0, 1.0);
+    vec3 lin = daltonize(srgb_to_linear(clamp(color, 0.0, 1.0)), uCompensateMode, uCompensateAmount);
+    return linear_to_srgb(clamp(lin, 0.0, 1.0));
 }
 
 // Preview overlay entry. Mode 7 replaces the image entirely with a
@@ -696,7 +707,8 @@ vec3 applyPreview(vec3 color)
         return color;
     if (uPreviewMode == 7)
         return falseColor(color);
-    return simulateCVD(clamp(color, 0.0, 1.0), uPreviewMode);
+    vec3 lin = simulateCVD(srgb_to_linear(clamp(color, 0.0, 1.0)), uPreviewMode);
+    return linear_to_srgb(clamp(lin, 0.0, 1.0));
 }
 
 

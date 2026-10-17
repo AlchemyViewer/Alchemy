@@ -48,7 +48,7 @@ out vec4 frag_color;
 // Uniforms
 // =============================================================================
 
-uniform sampler2D diffuseRect;      // Linear Rec.709 / linear-sRGB.
+uniform sampler2D diffuseRect;      // Display encoded: colorCorrect writes it through linear_to_srgb.
 uniform sampler2D depthMap;
 
 // Reference still: a grabbed frame that the live image is wiped against.
