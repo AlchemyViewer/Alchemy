@@ -215,8 +215,11 @@ void main()
             // argument-for-argument identical pbrPunctual call, whose result was already
             // sitting in diffPunc/specPunc) put an NdotL on it, so it fell to nothing on
             // exactly those surfaces, and charged a full GGX evaluation per fragment to do it.
-            // Against the diffuse albedo, as the legacy branch below does it.
-            final_color += diffuseColor.rgb * amb_rgb;
+            // Against the diffuse albedo, through the Lambert 1/pi every other PBR diffuse term
+            // carries (pbrPunctual's diffuse lobe for the beam above): PUNCTUAL_LIGHT_SCALE on
+            // amb_rgb is the factor that pairs with it, and the two together put the fill at
+            // the legacy branch's scale.
+            final_color += diffuseColor.rgb * amb_rgb * (1.0 / M_PI);
         }
     }
     else
