@@ -1426,7 +1426,7 @@ void LLPipeline::releaseAllGLResources()
     assertInitialized();
 
     releaseRenderTargets();
-    releaseDerivedState();
+    releaseDepthDependents();
 
     LLVOAvatar::resetImpostors();
     gBumpImageList.destroyGL();
@@ -1521,7 +1521,7 @@ void LLPipeline::releaseRenderTargets()
     releaseShadowBuffers();
 }
 
-void LLPipeline::releaseDerivedState()
+void LLPipeline::releaseDepthDependents()
 {
     mWaterSurface.release();
     mDepthPyramid.release();
@@ -1558,10 +1558,6 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
     std::string invalidated;
 
     releaseRenderTargets();
-    releaseDerivedState();
-    add(invalidated, "depth pyramid, water "
-                     "surface maps, selection outline, far-plane overlay");
-
     createGLBuffers();
     mBuiltHDR = hdrEnabled();
     mGLResourcesLive = true;
@@ -1632,6 +1628,12 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
         if (main_size && mReferenceStill.isComplete())
         {
             add(invalidated, "reference still (next frame)");
+        }
+
+        if (depth_format)
+        {
+            releaseDepthDependents();
+            add(invalidated, "depth pyramid, water surface maps, selection outline, far-plane overlay");
         }
 
         // An impostor is G-buffer channels and depth in the main G-buffer's formats (generateImpostor), so those

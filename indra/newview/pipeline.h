@@ -94,8 +94,9 @@ public:
 
     /// Every GL resource the pipeline holds, and the state derived from them: on context teardown and at shutdown.
     void releaseAllGLResources();
-    /// Rebuilds the render targets for the current settings, and logs what changed and what it dropped.
-    /// @a relinked: the programs were reloaded just before.
+    /// Rebuilds the render targets for the current settings. State derived from them is dropped only where what it
+    /// derives from changed across the rebuild, and one log line names both. @a relinked: the programs were reloaded
+    /// just before.
     void rebuildGLBuffers(bool relinked);
     /// The render targets createGLBuffers allocates.
     void releaseRenderTargets();
@@ -148,8 +149,9 @@ private:
     //implementation of above, wrapped for easy error handling
     eFBOStatus doAllocateScreenBuffer(U32 resX, U32 resY);
 
-    // The state derived from the render targets that every rebuild drops.
-    void releaseDerivedState();
+    // What is built against the main depth format and rebuilt where it is next used: the depth pyramid, the water
+    // surface's maps, the selection outline and the far-plane overlay.
+    void releaseDepthDependents();
 
     // What the render targets are and were built for: rebuildGLBuffers takes one before it builds and one after.
     struct RenderBuildState

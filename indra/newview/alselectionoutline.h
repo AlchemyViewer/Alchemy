@@ -146,8 +146,8 @@ class LLVOAvatar;
 /// The targets exist only while something is drawn: they are made the first frame there is, given up once a frame
 /// and TARGET_KEEP_SECONDS have passed without a call drawing with them (the world calls render every frame and the
 /// HUD while the selection is on it, so one call can have nothing to draw while the other draws; and the pointer
-/// passes from one glowing object to the next with frames between), and given up with the pipeline's own
-/// (LLPipeline::releaseDerivedState).
+/// passes from one glowing object to the next with frames between), and given up when the pipeline's context goes or
+/// the main depth format changes (LLPipeline::releaseDepthDependents).
 class ALSelectionOutline : public LLSingleton<ALSelectionOutline>
 {
     LLSINGLETON(ALSelectionOutline);
