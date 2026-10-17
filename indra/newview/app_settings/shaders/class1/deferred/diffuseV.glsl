@@ -43,7 +43,7 @@ void passTextureIndex();
 
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
-vec3 skinDirection(mat3x4 b, vec3 dir);
+vec3 skinNormal(mat3x4 b, vec3 n);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 
 #endif
@@ -59,7 +59,7 @@ void main()
     vec4 pos = skinTransformH(skin, position.xyz, modelview_matrix);
     vary_position = pos.xyz;
     gl_Position = projection_matrix * pos;
-    vary_normal = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
+    vary_normal = normalize(mat3(modelview_matrix) * skinNormal(skin, normal.xyz));
 #else
     vary_position = (modelview_matrix * vec4(position.xyz, 1.0)).xyz;
     gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);

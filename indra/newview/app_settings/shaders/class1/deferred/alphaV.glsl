@@ -47,7 +47,7 @@ in vec2 texcoord0;
 
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
-vec3 skinDirection(mat3x4 b, vec3 dir);
+vec3 skinNormal(mat3x4 b, vec3 n);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 #ifdef IS_AVATAR_SKIN
@@ -80,7 +80,7 @@ void main()
 
     pos = skinTransformH(skin, position.xyz, modelview_matrix);
 
-    norm = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
+    norm = normalize(mat3(modelview_matrix) * skinNormal(skin, normal.xyz));
     vec4 frag_pos = projection_matrix * pos;
     gl_Position = frag_pos;
 #else

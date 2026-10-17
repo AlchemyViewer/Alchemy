@@ -35,6 +35,7 @@
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
 vec3 skinDirection(mat3x4 b, vec3 dir);
+vec3 skinNormal(mat3x4 b, vec3 n);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 #endif
@@ -87,7 +88,7 @@ void main()
     emissive_texcoord = texture_transform(texcoord0, texture_emissive_transform, texture_matrix0);
 
 #ifdef HAS_SKIN
-    vec3 n = mat3(modelview_matrix) * skinDirection(skin, normal.xyz);
+    vec3 n = mat3(modelview_matrix) * skinNormal(skin, normal.xyz);
     vec3 t = mat3(modelview_matrix) * skinDirection(skin, tangent.xyz);
 #else //HAS_SKIN
     vec3 n = normal_matrix * normal;

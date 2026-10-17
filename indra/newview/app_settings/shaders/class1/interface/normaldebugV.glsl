@@ -36,6 +36,7 @@ uniform float debug_normal_draw_length;
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
 vec3 skinDirection(mat3x4 b, vec3 dir);
+vec3 skinNormal(mat3x4 b, vec3 n);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 #endif
@@ -62,7 +63,7 @@ void main()
 #ifdef HAS_SKIN
     mat3x4 skin = getSkinBlend();
     vec4 world_pos = skinTransformH(skin, position.xyz, modelview_matrix);
-    vec3 view_normal = mat3(modelview_matrix) * skinDirection(skin, normal.xyz);
+    vec3 view_normal = mat3(modelview_matrix) * skinNormal(skin, normal.xyz);
 #ifdef HAS_ATTRIBUTE_TANGENT
     vec3 view_tangent = mat3(modelview_matrix) * skinDirection(skin, tangent.xyz);
 #endif
