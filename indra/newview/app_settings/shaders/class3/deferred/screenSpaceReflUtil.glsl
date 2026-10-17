@@ -85,10 +85,13 @@ bool traceScreenRay(vec3 position, vec3 reflection, out vec4 hitColor, out float
 
     vec3 step = rayStep * reflection;
     vec3 marchingPosition = position + step;
-    float delta;
+    float delta = 0.0;
     float depthFromScreen;
     vec2 screenPosition;
     bool hit = false;
+    // Set where the march first passes behind the depth buffer, the one exit the refinement
+    // below starts from. Off screen, or at the surface's own depth, there is nothing to refine.
+    bool crossed = false;
     hitColor = vec4(0);
 
     int i = 0;
@@ -96,6 +99,12 @@ bool traceScreenRay(vec3 position, vec3 reflection, out vec4 hitColor, out float
     {
         for (; i < iterationCount && !hit; i++)
         {
+            // A point at or behind the eye has clip w <= 0, and its projection mirrors back onto
+            // the screen; nothing there is in the depth buffer to hit.
+            if (marchingPosition.z >= 0.0)
+            {
+                break;
+            }
             screenPosition = generateProjectedPosition(marchingPosition);
             if (screenPosition.x > 1 || screenPosition.x < 0 ||
                 screenPosition.y > 1 || screenPosition.y < 0)
@@ -123,6 +132,7 @@ bool traceScreenRay(vec3 position, vec3 reflection, out vec4 hitColor, out float
             }
             if (isBinarySearchEnabled && delta > 0)
             {
+                crossed = true;
                 break;
             }
             if (isAdaptiveStepEnabled)
@@ -143,13 +153,17 @@ bool traceScreenRay(vec3 position, vec3 reflection, out vec4 hitColor, out float
                 step *= adaptiveStepMultiplier;
             }
         }
-        if(isBinarySearchEnabled)
+        if(isBinarySearchEnabled && crossed)
         {
             for(; i < iterationCount && !hit; i++)
             {
                 step *= 0.5;
                 marchingPosition = marchingPosition - step * sign(delta);
 
+                if (marchingPosition.z >= 0.0)
+                {
+                    break;
+                }
                 screenPosition = generateProjectedPosition(marchingPosition);
                 if (screenPosition.x > 1 || screenPosition.x < 0 ||
                     screenPosition.y > 1 || screenPosition.y < 0)
