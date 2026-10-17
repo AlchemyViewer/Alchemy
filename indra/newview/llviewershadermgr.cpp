@@ -1964,7 +1964,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredImpostorProgram);
 
-        built(gDeferredImpostorProgram.createShader(), gDeferredImpostorProgram);
+        built(gDeferredImpostorProgram.createShader(mirror_variant()), gDeferredImpostorProgram);
     }
 
     {

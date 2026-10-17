@@ -42,15 +42,21 @@ uniform sampler2D emissiveMap;
 uniform mat3 impostor_norm_rot;
 
 in vec2 vary_texcoord0;
+in vec3 vary_position;
 
 vec3 linear_to_srgb(vec3 c);
 vec3 srgb_to_linear(vec3 c);
 
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 vec4 decodeNormal(vec4 norm);
+void mirrorClip(vec3 pos);
 
 void main()
 {
+    // An impostored avatar behind a mirror is clipped from its reflection, as the avatars the
+    // mirror pass draws whole are.
+    mirrorClip(vary_position);
+
     vec4 col = texture(diffuseMap, vary_texcoord0.xy);
 
     if (col.a < minimum_alpha)

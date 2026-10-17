@@ -599,7 +599,8 @@ void LLDrawPoolAvatar::beginDeferredImpostor()
 
     LLVOAvatar::sNumVisibleAvatars = 0;
 
-    sVertexProgram = &gDeferredImpostorProgram;
+    // The mirror pass's corner clips behind the mirror's plane (impostorF's mirrorClip).
+    sVertexProgram = gDeferredImpostorProgram.selectVariant();
     specular_channel = sVertexProgram->enableTexture(LLViewerShaderMgr::SPECULAR_MAP);
     normal_channel = sVertexProgram->enableTexture(LLViewerShaderMgr::NORMAL_MAP);
     // -1 when the program has no emissive sampler (RenderEnableEmissiveBuffer off), which is
