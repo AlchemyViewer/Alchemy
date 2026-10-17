@@ -147,7 +147,10 @@ static simdjson::dom::parser& json_parser()
         // than the LLSD parsers allow. The depth given the first allocation
         // is the one the buffers keep as they grow.
         constexpr size_t INITIAL_CAPACITY = 4 * 1024;
-        (void)parser.allocate(INITIAL_CAPACITY, LLSDParser::DEFAULT_MAX_DEPTH);
+        if (parser.allocate(INITIAL_CAPACITY, LLSDParser::DEFAULT_MAX_DEPTH) != simdjson::SUCCESS)
+        {
+            LL_WARNS("LlsdJson") << "Could not allocate the JSON parser" << LL_ENDL;
+        }
     }
     return parser;
 }
