@@ -147,7 +147,7 @@ namespace
         {
             LL_PROBE_LAYOUT(refmapCount),
             LL_PROBE_LAYOUT(heroShape),
-            LL_PROBE_LAYOUT(heroMipCount),
+            LL_PROBE_LAYOUT(heroMaxLod),
             LL_PROBE_LAYOUT(heroProbeCount),
             LL_PROBE_LAYOUT(iterationCount),
             LL_PROBE_LAYOUT(rayStep),
@@ -1561,7 +1561,7 @@ void LLReflectionMapManager::updateUniforms()
     mProbeData.heroBox = gPipeline.mHeroProbeManager.mHeroData.heroBox;
     mProbeData.heroSphere = gPipeline.mHeroProbeManager.mHeroData.heroSphere;
     mProbeData.heroShape  = gPipeline.mHeroProbeManager.mHeroData.heroShape;
-    mProbeData.heroMipCount   = gPipeline.mHeroProbeManager.mHeroData.heroMipCount;
+    mProbeData.heroMaxLod     = gPipeline.mHeroProbeManager.mHeroData.heroMaxLod;
     mProbeData.heroProbeCount = gPipeline.mHeroProbeManager.mHeroData.heroProbeCount;
 
     // SSR march parameters ride along in this block rather than being re-pushed loose on every

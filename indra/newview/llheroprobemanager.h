@@ -43,8 +43,8 @@ struct HeroProbeData
     LLMatrix4 heroBox;
     LLVector4 heroSphere;
     GLint     heroShape;
-    GLint     heroMipCount;
-    GLint     heroProbeCount;
+    GLfloat   heroMaxLod;     // the LOD radiance generation maps to roughness 1
+    GLint     heroProbeCount; // 1 while there is a mirror to reflect, else 0
 };
 
 class alignas(16) LLHeroProbeManager

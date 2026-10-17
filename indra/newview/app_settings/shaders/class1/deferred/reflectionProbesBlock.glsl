@@ -52,8 +52,8 @@ layout (std140) uniform ReflectionProbes
     int refmapCount;
 
     int heroShape;
-    int heroMipCount;
-    int heroProbeCount;
+    float heroMaxLod;   // the hero chain's LOD for roughness 1, as its radiance was generated
+    int heroProbeCount; // 1 while there is a mirror to reflect, else 0
 
     // Screen-space reflection march parameters (see ReflectionProbeData). noiseSine is NOT
     // here -- it advances per bind and stays a loose uniform.

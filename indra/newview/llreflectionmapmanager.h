@@ -97,7 +97,7 @@ public:
         GLint refmapCount;
 
         GLint heroShape;
-        GLint heroMipCount;
+        GLfloat heroMaxLod;
         GLint heroProbeCount;
 
         // Screen-space reflection march parameters. Frame-constant, and every SSR consumer is

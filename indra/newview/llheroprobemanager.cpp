@@ -444,7 +444,12 @@ void LLHeroProbeManager::generateRadiance(LLReflectionMap* probe)
 
             U32 res = mMipChain[0].getWidth();
 
-            for (int i = 0; i < mMipChain.size() / 4; ++i)
+            // tapHeroProbe weighs the hero probe in only above glossiness 0.75, so it reads LODs
+            // up to a quarter of heroMaxLod (mMaxProbeLOD, the LOD radianceGenF maps to roughness
+            // 1); those mips and the next one up, for the trilinear blend, are what is generated.
+            const S32 radiance_mips = llmin(S32(mMipChain.size()), S32(ceilf(0.25f * mMaxProbeLOD)) + 1);
+
+            for (int i = 0; i < radiance_mips; ++i)
             {
                 LL_PROFILE_GPU_ZONE("hero probe radiance gen");
                 gHeroRadianceGenProgram.uniform1f(LLShaderMgr::ROUGHNESS, (F32) i / (F32) (mMipChain.size() - 1));
@@ -492,11 +497,14 @@ void LLHeroProbeManager::updateUniforms()
     const LLMatrix4a& modelview = LLViewerCamera::getCurrent().getModelview();
     LLVector4a oa; // scratch space for transformed origin
     oa.set(0, 0, 0, 0);
-    mHeroData.heroProbeCount = 1;
+    // With no mirror, the box and sphere below keep the last one's, and the cube array its
+    // picture; 0 tells tapHeroProbe there is nothing to reflect.
+    mHeroData.heroProbeCount = 0;
 
     // Called every frame while mirrors are on, whether or not update() has built the default probe since cleanup().
     if (!mProbes.empty() && mProbes[0].notNull() && mNearestHero != nullptr && !mNearestHero->isDead())
     {
+        mHeroData.heroProbeCount = 1;
         if (mNearestHero->getReflectionProbeIsBox())
         {
             LLVector3 s = mNearestHero->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
@@ -518,8 +526,7 @@ void LLHeroProbeManager::updateUniforms()
         mHeroData.heroSphere.mV[3] = mProbes[0]->mRadius;
     }
 
-    llassert(mMipChain.size() <= size_t(S32_MAX));
-    mHeroData.heroMipCount = S32(mMipChain.size());
+    mHeroData.heroMaxLod = mMaxProbeLOD;
 }
 
 void LLHeroProbeManager::renderDebug()

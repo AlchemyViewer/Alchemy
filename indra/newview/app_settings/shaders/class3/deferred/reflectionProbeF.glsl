@@ -795,6 +795,12 @@ uniform samplerCubeArray   heroProbes;
 
 void tapHeroProbe(inout vec3 glossenv, vec3 pos, vec3 norm, float glossiness)
 {
+    // No mirror this frame: the box, sphere and cube layer still hold the last one's.
+    if (heroProbeCount < 1)
+    {
+        return;
+    }
+
     float clipDist = dot(pos.xyz, clipPlane.xyz) + clipPlane.w;
     float w = 0;
     float dw = 0;
@@ -818,7 +824,14 @@ void tapHeroProbe(inout vec3 glossenv, vec3 pos, vec3 norm, float glossiness)
     clipDist = clamp(clipDist * falloffMult, 0, 1);
     w = clamp(w * falloffMult * clipDist, 0, 1);
     w = mix(0, w, clamp(glossiness - 0.75, 0, 1) * 4); // We only generate a quarter of the mips for the hero probes.  Linearly interpolate between normal probes and hero probes based upon glossiness.
-    glossenv = mix(glossenv, textureLod(heroProbes, vec4(env_mat * refnormpersp, 0), (1.0-glossiness)*heroMipCount).xyz, w);
+
+    // Only the glossiest quarter's mips exist (LLHeroProbeManager::generateRadiance), and a
+    // weight of 0 does not keep an undefined texel out of mix, so the fetch is skipped there.
+    if (w <= 0.0)
+    {
+        return;
+    }
+    glossenv = mix(glossenv, textureLod(heroProbes, vec4(env_mat * refnormpersp, 0), (1.0-glossiness)*heroMaxLod).xyz, w);
 }
 
 #else
