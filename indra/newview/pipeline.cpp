@@ -1442,6 +1442,9 @@ void LLPipeline::releaseAllGLResources()
 
     mCGLut = nullptr;
 
+    releaseScopeBuffers();
+    clearReferenceStill();
+
     if (mNoiseMap)
     {
         LLImageGL::deleteTextures(1, &mNoiseMap);
@@ -1528,9 +1531,6 @@ void LLPipeline::releaseDerivedState()
     {
         ALSelectionOutline::instance().release();
     }
-
-    releaseScopeBuffers();
-    clearReferenceStill();
 }
 
 LLPipeline::RenderBuildState LLPipeline::renderBuildState() const
@@ -1559,7 +1559,7 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
 
     releaseRenderTargets();
     releaseDerivedState();
-    add(invalidated, "reference still, scopes, depth pyramid, water "
+    add(invalidated, "depth pyramid, water "
                      "surface maps, selection outline, far-plane overlay");
 
     createGLBuffers();
@@ -1623,10 +1623,15 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
             add(invalidated, "exposure and flare history");
         }
 
-        // generateLensDirt rebuilds the plate itself when the frame's size or the plate's parameters move.
+        // generateLensDirt rebuilds the plate itself when the frame's size or the plate's parameters move, and
+        // captureReferenceStill drops a still of another size; the scopes resize their sample without losing it.
         if (main_size && mLensDirtMap.isComplete())
         {
             add(invalidated, "lens dirt (next frame)");
+        }
+        if (main_size && mReferenceStill.isComplete())
+        {
+            add(invalidated, "reference still (next frame)");
         }
 
         // An impostor is G-buffer channels and depth in the main G-buffer's formats (generateImpostor), so those
