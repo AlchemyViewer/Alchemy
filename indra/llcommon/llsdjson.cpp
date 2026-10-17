@@ -140,14 +140,16 @@ LLSD LlsdFromJson(const simdjson::dom::element& val)
 static simdjson::dom::parser& json_parser()
 {
     thread_local simdjson::dom::parser parser;
-    if (parser.capacity() == 0)
+    constexpr size_t MAX_DEPTH = LLSDParser::DEFAULT_MAX_DEPTH;
+    if (parser.max_depth() != MAX_DEPTH)
     {
         // LlsdFromJson() recurses once per level, and the tree it builds is
         // destroyed and formatted recursively, so documents nest no deeper
-        // than the LLSD parsers allow. The depth given the first allocation
-        // is the one the buffers keep as they grow.
+        // than the LLSD parsers allow. The buffers keep the depth they were
+        // allocated with as they grow, but a parser that was never allocated,
+        // or failed to be, grows them to simdjson's own.
         constexpr size_t INITIAL_CAPACITY = 4 * 1024;
-        if (parser.allocate(INITIAL_CAPACITY, LLSDParser::DEFAULT_MAX_DEPTH) != simdjson::SUCCESS)
+        if (parser.allocate(INITIAL_CAPACITY, MAX_DEPTH) != simdjson::SUCCESS)
         {
             LL_WARNS("LlsdJson") << "Could not allocate the JSON parser" << LL_ENDL;
         }
@@ -155,9 +157,10 @@ static simdjson::dom::parser& json_parser()
     return parser;
 }
 
-// The parser's buffers come to about fourteen times the largest document it
-// has seen, and are kept between calls. Past this the buffers are let go once
-// the document is converted, rather than held for the life of the thread.
+// The parser's capacity is the largest document it has seen, its buffers about
+// fourteen times that, and both are kept between calls. Once the capacity is
+// past this the buffers are let go when the document is converted, rather than
+// held for the life of the thread.
 static constexpr size_t JSON_PARSER_KEEP_CAPACITY = 1024 * 1024;
 
 static bool llsd_from_parsed(simdjson::simdjson_result<simdjson::dom::element> parsed,
