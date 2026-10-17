@@ -161,7 +161,15 @@ uniform vec3[4] emissiveColors;
 #endif
 // Only the program for a region with a masked material can discard, as in pbropaqueF.
 #ifdef HAS_ALPHA_MASK
-uniform vec4 minimum_alphas; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
+// Per material, its glTF mAlphaCutoff for a MASK material, compared with the alpha the
+// material's base colour factor has already scaled; negative for any other mode, whose
+// alpha glTF ignores, so such a material always covers.
+uniform vec4 minimum_alphas;
+
+float material_coverage(float cutoff, float alpha)
+{
+    return (cutoff < 0.0) ? 1.0 : alpha;
+}
 #endif
 // Per material, its KHR texture transform as the affine map uv = A p + b of a projection's 2D
 // point of the region position, the v flips folded in. The pool builds it; every slice of a
@@ -284,6 +292,9 @@ void main()
 
     PBRMix pbr_mix = init_pbr_mix();
     PBRMix mix2;
+#ifdef HAS_ALPHA_MASK
+    float coverage = 0.0;
+#endif
     // Each material's fetches happen inside its branch, through textureGrad with the
     // derivatives derived above -- see sample_pbr().
     switch (tm.type & MIX_X)
@@ -319,6 +330,9 @@ void main()
 #endif
         );
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.x);
+#ifdef HAS_ALPHA_MASK
+        coverage += tm.weight.x * material_coverage(minimum_alphas.x, mix2.col.a);
+#endif
         break;
     default:
         break;
@@ -356,6 +370,9 @@ void main()
 #endif
         );
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.y);
+#ifdef HAS_ALPHA_MASK
+        coverage += tm.weight.y * material_coverage(minimum_alphas.y, mix2.col.a);
+#endif
         break;
     default:
         break;
@@ -393,6 +410,9 @@ void main()
 #endif
         );
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.z);
+#ifdef HAS_ALPHA_MASK
+        coverage += tm.weight.z * material_coverage(minimum_alphas.z, mix2.col.a);
+#endif
         break;
     default:
         break;
@@ -430,14 +450,19 @@ void main()
 #endif
         );
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.w);
+#ifdef HAS_ALPHA_MASK
+        coverage += tm.weight.w * material_coverage(minimum_alphas.w, mix2.col.a);
+#endif
         break;
     default:
         break;
     }
 
 #ifdef HAS_ALPHA_MASK
-    float minimum_alpha = terrain_mix(tm, minimum_alphas);
-    if (pbr_mix.col.a < minimum_alpha)
+    // Coverage and cutoff blended alike, so where one material lies alone the test is that
+    // material's own: alpha against its cutoff for MASK, always kept otherwise.
+    float minimum_alpha = terrain_mix(tm, max(minimum_alphas, vec4(0.0)));
+    if (coverage < minimum_alpha)
     {
         discard;
     }
