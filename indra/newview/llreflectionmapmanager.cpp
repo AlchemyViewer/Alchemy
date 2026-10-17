@@ -1748,6 +1748,7 @@ void LLReflectionMapManager::initReflectionMaps()
         mSHCoeffs.release();
         mSHCoeffs.allocate(LL_SH_COEFF_COUNT, mReflectionProbeCount + 2, GL_RGBA16F);
 
+        bool new_texture = false;
         if (mTexture.isNull() || hdr_changed ||
             mTexture->getWidth() != mProbeResolution ||
             mReflectionProbeCount + 2 != mTexture->getCount())
@@ -1765,6 +1766,7 @@ void LLReflectionMapManager::initReflectionMaps()
                 // store mReflectionProbeCount+2 cube maps, final two cube maps are used for render target and radiance map generation
                 // source)
                 mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, mHDR);
+                new_texture = true;
             }
         }
 
@@ -1774,8 +1776,9 @@ void LLReflectionMapManager::initReflectionMaps()
         mRadiancePass = false;
         mRealtimeRadiancePass = false;
 
-        // if default probe already exists, remember whether or not it's complete (SL-20498)
-        bool default_complete = mDefaultProbe.isNull() ? false : mDefaultProbe->mComplete;
+        // if default probe already exists, remember whether or not it's complete (SL-20498). Not over
+        // a new cube array, whose storage holds nothing until the default probe renders into it again.
+        bool default_complete = !new_texture && mDefaultProbe.notNull() && mDefaultProbe->mComplete;
 
         for (auto& probe : mProbes)
         {
