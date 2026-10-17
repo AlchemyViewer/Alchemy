@@ -984,6 +984,11 @@ void calcDiffuseSpecular(vec3 baseColor, float metallic, out vec3 diffuseColor, 
 
 vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v, vec3 norm, float perceptualRoughness, vec3 light_dir, vec3 sunlit, float scol, vec3 radiance, vec3 irradiance, vec3 colorEmissive, float ao, vec3 additive, vec3 atten)
 {
+    // The sun's lobe is widened from the surface's own roughness, before the floor: the disc is
+    // the sun's bound (MIN_PBR_ROUGHNESS above), and widening the floored value instead would
+    // count both, flattening a mirror's sun highlight to half its peak. The widened value is
+    // past the floor, so pbrPunctual's own does not apply to it.
+    float sunRoughness = sunDiscRoughness(perceptualRoughness);
     perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
     vec3 color = vec3(0);
 
@@ -1001,7 +1006,7 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
     // The sun is a disc, not a delta light. Widening its lobe by the disc's own angular size
     // is what gives a polished surface a sun highlight with a real edge, and is why
     // MIN_PBR_ROUGHNESS no longer has to invent one for every light at once.
-    pbrPunctual(diffuseColor, specularColor, sunDiscRoughness(perceptualRoughness), metallic, norm, v, normalize(light_dir), nl, diffPunc, specPunc);
+    pbrPunctual(diffuseColor, specularColor, sunRoughness, metallic, norm, v, normalize(light_dir), nl, diffPunc, specPunc);
     specPunc *= pbrEnergyCompensation(specularColor, perceptualRoughness, NdotV);
 
     // Depending on the sky, we combine these differently.
