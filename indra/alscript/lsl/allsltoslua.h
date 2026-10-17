@@ -72,6 +72,12 @@ public:
         // detected[i + 1]:getKey() -- where the call stands in the handler,
         // rather than through llcompat.Detected*.
         bool detectedTable = true;
+        // The script's own keys as SLua's uuids: its key variables, the
+        // parameters of its functions and handlers, and what its functions
+        // give. Off, held as text, as LSL held them: what SLua gives as a
+        // uuid made text where one is given it, a cast to a key the text as
+        // it is, and text given where ll takes a key.
+        bool uuidKeys = true;
         // SLua's ll rather than llcompat where it means the same: a boolean
         // answer, a constant index moved on by one, a find's answer read
         // against nil, and the script's time, where it resets it, read
@@ -84,9 +90,19 @@ public:
         // Luau types on locals, parameters and what functions return, from
         // LSL's types.
         bool types = false;
+        // Text given where SLua's ll takes a key, as LSL's functions took
+        // it, written `x :: any`, which the type checker, asking for a
+        // uuid, takes; or as it is, which it marks where it knows the text
+        // for text -- strict, or types written -- for the scripter to see
+        // to. The VM takes the text either way.
+        bool keyTextAny = true;
         // Each place noted as a "-- LSL:" comment over its line, as well as
         // in the notes.
         bool comments = true;
+        // A space inside a table's braces, and a table type's, as StyLua
+        // and the studio's formatter write them by default -- { "a", 1 },
+        // { any } -- or none: {"a", 1}. Nothing inside, {} either way.
+        bool braceSpaces = true;
         // The script's own comments, each over what it stood over, after it
         // where it was after it on its line, or at the end of what held it:
         // // as --, and /* */ as --[[ ]]; a rule of stars or slashes as one of
@@ -104,6 +120,7 @@ public:
             o.detectedTable = false;
             o.sluaCalls     = false;
             o.idioms        = false;
+            o.uuidKeys      = false;
             return o;
         }
     };

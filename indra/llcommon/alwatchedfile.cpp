@@ -26,6 +26,7 @@
 
 #include "alwatchedfile.h"
 
+#include "almainloop.h"
 #include "alserialworker.h"
 #include "fsyspath.h"
 #include "llerror.h"
@@ -188,7 +189,7 @@ private:
         {
             return;
         }
-        const LL::WorkQueue::ptr_t main = LL::WorkQueue::getInstance("mainloop");
+        const LL::WorkQueue::ptr_t main = ALMainLoop::queue();
         if (!mWorker)
         {
             mWorker = std::make_unique<ALSerialWorker>("WatchedFiles");

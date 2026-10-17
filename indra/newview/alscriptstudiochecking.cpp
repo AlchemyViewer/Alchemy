@@ -152,7 +152,7 @@ ALPreprocessor::Wanted ALScriptStudioChecking::preprocessedWhy(const Doc& doc) c
         }
         return doc.directives;
     };
-    return ALPreprocessor::wanted(doc.envelope.has_value(), directives, ALScriptStudioViewer::get().preprocessing());
+    return ALPreprocessor::wanted(directives, ALScriptStudioViewer::get().preprocessing());
 }
 
 ALScriptPreprocessor::Request ALScriptStudioChecking::preprocessRequest(const Doc& doc, bool with_source) const
@@ -1422,7 +1422,7 @@ void ALScriptStudioChecking::slideProblems(Doc& doc, const ALTextDocument::Edit&
     auto slide = [&edit](auto& list) {
         list.erase(std::remove_if(list.begin(), list.end(),
                                   [&edit](auto& problem) {
-                                      if (!problem.file.empty())
+                                      if (!problem.file.empty() || problem.line < 0)
                                       {
                                           return false;
                                       }

@@ -1,0 +1,38 @@
+# ThreadSanitizer suppressions for the tests of a sanitized build
+# (ALAddTestBinary.cmake gives the runs this file), and for runs of its
+# viewer. One per line:
+#
+#   race:<function or source file>
+#   called_from_lib:<library>
+#   deadlock:<function>
+#
+# A suppression is for code that is not ours and that the tsan triplet cannot
+# build instrumented, such as the system's GL driver under the gl tests, and
+# says above it what it hides, why it cannot be fixed here, and where it was
+# reported upstream. A race in our own code is fixed, not listed, and one in
+# a port the Alchemy registry carries is patched there.
+
+# Mesa's llvmpipe, the GL the gl tests run on in CI and on a host without a
+# GPU: libgallium, built by the distribution, uninstrumented. Its threads
+# order their work through futexes TSan cannot see, so each time Mesa
+# destroyed a mutex or condition variable an llvmpipe thread had used, TSan
+# reported a race between the two, from Mesa on both sides: 49 reports in
+# the gl tests of one run. This hides a race with Mesa in either stack.
+# called_from_lib, which would have TSan ignore what Mesa calls instead,
+# leaves it half of Mesa's locking to see: it then reports lock-order
+# inversions through the LLVM llvmpipe compiles with, and runs hang. Not a
+# bug to report: Mesa is not built for TSan.
+race:libgallium
+
+# SDL's PipeWire audio backend, from the Alchemy registry's sdl3: a
+# lock-order inversion between a device's lock and its stream's PipeWire
+# loop lock, which cannot deadlock. OpenPhysicalAudioDevice holds the
+# device lock while PIPEWIRE_OpenDevice takes the loop lock, and the loop's
+# thread, holding the loop lock, calls output_callback, which takes the
+# device lock. Each device has a loop of its own, and output_callback takes
+# the device lock only once the open has set PW_READY_FLAG_OPEN_COMPLETE
+# under the loop lock, writing silence until then; closing a device lets
+# its lock go before it stops the loop. So the one order is over before
+# the other begins, a protocol TSan's lock graph cannot see. Not patched:
+# SDL's locking is right, and a patch would only hide it from TSan.
+deadlock:SDL_pipewire.c

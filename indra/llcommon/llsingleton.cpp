@@ -118,11 +118,18 @@ public:
     struct LockedInitializing: public Lock
     {
     public:
+        // The running coroutine's list, made where it has none, or with
+        // ExistingOnly, null where it has none: see exists().
+        struct ExistingOnly {};
         LockedInitializing():
             // only do the lookup once, cache the result
             // note that the lock is already locked during this lookup
             mList(&mMasterList.get_initializing_())
         {}
+        explicit LockedInitializing(ExistingOnly):
+            mList(mMasterList.mInitializing.get())
+        {}
+        bool exists() const { return mList != nullptr; }
         list_t& get() const
         {
             if (! mList)
@@ -323,7 +330,15 @@ void LLSingletonBase::MasterList::LockedInitializing::log(const char* verb, cons
 
 void LLSingletonBase::capture_dependency()
 {
-    MasterList::LockedInitializing locked_list;
+    // Without making the coroutine a list where it has none: a coroutine with
+    // none is initializing nothing, so there is no dependency to record, and
+    // a list made here would be left behind, since only popping one back to
+    // empty deletes it. One was, for every coroutine that made a singleton.
+    MasterList::LockedInitializing locked_list{MasterList::LockedInitializing::ExistingOnly()};
+    if (! locked_list.exists())
+    {
+        return;
+    }
     list_t& initializing(locked_list.get());
     // Did this getInstance() call come from another LLSingleton, or from
     // vanilla application code? Note that although this is a nontrivial

@@ -28,7 +28,22 @@
 
 #include "llfloatersnapshot.h"
 
+#include "alcolorpopover.h"
+#include "alobjectproperties.h"
+#include "alrenderisolation.h"
+#include "alsnapshotcutout.h"
+#include "llagentcamera.h"
+#include "llavatarnamecache.h"
+#include "llbutton.h"
+#include "llcolorswatch.h"
 #include "llfloaterreg.h"
+#include "llfocusmgr.h"
+#include "llselectmgr.h"
+#include "lltoolobjpicker.h"
+#include "llviewerobjectlist.h"
+#include "llvoavatar.h"
+#include "rlvactions.h"
+#include "rlvcommon.h"
 #include "llimagefiltersmanager.h"
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
@@ -217,11 +232,17 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
             previewp->setEnabled(true);
         }
 
-        // RN: freeze all avatars
+        // RN: freeze all avatars, including any that arrived since the last
+        // frame. The new requests are taken before the old ones are dropped, so
+        // no avatar is ever unpaused in between, and the list stays one handle
+        // per avatar instead of growing by that much every frame.
+        std::vector<LLAnimPauseRequest> pause_handles;
+        pause_handles.reserve(LLCharacter::sInstances.size());
         for (LLCharacter* character : LLCharacter::sInstances)
         {
-            floaterp->impl->mAvatarPauseHandles.push_back(character->requestPause());
+            pause_handles.push_back(character->requestPause());
         }
+        floaterp->impl->mAvatarPauseHandles.swap(pause_handles);
 
         // freeze everything else
         gSavedSettings.setBOOL("FreezeTime", true);
@@ -250,10 +271,17 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
         gSavedSettings.setBOOL("FreezeTime", false);
 
         // restore last tool (e.g. pie menu, etc)
-        if (floaterp->impl->mLastToolset)
-        {
-            LLToolMgr::getInstance()->setCurrentToolset(floaterp->impl->mLastToolset);
-        }
+        floaterp->impl->restoreToolset();
+    }
+}
+
+void LLFloaterSnapshotBase::ImplBase::restoreToolset()
+{
+    if (mLastToolset)
+    {
+        LLToolset* toolset = mLastToolset;
+        mLastToolset = nullptr;
+        LLToolMgr::getInstance()->setCurrentToolset(toolset);
     }
 }
 
@@ -269,6 +297,7 @@ void LLFloaterSnapshot::Impl::updateControls(LLFloaterSnapshotBase* floater)
     LLSnapshotModel::ESnapshotType shot_type = getActiveSnapshotType(floater);
     LLSnapshotModel::ESnapshotFormat shot_format = (LLSnapshotModel::ESnapshotFormat)gSavedSettings.getS32("SnapshotFormat");
     LLSnapshotModel::ESnapshotLayerType layer_type = getLayerType(floater);
+    const std::optional<ALSnapshotCutout> cutout = ALSnapshotCutout::fromSettings(shot_type, shot_format);
 
     floater->getChild<LLComboBox>("local_format_combo")->selectNthItem(gSavedSettings.getS32("SnapshotFormat"));
     floater->getChildView("layer_types")->setEnabled(shot_type == LLSnapshotModel::SNAPSHOT_LOCAL);
@@ -302,7 +331,8 @@ void LLFloaterSnapshot::Impl::updateControls(LLFloaterSnapshotBase* floater)
         }
 
         // Clamp snapshot resolution to window size when showing UI or HUD in snapshot.
-        if (gSavedSettings.getBOOL("RenderUIInSnapshot") || gSavedSettings.getBOOL("RenderHUDInSnapshot"))
+        // A cutout shows neither, whatever the boxes it greys out still say.
+        if (!cutout && (gSavedSettings.getBOOL("RenderUIInSnapshot") || gSavedSettings.getBOOL("RenderHUDInSnapshot")))
         {
             S32 width = gViewerWindow->getWindowWidthRaw();
             S32 height = gViewerWindow->getWindowHeightRaw();
@@ -400,7 +430,10 @@ void LLFloaterSnapshot::Impl::updateControls(LLFloaterSnapshotBase* floater)
         previewp->setSnapshotType(shot_type);
         previewp->setSnapshotFormat(shot_format);
         previewp->setSnapshotBufferType(layer_type);
+        previewp->setCutout(cutout);
     }
+
+    updateCutoutControls(floater);
 
     LLPanelSnapshot* current_panel = Impl::getActivePanel(floater);
     if (current_panel)
@@ -585,6 +618,354 @@ void LLFloaterSnapshotBase::ImplBase::onCommitFreezeFrame(LLUICtrl* ctrl, void* 
     view->impl->updateLayout(view);
 }
 
+LLFloaterSnapshot::Impl::~Impl()
+{
+    cancelCutoutPick();
+    mCutoutAvatarName.disconnect();
+    mCutoutObjectName.disconnect();
+}
+
+void LLFloaterSnapshot::Impl::setupCutout(LLFloaterSnapshot* floater)
+{
+    floater->getChild<LLUICtrl>("cutout_check")->setValue(gSavedSettings.getBOOL("ALSnapshotCutout"));
+    floater->childSetCommitCallback("cutout_check", Impl::onCommitCutout, floater);
+    floater->childSetCommitCallback("cutout_pick_btn", Impl::onClickCutoutPick, floater);
+
+    if (LLColorSwatchCtrl* swatch = floater->getChild<LLColorSwatchCtrl>("cutout_fill_swatch"))
+    {
+        // The fill's alpha is the whole point of it, and the viewer's own
+        // picker has no way to change alpha.
+        swatch->setPickerOverride([](LLColorSwatchCtrl* from)
+        {
+            LLFloaterSnapshot* floater = LLFloaterSnapshot::findInstance();
+            return floater && ((Impl*)floater->impl)->openCutoutFillPopover(floater, from);
+        });
+    }
+
+    // However these change -- the swatch, its popover, the box, Debug
+    // Settings -- the preview is told again.
+    for (const char* key : { "ALSnapshotCutout", "ALSnapshotCutoutFill", "ALSnapshotCutoutIncludeSeated", "ALSnapshotCutoutSupersample" })
+    {
+        if (LLControlVariable* control = gSavedSettings.getControl(key))
+        {
+            mCutoutSettings.emplace_back(control->getSignal()->connect([](LLControlVariable*, const LLSD&, const LLSD&)
+            {
+                if (LLFloaterSnapshot* floater = LLFloaterSnapshot::findInstance())
+                {
+                    floater->impl->updateControls(floater);
+                }
+            }));
+        }
+    }
+
+    // The eyedropper has no use over a frozen frame, where a click lands on
+    // the preview: freezing puts down a pick under way, and either way the
+    // row is told.
+    if (LLControlVariable* control = gSavedSettings.getControl("UseFreezeFrame"))
+    {
+        mCutoutSettings.emplace_back(control->getSignal()->connect([](LLControlVariable*, const LLSD& value, const LLSD&)
+        {
+            if (LLFloaterSnapshot* floater = LLFloaterSnapshot::findInstance())
+            {
+                Impl* impl = (Impl*)floater->impl;
+                if (value.asBoolean())
+                {
+                    impl->cancelCutoutPick();
+                }
+                impl->updateCutoutControls(floater);
+            }
+        }));
+    }
+
+    // An object's name comes with its properties, whenever they arrive.
+    mCutoutObjectName = ALObjectPropertiesCache::instance().setChangeCallback([](const LLUUID& id)
+    {
+        LLFloaterSnapshot* floater = LLFloaterSnapshot::findInstance();
+        if (floater && id == ALRenderIsolation::armedTarget())
+        {
+            ((Impl*)floater->impl)->updateCutoutControls(floater);
+        }
+    });
+}
+
+// static
+void LLFloaterSnapshot::Impl::onCommitCutout(LLUICtrl* ctrl, void* data)
+{
+    LLFloaterSnapshot* floater = (LLFloaterSnapshot*)data;
+    Impl* impl = (Impl*)floater->impl;
+
+    const bool on = ctrl->getValue().asBoolean();
+    if (!on)
+    {
+        impl->cancelCutoutPick();
+        ALRenderIsolation::disarm();
+    }
+    else if (ALRenderIsolation::armedTarget().isNull() && !impl->mCutoutPicking)
+    {
+        // Nothing to cut out yet: straight on to picking it.
+        impl->startCutoutPick(floater);
+    }
+    gSavedSettings.setBOOL("ALSnapshotCutout", on);
+    impl->updateControls(floater);
+}
+
+// static
+void LLFloaterSnapshot::Impl::onClickCutoutPick(LLUICtrl* ctrl, void* data)
+{
+    LLFloaterSnapshot* floater = (LLFloaterSnapshot*)data;
+    Impl* impl = (Impl*)floater->impl;
+
+    // A press on the eyedropper while it was armed took the mouse from it,
+    // which cancelled it; this is the same press, finishing.
+    constexpr F64 PRESS_SECONDS = 2.0;
+    if (impl->mCutoutPickCancelledAt > 0.0 && LLFrameTimer::getTotalSeconds() - impl->mCutoutPickCancelledAt < PRESS_SECONDS)
+    {
+        impl->mCutoutPickCancelledAt = 0.0;
+        return;
+    }
+    impl->mCutoutPickCancelledAt = 0.0;
+
+    if (impl->mCutoutPicking)
+    {
+        impl->cancelCutoutPick();
+        impl->updateCutoutControls(floater);
+    }
+    else
+    {
+        impl->startCutoutPick(floater);
+    }
+}
+
+void LLFloaterSnapshot::Impl::startCutoutPick(LLFloaterSnapshotBase* floater)
+{
+    // The tool outlives any floater, so it is handed nothing to call back into:
+    // the floater is looked up when it answers.
+    LLToolObjPicker::getInstance()->setExitCallback(Impl::onCutoutPickExit, nullptr);
+    LLToolMgr::getInstance()->setTransientTool(LLToolObjPicker::getInstance());
+    mCutoutPicking = true;
+    updateCutoutControls(floater);
+}
+
+void LLFloaterSnapshot::Impl::cancelCutoutPick()
+{
+    if (!mCutoutPicking)
+    {
+        return;
+    }
+    mCutoutPicking = false;
+
+    if (LLToolObjPicker::instanceExists())
+    {
+        LLToolObjPicker* picker = LLToolObjPicker::getInstance();
+        picker->setExitCallback(nullptr, nullptr);
+        if (LLToolMgr::instanceExists() && LLToolMgr::getInstance()->getCurrentTool() == picker)
+        {
+            LLToolMgr::getInstance()->clearTransientTool();
+        }
+    }
+}
+
+// static
+void LLFloaterSnapshot::Impl::onCutoutPickExit(void*)
+{
+    const LLUUID picked = LLToolObjPicker::getInstance()->getObjectID();
+    LLToolMgr::getInstance()->clearTransientTool();
+
+    LLFloaterSnapshot* floater = LLFloaterSnapshot::findInstance();
+    if (!floater)
+    {
+        return;
+    }
+    Impl* impl = (Impl*)floater->impl;
+    impl->mCutoutPicking = false;
+
+    if (picked.isNull())
+    {
+        // Cancelled -- by Escape, by a click on the interface, or by a press on
+        // the eyedropper itself, which has the mouse by now.
+        LLView* pick_btn = floater->getChild<LLView>("cutout_pick_btn");
+        if (gFocusMgr.getMouseCapture() == pick_btn)
+        {
+            impl->mCutoutPickCancelledAt = LLFrameTimer::getTotalSeconds();
+        }
+        impl->updateCutoutControls(floater);
+        return;
+    }
+
+    const LLUUID target = ALRenderIsolation::targetFromPick(picked);
+    if (target.isNull())
+    {
+        // A HUD, land, water: nothing a cutout can lift out.
+        make_ui_sound("UISndBadKeystroke");
+        impl->updateCutoutControls(floater);
+        return;
+    }
+
+    ALRenderIsolation::arm(target);
+    floater->getChild<LLUICtrl>("cutout_check")->setValue(true);
+    // Through the setting's signal, the preview hears of it.
+    gSavedSettings.setBOOL("ALSnapshotCutout", true);
+    impl->updateControls(floater);
+}
+
+bool LLFloaterSnapshot::Impl::openCutoutFillPopover(LLFloaterSnapshotBase* floater, LLColorSwatchCtrl* swatch)
+{
+    LLControlVariable* control = gSavedSettings.getControl("ALSnapshotCutoutFill");
+    if (!swatch || !control)
+    {
+        return false;
+    }
+    mCutoutFillPopover.close(false);
+
+    const LLSD original = control->getValue();
+    ALColorPopover* popover = new ALColorPopover(
+        ALColorPopover::params(floater->getString("cutout_fill_title")),
+        LLColor4(original),
+        true,
+        [](const LLColor4& color)
+        {
+            gSavedSettings.setColor4("ALSnapshotCutoutFill", color);
+        },
+        swatch,
+        floater->getString("cutout_full_picker"), floater->getString("cutout_full_picker_tooltip"));
+
+    // Escape puts the colour back.
+    mCutoutFillPopover.hold(popover, [original](bool escaped)
+    {
+        if (escaped)
+        {
+            gSavedSettings.setUntypedValue("ALSnapshotCutoutFill", original);
+        }
+    });
+    popover->openBeside(swatch);
+    return true;
+}
+
+std::string LLFloaterSnapshot::Impl::cutoutSubjectName(LLFloaterSnapshotBase* floater, LLViewerObject* subject)
+{
+    const LLUUID& id = subject->getID();
+
+    if (subject->asAvatar())
+    {
+        LLAvatarName av_name;
+        if (LLAvatarNameCache::get(id, &av_name))
+        {
+// [RLVa:KB] - Checked: RLVa-2.0.1
+            return RlvActions::canShowName(RlvActions::SNC_DEFAULT, id) ? av_name.getCompleteName() : RlvStrings::getAnonym(av_name);
+// [/RLVa:KB]
+        }
+        if (mCutoutNameAsked != id)
+        {
+            mCutoutNameAsked = id;
+            mCutoutAvatarName.disconnect();
+            mCutoutAvatarName = LLAvatarNameCache::get(id, [](const LLUUID&, const LLAvatarName&)
+            {
+                if (LLFloaterSnapshot* floater = LLFloaterSnapshot::findInstance())
+                {
+                    ((Impl*)floater->impl)->updateCutoutControls(floater);
+                }
+            });
+        }
+        return floater->getString("cutout_retrieving");
+    }
+
+    if (const ALObjectPropertiesCache::ServerProps* props = ALObjectPropertiesCache::instance().get(id))
+    {
+        return props->mName;
+    }
+    if (mCutoutNameAsked != id && subject->getRegion())
+    {
+        mCutoutNameAsked = id;
+        LLSelectMgr::getInstance()->requestObjectPropertiesFamily(subject);
+    }
+    return floater->getString("cutout_retrieving");
+}
+
+void LLFloaterSnapshot::Impl::updateCutoutControls(LLFloaterSnapshotBase* floater)
+{
+    const bool rlv_blocked = ALSnapshotCutout::blockedByRlv();
+    const bool freeze_frame = gSavedSettings.getBOOL("UseFreezeFrame");
+    const bool cutout_on = gSavedSettings.getBOOL("ALSnapshotCutout") && !rlv_blocked;
+    LLViewerObject* subject = ALRenderIsolation::findArmedObject();
+
+    floater->getChild<LLUICtrl>("cutout_check")->setEnabled(!rlv_blocked);
+    floater->getChild<LLUICtrl>("cutout_check")->setValue(cutout_on);
+
+    // With the preview frozen over the world, a click in it lands on the
+    // preview; the eyedropper would only ever cancel.
+    LLButton* pick_btn = floater->getChild<LLButton>("cutout_pick_btn");
+    pick_btn->setEnabled(!rlv_blocked && !freeze_frame);
+    pick_btn->setToggleState(mCutoutPicking);
+
+    floater->getChildView("cutout_fill_swatch")->setEnabled(!rlv_blocked);
+    // Only an object has anyone sitting on it to take along.
+    floater->getChildView("cutout_seated_check")->setEnabled(cutout_on && subject && !subject->asAvatar());
+
+    // A cutout is colour, without the interface or the HUD.
+    if (cutout_on && ALRenderIsolation::armedTarget().notNull())
+    {
+        floater->getChildView("ui_check")->setEnabled(false);
+        floater->getChildView("balance_check")->setEnabled(false);
+        floater->getChildView("hud_check")->setEnabled(false);
+        floater->getChildView("layer_types")->setEnabled(false);
+    }
+    else
+    {
+        floater->getChildView("ui_check")->setEnabled(true);
+        floater->getChildView("balance_check")->setEnabled(gSavedSettings.getBOOL("RenderUIInSnapshot"));
+        floater->getChildView("hud_check")->setEnabled(true);
+    }
+
+    std::string text;
+    if (rlv_blocked)
+    {
+        text = floater->getString("cutout_rlv");
+    }
+    else if (mCutoutPicking)
+    {
+        text = floater->getString("cutout_picking");
+    }
+    else if (ALRenderIsolation::armedTarget().isNull())
+    {
+        text = floater->getString("cutout_nothing");
+    }
+    else if (!subject)
+    {
+        text = floater->getString("cutout_not_found");
+    }
+    else
+    {
+        text = cutoutSubjectName(floater, subject);
+        LLVOAvatar* avatar = subject->asAvatar();
+        if (avatar && avatar->isVisuallyMuted())
+        {
+            // Muted, a jelly doll or too complex to draw: the cutout shows it
+            // the way the world does.
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = text;
+            text = floater->getString("cutout_muted", args);
+        }
+        else if (avatar && avatar->isSelf() && gAgentCamera.cameraMouselook())
+        {
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = text;
+            text = floater->getString("cutout_mouselook", args);
+        }
+        else if (LLSnapshotLivePreview* previewp = getPreviewView(); previewp && previewp->cutoutDrewNothing())
+        {
+            // There, but out of the frame or past the draw distance: the
+            // preview is the fill alone.
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = text;
+            text = floater->getString("cutout_not_drawn", args);
+        }
+    }
+
+    LLUICtrl* target_text = floater->getChild<LLUICtrl>("cutout_target_text");
+    target_text->setValue(text);
+    target_text->setToolTip(text);
+}
+
 void LLFloaterSnapshot::Impl::checkAspectRatio(LLFloaterSnapshotBase *view, S32 index)
 {
     LLSnapshotLivePreview *previewp = getPreviewView() ;
@@ -691,7 +1072,11 @@ void LLFloaterSnapshot::Impl::updateResolution(LLUICtrl* ctrl, void* data, bool 
         S32 original_width = 0, original_height = 0;
         previewp->getSize(original_width, original_height);
 
-        if (gSavedSettings.getBOOL("RenderUIInSnapshot") || gSavedSettings.getBOOL("RenderHUDInSnapshot"))
+        // A cutout shows neither the UI nor the HUD, whatever the boxes it
+        // greys out still say (as in updateControls).
+        const std::optional<ALSnapshotCutout> cutout = ALSnapshotCutout::fromSettings(
+            getActiveSnapshotType(view), (LLSnapshotModel::ESnapshotFormat)gSavedSettings.getS32("SnapshotFormat"));
+        if (!cutout && (gSavedSettings.getBOOL("RenderUIInSnapshot") || gSavedSettings.getBOOL("RenderHUDInSnapshot")))
         { //clamp snapshot resolution to window size when showing UI or HUD in snapshot
             width = llmin(width, gViewerWindow->getWindowWidthRaw());
             height = llmin(height, gViewerWindow->getWindowHeightRaw());
@@ -979,10 +1364,7 @@ LLFloaterSnapshotBase::~LLFloaterSnapshotBase()
     //unfreeze everything else
     gSavedSettings.setBOOL("FreezeTime", false);
 
-    if (impl->mLastToolset)
-    {
-        LLToolMgr::getInstance()->setCurrentToolset(impl->mLastToolset);
-    }
+    impl->restoreToolset();
 
     delete impl;
 }
@@ -1030,6 +1412,8 @@ bool LLFloaterSnapshot::postBuild()
 
     getChild<LLUICtrl>("no_post_check")->setValue(gSavedSettings.getBOOL("RenderSnapshotNoPost"));
     childSetCommitCallback("no_post_check", ImplBase::onClickNoPost, this);
+
+    ((Impl*)impl)->setupCutout(this);
 
     getChild<LLButton>("retract_btn")->setCommitCallback(boost::bind(&LLFloaterSnapshot::onExtendFloater, this));
     getChild<LLButton>("extend_btn")->setCommitCallback(boost::bind(&LLFloaterSnapshot::onExtendFloater, this));
@@ -1121,6 +1505,12 @@ void LLFloaterSnapshotBase::draw()
             // Apply floater transparency to the texture unless the floater is focused.
             F32 alpha = getTransparencyType() == TT_ACTIVE ? 1.0f : getCurrentTransparency();
             LLColor4 color = working ? LLColor4::grey4 : LLColor4::white;
+            if (previewp->hasCutout())
+            {
+                // What a cutout leaves empty reads as empty, as a swatch's
+                // transparency does.
+                gl_rect_2d_checkerboard(LLRect(offset_x, offset_y + thumbnail_h, offset_x + thumbnail_w, offset_y), alpha);
+            }
             gl_draw_scaled_image(offset_x, offset_y,
                     thumbnail_w, thumbnail_h,
                     previewp->getThumbnailImage(), color % alpha);
@@ -1159,6 +1549,17 @@ void LLFloaterSnapshot::onOpen(const LLSD& key)
     getChild<LLSideTrayPanelContainer>("panel_container")->getCurrentPanel()->onOpen(LLSD());
 }
 
+void LLFloaterSnapshot::onClose(bool app_quitting)
+{
+    // The subject stays armed for Take Snapshot to Disk; the eyedropper and the
+    // fill's popover go with the window.
+    Impl* snapshot_impl = (Impl*)impl;
+    snapshot_impl->cancelCutoutPick();
+    snapshot_impl->mCutoutFillPopover.close(false);
+
+    LLFloaterSnapshotBase::onClose(app_quitting);
+}
+
 void LLFloaterSnapshot::onExtendFloater()
 {
     impl->setAdvanced(gSavedSettings.getBOOL("AdvanceSnapshot"));
@@ -1187,10 +1588,7 @@ void LLFloaterSnapshotBase::onClose(bool app_quitting)
     gSavedSettings.setBOOL("FreezeTime", false);
     impl->mAvatarPauseHandles.clear();
 
-    if (impl->mLastToolset)
-    {
-        LLToolMgr::getInstance()->setCurrentToolset(impl->mLastToolset);
-    }
+    impl->restoreToolset();
 }
 
 // virtual

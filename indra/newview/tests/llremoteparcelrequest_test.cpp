@@ -26,12 +26,11 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../llremoteparcelrequest.h"
 
 #include "../llagent.h"
-#include "llurlentry.h"
 
 namespace {
     const LLUUID TEST_PARCEL_ID("11111111-1111-1111-1111-111111111111");
@@ -52,12 +51,8 @@ LLAgent::~LLAgent() { }
 void LLAgent::sendReliableMessage(void) { }
 LLUUID gAgentSessionID;
 LLUUID gAgentID;
-LLUIColor::LLUIColor(void) { }
-LLControlGroup::LLControlGroup(std::string const & name) : LLInstanceTracker<LLControlGroup, std::string>(name) { }
-LLControlGroup::~LLControlGroup(void) { }
-void LLUrlEntryParcel::processParcelInfo(const LLUrlEntryParcel::LLParcelData& parcel_data) { }
 
-namespace tut
+namespace
 {
     struct TestObserver : public LLRemoteParcelInfoObserver {
         TestObserver() : mProcessed(false) { }
@@ -81,15 +76,8 @@ namespace tut
         }
     };
 
-    typedef test_group<RemoteParcelRequestData> remoteparcelrequest_t;
-    typedef remoteparcelrequest_t::object remoteparcelrequest_object_t;
-    tut::remoteparcelrequest_t tut_remoteparcelrequest("LLRemoteParcelRequest");
-
-    template<> template<>
-    void remoteparcelrequest_object_t::test<1>()
+    TEST_CASE_METHOD(RemoteParcelRequestData, "LLRemoteParcelRequest: an observer is told of the reply for its parcel", "[LLRemoteParcelRequest]")
     {
-        set_test_name("observer pointer");
-
         std::unique_ptr<TestObserver> observer(new TestObserver());
 
         LLRemoteParcelInfoProcessor & processor = LLRemoteParcelInfoProcessor::instance();
@@ -97,22 +85,26 @@ namespace tut
 
         processor.processParcelData(testParcelData());
 
-        ensure(observer->mProcessed);
+        CHECK(observer->mProcessed);
     }
 
-    template<> template<>
-    void remoteparcelrequest_object_t::test<2>()
+    // CHOP-220: a dangling observer pointer. The deleted observer comes
+    // before a live one for the same parcel: the reply passes it over, does
+    // not crash on it, and still reaches the live one.
+    TEST_CASE_METHOD(RemoteParcelRequestData, "LLRemoteParcelRequest: a reply after an observer is deleted passes it over and reaches the rest", "[LLRemoteParcelRequest]")
     {
-        set_test_name("CHOP-220: dangling observer pointer");
-
         LLRemoteParcelInfoObserver * observer = new TestObserver();
+        TestObserver live;
 
         LLRemoteParcelInfoProcessor & processor = LLRemoteParcelInfoProcessor::instance();
         processor.addObserver(LLUUID(TEST_PARCEL_ID), observer);
+        processor.addObserver(LLUUID(TEST_PARCEL_ID), &live);
 
         delete observer;
         observer = NULL;
 
         processor.processParcelData(testParcelData());
+        CHECK(live.mProcessed);
+        processor.removeObserver(LLUUID(TEST_PARCEL_ID), &live);
     }
 }

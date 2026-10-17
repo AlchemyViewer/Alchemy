@@ -169,12 +169,7 @@ void LLViewerTextureList::doPreloadImages()
     //uv_test->setClamp(false, false);
     //uv_test->setMipFilterNearest(true, true);
 
-    LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTextureFromFile("silhouette.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
-    if (image)
-    {
-        mImagePreloads.insert(image);
-    }
-    image = LLViewerTextureManager::getFetchedTextureFromFile("world/NoEntryLines.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
+    LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTextureFromFile("world/NoEntryLines.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
     if (image)
     {
         mImagePreloads.insert(image);
@@ -825,8 +820,8 @@ void LLViewerTextureList::updateImages(F32 max_time)
     {
         using namespace LLStatViewer;
         sample(NUM_IMAGES, sNumImages);
-        sample(NUM_RAW_IMAGES, LLImageRaw::sRawImageCount);
-        sample(FORMATTED_MEM, F64Bytes(LLImageFormatted::sGlobalFormattedMemory));
+        sample(NUM_RAW_IMAGES, LLImageRaw::sRawImageCount.load(std::memory_order_relaxed));
+        sample(FORMATTED_MEM, F64Bytes(LLImageFormatted::sGlobalFormattedMemory.load(std::memory_order_relaxed)));
     }
 
     // make sure each call below gets at least its "fair share" of time

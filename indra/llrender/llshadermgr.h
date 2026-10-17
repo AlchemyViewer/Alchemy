@@ -242,11 +242,11 @@ public:
         SKIN_ORIGIN,                        //  "skin_origin" (rigged path: agent-space rebase origin the palette translations were made relative to)
 
         WATER_SCREENTEX,                    //  "screenTex"
-        WATER_EXCLUSIONTEX,                 //  "exclusionTex"
+        WATER_EXCLUSION_DISTORT,            //  "exclusionDistort"  1 where the water below is distorted, 0 where an exclusion prim covers it
         WATER_EYEVEC,                       //  "eyeVec"
         WATER_TIME,                         //  "time"
-        WATER_BIG_WAVE_SCROLL,              //  "bigWaveScroll"
-        WATER_LITTLE_WAVE_SCROLL,           //  "littleWaveScroll"
+        WATER_BIG_PHASE,                    //  "waterBigPhase"  the big wave layer's phase at the camera (ALWaterField::wavePhases)
+        WATER_LITTLE_PHASE,                 //  "waterLittlePhase"  the little map's two reads' phases at the camera
         WATER_LIGHT_DIR,                    //  "lightDir"
         WATER_SPECULAR,                     //  "specular"
         WATER_SPECULAR_EXP,                 //  "lightExp"
@@ -255,7 +255,6 @@ public:
         WATER_FOGDENSITY,                   //  "waterFogDensity"
         WATER_FOGKS,                        //  "waterFogKS"
         WATER_REFSCALE,                     //  "refScale"
-        WATER_WATERHEIGHT,                  //  "waterHeight"
         WATER_WATERPLANE,                   //  "waterPlane"
         WATER_WATERSIGN,                    //  "waterSign"
         WATER_NORM_SCALE,                   //  "normScale"
@@ -598,6 +597,8 @@ public:
 
         CROSS_FILTER_MAP,                   //  "crossFilterMap"       streak accumulator, composited in colorCorrect
 
+        CUTOUT_PREMULTIPLIED,               //  "uCutoutPremultiplied" 1 in a snapshot cutout frame: scene colour is premultiplied by coverage
+
         // End Alchemy Effects Stack
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 
@@ -609,14 +610,79 @@ public:
 
         EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
         SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
-        SKY_BEHIND_WEIGHT,                  //  "skyBehindWeight"  1 while skyBehindMap holds this view's sky
 
         MOON_QUAD_CENTER,                   //  "moonQuadCenter"  the moon quad's centre direction, for the stars it covers
         MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length
         MOON_QUAD_V,                        //  "moonQuadV"  its up half-extent over its squared length
 
+        // Selection outlines, hover glow and wireframe (ALSelectionOutline)
+        SELECTION_ID,                       //  "selection_id"  the object's id, 1 to 65535
+        SELECTION_PRIORITY,                 //  "selection_priority"  ALSelectionOutline::EPriority
+        SELECTION_SHOW_HIDDEN,              //  "selection_show_hidden"  1 where hidden parts are drawn dimmed
+        SELECTION_OUTLINED,                 //  "selection_outlined"  0 where the id pass holds it for its wireframe alone
+        SELECTION_SCENE_DEPTH,              //  "selection_scene_depth"  1 where the scene's depth decides what is hidden
+        OUTLINE_WIDTH,                      //  "outline_width"  the contour's width in pixels
+        OUTLINE_INNER_WIDTH,                //  "outline_inner_width"  the edges between objects' width in pixels
+        OUTLINE_GLOW_RADIUS,                //  "outline_glow_radius"  the hover glow's reach in pixels, 0 for none
+        OUTLINE_GLOW_BRIGHTNESS,            //  "outline_glow_brightness"  RenderHighlightBrightness
+        WIREFRAME_PASS,                     //  "wireframe_pass"  ALSelectionOutline::EWirePass
+        WIREFRAME_WIDTH,                    //  "wireframe_width"  the lines' width in pixels
+        SELECTION_ID_MAP,                   //  "selectionIdMap"  the id target, read by the passes after the id pass
+        SELECTION_JUMP_MAP,                 //  "selectionJumpMap"  the near sides of jumps the jump pass marks
+        SELECTION_TILE_MAP,                 //  "selectionTileMap"  the tile pass's record of each tile
+        SELECTION_PALETTE,                  //  "selectionPalette"  each id's visible and hidden colours
+        SELECTION_GLOW_REACH_MAP,           //  "selectionGlowReachMap"  the glowing ids within the glow's reach of each tile
+        SELECTION_GLOW_ROW_MAP,             //  "selectionGlowRowMap"  the nearest glowing texel along each texel's row
+        SELECTION_BACKDROP_MAP,             //  "selectionBackdrop"  the window behind the lines, at half its resolution
+        SELECTION_CONTRAST,                 //  "selection_contrast"  how lines are kept apart from the backdrop (EContrast)
+        SELECTION_KEEP_CUT,                 //  "selection_keep_cut"  1 where texels the alpha test cuts are kept as unshown surface
+        SELECTION_TILE_DEPTH_MAP,           //  "selectionTileDepthMap"  each tile's nearest eye distance not glowing
+        OUTLINE_RIM_WIDTH,                  //  "outline_rim_width"  the contour's rim in pixels, 0 for none
+
+        WATER_CELL_MAP,                     //  "waterCellMap"  the cells' water heights and flags (ALWaterSurface)
+        WATER_CELL_SQUARE,                  //  "waterCellSquare"  the cell square: its south-west corner in agent space, a cell's width, the cells a side
+        WATER_DEFAULT_HEIGHT,               //  "waterDefaultHeight"  the water height past the cell square, the agent region's
+        WATER_RINGS,                        //  "waterRings"  the rings: the square's half-size, their count, the rim, and whether the void is drawn
+        WATER_SWEEP_PHASE,                  //  "waterSweepPhase"  LL's wave sweep's phase at the camera
+        WATER_LAYOUT,                       //  "waterLayout"  which part of the field a draw places (ALWaterField::Draw)
+        WATER_GLINT_ROUGHNESS,              //  "waterGlintRoughness"  the roughness of the sun's reflection on each wave face
+        WATER_LATTICE_FRAC,                 //  "waterLatticeFrac"  the camera's place on the tiled layers' lattices, its fraction
+        WATER_LATTICE_BASE,                 //  "waterLatticeBase"  and the low 32 bits of its floor
+        WATER_MAP_MEAN,                     //  "waterMapMean"  the two wave maps' mean normal xy
+        WATER_PATCH_RECT,                   //  "waterPatchRect"  the cells drawn as wave patches, square-local, max exclusive
+        WATER_TESS_DENSITY,                 //  "waterTessDensity"  the waves' tessellation density
+        WATER_MAX_DISPLACEMENT,             //  "waterMaxDisplacement"  the most the waves move the surface, in metres
+        WATER_CULL_PLANES,                  //  "waterCullPlanes"  the view's frustum planes but the far one, agent space
+        WATER_HEIGHT_MAP,                   //  "waterHeightMap"  the current wave map's baked heights
+        WATER_HEIGHT_MAP2,                  //  "waterHeightMap2"  the next wave map's
+        WATER_WAVE_AMP,                     //  "waterWaveAmp"  each map's wave height: the dial times its rise
+        WATER_WAVE_REACH,                   //  "waterWaveReach"  the tessellation reach, and the most the waves move the surface
+        WATER_WAVE_EYE,                     //  "waterWaveEye"  the camera the waves were laid out around, in agent space
+        WATER_RAISE,                        //  "waterRaise"  how far the field a draw places is raised
+
+        // The depth pyramid (ALDepthPyramid): each level the farthest scene depth under its texels
+        DEPTH_PYRAMID,                      //  "depthPyramid"  sampler2D, a built pyramid for its readers
+        DEPTH_PYRAMID_SOURCE,               //  "depthPyramidSource"  sampler2D the build reads: scene depth for level 0, the pyramid's previous level after
+        DEPTH_PYRAMID_TARGET,               //  "depthPyramidTarget"  image2D[5] (r32f), the levels a build dispatch writes
+        DEPTH_PYRAMID_LEVEL,                //  "depthPyramidLevel"  int, the pyramid lod a build dispatch reads, -1 for the depth
+        DEPTH_PYRAMID_SIZE,                 //  "depthPyramidSize"  ivec4, the depth's size in pixels (xy) and the pyramid's levels (z)
+        DEPTH_PYRAMID_COUNT,                //  "depthPyramidCount"  int, the levels a build dispatch writes
+
+        // The waves' patches
+        WATER_OCCLUSION,                    //  "waterOcclusion"  int, whether the control stage culls against the depth pyramid
+        WATER_PATCH_ORDER,                  //  "waterPatchOrder"  ivec4, the order the patches are drawn in
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
+
+    // Shader storage blocks, by block name, set in initAttribsAndUniforms beside the uniforms. Each has fixed binding
+    // points, the same in every program that declares it, as the engine's uniform blocks have theirs: the entries
+    // take them in this order, an array of blocks one for each of its elements. A buffer bound at a block's point is
+    // there for every program, so a pass binds it once whatever it draws or dispatches between.
+    typedef enum
+    {                                       // Block name, element count
+        END_RESERVED_STORAGE_BLOCKS
+    } eGLSLReservedStorageBlocks;
     // clang-format on
 
     // singleton pattern implementation
@@ -629,10 +695,29 @@ public:
     void dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text);
     bool    linkProgramObject(GLuint obj, bool suppress_errors = false, const std::string& shader_name = "unknown");
     bool    validateProgramObject(GLuint obj);
+    // Compile a shared object into mShaderObjects, which owns it from then on: programs attach it by name and never
+    // delete it, and an object it replaces under the same key is deleted. Returns the object, or 0.
     // `cache_key` overrides the map key the compiled object is stored under; empty means the
     // path. Shared objects are compiled once and attached by name, so a source that keys on a
     // compile-time variant axis is compiled once per axis value under distinct keys.
-    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string());
+    // `min_glsl_version` is the least #version the stage compiles at (430 to read storage blocks or images); 0 is the
+    // context's usual, and a compute stage is always 430. A context whose GLSL is below it fails the stage.
+    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string(), U32 min_glsl_version = 0);
+    // Compile a stage the caller owns and deletes, stored nowhere: what a program compiles of its own files. As
+    // loadShaderFile otherwise, from the class `shader_level` names down to the first that compiles.
+    GLuint compileShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, U32 min_glsl_version = 0);
+
+    // Delete a shader object. One still attached to a program is only flagged, and goes when the last program
+    // holding it detaches it.
+    static void deleteShaderObject(GLuint object);
+
+    // Shader objects compileShaderFile has made and deleteShaderObject has not yet deleted: the shared ones, plus any
+    // a program is still linking. A count that only grows is a leak.
+    static U32 sLiveObjects;
+
+    // The binding point of `element` of a reserved storage block (eGLSLReservedStorageBlocks), the same in every
+    // program; -1 for an index or element the table does not have.
+    S32 getStorageBlockBinding(S32 block, U32 element = 0) const;
 
     // Suffixes marking the axis copies of a shared object. Not legal path character sequences,
     // so they cannot collide with a real file.
@@ -687,17 +772,29 @@ public:
     // The "#define <STAGE>_SHADER 1" line loadShaderFile prepends for a stage.
     static const char* stageDefine(GLenum type);
 
+    // Delete every shared object and forget it. A program built on them goes on drawing, as a linked program needs
+    // none of its objects; one built afterwards needs them compiled again.
     void clearShaderObjects();
 
 public:
     // Compiled shared shader objects per stage, keyed by path -- or by the
-    // distinct key an axis copy was stored under (see loadShaderFile).
+    // distinct key an axis copy was stored under (see loadShaderFile). The
+    // manager owns them: unloading a program that attached one leaves it here.
     boost::unordered_flat_map<std::string, GLuint> mShaderObjects[STAGE_COUNT];
 
     //global (reserved slot) shader parameters
     std::vector<std::string> mReservedAttribs;
 
     std::vector<std::string> mReservedUniforms;
+
+    // The storage blocks, in eGLSLReservedStorageBlocks order: a block's name, and how many elements an array of it
+    // has (1 for a single block). Their binding points together stay within AL_NUM_STORAGE_BINDINGS.
+    struct ReservedStorageBlock
+    {
+        std::string mName;
+        U32         mCount = 1;
+    };
+    std::vector<ReservedStorageBlock> mReservedStorageBlocks;
 
     struct ProgramBinaryData
     {

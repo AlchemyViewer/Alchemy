@@ -162,7 +162,7 @@ inline void bytestream_int2float(U8 *stream, S32 &offset)
 // Returns true on success, return false and clip copy on buffer overflow
 inline bool bytestream2char(char *buffer, const U8 *stream, S32 &offset, S32 buffsize)
 {
-    S32 source_len = strlen( (const char *)stream+offset );
+    S32 source_len = static_cast<S32>(strlen( (const char *)stream+offset ));
     S32 copy_len = buffsize - 1;
     if( copy_len > source_len )
     {
@@ -555,17 +555,44 @@ inline void lscript_pusharg(U8 *stream, S32 arg)
     set_sp(stream, sp);
 }
 
+// A read of size bytes from the stack at sp lies within memory. set_sp
+// bounds where the pointer lands, not what a pop or a peek reads on the
+// way there: POPARG -2 and then DUPQ read past the buffer. The top of
+// memory is held to the buffer's, which a crafted image's register is not.
+inline BOOL lscript_check_stack_read(const U8 *stream, S32 sp, S32 size)
+{
+    S32 tm = get_register(stream, LREG_TM);
+    if (tm > TOP_OF_MEMORY)
+    {
+        tm = TOP_OF_MEMORY;
+    }
+    if (sp < 0 || sp > tm - size)
+    {
+        set_fault(stream, LSRF_BOUND_CHECK_ERROR);
+        return FALSE;
+    }
+    return TRUE;
+}
+
 inline void lscript_poparg(U8 *stream, S32 arg)
 {
-    S32 sp = get_register(stream, LREG_SP);
-    sp += arg;
-
-    set_sp(stream, sp);
+    // In 64 bits: the argument is the instruction's, and sp + arg wraps.
+    S64 sp = (S64)get_register(stream, LREG_SP) + arg;
+    if (sp < 0 || sp > TOP_OF_MEMORY)
+    {
+        set_fault(stream, LSRF_BOUND_CHECK_ERROR);
+        return;
+    }
+    set_sp(stream, (S32)sp);
 }
 
 inline U8 lscript_pop_char(U8 *stream)
 {
     S32 sp = get_register(stream, LREG_SP);
+    if (!lscript_check_stack_read(stream, sp, 1))
+    {
+        return 0;
+    }
     U8 value = *(stream + sp++);
     set_sp(stream, sp);
     return value;
@@ -574,6 +601,10 @@ inline U8 lscript_pop_char(U8 *stream)
 inline S32 lscript_pop_int(U8 *stream)
 {
     S32 sp = get_register(stream, LREG_SP);
+    if (!lscript_check_stack_read(stream, sp, LSCRIPTDataSize[LST_INTEGER]))
+    {
+        return 0;
+    }
     S32 value = bytestream2integer(stream, sp);
     set_sp(stream, sp);
     return value;
@@ -582,6 +613,10 @@ inline S32 lscript_pop_int(U8 *stream)
 inline F32 lscript_pop_float(U8 *stream)
 {
     S32 sp = get_register(stream, LREG_SP);
+    if (!lscript_check_stack_read(stream, sp, LSCRIPTDataSize[LST_FLOATINGPOINT]))
+    {
+        return 0;
+    }
     F32 value = bytestream2float(stream, sp);
     if (!llfinite(value))
     {
@@ -595,6 +630,10 @@ inline F32 lscript_pop_float(U8 *stream)
 inline void lscript_pop_vector(U8 *stream, LLVector3 &value)
 {
     S32 sp = get_register(stream, LREG_SP);
+    if (!lscript_check_stack_read(stream, sp, LSCRIPTDataSize[LST_VECTOR]))
+    {
+        return;
+    }
     bytestream2vector(value, stream, sp);
     set_sp(stream, sp);
 }
@@ -602,6 +641,10 @@ inline void lscript_pop_vector(U8 *stream, LLVector3 &value)
 inline void lscript_pop_quaternion(U8 *stream, LLQuaternion &value)
 {
     S32 sp = get_register(stream, LREG_SP);
+    if (!lscript_check_stack_read(stream, sp, LSCRIPTDataSize[LST_QUATERNION]))
+    {
+        return;
+    }
     bytestream2quaternion(value, stream, sp);
     set_sp(stream, sp);
 }
@@ -625,20 +668,22 @@ inline BOOL lscript_check_local(U8 *stream, S32 &address, S32 size)
     S32 sp = get_register(stream, LREG_SP);
     S32 bp = get_register(stream, LREG_BP);
 
-    address += size;
-    address = bp - address;
-
-    if (address < sp - size)
-    {
-        set_fault(stream, LSRF_BOUND_CHECK_ERROR);
-        return FALSE;
-    }
+    // In 64 bits: the address is the instruction's, and bp - (address +
+    // size) wraps. The top of memory is held to the buffer's, and the
+    // local to memory, which LL's bounds let a crafted image's registers
+    // put it below.
+    S64 at = (S64)bp - ((S64)address + size);
     S32 tm = get_register(stream, LREG_TM);
-    if (address + size > tm)
+    if (tm > TOP_OF_MEMORY)
+    {
+        tm = TOP_OF_MEMORY;
+    }
+    if (at < sp - size || at < 0 || at + size > tm)
     {
         set_fault(stream, LSRF_BOUND_CHECK_ERROR);
         return FALSE;
     }
+    address = (S32)at;
     return TRUE;
 }
 
@@ -653,14 +698,20 @@ inline BOOL lscript_check_global(U8 *stream, S32 &address, S32 size)
         return FALSE;
     }
 
-    address += gvr;
+    // In 64 bits: the address is the instruction's, and address + gvr
+    // wraps for PUSHG 0x7FFFFFF0.
+    S64 at = (S64)address + gvr;
     S32 gfr = get_register(stream, LREG_GFR);
-
-    if (address + size > gfr)
+    if (gfr > TOP_OF_MEMORY)
+    {
+        gfr = TOP_OF_MEMORY;
+    }
+    if (at < 0 || at + size > gfr)
     {
         set_fault(stream, LSRF_BOUND_CHECK_ERROR);
         return FALSE;
     }
+    address = (S32)at;
     return TRUE;
 }
 
@@ -774,147 +825,165 @@ inline void lscript_global_get(U8 *stream, S32 address, LLQuaternion &value)
 
 
 
-inline S32 get_state_event_opcoode_start(U8 *stream, S32 state, LSCRIPTStateEventType event)
+// The state table, at SR: how many states, then a row a state, its offset
+// from SR and its handled events, four bytes in version one and eight in
+// two. A state's row begins with its name's length, which the event jump
+// table follows: a pair an event the state handles, in event order, the
+// handler's offset from the jump table and its stack size, and the handler
+// begins with its parameters' size, which the opcodes follow. Every step
+// is an offset read from the image, so each is held to memory before the
+// next is read from it, in 64 bits where a sum of two could wrap, and the
+// state number to the table's count: LL's let a crafted image's steps read
+// up to the top of memory and past it.
+
+// Whether size bytes at offset lie within memory.
+inline BOOL lscript_in_memory(S64 offset, S32 size)
 {
-    // get the start of the state table
-    S32 sr = get_register(stream, LREG_SR);
+    return offset >= 0 && offset <= TOP_OF_MEMORY - size;
+}
 
-    // get the position of the jump to the desired state
+// The image's major version, or 0 where the version is neither.
+inline S32 get_major_version(const U8 *stream)
+{
     S32 value = get_register(stream, LREG_VN);
-
-    S32 state_offset_offset = 0;
-    S32 major_version = 0;
     if (value == LSL2_VERSION1_END_NUMBER)
     {
-        major_version = LSL2_MAJOR_VERSION_ONE;
-        state_offset_offset = sr + LSCRIPTDataSize[LST_INTEGER] + LSCRIPTDataSize[LST_INTEGER]*2*state;
+        return LSL2_MAJOR_VERSION_ONE;
     }
-    else if (value == LSL2_VERSION_NUMBER)
+    if (value == LSL2_VERSION_NUMBER)
     {
-        major_version = LSL2_MAJOR_VERSION_TWO;
-        state_offset_offset = sr + LSCRIPTDataSize[LST_INTEGER] + LSCRIPTDataSize[LST_INTEGER]*3*state;
+        return LSL2_MAJOR_VERSION_TWO;
     }
-    if ( state_offset_offset < 0 || state_offset_offset > TOP_OF_MEMORY )
+    return 0;
+}
+
+// Where a state's row in the table is, or -1 where the table is not in
+// memory, the state is not one it counts or its row is not in memory.
+inline S32 get_state_row(const U8 *stream, S32 state, S32 major_version)
+{
+    S32 sr = get_register(stream, LREG_SR);
+    if ((major_version != LSL2_MAJOR_VERSION_ONE && major_version != LSL2_MAJOR_VERSION_TWO) ||
+        !lscript_in_memory(sr, LSCRIPTDataSize[LST_INTEGER]))
     {
         return -1;
     }
-
-    // get the actual position in memory of the desired state
-    S32 state_offset = sr + bytestream2integer(stream, state_offset_offset);
-    if ( state_offset < 0 || state_offset > TOP_OF_MEMORY )
+    S32 count_offset = sr;
+    S32 count = bytestream2integer(stream, count_offset);
+    if (state < 0 || state >= count)
     {
         return -1;
     }
+    S32 row_size = LSCRIPTDataSize[LST_INTEGER] * (major_version == LSL2_MAJOR_VERSION_TWO ? 3 : 2);
+    S64 row = (S64)sr + LSCRIPTDataSize[LST_INTEGER] + (S64)row_size * state;
+    if (!lscript_in_memory(row, row_size))
+    {
+        return -1;
+    }
+    return (S32)row;
+}
 
-    // save that value
-    S32 state_offset_base = state_offset;
+// Where a state's event jump table is, or -1 where a step of the way is
+// not in memory.
+inline S32 get_state_jump_table(const U8 *stream, S32 state, S32 major_version)
+{
+    S32 row = get_state_row(stream, state, major_version);
+    if (row < 0)
+    {
+        return -1;
+    }
+    S64 state_offset = (S64)get_register(stream, LREG_SR) + bytestream2integer(stream, row);
+    if (!lscript_in_memory(state_offset, LSCRIPTDataSize[LST_INTEGER]))
+    {
+        return -1;
+    }
+    S32 name_offset = (S32)state_offset;
+    S64 jump_table = state_offset + bytestream2integer(stream, name_offset);
+    if (!lscript_in_memory(jump_table, LSCRIPTDataSize[LST_INTEGER]))
+    {
+        return -1;
+    }
+    return (S32)jump_table;
+}
 
-    // jump past the state name
-    S32 event_jump_offset = state_offset_base + bytestream2integer(stream, state_offset);
+// Where an event's pair in a state's jump table is, or -1.
+inline S32 get_state_event_pair(const U8 *stream, S32 state, LSCRIPTStateEventType event, S32 major_version)
+{
+    S32 jump_table = get_state_jump_table(stream, state, major_version);
+    if (jump_table < 0)
+    {
+        return -1;
+    }
+    S64 pair = (S64)jump_table + LSCRIPTDataSize[LST_INTEGER]*2*get_event_handler_jump_position(get_event_register((U8 *)stream, LREG_ER, major_version), event);
+    if (!lscript_in_memory(pair, LSCRIPTDataSize[LST_INTEGER]*2))
+    {
+        return -1;
+    }
+    return (S32)pair;
+}
 
-    // get the location of the event offset
-    S32 event_offset = event_jump_offset + LSCRIPTDataSize[LST_INTEGER]*2*get_event_handler_jump_position(get_event_register(stream, LREG_ER, major_version), event);
-    if ( event_offset < 0 || event_offset > TOP_OF_MEMORY )
+// Returns -1 on error
+inline S32 get_state_event_opcoode_start(U8 *stream, S32 state, LSCRIPTStateEventType event)
+{
+    S32 major_version = get_major_version(stream);
+    S32 jump_table = get_state_jump_table(stream, state, major_version);
+    S32 event_offset = get_state_event_pair(stream, state, event, major_version);
+    if (jump_table < 0 || event_offset < 0)
     {
         return -1;
     }
 
     // now, jump to the event
-    S32 event_start = bytestream2integer(stream, event_offset);
-    if ( event_start < 0 || event_start > TOP_OF_MEMORY )
+    S64 event_start = (S64)jump_table + bytestream2integer(stream, event_offset);
+    if (!lscript_in_memory(event_start, LSCRIPTDataSize[LST_INTEGER]))
     {
         return -1;
     }
-    event_start += event_jump_offset;
-
-    S32 event_start_original = event_start;
 
     // now skip past the parameters
-    S32 opcode_offset = bytestream2integer(stream, event_start);
-    if ( opcode_offset < 0 || opcode_offset > TOP_OF_MEMORY )
+    S32 parameters_offset = (S32)event_start;
+    S64 opcode_start = event_start + bytestream2integer(stream, parameters_offset);
+    if (!lscript_in_memory(opcode_start, 1))
     {
         return -1;
     }
 
-    return opcode_offset + event_start_original;
+    return (S32)opcode_start;
 }
 
 
+// The events a state handles; none, and the bound fault, where the state
+// is not one the table counts.
 inline U64 get_handled_events(U8 *stream, S32 state)
 {
-    U64 retvalue = 0;
-    // get the start of the state table
-    S32 sr = get_register(stream, LREG_SR);
-
-    // get the position of the jump to the desired state
-    S32 value = get_register(stream, LREG_VN);
-    S32 state_handled_offset = 0;
-    if (value == LSL2_VERSION1_END_NUMBER)
+    S32 major_version = get_major_version(stream);
+    S32 row = get_state_row(stream, state, major_version);
+    if (row < 0)
     {
-        state_handled_offset = sr + LSCRIPTDataSize[LST_INTEGER]*2*state + 2*LSCRIPTDataSize[LST_INTEGER];
-        retvalue = bytestream2integer(stream, state_handled_offset);
+        set_fault(stream, LSRF_BOUND_CHECK_ERROR);
+        return 0;
     }
-    else if (value == LSL2_VERSION_NUMBER)
+    S32 state_handled_offset = row + LSCRIPTDataSize[LST_INTEGER];
+    if (major_version == LSL2_MAJOR_VERSION_TWO)
     {
-        state_handled_offset = sr + LSCRIPTDataSize[LST_INTEGER]*3*state + 2*LSCRIPTDataSize[LST_INTEGER];
-        retvalue = bytestream2u64(stream, state_handled_offset);
+        return bytestream2u64(stream, state_handled_offset);
     }
-
-    // get the handled events
-    return retvalue;
+    return bytestream2integer(stream, state_handled_offset);
 }
 
-// Returns -1 on error
+// Returns -1 on error, with the bound fault
 inline S32 get_event_stack_size(U8 *stream, S32 state, LSCRIPTStateEventType event)
 {
-    // get the start of the state table
-    S32 sr = get_register(stream, LREG_SR);
-
-    // get state offset
-    S32 value = get_register(stream, LREG_VN);
-    S32 state_offset_offset = 0;
-    S32 major_version = 0;
-    if (value == LSL2_VERSION1_END_NUMBER)
+    S32 pair = get_state_event_pair(stream, state, event, get_major_version(stream));
+    if (pair < 0)
     {
-        major_version = LSL2_MAJOR_VERSION_ONE;
-        state_offset_offset = sr + LSCRIPTDataSize[LST_INTEGER] + LSCRIPTDataSize[LST_INTEGER]*2*state;
-    }
-    else if (value == LSL2_VERSION_NUMBER)
-    {
-        major_version = LSL2_MAJOR_VERSION_TWO;
-        state_offset_offset = sr + LSCRIPTDataSize[LST_INTEGER] + LSCRIPTDataSize[LST_INTEGER]*3*state;
-    }
-
-    if ( state_offset_offset < 0 || state_offset_offset > TOP_OF_MEMORY )
-    {
+        set_fault(stream, LSRF_BOUND_CHECK_ERROR);
         return -1;
     }
-
-    S32 state_offset = bytestream2integer(stream, state_offset_offset);
-    state_offset += sr;
-
-    state_offset_offset = state_offset;
-    if ( state_offset_offset < 0 || state_offset_offset > TOP_OF_MEMORY )
-    {
-        return -1;
-    }
-
-    // skip to jump table
-    S32 jump_table = bytestream2integer(stream, state_offset_offset);
-
-    jump_table += state_offset;
-    if ( jump_table < 0 || jump_table > TOP_OF_MEMORY )
-    {
-        return -1;
-    }
-
-    // get the position of the jump to the desired state
-    S32 stack_size_offset = jump_table + LSCRIPTDataSize[LST_INTEGER]*2*get_event_handler_jump_position(get_event_register(stream, LREG_ER, major_version), event) + LSCRIPTDataSize[LST_INTEGER];
-
-    // get the handled events
+    S32 stack_size_offset = pair + LSCRIPTDataSize[LST_INTEGER];
     S32 stack_size = bytestream2integer(stream, stack_size_offset);
     if ( stack_size < 0 || stack_size > TOP_OF_MEMORY )
     {
+        set_fault(stream, LSRF_BOUND_CHECK_ERROR);
         return -1;
     }
 
@@ -1081,7 +1150,7 @@ inline void safe_instruction_bytestream2char(char *buffer, U8 *stream, S32 &offs
     // then halt the script via safe_isntruction_check_address. Now we don't bother
     // copying a thing if there's an error.
 
-    if( safe_instruction_check_address(stream, offset, strlen( (const char *)stream + offset ) + 1 ) )
+    if( safe_instruction_check_address(stream, offset, static_cast<S32>(strlen( (const char *)stream + offset ) + 1) ) )
     {
         // Takes the same parms as this function. Won't overread, per above check.
         bytestream2char( buffer, stream, offset, buffsize );

@@ -871,7 +871,7 @@ void ALTextView::scrollToCaret()
     scrollToShow(mCaret);
 }
 
-void ALTextView::scrollToShow(const ALTextPos& pos)
+void ALTextView::scrollToShow(const ALTextPos& pos, S32 context)
 {
     const S32 row_h = mLayout.rowHeight();
     if (row_h <= 0)
@@ -884,6 +884,8 @@ void ALTextView::scrollToShow(const ALTextPos& pos)
     const S32 height = mLayout.rowHeightOf(pos.line, row);
     const LLRect text = textRect();
     const S32 page = llmax(height, text.getHeight());
+    // The rows either side, no more than leave it room on the page.
+    const S32 margin = llmin(llmax(0, context) * row_h, llmax(0, page - height) / 2);
     // Across first: where it is across says what covers it above.
     if (mWordWrap)
     {
@@ -901,9 +903,9 @@ void ALTextView::scrollToShow(const ALTextPos& pos)
             mScrollX = x + CARET_MARGIN - width;
         }
     }
-    if (top + height > mScrollY + page)
+    if (top + height + margin > mScrollY + page)
     {
-        mScrollY = top + height - page;
+        mScrollY = top + height + margin - page;
     }
     // Up, below what is drawn over the top where it is -- the find bar,
     // the lines pinned there -- which is asked again at each place tried,
@@ -915,15 +917,16 @@ void ALTextView::scrollToShow(const ALTextPos& pos)
     for (S32 tries = 0; tries < 4 && mScrollY > 0; ++tries)
     {
         const S32 covered = llmin(llmax(0, coveredAbove(local_x)), llmax(0, page - height));
-        if (top >= mScrollY + covered)
+        const S32 above   = llmin(margin, llmax(0, page - height - covered - margin));
+        if (top - above >= mScrollY + covered)
         {
             break;
         }
-        mScrollY = llmax(0, top - covered - llmin(gap, llmax(0, page - height - covered)));
+        mScrollY = llmax(0, top - above - covered - llmin(gap, llmax(0, page - height - covered - above)));
     }
-    if (top < mScrollY)
+    if (top - margin < mScrollY)
     {
-        mScrollY = top - llmin(gap, llmax(0, page - height));
+        mScrollY = top - margin - llmin(gap, llmax(0, page - height - margin));
     }
     mScrollY     = llmax(0, mScrollY);
     mScrollAsked = true;
@@ -4395,12 +4398,20 @@ bool ALTextView::getPreeditLocation(S32 query_offset, LLCoordGL* coord, LLRect* 
     }
     if (bounds)
     {
-        S32       row_begin, row_end;
-        const F32 x0 = lay().xOf(begin.line, begin.column, &row_begin);
-        F32       x1 = lay().xOf(begin.line, begin.column + mPreeditLength, &row_end);
-        if (row_end != row_begin)
+        // The preedit's span on the query's row, which is the row the top
+        // is of: from the row's start where the preedit began on a row
+        // before, to its end where it goes on to a row after.
+        S32 row_begin, row_end, row_at;
+        F32 x0 = lay().xOf(begin.line, begin.column, &row_begin);
+        F32 x1 = lay().xOf(begin.line, begin.column + mPreeditLength, &row_end);
+        lay().xOf(query.line, query.column, &row_at);
+        if (row_begin != row_at)
         {
-            x1 = lay().line(begin.line).rows[row_begin].width;
+            x0 = 0.f;
+        }
+        if (row_end != row_at)
+        {
+            x1 = lay().line(begin.line).rows[row_at].width;
         }
         LLRect local(static_cast<S32>(left + x0), top, static_cast<S32>(left + x1), top - row_h);
         LLRect screen;
@@ -4716,6 +4727,7 @@ bool ALTextView::findNext(bool forward)
     // from the keys.
     singleSelection();
     setSelection(match);
+    scrollToShow(mCaret, FOUND_CONTEXT);
     mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped(), wrapped);
     return true;
 }
@@ -5651,6 +5663,20 @@ void ALTextView::draw()
             const F32 baseline = static_cast<F32>(text.mTop - llround(mFont->getAscenderHeight()));
             mFont->renderUTF8(mPlaceholder, 0, static_cast<F32>(text.mLeft), baseline, lerp(backgroundColor(), textColor(), 0.5f) % alpha, LLFontGL::LEFT,
                               LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, text.getWidth(), nullptr, true);
+        }
+    }
+    // The input method's window at the caret, kept there as the caret, the
+    // scroll and the view move, as a text field keeps it from where it draws
+    // its caret: the caret's x, at the top of its row. Not while the caret
+    // is out of sight, where the window has nowhere to put it.
+    if (mLanguageInput && gFocusMgr.getAppHasFocus())
+    {
+        LLCoordGL caret;
+        LLRect    row;
+        LLWindow* window = getWindow();
+        if (window && getPreeditLocation(-1, &caret, &row, nullptr))
+        {
+            window->setLanguageTextInput(LLCoordGL(caret.mX, row.mTop));
         }
     }
     drawBars(alpha);

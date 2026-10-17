@@ -31,7 +31,6 @@
 #include "indra_constants.h"
 #include <algorithm>
 #include "lltrace.h"
-#include "llfasttimer.h"
 #include "v3colorutil.h"
 #include "llsdutil.h"
 #include <boost/bind.hpp>

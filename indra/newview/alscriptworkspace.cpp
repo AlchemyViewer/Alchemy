@@ -659,6 +659,7 @@ std::vector<ALScriptDiagnostic> ALScriptWorkspace::parseDiagnostics(const LLSD& 
         diagnostic.hasLine   = place.hasLine;
         diagnostic.level     = place.level;
         diagnostic.message   = place.message;
+        diagnostic.mentions  = place.mentions;
         out.push_back(std::move(diagnostic));
     }
     return out;
@@ -1057,7 +1058,7 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
 void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id, const std::string& text, bool lua,
                                 const std::string& target, prepared_callback_t callback, bool anyway, const From& from)
 {
-    if (ALPreprocessor::wanted(text, lua, ALScriptEnvelope::looksWrapped(text), ALScriptPreprocessor::enabled()) == ALPreprocessor::Wanted::No)
+    if (ALPreprocessor::wanted(text, lua, ALScriptPreprocessor::enabled()) == ALPreprocessor::Wanted::No)
     {
         ALScriptPrepared as_is;
         as_is.text = text;

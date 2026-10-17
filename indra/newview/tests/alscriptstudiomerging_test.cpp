@@ -32,7 +32,7 @@
 #include "alflatbutton.h"
 #include "alscriptstudio_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <memory>
 
@@ -83,7 +83,7 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
     struct alscriptstudiomerging_data
     {
@@ -143,156 +143,210 @@ namespace tut
         LLStringUtil::format_map_t named(const Doc& doc) { return { { "[NAME]", doc.name } }; }
     };
 
-    typedef test_group<alscriptstudiomerging_data> alscriptstudiomerging_group;
-    typedef alscriptstudiomerging_group::object    alscriptstudiomerging_object;
-    tut::alscriptstudiomerging_group               alscriptstudiomerging_test("alscriptstudiomerging");
-
-    template<> template<>
-    void alscriptstudiomerging_object::test<1>()
+    TEST_CASE_METHOD(alscriptstudiomerging_data, "alscriptstudiomerging: mergeSaved puts in theirs as one undo step and leaves conflicts to settle", "[alscriptstudiomerging]")
     {
-        set_test_name("saved elsewhere, merged: what only theirs changed put in as one step to undo, the rest a merge to settle; take and keep done with");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc       = tab("door");
         doc.savedThere = theirs;
-        ensure("it can be merged", ALScriptStudioMerging::canMerge(doc));
+        CHECK(ALScriptStudioMerging::canMerge(doc));
         unit->mergeSaved(doc);
-        ensure_equals("theirs's line put in, ours kept", doc.editor->wholeText(), lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
-        ensure("compared under the saved elsewhere's title", studio.titles.size() == 1 && studio.titles[0] == said("CompareSavedThere"));
-        ensure("as a merge", doc.compareView && doc.compareView->merging());
-        ensure_equals("one conflict", doc.compareView->conflictCount(), 1);
-        ensure("take and keep done with", !doc.savedThere && studio.notices == 1);
-        ensure_equals("said", services().reports.back().text, services().counted("MergeConflicts", 1, named(doc)));
+        UNSCOPED_INFO("theirs's line put in, ours kept");
+        CHECK(doc.editor->wholeText() == lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
+        {
+            INFO("compared under the saved elsewhere's title");
+            REQUIRE(studio.titles.size() == 1);
+            CHECK(studio.titles[0] == said("CompareSavedThere"));
+        }
+        REQUIRE(doc.compareView);
+        CHECK(doc.compareView->merging());
+        CHECK(doc.compareView->conflictCount() == 1);
+        {
+            INFO("take and keep done with");
+            REQUIRE_FALSE(doc.savedThere);
+            CHECK(studio.notices == 1);
+        }
+        REQUIRE_FALSE(services().reports.empty());
+        CHECK(services().reports.back().text == services().counted("MergeConflicts", 1, named(doc)));
 
         // Settled from the comparison's bar: an edit of the tab.
         doc.compareView->right()->setFocus(true);
         doc.compareView->right()->goTo(ALTextPos(6, 0));
-        ALViewType::as<ALFlatButton>(doc.compareView->bar()->getChild<LLView>("keep_both"))->press();
-        ensure_equals("mine then theirs", doc.editor->wholeText(),
+        ALFlatButton* keep_both = ALViewType::as<ALFlatButton>(doc.compareView->bar()->findChild<LLView>("keep_both"));
+        REQUIRE(keep_both);
+        keep_both->press();
+        UNSCOPED_INFO("mine then theirs");
+        CHECK(doc.editor->wholeText() ==
                       lines(9, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" }, { 7, "theirs 6" }, { 8, "line 7" } }));
-        ensure_equals("none left", doc.compareView->conflictCount(), 0);
+        CHECK(doc.compareView->conflictCount() == 0);
 
         // Each a step to undo: the settling, then the merge.
         doc.editor->undo();
         doc.editor->undo();
-        ensure_equals("back to ours", doc.editor->wholeText(), ours);
+        CHECK(doc.editor->wholeText() == ours);
     }
 
-    template<> template<>
-    void alscriptstudiomerging_object::test<2>()
+    TEST_CASE_METHOD(alscriptstudiomerging_data, "alscriptstudiomerging: with nothing both changed a merge is clean and said so", "[alscriptstudiomerging]")
     {
-        set_test_name("nothing both changed: merged, and said so");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc       = tab("door");
         doc.savedThere = lines(8, { { 0, "theirs 0" } });
         unit->mergeSaved(doc);
-        ensure_equals("merged", doc.editor->wholeText(), lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
-        ensure("no conflicts", doc.compareView->merging() && doc.compareView->conflictCount() == 0);
-        ensure_equals("said", services().reports.back().text, said("MergeClean", named(doc)));
+        CHECK(doc.editor->wholeText() == lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
+        REQUIRE(doc.compareView);
+        REQUIRE(doc.compareView->merging());
+        CHECK(doc.compareView->conflictCount() == 0);
+        REQUIRE_FALSE(services().reports.empty());
+        CHECK(services().reports.back().text == said("MergeClean", named(doc)));
     }
 
-    template<> template<>
-    void alscriptstudiomerging_object::test<3>()
+    TEST_CASE_METHOD(alscriptstudiomerging_data, "alscriptstudiomerging: with no base or a read-only tab the texts are compared rather than merged", "[alscriptstudiomerging]")
     {
-        set_test_name("what both were no longer known, or the tab not to be changed: compared as they are, take and keep still offered, and said why");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc       = tab("door");
         doc.savedThere = theirs;
         doc.editor->undoJournal().markNeverSaved();
         unit->mergeSaved(doc);
-        ensure_equals("nothing put in", doc.editor->wholeText(), ours);
-        ensure("compared, not merged", doc.compareView && !doc.compareView->merging() && doc.compareView->changeCount() > 0);
-        ensure("take and keep still offered", doc.savedThere && studio.notices == 0);
-        ensure_equals("said", services().statuses.back(), said("MergeNoBase", named(doc)));
+        UNSCOPED_INFO("nothing put in");
+        CHECK(doc.editor->wholeText() == ours);
+        {
+            INFO("compared, not merged");
+            REQUIRE(doc.compareView);
+            REQUIRE_FALSE(doc.compareView->merging());
+            CHECK(doc.compareView->changeCount() > 0);
+        }
+        {
+            INFO("take and keep still offered");
+            REQUIRE(doc.savedThere);
+            CHECK(studio.notices == 0);
+        }
+        REQUIRE_FALSE(services().statuses.empty());
+        CHECK(services().statuses.back() == said("MergeNoBase", named(doc)));
 
         Doc& locked       = tab("lamp");
         locked.modifiable = false;
         locked.savedThere = theirs;
-        ensure("cannot be merged", !ALScriptStudioMerging::canMerge(locked));
+        CHECK_FALSE(ALScriptStudioMerging::canMerge(locked));
         unit->mergeSaved(locked);
-        ensure("compared as they are", locked.editor->wholeText() == ours && locked.compareView && !locked.compareView->merging());
-        ensure_equals("said", services().statuses.back(), said("MergeReadOnly", named(locked)));
+        {
+            INFO("compared as they are");
+            REQUIRE(locked.editor->wholeText() == ours);
+            REQUIRE(locked.compareView);
+            CHECK_FALSE(locked.compareView->merging());
+        }
+        CHECK(services().statuses.back() == said("MergeReadOnly", named(locked)));
     }
 
-    template<> template<>
-    void alscriptstudiomerging_object::test<4>()
+    TEST_CASE_METHOD(alscriptstudiomerging_data, "alscriptstudiomerging: mergeWorld merges the world's text once loaded unless the unit has gone", "[alscriptstudiomerging]")
     {
-        set_test_name("the world's item moved on: asked for, merged once loaded, and the tab made from its asset; nothing once the window has gone");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc&         doc   = tab("door");
         const LLUUID was   = LLUUID::generateNewID();
         const LLUUID moved = LLUUID::generateNewID();
         doc.assetId        = was;
         unit->mergeWorld(doc);
-        ensure_equals("asked", studio.worldAsked, std::string("door"));
-        ensure_equals("nothing yet", doc.editor->wholeText(), ours);
+        CHECK(studio.worldAsked == std::string("door"));
+        UNSCOPED_INFO("nothing yet");
+        CHECK(doc.editor->wholeText() == ours);
         studio.world(doc, theirs, moved);
-        ensure_equals("merged", doc.editor->wholeText(), lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
-        ensure("under the world's title, as a merge", studio.titles.back() == said("CompareWorld") && doc.compareView->conflictCount() == 1);
-        ensure("made from what the world holds", doc.assetId == moved);
+        CHECK(doc.editor->wholeText() == lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
+        {
+            INFO("under the world's title, as a merge");
+            REQUIRE(studio.titles.size() == 1);
+            CHECK(studio.titles.back() == said("CompareWorld"));
+            REQUIRE(doc.compareView);
+            CHECK(doc.compareView->conflictCount() == 1);
+        }
+        UNSCOPED_INFO("made from what the world holds");
+        CHECK(doc.assetId == moved);
 
         Doc& lamp   = tab("lamp");
         lamp.assetId = was;
         unit->mergeWorld(lamp);
         unit.reset();
         studio.world(lamp, theirs, moved);
-        ensure("nothing", lamp.editor->wholeText() == ours && lamp.assetId == was);
+        {
+            INFO("nothing once the merges are gone");
+            CHECK(lamp.editor->wholeText() == ours);
+            CHECK(lamp.assetId == was);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiomerging_object::test<5>()
+    TEST_CASE_METHOD(alscriptstudiomerging_data, "alscriptstudiomerging: a merge undone before saving brings back the other version and its offer", "[alscriptstudiomerging]")
     {
-        set_test_name("a merge undone before it is saved: what was saved elsewhere back, said, and offered again; a step forward leaves it so");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc       = tab("door");
         doc.savedThere = theirs;
         unit->mergeSaved(doc);
-        ensure("set aside", !doc.savedThere && doc.merged);
-        ensure("the conflicts said with the comparison to show", services().reports.back().actions == std::vector<std::string>{ "show_compare" });
+        {
+            INFO("set aside");
+            REQUIRE_FALSE(doc.savedThere);
+            REQUIRE(doc.merged);
+        }
+        REQUIRE_FALSE(services().reports.empty());
+        UNSCOPED_INFO("the conflicts said with the comparison to show");
+        CHECK(services().reports.back().actions == std::vector<std::string>{ "show_compare" });
         // Typed in, or any change not a step back: nothing.
         unit->textChanged(doc);
-        ensure("still merged", !doc.savedThere && doc.merged);
+        {
+            INFO("still merged");
+            REQUIRE_FALSE(doc.savedThere);
+            REQUIRE(doc.merged);
+        }
 
         const S32 notices = studio.notices;
         doc.editor->undo();
-        ensure_equals("back to ours", doc.editor->wholeText(), ours);
+        CHECK(doc.editor->wholeText() == ours);
         unit->textChanged(doc);
-        ensure("what was saved elsewhere back", doc.savedThere && *doc.savedThere == theirs && !doc.merged);
-        ensure_equals("said", services().reports.back().text, said("MergeTakenBack", named(doc)));
-        ensure("take, keep, merge and compare offered again",
-               services().reports.back().actions == std::vector<std::string>{ "take_saved", "keep_saved", "merge_saved", "compare_saved" });
-        ensure("the notice said again", studio.notices > notices);
+        {
+            INFO("what was saved elsewhere back");
+            REQUIRE(doc.savedThere);
+            CHECK(*doc.savedThere == theirs);
+            REQUIRE_FALSE(doc.merged);
+        }
+        CHECK(services().reports.back().text == said("MergeTakenBack", named(doc)));
+        UNSCOPED_INFO("take, keep, merge and compare offered again");
+        CHECK(services().reports.back().actions == std::vector<std::string>{ "take_saved", "keep_saved", "merge_saved", "compare_saved" });
+        UNSCOPED_INFO("the notice said again");
+        CHECK(studio.notices > notices);
 
         // Stepped forward: the merge is back in the text, the other version
         // still stands until it is merged again.
         doc.editor->redo();
         unit->textChanged(doc);
-        ensure("left so", doc.savedThere && *doc.savedThere == theirs && !doc.merged);
+        {
+            INFO("left so");
+            REQUIRE(doc.savedThere);
+            CHECK(*doc.savedThere == theirs);
+            REQUIRE_FALSE(doc.merged);
+        }
         unit->mergeSaved(doc);
-        ensure("merged again: set aside again", !doc.savedThere && doc.merged);
+        {
+            INFO("merged again: set aside again");
+            REQUIRE_FALSE(doc.savedThere);
+            REQUIRE(doc.merged);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiomerging_object::test<6>()
+    TEST_CASE_METHOD(alscriptstudiomerging_data, "alscriptstudiomerging: a world merge undone puts back the old asset so a save stops for the world", "[alscriptstudiomerging]")
     {
-        set_test_name("the world's item merged, then undone: the tab made from the asset it was again, so a save stops for the world");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc&         doc   = tab("door");
         const LLUUID was   = LLUUID::generateNewID();
@@ -300,52 +354,68 @@ namespace tut
         doc.assetId        = was;
         unit->mergeWorld(doc);
         studio.world(doc, theirs, moved);
-        ensure("made from what the world holds", doc.assetId == moved && doc.merged);
+        {
+            INFO("made from what the world holds");
+            CHECK(doc.assetId == moved);
+            REQUIRE(doc.merged);
+        }
         doc.editor->undo();
         unit->textChanged(doc);
-        ensure("made from what it was again", doc.assetId == was && !doc.merged);
-        ensure("reload, merge and compare offered again",
-               services().reports.back().actions == std::vector<std::string>{ "reload_world", "merge_world", "compare_world" });
+        {
+            INFO("made from what it was again");
+            CHECK(doc.assetId == was);
+            REQUIRE_FALSE(doc.merged);
+        }
+        REQUIRE_FALSE(services().reports.empty());
+        UNSCOPED_INFO("reload, merge and compare offered again");
+        CHECK(services().reports.back().actions == std::vector<std::string>{ "reload_world", "merge_world", "compare_world" });
     }
 
-    template<> template<>
-    void alscriptstudiomerging_object::test<7>()
+    TEST_CASE_METHOD(alscriptstudiomerging_data, "alscriptstudiomerging: settle takes the conflict at the caret and the notice goes with the last", "[alscriptstudiomerging]")
     {
-        set_test_name("a conflict settled from the keyboard where the caret is in one; the notice says conflicts are left until none are");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc       = tab("door");
         doc.savedThere = theirs;
         unit->mergeSaved(doc);
         // As the window keeps what was said, and shows the comparison.
+        REQUIRE_FALSE(services().reports.empty());
         doc.offer = Doc::Offer{ services().reports.back().text, services().reports.back().actions };
-        ensure("not while the comparison is not in front", !ALScriptStudioMerging::canSettle(doc));
+        UNSCOPED_INFO("not while the comparison is not in front");
+        CHECK_FALSE(ALScriptStudioMerging::canSettle(doc));
         doc.view = Doc::View::Compare;
         ALScriptNoticeBar::Notice notice = ALScriptStudioOrphans::noticeFor(&doc, services());
-        ensure("the notice offers the comparison", notice.buttons[0].first == "show_compare" && notice.buttons[1].first.empty());
+        {
+            INFO("the notice offers the comparison");
+            CHECK(notice.buttons[0].first == "show_compare");
+            REQUIRE(notice.buttons[1].first.empty());
+        }
 
+        REQUIRE(doc.compareView);
         doc.compareView->right()->setFocus(true);
         doc.compareView->right()->goTo(ALTextPos(2, 0));
-        ensure("not where the caret is in no conflict", !ALScriptStudioMerging::canSettle(doc));
+        UNSCOPED_INFO("not where the caret is in no conflict");
+        CHECK_FALSE(ALScriptStudioMerging::canSettle(doc));
         doc.compareView->right()->goTo(ALTextPos(6, 0));
-        ensure("where it is in one", ALScriptStudioMerging::canSettle(doc));
-        ensure("settled with theirs", ALScriptStudioMerging::settle(doc, ALTextMerge::Take::Theirs));
-        ensure_equals("theirs in the tab", doc.editor->wholeText(), lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "theirs 6" } }));
-        ensure_equals("none left", doc.compareView->conflictCount(), 0);
-        ensure("nothing left to settle", !ALScriptStudioMerging::canSettle(doc));
+        UNSCOPED_INFO("where it is in one");
+        CHECK(ALScriptStudioMerging::canSettle(doc));
+        CHECK(ALScriptStudioMerging::settle(doc, ALTextMerge::Take::Theirs));
+        UNSCOPED_INFO("theirs in the tab");
+        CHECK(doc.editor->wholeText() == lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "theirs 6" } }));
+        CHECK(doc.compareView->conflictCount() == 0);
+        CHECK_FALSE(ALScriptStudioMerging::canSettle(doc));
         notice = ALScriptStudioOrphans::noticeFor(&doc, services());
-        ensure("nor to say", notice.buttons[0].first.empty());
+        UNSCOPED_INFO("nor to say");
+        REQUIRE(notice.buttons[0].first.empty());
     }
 
-    template<> template<>
-    void alscriptstudiomerging_object::test<8>()
+    TEST_CASE_METHOD(alscriptstudiomerging_data, "alscriptstudiomerging: a merge follows the tab's comparison in letting blank changes go", "[alscriptstudiomerging]")
     {
-        set_test_name("a merge begun as the tab's comparison tells lines: blanks let go of there, theirs's change among the lines they re-indented put in, and no conflict said where it finds none");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         // The tab compared before, letting blanks go; then changed line 5
         // and re-indented line 7, while what was saved elsewhere re-indented
@@ -357,10 +427,14 @@ namespace tut
         doc.editor->insertText(lines(8, { { 5, "mine 5" }, { 7, "    line 7" } }));
         doc.savedThere = lines(8, { { 2, "  line 2" }, { 3, "  three" }, { 4, "  line 4" }, { 5, "  line 5" } });
         unit->mergeSaved(doc);
-        ensure_equals("theirs's line 3 put in, the tab's own kept", doc.editor->wholeText(),
+        UNSCOPED_INFO("theirs's line 3 put in, the tab's own kept");
+        CHECK(doc.editor->wholeText() ==
                       lines(8, { { 3, "  three" }, { 5, "mine 5" }, { 7, "    line 7" } }));
-        ensure("compared with the tab as merged", doc.compareView->rightText() == doc.editor->wholeText());
-        ensure("a merge with no conflict", doc.compareView->merging() && doc.compareView->conflictCount() == 0);
-        ensure_equals("said", services().reports.back().text, said("MergeClean", named(doc)));
+        UNSCOPED_INFO("compared with the tab as merged");
+        CHECK(doc.compareView->rightText() == doc.editor->wholeText());
+        REQUIRE(doc.compareView->merging());
+        CHECK(doc.compareView->conflictCount() == 0);
+        REQUIRE_FALSE(services().reports.empty());
+        CHECK(services().reports.back().text == said("MergeClean", named(doc)));
     }
 }

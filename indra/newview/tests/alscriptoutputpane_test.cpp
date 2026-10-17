@@ -32,7 +32,7 @@
 
 #include "alscriptstudio_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <set>
@@ -88,7 +88,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct alscriptoutputpane_data
     {
@@ -98,15 +98,16 @@ namespace tut
         FakeWindow&                               studio   = window.pane();
         ALScriptOutputPane*                 pane = nullptr;
 
-        ALScriptOutputPane& make()
+        ALScriptOutputPane& require_pane()
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             // The tab as the skin built it.
             pane = window.find<ALScriptOutputPane>("output_tab");
-            ensure("the skin builds the tab as the pane", pane != nullptr);
+            INFO("the skin builds the tab as the pane");
+            REQUIRE(pane != nullptr);
             return *pane;
         }
 
@@ -157,55 +158,59 @@ namespace tut
             return out;
         }
         // A filter chosen, as a click on it would.
-        void whose(const std::string& value)
+        void require_whose(const std::string& value)
         {
             LLComboBox* combo = window.find<LLComboBox>("output_filter");
-            ensure("offered: " + value, combo->selectByValue(LLSD(value)));
+            CAPTURE(value);
+            REQUIRE(combo != nullptr);
+            REQUIRE(combo->selectByValue(LLSD(value)));
             combo->onCommit();
         }
-        void find(const std::string& words)
+        // Words typed in the find box, as a commit of it would take them.
+        void require_find(const std::string& words)
         {
             LLFilterEditor* editor = window.find<LLFilterEditor>("output_find");
+            REQUIRE(editor != nullptr);
             editor->setText(words);
             editor->onCommit();
         }
-        const ALOutputView::Entry& last() const { return pane->view()->entries().back(); }
+        // What the pane said last.
+        const ALOutputView::Entry& require_last() const
+        {
+            const auto& entries = pane->view()->entries();
+            REQUIRE_FALSE(entries.empty());
+            return entries.back();
+        }
     };
-    typedef test_group<alscriptoutputpane_data> alscriptoutputpane_group;
-    typedef alscriptoutputpane_group::object    alscriptoutputpane_object;
-    alscriptoutputpane_group                    alscriptoutputpane_instance("ALScriptOutputPane");
 
-    template <>
-    template <>
-    void alscriptoutputpane_object::test<1>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: the kind filter picks errors or owner words or debug or the studio's", "[ALScriptOutputPane]")
     {
-        set_test_name("by kind: errors, what owners were told, the debug channel, the studio's own words");
-        ALScriptOutputPane& out  = make();
+        ALScriptOutputPane& out  = require_pane();
         const LLUUID        door = fresh();
         out.heard(said(door, "Door", "opening", Event::Channel::OwnerSay));
         out.heard(said(door, "Door", "tick\n"));
         out.heard(failed(door, fresh(), "door.lsl", "Stack-Heap Collision", -1));
         out.said("Saved.", false, nullptr, {});
-        ensure_equals("everything, a trailing newline gone", shown(), std::string("|opening|tick|Stack-Heap Collision|Saved."));
+        UNSCOPED_INFO("everything, a trailing newline gone");
+        CHECK(shown() == std::string("|opening|tick|Stack-Heap Collision|Saved."));
         out.showKind("error");
-        ensure_equals("the error", shown(), std::string("|Stack-Heap Collision"));
-        ensure_equals("kept as chosen", out.kind(), std::string("error"));
+        CHECK(shown() == std::string("|Stack-Heap Collision"));
+        UNSCOPED_INFO("kept as chosen");
+        CHECK(out.kind() == std::string("error"));
         out.showKind("owner");
-        ensure_equals("what the owner was told", shown(), std::string("|opening"));
+        CHECK(shown() == std::string("|opening"));
         out.showKind("debug");
-        ensure_equals("the debug channel", shown(), std::string("|tick"));
+        CHECK(shown() == std::string("|tick"));
         out.showKind("studio");
-        ensure_equals("the studio", shown(), std::string("|Saved."));
+        CHECK(shown() == std::string("|Saved."));
         out.showKind("");
-        ensure_equals("everything again", shownTexts().size(), size_t(4));
+        UNSCOPED_INFO("everything again");
+        CHECK(shownTexts().size() == size_t(4));
     }
 
-    template <>
-    template <>
-    void alscriptoutputpane_object::test<2>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: filters by whose it is and by words in either case", "[ALScriptOutputPane]")
     {
-        set_test_name("by whose: one object's alone, the scripts open here, the agent's own; and by the words, in either case");
-        ALScriptOutputPane& out    = make();
+        ALScriptOutputPane& out    = require_pane();
         const LLUUID        door   = fresh();
         const LLUUID        lamp   = fresh();
         const LLUUID        crate  = fresh();
@@ -218,103 +223,126 @@ namespace tut
         out.heard(said(crate, "Crate", "crate tells its owner", Event::Channel::OwnerSay));
         out.said("Saved door.lsl.", false, nullptr, {});
 
-        whose(lamp.asString());
-        ensure_equals("one object's alone, not the studio's", shown(), std::string("|lamp speaks"));
-        whose("open");
-        ensure_equals("the open script's, and the studio's", shown(), std::string("|door speaks|Saved door.lsl."));
-        whose("mine");
-        ensure_equals("the agent's object's, what an owner was told, and the studio's", shown(),
+        require_whose(lamp.asString());
+        UNSCOPED_INFO("one object's alone, not the studio's");
+        CHECK(shown() == std::string("|lamp speaks"));
+        require_whose("open");
+        UNSCOPED_INFO("the open script's, and the studio's");
+        CHECK(shown() == std::string("|door speaks|Saved door.lsl."));
+        require_whose("mine");
+        UNSCOPED_INFO("the agent's object's, what an owner was told, and the studio's");
+        CHECK(shown() ==
                       std::string("|lamp speaks|crate tells its owner|Saved door.lsl."));
 
-        whose("");
-        find("DOOR");
-        ensure_equals("the words, in the text or whose it is", shown(), std::string("|door speaks|Saved door.lsl."));
-        find("  lamp  ");
-        ensure_equals("trimmed", shown(), std::string("|lamp speaks"));
-        find("");
-        ensure_equals("everything", shownTexts().size(), size_t(4));
+        require_whose("");
+        require_find("DOOR");
+        UNSCOPED_INFO("the words, in the text or whose it is");
+        CHECK(shown() == std::string("|door speaks|Saved door.lsl."));
+        require_find("  lamp  ");
+        UNSCOPED_INFO("trimmed");
+        CHECK(shown() == std::string("|lamp speaks"));
+        require_find("");
+        UNSCOPED_INFO("everything");
+        CHECK(shownTexts().size() == size_t(4));
 
         // The script closed: the filter by open scripts follows.
-        whose("open");
+        require_whose("open");
         services.docs.clear();
         out.openChanged();
-        ensure_equals("the studio's alone", shown(), std::string("|Saved door.lsl."));
+        UNSCOPED_INFO("the studio's alone");
+        CHECK(shown() == std::string("|Saved door.lsl."));
     }
 
-    template <>
-    template <>
-    void alscriptoutputpane_object::test<3>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: the objects offered stop at forty dropping the stalest but the chosen", "[ALScriptOutputPane]")
     {
-        set_test_name("the objects offered stop at forty, the one least lately heard from going first, unless it is the one chosen");
-        ALScriptOutputPane& out = make();
+        ALScriptOutputPane& out = require_pane();
         std::vector<LLUUID> roots;
         for (S32 i = 0; i < 45; ++i)
         {
             roots.push_back(fresh());
             out.heard(said(roots.back(), llformat("Object %02d", i), "hello"));
         }
-        ensure_equals("forty", out.objects().size(), size_t(40));
-        ensure("the first five gone", out.objects().front().first == roots[5]);
+        REQUIRE(out.objects().size() == size_t(40));
+        UNSCOPED_INFO("the first five gone");
+        CHECK(out.objects().front().first == roots[5]);
         // Heard from again: the last to go.
         out.heard(said(roots[5], "Object 05", "again"));
-        ensure("heard again, last", out.objects().back().first == roots[5]);
-        ensure_equals("still forty", out.objects().size(), size_t(40));
+        UNSCOPED_INFO("heard again, last");
+        CHECK(out.objects().back().first == roots[5]);
+        REQUIRE(out.objects().size() == size_t(40));
         // Renamed, and heard from under its new name.
         out.heard(said(roots[9], "Renamed", "again"));
-        ensure_equals("its new name", out.objects().back().second, std::string("Renamed"));
+        CHECK(out.objects().back().second == std::string("Renamed"));
         // The one chosen stays, least lately heard from as it is.
-        whose(roots[6].asString());
+        require_whose(roots[6].asString());
         out.heard(said(fresh(), "Newcomer", "hello"));
-        ensure_equals("forty still", out.objects().size(), size_t(40));
-        ensure("the one chosen stayed", out.objects().front().first == roots[6]);
-        ensure("the next went", std::none_of(out.objects().begin(), out.objects().end(), [&](const auto& one) { return one.first == roots[7]; }));
-        ensure_equals("and is still chosen", window.find<LLComboBox>("output_filter")->getValue().asString(), roots[6].asString());
+        REQUIRE(out.objects().size() == size_t(40));
+        UNSCOPED_INFO("the one chosen stayed");
+        CHECK(out.objects().front().first == roots[6]);
+        UNSCOPED_INFO("the next went");
+        CHECK(std::none_of(out.objects().begin(), out.objects().end(), [&](const auto& one) { return one.first == roots[7]; }));
+        const LLComboBox* filter = window.find<LLComboBox>("output_filter");
+        REQUIRE(filter != nullptr);
+        UNSCOPED_INFO("and is still chosen");
+        CHECK(filter->getValue().asString() == roots[6].asString());
     }
 
-    template <>
-    template <>
-    void alscriptoutputpane_object::test<4>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: an error or failure out of sight is unread until seen or cleared", "[ALScriptOutputPane]")
     {
-        set_test_name("an error or a failure said out of sight is unread until the tab is looked at, or cleared");
-        ALScriptOutputPane& out  = make();
+        ALScriptOutputPane& out  = require_pane();
         const LLUUID        door = fresh();
         out.heard(said(door, "Door", "tick"));
         out.said("Saved.", false, nullptr, {});
-        ensure("words alone are not unread", !out.unread());
-        ensure_equals("and nothing to say of it", studio.unreadChanges, 0);
+        UNSCOPED_INFO("words alone are not unread");
+        CHECK_FALSE(out.unread());
+        UNSCOPED_INFO("and nothing to say of it");
+        CHECK(studio.unreadChanges == 0);
         out.heard(failed(door, fresh(), "door.lsl", "Math Error", -1));
-        ensure("an error is", out.unread());
-        ensure_equals("said on the title", studio.unreadChanges, 1);
+        UNSCOPED_INFO("an error is");
+        CHECK(out.unread());
+        UNSCOPED_INFO("said on the title");
+        CHECK(studio.unreadChanges == 1);
         out.pump();
-        ensure("still, out of sight", out.unread());
+        UNSCOPED_INFO("still, out of sight");
+        CHECK(out.unread());
         studio.inSight = true;
         out.pump();
-        ensure("looked at", !out.unread());
-        ensure_equals("said again", studio.unreadChanges, 2);
+        UNSCOPED_INFO("looked at");
+        CHECK_FALSE(out.unread());
+        UNSCOPED_INFO("said again");
+        CHECK(studio.unreadChanges == 2);
         out.said("Could not save.", true, nullptr, {});
-        ensure("a failure in sight is read", !out.unread());
+        UNSCOPED_INFO("a failure in sight is read");
+        CHECK_FALSE(out.unread());
         studio.inSight = false;
         out.said("Could not save.", true, nullptr, {});
-        ensure("a failure out of sight is not", out.unread());
-        window.find<LLButton>("output_clear")->onCommit();
-        ensure("cleared", !out.unread());
-        ensure("with what was said", out.view()->entries().empty());
+        UNSCOPED_INFO("a failure out of sight is not");
+        CHECK(out.unread());
+        LLButton* clear = window.find<LLButton>("output_clear");
+        REQUIRE(clear != nullptr);
+        clear->onCommit();
+        UNSCOPED_INFO("cleared");
+        CHECK_FALSE(out.unread());
+        UNSCOPED_INFO("with what was said");
+        CHECK(out.view()->entries().empty());
     }
 
-    template <>
-    template <>
-    void alscriptoutputpane_object::test<5>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: the studio's words link to the tab they name and to its actions", "[ALScriptOutputPane]")
     {
-        set_test_name("the studio's words link to the tab they name and to what can be done about it, each handed to the window");
-        ALScriptOutputPane& out = make();
+        ALScriptOutputPane& out = require_pane();
         ALScriptStudioDoc&  doc = services.addDoc("door-script", ALScriptRef(fresh(), fresh()), "door.lsl");
         out.said("Could not save door.lsl.", true, &doc, { "retry", "copy" });
-        const ALOutputView::Entry& entry = last();
-        ensure_equals("the name and two things to do", entry.links.size(), size_t(3));
-        ensure_equals("the name, where the words say it", entry.links[0].begin, 15);
-        ensure_equals("to its end", entry.links[0].end, 23);
-        ensure("each thing after the words", entry.text.find(services.words("ActionRetry")) > entry.text.find("door.lsl."));
-        ensure_equals("where it is", entry.text.substr(entry.links[1].begin, entry.links[1].end - entry.links[1].begin), services.words("ActionRetry"));
+        const ALOutputView::Entry& entry = require_last();
+        UNSCOPED_INFO("the name and two things to do");
+        REQUIRE(entry.links.size() == size_t(3));
+        UNSCOPED_INFO("the name, where the words say it");
+        CHECK(entry.links[0].begin == 15);
+        UNSCOPED_INFO("to its end");
+        CHECK(entry.links[0].end == 23);
+        UNSCOPED_INFO("each thing after the words");
+        CHECK(entry.text.find(services.words("ActionRetry")) > entry.text.find("door.lsl."));
+        UNSCOPED_INFO("where it is");
+        CHECK(entry.text.substr(entry.links[1].begin, entry.links[1].end - entry.links[1].begin) == services.words("ActionRetry"));
 
         ALOutputView::Entry chosen = entry;
         for (const ALOutputView::Entry::Link& link : entry.links)
@@ -322,27 +350,29 @@ namespace tut
             chosen.value = link.value;
             out.choose(chosen);
         }
-        ensure_equals("the tab, with its problems", studio.shown.size(), size_t(1));
-        ensure_equals("the tab named", studio.shown[0], std::string("door-script:problems"));
-        ensure_equals("what to do, by name", studio.actions.size(), size_t(2));
-        ensure_equals("try again", studio.actions[0], std::string("door-script:retry"));
-        ensure_equals("a copy", studio.actions[1], std::string("door-script:copy"));
+        UNSCOPED_INFO("the tab, with its problems");
+        REQUIRE(studio.shown.size() == size_t(1));
+        UNSCOPED_INFO("the tab named");
+        CHECK(studio.shown[0] == std::string("door-script:problems"));
+        UNSCOPED_INFO("what to do, by name");
+        REQUIRE(studio.actions.size() == size_t(2));
+        CHECK(studio.actions[0] == std::string("door-script:retry"));
+        CHECK(studio.actions[1] == std::string("door-script:copy"));
 
         // Said of no tab: nothing to link.
         out.said("Nothing open.", false, nullptr, { "retry" });
-        ensure("no links", last().links.empty());
+        const ALOutputView::Entry& unlinked = require_last();
+        CHECK(unlinked.links.empty());
         // The tab closed since: nothing asked of the window.
         services.docs.clear();
         out.choose(chosen);
-        ensure_equals("nothing more", studio.actions.size(), size_t(2));
+        UNSCOPED_INFO("nothing more");
+        CHECK(studio.actions.size() == size_t(2));
     }
 
-    template <>
-    template <>
-    void alscriptoutputpane_object::test<6>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: a run's lines map back to the script or an include for each frame", "[ALScriptOutputPane]")
     {
-        set_test_name("a run's lines read back through the text it runs: the script's own, an include's, and the frames under an error");
-        ALScriptOutputPane& out    = make();
+        ALScriptOutputPane& out    = require_pane();
         const LLUUID        object = fresh();
         const LLUUID        item   = fresh();
         // Ten lines out: the first four the include's, the rest the
@@ -367,42 +397,63 @@ namespace tut
         Event error = failed(object, item, "Counter", "attempt to index nil", 7);
         error.stack = { "lua_script:8: attempt to index nil", "lua_script:3 function helper", "lua_script:8", "[C] function error" };
         const ALScriptOutputPane::Place at = out.heard(error);
-        ensure_equals("the error's line, the script's", at.line, 4);
-        ensure("in the script", at.file.empty());
-        const ALOutputView::Entry& entry = last();
-        ensure("a link to it", entry.link);
-        ensure_equals("at that line", entry.value["line"].asInteger(), 4);
-        ensure_equals("a link for each frame of the script's", entry.links.size(), size_t(2));
-        ensure_equals("the first in the include", entry.links[0].value["file"].asString(), std::string("disk:/scripts/lib.luau"));
-        ensure_equals("at its line", entry.links[0].value["line"].asInteger(), 2);
-        ensure_equals("the second in the script", entry.links[1].value["line"].asInteger(), 4);
+        UNSCOPED_INFO("the error's line, the script's");
+        CHECK(at.line == 4);
+        UNSCOPED_INFO("in the script");
+        CHECK(at.file.empty());
+        const ALOutputView::Entry& entry = require_last();
+        UNSCOPED_INFO("a link to it");
+        CHECK(entry.link);
+        UNSCOPED_INFO("at that line");
+        CHECK(entry.value["line"].asInteger() == 4);
+        UNSCOPED_INFO("a link for each frame of the script's");
+        REQUIRE(entry.links.size() == size_t(2));
+        UNSCOPED_INFO("the first in the include");
+        CHECK(entry.links[0].value["file"].asString() == std::string("disk:/scripts/lib.luau"));
+        UNSCOPED_INFO("at its line");
+        CHECK(entry.links[0].value["line"].asInteger() == 2);
+        UNSCOPED_INFO("the second in the script");
+        CHECK(entry.links[1].value["line"].asInteger() == 4);
 
         ALOutputView::Entry chosen = entry;
         out.choose(chosen);
         chosen.value = entry.links[0].value;
         out.choose(chosen);
-        ensure_equals("two places gone to", studio.went.size(), size_t(2));
-        ensure("the script", studio.went[0].ref == ALScriptRef(object, item) && studio.went[0].file.empty());
-        ensure_equals("at the error's line", studio.went[0].line, 4);
-        ensure("read back already", !studio.went[0].running);
-        ensure_equals("the include", studio.went[1].file, std::string("disk:/scripts/lib.luau"));
-        ensure_equals("by its name", studio.went[1].name, std::string("lib.luau"));
-        ensure_equals("at the frame's line", studio.went[1].line, 2);
+        UNSCOPED_INFO("two places gone to");
+        REQUIRE(studio.went.size() == size_t(2));
+        {
+            INFO("the script");
+            CHECK(studio.went[0].ref == ALScriptRef(object, item));
+            CHECK(studio.went[0].file.empty());
+        }
+        UNSCOPED_INFO("at the error's line");
+        CHECK(studio.went[0].line == 4);
+        UNSCOPED_INFO("read back already");
+        CHECK_FALSE(studio.went[0].running);
+        UNSCOPED_INFO("the include");
+        CHECK(studio.went[1].file == std::string("disk:/scripts/lib.luau"));
+        UNSCOPED_INFO("by its name");
+        CHECK(studio.went[1].name == std::string("lib.luau"));
+        UNSCOPED_INFO("at the frame's line");
+        CHECK(studio.went[1].line == 2);
 
         // Not open here: the line the run names, as it named it, and a
         // link that says so, for the window to read back once it can.
         services.docs.clear();
-        ensure_equals("as said", out.heard(error).line, 7);
-        chosen = last();
+        UNSCOPED_INFO("as said");
+        CHECK(out.heard(error).line == 7);
+        chosen = require_last();
         out.choose(chosen);
-        ensure("gone to as the region counts it", studio.went.back().line == 7 && studio.went.back().running);
+        {
+            INFO("gone to as the region counts it");
+            CHECK(studio.went.back().line == 7);
+            CHECK(studio.went.back().running);
+        }
     }
 
-    template<> template<>
-    void alscriptoutputpane_object::test<7>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: a run's line past the envelope's lines maps back through the code", "[ALScriptOutputPane]")
     {
-        set_test_name("a run's line counted with the envelope's lines above the code, as the region counts it, read back through the code");
-        ALScriptOutputPane& out    = make();
+        ALScriptOutputPane& out    = require_pane();
         const LLUUID        object = fresh();
         const LLUUID        item   = fresh();
         ALSourceMap map;
@@ -426,37 +477,40 @@ namespace tut
         envelope.compileTarget = "luau";
         doc.envelope           = envelope;
         const S32 under        = envelope.codeLine();
-        ensure("the envelope has lines of its own", under > 3);
-        ensure_equals("its code's third line, where the region names it", out.heard(failed(object, item, "Counter", "attempt to index nil", under + 2)).line, 102);
-        ensure_equals("a line in the envelope is none of the code's: as said", out.heard(failed(object, item, "Counter", "boom", 1)).line, 1);
+        UNSCOPED_INFO("the envelope has lines of its own");
+        CHECK(under > 3);
+        UNSCOPED_INFO("its code's third line, where the region names it");
+        CHECK(out.heard(failed(object, item, "Counter", "attempt to index nil", under + 2)).line == 102);
+        UNSCOPED_INFO("a line in the envelope is none of the code's: as said");
+        CHECK(out.heard(failed(object, item, "Counter", "boom", 1)).line == 1);
     }
 
-    template <>
-    template <>
-    void alscriptoutputpane_object::test<8>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: an error the filters hide is not unread", "[ALScriptOutputPane]")
     {
-        set_test_name("an error the filters hide is not unread: a stranger's, with one object's chosen; the chosen one's is");
-        ALScriptOutputPane& out   = make();
+        ALScriptOutputPane& out   = require_pane();
         const LLUUID        lamp  = fresh();
         const LLUUID        crate = fresh();
         out.heard(said(lamp, "Lamp", "lamp speaks"));
         out.heard(said(crate, "Crate", "crate speaks"));
-        whose(lamp.asString());
+        require_whose(lamp.asString());
         out.heard(failed(crate, fresh(), "crate.lsl", "Math Error", -1));
-        ensure("a stranger's, hidden: not unread", !out.unread() && studio.unreadChanges == 0);
+        {
+            INFO("a stranger's, hidden: not unread");
+            CHECK_FALSE(out.unread());
+            CHECK(studio.unreadChanges == 0);
+        }
         out.heard(failed(lamp, fresh(), "lamp.lsl", "Math Error", -1));
-        ensure("the chosen one's is", out.unread());
+        UNSCOPED_INFO("the chosen one's is");
+        CHECK(out.unread());
         const S32 said = studio.unreadChanges;
         out.heard(failed(lamp, fresh(), "lamp.lsl", "Another Error", -1));
-        ensure_equals("unread already: not said again", studio.unreadChanges, said);
+        UNSCOPED_INFO("unread already: not said again");
+        CHECK(studio.unreadChanges == said);
     }
 
-    template <>
-    template <>
-    void alscriptoutputpane_object::test<9>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: what objects say aloud or to the agent or in IMs gets its own kind", "[ALScriptOutputPane]")
     {
-        set_test_name("what the agent's objects say aloud, to the agent, and in IMs: each its kind, the agent's own; the prim that spoke named");
-        ALScriptOutputPane& out  = make();
+        ALScriptOutputPane& out  = require_pane();
         const LLUUID        lamp = fresh();
         Event               aloud = said(lamp, "Lamp", "hello", Event::Channel::Said);
         aloud.primName            = "Bulb";
@@ -464,25 +518,28 @@ namespace tut
         out.heard(said(lamp, "Lamp", "just you", Event::Channel::SaidTo));
         out.heard(said(lamp, "Lamp", "an IM", Event::Channel::Instant));
         const auto& entries = out.view()->entries();
-        ensure_equals("three", entries.size(), size_t(3));
-        ensure_equals("the prim that spoke, after its object", entries[0].source, std::string("Lamp \xE2\x96\xB8 Bulb"));
-        ensure_equals("said", entries[0].kind, window.services().words("KindSaid"));
-        ensure_equals("said to the agent", entries[1].kind, window.services().words("KindSaidTo"));
-        ensure_equals("an IM", entries[2].kind, window.services().words("KindInstant"));
-        whose("mine");
-        ensure_equals("the agent's own, all of them", shownTexts().size(), size_t(3));
-        whose("");
+        REQUIRE(entries.size() == size_t(3));
+        UNSCOPED_INFO("the prim that spoke, after its object");
+        CHECK(entries[0].source == std::string("Lamp \xE2\x96\xB8 Bulb"));
+        CHECK(entries[0].kind == window.services().words("KindSaid"));
+        UNSCOPED_INFO("said to the agent");
+        CHECK(entries[1].kind == window.services().words("KindSaidTo"));
+        UNSCOPED_INFO("an IM");
+        CHECK(entries[2].kind == window.services().words("KindInstant"));
+        require_whose("mine");
+        UNSCOPED_INFO("the agent's own, all of them");
+        CHECK(shownTexts().size() == size_t(3));
+        require_whose("");
         out.showKind("said");
-        ensure_equals("aloud and to the agent", shown(), std::string("|hello|just you"));
+        UNSCOPED_INFO("aloud and to the agent");
+        CHECK(shown() == std::string("|hello|just you"));
         out.showKind("im");
-        ensure_equals("IMs", shown(), std::string("|an IM"));
+        CHECK(shown() == std::string("|an IM"));
     }
 
-    template<> template<>
-    void alscriptoutputpane_object::test<10>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: the controls row keeps buttons right and narrows the lists first", "[ALScriptOutputPane]")
     {
-        set_test_name("the row over the log: the buttons against the right edge, the words' box the rest; narrow, the lists give way first, never overlapping");
-        ALScriptOutputPane& out   = make();
+        ALScriptOutputPane& out   = require_pane();
         const LLRect        whose = out.getChild<LLView>("output_filter")->getRect();
         const LLRect        kind  = out.getChild<LLView>("output_kind")->getRect();
         const auto          row   = [&]() {
@@ -505,41 +562,72 @@ namespace tut
         };
         out.reshape(800, out.getRect().getHeight());
         std::vector<LLRect> wide = row();
-        ensure("wide: the lists as the skin made them", wide[0].getWidth() == whose.getWidth() && wide[1].getWidth() == kind.getWidth());
-        ensure("the copy against the right edge, the box up to the clear", wide[4].mRight == 798 && wide[2].mRight + 6 == wide[3].mLeft);
-        ensure("in order, apart", apart(wide, 800));
+        {
+            INFO("wide: the lists as the skin made them");
+            CHECK(wide[0].getWidth() == whose.getWidth());
+            CHECK(wide[1].getWidth() == kind.getWidth());
+        }
+        {
+            INFO("the copy against the right edge, the box up to the clear");
+            CHECK(wide[4].mRight == 798);
+            CHECK(wide[2].mRight + 6 == wide[3].mLeft);
+        }
+        UNSCOPED_INFO("in order, apart");
+        CHECK(apart(wide, 800));
         out.reshape(420, out.getRect().getHeight());
         std::vector<LLRect> narrow = row();
-        ensure("narrow: the lists narrower", narrow[0].getWidth() < whose.getWidth() && narrow[1].getWidth() <= kind.getWidth());
-        ensure("the buttons as they were", narrow[3].getWidth() == wide[3].getWidth() && narrow[4].getWidth() == wide[4].getWidth());
-        ensure("in order, apart", apart(narrow, 420));
-        ensure("the box still there", narrow[2].getWidth() >= 60);
+        {
+            INFO("narrow: the lists narrower");
+            CHECK(narrow[0].getWidth() < whose.getWidth());
+            CHECK(narrow[1].getWidth() <= kind.getWidth());
+        }
+        {
+            INFO("the buttons as they were");
+            CHECK(narrow[3].getWidth() == wide[3].getWidth());
+            CHECK(narrow[4].getWidth() == wide[4].getWidth());
+        }
+        UNSCOPED_INFO("in order, apart");
+        CHECK(apart(narrow, 420));
+        UNSCOPED_INFO("the box still there");
+        CHECK(narrow[2].getWidth() >= 60);
     }
 
-    template<> template<>
-    void alscriptoutputpane_object::test<11>()
+    TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: a lone CR breaks a line and links follow it to the shown line", "[ALScriptOutputPane]")
     {
-        set_test_name("an error that says a lone CR runs to a line more, and a frame under it links from the line the log shows it on; the studio's own words' links likewise");
-        ALScriptOutputPane& out    = make();
+        ALScriptOutputPane& out    = require_pane();
         const LLUUID        object = fresh();
         const LLUUID        item   = fresh();
         Event               error  = failed(object, item, "Counter", "bad\rvalue", -1);
         error.stack                = { "lua_script:8: bad\rvalue", "lua_script:3 function helper" };
         out.heard(error);
-        const ALOutputView::Entry& entry = last();
-        ensure_equals("its breaks as the log reads them", entry.text, std::string("bad\nvalue\nlua_script:3 function helper"));
-        ensure_equals("a link for the frame", entry.links.size(), size_t(1));
-        ensure_equals("on the frame's line", entry.links[0].line, 2);
+        const ALOutputView::Entry& entry = require_last();
+        UNSCOPED_INFO("its breaks as the log reads them");
+        CHECK(entry.text == std::string("bad\nvalue\nlua_script:3 function helper"));
+        UNSCOPED_INFO("a link for the frame");
+        REQUIRE(entry.links.size() == size_t(1));
+        UNSCOPED_INFO("on the frame's line");
+        CHECK(entry.links[0].line == 2);
         const ALTextDocument& shown_text = out.view()->document();
-        ensure_equals("the line the log shows it on", shown_text.line(shown_text.lineCount() - 1), std::string("lua_script:3 function helper"));
+        UNSCOPED_INFO("the line the log shows it on");
+        CHECK(shown_text.line(shown_text.lineCount() - 1) == std::string("lua_script:3 function helper"));
 
         // The studio's own words likewise: a name after a lone CR linked on
         // the line it is shown on, and what to do after it.
         ALScriptStudioDoc& doc = services.addDoc("door-script", ALScriptRef(fresh(), fresh()), "door.lsl");
         out.said("Could not save\rdoor.lsl.", true, &doc, { "retry" });
-        const ALOutputView::Entry& studio_said = last();
-        ensure_equals("the name and what to do", studio_said.links.size(), size_t(2));
-        ensure("the name at the start of the second line", studio_said.links[0].line == 1 && studio_said.links[0].begin == 0 && studio_said.links[0].end == 8);
-        ensure("what to do on it too", studio_said.links[1].line == 1 && studio_said.links[1].begin == 12);
+        const ALOutputView::Entry& studio_said = require_last();
+        UNSCOPED_INFO("the name and what to do");
+        REQUIRE(studio_said.links.size() == size_t(2));
+        {
+            INFO("the name at the start of the second line");
+            CHECK(studio_said.links[0].line == 1);
+            CHECK(studio_said.links[0].begin == 0);
+            CHECK(studio_said.links[0].end == 8);
+        }
+        {
+            INFO("what to do on it too");
+            CHECK(studio_said.links[1].line == 1);
+            CHECK(studio_said.links[1].begin == 12);
+        }
     }
 }

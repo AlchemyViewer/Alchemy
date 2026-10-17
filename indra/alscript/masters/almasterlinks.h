@@ -32,6 +32,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -84,8 +85,12 @@ struct ALMasterLink
     // file has it, nothing expanded or compiled. A notecard that carries
     // items is never linked, since a file cannot hold them.
     bool        notecard = false;
-    // The compile target last sent with: "mono", "lsl2" or "luau".
+    // The compile target last sent with: "mono", "lsl2" or "luau"; or the
+    // one picked for the next send.
     std::string target;
+    // The experience the sends set, where one was picked in the file's tab
+    // -- null for none; unset, each keeps what the script runs under.
+    std::optional<LLUUID> experience;
     // The item's asset after the last upload made through the link, or as
     // it was when linked: the world moved where it holds another.
     LLUUID      base;
@@ -179,7 +184,10 @@ public:
     // that is not a key, is passed over, and the rest read; a field it does
     // not have, or cannot be read, is left as a new link has it; a way of
     // making or a state not known -- one a later version wrote -- is read
-    // as the most careful there is, a hint's link, suspended.
+    // as the most careful there is, a hint's link, suspended. A string the
+    // world or the disk gave -- a master, a use, a name -- that XML would
+    // not carry, one with a control character in it, is written as its
+    // bytes, and read back from either.
     LLSD                 toLLSD() const;
     static ALMasterLinks fromLLSD(const LLSD& llsd);
 

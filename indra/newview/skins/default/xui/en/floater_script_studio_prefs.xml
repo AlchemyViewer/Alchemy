@@ -550,6 +550,42 @@ end</floater.string>
              tool_tip="Formatting puts one space around operators and after commas; off, it only fixes indentation"
              top_pad="6"
              width="370" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="format_width_label"
+             top_pad="8"
+             width="170">
+                Break lines longer than:
+            </text>
+            <spinner
+             control_name="ALScriptFormatWidth"
+             decimal_digits="0"
+             follows="left|top"
+             height="20"
+             increment="10"
+             label_width="0"
+             layout="topleft"
+             left_pad="4"
+             max_val="400"
+             min_val="0"
+             name="format_width"
+             tool_tip="Formatting breaks a line with more columns than this at the commas of a bracket on it, each part on a line of its own; 0 never breaks a line"
+             top_delta="-2"
+             width="60" />
+            <check_box
+             control_name="ALScriptFormatBraceSpaces"
+             follows="left|top"
+             height="20"
+             label="Spaces inside SLua's braces: { 1, 2 }"
+             layout="topleft"
+             left="12"
+             name="format_brace_spaces"
+             tool_tip="Formatting and Convert to SLua put a space inside a table's braces, and a table type's, as StyLua does: { 1, 2 }, { any }. Off, {1, 2}"
+             top_pad="6"
+             width="370" />
 
             <!-- The right column: the studio, the caret, the hover card. -->
             <text
@@ -572,6 +608,17 @@ end</floater.string>
              left="412"
              name="restore_tabs"
              tool_tip="Reopen last session's tabs when the window opens; off, open only what you asked for"
+             top_pad="2"
+             width="370" />
+            <check_box
+             control_name="ALScriptStudioPanesWiden"
+             follows="left|top"
+             height="20"
+             label="Widen the window as the Explorer or Inspector opens"
+             layout="topleft"
+             left="412"
+             name="panes_widen"
+             tool_tip="Opening the Explorer or the Inspector widens the window by its width, and folding it narrows the window again; off, the pane takes its room from the editor"
              top_pad="2"
              width="370" />
             <text
@@ -1692,6 +1739,17 @@ end</floater.string>
              top_pad="4"
              width="700" />
             <check_box
+             control_name="ALScriptConvertUuidKeys"
+             follows="left|top"
+             height="20"
+             label="The script's keys as SLua's uuids"
+             layout="topleft"
+             left="12"
+             name="convert_uuid_keys"
+             tool_tip="local owner: uuid = ll.GetOwner(). Off: every key the script has held as text, as LSL held them -- local owner: string = tostring(ll.GetOwner()) -- so that a key given &quot;&quot;, or any other text, keeps it, compares with it and is sent on as it."
+             top_pad="4"
+             width="700" />
+            <check_box
              control_name="ALScriptConvertHandlerFields"
              follows="left|top"
              height="20"
@@ -1711,6 +1769,17 @@ end</floater.string>
              left="12"
              name="convert_types"
              tool_tip="local count: number = 0, and function names(who: string): string, from LSL's types. Handlers the editor completes typed the same way: function LLEvents.on_rez(start_param: number)."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertKeyTextAny"
+             follows="left|top"
+             height="20"
+             label="Text given for a key written :: any, for the type checker"
+             layout="topleft"
+             left="12"
+             name="convert_key_text_any"
+             tool_tip="ll.Key2Name(name :: any): SLua's ll takes a key as text, as LSL's functions did, and the type checker asks for a uuid. Off: the text as it is, which the type checker marks for you to see to; uuid(x) stops the script on text that is no UUID, and touuid(x) gives nil for it."
              top_pad="4"
              width="700" />
             <check_box

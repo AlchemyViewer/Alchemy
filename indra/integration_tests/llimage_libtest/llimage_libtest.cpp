@@ -45,7 +45,6 @@
 #include "llsdserialize.h"
 #include "llcleanup.h"
 #include "lltrace.h"
-#include "llfasttimer.h"
 
 // system libraries
 #include <iostream>

@@ -279,7 +279,7 @@ void LLDrawPoolBump::unbindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& 
 
 void LLDrawPoolBump::beginFullbrightShiny()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_SHINY);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     sVertexMask = VERTEX_MASK_SHINY | LLVertexBuffer::MAP_TEXCOORD0;
 
@@ -345,7 +345,7 @@ void LLDrawPoolBump::beginFullbrightShiny()
 
 void LLDrawPoolBump::renderFullbrightShiny()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_SHINY);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     {
         LLGLEnable blend_enable(GL_BLEND);
@@ -377,7 +377,7 @@ void LLDrawPoolBump::renderFullbrightShiny()
 
 void LLDrawPoolBump::endFullbrightShiny()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_SHINY);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     LLCubeMap* cube_map = gSky.mVOSkyp ? gSky.mVOSkyp->getCubeMap() : NULL;
     if( cube_map && !LLPipeline::sReflectionProbesEnabled )
@@ -486,7 +486,7 @@ bool LLDrawPoolBump::bindBumpMap(U8 bump_code, LLViewerTexture* texture, S32 cha
 //static
 void LLDrawPoolBump::beginBump()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_BUMP);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     sVertexMask = VERTEX_MASK_BUMP;
     // Optional second pass: emboss bump map
     stop_glerror();
@@ -508,7 +508,7 @@ void LLDrawPoolBump::beginBump()
 //static
 void LLDrawPoolBump::renderBump(U32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_BUMP);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE, GL_LEQUAL);
     LLGLEnable blend(GL_BLEND);
     gGL.diffuseColor4f(1,1,1,1);
@@ -531,9 +531,21 @@ S32 LLDrawPoolBump::getNumDeferredPasses()
     return 1;
 }
 
+// Whether a bump face's texture can fall below its cutoff. Without an alpha channel the texture reads 1 and the face
+// is never discarded; a texture whose channels are not yet known is taken to have one.
+static bool bump_can_discard(const LLDrawInfo& params)
+{
+    if (params.mAlphaMaskCutoff <= 0.f)
+    {
+        return false;
+    }
+    const LLViewerTexture* tex = params.mTexture.get();
+    return !(tex && tex->hasGLTexture() && tex->getComponents() == 3);
+}
+
 void LLDrawPoolBump::renderDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_BUMP);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     // The program's LINEAR_DIFFUSE makes pushBumpBatch decode the diffuse on the sampler;
     // the hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes on store.
@@ -551,59 +563,97 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
             continue;
         }
 
-        gDeferredBumpProgram.selectVariant()->bind(rigged);
-        diffuse_channel = LLGLSLShader::sCurBoundShaderPtr->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
-        bump_channel = LLGLSLShader::sCurBoundShaderPtr->enableTexture(LLViewerShaderMgr::BUMP_MAP);
-        gGL.getTextureSlot(diffuse_channel)->unbind();
-        gGL.getTextureSlot(bump_channel)->unbind();
-
-        const LLVOAvatar* lastAvatar = nullptr;
-        U64 lastMeshId = 0;
-        bool skipLastSkin = false;
-
-        // Faces are sorted by bumpmap then texture, so the alpha-mask cutoff and the
-        // bump-image bind (an image lookup + texture bind) repeat across runs of faces.
-        // Skip them when unchanged. (bindBumpMap's only side effect, addTextureStats, is
-        // max-based on the source texture, so skipping a repeat is a no-op there too.)
-        U8 lastBump = 255;
-        LLViewerTexture* lastBumpTex = nullptr;
-        F32 lastAlpha = -1.f;
-
-        for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+        // The faces that cannot be discarded first, under the program without the test, so their depth is written
+        // ahead of shading; the rest are set aside as the list is walked, once, and drawn after under the one with it.
+        // A program with no faces to draw is never bound.
+        static std::vector<LLDrawInfo*> masked;
+        masked.clear();
+        for (bool alpha_mask : { false, true })
         {
-            LLDrawInfo& params = **i;
+            LLGLSLShader* shader = nullptr;
 
-            LLCullResult::increment_iterator(i, end);
+            const LLVOAvatar* lastAvatar = nullptr;
+            U64 lastMeshId = 0;
+            bool skipLastSkin = false;
 
-            if (params.mAlphaMaskCutoff != lastAlpha)
+            // Faces are sorted by bumpmap then texture, so the alpha-mask cutoff and the
+            // bump-image bind (an image lookup + texture bind) repeat across runs of faces.
+            // Skip them when unchanged. (bindBumpMap's only side effect, addTextureStats, is
+            // max-based on the source texture, so skipping a repeat is a no-op there too.)
+            U8 lastBump = 255;
+            LLViewerTexture* lastBumpTex = nullptr;
+            F32 lastAlpha = -1.f;
+
+            const auto draw = [&](LLDrawInfo& params)
             {
-                lastAlpha = params.mAlphaMaskCutoff;
-                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(lastAlpha);
-            }
+                if (!shader)
+                {
+                    LLGLSLShader& program = alpha_mask ? gDeferredBumpAlphaMaskProgram : gDeferredBumpProgram;
+                    program.selectVariant()->bind(rigged);
+                    shader = LLGLSLShader::sCurBoundShaderPtr;
+                    diffuse_channel = shader->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
+                    bump_channel = shader->enableTexture(LLViewerShaderMgr::BUMP_MAP);
+                    gGL.getTextureSlot(diffuse_channel)->unbind();
+                    gGL.getTextureSlot(bump_channel)->unbind();
+                }
 
-            if (params.mBump != lastBump || params.mTexture.get() != lastBumpTex)
-            {
-                lastBump = params.mBump;
-                lastBumpTex = params.mTexture.get();
-                LLDrawPoolBump::bindBumpMap(params, bump_channel);
-            }
+                if (alpha_mask && params.mAlphaMaskCutoff != lastAlpha)
+                {
+                    lastAlpha = params.mAlphaMaskCutoff;
+                    shader->setMinimumAlpha(lastAlpha);
+                }
 
-            if (rigged)
-            {
-                if (uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+                if (params.mBump != lastBump || params.mTexture.get() != lastBumpTex)
+                {
+                    lastBump = params.mBump;
+                    lastBumpTex = params.mTexture.get();
+                    LLDrawPoolBump::bindBumpMap(params, bump_channel);
+                }
+
+                if (rigged)
+                {
+                    if (uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+                    {
+                        pushBumpBatch(params, true, false);
+                    }
+                }
+                else
                 {
                     pushBumpBatch(params, true, false);
+                }
+            };
+
+            if (!alpha_mask)
+            {
+                for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+                {
+                    LLDrawInfo& params = **i;
+
+                    LLCullResult::increment_iterator(i, end);
+
+                    if (bump_can_discard(params))
+                    {
+                        masked.push_back(&params);
+                        continue;
+                    }
+                    draw(params);
                 }
             }
             else
             {
-                pushBumpBatch(params, true, false);
+                for (LLDrawInfo* params : masked)
+                {
+                    draw(*params);
+                }
+            }
+
+            if (shader)
+            {
+                shader->disableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
+                shader->disableTexture(LLViewerShaderMgr::BUMP_MAP);
+                shader->unbind();
             }
         }
-
-        LLGLSLShader::sCurBoundShaderPtr->disableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
-        LLGLSLShader::sCurBoundShaderPtr->disableTexture(LLViewerShaderMgr::BUMP_MAP);
-        LLGLSLShader::sCurBoundShaderPtr->unbind();
     }
 
     shiny = false;
@@ -826,8 +876,7 @@ void LLBumpImageList::onSourceStandardLoaded( bool success, LLViewerFetchedTextu
 
 void LLBumpImageList::generateNormalMapFromAlpha(LLImageRaw* src, LLImageRaw* nrm_image)
 {
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(nrm_image);
+    LLImageDataCopyLock lock(src, nrm_image);
 
     U8* nrm_data = nrm_image->getData();
     S32 resX = src->getWidth();
@@ -941,7 +990,9 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
             LLGLDepthTest depth(GL_FALSE);
             LLGLDisable cull(GL_CULL_FACE);
             LLGLDisable blend(GL_BLEND);
-            gGL.setColorMask(true, true);
+            // Scoped: this is reached from the post-deferred bump pass too, where the passes
+            // after it keep alpha writes off.
+            LLGLSColorMask mask(true, true);
 
             LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
             gNormalMapGenProgram.bind();

@@ -26,11 +26,11 @@
 
 #include "../core/alscriptnameindex.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <map>
 
-namespace tut
+namespace
 {
     struct alscriptnameindex_data
     {
@@ -42,56 +42,78 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptnameindex_data> alscriptnameindex_group;
-    typedef alscriptnameindex_group::object    alscriptnameindex_object;
-    alscriptnameindex_group                    alscriptnameindex_instance("alscriptnameindex");
-
-    template<> template<>
-    void alscriptnameindex_object::test<1>()
+    TEST_CASE_METHOD(alscriptnameindex_data, "alscriptnameindex: once built an item's changes move what its names give and the generation", "[alscriptnameindex]")
     {
-        set_test_name("built once; an item renamed, added, taken away or moved out of reach changes what its names give, and the generation with it");
         ALScriptNameIndex index;
-        ensure("not built, nothing given", !index.built() && index.named("lib").empty());
+        {
+            INFO("not built, nothing given");
+            CHECK_FALSE(index.built());
+            REQUIRE(index.named("lib").empty());
+        }
         index.changed(id(1), std::string("lib"));
-        ensure("nothing kept before it is built", index.named("lib").empty());
+        UNSCOPED_INFO("nothing kept before it is built");
+        REQUIRE(index.named("lib").empty());
 
         index.build({ { id(1), "lib" }, { id(2), "lib" }, { id(3), "door" } });
-        ensure("two of a name, in order", index.named("lib") == std::vector<LLUUID>({ id(1), id(2) }) && index.size() == 3);
+        {
+            INFO("two of a name, in order");
+            CHECK(index.named("lib") == std::vector<LLUUID>({ id(1), id(2) }));
+            REQUIRE(index.size() == 3);
+        }
         U32 generation = index.generation();
 
         index.changed(id(3), std::string("door"));
-        ensure("the same said again: nothing moves", index.generation() == generation);
+        UNSCOPED_INFO("the same said again: nothing moves");
+        CHECK(index.generation() == generation);
         index.changed(id(9), std::nullopt);
-        ensure("an item never listed gone: nothing moves", index.generation() == generation);
+        UNSCOPED_INFO("an item never listed gone: nothing moves");
+        CHECK(index.generation() == generation);
 
         index.changed(id(2), std::string("util"));
-        ensure("renamed: under its new name only", index.named("lib") == std::vector<LLUUID>({ id(1) }) && index.named("util") == std::vector<LLUUID>({ id(2) }));
-        ensure("and the generation moved", index.generation() != generation);
+        {
+            INFO("renamed: under its new name only");
+            CHECK(index.named("lib") == std::vector<LLUUID>({ id(1) }));
+            CHECK(index.named("util") == std::vector<LLUUID>({ id(2) }));
+        }
+        UNSCOPED_INFO("and the generation moved");
+        CHECK(index.generation() != generation);
         generation = index.generation();
 
         index.changed(id(4), std::string("lib"));
-        ensure("added, after the rest", index.named("lib") == std::vector<LLUUID>({ id(1), id(4) }));
+        UNSCOPED_INFO("added, after the rest");
+        CHECK(index.named("lib") == std::vector<LLUUID>({ id(1), id(4) }));
         index.changed(id(1), std::nullopt);
-        ensure("taken away, or into the trash", index.named("lib") == std::vector<LLUUID>({ id(4) }) && index.size() == 3);
+        {
+            INFO("taken away, or into the trash");
+            CHECK(index.named("lib") == std::vector<LLUUID>({ id(4) }));
+            REQUIRE(index.size() == 3);
+        }
         index.changed(id(3), std::nullopt);
-        ensure("a name with nothing left gives nothing", index.named("door").empty());
+        UNSCOPED_INFO("a name with nothing left gives nothing");
+        REQUIRE(index.named("door").empty());
 
         generation = index.generation();
         index.forget();
-        ensure("forgotten: built again at the next question", !index.built() && index.generation() != generation);
+        {
+            INFO("forgotten: built again at the next question");
+            CHECK_FALSE(index.built());
+            CHECK(index.generation() != generation);
+        }
     }
 
-    template<> template<>
-    void alscriptnameindex_object::test<2>()
+    TEST_CASE_METHOD(alscriptnameindex_data, "alscriptnameindex: forEach visits every listed item once with its current name", "[alscriptnameindex]")
     {
-        set_test_name("every item listed is visited once with its name, as it is now");
         ALScriptNameIndex index;
         index.build({ { id(1), "lib" }, { id(2), "lib" }, { id(3), "door" } });
         index.changed(id(2), std::string("util"));
         index.changed(id(3), std::nullopt);
         std::map<LLUUID, std::string> seen;
-        index.forEach([&seen](const LLUUID& item, const std::string& name) { ensure("once each", seen.emplace(item, name).second); });
-        ensure_equals("what is listed", seen.size(), size_t(2));
-        ensure("by its name now", seen[id(1)] == "lib" && seen[id(2)] == "util");
+        index.forEach([&seen](const LLUUID& item, const std::string& name) { UNSCOPED_INFO("once each"); REQUIRE(seen.emplace(item, name).second); });
+        REQUIRE(seen.size() == size_t(2));
+        {
+            INFO("by its name now");
+            CHECK(seen[id(1)] == "lib");
+            CHECK(seen[id(2)] == "util");
+        }
     }
 }

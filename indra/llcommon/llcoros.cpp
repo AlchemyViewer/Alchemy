@@ -50,6 +50,16 @@
 #undef UNDO_BOOST_DISABLE_ASSERTS
 #undef BOOST_DISABLE_ASSERTS
 #endif
+// Boost.Context tells a sanitizer of its fiber switches only when built for
+// ucontext, and ignores BOOST_USE_ASAN and BOOST_USE_TSAN otherwise. The
+// sanitizer triplets build it so; ports from any other would leave every
+// switch unreported, and the sanitizer misreading the fibers' stacks.
+#if (defined(BOOST_USE_ASAN) || defined(BOOST_USE_TSAN)) && !defined(BOOST_USE_UCONTEXT)
+#error "A sanitized build needs Boost.Context built for ucontext: see indra/cmake/triplets/alchemy-sanitizer.cmake"
+#endif
+#if defined(BOOST_USE_TSAN)
+#include <sanitizer/tsan_interface.h>
+#endif
 // other Linden headers
 #include "llapp.h"
 #include "lltimer.h"
@@ -65,12 +75,18 @@
 // static
 bool LLCoros::on_main_coro()
 {
-    if (!LLCoros::instanceExists() || LLCoros::getName().empty())
+    // Every LLMutex::lock() asks this in assert builds, so it takes no lock. getName()
+    // would: get_CoroData()'s wasDeleted() locks this singleton's slot, which put every
+    // thread's every mutex behind one lock. instanceExists() is lock-free, and false
+    // after deletion as well as before construction. A launched coroutine always has
+    // mCurrent set, with a non-empty name; a thread's main coroutine never does.
+    if (!LLCoros::instanceExists())
     {
         return true;
     }
 
-    return false;
+    const CoroData* current = instance().mCurrent.get();
+    return !current || current->mName.empty();
 }
 
 // static
@@ -383,6 +399,13 @@ void LLCoros::toplevel(std::string name, callable_t callable)
     CoroData corodata(name);
     // set it as current
     mCurrent.reset(&corodata);
+#if defined(BOOST_USE_TSAN)
+    // ThreadSanitizer names the coroutine a race was on, as it names a
+    // thread. Boost.Context gives each coroutine a fiber of TSan's own, and
+    // the one current here is this coroutine's; without BOOST_USE_TSAN it
+    // would be the thread's, which this would rename.
+    __tsan_set_fiber_name(__tsan_get_current_fiber(), name.c_str());
+#endif
 
 #ifdef LL_WINDOWS
     // can not use __try directly, toplevel requires unwinding, thus use of a wrapper

@@ -38,6 +38,7 @@
 #include "llquaternion.h"
 #include "lloctree.h"
 #include "llviewercamera.h"
+#include "alquerypool.h"
 
 class LLViewerRegion;
 class LLViewerOctreeEntryData;
@@ -297,13 +298,21 @@ public:
 
     void setOcclusionState(U32 state, S32 mode = STATE_MODE_SINGLE);
     void clearOcclusionState(U32 state, S32 mode = STATE_MODE_SINGLE);
-    void checkOcclusion(); //read back last occlusion query (if any)
+    /// Reads back the last occlusion query, if any has come back. True where one has and found the group in view.
+    bool checkOcclusion();
     void doOcclusion(LLCamera* camera, const LLVector4a* shift = NULL); //issue occlusion query
     bool isOcclusionState(U32 state) const { return mOcclusionState[LLViewerCamera::sCurCameraID] & state; }
     U32  getOcclusionState() const { return mOcclusionState[LLViewerCamera::sCurCameraID];}
 
     bool needsUpdate();
     U32  getLastOcclusionIssuedTime();
+    /// Whether the current camera has no query of the group out, and asked its last a partition's update period ago or
+    /// more: for a cull that runs too seldom to meet needsUpdate().
+    bool isOcclusionRetestDue();
+
+    /// Lets go of what `camera`'s queries have found so far, as when the view they were asked of has turned: a group
+    /// asked before now is taken as seen, its query out forgotten, when the camera next checks it.
+    static void forgetOcclusion(U32 camera);
 
     //virtual
     void handleChildAddition(const OctreeNode* parent, OctreeNode* child);
@@ -312,14 +321,12 @@ public:
     bool isRecentlyVisible() const;
     bool isAnyRecentlyVisible() const;
 
-    static U32 getNewOcclusionQueryObjectName();
-    static void releaseOcclusionQueryObjectName(U32 name);
-
-protected:
-    void releaseOcclusionQueryObjectNames();
-
 private:
     bool earlyFail(LLCamera* camera, const LLVector4a* bounds);
+    /// What this group's queries count, for its partition.
+    ALQueryKind queryKind() const;
+    /// Discards the pending queries of the groups below this one that its occlusion hid, as it is found visible.
+    void discardStaleQueriesBelow();
 
 protected:
     U32         mOcclusionState[LLViewerCamera::NUM_CAMERAS];
@@ -328,11 +335,10 @@ protected:
     S32         mLODHash;
 
     LLViewerOctreePartition* mSpatialPartition;
-    U32                      mOcclusionQuery[LLViewerCamera::NUM_CAMERAS];
-    U32                      mOcclusionCheckCount[LLViewerCamera::NUM_CAMERAS];
+    ALQueryTicket            mOcclusionQuery[LLViewerCamera::NUM_CAMERAS]; ///< from gGL's pool, while QUERY_PENDING
 
-public:
-    static std::set<U32> sPendingQueries;
+private:
+    static U32 sOcclusionForgotten[LLViewerCamera::NUM_CAMERAS]; ///< the frame of each camera's forgetOcclusion()
 };
 
 class LLViewerOctreePartition
@@ -363,7 +369,10 @@ class LLViewerOctreeCull : public OctreeTraveler
 {
 public:
     LLViewerOctreeCull(LLCamera* camera)
-        : mCamera(camera), mRes(0) { }
+        : mCamera(camera), mRes(0), mNearFirst(!camera->getOrigin().isExactlyZero())
+    {
+        mEye.load3(camera->getOrigin().mV);
+    }
 
     virtual void traverse(const OctreeNode* n);
 
@@ -401,7 +410,13 @@ protected:
 
 protected:
     LLCamera *mCamera;
+    // The camera in the octree's own space, which traverse() visits children nearest to first while mNearFirst holds:
+    // the groups it hands on then come roughly front to back, and the depth test rejects what nearer ones hide. Off for
+    // a camera at the origin, which the sun's shadow cameras are placed at, and for culls whose results are not drawn
+    // in the order they are found; those keep the children's own order.
+    LLVector4a mEye;
     S32 mRes;
+    bool mNearFirst;
 };
 
 //scan the octree, output the info of each node for debug use.

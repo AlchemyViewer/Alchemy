@@ -91,6 +91,7 @@ public:
     F64 sendStopTimestamp() const { return mSendStopTimestamp; }
 
     using LLMotion::addJointState;
+    using LLMotion::mJointSignature;
 
     // Creates a joint state on `joint` with `usage`, adds it to the motion, and
     // returns it so the test can set its transform.

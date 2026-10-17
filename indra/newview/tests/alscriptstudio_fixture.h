@@ -56,6 +56,8 @@
 #include "llxmlnode.h"
 
 #include "../../llui/tests/alheadlessui_fixture.h"
+#include "alscriptstudio_stubs.h"
+#include "newview_test_fakes.h"
 
 #include <filesystem>
 #include <functional>
@@ -63,16 +65,6 @@
 #include <optional>
 #include <string>
 #include <vector>
-
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it. One test binary
-// includes this once.
-class LLAvatarName;
-const std::string gStudioTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gStudioTestAnonName;
-}
 
 namespace al_studio_test
 {
@@ -470,6 +462,7 @@ namespace al_studio_test
             unit(services, given ? *given : tabs, *this)
         {
             std::filesystem::create_directories(fsyspath(folder));
+            newview_test::useRecoveryWriter();
             store = std::make_unique<ALRecoveryStore>(folder, "this-session");
             ALRecovery::useStore(store.get());
         }

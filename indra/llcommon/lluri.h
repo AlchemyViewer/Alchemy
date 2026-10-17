@@ -187,7 +187,7 @@ private:
     std::string mEscapedQuery;
 };
 
-// this operator required for tut
-LL_COMMON_API bool operator!=(const LLURI& first, const LLURI& second);
+// Two URIs are equal when their strings are.
+LL_COMMON_API bool operator==(const LLURI& first, const LLURI& second);
 
 #endif // LL_LLURI_H

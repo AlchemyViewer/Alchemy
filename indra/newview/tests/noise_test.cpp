@@ -14,13 +14,14 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
 #include "../noise.h"
 
 #include <cstdlib>
 
-namespace tut
+namespace
 {
     // Every expected value below was read off the tables as MSVC's CRT built them from
     // srand(42) / rand(), which is what every Windows viewer has textured terrain from. A
@@ -35,29 +36,24 @@ namespace tut
         }
     };
 
-    typedef test_group<noise_data> noise_group;
-    typedef noise_group::object    noise_object;
-    tut::noise_group ng("noise");
-
     // The generator is MSVC's rand(). Where that CRT is the one linked, it is the reference.
-    template<> template<>
-    void noise_object::test<1>()
+    TEST_CASE_METHOD(noise_data, "noise: ALNoiseRand draws what MSVC's rand() draws", "[noise]")
     {
 #ifdef _MSC_VER
         srand(42);
         ALNoiseRand rand(42);
         for (int i = 0; i < 65536; ++i)
         {
-            ensure_equals("draw agrees with the CRT", rand.next(), ::rand());
+            CAPTURE(i);
+            REQUIRE(rand.next() == ::rand());
         }
 #else
-        skip("the CRT here is not the reference generator");
+        SKIP("the CRT here is not the reference generator");
 #endif
     }
 
     // The same draws, written down, for the platforms whose CRT is not the reference.
-    template<> template<>
-    void noise_object::test<2>()
+    TEST_CASE_METHOD(noise_data, "noise: ALNoiseRand draws MSVC's first sixteen values from seed 42", "[noise]")
     {
         static const S32 expected[16] = {
             175, 400, 17869, 30056, 16083, 12879, 8016, 7644,
@@ -66,13 +62,13 @@ namespace tut
         ALNoiseRand rand(42);
         for (int i = 0; i < 16; ++i)
         {
-            ensure_equals("draw", rand.next(), expected[i]);
+            CAPTURE(i);
+            REQUIRE(rand.next() == expected[i]);
         }
     }
 
     // The permutation table: its head, its whole (as a weighted sum), and its wrap.
-    template<> template<>
-    void noise_object::test<3>()
+    TEST_CASE_METHOD(noise_data, "noise: the permutation table's head and weighted sum match and it wraps", "[noise]")
     {
         static const S32 head[32] = {
             204, 117, 7, 120, 49, 222, 28, 96, 237, 17, 30, 184, 85, 140, 181, 18,
@@ -80,22 +76,24 @@ namespace tut
         };
         for (int i = 0; i < 32; ++i)
         {
-            ensure_equals("p head", p[i], head[i]);
+            CAPTURE(i);
+            REQUIRE(p[i] == head[i]);
         }
         long long sum = 0;
         for (int i = 0; i < 256; ++i)
         {
             sum += (long long)p[i] * (i + 1);
         }
-        ensure_equals("p weighted sum", sum, 4318278LL);
-        ensure_equals("p wraps at 256", p[257], 117);
-        ensure_equals("p wraps at 512", p[513], 117);
+        CHECK(sum == 4318278LL);
+        UNSCOPED_INFO("p wraps at 256");
+        CHECK(p[257] == 117);
+        UNSCOPED_INFO("p wraps at 512");
+        CHECK(p[513] == 117);
     }
 
     // The gradient tables. g1 holds multiples of 1/256 and compares exactly; g2 and g3 are
     // normalised, so they get the tolerance a float sqrt needs and no more.
-    template<> template<>
-    void noise_object::test<4>()
+    TEST_CASE_METHOD(noise_data, "noise: the gradient tables match MSVC's in their heads", "[noise]")
     {
         static const F32 g1_head[8] = {
             -0.31640625f, 0.3125f, -0.37890625f, -0.94140625f,
@@ -103,7 +101,8 @@ namespace tut
         };
         for (int i = 0; i < 8; ++i)
         {
-            ensure_equals("g1 head", g1[i], g1_head[i]);
+            CAPTURE(i);
+            REQUIRE(g1[i] == g1_head[i]);
         }
 
         static const F32 g2_head[4][2] = {
@@ -114,8 +113,9 @@ namespace tut
         };
         for (int i = 0; i < 4; ++i)
         {
-            ensure_approximately_equals("g2 head x", g2[i][0], g2_head[i][0], 20);
-            ensure_approximately_equals("g2 head y", g2[i][1], g2_head[i][1], 20);
+            CAPTURE(i);
+            REQUIRE_THAT(g2[i][0], ll_test::WithinBits(g2_head[i][0], 20));
+            REQUIRE_THAT(g2[i][1], ll_test::WithinBits(g2_head[i][1], 20));
         }
 
         static const F32 g3_head[4][3] = {
@@ -126,9 +126,10 @@ namespace tut
         };
         for (int i = 0; i < 4; ++i)
         {
-            ensure_approximately_equals("g3 head x", g3[i][0], g3_head[i][0], 20);
-            ensure_approximately_equals("g3 head y", g3[i][1], g3_head[i][1], 20);
-            ensure_approximately_equals("g3 head z", g3[i][2], g3_head[i][2], 20);
+            CAPTURE(i);
+            REQUIRE_THAT(g3[i][0], ll_test::WithinBits(g3_head[i][0], 20));
+            REQUIRE_THAT(g3[i][1], ll_test::WithinBits(g3_head[i][1], 20));
+            REQUIRE_THAT(g3[i][2], ll_test::WithinBits(g3_head[i][2], 20));
         }
     }
 }

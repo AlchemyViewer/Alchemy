@@ -60,7 +60,11 @@ in vec2 normal_texcoord;
 in vec2 metallic_roughness_texcoord;
 in vec2 emissive_texcoord;
 
+// Only the alpha-mask pass's program can discard. A program that may discard writes depth after it shades, so the
+// opaque pass's depth test and write would otherwise wait on the shading of every fragment.
+#ifdef HAS_ALPHA_MASK
 uniform float minimum_alpha; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
+#endif
 
 vec3 linear_to_srgb(vec3 c);
 
@@ -82,10 +86,12 @@ void main()
 
     basecolor *= vertex_color;
 
+#ifdef HAS_ALPHA_MASK
     if (basecolor.a < minimum_alpha)
     {
         discard;
     }
+#endif
 
     vec3 col = basecolor.rgb;
 

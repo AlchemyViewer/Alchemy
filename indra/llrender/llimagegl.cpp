@@ -35,13 +35,13 @@
 #include "llimagegl.h"
 
 #include "llerror.h"
-#include "llfasttimer.h"
 #include "llimage.h"
 
 #include "llmath.h"
 #include "llgl.h"
 #include "llglslshader.h"
 #include "llrender.h"
+#include "llrendertarget.h"
 #include "llwindow.h"
 #include "llframetimer.h"
 #include <atomic>
@@ -372,6 +372,77 @@ void LLImageGL::cleanupClass()
 }
 
 
+namespace
+{
+    // An integer internal format's pixel format and sign; a pixel format of 0 for any other format. isIntegerFormat,
+    // isSignedIntegerFormat and integerPixelFormat all answer from it, so the three cannot disagree.
+    struct IntegerFormatInfo
+    {
+        U32  mPixelFormat = 0;
+        bool mSigned      = false;
+    };
+
+    IntegerFormatInfo integer_format_info(S32 internal_format)
+    {
+        switch (internal_format)
+        {
+        case GL_R8I:
+        case GL_R16I:
+        case GL_R32I:
+            return { GL_RED_INTEGER, true };
+        case GL_R8UI:
+        case GL_R16UI:
+        case GL_R32UI:
+            return { GL_RED_INTEGER, false };
+        case GL_RG8I:
+        case GL_RG16I:
+        case GL_RG32I:
+            return { GL_RG_INTEGER, true };
+        case GL_RG8UI:
+        case GL_RG16UI:
+        case GL_RG32UI:
+            return { GL_RG_INTEGER, false };
+        case GL_RGB8I:
+        case GL_RGB16I:
+        case GL_RGB32I:
+            return { GL_RGB_INTEGER, true };
+        case GL_RGB8UI:
+        case GL_RGB16UI:
+        case GL_RGB32UI:
+            return { GL_RGB_INTEGER, false };
+        case GL_RGBA8I:
+        case GL_RGBA16I:
+        case GL_RGBA32I:
+            return { GL_RGBA_INTEGER, true };
+        case GL_RGBA8UI:
+        case GL_RGBA16UI:
+        case GL_RGBA32UI:
+        case GL_RGB10_A2UI:
+            return { GL_RGBA_INTEGER, false };
+        default:
+            return {};
+        }
+    }
+}
+
+//static
+bool LLImageGL::isIntegerFormat(S32 internal_format)
+{
+    return integer_format_info(internal_format).mPixelFormat != 0;
+}
+
+//static
+bool LLImageGL::isSignedIntegerFormat(S32 internal_format)
+{
+    return integer_format_info(internal_format).mSigned;
+}
+
+//static
+U32 LLImageGL::integerPixelFormat(S32 internal_format)
+{
+    return integer_format_info(internal_format).mPixelFormat;
+}
+
 // Whether an internal format is *sized*, i.e. legal for glTexStorage2D. Unsized
 // formats (GL_RGBA, GL_RGB, GL_RED, the legacy GL_LUMINANCE family, generic
 // GL_COMPRESSED_*) let the driver choose the actual storage, which immutable
@@ -418,7 +489,8 @@ static bool isSizedInternalFormat(S32 intformat)
     case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:
         return true;
     default:
-        return false;
+        // Every integer format is sized.
+        return LLImageGL::isIntegerFormat(intformat);
     }
 }
 
@@ -521,6 +593,31 @@ S32 LLImageGL::dataFormatBits(S32 dataformat)
     case GL_RG32F:                                  return 64;
     case GL_RGB32F:                                 return 96;
     case GL_RGBA32F:                                return 128;
+    case GL_R8I:                                    return 8;
+    case GL_R8UI:                                   return 8;
+    case GL_R16I:                                   return 16;
+    case GL_R16UI:                                  return 16;
+    case GL_R32I:                                   return 32;
+    case GL_R32UI:                                  return 32;
+    case GL_RG8I:                                   return 16;
+    case GL_RG8UI:                                  return 16;
+    case GL_RG16I:                                  return 32;
+    case GL_RG16UI:                                 return 32;
+    case GL_RG32I:                                  return 64;
+    case GL_RG32UI:                                 return 64;
+    case GL_RGB8I:                                  return 24;
+    case GL_RGB8UI:                                 return 24;
+    case GL_RGB16I:                                 return 48;
+    case GL_RGB16UI:                                return 48;
+    case GL_RGB32I:                                 return 96;
+    case GL_RGB32UI:                                return 96;
+    case GL_RGBA8I:                                 return 32;
+    case GL_RGBA8UI:                                return 32;
+    case GL_RGBA16I:                                return 64;
+    case GL_RGBA16UI:                               return 64;
+    case GL_RGBA32I:                                return 128;
+    case GL_RGBA32UI:                               return 128;
+    case GL_RGB10_A2UI:                             return 32;
     default:
         LL_ERRS() << "LLImageGL::Unknown format: " << std::hex << dataformat << std::dec << LL_ENDL;
         return 0;
@@ -560,8 +657,14 @@ S32 LLImageGL::dataFormatVRAMBits(S32 dataformat)
     {
     case GL_RGB8:                   return 32;  // padded to RGBX
     case GL_SRGB8:                  return 32;  // padded, as GL_RGB8
+    case GL_RGB8I:                  return 32;  // padded, as GL_RGB8
+    case GL_RGB8UI:                 return 32;  // padded, as GL_RGB8
     case GL_RGB16F:                 return 64;  // padded to RGBA16F
+    case GL_RGB16I:                 return 64;  // padded, as GL_RGB16F
+    case GL_RGB16UI:                return 64;  // padded, as GL_RGB16F
     case GL_RGB32F:                 return 128; // padded to RGBA32F
+    case GL_RGB32I:                 return 128; // padded, as GL_RGB32F
+    case GL_RGB32UI:                return 128; // padded, as GL_RGB32F
     case GL_DEPTH_COMPONENT24:      return 32;  // padded to 32-bit
     default:                        return dataFormatBits(dataformat);
     }
@@ -611,6 +714,12 @@ S32 LLImageGL::dataFormatComponents(S32 dataformat)
       case GL_RGBA:                             return 4;
       case GL_SRGB_ALPHA:                       return 4;
       case GL_BGRA:                             return 4;       // Used for QuickTime media textures on the Mac
+      case GL_RED_INTEGER:                      return 1;
+      case GL_RG_INTEGER:                       return 2;
+      case GL_RGB_INTEGER:                      return 3;
+      case GL_BGR_INTEGER:                      return 3;
+      case GL_RGBA_INTEGER:                     return 4;
+      case GL_BGRA_INTEGER:                     return 4;
       default:
         LL_ERRS() << "LLImageGL::Unknown format: " << std::hex << dataformat << std::dec << LL_ENDL;
         return 0;
@@ -771,6 +880,7 @@ void LLImageGL::init(bool usemipmaps)
     mHasExplicitFormat = false;
 
     mIsMask = false;
+    mMaxAlpha = 255;
     mNeedsAlphaAndPickMask = true ;
     mAlphaAnalysisSerial = 0;
     mAlphaStride = 0 ;
@@ -944,6 +1054,13 @@ void LLImageGL::setExplicitFormat( LLGLint internal_format, LLGLenum primary_for
     else
         mFormatType = type_format;
     mFormatSwapBytes = swap_bytes;
+
+    // GL neither builds nor filters an integer texture's mips, and the box filter setImage builds them with by hand
+    // would average the bits of its values: an integer texture holds level 0 alone.
+    if (isIntegerFormat(internal_format))
+    {
+        mUseMipMaps = false;
+    }
 
     // Order matters: alpha-stride/offset depends on the deprecated format
     // names (LUMINANCE_ALPHA → stride 2, etc.). Compute that first, then
@@ -2252,16 +2369,23 @@ void LLImageGL::setPickMask(U8* mask, U16 width, U16 height)
     mPickMaskHeight = height;
 }
 
-void LLImageGL::setIsMask(bool is_mask)
+void LLImageGL::setAlphaAnalysis(const AlphaAnalysis& analysis)
 {
     if (stagesAlpha())
     {
-        mPendingAlpha.mIsMask    = is_mask;
-        mPendingAlpha.mHasIsMask = true;
+        mPendingAlpha.mAnalysis    = analysis;
+        mPendingAlpha.mHasAnalysis = true;
         return;
     }
 
-    mIsMask = is_mask;
+    mIsMask = analysis.mIsMask;
+    mMaxAlpha = analysis.mMaxAlpha;
+}
+
+void LLImageGL::clearAlphaAnalysis()
+{
+    mIsMask = false;
+    mMaxAlpha = 255;
 }
 
 void LLImageGL::publishPendingAlpha()
@@ -2274,9 +2398,10 @@ void LLImageGL::publishPendingAlpha()
         mPickMaskHeight = mPendingAlpha.mPickMaskHeight;
         mPendingAlpha.mPickMask = nullptr;
     }
-    if (mPendingAlpha.mHasIsMask)
+    if (mPendingAlpha.mHasAnalysis)
     {
-        mIsMask = mPendingAlpha.mIsMask;
+        mIsMask = mPendingAlpha.mAnalysis.mIsMask;
+        mMaxAlpha = mPendingAlpha.mAnalysis.mMaxAlpha;
     }
     mPendingAlpha = PendingAlpha();
 }
@@ -2392,6 +2517,15 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     }
     else
     {
+        // An LLImageRaw holds a byte a component. A wider texel -- R32UI's, a float format's -- would not fit, and GL
+        // would write past the end of it.
+        if (!isCompressed() && pixel_bytes(mFormatPrimary, mFormatType) != (U32)ncomponents)
+        {
+            LL_WARNS() << "readBackRaw: a texel of format 0x" << std::hex << mFormatPrimary << " type 0x" << mFormatType
+                       << std::dec << " is wider than an image's " << ncomponents << " bytes" << LL_ENDL;
+            return false;
+        }
+
         if(!imageraw->allocateDataSize(width, height, ncomponents))
         {
             constexpr F32 MAX_IMAGE_SIZE = 2048 * 2048;
@@ -2535,7 +2669,7 @@ S64 LLImageGL::getBytes(S32 discard_level) const
     S32 h = mHeight>>discard_level;
     if (w == 0) w = 1;
     if (h == 0) h = 1;
-    return dataFormatBytes(mFormatPrimary, w, h);
+    return levelBytes(w, h);
 }
 
 S64 LLImageGL::getMipBytes(S32 discard_level) const
@@ -2549,17 +2683,27 @@ S64 LLImageGL::getMipBytes(S32 discard_level) const
     }
     S32 w = mWidth>>discard_level;
     S32 h = mHeight>>discard_level;
-    S64 res = dataFormatBytes(mFormatPrimary, w, h);
+    S64 res = levelBytes(w, h);
     if (mUseMipMaps)
     {
         while (w > 1 && h > 1)
         {
             w >>= 1; if (w == 0) w = 1;
             h >>= 1; if (h == 0) h = 1;
-            res += dataFormatBytes(mFormatPrimary, w, h);
+            res += levelBytes(w, h);
         }
     }
     return res;
+}
+
+S64 LLImageGL::levelBytes(S32 width, S32 height) const
+{
+    if (!isIntegerFormat(mFormatInternal))
+    {
+        return dataFormatBytes(mFormatPrimary, width, height);
+    }
+    const S64 bytes = (S64)width * (S64)height * (S64)pixel_bytes(mFormatPrimary, mFormatType);
+    return (bytes + 3) & ~3;
 }
 
 bool LLImageGL::isJustBound() const
@@ -2598,7 +2742,7 @@ void LLImageGL::setNeedsAlphaAndPickMask(bool need_mask)
         else //do not need alpha mask
         {
             mAlphaOffset = INVALID_OFFSET ;
-            mIsMask = false;
+            clearAlphaAnalysis();
 
             // Invalidate pending jobs
             ++mAlphaAnalysisSerial;
@@ -2627,8 +2771,18 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
     case GL_RGB:
     case GL_SRGB:
         mNeedsAlphaAndPickMask = false;
-        mIsMask = false;
+        clearAlphaAnalysis();
         return; //no alpha channel.
+    case GL_RED_INTEGER:
+    case GL_RG_INTEGER:
+    case GL_RGB_INTEGER:
+    case GL_BGR_INTEGER:
+    case GL_RGBA_INTEGER:
+    case GL_BGRA_INTEGER:
+        // Integers: even a fourth channel is a value, not coverage.
+        mNeedsAlphaAndPickMask = false;
+        clearAlphaAnalysis();
+        return;
     case GL_RGBA:
     case GL_SRGB_ALPHA:
         mAlphaStride = 4;
@@ -2675,7 +2829,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
         LL_WARNS() << "Cannot analyze alpha for image with format type " << std::hex << mFormatType << std::dec << LL_ENDL;
 
         mNeedsAlphaAndPickMask = false ;
-        mIsMask = false;
+        clearAlphaAnalysis();
     }
 }
 
@@ -2747,7 +2901,7 @@ void LLImageGL::resolveDeprecatedFormat()
     }
 }
 
-bool LLImageGL::analyzeAlphaData(
+LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
     const void* data_in,
     U32 w,
     U32 h,
@@ -2756,13 +2910,14 @@ bool LLImageGL::analyzeAlphaData(
 {
     if (!data_in || alpha_stride < 1)
     {
-        return false;
+        return AlphaAnalysis();
     }
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
     U32 length = w * h;
     U32 alphatotal = 0;
+    U32 max_alpha = 0;
 
     U32 sample[16];
     memset(sample, 0, sizeof(U32) * 16);
@@ -2807,12 +2962,32 @@ bool LLImageGL::analyzeAlphaData(
                 const U32 asum = (s1 + s2 + s3 + s4);
                 alphatotal += asum;
                 sample[asum / (16 * 4)] += 4;
+
+                max_alpha = llmax(max_alpha, llmax(llmax(s1, s2), llmax(s3, s4)));
             }
 
             rowstart += 2 * w * alpha_stride;
         }
         // Two histogram entries per source texel over the paired region.
         length = 2 * paired_w * paired_h;
+
+        // The trailing odd row and column are left out of the histogram, but one of their texels may be the only
+        // one with any alpha.
+        const GLubyte* alpha = ((const GLubyte*)data_in) + alpha_offset;
+        if (paired_w < w)
+        {
+            for (U32 y = 0; y < h; ++y)
+            {
+                max_alpha = llmax(max_alpha, (U32)alpha[((size_t)y * w + paired_w) * alpha_stride]);
+            }
+        }
+        if (paired_h < h)
+        {
+            for (U32 x = 0; x < w; ++x)
+            {
+                max_alpha = llmax(max_alpha, (U32)alpha[((size_t)paired_h * w + x) * alpha_stride]);
+            }
+        }
     }
     else
     {
@@ -2822,6 +2997,7 @@ bool LLImageGL::analyzeAlphaData(
             const U32 s1 = *current;
             alphatotal += s1;
             ++sample[s1 / 16];
+            max_alpha = llmax(max_alpha, s1);
             current += alpha_stride;
         }
     }
@@ -2849,16 +3025,19 @@ bool LLImageGL::analyzeAlphaData(
         upperhalftotal += sample[i];
     }
 
+    AlphaAnalysis analysis;
+    analysis.mMaxAlpha = (U8)max_alpha;
     if (midrangetotal > length / 48 ||
         (lowerhalftotal == length && alphatotal != 0) ||
         (upperhalftotal == length && alphatotal != 255 * length))
     {
-        return false; // not suitable for masking
+        analysis.mIsMask = false; // not suitable for masking
     }
     else
     {
-        return true; // is a mask
+        analysis.mIsMask = true; // is a mask
     }
+    return analysis;
 }
 
 void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
@@ -2875,7 +3054,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         // but increment either way, for extra safety.
         ++mAlphaAnalysisSerial;
 
-        setIsMask(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
+        setAlphaAnalysis(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
         return;
     }
 
@@ -2893,7 +3072,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
     if (!data_copy)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-        setIsMask(analyzeAlphaData(data_in, w, h, alpha_offset, alpha_stride));
+        setAlphaAnalysis(analyzeAlphaData(data_in, w, h, alpha_offset, alpha_stride));
         return;
     }
     memcpy(data_copy, static_cast<const U8*>(data_in), data_size);
@@ -2915,20 +3094,21 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         posted_job = mainq->postTo(
             workerq,
             // Worker thread: analyze alpha
-            [data_copy, w, h, alpha_offset, alpha_stride]() -> bool
+            [data_copy, w, h, alpha_offset, alpha_stride]() -> AlphaAnalysis
         {
             LL_PROFILE_ZONE_NAMED("Deffered alpha mask analysis");
-            bool is_mask = LLImageGL::analyzeAlphaData(data_copy, w, h, alpha_offset, alpha_stride);
+            const AlphaAnalysis analysis = LLImageGL::analyzeAlphaData(data_copy, w, h, alpha_offset, alpha_stride);
             delete[] data_copy;
-            return is_mask;
+            return analysis;
         },
             // Main thread: apply result
-            [this, request_serial](bool is_mask)
+            [this, request_serial](AlphaAnalysis analysis)
         {
             // Only apply if no newer analysis has been requested
             if (mAlphaAnalysisSerial == request_serial)
             {
-                mIsMask = is_mask;
+                mIsMask = analysis.mIsMask;
+                mMaxAlpha = analysis.mMaxAlpha;
             }
             unref();
         }
@@ -2947,7 +3127,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
             ref();
 
             // Conservative default until analysis completes
-            mIsMask = false;
+            clearAlphaAnalysis();
         }
     }
     if (!posted_job)
@@ -2955,7 +3135,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
         // Queues not available - fall back to synchronous analysis
         delete[] data_copy;
-        setIsMask(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
+        setAlphaAnalysis(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
     }
 }
 
@@ -3195,6 +3375,9 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         || isCompressed()        // neither path can work on block-compressed data:
                                  // the FBO path cannot render into it and the PBO path
                                  // cannot re-upload it as loose pixels
+        || isIntegerFormat(mFormatInternal) // nor on integers: the FBO path filters, which
+                                            // GL does not do to them, and the PBO path reads
+                                            // a mip level GL never built
         )
     {
         return false;
@@ -3221,6 +3404,24 @@ bool LLImageGL::scaleDown(S32 desired_discard)
     S32 desired_width = getWidth(desired_discard);
     S32 desired_height = getHeight(desired_discard);
 
+    // A deprecated source format is held under a swizzle, and the FBO path cannot carry
+    // one: it samples the old texture THROUGH the swizzle and copies the result back by
+    // position, so luminance-alpha's alpha comes back as luminance and alpha-only loses
+    // its alpha entirely. The PBO path copies the stored channels as they are.
+    //
+    // The FBO path also draws into the target the caller bound -- the texture list's
+    // 1024x1024 scratch -- and copies back out of it, so a result larger than that target
+    // copies undefined pixels from outside the framebuffer. Such a texture takes the PBO
+    // path, which reads the level out of the texture's own mip chain; without one there
+    // is nothing it can read, however it came to that path, so the downscale is refused.
+    const bool fits_target = desired_width <= (S32)LLRenderTarget::sCurResX
+                          && desired_height <= (S32)LLRenderTarget::sCurResY;
+    const bool use_fbo = gGLManager.mDownScaleMethod == 0 && mDeprecatedSourceFormat == 0 && fits_target;
+    if (!use_fbo && !mHasMipMaps)
+    {
+        return false;
+    }
+
     // Downscale into a NEW texture object rather than reallocating this one in place.
     // glTexImage2D on the live name is illegal once the texture has immutable storage
     // (GL_INVALID_OPERATION, silently leaving it at the old size), and it has no D3D11
@@ -3234,12 +3435,6 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         LL_WARNS_ONCE("LLImageGL") << "Failed to allocate a texture name for downscaling." << LL_ENDL;
         return false;
     }
-
-    // A deprecated source format is held under a swizzle, and the FBO path cannot carry
-    // one: it samples the old texture THROUGH the swizzle and copies the result back by
-    // position, so luminance-alpha's alpha comes back as luminance and alpha-only loses
-    // its alpha entirely. The PBO path copies the stored channels as they are.
-    const bool use_fbo = gGLManager.mDownScaleMethod == 0 && mDeprecatedSourceFormat == 0;
 
     if (use_fbo)
     { // use an FBO to downscale the texture
@@ -3283,7 +3478,10 @@ bool LLImageGL::scaleDown(S32 desired_discard)
     else
     { // use a PBO to downscale the texture
         U64 size = getBytes(desired_discard);
-        llassert(size <= 2048 * 2048 * 4); // we shouldn't be using this method to downscale huge textures, but it'll work
+        // At most a level below the largest texture the viewer keeps (a larger one is set
+        // missing on load), at four bytes a texel. The scratch buffer grows to whatever it is
+        // asked for; this bounds how far.
+        llassert(size <= (U64)(MAX_IMAGE_SIZE / 2) * (MAX_IMAGE_SIZE / 2) * 4);
         gGL.getTextureSlot(0)->bind(this, false, true);
 
         if (sScratchPBO == 0)
@@ -3357,6 +3555,11 @@ LLImageGLThread::LLImageGLThread(LLWindow* window)
 
     mContext = mWindow->createSharedContext();
     LL::ThreadPool::start();
+}
+
+LLImageGLThread::~LLImageGLThread()
+{
+    close();
 }
 
 void LLImageGLThread::run()

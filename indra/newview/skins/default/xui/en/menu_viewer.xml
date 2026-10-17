@@ -1829,15 +1829,174 @@ function="World.EnvPreset"
                      function="ToggleControl"
                      parameter="RenderHighlightSelections" />
                 </menu_item_check>
-                <menu_item_check			
-                 shortcut="alt|control|shift|h"
-                 label="Show Hidden Selection"
-                 name="Show Hidden Selection">
+                <menu_item_check
+                 label="Show Selection Wireframe"
+                 name="Show Selection Wireframe">
                     <menu_item_check.on_check
-                     control="RenderHiddenSelections" />
+                     control="AlchemySelectionWireframe" />
                     <menu_item_check.on_click
-                     function="Tools.ShowHiddenSelection" />
+                     function="ToggleControl"
+                     parameter="AlchemySelectionWireframe" />
                 </menu_item_check>
+                <menu
+                 create_jump_keys="true"
+                 label="Selection Outline Options"
+                 name="Selection Outline Options"
+                 tear_off="true">
+                    <menu_item_check
+                     shortcut="alt|control|shift|h"
+                     label="Show Hidden Parts"
+                     name="Show Hidden Selection">
+                        <menu_item_check.on_check
+                         control="RenderHiddenSelections" />
+                        <menu_item_check.on_click
+                         function="Tools.ShowHiddenSelection" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Outline Whole Faces (Ignore Alpha)"
+                     name="Outline Whole Faces">
+                        <menu_item_check.on_check
+                         function="Tools.CheckOutlineWholeFaces" />
+                        <menu_item_check.on_click
+                         function="ToggleControl"
+                         parameter="AlchemySelectionOutlineGeometry" />
+                        <menu_item_check.on_enable
+                         function="Tools.EnableOutlineWholeFaces" />
+                    </menu_item_check>
+                    <menu_item_separator/>
+                    <menu_item_check
+                     label="Thin Outline"
+                     name="Outline Thin">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineWidth"
+                         parameter="2" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineWidth"
+                         parameter="2" />
+                        <menu_item_check.on_enable
+                         function="CheckControl"
+                         parameter="RenderHighlightSelections" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Normal Outline"
+                     name="Outline Normal">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineWidth"
+                         parameter="3" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineWidth"
+                         parameter="3" />
+                        <menu_item_check.on_enable
+                         function="CheckControl"
+                         parameter="RenderHighlightSelections" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Thick Outline"
+                     name="Outline Thick">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineWidth"
+                         parameter="5" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineWidth"
+                         parameter="5" />
+                        <menu_item_check.on_enable
+                         function="CheckControl"
+                         parameter="RenderHighlightSelections" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Extra Thick Outline"
+                     name="Outline Extra Thick">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineWidth"
+                         parameter="8" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineWidth"
+                         parameter="8" />
+                        <menu_item_check.on_enable
+                         function="CheckControl"
+                         parameter="RenderHighlightSelections" />
+                    </menu_item_check>
+                    <menu_item_separator/>
+                    <menu_item_check
+                     label="Contrast: None"
+                     name="Outline Contrast Off">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineContrast"
+                         parameter="0" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineContrast"
+                         parameter="0" />
+                        <menu_item_check.on_enable
+                         function="Tools.EnableSelectionOutlineOptions" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Contrast: Adapt Brightness"
+                     name="Outline Contrast Shift">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineContrast"
+                         parameter="1" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineContrast"
+                         parameter="1" />
+                        <menu_item_check.on_enable
+                         function="Tools.EnableSelectionOutlineOptions" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Contrast: Dark or Light Rim"
+                     name="Outline Contrast Rim">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineContrast"
+                         parameter="2" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineContrast"
+                         parameter="2" />
+                        <menu_item_check.on_enable
+                         function="Tools.EnableSelectionOutlineOptions" />
+                    </menu_item_check>
+                    <menu_item_separator/>
+                    <menu_item_check
+                     label="Wireframe Lines: 1 px"
+                     name="Wireframe Width 1">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionWireframeWidth"
+                         parameter="1" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionWireframeWidth"
+                         parameter="1" />
+                        <menu_item_check.on_enable
+                         function="CheckControl"
+                         parameter="AlchemySelectionWireframe" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Wireframe Lines: 2 px"
+                     name="Wireframe Width 2">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionWireframeWidth"
+                         parameter="2" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionWireframeWidth"
+                         parameter="2" />
+                        <menu_item_check.on_enable
+                         function="CheckControl"
+                         parameter="AlchemySelectionWireframe" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Wireframe Lines: 3 px"
+                     name="Wireframe Width 3">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionWireframeWidth"
+                         parameter="3" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionWireframeWidth"
+                         parameter="3" />
+                        <menu_item_check.on_enable
+                         function="CheckControl"
+                         parameter="AlchemySelectionWireframe" />
+                    </menu_item_check>
+                </menu>
+
+          <menu_item_separator/>
+
                 <menu_item_check
                  label="Show Light Radius for Selection"
                  name="Show Light Radius for Selection">
@@ -4134,6 +4293,16 @@ function="World.EnvPreset"
                 <menu_item_check.on_click
                  function="Advanced.HandleAttachedLightParticles"
                  parameter="RenderAttachedParticles" />
+            </menu_item_check>
+            <menu_item_check
+             label="Hover Glow Objects"
+             name="Hover Glow Objects">
+                <menu_item_check.on_check
+                 function="CheckControl"
+                 parameter="RenderHoverGlowEnable" />
+                <menu_item_check.on_click
+                 function="ToggleControl"
+                 parameter="RenderHoverGlowEnable" />
             </menu_item_check>
             <menu_item_check
               label="Render Avatar Cloth"

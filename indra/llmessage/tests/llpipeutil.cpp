@@ -114,6 +114,8 @@ LLIOPipe::EStatus LLIOFuzz::process_impl(
     return STATUS_OK;
 }
 
+namespace
+{
 struct random_ascii_generator
 {
     random_ascii_generator() {}
@@ -125,6 +127,7 @@ struct random_ascii_generator
         return rv;
     }
 };
+}
 
 // virtual
 LLIOPipe::EStatus LLIOASCIIFuzz::process_impl(

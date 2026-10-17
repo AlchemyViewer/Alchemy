@@ -109,8 +109,14 @@ S32 lsa_heap_top(U8 *heap_start, S32 maxtop)
 
 S32 lsa_heap_add_data(U8 *buffer, LLScriptLibData *data, S32 heapsize, BOOL b_delete)
 {
+    // With b_delete the data is the heap's whatever comes of it, a fault
+    // already raised too.
     if (get_register(buffer, LREG_FR))
+    {
+        if (b_delete)
+            delete data;
         return 1;
+    }
     LLScriptAllocEntry entry, nextentry;
     S32 hr = get_register(buffer, LREG_HR);
     S32 hp = get_register(buffer, LREG_HP);
@@ -161,6 +167,17 @@ S32 lsa_heap_add_data(U8 *buffer, LLScriptLibData *data, S32 heapsize, BOOL b_de
         {
             if (entry.mSize >= size + SIZEOF_SCRIPT_ALLOC_ENTRY + 4)
             {
+                // The collision with the stack is checked before the split
+                // writes, as the walk below checks it before moving on:
+                // LL's wrote the data and the rest's new header first, over
+                // the stack the block runs under, and, with that header at
+                // the top of memory, past the buffer, then raised the same
+                // fault.
+                S32 new_hp = current_offset + size + 2*SIZEOF_SCRIPT_ALLOC_ENTRY;
+                if (new_hp >= hr + heapsize)
+                {
+                    break;
+                }
                 offset = current_offset;
                 lsa_split_block(buffer, offset, size, entry);
                 entry.mType = data->mType;
@@ -170,11 +187,6 @@ S32 lsa_heap_add_data(U8 *buffer, LLScriptLibData *data, S32 heapsize, BOOL b_de
                 alloc_entry2bytestream(buffer, offset, entry);
                 lsa_insert_data(buffer, offset, data, entry, heapsize);
                 hp = get_register(buffer, LREG_HP);
-                S32 new_hp = current_offset + size + 2*SIZEOF_SCRIPT_ALLOC_ENTRY;
-                if (new_hp >= hr + heapsize)
-                {
-                    break;
-                }
                 if (new_hp > hp)
                 {
                     set_register(buffer, LREG_HP, new_hp);
@@ -191,6 +203,14 @@ S32 lsa_heap_add_data(U8 *buffer, LLScriptLibData *data, S32 heapsize, BOOL b_de
             }
             else if (entry.mSize >= size)
             {
+                // The block is taken whole, but the last one runs under
+                // the stack: the data must stop short of it, or this is
+                // the collision too, which LL's raised only after the
+                // stack was written over.
+                if (current_offset + SIZEOF_SCRIPT_ALLOC_ENTRY + size > hr + heapsize)
+                {
+                    break;
+                }
                 entry.mType = data->mType;
                 entry.mReferenceCount = 1;
                 offset = current_offset;
@@ -978,6 +998,10 @@ S32 lsa_cmp_lists(U8 *buffer, S32 offset1, S32 offset2)
     }
     else
     {
+        // LL's own: the comparison took two references to the one list,
+        // as `l == l` pushes it twice, and lets one go, so the list is
+        // leaked on the heap until the script resets. Kept, as the grid's
+        // LSO has it.
         list1 = lsa_get_data(buffer, offset1, FALSE);
         list2 = lsa_get_data(buffer, offset2, TRUE);
     }
@@ -1008,16 +1032,24 @@ S32 lsa_cmp_lists(U8 *buffer, S32 offset1, S32 offset2)
 }
 
 
+// data's elements are taken whatever comes of it: the callers let go of
+// them after, and where the add fails they are freed here.
 S32 lsa_preadd_lists(U8 *buffer, LLScriptLibData *data, S32 offset2, S32 heapsize)
 {
     if (get_register(buffer, LREG_FR))
+    {
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
+    }
     LLScriptLibData *list2 = lsa_get_data(buffer, offset2, TRUE);
 
     if (!list2)
     {
         set_fault(buffer, LSRF_HEAP_ERROR);
         delete list2;
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
     }
 
@@ -1025,6 +1057,8 @@ S32 lsa_preadd_lists(U8 *buffer, LLScriptLibData *data, S32 offset2, S32 heapsiz
     {
         set_fault(buffer, LSRF_HEAP_ERROR);
         delete list2;
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
     }
 
@@ -1043,16 +1077,23 @@ S32 lsa_preadd_lists(U8 *buffer, LLScriptLibData *data, S32 offset2, S32 heapsiz
 }
 
 
+// As lsa_preadd_lists, data's elements are taken whatever comes of it.
 S32 lsa_postadd_lists(U8 *buffer, S32 offset1, LLScriptLibData *data, S32 heapsize)
 {
     if (get_register(buffer, LREG_FR))
+    {
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
+    }
     LLScriptLibData *list1 = lsa_get_data(buffer, offset1, TRUE);
 
     if (!list1)
     {
         set_fault(buffer, LSRF_HEAP_ERROR);
         delete list1;
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
     }
 
@@ -1060,6 +1101,8 @@ S32 lsa_postadd_lists(U8 *buffer, S32 offset1, LLScriptLibData *data, S32 heapsi
     {
         set_fault(buffer, LSRF_HEAP_ERROR);
         delete list1;
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
     }
 

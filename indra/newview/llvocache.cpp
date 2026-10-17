@@ -884,6 +884,7 @@ public:
           mPixelThreshold(pixel_threshold)
     {
         mLocalShift = shift;
+        mNearFirst = false; // the groups it finds go into a set (LLViewerRegion::addVisibleGroup)
         mUseObjectCacheOcclusion = use_object_cache_occlusion;
         mNearRadius = LLVOCacheEntry::sNearRadius;
     }
@@ -900,9 +901,19 @@ public:
                 return false;
             }
 
-            group->checkOcclusion();
+            // A query that has just come back finding the group in view makes it seen now. processGroup would
+            // otherwise take a group not seen in the last two frames for one new to the view, and query it again
+            // instead of adding it: while the camera rests this cull runs only every few frames (cull), so each
+            // answer would come back too late to count, and the group's objects would never be created.
+            if (group->checkOcclusion())
+            {
+                group->setVisible();
+            }
 
-            if (group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
+            // An occluded group is asked again on its needsUpdate() frame. While the camera rests, this cull runs only
+            // on frames that never fall on half the groups' (cull), so one whose last query is a period old is let
+            // through all the same, or it would stay hidden after whatever hid it had gone.
+            if (group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED) && !group->isOcclusionRetestDue())
             {
                 return true;
             }
@@ -1001,6 +1012,7 @@ public:
         : LLViewerOctreeCull(camera), mRegionp(regionp), mPixelThreshold(pixel_threshold), mUseObjectCacheOcclusion(use_occlusion)
     {
         mLocalShift = shift;
+        mNearFirst = false; // the groups it finds go into a set, as the front cull's do
         mSphereRadius = LLVOCacheEntry::sRearFarRadius;
     }
 

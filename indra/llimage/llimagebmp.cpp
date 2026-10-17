@@ -339,8 +339,7 @@ bool LLImageBMP::decode(LLImageRaw* raw_image, F32 decode_time)
 
     resetLastError();
 
-    LLImageDataLock lockIn(this);
-    LLImageDataLock lockOut(raw_image);
+    LLImageDataLockPair lock(this, raw_image);
 
     // Check to make sure that this instance has been initialized with data
     const U8* mdata = getData();
@@ -554,8 +553,7 @@ bool LLImageBMP::encode(const LLImageRaw* raw_image, F32 encode_time)
 
     resetLastError();
 
-    LLImageDataSharedLock lockIn(raw_image);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(raw_image, this);
 
     S32 src_components = raw_image->getComponents();
     S32 dst_components =  ( src_components < 3 ) ? 1 : 3;

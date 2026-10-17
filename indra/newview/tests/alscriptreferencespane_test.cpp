@@ -30,12 +30,13 @@
 #include "alscriptstudio_fixture.h"
 #include "lltabcontainer.h"
 #include "llbutton.h"
+#include "llclipboard.h"
 #include "llfocusmgr.h"
 #include "llscrolllistcell.h"
 #include "llscrolllistitem.h"
 #include "lltextbox.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace
 {
@@ -90,7 +91,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct alscriptreferencespane_data
     {
@@ -103,7 +104,7 @@ namespace tut
             ALScriptReferencesPane* found = window.find<ALScriptReferencesPane>("references_tab");
             if (!found)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             // In sight, its tab the one chosen, as when it is worked in.
             window.find<LLTabContainer>("bottom_tabs")->selectTabByName("references_tab");
@@ -147,43 +148,46 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptreferencespane_data> alscriptreferencespane_group;
-    typedef alscriptreferencespane_group::object    alscriptreferencespane_object;
-    alscriptreferencespane_group                    alscriptreferencespane_instance("alscriptreferencespane");
-
-    template<> template<>
-    void alscriptreferencespane_object::test<1>()
+    TEST_CASE_METHOD(alscriptreferencespane_data, "alscriptreferencespane: show lists places and marks the declaration and forget clears them", "[alscriptreferencespane]")
     {
-        set_test_name("what was found listed under what was looked up, the declaration marked; nothing, with the question it answers");
         ALScriptReferencesPane* refs = pane();
         refs->show(found());
-        ensure_equals("the head", head(), std::string("3 occurrences of count in 2 scripts."));
-        ensure("the window told", window.pane().counts == 1);
-        ensure_equals("each place", lines(), joined(Names{ "A 1:9", "A 2:5", "B 1:9" }));
+        CHECK(head() == std::string("3 occurrences of count in 2 scripts."));
+        UNSCOPED_INFO("the window told");
+        CHECK(window.pane().counts == 1);
+        CHECK(lines() == joined(Names{ "A 1:9", "A 2:5", "B 1:9" }));
         const std::vector<LLScrollListItem*> rows = refs->list()->getAllData();
-        ensure_equals("the declaration", cell(rows[0], 2), std::string("declaration"));
-        ensure_equals("in the script it is declared in only", cell(rows[2], 2), std::string());
-        ensure_equals("its text", cell(rows[1], 3), std::string("x = count;"));
-        ensure_equals("kept", refs->found().places.size(), size_t(3));
+        REQUIRE(rows.size() == size_t(3));
+        CHECK(cell(rows[0], 2) == std::string("declaration"));
+        UNSCOPED_INFO("in the script it is declared in only");
+        CHECK(cell(rows[2], 2) == std::string());
+        UNSCOPED_INFO("its text");
+        CHECK(cell(rows[1], 3) == std::string("x = count;"));
+        UNSCOPED_INFO("kept");
+        CHECK(refs->found().places.size() == size_t(3));
         Found twice = found();
         twice.places.push_back(place("", 0, 20, "integer count; count"));
         refs->show(twice);
-        ensure("on the declaration's line, not it", cell(refs->list()->getAllData()[3], 2).empty());
+        REQUIRE(refs->list()->getItemCount() == 4);
+        UNSCOPED_INFO("on the declaration's line, not it");
+        CHECK(cell(refs->list()->getAllData()[3], 2).empty());
 
         Found in_b = found();
         in_b.home  = B;
         refs->show(in_b);
-        ensure("declared in B: A's first line not it", cell(refs->list()->getAllData()[0], 2).empty());
+        REQUIRE(refs->list()->getItemCount() == 3);
+        UNSCOPED_INFO("declared in B: A's first line not it");
+        CHECK(cell(refs->list()->getAllData()[0], 2).empty());
         refs->forget();
-        ensure_equals("nothing", head(), std::string("Nothing to show yet. Put the caret on a name and choose Find References."));
-        ensure("no rows", refs->list()->getItemCount() == 0 && refs->found().from.empty());
-        ensure("told each time", window.pane().counts == 4);
+        CHECK(head() == std::string("Nothing to show yet. Put the caret on a name and choose Find References."));
+        CHECK(refs->list()->getItemCount() == 0);
+        CHECK(refs->found().from.empty());
+        UNSCOPED_INFO("told each time");
+        CHECK(window.pane().counts == 4);
     }
 
-    template<> template<>
-    void alscriptreferencespane_object::test<2>()
+    TEST_CASE_METHOD(alscriptreferencespane_data, "alscriptreferencespane: places slide with their script's edits and go where the name is edited", "[alscriptreferencespane]")
     {
-        set_test_name("places slid with the edits to what they are in, listed again once the frame is drawn; gone where the name was edited");
         ALScriptReferencesPane* refs = pane();
         Doc&                    a    = tab("a", "integer count;\nx = count;\n");
         Doc&                    b    = tab("b", "foo() { count; }\n");
@@ -200,69 +204,97 @@ namespace tut
 
         c.editor->replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "// one\n" } });
         a.editor->replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "// one\n" } });
-        ensure_equals("not listed again yet", lines(), joined(Names{ "A 1:9", "A 2:5", "B 1:9" }));
+        UNSCOPED_INFO("not listed again yet");
+        CHECK(lines() == joined(Names{ "A 1:9", "A 2:5", "B 1:9" }));
         refs->pump();
-        ensure_equals("A's slid, B's not", lines(), joined(Names{ "A 2:9", "A 3:5", "B 1:9" }));
-        ensure("the row chosen kept", refs->list()->getFirstSelected() && refs->list()->getFirstSelected()->getValue().asInteger() == 1);
-        ensure_equals("the declaration too", refs->found().definition.line, 1);
+        UNSCOPED_INFO("A's slid, B's not");
+        CHECK(lines() == joined(Names{ "A 2:9", "A 3:5", "B 1:9" }));
+        {
+            INFO("the row chosen kept");
+            REQUIRE(refs->list()->getFirstSelected());
+            CHECK(refs->list()->getFirstSelected()->getValue().asInteger() == 1);
+        }
+        UNSCOPED_INFO("the declaration too");
+        CHECK(refs->found().definition.line == 1);
 
         b.editor->replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "  " } });
         refs->pump();
-        ensure_equals("B's by its path", lines(), joined(Names{ "A 2:9", "A 3:5", "B 1:11" }));
-        ensure_equals("its line's words", refs->found().places[2].text, std::string("foo() { count; }"));
+        UNSCOPED_INFO("B's by its path");
+        CHECK(lines() == joined(Names{ "A 2:9", "A 3:5", "B 1:11" }));
+        REQUIRE(refs->found().places.size() == size_t(3));
+        UNSCOPED_INFO("its line's words");
+        CHECK(refs->found().places[2].text == std::string("foo() { count; }"));
 
         a.editor->replaceAll({ { ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)), "total" } });
         refs->pump();
-        ensure_equals("the declaration edited: gone", lines(), joined(Names{ "A 3:5", "B 1:11" }));
-        ensure("not declared any more", !refs->found().hasDefinition);
+        UNSCOPED_INFO("the declaration edited: gone");
+        CHECK(lines() == joined(Names{ "A 3:5", "B 1:11" }));
+        UNSCOPED_INFO("not declared any more");
+        CHECK_FALSE(refs->found().hasDefinition);
 
         a.editor->replaceAll({ { ALTextRange(ALTextPos(2, 0), ALTextPos(2, 1)), "yy" } });
         refs->pump();
-        ensure_equals("a place on the line edited", lines(), joined(Names{ "A 3:6", "B 1:11" }));
-        ensure_equals("its words again", refs->found().places[0].text, std::string("yy = count;"));
+        UNSCOPED_INFO("a place on the line edited");
+        CHECK(lines() == joined(Names{ "A 3:6", "B 1:11" }));
+        REQUIRE_FALSE(refs->found().places.empty());
+        UNSCOPED_INFO("its words again");
+        CHECK(refs->found().places[0].text == std::string("yy = count;"));
         const S32 counts = window.pane().counts;
         refs->pump();
-        ensure_equals("not listed again for nothing", window.pane().counts, counts);
+        UNSCOPED_INFO("not listed again for nothing");
+        CHECK(window.pane().counts == counts);
 
         a.editor->replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "\n" } });
         a.editor->replaceAll({ { ALTextRange(ALTextPos(4, 0), ALTextPos(4, 0)), "z" } });
         refs->pump();
-        ensure_equals("moved, not on a line edited; then an edit that moves nothing", lines(), joined(Names{ "A 4:6", "B 1:11" }));
+        UNSCOPED_INFO("moved, not on a line edited; then an edit that moves nothing");
+        CHECK(lines() == joined(Names{ "A 4:6", "B 1:11" }));
     }
 
-    template<> template<>
-    void alscriptreferencespane_object::test<3>()
+    TEST_CASE_METHOD(alscriptreferencespane_data, "alscriptreferencespane: choosing a row goes to its place and follows its tab's new id", "[alscriptreferencespane]")
     {
-        set_test_name("a row chosen gone to, walked or taken to the editor; the tab it was looked up from followed to its new id");
         ALScriptReferencesPane* refs = pane();
         refs->show(found());
         refs->choose(false);
-        ensure("nothing chosen, nothing gone to", window.pane().chosen.empty());
+        UNSCOPED_INFO("nothing chosen, nothing gone to");
+        CHECK(window.pane().chosen.empty());
         // A row is known by its place's number, counted from one.
         refs->list()->selectByValue(LLSD(3));
         refs->list()->onCommit();
         refs->choose(true);
-        ensure_equals("gone to", joined(window.pane().chosen), joined(Names{ "a|" + B + "|0", "a|" + B + "|0 editor" }));
+        UNSCOPED_INFO("gone to");
+        REQUIRE(joined(window.pane().chosen) == joined(Names{ "a|" + B + "|0", "a|" + B + "|0 editor" }));
         refs->rekey("elsewhere", "z");
-        ensure_equals("another's id", refs->found().from, std::string("a"));
+        UNSCOPED_INFO("another's id");
+        CHECK(refs->found().from == std::string("a"));
         refs->rekey("a", "a2");
         refs->list()->selectByValue(LLSD(1));
         refs->choose(false);
-        ensure_equals("followed", window.pane().chosen.back(), std::string("a2||0"));
+        UNSCOPED_INFO("followed");
+        CHECK(window.pane().chosen.back() == std::string("a2||0"));
 
         // The list's keys: return goes to the place chosen, to type there,
         // escape back to the script; and the rows copy.
-        ensure("return", refs->list()->handleKeyHere(KEY_RETURN, MASK_NONE) && window.pane().chosen.back() == "a2||0 editor");
+        CHECK(refs->list()->handleKeyHere(KEY_RETURN, MASK_NONE));
+        CHECK(window.pane().chosen.back() == "a2||0 editor");
         const size_t gone = window.pane().chosen.size();
-        ensure("escape", refs->list()->handleKeyHere(KEY_ESCAPE, MASK_NONE) && window.services().reveals.back()
-                             && window.pane().chosen.size() == gone);
-        ensure("copied", refs->list()->handleKeyHere('C', MASK_CONTROL));
+        CHECK(refs->list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+        REQUIRE_FALSE(window.services().reveals.empty());
+        CHECK(window.services().reveals.back());
+        CHECK(window.pane().chosen.size() == gone);
+        CHECK(refs->list()->handleKeyHere('C', MASK_CONTROL));
+        std::string copied;
+        LLClipboard::instance().pasteFromClipboard(copied);
+        {
+            INFO("the row chosen copied, and no other: " + copied);
+            CHECK(copied.find("integer count;") != std::string::npos);
+            CHECK(copied.find("x = count;") == std::string::npos);
+            CHECK(copied.find("foo() { count; }") == std::string::npos);
+        }
     }
 
-    template<> template<>
-    void alscriptreferencespane_object::test<4>()
+    TEST_CASE_METHOD(alscriptreferencespane_data, "alscriptreferencespane: rows sort by a column and then by script and place", "[alscriptreferencespane]")
     {
-        set_test_name("sorted by a column, then by script and place: by text, by script the other way, the declaration first");
         ALScriptReferencesPane* refs = pane();
         Found                   many = found();
         many.places.push_back(place("", 2, 0, "count = 0;"));
@@ -270,24 +302,25 @@ namespace tut
         ALPaneList* list = refs->list();
         list->sortByColumn("text", true);
         list->updateSort();
-        ensure_equals("by text", lines(), joined(Names{ "A 3:1", "B 1:9", "A 1:9", "A 2:5" }));
+        CHECK(lines() == joined(Names{ "A 3:1", "B 1:9", "A 1:9", "A 2:5" }));
         list->sortByColumn("where", false);
         list->updateSort();
-        ensure_equals("by script, then place, the other way", lines(), joined(Names{ "B 1:9", "A 3:1", "A 2:5", "A 1:9" }));
+        UNSCOPED_INFO("by script, then place, the other way");
+        CHECK(lines() == joined(Names{ "B 1:9", "A 3:1", "A 2:5", "A 1:9" }));
         list->sortByColumn("role", true);
         list->updateSort();
-        ensure_equals("the declaration first, then by script", lines(), joined(Names{ "A 1:9", "A 2:5", "A 3:1", "B 1:9" }));
+        UNSCOPED_INFO("the declaration first, then by script");
+        CHECK(lines() == joined(Names{ "A 1:9", "A 2:5", "A 3:1", "B 1:9" }));
         many.home = B;
         refs->show(many);
         list->sortByColumn("role", true);
         list->updateSort();
-        ensure_equals("the declaration first, then by script", lines(), joined(Names{ "B 1:9", "A 1:9", "A 2:5", "A 3:1" }));
+        UNSCOPED_INFO("the declaration first, then by script");
+        CHECK(lines() == joined(Names{ "B 1:9", "A 1:9", "A 2:5", "A 3:1" }));
     }
 
-    template<> template<>
-    void alscriptreferencespane_object::test<5>()
+    TEST_CASE_METHOD(alscriptreferencespane_data, "alscriptreferencespane: a row picked before relisting after a place is removed still goes to its place", "[alscriptreferencespane]")
     {
-        set_test_name("a row picked between an edit that took a place away and the listing again is still its own place");
         ALScriptReferencesPane* refs = pane();
         Doc&                    a    = tab("a", "integer count;\nx = count;\n");
         refs->show(found());
@@ -295,22 +328,24 @@ namespace tut
             [refs, &a](const ALTextDocument::Edit& edit) { refs->slide(a, "object:1:a", edit); }));
         refs->list()->selectFirstItem();
         refs->list()->selectNextItem(false);
-        ensure_equals("A's second chosen", cell(refs->list()->getFirstSelected(), 1), std::string("2:5"));
+        UNSCOPED_INFO("A's second chosen");
+        CHECK(cell(refs->list()->getFirstSelected(), 1) == std::string("2:5"));
         // The declaration's name edited: the first place goes, not listed
         // again until the frame is drawn.
         a.editor->replaceAll({ { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), "total" } });
-        ensure_equals("one place fewer", refs->found().places.size(), size_t(2));
+        UNSCOPED_INFO("one place fewer");
+        CHECK(refs->found().places.size() == size_t(2));
         window.pane().chosen.clear();
         refs->choose(false);
-        ensure_equals("A's second, not what took its index", joined(window.pane().chosen), std::string("a||1"));
+        UNSCOPED_INFO("A's second, not what took its index");
+        CHECK(joined(window.pane().chosen) == std::string("a||1"));
         refs->pump();
-        ensure_equals("listed again, the row still chosen", cell(refs->list()->getFirstSelected(), 1), std::string("2:5"));
+        UNSCOPED_INFO("listed again, the row still chosen");
+        CHECK(cell(refs->list()->getFirstSelected(), 1) == std::string("2:5"));
     }
 
-    template<> template<>
-    void alscriptreferencespane_object::test<6>()
+    TEST_CASE_METHOD(alscriptreferencespane_data, "alscriptreferencespane: a rename preview checks each place and renames only those kept", "[alscriptreferencespane]")
     {
-        set_test_name("a rename previewed: a box by each place and its line as renamed, Rename with the places kept, Space and a box leaving one out, Cancel listing them as found");
         ALScriptReferencesPane* refs = pane();
         std::vector<size_t>     made;
         bool                    applied = false;
@@ -318,33 +353,61 @@ namespace tut
             made    = kept;
             applied = true;
         });
-        ensure("previewing", refs->previewing());
-        ensure_equals("what it will do over them", head(), std::string("Rename 3 places"));
+        CHECK(refs->previewing());
+        UNSCOPED_INFO("what it will do over them");
+        CHECK(head() == std::string("Rename 3 places"));
         LLButton* rename = window.find<LLButton>("references_rename");
-        ensure("its buttons shown", rename && rename->getVisible() && window.find<LLButton>("references_cancel")->getVisible());
+        {
+            INFO("its buttons shown");
+            REQUIRE(rename);
+            CHECK(rename->getVisible());
+            CHECK(window.find<LLButton>("references_cancel")->getVisible());
+        }
         const std::vector<LLScrollListItem*> rows = refs->list()->getAllData();
-        ensure("each checked", rows.size() == 3 && std::all_of(rows.begin(), rows.end(), [](const LLScrollListItem* row) {
+        {
+            INFO("each checked");
+            REQUIRE(rows.size() == 3);
+            CHECK(std::all_of(rows.begin(), rows.end(), [](const LLScrollListItem* row) {
                    return row->getColumn(2)->getValue().asBoolean();
                }));
-        ensure_equals("the line as it would read", cell(rows[1], 3), std::string("x = total;"));
+        }
+        UNSCOPED_INFO("the line as it would read");
+        CHECK(cell(rows[1], 3) == std::string("x = total;"));
 
         // Left out by Space on the row chosen: its box clear, its line as it is.
         refs->list()->selectNthItem(1);
         refs->list()->handleUnicodeCharHere(' ');
-        ensure("left out", !refs->list()->getAllData()[1]->getColumn(2)->getValue().asBoolean());
-        ensure_equals("its line as it is", cell(refs->list()->getAllData()[1], 3), std::string("x = count;"));
+        REQUIRE(refs->list()->getItemCount() == 3);
+        UNSCOPED_INFO("left out");
+        CHECK_FALSE(refs->list()->getAllData()[1]->getColumn(2)->getValue().asBoolean());
+        UNSCOPED_INFO("its line as it is");
+        CHECK(cell(refs->list()->getAllData()[1], 3) == std::string("x = count;"));
         refs->setKept(2, false);
         refs->setKept(2, true);
         rename->onCommit();
-        ensure("made at the rest, by their order in what was found", applied && made == std::vector<size_t>({ 0, 2 }));
-        ensure("done previewing", !refs->previewing() && !rename->getVisible());
-        ensure_equals("listed as found again", head().find("total"), std::string::npos);
+        {
+            INFO("made at the rest, by their order in what was found");
+            CHECK(applied);
+            CHECK(made == std::vector<size_t>({ 0, 2 }));
+        }
+        {
+            INFO("done previewing");
+            CHECK_FALSE(refs->previewing());
+            CHECK_FALSE(rename->getVisible());
+        }
+        UNSCOPED_INFO("listed as found again");
+        CHECK(head().find("total") == std::string::npos);
 
         applied = false;
         refs->preview(found(), "total", "Rename 3 places", [&](const std::vector<size_t>&) { applied = true; });
-        ensure("no Show Changes where none is given", !window.find<LLButton>("references_changes")->getVisible());
+        UNSCOPED_INFO("no Show Changes where none is given");
+        CHECK_FALSE(window.find<LLButton>("references_changes")->getVisible());
         window.find<LLButton>("references_cancel")->onCommit();
-        ensure("Cancel makes nothing", !applied && !refs->previewing());
+        {
+            INFO("Cancel makes nothing");
+            CHECK_FALSE(applied);
+            CHECK_FALSE(refs->previewing());
+        }
 
         // Show Changes: the chosen row's file, or the script's own with
         // none chosen, and the places kept.
@@ -356,23 +419,33 @@ namespace tut
                           shown = kept;
                       });
         LLButton* changes = window.find<LLButton>("references_changes");
-        ensure("Show Changes shown", changes && changes->getVisible());
+        {
+            INFO("Show Changes shown");
+            REQUIRE(changes);
+            CHECK(changes->getVisible());
+        }
         changes->onCommit();
         refs->list()->selectNthItem(2);
         refs->setKept(1, false);
         refs->list()->selectNthItem(2);
         changes->onCommit();
-        ensure("its own, then the chosen row's", files == std::vector<std::string>({ std::string(), B }));
-        ensure("with the places kept", shown == std::vector<size_t>({ 0, 2 }));
+        UNSCOPED_INFO("its own, then the chosen row's");
+        CHECK(files == std::vector<std::string>({ std::string(), B }));
+        UNSCOPED_INFO("with the places kept");
+        CHECK(shown == std::vector<size_t>({ 0, 2 }));
         window.find<LLButton>("references_cancel")->onCommit();
-        ensure("gone with the preview", !changes->getVisible());
-        ensure("each row as found", cell(refs->list()->getAllData()[0], 3) == "integer count;" && refs->list()->getAllData()[0]->getColumn(2)->getValue().asString() != "1");
+        UNSCOPED_INFO("gone with the preview");
+        CHECK_FALSE(changes->getVisible());
+        {
+            INFO("each row as found");
+            REQUIRE(refs->list()->getItemCount() == 3);
+            CHECK(cell(refs->list()->getAllData()[0], 3) == "integer count;");
+            CHECK(refs->list()->getAllData()[0]->getColumn(2)->getValue().asString() != "1");
+        }
     }
 
-    template<> template<>
-    void alscriptreferencespane_object::test<7>()
+    TEST_CASE_METHOD(alscriptreferencespane_data, "alscriptreferencespane: places slid out of sight are listed again once the list is seen", "[alscriptreferencespane]")
     {
-        set_test_name("places slid out of sight are listed again once the list is seen, not before");
         ALScriptReferencesPane* refs = pane();
         Doc&                    a    = tab("a", "integer count;\nx = count;\n");
         tab("b", "foo() { count; }\n");
@@ -383,17 +456,19 @@ namespace tut
         tabs->selectTabByName("problems_tab");
         a.editor->replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "// one\n" } });
         refs->pump();
-        ensure_equals("slid, not listed again unseen", lines(), joined(Names{ "A 1:9", "A 2:5", "B 1:9" }));
-        ensure_equals("the places themselves slid", refs->found().places[0].span.line, 1);
+        UNSCOPED_INFO("slid, not listed again unseen");
+        CHECK(lines() == joined(Names{ "A 1:9", "A 2:5", "B 1:9" }));
+        REQUIRE_FALSE(refs->found().places.empty());
+        UNSCOPED_INFO("the places themselves slid");
+        CHECK(refs->found().places[0].span.line == 1);
         tabs->selectTabByName("references_tab");
         refs->pump();
-        ensure_equals("seen: listed again", lines(), joined(Names{ "A 2:9", "A 3:5", "B 1:9" }));
+        UNSCOPED_INFO("seen: listed again");
+        CHECK(lines() == joined(Names{ "A 2:9", "A 3:5", "B 1:9" }));
     }
 
-    template<> template<>
-    void alscriptreferencespane_object::test<8>()
+    TEST_CASE_METHOD(alscriptreferencespane_data, "alscriptreferencespane: a slid place keeps its row and at most a thousand places are listed", "[alscriptreferencespane]")
     {
-        set_test_name("a place slid is the same row, made again where it says something else; a thousand places listed at most, the rest counted");
         ALScriptReferencesPane* refs = pane();
         Doc&                    a    = tab("a", "integer count;\nx = count;\n");
         tab("b", "foo() { count; }\n");
@@ -401,15 +476,24 @@ namespace tut
         boost::signals2::scoped_connection in_a(
             a.editor->document().onChanged([refs, &a](const ALTextDocument::Edit& edit) { refs->slide(a, "object:1:a", edit); }));
         LLScrollListItem* in_b     = refs->list()->rowWithKey("3");
-        LLScrollListCell* b_line   = in_b ? in_b->getColumn(1) : nullptr;
+        REQUIRE(in_b);
+        LLScrollListCell* b_line   = in_b->getColumn(1);
         LLScrollListItem* second   = refs->list()->rowWithKey("2");
+        CHECK(second);
         refs->list()->selectByValue(LLSD(2));
         a.editor->replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "// one\n" } });
         refs->pump();
-        ensure_equals("slid", lines(), joined(Names{ "A 2:9", "A 3:5", "B 1:9" }));
-        ensure("the same rows", refs->list()->rowWithKey("2") == second && refs->list()->rowWithKey("3") == in_b);
-        ensure("one not moved, its cells as they were", in_b->getColumn(1) == b_line);
-        ensure("the row chosen kept", refs->list()->getFirstSelected() == second);
+        UNSCOPED_INFO("slid");
+        CHECK(lines() == joined(Names{ "A 2:9", "A 3:5", "B 1:9" }));
+        {
+            INFO("the same rows");
+            CHECK(refs->list()->rowWithKey("2") == second);
+            CHECK(refs->list()->rowWithKey("3") == in_b);
+        }
+        UNSCOPED_INFO("one not moved, its cells as they were");
+        CHECK(in_b->getColumn(1) == b_line);
+        UNSCOPED_INFO("the row chosen kept");
+        CHECK(refs->list()->getFirstSelected() == second);
 
         Found many;
         many.from     = "a";
@@ -420,8 +504,10 @@ namespace tut
             many.places.push_back(place("", i, 0, "count;"));
         }
         refs->show(many);
-        ensure_equals("a thousand and one row saying the rest", refs->list()->getItemCount(), 1001);
-        ensure_equals("the rest", cell(refs->list()->getAllData().back(), 3), window.services().counted("ReferencesUnlisted", 3));
-        ensure("all of them counted over the list", head().find("1003") != std::string::npos);
+        UNSCOPED_INFO("a thousand and one row saying the rest");
+        REQUIRE(refs->list()->getItemCount() == 1001);
+        CHECK(cell(refs->list()->getAllData().back(), 3) == window.services().counted("ReferencesUnlisted", 3));
+        UNSCOPED_INFO("all of them counted over the list");
+        CHECK(head().find("1003") != std::string::npos);
     }
 }

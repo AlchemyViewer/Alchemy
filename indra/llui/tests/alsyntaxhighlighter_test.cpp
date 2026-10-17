@@ -26,13 +26,13 @@
 
 #include "alsyntaxhighlighter.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <initializer_list>
 #include <string>
 #include <utility>
 
-namespace tut
+namespace
 {
     struct alsyntaxhighlighter_data
     {
@@ -99,11 +99,13 @@ namespace tut
             return grammar;
         }
 
-        static std::shared_ptr<const ALSyntaxGrammar> loaded(const LLSD& description)
+        static std::shared_ptr<const ALSyntaxGrammar> require_loaded(const LLSD& description)
         {
             auto        grammar = std::make_shared<ALSyntaxGrammar>();
             std::string error;
-            ensure("grammar loads: " + error, grammar->load(description, error));
+            const bool  loaded = grammar->load(description, error);
+            INFO("grammar loads: " << error);
+            REQUIRE(loaded);
             return grammar;
         }
 
@@ -132,191 +134,198 @@ namespace tut
         }
     };
 
-    typedef test_group<alsyntaxhighlighter_data> alsyntaxhighlighter_group;
-    typedef alsyntaxhighlighter_group::object    alsyntaxhighlighter_object;
-    alsyntaxhighlighter_group                    alsyntaxhighlighter_instance("alsyntaxhighlighter");
-
-    template<> template<>
-    void alsyntaxhighlighter_object::test<1>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a line lexes into kinds with words looked up in tables", "[alsyntaxhighlighter]")
     {
-        set_test_name("a line lexes into kinds, with words looked up in tables");
-        auto          grammar = loaded(mini());
+        auto          grammar = require_loaded(mini());
         ALSyntaxWords words;
         words.set("keyword", { "while" });
         words.set("function", { "foo" });
         ALSyntaxState state = grammar->initialState();
-        ensure_equals("tokens", lexed(*grammar, "x = foo(12) // hi", state, words),
+        CHECK(lexed(*grammar, "x = foo(12) // hi", state, words) ==
                       std::string("text:x |operator:=|text: |function:foo|punctuation:(|number:12|punctuation:)|text: |comment:// hi"));
-        ensure("back in main after the line", state == grammar->initialState());
-        ensure_equals("a table word", lexed(*grammar, "while", state, words), std::string("control:while"));
-        ensure_equals("a whole-word literal, and not inside a word", lexed(*grammar, "if iffy", state, words), std::string("keyword:if|text: iffy"));
-        ensure_equals("the longer operator first", lexed(*grammar, "a==b", state, words), std::string("text:a|operator:==|text:b"));
-        ensure_equals("tables named", grammar->wordTables().size(), size_t(2));
-        ensure_equals("extension", grammar->extensions().front(), std::string("mini"));
+        UNSCOPED_INFO("back in main after the line");
+        CHECK(state == grammar->initialState());
+        CHECK(lexed(*grammar, "while", state, words) == std::string("control:while"));
+        UNSCOPED_INFO("a whole-word literal, and not inside a word");
+        CHECK(lexed(*grammar, "if iffy", state, words) == std::string("keyword:if|text: iffy"));
+        UNSCOPED_INFO("the longer operator first");
+        CHECK(lexed(*grammar, "a==b", state, words) == std::string("text:a|operator:==|text:b"));
+        REQUIRE(grammar->wordTables().size() == size_t(2));
+        REQUIRE_FALSE(grammar->extensions().empty());
+        CHECK(grammar->extensions().front() == std::string("mini"));
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<2>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a string with an escape ends with its line", "[alsyntaxhighlighter]")
     {
-        set_test_name("a string with an escape ends with its line");
-        auto          grammar = loaded(mini());
+        auto          grammar = require_loaded(mini());
         ALSyntaxWords words;
         ALSyntaxState state = grammar->initialState();
-        ensure_equals("escape inside", lexed(*grammar, "\"a\\\"b\" c", state, words), std::string("string:\"a|escape:\\\"|string:b\"|text: c"));
-        ensure_equals("unterminated", lexed(*grammar, "\"open", state, words), std::string("string:\"open"));
-        ensure("and closed by the line end", state == grammar->initialState());
-        ensure_equals("so the next line is code", lexed(*grammar, "1", state, words), std::string("number:1"));
+        CHECK(lexed(*grammar, "\"a\\\"b\" c", state, words) == std::string("string:\"a|escape:\\\"|string:b\"|text: c"));
+        CHECK(lexed(*grammar, "\"open", state, words) == std::string("string:\"open"));
+        UNSCOPED_INFO("and closed by the line end");
+        CHECK(state == grammar->initialState());
+        UNSCOPED_INFO("so the next line is code");
+        CHECK(lexed(*grammar, "1", state, words) == std::string("number:1"));
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<3>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a block comment runs on across lines and the state says so", "[alsyntaxhighlighter]")
     {
-        set_test_name("a block comment runs on across lines and the state says so");
-        auto          grammar = loaded(mini());
+        auto          grammar = require_loaded(mini());
         ALSyntaxWords words;
         ALSyntaxState state = grammar->initialState();
-        ensure_equals("opened", lexed(*grammar, "a /* b", state, words), std::string("text:a |comment:/* b"));
-        ensure("still inside", state != grammar->initialState());
-        ensure_equals("all comment", lexed(*grammar, "c 12", state, words), std::string("comment:c 12"));
-        ensure_equals("closed", lexed(*grammar, "d */ 3", state, words), std::string("comment:d */|text: |number:3"));
-        ensure("out again", state == grammar->initialState());
+        CHECK(lexed(*grammar, "a /* b", state, words) == std::string("text:a |comment:/* b"));
+        UNSCOPED_INFO("still inside");
+        CHECK(state != grammar->initialState());
+        UNSCOPED_INFO("the next line all comment");
+        CHECK(lexed(*grammar, "c 12", state, words) == std::string("comment:c 12"));
+        CHECK(lexed(*grammar, "d */ 3", state, words) == std::string("comment:d */|text: |number:3"));
+        UNSCOPED_INFO("out again");
+        CHECK(state == grammar->initialState());
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<4>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a span's end can carry what its opening captured", "[alsyntaxhighlighter]")
     {
-        set_test_name("a span's end can carry what its opening captured");
-        auto          grammar = loaded(brackets());
+        auto          grammar = require_loaded(brackets());
         ALSyntaxWords words;
         ALSyntaxState state = grammar->initialState();
-        ensure_equals("level two ends at level two", lexed(*grammar, "[==[ a ]=] b ]==] c", state, words),
-                      std::string("string:[==[ a ]=] b ]==]|text: c"));
-        ensure_equals("open across lines", lexed(*grammar, "[=[ x", state, words), std::string("string:[=[ x"));
-        ensure_equals("with the level in the state", state.frames.back().payload, std::string("="));
-        ensure_equals("and closed on the next", lexed(*grammar, "y ]] ]=] z", state, words), std::string("string:y ]] ]=]|text: z"));
+        UNSCOPED_INFO("level two ends at level two");
+        CHECK(lexed(*grammar, "[==[ a ]=] b ]==] c", state, words) == std::string("string:[==[ a ]=] b ]==]|text: c"));
+        CHECK(lexed(*grammar, "[=[ x", state, words) == std::string("string:[=[ x"));
+        REQUIRE_FALSE(state.frames.empty());
+        UNSCOPED_INFO("with the level in the state");
+        CHECK(state.frames.back().payload == std::string("="));
+        UNSCOPED_INFO("and closed on the next");
+        CHECK(lexed(*grammar, "y ]] ]=] z", state, words) == std::string("string:y ]] ]=]|text: z"));
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<5>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a description that does not hold together is refused with its reason", "[alsyntaxhighlighter]")
     {
-        set_test_name("a description that does not hold together is refused with its reason");
         std::string     error;
         ALSyntaxGrammar grammar;
         LLSD            bad = mini();
         bad["states"]["main"][0]["kind"] = "purple";
-        ensure("unknown kind", !grammar.load(bad, error));
-        ensure("named: " + error, error.find("purple") != std::string::npos);
+        UNSCOPED_INFO("unknown kind");
+        REQUIRE_FALSE(grammar.load(bad, error));
+        UNSCOPED_INFO("named: " << error);
+        REQUIRE(error.find("purple") != std::string::npos);
 
         bad = mini();
         bad["states"]["main"][0]["push"] = "nowhere";
-        ensure("unknown state", !grammar.load(bad, error));
-        ensure("named: " + error, error.find("nowhere") != std::string::npos);
+        UNSCOPED_INFO("unknown state");
+        CHECK_FALSE(grammar.load(bad, error));
+        UNSCOPED_INFO("named: " << error);
+        REQUIRE(error.find("nowhere") != std::string::npos);
 
         LLSD nameless;
         nameless["states"]["main"] = rules({});
-        ensure("no name", !grammar.load(nameless, error));
+        UNSCOPED_INFO("no name");
+        CHECK_FALSE(grammar.load(nameless, error));
 
         bad = mini();
         bad["states"]["main"][3]["chars"] = "z-a";
-        ensure("a class that runs downward", !grammar.load(bad, error));
+        UNSCOPED_INFO("a class that runs downward");
+        CHECK_FALSE(grammar.load(bad, error));
 
         // RE2 has no lookaround; not_after_chars and consume stand in.
         bad = mini();
         bad["states"]["main"] = rules({ LLSD().with("regex", "x(?=y)").with("kind", "keyword") });
-        ensure("lookahead", !grammar.load(bad, error));
-        ensure("said as a regex: " + error, error.find("x(?=y)") != std::string::npos);
+        UNSCOPED_INFO("lookahead");
+        CHECK_FALSE(grammar.load(bad, error));
+        UNSCOPED_INFO("said as a regex: " << error);
+        REQUIRE(error.find("x(?=y)") != std::string::npos);
 
         bad = mini();
         bad["states"]["main"] = rules({ LLSD().with("regex", "(x)y").with("consume", 2).with("kind", "keyword") });
-        ensure("consuming a group the regex has not", !grammar.load(bad, error));
+        UNSCOPED_INFO("consuming a group the regex has not");
+        CHECK_FALSE(grammar.load(bad, error));
 
         bad = mini();
         bad["states"]["main"] = rules({ LLSD().with("match", "x").with("not_after_chars", "a-z").with("kind", "keyword") });
-        ensure("not_after_chars on no regex", !grammar.load(bad, error));
+        UNSCOPED_INFO("not_after_chars on no regex");
+        CHECK_FALSE(grammar.load(bad, error));
 
         LLSD good = mini();
         good["states"]["main"] = rules({ LLSD().with("regex", "(x)y").with("consume", 1).with("not_after_chars", "a-z").with("kind", "keyword") });
-        ensure("both on a regex: " + error, grammar.load(good, error));
+        const bool both = grammar.load(good, error);
+        UNSCOPED_INFO("both on a regex: " << error);
+        CHECK(both);
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<6>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: the highlighter follows a document and re-lexes only what an edit reaches", "[alsyntaxhighlighter]")
     {
-        set_test_name("the highlighter follows a document and re-lexes only what an edit reaches");
         ALTextDocument      doc("a\nb /* c\nd\ne */ f\ng");
         ALSyntaxHighlighter highlighter;
-        highlighter.setGrammar(loaded(mini()));
+        highlighter.setGrammar(require_loaded(mini()));
         highlighter.attach(&doc);
-        ensure_equals("line 2 is comment", said(doc.line(2), highlighter.tokens(2)), std::string("comment:d"));
-        ensure_equals("three lines lexed to get there", highlighter.lastLexed(), 3);
-        ensure_equals("line 3 closes it", said(doc.line(3), highlighter.tokens(3)), std::string("comment:e */|text: f"));
-        ensure_equals("line 4 is code", said(doc.line(4), highlighter.tokens(4)), std::string("text:g"));
+        CHECK(said(doc.line(2), highlighter.tokens(2)) == std::string("comment:d"));
+        UNSCOPED_INFO("three lines lexed to get there");
+        CHECK(highlighter.lastLexed() == 3);
+        CHECK(said(doc.line(3), highlighter.tokens(3)) == std::string("comment:e */|text: f"));
+        CHECK(said(doc.line(4), highlighter.tokens(4)) == std::string("text:g"));
         const U32 revision_of_4 = highlighter.revision(4);
 
         // A change inside the comment reaches the line it is on and no
         // further, since the next line still starts inside the comment.
         doc.replace(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 1)), "dd");
-        ensure_equals("line 2 again", said(doc.line(2), highlighter.tokens(2)), std::string("comment:dd"));
-        ensure_equals("one line lexed", highlighter.lastLexed(), 1);
+        CHECK(said(doc.line(2), highlighter.tokens(2)) == std::string("comment:dd"));
+        CHECK(highlighter.lastLexed() == 1);
         highlighter.tokens(4);
-        ensure_equals("nothing more", highlighter.lastLexed(), 0);
-        ensure_equals("line 4 unchanged", highlighter.revision(4), revision_of_4);
+        CHECK(highlighter.lastLexed() == 0);
+        CHECK(highlighter.revision(4) == revision_of_4);
 
         // Taking the opening out reaches every line until one starts in
         // the same state as before: line 4 does.
         doc.replace(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 4)), "");
-        ensure_equals("line 3 is code now", said(doc.line(3), highlighter.tokens(3)), std::string("text:e */ f"));
-        ensure_equals("lines 1 to 3 lexed", highlighter.lastLexed(), 3);
+        CHECK(said(doc.line(3), highlighter.tokens(3)) == std::string("text:e */ f"));
+        UNSCOPED_INFO("lines 1 to 3 lexed");
+        CHECK(highlighter.lastLexed() == 3);
         highlighter.tokens(4);
-        ensure_equals("line 4 still not", highlighter.revision(4), revision_of_4);
+        CHECK(highlighter.revision(4) == revision_of_4);
 
         // A line added and a line removed keep the lines lined up.
         doc.insert(ALTextPos(0, 1), "\n1");
-        ensure_equals("six lines", doc.lineCount(), 6);
-        ensure_equals("the new line", said(doc.line(1), highlighter.tokens(1)), std::string("number:1"));
-        ensure_equals("the last still there", said(doc.line(5), highlighter.tokens(5)), std::string("text:g"));
+        CHECK(doc.lineCount() == 6);
+        CHECK(said(doc.line(1), highlighter.tokens(1)) == std::string("number:1"));
+        CHECK(said(doc.line(5), highlighter.tokens(5)) == std::string("text:g"));
         doc.remove(ALTextRange(doc.start(), ALTextPos(2, 0)));
-        ensure_equals("the first now", said(doc.line(0), highlighter.tokens(0)), std::string("text:b  c"));
-        ensure_equals("the last still there", said(doc.line(3), highlighter.tokens(3)), std::string("text:g"));
+        CHECK(said(doc.line(0), highlighter.tokens(0)) == std::string("text:b  c"));
+        CHECK(said(doc.line(3), highlighter.tokens(3)) == std::string("text:g"));
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<7>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a change of words relexes every line and no grammar lexes nothing", "[alsyntaxhighlighter]")
     {
-        set_test_name("words changing lexes everything again, and no grammar lexes nothing");
         ALTextDocument      doc("foo bar");
         ALSyntaxHighlighter highlighter;
         highlighter.attach(&doc);
-        ensure("nothing without a grammar", highlighter.tokens(0).empty());
-        highlighter.setGrammar(loaded(mini()));
-        ensure_equals("plain words", said(doc.line(0), highlighter.tokens(0)), std::string("text:foo bar"));
+        REQUIRE(highlighter.tokens(0).empty());
+        highlighter.setGrammar(require_loaded(mini()));
+        CHECK(said(doc.line(0), highlighter.tokens(0)) == std::string("text:foo bar"));
         highlighter.ownWords().set("function", { "bar" });
         highlighter.wordsChanged();
-        ensure_equals("a function now", said(doc.line(0), highlighter.tokens(0)), std::string("text:foo |function:bar"));
+        CHECK(said(doc.line(0), highlighter.tokens(0)) == std::string("text:foo |function:bar"));
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<8>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: attached to another document it no longer hears the first", "[alsyntaxhighlighter]")
     {
-        set_test_name("attached to another document, the one it followed before is heard no more");
         ALTextDocument      first("a\nb\nc");
         ALTextDocument      second("x\ny\nz");
         ALSyntaxHighlighter highlighter;
-        highlighter.setGrammar(loaded(mini()));
+        highlighter.setGrammar(require_loaded(mini()));
         highlighter.attach(&first);
         highlighter.tokens(2);
         highlighter.attach(&second);
         highlighter.tokens(2);
-        ensure_equals("the second lexed", highlighter.lastLexed(), 3);
+        UNSCOPED_INFO("the second's three lines lexed");
+        CHECK(highlighter.lastLexed() == 3);
         first.insert(ALTextPos(0, 0), "/* one\ntwo\n");
         highlighter.tokens(2);
-        ensure_equals("the first's edit reached nothing", highlighter.lastLexed(), 0);
-        ensure_equals("and the second reads as it did", said(second.line(1), highlighter.tokens(1)), std::string("text:y"));
+        UNSCOPED_INFO("the first's edit reached nothing");
+        CHECK(highlighter.lastLexed() == 0);
+        UNSCOPED_INFO("and the second reads as it did");
+        CHECK(said(second.line(1), highlighter.tokens(1)) == std::string("text:y"));
     }
-    template<> template<>
-    void alsyntaxhighlighter_object::test<9>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: line states are shared and let go of; tokens match a fresh lexing", "[alsyntaxhighlighter]")
     {
-        set_test_name("the states lines are in are kept once, and those no line is in any longer let go of; the tokens are what lexing afresh gives");
         ALTextDocument doc;
         std::string    text;
         for (S32 i = 0; i < 100; ++i)
@@ -325,10 +334,11 @@ namespace tut
         }
         doc.setText(text);
         ALSyntaxHighlighter highlighter;
-        highlighter.setGrammar(loaded(brackets()));
+        highlighter.setGrammar(require_loaded(brackets()));
         highlighter.attach(&doc);
         highlighter.tokens(99);
-        ensure("one state for every line in the same state", highlighter.statesKept() <= 2);
+        UNSCOPED_INFO("one state for every line in the same state");
+        CHECK(highlighter.statesKept() <= 2);
 
         // Each time, the first line opens a bracket of another level, which
         // every line after it is inside: a hundred new states each time,
@@ -340,51 +350,55 @@ namespace tut
             highlighter.tokens(99);
         }
         highlighter.tokens(99);
-        ensure("let go of past a number: " + std::to_string(highlighter.statesKept()), highlighter.statesKept() <= 4096 + 100);
+        UNSCOPED_INFO("let go of past a number");
+        CHECK(highlighter.statesKept() <= 4096 + 100);
 
         // One more edit, and every line's tokens as a highlighter made
         // afresh has them.
         doc.replace(ALTextRange(ALTextPos(50, 0), ALTextPos(50, 1)), "]" + std::string(60, '=') + "] b");
         ALSyntaxHighlighter fresh;
-        fresh.setGrammar(loaded(brackets()));
+        fresh.setGrammar(require_loaded(brackets()));
         fresh.attach(&doc);
         for (S32 line = 0; line < doc.lineCount(); ++line)
         {
-            ensure("line " + std::to_string(line) + " as lexed afresh", highlighter.tokens(line) == fresh.tokens(line));
+            CAPTURE(line);
+            REQUIRE(highlighter.tokens(line) == fresh.tokens(line));
         }
     }
-    template<> template<>
-    void alsyntaxhighlighter_object::test<10>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: views share words set once until one takes a copy of its own", "[alsyntaxhighlighter]")
     {
-        set_test_name("words set once are shared between views; a view's own copy changes it and no other; none set, none");
         auto shared = std::make_shared<ALSyntaxWords>();
         shared->set("function", { "foo" });
         ALTextDocument doc;
         doc.setText("foo bar\n");
         ALSyntaxHighlighter a, b;
-        a.setGrammar(loaded(mini()));
-        b.setGrammar(loaded(mini()));
+        a.setGrammar(require_loaded(mini()));
+        b.setGrammar(require_loaded(mini()));
         a.attach(&doc);
         b.attach(&doc);
         a.setWords(shared);
         b.setWords(shared);
-        ensure("the same words", &a.words() == &b.words());
-        ensure_equals("a word of them", said(doc.line(0), a.tokens(0)), std::string("function:foo|text: bar"));
+        CHECK(&a.words() == &b.words());
+        CHECK(said(doc.line(0), a.tokens(0)) == std::string("function:foo|text: bar"));
 
         b.ownWords().set("function", { "bar" });
         b.wordsChanged();
-        ensure("its own now", &a.words() != &b.words());
-        ensure("the other's as they were", a.words().has("function", "foo") && !a.words().has("function", "bar"));
-        ensure_equals("its own word", said(doc.line(0), b.tokens(0)), std::string("text:foo |function:bar"));
-        ensure_equals("and the other's", said(doc.line(0), a.tokens(0)), std::string("function:foo|text: bar"));
+        CHECK(&a.words() != &b.words());
+        {
+            INFO("the other's as they were");
+            REQUIRE(a.words().has("function", "foo"));
+            REQUIRE_FALSE(a.words().has("function", "bar"));
+        }
+        CHECK(said(doc.line(0), b.tokens(0)) == std::string("text:foo |function:bar"));
+        UNSCOPED_INFO("and the other's");
+        CHECK(said(doc.line(0), a.tokens(0)) == std::string("function:foo|text: bar"));
 
         a.setWords(nullptr);
-        ensure_equals("none set, none", said(doc.line(0), a.tokens(0)), std::string("text:foo bar"));
+        UNSCOPED_INFO("no words set, none looked up");
+        CHECK(said(doc.line(0), a.tokens(0)) == std::string("text:foo bar"));
     }
-    template<> template<>
-    void alsyntaxhighlighter_object::test<11>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: lexSome lexes no more than asked and passes lines that lex as before", "[alsyntaxhighlighter]")
     {
-        set_test_name("lexed a slice at a time: no more lines lexed than asked, the lines that lex as they did passed for nothing, and the tokens what lexing afresh gives");
         ALTextDocument doc;
         std::string    text;
         for (S32 i = 0; i < 1000; ++i)
@@ -394,103 +408,136 @@ namespace tut
         doc.setText(text);
         const S32           last = doc.lineCount() - 1;
         ALSyntaxHighlighter highlighter;
-        ensure("nothing to lex without a grammar", highlighter.lexSome(1));
-        highlighter.setGrammar(loaded(mini()));
+        UNSCOPED_INFO("nothing to lex without a grammar");
+        REQUIRE(highlighter.lexSome(1));
+        highlighter.setGrammar(require_loaded(mini()));
         highlighter.attach(&doc);
         highlighter.tokens(last);
-        ensure("lexed to its end, nothing more to lex", highlighter.lexSome(1) && highlighter.lastLexed() == 0);
+        {
+            INFO("lexed to its end, nothing more to lex");
+            CHECK(highlighter.lexSome(1));
+            CHECK(highlighter.lastLexed() == 0);
+        }
 
         // A comment opened at the top: every line after it starts in it.
         doc.insert(ALTextPos(0, 0), "/* ");
-        ensure("a slice: not the end", !highlighter.lexSome(100));
-        ensure_equals("as many as asked", highlighter.lastLexed(), 100);
-        ensure("and again", !highlighter.lexSome(100) && highlighter.lastLexed() == 100);
-        ensure_equals("a line asked for lexed on from where the slices stopped", said(doc.line(500), highlighter.tokens(500)), std::string("comment:a 1"));
-        ensure_equals("from there", highlighter.lastLexed(), 301);
-        ensure("the rest", highlighter.lexSome(1000) && highlighter.lastLexed() == last - 500);
+        UNSCOPED_INFO("a slice: not the end");
+        CHECK_FALSE(highlighter.lexSome(100));
+        UNSCOPED_INFO("as many as asked");
+        CHECK(highlighter.lastLexed() == 100);
+        {
+            INFO("and again");
+            CHECK_FALSE(highlighter.lexSome(100));
+            CHECK(highlighter.lastLexed() == 100);
+        }
+        UNSCOPED_INFO("a line asked for lexed on from where the slices stopped");
+        CHECK(said(doc.line(500), highlighter.tokens(500)) == std::string("comment:a 1"));
+        UNSCOPED_INFO("from there");
+        CHECK(highlighter.lastLexed() == 301);
+        {
+            INFO("the rest");
+            CHECK(highlighter.lexSome(1000));
+            CHECK(highlighter.lastLexed() == last - 500);
+        }
 
         // A line typed in: lexed, and the lines after it, which start as
         // they did, passed for nothing.
         doc.insert(ALTextPos(10, 0), "b");
-        ensure("one line lexed, and none after it wants lexing", highlighter.lexSome(1) && highlighter.lastLexed() == 1);
+        {
+            INFO("one line lexed, and none after it wants lexing");
+            CHECK(highlighter.lexSome(1));
+            CHECK(highlighter.lastLexed() == 1);
+        }
 
         ALSyntaxHighlighter fresh;
-        fresh.setGrammar(loaded(mini()));
+        fresh.setGrammar(require_loaded(mini()));
         fresh.attach(&doc);
         for (S32 line = 0; line < doc.lineCount(); ++line)
         {
-            ensure("line " + std::to_string(line) + " as lexed afresh", highlighter.tokens(line) == fresh.tokens(line));
+            CAPTURE(line);
+            REQUIRE(highlighter.tokens(line) == fresh.tokens(line));
         }
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<12>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a rule with keys its kind does not read is refused with a reason", "[alsyntaxhighlighter]")
     {
-        set_test_name("a rule matches one thing, a span among them, and says only what a rule of its kind reads: a span goes nowhere but into itself, its escape is something, and a key no rule knows is refused by name");
         ALSyntaxGrammar grammar;
         std::string     error;
-        const auto      refused = [&](const LLSD& bad, const std::string& what) {
+        const auto      require_refused = [&](const LLSD& bad, const std::string& what) {
             LLSD description              = alsyntaxhighlighter_data::mini();
             description["states"]["main"] = alsyntaxhighlighter_data::rules({ bad });
-            ensure(what + " refused", !grammar.load(description, error));
-            ensure(what + ", and said why", !error.empty());
+            INFO(what);
+            REQUIRE_FALSE(grammar.load(description, error));
+            REQUIRE_FALSE(error.empty());
         };
-        refused(LLSD().with("regex", "x+").with("span", "\"").with("end", "\"").with("kind", "string"), "a span opened by a regex too");
-        refused(LLSD().with("span", "\"").with("span_regex", "'").with("end", "\""), "a span with two openings");
-        refused(LLSD().with("span", "(").with("end", ")").with("pop", true), "a span that pops");
-        refused(LLSD().with("span", "(").with("end", ")").with("push", "line_comment"), "a span that pushes");
-        refused(LLSD().with("span", "(").with("end", ")").with("next", "line_comment"), "a span that goes on to a state");
-        refused(LLSD().with("span", "if").with("end", "fi").with("whole_word", true), "a span of whole words");
-        refused(LLSD().with("span", "\"").with("end", "\"").with("escape", ""), "a span whose escape is empty");
-        refused(LLSD().with("span", "\"").with("end", "\"").with("unless_after", "\\"), "a span that runs on and ends with its line");
-        refused(LLSD().with("match", "x").with("end", "y"), "a span's end on a literal");
-        refused(LLSD().with("chars", "a-z").with("whole_word", true), "whole words of a class");
-        refused(LLSD().with("word", true).with("min", 2), "a class's least on a word");
-        refused(LLSD().with("span", "\"").with("end", "\"").with("mutliline", false), "a key misspelt");
-        ensure("named: " + error, error.find("mutliline") != std::string::npos);
+        require_refused(LLSD().with("regex", "x+").with("span", "\"").with("end", "\"").with("kind", "string"), "a span opened by a regex too");
+        require_refused(LLSD().with("span", "\"").with("span_regex", "'").with("end", "\""), "a span with two openings");
+        require_refused(LLSD().with("span", "(").with("end", ")").with("pop", true), "a span that pops");
+        require_refused(LLSD().with("span", "(").with("end", ")").with("push", "line_comment"), "a span that pushes");
+        require_refused(LLSD().with("span", "(").with("end", ")").with("next", "line_comment"), "a span that goes on to a state");
+        require_refused(LLSD().with("span", "if").with("end", "fi").with("whole_word", true), "a span of whole words");
+        require_refused(LLSD().with("span", "\"").with("end", "\"").with("escape", ""), "a span whose escape is empty");
+        require_refused(LLSD().with("span", "\"").with("end", "\"").with("unless_after", "\\"), "a span that runs on and ends with its line");
+        require_refused(LLSD().with("match", "x").with("end", "y"), "a span's end on a literal");
+        require_refused(LLSD().with("chars", "a-z").with("whole_word", true), "whole words of a class");
+        require_refused(LLSD().with("word", true).with("min", 2), "a class's least on a word");
+        require_refused(LLSD().with("span", "\"").with("end", "\"").with("mutliline", false), "a key misspelt");
+        UNSCOPED_INFO("named: " << error);
+        REQUIRE(error.find("mutliline") != std::string::npos);
 
         LLSD good = mini();
         good["states"]["main"] = rules({ LLSD().with("span", "\"").with("end", "\"").with("escape", "\\").with("multiline", false).with("unless_after", "\\"),
                                          LLSD().with("eol", true).with("unless_after", "\\").with("pop", true) });
-        ensure("a span its line ends, but for a backslash, and an eol that says the same: " + error, grammar.load(good, error));
-        ensure("and the little language: " + error, grammar.load(mini(), error));
+        const bool backslashed = grammar.load(good, error);
+        UNSCOPED_INFO("a span its line ends, but for a backslash, and an eol that says the same: " << error);
+        CHECK(backslashed);
+        const bool little = grammar.load(mini(), error);
+        UNSCOPED_INFO("and the little language: " << error);
+        CHECK(little);
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<13>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a line's revision moves on only when its tokens may have changed", "[alsyntaxhighlighter]")
     {
-        set_test_name("lexed again for a grammar or words that change nothing on a line, the line keeps its revision; one they change moves on, as every line of another document does; and with no grammar there are no tokens");
         ALTextDocument      doc("foo\nbar");
         ALTextDocument      other("foo\nbar");
         ALSyntaxHighlighter highlighter;
-        const auto          grammar = loaded(mini());
+        const auto          grammar = require_loaded(mini());
         highlighter.setGrammar(grammar);
         highlighter.attach(&doc);
         const U32 foo = highlighter.revision(0);
         const U32 bar = highlighter.revision(1);
 
         highlighter.setGrammar(grammar);
-        ensure_equals("the same grammar again: the first line as it was", highlighter.revision(0), foo);
-        ensure_equals("and the second", highlighter.revision(1), bar);
+        UNSCOPED_INFO("the same grammar again: the first line as it was");
+        CHECK(highlighter.revision(0) == foo);
+        UNSCOPED_INFO("and the second");
+        CHECK(highlighter.revision(1) == bar);
 
         highlighter.ownWords().set("function", { "bar" });
         highlighter.wordsChanged();
-        ensure_equals("a word taught that the first line does not hold: as it was", highlighter.revision(0), foo);
-        ensure_equals("the second's word a function now", said(doc.line(1), highlighter.tokens(1)), std::string("function:bar"));
-        ensure("and its revision moved on", highlighter.revision(1) != bar);
+        UNSCOPED_INFO("a word taught that the first line does not hold: as it was");
+        CHECK(highlighter.revision(0) == foo);
+        UNSCOPED_INFO("the second's word a function now");
+        CHECK(said(doc.line(1), highlighter.tokens(1)) == std::string("function:bar"));
+        UNSCOPED_INFO("and its revision moved on");
+        CHECK(highlighter.revision(1) != bar);
 
         highlighter.attach(&other);
-        ensure("another document's lines move on, though they lex the same", highlighter.revision(0) != foo);
-        ensure_equals("and lex as they do", said(other.line(0), highlighter.tokens(0)), std::string("text:foo"));
+        UNSCOPED_INFO("another document's lines move on, though they lex the same");
+        CHECK(highlighter.revision(0) != foo);
+        UNSCOPED_INFO("and lex as they do");
+        CHECK(said(other.line(0), highlighter.tokens(0)) == std::string("text:foo"));
 
         highlighter.setGrammar(nullptr);
-        ensure("no grammar, no tokens", highlighter.tokens(0).empty() && highlighter.tokens(1).empty());
+        {
+            INFO("no grammar, no tokens");
+            REQUIRE(highlighter.tokens(0).empty());
+            REQUIRE(highlighter.tokens(1).empty());
+        }
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<14>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: asking for the last line relexes each edit's lines and looks no further", "[alsyntaxhighlighter]")
     {
-        set_test_name("after edits, asking for the last line lexes each from where it was made to where lexing settles, and looks at no line between them or past");
         std::string text;
         for (S32 i = 0; i < 20000; ++i)
         {
@@ -498,30 +545,36 @@ namespace tut
         }
         ALTextDocument      doc(text);
         ALSyntaxHighlighter highlighter;
-        highlighter.setGrammar(loaded(mini()));
+        highlighter.setGrammar(require_loaded(mini()));
         highlighter.attach(&doc);
         const S32 last = doc.lineCount() - 1;
         highlighter.tokens(last);
         doc.insert(ALTextPos(5, 0), "y ");
         highlighter.tokens(last);
-        ensure_equals("the line edited lexed", highlighter.lastLexed(), 1);
-        ensure("and the one after it looked at, no more", highlighter.lastLooked() <= 2);
+        UNSCOPED_INFO("the line edited lexed");
+        CHECK(highlighter.lastLexed() == 1);
+        UNSCOPED_INFO("and the one after it looked at, no more");
+        CHECK(highlighter.lastLooked() <= 2);
         doc.insert(ALTextPos(10, 0), "a\nb ");
         doc.insert(ALTextPos(15000, 0), "c ");
         highlighter.tokens(last + 1);
-        ensure_equals("two edits: the lines each made", highlighter.lastLexed(), 3);
-        ensure("and the line after each looked at", highlighter.lastLooked() <= 5);
+        UNSCOPED_INFO("two edits: the lines each made");
+        CHECK(highlighter.lastLexed() == 3);
+        UNSCOPED_INFO("and the line after each looked at");
+        CHECK(highlighter.lastLooked() <= 5);
         ALSyntaxHighlighter fresh;
-        fresh.setGrammar(loaded(mini()));
+        fresh.setGrammar(require_loaded(mini()));
         fresh.attach(&doc);
-        ensure("lexed as they read", highlighter.tokens(15000) == fresh.tokens(15000) && highlighter.tokens(11) == fresh.tokens(11));
+        {
+            INFO("lexed as they read");
+            CHECK(highlighter.tokens(15000) == fresh.tokens(15000));
+            CHECK(highlighter.tokens(11) == fresh.tokens(11));
+        }
     }
 
-    template<> template<>
-    void alsyntaxhighlighter_object::test<15>()
+    TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: random edits leave every line's tokens as a fresh lexing gives", "[alsyntaxhighlighter]")
     {
-        set_test_name("edits of every kind, with lexing asked for a line at a time, a slice at a time or to the end between them, leave every line's tokens what a highlighter lexing afresh finds");
-        const auto grammar = loaded(mini());
+        const auto grammar = require_loaded(mini());
         const char* pieces[] = { "if a == 1", "/* open", "close */", "x = \"s", "// note", "y = \"a\" + 2", "", "end */ if", "\"", "/**/ z" };
         U32         seed     = 777;
         const auto  next     = [&seed](U32 below) {
@@ -596,7 +649,8 @@ namespace tut
                     const std::vector<ALSyntaxToken> mine = highlighter.tokens(l);
                     if (mine != fresh.tokens(l))
                     {
-                        ensure_equals("step " + std::to_string(step) + ", line " + std::to_string(l), said(doc.line(l), mine), said(doc.line(l), fresh.tokens(l)));
+                        CAPTURE(step, l);
+                        REQUIRE(said(doc.line(l), mine) == said(doc.line(l), fresh.tokens(l)));
                     }
                 }
             }

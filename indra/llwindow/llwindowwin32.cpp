@@ -38,8 +38,8 @@
 // Linden library includes
 #include "llerror.h"
 #include "llexception.h"
-#include "llfasttimer.h"
 #include "llgl.h"
+#include "llrender.h"
 #include "llstring.h"
 #include "lldir.h"
 #include "llsdutil.h"
@@ -603,6 +603,9 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
     }
 
     // Initialize the keyboard
+    // One keyboard for the process, a window made after another replacing
+    // the one before, which nothing else holds.
+    delete gKeyboard;
     gKeyboard = new LLKeyboardWin32();
     gKeyboard->setCallbacks(callbacks);
 
@@ -1823,8 +1826,8 @@ const   S32   max_format  = (S32)num_formats - 1;
     if (auto_show)
     {
         show();
-        glClearColor(0.0f, 0.0f, 0.0f, 0.f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        gGL.setClearColor(LLColor4::transparent);
+        gGL.clear(GL_COLOR_BUFFER_BIT);
         swapBuffers();
     }
 

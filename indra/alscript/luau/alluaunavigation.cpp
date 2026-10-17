@@ -340,6 +340,10 @@ namespace
         bool                                home = true;
         std::vector<ALScriptSpan>           spans;
         std::optional<Luau::Location>       definition;
+        // The definition is a local declared with no value -- `local f`
+        // ahead of `function f`, as the converter forward-declares: where it
+        // is first given a function is its definition instead.
+        bool                                forward   = false;
         bool                                parameter = false;
         bool                                function  = false;
         // Whether a place it may stand could not be told: its name indexed
@@ -527,6 +531,7 @@ namespace
             {
                 if (isLocal(local))
                 {
+                    forward = !definition && stat->values.size == 0;
                     declare(local->location);
                 }
             }
@@ -582,7 +587,7 @@ namespace
         // when it is visited as the expression it is.
         bool visit(Luau::AstStatFunction* stat) override
         {
-            if (!definition && bind(stat->name))
+            if (bind(stat->name, /*gives_function*/ true))
             {
                 function = true;
             }
@@ -590,15 +595,28 @@ namespace
         }
         bool visit(Luau::AstStatAssign* stat) override
         {
-            for (Luau::AstExpr* var : stat->vars)
+            for (size_t i = 0; i < stat->vars.size; ++i)
             {
-                bind(var);
+                if (bind(stat->vars.data[i], i < stat->values.size && stat->values.data[i]->is<Luau::AstExprFunction>()))
+                {
+                    function |= forwardGiven;
+                }
             }
             return true;
         }
-        // Whether this is the target's first binding.
-        bool bind(Luau::AstExpr* name)
+        // Whether this is the target's first binding: a forward-declared
+        // local's first function too.
+        bool forwardGiven = false;
+        bool bind(Luau::AstExpr* name, bool gives_function)
         {
+            forwardGiven = false;
+            if (Luau::AstExprLocal* local = name->as<Luau::AstExprLocal>(); local && forward && gives_function && isLocal(local->local))
+            {
+                forward      = false;
+                forwardGiven = true;
+                definition   = local->location;
+                return true;
+            }
             if (definition)
             {
                 return false;

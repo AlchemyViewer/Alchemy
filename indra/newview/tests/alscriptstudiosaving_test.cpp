@@ -33,7 +33,7 @@
 #include "../alscriptstudiofileio.h"
 #include "alscriptstudio_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 
@@ -92,6 +92,8 @@ namespace
             run = std::move(answer);
         }
         void showExpanded(Doc&, const std::string&) override {}
+        void dropExpanded(Doc& doc) override { droppedExpanded.push_back(doc.id); }
+        std::vector<std::string> droppedExpanded;
         void runningKnown(Doc& doc) override { known.push_back(doc.id); }
         bool send(const Doc& doc, const std::string& text, const ALScriptSaveOptions& with, std::string& error) override
         {
@@ -176,7 +178,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct alscriptstudiosaving_data
     {
@@ -197,7 +199,7 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             studio.services        = &services;
             studio.options.program = "Alchemy Test 1.2.3";
@@ -261,55 +263,75 @@ namespace tut
         std::string        lastStatus() const { return services.statuses.empty() ? std::string() : nameOf(services.statuses.back()); }
     };
 
-    typedef test_group<alscriptstudiosaving_data> alscriptstudiosaving_group;
-    typedef alscriptstudiosaving_group::object    alscriptstudiosaving_object;
-    alscriptstudiosaving_group                    alscriptstudiosaving_instance("alscriptstudiosaving");
-
-    template<> template<>
-    void alscriptstudiosaving_object::test<1>()
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save writes a file or sends a notecard and holds one away or detached", "[alscriptstudiosaving]")
     {
-        set_test_name("a save goes as its tab is: a file written, a notecard sent as it stands, one out of reach said, one detached loaded first");
         ALScriptStudioSaving& saving = make();
 
         Doc& file = tab("file", "x = 1");
         file.file = files->in("x.luau");
         saving.save(file);
         std::string written;
-        ensure("a file written, nothing sent", files->settled == Names{ "file" } && ALScriptFileIO::readWholeFile(file.file, written) && written == "x = 1" &&
-                                                  studio.sent.empty());
+        {
+            INFO("a file written, nothing sent");
+            CHECK(files->settled == Names{ "file" });
+            CHECK(ALScriptFileIO::readWholeFile(file.file, written));
+            CHECK(written == "x = 1");
+            CHECK(studio.sent.empty());
+        }
 
         Doc& card     = tab("card", "some words");
         card.notecard = true;
         // Kept against a crash before, which a save lets go of.
         recovery->store->write(ALScriptStudioRecovery::entryOf(card));
-        ensure("kept before", recovery->keptFor(card.recoveryKey) == 1);
+        UNSCOPED_INFO("kept before");
+        CHECK(recovery->keptFor(card.recoveryKey) == 1);
         saving.save(card);
-        ensure("a notecard sent as it stands", studio.notecards == Names{ "some words" });
-        ensure("and not tidied", studio.tidied.size() == 1);
+        UNSCOPED_INFO("a notecard sent as it stands");
+        CHECK(studio.notecards == Names{ "some words" });
+        UNSCOPED_INFO("the notecard not tidied: the one tidy the file's");
+        CHECK(studio.tidied.size() == 1);
         CompileResult saved = answer(card);
         saved.kind          = ALScriptKind::Notecard;
         saving.compiled(saved);
-        ensure_equals("its answer said", lastSaid(), std::string("SavedNotecard"));
-        ensure("and kept as saved: what was kept let go of", recovery->keptFor(card.recoveryKey) == 0 && !card.save.underway());
+        UNSCOPED_INFO("its answer said");
+        CHECK(lastSaid() == std::string("SavedNotecard"));
+        {
+            INFO("and kept as saved: what was kept let go of");
+            CHECK(recovery->keptFor(card.recoveryKey) == 0);
+            CHECK_FALSE(card.save.underway());
+        }
 
         Doc& away      = tab("away", "default {}");
         away.orphan->kind    = Doc::Orphan::Away;
         services.front = 2;
         saving.save(away);
-        ensure_equals("out of reach, said where", lastStatus(), std::string("SaveBlockedAway"));
-        ensure("stopped, and the notice back", studio.stops == 1 && studio.notices == 1 && !away.save.underway() && studio.sent.empty());
+        UNSCOPED_INFO("out of reach, said where");
+        CHECK(lastStatus() == std::string("SaveBlockedAway"));
+        {
+            INFO("stopped, and the notice back");
+            CHECK(studio.stops == 1);
+            CHECK(studio.notices == 1);
+            CHECK_FALSE(away.save.underway());
+            CHECK(studio.sent.empty());
+        }
 
         Doc& detached    = tab("detached", "default {}");
         detached.orphan->detached = true;
         saving.save(detached);
-        ensure("loaded under its item first", orphans->loads.size() == 1 && orphans->loads[0] == detached.ref && studio.sent.empty());
-        ensure_equals("and said to wait", lastStatus(), std::string("SaveWaitsForLoad"));
+        {
+            INFO("loaded under its item first");
+            REQUIRE(orphans->loads.size() == 1);
+            CHECK(orphans->loads[0] == detached.ref);
+            CHECK(studio.sent.empty());
+        }
+        UNSCOPED_INFO("and said to wait");
+        CHECK(lastStatus() == std::string("SaveWaitsForLoad"));
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<2>()
+    // Tidied as the settings say, and fixed once a save however many checks
+    // it waits on.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save is tidied first with fixes only over the text last checked", "[alscriptstudiosaving]")
     {
-        set_test_name("tidied first as the settings say: the safe fixes only over the text last checked, and once a save however many checks it waits on");
         ALScriptStudioSaving& saving = make();
         studio.options.fix           = true;
         studio.options.format        = true;
@@ -318,63 +340,102 @@ namespace tut
 
         Doc& unchecked = tab("unchecked", "default {}");
         saving.save(unchecked);
-        ensure_equals("no fixes over a text not checked", studio.tidied.back(), std::string("mt"));
+        REQUIRE_FALSE(studio.tidied.empty());
+        UNSCOPED_INFO("no fixes over a text not checked");
+        CHECK(studio.tidied.back() == std::string("mt"));
 
         Doc& doc = tab("a", "default {}");
         checked(doc);
         saving.save(doc);
-        ensure_equals("the fixes, over the text checked", studio.tidied.back(), std::string("fmt"));
+        UNSCOPED_INFO("the fixes, over the text checked");
+        CHECK(studio.tidied.back() == std::string("fmt"));
         // They changed the text: checked again before it goes.
-        ensure("checked again", studio.analysed.back() == "a" && studio.sent.empty());
+        {
+            INFO("checked again");
+            REQUIRE_FALSE(studio.analysed.empty());
+            CHECK(studio.analysed.back() == "a");
+            CHECK(studio.sent.empty());
+        }
         checked(doc);
-        ensure("the check waited on", doc.save.checked());
+        UNSCOPED_INFO("the check waited on");
+        CHECK(doc.save.checked());
         saving.save(doc);
-        ensure_equals("not fixed twice", studio.tidied.back(), std::string("mt"));
-        ensure("sent", studio.sent.size() == 1 && studio.sent.back().doc == "a");
+        UNSCOPED_INFO("not fixed twice");
+        CHECK(studio.tidied.back() == std::string("mt"));
+        {
+            INFO("sent");
+            REQUIRE(studio.sent.size() == 1);
+            CHECK(studio.sent.back().doc == "a");
+        }
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<3>()
+    // Checked first, their errors stop it with Save Anyway and the first in
+    // sight; asked again, it goes past them and the offer is answered.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save held on the analyzers stops at their errors until asked again", "[alscriptstudiosaving]")
     {
-        set_test_name("held on the analyzers: checked first, their errors stopping it with Save Anyway and the first in sight; asked again, past them, the offer answered");
         ALScriptStudioSaving& saving = make();
         studio.options.holdOnErrors  = true;
 
         Doc& doc = tab("a", "default {}");
         saving.save(doc);
-        ensure("checked first", studio.analysed == Names{ "a" } && studio.sent.empty());
-        ensure_equals("and said so", lastStatus(), std::string("Preflight"));
+        {
+            INFO("checked first");
+            CHECK(studio.analysed == Names{ "a" });
+            CHECK(studio.sent.empty());
+        }
+        UNSCOPED_INFO("and said so");
+        CHECK(lastStatus() == std::string("Preflight"));
 
         checked(doc, { anError() });
-        ensure("the check waited on", doc.save.checked());
+        UNSCOPED_INFO("the check waited on");
+        CHECK(doc.save.checked());
         saving.save(doc);
-        ensure_equals("its errors stop it", lastSaid(), std::string("PreflightErrors"));
+        UNSCOPED_INFO("its errors stop it");
+        REQUIRE(lastSaid() == std::string("PreflightErrors"));
         const al_studio_test::FakeServices::Said& said = services.reports.back();
-        ensure("a failure, of the tab, with Save Anyway", said.failure && said.doc == "a" && said.actions == Names{ "save_anyway" });
-        ensure("the first of the checkers' errors in sight", studio.problemsShown == 1 && studio.firstErrors == std::vector<bool>{ true });
-        ensure("stopped", studio.stops == 1 && studio.sent.empty() && !doc.save.underway());
+        {
+            INFO("a failure, of the tab, with Save Anyway");
+            CHECK(said.failure);
+            CHECK(said.doc == "a");
+            CHECK(said.actions == Names{ "save_anyway" });
+        }
+        {
+            INFO("the first of the checkers' errors in sight");
+            CHECK(studio.problemsShown == 1);
+            CHECK(studio.firstErrors == std::vector<bool>{ true });
+        }
+        {
+            INFO("stopped");
+            CHECK(studio.stops == 1);
+            CHECK(studio.sent.empty());
+            CHECK_FALSE(doc.save.underway());
+        }
 
         doc.offer = Doc::Offer{ "held", { "save_anyway" } };
         saving.saveAsked(doc);
-        ensure("asked again over the same text: past them", studio.sent.size() == 1);
-        ensure("what was offered answered", !doc.offer);
+        UNSCOPED_INFO("asked again over the same text: past them");
+        CHECK(studio.sent.size() == 1);
+        UNSCOPED_INFO("what was offered answered");
+        CHECK_FALSE(doc.offer);
         doc.offer = Doc::Offer{ "saved elsewhere", { "take_saved", "keep_saved", "compare_saved" } };
         saving.save(doc);
-        ensure("a conflict's offer stays", doc.offer.has_value());
+        UNSCOPED_INFO("a conflict's offer stays");
+        CHECK(doc.offer.has_value());
 
         // Not held, the errors go with the text, said.
         studio.options.holdOnErrors = false;
         Doc& free                   = tab("free", "default {}");
         checked(free, { anError() });
         saving.save(free);
-        ensure("sent", studio.sent.size() == 2);
-        ensure_equals("with its errors said", lastSaid(), std::string("SentWithErrors"));
+        CHECK(studio.sent.size() == 2);
+        UNSCOPED_INFO("with its errors said");
+        CHECK(lastSaid() == std::string("SentWithErrors"));
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<4>()
+    // Its target, whether it runs and its experience; marked saved as it
+    // went.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save sends the tab's own options and stops when too large or refused", "[alscriptstudiosaving]")
     {
-        set_test_name("sent as the tab's own -- its target, whether it runs, its experience -- marked saved as it went; too large or refused, said and stopped");
         ALScriptStudioSaving& saving = make();
 
         Doc& doc                   = tab("a", "default {}");
@@ -386,28 +447,42 @@ namespace tut
         doc.experienceChosen = true;
         type(doc, "\n// more");
         saving.save(doc);
-        ensure_equals("one sent", studio.sent.size(), size_t(1));
+        REQUIRE(studio.sent.size() == size_t(1));
         const FakeSavingWindow::Sent& sent = studio.sent.back();
-        ensure_equals("the text as it stands", sent.text, std::string("default {}\n// more"));
-        ensure("its target, not running, its experience",
-               sent.options.compileTarget == "mono" && sent.options.running == false && sent.options.experience == experience);
-        ensure("on its way", doc.save.sending());
-        ensure_equals("said", lastStatus(), std::string("Saving"));
+        UNSCOPED_INFO("the text as it stands");
+        CHECK(sent.text == std::string("default {}\n// more"));
+        {
+            INFO("its target, not running, its experience");
+            CHECK(sent.options.compileTarget == "mono");
+            CHECK(sent.options.running == false);
+            CHECK(sent.options.experience == experience);
+        }
+        UNSCOPED_INFO("on its way");
+        CHECK(doc.save.sending());
+        CHECK(lastStatus() == std::string("Saving"));
 
         // Typed while it was on its way: that is still to be saved.
         type(doc, "\n// later");
         saving.compiled(answer(doc));
-        ensure_equals("compiled", lastSaid(), std::string("Compiled"));
-        ensure("what was typed since still unsaved", doc.editor->isDirty());
-        ensure("the experience it went with is the one it runs under", !doc.experienceChosen && doc.experienceKnown);
-        ensure("kept for recovery as it is now", recovery->keptFor(doc.recoveryKey) == 1);
+        CHECK(lastSaid() == std::string("Compiled"));
+        UNSCOPED_INFO("what was typed since still unsaved");
+        CHECK(doc.editor->isDirty());
+        {
+            INFO("the experience it went with is the one it runs under");
+            CHECK_FALSE(doc.experienceChosen);
+            CHECK(doc.experienceKnown);
+        }
+        UNSCOPED_INFO("kept for recovery as it is now");
+        CHECK(recovery->keptFor(doc.recoveryKey) == 1);
 
         Doc& clean = tab("clean", "default {}");
         type(clean, " ");
         saving.save(clean);
-        ensure("whether it runs not heard yet: not said, for the save to ask", !studio.sent.back().options.running.has_value());
+        UNSCOPED_INFO("whether it runs not heard yet: not said, for the save to ask");
+        CHECK_FALSE(studio.sent.back().options.running.has_value());
         saving.compiled(answer(clean));
-        ensure("nothing typed since: saved", !clean.unsaved());
+        UNSCOPED_INFO("nothing typed since: saved");
+        CHECK_FALSE(clean.unsaved());
 
         std::string too_much;
         while (too_much.size() <= ALScriptEnvelope::MAX_ASSET_BYTES)
@@ -416,71 +491,171 @@ namespace tut
         }
         Doc& big = tab("big", too_much);
         saving.save(big);
-        ensure_equals("too large: said", lastSaid(), std::string("SaveTooLarge"));
-        ensure("with what would shrink it", services.reports.back().text.find("SaveTooLargePlain") != std::string::npos);
-        ensure("its size kept, nothing sent, stopped",
-               big.weighing->assetBytes == too_much.size() && studio.sent.size() == 2 && !big.save.underway() && studio.stops == 1);
+        UNSCOPED_INFO("too large: said");
+        REQUIRE(lastSaid() == std::string("SaveTooLarge"));
+        UNSCOPED_INFO("with what would shrink it");
+        CHECK(services.reports.back().text.find("SaveTooLargePlain") != std::string::npos);
+        {
+            INFO("its size kept, nothing sent, stopped");
+            CHECK(big.weighing->assetBytes == too_much.size());
+            CHECK(studio.sent.size() == 2);
+            CHECK_FALSE(big.save.underway());
+            CHECK(studio.stops == 1);
+        }
 
         studio.refuse = "no region";
         Doc& refused  = tab("refused", "default {}");
         saving.save(refused);
-        ensure_equals("refused: said", lastSaid(), std::string("SaveFailed"));
-        ensure("with what may be done", services.reports.back().actions == Names{ "retry", "copy", "export" });
-        ensure("stopped", !refused.save.underway() && studio.stops == 2);
+        UNSCOPED_INFO("refused: said");
+        CHECK(lastSaid() == std::string("SaveFailed"));
+        UNSCOPED_INFO("with what may be done");
+        CHECK(services.reports.back().actions == Names{ "retry", "copy", "export" });
+        {
+            INFO("stopped");
+            CHECK_FALSE(refused.save.underway());
+            CHECK(studio.stops == 2);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<5>()
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a wrapped script nothing preprocesses goes up as written, its envelope let go of", "[alscriptstudiosaving]")
     {
-        set_test_name("preprocessed first: sent with its errors said, what it made in the envelope with its map, and a text moved on is run again");
+        ALScriptStudioSaving& saving = make();
+        studio.preprocessor          = false;
+        Doc& doc                     = tab("a", "default {}");
+        doc.envelope                 = ALScriptEnvelope();
+        type(doc, "x");
+        saving.save(doc);
+        {
+            INFO("Tapple's: sent as written, nothing run");
+            CHECK(studio.runs.empty());
+            REQUIRE(studio.sent.size() == size_t(1));
+            CHECK(studio.sent.back().text == "default {}x");
+        }
+        {
+            INFO("the envelope let go of, and its expansion's view");
+            CHECK_FALSE(doc.envelope);
+            CHECK(studio.droppedExpanded == Names{ "a" });
+        }
+    }
+
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save without preprocessing goes as written once and its asset is kept as it went", "[alscriptstudiosaving]")
+    {
+        ALScriptStudioSaving& saving = make();
+        studio.preprocessor          = true;
+        Doc& doc                     = tab("a", "default {}");
+        doc.envelope                 = ALScriptEnvelope();
+        doc.savePlain                = true;
+        type(doc, "x");
+        saving.save(doc);
+        {
+            INFO("as written, though the preprocessor would run");
+            CHECK(studio.runs.empty());
+            REQUIRE(studio.sent.size() == size_t(1));
+            CHECK(studio.sent.back().text == "default {}x");
+            CHECK_FALSE(doc.envelope);
+            CHECK_FALSE(doc.savePlain);
+        }
+        UNSCOPED_INFO("not the asset until it is up");
+        CHECK_FALSE(doc.asset);
+        saving.compiled(answer(doc));
+        {
+            INFO("the asset, as it went");
+            REQUIRE(doc.asset);
+            CHECK(*doc.asset == "default {}x");
+        }
+        type(doc, "y");
+        saving.save(doc);
+        UNSCOPED_INFO("once: the next save preprocesses");
+        CHECK(studio.runs == Names{ "a" });
+
+        // Stopped before it went, it is let go of.
+        Doc& other      = tab("b", "default {}");
+        other.savePlain = true;
+        saving.stopped(other);
+        UNSCOPED_INFO("a stopped save's ask let go of");
+        CHECK_FALSE(other.savePlain);
+    }
+
+    // Preprocessed first, its errors said, what it made in the envelope with
+    // its map; a text moved on meanwhile is run again.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a preprocessed save goes with its errors and what it made enveloped", "[alscriptstudiosaving]")
+    {
         ALScriptStudioSaving& saving = make();
         studio.preprocessor          = true;
 
         Doc& doc = tab("a", "#include \"x.lsl\"\ndefault {}");
         saving.save(doc);
-        ensure("run first", studio.runs == Names{ "a" } && studio.sent.empty() && doc.preprocessing);
+        {
+            INFO("run first");
+            CHECK(studio.runs == Names{ "a" });
+            CHECK(studio.sent.empty());
+            CHECK(doc.preprocessing);
+        }
 
         // Its errors do not stop it: the save is what keeps the work.
         ALPreprocessor::Result wrong;
         wrong.text = "default {";
         wrong.problems.push_back(anError());
         studio.answerRun(wrong);
-        ensure("what waited on the map it made told", studio.known == Names{ "a" });
-        ensure_equals("sent all the same", studio.sent.size(), size_t(1));
-        ensure_equals("said as it went", lastSaid(), std::string("SavingWithErrors"));
-        ensure("a failure of the tab, nothing to press", services.reports.back().failure && services.reports.back().actions.empty());
-        ensure("not stopped, the problems in sight", doc.save.underway() && studio.stops == 0 && studio.problemsShown == 1);
+        UNSCOPED_INFO("what waited on the map it made told");
+        CHECK(studio.known == Names{ "a" });
+        UNSCOPED_INFO("sent all the same");
+        CHECK(studio.sent.size() == size_t(1));
+        UNSCOPED_INFO("said as it went");
+        REQUIRE(lastSaid() == std::string("SavingWithErrors"));
+        {
+            INFO("a failure of the tab, nothing to press");
+            CHECK(services.reports.back().failure);
+            CHECK(services.reports.back().actions.empty());
+        }
+        {
+            INFO("not stopped, the problems in sight");
+            CHECK(doc.save.underway());
+            CHECK(studio.stops == 0);
+            CHECK(studio.problemsShown == 1);
+        }
         saving.compiled(answer(doc));
 
         type(doc, " ");
         saving.save(doc);
-        ensure("run again", studio.runs.size() == 2);
+        UNSCOPED_INFO("run again");
+        REQUIRE(studio.runs.size() == 2);
         ALPreprocessor::Result made;
         made.text = "default { state_entry() {} }";
         studio.answerRun(made);
-        ensure_equals("sent", studio.sent.size(), size_t(2));
+        REQUIRE(studio.sent.size() == size_t(2));
         const std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(studio.sent.back().text);
-        ensure("in the envelope", envelope.has_value());
-        ensure_equals("what it made", envelope->expanded, made.text);
-        ensure_equals("by this viewer", envelope->programVersion, studio.options.program);
-        ensure("with its map, for the compiler's lines", doc.save.sentMap().has_value());
-        ensure("weighed as each went", std::count(weighing->weighs.begin(), weighing->weighs.end(), "sent") == 2);
+        UNSCOPED_INFO("in the envelope");
+        REQUIRE(envelope.has_value());
+        UNSCOPED_INFO("what it made");
+        CHECK(envelope->expanded == made.text);
+        UNSCOPED_INFO("by this viewer");
+        CHECK(envelope->programVersion == studio.options.program);
+        UNSCOPED_INFO("with its map, for the compiler's lines");
+        CHECK(doc.save.sentMap().has_value());
+        UNSCOPED_INFO("weighed as each went");
+        CHECK(std::count(weighing->weighs.begin(), weighing->weighs.end(), "sent") == 2);
         saving.compiled(answer(doc));
 
         // The text moved on while the includes came: checked, and run again.
         type(doc, "\n// a");
         saving.save(doc);
-        ensure("run", studio.runs.size() == 3);
+        REQUIRE(studio.runs.size() == 3);
         type(doc, "\n// b");
         studio.answerRun(made);
-        ensure("checked again", studio.analysed.back() == "a");
-        ensure("and run again, nothing sent", studio.runs.size() == 4 && studio.sent.size() == 2);
+        REQUIRE_FALSE(studio.analysed.empty());
+        UNSCOPED_INFO("checked again");
+        CHECK(studio.analysed.back() == "a");
+        {
+            INFO("and run again, nothing sent");
+            CHECK(studio.runs.size() == 4);
+            CHECK(studio.sent.size() == 2);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<6>()
+    // And a tab saved to close is let go of.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: the compiler's answer keeps its errors and sends a save asked meanwhile", "[alscriptstudiosaving]")
     {
-        set_test_name("the compiler's answer: its errors kept and in sight, a save asked meanwhile sent after it, and a tab saved to close let go of");
         ALScriptStudioSaving& saving = make();
 
         Doc& doc = tab("a", "default {}");
@@ -494,27 +669,52 @@ namespace tut
         diagnostic.message   = "syntax error";
         failed.diagnostics.push_back(diagnostic);
         saving.compiled(failed);
-        ensure_equals("said", lastSaid(), std::string("CompileFailed"));
-        ensure("kept", doc.problems.size() == 1 && doc.problems[0].line == 3 && doc.problems[0].message == "syntax error");
-        ensure("in sight, its first error chosen", studio.problemsShown == 1 && studio.firstErrors == std::vector<bool>{ false });
-        ensure("a close waiting on it stopped", studio.stops == 1);
+        CHECK(lastSaid() == std::string("CompileFailed"));
+        {
+            INFO("its errors kept");
+            REQUIRE(doc.problems.size() == 1);
+            CHECK(doc.problems[0].line == 3);
+            CHECK(doc.problems[0].message == "syntax error");
+        }
+        {
+            INFO("in sight, its first error chosen");
+            CHECK(studio.problemsShown == 1);
+            CHECK(studio.firstErrors == std::vector<bool>{ false });
+        }
+        UNSCOPED_INFO("a close waiting on it stopped");
+        CHECK(studio.stops == 1);
 
         type(doc, " ");
         saving.save(doc);
         type(doc, " ");
         saving.save(doc);
-        ensure_equals("one on its way at a time", studio.sent.size(), size_t(2));
+        UNSCOPED_INFO("one on its way at a time");
+        CHECK(studio.sent.size() == size_t(2));
         saving.compiled(answer(doc));
-        ensure("the one asked meanwhile sent after it", studio.sent.size() == 3 && doc.save.sending());
-        ensure("what the last said gone with it", doc.problems.empty());
+        {
+            INFO("the one asked meanwhile sent after it");
+            CHECK(studio.sent.size() == 3);
+            CHECK(doc.save.sending());
+        }
+        UNSCOPED_INFO("what the last said gone with it");
+        CHECK(doc.problems.empty());
         saving.compiled(answer(doc));
 
         type(doc, " ");
         saving.saveToClose("a");
-        ensure("sent to close", studio.sent.size() == 4 && doc.save.closeAfter());
+        {
+            INFO("sent to close");
+            CHECK(studio.sent.size() == 4);
+            CHECK(doc.save.closeAfter());
+        }
         saving.compiled(answer(doc));
-        ensure("let go of", studio.closed == Names{ "a" } && !services.findDoc(std::string_view("a")));
-        ensure("and a window closing gone on with", studio.continues == 1);
+        {
+            INFO("let go of");
+            CHECK(studio.closed == Names{ "a" });
+            CHECK_FALSE(services.findDoc(std::string_view("a")));
+        }
+        UNSCOPED_INFO("and a window closing gone on with");
+        CHECK(studio.continues == 1);
 
         Doc& card     = tab("card", "some words");
         card.notecard = true;
@@ -523,19 +723,26 @@ namespace tut
         CompileResult saved = answer(card);
         saved.kind          = ALScriptKind::Notecard;
         saving.compiled(saved);
-        ensure("a notecard the same", studio.closed == Names{ "a", "card" } && studio.continues == 2);
+        {
+            INFO("a notecard the same");
+            CHECK(studio.closed == Names{ "a", "card" });
+            CHECK(studio.continues == 2);
+        }
 
         Doc& loading  = tab("loading", "");
         loading.loaded = false;
         saving.saveToClose("loading");
-        ensure("one that cannot begin is left as it was", services.findDoc(std::string_view("loading")) && !loading.save.closeAfter());
-        ensure("and a close waiting on it stops", studio.stops == 2);
+        {
+            INFO("one that cannot begin is left as it was");
+            REQUIRE(services.findDoc(std::string_view("loading")));
+            CHECK_FALSE(loading.save.closeAfter());
+        }
+        UNSCOPED_INFO("and a close waiting on it stops");
+        CHECK(studio.stops == 2);
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<7>()
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a copy saved closes its original unless that was typed in since", "[alscriptstudiosaving]")
     {
-        set_test_name("a copy saved closes the tab it was made of, unless that was typed in since");
         ALScriptStudioSaving& saving = make();
 
         Doc& original      = tab("original", "default {}");
@@ -545,9 +752,11 @@ namespace tut
         type(copy, " ");
         saving.save(copy);
         saving.compiled(answer(copy));
-        ensure("the original let go of", studio.closed == Names{ "original" });
-        ensure_equals("said", lastSaid(), std::string("CopiedTo"));
-        ensure("the copy is no copy now", copy.copyOf.empty());
+        UNSCOPED_INFO("the original let go of");
+        CHECK(studio.closed == Names{ "original" });
+        CHECK(lastSaid() == std::string("CopiedTo"));
+        UNSCOPED_INFO("the copy is no copy now");
+        CHECK(copy.copyOf.empty());
 
         Doc& typed        = tab("typed", "default {}");
         Doc& other        = tab("other", "default {}");
@@ -557,21 +766,27 @@ namespace tut
         type(other, " ");
         saving.save(other);
         saving.compiled(answer(other));
-        ensure("typed in since: kept open", studio.closed.size() == 1 && services.findDoc(std::string_view("typed")));
-        ensure_equals("and said so", lastSaid(), std::string("CopiedToKeptOpen"));
-        ensure_equals("of it", services.reports.back().doc, std::string("typed"));
+        {
+            INFO("typed in since: kept open");
+            CHECK(studio.closed.size() == 1);
+            CHECK(services.findDoc(std::string_view("typed")));
+        }
+        UNSCOPED_INFO("and said so");
+        REQUIRE(lastSaid() == std::string("CopiedToKeptOpen"));
+        UNSCOPED_INFO("said of the tab kept open");
+        CHECK(services.reports.back().doc == std::string("typed"));
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<8>()
+    // What a save sends is weighed as it goes, and its weight over the limit
+    // said where it is exact.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save over its target's limit is said once and an estimate as one", "[alscriptstudiosaving]")
     {
-        set_test_name("what a save sends weighed as it goes, and over its target's limit said once, where the weight is exact; an estimate's said as one");
         ALScriptStudioSaving& saving = make();
 
         Doc& doc = tab("a", "default {}");
         type(doc, " ");
         saving.save(doc);
-        ensure("weighed", weighing->weighs == Names{ "text" });
+        CHECK(weighing->weighs == Names{ "text" });
         ALScriptWeight weight;
         weight.target     = ALScriptWeight::Target::Mono;
         weight.total      = 70000;
@@ -580,11 +795,13 @@ namespace tut
         doc.weighing->version = doc.editor->document().version();
         doc.weighing->exact   = true;
         saving.warnOverWeight(doc);
-        ensure_equals("over: said", lastSaid(), std::string("SaveOverWeight"));
-        ensure("as a failure", services.reports.back().failure);
+        UNSCOPED_INFO("over: said");
+        CHECK(lastSaid() == std::string("SaveOverWeight"));
+        CHECK(services.reports.back().failure);
         const size_t said = services.reports.size();
         saving.warnOverWeight(doc);
-        ensure("once", services.reports.size() == said);
+        UNSCOPED_INFO("not said again");
+        CHECK(services.reports.size() == said);
 
         Doc& guessed = tab("guessed", "default {}");
         type(guessed, " ");
@@ -594,37 +811,39 @@ namespace tut
         guessed.weighing->version = guessed.editor->document().version();
         guessed.weighing->exact   = true;
         saving.warnOverWeight(guessed);
-        ensure_equals("an estimate said as one", lastSaid(), std::string("SaveOverWeightEstimate"));
-        ensure("once too", services.reports.size() == said + 1);
+        UNSCOPED_INFO("an estimate said as one");
+        CHECK(lastSaid() == std::string("SaveOverWeightEstimate"));
+        UNSCOPED_INFO("once too");
+        CHECK(services.reports.size() == said + 1);
         saving.warnOverWeight(guessed);
-        ensure("and only once", services.reports.size() == said + 1);
+        UNSCOPED_INFO("and only once");
+        CHECK(services.reports.size() == said + 1);
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<9>()
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save the external editor made is not tidied but one made here after is", "[alscriptstudiosaving]")
     {
-        set_test_name("a save the external editor made is not tidied, and one made here after it is");
         ALScriptStudioSaving& saving = make();
         studio.options.format        = true;
         studio.options.trim          = true;
         Doc& doc                     = tab("a", "default {}");
         doc.save.fromExternal(doc.editor->document().version());
         saving.save(doc);
-        ensure("not tidied", studio.tidied.empty());
-        ensure("sent as it came", studio.sent.size() == 1);
+        CHECK(studio.tidied.empty());
+        UNSCOPED_INFO("sent as it came");
+        CHECK(studio.sent.size() == 1);
         saving.compiled(answer(doc));
         // Ended as the answer ends it where the editor is watched.
         doc.save.endExternal();
         doc.editor->setCaret(doc.editor->document().end());
         doc.editor->insertText(" ");
         saving.save(doc);
-        ensure_equals("tidied, made here", studio.tidied.size(), size_t(1));
+        UNSCOPED_INFO("tidied, made here");
+        CHECK(studio.tidied.size() == size_t(1));
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<10>()
+    // Its first run as it loaded is held up to its compiled half.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a wrapped script offers a compiled half its source cannot have made", "[alscriptstudiosaving]")
     {
-        set_test_name("a wrapped script's first run as it loaded held up to its compiled half: offered where the source could not have made it");
         ALScriptStudioSaving& saving = make();
         studio.preprocessor          = true;
         const std::string source     = "default { state_entry() { llSay(0, \"hi\"); } }";
@@ -649,40 +868,53 @@ namespace tut
 
         Doc& here = loaded("here", edited, "Alchemy Release 7.2.0");
         ran(here);
-        ensure("ours, edited outside: offered", here.compiledDiffers && *here.compiledDiffers == edited && !here.compareCompiledAt);
+        {
+            INFO("ours, edited outside: offered");
+            REQUIRE(here.compiledDiffers);
+            CHECK(*here.compiledDiffers == edited);
+            CHECK_FALSE(here.compareCompiledAt);
+        }
         Doc& same = loaded("same", "default{state_entry(){llSay(0,\"hi\");}}", "Alchemy Release 7.2.0");
         ran(same);
-        ensure("what the source makes, spaced otherwise: nothing", !same.compiledDiffers);
+        UNSCOPED_INFO("what the source makes, spaced otherwise: nothing");
+        CHECK_FALSE(same.compiledDiffers);
         Doc& firestorm = loaded("fs", edited, "Firestorm-Releasex64 7.1.11.76496");
         ran(firestorm);
-        ensure("Firestorm's, untransformed: told", firestorm.compiledDiffers.has_value());
+        UNSCOPED_INFO("Firestorm's, untransformed: told");
+        CHECK(firestorm.compiledDiffers.has_value());
         Doc& switched = loaded("sw", edited, "Firestorm-Releasex64 7.1.11.76496");
         ran(switched, true);
-        ensure("Firestorm's, with a transform whose names ours need not share: not told", !switched.compiledDiffers);
+        UNSCOPED_INFO("Firestorm's, with a transform whose names ours need not share: not told");
+        CHECK_FALSE(switched.compiledDiffers);
         Doc& typed = loaded("typed", edited, "Alchemy Release 7.2.0");
         type(typed, " ");
         ran(typed);
-        ensure("typed in before the run: not the text as it came", !typed.compiledDiffers && !typed.compareCompiledAt);
+        {
+            INFO("typed in before the run: not the text as it came");
+            CHECK_FALSE(typed.compiledDiffers);
+            CHECK_FALSE(typed.compareCompiledAt);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<11>()
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a tidy is one step to undo however many of its parts changed the text", "[alscriptstudiosaving]")
     {
-        set_test_name("tidied as one step to undo, however many of its parts changed the text");
         ALScriptStudioSaving& saving = make();
         studio.options.format = true;
         studio.options.trim   = true;
         studio.changes        = true;
         Doc& doc = tab("a", "default {}");
         saving.save(doc);
-        ensure_equals("each part changed it", doc.editor->text(), std::string("mdefault {}t"));
+        UNSCOPED_INFO("each part changed it");
+        CHECK(doc.editor->text() == std::string("mdefault {}t"));
         doc.editor->undo();
-        ensure_equals("one Undo takes back all of it", doc.editor->text(), std::string("default {}"));
+        UNSCOPED_INFO("one Undo takes back all of it");
+        CHECK(doc.editor->text() == std::string("default {}"));
     }
-    template<> template<>
-    void alscriptstudiosaving_object::test<12>()
+
+    // An include not found, or one that never came, said by name with the
+    // disk's route, and the other errors said besides.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save goes up without includes missing or pending and names them", "[alscriptstudiosaving]")
     {
-        set_test_name("a save goes up without an include not found, or one that never came, saying so by name with the disk's route, and with the other errors said");
         ALScriptStudioSaving& saving = make();
         studio.preprocessor          = true;
 
@@ -698,14 +930,23 @@ namespace tut
         nowhere.args                   = { "x.lsl" };
         wrong.problems                 = { missing, nowhere, anError() };
         studio.answerRun(wrong);
-        ensure_equals("sent: the save keeps the work", studio.sent.size(), size_t(1));
+        UNSCOPED_INFO("sent: the save keeps the work");
+        CHECK(studio.sent.size() == size_t(1));
         const auto going = std::find_if(services.reports.begin(), services.reports.end(),
                                         [](const al_studio_test::FakeServices::Said& s) { return alscriptstudiosaving_data::nameOf(s.text) == "SavingWithout"; });
-        ensure("said as it went, by name, a failure of the tab",
-               going != services.reports.end() && going->text.find("[FILES]=lib.lsl, x.lsl") != std::string::npos && going->failure && going->doc == "a");
-        ensure("with where includes come from", going->text.find("PreprocessMissingDiskRoute") != std::string::npos);
-        ensure_equals("and the error besides them", lastSaid(), std::string("SavingWithErrors"));
-        ensure("counted without them", services.reports.back().text.find("[COUNT]=1") != std::string::npos);
+        {
+            INFO("said as it went, by name, a failure of the tab");
+            REQUIRE(going != services.reports.end());
+            CHECK(going->text.find("[FILES]=lib.lsl, x.lsl") != std::string::npos);
+            CHECK(going->failure);
+            CHECK(going->doc == "a");
+        }
+        UNSCOPED_INFO("with where includes come from");
+        CHECK(going->text.find("PreprocessMissingDiskRoute") != std::string::npos);
+        UNSCOPED_INFO("and the error besides them");
+        CHECK(lastSaid() == std::string("SavingWithErrors"));
+        UNSCOPED_INFO("counted without them");
+        CHECK(services.reports.back().text.find("[COUNT]=1") != std::string::npos);
         saving.compiled(answer(doc));
 
         // Only the other errors: those said.
@@ -715,7 +956,11 @@ namespace tut
         plain.text     = "default {}";
         plain.problems = { anError() };
         studio.answerRun(plain);
-        ensure("sent, its errors said", studio.sent.size() == 2 && lastSaid() == "SavingWithErrors");
+        {
+            INFO("sent, its errors said");
+            CHECK(studio.sent.size() == 2);
+            CHECK(lastSaid() == "SavingWithErrors");
+        }
         saving.compiled(answer(doc));
 
         // One that never came: sent without it, and said.
@@ -725,38 +970,52 @@ namespace tut
         waiting.text    = "default {}";
         waiting.pending = { "far.lsl" };
         studio.answerRun(waiting);
-        ensure_equals("sent without it", studio.sent.size(), size_t(3));
-        ensure("and said so", services.reports.back().text.find("SavingWithout") == 0 &&
-                                  services.reports.back().text.find("[FILES]=far.lsl") != std::string::npos);
+        UNSCOPED_INFO("sent without it");
+        CHECK(studio.sent.size() == size_t(3));
+        {
+            INFO("and said so");
+            CHECK(services.reports.back().text.find("SavingWithout") == 0);
+            CHECK(services.reports.back().text.find("[FILES]=far.lsl") != std::string::npos);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<13>()
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a tab sending takes only its own save's answer and not a recompile's", "[alscriptstudiosaving]")
     {
-        set_test_name("a tab sending takes only its own save's answer: another's for the same script, a recompile's, does not land as its own");
         ALScriptStudioSaving& saving = make();
         Doc&                  doc    = tab("a", "default {}");
         type(doc, "\n// mine");
         saving.save(doc);
-        ensure("on its way", doc.save.sending());
+        UNSCOPED_INFO("on its way");
+        CHECK(doc.save.sending());
+        REQUIRE(studio.sent.size() == size_t(1));
         const U64 mine = studio.sent.back().options.sender.request;
-        ensure("sent as a request of the studio's", mine != 0 && studio.sent.back().options.sender.origin == ALScriptOrigin::Studio);
+        {
+            INFO("sent as a request of the studio's");
+            CHECK(mine != 0);
+            CHECK(studio.sent.back().options.sender.origin == ALScriptOrigin::Studio);
+        }
 
         // A recompile from the explorer answers first, for the same script.
         CompileResult other = answer(doc);
         other.sender        = ALScriptSender(ALScriptOrigin::Recompile, mine + 100);
         saving.compiled(other);
-        ensure("still on its way", doc.save.sending());
-        ensure("not marked saved by another's answer", doc.editor->isDirty());
+        UNSCOPED_INFO("still on its way");
+        CHECK(doc.save.sending());
+        UNSCOPED_INFO("not marked saved by another's answer");
+        CHECK(doc.editor->isDirty());
 
         saving.compiled(answer(doc));
-        ensure("its own lands", !doc.save.sending() && !doc.editor->isDirty());
+        {
+            INFO("its own lands");
+            CHECK_FALSE(doc.save.sending());
+            CHECK_FALSE(doc.editor->isDirty());
+        }
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<14>()
+    // Taken in by a tab with nothing typed, asked about by one with changes,
+    // let be where it saved what the tab last had.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save from elsewhere is taken in or asked about or let be", "[alscriptstudiosaving]")
     {
-        set_test_name("a save from elsewhere: taken in by a tab with nothing typed, asked about by one with changes, let be where it saved what the tab last had");
         ALScriptStudioSaving& saving = make();
         const auto            saved  = [](const Doc& doc, const std::string& text, ALScriptOrigin origin, U64 request = 0) {
             ALScriptSaved one;
@@ -770,25 +1029,42 @@ namespace tut
         // Nothing typed here: taken in as loaded.
         Doc& clean = tab("clean", "default {}");
         saving.savedElsewhere(saved(clean, "default { touch_start(integer n) {} }", ALScriptOrigin::Bridge));
-        ensure("taken in", studio.loadedAgain == Names{ "clean:default { touch_start(integer n) {} }" });
+        UNSCOPED_INFO("taken in");
+        CHECK(studio.loadedAgain == Names{ "clean:default { touch_start(integer n) {} }" });
 
         // Changed here and there: asked, and nothing taken yet.
         Doc& dirty = tab("dirty", "default {}");
         type(dirty, "\n// mine");
         saving.savedElsewhere(saved(dirty, "default {}\n// theirs", ALScriptOrigin::Bridge));
-        ensure_equals("asked whose to keep", lastSaid(), std::string("SavedElsewhereConflict"));
-        ensure("with the four answers", services.reports.back().actions == Names{ "take_saved", "keep_saved", "merge_saved", "compare_saved" });
-        ensure("nothing taken yet", dirty.editor->wholeText() == "default {}\n// mine" && dirty.savedThere);
+        UNSCOPED_INFO("asked whose to keep");
+        REQUIRE(lastSaid() == std::string("SavedElsewhereConflict"));
+        UNSCOPED_INFO("with the four answers");
+        CHECK(services.reports.back().actions == Names{ "take_saved", "keep_saved", "merge_saved", "compare_saved" });
+        {
+            INFO("nothing taken yet");
+            CHECK(dirty.editor->wholeText() == "default {}\n// mine");
+            CHECK(dirty.savedThere);
+        }
         saving.takeSaved(dirty);
-        ensure("theirs taken, and nothing to save", dirty.editor->wholeText() == "default {}\n// theirs" && !dirty.editor->isDirty());
-        ensure("asked no more", !dirty.savedThere);
+        {
+            INFO("theirs taken, and nothing to save");
+            CHECK(dirty.editor->wholeText() == "default {}\n// theirs");
+            CHECK_FALSE(dirty.editor->isDirty());
+        }
+        UNSCOPED_INFO("asked no more");
+        CHECK_FALSE(dirty.savedThere);
 
         // A recompile of what the tab last had: nothing changes, nothing asked.
         Doc& kept = tab("kept", "default {}");
         type(kept, "\n// typing");
         const size_t said = services.reports.size();
         saving.savedElsewhere(saved(kept, "default {}", ALScriptOrigin::Recompile));
-        ensure("not asked", services.reports.size() == said && !kept.savedThere && kept.editor->isDirty());
+        {
+            INFO("not asked");
+            CHECK(services.reports.size() == said);
+            CHECK_FALSE(kept.savedThere);
+            CHECK(kept.editor->isDirty());
+        }
 
         // In its envelope: read by its source; what went up is what is here.
         ALScriptEnvelope envelope;
@@ -796,7 +1072,11 @@ namespace tut
         envelope.expanded      = "default {}";
         envelope.compileTarget = "mono";
         saving.savedElsewhere(saved(kept, envelope.wrap(), ALScriptOrigin::Bridge));
-        ensure("the same as here: saved", !kept.editor->isDirty() && services.reports.size() == said);
+        {
+            INFO("the same as here: saved");
+            CHECK_FALSE(kept.editor->isDirty());
+            CHECK(services.reports.size() == said);
+        }
 
         // Its own save lands as its answer, not as a save from elsewhere.
         Doc& own = tab("own", "default {}");
@@ -804,26 +1084,37 @@ namespace tut
         saving.save(own);
         ALScriptSaved mine = saved(own, "something else", ALScriptOrigin::Studio, own.save.request());
         saving.savedElsewhere(mine);
-        ensure("its own let be", !own.savedThere && own.editor->wholeText() == "default {} ");
+        {
+            INFO("its own let be");
+            CHECK_FALSE(own.savedThere);
+            CHECK(own.editor->wholeText() == "default {} ");
+        }
 
         // Kept: what is here stays, to be saved.
         type(dirty, "\n// again");
         saving.savedElsewhere(saved(dirty, "default {}\n// third", ALScriptOrigin::Editor));
         saving.keepSaved(dirty);
-        ensure("kept", !dirty.savedThere && dirty.editor->isDirty() && lastStatus() == "SavedElsewhereKept");
+        {
+            INFO("kept");
+            CHECK_FALSE(dirty.savedThere);
+            CHECK(dirty.editor->isDirty());
+            CHECK(lastStatus() == "SavedElsewhereKept");
+        }
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<15>()
+    // It asks what the item holds now, and stops with Save Anyway, Reload and
+    // Compare.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save stops where the item was saved elsewhere since until asked again", "[alscriptstudiosaving]")
     {
-        set_test_name("a save asks what the item holds now; saved elsewhere since, it stops with Save Anyway, Reload and Compare, and goes when asked again");
         ALScriptStudioSaving& saving = make();
         Doc&                  doc    = tab("a", "default {}");
         doc.assetId.generate();
         type(doc, " ");
         saving.save(doc);
-        ensure_equals("asked once", studio.worldAsks, 1);
-        ensure_equals("nothing moved: sent", studio.sent.size(), size_t(1));
+        UNSCOPED_INFO("asked once");
+        CHECK(studio.worldAsks == 1);
+        UNSCOPED_INFO("nothing moved: sent");
+        CHECK(studio.sent.size() == size_t(1));
         saving.compiled(answer(doc));
 
         LLUUID elsewhere;
@@ -831,17 +1122,24 @@ namespace tut
         studio.worldHolds = elsewhere;
         type(doc, "x");
         saving.save(doc);
-        ensure_equals("moved: said", lastSaid(), std::string("SaveWorldMoved"));
-        ensure("with what can be done", services.reports.back().actions == Names{ "save_anyway", "reload_world", "merge_world", "compare_world" });
-        ensure("and not sent", studio.sent.size() == 1 && !doc.save.underway());
+        UNSCOPED_INFO("moved: said");
+        REQUIRE(lastSaid() == std::string("SaveWorldMoved"));
+        UNSCOPED_INFO("with what can be done");
+        CHECK(services.reports.back().actions == Names{ "save_anyway", "reload_world", "merge_world", "compare_world" });
+        {
+            INFO("and not sent");
+            CHECK(studio.sent.size() == 1);
+            CHECK_FALSE(doc.save.underway());
+        }
         saving.saveAsked(doc);
-        ensure_equals("asked again: sent over it", studio.sent.size(), size_t(2));
+        UNSCOPED_INFO("asked again: sent over it");
+        CHECK(studio.sent.size() == size_t(2));
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<16>()
+    // As every editor of the item decides it: the same text, taken, kept or
+    // asked about.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: heard sorts a save from elsewhere and reads the last save only if needed", "[alscriptstudiosaving]")
     {
-        set_test_name("a save heard from elsewhere, as every editor of the item decides it: the same text, taken, kept or asked about; what was last saved asked only where it is needed");
         using Heard = ALScriptSaved::Heard;
         S32  asked     = 0;
         auto last_was  = [&asked](std::optional<std::string> text) {
@@ -850,19 +1148,25 @@ namespace tut
                 return text;
             };
         };
-        ensure("the same text", ALScriptSaved::heard("a", "a", true, last_was("b")) == Heard::Same);
-        ensure("nothing typed: taken", ALScriptSaved::heard("a", "b", false, last_was("b")) == Heard::Take);
-        ensure_equals("without asking what was last saved", asked, 0);
-        ensure("typed, and theirs is what was last saved: kept", ALScriptSaved::heard("a", "b", true, last_was("a")) == Heard::Keep);
-        ensure("typed, and theirs is new: asked", ALScriptSaved::heard("a", "b", true, last_was("c")) == Heard::Ask);
-        ensure("typed, nothing known of the last save: asked", ALScriptSaved::heard("a", "b", true, last_was(std::nullopt)) == Heard::Ask);
-        ensure_equals("asked where it was needed", asked, 3);
+        UNSCOPED_INFO("the same text");
+        CHECK(ALScriptSaved::heard("a", "a", true, last_was("b")) == Heard::Same);
+        UNSCOPED_INFO("nothing typed: taken");
+        CHECK(ALScriptSaved::heard("a", "b", false, last_was("b")) == Heard::Take);
+        UNSCOPED_INFO("without asking what was last saved");
+        CHECK(asked == 0);
+        UNSCOPED_INFO("typed, and theirs is what was last saved: kept");
+        CHECK(ALScriptSaved::heard("a", "b", true, last_was("a")) == Heard::Keep);
+        UNSCOPED_INFO("typed, and theirs is new: asked");
+        CHECK(ALScriptSaved::heard("a", "b", true, last_was("c")) == Heard::Ask);
+        UNSCOPED_INFO("typed, nothing known of the last save: asked");
+        CHECK(ALScriptSaved::heard("a", "b", true, last_was(std::nullopt)) == Heard::Ask);
+        UNSCOPED_INFO("asked where it was needed");
+        CHECK(asked == 3);
     }
 
-    template<> template<>
-    void alscriptstudiosaving_object::test<17>()
+    // A save sent before it leaves it to be undone.
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a merge is kept for good once a save carrying it is saved", "[alscriptstudiosaving]")
     {
-        set_test_name("a merge is kept for good once a save that carries it is saved; a save sent before it leaves it to be undone");
         ALScriptStudioSaving& saving = make();
         // As ALScriptStudioMerging keeps a merge just put in: the step it
         // made, and what it set aside.
@@ -878,7 +1182,8 @@ namespace tut
         merged(doc);
         saving.save(doc);
         saving.compiled(answer(doc));
-        ensure("saved with it: kept for good", !doc.merged);
+        UNSCOPED_INFO("saved with it: kept for good");
+        CHECK_FALSE(doc.merged);
 
         Doc& early = tab("b", "default {}");
         type(early, "\n// typed");
@@ -886,6 +1191,10 @@ namespace tut
         type(early, "\n// merged while it went");
         merged(early);
         saving.compiled(answer(early));
-        ensure("sent before it: still to be undone", early.merged && early.merged->savedThere == std::string("theirs"));
+        {
+            INFO("sent before it: still to be undone");
+            REQUIRE(early.merged);
+            CHECK(early.merged->savedThere == std::string("theirs"));
+        }
     }
 }

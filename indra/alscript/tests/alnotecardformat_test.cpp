@@ -27,12 +27,12 @@
 
 #include "../core/alnotecardformat.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alnotecardformat_data
     {
@@ -48,44 +48,42 @@ namespace tut
             return out;
         }
     };
-    typedef test_group<alnotecardformat_data> alnotecardformat_group;
-    typedef alnotecardformat_group::object    alnotecardformat_object;
-    alnotecardformat_group                    alnotecardformat_instance("ALNotecardFormat");
 
-    template<> template<>
-    void alnotecardformat_object::test<1>()
+    TEST_CASE_METHOD(alnotecardformat_data, "ALNotecardFormat: guess: JSON by brace or bracket; settings by mostly keys; text otherwise", "[ALNotecardFormat]")
     {
-        set_test_name("guessed: JSON by its brace or bracket; settings where most lines are keys or sections, two at least; plain text otherwise");
-        ensure_equals("an object", ALNotecardFormat::guess("  \n{ \"a\": 1 }\n"), std::string("json"));
-        ensure_equals("an array", ALNotecardFormat::guess("[1, 2]"), std::string("json"));
-        ensure_equals("settings", ALNotecardFormat::guess("# the door\n[Door]\nspeed = 2\nsound: creak\n\nlocked=false\n"), std::string("config"));
-        ensure_equals("one key is not enough", ALNotecardFormat::guess("title: A Story\nOnce upon a time.\nThe end.\n"), std::string("text"));
-        ensure_equals("prose with a colon or two", ALNotecardFormat::guess("Note: read this.\nWelcome to the store\nAsk for help\nHave fun\n"),
+        UNSCOPED_INFO("an object");
+        CHECK(ALNotecardFormat::guess("  \n{ \"a\": 1 }\n") == std::string("json"));
+        UNSCOPED_INFO("an array");
+        CHECK(ALNotecardFormat::guess("[1, 2]") == std::string("json"));
+        UNSCOPED_INFO("settings");
+        CHECK(ALNotecardFormat::guess("# the door\n[Door]\nspeed = 2\nsound: creak\n\nlocked=false\n") == std::string("config"));
+        UNSCOPED_INFO("one key is not enough");
+        CHECK(ALNotecardFormat::guess("title: A Story\nOnce upon a time.\nThe end.\n") == std::string("text"));
+        UNSCOPED_INFO("prose with a colon or two");
+        CHECK(ALNotecardFormat::guess("Note: read this.\nWelcome to the store\nAsk for help\nHave fun\n") ==
                       std::string("text"));
-        ensure_equals("nothing", ALNotecardFormat::guess(""), std::string("text"));
+        CHECK(ALNotecardFormat::guess("") == std::string("text"));
     }
 
-    template<> template<>
-    void alnotecardformat_object::test<2>()
+    TEST_CASE_METHOD(alnotecardformat_data, "ALNotecardFormat: linesPast finds lines longer than llGetNotecardLine returns by bytes", "[ALNotecardFormat]")
     {
-        set_test_name("the lines, counted from 0, longer than llGetNotecardLine returns: by bytes");
         const std::string one_line_too_long(ALNotecardFormat::READ_LINE_BYTES + 1, 'x');
         const std::string exactly(ALNotecardFormat::READ_LINE_BYTES, 'y');
         const std::vector<S32> past = ALNotecardFormat::linesPast("short\n" + one_line_too_long + "\n" + exactly + "\n" + one_line_too_long);
-        ensure("the second and the fourth", past == std::vector<S32>({ 1, 3 }));
+        UNSCOPED_INFO("the second and the fourth");
+        CHECK(past == std::vector<S32>({ 1, 3 }));
         // 513 characters of two bytes each: 1026 bytes.
         std::string wide;
         for (int i = 0; i < 513; ++i)
         {
             wide += "\xC3\xA9";
         }
-        ensure("by bytes, not characters", ALNotecardFormat::linesPast(wide) == std::vector<S32>({ 0 }));
+        UNSCOPED_INFO("by bytes, not characters");
+        CHECK(ALNotecardFormat::linesPast(wide) == std::vector<S32>({ 0 }));
     }
 
-    template<> template<>
-    void alnotecardformat_object::test<3>()
+    TEST_CASE_METHOD(alnotecardformat_data, "ALNotecardFormat: a JSON outline nests keys and places array objects and spans each value", "[ALNotecardFormat]")
     {
-        set_test_name("a JSON outline: every key nested under the one it is in, an array's objects by their places, each spanning its value");
         const std::string text = "{\n"
                                  "  \"name\": \"Door\",\n"
                                  "  \"speed\": 2.5,\n"
@@ -94,61 +92,106 @@ namespace tut
                                  "  \"on\": true\n"
                                  "}\n";
         const std::vector<ALScriptOutlineEntry> entries = ALNotecardFormat::outline(text);
-        ensure_equals("the keys", said(entries),
+        REQUIRE(said(entries) ==
                       std::string("name=\"Door\" speed=2.5 sounds={...} .open=\"creak\" .shut=\"bang\" stops=[...] .[2]={...} ..at=3 on=true"));
         const ALScriptOutlineEntry& sounds = entries[2];
-        ensure("sounds named where it is written", sounds.nameSpan.line == 3 && sounds.nameSpan.column == 2 && sounds.nameSpan.endColumn == 10);
-        ensure("and spanning its object", sounds.span.line == 3 && sounds.span.endLine == 3 && sounds.span.endColumn == 47);
-        ensure("a scalar spans its value", entries[1].span.line == 2 && entries[1].span.endColumn == 14);
+        {
+            INFO("sounds named where it is written");
+            CHECK(sounds.nameSpan.line == 3);
+            CHECK(sounds.nameSpan.column == 2);
+            CHECK(sounds.nameSpan.endColumn == 10);
+        }
+        {
+            INFO("and spanning its object");
+            CHECK(sounds.span.line == 3);
+            CHECK(sounds.span.endLine == 3);
+            CHECK(sounds.span.endColumn == 47);
+        }
+        {
+            INFO("a scalar spans its value");
+            CHECK(entries[1].span.line == 2);
+            CHECK(entries[1].span.endColumn == 14);
+        }
     }
 
-    template<> template<>
-    void alnotecardformat_object::test<4>()
+    TEST_CASE_METHOD(alnotecardformat_data, "ALNotecardFormat: a JSON outline of a top array or broken text or too many entries", "[ALNotecardFormat]")
     {
-        set_test_name("a JSON outline of an array at the top, of text that is not JSON all through, and of more entries than asked for");
-        ensure_equals("an array's objects", said(ALNotecardFormat::outline("[{\"a\": 1}, {\"b\": [ {\"c\": null} ]}]")),
+        UNSCOPED_INFO("an array's objects");
+        CHECK(said(ALNotecardFormat::outline("[{\"a\": 1}, {\"b\": [ {\"c\": null} ]}]")) ==
                       std::string("[0]={...} .a=1 [1]={...} .b=[...] ..[0]={...} ...c=null"));
-        ensure_equals("broken off: as far as it goes", said(ALNotecardFormat::outline("{\"a\": {\"b\": 1, \"c\"")), std::string("a={...} .b=1"));
-        ensure_equals("not JSON at all: nothing", said(ALNotecardFormat::outline("just words: here")), std::string());
-        ensure_equals("no more than asked", ALNotecardFormat::outline("{\"a\":1,\"b\":2,\"c\":3}", 2).size(), size_t(2));
+        UNSCOPED_INFO("broken off: as far as it goes");
+        CHECK(said(ALNotecardFormat::outline("{\"a\": {\"b\": 1, \"c\"")) == std::string("a={...} .b=1"));
+        UNSCOPED_INFO("not JSON at all: nothing");
+        CHECK(said(ALNotecardFormat::outline("just words: here")) == std::string());
+        UNSCOPED_INFO("no more than asked");
+        REQUIRE(ALNotecardFormat::outline("{\"a\":1,\"b\":2,\"c\":3}", 2).size() == size_t(2));
     }
 
-    template<> template<>
-    void alnotecardformat_object::test<5>()
+    TEST_CASE_METHOD(alnotecardformat_data, "ALNotecardFormat: namedAt finds the notecard named first in llGetNotecardLine and its kin", "[ALNotecardFormat]")
     {
-        set_test_name("a notecard a script names where it reads one: the string first in llGetNotecardLine and its kin, LSL's or SLua's, in either quote");
         const std::string lsl = "    key q = llGetNotecardLine(\"config\", line);";
         std::optional<ALNotecardFormat::Named> named = ALNotecardFormat::namedAt(lsl, 34);
-        ensure("inside the string", named && named->name == "config" && named->begin == 30 && named->end == 38);
-        ensure("on its quote", ALNotecardFormat::namedAt(lsl, 30).has_value());
-        ensure("not on the call's name", !ALNotecardFormat::namedAt(lsl, 16));
-        ensure("SLua's, single quotes, blanks about the bracket", ALNotecardFormat::namedAt("ll.GetNumberOfNotecardLines ( 'dialog' )", 32)->name == "dialog");
-        ensure("an escape taken out", ALNotecardFormat::namedAt("llGetNotecardLineSync(\"say \\\"hi\\\"\", 0)", 25)->name == "say \"hi\"");
-        ensure("a string another call is given, not", !ALNotecardFormat::namedAt("llSay(0, \"config\");", 12));
-        ensure("the second argument, not", !ALNotecardFormat::namedAt("llGetNotecardLine(name, \"x\")", 25));
+        {
+            INFO("inside the string");
+            REQUIRE(named);
+            CHECK(named->name == "config");
+            CHECK(named->begin == 30);
+            CHECK(named->end == 38);
+        }
+        UNSCOPED_INFO("on its quote");
+        REQUIRE(ALNotecardFormat::namedAt(lsl, 30).has_value());
+        UNSCOPED_INFO("not on the call's name");
+        REQUIRE_FALSE(ALNotecardFormat::namedAt(lsl, 16));
+        named = ALNotecardFormat::namedAt("ll.GetNumberOfNotecardLines ( 'dialog' )", 32);
+        {
+            INFO("SLua's, single quotes, blanks about the bracket");
+            REQUIRE(named);
+            CHECK(named->name == "dialog");
+        }
+        named = ALNotecardFormat::namedAt("llGetNotecardLineSync(\"say \\\"hi\\\"\", 0)", 25);
+        {
+            INFO("an escape taken out");
+            REQUIRE(named);
+            CHECK(named->name == "say \"hi\"");
+        }
+        UNSCOPED_INFO("a string another call is given, not");
+        REQUIRE_FALSE(ALNotecardFormat::namedAt("llSay(0, \"config\");", 12));
+        UNSCOPED_INFO("the second argument, not");
+        REQUIRE_FALSE(ALNotecardFormat::namedAt("llGetNotecardLine(name, \"x\")", 25));
 
         const std::string script = "default {\n"
                                    "  state_entry() { llGetNotecardLine(\"config\", 0); llSay(0, \"config\"); }\n"
                                    "  touch_start(integer n) { llGetNumberOfNotecardLines(\"config\"); llGetNotecardLine(\"other\", 0); }\n"
                                    "}\n";
         const std::vector<ALScriptSpan> read = ALNotecardFormat::readersOf(script, "config");
-        ensure_equals("two readers of it", read.size(), size_t(2));
-        ensure("the first", read[0].line == 1 && read[0].column == 36 && read[0].endColumn == 44);
-        ensure("the second", read[1].line == 2 && read[1].column == 54);
-        ensure("none of another", ALNotecardFormat::readersOf(script, "missing").empty());
+        REQUIRE(read.size() == size_t(2));
+        CHECK(read[0].line == 1);
+        CHECK(read[0].column == 36);
+        CHECK(read[0].endColumn == 44);
+        CHECK(read[1].line == 2);
+        CHECK(read[1].column == 54);
+        UNSCOPED_INFO("none of another");
+        REQUIRE(ALNotecardFormat::readersOf(script, "missing").empty());
     }
 
-    template<> template<>
-    void alnotecardformat_object::test<6>()
+    TEST_CASE_METHOD(alnotecardformat_data, "ALNotecardFormat: readersOf counts a lone CR as a line break as LF is and CRLF as one", "[ALNotecardFormat]")
     {
-        set_test_name("a notecard's readers by the lines a document makes of the script: a lone CR a break as LF is, CRLF one");
         const std::string script = "default {\r"
                                    "  state_entry() { llGetNotecardLine(\"config\", 0); }\r\n"
                                    "  touch_start(integer n) { llGetNumberOfNotecardLines(\"config\"); }\n"
                                    "}\r";
         const std::vector<ALScriptSpan> read = ALNotecardFormat::readersOf(script, "config");
-        ensure_equals("both", read.size(), size_t(2));
-        ensure("the first on the second line", read[0].line == 1 && read[0].column == 36 && read[0].endColumn == 44);
-        ensure("the second on the third", read[1].line == 2 && read[1].column == 54);
+        REQUIRE(read.size() == size_t(2));
+        {
+            INFO("the first on the second line");
+            CHECK(read[0].line == 1);
+            CHECK(read[0].column == 36);
+            CHECK(read[0].endColumn == 44);
+        }
+        {
+            INFO("the second on the third");
+            CHECK(read[1].line == 2);
+            CHECK(read[1].column == 54);
+        }
     }
 }

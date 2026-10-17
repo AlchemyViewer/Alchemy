@@ -29,7 +29,7 @@
 		<menu_item_call label="すべて取り外す" name="Detach All"/>
 	</context_menu>
 	<menu_item_call label="座る／立つ" name="Sit stand"/>
-	<menu_item_call label="飛行／着地" name="Fly land"/>
+	<menu_item_call label="飛ぶ／着地" name="Fly land"/>
 	<menu_item_call label="アニメーションを停止" name="Stop Animating My Avatar"/>
 	<menu_item_call label="テクスチャをリフレシュ" name="Refresh Textures"/>
 	<menu_item_call label="スケルトンをリセット" name="Reset Skeleton"/>

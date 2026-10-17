@@ -26,9 +26,9 @@
 
 #include "alvimregisters.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alvimregisters_data
     {
@@ -51,144 +51,209 @@ namespace tut
         }
     };
 
-    typedef test_group<alvimregisters_data> alvimregisters_group;
-    typedef alvimregisters_group::object    alvimregisters_object;
-    alvimregisters_group                    alvimregisters_instance("alvimregisters");
-
-    template<> template<>
-    void alvimregisters_object::test<1>()
+    TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: a named register keeps its text and its capital adds to it", "[alvimregisters]")
     {
-        set_test_name("a named register keeps what goes in it, its capital adds to it, and the clipboard is left alone");
         registers.store('a', "one", false, false, true, true);
-        ensure_equals("kept", registers.fetch('a', true).text, std::string("one"));
+        CHECK(registers.fetch('a', true).text == std::string("one"));
         registers.store('A', "two", false, false, true, true);
-        ensure_equals("added straight on", registers.fetch('a', true).text, std::string("onetwo"));
+        UNSCOPED_INFO("added straight on");
+        CHECK(registers.fetch('a', true).text == std::string("onetwo"));
         registers.store('A', "line", true, false, true, true);
         const ALVimRegisters::Register lines = registers.fetch('A', true);
-        ensure("a line added makes it lines", lines.text == "onetwo\nline" && lines.linewise);
-        ensure_equals("\"\" is what went in last", registers.fetch('"', true).text, std::string("onetwo\nline"));
-        ensure_equals("the clipboard untouched", copies, 0);
+        {
+            INFO("a line added makes it lines");
+            CHECK(lines.text == "onetwo\nline");
+            CHECK(lines.linewise);
+        }
+        UNSCOPED_INFO("\"\" is what went in last");
+        CHECK(registers.fetch('"', true).text == std::string("onetwo\nline"));
+        UNSCOPED_INFO("the clipboard untouched");
+        CHECK(copies == 0);
     }
 
-    template<> template<>
-    void alvimregisters_object::test<2>()
+    // A yank goes in 0, a delete of lines in 1 with the rest moved along, a
+    // smaller one in -, and _ keeps nothing.
+    TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: yanks go in 0 and deletes of lines shift through 1 and small ones go in -", "[alvimregisters]")
     {
-        set_test_name("a yank goes in 0, a delete of lines in 1 with the rest moved along, a smaller one in -, and _ keeps nothing");
         registers.store(0, "yanked", false, false, true, false);
-        ensure_equals("0", registers.fetch('0', false).text, std::string("yanked"));
+        CHECK(registers.fetch('0', false).text == std::string("yanked"));
         for (int i = 1; i <= 10; ++i)
         {
             registers.store(0, "line " + std::to_string(i), true, false, false, false);
         }
-        ensure_equals("the newest in 1", registers.fetch('1', false).text, std::string("line 10"));
-        ensure_equals("the oldest kept in 9", registers.fetch('9', false).text, std::string("line 2"));
+        UNSCOPED_INFO("the newest in 1");
+        CHECK(registers.fetch('1', false).text == std::string("line 10"));
+        UNSCOPED_INFO("the oldest kept in 9");
+        CHECK(registers.fetch('9', false).text == std::string("line 2"));
         registers.store(0, "two\nlines", false, false, false, false);
-        ensure_equals("two lines taken as characters are a line or more", registers.fetch('1', false).text, std::string("two\nlines"));
+        UNSCOPED_INFO("two lines taken as characters are a line or more");
+        CHECK(registers.fetch('1', false).text == std::string("two\nlines"));
         registers.store(0, "word", false, false, false, false);
-        ensure_equals("a smaller one in -", registers.fetch('-', false).text, std::string("word"));
-        ensure_equals("and 1 as it was", registers.fetch('1', false).text, std::string("two\nlines"));
+        UNSCOPED_INFO("a smaller one in -");
+        CHECK(registers.fetch('-', false).text == std::string("word"));
+        UNSCOPED_INFO("and 1 as it was");
+        CHECK(registers.fetch('1', false).text == std::string("two\nlines"));
         registers.store('_', "gone", false, false, false, false);
-        ensure_equals("_ keeps nothing, and the unnamed is as it was", registers.fetch(0, false).text, std::string("word"));
+        UNSCOPED_INFO("_ keeps nothing, and the unnamed is as it was");
+        CHECK(registers.fetch(0, false).text == std::string("word"));
     }
 
-    template<> template<>
-    void alvimregisters_object::test<3>()
+    TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: the unnamed register is the clipboard if set and + and * always are", "[alvimregisters]")
     {
-        set_test_name("the unnamed register is the clipboard where the setting says so, and + and * are the clipboard whatever it says");
         registers.store(0, "shared", true, false, true, true);
-        ensure_equals("written to the clipboard", clipboard, std::string("shared"));
+        UNSCOPED_INFO("written to the clipboard");
+        CHECK(clipboard == std::string("shared"));
         const ALVimRegisters::Register back = registers.fetch(0, true);
-        ensure("read back from it, a line as it was taken", back.text == "shared" && back.linewise);
+        {
+            INFO("read back from it, a line as it was taken");
+            CHECK(back.text == "shared");
+            CHECK(back.linewise);
+        }
         clipboard = "from elsewhere";
         const ALVimRegisters::Register other = registers.fetch(0, true);
-        ensure("somebody else's as characters", other.text == "from elsewhere" && !other.linewise);
-        ensure_equals("\"\" is the register's all the same", registers.fetch('"', true).text, std::string("shared"));
+        {
+            INFO("somebody else's as characters");
+            CHECK(other.text == "from elsewhere");
+            CHECK_FALSE(other.linewise);
+        }
+        UNSCOPED_INFO("\"\" is the register's all the same");
+        CHECK(registers.fetch('"', true).text == std::string("shared"));
 
         registers.store(0, "own", false, false, true, false);
-        ensure_equals("the setting off: the clipboard not written", clipboard, std::string("from elsewhere"));
-        ensure_equals("and none named is the register's", registers.fetch(0, false).text, std::string("own"));
+        UNSCOPED_INFO("the setting off: the clipboard not written");
+        CHECK(clipboard == std::string("from elsewhere"));
+        UNSCOPED_INFO("and none named is the register's");
+        CHECK(registers.fetch(0, false).text == std::string("own"));
         registers.store('+', "plus", false, false, true, false);
-        ensure_equals("+ is the clipboard whatever the setting", clipboard, std::string("plus"));
-        ensure_equals("and reads it", registers.fetch('*', false).text, std::string("plus"));
+        UNSCOPED_INFO("+ is the clipboard whatever the setting");
+        CHECK(clipboard == std::string("plus"));
+        UNSCOPED_INFO("and reads it");
+        CHECK(registers.fetch('*', false).text == std::string("plus"));
     }
 
-    template<> template<>
-    void alvimregisters_object::test<4>()
+    // A macro's keys go in its register alone, as characters, its capital adding
+    // to them.
+    TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: a macro's keys go in its register alone as characters", "[alvimregisters]")
     {
-        set_test_name("a macro's keys go in its register alone, as characters, its capital adding to them");
         registers.store(0, "before", true, false, true, true);
         const int copied = copies;
         registers.record('q', "dd");
-        ensure_equals("kept", registers.fetch('q', true).text, std::string("dd"));
+        CHECK(registers.fetch('q', true).text == std::string("dd"));
         registers.record('Q', "j");
         const ALVimRegisters::Register macro = registers.fetch('q', true);
-        ensure("added, as characters", macro.text == "ddj" && !macro.linewise);
-        ensure("neither the clipboard nor the unnamed register touched", copies == copied && registers.fetch('"', true).text == "before");
+        {
+            INFO("added, as characters");
+            CHECK(macro.text == "ddj");
+            CHECK_FALSE(macro.linewise);
+        }
+        {
+            INFO("neither the clipboard nor the unnamed register touched");
+            CHECK(copies == copied);
+            CHECK(registers.fetch('"', true).text == "before");
+        }
     }
 
-    template<> template<>
-    void alvimregisters_object::test<5>()
+    // An empty line is kept as a line, and read back so through the clipboard it
+    // leaves empty; a register never set is no line.
+    TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: an empty line is kept as a line even through an empty clipboard", "[alvimregisters]")
     {
-        set_test_name("an empty line is kept as a line, and read back so through the clipboard it leaves empty; a register never set is no line");
         const ALVimRegisters::Register unset = registers.fetch('a', false);
-        ensure("never set: no text, and no line", unset.text.empty() && !unset.linewise);
+        {
+            INFO("never set: no text, and no line");
+            CHECK(unset.text.empty());
+            CHECK_FALSE(unset.linewise);
+        }
         registers.store(0, "", true, false, true, true);
-        ensure("kept as a line", registers.fetch('0', true).linewise);
-        ensure_equals("the clipboard written, and empty", clipboard, std::string());
+        UNSCOPED_INFO("kept as a line");
+        CHECK(registers.fetch('0', true).linewise);
+        UNSCOPED_INFO("the clipboard written, and empty");
+        CHECK(clipboard == std::string());
         const ALVimRegisters::Register back = registers.fetch(0, true);
-        ensure("read back through the clipboard as the line it was", back.text.empty() && back.linewise);
+        {
+            INFO("read back through the clipboard as the line it was");
+            CHECK(back.text.empty());
+            CHECK(back.linewise);
+        }
     }
 
-    template<> template<>
-    void alvimregisters_object::test<6>()
+    // A delete of a line or more into a named register goes in 1 as well, the
+    // rest moved along, and so does one over a search; a smaller one and a yank
+    // leave 1 alone.
+    TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: a delete of lines into a named register goes in 1 as well", "[alvimregisters]")
     {
-        set_test_name("a delete of a line or more into a named register goes in 1 as well, the rest moved along, and so does one over a search; a smaller one and a yank leave 1 alone");
         registers.store(0, "older", true, false, false, false);
         registers.store('a', "one", true, false, false, false);
-        ensure_equals("the line in a", registers.fetch('a', false).text, std::string("one"));
-        ensure_equals("and in 1", registers.fetch('1', false).text, std::string("one"));
-        ensure_equals("the one before moved along to 2", registers.fetch('2', false).text, std::string("older"));
+        UNSCOPED_INFO("the line in a");
+        CHECK(registers.fetch('a', false).text == std::string("one"));
+        UNSCOPED_INFO("and in 1");
+        CHECK(registers.fetch('1', false).text == std::string("one"));
+        UNSCOPED_INFO("the one before moved along to 2");
+        CHECK(registers.fetch('2', false).text == std::string("older"));
         registers.store('A', "two", true, false, false, false);
-        ensure_equals("A adds to a", registers.fetch('a', false).text, std::string("one\ntwo"));
-        ensure_equals("1 the line taken, alone", registers.fetch('1', false).text, std::string("two"));
-        ensure_equals("\"\" what a holds", registers.fetch('"', false).text, std::string("one\ntwo"));
+        UNSCOPED_INFO("A adds to a");
+        CHECK(registers.fetch('a', false).text == std::string("one\ntwo"));
+        UNSCOPED_INFO("1 the line taken, alone");
+        CHECK(registers.fetch('1', false).text == std::string("two"));
+        UNSCOPED_INFO("\"\" what a holds");
+        CHECK(registers.fetch('"', false).text == std::string("one\ntwo"));
         registers.store('b', "two\nlines", false, false, false, false);
-        ensure_equals("characters over two lines are a line or more", registers.fetch('1', false).text, std::string("two\nlines"));
+        UNSCOPED_INFO("characters over two lines are a line or more");
+        CHECK(registers.fetch('1', false).text == std::string("two\nlines"));
         registers.store('c', "word ", false, false, false, false, true);
-        ensure_equals("a smaller one over a search in 1 too", registers.fetch('1', false).text, std::string("word "));
-        ensure("but not in -", registers.fetch('-', false).text.empty());
+        UNSCOPED_INFO("a smaller one over a search in 1 too");
+        CHECK(registers.fetch('1', false).text == std::string("word "));
+        UNSCOPED_INFO("but not in -");
+        CHECK(registers.fetch('-', false).text.empty());
         registers.store('d', "small", false, false, false, false);
-        ensure_equals("a smaller one: 1 as it was", registers.fetch('1', false).text, std::string("word "));
+        UNSCOPED_INFO("a smaller one: 1 as it was");
+        CHECK(registers.fetch('1', false).text == std::string("word "));
         registers.store('e', "yanked\nlines", true, false, true, false);
-        ensure_equals("a yank: 1 as it was", registers.fetch('1', false).text, std::string("word "));
-        ensure("and 0 never set", registers.fetch('0', false).text.empty());
+        UNSCOPED_INFO("a yank: 1 as it was");
+        CHECK(registers.fetch('1', false).text == std::string("word "));
+        UNSCOPED_INFO("and 0 never set");
+        CHECK(registers.fetch('0', false).text.empty());
     }
 
-    template<> template<>
-    void alvimregisters_object::test<7>()
+    // A digit or - named keeps it as a letter does, and neither 0, the small
+    // delete register nor the clipboard takes it too.
+    TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: a digit or - named keeps text as a letter does and nothing else takes it", "[alvimregisters]")
     {
-        set_test_name("a digit or - named keeps it as a letter does, and neither 0, the small delete register nor the clipboard takes it too");
         registers.store(0, "Z0", false, false, true, true);
         registers.store(0, "Zm", false, false, false, true);
         const int copied = copies;
         registers.store('-', "one two", true, false, true, true);
         const ALVimRegisters::Register small = registers.fetch('-', true);
-        ensure("\"-yy: the line in -", small.text == "one two" && small.linewise);
-        ensure_equals("0 as it was", registers.fetch('0', true).text, std::string("Z0"));
-        ensure_equals("\"\" says it", registers.fetch('"', true).text, std::string("one two"));
+        {
+            INFO("\"-yy: the line in -");
+            CHECK(small.text == "one two");
+            CHECK(small.linewise);
+        }
+        UNSCOPED_INFO("0 as it was");
+        CHECK(registers.fetch('0', true).text == std::string("Z0"));
+        UNSCOPED_INFO("\"\" says it");
+        CHECK(registers.fetch('"', true).text == std::string("one two"));
         registers.store('5', "one two", true, false, true, true);
-        ensure_equals("\"5yy: the line in 5", registers.fetch('5', true).text, std::string("one two"));
-        ensure_equals("0 still as it was", registers.fetch('0', true).text, std::string("Z0"));
+        UNSCOPED_INFO("\"5yy: the line in 5");
+        CHECK(registers.fetch('5', true).text == std::string("one two"));
+        UNSCOPED_INFO("0 still as it was");
+        CHECK(registers.fetch('0', true).text == std::string("Z0"));
         registers.store('5', "one ", false, false, false, true);
-        ensure_equals("\"5dw: the word in 5", registers.fetch('5', true).text, std::string("one "));
-        ensure_equals("not in -", registers.fetch('-', true).text, std::string("one two"));
-        ensure_equals("the clipboard untouched", copies, copied);
+        UNSCOPED_INFO("\"5dw: the word in 5");
+        CHECK(registers.fetch('5', true).text == std::string("one "));
+        UNSCOPED_INFO("not in -");
+        CHECK(registers.fetch('-', true).text == std::string("one two"));
+        UNSCOPED_INFO("the clipboard untouched");
+        CHECK(copies == copied);
         registers.store(0, "Z1", true, false, false, false);
         registers.store('1', "line", true, false, false, false);
-        ensure_equals("\"1dd: the line in 1", registers.fetch('1', false).text, std::string("line"));
-        ensure_equals("and moved along to 2 with it", registers.fetch('2', false).text, std::string("line"));
+        UNSCOPED_INFO("\"1dd: the line in 1");
+        CHECK(registers.fetch('1', false).text == std::string("line"));
+        UNSCOPED_INFO("and moved along to 2 with it");
+        CHECK(registers.fetch('2', false).text == std::string("line"));
         registers.store('-', "lines", true, false, false, false);
-        ensure_equals("\"-dd: in -", registers.fetch('-', false).text, std::string("lines"));
-        ensure_equals("and in 1", registers.fetch('1', false).text, std::string("lines"));
+        UNSCOPED_INFO("\"-dd: in -");
+        CHECK(registers.fetch('-', false).text == std::string("lines"));
+        UNSCOPED_INFO("and in 1");
+        CHECK(registers.fetch('1', false).text == std::string("lines"));
     }
 }

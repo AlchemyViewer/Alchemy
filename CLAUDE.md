@@ -16,7 +16,7 @@ CMake with vcpkg for dependency management. The source root for CMake is `indra/
 - Rust only for the Velopack update client (`AL_USE_VELOPACK`), whose C API Corrosion builds from `indra/rust`
 - The .NET SDK (`dotnet tool restore`) only for Velopack installers, and on Linux `squashfs-tools` for the AppImage
 - Python 3 with `llsd` (`pip install -r requirements.txt`) only for the four tests that spawn a Python peer; without it they are registered disabled
-- Python 3 with `PyYAML` and `llsd`, plus bison and flex, only for LL's LSL compiler (`indra/lscript`, a test-only reference); without them it is left out
+- Python 3 with `PyYAML` and `llsd`, plus bison 3 and flex (on macOS Homebrew's: `brew install bison flex`), only for LL's LSL compiler (`indra/lscript`, a test-only reference); without them it is left out
 
 CMake files are formatted with gersemi (`.gersemirc` at the repo root): run `gersemi -i <files>` on any CMake file you edit.
 
@@ -57,10 +57,12 @@ The viewer executable lands at `build-<OS>-<preset>/newview/<CONFIG>/` (e.g., `S
 Tests are off by default. To enable: add `-DAL_BUILD_TESTS=ON` to the configure command. Then run via CTest:
 
 ```
-ctest --test-dir build-<OS>-<preset> --output-on-failure
+ctest --test-dir build-<OS>-<preset> --output-on-failure -LE manual
 ```
 
-Unit tests live alongside the library they test in `indra/<library>/tests/` directories. The test framework is TUT (Template Unit Test). Test targets are defined by the `LL_ADD_PROJECT_UNIT_TESTS` macro in `indra/cmake/LLAddBuildTest.cmake`. Integration tests are in `indra/integration_tests/`.
+`-LE manual` leaves out the benchmarks and the pending one-process runs of Catch2 binaries (label `combined_pending`), as the build's own test target does. `-L <library>` runs one library's tests, and `-R '^<binary>/<file stem>$'` one file's.
+
+Tests are Catch2 v3 and live alongside the library they test in `indra/<library>/tests/` directories. A library's test files build into one binary with `al_add_test_binary` (`indra/cmake/ALAddTestBinary.cmake`), on the harness in `indra/test/`, each file still a CTest entry of its own. Run one file by hand as `<binary> "[#<file stem>]~[.]"`, and add `--order rand` to shuffle. Benchmarks are files of the same binaries (`BENCH_SOURCES`), run by `ctest -L benchmark -V`. How to write a test, and the rules a test binary needs, are in `doc/TESTING.md`. Integration tests are in `indra/integration_tests/`.
 
 ## Architecture
 

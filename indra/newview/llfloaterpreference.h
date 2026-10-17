@@ -42,6 +42,8 @@
 
 #include <boost/signals2/connection.hpp>
 
+#include <optional>
+
 class LLConversationLogObserver;
 class LLPanelPreference;
 class LLPanelLCD;
@@ -53,6 +55,7 @@ class LLScrollListCell;
 class LLSliderCtrl;
 class LLSD;
 class LLTextBox;
+class LLTextEditor;
 struct skin_t;
 
 namespace ll
@@ -394,6 +397,40 @@ private:
     // destroyed; boost::signals2 makes that safe even if the engine
     // outlives the panel.
     boost::signals2::scoped_connection mDevicesChangedConn;
+};
+
+// Colors > Chat preferences panel. Renders a live mock-chat preview that
+// re-colors whenever a chat-color swatch or any AlchemyChatIRC* setting
+// changes, using the real chat-color path so it matches in-world local chat.
+class LLPanelPreferenceColors final : public LLPanelPreference
+{
+    LOG_CLASS(LLPanelPreferenceColors);
+public:
+    AL_VIEW_TYPE(LLPanelPreferenceColors, LLPanelPreference);
+
+    bool postBuild() override;
+    void draw() override;
+
+private:
+    // what the preview was last laid out from
+    struct PreviewInputs
+    {
+        U32  mColorGeneration;
+        bool mIRCColors;
+        F32  mSaturation;
+        F32  mLightness;
+        F32  mNameLightness;
+        bool mShowTime;
+        bool mShowSeconds;
+        bool mUse24Hour;
+
+        bool operator==(const PreviewInputs&) const = default;
+    };
+
+    void updatePreview(const PreviewInputs& inputs);
+
+    LLTextEditor* mPreviewEditor = nullptr;
+    std::optional<PreviewInputs> mPreviewInputs;
 };
 
 class LLPanelPreferenceControls final : public LLPanelPreference, public LLKeyBindResponderInterface

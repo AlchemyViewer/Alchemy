@@ -4,4 +4,3 @@ This directory contains vendored external resources which are unsuited for vcpkg
 
 * js - ThreeJS and JPEGEncoder
 * mikktspace - Blender Mikktspace - code relatively static and unchanging
-* tut - TUT unit testing library - Upstream inactive

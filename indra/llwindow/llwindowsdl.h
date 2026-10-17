@@ -195,6 +195,7 @@ public:
     void bringToFront(const std::string& activation_token);
 
     void setLanguageTextInput(const LLCoordGL& pos) override;
+    void updateLanguageTextInputArea() override;
     void allowLanguageTextInput(LLPreeditor* preeditor, bool b) override;
 
     void spawnWebBrowser(const std::string &escaped_url, bool async) override;
@@ -385,6 +386,13 @@ private:
     F32 mScrollWheelAccumX = 0.f;
     F32 mScrollWheelAccumY = 0.f;
 
+    // A touchpad pinch, given to the viewer as Control+wheel clicks (see
+    // SDL_EVENT_PINCH_UPDATE): the scale the gesture last reported, where a
+    // backend reports it from the gesture's start, and the clicks it has not
+    // yet made whole. Both reset with each gesture.
+    F32 mPinchLastScale = 1.f;
+    F32 mPinchClickAccum = 0.f;
+
     // Mirrors LLWindowWin32::mAbsoluteCursorPosition. Set true while the
     // most recent mouse motion/button event was synthesised from a touch
     // screen (event.motion.which == SDL_TOUCH_MOUSEID) or a pen / stylus
@@ -445,9 +453,11 @@ private:
     LLMutex mSharedCtxMutex;
     std::set<void*> mSharedContexts;
 
-    // Files accumulated between SDL_EVENT_DROP_BEGIN and SDL_EVENT_DROP_COMPLETE.
-    // Each SDL_EVENT_DROP_FILE only carries one path, so we batch them and
-    // dispatch a single handleDragNDrop on COMPLETE.
+    // Files and text accumulated between SDL_EVENT_DROP_BEGIN and
+    // SDL_EVENT_DROP_COMPLETE. Each SDL_EVENT_DROP_FILE only carries one path
+    // and each SDL_EVENT_DROP_TEXT one line, so we batch them and dispatch a
+    // single handleDragNDrop on COMPLETE.
+    std::string mPendingDropText;
     std::vector<std::string> mPendingDropFiles;
 
     // Currently-focused preeditor receiving SDL_EVENT_TEXT_EDITING composition
@@ -464,6 +474,12 @@ private:
     // delivery on regardless of composition state, there is no way to get
     // just-the-commits from SDL3.
     LLPreeditor* mPreeditor = nullptr;
+
+    // Hand the platform IME the text input area of mPreeditor, the caret
+    // and the preedit around it, as the preeditor places them, so the IME's
+    // candidate window opens under the caret. False when there is no
+    // preeditor or it cannot place its caret (scrolled out of sight).
+    bool placeLanguageTextInputArea();
 
     enum EServerProtocol{ X11, Wayland, Unknown };
     EServerProtocol mServerProtocol = Unknown;

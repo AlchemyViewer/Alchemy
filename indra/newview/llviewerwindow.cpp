@@ -212,6 +212,9 @@
 
 #include "llwindowlistener.h"
 #include "llviewerwindowlistener.h"
+#include "alcutoutimage.h"
+#include "alrenderisolation.h"
+#include "alsnapshotcutout.h"
 #include "llstatslistener.h"
 #include "llcleanup.h"
 
@@ -614,8 +617,6 @@ public:
         static LLCachedControl<bool> debug_show_render_info(gSavedSettings, "DebugShowRenderInfo", false);
         if (debug_show_render_info())
         {
-            LLTrace::Recording& last_frame_recording = LLTrace::get_frame_recording().getLastRecording();
-
             //show streaming cost/triangle count of known prims in current region OR selection
             {
                 F32 cost = 0.f;
@@ -695,7 +696,8 @@ public:
                 ypos += y_inc;
             }
 
-            addText(xpos, ypos, llformat("%d Render Calls", (U32)last_frame_recording.getSampleCount(LLPipeline::sStatBatchSize)));
+            addText(xpos, ypos, llformat("%d Render Calls (%.0f elements each)", LLRender::sDrawCalls,
+                                         LLRender::sDrawCalls ? (F64)LLRender::sDrawElements / LLRender::sDrawCalls : 0.0));
             ypos += y_inc;
 
             addText(xpos, ypos, llformat("%d/%d Objects Active", gObjectList.getNumActiveObjects(), gObjectList.getNumObjects()));
@@ -715,12 +717,6 @@ public:
             gPipeline.mTextureMatrixOpsIdentity = 0;
             gPipeline.mMatrixOpCount = 0;
 
-            if (last_frame_recording.getSampleCount(LLPipeline::sStatBatchSize) > 0)
-            {
-                addText(xpos, ypos, llformat("Batch min/max/mean: %d/%d/%d", (U32)last_frame_recording.getMin(LLPipeline::sStatBatchSize), (U32)last_frame_recording.getMax(LLPipeline::sStatBatchSize), (U32)last_frame_recording.getMean(LLPipeline::sStatBatchSize)));
-            }
-            ypos += y_inc;
-
             addText(xpos, ypos, llformat("UI Verts/Calls: %d/%d", LLRender::sUIVerts, LLRender::sUICalls));
             LLRender::sUICalls = LLRender::sUIVerts = 0;
             ypos += y_inc;
@@ -728,12 +724,6 @@ public:
             addText(xpos,ypos, llformat("%d/%d Nodes visible", gPipeline.mNumVisibleNodes, LLSpatialGroup::sNodeCount));
 
             ypos += y_inc;
-
-            if (!LLOcclusionCullingGroup::sPendingQueries.empty())
-            {
-                addText(xpos,ypos, llformat("%d Queries pending", LLOcclusionCullingGroup::sPendingQueries.size()));
-                ypos += y_inc;
-            }
 
 
             addText(xpos,ypos, llformat("%d Avatars visible", LLVOAvatar::sNumVisibleAvatars));
@@ -2759,10 +2749,12 @@ void LLViewerWindow::shutdownGL()
     LLViewerTextureManager::cleanup() ;
     SUBSYSTEM_CLEANUP(LLImageGL) ;
 
-    LL_INFOS() << "All textures and llimagegl images are destroyed!" << LL_ENDL ;
+    // The UI images' recorded draws hold vertex buffers, which go back to the pool while
+    // there is still one, and a context to delete their names in. LLUIImageList's own
+    // cleanUp comes after the window is gone.
+    LLUIImage::cleanupClass();
 
-    LL_INFOS() << "Cleaning up select manager" << LL_ENDL;
-    LLSelectMgr::getInstance()->cleanup();
+    LL_INFOS() << "All textures and llimagegl images are destroyed!" << LL_ENDL ;
 
     LL_INFOS() << "Stopping GL during shutdown" << LL_ENDL;
     stopGL();
@@ -3033,10 +3025,7 @@ void LLViewerWindow::draw()
 
     //S32 screen_x, screen_y;
 
-    if (!LLPipeline::RenderUIBuffer)
-    {
-        LLView::sDirtyRect = getWindowRectScaled();
-    }
+    LLView::sDirtyRect = getWindowRectScaled();
 
     // HACK for timecode debugging
     if (gSavedSettings.getBOOL("DisplayTimecode"))
@@ -3215,6 +3204,19 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
     if (ALKeyChords::takeKey(key, mask))
     {
         return true;
+    }
+
+    // Escape to a tool that holds the mouse -- an eyedropper waiting for its
+    // click, a drag under way -- before whatever has the keyboard: the window
+    // the tool was started from has it, and would take Escape only to drop
+    // its own focus, leaving the tool running.
+    if (key == KEY_ESCAPE && mask == MASK_NONE)
+    {
+        LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
+        if (tool && tool->hasMouseCapture() && tool->handleKey(key, mask))
+        {
+            return true;
+        }
     }
 
     LLFocusableElement* keyboard_focus = gFocusMgr.getKeyboardFocus();
@@ -3455,8 +3457,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
         letter_keys_Focus_chat_bar && !gAgentCamera.cameraMouselook() &&
         !keyboard_focus && key < 0x80 && (mask == MASK_NONE || mask == MASK_SHIFT) )
     {
-        static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
-        if (!sChatInWindow)
+        if (!ALChatBar::shouldUseChatBar())
         {
             // Initialize nearby chat if it's missing
             LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
@@ -4520,7 +4521,7 @@ void LLViewerWindow::renderSelections( bool for_gl_pick, bool pick_parcel_walls,
     if (!for_hud && !for_gl_pick)
     {
         // Call this once and only once
-        LLSelectMgr::getInstance()->updateSilhouettes();
+        LLSelectMgr::getInstance()->updateHighlightedObjects();
     }
 
     // <FS:Beq> render the poser manipulator guides
@@ -4541,12 +4542,19 @@ void LLViewerWindow::renderSelections( bool for_gl_pick, bool pick_parcel_walls,
         {
             LLViewerParcelMgr::getInstance()->renderParcelCollision();
         }
+        return;
     }
-    else if (( for_hud && selection->getSelectType() == SELECT_TYPE_HUD) ||
-             (!for_hud && selection->getSelectType() != SELECT_TYPE_HUD))
+
+    // The world's outlines every frame, for what the pointer is over glows in the world wherever the selection is;
+    // the HUD's while the selection is on it.
+    if (!for_hud || selection->getSelectType() == SELECT_TYPE_HUD)
     {
         LLSelectMgr::getInstance()->renderSilhouettes(for_hud);
+    }
 
+    if (( for_hud && selection->getSelectType() == SELECT_TYPE_HUD) ||
+        (!for_hud && selection->getSelectType() != SELECT_TYPE_HUD))
+    {
         stop_glerror();
 
         // setup HUD render
@@ -5482,26 +5490,112 @@ bool LLViewerWindow::thumbnailSnapshot(LLImageRaw *raw, S32 preview_width, S32 p
     return rawSnapshot(raw, preview_width, preview_height, false, false, show_ui, show_hud, do_rebuild, no_post, gSavedSettings.getBOOL("RenderBalanceInSnapshot"), type);
 }
 
+namespace
+{
+    // Runs a callable when the scope that declares it is left, however it is left.
+    template <typename F>
+    class OnScopeExit
+    {
+    public:
+        explicit OnScopeExit(F f) : mF(std::move(f)) {}
+        ~OnScopeExit() { mF(); }
+        OnScopeExit(const OnScopeExit&) = delete;
+        OnScopeExit& operator=(const OnScopeExit&) = delete;
+
+    private:
+        F mF;
+    };
+}
+
 // Saves the image from the screen to a raw image
 // Since the required size might be bigger than the available screen, this method rerenders the scene in parts (called subimages) and copy
 // the results over to the final raw image.
 bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_height,
-    bool keep_window_aspect, bool is_texture, bool show_ui, bool show_hud, bool do_rebuild, bool no_post, bool show_balance, LLSnapshotModel::ESnapshotLayerType type, S32 max_size)
+    bool keep_window_aspect, bool is_texture, bool show_ui, bool show_hud, bool do_rebuild, bool no_post, bool show_balance, LLSnapshotModel::ESnapshotLayerType type, S32 max_size,
+    const ALSnapshotCutout* cutout, bool* cutout_drawn)
 {
     if (!raw)
     {
         return false;
     }
 
+    // A cutout is colour without the interface. It renders offscreen, always:
+    // the tiled path reads the window's back buffer, which may have no alpha
+    // or two bits of it. It renders a whole multiple larger than the image it
+    // makes, and averages down after (ALCutoutImage::resolve) -- its edges
+    // cannot come from anti-aliasing, which blends the subject into what is
+    // to be left empty without telling the coverage.
+    S32 cutout_width = 0;
+    S32 cutout_height = 0;
+    if (cutout)
+    {
+        show_ui = false;
+        show_hud = false;
+        show_balance = false;
+        type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
+
+        // The image, within max_size as the rest of this function would keep it.
+        if (image_width > max_size || image_height > max_size)
+        {
+            const F32 fit = llmin((F32)max_size / image_width, (F32)max_size / image_height);
+            image_width = llmax(1, (S32)(image_width * fit));
+            image_height = llmax(1, (S32)(image_height * fit));
+        }
+        cutout_width = image_width;
+        cutout_height = image_height;
+
+        // Then the render, as many times larger as allowed, down to once. The
+        // read-back is the render's size, and the screen targets are that with
+        // RenderResolutionDivisor or RenderResolutionMultiplier applied, so a
+        // multiplier of 2 is already twice the render each way. Neither may have
+        // a side past what the GL can target, nor more pixels than the largest
+        // snapshot the floater offers anyway (MAX_SNAPSHOT_IMAGE_SIZE by 4320):
+        // every screen pixel carries the whole G-buffer, and the read-back has
+        // to fit LLImageBase's 256 MB allocation cap besides.
+        const S64 max_side = (S64)gGLManager.mGLMaxTextureSize;
+        constexpr S64 MAX_CUTOUT_RENDER_PIXELS = (S64)MAX_SNAPSHOT_IMAGE_SIZE * 4320;
+        const auto fits = [&](S32 supersample)
+        {
+            const U32 read_width = (U32)(image_width * supersample);
+            const U32 read_height = (U32)(image_height * supersample);
+            U32 screen_width = read_width;
+            U32 screen_height = read_height;
+            LLPipeline::scaleToRenderResolution(screen_width, screen_height);
+            return (S64)llmax(read_width, screen_width) <= max_side && (S64)llmax(read_height, screen_height) <= max_side &&
+                   llmax((S64)read_width * read_height, (S64)screen_width * screen_height) <= MAX_CUTOUT_RENDER_PIXELS;
+        };
+        S32 supersample = (S32)cutout->mSupersample;
+        while (supersample > 1 && !fits(supersample))
+        {
+            --supersample;
+        }
+        if (image_width > max_side || image_height > max_side)
+        {
+            LL_WARNS("Snapshot") << "A cutout at " << image_width << "x" << image_height
+                                 << " is larger than the GL can render in one pass." << LL_ENDL;
+            return false;
+        }
+        image_width *= supersample;
+        image_height *= supersample;
+        max_size = llmax(image_width, image_height);
+    }
+
     //check if there is enough memory for the snapshot image
     if(image_width * image_height > (1 << 22)) //if snapshot image is larger than 2K by 2K
     {
-        if(!LLMemory::tryToAlloc(NULL, image_width * image_height * 3))
+        if(!LLMemory::tryToAlloc(NULL, image_width * image_height * (cutout ? 4 : 3)))
         {
             LL_WARNS() << "No enough memory to take the snapshot with size (w : h): " << image_width << " : " << image_height << LL_ENDL ;
             return false ; //there is no enough memory for taking this snapshot.
         }
     }
+
+    // What the single-pass path below changes, recorded so the restore can undo it.
+    LLRenderTarget scratch_space;
+    S32 original_width = 0;
+    S32 original_height = 0;
+    bool reset_deferred = false;
+    LLRect window_rect;
 
     // PRE SNAPSHOT
     gSnapshotNoPost = no_post;
@@ -5511,18 +5605,58 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     setCursor(UI_CURSOR_WAIT);
 
     // Hide all the UI widgets first and draw a frame
-    bool prev_draw_ui = gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI);
+    const bool prev_draw_ui = gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI);
 
     if ( prev_draw_ui != show_ui)
     {
         LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
     }
 
-    bool hide_hud = !show_hud && LLPipeline::sShowHUDAttachments;
+    const bool hide_hud = !show_hud && LLPipeline::sShowHUDAttachments;
     if (hide_hud)
     {
         LLPipeline::sShowHUDAttachments = false;
     }
+
+    // POST SNAPSHOT, on every way out. The early returns below used to skip all
+    // of it: the UI stayed hidden, the wait cursor stayed up, and past the
+    // single-pass branch the screen buffers stayed at the snapshot's size with
+    // the scratch target still bound.
+    OnScopeExit restore([&]()
+    {
+        gDisplaySwapBuffers = false;
+        gSnapshotNoPost = false;
+        gDepthDirty = true;
+
+        // Put the UI back the way it was found, rather than forcing it on: a
+        // snapshot taken with the interface hidden should leave it hidden.
+        if (gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI) != prev_draw_ui)
+        {
+            LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
+        }
+
+        if (hide_hud)
+        {
+            LLPipeline::sShowHUDAttachments = true;
+        }
+
+        setCursor(UI_CURSOR_ARROW);
+
+        if (reset_deferred)
+        {
+            mWorldViewRectRaw = window_rect;
+            LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
+            LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
+            scratch_space.flush();
+            scratch_space.release();
+            gPipeline.allocateScreenBuffer(original_width, original_height);
+            // Reallocated, the SSR source holds whatever was in that memory,
+            // and the next live frame's reflections would trace it.
+            gPipeline.clearSceneMap();
+        }
+
+        setBalanceVisible(true);
+    });
 
     // if not showing ui, use full window to render world view
     updateWorldViewRect(!show_ui);
@@ -5530,7 +5664,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     // Copy screen to a buffer
     // crop sides or top and bottom, if taking a snapshot of different aspect ratio
     // from window
-    LLRect window_rect = show_ui ? getWindowRectRaw() : getWorldViewRectRaw();
+    window_rect = show_ui ? getWindowRectRaw() : getWorldViewRectRaw();
 
     S32 snapshot_width  = window_rect.getWidth();
     S32 snapshot_height = window_rect.getHeight();
@@ -5548,17 +5682,11 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         setBalanceVisible(show_balance);
     }
 
-    S32 original_width = 0;
-    S32 original_height = 0;
-    bool reset_deferred = false;
-
-    LLRenderTarget scratch_space;
-
     F32 scale_factor = 1.0f ;
-    if (!keep_window_aspect || (image_width > window_width) || (image_height > window_height))
+    if (cutout || !keep_window_aspect || (image_width > window_width) || (image_height > window_height))
     {
         if ((image_width <= gGLManager.mGLMaxTextureSize && image_height <= gGLManager.mGLMaxTextureSize) &&
-            (image_width > window_width || image_height > window_height) && LLPipeline::sRenderDeferred && !show_ui)
+            (cutout || image_width > window_width || image_height > window_height) && LLPipeline::sRenderDeferred && !show_ui)
         {
             // GL_RGBA8, not GL_RGBA, and not GL_DEPTH_COMPONENT for the depth layers.
             //
@@ -5613,6 +5741,14 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             }
         }
 
+        if (!reset_deferred && cutout)
+        {
+            // No tiled fallback for a cutout: see above.
+            LL_WARNS("Snapshot") << "A cutout at " << image_width << "x" << image_height
+                                 << " could not get its offscreen target." << LL_ENDL;
+            return false;
+        }
+
         if (!reset_deferred)
         {
             // if image cropping or need to enlarge the scene, compute a scale_factor
@@ -5661,17 +5797,15 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
     if ((image_buffer_x > 0) && (image_buffer_y > 0))
     {
-        raw->resize(image_buffer_x, image_buffer_y, 3);
+        raw->resize(image_buffer_x, image_buffer_y, cutout ? 4 : 3);
     }
     else
     {
-        setBalanceVisible(true);
         return false;
     }
 
     if (raw->isBufferInvalid())
     {
-        setBalanceVisible(true);
         return false;
     }
 
@@ -5715,6 +5849,12 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         return (snap_far * snap_near) / (snap_far - window_depth * (snap_far - snap_near));
     };
 
+    std::optional<ALRenderIsolation::Scope> isolation;
+    if (cutout)
+    {
+        isolation.emplace(cutout->mTarget, cutout->mIncludeSeated);
+    }
+
     // Subimages are in fact partial rendering of the final view. This happens when the final view is bigger than the screen.
     // In most common cases, scale_factor is 1 and there's no more than 1 iteration on x and y
     for (int subimage_y = 0; subimage_y < scale_factor; ++subimage_y)
@@ -5740,6 +5880,13 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             {
                 const U32 subfield = subimage_x+(subimage_y*llceil(scale_factor));
                 display(do_rebuild, scale_factor, subfield, true);
+
+                if (cutout)
+                {
+                    // The colour is the subject premultiplied by its coverage;
+                    // the coverage itself goes into alpha here.
+                    gPipeline.copyCutoutCoverageToAlpha();
+                }
 
                 if (!LLPipeline::sRenderDeferred)
                 {
@@ -5772,7 +5919,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                             glReadPixels(
                                      subimage_x_offset, out_y + subimage_y_offset,
                                      read_width, 1,
-                                     GL_RGB, GL_UNSIGNED_BYTE,
+                                     cutout ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE,
                                      raw->getData() + output_buffer_offset
                                      );
                         }
@@ -5838,43 +5985,35 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         output_buffer_offset_y += subimage_y_offset;
     }
 
-    gDisplaySwapBuffers = false;
-    gSnapshotNoPost = false;
-    gDepthDirty = true;
-
-    // POST SNAPSHOT
-    if (!gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
-    {
-        LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
-    }
-
-    if (hide_hud)
-    {
-        LLPipeline::sShowHUDAttachments = true;
-    }
-
     /*if (high_res)
     {
         initFonts(1.f);
         LLHUDObject::reshapeAll();
     }*/
 
-    // Pre-pad image to number of pixels such that the line length is a multiple of 4 bytes (for BMP encoding)
-    // Note: this formula depends on the number of components being 3.  Not obvious, but it's correct.
-    image_width += (image_width * 3) % 4;
-
     bool ret = true ;
-    // Resize image
-    if(llabs(image_width - image_buffer_x) > 4 || llabs(image_height - image_buffer_y) > 4)
+    if (cutout)
     {
-        ret = raw->scale( image_width, image_height );
+        // Left premultiplied at the size asked for, not padded as below: the
+        // fill goes on after, and a BMP encoder pads its own rows.
+        ret = ALCutoutImage::resolve(*raw, cutout_width, cutout_height, cutout_drawn);
     }
-    else if(image_width != image_buffer_x || image_height != image_buffer_y)
+    else
     {
-        ret = raw->scale( image_width, image_height, false );
-    }
+        // Pre-pad image to number of pixels such that the line length is a multiple of 4 bytes (for BMP encoding)
+        // Note: this formula depends on the number of components being 3.  Not obvious, but it's correct.
+        image_width += (image_width * 3) % 4;
 
-    setCursor(UI_CURSOR_ARROW);
+        // Resize image
+        if(llabs(image_width - image_buffer_x) > 4 || llabs(image_height - image_buffer_y) > 4)
+        {
+            ret = raw->scale( image_width, image_height );
+        }
+        else if(image_width != image_buffer_x || image_height != image_buffer_y)
+        {
+            ret = raw->scale( image_width, image_height, false );
+        }
+    }
 
     if (do_rebuild)
     {
@@ -5886,22 +6025,10 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         gPipeline.resetDrawOrders();
     }
 
-    if (reset_deferred)
-    {
-        mWorldViewRectRaw = window_rect;
-        LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
-        LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
-        scratch_space.flush();
-        scratch_space.release();
-        gPipeline.allocateScreenBuffer(original_width, original_height);
-
-    }
-
     if (high_res)
     {
         send_agent_resume();
     }
-    setBalanceVisible(true);
 
     return ret;
 }

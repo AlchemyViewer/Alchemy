@@ -772,8 +772,6 @@ public:
         LL_VO_WL_SKY =              LL_PCODE_APP | 0x40,
         LL_VO_SQUARE_TORUS =        LL_PCODE_APP | 0x50,
         LL_VO_SKY =                 LL_PCODE_APP | 0x60,
-        LL_VO_VOID_WATER =          LL_PCODE_APP | 0x70,
-        LL_VO_WATER =               LL_PCODE_APP | 0x80,
         LL_VO_PART_GROUP =          LL_PCODE_APP | 0xa0,
         LL_VO_TRIANGLE_TORUS =      LL_PCODE_APP | 0xb0,
         LL_VO_HUD_PART_GROUP =      LL_PCODE_APP | 0xc0,
@@ -1090,14 +1088,14 @@ public:
 inline void LLViewerObject::setRotation(const LLQuaternion& quat, bool damped)
 {
     LLPrimitive::setRotation(quat);
-    setChanged(ROTATED | SILHOUETTE);
+    setChanged(ROTATED);
     updateDrawable(damped);
 }
 
 inline void LLViewerObject::setRotation(const F32 x, const F32 y, const F32 z, bool damped)
 {
     LLPrimitive::setRotation(x, y, z);
-    setChanged(ROTATED | SILHOUETTE);
+    setChanged(ROTATED);
     updateDrawable(damped);
 }
 

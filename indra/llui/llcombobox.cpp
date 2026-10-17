@@ -217,10 +217,14 @@ void LLComboBox::onCommit()
             mTextEntry->setValue(label);
             mTextEntry->setTentative(false);
         }
+        // Chosen or typed: the value is the control's own now, whoever had
+        // written it before.
+        mUnset = false;
         setControlValue(item->getValue());
     }
     else if (mAllowTextEntry)
     {
+        mUnset = false;
         setControlValue(mTextEntry->getValue());
     }
     else
@@ -465,6 +469,10 @@ void LLComboBox::setUnset(bool unset)
 
 void LLComboBox::updateLabel()
 {
+    // An item chosen is shown as settled, and is: whoever had written the
+    // value before, it is the control's own now.
+    mUnset = false;
+
     // Update the combo editor with the selected
     // item label.
     if (mTextEntry)

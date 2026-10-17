@@ -1116,6 +1116,11 @@ size_t ALLuauService::modulesChecked() const
     return mFrontend->frontend->stats.filesStrict + mFrontend->frontend->stats.filesNonstrict;
 }
 
+void ALLuauService::setModuleCheckedHook(std::function<void(const std::string& module)> hook)
+{
+    mFrontend->moduleChecked = std::move(hook);
+}
+
 bool ALLuauService::hasDefinitions() const
 {
     return mFrontend->definitions;
@@ -1235,13 +1240,16 @@ void ALLuauService::setModules(const Modules& modules)
             front.frontend->markDirty(key.substr(0, key.find('\x1f')));
         }
     }
-    // The script's own that it no longer says.
-    const std::string own = front.moduleName + '\x1f';
+    // What the script, and each module set again, no longer says: a
+    // require left in would still reach the module it reached, though
+    // nothing leads there now.
     for (auto it = front.files.leadsTo.begin(); it != front.files.leadsTo.end();)
     {
-        if (it->first.compare(0, own.size(), own) == 0 && !now.count(it->first))
+        const std::string_view from = std::string_view(it->first).substr(0, it->first.find('\x1f'));
+        const bool             told = from == front.moduleName || std::find(names.begin(), names.end(), from) != names.end();
+        if (told && !now.count(it->first))
         {
-            front.frontend->markDirty(front.moduleName);
+            front.frontend->markDirty(std::string(from));
             it = front.files.leadsTo.erase(it);
         }
         else
@@ -1308,10 +1316,41 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     front.wasStopped = false;
     front.sync(source);
     // What was found the first time, where the text has not changed since.
-    Luau::CheckResult result;
-    if (front.stoppedIn(front.checkScript(&result)))
+    // The checker failing inside -- an internal compiler error of its own,
+    // thrown on this thread or kept from a module's thread and thrown
+    // again here -- is a problem said of the script, not an exception up
+    // the lane: it is told, and the script is checked again next time.
+    Luau::CheckResult        result;
+    std::vector<std::string> failed;
+    try
     {
-        return ALScriptProblems();
+        if (front.stoppedIn(front.checkScript(&result)))
+        {
+            return ALScriptProblems();
+        }
+    }
+    catch (const Luau::InternalCompilerError& e)
+    {
+        failed.push_back(e.message);
+        front.frontend->markDirty(front.moduleName);
+    }
+    // And what the hook each module's check runs threw, kept there rather
+    // than thrown on the checker's thread, which would lose the module.
+    if (const std::exception_ptr threw = front.takeCheckFailure())
+    {
+        try
+        {
+            std::rethrow_exception(threw);
+        }
+        catch (const std::exception& e)
+        {
+            failed.push_back(e.what());
+        }
+        catch (...)
+        {
+            failed.push_back("unknown exception");
+        }
+        front.frontend->markDirty(front.moduleName);
     }
     // Each module checked since the script's last check told what it
     // found: by this one, or before it by a question -- which checks the
@@ -1330,6 +1369,15 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     }
 
     ALScriptProblems problems;
+    for (const std::string& what : failed)
+    {
+        const std::vector<std::string> args{ what };
+        problems.push_back(problemAt(Luau::Location(Luau::Position(0, 0), Luau::Position(0, 0)), ALScriptProblem::Severity::Error,
+                                     ALScriptProblem::Source::Types, std::string(),
+                                     ALScriptProblem::fill("The type checker failed inside: [1]", args)));
+        problems.back().key  = "LuauInternalError";
+        problems.back().args = args;
+    }
     if (!result.timeoutHits.empty())
     {
         // Past the time limit: what was found before it, and that there
@@ -2511,10 +2559,16 @@ std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 lin
     // Only where that runs it as often, and as surely, as it ran: not out
     // of a loop's condition, an `elseif`'s, nor what `and`, `or` or an `if`
     // expression may skip.
-    if (endLine == line && endColumn > column)
+    // The stretch as the line has it: cut to the line where it reaches
+    // past its end, and nothing where that leaves nothing of it.
+    const size_t           line_at = line >= 0 ? offsetAt(source, Luau::Position(static_cast<unsigned>(line), 0)) : std::string_view::npos;
+    const std::string_view whole =
+        line_at == std::string_view::npos ? std::string_view() : source.substr(line_at, std::min(source.find('\n', line_at), source.size()) - line_at);
+    if (endLine == line && endColumn > column && !whole.empty())
     {
-        S32                    from = column, to = endColumn;
-        const std::string_view text = sliceOf(source, Luau::Position(line, 0), Luau::Position(line, endColumn));
+        S32 from = std::clamp<S32>(column, 0, static_cast<S32>(whole.size()));
+        S32 to   = std::clamp<S32>(endColumn, 0, static_cast<S32>(whole.size()));
+        const std::string_view text = whole.substr(0, static_cast<size_t>(to));
         while (from < to && isspace(static_cast<unsigned char>(text[from])))
         {
             ++from;

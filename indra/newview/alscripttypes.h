@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alscriptmessages.h"
 #include "llinventory.h"
 #include "llpointer.h"
 #include "lluuid.h"
@@ -157,6 +158,8 @@ struct ALScriptDiagnostic
     // It names a line at all: a line the compiler said nothing of the
     // place of does not, nor an include that never came.
     bool        hasLine = true;
+    // The places its words name, in the compiler's count.
+    std::vector<ALScriptMessages::Mention> mentions;
 };
 
 struct ALScriptCompileResult

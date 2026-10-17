@@ -354,7 +354,9 @@ void LLPanelProfileClassifieds::callbackDeleteClassified(const LLSD& notificatio
         LLPanelProfileClassified* classified_panel = ALViewType::as<LLPanelProfileClassified>(mTabContainer->getPanelByIndex(tab_idx));
         if (classified_panel && classified_panel->getClassifiedId() == classified_id)
         {
+            // Let go by its tab, and kept by nothing else.
             mTabContainer->removeTabPanel(classified_panel);
+            classified_panel->die();
         }
 
         if (classified_id.notNull())
@@ -454,7 +456,7 @@ void LLPanelProfileClassifieds::processProperties(void* data, EAvatarProcessorTy
 void LLPanelProfileClassifieds::resetData()
 {
     resetLoading();
-    mTabContainer->deleteAllTabs();
+    mTabContainer->deleteAllTabs(true);
 }
 
 void LLPanelProfileClassifieds::updateButtons()

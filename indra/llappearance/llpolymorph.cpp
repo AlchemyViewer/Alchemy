@@ -37,7 +37,6 @@
 #include "llendianswizzle.h"
 #include "llpolymesh.h"
 #include "alsimdkernels.h"
-#include "llfasttimer.h"
 
 //#include "../tools/imdebug/imdebug.h"
 

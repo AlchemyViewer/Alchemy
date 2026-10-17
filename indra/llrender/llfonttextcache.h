@@ -146,6 +146,7 @@ private:
     F32             mHorizDPI = 0.f;
     S32             mResGeneration = 0;
     U64             mFontCacheGen = 0;
+    U32             mSamplerGen = 0;    // 0 is never a generation, so the first ask records
 };
 
 // Everything one piece of text costs to draw, kept so it can be reused: the

@@ -23,76 +23,38 @@
  * $/LicenseInfo$
  */
 
-// Each row is one of the places the viewer runs regexes the most, done the
+// Each case is one of the places the viewer runs regexes the most, done the
 // way it was done under Boost.Regex and the way it is done under ALRegex,
 // over text like what it meets there: the Urls found in a line of chat, the
 // names RLVa hides in one, a script lexed position by position, a chat log
-// read back, the dates of a group's members. A number is nanoseconds per
-// line, position or call: the median of five samples, each as many passes
-// as fit in twenty milliseconds. Boost.Regex stays in the tree for the
-// script editor's find, so the rows can be run again at any time.
+// read back, the dates of a group's members. Each benchmark is one side of
+// a row, boost or re2, and one call, or one pass named for what it covers:
+// ten lines of chat, every place in the script, a log of 10,000 lines.
+// Catch2 reports the mean of its samples and the interval around it. A side
+// done the same way in several rows is measured once, under the first.
+// Boost.Regex stays in the tree for the script editor's find, so the rows
+// can be run again at any time.
 //
-// The output is a table, not a verdict; a number is read against the one
-// beside it, from the same run on the same quiet machine. An unoptimised
-// build exits 125, which CTest reads as skipped, since its numbers would say
-// nothing.
+// The output is not a verdict; a number is read against the other side's,
+// from the same run on the same quiet machine.
 
 #include "linden_common.h"
 
 #include "alregex.h"
+
+#include "altestbenchmark.h"
 
 #include <boost/algorithm/string/find.hpp>
 #include <boost/algorithm/string/regex.hpp>
 #include <boost/regex.hpp>
 
 #include <algorithm>
-#include <chrono>
 #include <cstdio>
 #include <string>
 #include <vector>
 
-// Only an optimised build measures, and only it has a use for these: an
-// unoptimised one would say they are unused.
-#if defined(LL_RELEASE)
 namespace
 {
-    using clock = std::chrono::steady_clock;
-
-    // Everything a row finds feeds this, so nothing is found for nothing.
-    volatile size_t g_sink = 0;
-
-    template <class F>
-    double time_per_item(size_t count, F&& pass)
-    {
-        pass();
-        double samples[5];
-        for (double& sample : samples)
-        {
-            size_t          passes = 0;
-            const auto      start  = clock::now();
-            clock::duration elapsed{};
-            do
-            {
-                pass();
-                ++passes;
-                elapsed = clock::now() - start;
-            } while (elapsed < std::chrono::milliseconds(20));
-            sample = std::chrono::duration<double, std::nano>(elapsed).count() / (double(passes) * double(count));
-        }
-        std::sort(samples, samples + 5);
-        return samples[2];
-    }
-
-    void row(const char* name, double boost_ns, double re2_ns)
-    {
-        std::printf("  %-44s %10.1f %10.1f %8.2fx\n", name, boost_ns, re2_ns, boost_ns / re2_ns);
-    }
-
-    void heading(const char* title, const char* unit)
-    {
-        std::printf("\n%s (ns per %s)\n  %-44s %10s %10s %9s\n", title, unit, "", "boost", "re2", "speedup");
-    }
-
     // --- Urls in chat -----------------------------------------------------
 
 #define APP_HEADER_REGEX "((x-grid-location-info://[-\\w\\.]+/app)|(secondlife:///app))"
@@ -155,9 +117,9 @@ namespace
         "hey secondlife:///app/agent/0e346d8b-4433-4d66-a6b0-fd37083abc4c/mention are you around? www.example.com",
     };
 
-    void bench_urls()
+    TEST_CASE("alregex_bench: every URL found in a line of chat as LLTextBase appends it", "[alregex_bench][!benchmark]")
     {
-        heading("Urls: every one found in a line of chat, as LLTextBase appends it", "line");
+        ll_test::skipUnlessOptimised();
         std::vector<boost::regex> boost_patterns;
         std::vector<ALRegex>      re2_patterns;
         std::vector<U32>          groups;
@@ -167,11 +129,12 @@ namespace
             re2_patterns.emplace_back(p.re2 ? p.re2 : p.boost, ALRegex::ICASE);
             groups.push_back(p.group);
         }
-        const size_t lines = std::size(CHAT_WITH_URLS);
 
         // As LLUrlRegistry::findUrl did: each pattern by value, the earliest
         // match of all of them in the rest of the line, and on past it.
-        const double boost_ns = time_per_item(lines, [&] {
+        BENCHMARK("31 patterns, earliest match, repeated, ten lines, boost")
+        {
+            size_t sum = 0;
             for (const char* line : CHAT_WITH_URLS)
             {
                 const std::string text(line);
@@ -194,12 +157,15 @@ namespace
                     {
                         break;
                     }
-                    g_sink = g_sink + first;
+                    sum += first;
                     at += std::max<size_t>(last, 1);
                 }
             }
-        });
-        const double re2_ns = time_per_item(lines, [&] {
+            return sum;
+        };
+        BENCHMARK("31 patterns, earliest match, repeated, ten lines, re2")
+        {
+            size_t sum = 0;
             for (const char* line : CHAT_WITH_URLS)
             {
                 const std::string text(line);
@@ -222,20 +188,24 @@ namespace
                     {
                         break;
                     }
-                    g_sink = g_sink + first;
+                    sum += first;
                     at += std::max<size_t>(last, 1);
                 }
             }
-        });
+            return sum;
+        };
         // The same, with the patterns first looked for all at once: only
-        // those the set says match somewhere in the rest are searched.
+        // those the set says match somewhere in the rest are searched. Its
+        // boost side is the row's above.
         ALRegexSet set(ALRegex::ICASE);
         for (const ALRegex& pattern : re2_patterns)
         {
             set.add(pattern.pattern());
         }
         set.compile();
-        const double re2_set_ns = time_per_item(lines, [&] {
+        BENCHMARK("31 patterns, the set asked first, ten lines, re2")
+        {
+            size_t            sum = 0;
             std::vector<S32>  hits;
             std::vector<bool> hit(re2_patterns.size());
             for (const char* line : CHAT_WITH_URLS)
@@ -270,13 +240,12 @@ namespace
                     {
                         break;
                     }
-                    g_sink = g_sink + first;
+                    sum += first;
                     at += std::max<size_t>(last, 1);
                 }
             }
-        });
-        row("31 patterns, earliest match, repeated", boost_ns, re2_ns);
-        row("the same, the set asked first (re2)", boost_ns, re2_set_ns);
+            return sum;
+        };
     }
 
     // The check LLUrlRegistry::findUrl made before any pattern, as it was:
@@ -345,9 +314,9 @@ namespace
         "that build is gorgeous, how many prims is it? the windows are amazing",
     };
 
-    void bench_url_gate()
+    TEST_CASE("alregex_bench: a line of chat with no URL as findUrl is asked of every line", "[alregex_bench][!benchmark]")
     {
-        heading("Urls: a line of chat with none, as findUrl is asked of every line", "line");
+        ll_test::skipUnlessOptimised();
         std::vector<boost::regex> boost_patterns;
         ALRegexSet                set(ALRegex::ICASE);
         for (const UrlPattern& p : URL_PATTERNS)
@@ -356,10 +325,11 @@ namespace
             set.add(p.re2 ? p.re2 : p.boost);
         }
         set.compile();
-        const size_t lines = std::size(CHAT_WITHOUT_URLS);
 
         // As it was: the check, and where it was fooled every pattern.
-        const double boost_ns = time_per_item(lines, [&] {
+        BENCHMARK("the old check, then the patterns, ten lines, boost")
+        {
+            size_t sum = 0;
             for (const char* line : CHAT_WITHOUT_URLS)
             {
                 const std::string text(line);
@@ -370,25 +340,30 @@ namespace
                 for (const boost::regex& pattern : boost_patterns)
                 {
                     boost::cmatch found;
-                    g_sink = g_sink + boost::regex_search(text.c_str(), found, pattern);
+                    sum += boost::regex_search(text.c_str(), found, pattern);
                 }
             }
-        });
-        const double check_ns = time_per_item(lines, [&] {
-            for (const char* line : CHAT_WITHOUT_URLS)
-            {
-                g_sink = g_sink + oldUrlCheck(line);
-            }
-        });
-        const double set_ns = time_per_item(lines, [&] {
+            return sum;
+        };
+        BENCHMARK("the set, ten lines, re2")
+        {
+            size_t           sum = 0;
             std::vector<S32> hits;
             for (const char* line : CHAT_WITHOUT_URLS)
             {
-                g_sink = g_sink + (set.match(line, hits) ? hits.size() + 1 : 0);
+                sum += set.match(line, hits) ? hits.size() + 1 : 0;
             }
-        });
-        row("old check, then patterns (boost) vs set", boost_ns, set_ns);
-        row("the old check alone vs the set", check_ns, set_ns);
+            return sum;
+        };
+        BENCHMARK("the old check alone, ten lines")
+        {
+            size_t sum = 0;
+            for (const char* line : CHAT_WITHOUT_URLS)
+            {
+                sum += oldUrlCheck(line);
+            }
+            return sum;
+        };
     }
 
     // --- RLVa's hidden names ----------------------------------------------
@@ -418,9 +393,9 @@ namespace
         return boost::regex_replace(text, boost::regex("[.^$|()\\[\\]{}*+?\\\\]"), "\\\\&", boost::match_default | boost::format_sed);
     }
 
-    void bench_rlva()
+    TEST_CASE("alregex_bench: RLVa hiding twenty nearby names in a line of chat", "[alregex_bench][!benchmark]")
     {
-        heading("RLVa: twenty nearby names hidden in a line of chat", "line");
+        ll_test::skipUnlessOptimised();
         std::vector<boost::regex> boost_cached;
         std::vector<ALRegex>      re2_cached;
         for (const char* name : NEARBY)
@@ -432,30 +407,33 @@ namespace
 
         // As RlvUtil::filterNames did: each name escaped and compiled for
         // every line.
-        const double boost_each_ns = time_per_item(1, [&] {
+        BENCHMARK("twenty names compiled per line, boost")
+        {
             std::string text(RLV_LINE);
             for (const char* name : NEARBY)
             {
                 boost::replace_all_regex(text, boost::regex("\\b" + escaped(name) + "\\b", boost::regex::icase), anonym);
             }
-            g_sink = g_sink + text.size();
-        });
-        const double boost_cached_ns = time_per_item(1, [&] {
-            std::string text(RLV_LINE);
-            for (const boost::regex& pattern : boost_cached)
-            {
-                boost::replace_all_regex(text, pattern, anonym);
-            }
-            g_sink = g_sink + text.size();
-        });
-        const double re2_ns = time_per_item(1, [&] {
+            return text.size();
+        };
+        BENCHMARK("twenty names cached, re2")
+        {
             std::string text(RLV_LINE);
             for (const ALRegex& pattern : re2_cached)
             {
                 pattern.replaceAll(text, anonym);
             }
-            g_sink = g_sink + text.size();
-        });
+            return text.size();
+        };
+        BENCHMARK("twenty names cached, boost")
+        {
+            std::string text(RLV_LINE);
+            for (const boost::regex& pattern : boost_cached)
+            {
+                boost::replace_all_regex(text, pattern, anonym);
+            }
+            return text.size();
+        };
         // A name can only match where it is written, whatever its case: a
         // plain find in the line lowered, before the regex, passes over the
         // names that are not in it.
@@ -464,7 +442,8 @@ namespace
         {
             lowered.push_back(asciiLower(name));
         }
-        const double re2_found_ns = time_per_item(1, [&] {
+        BENCHMARK("twenty names found first, then cached, re2")
+        {
             std::string text(RLV_LINE);
             std::string lower = asciiLower(text);
             for (size_t i = 0; i < re2_cached.size(); ++i)
@@ -474,12 +453,8 @@ namespace
                     lower = asciiLower(text);
                 }
             }
-            g_sink = g_sink + text.size();
-        });
-        row("compiled per line (boost) vs cached (re2)", boost_each_ns, re2_ns);
-        row("both cached", boost_cached_ns, re2_ns);
-        row("compiled per line (boost) vs found first (re2)", boost_each_ns, re2_found_ns);
-        row("both cached, found first (re2)", boost_cached_ns, re2_found_ns);
+            return text.size();
+        };
     }
 
     // --- a script lexed ---------------------------------------------------
@@ -530,9 +505,9 @@ namespace
         "local t = type(door); t.type = 1e3; local x = 0b1010 + 3.25e-2",
     };
 
-    void bench_lexing()
+    TEST_CASE("alregex_bench: lexing with the SLua grammar's regex rules tried at every place in a script", "[alregex_bench][!benchmark]")
     {
-        heading("Lexing: the SLua grammar's regex rules tried at every place in a script", "place");
+        ll_test::skipUnlessOptimised();
         std::vector<boost::regex> boost_rules;
         std::vector<ALRegex>      re2_rules;
         std::vector<U8>           lo, hi;
@@ -551,13 +526,17 @@ namespace
         {
             places += std::string_view(line).size();
         }
+        // A call is a pass over every place in the script.
+        const std::string script = ", " + std::to_string(places) + " places, ";
         auto word_or_access = [](char c) {
             return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == ':';
         };
 
         // As ALSyntaxGrammar::tryRule did: each rule anchored where the lexer
         // stands, with what comes before it read.
-        const double boost_ns = time_per_item(places, [&] {
+        BENCHMARK("seven rules, anchored" + script + "boost")
+        {
+            size_t sum = 0;
             for (const char* line_text : SLUA_SOURCE)
             {
                 const std::string_view line(line_text);
@@ -575,12 +554,14 @@ namespace
                             break;
                         }
                     }
-                    g_sink = g_sink + taken;
+                    sum += taken;
                     pos += taken;
                 }
             }
-        });
+            return sum;
+        };
         auto re2_pass = [&](bool use_filter) {
+            size_t sum = 0;
             for (const char* line_text : SLUA_SOURCE)
             {
                 const std::string_view line(line_text);
@@ -607,15 +588,20 @@ namespace
                             break;
                         }
                     }
-                    g_sink = g_sink + taken;
+                    sum += taken;
                     pos += taken;
                 }
             }
+            return sum;
         };
-        const double re2_ns          = time_per_item(places, [&] { re2_pass(false); });
-        const double re2_filtered_ns = time_per_item(places, [&] { re2_pass(true); });
-        row("seven rules, anchored", boost_ns, re2_ns);
-        row("seven rules, anchored, first byte filtered", boost_ns, re2_filtered_ns);
+        BENCHMARK("seven rules, anchored" + script + "re2")
+        {
+            return re2_pass(false);
+        };
+        BENCHMARK("seven rules, anchored, first byte filtered" + script + "re2")
+        {
+            return re2_pass(true);
+        };
     }
 
     // --- chat highlights -----------------------------------------------------
@@ -683,10 +669,9 @@ namespace
         return 1;
     }
 
-    void bench_highlights()
+    TEST_CASE("alregex_bench: chat highlights splitting a line at the keywords it holds as LLTextBase appends it", "[alregex_bench][!benchmark]")
     {
-        heading("Chat highlights: a line split at the keywords it holds, as LLTextBase appends it", "line");
-        const size_t lines = std::size(CHAT_LINES);
+        ll_test::skipUnlessOptimised();
         for (const size_t count : { size_t(5), size_t(20), size_t(50) })
         {
             ALRegexSet set(ALRegex::ICASE);
@@ -695,29 +680,33 @@ namespace
                 set.add(ALRegex::escape(KEYWORDS[i]));
             }
             set.compile();
-            const double boost_ns = time_per_item(lines, [&] {
+            const std::string keywords = std::to_string(count) + " keywords, ";
+            BENCHMARK(keywords + "each found, ten lines, boost")
+            {
+                size_t sum = 0;
                 for (const char* line : CHAT_LINES)
                 {
-                    g_sink = g_sink + highlightPieces(line, 0, count, nullptr);
+                    sum += highlightPieces(line, 0, count, nullptr);
                 }
-            });
-            const double set_ns = time_per_item(lines, [&] {
+                return sum;
+            };
+            BENCHMARK(keywords + "the set, ten lines, re2")
+            {
+                size_t sum = 0;
                 for (const char* line : CHAT_LINES)
                 {
-                    g_sink = g_sink + highlightPieces(line, 0, count, &set);
+                    sum += highlightPieces(line, 0, count, &set);
                 }
-            });
-            char name[64];
-            std::snprintf(name, sizeof(name), "%zu keywords, each found (boost) vs the set", count);
-            row(name, boost_ns, set_ns);
+                return sum;
+            };
         }
     }
 
     // --- a chat log read back ---------------------------------------------
 
-    void bench_chat_log()
+    TEST_CASE("alregex_bench: a chat log's lines read for their time and name and words as LLChatLogParser reads them", "[alregex_bench][!benchmark]")
     {
-        heading("Chat log: each line's time, name and words, as LLChatLogParser reads them", "line");
+        ll_test::skipUnlessOptimised();
         const char* const TIMESTAMP_AND_STUFF =
             "^(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\s[AaPp][Mm]\\]\\s+|\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\]\\s+|"
             "\\[\\d{1,2}:\\d{2}\\s[AaPp][Mm]\\]\\s+|\\[\\d{1,2}:\\d{2}\\]\\s+)?(.*)$";
@@ -738,7 +727,9 @@ namespace
                           (i % 3 ? "hello there, how is everyone doing today?" : "brb"));
         }
 
-        const double boost_ns = time_per_item(log.size(), [&] {
+        BENCHMARK("timestamp, then name and text, 10,000 lines, boost")
+        {
+            size_t sum = 0;
             for (const std::string& line : log)
             {
                 boost::smatch stamp, name;
@@ -747,12 +738,15 @@ namespace
                     const std::string stuff = stamp[2];
                     if (boost::regex_match(stuff, name, boost_name))
                     {
-                        g_sink = g_sink + name[3].length();
+                        sum += name[3].length();
                     }
                 }
             }
-        });
-        const double re2_ns = time_per_item(log.size(), [&] {
+            return sum;
+        };
+        BENCHMARK("timestamp, then name and text, 10,000 lines, re2")
+        {
+            size_t sum = 0;
             for (const std::string& line : log)
             {
                 ALRegexMatch stamp, name;
@@ -761,11 +755,12 @@ namespace
                     const std::string stuff = stamp.str(2);
                     if (re2_name.match(stuff, &name))
                     {
-                        g_sink = g_sink + name.length(3);
+                        sum += name.length(3);
                     }
                 }
             }
-        });
+            return sum;
+        };
         // The same read with the tails left off: `(.*)$` takes the rest of
         // the line whatever it is, so the rest is what follows the stamp,
         // and what follows the name.
@@ -773,7 +768,9 @@ namespace
             "(\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\s[AaPp][Mm]\\]\\s+|\\[\\d{4}/\\d{1,2}/\\d{1,2}\\s+\\d{1,2}:\\d{2}\\]\\s+|"
             "\\[\\d{1,2}:\\d{2}\\s[AaPp][Mm]\\]\\s+|\\[\\d{1,2}:\\d{2}\\]\\s+)?");
         const ALRegex re2_name_only("([^:]+[:]{1})?(\\s*)");
-        const double  re2_prefix_ns = time_per_item(log.size(), [&] {
+        BENCHMARK("timestamp, then name and text, prefixes only, 10,000 lines, re2")
+        {
+            size_t sum = 0;
             for (const std::string& line : log)
             {
                 ALRegexMatch stamp, name;
@@ -782,17 +779,20 @@ namespace
                     const std::string stuff = line.substr(stamp.end());
                     if (re2_name_only.search(stuff, &name, 0, true))
                     {
-                        g_sink = g_sink + (stuff.size() - name.end());
+                        sum += stuff.size() - name.end();
                     }
                 }
             }
-        });
+            return sum;
+        };
         // And with no group asked for at all, which the DFA alone answers:
         // the stamp is the whole of what its pattern matches, and the name
         // is what `[^:]+:` does, the blanks after it what `\s*` does.
         const ALRegex re2_name_colon("[^:]+:");
         const ALRegex re2_blanks("\\s*");
-        const double  re2_whole_ns = time_per_item(log.size(), [&] {
+        BENCHMARK("timestamp, then name and text, whole matches only, 10,000 lines, re2")
+        {
+            size_t sum = 0;
             for (const std::string& line : log)
             {
                 ALRegexMatch stamp, name, blanks;
@@ -801,60 +801,43 @@ namespace
                     const std::string_view stuff = std::string_view(line).substr(stamp.end());
                     const size_t           named = re2_name_colon.search(stuff, &name, 0, true, 0) ? name.end() : 0;
                     re2_blanks.search(stuff, &blanks, named, true, 0);
-                    g_sink = g_sink + (stuff.size() - blanks.end());
+                    sum += stuff.size() - blanks.end();
                 }
             }
-        });
-        row("timestamp, then name and text", boost_ns, re2_ns);
-        row("the same, prefixes only (re2)", boost_ns, re2_prefix_ns);
-        row("the same, whole matches only (re2)", boost_ns, re2_whole_ns);
+            return sum;
+        };
     }
 
     // --- a group's members' dates -----------------------------------------
 
-    void bench_dates()
+    TEST_CASE("alregex_bench: group members with a date read from each row", "[alregex_bench][!benchmark]")
     {
-        heading("Group members: a date read from each row", "row");
+        ll_test::skipUnlessOptimised();
         const char* const DATE = "([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})";
         const std::string when = "09/23/2026";
 
         // As LLGroupMgr::formatDateString did: compiled for every row.
-        const double boost_ns = time_per_item(1, [&] {
+        BENCHMARK("a date's pattern compiled per row, boost")
+        {
+            size_t             sum = 0;
             const boost::regex expression(DATE);
             boost::cmatch      result;
             if (boost::regex_match(when.c_str(), result, expression))
             {
-                g_sink = g_sink + result[3].length();
+                sum += result[3].length();
             }
-        });
-        static const ALRegex expression(DATE);
-        const double         re2_ns = time_per_item(1, [&] {
+            return sum;
+        };
+        const ALRegex expression(DATE);
+        BENCHMARK("a date's pattern compiled once, re2")
+        {
+            size_t       sum = 0;
             ALRegexMatch result;
             if (expression.match(when, &result))
             {
-                g_sink = g_sink + result.length(3);
+                sum += result.length(3);
             }
-        });
-        row("compiled per row (boost) vs once (re2)", boost_ns, re2_ns);
+            return sum;
+        };
     }
-}
-#endif // LL_RELEASE
-
-int main(int, char**)
-{
-#if !defined(LL_RELEASE)
-    std::printf("Skipped: an unoptimised build has no numbers worth reading\n");
-    return 125;
-#else
-    std::printf("alregex_bench: Boost.Regex against ALRegex over RE2");
-    bench_urls();
-    bench_url_gate();
-    bench_rlva();
-    bench_lexing();
-    bench_highlights();
-    bench_chat_log();
-    bench_dates();
-    std::printf("\n(checksum %zu)\n", static_cast<size_t>(g_sink));
-    return 0;
-#endif
 }

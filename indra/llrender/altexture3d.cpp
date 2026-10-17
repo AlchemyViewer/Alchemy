@@ -62,6 +62,7 @@ bool ALTexture3D::allocate(U32 width, U32 height, U32 depth,
     mWidth = width;
     mHeight = height;
     mDepth = depth;
+    mInternalFormat = (U32)internal_format;
 
     // The LLImageGL exists to carry the name, target and sampler state -- it is never
     // asked to allocate, since its allocation path is 2D.
@@ -135,6 +136,7 @@ void ALTexture3D::destroyGL()
     // LLImageGL owns the name and releases it (and its accounting) on destruction.
     mImage = nullptr;
     mWidth = mHeight = mDepth = 0;
+    mInternalFormat = 0;
 }
 
 GLuint ALTexture3D::getGLName() const

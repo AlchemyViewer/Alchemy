@@ -38,7 +38,6 @@
 #include "llface.h"
 #include "llcubemap.h"
 #include "lldrawpoolsky.h"
-#include "lldrawpoolwater.h"
 #include "llglheaders.h"
 #include "llsky.h"
 #include "llviewercamera.h"
@@ -54,7 +53,6 @@
 #include "llenvironment.h"
 
 #include "lltrace.h"
-#include "llfasttimer.h"
 
 #undef min
 #undef max
@@ -443,7 +441,6 @@ LLVOSky::LLVOSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
 
     mHeavenlyBodyUpdated = false ;
 
-    mDrawRefl = 0;
     mInterpVal = 0.f;
 }
 
@@ -943,14 +940,6 @@ void LLVOSky::setBloomTextures(const LLUUID& bloom_texture, const LLUUID& bloom_
 bool LLVOSky::updateGeometry(LLDrawable *drawable)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
-    if (mFace[FACE_REFLECTION] == NULL)
-    {
-        LLDrawPoolWater *poolp = (LLDrawPoolWater*) gPipeline.getPool(LLDrawPool::POOL_WATER);
-        if (gPipeline.getPool(LLDrawPool::POOL_WATER)->getShaderLevel() != 0)
-        {
-            mFace[FACE_REFLECTION] = drawable->addFace(poolp, NULL);
-        }
-    }
 
     mCameraPosAgent = drawable->getPositionAgent();
 
@@ -1036,25 +1025,6 @@ bool LLVOSky::updateGeometry(LLDrawable *drawable)
 
     mSun.setDraw(draw_sun);
     mMoon.setDraw(draw_moon);
-
-    const F32 water_height = gAgent.getRegion()->getWaterHeight() + 0.01f;
-        // LLWorld::getInstance()->getWaterHeight() + 0.01f;
-    const F32 camera_height = mCameraPosAgent.mV[2];
-    const F32 height_above_water = camera_height - water_height;
-
-    bool sun_flag = false;
-    if (mSun.isVisible())
-    {
-        sun_flag = !mMoon.isVisible() || ((look_at * mSun.getDirection()) > 0);
-        }
-
-    bool above_water = (height_above_water > 0);
-    bool render_ref  = above_water && gPipeline.getPool(LLDrawPool::POOL_WATER)->getShaderLevel() == 0;
-    setDrawRefl(above_water ? (sun_flag ? 0 : 1) : -1);
-            if (render_ref)
-            {
-                updateReflectionGeometry(drawable, height_above_water, mSun);
-            }
 
     LLPipeline::sCompiles++;
     return true;
@@ -1154,349 +1124,6 @@ bool LLVOSky::updateHeavenlyBodyGeometry(LLDrawable *drawable, F32 scale, const 
     facep->getVertexBuffer()->unmapBuffer();
 
     return true;
-}
-
-F32 dtReflection(const LLVector3& p, F32 cos_dir_from_top, F32 sin_dir_from_top, F32 diff_angl_dir)
-{
-    LLVector3 P = p;
-    P.normalize();
-
-    const F32 cos_dir_angle = -P.mV[VZ];
-    const F32 sin_dir_angle = sqrt(1 - cos_dir_angle * cos_dir_angle);
-
-    F32 cos_diff_angles = cos_dir_angle * cos_dir_from_top
-                                    + sin_dir_angle * sin_dir_from_top;
-
-    F32 diff_angles;
-    if (cos_diff_angles > (1 - 1e-7))
-        diff_angles = 0;
-    else
-        diff_angles = acos(cos_diff_angles);
-
-    const F32 rel_diff_angles = diff_angles / diff_angl_dir;
-    const F32 dt = 1 - rel_diff_angles;
-
-    return (dt < 0) ? 0 : dt;
-}
-
-
-F32 dtClip(const LLVector3& v0, const LLVector3& v1, F32 far_clip2)
-{
-    F32 dt_clip;
-    const LLVector3 otrezok = v1 - v0;
-    const F32 A = otrezok.lengthSquared();
-    const F32 B = v0 * otrezok;
-    const F32 C = v0.lengthSquared() - far_clip2;
-    const F32 det = sqrt(B*B - A*C);
-    dt_clip = (-B - det) / A;
-    if ((dt_clip < 0) || (dt_clip > 1))
-        dt_clip = (-B + det) / A;
-    return dt_clip;
-}
-
-
-void LLVOSky::updateReflectionGeometry(LLDrawable *drawable, F32 H,
-                                         const LLHeavenBody& HB)
-{
-    const LLVector3 &look_at = LLViewerCamera::getInstance()->getAtAxis();
-    // const F32 water_height = gAgent.getRegion()->getWaterHeight() + 0.001f;
-    // LLWorld::getInstance()->getWaterHeight() + 0.001f;
-
-    LLVector3 to_dir = HB.getDirection();
-    LLVector3 hb_pos = to_dir * (HORIZON_DIST - 10);
-    LLVector3 to_dir_proj = to_dir;
-    to_dir_proj.mV[VZ] = 0;
-    to_dir_proj.normalize();
-
-    LLVector3 Right = to_dir % LLVector3::z_axis;
-    LLVector3 Up = Right % to_dir;
-    Right.normalize();
-    Up.normalize();
-
-    // finding angle between  look direction and sprite.
-    LLVector3 look_at_right = look_at % LLVector3::z_axis;
-    look_at_right.normalize();
-
-    const F32 enlargm_factor = ( 1 - to_dir.mV[2] );
-    F32 horiz_enlargement = 1 + enlargm_factor * 0.3f;
-    F32 vert_enlargement = 1 + enlargm_factor * 0.2f;
-
-    F32 vert_size = vert_enlargement * HEAVENLY_BODY_SCALE * HB.getDiskRadius();
-    Right *= /*cos_lookAt_toDir */ horiz_enlargement * HEAVENLY_BODY_SCALE * HB.getDiskRadius();
-    Up *= vert_size;
-
-    LLVector3 v_corner[2];
-    LLVector3 stretch_corner[2];
-
-    LLVector3 top_hb = v_corner[0] = stretch_corner[0] = hb_pos - Right + Up;
-    v_corner[1] = stretch_corner[1] = hb_pos - Right - Up;
-
-    LLVector2 TEX0t = TEX00;
-    LLVector2 TEX1t = TEX10;
-    LLVector3 lower_corner = v_corner[1];
-
-    top_hb.normalize();
-    const F32 cos_angle_of_view = fabs(top_hb.mV[VZ]);
-    const F32 extension = llmin (5.0f, 1.0f / cos_angle_of_view);
-
-    const S32 cols = 1;
-    const S32 raws = lltrunc(16 * extension);
-    S32 quads = cols * raws;
-
-    stretch_corner[0] = lower_corner + extension * (stretch_corner[0] - lower_corner);
-    stretch_corner[1] = lower_corner + extension * (stretch_corner[1] - lower_corner);
-
-    F32 cos_dir_from_top[2];
-
-    LLVector3 dir = stretch_corner[0];
-    dir.normalize();
-    cos_dir_from_top[0] = dir.mV[VZ];
-
-    dir = stretch_corner[1];
-    dir.normalize();
-    cos_dir_from_top[1] = dir.mV[VZ];
-
-    const F32 sin_dir_from_top = sqrt(1 - cos_dir_from_top[0] * cos_dir_from_top[0]);
-    const F32 sin_dir_from_top2 = sqrt(1 - cos_dir_from_top[1] * cos_dir_from_top[1]);
-    const F32 cos_diff_dir = cos_dir_from_top[0] * cos_dir_from_top[1]
-                            + sin_dir_from_top * sin_dir_from_top2;
-    const F32 diff_angl_dir = acos(cos_diff_dir);
-
-    v_corner[0] = stretch_corner[0];
-    v_corner[1] = lower_corner;
-
-
-    LLVector2 TEX0tt = TEX01;
-    LLVector2 TEX1tt = TEX11;
-
-    LLVector3 v_refl_corner[4];
-    LLVector3 v_sprite_corner[4];
-
-    S32 vtx;
-    for (vtx = 0; vtx < 2; ++vtx)
-    {
-        LLVector3 light_proj = v_corner[vtx];
-        light_proj.normalize();
-
-        const F32 z = light_proj.mV[VZ];
-        const F32 sin_angle = sqrt(1 - z * z);
-        light_proj *= 1.f / sin_angle;
-        light_proj.mV[VZ] = 0;
-        const F32 to_refl_point = H * sin_angle / fabs(z);
-
-        v_refl_corner[vtx] = to_refl_point * light_proj;
-    }
-
-
-    for (vtx = 2; vtx < 4; ++vtx)
-    {
-        const LLVector3 to_dir_vec = (to_dir_proj * v_refl_corner[vtx-2]) * to_dir_proj;
-        v_refl_corner[vtx] = v_refl_corner[vtx-2] + 2 * (to_dir_vec - v_refl_corner[vtx-2]);
-    }
-
-    for (vtx = 0; vtx < 4; ++vtx)
-        v_refl_corner[vtx].mV[VZ] -= H;
-
-    S32 side = 0;
-    LLVector3 refl_corn_norm[2];
-    refl_corn_norm[0] = v_refl_corner[1];
-    refl_corn_norm[0].normalize();
-    refl_corn_norm[1] = v_refl_corner[3];
-    refl_corn_norm[1].normalize();
-
-    F32 cos_refl_look_at[2];
-    cos_refl_look_at[0] = refl_corn_norm[0] * look_at;
-    cos_refl_look_at[1] = refl_corn_norm[1] * look_at;
-
-    if (cos_refl_look_at[1] > cos_refl_look_at[0])
-    {
-        side = 2;
-    }
-
-    //const F32 far_clip = (LLViewerCamera::getInstance()->getFar() - 0.01) / far_clip_factor;
-    const F32 far_clip = 512;
-    const F32 far_clip2 = far_clip*far_clip;
-
-    F32 dt_clip;
-    F32 vtx_near2, vtx_far2;
-
-    if ((vtx_far2 = v_refl_corner[side].lengthSquared()) > far_clip2)
-    {
-        // whole thing is sprite: reflection is beyond far clip plane.
-        dt_clip = 1.1f;
-        quads = 1;
-    }
-    else if ((vtx_near2 = v_refl_corner[side+1].lengthSquared()) > far_clip2)
-    {
-        // part is reflection, the rest is sprite.
-        dt_clip = dtClip(v_refl_corner[side + 1], v_refl_corner[side], far_clip2);
-        const LLVector3 P = (1 - dt_clip) * v_refl_corner[side + 1] + dt_clip * v_refl_corner[side];
-
-        F32 dt_tex = dtReflection(P, cos_dir_from_top[0], sin_dir_from_top, diff_angl_dir);
-
-        TEX0tt = LLVector2(0, dt_tex);
-        TEX1tt = LLVector2(1, dt_tex);
-        quads++;
-    }
-    else
-    {
-        // whole thing is correct reflection.
-        dt_clip = -0.1f;
-    }
-
-    LLFace *face = mFace[FACE_REFLECTION];
-
-    if (face)
-    {
-    if (!face->getVertexBuffer() || quads*4 != face->getGeomCount())
-    {
-        face->setSize(quads * 4, quads * 6);
-        LLVertexBuffer* buff = new LLVertexBuffer(LLDrawPoolWater::VERTEX_DATA_MASK);
-        if (!buff->allocateBuffer(face->getGeomCount(), face->getIndicesCount()))
-        {
-            LL_WARNS() << "Failed to allocate Vertex Buffer for vosky to "
-                << face->getGeomCount() << " vertices and "
-                << face->getIndicesCount() << " indices" << LL_ENDL;
-        }
-        face->setIndicesIndex(0);
-        face->setGeomIndex(0);
-        face->setVertexBuffer(buff);
-    }
-
-    LLStrider<LLVector3> verticesp;
-    LLStrider<LLVector3> normalsp;
-    LLStrider<LLVector2> texCoordsp;
-    LLStrider<U16> indicesp;
-    S32 index_offset;
-
-    index_offset = face->getGeometry(verticesp,normalsp,texCoordsp, indicesp);
-    if (-1 == index_offset)
-    {
-        return;
-    }
-
-    LLColor3 hb_col3 = HB.getInterpColor();
-    hb_col3.clamp();
-    const LLColor4 hb_col = LLColor4(hb_col3);
-
-    const F32 min_attenuation = 0.4f;
-    const F32 max_attenuation = 0.7f;
-    const F32 attenuation = min_attenuation
-        + cos_angle_of_view * (max_attenuation - min_attenuation);
-
-        LLColor4 hb_refl_col = (1 - attenuation) * hb_col + attenuation * getSkyFogColor();
-    face->setFaceColor(hb_refl_col);
-
-    LLVector3 v_far[2];
-    v_far[0] = v_refl_corner[1];
-    v_far[1] = v_refl_corner[3];
-
-    if(dt_clip > 0)
-    {
-        if (dt_clip >= 1)
-        {
-            for (S32 vtx = 0; vtx < 4; ++vtx)
-            {
-                F32 ratio = far_clip / v_refl_corner[vtx].length();
-                *(verticesp++) = v_refl_corner[vtx] = ratio * v_refl_corner[vtx] + mCameraPosAgent;
-            }
-            const LLVector3 draw_pos = 0.25 *
-                (v_refl_corner[0] + v_refl_corner[1] + v_refl_corner[2] + v_refl_corner[3]);
-            face->mCenterAgent = draw_pos;
-        }
-        else
-        {
-            F32 ratio = far_clip / v_refl_corner[1].length();
-            v_sprite_corner[1] = v_refl_corner[1] * ratio;
-
-            ratio = far_clip / v_refl_corner[3].length();
-            v_sprite_corner[3] = v_refl_corner[3] * ratio;
-
-            v_refl_corner[1] = (1 - dt_clip) * v_refl_corner[1] + dt_clip * v_refl_corner[0];
-            v_refl_corner[3] = (1 - dt_clip) * v_refl_corner[3] + dt_clip * v_refl_corner[2];
-            v_sprite_corner[0] = v_refl_corner[1];
-            v_sprite_corner[2] = v_refl_corner[3];
-
-            for (S32 vtx = 0; vtx < 4; ++vtx)
-            {
-                *(verticesp++) = v_sprite_corner[vtx] + mCameraPosAgent;
-            }
-
-            const LLVector3 draw_pos = 0.25 *
-                (v_refl_corner[0] + v_sprite_corner[1] + v_refl_corner[2] + v_sprite_corner[3]);
-            face->mCenterAgent = draw_pos;
-        }
-
-        *(texCoordsp++) = TEX0tt;
-        *(texCoordsp++) = TEX0t;
-        *(texCoordsp++) = TEX1tt;
-        *(texCoordsp++) = TEX1t;
-
-        *indicesp++ = index_offset + 0;
-        *indicesp++ = index_offset + 2;
-        *indicesp++ = index_offset + 1;
-
-        *indicesp++ = index_offset + 1;
-        *indicesp++ = index_offset + 2;
-        *indicesp++ = index_offset + 3;
-
-        index_offset += 4;
-    }
-
-    if (dt_clip < 1)
-    {
-        if (dt_clip <= 0)
-        {
-            const LLVector3 draw_pos = 0.25 *
-                (v_refl_corner[0] + v_refl_corner[1] + v_refl_corner[2] + v_refl_corner[3]);
-            face->mCenterAgent = draw_pos;
-        }
-
-        const F32 raws_inv = 1.f/raws;
-        const F32 cols_inv = 1.f/cols;
-        LLVector3 left  = v_refl_corner[0] - v_refl_corner[1];
-        LLVector3 right = v_refl_corner[2] - v_refl_corner[3];
-        left *= raws_inv;
-        right *= raws_inv;
-
-        for (S32 raw = 0; raw < raws; ++raw)
-        {
-            F32 dt_v0 = raw * raws_inv;
-            F32 dt_v1 = (raw + 1) * raws_inv;
-            const LLVector3 BL = v_refl_corner[1] + (F32)raw * left;
-            const LLVector3 BR = v_refl_corner[3] + (F32)raw * right;
-            const LLVector3 EL = BL + left;
-            const LLVector3 ER = BR + right;
-                dt_v0 = dt_v1 = dtReflection(EL, cos_dir_from_top[0], sin_dir_from_top, diff_angl_dir);
-            for (S32 col = 0; col < cols; ++col)
-            {
-                F32 dt_h0 = col * cols_inv;
-                *(verticesp++) = (1 - dt_h0) * EL + dt_h0 * ER + mCameraPosAgent;
-                *(verticesp++) = (1 - dt_h0) * BL + dt_h0 * BR + mCameraPosAgent;
-                F32 dt_h1 = (col + 1) * cols_inv;
-                *(verticesp++) = (1 - dt_h1) * EL + dt_h1 * ER + mCameraPosAgent;
-                *(verticesp++) = (1 - dt_h1) * BL + dt_h1 * BR + mCameraPosAgent;
-
-                *(texCoordsp++) = LLVector2(dt_h0, dt_v1);
-                *(texCoordsp++) = LLVector2(dt_h0, dt_v0);
-                *(texCoordsp++) = LLVector2(dt_h1, dt_v1);
-                *(texCoordsp++) = LLVector2(dt_h1, dt_v0);
-
-                *indicesp++ = index_offset + 0;
-                *indicesp++ = index_offset + 2;
-                *indicesp++ = index_offset + 1;
-
-                *indicesp++ = index_offset + 1;
-                *indicesp++ = index_offset + 2;
-                *indicesp++ = index_offset + 3;
-
-                index_offset += 4;
-            }
-        }
-    }
-
-    face->getVertexBuffer()->unmapBuffer();
-}
 }
 
 void LLVOSky::updateFog(const F32 distance)

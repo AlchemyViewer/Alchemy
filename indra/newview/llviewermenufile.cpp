@@ -73,6 +73,9 @@
 // linden libraries
 #include "llfilesystem.h"
 #include "llnotificationsutil.h"
+#include "alcutoutimage.h"
+#include "alrenderisolation.h"
+#include "alsnapshotcutout.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
 #include "llstring.h"
@@ -1058,6 +1061,18 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
     {
         LLPointer<LLImageRaw> raw = new LLImageRaw;
 
+        const LLSnapshotModel::ESnapshotFormat fmt = (LLSnapshotModel::ESnapshotFormat) gSavedSettings.getS32("SnapshotFormat");
+
+        // A cutout while the snapshot window's Cutout box is on, whether or
+        // not the window is open -- the same cutout the window would take.
+        const std::optional<ALSnapshotCutout> cutout = ALSnapshotCutout::fromSettings(LLSnapshotModel::SNAPSHOT_LOCAL, fmt);
+        if (cutout && !ALRenderIsolation::findArmedObject())
+        {
+            // A snapshot of nothing, on a fill, is not what was asked for.
+            LLNotificationsUtil::add("CutoutTargetMissing");
+            return true;
+        }
+
         S32 width = gViewerWindow->getWindowWidthRaw();
         S32 height = gViewerWindow->getWindowHeightRaw();
 
@@ -1076,6 +1091,7 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
             render_hud = false;
         }
 
+        bool cutout_drawn = true;
         if (gViewerWindow->rawSnapshot(raw,
                                        width,
                                        height,
@@ -1087,37 +1103,36 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
                                        render_no_post,
                                        render_balance,
                                        LLSnapshotModel::SNAPSHOT_TYPE_COLOR,
-                                       high_res ? S32_MAX : MAX_SNAPSHOT_IMAGE_SIZE)) //per side
+                                       high_res ? S32_MAX : MAX_SNAPSHOT_IMAGE_SIZE, //per side
+                                       cutout ? &*cutout : nullptr,
+                                       &cutout_drawn))
         {
-            LLPointer<LLImageFormatted> formatted;
-            LLSnapshotModel::ESnapshotFormat fmt = (LLSnapshotModel::ESnapshotFormat) gSavedSettings.getS32("SnapshotFormat");
-            switch (fmt)
+            if (cutout && !cutout_drawn)
             {
-            case LLSnapshotModel::SNAPSHOT_FORMAT_JPEG:
-                formatted = new LLImageJPEG(gSavedSettings.getS32("SnapshotQuality"));
-                break;
-            default:
-                LL_WARNS() << "Unknown local snapshot format: " << fmt << LL_ENDL;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_PNG:
-                formatted = new LLImagePNG;
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
-                formatted = new LLImageBMP;
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
-                formatted = new LLImageWebP;
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
-                formatted = new LLImageAVIF(gSavedSettings.getS32("SnapshotQuality"));
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
-                formatted = new LLImageAVIF(100); // quality 100 == lossless
-                break;
+                // There, but out of the frame or past the draw distance: the
+                // image would be the fill alone.
+                LLNotificationsUtil::add("CutoutTargetMissing");
+                return true;
             }
+            if (cutout && !ALCutoutImage::layOverFill(*raw, cutout->mFill, cutout->mKeepAlpha))
+            {
+                return true;
+            }
+
+            LLPointer<LLImageFormatted> formatted = LLSnapshotLivePreview::createFormattedImage(fmt, gSavedSettings.getS32("SnapshotQuality"));
             formatted->enableOverSize() ;
             formatted->encode(raw, 0);
             formatted->disableOverSize() ;
-            LLSnapshotLivePreview::saveLocal(formatted);
+            if (cutout)
+            {
+                // Said every time: the box outlives the window, and a key
+                // pressed an hour later should not surprise anyone.
+                LLSnapshotLivePreview::saveLocal(formatted, []() { LLNotificationsUtil::add("CutoutSnapshotSaved"); });
+            }
+            else
+            {
+                LLSnapshotLivePreview::saveLocal(formatted);
+            }
         }
         return true;
     }

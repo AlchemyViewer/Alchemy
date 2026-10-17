@@ -316,11 +316,6 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
         gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
     }
-    // The feature table sets this at startup, before the world exists.
-    if (LLWorld::instanceExists())
-    {
-        LLWorld::getInstance()->updateWaterObjects();
-    }
     return true;
 }
 
@@ -328,12 +323,6 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
 static bool handleShadowsResized(const LLSD& newvalue)
 {
     gPipeline.requestResizeShadowTexture();
-    return true;
-}
-
-static bool handleWindowResized(const LLSD& newvalue)
-{
-    gPipeline.requestResizeScreenTexture();
     return true;
 }
 
@@ -1058,13 +1047,15 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRNormalsEnabled", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderTerrainHexTiling", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterHextile", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterWaves", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderDisableCompute", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "OctreeStaticObjectSizeFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeMaxNodeCapacity", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAlphaDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAttachmentSizeFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "RenderMaxTextureIndex", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderUIBuffer", handleWindowResized);
     setting_setup_signal_listener(gSavedSettings, "RenderDepthOfField", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAUseStencil", handleReleaseGLBufferChanged);

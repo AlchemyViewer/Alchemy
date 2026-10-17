@@ -165,20 +165,39 @@ void ALPopover::adopt(const LLView* anchor)
     }
 }
 
+LLFloaterView* ALPopover::homeFloaterView() const
+{
+    LLFloater* home = mHome.get();
+    LLFloaterView* view = home ? home->getParentByType<LLFloaterView>() : nullptr;
+    return view ? view : gFloaterView;
+}
+
+LLRect ALPopover::screenRectToView(const LLRect& screen) const
+{
+    LLRect local = screen;
+    if (const LLFloaterView* view = homeFloaterView())
+    {
+        view->screenRectToLocal(screen, &local);
+    }
+    return local;
+}
+
 void ALPopover::openAt(LLRect where)
 {
     // One of its home's dependents, and so gone when its home goes: a
     // popover left over a window that has closed is about nothing. Its
     // home put away or minimised hides it, and it goes as the keyboard
-    // leaves it. Before it is placed, since the placing is its own.
+    // leaves it. Before it is placed, since the placing is its own -- and
+    // since being a dependent is what puts it in its home's floater view.
     if (LLFloater* home = mHome.get())
     {
         home->addDependentFloater(this, /*reposition*/ false);
     }
+    LLFloaterView* view = homeFloaterView();
     setRect(where);
-    if (gFloaterView && getParent() == gFloaterView)
+    if (view && getParent() == view)
     {
-        gFloaterView->adjustToFitScreen(this, false);
+        view->adjustToFitScreen(this, false);
     }
     if (LLView* keys = gFocusMgr.getKeyboardFocusView(); keys && keys != this && !keys->hasAncestor(this))
     {
@@ -206,8 +225,9 @@ void ALPopover::openBeside(const LLRect& screen, const LLView* anchor)
     }
     // The floater view is the screen a popover has; without one, only the
     // screen's bottom is known.
-    const LLRect bounds = gFloaterView ? gFloaterView->getLocalRect() : LLRect(S32_MIN / 2, S32_MAX / 2, S32_MAX / 2, 0);
-    openAt(ALPlace::under(screen, getRect().getWidth(), getRect().getHeight(), bounds));
+    const LLFloaterView* view = homeFloaterView();
+    const LLRect bounds = view ? view->getLocalRect() : LLRect(S32_MIN / 2, S32_MAX / 2, S32_MAX / 2, 0);
+    openAt(ALPlace::under(screenRectToView(screen), getRect().getWidth(), getRect().getHeight(), bounds));
 }
 
 void ALPopover::openOver(const LLView* anchor)
@@ -217,8 +237,8 @@ void ALPopover::openOver(const LLView* anchor)
     if (anchor)
     {
         adopt(anchor);
-        const LLRect screen = anchor->calcScreenRect();
-        where.setLeftTopAndSize(screen.getCenterX() - where.getWidth() / 2, screen.mTop - BELOW_TOP, where.getWidth(), where.getHeight());
+        const LLRect anchor_rect = screenRectToView(anchor->calcScreenRect());
+        where.setLeftTopAndSize(anchor_rect.getCenterX() - where.getWidth() / 2, anchor_rect.mTop - BELOW_TOP, where.getWidth(), where.getHeight());
     }
     openAt(where);
 }

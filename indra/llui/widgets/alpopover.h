@@ -149,6 +149,11 @@ private:
     // The window the anchor is in, adopted as where keys go home to.
     void adopt(const LLView* anchor);
     void openAt(LLRect where);
+    // The floater view the home window is in, or the global one.
+    LLFloaterView* homeFloaterView() const;
+    // A rect of the screen in that view's coordinates, which is where a
+    // popover's own rect is: views are not all at the screen's origin.
+    LLRect screenRectToView(const LLRect& screen) const;
 
     // Closed from the keyboard, the keyboard back where it was when it
     // opened, where nothing else has taken it: not the world's.

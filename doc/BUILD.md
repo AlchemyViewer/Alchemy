@@ -142,6 +142,8 @@ sudo dnf install @development-tools @c-development cmake fontconfig-devel git gl
 
 To build with Clang instead of GCC, also install: `sudo dnf install clang lld`
 
+For the sanitizer presets, the sanitizers' runtimes and the symbolizer too: `sudo dnf install clang lld compiler-rt llvm`
+
 </details>
 
 <details>
@@ -204,6 +206,7 @@ Most contributors want the `-os` variants.
 | `ninja-os`                                   | Linux    | Ninja Multi-Config |
 | `ninja-os-lld`, `ninja-os-mold`              | Linux    | Ninja Multi-Config |
 | `ninja-os-clang`, `ninja-os-clang-lld`       | Linux    | Ninja Multi-Config |
+| `ninja-os-asan`, `ninja-os-tsan`             | Linux    | Ninja Multi-Config |
 | `ninja-os-arm64`, `ninja-os-x64`             | macOS    | Ninja Multi-Config |
 | `xcode-os`, `xcode-os-arm64`, `xcode-os-x64` | macOS    | Xcode              |
 
@@ -227,7 +230,8 @@ access, retention, and rollout checks.
 - **Windows architecture** — `vs2026-os` (no arch suffix) builds for Visual Studio's default, the host. `vs2026[-os][-fullopt]-arm64` and `vs2026[-os][-fullopt]-x64` name the architecture, natively or cross from the other host; CI builds and tests arm64 natively on an arm64 runner. Cross-compiling for arm64 needs the Visual Studio component *MSVC ARM64 build tools*. Ninja builds for the architecture of the Developer Command Prompt it runs in (`VsDevCmd -arch=arm64`). The triplet follows the architecture the compiler targets, `arm64-windows-alchemy[-release]` with no ISA tier, and a configure whose compiler and triplet disagree stops with an error. NVAPI is x64-only and is left out of arm64 builds, as are the DirectX shader compiler DLLs, which CEF ships for x64 only. The `vlc-bin` port supports only x64 on Windows so far, so an arm64 configure stops at the vcpkg install until it gains an arm64 build.
 - **Linux linker** — `ninja[-os][-fullopt]-lld` and `ninja[-os][-fullopt]-mold` link with lld or mold instead of the toolchain's default, through `CMAKE_LINKER_TYPE`. LTO through lld needs Clang, because lld cannot read GCC's LTO objects; mold reads both.
 - **Linux with Clang** — `ninja[-os][-fullopt]-clang`, with `-lld` or `-mold` after it to pick the linker too. GCC and Clang builds of some ports are not interchangeable, so a viewer built with Clang takes the `-clang` triplets, whose ports Clang builds as well, through [`cmake/toolchains/linux-clang.cmake`](../indra/cmake/toolchains/linux-clang.cmake); the first configure builds that dependency tree from scratch. The triplet follows the compiler however it was chosen — a preset, `-DCMAKE_CXX_COMPILER=clang++`, `CXX=clang++`, or a `c++` that is Clang — and a configure whose compiler and triplet disagree stops with an error. The ports are built with the `clang` and `clang++` on `PATH`. The hidden `clang`, `lld` and `mold` presets set the compiler and `CMAKE_LINKER_TYPE`, and `ccache` and `sccache` set the compiler launcher, for a preset of your own in `CMakeUserPresets.json`, for example `{"name": "mine", "inherits": ["ninja-os", "clang", "mold", "ccache"]}`. A compiler cache needs `/Z7`-style debug info on MSVC, which this tree does not use, so the launcher presets are for Linux and macOS.
-- **vcpkg triplet** — chosen from the generator, the architecture, `AL_ISA_TIER` and, on Linux, the compiler: `<arch>-<os>-alchemy[-clang][-avx2|-avx512][-release]`, where `-release` means a single-configuration tree that is not Debug and skips the debug ports. Pass `-DVCPKG_TARGET_TRIPLET=<name>` to choose one yourself; CI does, to take release-only ports under a multi-config generator.
+- **Linux with the sanitizers** — `ninja-os-asan` builds the tests and the viewer with AddressSanitizer and UndefinedBehaviorSanitizer, `ninja-os-tsan` with ThreadSanitizer, both with Clang and lld. They take the `-asan` and `-tsan` triplets, whose ports are release builds made for that sanitizer (see [`doc/TESTING.md`](TESTING.md#sanitizers)); the first configure of each builds its dependency tree from scratch.
+- **vcpkg triplet** — chosen from the generator, the architecture, `AL_ISA_TIER` and, on Linux, the compiler and `AL_SANITIZERS`: `<arch>-<os>-alchemy[-clang][-avx2|-avx512][-asan|-tsan|-release]`, where `-release` means a single-configuration tree that is not Debug and skips the debug ports, and `-asan` and `-tsan` are the sanitizers' release-only ports. Pass `-DVCPKG_TARGET_TRIPLET=<name>` to choose one yourself; CI does, to take release-only ports under a multi-config generator.
 
 ### Workflow presets (one-shot configure + build)
 
@@ -309,6 +313,8 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 | `AL_BUILD_APPEARANCE_UTILITY` | OFF     | Build the appearance utility                                          |
 | `AL_BUILD_TESTS`         | OFF     | Build and run unit + integration tests                                |
 | `AL_ENABLE_GL_TESTS`     | ON      | Run the tests that render on a hidden window; off, they are built and registered disabled (needs `AL_BUILD_TESTS`) |
+| `AL_REQUIRE_LSCRIPT`     | OFF     | Fail to configure when LL's LSL compiler (`indra/lscript`, a test-only reference needing bison 3, flex and Python with `yaml` and `llsd`) cannot be built, rather than leave it out; CI's test rows set it (needs `AL_BUILD_TESTS`) |
+| `AL_BUILD_FUZZERS`       | OFF     | Build the libFuzzer drivers on LL's LSL compiler and Script Studio's analysis: Clang with `address` in `AL_SANITIZERS`; see [`TESTING.md`](TESTING.md#fuzzing) (needs `AL_BUILD_TESTS`) |
 | `AL_BUILD_DOCS`          | OFF     | Add the `doc` target (API documentation with Doxygen)                 |
 | `AL_VCPKG_INSTALL`       | ON      | Let configure run `vcpkg install` when the manifest, the registry configuration, the triplets or the feature list changed; off leaves the ports to you |
 | `AL_BUILD_PACKAGE`       | ON      | Add the `package` target: the CPack archive of the installed tree (zip, tar.xz, dmg), and on Linux the .deb and .rpm |
@@ -364,7 +370,7 @@ The registry's README covers CI and adding ports.
 |:--------------------------------------------------|:--------|:-------------------------------------------------------------------|
 | `AL_USE_LTO`                     | OFF     | Link Time Optimization                                                      |
 | `AL_ISA_TIER`                    | `v3`    | x86-64 level for the viewer and its vcpkg ports: `baseline`, `v2` (SSE4.2), `v3` (AVX2), `v4` (AVX-512). Ignored on macOS |
-| `AL_SANITIZERS`                  | empty   | Any of `address`, `undefined`, `thread` (GCC and Clang only)                |
+| `AL_SANITIZERS`                  | empty   | Any of `address`, `undefined`, `thread`, but not `address` with `thread` (GCC and Clang; `address` and `thread` need Clang on Linux). Turns off Tracy, Sentry and WebRTC. See [`TESTING.md`](TESTING.md#sanitizers) |
 | `AL_ENABLE_WARNINGS_AS_ERRORS`   | ON      | Treat compiler warnings as errors                                           |
 | `AL_ENABLE_RELEASE_DEBUG_LOGGING`| Test channel only | Keep debug-level logging in Release builds                        |
 | `AL_USE_WEBRTC`                  | ON      | WebRTC voice (off automatically in sanitized builds)                        |
@@ -376,7 +382,7 @@ The registry's README covers CI and adding ports.
 | `AL_BUILD_CEF_PLUGIN`       | ON          | Chromium Embedded Framework (in-world web) |
 | `AL_BUILD_VLC_PLUGIN`       | OFF on Linux | VLC media plugin; on Linux GStreamer plays media, and VLC only with `MediaPluginForceVLC` |
 | `AL_BUILD_GSTREAMER_PLUGIN` | ON on Linux | GStreamer media plugin (Linux only): video, audio and the parcel stream |
-| `AL_BUILD_EXAMPLE_PLUGIN`   | ON          | Reference/example plugin                   |
+| `AL_BUILD_EXAMPLE_PLUGIN`   | OFF         | Reference/example plugin                   |
 
 ### Platform-specific
 
@@ -422,7 +428,7 @@ cmake -S indra --preset <preset> -DAL_BUILD_TESTS=ON
 
 Four tests drive a Python peer (`llleap`, `llprocess`, `llsdserialize`, `llcorehttp`); they need a Python 3 interpreter with the `llsd` package (`pip install -r requirements.txt`, in a venv if you like) and are registered disabled when configure finds none.
 
-LL's LSL compiler (`indra/lscript`), restored as a reference for the script tests, is built only with tests on. Its lexer, grammar, newer event nodes and library table are written at build time by lsl-definitions' own generator, which needs Python with `PyYAML` and `llsd` (both in `requirements.txt`), and then put through `bison` and `flex`. Where any of them is missing, configure leaves the library out and the configuration report says what it needs. Nothing else in the build runs Python.
+LL's LSL compiler (`indra/lscript`), restored as a reference for the script tests, is built only with tests on. Its lexer, grammar, newer event nodes and library table are written at build time by lsl-definitions' own generator, which needs Python with `PyYAML` and `llsd` (both in `requirements.txt`), and then put through `bison`, 3.0 or later, and `flex`. macOS's own bison is 2.3: `brew install bison flex`, which Homebrew keeps off the path and configure looks for where it puts them. Where any of them is missing, configure leaves the library out and the configuration report says what it needs. Nothing else in the build runs Python.
 
 The `llrender` suites render on a hidden SDL window with the platform's own GL -- WGL on Windows, EGL on Linux, and where Linux has no display SDL's offscreen driver over Mesa (set `LIBGL_ALWAYS_SOFTWARE=1` for llvmpipe on a machine with no GPU). A host with no GL 4.1 to give, such as a CI runner without a graphics driver, configures with `-DAL_ENABLE_GL_TESTS=OFF`: those suites still build, and CTest reports them as not run rather than failed. They carry the label `gl`, so `ctest -LE gl` skips them for one run.
 
@@ -430,10 +436,12 @@ Build, then run with CTest:
 
 ```
 cmake --build <build-dir> --config RelWithDebInfo
-ctest --test-dir <build-dir> --output-on-failure
+ctest --test-dir <build-dir> --output-on-failure -LE manual
 ```
 
-Unit tests live alongside the library they cover in `indra/<library>/tests/`, written against the TUT (Template Unit Test) framework. Integration tests are in `indra/integration_tests/`.
+`-LE manual` leaves out what the build's own test target leaves out: the benchmarks, and each Catch2 binary's run of all its files in one process while that run is still labelled `combined_pending` (`ctest -L combined_pending` runs those).
+
+Unit tests are Catch2 v3, and live alongside the library they cover in `indra/<library>/tests/`. A library builds its test files into one binary (`al_add_test_binary`, `indra/cmake/ALAddTestBinary.cmake`), each file still a CTest entry of its own, on the harness in `indra/test/`. [TESTING.md](TESTING.md) says how to run them, how to write one, and what a test binary asks of its files. Integration tests are in `indra/integration_tests/`.
 
 ## Editing XUI
 

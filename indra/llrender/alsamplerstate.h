@@ -227,7 +227,8 @@ namespace ALSamplers
                                               | ALSampler::Compare;
 
     // NOT a sampling mode: "resolve from the render target's per-attachment policy"
-    // (getDefaultColorSampler -- bilinear for attachment 0, point for the data attachments).
+    // (getDefaultColorSampler -- bilinear for attachment 0, point for the data attachments and
+    // integer ones).
     // Only LLRenderTarget::bindTexture interprets it; it must never reach getSampler().
     // Built on the addressing field's unused fourth encoding, so if it leaks through anyway
     // the masked slot is one warmup() never fills and the cache's debug assert fires instead

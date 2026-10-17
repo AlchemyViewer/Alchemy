@@ -30,7 +30,9 @@
 #include "alscriptlexicon.h"
 
 #include <algorithm>
+#include <optional>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace
@@ -77,6 +79,38 @@ namespace
         What what = Other;
     };
 
+    // The brackets and blocks open, innermost last, and where each block is
+    // among them. What block is innermost, and how many are open, is asked
+    // at every line and every bracket, and finding it by scanning the
+    // whole made formatting a script a hundred thousand brackets deep take
+    // most of a minute.
+    struct OpenStack
+    {
+        std::vector<Open>   entries;
+        std::vector<size_t> blocks;
+
+        bool  empty() const { return entries.empty(); }
+        Open& back() { return entries.back(); }
+        void  push_back(const Open& o)
+        {
+            if (!o.bracket)
+            {
+                blocks.push_back(entries.size());
+            }
+            entries.push_back(o);
+        }
+        void pop_back()
+        {
+            if (!entries.back().bracket)
+            {
+                blocks.pop_back();
+            }
+            entries.pop_back();
+        }
+        size_t      blocksOpen() const { return blocks.size(); }
+        const Open* innermostBlock() const { return blocks.empty() ? nullptr : &entries[blocks.back()]; }
+    };
+
     bool significant(const Token& t) { return t.kind != Kind::Space && t.kind != Kind::Comment; }
 
     // LSL's words that shape the code -- not its types, nor print, which
@@ -117,8 +151,34 @@ namespace
         }
     }
 
+    // How deep a line's indentation goes at most. A level is written for
+    // each block and bracket open, and a script nested a hundred thousand
+    // deep, a block a line, wrote gigabytes of blanks, on the main thread,
+    // which formats. A line deeper stands where this many levels put it.
+    constexpr S32 MAX_INDENT_LEVELS = 32;
+
+    // A line is broken at the width only where it has no more tokens than
+    // this, and no bracket deeper in than the indentation goes: breaking
+    // recurses a level for each bracket it goes into and measures the line
+    // afresh at each, which a long enough line, on the main thread's
+    // stack, does not come back from. A longer or deeper line is left as
+    // it is.
+    constexpr size_t WRAP_MAX_TOKENS = 2048;
+
+    // The options as given, kept to what the formatter can do: an indent of
+    // no more than sixteen columns and no less than none -- a negative one,
+    // times the levels, was the size of a string the length of the address
+    // space -- and no fewer blank lines in a row than none.
+    ALScriptFormatter::Options sanitized(ALScriptFormatter::Options options)
+    {
+        options.indent        = llclamp(options.indent, 0, 16);
+        options.maxBlankLines = llmax(options.maxBlankLines, 0);
+        return options;
+    }
+
     std::string indentText(const ALScriptFormatter::Options& options, S32 levels)
     {
+        levels = std::min(levels, MAX_INDENT_LEVELS);
         if (levels <= 0)
         {
             return std::string();
@@ -138,10 +198,13 @@ namespace
 
     // The line's tokens spaced afresh, after its indentation: one space
     // around a binary operator, none around a unary one or inside
-    // brackets, one after a comma and none before; a trailing comment,
-    // and anything the rules do not name, spaced as written.
-    std::string spaced(const Line& line, bool lua)
+    // brackets, one after a comma and none before; inside Luau's braces
+    // as Options::braceSpaces asks, whatever stands next to them; a
+    // trailing comment, and anything the rules do not name, spaced as
+    // written.
+    std::string spaced(const Line& line, const ALScriptFormatter::Options& options)
     {
+        const bool   lua       = options.lua;
         std::string  out;
         const Token* prev      = nullptr;
         // The last token before prev that is neither blank nor a comment:
@@ -155,6 +218,9 @@ namespace
         // statement, spaced from it; what follows a cast's is its operand.
         std::vector<bool> brackets;
         bool              conditionClosed = false;
+        // Whether the token before is a < that opened an LSL vector, not
+        // a comparison: a sign after it is the first part's.
+        bool              vectorOpened    = false;
         for (const Token& t : line.tokens)
         {
             if (t.kind == Kind::Space)
@@ -164,6 +230,8 @@ namespace
             }
             const bool closedCondition = conditionClosed;
             conditionClosed            = false;
+            const bool openedVector    = vectorOpened;
+            vectorOpened               = false;
             if (t.kind == Kind::Punct && t.text == "(")
             {
                 brackets.push_back(prev && prev->kind == Kind::Ident && (prev->text == "if" || prev->text == "while" || prev->text == "for"));
@@ -175,6 +243,13 @@ namespace
             }
             if (!prev)
             {
+                // A vector or rotation opens where nothing stands before
+                // it: a line of a list may begin with one.
+                if (!lua && t.kind == Kind::Punct && t.text == "<")
+                {
+                    ++vector;
+                    vectorOpened = true;
+                }
                 out += t.text;
                 prev = &t;
                 gap.clear();
@@ -197,7 +272,13 @@ namespace
             else if (t.kind == Kind::Punct)
             {
                 const std::string& p = t.text;
-                if (p == "," || p == ";")
+                if (lua && a.kind == Kind::Punct && a.text == "{" && p != "}")
+                {
+                    // A table's first part, or a table type's, whatever
+                    // begins it: { { 1 } }, { [k] = v }, { -1 }.
+                    say(options.braceSpaces);
+                }
+                else if (p == "," || p == ";")
                 {
                     say(false);
                 }
@@ -211,13 +292,14 @@ namespace
                     {
                         say(isKeyword(lua, a) && !(lua && a.text == "function"));
                     }
-                    else if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == ")" || a.text == "]" || a.text == "." || a.text == ":"))
+                    else if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == ")" || a.text == "]" || a.text == "."))
                     {
                         say(false);
                     }
                     else if (a.kind == Kind::Punct && isOperator(lua, a.text))
                     {
-                        say(true);
+                        // After a sign, nothing: -(a), #(t), !(b).
+                        say(!(isUnary(lua, a.text) && (!earlier || !operand(lua, *earlier))));
                     }
                 }
                 else if (p == "[")
@@ -234,6 +316,11 @@ namespace
                     {
                         say(false);
                     }
+                    else if (a.kind == Kind::Punct && isUnary(lua, a.text) && (!earlier || !operand(lua, *earlier)))
+                    {
+                        // A length of a table written out: #{1, 2}.
+                        say(false);
+                    }
                     else
                     {
                         say(true);
@@ -241,20 +328,46 @@ namespace
                 }
                 else if (p == "}")
                 {
-                    say(!(a.kind == Kind::Punct && a.text == "{"));
+                    say(!(a.kind == Kind::Punct && a.text == "{") && (!lua || options.braceSpaces));
                 }
-                else if (p == "." || p == "++" || p == "--")
+                else if (p == ".")
                 {
                     say(false);
+                }
+                else if (p == "++" || p == "--")
+                {
+                    if (aOperand)
+                    {
+                        // After its operand, i++.
+                        say(false);
+                    }
+                    else if (a.kind == Kind::Punct &&
+                             (a.text == "(" || a.text == "[" || (a.text == "<" && openedVector) || a.text == "{" || a.text == "!" || a.text == "~"))
+                    {
+                        // Before its operand, against the bracket or the
+                        // sign before it: (++i), !++i.
+                        say(false);
+                    }
+                    else
+                    {
+                        // Before its operand, after an operator: x = ++i,
+                        // i + ++j, a - --b. Spaced from it, since LSL
+                        // lexes the longest token it can, and i +++j is
+                        // (i++) + j.
+                        say(true);
+                    }
                 }
                 else if (p == "<" && !lua)
                 {
                     // A vector or rotation opens where no operand stands
-                    // before it; a comparison follows one.
+                    // before it; a comparison follows one. Spaced from a <
+                    // before it, a vector's or a comparison's, since << is
+                    // a shift.
                     if (!aOperand)
                     {
                         ++vector;
-                        say(!(a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == "<" || a.text == "{")));
+                        vectorOpened = true;
+                        say(!(a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == "{")));
                     }
                     else
                     {
@@ -263,8 +376,10 @@ namespace
                 }
                 else if (p == ">" && !lua && vector > 0)
                 {
+                    // Against the last part, but for a vector's > it closes
+                    // after: >> is a shift.
                     --vector;
-                    say(false);
+                    say(a.kind == Kind::Punct && a.text == ">");
                 }
                 else if (isOperator(lua, p))
                 {
@@ -273,7 +388,9 @@ namespace
                         // A sign or a not: spaced before as its neighbour
                         // asks, and nothing after, which the next token's
                         // turn will see to.
-                        if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == "<" || a.text == "{" || a.text == "!" || a.text == "~" || a.text == "#"))
+                        // Not after a < that compares: LSL's where an operand
+                        // stood before it, and Luau's everywhere.
+                        if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || (a.text == "<" && openedVector) || a.text == "{" || a.text == "!" || a.text == "~" || a.text == "#"))
                         {
                             say(false);
                         }
@@ -281,8 +398,10 @@ namespace
                         {
                             say(true);
                         }
-                        else if (a.kind == Kind::Punct && isUnary(lua, a.text))
+                        else if (a.kind == Kind::Punct && isUnary(lua, a.text) && (!earlier || !operand(lua, *earlier)))
                         {
+                            // A sign after a sign: -#t. Not after a minus
+                            // that subtracts, x - #t.
                             say(false);
                         }
                         else
@@ -309,7 +428,7 @@ namespace
                 }
                 else if (p == "{")
                 {
-                    say(true);
+                    say(!lua || options.braceSpaces);
                 }
                 else if (p == "," || p == ";")
                 {
@@ -416,7 +535,7 @@ namespace
     // Each line's indentation from what is open at its start.
     void decide(std::vector<Line>& lines, bool lua)
     {
-        std::vector<Open> open;
+        OpenStack         open;
         bool              hang = false;
         // Luau: each `if` met and not yet done with, statement or
         // expression -- an expression's `then` and `else` open no block,
@@ -436,24 +555,8 @@ namespace
         // Whether the token before was the `else` of an if-expression,
         // after which another `if` is the same expression going on.
         bool afterElseExpression = false;
-        auto              blocksOpen = [&open]() {
-            size_t n = 0;
-            for (const Open& o : open)
-            {
-                n += o.bracket ? 0 : 1;
-            }
-            return n;
-        };
-        auto innermostBlock = [&open]() -> const Open* {
-            for (auto it = open.rbegin(); it != open.rend(); ++it)
-            {
-                if (!it->bracket)
-                {
-                    return &*it;
-                }
-            }
-            return nullptr;
-        };
+        auto              blocksOpen     = [&open]() { return open.blocksOpen(); };
+        auto              innermostBlock = [&open]() { return open.innermostBlock(); };
         auto isBlockCloser = [lua](const Token& t) {
             if (t.kind == Kind::Punct)
             {
@@ -666,20 +769,686 @@ namespace
         }
     }
 
-    std::string emit(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, bool endsWithNewline, S32 first, S32 last)
+    // How many columns text takes: a tab a level's width, a character of
+    // several bytes one.
+    S32 columns(std::string_view text, S32 tab)
     {
+        S32 n = 0;
+        for (const char c : text)
+        {
+            n += c == '\t' ? tab : (static_cast<unsigned char>(c) & 0xC0) != 0x80 ? 1 : 0;
+        }
+        return n;
+    }
+
+    // A bracket of a line that closes on it, by its tokens' indexes: the
+    // commas directly in it, and the bracket it is in. An LSL vector or
+    // rotation is one too, which nothing breaks.
+    struct Group
+    {
+        size_t              open   = 0;
+        size_t              close  = 0;
+        size_t              parent = std::string::npos;
+        size_t              width  = 0;
+        bool                vector = false;
+        std::vector<size_t> commas;
+        // The groups directly inside it that may be broken -- closed, and
+        // no vector -- widest first.
+        std::vector<size_t> breakable;
+    };
+
+    // The groups of a line's tokens, and those at its top that may be
+    // broken, widest first.
+    struct Groups
+    {
+        std::vector<Group>  all;
+        std::vector<size_t> top;
+        // How deep its brackets go.
+        size_t              depth = 0;
+    };
+
+    // What the tokens' brackets are; none where they do not match, or one
+    // is left open: a line that runs on over the next is not broken.
+    Groups groupsOf(const std::vector<Token>& tokens, bool lua)
+    {
+        Groups              found;
+        std::vector<Group>& groups = found.all;
+        std::vector<size_t> open;
+        const Token*        before = nullptr;
+        for (size_t i = 0; i < tokens.size(); ++i)
+        {
+            const Token& t = tokens[i];
+            if (!significant(t))
+            {
+                continue;
+            }
+            if (t.kind == Kind::Punct)
+            {
+                // A vector where no operand stands before its <, as spaced
+                // reads one; one that never closes was a comparison.
+                const bool vector = !lua && t.text == "<" && !(before && operand(lua, *before));
+                if (t.text == "(" || t.text == "[" || t.text == "{" || vector)
+                {
+                    Group group;
+                    group.open   = i;
+                    group.close  = std::string::npos;
+                    group.parent = open.empty() ? std::string::npos : open.back();
+                    group.vector = vector;
+                    open.push_back(groups.size());
+                    groups.push_back(std::move(group));
+                    found.depth = std::max(found.depth, open.size());
+                }
+                else if (t.text == ")" || t.text == "]" || t.text == "}")
+                {
+                    while (!open.empty() && groups[open.back()].vector)
+                    {
+                        open.pop_back();
+                    }
+                    const std::string_view opener = t.text == ")" ? "(" : t.text == "]" ? "[" : "{";
+                    if (open.empty() || tokens[groups[open.back()].open].text != opener)
+                    {
+                        return Groups();
+                    }
+                    groups[open.back()].close = i;
+                    open.pop_back();
+                }
+                else if (t.text == ">" && !lua && !open.empty() && groups[open.back()].vector)
+                {
+                    groups[open.back()].close = i;
+                    open.pop_back();
+                }
+                else if (t.text == "," && !open.empty() && !groups[open.back()].vector)
+                {
+                    groups[open.back()].commas.push_back(i);
+                }
+            }
+            before = &t;
+        }
+        if (!open.empty() && std::any_of(open.begin(), open.end(), [&groups](size_t g) { return !groups[g].vector; }))
+        {
+            return Groups();
+        }
+        // Each group's width from the tokens' running sizes, and where it
+        // stands in its parent's breakable ones: once, rather than a scan
+        // of every token in it and of every group for each parent.
+        std::vector<size_t> upTo(tokens.size() + 1, 0);
+        for (size_t i = 0; i < tokens.size(); ++i)
+        {
+            upTo[i + 1] = upTo[i] + tokens[i].text.size();
+        }
+        for (size_t g = 0; g < groups.size(); ++g)
+        {
+            Group& group = groups[g];
+            if (group.close == std::string::npos)
+            {
+                continue;
+            }
+            group.width = upTo[group.close + 1] - upTo[group.open];
+            if (!group.vector)
+            {
+                (group.parent == std::string::npos ? found.top : groups[group.parent].breakable).push_back(g);
+            }
+        }
+        const auto widestFirst = [&groups](std::vector<size_t>& in) {
+            std::stable_sort(in.begin(), in.end(), [&groups](size_t a, size_t b) { return groups[a].width > groups[b].width; });
+        };
+        widestFirst(found.top);
+        for (Group& group : groups)
+        {
+            widestFirst(group.breakable);
+        }
+        return found;
+    }
+
+    // A line's tokens as lines of their own, each with how far in it is.
+    struct Piece
+    {
+        std::vector<Token> tokens;
+        S32                indent = 0;
+    };
+
+    // The tokens from `from` to `to`, the blanks at either end left off.
+    std::vector<Token> slice(const std::vector<Token>& tokens, size_t from, size_t to)
+    {
+        while (from < to && tokens[from].kind == Kind::Space)
+        {
+            ++from;
+        }
+        while (to > from && tokens[to - 1].kind == Kind::Space)
+        {
+            --to;
+        }
+        return std::vector<Token>(tokens.begin() + static_cast<std::ptrdiff_t>(from), tokens.begin() + static_cast<std::ptrdiff_t>(to));
+    }
+
+    std::string written(const std::vector<Token>& tokens, S32 indent, const ALScriptFormatter::Options& options)
+    {
+        Line line;
+        line.tokens = tokens;
+        return indentText(options, indent) + spaced(line, options);
+    }
+
+    // The tokens as pieces no wider than the width where a bracket's commas
+    // let them be: the bracket broken is the widest with commas, looked
+    // for in the widest without, down; or, where its last part is a table
+    // or a list with commas of its own, that, which stays on the line
+    // that opens the bracket where that fits.
+    void wrap(const std::vector<Token>& tokens, S32 indent, const ALScriptFormatter::Options& options, std::vector<Piece>& out)
+    {
+        const S32 tab = options.tabs ? options.indent : 1;
+        if (columns(written(tokens, indent, options), tab) <= options.width)
+        {
+            out.push_back({ tokens, indent });
+            return;
+        }
+        const Groups              found  = groupsOf(tokens, options.lua);
+        const std::vector<Group>& groups = found.all;
+        // Recursing no deeper than the line's brackets, which wrapped()
+        // has held to the indentation's depth.
+        const auto pick = [&groups](const std::vector<size_t>& in, auto&& self) -> std::optional<size_t> {
+            for (size_t g : in)
+            {
+                if (!groups[g].commas.empty())
+                {
+                    return g;
+                }
+                if (const std::optional<size_t> inner = self(groups[g].breakable, self))
+                {
+                    return inner;
+                }
+            }
+            return std::nullopt;
+        };
+        std::optional<size_t> chosen = pick(found.top, pick);
+        if (!chosen)
+        {
+            out.push_back({ tokens, indent });
+            return;
+        }
+        // Its last part, where that is a table or a list of its own with
+        // commas, and the line to its opening fits.
+        const Group& group = groups[*chosen];
+        size_t       last  = group.commas.back() + 1;
+        while (last < group.close && !significant(tokens[last]))
+        {
+            ++last;
+        }
+        for (size_t g = 0; g < groups.size(); ++g)
+        {
+            const Group& inner = groups[g];
+            if (inner.parent == *chosen && inner.open == last && !inner.commas.empty() && tokens[inner.open].text != "(")
+            {
+                size_t end = inner.close + 1;
+                while (end < group.close && !significant(tokens[end]))
+                {
+                    ++end;
+                }
+                if (end == group.close && columns(written(slice(tokens, 0, inner.open + 1), indent, options), tab) <= options.width)
+                {
+                    chosen = g;
+                }
+                break;
+            }
+        }
+        const Group& broken = groups[*chosen];
+        wrap(slice(tokens, 0, broken.open + 1), indent, options, out);
+        size_t from = broken.open + 1;
+        for (size_t comma : broken.commas)
+        {
+            wrap(slice(tokens, from, comma + 1), indent + 1, options, out);
+            from = comma + 1;
+        }
+        const std::vector<Token> rest = slice(tokens, from, broken.close);
+        if (!rest.empty())
+        {
+            wrap(rest, indent + 1, options, out);
+        }
+        wrap(slice(tokens, broken.close, tokens.size()), indent, options, out);
+    }
+
+    // A line past the width broken where it can be: its comment after its
+    // code, where it has one, after the last piece. As it is where it has
+    // a comment inside it, or a string or comment runs on past it.
+    std::string wrapped(const Line& line, const ALScriptFormatter::Options& options, const std::string& text)
+    {
+        const S32 tab = options.tabs ? options.indent : 1;
+        if (options.width <= 0 || line.first != line.last || columns(text, tab) <= options.width)
+        {
+            return text;
+        }
+        std::vector<Token> tokens = slice(line.tokens, 0, line.tokens.size());
+        std::vector<Token> after;
+        if (!tokens.empty() && tokens.back().kind == Kind::Comment)
+        {
+            after.push_back(tokens.back());
+            tokens = slice(tokens, 0, tokens.size() - 1);
+        }
+        if (std::any_of(tokens.begin(), tokens.end(), [](const Token& t) { return t.kind == Kind::Comment; }))
+        {
+            return text;
+        }
+        if (tokens.size() > WRAP_MAX_TOKENS || groupsOf(tokens, options.lua).depth > static_cast<size_t>(MAX_INDENT_LEVELS))
+        {
+            return text;
+        }
+        std::vector<Piece> pieces;
+        wrap(tokens, line.indent, options, pieces);
+        if (pieces.size() < 2)
+        {
+            return text;
+        }
+        if (!after.empty())
+        {
+            Token gap;
+            gap.kind = Kind::Space;
+            gap.text = " ";
+            pieces.back().tokens.push_back(gap);
+            pieces.back().tokens.push_back(after.front());
+        }
         std::string out;
-        S32         blanks = 0;
-        const bool  whole  = first < 0;
+        for (const Piece& piece : pieces)
+        {
+            std::string one = options.spacing ? written(piece.tokens, piece.indent, options) : indentText(options, piece.indent) + asWritten(Line{ piece.tokens });
+            while (!one.empty() && (one.back() == ' ' || one.back() == '\t'))
+            {
+                one.pop_back();
+            }
+            out += (out.empty() ? "" : "\n") + one;
+        }
+        return out;
+    }
+
+    // How far in the author wrote a line, tabs to their stops.
+    S32 writtenIndent(const Line& line, S32 tab)
+    {
+        S32 column = 0;
+        if (!line.tokens.empty() && line.tokens.front().kind == Kind::Space)
+        {
+            for (const char c : line.tokens.front().text)
+            {
+                column = c == '\t' ? (column / tab + 1) * tab : column + 1;
+            }
+        }
+        return column;
+    }
+
+    // Whether a line holds a comment and nothing else.
+    bool commentOnly(const Line& line)
+    {
+        bool comment = false;
+        for (const Token& t : line.tokens)
+        {
+            if (t.kind == Kind::Comment)
+            {
+                comment = true;
+            }
+            else if (t.kind != Kind::Space)
+            {
+                return false;
+            }
+        }
+        return comment && !line.directive && line.first == line.last;
+    }
+
+    // A comment over a line that goes back out -- `elseif`, `else`,
+    // `until`, `end`, `}` -- is about that line where the author wrote it
+    // out of the block: no further in than that line, and less far than
+    // the code over it in the block, or, in a block with none, in text
+    // the author indented. It goes in as far as the line. One written as
+    // far in as the block, or in text with no indentation to tell, is the
+    // end of the block, and stays in it.
+    void overWhatFollows(std::vector<Line>& lines, const ALScriptFormatter::Options& options)
+    {
+        const S32  tab      = options.indent > 0 ? options.indent : 4;
+        const auto code     = [&](const Line& line) { return !line.blank && !line.directive && !commentOnly(line); };
+        const bool indented = std::any_of(lines.begin(), lines.end(),
+                                          [&](const Line& line) { return code(line) && line.indent > 0 && writtenIndent(line, tab) > 0; });
+        for (size_t i = 1; i < lines.size(); ++i)
+        {
+            const Line& next = lines[i];
+            if (!code(next))
+            {
+                continue;
+            }
+            size_t top = i;
+            while (top > 0 && commentOnly(lines[top - 1]))
+            {
+                --top;
+            }
+            if (top == i)
+            {
+                continue;
+            }
+            size_t over = top;
+            while (over > 0 && !code(lines[over - 1]))
+            {
+                --over;
+            }
+            if (over == 0)
+            {
+                continue;
+            }
+            // The code over them, in the block or the line that opens it.
+            const Line& above   = lines[over - 1];
+            const S32   written = writtenIndent(next, tab);
+            const auto  out     = [&](const Line& comment) {
+                const S32 at = writtenIndent(comment, tab);
+                return at <= written && (above.indent < comment.indent ? indented : at < writtenIndent(above, tab));
+            };
+            for (size_t j = i; j > top && lines[j - 1].indent > next.indent && out(lines[j - 1]); --j)
+            {
+                lines[j - 1].indent = next.indent;
+            }
+        }
+    }
+
+    // Where the author put a line's `=` -- its first outside brackets --
+    // or its trailing comment: the token, and its column from where the
+    // line's code starts, tabs to their stops; and whether the blank
+    // before it is wider than one space, which is what says it was put
+    // there.
+    struct Mark
+    {
+        size_t token  = std::string::npos;
+        S32    column = 0;
+        bool   padded = false;
+    };
+
+    struct Marks
+    {
+        Mark equals;
+        Mark comment;
+        // A comment and nothing else, which a run goes on past.
+        bool through = false;
+    };
+
+    Marks marksOf(const Line& line, S32 tab)
+    {
+        Marks marks;
+        marks.through = commentOnly(line);
+        if (line.blank || line.directive || line.first != line.last || marks.through)
+        {
+            return marks;
+        }
+        S32  column = 0;
+        S32  start  = -1;
+        S32  depth  = 0;
+        bool code   = false;
+        for (size_t i = 0; i < line.tokens.size(); ++i)
+        {
+            const Token& t = line.tokens[i];
+            if (t.kind != Kind::Space && start < 0)
+            {
+                start = column;
+            }
+            const bool padded = i > 0 && line.tokens[i - 1].kind == Kind::Space && line.tokens[i - 1].text != " ";
+            if (t.kind == Kind::Punct)
+            {
+                if (t.text == "(" || t.text == "[" || t.text == "{")
+                {
+                    ++depth;
+                }
+                else if (t.text == ")" || t.text == "]" || t.text == "}")
+                {
+                    // Closing what an earlier line opened: no statement's =.
+                    depth = depth > 0 ? depth - 1 : -1000;
+                }
+                else if (t.text == "=" && depth == 0 && code && marks.equals.token == std::string::npos)
+                {
+                    marks.equals = { i, column - start, padded };
+                }
+            }
+            if (t.kind == Kind::Comment && code)
+            {
+                marks.comment = { i, column - start, padded };
+            }
+            else if (t.kind != Kind::Space)
+            {
+                // Anything after a comment is no trailing one.
+                marks.comment = Mark();
+                code          = true;
+            }
+            for (const char c : t.text)
+            {
+                column = c == '\t' ? (column / tab + 1) * tab : column + ((static_cast<unsigned char>(c) & 0xC0) != 0x80 ? 1 : 0);
+            }
+        }
+        if (marks.comment.token != std::string::npos && marks.equals.token > marks.comment.token)
+        {
+            marks.equals = Mark();
+        }
+        return marks;
+    }
+
+    // What the author lined up, lined up again once each line is spaced
+    // afresh: a run of lines one after another, as deep as each other,
+    // whose `=`, or whose trailing comments, the author put at one column
+    // and spaced wider than one somewhere to get there. Each goes to that
+    // column again, or just past the longest line where it no longer
+    // fits. A run of comments none of whose lines' code changed is left
+    // as it was, its blanks as written. A line that would go past the
+    // width once lined up is broken there instead, spaced afresh in
+    // pieces: it lines up with nothing, and the lines on either side of
+    // it line up among themselves, as they will again once it is broken,
+    // so that the formatter writes its own output out the same. `code`
+    // holds each line written out where it is the formatter's to write.
+    void lineUp(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, std::vector<std::optional<std::string>>& code)
+    {
+        const S32          tab  = options.indent > 0 ? options.indent : 4;
+        const S32          wide = options.tabs ? options.indent : 1;
+        std::vector<Marks> marks;
+        marks.reserve(lines.size());
+        for (const Line& line : lines)
+        {
+            marks.push_back(marksOf(line, tab));
+        }
+        // Each run of the marks `of` picks, from `from` to `to`, one past,
+        // a comment as far in on a line of its own going on past; each
+        // line of it given `each` has its mark.
+        const auto runs = [&](auto of, auto&& each) {
+            for (size_t from = 0; from < lines.size();)
+            {
+                const Mark first = of(marks[from]);
+                if (first.token == std::string::npos)
+                {
+                    ++from;
+                    continue;
+                }
+                size_t to     = from;
+                size_t marked = 0;
+                bool   padded = false;
+                for (size_t at = from; at < lines.size() && lines[at].indent == lines[from].indent; ++at)
+                {
+                    if (marks[at].through)
+                    {
+                        continue;
+                    }
+                    if (of(marks[at]).token == std::string::npos || of(marks[at]).column != first.column)
+                    {
+                        break;
+                    }
+                    padded = padded || of(marks[at]).padded;
+                    ++marked;
+                    to = at + 1;
+                }
+                if (marked >= 2 && padded)
+                {
+                    each(from, to, first.column);
+                }
+                from = to;
+            }
+        };
+        const auto lead = [&](size_t i) { return indentText(options, lines[i].indent).size(); };
+        // Whether a line written `width` columns wide goes past the width
+        // it would be broken at.
+        const auto past = [&](S32 width) { return options.width > 0 && width > options.width; };
+        // Each stretch of a run between the lines that would go past the
+        // width, `lined` telling which lines have their mark and `breaks`
+        // which go past: those of a stretch of two or more lined up by
+        // `pad`, the rest left as spaced.
+        const auto stretches = [](size_t from, size_t to, auto&& lined, auto&& breaks, auto&& pad) {
+            for (size_t start = from; start < to;)
+            {
+                size_t end    = start;
+                size_t marked = 0;
+                for (; end < to && !breaks(end); ++end)
+                {
+                    marked += lined(end) ? 1 : 0;
+                }
+                for (size_t i = start; marked >= 2 && i < end; ++i)
+                {
+                    if (lined(i))
+                    {
+                        pad(i);
+                    }
+                }
+                start = end + 1;
+            }
+        };
+        runs([](const Marks& m) { return m.equals; },
+             [&](size_t from, size_t to, S32 column) {
+                 // Where each = is now: past its code as spaced, which is
+                 // what the line written out begins with, and one space.
+                 std::vector<std::pair<size_t, S32>> at(to - from, { std::string::npos, 0 });
+                 S32                                 most = column;
+                 for (size_t i = from; i < to; ++i)
+                 {
+                     if (!code[i] || marks[i].through)
+                     {
+                         continue;
+                     }
+                     Line before;
+                     before.tokens.assign(lines[i].tokens.begin(), lines[i].tokens.begin() + static_cast<std::ptrdiff_t>(marks[i].equals.token));
+                     std::string prefix = spaced(before, options);
+                     while (!prefix.empty() && (prefix.back() == ' ' || prefix.back() == '\t'))
+                     {
+                         prefix.pop_back();
+                     }
+                     const size_t equals = lead(i) + prefix.size() + 1;
+                     if (equals < code[i]->size() && (*code[i])[equals] == '=' && (*code[i])[equals - 1] == ' ')
+                     {
+                         at[i - from] = { equals, columns(prefix, 1) + 1 };
+                         most         = std::max(most, at[i - from].second);
+                     }
+                 }
+                 const auto lined  = [&](size_t i) { return at[i - from].first != std::string::npos; };
+                 const auto breaks = [&](size_t i) { return lined(i) && past(columns(*code[i], wide) + most - at[i - from].second); };
+                 stretches(from, to, lined, breaks, [&](size_t i) {
+                     code[i]->insert(at[i - from].first, static_cast<size_t>(most - at[i - from].second), ' ');
+                 });
+             });
+        runs([](const Marks& m) { return m.comment; },
+             [&](size_t from, size_t to, S32 column) {
+                 // Each line's code, as written out now, and its comment.
+                 struct Split
+                 {
+                     size_t end     = std::string::npos;
+                     S32    columns = 0;
+                 };
+                 std::vector<Split> at(to - from);
+                 S32                most    = column;
+                 bool               changed = false;
+                 for (size_t i = from; i < to; ++i)
+                 {
+                     if (!code[i] || marks[i].through)
+                     {
+                         continue;
+                     }
+                     std::string comment = lines[i].tokens[marks[i].comment.token].text;
+                     while (!comment.empty() && (comment.back() == ' ' || comment.back() == '\t' || comment.back() == '\r'))
+                     {
+                         comment.pop_back();
+                     }
+                     const std::string& text = *code[i];
+                     if (comment.empty() || text.size() < comment.size() + lead(i) ||
+                         text.compare(text.size() - comment.size(), comment.size(), comment) != 0)
+                     {
+                         continue;
+                     }
+                     size_t end = text.size() - comment.size();
+                     while (end > lead(i) && (text[end - 1] == ' ' || text[end - 1] == '\t'))
+                     {
+                         --end;
+                     }
+                     const std::string_view now = std::string_view(text).substr(lead(i), end - lead(i));
+                     std::string            was;
+                     for (size_t t = 0; t < marks[i].comment.token; ++t)
+                     {
+                         was += was.empty() && lines[i].tokens[t].kind == Kind::Space ? std::string() : lines[i].tokens[t].text;
+                     }
+                     while (!was.empty() && (was.back() == ' ' || was.back() == '\t'))
+                     {
+                         was.pop_back();
+                     }
+                     changed      = changed || now != was;
+                     at[i - from] = { end, columns(now, 1) };
+                     most         = std::max(most, at[i - from].columns + 1);
+                 }
+                 if (!changed)
+                 {
+                     return;
+                 }
+                 const auto lined = [&](size_t i) { return at[i - from].end != std::string::npos; };
+                 const auto padded = [&](size_t i) {
+                     const std::string& text    = *code[i];
+                     const size_t       comment = text.find_first_not_of(" \t", at[i - from].end);
+                     return text.substr(0, at[i - from].end) + std::string(static_cast<size_t>(most - at[i - from].columns), ' ') + text.substr(comment);
+                 };
+                 const auto breaks = [&](size_t i) { return lined(i) && past(columns(padded(i), wide)); };
+                 stretches(from, to, lined, breaks, [&](size_t i) { *code[i] = padded(i); });
+             });
+    }
+
+    // Each line as written out, or none for a blank line past a run's
+    // length where the whole text is asked for; past the width broken
+    // where `wrap`.
+    std::vector<std::optional<std::string>> writtenLines(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, S32 first,
+                                                         S32 last, bool wrap)
+    {
+        std::vector<std::optional<std::string>> out;
+        S32                                     blanks = 0;
+        size_t                                  kept   = 0;
+        const bool                              whole  = first < 0;
+        const auto ours = [&](const Line& line) { return whole || (line.first >= first && line.last <= last); };
+        // Each line of code the formatter writes, spaced, and lined up
+        // where the author lined them up, before any is broken.
+        std::vector<std::optional<std::string>> code(lines.size());
         for (size_t i = 0; i < lines.size(); ++i)
         {
             const Line& line = lines[i];
-            const bool  ours = whole || (line.first >= first && line.last <= last);
+            if (!ours(line) || line.directive || line.blank)
+            {
+                continue;
+            }
+            std::string text = indentText(options, line.indent);
+            if (options.spacing)
+            {
+                text += spaced(line, options);
+            }
+            else
+            {
+                std::string body = asWritten(line);
+                size_t      at   = body.find_first_not_of(" \t");
+                text += at == std::string::npos ? std::string() : body.substr(at);
+            }
+            while (!text.empty() && (text.back() == ' ' || text.back() == '\t'))
+            {
+                text.pop_back();
+            }
+            code[i] = std::move(text);
+        }
+        if (options.spacing)
+        {
+            lineUp(lines, options, code);
+        }
+        for (size_t i = 0; i < lines.size(); ++i)
+        {
+            const Line& line = lines[i];
             std::string text;
-            if (!ours || line.directive)
+            if (!ours(line) || line.directive)
             {
                 text = asWritten(line);
-                if (ours)
+                if (ours(line))
                 {
                     while (!text.empty() && (text.back() == ' ' || text.back() == '\t'))
                     {
@@ -695,8 +1464,9 @@ namespace
                 if (whole)
                 {
                     ++blanks;
-                    if (blanks > options.maxBlankLines || out.empty())
+                    if (blanks > options.maxBlankLines || kept == 0)
                     {
+                        out.emplace_back();
                         continue;
                     }
                 }
@@ -704,28 +1474,36 @@ namespace
             }
             else
             {
-                text = indentText(options, line.indent);
-                if (options.spacing)
+                text = std::move(*code[i]);
+                if (wrap)
                 {
-                    text += spaced(line, options.lua);
-                }
-                else
-                {
-                    std::string body = asWritten(line);
-                    size_t      at   = body.find_first_not_of(" \t");
-                    text += at == std::string::npos ? std::string() : body.substr(at);
-                }
-                while (!text.empty() && (text.back() == ' ' || text.back() == '\t'))
-                {
-                    text.pop_back();
+                    text = wrapped(line, options, text);
                 }
             }
             if (!line.blank)
             {
                 blanks = 0;
             }
-            out += text;
-            if (i + 1 < lines.size() || endsWithNewline)
+            ++kept;
+            out.push_back(std::move(text));
+        }
+        return out;
+    }
+
+    std::string emit(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, bool endsWithNewline, S32 first, S32 last,
+                     bool wrap)
+    {
+        const std::vector<std::optional<std::string>> each = writtenLines(lines, options, first, last, wrap);
+        const bool                                    whole = first < 0;
+        std::string                                   out;
+        for (size_t i = 0; i < each.size(); ++i)
+        {
+            if (!each[i])
+            {
+                continue;
+            }
+            out += *each[i];
+            if (i + 1 < each.size() || endsWithNewline)
             {
                 out += '\n';
             }
@@ -747,23 +1525,68 @@ namespace
 }
 
 // static
-std::string ALScriptFormatter::format(std::string_view text, const Options& options)
+std::string ALScriptFormatter::format(std::string_view text, const Options& asked)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const Options     options         = sanitized(asked);
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
-    return emit(lines, options, endsWithNewline, -1, -1);
+    overWhatFollows(lines, options);
+    return emit(lines, options, endsWithNewline, -1, -1, true);
 }
 
 // static
-std::string ALScriptFormatter::formatLines(std::string_view text, const Options& options, S32 first, S32 last)
+std::string ALScriptFormatter::formatLines(std::string_view text, const Options& asked, S32 first, S32 last)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const Options     options         = sanitized(asked);
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
-    return emit(lines, options, endsWithNewline, first, last);
+    overWhatFollows(lines, options);
+    return emit(lines, options, endsWithNewline, first, last, false);
+}
+
+// static
+std::vector<std::string> ALScriptFormatter::formatEach(std::string_view text, const Options& asked, S32 first, S32 last)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const Options     options         = sanitized(asked);
+    bool              endsWithNewline = false;
+    std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
+    decide(lines, options.lua);
+    overWhatFollows(lines, options);
+    // Every line kept, blank or not: from the first where `first` is
+    // below it, which would otherwise ask for the whole text's runs.
+    const std::vector<std::optional<std::string>> each = writtenLines(lines, options, llmax(first, 0), last, true);
+    // A line a string or a comment runs on over is as many of the text's;
+    // a line broken at the width is still one.
+    std::vector<std::string> out;
+    for (size_t i = 0; i < each.size(); ++i)
+    {
+        const std::string& one = *each[i];
+        if (lines[i].first == lines[i].last)
+        {
+            out.push_back(one);
+            continue;
+        }
+        for (size_t at = 0;;)
+        {
+            const size_t nl = one.find('\n', at);
+            out.push_back(one.substr(at, nl == std::string::npos ? std::string::npos : nl - at));
+            if (nl == std::string::npos)
+            {
+                break;
+            }
+            at = nl + 1;
+        }
+    }
+    if (endsWithNewline)
+    {
+        out.emplace_back();
+    }
+    return out;
 }
 
 // static

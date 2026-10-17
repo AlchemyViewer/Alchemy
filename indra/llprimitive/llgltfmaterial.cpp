@@ -646,8 +646,12 @@ void LLGLTFMaterial::applyOverride(const LLGLTFMaterial& override_mat)
 
     if (!override_mat.mTrackingIdToLocalTexture.empty())
     {
-        auto it = override_mat.mTrackingIdToLocalTexture.begin();
-        mTrackingIdToLocalTexture.insert(it, it);
+        // The override is the layer on top, so where both track a local
+        // texture its entry wins, as its texture ids do above.
+        for (const auto& [tracking_id, local_texture] : override_mat.mTrackingIdToLocalTexture)
+        {
+            mTrackingIdToLocalTexture.insert_or_assign(tracking_id, local_texture);
+        }
         updateLocalTexDataDigest();
         updateTextureTracking();
     }

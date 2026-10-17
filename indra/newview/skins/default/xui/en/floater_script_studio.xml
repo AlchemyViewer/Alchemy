@@ -383,11 +383,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="TrailerSourceTipNoKeys">Showing the source. Click for the Preprocessed view, the code the server compiles</floater.string>
     <floater.string name="TrailerExpandedTip">Showing the preprocessed code the server compiles; read-only. Click for the source ([KEYS])</floater.string>
     <floater.string name="TrailerExpandedTipNoKeys">Showing the preprocessed code the server compiles; read-only. Click for the source</floater.string>
-    <floater.string name="TrailerPreprocessedEnveloped">A save preprocesses it: it was saved with the preprocessor before, and keeps its source.</floater.string>
     <floater.string name="TrailerPreprocessedDirectives">A save preprocesses it: it has directives, which the server could compile no other way.</floater.string>
     <floater.string name="TrailerPreprocessedSetting">A save preprocesses it: Build &gt; Preprocess on Save is on.</floater.string>
     <floater.string name="TrailerNotPreprocessed">Not preprocessed on save</floater.string>
-    <floater.string name="TrailerNotPreprocessedTip">A save sends this script as written: it has no directive, was not saved with the preprocessor before, and Build &gt; Preprocess on Save is off. The Preprocessed view shows what the preprocessor would make of it, not what goes up.</floater.string>
+    <floater.string name="TrailerNotPreprocessedTip">A save sends this script as written, without the preprocessor's envelope: it has no directive, and Build &gt; Preprocess on Save is off. The Preprocessed view shows what the preprocessor would make of it, not what goes up.</floater.string>
     <floater.string name="ReferenceDeclaration">declaration</floater.string>
     <floater.string name="ReferenceDeclarationTip">Where [NAME] is declared</floater.string>
     <floater.string name="OutlineNoMatch">No symbol names match what you typed.</floater.string>
@@ -510,6 +509,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ExplorerComparePlaceholder">Type a name to find a script or notecard</floater.string>
     <floater.string name="ExplorerNothingToCompare">Nothing listed in the Explorer is like [NAME] to compare it with. Pin or select the other object first.</floater.string>
     <floater.string name="CompareSaved">As last saved</floater.string>
+    <floater.string name="CompareAsset">The saved asset, as other viewers open it</floater.string>
     <floater.string name="CompareWithTitle">Compare [NAME] with</floater.string>
     <floater.string name="PeekNoChange">The caret's line has not changed since the script was saved.</floater.string>
     <floater.string name="NoChangeAfter">No change since the save after this line.</floater.string>
@@ -669,6 +669,9 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterLinkedUnsaved">[NAME] is linked to [FILE] now, and what was typed here is not in the file: copy it into the file to keep it, or Unlink to save it from here.</floater.string>
     <floater.string name="MasterLinkedClean">[NAME] is linked to [FILE] now, and nothing unsaved is left here: switch to the file to change it there, or Unlink to save it from here.</floater.string>
     <floater.string name="MasterEditedOutside">[NAME] is linked to [FILE]: the file is opened in the external editor in its place.</floater.string>
+    <floater.string name="MasterTargetChosen">[NAME]'s next save sends its script compiled for [TARGET].</floater.string>
+    <floater.string name="MasterExperienceChosen">From [NAME]'s next save, its script runs under [EXPERIENCE].</floater.string>
+    <floater.string name="MasterExperienceCleared">From [NAME]'s next save, its script runs under no experience.</floater.string>
     <floater.string name="MasterNotRead">[FILE] could not be read to compare with [NAME].</floater.string>
     <floater.string name="LinkHeadListing">Asking what [OBJECTS] holds...</floater.string>
     <floater.string name="LinkHeadReading">Reading the scripts of [OBJECTS]: [DONE] of [COUNT]...</floater.string>
@@ -1477,6 +1480,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_saved" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_saved" />
             </menu_item_check>
+            <menu_item_call label="Compare with Saved Asset" layout="topleft" name="compare_asset">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_asset" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_asset" />
+            </menu_item_call>
             <menu_item_check label="Peek at Change" layout="topleft" name="peek_change">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="peek_change" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="peek_change" />
@@ -1789,6 +1796,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preprocess" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="preprocess" />
             </menu_item_call>
+            <menu_item_call label="Save Without Preprocessing" layout="topleft" name="save_plain">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_plain" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_plain" />
+            </menu_item_call>
             <menu_item_call label="Check Every Script in This Object" layout="topleft" name="check_object">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="check_object" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="check_object" />
@@ -1815,6 +1826,18 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_check label="Hold Saves on Errors" layout="topleft" name="preflight">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="preflight" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preflight" />
+            </menu_item_check>
+            <menu_item_check label="Make Safe Fixes on Save" layout="topleft" name="fix_on_save">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="fix_on_save" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="fix_on_save" />
+            </menu_item_check>
+            <menu_item_check label="Format on Save" layout="topleft" name="format_on_save">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="format_on_save" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="format_on_save" />
+            </menu_item_check>
+            <menu_item_check label="Trim Trailing Spaces on Save" layout="topleft" name="trim_on_save">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="trim_on_save" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="trim_on_save" />
             </menu_item_check>
             <menu_item_separator layout="topleft" />
             <menu

@@ -31,6 +31,8 @@
 
 #include "llagent.h"
 #include "llagentcamera.h"
+#include "llappviewer.h"
+#include "llviewercamera.h"
 #include "llviewercontrol.h"
 #include "llcylinder.h"
 #include "llfloatertools.h"

@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alcodeeditor.h"
+#include "alpaneroom.h"
 #include "alscriptexplorerpane.h"
 #include "alscriptlinkpane.h"
 #include "alnotecardembedded.h"
@@ -53,6 +54,7 @@
 #include "alscriptstudiowords.h"
 #include "alscriptstudioorphans.h"
 #include "alscriptnavigation.h"
+#include "allsltoslua.h"
 #include "alscriptlookup.h"
 #include "alscriptobjectcheck.h"
 #include "alscriptrecompile.h"
@@ -368,7 +370,7 @@ private:
     void                      showExpanded(Doc& doc, const std::string& text) override;
     // The other editor gone, where what it holds is of no text the
     // script is now, and the source shown in its place.
-    void                      dropExpanded(Doc& doc);
+    void                      dropExpanded(Doc& doc) override;
     void                      toggleExpanded();
     // A view of the tab put in front, and the pane, the bars and the
     // toolbar shown as it now is; the keyboard with it where asked, or
@@ -404,6 +406,9 @@ private:
     // The tab's script read as the other language from here: its grammar,
     // its words, its checks; what was made of it as the one it was, gone.
     void readAs(Doc& doc, bool lua);
+    // What the tab's script compiles for changed, as the region said it or
+    // as it was picked: checked, weighed and expanded again for it.
+    void targetChanged(Doc& doc);
     void onRunning();
 
     // --- loading, saving and files -----------------------------------------------------
@@ -461,8 +466,11 @@ private:
     // An LSL tab written again as SLua (ALLSLToSLua) in a new SLua script
     // beside it -- in the prim the LSL is in, or the inventory's scripts
     // folder for one in the inventory -- its text put in unsaved and set
-    // beside the LSL; the LSL script left as it is.
+    // beside the LSL; the LSL script left as it is. Written on Tailslide's
+    // lane, which the script's checks are on too, and finished here once
+    // it is back, if its tab is still open.
     void convertToSLua(Doc& doc);
+    void convertedToSLua(Doc& doc, const std::string& lsl, bool expanded, const ALLSLToSLua::Result& converted);
     // A script written as SLua into a prim, waited for until the prim lists
     // it: by the id the region gave, or by its name where it gave none, as
     // one of that name that was not there before.
@@ -554,6 +562,7 @@ private:
     // Whether a script runs, what it compiles for: the region's word, on a
     // tab that has it open.
     void runningState(const ALScriptRunningState& state);
+    void heardRunning(Doc& doc, const ALScriptRunningState& state);
 
     // --- going places ------------------------------------------------------------------
 
@@ -694,6 +703,22 @@ private:
     // one or the agent has any to give it.
     void askExperienceOf(Doc& doc);
     void refreshExperience();
+    // The script in the world a tab's strip acts on -- Running, Reset, its
+    // experience and what it compiles for: its own; or, for the tab of a
+    // file that masters one script in an object, that one, which the tab
+    // stands in for. Running and Reset act on it at once; a target or an
+    // experience picked goes with the file's next send.
+    ALScriptRef worldRefOf(const Doc& doc) const { return !doc.file.empty() && doc.ref.isNull() ? doc.standsFor : doc.ref; }
+    bool        standsIn(const Doc& doc) const { return !doc.file.empty() && !doc.notecard && !worldRefOf(doc).inInventory(); }
+    // What a file's tab stands in for, found as it opens, as its file
+    // changes and as the links do: by the file's path, which the disk is
+    // asked for, not at every look.
+    void        restand(Doc& doc);
+    void        restandAll();
+    // What a tab standing in compiles for: what its link's next send
+    // takes, else what the region says it compiles for now, else its
+    // language's own.
+    std::string standingTarget(const Doc& doc) const;
     // The strip under the editor laid out for what shows on it and the
     // width it has.
     void layStrip();
@@ -1062,6 +1087,9 @@ private:
     // panel waits folded for something to show (firstOpen).
     boost::signals2::scoped_connection mQuickModeConnection;
     bool mBottomWaiting = false;
+    // The window widened as the Explorer or the Inspector opens, and
+    // narrowed as it folds, where ALScriptStudioPanesWiden asks.
+    ALPaneRoom mPaneRoom;
     std::vector<std::unique_ptr<Doc>>  mDocs;
     size_t                             mActive = NONE;
     // What the strip and the toolbar last stood for: a keystroke asks
@@ -1094,6 +1122,9 @@ private:
     struct ToolbarFacts
     {
         std::string         id;
+        // The script in the world the strip acts on (worldRefOf), which a
+        // file's tab changes as its links do.
+        ALScriptRef         world;
         bool                loaded     = false;
         bool                modifiable = false;
         bool                notecard   = false;
@@ -1438,4 +1469,5 @@ private:
     // A file's links made or let go of: its tab says how many scripts it
     // is the master of.
     boost::signals2::scoped_connection mLinkBadgesConnection;
+    boost::signals2::scoped_connection mMastersConnection;
 };

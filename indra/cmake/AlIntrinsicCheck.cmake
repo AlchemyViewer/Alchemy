@@ -17,7 +17,9 @@ if(NOT DEFINED SOURCE_DIR)
 endif()
 
 # The files that are the backend, and the tests and bench that compare
-# against the raw instruction on purpose.
+# against the raw instruction on purpose. The test harness's state guard
+# reads the floating-point control register, which nothing but the raw
+# instruction does, one branch an architecture.
 set(
   allowed
   llcommon/alsimd.h
@@ -26,6 +28,7 @@ set(
   llmath/alsimdkernels.inl
   llmath/tests/alsimdkernels_test.cpp
   llmath/tests/llsimd_bench.cpp
+  test/alteststateguard.cpp
 )
 
 # _mm_, _mm256_ and _mm512_ for x86; for NEON the ACLE names, a mnemonic

@@ -74,6 +74,14 @@
 #define GL_SKIP_DECODE_EXT                0x8A4A
 #endif
 
+// Not in glcorearb.h, though core contexts expose it where the hardware has it.
+#ifndef GL_EXT_depth_bounds_test
+#define GL_EXT_depth_bounds_test 1
+#define GL_DEPTH_BOUNDS_TEST_EXT          0x8890
+#define GL_DEPTH_BOUNDS_EXT               0x8891
+typedef void (APIENTRYP PFNGLDEPTHBOUNDSEXTPROC) (GLdouble zmin, GLdouble zmax);
+#endif
+
 #ifndef GL_EXT_memory_object
 #define GL_EXT_memory_object 1
 #define GL_TEXTURE_TILING_EXT             0x9580
@@ -997,6 +1005,9 @@ extern PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC    glImportMemoryWin32HandleEXT;
 
 // GL_EXT_semaphore_win32
 extern PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC glImportSemaphoreWin32HandleEXT;
+
+// GL_EXT_depth_bounds_test
+extern PFNGLDEPTHBOUNDSEXTPROC                glDepthBoundsEXT;
 
 #endif
 

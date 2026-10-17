@@ -299,10 +299,17 @@ namespace
             return false;
         }
 
+        // The most elements a literal written as a sum may have: the sum
+        // nests an element deeper for each, where the literal is one node,
+        // and a tree deeper than ALLSLDepth::LIMIT is one no pass may walk,
+        // which would refuse the whole run. A literal of more stays one.
+        static constexpr size_t MOST_SUMMED = 256;
+
         bool visit(LSLListExpression* expr) override
         {
             visitChildren(expr);
-            if (mStage != Stage::Lists || !options.listadd || !mCosts.listAsSum || expr->getNumChildren() == 0)
+            if (mStage != Stage::Lists || !options.listadd || !mCosts.listAsSum || expr->getNumChildren() == 0 ||
+                expr->getNumChildren() > MOST_SUMMED)
             {
                 return false;
             }
@@ -1220,29 +1227,6 @@ namespace
             return 0;
         }
 
-        // Whether running an expression could stop the script: a division
-        // or a remainder by anything but a constant other than nought.
-        static bool mayFault(LSLASTNode* root)
-        {
-            bool fault = false;
-            eachNode(root, [&](LSLASTNode* n) {
-                if (fault || n->getNodeType() != NODE_EXPRESSION || n->getNodeSubType() != NODE_BINARY_EXPRESSION)
-                {
-                    return;
-                }
-                const LSLOperator op = static_cast<LSLExpression*>(n)->getOperation();
-                if (op != OP_DIV && op != OP_MOD && op != OP_DIV_ASSIGN && op != OP_MOD_ASSIGN)
-                {
-                    return;
-                }
-                LSLConstant* cv = n->getChild(1)->getConstantValue();
-                fault           = !cv || (cv->getNodeSubType() == NODE_INTEGER_CONSTANT && !static_cast<LSLIntegerConstant*>(cv)->getValue()) ||
-                        (cv->getNodeSubType() == NODE_FLOAT_CONSTANT && static_cast<LSLFloatConstant*>(cv)->getValue() == 0.0) ||
-                        (cv->getNodeSubType() != NODE_INTEGER_CONSTANT && cv->getNodeSubType() != NODE_FLOAT_CONSTANT);
-            });
-            return fault;
-        }
-
         // An operand of a new && or &, bracketed where it is an operation.
         LSLExpression* operand(LSLExpression* x)
         {
@@ -1280,7 +1264,7 @@ namespace
             }
             const bool  truths = truthValue(a) && truthValue(b);
             LSLOperator op     = truths && mCosts.bitAndForNestedTruths ? OP_BIT_AND : mCosts.andForNestedIf ? OP_BOOLEAN_AND : OP_NONE;
-            if (op == OP_NONE || !sideEffectFree(b) || mayFault(b))
+            if (op == OP_NONE || !sideEffectFree(b))
             {
                 return;
             }

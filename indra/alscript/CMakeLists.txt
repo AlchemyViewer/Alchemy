@@ -37,6 +37,7 @@ target_sources(
     lint/alscriptlintpass.cpp
     lint/alselenefilters.cpp
     lsl/allslconsts.cpp
+    lsl/allsldepth.cpp
     lsl/allsleffects.cpp
     lsl/allslexports.cpp
     lsl/allslservice.cpp
@@ -68,8 +69,8 @@ target_sources(
     luau/alluaufrontend.cpp
     luau/alluaunavigation.cpp
     luau/alluauservice.cpp
+    luau/alluaushadowed.cpp
     luau/alluausharedstart.cpp
-    luau/alluautaskpool.cpp
     luau/alluautypes.cpp
     masters/almasterburst.cpp
     masters/almasterclock.cpp
@@ -118,6 +119,7 @@ target_sources(
         lint/alscriptlintpass.h
         lint/alselenefilters.h
         lsl/allslconsts.h
+        lsl/allsldepth.h
         lsl/allsleffects.h
         lsl/allsleventtext.inc
         lsl/allslexports.h
@@ -153,8 +155,8 @@ target_sources(
         luau/alluaufrontend.h
         luau/alluaunavigation.h
         luau/alluauservice.h
+        luau/alluaushadowed.h
         luau/alluausharedstart.h
-        luau/alluautaskpool.h
         luau/alluautypes.h
         masters/almasterburst.h
         masters/almasterclock.h
@@ -186,7 +188,11 @@ target_include_directories(
 )
 
 target_link_libraries(alscript PRIVATE al::flags ll::slua ll::tailslide llmath PUBLIC llcommon)
-target_precompile_headers(alscript REUSE_FROM llprecompiled)
+# Not with the fuzzers, whose coverage flags the shared header was not
+# built with, which Clang refuses.
+if(NOT AL_BUILD_FUZZERS)
+  target_precompile_headers(alscript REUSE_FROM llprecompiled)
+endif()
 
 # The optimizer folds LSL's floats to what the VM gives and prints them so
 # that they read back as themselves: IEEE's arithmetic a step at a time, and
@@ -235,176 +241,132 @@ if(AL_BUILD_TESTS)
     templates_define
     "AL_SCRIPT_TEMPLATES_DIR=\"${INDRA_SOURCE_DIR}/newview/app_settings/script_templates\""
   )
-  al_add_test(
-    alluauservice
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines} ${templates_define}
+  # What every binary of alscript's tests sets up once, as the viewer has it
+  # before it checks a script, and the state guard's checks on what the
+  # script engines keep for the process.
+  add_library(alscript_test_checks OBJECT tests/alscript_test_checks.cpp)
+  target_link_libraries(
+    alscript_test_checks
+    PRIVATE al::flags al_test_support alscript llcommon ll::tailslide
   )
-  # Completion and signature help over a fragment, against the whole
-  # script, at the places a scripter asks, over every SLua script to hand;
-  # the places found by Luau's own lexer.
-  al_add_test(
-    alluaufragment
+  target_compile_definitions(alscript_test_checks PRIVATE ${definitions_defines})
+  set_target_properties(alscript_test_checks PROPERTIES FOLDER "Tests/alscript")
+
+  # One Catch2 binary for alscript's tests, each test file run in a process
+  # of its own. The SLua checks, and LSL written again as SLua, run again
+  # with Luau's new type solver, which a scripter may choose
+  # (ALScriptLuauSolver): the same tests, told by the environment.
+  al_add_test_binary(
+    alscript_tests
     PROJECT alscript
-    LIBRARIES alscript llcommon ll::slua
+    SOURCES
+      tests/aldiskcache_test.cpp
+      tests/aldiskincludes_test.cpp
+      tests/alincludeidentity_test.cpp
+      tests/alincludesearch_test.cpp
+      tests/allinelabel_test.cpp
+      tests/allslconsts_test.cpp
+      tests/allslcosts_test.cpp
+      tests/allsleffects_test.cpp
+      tests/allsloptimizer_test.cpp
+      tests/allslservice_test.cpp
+      tests/allsltoslua_test.cpp
+      tests/alluauconfig_test.cpp
+      tests/alluaufragment_test.cpp
+      tests/alluaunavigation_test.cpp
+      tests/alluauservice_test.cpp
+      tests/almasterburst_test.cpp
+      tests/almasterindex_test.cpp
+      tests/almasterlinks_test.cpp
+      tests/almastermatch_test.cpp
+      tests/almasterplan_test.cpp
+      tests/almasterqueue_test.cpp
+      tests/almasterwatch_test.cpp
+      tests/almessagemap_test.cpp
+      tests/almodulelook_test.cpp
+      tests/alnotecardformat_test.cpp
+      tests/alpreprocessor_test.cpp
+      tests/alpreprocessorc11_test.cpp
+      tests/alscriptenvelope_test.cpp
+      tests/alscriptfixes_test.cpp
+      tests/alscriptformatter_test.cpp
+      tests/alscripthostile_test.cpp
+      tests/alscriptjoblane_test.cpp
+      tests/alscriptlexicon_test.cpp
+      tests/alscriptlintpass_test.cpp
+      tests/alscriptmessages_test.cpp
+      tests/alscriptnameindex_test.cpp
+      tests/alscriptoutlinepairs_test.cpp
+      tests/alscriptsnapshot_test.cpp
+      tests/alscriptstack_test.cpp
+      tests/alscripttempfiles_test.cpp
+      tests/alscripttextcache_test.cpp
+      tests/alscriptweight_test.cpp
+      tests/alsourcemap_test.cpp
+      tests/aluploadheader_test.cpp
+    # The preprocessor, the formatter, the optimizer and one analysis of each
+    # language over big scripts, with the grid's definitions loaded.
+    BENCH_SOURCES tests/alscript_bench.cpp
+    SUPPORT alscript_test_checks llcommon_test_checks
+    LIBRARIES alscript llcommon ll::slua ll::tailslide
     DEFINES
       ${definitions_defines}
       ${templates_define}
       "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
+      "AL_LSCRIPT_REGRESSION_DIR=\"${INDRA_SOURCE_DIR}/lscript/tests/regressions\""
+    RERUN newsolver
+    RERUN_SOURCES
+      tests/alluaufragment_test.cpp
+      tests/alluaunavigation_test.cpp
+      tests/alluauservice_test.cpp
+      tests/allsltoslua_test.cpp
+      tests/alscriptfixes_test.cpp
+      tests/alscriptlintpass_test.cpp
+    RERUN_ENVIRONMENT AL_TEST_LUAU_SOLVER=new
   )
-  # Where a name is declared and used, across a script and the modules it
-  # requires.
-  al_add_test(
-    alluaunavigation
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines}
-  )
-  al_add_test(
-    allslservice
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines} ${templates_define}
-  )
-  # Each fix made over a real check, applied, and the text checked again.
-  al_add_test(
-    alscriptfixes
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines}
-  )
-  # The studio's own lints, each over real checks, with its fix made.
-  al_add_test(
-    alscriptlintpass
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines}
-  )
-  # The SLua checks, and LSL written again as SLua, again with Luau's new
-  # type solver, which a scripter may choose (ALScriptLuauSolver): the same
-  # tests, told by the environment.
-  foreach(
-    test
-    alluauservice
-    alluaufragment
-    alluaunavigation
-    alscriptfixes
-    alscriptlintpass
-    allsltoslua
-  )
-    add_test(
-      NAME INTEGRATION_TEST_RUNNER_${test}_newsolver
-      COMMAND $<TARGET_FILE:INTEGRATION_TEST_${test}>
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    )
+
+  # libFuzzer on Script Studio, from a script pasted into the editor:
+  # alscript_fuzz_lsl runs what a check, the editor's commands and the
+  # preprocessor run on one (fuzz/alscriptfuzzlsl.cpp), and
+  # alscript_fuzz_format formats one with options the input chooses
+  # (fuzz/alscriptfuzzformat.cpp). alscript is built with libFuzzer's
+  # coverage for them, whose hooks the sanitizer runtime answers in
+  # alscript_tests. Their short runs are tests, over Tailslide's test
+  # scripts and the regression scripts, lscript's and alscript's.
+  if(AL_BUILD_FUZZERS)
+    target_compile_options(alscript PRIVATE -fsanitize=fuzzer-no-link)
+    foreach(fuzzer IN ITEMS lsl format)
+      add_executable(alscript_fuzz_${fuzzer} fuzz/alscriptfuzz${fuzzer}.cpp)
+      target_compile_options(alscript_fuzz_${fuzzer} PRIVATE -fsanitize=fuzzer)
+      target_link_options(alscript_fuzz_${fuzzer} PRIVATE -fsanitize=fuzzer)
+      target_compile_definitions(alscript_fuzz_${fuzzer} PRIVATE ${definitions_defines})
+      target_link_libraries(
+        alscript_fuzz_${fuzzer}
+        PRIVATE al::flags alscript llcommon ll::slua ll::tailslide
+      )
+      set_target_properties(alscript_fuzz_${fuzzer} PROPERTIES FOLDER "Tests/alscript")
+      # libFuzzer writes the inputs it keeps into the first corpus directory
+      # it is given, so that is a scratch one in the build tree: the
+      # directories after it are the tests' own scripts, which other tests
+      # hold to exactly the files they have.
+      set(fuzz_corpus ${CMAKE_CURRENT_BINARY_DIR}/fuzz_corpus/${fuzzer})
+      file(MAKE_DIRECTORY ${fuzz_corpus})
+      add_test(
+        NAME alscript_fuzz_${fuzzer}
+        COMMAND
+          alscript_fuzz_${fuzzer} -runs=0 -close_fd_mask=1 -max_len=262160 ${fuzz_corpus}
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/tailslide/scripts
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/regressions
+          ${INDRA_SOURCE_DIR}/lscript/tests/regressions
+      )
+    endforeach()
     set_tests_properties(
-      INTEGRATION_TEST_RUNNER_${test}_newsolver
+      alscript_fuzz_lsl
+      alscript_fuzz_format
       PROPERTIES
-        ENVIRONMENT "AL_TEST_LUAU_SOLVER=new"
+        LABELS "alscript;fuzz"
         ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
-        SKIP_RETURN_CODE 125
+        FAIL_REGULAR_EXPRESSION "${AL_TEST_FAIL_REGULAR_EXPRESSION}"
     )
-  endforeach()
-  # What a script weighs: SLua by its bytecode, LSO by Tailslide's image,
-  # with the grid's builtins loaded.
-  al_add_test(
-    alscriptweight
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines}
-  )
-  al_add_test(aldiskincludes PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(aldiskcache PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alincludeidentity PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alincludesearch PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(allinelabel PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(almodulelook PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alsourcemap PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscriptjoblane PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscriptnameindex PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscriptoutlinepairs PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscriptsnapshot PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscripttextcache PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscriptstack PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(aluploadheader PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(almessagemap PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alluauconfig PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscriptformatter PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscriptlexicon PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscriptmessages PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alnotecardformat PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscripttempfiles PROJECT alscript LIBRARIES alscript llcommon)
-  # Disk masters: the changes gathered over a burst, the links and their
-  # index, the index kept in a file, a master found from what a script says
-  # or its name, what a send does, the sends underway, and the files watched
-  # for saves made outside.
-  al_add_test(almasterburst PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(almasterindex PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(almasterlinks PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(almastermatch PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(almasterplan PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(almasterqueue PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(almasterwatch PROJECT alscript LIBRARIES alscript llcommon)
-  # The preprocessor against C11's 6.10, clause by clause.
-  al_add_test(alpreprocessorc11 PROJECT alscript LIBRARIES alscript llcommon)
-  # What LSL may change and the order it runs in, over scripts parsed with
-  # the grid's builtins loaded.
-  al_add_test(
-    allsleffects
-    PROJECT alscript
-    LIBRARIES alscript llcommon ll::tailslide
-    DEFINES ${definitions_defines}
-  )
-  # What LSL forms cost on each target: snippet pairs compiled by
-  # Tailslide, against what the optimizer takes them to cost.
-  al_add_test(
-    allslcosts
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines}
-  )
-  # The const keyword over scripts parsed with the grid's builtins loaded.
-  al_add_test(
-    allslconsts
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines}
-  )
-  # The optimizer's golden files under tests/optimizer/, checked with the
-  # grid's builtins loaded.
-  al_add_test(
-    allsloptimizer
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
-  )
-  # LSL written again as SLua, each result checked as SLua against the
-  # grid's definitions; and Tailslide's own test scripts under
-  # tests/tailslide/, for their breadth. The comments a toggle makes, as
-  # Luau's own lexer reads them.
-  al_add_test(
-    allsltoslua
-    PROJECT alscript
-    LIBRARIES alscript llcommon ll::slua
-    DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
-  )
-  # The golden files under tests/preprocessor/: every test_*.lsl beside
-  # its expected output.
-  al_add_test(
-    alpreprocessor
-    PROJECT alscript
-    LIBRARIES alscript llcommon ll::slua
-    DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
-  )
-  # The preprocessor, the formatter, the optimizer and one analysis of each
-  # language over big scripts, with the grid's definitions loaded.
-  al_add_bench(
-    alscript
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    INCLUDES ${INDRA_SOURCE_DIR}/test
-    DEFINES ${definitions_defines}
-  )
+  endif()
 endif()

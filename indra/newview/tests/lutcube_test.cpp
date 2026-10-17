@@ -17,13 +17,13 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../lutcube.h"
 
 #include <sstream>
 
-namespace tut
+namespace
 {
     struct lutcube_data
     {
@@ -70,56 +70,59 @@ namespace tut
             return (int)cube.colorCube[(size_t)index * 4 + channel];
         }
 
-        // constexpr, not const: ensure_equals takes its arguments by reference,
-        // which would odr-use a plain static const and want a definition.
+        // constexpr, not const: an assertion that took its operands by
+        // reference would odr-use a plain static const and want a definition.
         static constexpr int FULL = 65535;
         static constexpr int MID  = 32768;
     };
 
-    typedef test_group<lutcube_data> lutcube_group;
-    typedef lutcube_group::object    lutcube_object;
-    tut::lutcube_group lcg("LutCube");
-
     // The ordinary case, and the layout the uploader depends on: red varies
     // fastest, so entry 1 of a size-2 cube is (FULL, 0, 0).
-    template<> template<>
-    void lutcube_object::test<1>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: an identity cube parses with red varying fastest", "[LutCube]")
     {
         const LutCube cube = parse(identity(2));
-        ensure_equals("size", cube.size, 2);
-        ensure_equals("entry count", (int)cube.colorCube.size(), 2 * 2 * 2 * 4);
+        REQUIRE(cube.size == 2);
+        REQUIRE((int)cube.colorCube.size() == 2 * 2 * 2 * 4);
 
-        ensure_equals("black R", at(cube, 0, 0), 0);
-        ensure_equals("black G", at(cube, 0, 1), 0);
-        ensure_equals("black B", at(cube, 0, 2), 0);
+        UNSCOPED_INFO("black R");
+        CHECK(at(cube, 0, 0) == 0);
+        UNSCOPED_INFO("black G");
+        CHECK(at(cube, 0, 1) == 0);
+        UNSCOPED_INFO("black B");
+        CHECK(at(cube, 0, 2) == 0);
 
-        ensure_equals("red is next R", at(cube, 1, 0), FULL);
-        ensure_equals("red is next G", at(cube, 1, 1), 0);
-        ensure_equals("red is next B", at(cube, 1, 2), 0);
+        UNSCOPED_INFO("red is next R");
+        CHECK(at(cube, 1, 0) == FULL);
+        UNSCOPED_INFO("red is next G");
+        CHECK(at(cube, 1, 1) == 0);
+        UNSCOPED_INFO("red is next B");
+        CHECK(at(cube, 1, 2) == 0);
 
-        ensure_equals("white is last R", at(cube, 7, 0), FULL);
-        ensure_equals("white is last G", at(cube, 7, 1), FULL);
-        ensure_equals("white is last B", at(cube, 7, 2), FULL);
+        UNSCOPED_INFO("white is last R");
+        CHECK(at(cube, 7, 0) == FULL);
+        UNSCOPED_INFO("white is last G");
+        CHECK(at(cube, 7, 1) == FULL);
+        UNSCOPED_INFO("white is last B");
+        CHECK(at(cube, 7, 2) == FULL);
     }
 
     // Quantisation rounds rather than truncates. 0.5 * 65535 is 32767.5;
     // truncating biases every entry in the cube downwards by up to one step,
     // which on an identity LUT is a darkening for no reason at all.
-    template<> template<>
-    void lutcube_object::test<2>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: quantisation rounds rather than truncates", "[LutCube]")
     {
         const LutCube cube = parse(identity(3));
-        ensure_equals("size", cube.size, 3);
+        REQUIRE(cube.size == 3);
         // Entry 1 is x = 1 of 2, i.e. exactly mid grey on red alone.
-        ensure_equals("mid rounds up", at(cube, 1, 0), MID);
+        UNSCOPED_INFO("mid rounds up");
+        CHECK(at(cube, 1, 0) == MID);
     }
 
     // DOMAIN_MIN was parsed and then ignored: the original divided by the span
     // but never subtracted the offset. With a domain of [-1, 1], an input of 0
     // is the middle of the domain and must land on mid grey -- the old code put
     // it at 0.
-    template<> template<>
-    void lutcube_object::test<3>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: DOMAIN_MIN offsets the input so the domain's centre is mid grey", "[LutCube]")
     {
         std::ostringstream text;
         text << "LUT_3D_SIZE 2\n";
@@ -131,18 +134,20 @@ namespace tut
         }
 
         const LutCube cube = parse(text.str());
-        ensure_equals("size", cube.size, 2);
-        ensure_equals("domain centre is mid grey", at(cube, 0, 0), MID);
-        ensure_equals("domain centre is mid grey", at(cube, 0, 1), MID);
-        ensure_equals("domain centre is mid grey", at(cube, 0, 2), MID);
+        REQUIRE(cube.size == 2);
+        {
+            INFO("domain centre is mid grey");
+            CHECK(at(cube, 0, 0) == MID);
+            CHECK(at(cube, 0, 1) == MID);
+            CHECK(at(cube, 0, 2) == MID);
+        }
     }
 
     // The one that shows up as an artefact rather than a failure. "clampTripel"
     // did not clamp, so 1.1 became 255 * 1.1 = 280, which wrapped to 24 on the
     // cast -- a blown highlight rendered as near-black speckle. Below the
     // domain wrapped the other way.
-    template<> template<>
-    void lutcube_object::test<4>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: values outside the domain clamp instead of wrapping", "[LutCube]")
     {
         std::ostringstream text;
         text << "LUT_3D_SIZE 2\n";
@@ -152,17 +157,20 @@ namespace tut
         }
 
         const LutCube cube = parse(text.str());
-        ensure_equals("above domain clamps to white", at(cube, 0, 0), FULL);
-        ensure_equals("below domain clamps to black", at(cube, 0, 1), 0);
-        ensure_equals("in domain is untouched", at(cube, 0, 2), MID);
+        REQUIRE(cube.size == 2);
+        UNSCOPED_INFO("above domain clamps to white");
+        CHECK(at(cube, 0, 0) == FULL);
+        UNSCOPED_INFO("below domain clamps to black");
+        CHECK(at(cube, 0, 1) == 0);
+        UNSCOPED_INFO("in domain is untouched");
+        CHECK(at(cube, 0, 2) == MID);
     }
 
     // Legal .cube files indent their data, and the original required a digit at
     // column zero. A rejected row does not merely lose itself: every later row
     // slides up into its slot, so the whole cube is wrong and the tail is left
     // at the full-scale fill. Indented, signed and bare-decimal rows all count.
-    template<> template<>
-    void lutcube_object::test<5>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: rows indented or signed or with a bare decimal point are accepted", "[LutCube]")
     {
         const LutCube plain = parse(identity(2));
 
@@ -178,65 +186,70 @@ namespace tut
         text << "1.0 1.0 1.0\n";
 
         const LutCube indented = parse(text.str());
-        ensure_equals("indented cube is accepted", indented.size, 2);
-        ensure("indented cube matches the plain one", indented.colorCube == plain.colorCube);
+        UNSCOPED_INFO("indented cube is accepted");
+        REQUIRE(indented.size == 2);
+        UNSCOPED_INFO("indented cube matches the plain one");
+        CHECK(indented.colorCube == plain.colorCube);
     }
 
     // The memory-safety one. With no LUT_3D_SIZE the cube is never allocated and
     // size stays zero, and the original wrote the first data row into it
     // regardless. Rejecting the file is the whole fix; the assertion here is
     // that we get an empty cube back and not a crash.
-    template<> template<>
-    void lutcube_object::test<6>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: data before LUT_3D_SIZE is rejected without writing anywhere", "[LutCube]")
     {
         const LutCube cube = parse("0.0 0.0 0.0\n1.0 1.0 1.0\n");
-        ensure("data before LUT_3D_SIZE is rejected", cube.colorCube.empty());
-        ensure_equals("and leaves no size", cube.size, 0);
+        UNSCOPED_INFO("data before LUT_3D_SIZE is rejected");
+        CHECK(cube.colorCube.empty());
+        UNSCOPED_INFO("and leaves no size");
+        CHECK(cube.size == 0);
     }
 
     // A short file used to be kept. The allocation is prefilled with full
     // scale, so everything past the last row read came out white -- an "almost
     // working" LUT that blows out the top of the image.
-    template<> template<>
-    void lutcube_object::test<7>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: a file short of rows is rejected", "[LutCube]")
     {
         std::string text = identity(2);
         text.erase(text.find_last_of('\n', text.size() - 2) + 1);
 
         const LutCube cube = parse(text);
-        ensure("an incomplete cube is rejected", cube.colorCube.empty());
+        UNSCOPED_INFO("an incomplete cube is rejected");
+        CHECK(cube.colorCube.empty());
     }
 
     // stof/stoi throw, and nothing used to catch them, so a corrupt file threw
     // out of setupGradingLUT rather than falling back.
-    template<> template<>
-    void lutcube_object::test<8>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: a non-numeric size or row is rejected rather than thrown", "[LutCube]")
     {
         const LutCube bad_size = parse("LUT_3D_SIZE banana\n");
-        ensure("a non-numeric size is rejected", bad_size.colorCube.empty());
+        UNSCOPED_INFO("a non-numeric size is rejected");
+        CHECK(bad_size.colorCube.empty());
 
         std::ostringstream text;
         text << "LUT_3D_SIZE 2\n";
         text << "0.0 0.0 0.0\n";
         text << "0.5 what 0.5\n";
         const LutCube bad_row = parse(text.str());
-        ensure("a malformed row is rejected", bad_row.colorCube.empty());
+        UNSCOPED_INFO("a malformed row is rejected");
+        CHECK(bad_row.colorCube.empty());
     }
 
     // An absurd size should be refused before it is allocated, not after.
-    template<> template<>
-    void lutcube_object::test<9>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: a huge or degenerate or negative size is refused", "[LutCube]")
     {
-        ensure("a huge size is rejected", parse("LUT_3D_SIZE 100000\n").colorCube.empty());
-        ensure("a degenerate size is rejected", parse("LUT_3D_SIZE 1\n").colorCube.empty());
-        ensure("a negative size is rejected", parse("LUT_3D_SIZE -4\n").colorCube.empty());
+        UNSCOPED_INFO("a huge size is rejected");
+        CHECK(parse("LUT_3D_SIZE 100000\n").colorCube.empty());
+        UNSCOPED_INFO("a degenerate size is rejected");
+        CHECK(parse("LUT_3D_SIZE 1\n").colorCube.empty());
+        UNSCOPED_INFO("a negative size is rejected");
+        CHECK(parse("LUT_3D_SIZE -4\n").colorCube.empty());
     }
 
     // Values separated by runs of spaces or by tabs, and a file with CRLF line
     // endings read somewhere that does not strip the CR. The original split on
     // the first " \n" it found and lost a value to any of these.
-    template<> template<>
-    void lutcube_object::test<10>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: runs of spaces and tabs and CRLF endings separate values", "[LutCube]")
     {
         const LutCube plain = parse(identity(2));
 
@@ -252,8 +265,10 @@ namespace tut
         text << "1.0 1.0 1.0\r\n";
 
         const LutCube odd = parse(text.str());
-        ensure_equals("odd whitespace is accepted", odd.size, 2);
-        ensure("odd whitespace matches the plain cube", odd.colorCube == plain.colorCube);
+        UNSCOPED_INFO("odd whitespace is accepted");
+        REQUIRE(odd.size == 2);
+        UNSCOPED_INFO("odd whitespace matches the plain cube");
+        CHECK(odd.colorCube == plain.colorCube);
     }
 
     // A value the text can carry but the arithmetic cannot survive. Whether a
@@ -261,8 +276,7 @@ namespace tut
     // the parser must reject them itself rather than lean on the extraction
     // failing: a NaN sails through llclamp (both comparisons are false) and
     // the cast to unsigned short is undefined behaviour.
-    template<> template<>
-    void lutcube_object::test<11>()
+    TEST_CASE_METHOD(lutcube_data, "LutCube: nan and inf values and a non-finite domain are rejected", "[LutCube]")
     {
         static const char* const poison[] = { "nan", "inf", "-inf" };
         for (const char* value : poison)
@@ -274,8 +288,8 @@ namespace tut
             {
                 text << "0.0 0.0 0.0\n";
             }
-            ensure(std::string("a ") + value + " value is rejected",
-                   parse(text.str()).colorCube.empty());
+            CAPTURE(value);
+            REQUIRE(parse(text.str()).colorCube.empty());
         }
 
         // The domain lines go through the same reader, and a non-finite domain
@@ -287,6 +301,7 @@ namespace tut
         {
             domain << "0.0 0.0 0.0\n";
         }
-        ensure("a non-finite domain is rejected", parse(domain.str()).colorCube.empty());
+        UNSCOPED_INFO("a non-finite domain is rejected");
+        CHECK(parse(domain.str()).colorCube.empty());
     }
 }

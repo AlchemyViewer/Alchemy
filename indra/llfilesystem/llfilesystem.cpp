@@ -31,7 +31,6 @@
 
 #include "lldir.h"
 #include "llfilesystem.h"
-#include "llfasttimer.h"
 #include "lldiskcache.h"
 
 constexpr S32 LLFileSystem::READ        = 0x00000001;

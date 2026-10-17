@@ -28,6 +28,7 @@
 #define LL_LLTHREAD_H
 
 #include "llrefcount.h"
+#include <atomic>
 #include <thread>
 
 extern LL_COMMON_API void set_thread_name(const char* threadName);
@@ -91,7 +92,8 @@ public:
     id_t getID() const { return mID; }
 
 private:
-    bool                mPaused;
+    // Written under mRunCondition, so a thread checking whether to sleep cannot miss it.
+    std::atomic<bool>   mPaused;
     std::thread::native_handle_type mNativeHandle; // for termination in case of issues
 
     // static function passed to APR thread creation routine
@@ -104,11 +106,16 @@ private:
 
 protected:
     std::string         mName;
+    // What the thread sleeps on, and the lock lockData() takes: the state runCondition()
+    // reads is changed under the same lock the thread checks it under before sleeping.
+    // A pointer because llmutex.h includes this header.
     class LLCondition*  mRunCondition;
-    LLMutex*            mDataLock;
 
     std::thread        *mThreadp;
-    EThreadStatus       mStatus;
+    // Written by the thread as it ends, and read by whoever waits for it to:
+    // atomic, so that once a waiter reads it stopped, all the thread did
+    // before is seen done -- what shutdown() deletes after reading it.
+    std::atomic<EThreadStatus> mStatus;
     id_t                mID;
     LLTrace::ThreadRecorder* mRecorder;
 
@@ -125,15 +132,15 @@ protected:
     void unlockData();
 
     // This is the predicate that decides whether the thread should sleep.
-    // It should only be called with mDataLock locked, since the virtual runCondition() function may need to access
+    // It should only be called with mRunCondition locked, since the virtual runCondition() function may need to access
     // data structures that are thread-unsafe.
     bool shouldSleep(void) { return (mStatus == RUNNING) && (isPaused() || (!runCondition())); }
 
     // To avoid spurious signals (and the associated context switches) when the condition may or may not have changed, you can do the following:
-    // mDataLock->lock();
+    // lockData();
     // if(!shouldSleep())
     //     mRunCondition->signal();
-    // mDataLock->unlock();
+    // unlockData();
 };
 
 

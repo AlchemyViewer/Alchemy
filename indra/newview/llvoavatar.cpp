@@ -38,6 +38,7 @@
 #include "raytrace.h"
 
 #include "alavatargroups.h"
+#include "alrenderisolation.h"
 #include "aoengine.h"
 #include "llagent.h" //  Get state values from here
 #include "llagentbenefits.h"
@@ -2854,6 +2855,8 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
         return;
     }
 
+    readProfileQuery();
+
     static LLCachedControl<bool> friends_only(gSavedSettings, "RenderAvatarFriendsOnly", false);
     if (friends_only()
         && !isUIAvatar()
@@ -4808,10 +4811,13 @@ void LLVOAvatar::computeUpdatePeriod()
             mUpdatePeriod = UPDATE_RATE_SLOW;
         }
         else if (!shouldImpostorByRank()
-            || mDrawable->mDistanceWRTCamera < 1.f + mag)
+            || mDrawable->mDistanceWRTCamera < 1.f + mag
+            || ALRenderIsolation::isArmedAvatar(this))
         {   // first 25% of max visible avatars are not impostored
             // also, don't impostor avatars whose bounding box may be penetrating the
             // impostor camera near clip plane
+            // nor the one a snapshot cutout is waiting to take: an impostor has
+            // no attachments and is a billboard
             mUpdatePeriod = 1;
         }
         else if (shouldImpostorByRank(4.0))
@@ -10054,6 +10060,37 @@ bool LLVOAvatar::hasHUDAttachment() const
     return false;
 }
 
+static void add_hud_attachment_bbox(LLBBox& bbox, const LLViewerJointAttachment* attachment)
+{
+    for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator attachment_iter = attachment->mAttachedObjects.begin();
+         attachment_iter != attachment->mAttachedObjects.end();
+         ++attachment_iter)
+    {
+        const LLViewerObject* attached_object = attachment_iter->get();
+        if (attached_object == NULL)
+        {
+            LL_WARNS() << "HUD attached object is NULL!" << LL_ENDL;
+            continue;
+        }
+        // A point added first fixes the box's frame at the HUD's origin with no rotation, so the rotated boxes below
+        // land in the HUD's own frame. The point is the object's centre on the HUD, inside the box added next, so it
+        // widens nothing. (The object's position is its offset from the attachment point, another frame: a corner
+        // HUD's box seeded with it reached towards the middle of the screen.)
+        const LLBBox object_bbox = attached_object->getBoundingBoxAgent();
+        bbox.addPointLocal(object_bbox.getCenterAgent());
+        // add rotated bounding box for attached object
+        bbox.addBBoxAgent(object_bbox);
+        LLViewerObject::const_child_list_t& child_list = attached_object->getChildren();
+        for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
+             iter != child_list.end();
+             ++iter)
+        {
+            const LLViewerObject* child_objectp = *iter;
+            bbox.addBBoxAgent(child_objectp->getBoundingBoxAgent());
+        }
+    }
+}
+
 LLBBox LLVOAvatar::getHUDBBox() const
 {
     LLBBox bbox;
@@ -10061,35 +10098,21 @@ LLBBox LLVOAvatar::getHUDBBox() const
          iter != mAttachmentPoints.end();
          ++iter)
     {
-        LLViewerJointAttachment* attachment = iter->second;
+        const LLViewerJointAttachment* attachment = iter->second;
         if (attachment->getIsHUDAttachment())
         {
-            for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-                 attachment_iter != attachment->mAttachedObjects.end();
-                 ++attachment_iter)
-            {
-                const LLViewerObject* attached_object = attachment_iter->get();
-                if (attached_object == NULL)
-                {
-                    LL_WARNS() << "HUD attached object is NULL!" << LL_ENDL;
-                    continue;
-                }
-                // initialize bounding box to contain identity orientation and center point for attached object
-                bbox.addPointLocal(attached_object->getPosition());
-                // add rotated bounding box for attached object
-                bbox.addBBoxAgent(attached_object->getBoundingBoxAgent());
-                LLViewerObject::const_child_list_t& child_list = attached_object->getChildren();
-                for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-                     iter != child_list.end();
-                     ++iter)
-                {
-                    const LLViewerObject* child_objectp = *iter;
-                    bbox.addBBoxAgent(child_objectp->getBoundingBoxAgent());
-                }
-            }
+            add_hud_attachment_bbox(bbox, attachment);
         }
     }
 
+    return bbox;
+}
+
+// static
+LLBBox LLVOAvatar::getHUDBBox(const LLViewerJointAttachment* attachment)
+{
+    LLBBox bbox;
+    add_hud_attachment_bbox(bbox, attachment);
     return bbox;
 }
 
@@ -12810,54 +12833,22 @@ bool LLVOAvatar::isTextureVisible(LLAvatarAppearanceDefines::ETextureIndex type,
 
 void LLVOAvatar::placeProfileQuery()
 {
-    if (mGPUTimerQuery == 0)
-    {
-        glGenQueries(1, &mGPUTimerQuery);
-    }
-
-    glBeginQuery(GL_TIME_ELAPSED, mGPUTimerQuery);
+    mGPUTimer.begin();
 }
 
-void LLVOAvatar::readProfileQuery(S32 retries)
+void LLVOAvatar::endProfileQuery()
 {
-    if (!mGPUProfilePending)
+    mGPUTimer.end();
+}
+
+void LLVOAvatar::readProfileQuery()
+{
+    U64 time_elapsed = 0;
+    if (mGPUTimer.poll(time_elapsed))
     {
-        glEndQuery(GL_TIME_ELAPSED);
-        mGPUProfilePending = true;
-    }
-
-    GLuint64 result = 0;
-    glGetQueryObjectui64v(mGPUTimerQuery, GL_QUERY_RESULT_AVAILABLE, &result);
-
-    if (result == GL_TRUE || --retries <= 0)
-    { // query available, readback result
-        GLuint64 time_elapsed = 0;
-        glGetQueryObjectui64v(mGPUTimerQuery, GL_QUERY_RESULT, &time_elapsed);
         mGPURenderTime = time_elapsed / 1000000.f;
-        mGPUProfilePending = false;
 
         setDebugText(llformat("%d", (S32)(mGPURenderTime * 1000.f)));
-
-    }
-    else
-    {
-        // wait until next frame
-        const LLUUID id = getID();
-
-        LL::WorkQueue::getInstance("mainloop")->post([id, retries]
-        {
-            LLViewerObject* object = gObjectList.findObject(id);
-            if (object
-                && !object->isDead()
-                && object->isAvatar()) // probably excessive, pcode isn't supposed to change
-            {
-                LLVOAvatar* avatar = (LLVOAvatar*)object;
-                if (avatar)
-                {
-                    avatar->readProfileQuery(retries);
-                }
-            }
-        });
     }
 }
 

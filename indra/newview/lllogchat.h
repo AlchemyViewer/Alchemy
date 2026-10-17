@@ -26,6 +26,7 @@
 
 #ifndef LL_LLLOGCHAT_H
 #define LL_LLLOGCHAT_H
+#include "llcond.h"
 #include "llthread.h"
 
 class LLChat;
@@ -37,13 +38,11 @@ public:
     ~LLActionThread();
 
     void waitFinished();
-    bool isFinished() { return mFinished; }
+    bool isFinished() { return mFinished.get(); }
 protected:
     void setFinished();
 private:
-    bool mFinished;
-    LLMutex mMutex;
-    LLCondition mRunCondition;
+    LLOneShotCond mFinished;
 };
 
 class LLLoadHistoryThread : public LLActionThread

@@ -32,7 +32,7 @@
 
 #include "alscriptstudio_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <string>
@@ -58,7 +58,7 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
     struct alscriptstudiodoc_data
     {
@@ -71,55 +71,60 @@ namespace tut
             return one;
         }
     };
-    typedef test_group<alscriptstudiodoc_data> alscriptstudiodoc_group;
-    typedef alscriptstudiodoc_group::object    alscriptstudiodoc_object;
-    alscriptstudiodoc_group                    alscriptstudiodoc_instance("ALScriptStudioDoc");
 
-    template<> template<>
-    void alscriptstudiodoc_object::test<1>()
+    TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: what counts as unsaved and when a save is under way", "[ALScriptStudioDoc]")
     {
-        set_test_name("unsaved is the text, or a compile target or an experience picked; a save is under way at any stage of it, or while the preprocessor runs");
         Doc doc;
-        ensure("nothing changed", !doc.unsaved());
+        UNSCOPED_INFO("nothing changed");
+        CHECK_FALSE(doc.unsaved());
         doc.targetChosen = true;
-        ensure("a compile target picked", doc.unsaved());
+        UNSCOPED_INFO("a compile target picked");
+        CHECK(doc.unsaved());
         doc.targetChosen     = false;
         doc.experienceChosen = true;
-        ensure("an experience picked", doc.unsaved());
+        UNSCOPED_INFO("an experience picked");
+        CHECK(doc.unsaved());
 
-        ensure("no save", !doc.saveUnderway());
+        UNSCOPED_INFO("no save");
+        CHECK_FALSE(doc.saveUnderway());
         doc.preprocessing = true;
-        ensure("the preprocessor running, which a save may wait on", doc.saveUnderway());
+        UNSCOPED_INFO("the preprocessor running, which a save may wait on");
+        CHECK(doc.saveUnderway());
         doc.preprocessing = false;
         ALScriptSaveFlow::Tab tab;
         tab.holdOnErrors = true;
         doc.save.route(tab);
-        ensure("waiting on a check", doc.saveUnderway());
+        UNSCOPED_INFO("waiting on a check");
+        CHECK(doc.saveUnderway());
         doc.save.checked();
-        ensure("and not once it has come", !doc.saveUnderway());
+        UNSCOPED_INFO("and not once it has come");
+        CHECK_FALSE(doc.saveUnderway());
         doc.save.sent(ALTextUndo::SavePoint(), std::nullopt, {});
-        ensure("sent", doc.saveUnderway());
+        UNSCOPED_INFO("sent");
+        CHECK(doc.saveUnderway());
     }
 
-    template<> template<>
-    void alscriptstudiodoc_object::test<2>()
+    TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: the expansion is in front only where there is one", "[ALScriptStudioDoc]")
     {
-        set_test_name("the expansion is in front only where there is one");
         Doc doc;
         doc.view = Doc::View::Expanded;
-        ensure("nothing expanded yet: the source", doc.shownView() == Doc::View::Source);
-        ensure("and its text", doc.shownText() == doc.editor);
+        UNSCOPED_INFO("nothing expanded yet: the source");
+        CHECK(doc.shownView() == Doc::View::Source);
+        UNSCOPED_INFO("and its text");
+        CHECK(doc.shownText() == doc.editor);
     }
 
-    template<> template<>
-    void alscriptstudiodoc_object::test<3>()
+    TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: levelOf reads compiler words and severities and ProblemTraits a row", "[ALScriptStudioDoc]")
     {
-        set_test_name("levels: the compiler's words, the checkers' severities, the marks, and how the findings store reads a problem");
-        ensure("WARNING", Doc::levelOf("WARNING") == Doc::Level::Warning);
-        ensure("WARN", Doc::levelOf("WARN") == Doc::Level::Warning);
-        ensure("anything else is an error, as the server has two", Doc::levelOf("ERROR") == Doc::Level::Error && Doc::levelOf("oops") == Doc::Level::Error);
-        ensure("a note", Doc::levelOf(ALScriptProblem::Severity::Note) == Doc::Level::Note);
-        ensure("named", std::string(Doc::levelName(Doc::Level::Warning)) == "WARNING");
+        CHECK(Doc::levelOf("WARNING") == Doc::Level::Warning);
+        CHECK(Doc::levelOf("WARN") == Doc::Level::Warning);
+        {
+            INFO("anything else is an error, as the server has two");
+            CHECK(Doc::levelOf("ERROR") == Doc::Level::Error);
+            CHECK(Doc::levelOf("oops") == Doc::Level::Error);
+        }
+        CHECK(Doc::levelOf(ALScriptProblem::Severity::Note) == Doc::Level::Note);
+        CHECK(std::string(Doc::levelName(Doc::Level::Warning)) == "WARNING");
 
         Doc::Shown shown;
         shown.level    = Doc::Level::Warning;
@@ -127,29 +132,34 @@ namespace tut
         shown.message  = "unused local";
         shown.fileName = "util.luau";
         shown.fixes    = { fix(ALScriptFix::Kind::Suppress) };
-        ensure("a suppression is no fix", !Doc::ProblemTraits::fixable(shown));
+        UNSCOPED_INFO("a suppression is no fix");
+        CHECK_FALSE(Doc::ProblemTraits::fixable(shown));
         shown.fixes.push_back(fix(ALScriptFix::Kind::Fix));
-        ensure("a change is", Doc::ProblemTraits::fixable(shown));
-        ensure("found by its level's name", Doc::ProblemTraits::mentions(shown, "warn"));
-        ensure("by its include", Doc::ProblemTraits::mentions(shown, "util"));
-        ensure("not by what it does not say", !Doc::ProblemTraits::mentions(shown, "state"));
-        ensure("its rule is where it came from", Doc::ProblemTraits::rule(shown) == "Luau");
-        ensure("its level", Doc::ProblemTraits::level(shown) == ALFindingLevel::Warning);
+        UNSCOPED_INFO("a change is");
+        CHECK(Doc::ProblemTraits::fixable(shown));
+        UNSCOPED_INFO("found by its level's name");
+        CHECK(Doc::ProblemTraits::mentions(shown, "warn"));
+        UNSCOPED_INFO("by its include");
+        CHECK(Doc::ProblemTraits::mentions(shown, "util"));
+        UNSCOPED_INFO("not by what it does not say");
+        CHECK_FALSE(Doc::ProblemTraits::mentions(shown, "state"));
+        UNSCOPED_INFO("its rule is where it came from");
+        CHECK(Doc::ProblemTraits::rule(shown) == "Luau");
+        CHECK(Doc::ProblemTraits::level(shown) == ALFindingLevel::Warning);
     }
 
-    template<> template<>
-    void alscriptstudiodoc_object::test<4>()
+    TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: the fake services say skin words and counts and find tabs", "[ALScriptStudioDoc]")
     {
-        set_test_name("the fake of the window's services: the studio's own words, counted, and its tabs found");
         al_studio_test::StudioWindow window;
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         al_studio_test::FakeServices services(window.floater);
-        ensure_equals("a word of the skin's", services.words("ObjectNameComing"), std::string("\xE2\x80\xA6"));
-        ensure_equals("one", services.counted("Fixes", 1), std::string("1 fix"));
-        ensure_equals("many", services.counted("Fixes", 3), std::string("3 fixes"));
+        UNSCOPED_INFO("a word of the skin's");
+        CHECK(services.words("ObjectNameComing") == std::string("\xE2\x80\xA6"));
+        CHECK(services.counted("Fixes", 1) == std::string("1 fix"));
+        CHECK(services.counted("Fixes", 3) == std::string("3 fixes"));
 
         LLUUID object, item;
         object.generate();
@@ -158,58 +168,96 @@ namespace tut
         Doc& script = services.addDoc("script", ref, "Door");
         Doc& file   = services.addDoc("disk:/lib.lsl");
         file.file   = "/lib.lsl";
-        ensure("the first in front", services.frontDoc() == &script);
-        ensure("by id", services.findDoc("disk:/lib.lsl") == &file);
-        ensure("by what it holds", services.findDoc(ref) == &script);
-        ensure("none", services.findDoc("nothing") == nullptr);
+        UNSCOPED_INFO("the first in front");
+        CHECK(services.frontDoc() == &script);
+        UNSCOPED_INFO("by id");
+        CHECK(services.findDoc("disk:/lib.lsl") == &file);
+        UNSCOPED_INFO("by what it holds");
+        CHECK(services.findDoc(ref) == &script);
+        CHECK(services.findDoc("nothing") == nullptr);
 
         services.report("Saved", false, &script, { "retry" });
-        ensure("said of the tab", services.reports.size() == 1 && services.reports.front().doc == "script" && services.reports.front().actions.size() == 1);
+        {
+            INFO("said of the tab");
+            REQUIRE(services.reports.size() == 1);
+            CHECK(services.reports.front().doc == "script");
+            CHECK(services.reports.front().actions.size() == 1);
+        }
         services.openScript(ref, "Door", std::nullopt, 12);
-        ensure("asked to open at a line", services.opened.size() == 1 && services.opened.front().line == 12);
+        {
+            INFO("asked to open at a line");
+            REQUIRE(services.opened.size() == 1);
+            CHECK(services.opened.front().line == 12);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiodoc_object::test<5>()
+    TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: namedIn finds an include line or a require call and foundAs a run's find", "[ALScriptStudioDoc]")
     {
-        set_test_name("an include or a module a place names: anywhere on an #include line, or in a require call; and what a run found it as");
         const ALTextDocument lsl("default {}\n  #  include \"lib/util.lsl\" // the helpers\n#include <sys.lsl>\n#define X \"y.lsl\"\n");
         const std::vector<ALPreprocessor::Required> none;
         const std::optional<Doc::Named> util = Doc::namedIn(lsl, ALTextPos(1, 0), false, none);
-        ensure("on its line, before the #", util.has_value() && util->name == "lib/util.lsl" && !util->require);
-        ensure("the whole line", util->range == ALTextRange(ALTextPos(1, 0), ALTextPos(1, lsl.lineLength(1))));
-        ensure("angled", Doc::namedIn(lsl, ALTextPos(2, 12), false, none)->name == "sys.lsl");
-        ensure("not a string elsewhere",
-               !Doc::namedIn(lsl, ALTextPos(3, 12), false, none) && !Doc::namedIn(lsl, ALTextPos(0, 3), false, none));
+        {
+            INFO("on its line, before the #");
+            REQUIRE(util.has_value());
+            CHECK(util->name == "lib/util.lsl");
+            CHECK_FALSE(util->require);
+        }
+        UNSCOPED_INFO("the whole line");
+        CHECK(util->range == ALTextRange(ALTextPos(1, 0), ALTextPos(1, lsl.lineLength(1))));
+        const std::optional<Doc::Named> sys = Doc::namedIn(lsl, ALTextPos(2, 12), false, none);
+        {
+            INFO("angled");
+            REQUIRE(sys.has_value());
+            CHECK(sys->name == "sys.lsl");
+        }
+        {
+            INFO("not a string elsewhere");
+            CHECK_FALSE(Doc::namedIn(lsl, ALTextPos(3, 12), false, none));
+            CHECK_FALSE(Doc::namedIn(lsl, ALTextPos(0, 3), false, none));
+        }
 
         const std::string                           source = "local m = require(\"mod\")\nlocal n = 1\n";
         const ALTextDocument                        lua(source);
         const std::vector<ALPreprocessor::Required> calls  = ALPreprocessor::requiresIn(source);
         const std::optional<Doc::Named>             mod    = Doc::namedIn(lua, ALTextPos(0, 12), true, calls);
-        ensure("in a require call", mod.has_value() && mod->name == "mod" && mod->require);
-        ensure("over the call", mod->range == ALTextRange(ALTextPos(0, 10), ALTextPos(0, 24)));
-        ensure("not before it", !Doc::namedIn(lua, ALTextPos(0, 3), true, calls));
-        ensure("not in LSL", !Doc::namedIn(lua, ALTextPos(0, 12), false, calls));
+        {
+            INFO("in a require call");
+            REQUIRE(mod.has_value());
+            CHECK(mod->name == "mod");
+            CHECK(mod->require);
+        }
+        UNSCOPED_INFO("over the call");
+        CHECK(mod->range == ALTextRange(ALTextPos(0, 10), ALTextPos(0, 24)));
+        UNSCOPED_INFO("not before it");
+        CHECK_FALSE(Doc::namedIn(lua, ALTextPos(0, 3), true, calls));
+        UNSCOPED_INFO("not in LSL");
+        CHECK_FALSE(Doc::namedIn(lua, ALTextPos(0, 12), false, calls));
 
         Doc doc;
-        ensure("no run, nothing found", doc.foundAs("lib/util.lsl").empty());
+        UNSCOPED_INFO("no run, nothing found");
+        CHECK(doc.foundAs("lib/util.lsl").empty());
         doc.expanded.valid    = true;
         doc.expanded.resolved = { { "", "lib/util.lsl", false, "disk:/s/lib/util.lsl" },
                                   { "disk:/s/lib/util.lsl", "inner.lsl", false, "disk:/s/inner.lsl" },
                                   { "", "mod", true, "inv:mod" } };
-        ensure_equals("the script's own", doc.foundAs("lib/util.lsl"), std::string("disk:/s/lib/util.lsl"));
-        ensure("not an include's own", doc.foundAs("inner.lsl").empty());
-        ensure("a module as a module", doc.foundAs("mod", true) == "inv:mod" && doc.foundAs("mod", false).empty());
+        UNSCOPED_INFO("the script's own");
+        CHECK(doc.foundAs("lib/util.lsl") == std::string("disk:/s/lib/util.lsl"));
+        UNSCOPED_INFO("not an include's own");
+        CHECK(doc.foundAs("inner.lsl").empty());
+        {
+            INFO("a module as a module");
+            CHECK(doc.foundAs("mod", true) == "inv:mod");
+            CHECK(doc.foundAs("mod", false).empty());
+        }
         doc.expanded.valid  = false;
         doc.uploaded.valid  = true;
         doc.uploaded.resolved = { { "", "lib/util.lsl", false, "disk:/s/other.lsl" } };
-        ensure_equals("or the last save's run", doc.foundAs("lib/util.lsl"), std::string("disk:/s/other.lsl"));
+        UNSCOPED_INFO("or the last save's run");
+        CHECK(doc.foundAs("lib/util.lsl") == std::string("disk:/s/other.lsl"));
     }
 
-    template<> template<>
-    void alscriptstudiodoc_object::test<6>()
+    TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: run-time errors are held until the map is known then placed and counted", "[ALScriptStudioDoc]")
     {
-        set_test_name("a run-time error read back to the source, counted where said again; held until the map is known, then placed");
         Doc doc;
         // Six lines run: the first two the include's, the rest the
         // script's from its first line on.
@@ -230,34 +278,68 @@ namespace tut
         Doc::RuntimeProblem said;
         said.line    = 4;
         said.message = "Math Error";
-        ensure_equals("no map: as the region counts it", doc.placeOfRunning(4, -1).line, 4);
+        UNSCOPED_INFO("no map: as the region counts it");
+        CHECK(doc.placeOfRunning(4, -1).line == 4);
         doc.heardRuntime(said, true);
-        ensure("held", doc.runtime.empty() && doc.runtimeHeld.size() == 1);
+        {
+            INFO("held");
+            CHECK(doc.runtime.empty());
+            CHECK(doc.runtimeHeld.size() == 1);
+        }
         doc.heardRuntime(said, true);
 
         doc.uploaded.valid = true;
         doc.uploaded.map   = map;
         const Doc::RunningPlace place = doc.placeOfRunning(1, 3);
-        ensure("an include's line, by its path and name", place.line == 1 && place.column == 3 && place.file == "disk:/s/lib.lsl" && place.fileName == "lib.lsl");
+        {
+            INFO("an include's line, by its path and name");
+            CHECK(place.line == 1);
+            CHECK(place.column == 3);
+            CHECK(place.file == "disk:/s/lib.lsl");
+            CHECK(place.fileName == "lib.lsl");
+        }
         doc.placeHeldRuntime();
-        ensure("placed, and let go of", doc.runtimeHeld.empty() && doc.runtime.size() == 1);
-        ensure("at the source's line, said twice", doc.runtime[0].line == 2 && doc.runtime[0].file.empty() && doc.runtime[0].count == 2);
+        {
+            INFO("placed, and let go of");
+            CHECK(doc.runtimeHeld.empty());
+            REQUIRE(doc.runtime.size() == 1);
+        }
+        {
+            INFO("at the source's line, said twice");
+            CHECK(doc.runtime[0].line == 2);
+            CHECK(doc.runtime[0].file.empty());
+            CHECK(doc.runtime[0].count == 2);
+        }
         doc.heardRuntime(said, false);
-        ensure_equals("said again: counted", doc.runtime[0].count, 3);
+        UNSCOPED_INFO("said again: counted");
+        CHECK(doc.runtime[0].count == 3);
         said.line = 0;
         doc.heardRuntime(said, false);
-        ensure("in the include", doc.runtime.size() == 2 && doc.runtime[1].file == "disk:/s/lib.lsl" && doc.runtime[1].line == 0);
+        {
+            INFO("in the include");
+            REQUIRE(doc.runtime.size() == 2);
+            CHECK(doc.runtime[1].file == "disk:/s/lib.lsl");
+            CHECK(doc.runtime[1].line == 0);
+        }
         const Doc::RunningPlace made = doc.placeOfRunning(9, -1);
-        ensure("past the map: code the preprocessor made, at its own line", made.generated && made.line == 9 && made.file.empty());
+        {
+            INFO("past the map: code the preprocessor made, at its own line");
+            CHECK(made.generated);
+            CHECK(made.line == 9);
+            CHECK(made.file.empty());
+        }
         said.line = 9;
         doc.heardRuntime(said, false);
-        ensure("said to be there", doc.runtime.size() == 3 && doc.runtime[2].file == Doc::GENERATED && doc.runtime[2].line == 9);
+        {
+            INFO("said to be there");
+            REQUIRE(doc.runtime.size() == 3);
+            CHECK(doc.runtime[2].file == Doc::GENERATED);
+            CHECK(doc.runtime[2].line == 9);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiodoc_object::test<7>()
+    TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: setShown counts errors and warnings but not notes", "[ALScriptStudioDoc]")
     {
-        set_test_name("the rows put in counted: errors and warnings, notes not; counted again when others are put in");
         Doc                    doc;
         std::vector<Doc::Shown> rows(4);
         rows[0].level = Doc::Level::Error;
@@ -265,21 +347,21 @@ namespace tut
         rows[2].level = Doc::Level::Warning;
         rows[3].level = Doc::Level::Note;
         doc.setShown(rows);
-        ensure("four rows", doc.shown().size() == 4);
-        ensure_equals("one error", doc.shownErrors, 1);
-        ensure_equals("two warnings", doc.shownWarnings, 2);
+        CHECK(doc.shown().size() == 4);
+        CHECK(doc.shownErrors == 1);
+        CHECK(doc.shownWarnings == 2);
         doc.setShown({});
-        ensure("none", doc.shown().empty() && doc.shownErrors == 0 && doc.shownWarnings == 0);
+        CHECK(doc.shown().empty());
+        CHECK(doc.shownErrors == 0);
+        CHECK(doc.shownWarnings == 0);
     }
 
-    template<> template<>
-    void alscriptstudiodoc_object::test<8>()
+    TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: a notecard's items carry into another tab but a script tab has none", "[ALScriptStudioDoc]")
     {
-        set_test_name("a notecard's items carried into another tab; a script's tab carries none");
         al_studio_test::StudioWindow window;
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
         p.name = "editor";
@@ -293,20 +375,24 @@ namespace tut
         card.items->loaded({ a, b });
         Doc there;
         card.carryItemsTo(there);
-        ensure("carried", there.carriedEmbedded && there.carriedEmbedded->size() == 2 && (*there.carriedEmbedded)[1] == b);
+        {
+            INFO("carried");
+            REQUIRE(there.carriedEmbedded);
+            REQUIRE(there.carriedEmbedded->size() == 2);
+            CHECK((*there.carriedEmbedded)[1] == b);
+        }
         Doc script, after;
         script.carryItemsTo(after);
-        ensure("a script's tab carries nothing", !after.carriedEmbedded);
+        UNSCOPED_INFO("a script's tab carries nothing");
+        CHECK_FALSE(after.carriedEmbedded);
     }
 
-    template<> template<>
-    void alscriptstudiodoc_object::test<9>()
+    TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: undo follows the view in front but the tab's own for a comparison of it", "[ALScriptStudioDoc]")
     {
-        set_test_name("undo takes back the view in front's steps, but the tab's own while a comparison that follows the tab is in front");
         al_studio_test::StudioWindow window;
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
         p.name = "editor";
@@ -319,22 +405,22 @@ namespace tut
         dp.rect         = LLRect(0, 200, 400, 0);
         doc.compareView = LLUICtrlFactory::create<ALDiffView>(dp);
         window.floater->addChild(doc.compareView);
-        ensure("the source's", doc.undoText() == doc.editor);
+        UNSCOPED_INFO("the source's");
+        CHECK(doc.undoText() == doc.editor);
         doc.view = Doc::View::Compare;
-        ensure("a comparison of texts of no tab's: its side's, which has none", doc.undoText() == doc.compareView->shown());
+        UNSCOPED_INFO("a comparison of texts of no tab's: its side's, which has none");
+        CHECK(doc.undoText() == doc.compareView->shown());
         doc.compareTitles = Doc::CompareTitles{ "Saved", "Now" };
-        ensure("one that follows the tab: the tab's", doc.undoText() == doc.editor);
+        UNSCOPED_INFO("one that follows the tab: the tab's");
+        CHECK(doc.undoText() == doc.editor);
     }
 
-    template<> template<>
-    void alscriptstudiodoc_object::test<10>()
+    TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: a save's envelope carries an upload header only where one is asked for", "[ALScriptStudioDoc]")
     {
-        set_test_name("a save's envelope carries an upload header where one is asked for -- what the save hashes to, when and who, "
-                      "between the target line and the code, which it moves down by its lines -- and none where not");
         al_studio_test::StudioWindow window;
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
         p.name = "editor";
@@ -347,20 +433,32 @@ namespace tut
         const std::string expanded = "default { state_entry() { llOwnerSay((string)1); } }\n";
 
         const ALScriptEnvelope plain = doc.envelopeFor(expanded, "Test 1.0");
-        ensure("none unasked", plain.header.empty());
+        UNSCOPED_INFO("none unasked");
+        CHECK(plain.header.empty());
 
         ALScriptHeaderOptions asked;
         asked.on      = true;
         asked.creator = "Some One";
         const ALScriptEnvelope              with = doc.envelopeFor(expanded, "Test 1.0", asked);
         const std::optional<ALUploadHeader> said = ALUploadHeader::parse(with.header, false);
-        ensure("ours, read back: " + with.header, said.has_value() && said->ours);
-        ensure_equals("its hash", said->hash, ALUploadHeader::hashOf("mono", doc.editor->text(), expanded));
-        ensure_equals("who", said->creator, std::string("Some One"));
-        ensure("no file: a tab has no link", said->file.empty());
+        {
+            INFO("ours, read back: " + with.header);
+            REQUIRE(said.has_value());
+            CHECK(said->ours);
+        }
+        CHECK(said->hash == ALUploadHeader::hashOf("mono", doc.editor->text(), expanded));
+        CHECK(said->creator == std::string("Some One"));
+        UNSCOPED_INFO("no file: a tab has no link");
+        CHECK(said->file.empty());
         const int lines = static_cast<int>(std::count(with.header.begin(), with.header.end(), '\n'));
-        ensure_equals("the code its lines down", with.codeLine(), plain.codeLine() + lines);
+        UNSCOPED_INFO("the code its lines down");
+        CHECK(with.codeLine() == plain.codeLine() + lines);
         const std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(with.wrap());
-        ensure("parsed back with it", back.has_value() && back->header == with.header && back->expanded == expanded);
+        {
+            INFO("parsed back with it");
+            REQUIRE(back.has_value());
+            CHECK(back->header == with.header);
+            CHECK(back->expanded == expanded);
+        }
     }
 }

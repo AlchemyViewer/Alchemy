@@ -396,6 +396,14 @@ struct ALScriptStudioDoc
     };
     Expanded                                   expanded;
     Expanded                                   uploaded;
+    // The asset as the world holds it, whole -- the envelope and all, as
+    // another viewer opens it: as loaded, and as the last save that went
+    // up sent it; and what the save on its way sent.
+    std::shared_ptr<const std::string>         asset;
+    std::shared_ptr<const std::string>         assetSending;
+    // The next save sends it as written, its envelope let go of, whatever
+    // the setting says (Save Without Preprocessing).
+    bool                                       savePlain = false;
     // The source's require calls, of the text at requiresOf (namedAt).
     mutable std::vector<ALPreprocessor::Required> requiresFound;
     mutable std::optional<U32>                    requiresOf;
@@ -407,7 +415,7 @@ struct ALScriptStudioDoc
     bool                                       preprocessing       = false;
     // What the compiler said of the last save, in the source's places
     // -- back through the preprocessor's map, where it ran -- or an
-    // include's, by its path.
+    // include's, by its path; its line -1 where it named none.
     struct Compiled
     {
         S32         line      = 0;
@@ -423,6 +431,10 @@ struct ALScriptStudioDoc
     // to the source and its includes, or at the expansion's line where the
     // preprocessor made the code; as said where there is no map.
     static std::vector<Compiled> compiledOf(const std::vector<ALScriptDiagnostic>& said, const ALSourceMap* map, S32 under);
+    // What a compiler said, with each place its words name in the
+    // source's count, as the map reads it back: `(343, 1)`, or an
+    // include's `(12, 5) in name`; as said where nothing maps it.
+    static std::string mentionsMapped(const ALScriptDiagnostic& said, const ALSourceMap* map, S32 under);
     // What the script said as it ran, since it was last saved: a
     // run-time error's place, or -1 for none, the include it is in,
     // and its words.
@@ -493,6 +505,12 @@ struct ALScriptStudioDoc
     // more it is asked.
     std::optional<bool>                        runningAsked;
     S32                                        runningAsks = 0;
+    // The script in an object a file's tab stands in for -- its file
+    // masters it and no other -- or none, found again as the links change
+    // (ALFloaterScriptStudio::restand); and the one asked whether it runs
+    // and what experience it runs under, asked again for another.
+    ALScriptRef                                standsFor;
+    ALScriptRef                                worldAsked;
     // A compile target picked here since the last save, which the
     // region's word on what the script compiles for does not put back.
     bool                                       targetChosen = false;

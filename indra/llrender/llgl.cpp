@@ -46,7 +46,10 @@
 
 #include "llglheaders.h"
 #include "llglslshader.h"
+#include "llimagegl.h"
 #include "llshadermgr.h"
+
+#include <fmt/format.h>
 
 
 #if LL_SDL_WINDOW
@@ -99,11 +102,27 @@ namespace
     struct ProgramSampler
     {
         std::string mName;
-        GLenum      mType     = 0;
-        GLint       mUnit     = -1;
-        GLenum      mTarget   = 0;
-        GLenum      mBinding  = 0;
-        bool        mIsShadow = false;
+        GLenum      mType      = 0;
+        GLint       mUnit      = -1;
+        GLenum      mTarget    = 0;
+        GLenum      mBinding   = 0;
+        bool        mIsShadow  = false;
+        bool        mIsInteger = false;
+    };
+
+    // The kind of texel an image uniform reads and writes, and so the kind of format its unit must hold.
+    enum class TexelKind : U8
+    {
+        FLOAT,      // float and normalized formats
+        SIGNED,     // the signed integer formats
+        UNSIGNED,   // the unsigned integer formats
+    };
+
+    struct ProgramImage
+    {
+        std::string mName;
+        GLint       mUnit = -1;
+        TexelKind   mKind = TexelKind::FLOAT;
     };
 
     struct ProgramSamplerCache
@@ -112,39 +131,166 @@ namespace
         // deleted name back out. Cheap enough to re-check every call.
         GLint                      mUniformCount = -1;
         std::vector<ProgramSampler> mSamplers;
+        std::vector<ProgramImage>   mImages;
     };
 
     std::map<GLuint, ProgramSamplerCache> sProgramSamplerCache;
 
-    bool sampler_target_for_type(GLenum type, GLenum& target, GLenum& binding, bool& is_shadow)
+    // Every sampler type GL has, as mapUniformTextureChannel gives each a unit: the texture target it reads, the binding
+    // naming the texture bound there, whether it compares, and whether it returns integers.
+    struct SamplerType
     {
-        switch (type)
+        GLenum mType;
+        GLenum mTarget;
+        GLenum mBinding;
+        bool   mIsShadow;
+        bool   mIsInteger;
+    };
+
+    constexpr SamplerType sSamplerTypes[] =
+    {
+        { GL_SAMPLER_1D,                                   GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   false, false },
+        { GL_SAMPLER_1D_SHADOW,                            GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   true,  false },
+        { GL_INT_SAMPLER_1D,                               GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_1D,                      GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   false, true  },
+        { GL_SAMPLER_2D,                                   GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   false, false },
+        { GL_SAMPLER_2D_SHADOW,                            GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   true,  false },
+        { GL_INT_SAMPLER_2D,                               GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D,                      GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   false, true  },
+        { GL_SAMPLER_3D,                                   GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   false, false },
+        { GL_INT_SAMPLER_3D,                               GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_3D,                      GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   false, true  },
+        { GL_SAMPLER_CUBE,                                 GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             false, false },
+        { GL_SAMPLER_CUBE_SHADOW,                          GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             true,  false },
+        { GL_INT_SAMPLER_CUBE,                             GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_CUBE,                    GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             false, true  },
+        { GL_SAMPLER_1D_ARRAY,                             GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             false, false },
+        { GL_SAMPLER_1D_ARRAY_SHADOW,                      GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             true,  false },
+        { GL_INT_SAMPLER_1D_ARRAY,                         GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_1D_ARRAY,                GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             false, true  },
+        { GL_SAMPLER_2D_ARRAY,                             GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             false, false },
+        { GL_SAMPLER_2D_ARRAY_SHADOW,                      GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             true,  false },
+        { GL_INT_SAMPLER_2D_ARRAY,                         GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_ARRAY,                GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             false, true  },
+        { GL_SAMPLER_CUBE_MAP_ARRAY,                       GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       false, false },
+        { GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW,                GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       true,  false },
+        { GL_INT_SAMPLER_CUBE_MAP_ARRAY,                   GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY,          GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       false, true  },
+        { GL_SAMPLER_2D_RECT,                              GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            false, false },
+        { GL_SAMPLER_2D_RECT_SHADOW,                       GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            true,  false },
+        { GL_INT_SAMPLER_2D_RECT,                          GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_RECT,                 GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            false, true  },
+        { GL_SAMPLER_2D_MULTISAMPLE,                       GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       false, false },
+        { GL_INT_SAMPLER_2D_MULTISAMPLE,                   GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE,          GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       false, true  },
+        { GL_SAMPLER_2D_MULTISAMPLE_ARRAY,                 GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, false, false },
+        { GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY,             GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY,    GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, false, true  },
+        { GL_SAMPLER_BUFFER,                               GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               false, false },
+        { GL_INT_SAMPLER_BUFFER,                           GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_BUFFER,                  GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               false, true  },
+    };
+
+    bool sampler_target_for_type(GLenum type, GLenum& target, GLenum& binding, bool& is_shadow, bool& is_integer)
+    {
+        for (const SamplerType& entry : sSamplerTypes)
         {
-            case GL_SAMPLER_2D:
-            case GL_INT_SAMPLER_2D:
-            case GL_UNSIGNED_INT_SAMPLER_2D:
-                target = GL_TEXTURE_2D;             binding = GL_TEXTURE_BINDING_2D;             is_shadow = false; return true;
-            case GL_SAMPLER_2D_SHADOW:
-                target = GL_TEXTURE_2D;             binding = GL_TEXTURE_BINDING_2D;             is_shadow = true;  return true;
-            case GL_SAMPLER_3D:
-                target = GL_TEXTURE_3D;             binding = GL_TEXTURE_BINDING_3D;             is_shadow = false; return true;
-            case GL_SAMPLER_CUBE:
-                target = GL_TEXTURE_CUBE_MAP;       binding = GL_TEXTURE_BINDING_CUBE_MAP;       is_shadow = false; return true;
-            case GL_SAMPLER_CUBE_SHADOW:
-                target = GL_TEXTURE_CUBE_MAP;       binding = GL_TEXTURE_BINDING_CUBE_MAP;       is_shadow = true;  return true;
-            case GL_SAMPLER_CUBE_MAP_ARRAY:
-                target = GL_TEXTURE_CUBE_MAP_ARRAY; binding = GL_TEXTURE_BINDING_CUBE_MAP_ARRAY; is_shadow = false; return true;
-            case GL_SAMPLER_2D_ARRAY:
-                target = GL_TEXTURE_2D_ARRAY;       binding = GL_TEXTURE_BINDING_2D_ARRAY;       is_shadow = false; return true;
-            case GL_SAMPLER_2D_ARRAY_SHADOW:
-                target = GL_TEXTURE_2D_ARRAY;       binding = GL_TEXTURE_BINDING_2D_ARRAY;       is_shadow = true;  return true;
-            case GL_SAMPLER_2D_RECT:
-                target = GL_TEXTURE_RECTANGLE;      binding = GL_TEXTURE_BINDING_RECTANGLE;      is_shadow = false; return true;
-            case GL_SAMPLER_2D_MULTISAMPLE:
-                target = GL_TEXTURE_2D_MULTISAMPLE; binding = GL_TEXTURE_BINDING_2D_MULTISAMPLE; is_shadow = false; return true;
-            default:
-                return false;
+            if (entry.mType == type)
+            {
+                target     = entry.mTarget;
+                binding    = entry.mBinding;
+                is_shadow  = entry.mIsShadow;
+                is_integer = entry.mIsInteger;
+                return true;
+            }
         }
+        return false;
+    }
+
+    // Every image type GL has, and the kind of texel each reads and writes.
+    struct ImageType
+    {
+        GLenum    mType;
+        TexelKind mKind;
+    };
+
+    constexpr ImageType sImageTypes[] =
+    {
+        { GL_IMAGE_1D,                                   TexelKind::FLOAT    },
+        { GL_IMAGE_2D,                                   TexelKind::FLOAT    },
+        { GL_IMAGE_3D,                                   TexelKind::FLOAT    },
+        { GL_IMAGE_2D_RECT,                              TexelKind::FLOAT    },
+        { GL_IMAGE_CUBE,                                 TexelKind::FLOAT    },
+        { GL_IMAGE_BUFFER,                               TexelKind::FLOAT    },
+        { GL_IMAGE_1D_ARRAY,                             TexelKind::FLOAT    },
+        { GL_IMAGE_2D_ARRAY,                             TexelKind::FLOAT    },
+        { GL_IMAGE_CUBE_MAP_ARRAY,                       TexelKind::FLOAT    },
+        { GL_IMAGE_2D_MULTISAMPLE,                       TexelKind::FLOAT    },
+        { GL_IMAGE_2D_MULTISAMPLE_ARRAY,                 TexelKind::FLOAT    },
+        { GL_INT_IMAGE_1D,                               TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D,                               TexelKind::SIGNED   },
+        { GL_INT_IMAGE_3D,                               TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_RECT,                          TexelKind::SIGNED   },
+        { GL_INT_IMAGE_CUBE,                             TexelKind::SIGNED   },
+        { GL_INT_IMAGE_BUFFER,                           TexelKind::SIGNED   },
+        { GL_INT_IMAGE_1D_ARRAY,                         TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_ARRAY,                         TexelKind::SIGNED   },
+        { GL_INT_IMAGE_CUBE_MAP_ARRAY,                   TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_MULTISAMPLE,                   TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_MULTISAMPLE_ARRAY,             TexelKind::SIGNED   },
+        { GL_UNSIGNED_INT_IMAGE_1D,                      TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D,                      TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_3D,                      TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_RECT,                 TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_CUBE,                    TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_BUFFER,                  TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_1D_ARRAY,                TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_ARRAY,                TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY,          TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE,          TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE_ARRAY,    TexelKind::UNSIGNED },
+    };
+
+    bool image_kind_for_type(GLenum type, TexelKind& kind)
+    {
+        for (const ImageType& entry : sImageTypes)
+        {
+            if (entry.mType == type)
+            {
+                kind = entry.mKind;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // The kind of texel a sized format holds.
+    TexelKind texel_kind_of_format(GLint internal_format)
+    {
+        if (!LLImageGL::isIntegerFormat(internal_format))
+        {
+            return TexelKind::FLOAT;
+        }
+        return LLImageGL::isSignedIntegerFormat(internal_format) ? TexelKind::SIGNED : TexelKind::UNSIGNED;
+    }
+
+    const char* texel_kind_name(TexelKind kind)
+    {
+        switch (kind)
+        {
+        case TexelKind::SIGNED:   return "signed integer";
+        case TexelKind::UNSIGNED: return "unsigned integer";
+        case TexelKind::FLOAT:
+        default:                  return "float";
+        }
+    }
+
+    // Sampler state means nothing to a buffer texture, which has none, or to a multisample one, read only by
+    // texelFetch; nor does a buffer texture have the levels the format query asks about.
+    bool target_has_sampler_state(GLenum target)
+    {
+        return target != GL_TEXTURE_BUFFER && target != GL_TEXTURE_2D_MULTISAMPLE
+            && target != GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
     }
 
     // Re-entrancy latch for gl_debug_callback; see the guard there for why.
@@ -181,27 +327,65 @@ namespace
             || internal_format == GL_DEPTH32F_STENCIL8;
     }
 
-    const std::vector<ProgramSampler>& get_program_samplers(GLuint program)
+    // Whether the texture bound at `target` is read as its stencil, through an integer sampler: a stencil-only one
+    // always, and a depth-stencil one where GL 4.3's stencil texturing has set its mode so. Below 4.3 a depth-stencil
+    // texture is read as its depth.
+    bool reads_stencil(GLenum target, GLint internal_format)
     {
-        static const std::vector<ProgramSampler> empty;
+        if (internal_format == GL_STENCIL_INDEX8)
+        {
+            return true;
+        }
+        if ((internal_format != GL_DEPTH24_STENCIL8 && internal_format != GL_DEPTH32F_STENCIL8)
+            || gGLManager.mGLVersion < 4.29f)
+        {
+            return false;
+        }
+        GLint mode = GL_DEPTH_COMPONENT;
+        glGetTexParameteriv(target, GL_DEPTH_STENCIL_TEXTURE_MODE, &mode);
+        return mode == GL_STENCIL_INDEX;
+    }
 
+    // Whether a sampler, or the texture object where none is bound, reads texel by texel: the only way GL reads an
+    // integer texture, which a filtering one leaves incomplete.
+    bool reads_nearest(GLuint sampler, GLenum target)
+    {
+        GLint min_filter = 0;
+        GLint mag_filter = 0;
+        if (sampler != 0)
+        {
+            glGetSamplerParameteriv(sampler, GL_TEXTURE_MIN_FILTER, &min_filter);
+            glGetSamplerParameteriv(sampler, GL_TEXTURE_MAG_FILTER, &mag_filter);
+        }
+        else
+        {
+            glGetTexParameteriv(target, GL_TEXTURE_MIN_FILTER, &min_filter);
+            glGetTexParameteriv(target, GL_TEXTURE_MAG_FILTER, &mag_filter);
+        }
+        return mag_filter == GL_NEAREST && (min_filter == GL_NEAREST || min_filter == GL_NEAREST_MIPMAP_NEAREST);
+    }
+
+    // The samplers and images `program` declares, each with the unit its uniform holds.
+    const ProgramSamplerCache& get_program_bindings(GLuint program)
+    {
         GLint uniform_count = 0;
         glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &uniform_count);
 
         ProgramSamplerCache& cached = sProgramSamplerCache[program];
         if (cached.mUniformCount == uniform_count)
         {
-            return cached.mSamplers;
+            return cached;
         }
 
         cached.mUniformCount = uniform_count;
         cached.mSamplers.clear();
+        cached.mImages.clear();
 
         GLint max_name_len = 0;
         glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_name_len);
         if (max_name_len <= 0)
         {
-            return cached.mSamplers;
+            return cached;
         }
         std::vector<GLchar> name_buf((size_t)max_name_len);
 
@@ -217,25 +401,37 @@ namespace
             }
 
             ProgramSampler sampler;
-            if (!sampler_target_for_type(type, sampler.mTarget, sampler.mBinding, sampler.mIsShadow))
+            ProgramImage   image;
+            const bool is_sampler =
+                sampler_target_for_type(type, sampler.mTarget, sampler.mBinding, sampler.mIsShadow, sampler.mIsInteger);
+            if (!is_sampler && !image_kind_for_type(type, image.mKind))
             {
                 continue;
             }
 
-            sampler.mName = std::string(name_buf.data(), (size_t)written);
-            sampler.mType = type;
-
-            const GLint location = glGetUniformLocation(program, sampler.mName.c_str());
+            const std::string name(name_buf.data(), (size_t)written);
+            const GLint location = glGetUniformLocation(program, name.c_str());
             if (location < 0)
             {
                 continue;
             }
-            glGetUniformiv(program, location, &sampler.mUnit);
 
-            cached.mSamplers.push_back(sampler);
+            if (is_sampler)
+            {
+                sampler.mName = name;
+                sampler.mType = type;
+                glGetUniformiv(program, location, &sampler.mUnit);
+                cached.mSamplers.push_back(sampler);
+            }
+            else
+            {
+                image.mName = name;
+                glGetUniformiv(program, location, &image.mUnit);
+                cached.mImages.push_back(image);
+            }
         }
 
-        return cached.mSamplers;
+        return cached;
     }
 }
 
@@ -267,7 +463,7 @@ static void log_texture_unit_state()
     GLint saved_active_unit = GL_TEXTURE0;
     glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active_unit);
 
-    // What the PROGRAM declares, per unit. See get_program_samplers.
+    // What the PROGRAM declares, per unit. See get_program_bindings.
     struct UnitUniform
     {
         std::string mName;
@@ -280,7 +476,7 @@ static void log_texture_unit_state()
     glGetIntegerv(GL_CURRENT_PROGRAM, &program);
     if (program != 0 && glGetActiveUniform && glGetUniformiv)
     {
-        for (const ProgramSampler& sampler : get_program_samplers((GLuint)program))
+        for (const ProgramSampler& sampler : get_program_bindings((GLuint)program).mSamplers)
         {
             if (sampler.mUnit >= 0 && sampler.mUnit < max_units)
             {
@@ -291,12 +487,17 @@ static void log_texture_unit_state()
 
     static const struct { GLenum mTarget; GLenum mBinding; const char* mName; } targets[] =
     {
-        { GL_TEXTURE_2D,               GL_TEXTURE_BINDING_2D,               "2D"         },
-        { GL_TEXTURE_3D,               GL_TEXTURE_BINDING_3D,               "3D"         },
-        { GL_TEXTURE_CUBE_MAP,         GL_TEXTURE_BINDING_CUBE_MAP,         "CUBE"       },
-        { GL_TEXTURE_CUBE_MAP_ARRAY,   GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,   "CUBE_ARRAY" },
-        { GL_TEXTURE_RECTANGLE,        GL_TEXTURE_BINDING_RECTANGLE,        "RECT"       },
-        { GL_TEXTURE_2D_MULTISAMPLE,   GL_TEXTURE_BINDING_2D_MULTISAMPLE,   "2D_MS"      },
+        { GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   "1D"          },
+        { GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             "1D_ARRAY"    },
+        { GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   "2D"          },
+        { GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             "2D_ARRAY"    },
+        { GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   "3D"          },
+        { GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             "CUBE"        },
+        { GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       "CUBE_ARRAY"  },
+        { GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            "RECT"        },
+        { GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       "2D_MS"       },
+        { GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, "2D_MS_ARRAY" },
+        { GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               "BUFFER"      },
     };
 
     LL_WARNS() << "Texture units:" << LL_ENDL;
@@ -321,7 +522,7 @@ static void log_texture_unit_state()
             // a bound sampler wins, so print both -- disagreement is the usual culprit.
             GLint internal_format = 0;
             GLint tex_compare     = GL_NONE;
-            if (target.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
+            if (target_has_sampler_state(target.mTarget))
             {
                 glGetTexLevelParameteriv(level_query_target(target.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
                 glGetTexParameteriv(target.mTarget, GL_TEXTURE_COMPARE_MODE, &tex_compare);
@@ -386,7 +587,7 @@ static void log_texture_unit_state()
 }
 
 
-// Check every sampler the bound program declares against what is actually bound.
+// Check every sampler and image the bound program declares against what is actually bound.
 //
 // Catches the mismatch AT THE DRAW THAT CAUSES IT, naming the uniform -- rather than via a
 // driver warning that reports two object names and leaves you inferring which bind site was
@@ -421,7 +622,8 @@ bool validate_bound_samplers()
                                   : "<unknown>";
     std::string failure;
 
-    for (const ProgramSampler& sampler : get_program_samplers((GLuint)program))
+    const ProgramSamplerCache& bindings = get_program_bindings((GLuint)program);
+    for (const ProgramSampler& sampler : bindings.mSamplers)
     {
         if (sampler.mUnit < 0)
         {
@@ -440,6 +642,12 @@ bool validate_bound_samplers()
             continue;
         }
 
+        // Nothing below applies to a texture with no sampler state, which reads as it is whatever is bound.
+        if (!target_has_sampler_state(sampler.mTarget))
+        {
+            continue;
+        }
+
         // A bound sampler object overrides the texture's own compare state, so it decides.
         GLint bound_sampler = 0;
         glGetIntegerv(GL_SAMPLER_BINDING, &bound_sampler);
@@ -449,16 +657,13 @@ bool validate_bound_samplers()
         {
             glGetSamplerParameteriv((GLuint)bound_sampler, GL_TEXTURE_COMPARE_MODE, &compare_mode);
         }
-        else if (sampler.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
+        else
         {
             glGetTexParameteriv(sampler.mTarget, GL_TEXTURE_COMPARE_MODE, &compare_mode);
         }
 
         GLint internal_format = 0;
-        if (sampler.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
-        {
-            glGetTexLevelParameteriv(level_query_target(sampler.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
-        }
+        glGetTexLevelParameteriv(level_query_target(sampler.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
         const bool is_depth = is_depth_format(internal_format);
 
         // The two pairings GL calls undefined, in both directions.
@@ -483,9 +688,62 @@ bool validate_bound_samplers()
                                sampler.mName.c_str(), sampler.mUnit, texture, internal_format);
             break;
         }
+
+        // An integer texture reads only through an integer sampler, and an integer sampler reads only an integer
+        // texture or a texture read as its stencil, which a float one cannot read. Every other pairing is undefined.
+        const bool integer_texture = LLImageGL::isIntegerFormat(internal_format);
+        const bool stencil_texture = reads_stencil(sampler.mTarget, internal_format);
+        if (sampler.mIsInteger != (integer_texture || stencil_texture))
+        {
+            failure = fmt::format("'{}' (unit {}) is {} sampler over {} texture {} (format {:#x})", sampler.mName,
+                                  sampler.mUnit, sampler.mIsInteger ? "an integer" : "a float",
+                                  integer_texture   ? "an integer"
+                                  : stencil_texture ? "a stencil-mode"
+                                                    : "a non-integer",
+                                  texture, internal_format);
+            break;
+        }
+        // And GL reads integers texel by texel: under a filtering sampler the texture is incomplete, and reads 0.
+        if (sampler.mIsInteger && !reads_nearest((GLuint)bound_sampler, sampler.mTarget))
+        {
+            failure = fmt::format("'{}' (unit {}) is an integer sampler over texture {} filtered by sampler {}, "
+                                  "which leaves it incomplete",
+                                  sampler.mName, sampler.mUnit, texture, bound_sampler);
+            break;
+        }
     }
 
     glActiveTexture(saved_active_unit);
+
+    // An image reads and writes a texel's bits as its unit's format lays them out, and the uniform's type says which
+    // kind of value that is: a float image over an integer format, or the reverse, is undefined. An empty unit is not
+    // -- its loads read 0 and its stores go nowhere.
+    if (failure.empty() && gGLManager.mHasCompute)
+    {
+        for (const ProgramImage& image : bindings.mImages)
+        {
+            if (image.mUnit < 0)
+            {
+                continue;
+            }
+            GLint texture = 0;
+            glGetIntegeri_v(GL_IMAGE_BINDING_NAME, (GLuint)image.mUnit, &texture);
+            if (texture == 0)
+            {
+                continue;
+            }
+            GLint format = 0;
+            glGetIntegeri_v(GL_IMAGE_BINDING_FORMAT, (GLuint)image.mUnit, &format);
+            const TexelKind bound = texel_kind_of_format(format);
+            if (bound != image.mKind)
+            {
+                failure = fmt::format("'{}' (image unit {}) is a {} image over texture {} bound as {} format {:#x}",
+                                      image.mName, image.mUnit, texel_kind_name(image.mKind), texture,
+                                      texel_kind_name(bound), format);
+                break;
+            }
+        }
+    }
 
     if (failure.empty())
     {
@@ -1425,6 +1683,9 @@ PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC    glImportMemoryWin32HandleEXT    = nullptr
 // GL_EXT_semaphore_win32
 PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC glImportSemaphoreWin32HandleEXT = nullptr;
 
+// GL_EXT_depth_bounds_test
+PFNGLDEPTHBOUNDSEXTPROC                glDepthBoundsEXT                = nullptr;
+
 #endif
 
 LLGLManager gGLManager;
@@ -2013,9 +2274,102 @@ bool LLGLManager::initGL()
         glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &mMaxAnisotropy);
     }
 
+    initCompute();
+
+    initQueries();
+
     initGLStates();
 
     return true;
+}
+
+// What the query targets past 4.1's can count, and whether the timestamps count at all. After initExtensions, which
+// loads glGetQueryiv.
+void LLGLManager::initQueries()
+{
+    mHasConservativeOcclusion = mGLVersion >= 4.29f || mGLExtensions.contains("GL_ARB_ES3_compatibility");
+    mHasPipelineStatistics    = mGLVersion >= 4.59f || mGLExtensions.contains("GL_ARB_pipeline_statistics_query");
+
+    GLint bits = 0;
+    glGetQueryiv(GL_TIMESTAMP, GL_QUERY_COUNTER_BITS, &bits);
+    mHasTimestampQuery = bits > 0;
+
+    LL_INFOS("RenderInit") << "Queries: conservative occlusion " << (mHasConservativeOcclusion ? "yes" : "no")
+                           << ", timestamps " << bits << " bits, pipeline statistics "
+                           << (mHasPipelineStatistics ? "yes" : "no") << LL_ENDL;
+}
+
+// Here rather than in initExtensions, whose version ladder returns before its end on any context below 4.6: this
+// reads what the 4.3 rung resolved.
+void LLGLManager::initCompute()
+{
+    mHasCompute = mGLVersion >= 4.29f
+               && glDispatchCompute && glDispatchComputeIndirect && glMemoryBarrier && glBindImageTexture
+               && glShaderStorageBlockBinding && glGetProgramResourceIndex && glGetProgramInterfaceiv
+               && glGetProgramResourceName && glGetProgramResourceiv && glClearBufferSubData && glDrawArraysIndirect
+               && glGetIntegeri_v;
+
+    for (U32 i = 0; i < 3; ++i)
+    {
+        mMaxComputeWorkGroupCount[i] = 0;
+        mMaxComputeWorkGroupSize[i]  = 0;
+    }
+    mMaxComputeWorkGroupInvocations     = 0;
+    mMaxComputeSharedMemorySize         = 0;
+    mMaxImageUnits                      = 0;
+    mMaxShaderStorageBufferBindings     = 0;
+    mMaxVertexShaderStorageBlocks       = 0;
+    mMaxFragmentShaderStorageBlocks     = 0;
+    mMaxComputeShaderStorageBlocks      = 0;
+    mMaxShaderStorageBlockSize          = 0;
+    mShaderStorageBufferOffsetAlignment = 0;
+
+    if (!mHasCompute)
+    {
+        LL_INFOS("RenderInit") << "Compute unavailable (GL " << mGLVersion
+                               << (mGLVersion >= 4.29f ? ": its entry points did not resolve)" : ", needs 4.3)")
+                               << LL_ENDL;
+        return;
+    }
+
+    for (U32 i = 0; i < 3; ++i)
+    {
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, i, &mMaxComputeWorkGroupCount[i]);
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, i, &mMaxComputeWorkGroupSize[i]);
+    }
+    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &mMaxComputeWorkGroupInvocations);
+    glGetIntegerv(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE, &mMaxComputeSharedMemorySize);
+    glGetIntegerv(GL_MAX_IMAGE_UNITS, &mMaxImageUnits);
+    glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &mMaxShaderStorageBufferBindings);
+    glGetIntegerv(GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS, &mMaxVertexShaderStorageBlocks);
+    glGetIntegerv(GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS, &mMaxFragmentShaderStorageBlocks);
+    glGetIntegerv(GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS, &mMaxComputeShaderStorageBlocks);
+    glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &mShaderStorageBufferOffsetAlignment);
+    // A block may be larger than an int can say.
+    if (glGetInteger64v)
+    {
+        GLint64 block_size = 0;
+        glGetInteger64v(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &block_size);
+        mMaxShaderStorageBlockSize = block_size;
+    }
+    else
+    {
+        GLint block_size = 0;
+        glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &block_size);
+        mMaxShaderStorageBlockSize = block_size;
+    }
+    mShaderStorageBufferOffsetAlignment = llmax(mShaderStorageBufferOffsetAlignment, 1);
+
+    LL_INFOS("RenderInit") << "Compute available (GL " << mGLVersion << "): work groups up to "
+                           << mMaxComputeWorkGroupCount[0] << "x" << mMaxComputeWorkGroupCount[1] << "x"
+                           << mMaxComputeWorkGroupCount[2] << " of " << mMaxComputeWorkGroupSize[0] << "x"
+                           << mMaxComputeWorkGroupSize[1] << "x" << mMaxComputeWorkGroupSize[2] << ", "
+                           << mMaxComputeWorkGroupInvocations << " invocations, " << mMaxComputeSharedMemorySize
+                           << " bytes shared; " << mMaxImageUnits << " image units; storage blocks "
+                           << mMaxVertexShaderStorageBlocks << " vertex, " << mMaxFragmentShaderStorageBlocks
+                           << " fragment, " << mMaxComputeShaderStorageBlocks << " compute, at "
+                           << mMaxShaderStorageBufferBindings << " bindings, up to " << mMaxShaderStorageBlockSize
+                           << " bytes each, offsets aligned to " << mShaderStorageBufferOffsetAlignment << LL_ENDL;
 }
 
 void LLGLManager::getGLInfo(LLSD& info)
@@ -2090,6 +2444,15 @@ void LLGLManager::asLLSD(LLSD& info)
     info["max_vertex_range"] = mGLMaxVertexRange;
     info["max_index_range"] = mGLMaxIndexRange;
     info["max_texture_size"] = mGLMaxTextureSize;
+
+    // Compute, and the limits a compute feature sizes itself by
+    info["has_compute"] = mHasCompute;
+    info["max_compute_work_group_invocations"] = mMaxComputeWorkGroupInvocations;
+    info["max_compute_shared_memory_size"] = mMaxComputeSharedMemorySize;
+    info["max_image_units"] = mMaxImageUnits;
+    info["max_vertex_shader_storage_blocks"] = mMaxVertexShaderStorageBlocks;
+    info["max_fragment_shader_storage_blocks"] = mMaxFragmentShaderStorageBlocks;
+    info["max_compute_shader_storage_blocks"] = mMaxComputeShaderStorageBlocks;
 
     // Which vendor
     info["is_ati"] = mIsAMD;  // note, do not rename is_ati to is_amd without coordinating with DW
@@ -2237,6 +2600,9 @@ void LLGLManager::initExtensions()
     // does not resolve. macOS GL 4.1 lacks it entirely and stays forward-Z.
     mHasClipControl = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_clip_control");
 
+    // Downgraded below if glDepthBoundsEXT does not resolve.
+    mHasDepthBoundsTest = mGLExtensions.contains("GL_EXT_depth_bounds_test");
+
     mHasNVXGpuMemoryInfo = mGLExtensions.contains("GL_NVX_gpu_memory_info");
     mHasATIMemInfo = mGLExtensions.contains("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
     mHasEXTMemoryObject  = mGLExtensions.contains("GL_EXT_memory_object");
@@ -2332,6 +2698,11 @@ void LLGLManager::initExtensions()
         {
             glNamedBufferStorage = (PFNGLNAMEDBUFFERSTORAGEPROC)LL_GET_PROC_ADDRESS("glNamedBufferStorage");
         }
+        // And the ones ALGPUBuffer makes. Not part of the check below: glClearNamedBufferSubData exists only beside
+        // GL_ARB_clear_buffer_object, and that class checks each before it uses it.
+        glCopyNamedBufferSubData  = (PFNGLCOPYNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glCopyNamedBufferSubData");
+        glGetNamedBufferSubData   = (PFNGLGETNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glGetNamedBufferSubData");
+        glClearNamedBufferSubData = (PFNGLCLEARNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glClearNamedBufferSubData");
 
         if (!glBindTextureUnit || !glCreateSamplers || !glCreateBuffers || !glNamedBufferData ||
             !glNamedBufferSubData || !glMapNamedBufferRange || !glUnmapNamedBuffer ||
@@ -2420,6 +2791,18 @@ void LLGLManager::initExtensions()
         glGetnUniformuiv         = (PFNGLGETNUNIFORMUIVPROC)LL_GET_PROC_ADDRESS("glGetnUniformuiv");
     }
 
+    // Texture barrier. Core in 4.5, and GL_ARB_texture_barrier names it without a suffix on a
+    // lower context, so it is resolved here for the GL_VERSION_4_5 ladder's early-out as above.
+    // GL_NV_texture_barrier, which ARB's took over unchanged, names it glTextureBarrierNV.
+    if (mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_texture_barrier"))
+    {
+        glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)LL_GET_PROC_ADDRESS("glTextureBarrier");
+    }
+    if (!glTextureBarrier && mGLExtensions.contains("GL_NV_texture_barrier"))
+    {
+        glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)LL_GET_PROC_ADDRESS("glTextureBarrierNV");
+    }
+
     // GL_EXT_memory_object
     if (mHasEXTMemoryObject)
     {
@@ -2454,6 +2837,18 @@ void LLGLManager::initExtensions()
         glImportSemaphoreWin32HandleEXT = (PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC)LL_GET_PROC_ADDRESS("glImportSemaphoreWin32HandleEXT");
         LL_INFOS("RenderInit") << "GL_EXT_semaphore_win32 symbols loaded" << LL_ENDL;
     }
+
+    // GL_EXT_depth_bounds_test. Never core; a context has it or it does not.
+    if (mHasDepthBoundsTest)
+    {
+        glDepthBoundsEXT = (PFNGLDEPTHBOUNDSEXTPROC)LL_GET_PROC_ADDRESS("glDepthBoundsEXT");
+        if (!glDepthBoundsEXT)
+        {
+            mHasDepthBoundsTest = false;
+            LL_WARNS("RenderInit") << "GL_EXT_depth_bounds_test advertised but glDepthBoundsEXT did not resolve" << LL_ENDL;
+        }
+    }
+    LL_INFOS("RenderInit") << "Depth bounds test " << (mHasDepthBoundsTest ? "available" : "unavailable") << LL_ENDL;
 
     // GL_VERSION_1_2
     if (mGLVersion < 1.19f)
@@ -3292,6 +3687,11 @@ GLboolean LLGLDepthTest::sWriteEnabled = GL_TRUE; // OpenGL default
 //static
 void LLGLState::initClass()
 {
+    // Runs per context, from initGL: the map and the depth state describe this context, and
+    // GL starts every context at its defaults.
+    sStateMap.clear();
+    LLGLDepthTest::initClass();
+
     sStateMap[GL_DITHER] = GL_TRUE;
     // sStateMap[GL_TEXTURE_2D] = GL_TRUE;
 
@@ -3677,6 +4077,15 @@ GLenum LLGLDepthTest::remap(GLenum func)
     }
 }
 
+//static
+void LLGLDepthTest::initClass()
+{
+    sDepthEnabled = GL_FALSE;
+    sDepthFunc = GL_LESS;
+    sWriteEnabled = GL_TRUE;
+    glDepthFunc(remap(sDepthFunc));
+}
+
 void LLGLDepthTest::rebase()
 {
     // Force the physical depth func to agree with the current translation of the tracked
@@ -3773,52 +4182,6 @@ void LLGLDepthTest::checkState()
 }
 
 
-
-LLGLSyncFence::LLGLSyncFence()
-{
-    mSync = 0;
-}
-
-LLGLSyncFence::~LLGLSyncFence()
-{
-    if (mSync)
-    {
-        glDeleteSync(mSync);
-    }
-}
-
-void LLGLSyncFence::placeFence()
-{
-    if (mSync)
-    {
-        glDeleteSync(mSync);
-    }
-    mSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-}
-
-bool LLGLSyncFence::isCompleted()
-{
-    bool ret = true;
-    if (mSync)
-    {
-        GLenum status = glClientWaitSync(mSync, 0, 1);
-        if (status == GL_TIMEOUT_EXPIRED)
-        {
-            ret = false;
-        }
-    }
-    return ret;
-}
-
-void LLGLSyncFence::wait()
-{
-    if (mSync)
-    {
-        while (glClientWaitSync(mSync, 0, FENCE_WAIT_TIME_NANOSECONDS) == GL_TIMEOUT_EXPIRED)
-        { //track the number of times we've waited here
-        }
-    }
-}
 
 #if LL_WINDOWS
 // Expose desired use of high-performance graphics processor to Optimus driver and to AMD driver

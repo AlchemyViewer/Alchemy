@@ -277,6 +277,55 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALSnapshotCutout</key>
+        <map>
+            <key>Comment</key>
+            <string>Snapshots draw only the picked avatar or object and fill the rest with ALSnapshotCutoutFill. Applies to the snapshot floater and File &gt; Take Snapshot to Disk; off at every login.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSnapshotCutoutFill</key>
+        <map>
+            <key>Comment</key>
+            <string>What fills a cutout snapshot around its subject. Alpha 0 leaves it transparent, 1 fills it solid; formats without alpha (JPEG, BMP, postcards) always use the colour solid.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color4</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>ALSnapshotCutoutIncludeSeated</key>
+        <map>
+            <key>Comment</key>
+            <string>A cutout of an object includes the avatars sitting on it, and what they wear.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSnapshotCutoutSupersample</key>
+        <map>
+            <key>Comment</key>
+            <string>A cutout snapshot is rendered this many times larger each way and averaged down, which is where its smooth edges come from (1-4). Lowered automatically when the render would be too large.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
         <key>ALScriptPreprocCompress</key>
         <map>
             <key>Comment</key>
@@ -750,6 +799,28 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptConvertUuidKeys</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua holds the script's own keys as SLua's uuids: its key variables, its functions' and handlers' key parameters, and what its functions give. Off, as text, as LSL held them, so that a key given "" or any other text keeps it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertKeyTextAny</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua writes text given where SLua's ll takes a key as x :: any, which the type checker takes; off, as it is, which the type checker marks for the scripter to see to. The script runs the same either way.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptConvertComments</key>
         <map>
             <key>Comment</key>
@@ -882,6 +953,28 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptFormatBraceSpaces</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio writes a space inside SLua's braces, { 1, 2 } and { any }, as StyLua does: its formatter, and Convert to SLua; off, {1, 2}.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptFormatWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>How many columns a line may take before Script Studio's formatter breaks it, at the commas of a bracket on it; 0 never breaks a line.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>120</integer>
+        </map>
         <key>ALScriptFixOnSave</key>
         <map>
             <key>Comment</key>
@@ -1002,6 +1095,17 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>1</integer>
+        </map>
+        <key>ALScriptStudioPanesWiden</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's window widens by the Explorer's or the Inspector's width as it opens, as far as the screen goes, and narrows by as much as it folds; off, the pane takes its room from the editor.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
         </map>
         <key>ALScriptStudioState</key>
         <map>
@@ -1541,6 +1645,61 @@
             <string>String</string>
             <key>Value</key>
             <string>/tp2cam</string>
+        </map>
+        <key>AlchemyChatIRCColorsEnabled</key>
+        <map>
+            <key>Comment</key>
+            <string>Give each other resident's chat text and name, in nearby chat and conversations, a color of their own worked from their id. You, Lindens and the muted keep their chat colors.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyChatIRCColorNameTags</key>
+        <map>
+            <key>Comment</key>
+            <string>With AlchemyChatIRCColorsEnabled, color each other resident's name tag with the color of their name in chat.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyChatIRCAgentSaturation</key>
+        <map>
+            <key>Comment</key>
+            <string>Saturation of the per-agent IRC-style chat colors (0-1).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.7</real>
+        </map>
+        <key>AlchemyChatIRCAgentLightness</key>
+        <map>
+            <key>Comment</key>
+            <string>Lightness of the per-agent IRC-style chat colors (0-1).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.9</real>
+        </map>
+        <key>AlchemyChatIRCNameLightness</key>
+        <map>
+            <key>Comment</key>
+            <string>Lightness of the displayed name in IRC-style chat colors; shares the chat color's hue and saturation (0-1).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.7</real>
         </map>
         <key>AlchemyChatMarkUnnamedObjects</key>
         <map>
@@ -2097,6 +2256,28 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderDisableCompute</key>
+        <map>
+            <key>Comment</key>
+            <string>Use no compute shaders even where the GPU has them (OpenGL 4.3): everything built on compute takes its other path or is off. For diagnosing a driver. Change triggers a shader rebuild.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyRenderDepthBoundsTest</key>
+        <map>
+            <key>Comment</key>
+            <string>Hold the full-screen lighting and haze passes, and each local light, to the depths they reach with the depth bounds test where the GPU has it (GL_EXT_depth_bounds_test); off, they keep to the depth test. For diagnosing a driver. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderFarPlaneForce</key>
         <map>
             <key>Comment</key>
@@ -2152,6 +2333,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderShadowOcclusion</key>
+        <map>
+            <key>Comment</key>
+            <string>Occlusion culling for the sun's shadow cascades: a caster the sun cannot see past the casters nearer it is left out of the shadow map. Experimental; spot light shadows are never culled.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderShadowPCSSScale</key>
         <map>
             <key>Comment</key>
@@ -2195,6 +2387,72 @@
             <string>F32</string>
             <key>Value</key>
             <real>64</real>
+        </map>
+        <key>AlchemyRenderWaterGlintRoughness</key>
+        <map>
+            <key>Comment</key>
+            <string>Roughness of the sun's reflection on water, which sets how far each wave face's glint spreads: low gives small, hard sparkles, high soft ones that run together into a broad path. 0.35 matches WindLight's water. 0.05 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.35</real>
+        </map>
+        <key>AlchemyRenderWaterTessDensity</key>
+        <map>
+            <key>Comment</key>
+            <string>Tessellation density of the water's waves: an edge's level is its length times this over its distance from the camera, as the terrain's. Sets how far the waves reach, where the vertex spacing grows to half the large waves' wavelength. 8 to 256.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>32</real>
+        </map>
+        <key>AlchemyRenderWaterWaveHeight</key>
+        <map>
+            <key>Comment</key>
+            <string>Height of the water's waves over what its normal maps integrate to: 1 raises the surface as its shading says it slopes. 0 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>AlchemyRenderWaterWaves</key>
+        <map>
+            <key>Comment</key>
+            <string>Displace the water near the camera into waves, the heights integrated from the normal maps that shade it, so the surface's crests lie where its shading's are. Needs tessellation (OpenGL 4.0).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderWaterOcclusionCull</key>
+        <map>
+            <key>Comment</key>
+            <string>Cull the water's wave patches the scene hides, against a depth pyramid of the main view built with compute, so they are never tessellated. Needs compute (OpenGL 4.3).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderWaterHextile</key>
+        <map>
+            <key>Comment</key>
+            <string>Which of the water's wave layers are hex-tiled, so their repeat does not show: each cell of a hexagonal lattice fixed in the world shows the normal map at its own offset, never turned. 0 none, 1 the large waves, 2 the large and medium waves. Up to three reads per tiled layer instead of one. Change triggers a shader rebuild.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
         </map>
         <key>AlchemyRenderTonemapType</key>
         <map>
@@ -2404,6 +2662,72 @@
             <string>F32</string>
             <key>Value</key>
             <real>0.5</real>
+        </map>
+        <key>AlchemySelectionOutlineWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the outline around selected objects, in the world and on the HUD, at a UI scale of 1, while the selection wireframe is off; it grows with the UI scale. Range 1 to 16. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>3.0</real>
+        </map>
+        <key>AlchemySelectionOutlineWireframeWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the outline around selected objects while the selection wireframe is on, at a UI scale of 1; it grows with the UI scale. Range 1 to 16. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
+        <key>AlchemySelectionOutlineContrast</key>
+        <map>
+            <key>Comment</key>
+            <string>How selection outlines stay visible over what lies behind them. 0: drawn in their colours as they are. 1: their lightness, the wireframe's too, moved away from that of what lies around them where the two are too alike, their hue kept. 2: their colours as they are, the outline cased by a thin rim, dark around a light line and light around a dark one. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
+        <key>AlchemySelectionOutlineGeometry</key>
+        <map>
+            <key>Comment</key>
+            <string>Outline and wireframe the whole faces of selected objects, whatever their textures' alpha cuts away, so an alpha card shows its card rather than its leaf. Not while RLVa prevents Highlight Transparent; always while Highlight Transparent is on. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemySelectionWireframe</key>
+        <map>
+            <key>Comment</key>
+            <string>Draw the triangles of selected objects as lines under their outline, in the world and on the HUD, with hidden lines dimmed while hidden selections are shown. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemySelectionWireframeWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the selection wireframe's lines at a UI scale of 1; it grows with the UI scale. Range 1 to 8. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
         </map>
         <key>AlchemyRenderUBOUpdateMode</key>
         <map>

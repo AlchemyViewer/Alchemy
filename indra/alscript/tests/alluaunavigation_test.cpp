@@ -27,7 +27,7 @@
 #include "../luau/alluauservice.h"
 #include "../luau/alluauconfig.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <sstream>
 
@@ -94,7 +94,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct alluaunavigation_data
     {
@@ -133,123 +133,158 @@ namespace tut
         }
     };
 
-    typedef test_group<alluaunavigation_data> alluaunavigation_group;
-    typedef alluaunavigation_group::object    alluaunavigation_object;
-    alluaunavigation_group                    alluaunavigation_instance("alluaunavigation");
-
-    template<> template<>
-    void alluaunavigation_object::test<1>()
+    TEST_CASE_METHOD(alluaunavigation_data, "alluaunavigation: hover and references place a module's field in the module's own lines", "[alluaunavigation]")
     {
-        set_test_name("a field a module declares is declared there: hover and references say the module's key and its place in the module's lines");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         open("a", true);
         ALScriptReferences refs = service.references(SCRIPT_A, 5, 12); // `twice` in `util.twice(2)`
-        ensure("found", refs.found && refs.name == "twice");
-        ensure(llformat("a function, not kind %d", (int)refs.kind), refs.kind == ALScriptSymbolKind::Function);
-        ensure_equals("declared in the module", refs.definitionFile, std::string(UTIL));
-        ensure_equals("at `function M.twice`", where(refs.definition), std::string("3:11"));
-        ensure("the module's to rename", refs.hasDefinition && refs.renamable);
+        REQUIRE(refs.found);
+        CHECK(refs.name == "twice");
+        CHECK(refs.kind == ALScriptSymbolKind::Function);
+        UNSCOPED_INFO("declared in the module");
+        CHECK(refs.definitionFile == std::string(UTIL));
+        UNSCOPED_INFO("at `function M.twice`");
+        CHECK(where(refs.definition) == std::string("3:11"));
+        {
+            INFO("the module's to rename");
+            CHECK(refs.hasDefinition);
+            CHECK(refs.renamable);
+        }
 
         const ALScriptHover hover = service.hover(SCRIPT_A, 5, 12);
-        ensure("hover: the module's", hover.found && hover.hasDefinition && hover.definitionFile == UTIL);
-        ensure_equals("hover: the same place", llformat("%d:%d", hover.definitionLine, hover.definitionColumn), std::string("3:11"));
+        {
+            INFO("hover: the module's");
+            REQUIRE(hover.found);
+            CHECK(hover.hasDefinition);
+            CHECK(hover.definitionFile == UTIL);
+        }
+        UNSCOPED_INFO("hover: the same place");
+        CHECK(llformat("%d:%d", hover.definitionLine, hover.definitionColumn) == std::string("3:11"));
 
         refs = service.references(SCRIPT_A, 6, 12); // `limit`, assigned
-        ensure_equals("a field assigned: declared where it is assigned", refs.definitionFile + "@" + where(refs.definition),
-                      std::string(UTIL) + "@6:2");
+        UNSCOPED_INFO("a field assigned: declared where it is assigned");
+        CHECK(refs.definitionFile + "@" + where(refs.definition) == std::string(UTIL) + "@6:2");
         refs = service.references(SCRIPT_A, 5, 29); // `double`, a module that requires the other
-        ensure_equals("each module its own key", refs.definitionFile + "@" + where(refs.definition), std::string(SHAPES) + "@2:11");
+        UNSCOPED_INFO("each module its own key");
+        CHECK(refs.definitionFile + "@" + where(refs.definition) == std::string(SHAPES) + "@2:11");
 
         const ALScriptHover local = service.hover(SCRIPT_A, 5, 7); // `util` itself
-        ensure("a local the script binds: the script's", local.hasDefinition && local.definitionFile.empty() && local.definitionLine == 1);
+        {
+            INFO("a local the script binds: the script's");
+            CHECK(local.hasDefinition);
+            REQUIRE(local.definitionFile.empty());
+            CHECK(local.definitionLine == 1);
+        }
         const ALScriptHover say = service.hover("ll.Say(0, \"x\")\n", 0, 4);
-        ensure("what the definitions declare: nowhere to go", say.found && !say.hasDefinition);
+        {
+            INFO("what the definitions declare: nowhere to go");
+            REQUIRE(say.found);
+            CHECK_FALSE(say.hasDefinition);
+        }
         service.setDocument("");
     }
 
-    template<> template<>
-    void alluaunavigation_object::test<2>()
+    TEST_CASE_METHOD(alluaunavigation_data, "alluaunavigation: a module's exported type is found through its local and declared there", "[alluaunavigation]")
     {
-        set_test_name("a type a module exports is declared there, found through the local the module was required as; its uses in the module too");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         open("a", true);
         const ALScriptReferences refs = service.references(SCRIPT_A, 4, 15); // `Point` in `util.Point`
-        ensure("found", refs.found && refs.name == "Point");
-        ensure("a type", refs.kind == ALScriptSymbolKind::Type);
-        ensure_equals("declared in the module", refs.definitionFile + "@" + where(refs.definition), std::string(UTIL) + "@2:12");
-        ensure_equals("each place: the script's, the module's", placesOf(refs), std::string("4:14 ") + UTIL + "@2:12 " + UTIL + "@7:21");
-        ensure("renamable", refs.renamable);
+        REQUIRE(refs.found);
+        CHECK(refs.name == "Point");
+        CHECK(refs.kind == ALScriptSymbolKind::Type);
+        UNSCOPED_INFO("declared in the module");
+        CHECK(refs.definitionFile + "@" + where(refs.definition) == std::string(UTIL) + "@2:12");
+        UNSCOPED_INFO("each place: the script's, the module's");
+        CHECK(placesOf(refs) == std::string("4:14 ") + UTIL + "@2:12 " + UTIL + "@7:21");
+        CHECK(refs.renamable);
 
         // The local the module was required as is named in a type's prefix
         // too, which a rename of it renames.
         const ALScriptReferences local = service.references(SCRIPT_A, 1, 7);
-        ensure_equals("the local, the prefix among its places", placesOf(local), std::string("1:6 4:9 4:22 5:6 6:6"));
+        UNSCOPED_INFO("the local, the prefix among its places");
+        CHECK(placesOf(local) == std::string("1:6 4:9 4:22 5:6 6:6"));
         service.setDocument("");
     }
 
-    template<> template<>
-    void alluaunavigation_object::test<3>()
+    TEST_CASE_METHOD(alluaunavigation_data, "alluaunavigation: a module's field is found everywhere it stands but not another table's", "[alluaunavigation]")
     {
-        set_test_name("a module's field is found wherever it stands, in the script and every module it requires; a field of the same name on another table is left alone");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         open("a", true);
         ALScriptReferences refs = service.references(SCRIPT_A, 5, 12);
-        ensure_equals("the script's, the module's own, and the other module's", placesOf(refs),
-                      std::string("5:11 ") + UTIL + "@3:11 " + SHAPES + "@3:16");
+        UNSCOPED_INFO("the script's, the module's own, and the other module's");
+        CHECK(placesOf(refs) == std::string("5:11 ") + UTIL + "@3:11 " + SHAPES + "@3:16");
         refs = service.references(SCRIPT_A, 6, 12);
-        ensure_equals("an assigned one the same", placesOf(refs), std::string("6:11 ") + UTIL + "@6:2 " + SHAPES + "@3:32");
+        UNSCOPED_INFO("an assigned one the same");
+        CHECK(placesOf(refs) == std::string("6:11 ") + UTIL + "@6:2 " + SHAPES + "@3:32");
 
         // The script's own table's field of the same name: the script's alone.
         refs = service.references(SCRIPT_A, 5, 46);
-        ensure("found", refs.found && refs.name == "twice" && refs.definitionFile.empty());
-        ensure_equals("declared in the script's constructor", where(refs.definition), std::string("3:16"));
-        ensure_equals("and used once; none of the module's", placesOf(refs), std::string("3:16 5:45"));
+        REQUIRE(refs.found);
+        CHECK(refs.name == "twice");
+        REQUIRE(refs.definitionFile.empty());
+        UNSCOPED_INFO("declared in the script's constructor");
+        CHECK(where(refs.definition) == std::string("3:16"));
+        UNSCOPED_INFO("and used once; none of the module's");
+        CHECK(placesOf(refs) == std::string("3:16 5:45"));
 
         // Asked at the declaration in the constructor: the same.
-        ensure_equals("from the declaration", placesOf(service.references(SCRIPT_A, 3, 17)), std::string("3:16 5:45"));
+        UNSCOPED_INFO("from the declaration");
+        CHECK(placesOf(service.references(SCRIPT_A, 3, 17)) == std::string("3:16 5:45"));
         service.setDocument("");
     }
 
-    template<> template<>
-    void alluaunavigation_object::test<4>()
+    TEST_CASE_METHOD(alluaunavigation_data, "alluaunavigation: scripts sharing a module find their places and the module's from either end", "[alluaunavigation]")
     {
-        set_test_name("two scripts requiring one module: each finds its own places and the module's; and asked at the module's declaration, as a lookup through another script asks, the script's places through the require");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         open("a", true);
         const ALScriptReferences a = service.references(SCRIPT_A, 5, 12);
         open("b", false);
         const ALScriptReferences b = service.references(SCRIPT_B, 1, 12);
-        ensure_equals("the other script's: its own and the module's", placesOf(b), std::string("1:11 ") + UTIL + "@3:11");
-        ensure_equals("the same declaration", b.definitionFile + "@" + where(b.definition), a.definitionFile + "@" + where(a.definition));
+        UNSCOPED_INFO("the other script's: its own and the module's");
+        CHECK(placesOf(b) == std::string("1:11 ") + UTIL + "@3:11");
+        UNSCOPED_INFO("the same declaration");
+        CHECK(b.definitionFile + "@" + where(b.definition) == a.definitionFile + "@" + where(a.definition));
 
         // What the lookup across scripts asks of each: the script read
         // apart with its modules, as the checker reads it, asked at the
         // module's declaration in the module's own lines.
         open("lookup", false);
         const ALScriptReferences from_module = service.references(SCRIPT_B, 3, 12, UTIL); // `twice` in `function M.twice`
-        ensure("found from the module", from_module.found && from_module.name == "twice" && from_module.definitionFile == UTIL);
-        ensure_equals("the script's use, through the require, and the module's declaration", placesOf(from_module),
-                      std::string("1:11 ") + UTIL + "@3:11");
+        {
+            INFO("found from the module");
+            REQUIRE(from_module.found);
+            CHECK(from_module.name == "twice");
+            CHECK(from_module.definitionFile == UTIL);
+        }
+        UNSCOPED_INFO("the script's use, through the require, and the module's declaration");
+        CHECK(placesOf(from_module) == std::string("1:11 ") + UTIL + "@3:11");
         // A module's local is its own alone.
         const ALScriptReferences local = service.references(SCRIPT_B, 1, 6, UTIL); // `M` in `local M = {}`
-        ensure("found", local.found && local.name == "M");
-        ensure_equals("the module's places alone", placesOf(local),
-                      std::string(UTIL) + "@1:6 " + UTIL + "@3:9 " + UTIL + "@6:0 " + UTIL + "@7:9 " + UTIL + "@10:7");
+        REQUIRE(local.found);
+        CHECK(local.name == "M");
+        UNSCOPED_INFO("the module's places alone");
+        CHECK(placesOf(local) == std::string(UTIL) + "@1:6 " + UTIL + "@3:9 " + UTIL + "@6:0 " + UTIL + "@7:9 " + UTIL + "@10:7");
         service.setDocument("");
     }
 
-    template<> template<>
-    void alluaunavigation_object::test<5>()
+    TEST_CASE_METHOD(alluaunavigation_data, "alluaunavigation: hover on a type's name says it as declared and where it was declared", "[alluaunavigation]")
     {
-        set_test_name("a hover on a type's name says the type as its declaration reads, and where it was declared: a module's through its local, the script's own, a generic one, a built-in one");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         open("a", true);
         ALScriptHover hover = service.hover(SCRIPT_A, 4, 15); // `Point` in `util.Point`
-        ensure("found", hover.found);
-        ensure("the module's, by its name and fields: " + hover.label,
-               hover.label.rfind("type util.Point = ", 0) == 0 && hover.label.find("x: number") != std::string::npos);
-        ensure_equals("declared in the module", hover.definitionFile + "@" + llformat("%d:%d", hover.definitionLine, hover.definitionColumn),
-                      std::string(UTIL) + "@2:12");
+        REQUIRE(hover.found);
+        {
+            INFO("the module's, by its name and fields: " + hover.label);
+            CHECK(hover.label.rfind("type util.Point = ", 0) == 0);
+            REQUIRE(hover.label.find("x: number") != std::string::npos);
+        }
+        UNSCOPED_INFO("declared in the module");
+        CHECK(hover.definitionFile + "@" + llformat("%d:%d", hover.definitionLine, hover.definitionColumn) == std::string(UTIL) + "@2:12");
 
         const std::string own = "--!strict\n"                                   // 0
                                 "type Pair<T> = { first: T, second: T }\n"      // 1
@@ -257,45 +292,61 @@ namespace tut
                                 "local n: number = p.first\n";                  // 3
         open("own", false);
         hover = service.hover(own, 2, 10); // `Pair`
-        ensure("the script's own, generic: " + hover.label, hover.found && hover.label.rfind("type Pair<T> = ", 0) == 0 &&
-                                                             hover.label.find("first: T") != std::string::npos);
-        ensure("declared in the script", hover.hasDefinition && hover.definitionFile.empty() && hover.definitionLine == 1);
+        {
+            INFO("the script's own, generic: " + hover.label);
+            REQUIRE(hover.found);
+            CHECK(hover.label.rfind("type Pair<T> = ", 0) == 0);
+            REQUIRE(hover.label.find("first: T") != std::string::npos);
+        }
+        {
+            INFO("declared in the script");
+            CHECK(hover.hasDefinition);
+            REQUIRE(hover.definitionFile.empty());
+            CHECK(hover.definitionLine == 1);
+        }
         hover = service.hover(own, 3, 10); // `number`
-        ensure_equals("a built-in one, only itself", hover.label, std::string("type number"));
+        UNSCOPED_INFO("a built-in one, only itself");
+        CHECK(hover.label == std::string("type number"));
         hover = service.hover(own, 3, 6); // `n`, the local, as ever
-        ensure("a local still a local: " + hover.label, hover.label.rfind("local n", 0) == 0);
+        UNSCOPED_INFO("a local still a local: " + hover.label);
+        CHECK(hover.label.rfind("local n", 0) == 0);
         service.setDocument("");
     }
 
-    template<> template<>
-    void alluaunavigation_object::test<6>()
+    TEST_CASE_METHOD(alluaunavigation_data, "alluaunavigation: a field is found by a string key in brackets too with its quotes left out", "[alluaunavigation]")
     {
-        set_test_name("a field is found by a string in brackets too -- an index, a constructor's key -- each place its name alone, quotes aside, which is what a rename replaces");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         const std::string text = "--!strict\n"                                  // 0
                                  "local t = { size = 1, [\"name\"] = \"a\" }\n" // 1
                                  "t[\"size\"] = t.size + 1\n"                   // 2
                                  "print(t.name, t[\"name\"], t['size'])\n";     // 3
         open("keys", false);
         ALScriptReferences refs = service.references(text, 2, 4); // `size` in `t["size"]`
-        ensure("found", refs.found && refs.name == "size");
-        ensure_equals("each place: the record's key, the strings' insides, the name", placesOf(refs), std::string("1:12 2:3 2:14 3:28"));
-        ensure_equals("declared by the record", where(refs.definition), std::string("1:12"));
-        ensure("renamable", refs.hasDefinition && refs.renamable);
+        REQUIRE(refs.found);
+        CHECK(refs.name == "size");
+        UNSCOPED_INFO("each place: the record's key, the strings' insides, the name");
+        CHECK(placesOf(refs) == std::string("1:12 2:3 2:14 3:28"));
+        UNSCOPED_INFO("declared by the record");
+        CHECK(where(refs.definition) == std::string("1:12"));
+        CHECK(refs.hasDefinition);
+        CHECK(refs.renamable);
 
         refs = service.references(text, 3, 9); // `name` in `t.name`
-        ensure_equals("a key in brackets declares it", placesOf(refs), std::string("1:24 3:8 3:17"));
-        ensure_equals("there, inside its quotes", where(refs.definition), std::string("1:24"));
-        ensure("renamable", refs.renamable);
-        ensure_equals("asked at that key: the same", placesOf(service.references(text, 1, 25)), std::string("1:24 3:8 3:17"));
+        UNSCOPED_INFO("a key in brackets declares it");
+        CHECK(placesOf(refs) == std::string("1:24 3:8 3:17"));
+        UNSCOPED_INFO("there, inside its quotes");
+        CHECK(where(refs.definition) == std::string("1:24"));
+        CHECK(refs.renamable);
+        UNSCOPED_INFO("asked at that key: the same");
+        CHECK(placesOf(service.references(text, 1, 25)) == std::string("1:24 3:8 3:17"));
         service.setDocument("");
     }
 
-    template<> template<>
-    void alluaunavigation_object::test<7>()
+    TEST_CASE_METHOD(alluaunavigation_data, "alluaunavigation: a method is its class's through __index; a function __index stops a rename", "[alluaunavigation]")
     {
-        set_test_name("an object's method is its class's, through its metatable's __index, whichever end it is asked at; one reached some way not followed leaves the field not to rename");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         const std::string account = "--!strict\n"                                    // 0
                                     "local Account = {}\n"                           // 1
                                     "Account.__index = Account\n"                    // 2
@@ -309,12 +360,17 @@ namespace tut
                                     "print(a:deposit(5))\n";                         // 10
         open("account", false);
         ALScriptReferences refs = service.references(account, 6, 18); // `deposit` in `function Account:deposit`
-        ensure("found", refs.found && refs.name == "deposit");
-        ensure_equals("the declaration and the object's call", placesOf(refs), std::string("6:17 10:8"));
-        ensure("renamable", refs.hasDefinition && refs.renamable);
+        REQUIRE(refs.found);
+        CHECK(refs.name == "deposit");
+        UNSCOPED_INFO("the declaration and the object's call");
+        CHECK(placesOf(refs) == std::string("6:17 10:8"));
+        CHECK(refs.hasDefinition);
+        CHECK(refs.renamable);
         refs = service.references(account, 10, 9); // `deposit` in `a:deposit(5)`
-        ensure_equals("from the call: the same", placesOf(refs), std::string("6:17 10:8"));
-        ensure_equals("declared in the class", where(refs.definition), std::string("6:17"));
+        UNSCOPED_INFO("from the call: the same");
+        CHECK(placesOf(refs) == std::string("6:17 10:8"));
+        UNSCOPED_INFO("declared in the class");
+        CHECK(where(refs.definition) == std::string("6:17"));
 
         const std::string proxy = "--!strict\n"                                                             // 0
                                   "local Base = {}\n"                                                       // 1
@@ -325,8 +381,43 @@ namespace tut
                                   "print(Base.greet(), o.greet)\n";                                         // 6
         open("proxy", false);
         refs = service.references(proxy, 2, 15); // `greet` in `function Base.greet`
-        ensure("found, and declared", refs.found && refs.hasDefinition);
-        ensure("an object's field of the name, its __index a function: not to rename", !refs.renamable);
+        REQUIRE(refs.found);
+        CHECK(refs.hasDefinition);
+        UNSCOPED_INFO("an object's field of the name, its __index a function: not to rename");
+        CHECK_FALSE(refs.renamable);
+        service.setDocument("");
+    }
+
+    TEST_CASE_METHOD(alluaunavigation_data, "alluaunavigation: a forward-declared local function is defined where its function is", "[alluaunavigation]")
+    {
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
+        const std::string text = "local count, f, g\n"                  // 0
+                                 "local function h() return f() end\n" // 1
+                                 "function f() return 1 end\n"         // 2
+                                 "g = function() return 2 end\n"       // 3
+                                 "count = 0\n"                         // 4
+                                 "print(h(), g(), count)\n";           // 5
+        open("forward", false);
+        ALScriptReferences refs = service.references(text, 1, 26); // `f` in `return f()`
+        REQUIRE(refs.found);
+        CHECK(refs.name == "f");
+        UNSCOPED_INFO("Tapple's: at `function f`, not `local f`");
+        CHECK(where(refs.definition) == std::string("2:9"));
+        CHECK(refs.hasDefinition);
+        CHECK(refs.kind == ALScriptSymbolKind::Function);
+        UNSCOPED_INFO("every place, the declaration among them");
+        CHECK(placesOf(refs) == std::string("0:13 1:26 2:9"));
+
+        refs = service.references(text, 5, 11); // `g` in `g()`
+        UNSCOPED_INFO("given a function by an assignment: there");
+        CHECK(where(refs.definition) == std::string("3:0"));
+        CHECK(refs.kind == ALScriptSymbolKind::Function);
+
+        refs = service.references(text, 5, 16); // `count`
+        UNSCOPED_INFO("given a number: where it is declared");
+        CHECK(where(refs.definition) == std::string("0:6"));
+        CHECK(refs.kind == ALScriptSymbolKind::Variable);
         service.setDocument("");
     }
 }

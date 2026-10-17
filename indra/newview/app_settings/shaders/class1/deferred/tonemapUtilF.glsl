@@ -53,7 +53,6 @@
 
 uniform sampler2D exposureMap;
 uniform vec2 screen_res;
-in vec2 vary_fragcoord;
 
 //===============================================================
 // tone mapping taken from Khronos sample implementation
@@ -375,11 +374,13 @@ vec3 applyToneMap(vec3 color)
 
 //===============================================================
 
-void debugExposure(inout vec3 color)
+// The caller passes its screen coordinate: an input declared in this shared object would be one every program
+// attaching it has to write, and Mesa refuses to link one that does not, called or not.
+void debugExposure(inout vec3 color, vec2 tc)
 {
     float exp_scale = texture(exposureMap, vec2(0.5,0.5)).r;
     exp_scale *= 0.5;
-    if (abs(vary_fragcoord.y-exp_scale) < 0.01 && vary_fragcoord.x < 0.1)
+    if (abs(tc.y-exp_scale) < 0.01 && tc.x < 0.1)
     {
         color = vec3(1,0,0);
     }

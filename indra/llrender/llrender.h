@@ -43,6 +43,9 @@
 #include "llglheaders.h"
 #include "llmatrix4a.h"
 #include "alsamplerstate.h"  // mSamplerCache -- this context's sampler objects
+#include "algpubuffer.h"     // AL_NUM_STORAGE_BINDINGS -- the storage binding points this context keeps
+#include "alimageslot.h"
+#include "alquerypool.h"
 #include "altextureslot.h"
 #include "aluniformbuffer.h"
 
@@ -59,6 +62,8 @@ class LLImageGL;
 class LLRenderTarget;
 class LLTexture;
 class LLVertexBufferData;
+
+namespace ll_test { struct RenderProbe; }
 
 #define LL_MATRIX_STACK_DEPTH 32
 
@@ -216,6 +221,28 @@ public:
         MM_PROJECTION,
         MM_TEXTURE0,
         NUM_MATRIX_MODES
+    };
+
+    // Memory barrier bits, GL's own values, so a caller states exactly which later reads must see
+    // earlier shader writes.
+    enum eBarrier : U32
+    {
+        BARRIER_VERTEX_ATTRIB      = GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT,
+        BARRIER_ELEMENT_ARRAY      = GL_ELEMENT_ARRAY_BARRIER_BIT,
+        BARRIER_UNIFORM            = GL_UNIFORM_BARRIER_BIT,
+        BARRIER_TEXTURE_FETCH      = GL_TEXTURE_FETCH_BARRIER_BIT,
+        BARRIER_IMAGE              = GL_SHADER_IMAGE_ACCESS_BARRIER_BIT,
+        BARRIER_COMMAND            = GL_COMMAND_BARRIER_BIT,
+        BARRIER_PIXEL_BUFFER       = GL_PIXEL_BUFFER_BARRIER_BIT,
+        BARRIER_TEXTURE_UPDATE     = GL_TEXTURE_UPDATE_BARRIER_BIT,
+        BARRIER_BUFFER_UPDATE      = GL_BUFFER_UPDATE_BARRIER_BIT,
+        BARRIER_FRAMEBUFFER        = GL_FRAMEBUFFER_BARRIER_BIT,
+        BARRIER_TRANSFORM_FEEDBACK = GL_TRANSFORM_FEEDBACK_BARRIER_BIT,
+        BARRIER_ATOMIC_COUNTER     = GL_ATOMIC_COUNTER_BARRIER_BIT,
+        BARRIER_STORAGE            = GL_SHADER_STORAGE_BARRIER_BIT,
+        BARRIER_CLIENT_MAPPED      = GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT,
+        BARRIER_QUERY_BUFFER       = GL_QUERY_BUFFER_BARRIER_BIT,
+        BARRIER_ALL                = GL_ALL_BARRIER_BITS,
     };
 
     LLRender();
@@ -381,13 +408,94 @@ public:
     // Redundant sets are dropped without a flush.
     void setPatchVertices(U32 count);
 
+    // The colour glClear fills colour buffers with. Every writer in the tree goes through
+    // here, so the cache is the state. Redundant sets are dropped; nothing batched reads it,
+    // so a change needs no flush.
+    void setClearColor(const LLColor4& color);
+    const LLColor4& getClearColor() const { return mClearColor; }
+
+    // Clears the bound framebuffer's buffers named in mask (GL_COLOR_BUFFER_BIT and the rest)
+    // through the write masks, scissor box and clear values in force, after what is batched
+    // has been drawn.
+    void clear(U32 mask);
+
+    // Draws `instances` copies of `count` vertices from `first` with no vertex arrays: the bound program builds every
+    // position from gl_VertexID and gl_InstanceID and declares no inputs, so binding it enabled none. What is batched
+    // is drawn first, and the matrices are synced as LLVertexBuffer's draws sync them.
+    void drawArraysInstanced(eGeomModes mode, U32 first, U32 count, U32 instances);
+
+    // Draws from the ALDrawArraysIndirectCommand at `offset` in `buffer` (a multiple of 4), with no vertex arrays, as
+    // drawArraysInstanced does: the command's count and instances are whatever wrote them, the GPU's own compaction
+    // most often. GL 4.0, so it needs no compute -- but a command a shader wrote is read only past BARRIER_COMMAND.
+    void drawArraysIndirect(eGeomModes mode, const ALGPUBuffer& buffer, size_t offset);
+
+    // ---- Compute ---------------------------------------------------------------------------------------------------
+    // Everything here needs sCompute and asserts it.
+
+    // Make later reads of the kinds in `barriers` (eBarrier bits, or-ed) see what shaders wrote before it -- storage
+    // buffers, images and atomics are not ordered against anything else. What is batched is drawn first.
+    void memoryBarrier(U32 barriers);
+
+    // Runs the bound compute program over groups_x * groups_y * groups_z work groups. What is batched is drawn first
+    // and the matrices are synced, as for a draw. Zero groups dispatch nothing, and a count past the context's limit
+    // warns once and dispatches nothing. LLGLSLShader::dispatch and dispatchThreads are the usual way here.
+    void dispatchCompute(U32 groups_x, U32 groups_y, U32 groups_z);
+
+    // As dispatchCompute, the group counts read from the ALDispatchIndirectCommand at `offset` in `buffer` (a multiple
+    // of 4) -- written on the GPU, so a pass sizes the next without a read back. A command a shader wrote is read only
+    // past BARRIER_COMMAND.
+    void dispatchComputeIndirect(const ALGPUBuffer& buffer, size_t offset);
+
+    // Attach `buffer`, whole or [offset, offset + bytes), to shader storage binding point `binding`, below
+    // AL_NUM_STORAGE_BINDINGS. The points are kept as the texture and image units are: a bind of what a point holds
+    // issues nothing, refreshState re-issues them, and deleting a buffer forgets it. A reserved block's point is the
+    // same in every program (LLShaderMgr::getStorageBlockBinding), so a buffer bound there serves each in turn.
+    // `offset` is a multiple of gGLManager.mShaderStorageBufferOffsetAlignment (asserted).
+    void bindStorageBuffer(U32 binding, const ALGPUBuffer& buffer);
+    void bindStorageBuffer(U32 binding, const ALGPUBuffer& buffer, size_t offset, size_t bytes);
+    // Leave nothing at `binding`.
+    void unbindStorageBuffer(U32 binding);
+    // The buffer at `binding`, 0 for none or for a point past AL_NUM_STORAGE_BINDINGS.
+    U32 getStorageBuffer(U32 binding) const;
+
+    // ---- Frames ----------------------------------------------------------------------------------------------------
+
+    // This context's queries: the viewer's display() retires them before its first cull reads them. Released with the
+    // context in shutdown().
+    ALQueryPool& queries() { return mQueries; }
+
+    // Ends the frame for what is kept a frame at a time: the query pool's batch is fenced, and the uniform buffer rings
+    // close their counters and resize. Once a frame, past the swap; the main context's only.
+    void endFrame();
+
+    // The scissor box, in pixels of the bound framebuffer, that GL_SCISSOR_TEST (an
+    // LLGLState) cuts to. Every writer goes through here; a change flushes what is batched
+    // under the old box, and redundant sets are dropped without one. See LLGLSScissor.
+    void setScissor(S32 x, S32 y, S32 width, S32 height);
+    // The box in force: x, y, width, height. Width is negative until a box is set in this
+    // context, which GL starts at the size of the window it was made for.
+    void getScissor(S32 (&box)[4]) const
+    {
+        box[0] = mScissor[0];
+        box[1] = mScissor[1];
+        box[2] = mScissor[2];
+        box[3] = mScissor[3];
+    }
+
     ALTextureSlot* getTextureSlot(U32 index);
 
+    // The image unit `index`, or a slot that binds nothing past AL_NUM_IMAGE_SLOTS.
+    ALImageSlot* getImageSlot(U32 index);
+
     // Drop these texture names, about to be deleted in this context, from every slot's
-    // bind cache. Deleting a bound texture returns that binding to 0, and GL may hand the
+    // bind cache, the image slots' included. Deleting a bound texture returns that binding to 0, and GL may hand the
     // name out again; a slot still caching it would take the new texture for bound already
     // and skip the bind.
     void forgetTextures(S32 count, const U32* names);
+
+    // The same for a buffer name about to be deleted, which the indirect draw and dispatch bindings and the storage
+    // binding points cache. ALGPUBuffer::release calls it.
+    void forgetBuffer(U32 name);
 
     U32 getCurrentTexUnitIndex(void) const { return mCurrTextureUnitIndex; }
 
@@ -442,6 +550,10 @@ public:
 public:
     static U32 sUICalls;
     static U32 sUIVerts;
+    // The draws issued, through LLVertexBuffer and LLRender's own, and the vertices or indices they took, since the
+    // frame's statistics were last reset (LLPipeline::resetFrameStats).
+    static U32 sDrawCalls;
+    static U64 sDrawElements;
     static F32 sAnisotropicFilteringLevel;
     static bool sGLCoreProfile;
     static bool sNsightDebugSupport;
@@ -455,6 +567,12 @@ public:
     // llrender cannot read settings, so newview owns the decision and writes it here.
     static bool sReverseZ;
 
+    // Compute is in use this session: the context has it (gGLManager.mHasCompute), GLSL is 4.30 after
+    // whatever fallback the feature manager applied, and the user has not turned it off. Latched by newview
+    // at shader load (llrender cannot read settings), as sReverseZ is. Everything compute in LLRender,
+    // ALImageSlot and ALGPUBuffer's storage binds asserts it.
+    static bool sCompute;
+
     // The GBuffer normal attachment is GL_RGBA16 when the deferred targets are HDR and
     // GL_RGB10_A2 when they are not, which changes how many bits its blue channel has to spend
     // on the packed geometric normal -- 16 versus 10. Latched by addDeferredAttachments from the
@@ -464,6 +582,8 @@ public:
 
 private:
     friend class LLLightState;
+    // The tests' state guard reads how deep each matrix stack is.
+    friend struct ll_test::RenderProbe;
 
     LLVertexBuffer* bufferfromCache(U32 attribute_mask, U32 count);
     LLVertexBuffer* genBuffer(U32 attribute_mask, S32 count);
@@ -497,6 +617,8 @@ private:
     U32             mMatricesUBOHash[NUM_MATRIX_MODES] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
     bool            mMatricesUBOBound = false;
 
+    ALQueryPool mQueries;
+
     // Derived matrices, cached across epochs so a stack that did not move is not re-derived.
     // Members rather than function statics: they belong to this context, and shutdown() has to
     // be able to invalidate them along with the block.
@@ -514,6 +636,8 @@ private:
     F32             mPolygonOffsetFactor = 0.f;
     F32             mPolygonOffsetUnits = 0.f;
     U32             mPatchVertices = 3; // GL's initial GL_PATCH_VERTICES
+    LLColor4        mClearColor = LLColor4(0.f, 0.f, 0.f, 0.f); // GL's initial GL_COLOR_CLEAR_VALUE
+    S32             mScissor[4] = { 0, 0, -1, -1 };              // unknown until set (see getScissor)
 
     LLPointer<LLVertexBuffer>   mBuffer;
     LLStrider<LLVector4a>       mVerticesp;
@@ -526,7 +650,29 @@ private:
     // torn down together and by the same thread.
     ALSamplerCache mSamplerCache;
     ALTextureSlot           mDummySlot;
+    std::array<ALImageSlot, AL_NUM_IMAGE_SLOTS> mImageSlots;
+    ALImageSlot             mDummyImageSlot;
     std::array<LLLightState, LL_NUM_LIGHT_UNITS> mLightState;
+
+    // The buffers bound at GL_DRAW_INDIRECT_BUFFER and GL_DISPATCH_INDIRECT_BUFFER, so a run of draws or dispatches
+    // from one buffer binds it once. UNKNOWN_BUFFER after refreshState: the next use binds whatever it wants.
+    static constexpr U32 UNKNOWN_BUFFER = 0xFFFFFFFFu;
+    U32 mDrawIndirectBuffer     = 0;
+    U32 mDispatchIndirectBuffer = 0;
+    // Bind `name` at `target`, which `bound` caches, unless it is there already.
+    static void bindIndirectBuffer(U32 target, U32& bound, U32 name);
+
+    // What each shader storage binding point holds: a buffer, and the range of it bound, mBytes 0 for the whole.
+    struct StorageBinding
+    {
+        U32    mName   = 0;
+        size_t mOffset = 0;
+        size_t mBytes  = 0;
+    };
+    std::array<StorageBinding, AL_NUM_STORAGE_BINDINGS> mStorageBindings;
+    void setStorageBinding(U32 binding, const StorageBinding& wanted);
+    // Issue what `binding` holds to GL.
+    void issueStorageBinding(U32 binding) const;
 
     eBlendFactor mCurrBlendColorSFactor;
     eBlendFactor mCurrBlendColorDFactor;

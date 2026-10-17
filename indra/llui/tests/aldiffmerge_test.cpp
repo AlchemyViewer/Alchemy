@@ -31,13 +31,13 @@
 #include "aldiffsplice.h"
 #include "alsyntaxgrammar.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <memory>
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct aldiffmerge_data
     {
@@ -91,10 +91,11 @@ namespace tut
         std::vector<size_t> inOurs(S32 first, S32 count) const { return merge->conflictsIn(0, 0, first, count); }
         // The one conflict a line of ours is in settled: ours as it is
         // made, the base as it is left.
-        void settle(S32 line, ALTextMerge::Take take)
+        void require_settled(S32 line, ALTextMerge::Take take)
         {
             const std::optional<ALDiffMerge::Settling> settling = merge->settle(inOurs(line, 1), take);
-            ensure("settled", settling.has_value());
+            INFO("the conflict at line " << line << " of ours settles");
+            REQUIRE(settling.has_value());
             merge->settled(*settling);
             if (settling->edits)
             {
@@ -103,198 +104,256 @@ namespace tut
         }
     };
 
-    typedef test_group<aldiffmerge_data> aldiffmerge_group;
-    typedef aldiffmerge_group::object    aldiffmerge_object;
-    tut::aldiffmerge_group               aldiffmerge_test("aldiffmerge");
-
-    template<> template<>
-    void aldiffmerge_object::test<1>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: replaceLines puts lines in place of others at either end or between", "[aldiffmerge]")
     {
-        set_test_name("lines put in place of others: changed, taken out, put in, at the start, the middle and the end");
-        ensure_equals("changed", replaced("a\nb\nc", 1, 1, { "B", "B2" }), std::string("a\nB\nB2\nc"));
-        ensure_equals("taken out, with the break after", replaced("a\nb\nc", 1, 1, {}), std::string("a\nc"));
-        ensure_equals("taken out at the end, with the break before", replaced("a\nb\nc", 1, 2, {}), std::string("a"));
-        ensure_equals("all taken out", replaced("a\nb", 0, 2, {}), std::string());
-        ensure_equals("put in before a line", replaced("a\nc", 1, 0, { "b" }), std::string("a\nb\nc"));
-        ensure_equals("put in at the start", replaced("b\nc", 0, 0, { "a" }), std::string("a\nb\nc"));
-        ensure_equals("put in after the last", replaced("a\nb", 2, 0, { "c", "d" }), std::string("a\nb\nc\nd"));
-        ensure_equals("nothing out, nothing in", replaced("a\nb", 1, 0, {}), std::string("none"));
+        UNSCOPED_INFO("changed");
+        CHECK(replaced("a\nb\nc", 1, 1, { "B", "B2" }) == std::string("a\nB\nB2\nc"));
+        UNSCOPED_INFO("taken out, with the break after");
+        CHECK(replaced("a\nb\nc", 1, 1, {}) == std::string("a\nc"));
+        UNSCOPED_INFO("taken out at the end, with the break before");
+        CHECK(replaced("a\nb\nc", 1, 2, {}) == std::string("a"));
+        UNSCOPED_INFO("all taken out");
+        CHECK(replaced("a\nb", 0, 2, {}) == std::string());
+        UNSCOPED_INFO("put in before a line");
+        CHECK(replaced("a\nc", 1, 0, { "b" }) == std::string("a\nb\nc"));
+        UNSCOPED_INFO("put in at the start");
+        CHECK(replaced("b\nc", 0, 0, { "a" }) == std::string("a\nb\nc"));
+        UNSCOPED_INFO("put in after the last");
+        CHECK(replaced("a\nb", 2, 0, { "c", "d" }) == std::string("a\nb\nc\nd"));
+        UNSCOPED_INFO("nothing out, nothing in");
+        CHECK(replaced("a\nb", 1, 0, {}) == std::string("none"));
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<2>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: start takes each side's own changes and ours where both changed", "[aldiffmerge]")
     {
-        set_test_name("a merge begun: what only theirs changed put in, what only ours changed kept, and ours where both changed");
         const std::string b = "alpha\nbeta\ngamma\ndelta\nepsilon\nzeta\neta";
         const std::string o = "alpha\nbeta\ngamma mine\ndelta\nepsilon\nzeta\neta mine";
         const std::string t = "alpha theirs\nbeta\ngamma\ndelta\nepsilon\nzeta\neta theirs";
-        ensure_equals("merged", ALDiffMerge::start(b, o, t), std::string("alpha theirs\nbeta\ngamma mine\ndelta\nepsilon\nzeta\neta mine"));
-        ensure_equals("nothing of theirs, ours", ALDiffMerge::start(b, o, b), o);
-        ensure_equals("nothing of ours, theirs", ALDiffMerge::start(b, b, t), t);
+        CHECK(ALDiffMerge::start(b, o, t) == std::string("alpha theirs\nbeta\ngamma mine\ndelta\nepsilon\nzeta\neta mine"));
+        UNSCOPED_INFO("nothing of theirs, ours");
+        CHECK(ALDiffMerge::start(b, o, b) == o);
+        UNSCOPED_INFO("nothing of ours, theirs");
+        CHECK(ALDiffMerge::start(b, b, t) == t);
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<3>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: conflicts are found by either side's line and again as ours changes", "[aldiffmerge]")
     {
-        set_test_name("conflicts found where both changed otherwise, by a line of theirs or of ours in one; found again as ours changes");
         const std::string b = "alpha\nbeta\ngamma\ndelta\nepsilon\nzeta\neta";
         const std::string t = "alpha theirs\nbeta\ngamma\ndelta\nepsilon\nzeta\neta theirs";
         begin(b, ALDiffMerge::start(b, "alpha\nbeta\ngamma mine\ndelta\nepsilon\nzeta\neta mine", t), t);
-        ensure_equals("one", merge->conflictCount(), 1);
-        ensure_equals("by ours's line", inOurs(6, 1).size(), 1U);
-        ensure_equals("by theirs's line", merge->conflictsIn(6, 1, 0, 0).size(), 1U);
-        ensure("not by a line of ours's own change", inOurs(2, 1).empty());
-        ensure("nor by theirs taken", inOurs(0, 1).empty());
-        ensure("nor by a stretch of nothing", merge->conflictsIn(6, 0, 6, 0).empty());
+        CHECK(merge->conflictCount() == 1);
+        UNSCOPED_INFO("by ours's line");
+        CHECK(inOurs(6, 1).size() == 1U);
+        UNSCOPED_INFO("by theirs's line");
+        CHECK(merge->conflictsIn(6, 1, 0, 0).size() == 1U);
+        UNSCOPED_INFO("not by a line of ours's own change");
+        CHECK(inOurs(2, 1).empty());
+        UNSCOPED_INFO("nor by theirs taken");
+        CHECK(inOurs(0, 1).empty());
+        UNSCOPED_INFO("nor by a stretch of nothing");
+        CHECK(merge->conflictsIn(6, 0, 6, 0).empty());
 
         // Ours made theirs there by hand: no conflict.
         becomes("alpha theirs\nbeta\ngamma mine\ndelta\nepsilon\nzeta\neta theirs");
-        ensure_equals("settled by hand", merge->conflictCount(), 0);
+        UNSCOPED_INFO("settled by hand");
+        CHECK(merge->conflictCount() == 0);
         // And something else changed by both: another.
         becomes("alpha theirs\nbeta\ngamma mine\ndelta\nepsilon\nzeta\neta mine again");
-        ensure_equals("again", merge->conflictCount(), 1);
+        UNSCOPED_INFO("again");
+        CHECK(merge->conflictCount() == 1);
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<4>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: a conflict settled any way leaves none however ours is edited after", "[aldiffmerge]")
     {
-        set_test_name("a conflict settled as theirs, as ours, or ours then theirs: ours edited, and no conflict left however ours is edited after");
         const std::string b = "one\ntwo\nthree";
         const std::string o = "one\ntwo mine\nthree";
         const std::string t = "one\ntwo theirs\nthree";
 
         begin(b, o, t);
-        ensure_equals("a conflict", merge->conflictCount(), 1);
-        settle(1, ALTextMerge::Take::Theirs);
-        ensure_equals("theirs", ours, t);
-        ensure_equals("settled", merge->conflictCount(), 0);
+        CHECK(merge->conflictCount() == 1);
+        require_settled(1, ALTextMerge::Take::Theirs);
+        UNSCOPED_INFO("theirs");
+        CHECK(ours == t);
+        CHECK(merge->conflictCount() == 0);
 
         begin(b, o, t);
         const std::optional<ALDiffMerge::Settling> kept = merge->settle(inOurs(1, 1), ALTextMerge::Take::Ours);
-        ensure("ours: no edit", kept && !kept->edits);
-        ensure("kept as it was and as it will be, ours both",
-               kept->settled.size() == 1 && joined(kept->settled[0].before) == "two mine" && joined(kept->settled[0].after) == "two mine");
+        {
+            INFO("ours: no edit");
+            REQUIRE(kept);
+            CHECK_FALSE(kept->edits);
+        }
+        {
+            INFO("kept as it was and as it will be, ours both");
+            REQUIRE(kept->settled.size() == 1);
+            CHECK(joined(kept->settled[0].before) == "two mine");
+            CHECK(joined(kept->settled[0].after) == "two mine");
+        }
         merge->settled(*kept);
-        ensure_equals("settled", merge->conflictCount(), 0);
+        CHECK(merge->conflictCount() == 0);
         becomes("one\ntwo mine, and more\nthree");
-        ensure_equals("ours's own change, edited", merge->conflictCount(), 0);
+        UNSCOPED_INFO("ours's own change, edited");
+        CHECK(merge->conflictCount() == 0);
 
         begin(b, o, t);
-        settle(1, ALTextMerge::Take::OursThenTheirs);
-        ensure_equals("both", ours, std::string("one\ntwo mine\ntwo theirs\nthree"));
-        ensure_equals("settled", merge->conflictCount(), 0);
+        require_settled(1, ALTextMerge::Take::OursThenTheirs);
+        UNSCOPED_INFO("both");
+        CHECK(ours == std::string("one\ntwo mine\ntwo theirs\nthree"));
+        CHECK(merge->conflictCount() == 0);
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<5>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: two settled together keep the lines between and none settles nothing", "[aldiffmerge]")
     {
-        set_test_name("conflicts settled together keep the lines between them; one that is none is not settled");
         const std::string b = "a\nb\nc\nd\ne";
         const std::string o = "a mine\nb\nc\nd\ne mine";
         const std::string t = "a theirs\nb\nc\nd\ne theirs";
         begin(b, o, t);
-        ensure_equals("two", merge->conflictCount(), 2);
+        CHECK(merge->conflictCount() == 2);
         const std::vector<size_t> both = inOurs(0, 5);
-        ensure_equals("both by a stretch over them", both.size(), 2U);
+        UNSCOPED_INFO("both by a stretch over them");
+        REQUIRE(both.size() == 2U);
         const std::optional<ALDiffMerge::Settling> settling = merge->settle(both, ALTextMerge::Take::Theirs);
-        ensure("an edit", settling && settling->edits);
-        ensure_equals("each theirs, the lines between kept", settling->made, t);
+        {
+            INFO("an edit");
+            REQUIRE(settling);
+            CHECK(settling->edits);
+        }
+        UNSCOPED_INFO("each theirs, the lines between kept");
+        CHECK(settling->made == t);
         merge->settled(*settling);
         becomes(settling->made);
-        ensure_equals("none left", merge->conflictCount(), 0);
-        ensure("nothing to settle", !merge->settle({ 0 }, ALTextMerge::Take::Theirs));
-        ensure("nor past the hunks", !merge->settle({ 99 }, ALTextMerge::Take::Theirs));
+        CHECK(merge->conflictCount() == 0);
+        UNSCOPED_INFO("nothing to settle");
+        CHECK_FALSE(merge->settle({ 0 }, ALTextMerge::Take::Theirs));
+        UNSCOPED_INFO("nor past the hunks");
+        CHECK_FALSE(merge->settle({ 99 }, ALTextMerge::Take::Theirs));
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<6>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: with blanks let go of a change of blanks alone is no conflict", "[aldiffmerge]")
     {
-        set_test_name("lines told the same as the comparison tells them: blanks let go of, a change of blanks alone is both's, not a conflict");
         const std::string b = "x = 1;\ny = 2;";
         const std::string o = "x = 1;\ny  =  3;";
         const std::string t = "x = 1;\ny = 3;";
         begin(b, o, t);
-        ensure_equals("as they are, a conflict", merge->conflictCount(), 1);
+        UNSCOPED_INFO("as they are, a conflict");
+        CHECK(merge->conflictCount() == 1);
         ALTextDiff::Options loose;
         loose.like.ignoreWhitespace = true;
         merge->setOptions(loose);
-        ensure_equals("blanks let go of, none", merge->conflictCount(), 0);
+        UNSCOPED_INFO("blanks let go of, none");
+        CHECK(merge->conflictCount() == 0);
         // By structure is by lines, here.
         loose.algorithm = ALTextDiff::Algorithm::Structural;
         merge->setOptions(loose);
-        ensure_equals("still none", merge->conflictCount(), 0);
+        UNSCOPED_INFO("still none");
+        CHECK(merge->conflictCount() == 0);
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<7>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: becoming edits between the edges in LF and options find theirs again", "[aldiffmerge]")
     {
-        set_test_name("the edit that makes one text another, between their edges, made with LF whatever the text's line ends; theirs's changes found again with the options");
         const lines_t was = ALTextDiff::split("a\nb\nc");
         ALTextRange   range;
         std::string   put;
         std::string   made;
-        ensure("lines put in between", ALDiffEdit::becoming(was, ALTextDiff::split("a\nx\ny\nc"), range, put, made));
-        ensure("in place of the line between", range == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 1)) && put == "x\ny" && made == "a\nx\ny\nc");
-        ensure("the same: nothing", !ALDiffEdit::becoming(was, ALTextDiff::split("a\nb\nc"), range, put, made));
+        UNSCOPED_INFO("lines put in between");
+        REQUIRE(ALDiffEdit::becoming(was, ALTextDiff::split("a\nx\ny\nc"), range, put, made));
+        {
+            INFO("in place of the line between");
+            CHECK(range == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 1)));
+            CHECK(put == "x\ny");
+            CHECK(made == "a\nx\ny\nc");
+        }
+        UNSCOPED_INFO("the same: nothing");
+        CHECK_FALSE(ALDiffEdit::becoming(was, ALTextDiff::split("a\nb\nc"), range, put, made));
         const ALDiffEdit::Edges self = ALDiffEdit::edgesOf(was, was);
         const ALDiffEdit::Edges copy = ALDiffEdit::edgesOf(was, lines_t(was));
-        ensure("a text with itself as with its copy", self.head == 3 && self.tail == 0 && copy.head == 3 && copy.tail == 0);
+        {
+            INFO("a text with itself as with its copy");
+            CHECK(self.head == 3);
+            CHECK(self.tail == 0);
+            CHECK(copy.head == 3);
+            CHECK(copy.tail == 0);
+        }
         const ALDiffEdit::Edges ends = ALDiffEdit::edgesOf(ALTextDiff::split("a\nb\nc\nd"), ALTextDiff::split("a\nx\nd"));
-        ensure("the lines shared at either end", ends.head == 1 && ends.tail == 1);
-        ensure_equals("lines a CR ends: LF made", replaced("a\r\nb\rc", 1, 1, { "x" }), std::string("a\nx\nc"));
+        {
+            INFO("the lines shared at either end");
+            CHECK(ends.head == 1);
+            CHECK(ends.tail == 1);
+        }
+        UNSCOPED_INFO("lines a CR ends: LF made");
+        CHECK(replaced("a\r\nb\rc", 1, 1, { "x" }) == std::string("a\nx\nc"));
 
         // Theirs changed only blanks, ours the line: a conflict as they are,
         // none with blanks let go of -- theirs's change found again.
         begin("y = 2;", "y = 5;", "y  =  2;");
-        ensure_equals("as they are, a conflict", merge->conflictCount(), 1);
+        UNSCOPED_INFO("as they are, a conflict");
+        CHECK(merge->conflictCount() == 1);
         ALTextDiff::Options loose;
         loose.like.ignoreWhitespace = true;
         merge->setOptions(loose);
-        ensure_equals("theirs no change: none", merge->conflictCount(), 0);
+        UNSCOPED_INFO("theirs no change: none");
+        CHECK(merge->conflictCount() == 0);
 
         // Each side reworded the comment on a line: a conflict as they are,
         // none with comments let go of -- the merge reads where they are by
         // the grammar, as a compare does.
         std::string                                  error;
         const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
-        ensure("the LSL grammar", lsl != nullptr);
+        UNSCOPED_INFO("the LSL grammar");
+        REQUIRE(lsl != nullptr);
         begin("x = 1; // one", "x = 1; // uno", "x = 1; // eins");
-        ensure_equals("comments as they are, a conflict", merge->conflictCount(), 1);
+        UNSCOPED_INFO("comments as they are, a conflict");
+        CHECK(merge->conflictCount() == 1);
         ALTextDiff::Options commented;
         commented.like.ignoreComments = true;
         commented.lexer               = ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl));
         merge->setOptions(commented);
-        ensure_equals("comments let go of: none", merge->conflictCount(), 0);
-        ensure("and no change by either", merge->hunks().size() == 1 && merge->hunks()[0].kind == ALTextMerge::Kind::Same);
+        UNSCOPED_INFO("comments let go of: none");
+        CHECK(merge->conflictCount() == 0);
+        {
+            INFO("and no change by either");
+            REQUIRE(merge->hunks().size() == 1);
+            CHECK(merge->hunks()[0].kind == ALTextMerge::Kind::Same);
+        }
         // The same change of the code by both, each with a comment of its
         // own: alike, but for the comments.
         begin("x = 1; // one", "x = 2; // uno", "x = 2; // eins", commented);
-        ensure_equals("alike but for comments: no conflict", merge->conflictCount(), 0);
-        ensure("both took the one change", merge->hunks().size() == 1 && merge->hunks()[0].kind == ALTextMerge::Kind::Both);
+        UNSCOPED_INFO("alike but for comments: no conflict");
+        CHECK(merge->conflictCount() == 0);
+        {
+            INFO("both took the one change");
+            REQUIRE(merge->hunks().size() == 1);
+            CHECK(merge->hunks()[0].kind == ALTextMerge::Kind::Both);
+        }
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<8>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: a settling undone is a conflict again and redone is settled again", "[aldiffmerge]")
     {
-        set_test_name("a settling undone -- ours as it was before it -- is a conflict again, and redone settled again; the base is never changed");
         const std::string b = "one\ntwo\nthree";
         const std::string o = "one\ntwo mine\nthree";
         const std::string t = "one\ntwo theirs\nthree";
         for (const ALTextMerge::Take take : { ALTextMerge::Take::Theirs, ALTextMerge::Take::OursThenTheirs })
         {
+            CAPTURE(take);
             begin(b, o, t);
-            settle(1, take);
+            require_settled(1, take);
             const std::string made = ours;
-            ensure("an edit", made != o);
-            ensure_equals("settled", merge->conflictCount(), 0);
-            ensure_equals("the base as it was", joined(merge->base()), b);
+            UNSCOPED_INFO("an edit");
+            REQUIRE(made != o);
+            REQUIRE(merge->conflictCount() == 0);
+            UNSCOPED_INFO("the base as it was");
+            REQUIRE(joined(merge->base()) == b);
             becomes(o);
-            ensure_equals("undone: a conflict again", merge->conflictCount(), 1);
-            ensure_equals("found by ours's line", inOurs(1, 1).size(), 1U);
+            UNSCOPED_INFO("undone: a conflict again");
+            REQUIRE(merge->conflictCount() == 1);
+            UNSCOPED_INFO("found by ours's line");
+            REQUIRE(inOurs(1, 1).size() == 1U);
             becomes(made);
-            ensure_equals("redone: settled again", merge->conflictCount(), 0);
+            UNSCOPED_INFO("redone: settled again");
+            REQUIRE(merge->conflictCount() == 0);
             becomes(o);
-            ensure_equals("and undone again", merge->conflictCount(), 1);
+            UNSCOPED_INFO("and undone again");
+            REQUIRE(merge->conflictCount() == 1);
         }
 
         // Two settled at once, undone together: both back.
@@ -303,73 +362,88 @@ namespace tut
         const std::string t2 = "a theirs\nb\nc\nd\ne theirs";
         begin(b2, o2, t2);
         const std::optional<ALDiffMerge::Settling> settling = merge->settle(inOurs(0, 5), ALTextMerge::Take::OursThenTheirs);
-        ensure("both settled together", settling && settling->edits && settling->settled.size() == 2);
+        {
+            INFO("both settled together");
+            REQUIRE(settling);
+            REQUIRE(settling->edits);
+            REQUIRE(settling->settled.size() == 2);
+        }
         merge->settled(*settling);
         becomes(settling->made);
-        ensure_equals("none left", merge->conflictCount(), 0);
+        CHECK(merge->conflictCount() == 0);
         becomes(o2);
-        ensure_equals("undone: both again", merge->conflictCount(), 2);
+        UNSCOPED_INFO("undone: both again");
+        CHECK(merge->conflictCount() == 2);
         becomes(settling->made);
-        ensure_equals("redone: none", merge->conflictCount(), 0);
+        UNSCOPED_INFO("redone: none");
+        CHECK(merge->conflictCount() == 0);
         // One left as settled, the other put back by hand alone: that one a
         // conflict again.
         becomes("a mine\na theirs\nb\nc\nd\ne mine");
-        ensure_equals("one undone by hand", merge->conflictCount(), 1);
-        ensure_equals("the one", inOurs(5, 1).size(), 1U);
+        UNSCOPED_INFO("one undone by hand");
+        CHECK(merge->conflictCount() == 1);
+        UNSCOPED_INFO("the one");
+        CHECK(inOurs(5, 1).size() == 1U);
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<9>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: joining a settled conflict to an unsettled one leaves one to settle", "[aldiffmerge]")
     {
-        set_test_name("an edit that joins a conflict settled to one that is not: one conflict, still to settle; apart again, the one not settled; both settled and joined, none");
         const std::string b = "a\nb\nc";
         const std::string o = "A1\nb\nC1";
         const std::string t = "A2\nb\nC2";
         begin(b, o, t);
-        ensure_equals("two", merge->conflictCount(), 2);
-        settle(0, ALTextMerge::Take::Ours);
-        ensure_equals("the first settled", merge->conflictCount(), 1);
+        CHECK(merge->conflictCount() == 2);
+        require_settled(0, ALTextMerge::Take::Ours);
+        UNSCOPED_INFO("the first settled");
+        CHECK(merge->conflictCount() == 1);
         // The line between edited: one stretch both changed, which holds
         // theirs's C2 that no settling was of.
         becomes("A1\nB\nC1");
-        ensure_equals("joined: a conflict still", merge->conflictCount(), 1);
-        ensure_equals("found by the line not settled", inOurs(2, 1).size(), 1U);
+        UNSCOPED_INFO("joined: a conflict still");
+        CHECK(merge->conflictCount() == 1);
+        UNSCOPED_INFO("found by the line not settled");
+        CHECK(inOurs(2, 1).size() == 1U);
         becomes(o);
-        ensure_equals("apart again: the one not settled", merge->conflictCount(), 1);
-        ensure("the first settled still", inOurs(0, 1).empty() && inOurs(2, 1).size() == 1U);
+        UNSCOPED_INFO("apart again: the one not settled");
+        CHECK(merge->conflictCount() == 1);
+        {
+            INFO("the first settled still");
+            CHECK(inOurs(0, 1).empty());
+            CHECK(inOurs(2, 1).size() == 1U);
+        }
 
         begin(b, o, t);
-        settle(0, ALTextMerge::Take::Ours);
-        settle(2, ALTextMerge::Take::Ours);
-        ensure_equals("both settled", merge->conflictCount(), 0);
+        require_settled(0, ALTextMerge::Take::Ours);
+        require_settled(2, ALTextMerge::Take::Ours);
+        UNSCOPED_INFO("both settled");
+        CHECK(merge->conflictCount() == 0);
         becomes("A1\nB\nC1");
-        ensure_equals("both settled, joined: none", merge->conflictCount(), 0);
+        UNSCOPED_INFO("both settled, joined: none");
+        CHECK(merge->conflictCount() == 0);
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<10>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: start with blanks let go of puts in theirs where ours did not change", "[aldiffmerge]")
     {
-        set_test_name("a merge begun by lines told the same as a comparison tells them: theirs's change put in where, so told, ours did not change it; ours as it is wherever neither changed");
         // Theirs re-indented lines 2 to 5 and changed line 3; ours changed
         // line 5 and re-indented line 7.
         const std::string b = "line 0\nline 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7";
         const std::string t = "line 0\nline 1\n  line 2\n  three\n  line 4\n  line 5\nline 6\nline 7";
         const std::string o = "line 0\nline 1\nline 2\nline 3\nline 4\nmine 5\nline 6\n    line 7";
-        ensure_equals("as they are: both changed lines 2 to 5, and ours kept there", ALDiffMerge::start(b, o, t), o);
+        UNSCOPED_INFO("as they are: both changed lines 2 to 5, and ours kept there");
+        CHECK(ALDiffMerge::start(b, o, t) == o);
         ALTextDiff::Options loose;
         loose.like.ignoreWhitespace = true;
         const std::string begun = ALDiffMerge::start(b, o, t, loose);
-        ensure_equals("blanks let go of: theirs's line 3 put in, ours's indent kept", begun,
+        UNSCOPED_INFO("blanks let go of: theirs's line 3 put in, ours's indent kept");
+        CHECK(begun ==
                       std::string("line 0\nline 1\nline 2\n  three\nline 4\nmine 5\nline 6\n    line 7"));
         // Merged so, no conflict, as a merge letting blanks go finds.
         begin(b, begun, t, loose);
-        ensure_equals("none", merge->conflictCount(), 0);
+        CHECK(merge->conflictCount() == 0);
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<11>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: ours spliced in between its edges merges as ours given whole", "[aldiffmerge]")
     {
-        set_test_name("ours made anew between its edges: compared with the base again only about each edit, the merge found as with ours given whole, edit after edit");
         // Theirs changed lines 10 and 100, ours lines 50 and 150.
         lines_t base_lines;
         for (S32 n = 0; n < 200; ++n)
@@ -387,13 +461,19 @@ namespace tut
         spliced.setOurs(ours_lines);
         whole.setOurs(ours_lines);
         const auto edit = [&](const auto& made, const std::string& where, S32 conflicts) {
+            CAPTURE(where);
             lines_t now = ours_lines;
             made(now);
             spliced.setOurs(now, ALDiffEdit::edgesOf(ours_lines, now));
-            ensure(where + ": compared again only about the edit", ALDiffSplice::lastCompared() > 0 && ALDiffSplice::lastCompared() <= 6);
+            {
+                INFO("compared again only about the edit");
+                REQUIRE(ALDiffSplice::lastCompared() > 0);
+                REQUIRE(ALDiffSplice::lastCompared() <= 6);
+            }
             whole.setOurs(now);
-            ensure(where + ": as with ours whole", spliced.hunks() == whole.hunks());
-            ensure_equals(where + ": conflicts", spliced.conflictCount(), conflicts);
+            UNSCOPED_INFO("as with ours whole");
+            REQUIRE(spliced.hunks() == whole.hunks());
+            REQUIRE(spliced.conflictCount() == conflicts);
             ours_lines = std::move(now);
         };
         edit([](lines_t& lines) { lines[120] = "mine 120"; }, "a line typed into", 0);
@@ -402,16 +482,16 @@ namespace tut
         // The base's line 100 is ours's 101 now.
         edit([](lines_t& lines) { lines[101] = "mine 100"; }, "theirs's line changed otherwise", 1);
         edit([](lines_t& lines) { lines[101] = "line 100"; }, "and back", 0);
-        ensure("the base as it was", spliced.base() == base_lines);
+        UNSCOPED_INFO("the base as it was");
+        CHECK(spliced.base() == base_lines);
     }
 
-    template<> template<>
-    void aldiffmerge_object::test<12>()
+    TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: with comments let go of ours spliced in merges as ours given whole", "[aldiffmerge]")
     {
-        set_test_name("with comments let go of, ours made anew is read again and compared with the base again only about each edit and as far after it as it made lines read otherwise, the merge found as with ours given whole");
         std::string                                  error;
         const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
-        ensure("the LSL grammar", lsl != nullptr);
+        UNSCOPED_INFO("the LSL grammar");
+        REQUIRE(lsl != nullptr);
         // Theirs changed lines 10 and 100, ours lines 50 and 150; theirs's
         // and ours's comments on line 120 each their own, which comments
         // let go of are not a conflict.
@@ -440,8 +520,10 @@ namespace tut
         ALDiffMerge whole(base_lines, theirs_lines, commented);
         spliced.setOurs(ours_lines);
         whole.setOurs(ours_lines);
-        ensure_equals("comments let go of: no conflict", spliced.conflictCount(), 0);
+        UNSCOPED_INFO("comments let go of: no conflict");
+        CHECK(spliced.conflictCount() == 0);
         const auto edit = [&](const auto& made, const std::string& where, S32 most, S32 conflicts) {
+            CAPTURE(where);
             lines_t now = ours_lines;
             made(now);
             const U64 hashed = ALTextDiff::hashed();
@@ -449,17 +531,24 @@ namespace tut
             spliced.setOurs(now, ALDiffEdit::edgesOf(ours_lines, now));
             const U64 cost     = ALTextDiff::hashed() - hashed;
             const S32 compared = ALDiffSplice::lastCompared();
-            ensure(where + ": ours read by what the edit knows, none of its lines compared with those the lexer holds", lexer->linesCompared() == looked);
+            UNSCOPED_INFO("ours read by what the edit knows, none of its lines compared with those the lexer holds");
+            REQUIRE(lexer->linesCompared() == looked);
             // A most of none: more than half the text read otherwise, which
             // is compared whole.
             if (most >= 0)
             {
-                ensure(where + ": compared again only about the edit, " + std::to_string(compared), compared > 0 && compared <= most);
-                ensure(where + ": as many lines' regions made a number, " + std::to_string(cost), cost <= static_cast<U64>(2 * most));
+                {
+                    INFO("compared again only about the edit");
+                    REQUIRE(compared > 0);
+                    REQUIRE(compared <= most);
+                }
+                UNSCOPED_INFO("as many lines' regions made a number");
+                REQUIRE(cost <= static_cast<U64>(2 * most));
             }
             whole.setOurs(now);
-            ensure(where + ": as with ours whole", spliced.hunks() == whole.hunks());
-            ensure_equals(where + ": conflicts", spliced.conflictCount(), conflicts);
+            UNSCOPED_INFO("as with ours whole");
+            REQUIRE(spliced.hunks() == whole.hunks());
+            REQUIRE(spliced.conflictCount() == conflicts);
             ours_lines = std::move(now);
         };
         edit([](lines_t& lines) { lines[130] = "x130 = 2130;"; }, "a line typed into", 6, 0);
@@ -487,8 +576,11 @@ namespace tut
         moved[90]     = "closed */ " + moved[90];
         spliced.setOurs(moved);
         whole.setOurs(moved);
-        ensure("given whole: as with ours whole", spliced.hunks() == whole.hunks());
-        ensure("and the lines it closed over changes", spliced.hunks().size() > 3);
-        ensure("the base as it was", spliced.base() == base_lines);
+        UNSCOPED_INFO("given whole: as with ours whole");
+        CHECK(spliced.hunks() == whole.hunks());
+        UNSCOPED_INFO("and the lines it closed over changes");
+        CHECK(spliced.hunks().size() > 3);
+        UNSCOPED_INFO("the base as it was");
+        CHECK(spliced.base() == base_lines);
     }
 }

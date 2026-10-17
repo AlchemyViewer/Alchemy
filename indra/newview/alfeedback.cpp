@@ -109,8 +109,13 @@ std::optional<ALFeedback::Endpoint> ALFeedback::endpointFromDsn(std::string_view
         return std::nullopt;
     }
 
-    const size_t at = rest.find('@');
-    if (at == std::string_view::npos)
+    // The key is the address's user part, which comes before the host, in
+    // what ends at the first '/': an '@' after it is the path's. One user
+    // part: a second would make what follows it the host the address names,
+    // whatever the host below was taken to be.
+    const std::string_view authority = rest.substr(0, rest.find('/'));
+    const size_t           at        = authority.find('@');
+    if (at == std::string_view::npos || authority.find('@', at + 1) != std::string_view::npos)
     {
         return std::nullopt;
     }

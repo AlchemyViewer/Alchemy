@@ -27,6 +27,7 @@
 #include "linden_common.h"
 
 #include <algorithm>
+#include <memory>
 
 #include "stdio.h"
 
@@ -185,39 +186,37 @@ bool LLMultiGesture::deserialize(LLDataPacker& dp)
             return false;
         }
 
+        // Each step held until it reads whole: one that does not is deleted
+        // with the gesture refused, not left behind.
         EStepType step_type = (EStepType)type;
         switch(step_type)
         {
         case STEP_ANIMATION:
             {
-                LLGestureStepAnimation* step = new LLGestureStepAnimation();
-                bool ok = step->deserialize(dp);
-                if (!ok) return false;
-                mSteps.push_back(step);
+                auto step = std::make_unique<LLGestureStepAnimation>();
+                if (!step->deserialize(dp)) return false;
+                mSteps.push_back(step.release());
                 break;
             }
         case STEP_SOUND:
             {
-                LLGestureStepSound* step = new LLGestureStepSound();
-                bool ok = step->deserialize(dp);
-                if (!ok) return false;
-                mSteps.push_back(step);
+                auto step = std::make_unique<LLGestureStepSound>();
+                if (!step->deserialize(dp)) return false;
+                mSteps.push_back(step.release());
                 break;
             }
         case STEP_CHAT:
             {
-                LLGestureStepChat* step = new LLGestureStepChat();
-                bool ok = step->deserialize(dp);
-                if (!ok) return false;
-                mSteps.push_back(step);
+                auto step = std::make_unique<LLGestureStepChat>();
+                if (!step->deserialize(dp)) return false;
+                mSteps.push_back(step.release());
                 break;
             }
         case STEP_WAIT:
             {
-                LLGestureStepWait* step = new LLGestureStepWait();
-                bool ok = step->deserialize(dp);
-                if (!ok) return false;
-                mSteps.push_back(step);
+                auto step = std::make_unique<LLGestureStepWait>();
+                if (!step->deserialize(dp)) return false;
+                mSteps.push_back(step.release());
                 break;
             }
         default:

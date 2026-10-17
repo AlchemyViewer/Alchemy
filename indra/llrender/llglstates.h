@@ -40,7 +40,16 @@ public:
 
     ~LLGLDepthTest();
 
+    // A copy would restore the depth state a second time.
+    LLGLDepthTest(const LLGLDepthTest&) = delete;
+    LLGLDepthTest& operator=(const LLGLDepthTest&) = delete;
+
     void checkState();
+
+    // Take the tracked state back to a fresh context's: test off, writes on, GL_LESS, with the
+    // func issued through remap so GL agrees under whichever convention is latched. Run per
+    // context by LLGLState::initClass.
+    static void initClass();
 
     // Reverse-Z depth-func translation. The tracked state (sDepthFunc) and every call
     // site stay in the forward/semantic convention; the physical glDepthFunc is fed the
@@ -169,6 +178,71 @@ public:
 
 private:
     bool mPrev[4];
+};
+
+// Scoped scissor: the test enabled and the box set, both handed back on exit as they were
+// found. A box never set in this context is left as the scope set it, since GL takes no
+// negative size to restore it with.
+class LLGLSScissor
+{
+public:
+    LLGLSScissor(S32 x, S32 y, S32 width, S32 height)
+    :   mTest(GL_SCISSOR_TEST)
+    {
+        gGL.getScissor(mPrev);
+        gGL.setScissor(x, y, width, height);
+    }
+
+    ~LLGLSScissor()
+    {
+        if (mPrev[2] >= 0 && mPrev[3] >= 0)
+        {
+            gGL.setScissor(mPrev[0], mPrev[1], mPrev[2], mPrev[3]);
+        }
+    }
+
+    LLGLSScissor(const LLGLSScissor&) = delete;
+    LLGLSScissor& operator=(const LLGLSScissor&) = delete;
+
+private:
+    LLGLEnable mTest;
+    S32 mPrev[4];
+};
+
+// Scoped stencil test: on, with the function, reference and read mask, the operations on a stencil
+// fail, a depth fail and a pass, and the write mask given. On exit the test goes back off and the
+// rest to GL's defaults, the write mask to every bit above all: a clear writes stencil only through
+// it. Scopes do not nest; the inner one's exit would leave the outer's test on at the defaults.
+class ALGLStencil
+{
+public:
+    ALGLStencil(GLenum func, GLint ref, GLuint read_mask, GLenum fail, GLenum depth_fail, GLenum pass, GLuint write_mask)
+    :   mTest(GL_STENCIL_TEST)
+    {
+        llassert(sOpen == 0);
+        ++sOpen;
+        gGL.flush();
+        glStencilFunc(func, ref, read_mask);
+        glStencilOp(fail, depth_fail, pass);
+        glStencilMask(write_mask);
+    }
+
+    ~ALGLStencil()
+    {
+        gGL.flush();
+        glStencilFunc(GL_ALWAYS, 0, ~0u);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        glStencilMask(~0u);
+        --sOpen;
+    }
+
+    ALGLStencil(const ALGLStencil&) = delete;
+    ALGLStencil& operator=(const ALGLStencil&) = delete;
+
+private:
+    LLGLEnable mTest;
+    // The scopes open, on the thread that draws: one at most.
+    static inline S32 sOpen = 0;
 };
 
 class LLGLSTracker

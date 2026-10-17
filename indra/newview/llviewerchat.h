@@ -37,7 +37,6 @@ public:
     typedef boost::signals2::signal<void (LLFontGL*)> font_change_signal_t;
 
     static void getChatColor(const LLChat& chat, LLUIColor& r_color, F32& r_color_alpha);
-    static void getChatColor(const LLChat& chat, std::string& r_color_name, F32& r_color_alpha);
     static LLFontGL* getChatFont();
     static S32 getChatFontSize();
     static void formatChatMsg(const LLChat& chat, std::string& formated_msg);

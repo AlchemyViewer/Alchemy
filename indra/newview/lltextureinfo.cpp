@@ -62,20 +62,11 @@ void LLTextureInfo::setLogging(bool log_info)
 
 LLTextureInfo::~LLTextureInfo()
 {
-    std::map<LLUUID, LLTextureInfoDetails *>::iterator iterator;
-    for (iterator = mTextures.begin(); iterator != mTextures.end(); iterator++)
-    {
-        LLTextureInfoDetails *info = (*iterator).second;
-        delete info;
-    }
-
-    mTextures.clear();
 }
 
 void LLTextureInfo::addRequest(const LLUUID& id)
 {
-    LLTextureInfoDetails *info = new LLTextureInfoDetails();
-    mTextures[id] = info;
+    mTextures[id] = std::make_unique<LLTextureInfoDetails>();
 }
 
 U32 LLTextureInfo::getTextureInfoMapSize()
@@ -277,7 +268,7 @@ U32Microseconds LLTextureInfo::getRequestStartTime(const LLUUID& id)
     }
     else
     {
-        std::map<LLUUID, LLTextureInfoDetails *>::iterator iterator = mTextures.find(id);
+        auto iterator = mTextures.find(id);
         return (*iterator).second->mStartTime;
     }
 }
@@ -290,7 +281,7 @@ U32Bytes LLTextureInfo::getRequestSize(const LLUUID& id)
     }
     else
     {
-        std::map<LLUUID, LLTextureInfoDetails *>::iterator iterator = mTextures.find(id);
+        auto iterator = mTextures.find(id);
         return (*iterator).second->mSize;
     }
 }
@@ -303,7 +294,7 @@ U32 LLTextureInfo::getRequestOffset(const LLUUID& id)
     }
     else
     {
-        std::map<LLUUID, LLTextureInfoDetails *>::iterator iterator = mTextures.find(id);
+        auto iterator = mTextures.find(id);
         return (*iterator).second->mOffset;
     }
 }
@@ -316,7 +307,7 @@ LLTextureInfoDetails::LLRequestType LLTextureInfo::getRequestType(const LLUUID& 
     }
     else
     {
-        std::map<LLUUID, LLTextureInfoDetails *>::iterator iterator = mTextures.find(id);
+        auto iterator = mTextures.find(id);
         return (*iterator).second->mType;
     }
 }
@@ -329,7 +320,7 @@ U32Microseconds LLTextureInfo::getRequestCompleteTime(const LLUUID& id)
     }
     else
     {
-        std::map<LLUUID, LLTextureInfoDetails *>::iterator iterator = mTextures.find(id);
+        auto iterator = mTextures.find(id);
         return (*iterator).second->mCompleteTime;
     }
 }

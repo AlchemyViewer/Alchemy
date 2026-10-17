@@ -45,6 +45,63 @@ const S32 DP_BUFSIZE = 512;
 
 static char DUMMY_BUFFER[128]; /*Flawfinder: ignore*/
 
+// Reads up to count bytes, each written "%02x ", from text, a line
+// getValueStr read, and returns how many it read. It stops where the line
+// does rather than reading on past its terminator.
+static S32 unpack_hex_bytes(const char* text, U8* value, S32 count)
+{
+    const size_t len = strlen(text);   /* Flawfinder: ignore */
+    S32 i = 0;
+    for (size_t pos = 0; i < count && pos + 2 <= len; pos += 3, ++i)
+    {
+        unsigned int val;
+        if (sscanf(text + pos, "%2x", &val) != 1)
+        {
+            break;
+        }
+        value[i] = (U8)val;
+    }
+    return i;
+}
+
+// Unpacks a line packBinaryData wrote, its size as "%010d " and then its
+// bytes, into value, which holds value_size of them. out_size is the size
+// the line gives, or what was read of it when the line holds less.
+static bool unpack_ascii_binary_data(const char* valuestr, U8* value, S32 value_size, S32& out_size, const char* name)
+{
+    if (value_size < 0)
+    {
+        LL_WARNS() << "unpackBinaryData passed negative buffer size for " << name << ", aborting!" << LL_ENDL;
+        out_size = 0;
+        return false;
+    }
+
+    S32 size = 0;
+    if (sscanf(valuestr, "%010d", &size) != 1 || size < 0)
+    {
+        LL_WARNS() << "unpackBinaryData unpacked invalid size for " << name << ", aborting!" << LL_ENDL;
+        out_size = 0;
+        return false;
+    }
+
+    // The bytes follow the ten digits of the size and a space.
+    const char* bytes = valuestr + llmin(strlen(valuestr), (size_t)11);   /* Flawfinder: ignore */
+    S32 max_bytes = llmin(size, value_size);
+    if (max_bytes != size)
+    {
+        LL_WARNS() << "unpackBinaryData: buffer too small for " << name << ", truncating!" << LL_ENDL;
+    }
+    S32 read = unpack_hex_bytes(bytes, value, max_bytes);
+    if (read < max_bytes)
+    {
+        LL_WARNS() << "unpackBinaryData: " << name << " holds " << read << " of its " << size << " bytes, aborting!" << LL_ENDL;
+        out_size = read;
+        return false;
+    }
+    out_size = size;
+    return true;
+}
+
 LLDataPacker::LLDataPacker() : mPassFlags(0), mWriteEnabled(false)
 {
 }
@@ -248,7 +305,7 @@ bool LLDataPackerBinaryBuffer::packString(const std::string& value, const char *
     {
         htolememcpy(mCurBufferp, value.c_str(), MVT_VARIABLE, length);
     }
-    mCurBufferp += length;
+    advance(length);
     return true;
 }
 
@@ -264,7 +321,7 @@ bool LLDataPackerBinaryBuffer::unpackString(std::string& value, const char *name
 
     value = std::string((char*)mCurBufferp); // We already assume NULL termination calling strlen()
 
-    mCurBufferp += length;
+    advance(length);
     return true;
 }
 
@@ -279,12 +336,12 @@ bool LLDataPackerBinaryBuffer::packBinaryData(const U8 *value, S32 size, const c
     {
         htolememcpy(mCurBufferp, &size, MVT_S32, 4);
     }
-    mCurBufferp += 4;
+    advance(4);
     if (mWriteEnabled)
     {
         htolememcpy(mCurBufferp, value, MVT_VARIABLE, size);
     }
-    mCurBufferp += size;
+    advance(size);
     return true;
 }
 
@@ -314,7 +371,7 @@ bool LLDataPackerBinaryBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &
         return false;
     }
 
-    mCurBufferp += 4;
+    advance(4);
 
     if (!verifyLength(out_size, name))
     {
@@ -323,7 +380,7 @@ bool LLDataPackerBinaryBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &
     }
     S32 copy_size = llmin(out_size, value_size);
     htolememcpy(value, mCurBufferp, MVT_VARIABLE, copy_size);
-    mCurBufferp += out_size;
+    advance(out_size);
 
     if (value_size < out_size)
     {
@@ -345,7 +402,7 @@ bool LLDataPackerBinaryBuffer::packBinaryDataFixed(const U8 *value, S32 size, co
     {
         htolememcpy(mCurBufferp, value, MVT_VARIABLE, size);
     }
-    mCurBufferp += size;
+    advance(size);
     return true;
 }
 
@@ -357,7 +414,7 @@ bool LLDataPackerBinaryBuffer::unpackBinaryDataFixed(U8 *value, S32 size, const 
         return false;
     }
     htolememcpy(value, mCurBufferp, MVT_VARIABLE, size);
-    mCurBufferp += size;
+    advance(size);
     return true;
 }
 
@@ -373,7 +430,7 @@ bool LLDataPackerBinaryBuffer::packU8(const U8 value, const char *name)
     {
         *mCurBufferp = value;
     }
-    mCurBufferp++;
+    advance(1);
     return true;
 }
 
@@ -386,7 +443,7 @@ bool LLDataPackerBinaryBuffer::unpackU8(U8 &value, const char *name)
     }
 
     value = *mCurBufferp;
-    mCurBufferp++;
+    advance(1);
     return true;
 }
 
@@ -402,7 +459,7 @@ bool LLDataPackerBinaryBuffer::packU16(const U16 value, const char *name)
     {
         htolememcpy(mCurBufferp, &value, MVT_U16, 2);
     }
-    mCurBufferp += 2;
+    advance(2);
     return true;
 }
 
@@ -415,7 +472,7 @@ bool LLDataPackerBinaryBuffer::unpackU16(U16 &value, const char *name)
     }
 
     htolememcpy(&value, mCurBufferp, MVT_U16, 2);
-    mCurBufferp += 2;
+    advance(2);
     return true;
 }
 
@@ -427,7 +484,7 @@ bool LLDataPackerBinaryBuffer::packS16(const S16 value, const char *name)
     {
         htolememcpy(mCurBufferp, &value, MVT_S16, 2);
     }
-    mCurBufferp += 2;
+    advance(2);
     return success;
 }
 
@@ -439,7 +496,7 @@ bool LLDataPackerBinaryBuffer::unpackS16(S16 &value, const char *name)
     {
         htolememcpy(&value, mCurBufferp, MVT_S16, 2);
     }
-    mCurBufferp += 2;
+    advance(2);
     return success;
 }
 
@@ -454,7 +511,7 @@ bool LLDataPackerBinaryBuffer::packU32(const U32 value, const char *name)
     {
         htolememcpy(mCurBufferp, &value, MVT_U32, 4);
     }
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -467,7 +524,7 @@ bool LLDataPackerBinaryBuffer::unpackU32(U32 &value, const char *name)
     }
 
     htolememcpy(&value, mCurBufferp, MVT_U32, 4);
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -483,7 +540,7 @@ bool LLDataPackerBinaryBuffer::packS32(const S32 value, const char *name)
     {
         htolememcpy(mCurBufferp, &value, MVT_S32, 4);
     }
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -496,7 +553,7 @@ bool LLDataPackerBinaryBuffer::unpackS32(S32 &value, const char *name)
     }
 
     htolememcpy(&value, mCurBufferp, MVT_S32, 4);
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -512,7 +569,7 @@ bool LLDataPackerBinaryBuffer::packF32(const F32 value, const char *name)
     {
         htolememcpy(mCurBufferp, &value, MVT_F32, 4);
     }
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -525,7 +582,7 @@ bool LLDataPackerBinaryBuffer::unpackF32(F32 &value, const char *name)
     }
 
     htolememcpy(&value, mCurBufferp, MVT_F32, 4);
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -541,7 +598,7 @@ bool LLDataPackerBinaryBuffer::packColor4(const LLColor4 &value, const char *nam
     {
         htolememcpy(mCurBufferp, value.mV, MVT_LLVector4, 16);
     }
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -554,7 +611,7 @@ bool LLDataPackerBinaryBuffer::unpackColor4(LLColor4 &value, const char *name)
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_LLVector4, 16);
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -570,7 +627,7 @@ bool LLDataPackerBinaryBuffer::packColor4U(const LLColor4U &value, const char *n
     {
         htolememcpy(mCurBufferp, value.mV, MVT_VARIABLE, 4);
     }
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -583,7 +640,7 @@ bool LLDataPackerBinaryBuffer::unpackColor4U(LLColor4U &value, const char *name)
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_VARIABLE, 4);
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -601,7 +658,7 @@ bool LLDataPackerBinaryBuffer::packVector2(const LLVector2 &value, const char *n
         htolememcpy(mCurBufferp, &value.mV[0], MVT_F32, 4);
         htolememcpy(mCurBufferp+4, &value.mV[1], MVT_F32, 4);
     }
-    mCurBufferp += 8;
+    advance(8);
     return true;
 }
 
@@ -615,7 +672,7 @@ bool LLDataPackerBinaryBuffer::unpackVector2(LLVector2 &value, const char *name)
 
     htolememcpy(&value.mV[0], mCurBufferp, MVT_F32, 4);
     htolememcpy(&value.mV[1], mCurBufferp+4, MVT_F32, 4);
-    mCurBufferp += 8;
+    advance(8);
     return true;
 }
 
@@ -631,7 +688,7 @@ bool LLDataPackerBinaryBuffer::packVector3(const LLVector3 &value, const char *n
     {
         htolememcpy(mCurBufferp, value.mV, MVT_LLVector3, 12);
     }
-    mCurBufferp += 12;
+    advance(12);
     return true;
 }
 
@@ -644,7 +701,7 @@ bool LLDataPackerBinaryBuffer::unpackVector3(LLVector3 &value, const char *name)
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_LLVector3, 12);
-    mCurBufferp += 12;
+    advance(12);
     return true;
 }
 
@@ -659,7 +716,7 @@ bool LLDataPackerBinaryBuffer::packVector4(const LLVector4 &value, const char *n
     {
         htolememcpy(mCurBufferp, value.mV, MVT_LLVector4, 16);
     }
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -672,7 +729,7 @@ bool LLDataPackerBinaryBuffer::unpackVector4(LLVector4 &value, const char *name)
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_LLVector4, 16);
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -687,7 +744,7 @@ bool LLDataPackerBinaryBuffer::packUUID(const LLUUID &value, const char *name)
     {
         htolememcpy(mCurBufferp, value.mData, MVT_LLUUID, 16);
     }
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -700,7 +757,7 @@ bool LLDataPackerBinaryBuffer::unpackUUID(LLUUID &value, const char *name)
     }
 
     htolememcpy(value.mData, mCurBufferp, MVT_LLUUID, 16);
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -852,39 +909,13 @@ bool LLDataPackerAsciiBuffer::packBinaryData(const U8 *value, S32 size, const ch
 
 bool LLDataPackerAsciiBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &out_size, const char *name)
 {
-    bool success = true;
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
         out_size = 0;
         return false;
     }
-
-    if (value_size < 0)
-    {
-        LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData passed negative buffer size, aborting!" << LL_ENDL;
-        out_size = 0;
-        return false;
-    }
-
-    char *cur_pos = &valuestr[0];
-    sscanf(valuestr,"%010d", &out_size);
-    cur_pos += 11;
-
-    S32 max_bytes = llmin(out_size, value_size);
-    if (max_bytes != out_size)
-    {
-        LL_WARNS() << "LLDataPackerAsciiBuffer::unpackBinaryData: buffer too small for data, truncating!" << LL_ENDL;
-    }
-    S32 i;
-    for (i = 0; i < max_bytes; i++)
-    {
-        S32 val;
-        sscanf(cur_pos,"%02x", &val);
-        value[i] = val;
-        cur_pos += 3;
-    }
-    return success;
+    return unpack_ascii_binary_data(valuestr, value, value_size, out_size, name);
 }
 
 
@@ -937,24 +968,19 @@ bool LLDataPackerAsciiBuffer::packBinaryDataFixed(const U8 *value, S32 size, con
 
 bool LLDataPackerAsciiBuffer::unpackBinaryDataFixed(U8 *value, S32 size, const char *name)
 {
-    bool success = true;
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
         return false;
     }
 
-    char *cur_pos = &valuestr[0];
-
-    S32 i;
-    for (i = 0; i < size; i++)
+    S32 read = unpack_hex_bytes(valuestr, value, size);
+    if (read < size)
     {
-        S32 val;
-        sscanf(cur_pos,"%02x", &val);
-        value[i] = val;
-        cur_pos += 3;
+        LL_WARNS() << "unpackBinaryDataFixed: " << name << " holds " << read << " of its " << size << " bytes, aborting!" << LL_ENDL;
+        return false;
     }
-    return success;
+    return true;
 }
 
 
@@ -1677,38 +1703,13 @@ bool LLDataPackerAsciiFile::packBinaryData(const U8 *value, S32 size, const char
 
 bool LLDataPackerAsciiFile::unpackBinaryData(U8 *value, S32 value_size, S32 &out_size, const char *name)
 {
-    char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore*/
+    char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
         out_size = 0;
         return false;
     }
-
-    if (value_size < 0)
-    {
-        LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData passed negative buffer size, aborting!" << LL_ENDL;
-        out_size = 0;
-        return false;
-    }
-
-    char *cur_pos = &valuestr[0];
-    sscanf(valuestr,"%010d", &out_size);
-    cur_pos += 11;
-
-    S32 max_bytes = llmin(out_size, value_size);
-    if (max_bytes != out_size)
-    {
-        LL_WARNS() << "LLDataPackerAsciiBuffer::unpackBinaryData: buffer too small for data, truncating!" << LL_ENDL;
-    }
-    S32 i;
-    for (i = 0; i < max_bytes; i++)
-    {
-        S32 val;
-        sscanf(cur_pos,"%02x", &val);
-        value[i] = val;
-        cur_pos += 3;
-    }
-    return true;
+    return unpack_ascii_binary_data(valuestr, value, value_size, out_size, name);
 }
 
 
@@ -1743,24 +1744,19 @@ bool LLDataPackerAsciiFile::packBinaryDataFixed(const U8 *value, S32 size, const
 
 bool LLDataPackerAsciiFile::unpackBinaryDataFixed(U8 *value, S32 size, const char *name)
 {
-    bool success = true;
-    char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore*/
+    char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
     if (!getValueStr(name, valuestr, DP_BUFSIZE))
     {
         return false;
     }
 
-    char *cur_pos = &valuestr[0];
-
-    S32 i;
-    for (i = 0; i < size; i++)
+    S32 read = unpack_hex_bytes(valuestr, value, size);
+    if (read < size)
     {
-        S32 val;
-        sscanf(cur_pos,"%02x", &val);
-        value[i] = val;
-        cur_pos += 3;
+        LL_WARNS() << "unpackBinaryDataFixed: " << name << " holds " << read << " of its " << size << " bytes, aborting!" << LL_ENDL;
+        return false;
     }
-    return success;
+    return true;
 }
 
 

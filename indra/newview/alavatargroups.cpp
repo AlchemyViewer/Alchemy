@@ -26,6 +26,7 @@
 // lib includes
 #include "llavatarname.h"
 #include "llavatarnamecache.h"
+#include "llchat.h"
 #include "lluicolor.h"
 #include "lluicolortable.h"
 #include "lluuid.h"
@@ -34,6 +35,7 @@
 // viewer includes
 #include "llagent.h"
 #include "llcallingcard.h"
+#include "llinstantmessage.h" // SYSTEM_FROM
 #include "llmutelist.h"
 #include "llviewercontrol.h"
 #include "llvoavatar.h"
@@ -57,6 +59,24 @@ namespace
         if (index >= 9) return &LLColor4::cyan;    // staff
         if (index >= 6) return &LLColor4::grey3;   // muted
         return &LLColor4::white;
+    }
+
+    bool ircColorsEnabled()
+    {
+        static LLCachedControl<bool> enabled(gSavedSettings, "AlchemyChatIRCColorsEnabled", false);
+        return enabled;
+    }
+
+    // IRC-style chat's colour for an id: a hue of its own, at the shared
+    // saturation and the lightness given
+    LLColor4 hashedColor(const LLUUID& id, F32 lightness)
+    {
+        static LLCachedControl<F32> saturation(gSavedSettings, "AlchemyChatIRCAgentSaturation", 0.7f);
+
+        LLColor4 color;
+        color.setHSL(static_cast<F32>(id.getCRC32() % 360) / 360.f, saturation, lightness);
+        color.mV[VALPHA] = 1.f;
+        return color;
     }
 }
 
@@ -166,23 +186,80 @@ LLColor4 ALAvatarGroups::colorForKind(EAvatarKind kind, LLColor4 default_color, 
     return index < 0 ? default_color : LLColor4(ui_color_cache[index]);
 }
 
+bool ALAvatarGroups::ircColored(EAvatarKind kind)
+{
+    // You, staff and the muted keep the colours that say so, and a colour of
+    // one's own would give away a name RLV hides.
+    return kind == EAvatarKind::OTHER || kind == EAvatarKind::FRIEND;
+}
+
+bool ALAvatarGroups::ircColor(EAvatarKind kind, const LLUUID& id, EColorType color_type, LLColor4& color)
+{
+    if (!ircColorsEnabled() || !ircColored(kind))
+    {
+        return false;
+    }
+
+    static LLCachedControl<bool> name_tags(gSavedSettings, "AlchemyChatIRCColorNameTags", false);
+    switch (color_type)
+    {
+    case COLOR_CHAT:
+        color = getIRCChatColor(id);
+        return true;
+    case COLOR_NAMETAG:
+        if (!name_tags)
+        {
+            return false;
+        }
+        color = getIRCNameColor(id);
+        return true;
+    default:
+        return false;
+    }
+}
+
 LLColor4 ALAvatarGroups::getAvatarColor(const LLUUID& id, LLColor4 default_color, EColorType color_type)
 {
-    return colorForKind(classify(id), default_color, color_type);
+    const EAvatarKind kind = classify(id);
+    LLColor4 color;
+    return ircColor(kind, id, color_type, color) ? color : colorForKind(kind, default_color, color_type);
 }
 
 LLColor4 ALAvatarGroups::getAvatarColor(const LLVOAvatar* avatar, LLColor4 default_color, EColorType color_type)
 {
-    return colorForKind(classify(avatar), default_color, color_type);
+    const EAvatarKind kind = classify(avatar);
+    LLColor4 color;
+    return ircColor(kind, avatar->getID(), color_type, color) ? color : colorForKind(kind, default_color, color_type);
 }
 
-std::string ALAvatarGroups::getAvatarColorName(const LLUUID& id, std::string_view color_name, EColorType color_type)
+bool ALAvatarGroups::getChatNameColor(const LLChat& chat, LLColor4& color)
 {
-    const EAvatarKind kind = classify(id);
-    if (kind == EAvatarKind::OTHER)
+    // the messages LLViewerChat::getChatColor gives the speaker's own colour
+    if (!ircColorsEnabled()
+        || chat.mMuted
+        || chat.mSourceType != CHAT_SOURCE_AGENT
+        || chat.mFromID.isNull()
+        || chat.mFromName == SYSTEM_FROM
+        || !ircColored(classify(chat.mFromID)))
     {
-        return std::string(color_name);
+        return false;
     }
-    const S32 index = colorIndex(kind, color_type);
-    return index < 0 ? std::string() : std::string(COLOR_NAMES[index]);
+
+    color = getIRCNameColor(chat.mFromID);
+    return true;
+}
+
+LLColor4 ALAvatarGroups::getIRCChatColor(const LLUUID& id)
+{
+    static LLCachedControl<F32> lightness(gSavedSettings, "AlchemyChatIRCAgentLightness", 0.9f);
+    return hashedColor(id, lightness);
+}
+
+LLColor4 ALAvatarGroups::getIRCNameColor(const LLUUID& id)
+{
+    // The same hue and saturation at a lightness of its own, worked from the
+    // id rather than from the text colour: a very light or dark colour loses
+    // its saturation, and at the extremes its hue, on the way through RGB.
+    static LLCachedControl<F32> lightness(gSavedSettings, "AlchemyChatIRCNameLightness", 0.7f);
+    return hashedColor(id, lightness);
 }

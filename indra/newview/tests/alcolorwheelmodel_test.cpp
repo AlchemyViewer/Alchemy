@@ -14,13 +14,14 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
 #include "../alcolorwheelmodel.h"
 
 #include <cmath>
 
-namespace tut
+namespace
 {
     struct wheel_data
     {
@@ -44,55 +45,55 @@ namespace tut
         }
     };
 
-    typedef test_group<wheel_data> wheel_group;
-    typedef wheel_group::object    wheel_object;
-    tut::wheel_group wg("ALColorWheelModel");
-
     // --- the basis itself ----------------------------------------------------
 
     // The whole design rests on {(1,1,1)/sqrt3, u, v} being orthonormal -- that
     // is what makes the decomposition lossless. A typo in the constants would
     // show up here and nowhere else obvious.
-    template<> template<>
-    void wheel_object::test<1>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: the chroma basis is orthonormal and has no grey in it", "[ALColorWheelModel]")
     {
         const LLVector3 u = ALColorWheelModel::chromaDirection(0.f);
         const LLVector3 v = ALColorWheelModel::chromaDirection(F_PI_BY_TWO);
         const LLVector3 grey(1.f, 1.f, 1.f);
 
-        ensure_approximately_equals("u is unit", u.magVec(), 1.f, 5);
-        ensure_approximately_equals("v is unit", v.magVec(), 1.f, 5);
-        ensure_approximately_equals("u and v are perpendicular", u * v, 0.f, 5);
-        ensure_approximately_equals("u has no achromatic part", u * grey, 0.f, 5);
-        ensure_approximately_equals("v has no achromatic part", v * grey, 0.f, 5);
+        CHECK_THAT(u.magVec(), ll_test::WithinBits(1.f, 5));
+        CHECK_THAT(v.magVec(), ll_test::WithinBits(1.f, 5));
+        UNSCOPED_INFO("u and v are perpendicular");
+        CHECK_THAT(u * v, ll_test::WithinBits(0.f, 5));
+        UNSCOPED_INFO("u has no achromatic part");
+        CHECK_THAT(u * grey, ll_test::WithinBits(0.f, 5));
+        UNSCOPED_INFO("v has no achromatic part");
+        CHECK_THAT(v * grey, ll_test::WithinBits(0.f, 5));
     }
 
     // Angle lands on the usual colour circle: red at 0, green at 120, blue at 240.
-    template<> template<>
-    void wheel_object::test<2>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: toPolar puts the primaries at their usual hues", "[ALColorWheelModel]")
     {
         F32 hue, sat;
         ALColorWheelModel::toPolar(LLVector3(1.f, 0.f, 0.f), hue, sat);
-        ensure_approximately_equals("pure red is hue 0", angleDelta(hue, deg(0.f)), 0.f, 4);
+        UNSCOPED_INFO("pure red is hue 0");
+        CHECK_THAT(angleDelta(hue, deg(0.f)), ll_test::WithinBits(0.f, 4));
 
         ALColorWheelModel::toPolar(LLVector3(0.f, 1.f, 0.f), hue, sat);
-        ensure_approximately_equals("pure green is 120", angleDelta(hue, deg(120.f)), 0.f, 4);
+        UNSCOPED_INFO("pure green is 120");
+        CHECK_THAT(angleDelta(hue, deg(120.f)), ll_test::WithinBits(0.f, 4));
 
         ALColorWheelModel::toPolar(LLVector3(0.f, 0.f, 1.f), hue, sat);
-        ensure_approximately_equals("pure blue is 240", angleDelta(hue, deg(240.f)), 0.f, 4);
+        UNSCOPED_INFO("pure blue is 240");
+        CHECK_THAT(angleDelta(hue, deg(240.f)), ll_test::WithinBits(0.f, 4));
     }
 
     // A neutral triplet has no chroma, and asking its hue must not produce a
     // NaN from atan2(0,0) -- the puck would jump the moment it crossed centre.
-    template<> template<>
-    void wheel_object::test<3>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: a grey has no saturation and a finite hue", "[ALColorWheelModel]")
     {
         F32 hue, sat;
         for (F32 grey : { -0.4f, 0.f, 0.5f, 1.f })
         {
+            CAPTURE(grey);
             ALColorWheelModel::toPolar(LLVector3(grey, grey, grey), hue, sat);
-            ensure_approximately_equals("no saturation", sat, 0.f, 5);
-            ensure("hue is finite", std::isfinite(hue));
+            REQUIRE_THAT(sat, ll_test::WithinBits(0.f, 5));
+            REQUIRE(std::isfinite(hue));
         }
     }
 
@@ -101,8 +102,7 @@ namespace tut
     // The property everything else depends on: decompose and rebuild returns
     // the same triplet. If this fails, typing a number and dragging the puck
     // disagree about the value.
-    template<> template<>
-    void wheel_object::test<4>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: decomposing a triplet and rebuilding it returns the same triplet", "[ALColorWheelModel]")
     {
         const F32 samples[] = { -0.5f, -0.31f, -0.07f, 0.f, 0.12f, 0.29f, 0.5f };
         for (F32 r : samples)
@@ -111,34 +111,36 @@ namespace tut
             {
                 for (F32 b : samples)
                 {
+                    CAPTURE(r, g, b);
                     const LLVector3 in(r, g, b);
                     F32 hue, sat;
                     ALColorWheelModel::toPolar(in, hue, sat);
                     const LLVector3 out = ALColorWheelModel::toRGB(
                         ALColorWheelModel::masterOf(in), hue, sat);
 
-                    ensure_approximately_equals("r round trips", out.mV[VX], in.mV[VX], 5);
-                    ensure_approximately_equals("g round trips", out.mV[VY], in.mV[VY], 5);
-                    ensure_approximately_equals("b round trips", out.mV[VZ], in.mV[VZ], 5);
+                    REQUIRE_THAT(out.mV[VX], ll_test::WithinBits(in.mV[VX], 5));
+                    REQUIRE_THAT(out.mV[VY], ll_test::WithinBits(in.mV[VY], 5));
+                    REQUIRE_THAT(out.mV[VZ], ll_test::WithinBits(in.mV[VZ], 5));
                 }
             }
         }
     }
 
     // Round trip through the stored value, which is the path the widget takes.
-    template<> template<>
-    void wheel_object::test<5>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: setPolar round trips hue and saturation through the stored value", "[ALColorWheelModel]")
     {
         asLift();
         for (S32 i = 0; i < 24; ++i)
         {
+            CAPTURE(i);
             const F32 hue = deg((F32)i * 15.f);
             const F32 sat = mWheel.getMaxSat() * 0.6f;
             mWheel.setPolar(hue, sat);
 
-            ensure_approximately_equals("hue survives", angleDelta(mWheel.getHue(), hue), 0.f, 4);
-            ensure_approximately_equals("saturation survives", mWheel.getSat(), sat, 4);
-            ensure_approximately_equals("master untouched", mWheel.getMaster(), 0.f, 5);
+            REQUIRE_THAT(angleDelta(mWheel.getHue(), hue), ll_test::WithinBits(0.f, 4));
+            REQUIRE_THAT(mWheel.getSat(), ll_test::WithinBits(sat, 4));
+            UNSCOPED_INFO("master untouched");
+            REQUIRE_THAT(mWheel.getMaster(), ll_test::WithinBits(0.f, 5));
         }
     }
 
@@ -146,34 +148,34 @@ namespace tut
 
     // getMaxSat is the inradius, so a puck on the rim is reachable at EVERY
     // hue with the master centred -- nothing gets clamped.
-    template<> template<>
-    void wheel_object::test<6>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: a puck on the rim is reachable at every hue with the master centred", "[ALColorWheelModel]")
     {
         asLift();
         const F32 rim = mWheel.getMaxSat();
         for (S32 i = 0; i < 72; ++i)
         {
+            CAPTURE(i);
             const F32 hue = deg((F32)i * 5.f);
             mWheel.setPolar(hue, rim);
-            ensure_approximately_equals("rim is reachable at every hue", mWheel.getSat(), rim, 3);
-            ensure_approximately_equals("and the hue is the one asked for",
-                                        angleDelta(mWheel.getHue(), hue), 0.f, 3);
+            REQUIRE_THAT(mWheel.getSat(), ll_test::WithinBits(rim, 3));
+            REQUIRE_THAT(angleDelta(mWheel.getHue(), hue), ll_test::WithinBits(0.f, 3));
         }
     }
 
     // The inradius is sqrt(1.5) * halfRange, and the tightest directions are
     // the primaries, where one channel lands exactly on its limit.
-    template<> template<>
-    void wheel_object::test<7>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: getMaxSat is the inradius and red on the rim sits on its limit", "[ALColorWheelModel]")
     {
         asLift();
-        ensure_approximately_equals("inradius", mWheel.getMaxSat(), sqrtf(1.5f) * 0.5f, 4);
+        CHECK_THAT(mWheel.getMaxSat(), ll_test::WithinBits(sqrtf(1.5f) * 0.5f, 4));
 
         mWheel.setPolar(0.f, mWheel.getMaxSat());
-        ensure_approximately_equals("red sits on its limit", mWheel.getRGB().mV[VX], 0.5f, 3);
+        UNSCOPED_INFO("red sits on its limit");
+        CHECK_THAT(mWheel.getRGB().mV[VX], ll_test::WithinBits(0.5f, 3));
 
         asGain();
-        ensure_approximately_equals("gain inradius", mWheel.getMaxSat(), sqrtf(1.5f) * 0.5f, 4);
+        UNSCOPED_INFO("gain inradius");
+        CHECK_THAT(mWheel.getMaxSat(), ll_test::WithinBits(sqrtf(1.5f) * 0.5f, 4));
     }
 
     // Past the rim the channel clamp bites: the value stays legal, and the
@@ -194,8 +196,7 @@ namespace tut
     // Clamping moves the mean, so the result leaves the master-pinned hexagon
     // and lands on the projection of the whole cube -- the third figure. A
     // bound of the second is too tight and fails here.
-    template<> template<>
-    void wheel_object::test<8>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: past the rim the channel clamp keeps the value legal", "[ALColorWheelModel]")
     {
         asLift();
         const F32 rim = mWheel.getMaxSat();
@@ -203,38 +204,45 @@ namespace tut
 
         for (S32 i = 0; i < 36; ++i)
         {
+            CAPTURE(i);
             const F32 hue = deg((F32)i * 10.f);
             mWheel.setPolar(hue, rim * 4.f);
 
             const LLVector3& rgb = mWheel.getRGB();
             for (S32 c = 0; c < 3; ++c)
             {
-                ensure("channel stayed in range", rgb.mV[c] >= -0.5f - 1e-5f && rgb.mV[c] <= 0.5f + 1e-5f);
+                CAPTURE(c);
+                REQUIRE(rgb.mV[c] >= -0.5f - 1e-5f);
+                REQUIRE(rgb.mV[c] <= 0.5f + 1e-5f);
             }
-            ensure("saturation did not run away", mWheel.getSat() <= widest + 1e-4f);
-            ensure("but it did move out to the boundary", mWheel.getSat() > rim * 0.9f);
+            UNSCOPED_INFO("saturation did not run away");
+            REQUIRE(mWheel.getSat() <= widest + 1e-4f);
+            UNSCOPED_INFO("but it did move out to the boundary");
+            REQUIRE(mWheel.getSat() > rim * 0.9f);
         }
 
         // Far enough past the rim in a primary direction and the triplet is
         // pinned to a cube corner, which is exactly the widest case.
         mWheel.setPolar(0.f, rim * 4.f);
-        ensure_approximately_equals("corner-pinned saturation", mWheel.getSat(), widest, 4);
-        ensure_approximately_equals("r on its ceiling", mWheel.getRGB().mV[VX], 0.5f, 5);
-        ensure_approximately_equals("g on its floor", mWheel.getRGB().mV[VY], -0.5f, 5);
+        UNSCOPED_INFO("corner-pinned saturation");
+        CHECK_THAT(mWheel.getSat(), ll_test::WithinBits(widest, 4));
+        UNSCOPED_INFO("r on its ceiling");
+        CHECK_THAT(mWheel.getRGB().mV[VX], ll_test::WithinBits(0.5f, 5));
+        UNSCOPED_INFO("g on its floor");
+        CHECK_THAT(mWheel.getRGB().mV[VY], ll_test::WithinBits(-0.5f, 5));
     }
 
     // Clamping must not silently rotate the hue -- the puck would slide around
     // the ring while the user dragged straight outward.
-    template<> template<>
-    void wheel_object::test<9>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: clamping past the rim does not rotate the hue", "[ALColorWheelModel]")
     {
         asLift();
         for (S32 i = 0; i < 12; ++i)
         {
+            CAPTURE(i);
             const F32 hue = deg((F32)i * 30.f);
             mWheel.setPolar(hue, mWheel.getMaxSat() * 3.f);
-            ensure_approximately_equals("hue held through the clamp",
-                                        angleDelta(mWheel.getHue(), hue), 0.f, 3);
+            REQUIRE_THAT(angleDelta(mWheel.getHue(), hue), ll_test::WithinBits(0.f, 3));
         }
     }
 
@@ -242,8 +250,7 @@ namespace tut
 
     // Moving the master keeps the chroma, which is what makes the wheel and
     // its slider feel independent.
-    template<> template<>
-    void wheel_object::test<10>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: moving the master keeps the hue and saturation", "[ALColorWheelModel]")
     {
         asGain();
         mWheel.setPolar(deg(200.f), mWheel.getMaxSat() * 0.4f);
@@ -251,40 +258,40 @@ namespace tut
         const F32 sat = mWheel.getSat();
 
         mWheel.setMaster(1.2f);
-        ensure_approximately_equals("master moved", mWheel.getMaster(), 1.2f, 4);
-        ensure_approximately_equals("hue kept", angleDelta(mWheel.getHue(), hue), 0.f, 3);
-        ensure_approximately_equals("saturation kept", mWheel.getSat(), sat, 3);
+        CHECK_THAT(mWheel.getMaster(), ll_test::WithinBits(1.2f, 4));
+        CHECK_THAT(angleDelta(mWheel.getHue(), hue), ll_test::WithinBits(0.f, 3));
+        CHECK_THAT(mWheel.getSat(), ll_test::WithinBits(sat, 3));
     }
 
-    // A master pushed past its range clamps, and the triplet stays legal.
-    template<> template<>
-    void wheel_object::test<11>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: a master pushed past its range clamps and the triplet stays legal", "[ALColorWheelModel]")
     {
         asGain();
         mWheel.setMaster(9.f);
-        ensure("master clamped", mWheel.getMaster() <= 1.5f + 1e-5f);
+        CHECK(mWheel.getMaster() <= 1.5f + 1e-5f);
         for (S32 c = 0; c < 3; ++c)
         {
-            ensure("channel in range", mWheel.getRGB().mV[c] <= 1.5f + 1e-5f);
+            CAPTURE(c);
+            REQUIRE(mWheel.getRGB().mV[c] <= 1.5f + 1e-5f);
         }
     }
 
     // Tint wheels lock the master, because the renderer divides each tint by
     // dot(tint, LUMA) -- magnitude cancels, so a master there would be a
     // control that visibly does nothing.
-    template<> template<>
-    void wheel_object::test<12>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: a tint wheel ignores the master and re-centres it on a puck move", "[ALColorWheelModel]")
     {
         asTint();
         mWheel.setPolar(deg(90.f), mWheel.getMaxSat() * 0.5f);
         const F32 master = mWheel.getMaster();
 
         mWheel.setMaster(0.9f);
-        ensure_approximately_equals("master ignored", mWheel.getMaster(), master, 5);
+        UNSCOPED_INFO("master ignored");
+        CHECK_THAT(mWheel.getMaster(), ll_test::WithinBits(master, 5));
 
         // ... and a fresh puck move re-centres on the configured neutral.
         mWheel.setPolar(deg(30.f), mWheel.getMaxSat() * 0.5f);
-        ensure_approximately_equals("re-centred on neutral", mWheel.getMaster(), 0.5f, 4);
+        UNSCOPED_INFO("re-centred on neutral");
+        CHECK_THAT(mWheel.getMaster(), ll_test::WithinBits(0.5f, 4));
     }
 
     // --- ring / puck agreement ----------------------------------------------
@@ -292,34 +299,33 @@ namespace tut
     // The ring is generated from the same basis as the puck, so the colour
     // shown at an angle is the colour dragging to that angle produces. Drawing
     // a generic HSV ring instead is where these two drift apart.
-    template<> template<>
-    void wheel_object::test<13>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: the ring's colour at a hue is coloured and has that hue", "[ALColorWheelModel]")
     {
         for (S32 i = 0; i < 36; ++i)
         {
+            CAPTURE(i);
             const F32 hue = deg((F32)i * 10.f);
             const LLVector3 ring = ALColorWheelModel::ringColor(hue);
 
             F32 ring_hue, ring_sat;
             ALColorWheelModel::toPolar(ring, ring_hue, ring_sat);
-            ensure_approximately_equals("ring hue matches the puck's",
-                                        angleDelta(ring_hue, hue), 0.f, 3);
-            ensure("ring is actually coloured", ring_sat > 0.f);
+            REQUIRE_THAT(angleDelta(ring_hue, hue), ll_test::WithinBits(0.f, 3));
+            REQUIRE(ring_sat > 0.f);
         }
     }
 
     // The ring's reference chroma is chosen to stay inside 0..1, so no channel
     // is ever clipped -- clipping would bend the hue it is advertising.
-    template<> template<>
-    void wheel_object::test<14>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: every ring channel stays strictly inside 0..1", "[ALColorWheelModel]")
     {
         for (S32 i = 0; i < 72; ++i)
         {
             const LLVector3 ring = ALColorWheelModel::ringColor(deg((F32)i * 5.f));
             for (S32 c = 0; c < 3; ++c)
             {
-                ensure("ring channel is strictly inside the gamut",
-                       ring.mV[c] > 0.001f && ring.mV[c] < 0.999f);
+                CAPTURE(i, c);
+                REQUIRE(ring.mV[c] > 0.001f);
+                REQUIRE(ring.mV[c] < 0.999f);
             }
         }
     }
@@ -327,93 +333,102 @@ namespace tut
     // --- numeric entry and reset --------------------------------------------
 
     // Typing into one field leaves the other two alone and moves the puck.
-    template<> template<>
-    void wheel_object::test<15>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: setChannel writes one channel alone and moves the puck", "[ALColorWheelModel]")
     {
         asLift();
         mWheel.setChannel(0, 0.2f);
-        ensure_approximately_equals("channel written", mWheel.getRGB().mV[VX], 0.2f, 5);
-        ensure_approximately_equals("g untouched", mWheel.getRGB().mV[VY], 0.f, 5);
-        ensure_approximately_equals("b untouched", mWheel.getRGB().mV[VZ], 0.f, 5);
-        ensure("puck moved off centre", mWheel.getSat() > 0.f);
-        ensure_approximately_equals("towards red", angleDelta(mWheel.getHue(), 0.f), 0.f, 3);
+        CHECK_THAT(mWheel.getRGB().mV[VX], ll_test::WithinBits(0.2f, 5));
+        UNSCOPED_INFO("g untouched");
+        CHECK_THAT(mWheel.getRGB().mV[VY], ll_test::WithinBits(0.f, 5));
+        UNSCOPED_INFO("b untouched");
+        CHECK_THAT(mWheel.getRGB().mV[VZ], ll_test::WithinBits(0.f, 5));
+        UNSCOPED_INFO("puck moved off centre");
+        CHECK(mWheel.getSat() > 0.f);
+        UNSCOPED_INFO("towards red");
+        CHECK_THAT(angleDelta(mWheel.getHue(), 0.f), ll_test::WithinBits(0.f, 3));
 
         mWheel.setChannel(0, 9.f);
-        ensure_approximately_equals("typed value clamped", mWheel.getRGB().mV[VX], 0.5f, 5);
+        UNSCOPED_INFO("typed value clamped");
+        CHECK_THAT(mWheel.getRGB().mV[VX], ll_test::WithinBits(0.5f, 5));
 
         mWheel.setChannel(7, 1.f);      // out of range, ignored
-        ensure_approximately_equals("bad index ignored", mWheel.getRGB().mV[VX], 0.5f, 5);
+        UNSCOPED_INFO("bad index ignored");
+        CHECK_THAT(mWheel.getRGB().mV[VX], ll_test::WithinBits(0.5f, 5));
     }
 
-    // Reset returns the configured neutral for each flavour.
-    template<> template<>
-    void wheel_object::test<16>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: reset returns the configured neutral for each flavour", "[ALColorWheelModel]")
     {
         asLift();
         mWheel.setPolar(deg(45.f), mWheel.getMaxSat());
         mWheel.reset();
-        ensure_approximately_equals("lift neutral is 0", mWheel.getMaster(), 0.f, 5);
-        ensure_approximately_equals("and colourless", mWheel.getSat(), 0.f, 5);
+        UNSCOPED_INFO("lift neutral is 0");
+        CHECK_THAT(mWheel.getMaster(), ll_test::WithinBits(0.f, 5));
+        UNSCOPED_INFO("and colourless");
+        CHECK_THAT(mWheel.getSat(), ll_test::WithinBits(0.f, 5));
 
         asGain();
         mWheel.reset();
-        ensure_approximately_equals("gain neutral is 1", mWheel.getMaster(), 1.f, 5);
+        UNSCOPED_INFO("gain neutral is 1");
+        CHECK_THAT(mWheel.getMaster(), ll_test::WithinBits(1.f, 5));
 
         asTint();
         mWheel.reset();
-        ensure_approximately_equals("tint neutral is 0.5", mWheel.getMaster(), 0.5f, 5);
-        ensure_approximately_equals("tint neutral r", mWheel.getRGB().mV[VX], 0.5f, 5);
+        UNSCOPED_INFO("tint neutral is 0.5");
+        CHECK_THAT(mWheel.getMaster(), ll_test::WithinBits(0.5f, 5));
+        UNSCOPED_INFO("tint neutral r");
+        CHECK_THAT(mWheel.getRGB().mV[VX], ll_test::WithinBits(0.5f, 5));
     }
 
     // Re-configuring re-clamps whatever was already held, so switching a wheel
     // from lift to gain cannot leave an out-of-range value behind.
-    template<> template<>
-    void wheel_object::test<17>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: configure re-clamps the value already held", "[ALColorWheelModel]")
     {
         asLift();
         mWheel.setRGB(LLVector3(-0.4f, 0.f, 0.3f));
         asGain();
         for (S32 c = 0; c < 3; ++c)
         {
-            ensure("re-clamped on configure",
-                   mWheel.getRGB().mV[c] >= 0.5f - 1e-5f && mWheel.getRGB().mV[c] <= 1.5f + 1e-5f);
+            CAPTURE(c);
+            REQUIRE(mWheel.getRGB().mV[c] >= 0.5f - 1e-5f);
+            REQUIRE(mWheel.getRGB().mV[c] <= 1.5f + 1e-5f);
         }
     }
 
-    // A reversed range is accepted rather than producing a negative width.
-    template<> template<>
-    void wheel_object::test<18>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: a reversed range is accepted rather than producing a negative width", "[ALColorWheelModel]")
     {
         mWheel.configure(0.f, 0.5f, -0.5f, false);
-        ensure_approximately_equals("min is the low one", mWheel.getMin(), -0.5f, 5);
-        ensure_approximately_equals("max is the high one", mWheel.getMax(), 0.5f, 5);
-        ensure("max saturation is positive", mWheel.getMaxSat() > 0.f);
+        UNSCOPED_INFO("min is the low one");
+        CHECK_THAT(mWheel.getMin(), ll_test::WithinBits(-0.5f, 5));
+        UNSCOPED_INFO("max is the high one");
+        CHECK_THAT(mWheel.getMax(), ll_test::WithinBits(0.5f, 5));
+        CHECK(mWheel.getMaxSat() > 0.f);
     }
 
     // Exactly zero, not approximately: the vectorscope bins chroma with floorf,
     // so an epsilon of either sign puts one grey in a different cell from the
     // next. Compared bit for bit because that is the property callers rely on,
     // and because an epsilon is exactly what a tolerance would hide.
-    template<> template<>
-    void wheel_object::test<19>()
+    TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: toChroma gives a grey exactly zero chroma", "[ALColorWheelModel]")
     {
         for (S32 level = 0; level < 256; ++level)
         {
+            CAPTURE(level);
             const F32 grey = (F32)level / 255.f;
             F32 u = 1.f, v = 1.f;
             ALColorWheelModel::toChroma(LLVector3(grey, grey, grey), u, v);
-            ensure("grey has no u", u == 0.f);
-            ensure("grey has no v", v == 0.f);
+            REQUIRE(u == 0.f);
+            REQUIRE(v == 0.f);
         }
 
         // Outside 0..1 as well: wheels carry lift and gain, which sit either
         // side of the unit range.
         for (F32 grey : { -0.4f, 1.5f, 37.f })
         {
+            CAPTURE(grey);
             F32 u = 1.f, v = 1.f;
             ALColorWheelModel::toChroma(LLVector3(grey, grey, grey), u, v);
-            ensure("grey has no u", u == 0.f);
-            ensure("grey has no v", v == 0.f);
+            REQUIRE(u == 0.f);
+            REQUIRE(v == 0.f);
         }
     }
 }

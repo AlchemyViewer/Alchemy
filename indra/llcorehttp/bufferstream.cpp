@@ -185,6 +185,41 @@ std::streamsize BufferArrayStreamBuf::xsputn(const char * src, std::streamsize c
 }
 
 
+namespace
+{
+    // Where a seek of off from way lands in size bytes, from cur for a seek
+    // from the current position. Before the start is -1, and past the end
+    // is the end.
+    std::streamoff seek_target(std::streamoff off, std::ios_base::seekdir way, size_t cur, size_t size)
+    {
+        std::streamoff base(0);
+        switch (way)
+        {
+        case std::ios_base::beg:
+            break;
+
+        case std::ios_base::cur:
+            base = std::streamoff(cur);
+            break;
+
+        case std::ios_base::end:
+            base = std::streamoff(size);
+            break;
+
+        default:
+            return -1;
+        }
+
+        const std::streamoff target(base + off);
+        if (target < 0)
+        {
+            return -1;
+        }
+        return (std::min)(target, std::streamoff(size));
+    }
+}
+
+
 std::streampos BufferArrayStreamBuf::seekoff(std::streamoff off,
                                              std::ios_base::seekdir way,
                                              std::ios_base::openmode which)
@@ -198,70 +233,47 @@ std::streampos BufferArrayStreamBuf::seekoff(std::streamoff off,
 
     if (std::ios_base::in == which)
     {
-        size_t pos(0);
-
-        switch (way)
+        const size_t size(mBufferArray->size());
+        const std::streamoff target(seek_target(off, way, mReadCurPos, size));
+        if (target < 0)
         {
-        case std::ios_base::beg:
-            pos = off;
-            break;
-
-        case std::ios_base::cur:
-            pos = mReadCurPos += off;
-            break;
-
-        case std::ios_base::end:
-            pos = mBufferArray->mLen - off;
-            break;
-
-        default:
             return ret;
         }
+        const size_t pos(target);
 
-        if (pos >= mBufferArray->size())
+        if (0 == size)
         {
-            pos = (std::max)(size_t(0), mBufferArray->size() - 1);
+            // Nothing to read: where a new stream buffer starts
+            mReadCurBlock = -1;
+            mReadBegin = mReadCur = mReadEnd = NULL;
         }
-        size_t ba_offset(0);
-        int block(mBufferArray->findBlock(pos, &ba_offset));
-        if (block < 0)
-            return ret;
-        const char * start(NULL), * end(NULL);
-        if (! mBufferArray->getBlockStartEnd(block, &start, &end))
-            return ret;
-        mReadCurBlock = block;
-        mReadBegin = start;
-        mReadCur = start + ba_offset;
-        mReadEnd = end;
+        else
+        {
+            // The end lies just past the last byte, in that byte's block,
+            // so that a read there finds nothing and a putback finds the byte.
+            const bool at_end(pos == size);
+            size_t ba_offset(0);
+            int block(mBufferArray->findBlock(at_end ? pos - 1 : pos, &ba_offset));
+            if (block < 0)
+                return ret;
+            const char * start(NULL), * end(NULL);
+            if (! mBufferArray->getBlockStartEnd(block, &start, &end))
+                return ret;
+            mReadCurBlock = block;
+            mReadBegin = start;
+            mReadCur = start + ba_offset + (at_end ? 1 : 0);
+            mReadEnd = end;
+        }
         ret = mReadCurPos = pos;
     }
     else if (std::ios_base::out == which)
     {
-        size_t pos(0);
-
-        switch (way)
+        const std::streamoff target(seek_target(off, way, mWriteCurPos, mBufferArray->size()));
+        if (target < 0)
         {
-        case std::ios_base::beg:
-            pos = off;
-            break;
-
-        case std::ios_base::cur:
-            pos = mWriteCurPos += off;
-            break;
-
-        case std::ios_base::end:
-            pos = mBufferArray->mLen - off;
-            break;
-
-        default:
             return ret;
         }
-
-        if (pos > mBufferArray->size())
-        {
-            pos = mBufferArray->size();
-        }
-        ret = mWriteCurPos = pos;
+        ret = mWriteCurPos = size_t(target);
     }
 
     return ret;

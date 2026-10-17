@@ -33,7 +33,7 @@
 #include "altextview.h"
 #include "llfocusmgr.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <set>
 
@@ -70,7 +70,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct alscriptinspectorpane_data
     {
@@ -99,7 +99,7 @@ namespace tut
             ALScriptInspectorPane* found = window.find<ALScriptInspectorPane>("inspector_pane");
             if (!found)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             return found;
         }
@@ -123,14 +123,8 @@ namespace tut
         std::string shown() { return pane()->view()->document().text(); }
     };
 
-    typedef test_group<alscriptinspectorpane_data> alscriptinspectorpane_group;
-    typedef alscriptinspectorpane_group::object    alscriptinspectorpane_object;
-    alscriptinspectorpane_group                    alscriptinspectorpane_instance("alscriptinspectorpane");
-
-    template<> template<>
-    void alscriptinspectorpane_object::test<1>()
+    TEST_CASE_METHOD(alscriptinspectorpane_data, "alscriptinspectorpane: a hover shows its declaration as a link and its type as code and page", "[alscriptinspectorpane]")
     {
-        set_test_name("a name's declaration, where it is declared as a link there, what is expected, its type as code, its words and page");
         ALScriptInspectorPane*   inspector = pane();
         Doc&                     doc       = tab("a");
         ALScriptAnalysis::Result result    = hover("integer count");
@@ -142,7 +136,7 @@ namespace tut
         result.hover.documentation         = "How many.";
         result.hover.link                  = "https://example.com/count";
         inspector->inspected(doc, result, ALTextPos(0, 8));
-        ensure_equals("said", shown(),
+        CHECK(shown() ==
                       std::string("integer count\nDeclared on line 1.\nExpected here: float\n\ninteger\n  count\n\nHow many.\n"
                                   "https://example.com/count"));
         const std::vector<ALTextView::Substitution>& links = inspector->view()->substitutions();
@@ -153,18 +147,41 @@ namespace tut
             to  = link.range.begin == ALTextPos(1, 0) ? &link : to;
             url = link.range.begin == ALTextPos(8, 0) ? &link : url;
         }
-        ensure("the declaration's line a link there", to && to->link && to->tooltip == "Go to the declaration");
-        ensure("to the line", to->value["line"].asInteger() == 0 && to->value["column"].asInteger() == 8);
-        ensure("in the script", to->value["path"].asString().empty());
-        ensure("the page a link", url && url->link);
+        {
+            INFO("the declaration's line a link there");
+            REQUIRE(to);
+            REQUIRE(to->link);
+            CHECK(to->tooltip == "Go to the declaration");
+        }
+        {
+            INFO("to the line");
+            CHECK(to->value["line"].asInteger() == 0);
+            CHECK(to->value["column"].asInteger() == 8);
+        }
+        UNSCOPED_INFO("in the script");
+        REQUIRE(to->value["path"].asString().empty());
+        {
+            INFO("the page a link");
+            REQUIRE(url);
+            CHECK(url->link);
+        }
         std::set<S32> styled;
         for (const ALTextView::Style& style : inspector->view()->styles())
         {
             styled.insert(style.range.begin.line);
         }
-        ensure("the declaration as code", styled.count(0) == 1);
-        ensure("the type as code", styled.count(4) == 1 && styled.count(5) == 1);
-        ensure("the words not", styled.count(7) == 0 && styled.count(2) == 0);
+        UNSCOPED_INFO("the declaration as code");
+        REQUIRE(styled.count(0) == 1);
+        {
+            INFO("the type as code");
+            REQUIRE(styled.count(4) == 1);
+            REQUIRE(styled.count(5) == 1);
+        }
+        {
+            INFO("the words not");
+            REQUIRE(styled.count(7) == 0);
+            REQUIRE(styled.count(2) == 0);
+        }
 
         // Followed: the window's.
         window.floater->setVisible(true);
@@ -174,57 +191,64 @@ namespace tut
             view->handleMouseDown(4, y, MASK_NONE);
             view->handleMouseUp(4, y, MASK_NONE);
         }
-        ensure("followed", told().went.size() == 1 && told().went[0]["line"].asInteger() == 0);
+        {
+            INFO("followed");
+            REQUIRE(told().went.size() == 1);
+            CHECK(told().went[0]["line"].asInteger() == 0);
+        }
     }
 
-    template<> template<>
-    void alscriptinspectorpane_object::test<2>()
+    TEST_CASE_METHOD(alscriptinspectorpane_data, "alscriptinspectorpane: an answer for another tab or a place the caret has left is not shown", "[alscriptinspectorpane]")
     {
-        set_test_name("an answer for another tab, or a place the caret has left, not shown");
         ALScriptInspectorPane* inspector = pane();
         Doc&                   doc       = tab("a");
         Doc&                   other     = tab("b");
         inspector->show("before");
         inspector->inspected(other, hover("x"), ALTextPos(0, 8));
-        ensure_equals("another tab's", shown(), std::string("before"));
+        UNSCOPED_INFO("another tab's");
+        CHECK(shown() == std::string("before"));
         inspector->inspected(doc, hover("x"), ALTextPos(1, 0));
-        ensure_equals("the caret gone", shown(), std::string("before"));
+        UNSCOPED_INFO("the caret gone");
+        CHECK(shown() == std::string("before"));
         inspector->inspected(doc, hover("x"), ALTextPos(0, 8));
-        ensure_equals("this one", shown(), std::string("x"));
+        UNSCOPED_INFO("this one");
+        CHECK(shown() == std::string("x"));
         inspector->forget();
-        ensure_equals("forgotten", shown(), std::string());
+        UNSCOPED_INFO("forgotten");
+        CHECK(shown() == std::string());
     }
 
-    template<> template<>
-    void alscriptinspectorpane_object::test<3>()
+    TEST_CASE_METHOD(alscriptinspectorpane_data, "alscriptinspectorpane: a built-in the analyzer has no words for shows the definitions' words", "[alscriptinspectorpane]")
     {
-        set_test_name("a word of the language's the analyzer has no words for: the definitions', and its page");
         ALScriptInspectorPane* inspector = pane();
         Doc&                   doc       = tab("a", "default { state_entry() { llSay(0, \"hi\"); } }\n");
         doc.editor->setCaret(ALTextPos(0, 28));
         inspector->inspected(doc, hover("llSay(integer channel, string msg)"), ALTextPos(0, 8));
-        ensure_equals("the definitions' words and page", shown(),
+        UNSCOPED_INFO("the definitions' words and page");
+        CHECK(shown() ==
                       std::string("llSay(integer channel, string msg)\n\nSays it.\nhttps://wiki.example/llSay"));
         ALScriptAnalysis::Result own = hover("llSay(integer channel, string msg)");
         own.hover.documentation      = "The analyzer's.";
         inspector->inspected(doc, own, ALTextPos(0, 8));
-        ensure_equals("the analyzer's first", shown(), std::string("llSay(integer channel, string msg)\n\nThe analyzer's."));
+        UNSCOPED_INFO("the analyzer's first");
+        CHECK(shown() == std::string("llSay(integer channel, string msg)\n\nThe analyzer's."));
         own.hover.link = "https://mine.example";
         inspector->inspected(doc, own, ALTextPos(0, 8));
-        ensure("its own page", shown().find("\nhttps://mine.example") != std::string::npos);
+        UNSCOPED_INFO("its own page");
+        REQUIRE(shown().find("\nhttps://mine.example") != std::string::npos);
         own.hover.documentation.clear();
         inspector->inspected(doc, own, ALTextPos(0, 8));
-        ensure_equals("the definitions' words, its own page", shown(),
+        UNSCOPED_INFO("the definitions' words, its own page");
+        CHECK(shown() ==
                       std::string("llSay(integer channel, string msg)\n\nSays it.\nhttps://mine.example"));
         doc.editor->setCaret(ALTextPos(0, 0));
         inspector->inspected(doc, hover("default"), ALTextPos(0, 8));
-        ensure_equals("a word the definitions have not", shown(), std::string("default"));
+        UNSCOPED_INFO("a word the definitions have not");
+        CHECK(shown() == std::string("default"));
     }
 
-    template<> template<>
-    void alscriptinspectorpane_object::test<4>()
+    TEST_CASE_METHOD(alscriptinspectorpane_data, "alscriptinspectorpane: a name declared in an include is said to be there and linked there", "[alscriptinspectorpane]")
     {
-        set_test_name("declared in an include, through the expansion: said in it, and linked there");
         ALScriptInspectorPane* inspector = pane();
         Doc&                   doc       = tab("a");
         told().expanded                  = true;
@@ -242,35 +266,42 @@ namespace tut
         result.hover.definitionLine     = 0;
         result.hover.definitionColumn   = 8;
         inspector->inspected(doc, result, ALTextPos(0, 8));
-        ensure_equals("in the include", shown(), std::string("integer count\nDeclared in inc.lsl on line 5."));
-        const ALTextView::Substitution& to = inspector->view()->substitutions().back();
-        ensure("linked there", to.value["path"].asString() == "disk:/inc.lsl" && to.value["line"].asInteger() == 4);
+        UNSCOPED_INFO("in the include");
+        CHECK(shown() == std::string("integer count\nDeclared in inc.lsl on line 5."));
+        const std::vector<ALTextView::Substitution>& to_include = inspector->view()->substitutions();
+        REQUIRE_FALSE(to_include.empty());
+        const ALTextView::Substitution& to = to_include.back();
+        {
+            INFO("linked there");
+            CHECK(to.value["path"].asString() == "disk:/inc.lsl");
+            CHECK(to.value["line"].asInteger() == 4);
+        }
         result.hover.definitionLine = 3;
         inspector->inspected(doc, result, ALTextPos(0, 8));
-        ensure_equals("from nothing of the source: not said", shown(), std::string("integer count"));
+        UNSCOPED_INFO("from nothing of the source: not said");
+        CHECK(shown() == std::string("integer count"));
     }
 
-    template<> template<>
-    void alscriptinspectorpane_object::test<5>()
+    TEST_CASE_METHOD(alscriptinspectorpane_data, "alscriptinspectorpane: the squiggles under the caret are listed under the hover or alone", "[alscriptinspectorpane]")
     {
-        set_test_name("what is squiggled where the caret is, each with what it says, under the name or alone");
         ALScriptInspectorPane* inspector = pane();
         Doc&                   doc       = tab("a");
         doc.editor->setDecorations({ squiggle(0, 8, 13, "Unused."), squiggle(0, 0, 13, "Twice."), squiggle(0, 8, 13, ""),
                                      squiggle(0, 8, 13, "Lit.", ALCodeEditor::Decoration::Style::Background),
                                      squiggle(1, 0, 5, "Elsewhere.") });
-        ensure_equals("each", inspector->problemsAt(doc, ALTextPos(0, 9)), std::string("Problem: Unused.\nProblem: Twice."));
-        ensure_equals("none", inspector->problemsAt(doc, ALTextPos(2, 0)), std::string());
+        UNSCOPED_INFO("each squiggle under the caret that says something");
+        CHECK(inspector->problemsAt(doc, ALTextPos(0, 9)) == std::string("Problem: Unused.\nProblem: Twice."));
+        CHECK(inspector->problemsAt(doc, ALTextPos(2, 0)) == std::string());
         inspector->inspected(doc, hover("integer count"), ALTextPos(0, 8));
-        ensure_equals("under the name", shown(), std::string("integer count\n\nProblem: Unused.\nProblem: Twice."));
+        UNSCOPED_INFO("under the name");
+        CHECK(shown() == std::string("integer count\n\nProblem: Unused.\nProblem: Twice."));
         inspector->inspected(doc, ALScriptAnalysis::Result(), ALTextPos(0, 8));
-        ensure_equals("alone", shown(), std::string("Problem: Unused.\nProblem: Twice."));
+        UNSCOPED_INFO("alone");
+        CHECK(shown() == std::string("Problem: Unused.\nProblem: Twice."));
     }
 
-    template<> template<>
-    void alscriptinspectorpane_object::test<6>()
+    TEST_CASE_METHOD(alscriptinspectorpane_data, "alscriptinspectorpane: a name from a required module is said to be in its file and linked there", "[alscriptinspectorpane]")
     {
-        set_test_name("declared in a module the script requires, which the analyzers read apart: said in its file, and linked there");
         ALScriptInspectorPane* inspector = pane();
         Doc&                   doc       = tab("a", "local util = require(\"util\")\nprint(util.twice(2))\n");
         told().expanded                  = true;
@@ -296,16 +327,25 @@ namespace tut
         result.hover.definitionColumn   = 11;
         result.hover.definitionFile     = "disk:/lib/util.luau";
         inspector->inspected(doc, result, ALTextPos(0, 8));
-        ensure_equals("in the module", shown(), std::string("function M.twice(n: number): number\nDeclared in util.luau on line 4."));
-        const ALTextView::Substitution& to = inspector->view()->substitutions().back();
-        ensure("linked there", to.value["path"].asString() == "disk:/lib/util.luau" && to.value["line"].asInteger() == 3 &&
-                                   to.value["column"].asInteger() == 11);
+        UNSCOPED_INFO("in the module");
+        CHECK(shown() == std::string("function M.twice(n: number): number\nDeclared in util.luau on line 4."));
+        const std::vector<ALTextView::Substitution>& to_module = inspector->view()->substitutions();
+        REQUIRE_FALSE(to_module.empty());
+        const ALTextView::Substitution& to = to_module.back();
+        {
+            INFO("linked there");
+            CHECK(to.value["path"].asString() == "disk:/lib/util.luau");
+            CHECK(to.value["line"].asInteger() == 3);
+            CHECK(to.value["column"].asInteger() == 11);
+        }
         result.hover.definitionFile = "disk:/lib/gone.luau";
         inspector->inspected(doc, result, ALTextPos(0, 8));
-        ensure_equals("a module the expansion has not: not said", shown(), std::string("function M.twice(n: number): number"));
+        UNSCOPED_INFO("a module the expansion has not: not said");
+        CHECK(shown() == std::string("function M.twice(n: number): number"));
         result.hover.definitionFile = "disk:/lib/util.luau";
         told().expanded             = false;
         inspector->inspected(doc, result, ALTextPos(0, 8));
-        ensure_equals("nor where the script is not expanded", shown(), std::string("function M.twice(n: number): number"));
+        UNSCOPED_INFO("nor where the script is not expanded");
+        CHECK(shown() == std::string("function M.twice(n: number): number"));
     }
 }

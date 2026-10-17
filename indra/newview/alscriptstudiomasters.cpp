@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "alfilewrite.h"
+#include "almainloop.h"
 #include "almastermatch.h"
 #include "alnotecardembedded.h"
 #include "alscriptenvelope.h"
@@ -382,7 +383,7 @@ void ALScriptStudioMasters::loaded(Doc& doc)
     std::vector<std::pair<std::string, std::string>> aliases   = mDiskMasters.aliasesFor(std::string(), lua);
     const U32                                        look      = ++doc.master->hintLook;
     const std::string                                id        = doc.id;
-    const LL::WorkQueue::ptr_t                       main_loop = LL::WorkQueue::getInstance("mainloop");
+    const LL::WorkQueue::ptr_t                       main_loop = ALMainLoop::queue();
     if (!main_loop)
     {
         // No main loop to hand it back to -- a test -- so looked for here.
@@ -621,7 +622,7 @@ void ALScriptStudioMasters::lookAgain()
     {
         return;
     }
-    const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
+    const LL::WorkQueue::ptr_t main_loop = ALMainLoop::queue();
     if (!main_loop)
     {
         return;

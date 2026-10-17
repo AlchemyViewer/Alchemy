@@ -36,6 +36,8 @@
 #include "hbxxh.h"
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
+
+#include "alwatersurface.h"
 #include "llviewercontrol.h"
 #include "llversioninfo.h"
 
@@ -72,6 +74,27 @@ bool                LLViewerShaderMgr::sInitialized = false;
 bool                LLViewerShaderMgr::sSkipReload = false;
 
 LLVector4           gShinyOrigin;
+
+// The water's hex-tiled wave layers: 0 none, 1 the big layer, 2 the mid layer too (waterSurface.glsl's WATER_HEXTILE).
+static S32 water_hextile()
+{
+    return (S32)llmin(gSavedSettings.getU32("AlchemyRenderWaterHextile"), 2U);
+}
+
+bool water_waves_supported()
+{
+    // The effective version, after the feature manager has held a context back (the Intel clamp): tessellation is
+    // GL 4.0.
+    return gGLManager.mGLVersion >= 4.f;
+}
+
+// Whether the session computes: a context with compute, GLSL 4.30 left to it after the feature manager's fallbacks,
+// and AlchemyRenderDisableCompute off. Read at shader load, as everything built on it is.
+static bool compute_enabled()
+{
+    const S32 glsl = gGLManager.mGLSLVersionMajor * 100 + gGLManager.mGLSLVersionMinor;
+    return gGLManager.mHasCompute && glsl >= 430 && !gSavedSettings.getBOOL("AlchemyRenderDisableCompute");
+}
 
 S32 clamp_terrain_mapping(S32 mapping)
 {
@@ -137,6 +160,7 @@ LLGLSLShader    gAlphaMaskProgram;
 LLGLSLShader    gBenchmarkProgram;
 LLGLSLShader    gReflectionProbeDisplayProgram;
 LLGLSLShader    gCopyProgram;
+LLGLSLShader    gCopyDepthProgram;
 LLGLSLShader    gPBRTerrainBakeProgram;
 LLGLSLShader    gDrawColorProgram;
 
@@ -149,11 +173,24 @@ LLGLSLShader        gObjectAlphaMaskNoColorProgram;
 //environment shaders
 LLGLSLShader        gWaterProgram;
 LLGLSLShader        gUnderWaterProgram;
+LLGLSLShader        gWaterWavesProgram;
+LLGLSLShader        gUnderWaterWavesProgram;
+LLGLSLShader        gWaterExclusionProgram;
+LLGLSLShader        gWaterFieldProgram;
+LLGLSLShader        gDepthPyramidProgram;
 
 //interface shaders
 LLGLSLShader        gHighlightProgram;
 LLGLSLShader        gHighlightNormalProgram;
 LLGLSLShader        gHighlightSpecularProgram;
+LLGLSLShader        gSelectionIdProgram;
+LLGLSLShader        gSelectionWireframeProgram;
+LLGLSLShader        gSelectionJumpProgram;
+LLGLSLShader        gSelectionTileProgram;
+LLGLSLShader        gSelectionOutlineProgram;
+LLGLSLShader        gSelectionGlowReachProgram;
+LLGLSLShader        gSelectionGlowRowProgram;
+LLGLSLShader        gSelectionBackdropMaskProgram;
 
 LLGLSLShader        gDeferredHighlightProgram;
 
@@ -182,6 +219,7 @@ LLGLSLShader            gDeferredDiffuseAlphaMaskProgram;
 LLGLSLShader            gDeferredNonIndexedDiffuseAlphaMaskProgram;
 LLGLSLShader            gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram;
 LLGLSLShader            gDeferredBumpProgram;
+LLGLSLShader            gDeferredBumpAlphaMaskProgram;
 LLGLSLShader            gDeferredTerrainProgram;
 LLGLSLShader            gDeferredTreeProgram;
 LLGLSLShader            gDeferredTreeShadowProgram;
@@ -194,9 +232,11 @@ LLGLSLShader            gDeferredMultiSpotLightProgram;
 LLGLSLShader            gDeferredSunProgram;
 LLGLSLShader            gDeferredSunProbeProgram;
 LLGLSLShader            gHazeProgram;
+LLGLSLShader            gHazeOnWaterProgram;
 LLGLSLShader            gHazeWaterProgram;
 LLGLSLShader            gDeferredBlurLightProgram;
 LLGLSLShader            gDeferredSoftenProgram;
+LLGLSLShader            gDeferredSoftenSkyProgram;
 LLGLSLShader            gDeferredShadowProgram;
 LLGLSLShader            gDeferredTerrainShadowProgram;
 LLGLSLShader            gDeferredShadowCubeProgram;
@@ -271,11 +311,14 @@ LLGLSLShader            gHUDPBROpaqueProgram;
 LLGLSLShader            gPBRGlowProgram;
 LLGLSLShader            gPBRGlowIndexedProgram; // multi-material indexed PBR glow
 LLGLSLShader            gDeferredPBROpaqueProgram;
+LLGLSLShader            gDeferredPBRAlphaMaskProgram;
 LLGLSLShader            gDeferredPBROpaqueIndexedProgram;
+LLGLSLShader            gDeferredPBRAlphaMaskIndexedProgram;
 LLGLSLShader            gHUDPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRAlphaImpostorProgram;
 LLGLSLShader            gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
+LLGLSLShader            gDeferredPBRTerrainAlphaMaskProgram[TERRAIN_PAINT_TYPE_COUNT];
 
 // Mirror corners are only reachable during the hero-probe mirror pass, which RenderMirrors
 // gates entirely; toggling it re-runs setShaders (handleReflectionProbeDetailChanged), so
@@ -554,6 +597,10 @@ void LLViewerShaderMgr::setShaders()
     // whole next frame.
     LLPipeline::updateReverseZ();
 
+    // The same for compute: the shared objects compiled for its stage and every program built on it follow the switch
+    // as it stands for this load.
+    LLRender::sCompute = compute_enabled();
+
     {
         static LLCachedControl<bool> shader_cache_enabled(gSavedSettings, "RenderShaderCacheEnabled", true);
         static LLUUID old_cache_version;
@@ -787,6 +834,8 @@ void LLViewerShaderMgr::unloadShaders()
         LLGLSLShader* shader = *(LLGLSLShader::sInstances.begin());
         shader->unload();
     }
+    // The shared objects are the manager's, so they go here rather than with the programs that attached them.
+    clearShaderObjects();
 
     mShaderLevel[SHADER_LIGHTING] = 0;
     mShaderLevel[SHADER_OBJECT] = 0;
@@ -829,6 +878,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     shaders.push_back( make_pair( "avatar/avatarSkinV.glsl",                1 ) );
     shaders.push_back( make_pair( "avatar/objectSkinV.glsl",                1 ) );
     shaders.push_back( make_pair( "deferred/textureUtilV.glsl",             1 ) );
+    shaders.push_back( make_pair( "environment/waterSurface.glsl",          1 ) );
     if (gGLManager.mGLSLVersionMajor >= 2 || gGLManager.mGLSLVersionMinor >= 30)
     {
         shaders.push_back( make_pair( "objects/indexedTextureV.glsl",           1 ) );
@@ -925,6 +975,9 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         }
     }
 
+    // The water's wave layers that hex-tile, read in waterSurface.glsl, a shared object.
+    attribs["WATER_HEXTILE"] = std::to_string(water_hextile());
+
     LLGLSLShader::sGlobalDefines = attribs;
 
     // Shared objects are compiled once and attached by name, so a per-program permutation
@@ -966,6 +1019,26 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         }
     }
 
+    // The water waves' stages, where they are wanted: the evaluation stage's surface and the lattice its heights are read
+    // through, and the control stage's depth pyramid test, which culls the patches the scene hides. The waves are
+    // optional, so these failing leaves only them off: their programs then fail to attach what is missing.
+    if (ALWaterSurface::wavesWanted())
+    {
+        const std::pair<const char*, GLenum> water_objects[] = {
+            { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
+            { "deferred/hexLatticeUtil.glsl", GL_TESS_EVALUATION_SHADER },
+            { "deferred/depthPyramidUtil.glsl", GL_TESS_CONTROL_SHADER },
+        };
+        for (const auto& object : water_objects)
+        {
+            S32 level = 1;
+            if (loadShaderFile(object.first, level, object.second, &attribs) == 0)
+            {
+                LL_WARNS("Shader") << "Failed to load the water waves' " << object.first << "; the water is drawn flat" << LL_ENDL;
+            }
+        }
+    }
+
     // Load the Basic Fragment Shaders at the appropriate level.
     // (in order of shader function call depth for reference purposes, deepest level first)
 
@@ -991,7 +1064,9 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/shadowUtil.glsl",                      1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/aoUtil.glsl",                          1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/terrainSurface.glsl",                  1) );
+    index_channels.push_back(-1);    shaders.push_back( make_pair( "environment/waterSurface.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/pbrterrainUtilF.glsl",                 1) );
+    index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/hexLatticeUtil.glsl",                  1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/tonemapUtilF.glsl",                    1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/colorGradeUtilF.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/postEffectUtilsF.glsl",                 1) );
@@ -1054,57 +1129,108 @@ bool LLViewerShaderMgr::loadShadersWater()
     {
         gWaterProgram.unload();
         gUnderWaterProgram.unload();
+        gWaterWavesProgram.unload();
+        gUnderWaterWavesProgram.unload();
+        gWaterExclusionProgram.unload();
+        gWaterFieldProgram.unload();
         return true;
     }
 
     if (success)
     {
-        // load water shader
-        gWaterProgram.mName = "Water Shader";
-        gWaterProgram.mFeatures.calculatesAtmospherics = true;
-        gWaterProgram.mFeatures.hasAtmospherics = true;
-        gWaterProgram.mFeatures.hasGamma = true;
-        gWaterProgram.mFeatures.hasSrgb = true;
-        gWaterProgram.mFeatures.hasReflectionProbes = true;
-        gWaterProgram.mFeatures.hasTonemap = true;
-        gWaterProgram.mFeatures.hasShadows = use_sun_shadow;
-        gWaterProgram.mShaderFiles.clear();
-        gWaterProgram.mShaderFiles.push_back(make_pair("environment/waterV.glsl", GL_VERTEX_SHADER));
-        gWaterProgram.mShaderFiles.push_back(make_pair("environment/waterF.glsl", GL_FRAGMENT_SHADER));
-        gWaterProgram.clearPermutations();
-        if (LLPipeline::sRenderTransparentWater)
+        // The surface seen from above and from below, each flat (the cells and rings, from waterV) and, where
+        // tessellation is, waved (the patches within the reach: waterPatchV, waterTC, waterTE). The two share the
+        // fragment stage and what it takes (waterVaryingsV, written once for the stage before it).
+        const auto setup = [&](LLGLSLShader& shader, bool under, bool waves)
         {
-            gWaterProgram.addPermutation("TRANSPARENT_WATER", "1");
-        }
+            shader.mName = std::string(under ? "Underwater" : "Water") + (waves ? " Waves Shader" : " Shader");
+            shader.mFeatures.calculatesAtmospherics = true;
+            shader.mFeatures.hasAtmospherics = true;
+            shader.mFeatures.hasWaterSurface = true;
+            shader.mFeatures.hasWaterWaves = waves;
+            if (!under)
+            {
+                shader.mFeatures.hasGamma = true;
+                shader.mFeatures.hasSrgb = true;
+                shader.mFeatures.hasReflectionProbes = true;
+                shader.mFeatures.hasTonemap = true;
+                shader.mFeatures.hasShadows = use_sun_shadow;
+            }
+            shader.mShaderFiles.clear();
+            if (waves)
+            {
+                shader.mShaderFiles.push_back(make_pair("environment/waterPatchV.glsl", GL_VERTEX_SHADER));
+                shader.mShaderFiles.push_back(make_pair("environment/waterTC.glsl", GL_TESS_CONTROL_SHADER));
+                shader.mShaderFiles.push_back(make_pair("environment/waterTE.glsl", GL_TESS_EVALUATION_SHADER));
+                shader.mShaderFiles.push_back(make_pair("environment/waterVaryingsV.glsl", GL_TESS_EVALUATION_SHADER));
+            }
+            else
+            {
+                shader.mShaderFiles.push_back(make_pair("environment/waterV.glsl", GL_VERTEX_SHADER));
+                shader.mShaderFiles.push_back(make_pair("environment/waterVaryingsV.glsl", GL_VERTEX_SHADER));
+            }
+            shader.mShaderFiles.push_back(make_pair(under ? "environment/underWaterF.glsl" : "environment/waterF.glsl", GL_FRAGMENT_SHADER));
+            shader.mShaderLevel = mShaderLevel[SHADER_WATER];
+            shader.mShaderGroup = LLGLSLShader::SG_WATER;
+            shader.clearPermutations();
+            if (LLPipeline::sRenderTransparentWater)
+            {
+                shader.addPermutation("TRANSPARENT_WATER", "1");
+            }
+            if (!under && use_sun_shadow)
+            {
+                shader.addPermutation("HAS_SUN_SHADOW", "1");
+            }
+            // Read by waterSurface.glsl, a shared object, through the global define; the program's copy keeps its
+            // hash honest.
+            shader.addPermutation("WATER_HEXTILE", std::to_string(water_hextile()));
+            return shader.createShader((under ? 0 : LLGLSLShader::VARIANT_CLASSIC) | mirror_variant());
+        };
 
-        if (use_sun_shadow)
+        success = setup(gWaterProgram, false, false) && setup(gUnderWaterProgram, true, false);
+        llassert(success);
+        // The waves are optional: built only where they are wanted, and their failing leaves them off, the water flat,
+        // rather than the water or any shader after it.
+        gWaterWavesProgram.unload();
+        gUnderWaterWavesProgram.unload();
+        if (success && ALWaterSurface::wavesWanted())
         {
-            gWaterProgram.addPermutation("HAS_SUN_SHADOW", "1");
+            if (!setup(gWaterWavesProgram, false, true) || !setup(gUnderWaterWavesProgram, true, true))
+            {
+                LL_WARNS("Shader") << "The water waves' programs did not build; the water is drawn flat" << LL_ENDL;
+                gWaterWavesProgram.unload();
+                gUnderWaterWavesProgram.unload();
+            }
         }
+    }
 
-        gWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
-        gWaterProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
-        success = gWaterProgram.createShader(LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
+    if (success)
+    {
+        // The exclusion pass's stencil write (LLDrawPoolWaterExclusion).
+        gWaterExclusionProgram.mName = "Water Exclusion Shader";
+        gWaterExclusionProgram.mFeatures.hasWaterSurface = true;
+        gWaterExclusionProgram.mShaderFiles.clear();
+        gWaterExclusionProgram.mShaderFiles.push_back(make_pair("environment/waterExclusionV.glsl", GL_VERTEX_SHADER));
+        gWaterExclusionProgram.mShaderFiles.push_back(make_pair("environment/waterExclusionF.glsl", GL_FRAGMENT_SHADER));
+        gWaterExclusionProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
+        gWaterExclusionProgram.mShaderGroup = LLGLSLShader::SG_WATER;
+        gWaterExclusionProgram.clearPermutations();
+        success = gWaterExclusionProgram.createShader();
         llassert(success);
     }
 
     if (success)
     {
-        //load under water vertex shader
-        gUnderWaterProgram.mName = "Underwater Shader";
-        gUnderWaterProgram.mFeatures.calculatesAtmospherics = true;
-        gUnderWaterProgram.mFeatures.hasAtmospherics = true;
-        gUnderWaterProgram.mShaderFiles.clear();
-        gUnderWaterProgram.mShaderFiles.push_back(make_pair("environment/waterV.glsl", GL_VERTEX_SHADER));
-        gUnderWaterProgram.mShaderFiles.push_back(make_pair("environment/underWaterF.glsl", GL_FRAGMENT_SHADER));
-        gUnderWaterProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
-        gUnderWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
-        gUnderWaterProgram.clearPermutations();
-        if (LLPipeline::sRenderTransparentWater)
-        {
-            gUnderWaterProgram.addPermutation("TRANSPARENT_WATER", "1");
-        }
-        success = gUnderWaterProgram.createShader(mirror_variant());
+        // The field and nothing else: the sky pool's occlusion query over the water (LLPipeline::mSkyBehindQuery).
+        gWaterFieldProgram.mName = "Water Field Shader";
+        gWaterFieldProgram.mFeatures.hasWaterSurface = true;
+        gWaterFieldProgram.mShaderFiles.clear();
+        gWaterFieldProgram.mShaderFiles.push_back(make_pair("environment/waterFieldV.glsl", GL_VERTEX_SHADER));
+        gWaterFieldProgram.mShaderFiles.push_back(make_pair("environment/waterFieldF.glsl", GL_FRAGMENT_SHADER));
+        gWaterFieldProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
+        gWaterFieldProgram.mShaderGroup = LLGLSLShader::SG_WATER;
+        gWaterFieldProgram.clearPermutations();
+        success = gWaterFieldProgram.createShader();
         llassert(success);
     }
 
@@ -1127,11 +1253,6 @@ bool LLViewerShaderMgr::loadShadersWater()
     {
         mShaderLevel[SHADER_WATER]--;
         return loadShadersWater();
-    }
-
-    if (LLWorld::instanceExists())
-    {
-        LLWorld::getInstance()->updateWaterObjects();
     }
 
     return true;
@@ -1297,6 +1418,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredNonIndexedDiffuseAlphaMaskProgram.unload();
         gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.unload();
         gDeferredBumpProgram.unload();
+        gDeferredBumpAlphaMaskProgram.unload();
         gDeferredImpostorProgram.unload();
         gDeferredTerrainProgram.unload();
         gDeferredLightProgram.unload();
@@ -1309,6 +1431,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredSunProgram.unload();
         gDeferredBlurLightProgram.unload();
         gDeferredSoftenProgram.unload();
+        gDeferredSoftenSkyProgram.unload();
         gDeferredShadowProgram.unload();
         gDeferredTerrainShadowProgram.unload();
         gDeferredShadowCubeProgram.unload();
@@ -1368,6 +1491,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         gNormalMapGenProgram.unload();
         gDeferredGenBrdfLutProgram.unload();
+        gDepthPyramidProgram.unload();
         gDeferredBufferVisualProgram.unload();
 
         for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
@@ -1381,12 +1505,15 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gPBRGlowProgram.unload();
         gPBRGlowIndexedProgram.unload();
         gDeferredPBROpaqueProgram.unload();
+        gDeferredPBRAlphaMaskProgram.unload();
         gDeferredPBROpaqueIndexedProgram.unload();
+        gDeferredPBRAlphaMaskIndexedProgram.unload();
         gDeferredPBRAlphaProgram.unload();
         gDeferredPBRAlphaImpostorProgram.unload();
         for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
         {
             gDeferredPBRTerrainProgram[paint_type].unload();
+            gDeferredPBRTerrainAlphaMaskProgram[paint_type].unload();
         }
 
 // [RLVa:KB] - @setsphere
@@ -1461,17 +1588,27 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         llassert(success);
     }
 
-    if (success)
+    // The bump pass draws the faces whose texture can fall below their cutoff with the program that discards, and the
+    // rest with one that cannot (LLDrawPoolBump::renderDeferred).
+    for (LLGLSLShader* shader : { &gDeferredBumpProgram, &gDeferredBumpAlphaMaskProgram })
     {
-        gDeferredBumpProgram.mName = "Deferred Bump Shader";
-        gDeferredBumpProgram.mShaderFiles.clear();
-        gDeferredBumpProgram.mShaderFiles.push_back(make_pair("deferred/bumpV.glsl", GL_VERTEX_SHADER));
-        gDeferredBumpProgram.mShaderFiles.push_back(make_pair("deferred/bumpF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredBumpProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        add_common_permutations(&gDeferredBumpProgram);
-        gDeferredBumpProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredBumpProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
-        llassert(success);
+        if (success)
+        {
+            const bool alpha_mask = shader == &gDeferredBumpAlphaMaskProgram;
+            shader->mName = alpha_mask ? "Deferred Bump Alpha Mask Shader" : "Deferred Bump Shader";
+            shader->mShaderFiles.clear();
+            shader->mShaderFiles.push_back(make_pair("deferred/bumpV.glsl", GL_VERTEX_SHADER));
+            shader->mShaderFiles.push_back(make_pair("deferred/bumpF.glsl", GL_FRAGMENT_SHADER));
+            shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            add_common_permutations(shader);
+            shader->addPermutation("LINEAR_DIFFUSE", "1");
+            if (alpha_mask)
+            {
+                shader->addPermutation("HAS_ALPHA_MASK", "1");
+            }
+            success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
+            llassert(success);
+        }
     }
 
     gDeferredMaterialProgram[1].mFeatures.hasLighting = false;
@@ -1612,52 +1749,72 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
     }
 
-    if (success)
+    // The opaque pass's program cannot discard; the alpha-mask pass has its own (LLDrawPoolGLTFPBR::renderDeferred).
+    for (LLGLSLShader* shader : { &gDeferredPBROpaqueProgram, &gDeferredPBRAlphaMaskProgram })
     {
-        gDeferredPBROpaqueProgram.mName = "Deferred PBR Opaque Shader";
-        gDeferredPBROpaqueProgram.mFeatures.hasSrgb = true;
+        if (success)
+        {
+            const bool alpha_mask = shader == &gDeferredPBRAlphaMaskProgram;
+            shader->mName = alpha_mask ? "Deferred PBR Alpha Mask Shader" : "Deferred PBR Opaque Shader";
+            shader->mFeatures.hasSrgb = true;
 
-        gDeferredPBROpaqueProgram.mShaderFiles.clear();
-        gDeferredPBROpaqueProgram.mShaderFiles.push_back(make_pair("deferred/pbropaqueV.glsl", GL_VERTEX_SHADER));
-        gDeferredPBROpaqueProgram.mShaderFiles.push_back(make_pair("deferred/pbropaqueF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredPBROpaqueProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredPBROpaqueProgram.clearPermutations();
+            shader->mShaderFiles.clear();
+            shader->mShaderFiles.push_back(make_pair("deferred/pbropaqueV.glsl", GL_VERTEX_SHADER));
+            shader->mShaderFiles.push_back(make_pair("deferred/pbropaqueF.glsl", GL_FRAGMENT_SHADER));
+            shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            shader->clearPermutations();
 
-        add_common_permutations(&gDeferredPBROpaqueProgram);
+            add_common_permutations(shader);
+            if (alpha_mask)
+            {
+                shader->addPermutation("HAS_ALPHA_MASK", "1");
+            }
 
-        success = gDeferredPBROpaqueProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
-        llassert(success);
+            success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
+            llassert(success);
+        }
     }
 
     if (success && LLGLSLShader::sIndexedGLTFChannels >= 2)
     {
-        // Indexed (multi-material) PBR opaque. Optional acceleration: failure here
+        // Indexed (multi-material) PBR, opaque and alpha mask. Optional acceleration: failure here
         // disables GLTF batching but must NOT fail overall shader loading, so the
         // result is kept out of the `success` chain.
-        gDeferredPBROpaqueIndexedProgram.mName = "Deferred PBR Opaque Indexed Shader";
-        gDeferredPBROpaqueIndexedProgram.mFeatures.hasSrgb = true;
-        gDeferredPBROpaqueIndexedProgram.mShaderFiles.clear();
-        gDeferredPBROpaqueIndexedProgram.mShaderFiles.push_back(make_pair("deferred/pbropaqueIndexedV.glsl", GL_VERTEX_SHADER));
-        gDeferredPBROpaqueIndexedProgram.mShaderFiles.push_back(make_pair("deferred/pbropaqueIndexedF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredPBROpaqueIndexedProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredPBROpaqueIndexedProgram.clearPermutations();
-        gDeferredPBROpaqueIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
-        add_common_permutations(&gDeferredPBROpaqueIndexedProgram);
-
-        // rigged (skinned) variant for animesh / avatar attachments
-        bool indexed_ok = gDeferredPBROpaqueIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
-
-        if (indexed_ok)
+        bool indexed_ok = true;
+        for (LLGLSLShader* shader : { &gDeferredPBROpaqueIndexedProgram, &gDeferredPBRAlphaMaskIndexedProgram })
         {
-            // Map each slot's four material samplers to texture units, on every variant.
-            const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            gDeferredPBROpaqueIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, true); });
+            const bool alpha_mask = shader == &gDeferredPBRAlphaMaskIndexedProgram;
+            shader->mName = alpha_mask ? "Deferred PBR Alpha Mask Indexed Shader" : "Deferred PBR Opaque Indexed Shader";
+            shader->mFeatures.hasSrgb = true;
+            shader->mShaderFiles.clear();
+            shader->mShaderFiles.push_back(make_pair("deferred/pbropaqueIndexedV.glsl", GL_VERTEX_SHADER));
+            shader->mShaderFiles.push_back(make_pair("deferred/pbropaqueIndexedF.glsl", GL_FRAGMENT_SHADER));
+            shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            shader->clearPermutations();
+            shader->addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
+            add_common_permutations(shader);
+            if (alpha_mask)
+            {
+                shader->addPermutation("HAS_ALPHA_MASK", "1");
+            }
+
+            // rigged (skinned) variant for animesh / avatar attachments
+            indexed_ok = indexed_ok && shader->createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
+
+            if (indexed_ok)
+            {
+                // Map each slot's four material samplers to texture units, on every variant.
+                const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+                shader->forEachVariant([n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, true); });
+            }
         }
-        else
+
+        if (!indexed_ok)
         {
             // Degrade gracefully: route all PBR faces back to the scalar path.
             LL_WARNS("ShaderLoading") << "Indexed PBR shader failed to load; GLTF batching disabled." << LL_ENDL;
             gDeferredPBROpaqueIndexedProgram.unload();
+            gDeferredPBRAlphaMaskIndexedProgram.unload();
             LLGLSLShader::sIndexedGLTFChannels = 0;
 
             // The legacy material indexed programs were built earlier (above) with the
@@ -1869,15 +2026,20 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         // Read by pbrterrainUtilF, a shared object, so the define that matters is the global one
         // set above; the program's copy keeps its name and hash honest.
         const bool hex_tiling = gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling");
-        for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
+        // A region whose materials include a masked one is drawn by the program that can discard; every other by one
+        // that cannot (LLDrawPoolTerrain::renderDeferred).
+        for (U32 program = 0; program < 2 * TERRAIN_PAINT_TYPE_COUNT; ++program)
         {
-            LLGLSLShader* shader = &gDeferredPBRTerrainProgram[paint_type];
-            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s %s%s",
+            const U32 paint_type = program % TERRAIN_PAINT_TYPE_COUNT;
+            const bool alpha_mask = program >= TERRAIN_PAINT_TYPE_COUNT;
+            LLGLSLShader* shader = alpha_mask ? &gDeferredPBRTerrainAlphaMaskProgram[paint_type] : &gDeferredPBRTerrainProgram[paint_type];
+            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s %s%s%s",
                     detail,
                     (paint_type == TERRAIN_PAINT_TYPE_PBR_PAINTMAP ? "paintmap" : "heightmap-with-noise"),
                     (mapping == 1 ? "flat" : "triplanar"),
                     (flat_normals ? "faceted" : "smooth"),
-                    (hex_tiling ? " hex" : ""));
+                    (hex_tiling ? " hex" : ""),
+                    (alpha_mask ? " alpha mask" : ""));
             shader->mFeatures.hasSrgb = true;
             shader->mFeatures.isAlphaLighting = true;
             shader->mFeatures.calculatesAtmospherics = true;
@@ -1903,6 +2065,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             if (hex_tiling)
             {
                 shader->addPermutation("TERRAIN_HEX_TILING", "1");
+            }
+            if (alpha_mask)
+            {
+                shader->addPermutation("HAS_ALPHA_MASK", "1");
             }
 
             add_common_permutations(shader);
@@ -2443,61 +2609,86 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        gDeferredSoftenProgram.mName = "Deferred Soften Shader";
-        gDeferredSoftenProgram.mShaderFiles.clear();
-        gDeferredSoftenProgram.mFeatures.hasSrgb = true;
-        gDeferredSoftenProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredSoftenProgram.mFeatures.hasAtmospherics = true;
-        gDeferredSoftenProgram.mFeatures.hasGamma = true;
-        gDeferredSoftenProgram.mFeatures.isDeferred = true;
-        gDeferredSoftenProgram.mFeatures.hasFullGBuffer = true;
-        gDeferredSoftenProgram.mFeatures.hasShadows = use_sun_shadow;
-        gDeferredSoftenProgram.mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED] > 2;
-
-        gDeferredSoftenProgram.clearPermutations();
-        add_common_permutations(&gDeferredSoftenProgram);
-        gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/softenLightV.glsl", GL_VERTEX_SHADER));
-        gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/softenLightF.glsl", GL_FRAGMENT_SHADER));
-
-        gDeferredSoftenProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-
-        if (use_sun_shadow)
+        // The soften pass, and its variant for the sky alone (softenLightF.glsl, SOFTEN_SKY), from one configuration,
+        // so the two resolve the same shader level and link the same objects.
+        const auto load_soften = [&](LLGLSLShader& shader, const char* name, bool sky)
         {
-            gDeferredSoftenProgram.addPermutation("HAS_SUN_SHADOW", "1");
-        }
+            shader.mName = name;
+            shader.mShaderFiles.clear();
+            shader.mFeatures.hasSrgb = true;
+            shader.mFeatures.calculatesAtmospherics = true;
+            shader.mFeatures.hasAtmospherics = true;
+            shader.mFeatures.hasGamma = true;
+            shader.mFeatures.isDeferred = true;
+            shader.mFeatures.hasFullGBuffer = true;
+            shader.mFeatures.hasShadows = use_sun_shadow;
+            shader.mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED] > 2;
 
-        if (gSavedSettings.getBOOL("RenderDeferredSSAO"))
-        { //if using SSAO, take screen space light map into account as if shadows are enabled
-            gDeferredSoftenProgram.mShaderLevel = llmax(gDeferredSoftenProgram.mShaderLevel, 2);
-            gDeferredSoftenProgram.addPermutation("HAS_SSAO", "1");
-        }
+            shader.clearPermutations();
+            add_common_permutations(&shader);
+            shader.mShaderFiles.push_back(make_pair("deferred/softenLightV.glsl", GL_VERTEX_SHADER));
+            shader.mShaderFiles.push_back(make_pair("deferred/softenLightF.glsl", GL_FRAGMENT_SHADER));
 
-        success = gDeferredSoftenProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
-        llassert(success);
+            shader.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+
+            if (use_sun_shadow)
+            {
+                shader.addPermutation("HAS_SUN_SHADOW", "1");
+            }
+
+            if (gSavedSettings.getBOOL("RenderDeferredSSAO"))
+            { //if using SSAO, take screen space light map into account as if shadows are enabled
+                shader.mShaderLevel = llmax(shader.mShaderLevel, 2);
+                shader.addPermutation("HAS_SSAO", "1");
+            }
+
+            if (sky)
+            {
+                shader.addPermutation("SOFTEN_SKY", "1");
+            }
+
+            const bool loaded = shader.createShader(LLGLSLShader::VARIANT_CLASSIC);
+            llassert(loaded);
+            return loaded;
+        };
+
+        success = load_soften(gDeferredSoftenProgram, "Deferred Soften Shader", false) &&
+                  load_soften(gDeferredSoftenSkyProgram, "Deferred Soften Sky Shader", true);
     }
 
     if (success)
     {
-        gHazeProgram.mName = "Haze Shader";
-        gHazeProgram.mShaderFiles.clear();
-        gHazeProgram.mFeatures.hasSrgb                = true;
-        gHazeProgram.mFeatures.calculatesAtmospherics = true;
-        gHazeProgram.mFeatures.hasAtmospherics        = true;
-        gHazeProgram.mFeatures.hasGamma               = true;
-        gHazeProgram.mFeatures.isDeferred             = true;
-        gHazeProgram.mFeatures.hasShadows             = use_sun_shadow;
-        gHazeProgram.mFeatures.hasReflectionProbes    = mShaderLevel[SHADER_DEFERRED] > 2;
+        // The haze pass, and its variant for the water's pixels, which converges on the sky behind the water.
+        const auto load_haze = [&](LLGLSLShader& program, const char* name, bool on_water)
+        {
+            program.mName = name;
+            program.mShaderFiles.clear();
+            program.mFeatures.hasSrgb                = true;
+            program.mFeatures.calculatesAtmospherics = true;
+            program.mFeatures.hasAtmospherics        = true;
+            program.mFeatures.hasGamma               = true;
+            program.mFeatures.isDeferred             = true;
+            program.mFeatures.hasShadows             = use_sun_shadow;
+            program.mFeatures.hasReflectionProbes    = mShaderLevel[SHADER_DEFERRED] > 2;
 
-        gHazeProgram.clearPermutations();
-        gHazeProgram.mShaderFiles.push_back(make_pair("deferred/hazeV.glsl", GL_VERTEX_SHADER));
-        gHazeProgram.mShaderFiles.push_back(make_pair("deferred/hazeF.glsl", GL_FRAGMENT_SHADER));
+            program.clearPermutations();
+            program.mShaderFiles.push_back(make_pair("deferred/hazeV.glsl", GL_VERTEX_SHADER));
+            program.mShaderFiles.push_back(make_pair("deferred/hazeF.glsl", GL_FRAGMENT_SHADER));
 
-        add_common_permutations(&gHazeProgram);
+            add_common_permutations(&program);
+            if (on_water)
+            {
+                program.addPermutation("HAZE_ON_WATER", "1");
+            }
 
-        gHazeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            program.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
-        success = gHazeProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
-        llassert(success);
+            const bool loaded = program.createShader(LLGLSLShader::VARIANT_CLASSIC);
+            llassert(loaded);
+            return loaded;
+        };
+        success = load_haze(gHazeProgram, "Haze Shader", false) &&
+                  load_haze(gHazeOnWaterProgram, "Haze On Water Shader", true);
     }
 
 
@@ -2513,6 +2704,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gHazeWaterProgram.mFeatures.isDeferred             = true;
         gHazeWaterProgram.mFeatures.hasShadows             = use_sun_shadow;
         gHazeWaterProgram.mFeatures.hasReflectionProbes    = mShaderLevel[SHADER_DEFERRED] > 2;
+        gHazeWaterProgram.mFeatures.hasWaterSurface        = true;
 
         gHazeWaterProgram.clearPermutations();
         gHazeWaterProgram.mShaderFiles.push_back(make_pair("deferred/waterHazeV.glsl", GL_VERTEX_SHADER));
@@ -3354,6 +3546,23 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         success = gDeferredGenBrdfLutProgram.createShader();
     }
 
+    // The depth pyramid's levels, where the session computes and the water's waves, its reader, are wanted. Optional,
+    // like them: its failing leaves the cull off (ALDepthPyramid::build), not the shaders after it.
+    gDepthPyramidProgram.unload();
+    if (success && LLRender::sCompute && ALWaterSurface::wavesWanted())
+    {
+        gDepthPyramidProgram.mName = "Depth Pyramid Shader";
+        gDepthPyramidProgram.mShaderFiles.clear();
+        gDepthPyramidProgram.mShaderFiles.push_back(make_pair("deferred/depthPyramidC.glsl", GL_COMPUTE_SHADER));
+        gDepthPyramidProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDepthPyramidProgram.clearPermutations();
+        if (!gDepthPyramidProgram.createShader())
+        {
+            LL_WARNS("Shader") << "The depth pyramid's program did not build; the water's patches are not culled by depth" << LL_ENDL;
+            gDepthPyramidProgram.unload();
+        }
+    }
+
     if (success) {
         gDeferredBufferVisualProgram.mName = "Deferred Buffer Visualization Shader";
         gDeferredBufferVisualProgram.mShaderFiles.clear();
@@ -3809,6 +4018,75 @@ bool LLViewerShaderMgr::loadShadersInterface()
 
     if (success)
     {
+        // The selection outline's and wireframe's programs. ALSelectionOutline::render draws only with the ones that
+        // loaded, so a driver that rejects one loses what that one draws and keeps the rest of the interface.
+        const auto load_selection = [this](LLGLSLShader& program, const char* name,
+                                           std::initializer_list<std::pair<const char*, GLenum>> files, U32 variants)
+        {
+            program.mName = name;
+            program.mShaderFiles.clear();
+            for (const auto& [file, stage] : files)
+            {
+                program.mShaderFiles.push_back(make_pair(file, stage));
+            }
+            program.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+            if (!program.createShader(variants))
+            {
+                LL_WARNS("Shader") << "Could not load " << name << "; selections are drawn without it" << LL_ENDL;
+                program.unload();
+            }
+        };
+
+        load_selection(gSelectionIdProgram, "Selection Id Shader",
+                       { { "interface/selectionIdV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionIdF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       LLGLSLShader::VARIANT_RIGGED);
+        load_selection(gSelectionWireframeProgram, "Selection Wireframe Shader",
+                       { { "interface/selectionIdV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionWireframeG.glsl", GL_GEOMETRY_SHADER },
+                         { "interface/selectionWireframeF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionContrastF.glsl", GL_FRAGMENT_SHADER },
+                         { "environment/srgbF.glsl", GL_FRAGMENT_SHADER } },
+                       LLGLSLShader::VARIANT_RIGGED);
+        load_selection(gSelectionJumpProgram, "Selection Jump Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionJumpF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+        load_selection(gSelectionTileProgram, "Selection Tile Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionTileF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+        load_selection(gSelectionOutlineProgram, "Selection Outline Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionOutlineF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionContrastF.glsl", GL_FRAGMENT_SHADER },
+                         { "environment/srgbF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+        load_selection(gSelectionGlowReachProgram, "Selection Glow Reach Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionGlowReachF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+        load_selection(gSelectionGlowRowProgram, "Selection Glow Row Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionGlowRowF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+        load_selection(gSelectionBackdropMaskProgram, "Selection Backdrop Mask Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionBackdropMaskF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+    }
+
+    if (success)
+    {
         gUIProgram.mName = "UI Shader";
         gUIProgram.mShaderFiles.clear();
         gUIProgram.mShaderFiles.push_back(make_pair("interface/uiV.glsl", GL_VERTEX_SHADER));
@@ -4022,6 +4300,19 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gCopyProgram.mShaderFiles.push_back(make_pair("interface/copyF.glsl", GL_FRAGMENT_SHADER));
         gCopyProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gCopyProgram.createShader();
+    }
+
+    if (success)
+    {
+        gCopyDepthProgram.mName = "Copy Depth Shader";
+        gCopyDepthProgram.mShaderFiles.clear();
+        gCopyDepthProgram.mShaderFiles.push_back(make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
+        gCopyDepthProgram.mShaderFiles.push_back(make_pair("interface/copyF.glsl", GL_FRAGMENT_SHADER));
+        gCopyDepthProgram.clearPermutations();
+        gCopyDepthProgram.addPermutation("COPY_DEPTH", "1");
+        gCopyDepthProgram.addPermutation("DEPTH_ONLY", "1");
+        gCopyDepthProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        success = gCopyDepthProgram.createShader();
     }
 
     if (success)

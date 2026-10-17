@@ -25,6 +25,7 @@
  */
 
 #include "llterrainpaintmap.h"
+#include "llspatialpartition.h"
 
 #include "llviewerprecompiledheaders.h"
 
@@ -89,7 +90,7 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
     stop_glerror();
 
     scratch_target.bindTarget();
-    glClearColor(0, 0, 0, 0);
+    gGL.setClearColor(LLColor4::transparent);
     scratch_target.clear();
 
     // Render terrain heightmap to paint map via shader

@@ -34,6 +34,16 @@
 # pragma warning(disable: 4702) // unreachable code
 #endif
 
+// memcpy, for a source that may be an empty chunk's buffer, which is null
+// until something is added: a copy from null is undefined, even of nothing.
+static void copy_bytes(U8 *to, const void *from, S32 size)
+{
+    if (size > 0)
+    {
+        memcpy(to, from, size);     /*Flawfinder: ignore*/
+    }
+}
+
 LLScriptJumpTable::LLScriptJumpTable()
 {
 }
@@ -44,21 +54,28 @@ LLScriptJumpTable::~LLScriptJumpTable()
     delete_and_clear(mJumpMap);
 }
 
+// A label or jump of a name already in the table takes its place, as LSO
+// has it: only the last of several jumps to one label is patched, which
+// scripts on the grid rely on. The offset it replaces is deleted.
 void LLScriptJumpTable::addLabel(char *name, S32 offset)
 {
     char *temp = gScopeStringTable->addString(name);
-    mLabelMap[temp] = new S32(offset);
+    S32*& kept = mLabelMap[temp];
+    delete kept;
+    kept = new S32(offset);
 }
 
 void LLScriptJumpTable::addJump(char *name, S32 offset)
 {
     char *temp = gScopeStringTable->addString(name);
-    mJumpMap[temp] = new S32(offset);
+    S32*& kept = mJumpMap[temp];
+    delete kept;
+    kept = new S32(offset);
 }
 
 
 LLScriptByteCodeChunk::LLScriptByteCodeChunk(BOOL b_need_jumps)
-: mCodeChunk(NULL), mCurrentOffset(0), mJumpTable(NULL)
+: mCodeChunk(NULL), mCurrentOffset(0), mJumpTable(NULL), mCapacity(0)
 {
     if (b_need_jumps)
     {
@@ -72,19 +89,30 @@ LLScriptByteCodeChunk::~LLScriptByteCodeChunk()
     delete mJumpTable;
 }
 
+// Room for size bytes past the chunk's end. Every add made a new buffer just
+// big enough and copied the chunk into it, which made building a chunk
+// quadratic in its length: a script of the 256 KiB the grid takes, whose
+// code is emitted whole before its size is checked, took minutes. The
+// buffer doubles instead; what lies past mCurrentOffset is no part of the
+// chunk. Any add leaves a buffer, as new U8[0] did for nothing added.
+void LLScriptByteCodeChunk::reserve(S32 size)
+{
+    const S32 needed = mCurrentOffset + size;
+    if (mCodeChunk && needed <= mCapacity)
+    {
+        return;
+    }
+    const S32 capacity = llmax(needed, mCapacity * 2, (S32)64);
+    U8 *temp = new U8[capacity];
+    copy_bytes(temp, mCodeChunk, mCurrentOffset);
+    delete [] mCodeChunk;
+    mCodeChunk = temp;
+    mCapacity = capacity;
+}
+
 void LLScriptByteCodeChunk::addByte(U8 byte)
 {
-    if (mCodeChunk)
-    {
-        U8 *temp = new U8[mCurrentOffset + 1];
-        memcpy(temp, mCodeChunk, mCurrentOffset);   /* Flawfinder: ignore */
-        delete [] mCodeChunk;
-        mCodeChunk = temp;
-    }
-    else
-    {
-        mCodeChunk = new U8[1];
-    }
+    reserve(1);
     *(mCodeChunk + mCurrentOffset++) = byte;
 }
 
@@ -98,68 +126,28 @@ void LLScriptByteCodeChunk::addU16(U16 data)
 
 void LLScriptByteCodeChunk::addBytes(const U8 *bytes, S32 size)
 {
-    if (mCodeChunk)
-    {
-        U8 *temp = new U8[mCurrentOffset + size];
-        memcpy(temp, mCodeChunk, mCurrentOffset);   /* Flawfinder: ignore */
-        delete [] mCodeChunk;
-        mCodeChunk = temp;
-    }
-    else
-    {
-        mCodeChunk = new U8[size];
-    }
-    memcpy(mCodeChunk + mCurrentOffset, bytes, size);/* Flawfinder: ignore */
+    reserve(size);
+    copy_bytes(mCodeChunk + mCurrentOffset, bytes, size);
     mCurrentOffset += size;
 }
 
 void LLScriptByteCodeChunk::addBytes(const char *bytes, S32 size)
 {
-    if (mCodeChunk)
-    {
-        U8 *temp = new U8[mCurrentOffset + size];
-        memcpy(temp, mCodeChunk, mCurrentOffset);       /*Flawfinder: ignore*/
-        delete [] mCodeChunk;
-        mCodeChunk = temp;
-    }
-    else
-    {
-        mCodeChunk = new U8[size];
-    }
-    memcpy(mCodeChunk + mCurrentOffset, bytes, size);   /*Flawfinder: ignore*/
+    reserve(size);
+    copy_bytes(mCodeChunk + mCurrentOffset, bytes, size);
     mCurrentOffset += size;
 }
 
 void LLScriptByteCodeChunk::addBytes(S32 size)
 {
-    if (mCodeChunk)
-    {
-        U8 *temp = new U8[mCurrentOffset + size];
-        memcpy(temp, mCodeChunk, mCurrentOffset);   /*Flawfinder: ignore*/
-        delete [] mCodeChunk;
-        mCodeChunk = temp;
-    }
-    else
-    {
-        mCodeChunk = new U8[size];
-    }
+    reserve(size);
     memset(mCodeChunk + mCurrentOffset, 0, size);
     mCurrentOffset += size;
 }
 
 void LLScriptByteCodeChunk::addBytesDontInc(S32 size)
 {
-    if (mCodeChunk)
-    {
-        U8 *temp = new U8[mCurrentOffset + size];
-        memcpy(temp, mCodeChunk, mCurrentOffset);       /*Flawfinder: ignore*/
-        delete [] mCodeChunk;
-        mCodeChunk = temp;
-    }
-    else
-    {
-        mCodeChunk = new U8[size];
-    }
+    reserve(size);
     memset(mCodeChunk + mCurrentOffset, 0, size);
 }
 
@@ -252,7 +240,7 @@ void LLScriptScriptCodeChunk::build(LLFILE *efp, LLFILE *bcfp)
         mCompleteCode = new U8[mTotalSize];
         memset(mCompleteCode, 0, mTotalSize);
 
-        memcpy(mCompleteCode, mRegisters->mCodeChunk, mRegisters->mCurrentOffset);
+        copy_bytes(mCompleteCode, mRegisters->mCodeChunk, mRegisters->mCurrentOffset);
         offset += mRegisters->mCurrentOffset;
 
         set_register(mCompleteCode, LREG_IP, 0);
@@ -263,12 +251,12 @@ void LLScriptScriptCodeChunk::build(LLFILE *efp, LLFILE *bcfp)
 
         set_register(mCompleteCode, LREG_GVR, offset);
 
-        memcpy(mCompleteCode + offset, mGlobalVariables->mCodeChunk, mGlobalVariables->mCurrentOffset);     /*Flawfinder: ignore*/
+        copy_bytes(mCompleteCode + offset, mGlobalVariables->mCodeChunk, mGlobalVariables->mCurrentOffset);
         offset += mGlobalVariables->mCurrentOffset;
 
         set_register(mCompleteCode, LREG_GFR, offset);
 
-        memcpy(mCompleteCode + offset, mGlobalFunctions->mCodeChunk, mGlobalFunctions->mCurrentOffset); /*Flawfinder: ignore*/
+        copy_bytes(mCompleteCode + offset, mGlobalFunctions->mCodeChunk, mGlobalFunctions->mCurrentOffset);
         offset += mGlobalFunctions->mCurrentOffset;
 
         set_register(mCompleteCode, LREG_SR, offset);
@@ -287,12 +275,12 @@ void LLScriptScriptCodeChunk::build(LLFILE *efp, LLFILE *bcfp)
         }
         set_event_register(mCompleteCode, LREG_ER, bytestream2u64(mStates->mCodeChunk, default_state_offset), LSL2_CURRENT_MAJOR_VERSION);
 
-        memcpy(mCompleteCode + offset, mStates->mCodeChunk, mStates->mCurrentOffset);       /*Flawfinder: ignore*/
+        copy_bytes(mCompleteCode + offset, mStates->mCodeChunk, mStates->mCurrentOffset);
         offset += mStates->mCurrentOffset;
 
         set_register(mCompleteCode, LREG_HR, offset);
 
-        memcpy(mCompleteCode + offset, mHeap->mCodeChunk, mHeap->mCurrentOffset);       /*Flawfinder: ignore*/
+        copy_bytes(mCompleteCode + offset, mHeap->mCodeChunk, mHeap->mCurrentOffset);
         offset += mHeap->mCurrentOffset;
 
         set_register(mCompleteCode, LREG_HP, offset);

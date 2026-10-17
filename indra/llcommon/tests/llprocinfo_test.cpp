@@ -28,14 +28,14 @@
 
 #include "../llprocinfo.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../lltimer.h"
 
 
 static const LLProcInfo::time_type bad_user(289375U), bad_system(275U);
 
 
-namespace tut
+namespace
 {
 
 struct procinfo_test
@@ -45,34 +45,23 @@ struct procinfo_test
         }
 };
 
-typedef test_group<procinfo_test> procinfo_group_t;
-typedef procinfo_group_t::object procinfo_object_t;
-tut::procinfo_group_t procinfo_instance("LLProcInfo");
-
-
 // Basic invocation works
-template<> template<>
-void procinfo_object_t::test<1>()
+TEST_CASE_METHOD(procinfo_test, "LLProcInfo: getCPUUsage() writes both its arguments", "[LLProcInfo]")
 {
     LLProcInfo::time_type user(bad_user), system(bad_system);
 
-    set_test_name("getCPUUsage() basic function");
-
     LLProcInfo::getCPUUsage(user, system);
 
-    ensure_not_equals("getCPUUsage() writes to its user argument", user, bad_user);
-    ensure_not_equals("getCPUUsage() writes to its system argument", system, bad_system);
+    CHECK(user != bad_user);
+    CHECK(system != bad_system);
 }
 
 
 // Time increases
-template<> template<>
-void procinfo_object_t::test<2>()
+TEST_CASE_METHOD(procinfo_test, "LLProcInfo: getCPUUsage() never goes down over time", "[LLProcInfo]")
 {
     LLProcInfo::time_type user(bad_user), system(bad_system);
     LLProcInfo::time_type user2(bad_user), system2(bad_system);
-
-    set_test_name("getCPUUsage() increases over time");
 
     LLProcInfo::getCPUUsage(user, system);
 
@@ -83,9 +72,9 @@ void procinfo_object_t::test<2>()
 
     LLProcInfo::getCPUUsage(user2, system2);
 
-    ensure_equals("getCPUUsage() user value doesn't decrease over time", user2 >= user, true);
-    ensure_equals("getCPUUsage() system value doesn't decrease over time", system2 >= system, true);
+    CHECK(user2 >= user);
+    CHECK(system2 >= system);
 }
 
 
-} // end namespace tut
+} // anonymous namespace

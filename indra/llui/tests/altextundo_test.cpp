@@ -26,14 +26,14 @@
 
 #include "altextundo.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "llsdserialize.h"
 
 #include <sstream>
 #include <string>
 
-namespace tut
+namespace
 {
     struct altextundo_data
     {
@@ -61,66 +61,71 @@ namespace tut
         }
     };
 
-    typedef test_group<altextundo_data> altextundo_group;
-    typedef altextundo_group::object    altextundo_object;
-    altextundo_group                    altextundo_instance("altextundo");
-
-    template<> template<>
-    void altextundo_object::test<1>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a run of typing is one step and is undone and redone as one", "[altextundo]")
     {
-        set_test_name("a run of typing is one step, and comes back as one");
         ALTextPos at = type(ALTextPos(0, 0), "a");
         at           = type(at, "b");
         at           = type(at, "c");
-        ensure_equals("typed", doc.text(), std::string("abc"));
-        ensure("can undo", undo.canUndo());
+        CHECK(doc.text() == std::string("abc"));
+        CHECK(undo.canUndo());
         std::optional<ALTextRange> caret = undo.undo();
-        ensure("undone", caret.has_value());
-        ensure_equals("all of it", doc.text(), std::string());
-        ensure("caret back at the start, nothing selected", caret->end == ALTextPos(0, 0) && caret->empty());
-        ensure("nothing more to undo", !undo.canUndo());
+        REQUIRE(caret.has_value());
+        UNSCOPED_INFO("all of it");
+        CHECK(doc.text() == std::string());
+        {
+            INFO("caret back at the start, nothing selected");
+            CHECK(caret->end == ALTextPos(0, 0));
+            CHECK(caret->empty());
+        }
+        CHECK_FALSE(undo.canUndo());
         caret = undo.redo();
-        ensure_equals("redone", doc.text(), std::string("abc"));
-        ensure("caret after the run", caret->end == ALTextPos(0, 3) && caret->empty());
-        ensure("nothing to redo", !undo.redo().has_value());
+        REQUIRE(caret.has_value());
+        UNSCOPED_INFO("redone");
+        CHECK(doc.text() == std::string("abc"));
+        {
+            INFO("caret after the run");
+            CHECK(caret->end == ALTextPos(0, 3));
+            CHECK(caret->empty());
+        }
+        CHECK_FALSE(undo.redo().has_value());
     }
 
-    template<> template<>
-    void altextundo_object::test<2>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a pause or a move elsewhere or a line break ends the run", "[altextundo]")
     {
-        set_test_name("a pause, a move, or a line break ends the run");
         ALTextPos at = type(ALTextPos(0, 0), "a");
         at           = type(at, "b", 5.0);  // a pause
         undo.undo();
-        ensure_equals("only the last", doc.text(), std::string("a"));
+        UNSCOPED_INFO("only the last");
+        CHECK(doc.text() == std::string("a"));
         at = type(ALTextPos(0, 1), "c");
         type(ALTextPos(0, 0), "z");  // somewhere else
         undo.undo();
-        ensure_equals("the move started a new step", doc.text(), std::string("ac"));
+        UNSCOPED_INFO("the move started a new step");
+        CHECK(doc.text() == std::string("ac"));
         at = type(ALTextPos(0, 2), "\n");
         type(ALTextPos(1, 0), "d");
         undo.undo();
-        ensure_equals("a line break is its own step", doc.text(), std::string("ac\n"));
+        UNSCOPED_INFO("a line break is its own step");
+        CHECK(doc.text() == std::string("ac\n"));
     }
 
-    template<> template<>
-    void altextundo_object::test<3>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: backspaces join into one step going backwards", "[altextundo]")
     {
-        set_test_name("backspaces join into one step going backwards");
         doc.setText("abcd");
         undo.markSaved();
         ALTextPos at = backspace(ALTextPos(0, 4));
         at           = backspace(at);
-        ensure_equals("two gone", doc.text(), std::string("ab"));
+        UNSCOPED_INFO("two gone");
+        CHECK(doc.text() == std::string("ab"));
         undo.undo();
-        ensure_equals("both back", doc.text(), std::string("abcd"));
-        ensure("pristine again", undo.isPristine());
+        UNSCOPED_INFO("both back");
+        CHECK(doc.text() == std::string("abcd"));
+        UNSCOPED_INFO("pristine again");
+        CHECK(undo.isPristine());
     }
 
-    template<> template<>
-    void altextundo_object::test<4>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a group is one step however many edits it holds", "[altextundo]")
     {
-        set_test_name("a group is one step however many edits it holds");
         doc.setText("one two");
         undo.beginGroup();
         ALTextDocument::Edit first = doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)), "1");
@@ -128,105 +133,125 @@ namespace tut
         ALTextDocument::Edit second = doc.replace(ALTextRange(ALTextPos(0, 2), ALTextPos(0, 5)), "2");
         undo.record(second, ALTextPos(0, 2), second.endAfter(), now + 30.0);
         undo.endGroup();
-        ensure_equals("both applied", doc.text(), std::string("1 2"));
+        UNSCOPED_INFO("both applied");
+        CHECK(doc.text() == std::string("1 2"));
         undo.undo();
-        ensure_equals("both undone at once", doc.text(), std::string("one two"));
+        UNSCOPED_INFO("both undone at once");
+        CHECK(doc.text() == std::string("one two"));
         undo.redo();
-        ensure_equals("both redone at once", doc.text(), std::string("1 2"));
+        UNSCOPED_INFO("both redone at once");
+        CHECK(doc.text() == std::string("1 2"));
     }
 
-    template<> template<>
-    void altextundo_object::test<5>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: the saved mark survives undo and redo and a save ends the run", "[altextundo]")
     {
-        set_test_name("the saved mark survives undo and redo, and a save ends the run");
         doc.setText("x");
         undo.markSaved();
-        ensure("saved is pristine", undo.isPristine());
-        ALTextPos at = type(ALTextPos(0, 1), "y");
-        ensure("changed", !undo.isPristine());
+        UNSCOPED_INFO("saved is pristine");
+        CHECK(undo.isPristine());
+        type(ALTextPos(0, 1), "y");
+        UNSCOPED_INFO("changed");
+        CHECK_FALSE(undo.isPristine());
         undo.undo();
-        ensure("undone to the saved text", undo.isPristine());
+        UNSCOPED_INFO("undone to the saved text");
+        CHECK(undo.isPristine());
         undo.redo();
-        ensure("redone away from it", !undo.isPristine());
+        UNSCOPED_INFO("redone away from it");
+        CHECK_FALSE(undo.isPristine());
         undo.markSaved();
-        ensure("saved here now", undo.isPristine());
+        UNSCOPED_INFO("saved here now");
+        CHECK(undo.isPristine());
         type(ALTextPos(0, 2), "z");
-        ensure("typed on after the save is a change", !undo.isPristine());
+        UNSCOPED_INFO("typed on after the save is a change");
+        CHECK_FALSE(undo.isPristine());
         undo.undo();
-        ensure("and its own step, so undoing it is the saved text", undo.isPristine());
-        ensure_equals("text", doc.text(), std::string("xy"));
+        UNSCOPED_INFO("and its own step, so undoing it is the saved text");
+        CHECK(undo.isPristine());
+        CHECK(doc.text() == std::string("xy"));
     }
 
-    template<> template<>
-    void altextundo_object::test<6>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a change after an undo drops the redo steps and the saved mark in them", "[altextundo]")
     {
-        set_test_name("a change after an undo drops the redo steps, and the mark among them");
         doc.setText("a");
         type(ALTextPos(0, 1), "b");
         undo.markSaved();
         undo.undo();
-        ensure("can redo to the saved text", undo.canRedo());
+        UNSCOPED_INFO("can redo to the saved text");
+        CHECK(undo.canRedo());
         type(ALTextPos(0, 1), "c", 5.0);
-        ensure("redo gone", !undo.canRedo());
-        ensure("saved text unreachable", !undo.isPristine());
+        UNSCOPED_INFO("redo gone");
+        CHECK_FALSE(undo.canRedo());
+        UNSCOPED_INFO("saved text unreachable");
+        CHECK_FALSE(undo.isPristine());
         undo.undo();
-        ensure("still not, since that step was not the saved one", !undo.isPristine());
+        UNSCOPED_INFO("still not, since that step was not the saved one");
+        CHECK_FALSE(undo.isPristine());
     }
 
-    template<> template<>
-    void altextundo_object::test<7>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a label names the step for undo and redo and an empty edit is no step", "[altextundo]")
     {
-        set_test_name("labels name the next step either way, and nothing records nothing");
         type(ALTextPos(0, 0), "a");
         undo.label("Type");
-        ensure_equals("undo says", undo.undoLabel(), std::string("Type"));
+        CHECK(undo.undoLabel() == std::string("Type"));
         undo.undo();
-        ensure_equals("redo says", undo.redoLabel(), std::string("Type"));
+        CHECK(undo.redoLabel() == std::string("Type"));
         undo.record(ALTextDocument::Edit(), ALTextPos(), ALTextPos(), now);
-        ensure("an empty edit is not a step", !undo.canUndo());
+        UNSCOPED_INFO("an empty edit is not a step");
+        CHECK_FALSE(undo.canUndo());
     }
 
-    template<> template<>
-    void altextundo_object::test<8>()
+    // Steps of 300 KB, three of which the steps back hold: a fourth lets the
+    // oldest go, and the saved mark, counted from the bottom, moves down
+    // with it -- until the step that led to the saved text is let go too,
+    // and stepping back can never reach it, and the journal must not say it
+    // has.
+    TEST_CASE_METHOD(altextundo_data, "altextundo: the saved mark follows forgotten steps and is lost once out of reach", "[altextundo]")
     {
-        set_test_name("the saved mark goes down with the oldest step forgotten, and away once the saved text is out of reach");
-        // Five steps, saved, then more than the stack keeps: the steps
-        // that led to the saved text are gone, so stepping back can never
-        // reach it, and the journal must not say it has.
-        ALTextPos at = ALTextPos(0, 0);
-        for (S32 i = 0; i < 5; ++i)
-        {
-            at = type(at, "a", 2.0);
-        }
+        const std::string part(300 * 1024, 'a');
+        ALTextPos         at(0, 0);
+        at = type(at, part.c_str(), 2.0);
+        at = type(at, part.c_str(), 2.0);
         undo.markSaved();
-        ensure("saved", undo.isPristine());
-        for (S32 i = 0; i < 100; ++i)
-        {
-            at = type(at, "b", 2.0);
-        }
-        ensure("changed since", !undo.isPristine());
-        for (S32 i = 0; i < 95; ++i)
-        {
-            undo.undo();
-        }
-        ensure("five steps in force again, but not the saved five", !undo.isPristine());
-        // Saved again with a full stack: another step drops one, and the
-        // mark with it keeps counting from the bottom.
-        for (S32 i = 0; i < 95; ++i)
+        UNSCOPED_INFO("saved");
+        CHECK(undo.isPristine());
+        at = type(at, part.c_str(), 2.0);
+        at = type(at, part.c_str(), 2.0);
+        UNSCOPED_INFO("changed since");
+        CHECK_FALSE(undo.isPristine());
+        undo.undo();
+        UNSCOPED_INFO("two steps in force again, but not the saved two");
+        CHECK_FALSE(undo.isPristine());
+        undo.undo();
+        UNSCOPED_INFO("back to the saved text, the mark having moved down");
+        CHECK(undo.isPristine());
+        undo.undo();
+        UNSCOPED_INFO("and one step back past it, the oldest having gone");
+        CHECK_FALSE(undo.canUndo());
+
+        // Forward again, and on until the step that led to the saved text is
+        // let go too.
+        for (S32 i = 0; i < 3; ++i)
         {
             undo.redo();
         }
-        undo.markSaved();
-        at = type(at, "c", 2.0);
-        ensure("changed", !undo.isPristine());
-        undo.undo();
-        ensure("back to the saved text, the mark having moved down", undo.isPristine());
+        at = type(at, part.c_str(), 2.0);
+        UNSCOPED_INFO("the saved text at the bottom of the stack, still reached");
+        CHECK(undo.savedText().has_value());
+        type(at, part.c_str(), 2.0);
+        UNSCOPED_INFO("the step that led to it gone, and the saved text with it");
+        CHECK_FALSE(undo.savedText().has_value());
+        while (undo.undo())
+        {
+        }
+        UNSCOPED_INFO("stepping back as far as it goes never finds it");
+        CHECK_FALSE(undo.isPristine());
     }
 
-    template<> template<>
-    void altextundo_object::test<9>()
+    // A save point is taken when a text is sent to be saved, and marks that
+    // text saved when the answer comes, whatever was typed or undone
+    // meanwhile.
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a save point marks the sent text saved whatever was typed or undone since", "[altextundo]")
     {
-        set_test_name("a save point taken when a text is sent marks that text saved when the answer comes, whatever was typed meanwhile");
         ALTextPos       at    = type(ALTextPos(0, 0), "a");
         at                    = type(at, "b");
         const ALTextUndo::SavePoint sent = undo.savePoint();
@@ -234,30 +259,38 @@ namespace tut
         // a step of its own all the same.
         at = type(at, "c");
         undo.markSaved(sent);
-        ensure("what was typed meanwhile is unsaved", !undo.isPristine());
+        UNSCOPED_INFO("what was typed meanwhile is unsaved");
+        CHECK_FALSE(undo.isPristine());
         undo.undo();
-        ensure_equals("the step back is only what came after", doc.text(), std::string("ab"));
-        ensure("and that is the saved text", undo.isPristine());
+        UNSCOPED_INFO("the step back is only what came after");
+        CHECK(doc.text() == std::string("ab"));
+        UNSCOPED_INFO("and that is the saved text");
+        CHECK(undo.isPristine());
         undo.redo();
-        ensure("forward again, unsaved", !undo.isPristine());
+        UNSCOPED_INFO("forward again, unsaved");
+        CHECK_FALSE(undo.isPristine());
 
         // Undone past before the answer came: the saved text is a step
         // forward.
         const ALTextUndo::SavePoint again = undo.savePoint();
         undo.undo();
         undo.markSaved(again);
-        ensure("a step short of the saved text", !undo.isPristine());
+        UNSCOPED_INFO("a step short of the saved text");
+        CHECK_FALSE(undo.isPristine());
         undo.redo();
-        ensure("the redo reaches it", undo.isPristine());
+        UNSCOPED_INFO("the redo reaches it");
+        CHECK(undo.isPristine());
 
         // Undone, then changed: the saved text can no longer be reached.
         const ALTextUndo::SavePoint lost = undo.savePoint();
         undo.undo();
         type(ALTextPos(0, 2), "x", 5.0);
         undo.markSaved(lost);
-        ensure("unreachable, so never pristine", !undo.isPristine());
+        UNSCOPED_INFO("unreachable, so never pristine");
+        CHECK_FALSE(undo.isPristine());
         undo.undo();
-        ensure("not even stepping back", !undo.isPristine());
+        UNSCOPED_INFO("not even stepping back");
+        CHECK_FALSE(undo.isPristine());
 
         // A point before any step at all.
         undo.clear();
@@ -265,32 +298,34 @@ namespace tut
         const ALTextUndo::SavePoint empty = undo.savePoint();
         type(ALTextPos(0, 0), "z", 5.0);
         undo.markSaved(empty);
-        ensure("the empty text was saved, the z is not", !undo.isPristine());
+        UNSCOPED_INFO("the empty text was saved, the z is not");
+        CHECK_FALSE(undo.isPristine());
         undo.undo();
-        ensure("back to it", undo.isPristine());
+        UNSCOPED_INFO("back to it");
+        CHECK(undo.isPristine());
     }
 
-    template<> template<>
-    void altextundo_object::test<10>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a text marked never saved is unsaved at every step until a save", "[altextundo]")
     {
-        set_test_name("a text marked never saved is unsaved at every step the journal can reach, until a save marks it");
         ALTextPos at = type(ALTextPos(0, 0), "a");
         undo.markSaved();
-        ensure("saved", undo.isPristine());
+        UNSCOPED_INFO("saved");
+        CHECK(undo.isPristine());
         undo.markNeverSaved();
-        ensure("never saved: unsaved as it stands", !undo.isPristine());
+        UNSCOPED_INFO("never saved: unsaved as it stands");
+        CHECK_FALSE(undo.isPristine());
         at = type(at, "b", 5.0);
         undo.undo();
-        ensure("and stepping back does not find a saved text", !undo.isPristine());
+        UNSCOPED_INFO("and stepping back does not find a saved text");
+        CHECK_FALSE(undo.isPristine());
         undo.redo();
         undo.markSaved();
-        ensure("a save marks it again", undo.isPristine());
+        UNSCOPED_INFO("a save marks it again");
+        CHECK(undo.isPristine());
     }
 
-    template<> template<>
-    void altextundo_object::test<11>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a history written out reads back over the same text step for step", "[altextundo]")
     {
-        set_test_name("a history written out comes back over the same text in another journal, every step back and forward as it was");
         ALTextPos at = type(ALTextPos(0, 0), "one");
         at           = type(at, "\n", 5.0);
         at           = type(at, "two", 5.0);
@@ -299,64 +334,84 @@ namespace tut
         at = backspace(at, 5.0);
         undo.label("rename");
         undo.undo();
-        ensure_equals("where it stands", doc.text(), std::string("one\ntwo three"));
+        CHECK(doc.text() == std::string("one\ntwo three"));
         const LLSD written = undo.asLLSD();
 
         // Another session: the same text, a journal of its own.
         ALTextDocument later(doc.text());
         ALTextUndo     again(later);
-        ensure("put back", again.fromLLSD(written));
-        ensure("unsaved, as it was", !again.isPristine());
-        ensure("a step forward still to take", again.canRedo());
+        CHECK(again.fromLLSD(written));
+        UNSCOPED_INFO("unsaved, as it was");
+        CHECK_FALSE(again.isPristine());
+        UNSCOPED_INFO("a step forward still to take");
+        CHECK(again.canRedo());
         again.redo();
-        ensure_equals("the step forward", later.text(), std::string("one\ntwo thre"));
-        ensure_equals("with its name", again.undoLabel(), std::string("rename"));
+        UNSCOPED_INFO("the step forward");
+        CHECK(later.text() == std::string("one\ntwo thre"));
+        UNSCOPED_INFO("with its name");
+        CHECK(again.undoLabel() == std::string("rename"));
         again.undo();
         again.undo();
-        ensure_equals("back past the typing", later.text(), std::string("one\ntwo"));
-        ensure("to the saved text", again.isPristine());
+        UNSCOPED_INFO("back past the typing");
+        CHECK(later.text() == std::string("one\ntwo"));
+        UNSCOPED_INFO("to the saved text");
+        CHECK(again.isPristine());
         again.undo();
         again.undo();
         again.undo();
-        ensure_equals("back to the start", later.text(), std::string());
-        ensure("and no further", !again.canUndo());
+        UNSCOPED_INFO("back to the start");
+        CHECK(later.text() == std::string());
+        UNSCOPED_INFO("and no further");
+        CHECK_FALSE(again.canUndo());
     }
 
-    template<> template<>
-    void altextundo_object::test<12>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a history is refused over another text and savedText steps to the mark", "[altextundo]")
     {
-        set_test_name("a history is not put over another text; the saved text is found by stepping to it");
         ALTextPos at = type(ALTextPos(0, 0), "alpha");
         undo.markSaved();
         at = type(at, " beta", 5.0);
         const LLSD written = undo.asLLSD();
         const std::optional<std::string> saved = undo.savedText();
-        ensure("the saved text is found", saved.has_value() && *saved == "alpha");
+        {
+            INFO("the saved text is found");
+            REQUIRE(saved.has_value());
+            CHECK(*saved == "alpha");
+        }
 
         ALTextDocument other("alpha gamma");
         ALTextUndo     wrong(other);
-        ensure("refused over a text it was not written with", !wrong.fromLLSD(written));
-        ensure("and that journal left as it was", !wrong.canUndo() && !wrong.canRedo());
-        ensure_equals("and the text as it was", other.text(), std::string("alpha gamma"));
+        UNSCOPED_INFO("refused over a text it was not written with");
+        CHECK_FALSE(wrong.fromLLSD(written));
+        {
+            INFO("and that journal left as it was");
+            CHECK_FALSE(wrong.canUndo());
+            CHECK_FALSE(wrong.canRedo());
+        }
+        UNSCOPED_INFO("and the text as it was");
+        CHECK(other.text() == std::string("alpha gamma"));
 
         // A saved text among the steps forward is found forward.
+        undo.markSaved();
         undo.undo();
+        UNSCOPED_INFO("saved a step forward");
+        CHECK(undo.savedText() == std::optional<std::string>("alpha beta"));
         undo.markSaved();
         undo.redo();
-        ensure("saved a step back", undo.savedText() == std::optional<std::string>("alpha"));
+        UNSCOPED_INFO("saved a step back");
+        CHECK(undo.savedText() == std::optional<std::string>("alpha"));
         undo.undo();
-        ensure("the saved text is the one standing", undo.savedText() == std::optional<std::string>("alpha"));
+        UNSCOPED_INFO("the saved text is the one standing");
+        CHECK(undo.savedText() == std::optional<std::string>("alpha"));
         undo.markSaved();
         undo.redo();
         undo.undo();
         undo.markNeverSaved();
-        ensure("never saved has none", !undo.savedText().has_value());
+        UNSCOPED_INFO("never saved has none");
+        CHECK_FALSE(undo.savedText().has_value());
     }
 
-    template<> template<>
-    void altextundo_object::test<13>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a history past its budget keeps the newest steps and the mark they reach", "[altextundo]")
     {
-        set_test_name("a history past its budget keeps the newest steps, and the saved mark only where they reach it");
         ALTextPos at = type(ALTextPos(0, 0), std::string(100, 'a').c_str());
         undo.markSaved();
         at = type(at, std::string(100, 'b').c_str(), 5.0);
@@ -364,24 +419,28 @@ namespace tut
         // Each step about a hundred and sixty written: its hundred
         // characters, and its carets, label and edit's places.
         const LLSD kept = undo.asLLSD(400);
-        ensure_equals("the two newest steps", kept["undo"].size(), 2);
-        ensure_equals("the saved mark at the oldest kept", kept["saved"].asInteger(), 0);
+        UNSCOPED_INFO("the two newest steps");
+        CHECK(kept["undo"].size() == 2);
+        UNSCOPED_INFO("the saved mark at the oldest kept");
+        CHECK(kept["saved"].asInteger() == 0);
         ALTextDocument later(doc.text());
         ALTextUndo     again(later);
-        ensure("put back", again.fromLLSD(kept));
+        CHECK(again.fromLLSD(kept));
         again.undo();
         again.undo();
-        ensure("to the saved text", again.isPristine());
-        ensure("and no further", !again.canUndo());
+        UNSCOPED_INFO("to the saved text");
+        CHECK(again.isPristine());
+        UNSCOPED_INFO("and no further");
+        CHECK_FALSE(again.canUndo());
         const LLSD tight = undo.asLLSD(200);
-        ensure_equals("only the newest", tight["undo"].size(), 1);
-        ensure_equals("the saved text out of reach", tight["saved"].asInteger(), -1);
+        UNSCOPED_INFO("only the newest");
+        CHECK(tight["undo"].size() == 1);
+        UNSCOPED_INFO("the saved text out of reach");
+        CHECK(tight["saved"].asInteger() == -1);
     }
 
-    template<> template<>
-    void altextundo_object::test<14>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a run of typing or erasing is written as the one edit it amounts to", "[altextundo]")
     {
-        set_test_name("a run of typing or erasing is written as the one edit it amounts to, and steps back and forward as before");
         ALTextPos at = type(ALTextPos(0, 0), "one two");
         at           = type(at, "\n", 5.0);
         // Typed a character at a time: one step, an edit a character.
@@ -400,39 +459,50 @@ namespace tut
         now += 0.1;
         ALTextDocument::Edit second = doc.remove(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 4)));
         undo.record(second, ALTextPos(0, 3), ALTextPos(0, 3), now);
-        ensure_equals("where it stands", doc.text(), std::string("onewo\nthr"));
+        CHECK(doc.text() == std::string("onewo\nthr"));
 
         const LLSD written = undo.asLLSD();
-        ensure_equals("five steps", written["undo"].size(), 5);
-        ensure_equals("the typing one edit", written["undo"][2]["edits"].size(), 1);
-        ensure_equals("with all it typed", written["undo"][2]["edits"][0][5].asString(), std::string("three"));
-        ensure_equals("the backspacing one edit", written["undo"][3]["edits"].size(), 1);
-        ensure_equals("with all it took, in order", written["undo"][3]["edits"][0][4].asString(), std::string("ee"));
-        ensure_equals("the deleting one edit", written["undo"][4]["edits"].size(), 1);
-        ensure_equals("with all it took, in order", written["undo"][4]["edits"][0][4].asString(), std::string(" t"));
+        REQUIRE(written["undo"].size() == 5);
+        UNSCOPED_INFO("the typing one edit");
+        REQUIRE(written["undo"][2]["edits"].size() == 1);
+        UNSCOPED_INFO("with all it typed");
+        CHECK(written["undo"][2]["edits"][0][5].asString() == std::string("three"));
+        UNSCOPED_INFO("the backspacing one edit");
+        REQUIRE(written["undo"][3]["edits"].size() == 1);
+        UNSCOPED_INFO("with all it took, in order");
+        CHECK(written["undo"][3]["edits"][0][4].asString() == std::string("ee"));
+        UNSCOPED_INFO("the deleting one edit");
+        REQUIRE(written["undo"][4]["edits"].size() == 1);
+        UNSCOPED_INFO("with all it took, in order");
+        CHECK(written["undo"][4]["edits"][0][4].asString() == std::string(" t"));
 
         ALTextDocument later(doc.text());
         ALTextUndo     again(later);
-        ensure("put back", again.fromLLSD(written));
+        CHECK(again.fromLLSD(written));
         again.undo();
-        ensure_equals("the deletes back", later.text(), std::string("one two\nthr"));
+        UNSCOPED_INFO("the deletes back");
+        CHECK(later.text() == std::string("one two\nthr"));
         again.undo();
-        ensure_equals("the backspaces back", later.text(), std::string("one two\nthree"));
+        UNSCOPED_INFO("the backspaces back");
+        CHECK(later.text() == std::string("one two\nthree"));
         again.undo();
-        ensure_equals("the typing back", later.text(), std::string("one two\n"));
+        UNSCOPED_INFO("the typing back");
+        CHECK(later.text() == std::string("one two\n"));
         again.redo();
         again.redo();
         again.redo();
-        ensure_equals("and forward again", later.text(), doc.text());
+        UNSCOPED_INFO("and forward again");
+        CHECK(later.text() == doc.text());
         LLSD older       = written;
         older["version"] = 1;
-        ensure("a history of another version is refused", !again.fromLLSD(older));
+        UNSCOPED_INFO("a history of another version is refused");
+        CHECK_FALSE(again.fromLLSD(older));
     }
 
-    template<> template<>
-    void altextundo_object::test<15>()
+    // A group's edits fold where each carries on from the last, across lines
+    // too, and a run of erasing both ways folds as one.
+    TEST_CASE_METHOD(altextundo_data, "altextundo: edits that carry on from the last fold into one in a group or a run", "[altextundo]")
     {
-        set_test_name("a group's edits fold where each carries on from the last, across lines too, and a run of erasing both ways folds as one");
         doc.setText("a\nbc\ndef");
         const std::string before = doc.text();
         const auto        edit   = [this](ALTextDocument::Edit made) {
@@ -444,13 +514,13 @@ namespace tut
         // Two lines put in, and typed on at their end: one insertion.
         ALTextDocument::Edit made = edit(doc.insert(ALTextPos(0, 1), "x\ny"));
         edit(doc.insert(made.endAfter(), "z"));
-        ensure_equals("put in", doc.text(), std::string("ax\nyz\nbc\ndef"));
+        CHECK(doc.text() == std::string("ax\nyz\nbc\ndef"));
         // A line break taken, then the letter that moved into its place,
         // then the letter before them: one removal, across a line.
         edit(doc.remove(ALTextRange(ALTextPos(1, 2), ALTextPos(2, 0))));
         edit(doc.remove(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 3))));
         edit(doc.remove(ALTextRange(ALTextPos(1, 1), ALTextPos(1, 2))));
-        ensure_equals("taken", doc.text(), std::string("ax\nyc\ndef"));
+        CHECK(doc.text() == std::string("ax\nyc\ndef"));
         // And somewhere else: an edit of its own.
         edit(doc.insert(ALTextPos(2, 3), "!"));
         undo.endGroup();
@@ -458,17 +528,22 @@ namespace tut
 
         const LLSD written = undo.asLLSD();
         const LLSD edits   = written["undo"][0]["edits"];
-        ensure_equals("three edits written for six made", edits.size(), 3);
-        ensure_equals("the insertion whole", edits[0][5].asString(), std::string("x\nyz"));
-        ensure_equals("the removal whole, in the order it stood", edits[1][4].asString(), std::string("z\nb"));
+        UNSCOPED_INFO("three edits written for six made");
+        REQUIRE(edits.size() == 3);
+        UNSCOPED_INFO("the insertion whole");
+        CHECK(edits[0][5].asString() == std::string("x\nyz"));
+        UNSCOPED_INFO("the removal whole, in the order it stood");
+        CHECK(edits[1][4].asString() == std::string("z\nb"));
 
         ALTextDocument later(after);
         ALTextUndo     again(later);
-        ensure("put back", again.fromLLSD(written));
+        CHECK(again.fromLLSD(written));
         again.undo();
-        ensure_equals("stepped back to where it began", later.text(), before);
+        UNSCOPED_INFO("stepped back to where it began");
+        CHECK(later.text() == before);
         again.redo();
-        ensure_equals("and forward to where it ended", later.text(), after);
+        UNSCOPED_INFO("and forward to where it ended");
+        CHECK(later.text() == after);
 
         // A backspace and then a delete where the caret stood: one run, and
         // one edit written, taking what stood on both sides.
@@ -481,20 +556,20 @@ namespace tut
         ALTextDocument::Edit ahead = doc.remove(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
         undo.record(ahead, ALTextPos(0, 4), ALTextPos(0, 4), now);
         const LLSD run = undo.asLLSD();
-        ensure_equals("one step", run["undo"].size(), 1);
-        ensure_equals("one edit", run["undo"][0]["edits"].size(), 1);
-        ensure_equals("both letters", run["undo"][0]["edits"][0][4].asString(), std::string("ef"));
+        REQUIRE(run["undo"].size() == 1);
+        REQUIRE(run["undo"][0]["edits"].size() == 1);
+        UNSCOPED_INFO("both letters");
+        CHECK(run["undo"][0]["edits"][0][4].asString() == std::string("ef"));
         ALTextDocument erased(doc.text());
         ALTextUndo     restored(erased);
-        ensure("put back", restored.fromLLSD(run));
+        CHECK(restored.fromLLSD(run));
         restored.undo();
-        ensure_equals("stepped back whole", erased.text(), std::string("abcdefg"));
+        UNSCOPED_INFO("stepped back whole");
+        CHECK(erased.text() == std::string("abcdefg"));
     }
 
-    template<> template<>
-    void altextundo_object::test<16>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a step keeps its selection before and the one settle gave it after", "[altextundo]")
     {
-        set_test_name("a step keeps the selection it was made over and the one it left, which settle says, until a step is taken");
         doc.setText("one two three");
         now += 5.0;
         // "two" selected from its end back to its start, and typed over.
@@ -505,50 +580,70 @@ namespace tut
         undo.settle(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
 
         std::optional<ALTextRange> back = undo.undo();
-        ensure_equals("undone", doc.text(), std::string("one two three"));
-        ensure("the selection it was made over, anchor and caret as they were", back && *back == ALTextRange(ALTextPos(0, 7), ALTextPos(0, 4)));
+        UNSCOPED_INFO("undone");
+        CHECK(doc.text() == std::string("one two three"));
+        {
+            INFO("the selection it was made over, anchor and caret as they were");
+            REQUIRE(back);
+            CHECK(*back == ALTextRange(ALTextPos(0, 7), ALTextPos(0, 4)));
+        }
         // Settled after a step back: nothing, since the step settled is not
         // the one last recorded.
         undo.settle(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
         std::optional<ALTextRange> ahead = undo.redo();
-        ensure_equals("redone", doc.text(), std::string("one 2 three"));
-        ensure("the selection it was left with", ahead && *ahead == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
+        UNSCOPED_INFO("redone");
+        CHECK(doc.text() == std::string("one 2 three"));
+        {
+            INFO("the selection it was left with");
+            REQUIRE(ahead);
+            CHECK(*ahead == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
+        }
 
         // Through the history written out and read back.
         const LLSD written = undo.asLLSD();
         ALTextDocument later(doc.text());
         ALTextUndo     again(later);
-        ensure("put back", again.fromLLSD(written));
+        CHECK(again.fromLLSD(written));
         back = again.undo();
-        ensure("the selection before, from the history", back && *back == ALTextRange(ALTextPos(0, 7), ALTextPos(0, 4)));
+        {
+            INFO("the selection before, from the history");
+            REQUIRE(back);
+            CHECK(*back == ALTextRange(ALTextPos(0, 7), ALTextPos(0, 4)));
+        }
         ahead = again.redo();
-        ensure("and after", ahead && *ahead == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
+        {
+            INFO("and after");
+            REQUIRE(ahead);
+            CHECK(*ahead == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
+        }
     }
 
-    template<> template<>
-    void altextundo_object::test<17>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a save while a group is open -- vim's insert mode -- ends the step there", "[altextundo]")
     {
-        set_test_name("a save while a group is open -- vim's insert mode -- ends the step there: typed on after is a change, and a step of its own");
         undo.beginGroup();
         ALTextPos at = type(ALTextPos(0, 0), "a");
         at           = type(at, "b");
         undo.markSaved();
-        ensure("saved", undo.isPristine());
+        UNSCOPED_INFO("saved");
+        CHECK(undo.isPristine());
         at = type(at, "c");
-        ensure("typed on: changed", !undo.isPristine());
+        UNSCOPED_INFO("typed on: changed");
+        CHECK_FALSE(undo.isPristine());
         undo.endGroup();
         undo.undo();
-        ensure_equals("the step after the save undone alone", doc.text(), std::string("ab"));
-        ensure("which is the saved text", undo.isPristine());
+        UNSCOPED_INFO("the step after the save undone alone");
+        CHECK(doc.text() == std::string("ab"));
+        UNSCOPED_INFO("which is the saved text");
+        CHECK(undo.isPristine());
         undo.undo();
-        ensure_equals("then the step before it", doc.text(), std::string());
-        ensure("nothing open", !undo.inGroup());
+        UNSCOPED_INFO("then the step before it");
+        CHECK(doc.text() == std::string());
+        UNSCOPED_INFO("nothing open");
+        CHECK_FALSE(undo.inGroup());
     }
 
-    template<> template<>
-    void altextundo_object::test<18>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a run joins into one edit as it goes and is undone as one change", "[altextundo]")
     {
-        set_test_name("a run is kept as the one edit it amounts to as it joins: undone and redone as one change, however long");
         S32 changes = 0;
         doc.onChanged([&changes](const ALTextDocument::Edit&) { ++changes; });
         ALTextPos at(0, 0);
@@ -558,25 +653,32 @@ namespace tut
         }
         at = backspace(at);
         at = backspace(at);
-        ensure_equals("typed, and two taken back", doc.text(), std::string("hello wor"));
+        UNSCOPED_INFO("typed, and two taken back");
+        CHECK(doc.text() == std::string("hello wor"));
         changes = 0;
         undo.undo();
-        ensure_equals("the erasing, as one change", changes, 1);
-        ensure_equals("both back", doc.text(), std::string("hello world"));
+        UNSCOPED_INFO("the erasing, as one change");
+        CHECK(changes == 1);
+        UNSCOPED_INFO("both back");
+        CHECK(doc.text() == std::string("hello world"));
         changes = 0;
         undo.undo();
-        ensure_equals("the typing, as one change", changes, 1);
-        ensure_equals("all of it", doc.text(), std::string());
+        UNSCOPED_INFO("the typing, as one change");
+        CHECK(changes == 1);
+        UNSCOPED_INFO("all of it");
+        CHECK(doc.text() == std::string());
         changes = 0;
         undo.redo();
-        ensure_equals("redone as one change", changes, 1);
-        ensure_equals("redone", doc.text(), std::string("hello world"));
+        UNSCOPED_INFO("redone as one change");
+        CHECK(changes == 1);
+        UNSCOPED_INFO("redone");
+        CHECK(doc.text() == std::string("hello world"));
     }
 
-    template<> template<>
-    void altextundo_object::test<19>()
+    // Hundreds of small steps are kept; of big ones the oldest are let go,
+    // and the saved mark with them.
+    TEST_CASE_METHOD(altextundo_data, "altextundo: the steps back are held by what they weigh and not by how many", "[altextundo]")
     {
-        set_test_name("the steps back are held by what they weigh, not by how many: hundreds of small ones kept, the oldest of big ones let go, the saved mark with them");
         ALTextPos at(0, 0);
         for (S32 i = 0; i < 300; ++i)
         {
@@ -588,8 +690,10 @@ namespace tut
         {
             ++steps;
         }
-        ensure_equals("every one of three hundred kept", steps, 300);
-        ensure_equals("back to nothing", doc.text(), std::string());
+        UNSCOPED_INFO("every one of three hundred kept");
+        CHECK(steps == 300);
+        UNSCOPED_INFO("back to nothing");
+        CHECK(doc.text() == std::string());
 
         ALTextDocument big_doc;
         ALTextUndo     big{ big_doc };
@@ -603,28 +707,39 @@ namespace tut
         put(1.0);
         big.markSaved();
         put(3.0);
-        ensure("two of 400 KB kept", big.canUndo());
+        big.undo();
+        UNSCOPED_INFO("two of 400 KB kept: one still back past the newest");
+        CHECK(big.canUndo());
+        big.redo();
         put(5.0);
-        ensure_equals("three written", big_doc.text().size(), part.size() * 3);
-        ensure_equals("past the budget, the oldest went: the saved text still reached", big.savedText().value_or(std::string()).size(), part.size());
+        UNSCOPED_INFO("three written");
+        CHECK(big_doc.text().size() == part.size() * 3);
+        UNSCOPED_INFO("past the budget, the oldest went: the saved text still reached");
+        CHECK(big.savedText().value_or(std::string()).size() == part.size());
         big.undo();
         big.undo();
-        ensure("two back, and no more", !big.canUndo());
-        ensure_equals("the first's text stands", big_doc.text().size(), part.size());
-        ensure("which is the saved one", big.isPristine());
+        UNSCOPED_INFO("two back, and no more");
+        CHECK_FALSE(big.canUndo());
+        UNSCOPED_INFO("the first's text stands");
+        CHECK(big_doc.text().size() == part.size());
+        UNSCOPED_INFO("which is the saved one");
+        CHECK(big.isPristine());
 
         const std::string huge(ALTextUndo::BUDGET * 2, 'b');
         ALTextDocument::Edit edit = big_doc.insert(big_doc.end(), huge);
         big.record(edit, big_doc.end(), edit.endAfter(), 9.0);
-        ensure("one step past the budget alone is kept, the newest always", big.canUndo());
+        UNSCOPED_INFO("one step past the budget alone is kept, the newest always");
+        CHECK(big.canUndo());
         big.undo();
-        ensure("and it alone", !big.canUndo());
+        UNSCOPED_INFO("and it alone");
+        CHECK_FALSE(big.canUndo());
     }
 
-    template<> template<>
-    void altextundo_object::test<20>()
+    // What one key typed does -- a pair with the caret between, a closer
+    // typed over, a line broken and indented, an outdent -- is one with the
+    // typing run.
+    TEST_CASE_METHOD(altextundo_data, "altextundo: all one key does joins the typing run", "[altextundo]")
     {
-        set_test_name("what one key typed does -- a pair with the caret between, a closer typed over, a line broken and indented, an outdent -- is one with the typing run");
         // A key typed where `at` is: its text put in, the caret where the
         // key leaves it.
         const auto key = [&](ALTextPos at, const char* text, std::optional<ALTextPos> caret = std::nullopt) {
@@ -655,86 +770,100 @@ namespace tut
         const ALTextDocument::Edit outdent = doc.remove(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 4)));
         undo.record(outdent, ALTextPos(1, 6), ALTextPos(1, 2), now);
         undo.endTyping();
-        ensure_equals("typed", doc.text(), std::string("f(x)\ny}"));
+        CHECK(doc.text() == std::string("f(x)\ny}"));
         undo.undo();
-        ensure_equals("one step takes all of it back", doc.text(), std::string());
-        ensure("nothing before it", !undo.canUndo());
+        UNSCOPED_INFO("one step takes all of it back");
+        CHECK(doc.text() == std::string());
+        UNSCOPED_INFO("nothing before it");
+        CHECK_FALSE(undo.canUndo());
         undo.redo();
-        ensure_equals("and puts it back", doc.text(), std::string("f(x)\ny}"));
+        UNSCOPED_INFO("and puts it back");
+        CHECK(doc.text() == std::string("f(x)\ny}"));
 
         // A key typed somewhere else is a step of its own.
         key(ALTextPos(0, 0), "z");
-        ensure_equals("typed at the start", doc.text(), std::string("zf(x)\ny}"));
+        UNSCOPED_INFO("typed at the start");
+        CHECK(doc.text() == std::string("zf(x)\ny}"));
         undo.undo();
-        ensure_equals("undone alone", doc.text(), std::string("f(x)\ny}"));
+        UNSCOPED_INFO("undone alone");
+        CHECK(doc.text() == std::string("f(x)\ny}"));
     }
 
-    template<> template<>
-    void altextundo_object::test<21>()
+    TEST_CASE_METHOD(altextundo_data, "altextundo: historyFrom checks a history against its text and restore puts it back", "[altextundo]")
     {
-        set_test_name("a history is read and checked against its text once, then put back as it was read");
         ALTextPos at = type(ALTextPos(0, 0), "one", 2.0);
         type(at, " two", 2.0);
         const LLSD written = undo.asLLSD();
-        ensure("another text's is no history", !ALTextUndo::historyFrom(written, "one six").has_value());
+        UNSCOPED_INFO("another text's is no history");
+        CHECK_FALSE(ALTextUndo::historyFrom(written, "one six").has_value());
         std::optional<ALTextUndo::History> read = ALTextUndo::historyFrom(written, doc.text());
-        ensure("its own text's is", read.has_value());
-        ensure_equals("both steps back", read->undo.size(), size_t(2));
+        UNSCOPED_INFO("its own text's is");
+        REQUIRE(read.has_value());
+        UNSCOPED_INFO("both steps back");
+        CHECK(read->undo.size() == size_t(2));
         ALTextDocument again(doc.text());
         ALTextUndo     journal{ again };
         journal.restore(std::move(*read));
         journal.undo();
         journal.undo();
-        ensure_equals("stepped back through it", again.text(), std::string());
+        UNSCOPED_INFO("stepped back through it");
+        CHECK(again.text() == std::string());
     }
 
-    template<> template<>
-    void altextundo_object::test<22>()
+    // The newest step is written again as it changes, and the whole still
+    // reads back as asLLSD's.
+    TEST_CASE_METHOD(altextundo_data, "altextundo: asNotation reads back as asLLSD writes it as the newest step changes", "[altextundo]")
     {
-        set_test_name("the history written as notation reads back as asLLSD's, the newest step written again as it changes");
-        const auto same = [this](const char* what) {
+        const auto require_notation_as_llsd = [this](const char* what) {
+            INFO(what);
             std::istringstream in(undo.asNotation());
             LLSD               read;
-            ensure(std::string(what) + ": reads back", LLSDSerialize::fromNotation(read, in, LLSDSerialize::SIZE_UNLIMITED) > 0);
+            REQUIRE(LLSDSerialize::fromNotation(read, in, LLSDSerialize::SIZE_UNLIMITED) > 0);
             std::ostringstream a, b;
             LLSDSerialize::toNotation(read, a);
             LLSDSerialize::toNotation(undo.asLLSD(), b);
-            ensure_equals(std::string(what) + ": as asLLSD writes it", a.str(), b.str());
+            UNSCOPED_INFO("as asLLSD writes it");
+            REQUIRE(a.str() == b.str());
         };
         ALTextPos at = type(ALTextPos(0, 0), "one", 2.0);
         at           = type(at, " two", 2.0);
         undo.label("Typing");
-        same("two steps, one named");
+        require_notation_as_llsd("two steps, one named");
         at = type(at, "s");
-        same("the newest joined");
+        require_notation_as_llsd("the newest joined");
         undo.settle(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)));
-        same("its selection settled");
+        require_notation_as_llsd("its selection settled");
         undo.markSaved();
         undo.undo();
-        same("one taken back, the saved mark past it");
+        require_notation_as_llsd("one taken back, the saved mark past it");
         std::optional<ALTextUndo::History> read = ALTextUndo::historyFrom(undo.asLLSD(), doc.text());
-        ensure("and it is a history of the text", read.has_value());
+        UNSCOPED_INFO("and it is a history of the text");
+        CHECK(read.has_value());
     }
 
-    template<> template<>
-    void altextundo_object::test<23>()
+    // A group closed to wait goes on with its step where nothing came
+    // between: not after a change, a save, an undo or another's group.
+    TEST_CASE_METHOD(altextundo_data, "altextundo: resumeGroup carries on a group's step only where nothing came between", "[altextundo]")
     {
-        set_test_name("a group closed to wait goes on with its step where nothing came between; not after a change, a save, an undo or another's group");
         doc.setText("abc");
         // One group, closed, then gone on with: one step.
         undo.beginGroup();
         type(ALTextPos(0, 0), "1");
         undo.endGroup();
         const U64 step = undo.groupStep();
-        ensure("the group's step", step != 0);
+        UNSCOPED_INFO("the group's step");
+        CHECK(step != 0);
         undo.resumeGroup(step);
         type(ALTextPos(0, 1), "2");
         undo.endGroup();
-        ensure_equals("still that step", undo.groupStep(), step);
+        UNSCOPED_INFO("still that step");
+        CHECK(undo.groupStep() == step);
         undo.undo();
-        ensure_equals("both undone as one", doc.text(), std::string("abc"));
+        UNSCOPED_INFO("both undone as one");
+        CHECK(doc.text() == std::string("abc"));
         undo.redo();
-        ensure("undone and redone, nothing to go on with", undo.groupStep() == 0);
+        UNSCOPED_INFO("undone and redone, nothing to go on with");
+        CHECK(undo.groupStep() == 0);
 
         // A change between: a step of its own, and the next group's own.
         undo.beginGroup();
@@ -742,13 +871,16 @@ namespace tut
         undo.endGroup();
         const U64 before = undo.groupStep();
         type(ALTextPos(0, 6), "y", 10.0);
-        ensure("a change after it", undo.groupStep() == 0);
+        UNSCOPED_INFO("a change after it");
+        CHECK(undo.groupStep() == 0);
         undo.resumeGroup(before);
         type(ALTextPos(0, 0), "z");
         undo.endGroup();
-        ensure("a step of its own", undo.groupStep() != before);
+        UNSCOPED_INFO("a step of its own");
+        CHECK(undo.groupStep() != before);
         undo.undo();
-        ensure_equals("only the last", doc.text(), std::string("x12abcy"));
+        UNSCOPED_INFO("only the last");
+        CHECK(doc.text() == std::string("x12abcy"));
 
         // Saved between: another step.
         undo.beginGroup();
@@ -756,12 +888,14 @@ namespace tut
         undo.endGroup();
         const U64 saved = undo.groupStep();
         undo.savePoint();
-        ensure("a save", undo.groupStep() == 0);
+        UNSCOPED_INFO("a save");
+        CHECK(undo.groupStep() == 0);
         undo.resumeGroup(saved);
         type(ALTextPos(0, 0), "t");
         undo.endGroup();
         undo.undo();
-        ensure_equals("the save kept apart", doc.text(), std::string("sx12abcy"));
+        UNSCOPED_INFO("the save kept apart");
+        CHECK(doc.text() == std::string("sx12abcy"));
 
         // Another group's step between.
         undo.beginGroup();
@@ -775,13 +909,14 @@ namespace tut
         type(ALTextPos(0, 0), "r");
         undo.endGroup();
         undo.undo();
-        ensure_equals("not the other's", doc.text(), std::string("qpsx12abcy"));
+        UNSCOPED_INFO("not the other's");
+        CHECK(doc.text() == std::string("qpsx12abcy"));
     }
 
-    template<> template<>
-    void altextundo_object::test<24>()
+    // A step keeps the other selections before and after it: a run the
+    // first edit's before and the last's after; written and read back.
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a step keeps the other selections before and after and writes them out", "[altextundo]")
     {
-        set_test_name("a step keeps the other selections before and after: a run the first's before and the last's after; written and read back");
         doc.setText("abc\nabc\nabc");
         const auto at = [](S32 line, S32 column) { return ALTextRange(ALTextPos(line, column), ALTextPos(line, column)); };
         const auto said = [](const std::vector<ALTextRange>& all) {
@@ -808,24 +943,39 @@ namespace tut
 
         std::vector<ALTextRange> others;
         std::optional<ALTextRange> back = undo.undo(&others);
-        ensure("one step", back.has_value() && doc.text() == "abc\nabc\nabc");
-        ensure_equals("the others as they stood before the run", said(others), said({ at(1, 1), ALTextRange(ALTextPos(2, 3), ALTextPos(2, 0)) }));
+        {
+            INFO("one step");
+            CHECK(back.has_value());
+            CHECK(doc.text() == "abc\nabc\nabc");
+        }
+        UNSCOPED_INFO("the others as they stood before the run");
+        CHECK(said(others) == said({ at(1, 1), ALTextRange(ALTextPos(2, 3), ALTextPos(2, 0)) }));
         std::optional<ALTextRange> ahead = undo.redo(&others);
-        ensure("and forward", ahead.has_value() && *ahead == at(0, 3));
-        ensure_equals("as they stood after it", said(others), said({ at(1, 3) }));
+        {
+            INFO("and forward");
+            REQUIRE(ahead.has_value());
+            CHECK(*ahead == at(0, 3));
+        }
+        UNSCOPED_INFO("as they stood after it");
+        CHECK(said(others) == said({ at(1, 3) }));
 
         // Written out and read back over the same text.
         ALTextDocument copy(doc.text());
         ALTextUndo     again(copy);
-        ensure("read back", again.fromLLSD(undo.asLLSD()));
+        CHECK(again.fromLLSD(undo.asLLSD()));
         std::istringstream notation(undo.asNotation());
         LLSD               written;
-        ensure("and in notation", LLSDSerialize::fromNotation(written, notation, LLSDSerialize::SIZE_UNLIMITED) > 0 &&
-                                      written["undo"][0]["others_after"].size() == 1);
+        {
+            INFO("and in notation");
+            CHECK(LLSDSerialize::fromNotation(written, notation, LLSDSerialize::SIZE_UNLIMITED) > 0);
+            CHECK(written["undo"][0]["others_after"].size() == 1);
+        }
         again.undo(&others);
-        ensure_equals("the others before, read back", said(others), said({ at(1, 1), ALTextRange(ALTextPos(2, 3), ALTextPos(2, 0)) }));
+        UNSCOPED_INFO("the others before, read back");
+        CHECK(said(others) == said({ at(1, 1), ALTextRange(ALTextPos(2, 3), ALTextPos(2, 0)) }));
         again.redo(&others);
-        ensure_equals("and after", said(others), said({ at(1, 3) }));
+        UNSCOPED_INFO("and after");
+        CHECK(said(others) == said({ at(1, 3) }));
 
         // A step whose others after were never said: a redo leaves the
         // caret alone; and one with none has none.
@@ -834,19 +984,23 @@ namespace tut
         undo.record(third, at(0, 0), third.endAfter(), now, { at(2, 0) });
         undo.settle(at(0, 1));
         undo.undo(&others);
-        ensure_equals("before, as noted", said(others), said({ at(2, 0) }));
+        UNSCOPED_INFO("before, as noted");
+        CHECK(said(others) == said({ at(2, 0) }));
         undo.redo(&others);
-        ensure("after, none", others.empty());
+        UNSCOPED_INFO("after, none");
+        CHECK(others.empty());
         now += 5.0;
         type(ALTextPos(0, 0), "w");
         undo.undo(&others);
-        ensure("none where there were none", others.empty());
+        UNSCOPED_INFO("none where there were none");
+        CHECK(others.empty());
     }
 
-    template<> template<>
-    void altextundo_object::test<25>()
+    // A batch is kept by its stretches' own text, not the whole of the text
+    // from the first to the last: keys typed at carets far apart keep the
+    // steps before them, and step back and forward as batches.
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a batch keeps its stretches' own text and not the text between them", "[altextundo]")
     {
-        set_test_name("a batch is kept by its stretches' own text, not the whole of the text from the first to the last: keys typed at carets far apart keep the steps before them, and step back and forward as batches");
         // A name on the first line and on the last, forty thousand bytes
         // apart.
         std::string text = "name = 1;\n";
@@ -879,19 +1033,24 @@ namespace tut
             now += 0.1;
         }
         const std::string after = doc.text();
-        ensure_equals("typed at both", doc.line(last), std::string("name") + typed + " = 2;");
-        ensure("the saved text still reached, past the run", undo.savedText() == std::optional<std::string>(saved));
-        ensure("the history written a few bytes a key", undo.asNotation().size() < 16 * 1024);
+        UNSCOPED_INFO("typed at both");
+        CHECK(doc.line(last) == std::string("name") + typed + " = 2;");
+        UNSCOPED_INFO("the saved text still reached, past the run");
+        CHECK(undo.savedText() == std::optional<std::string>(saved));
+        UNSCOPED_INFO("the history written a few bytes a key");
+        CHECK(undo.asNotation().size() < 16 * 1024);
 
         // Read back over the text as it stands, in another journal: the run
         // steps back to where it began.
         std::optional<ALTextUndo::History> read = ALTextUndo::historyFrom(undo.asLLSD(), after);
-        ensure("the history read back", read.has_value());
+        UNSCOPED_INFO("the history read back");
+        REQUIRE(read.has_value());
         ALTextDocument later(after);
         ALTextUndo     again(later);
         again.restore(std::move(*read));
         again.undo();
-        ensure("and stepped back through", later.text() == before);
+        UNSCOPED_INFO("and stepped back through");
+        CHECK(later.text() == before);
 
         // Stepped back in its own journal: each key put back as the batch it
         // was, the run one step, and the steps before it still there.
@@ -902,15 +1061,24 @@ namespace tut
             batches += edit.parts.size() == 2 ? 1 : 0;
         });
         undo.undo();
-        ensure("the run one step", doc.text() == before);
-        ensure_equals("each key put back as one change", changes, static_cast<S32>(typed.size()));
-        ensure_equals("each a batch of both stretches", batches, changes);
-        ensure("the steps before it kept", undo.canUndo());
+        UNSCOPED_INFO("the run one step");
+        CHECK(doc.text() == before);
+        UNSCOPED_INFO("each key put back as one change");
+        CHECK(changes == static_cast<S32>(typed.size()));
+        UNSCOPED_INFO("each a batch of both stretches");
+        CHECK(batches == changes);
+        UNSCOPED_INFO("the steps before it kept");
+        CHECK(undo.canUndo());
         undo.undo();
-        ensure("back to the saved text", undo.isPristine() && doc.text() == saved);
+        {
+            INFO("back to the saved text");
+            CHECK(undo.isPristine());
+            CHECK(doc.text() == saved);
+        }
         undo.redo();
         undo.redo();
-        ensure("and forward to where the run ended", doc.text() == after);
+        UNSCOPED_INFO("and forward to where the run ended");
+        CHECK(doc.text() == after);
 
         // Stretches across lines, taking text and putting it, and one that
         // only takes: each with its own text, as it was and as it is after.
@@ -921,27 +1089,33 @@ namespace tut
                                                             { ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "Z" },
                                                             { ALTextRange(ALTextPos(3, 2), ALTextPos(3, 5)), "" } });
         undo.record(many, ALTextPos(0, 1), many.endAfter(), now);
-        ensure_equals("made", doc.text(), std::string("aX\nYta\nZgamma\nde"));
+        CHECK(doc.text() == std::string("aX\nYta\nZgamma\nde"));
         const LLSD written = undo.asLLSD();
         const LLSD edits   = written["undo"][0]["edits"];
-        ensure_equals("written an edit a stretch", edits.size(), 3);
-        ensure_equals("the last first, with what it took", edits[0][4].asString(), std::string("lta"));
-        ensure_equals("the first last, with what it took and put", edits[2][4].asString() + "|" + edits[2][5].asString(), std::string("lpha\nbe|X\nY"));
+        UNSCOPED_INFO("written an edit a stretch");
+        REQUIRE(edits.size() == 3);
+        UNSCOPED_INFO("the last first, with what it took");
+        CHECK(edits[0][4].asString() == std::string("lta"));
+        UNSCOPED_INFO("the first last, with what it took and put");
+        CHECK(edits[2][4].asString() + "|" + edits[2][5].asString() == std::string("lpha\nbe|X\nY"));
         undo.undo();
-        ensure_equals("stepped back", doc.text(), std::string("alpha\nbeta\ngamma\ndelta"));
+        UNSCOPED_INFO("stepped back");
+        CHECK(doc.text() == std::string("alpha\nbeta\ngamma\ndelta"));
         undo.redo();
-        ensure_equals("and forward", doc.text(), std::string("aX\nYta\nZgamma\nde"));
+        UNSCOPED_INFO("and forward");
+        CHECK(doc.text() == std::string("aX\nYta\nZgamma\nde"));
         ALTextDocument copy(doc.text());
         ALTextUndo     restored(copy);
-        ensure("read back", restored.fromLLSD(written));
+        CHECK(restored.fromLLSD(written));
         restored.undo();
-        ensure_equals("and stepped back from the history", copy.text(), std::string("alpha\nbeta\ngamma\ndelta"));
+        UNSCOPED_INFO("and stepped back from the history");
+        CHECK(copy.text() == std::string("alpha\nbeta\ngamma\ndelta"));
     }
 
-    template<> template<>
-    void altextundo_object::test<26>()
+    // The key that would take a run's step past the budget begins a step of
+    // its own, and the history is written within the budget.
+    TEST_CASE_METHOD(altextundo_data, "altextundo: a run stays in its step only while the step is within the budget", "[altextundo]")
     {
-        set_test_name("a run goes on in its step only while the step stays within the budget: the key that would pass it begins a step of its own, and the history is written within it");
         // Ten keys typed one after the other, each putting in 300 KB: three
         // to a step.
         const std::string put(300 * 1024, 'k');
@@ -952,11 +1126,15 @@ namespace tut
             at = type(at, put.c_str());
             undo.endTyping();
         }
-        ensure_equals("all typed", doc.text().size(), 10 * put.size());
-        ensure("the history written within the budget", undo.asNotation().size() <= ALTextUndo::BUDGET);
+        UNSCOPED_INFO("all typed");
+        CHECK(doc.text().size() == 10 * put.size());
+        UNSCOPED_INFO("the history written within the budget");
+        CHECK(undo.asNotation().size() <= ALTextUndo::BUDGET);
         undo.undo();
-        ensure_equals("the last key a step of its own", doc.text().size(), 9 * put.size());
+        UNSCOPED_INFO("the last key a step of its own");
+        CHECK(doc.text().size() == 9 * put.size());
         undo.redo();
-        ensure_equals("and put back", doc.text().size(), 10 * put.size());
+        UNSCOPED_INFO("and put back");
+        CHECK(doc.text().size() == 10 * put.size());
     }
 }

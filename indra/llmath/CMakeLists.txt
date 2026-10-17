@@ -103,50 +103,75 @@ target_precompile_headers(llmath REUSE_FROM llprecompiled)
 
 # Add tests
 if(AL_BUILD_TESTS)
-  foreach(
-    test
-    llbboxlocal
-    llmodularmath
-    llrect
-    v2math
-    v3color
-    v4color
-    v4coloru
+  # One Catch2 binary for llmath's tests, each test file run in a process of
+  # its own. Each links the library rather than compiling a copy of the file
+  # it tests, so the code under test is the code the viewer runs.
+  al_add_test_binary(
+    llmath_tests
+    PROJECT llmath
+    SOURCES
+      tests/alignment_test.cpp
+      tests/alplaneset_test.cpp
+      tests/alsimdkernels_test.cpp
+      tests/llbbox_test.cpp
+      tests/llbboxlocal_test.cpp
+      tests/llmatrix3a_test.cpp
+      tests/llmatrix4a_test.cpp
+      tests/llmodularmath_test.cpp
+      tests/lloctree_test.cpp
+      tests/llquaternion2_test.cpp
+      tests/llquaternion_test.cpp
+      tests/llrect_test.cpp
+      tests/llsdutil_math_test.cpp
+      tests/llvector4a_test.cpp
+      tests/m3math_test.cpp
+      tests/mathmisc_test.cpp
+      tests/v2math_test.cpp
+      tests/v3color_test.cpp
+      tests/v3dmath_test.cpp
+      tests/v3math_test.cpp
+      tests/v4color_test.cpp
+      tests/v4coloru_test.cpp
+      tests/v4math_test.cpp
+      tests/xform_test.cpp
+    # Nanoseconds per element for the SIMD math the geometry rebuild spends
+    # its time in, and for the choices the SIMD series makes by a number.
+    BENCH_SOURCES tests/llsimd_bench.cpp
+    LIBRARIES llmath llcommon
   )
-    al_add_test(${test} UNIT PROJECT llmath)
-  endforeach()
 
-  foreach(
-    test
-    alignment
-    alplaneset
-    llsdutil_math
-    mathmisc
-    m3math
-    llmatrix3a
-    llmatrix4a
-    llvector4a
-  )
-    al_add_test(${test} PROJECT llmath LIBRARIES llmath llcommon)
-  endforeach()
-  al_add_test(llbbox PROJECT llmath SOURCES llbbox.cpp LIBRARIES llmath llcommon)
-  al_add_test(llquaternion PROJECT llmath SOURCES llquaternion.cpp LIBRARIES llmath llcommon)
-  al_add_test(llquaternion2 PROJECT llmath SOURCES llquaternion.cpp LIBRARIES llmath llcommon)
-  al_add_test(v3dmath PROJECT llmath SOURCES v3dmath.cpp LIBRARIES llmath llcommon)
-  al_add_test(v3math PROJECT llmath SOURCES v3math.cpp LIBRARIES llmath llcommon)
-  al_add_test(v4math PROJECT llmath SOURCES v4math.cpp LIBRARIES llmath llcommon)
-  al_add_test(xform PROJECT llmath SOURCES xform.cpp LIBRARIES llmath llcommon)
-
-  # The batch kernels at every width, at the tree's tier and, where the
-  # tiers differ, at each of them; a variant the host cannot run skips.
-  al_add_test(alsimdkernels PROJECT llmath LIBRARIES llmath llcommon)
-  if(BUILD_TARGET_IS_X86_64 AND NOT DARWIN)
-    foreach(tier baseline v2 v3 v4)
-      al_add_test(alsimdkernels PROJECT llmath LIBRARIES llmath llcommon ISA_TIER ${tier})
-    endforeach()
+  # The kernel test compares kernels, instantiated in it, bit for bit with each
+  # other and with the vector types' own operations. Built with the tree's
+  # reassociation and contraction, the compiler may round the same sum
+  # differently at each place it inlines it, and Clang's sanitizers move
+  # those places, so the file is built strict, where the same operations in
+  # the same order round the same. MSVC's /fp:fast does not reorder the
+  # intrinsics, and the file passes there as it is. Accuracy against a double
+  # reference, and the library's own entry built as the viewer has it, are
+  # checked to a tolerance.
+  if(NOT COMPILER_IS_MSVC AND NOT COMPILER_IS_CLANG_CL)
+    set_source_files_properties(
+      tests/alsimdkernels_test.cpp
+      PROPERTIES COMPILE_OPTIONS "-ffp-contract=off;-fno-associative-math;-fno-reciprocal-math"
+    )
   endif()
 
-  # Nanoseconds per element for the SIMD math the geometry rebuild spends
-  # its time in, and for the choices the SIMD series makes by a number.
-  al_add_bench(llsimd PROJECT llmath LIBRARIES llmath llcommon)
+  # llcommon's SIMD ops layer and the batch kernels again at each other
+  # x86-64 tier, one binary a tier: code the linker folds across files would
+  # otherwise run one tier's instructions in another's test. The tree's own
+  # tier is llcommon_tests' and llmath_tests'; a variant the host cannot run
+  # skips.
+  if(BUILD_TARGET_IS_X86_64 AND NOT DARWIN)
+    foreach(tier baseline v2 v3 v4)
+      if(NOT tier STREQUAL AL_ISA_TIER)
+        al_add_test_binary(
+          simd_tests
+          PROJECT llmath
+          SOURCES tests/alsimdkernels_test.cpp ${INDRA_SOURCE_DIR}/llcommon/tests/alsimd_test.cpp
+          LIBRARIES llmath llcommon
+          ISA_TIER ${tier}
+        )
+      endif()
+    endforeach()
+  endif()
 endif()

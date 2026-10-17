@@ -29,9 +29,15 @@ out vec4 vary_fragcoord;
 
 void main()
 {
-    //transform vertex
     vec4 pos = vec4(position.xyz, 1.0);
     vary_fragcoord = pos;
 
-    gl_Position = pos;
+    // Level with the depth the sky leaves cleared, as the haze's triangle is (hazeV.glsl): the draw passes only in
+    // front of the far plane (LLPipeline::renderDeferredLighting), so the sky is rejected before a light is shaded
+    // over it. Reverse-Z puts the far plane at ndc z 0.
+#ifdef REVERSE_Z
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+#else
+    gl_Position = vec4(position.xy, 1.0, 1.0);
+#endif
 }

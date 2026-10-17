@@ -27,6 +27,7 @@
 #include "alluaufragment.h"
 
 #include "alluaufrontend.h"
+#include "alluaushadowed.h"
 #include "alscriptlexicon.h"
 
 #include "Luau/Allocator.h"
@@ -350,7 +351,8 @@ ALLuauFragment::Completion ALLuauFragment::complete(std::string_view source, Lua
     Luau::FragmentAutocompleteStatusResult made{ Luau::FragmentAutocompleteStatus::Success, std::nullopt };
     bool                                   timedOut = false;
     {
-        const Restored restored(*mFront.frontend, mFront.moduleName, *mBase);
+        const Restored       restored(*mFront.frontend, mFront.moduleName, *mBase);
+        const ALLuauShadowed shadowed(*mBase, at);
         made     = Luau::tryFragmentAutocomplete(*mFront.frontend, mFront.moduleName, at, context, std::move(callback));
         timedOut = restored.timedOut();
     }
@@ -392,6 +394,13 @@ ALLuauFragment::Completion ALLuauFragment::complete(std::string_view source, Lua
     {
         return answer;
     }
+    // A name the fragment declares again beside the last check's of it,
+    // both in the fragment's own scope, where Luau took whichever its table
+    // gave first: the whole script, whose scopes are set right first.
+    if (made.result->freshScope && ALLuauShadowed::ambiguous(*made.result->freshScope, at, found))
+    {
+        return answer;
+    }
     ++mFront.fragments;
     answer.outcome = Outcome::Answered;
     answer.found   = std::move(made.result->acResults);
@@ -429,7 +438,8 @@ ALLuauFragment::Typed ALLuauFragment::typecheck(std::string_view source, Luau::P
     std::pair<Luau::FragmentTypeCheckStatus, Luau::FragmentTypeCheckResult> made{ Luau::FragmentTypeCheckStatus::SkipAutocomplete, {} };
     bool timedOut = false;
     {
-        const Restored restored(*mFront.frontend, mFront.moduleName, *mBase);
+        const Restored       restored(*mFront.frontend, mFront.moduleName, *mBase);
+        const ALLuauShadowed shadowed(*mBase, at);
         try
         {
             // To the end of the call at the least, rather than Luau's own

@@ -159,7 +159,10 @@ uniform vec4 roughnessFactors;
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
 uniform vec3[4] emissiveColors;
 #endif
+// Only the program for a region with a masked material can discard, as in pbropaqueF.
+#ifdef HAS_ALPHA_MASK
 uniform vec4 minimum_alphas; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
+#endif
 // Per material, its KHR texture transform as the affine map uv = A p + b of a projection's 2D
 // point of the region position, the v flips folded in. The pool builds it; every slice of a
 // material goes through the same map, and the derivatives through A alone.
@@ -432,11 +435,13 @@ void main()
         break;
     }
 
+#ifdef HAS_ALPHA_MASK
     float minimum_alpha = terrain_mix(tm, minimum_alphas);
     if (pbr_mix.col.a < minimum_alpha)
     {
         discard;
     }
+#endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     // The materials' normals were composed and blended in region space; one transform brings
     // the blend into view space. No facing flip before this point: the one below has to be

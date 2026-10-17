@@ -1,0 +1,33 @@
+# LeakSanitizer suppressions for the tests of a sanitized build
+# (ALAddTestBinary.cmake gives the runs this file), and for runs of its
+# viewer. One per line:
+#
+#   leak:<function, source file or library>
+#
+# A suppression is for code that is not ours -- a system library, a driver
+# -- and says above it what it hides, why it cannot be fixed here, and where
+# it was reported upstream. A leak in our own code is fixed, not listed, and
+# one in a port the Alchemy registry carries is patched there.
+#
+# The gl tests keep every library loaded until the process ends
+# (llheadlessgl_fixture.h): an unloaded driver's globals hold nothing, and
+# all it keeps for the process would read as leaked. Mesa's llvmpipe, which
+# the tests draw with, leaks nothing then.
+
+# NVIDIA's EGL driver, on a host that has it: libglvnd loads every vendor's
+# EGL library it finds, so it is loaded beside Mesa even where the tests draw
+# on llvmpipe, and its initialisation (NvGlEglApiInit) keeps blocks nothing
+# holds once it is done. Closed source and the system's; not on CI's runners.
+leak:libnvidia-eglcore
+
+# fontconfig, vcpkg's port: a pattern holds its array of elements as an
+# offset from itself (elts_offset, fcint.h), not a pointer, so LeakSanitizer,
+# which follows pointers, finds the array of every pattern fontconfig keeps
+# for the process unreachable. A config that selects fonts by pattern keeps
+# one from the first FcInit -- Ubuntu's 70-no-bitmaps.conf rejects bitmap
+# fonts with <rejectfont><pattern>, so CI's runners do, where Fedora's
+# config has none -- and every process that asked fontconfig for a fallback
+# font reported 288 to 320 bytes. Only the array's allocation is hidden: a
+# pattern that does leak is still reported by its own (FcPatternCreate). Not
+# a fontconfig bug to report: the offsets are its cache's format.
+leak:FcPatternObjectInsertElt

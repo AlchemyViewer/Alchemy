@@ -344,19 +344,19 @@ public:
     static bool usesDirectives(std::string_view text, bool lua);
 
     // Why a script is preprocessed as it goes up, or No, in this order: it
-    // went up in the preprocessor's envelope before, its source kept, and
-    // goes up as it went; it holds a directive, which the grid could
-    // compile no other way, whatever the setting; Preprocess on Save is on,
-    // for every script. `directives` is asked only where it decides.
+    // holds a directive, which the grid could compile no other way,
+    // whatever the setting; Preprocess on Save is on, for every script.
+    // That it went up in the preprocessor's envelope before is no reason:
+    // a script with neither goes up as written, the envelope let go of.
+    // `directives` is asked only where it decides.
     enum class Wanted : U8
     {
         No,
-        Enveloped,
         Directives,
         Setting
     };
-    static Wanted wanted(bool enveloped, const std::function<bool()>& directives, bool setting);
-    static Wanted wanted(std::string_view text, bool lua, bool enveloped, bool setting);
+    static Wanted wanted(const std::function<bool()>& directives, bool setting);
+    static Wanted wanted(std::string_view text, bool lua, bool setting);
 
     // The transform a line of LSL is written for, by the shape of its
     // first statement: `switch (` and `case ...:` the switch's; `break;`,
