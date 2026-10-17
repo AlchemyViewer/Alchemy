@@ -64,7 +64,7 @@ ALWaterSurface::WaveSettings ALWaterSurface::waveSettings()
 bool ALWaterSurface::wavesWanted()
 {
     static LLCachedControl<bool> waves(gSavedSettings, "AlchemyRenderWaterWaves", true);
-    return waves && water_waves_supported();
+    return waves;
 }
 
 void ALWaterSurface::update()

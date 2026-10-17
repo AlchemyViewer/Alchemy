@@ -149,9 +149,9 @@ if(AL_BUILD_TESTS)
 
   # The suites that need no GL: arithmetic (where a local coordinate lands
   # under the UI transform; the matrix stack, the projection helpers and the
-  # clip-plane classes), and the font tables and shaping. alfontshaping holds
-  # both Unicode tables against each other, so this binary links ICU, which
-  # llrender itself has no need of.
+  # clip-plane classes; the GL floor's version test), and the font tables and
+  # shaping. alfontshaping holds both Unicode tables against each other, so
+  # this binary links ICU, which llrender itself has no need of.
   al_add_test_binary(
     llrender_tests
     PROJECT llrender
@@ -161,6 +161,7 @@ if(AL_BUILD_TESTS)
       tests/llfontbitmapcache_test.cpp
       tests/llfontfreetype_test.cpp
       tests/llfontregistry_test.cpp
+      tests/llglfloor_test.cpp
       tests/llrendermatrix_test.cpp
       tests/lluitransform_test.cpp
     LIBRARIES llrender ll::icu

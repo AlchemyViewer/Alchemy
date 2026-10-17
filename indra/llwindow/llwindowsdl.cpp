@@ -409,6 +409,20 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         LLRender::s10bitBackBuffer = false;
         return createContext(x, y, width, height, bits, fullscreen, enable_vsync);
     }
+    if (!mContext)
+    {
+        // A driver that offers no 4.1 core context. The context it makes by default is what tells the
+        // user which version they have: initGL refuses it, naming the floor and the version
+        // (MBGLVersionErr), where failing here could only say no context was made. SDL's own
+        // defaults: no profile, GL 2.1, and none of the flags above but debug.
+        LL_WARNS() << "No OpenGL 4.1 core context; making the driver's default one for initGL to judge. SDL: "
+                   << SDL_GetError() << LL_ENDL;
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, 0);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, gDebugGL ? SDL_GL_CONTEXT_DEBUG_FLAG : 0);
+        mContext = create_context();
+    }
     if(!mContext)
     {
         LL_WARNS() << "Cannot create GL context " << SDL_GetError() << LL_ENDL;
