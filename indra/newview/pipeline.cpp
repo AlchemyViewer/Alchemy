@@ -1431,6 +1431,7 @@ void LLPipeline::releaseAllGLResources()
     LLVOAvatar::resetImpostors();
     gBumpImageList.destroyGL();
     mHeroProbeManager.cleanup();
+    releaseExposureBuffers();
 
     mGLResourcesLive = false;
 }
@@ -1508,7 +1509,7 @@ void LLPipeline::releaseDerivedState()
     }
     mToneCurveLutDirty = true;
 
-    releaseLUTBuffers();
+    mPbrBrdfLut.release();
 
     ALFarPlaneOverlay::release();
     if (ALSelectionOutline::instanceExists())
@@ -1554,7 +1555,7 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
 
     releaseRenderTargets();
     releaseDerivedState();
-    add(invalidated, "exposure and flare history, lens dirt, colour-grade LUT, noise, SMAA "
+    add(invalidated, "lens dirt, colour-grade LUT, noise, SMAA "
                      "tables, tone curve, UBOs, query plots, BRDF LUT, reference still, scopes, depth pyramid, water "
                      "surface maps, selection outline, far-plane overlay");
 
@@ -1602,6 +1603,14 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
             add(changed, "hero pack");
         }
 
+        // The exposure adapts in the HDR scene's units, and the flare's history is measured in them.
+        if (before.mHDR != after.mHDR)
+        {
+            releaseExposureBuffers();
+            createExposureBuffers();
+            add(invalidated, "exposure and flare history");
+        }
+
         // An impostor is G-buffer channels and depth in the main G-buffer's formats (generateImpostor), so those
         // are what make one stale; its size is its own.
         if (gbuffer_formats || depth_format)
@@ -1623,10 +1632,8 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
                                 << LL_ENDL;
 }
 
-void LLPipeline::releaseLUTBuffers()
+void LLPipeline::releaseExposureBuffers()
 {
-    mPbrBrdfLut.release();
-
     mExposureMap.release();
     mLuminanceMap.release();
     mExposureHistogram.release();
@@ -1861,7 +1868,8 @@ void LLPipeline::createGLBuffers()
         mToneCurveLutDirty = true;   // fresh storage holds nothing
     }
 
-    createLUTBuffers();
+    createBrdfLut();
+    createExposureBuffers();
 
     setupGradingLUT();
 }
@@ -1871,7 +1879,7 @@ F32 lerpf(F32 a, F32 b, F32 w)
     return a + w * (b - a);
 }
 
-void LLPipeline::createLUTBuffers()
+void LLPipeline::createBrdfLut()
 {
     mPbrBrdfLut.allocate(512, 512, GL_RG16F);
     mPbrBrdfLut.bindTarget();
@@ -1906,27 +1914,45 @@ void LLPipeline::createLUTBuffers()
 
     gDeferredGenBrdfLutProgram.unbind();
     mPbrBrdfLut.flush();
+}
 
-    // Scale 1 at EV 0: the first frame adapts from no exposure at all.
-    mExposureMap.allocate(1, 1, GL_RGBA16F);
-    mExposureMap.bindTarget();
-    gGL.setClearColor(LLColor4::red);
-    mExposureMap.clear();
-    gGL.setClearColor(LLColor4::transparent);
-    mExposureMap.flush();
+void LLPipeline::createExposureBuffers()
+{
+    if (!mExposureMap.isComplete())
+    {
+        // Scale 1 at EV 0: the first frame adapts from no exposure at all.
+        mExposureMap.allocate(1, 1, GL_RGBA16F);
+        mExposureMap.bindTarget();
+        gGL.setClearColor(LLColor4::red);
+        mExposureMap.clear();
+        gGL.setClearColor(LLColor4::transparent);
+        mExposureMap.flush();
+    }
 
-    mLuminanceMap.allocate(EXPOSURE_METER_WIDTH, EXPOSURE_METER_HEIGHT, GL_RGBA16F);
+    if (!mLuminanceMap.isComplete())
+    {
+        mLuminanceMap.allocate(EXPOSURE_METER_WIDTH, EXPOSURE_METER_HEIGHT, GL_RGBA16F);
+    }
 
-    // RGBA32F: a bin's weight sums thousands of points, past what a half float counts exactly.
-    mExposureHistogram.allocate(EXPOSURE_HISTOGRAM_BINS, 1, GL_RGBA32F);
+    if (!mExposureHistogram.isComplete())
+    {
+        // RGBA32F: a bin's weight sums thousands of points, past what a half float counts exactly.
+        mExposureHistogram.allocate(EXPOSURE_HISTOGRAM_BINS, 1, GL_RGBA32F);
+    }
 
-    mLastExposure.allocate(1, 1, GL_RGBA16F);
+    if (!mLastExposure.isComplete())
+    {
+        mLastExposure.allocate(1, 1, GL_RGBA16F);
+    }
 
-    // Lens flare sun state, 2x1, two of them swapped each frame. Zero is the
-    // correct history: no drive, no instability, no reference luminance.
-    mLensFlareState[0].allocate(2, 1, GL_RGBA16F);
-    mLensFlareState[1].allocate(2, 1, GL_RGBA16F);
-    clearLensFlareState();
+    if (!mLensFlareState[0].isComplete() || !mLensFlareState[1].isComplete())
+    {
+        // Lens flare sun state, 2x1, two of them swapped each frame. Zero is the
+        // correct history: no drive, no instability, no reference luminance.
+        mLensFlareState[0].allocate(2, 1, GL_RGBA16F);
+        mLensFlareState[1].allocate(2, 1, GL_RGBA16F);
+        clearLensFlareState();
+    }
 }
 
 // Lens dirt plate generator.

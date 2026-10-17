@@ -99,7 +99,8 @@ public:
     void rebuildGLBuffers(bool relinked);
     /// The render targets createGLBuffers allocates.
     void releaseRenderTargets();
-    void releaseLUTBuffers();
+    /// The auto-exposure's targets and the lens flare's history.
+    void releaseExposureBuffers();
     /// The main pack's screen targets, which follow the window, the resolution scale and snapshots.
     void releaseScreenBuffers();
     /// The probe and hero packs' screen targets (allocateProbeBuffers).
@@ -107,7 +108,9 @@ public:
     void releaseShadowBuffers();
 
     void createGLBuffers();
-    void createLUTBuffers();
+    void createBrdfLut();
+    /// Whichever of the auto-exposure's targets and the lens flare's are missing, at their starting values.
+    void createExposureBuffers();
     void setupGradingLUT();
     void generateLensDirt();
     /// Re-bake the tone curve lookup row from the four RenderColorGradeCurve*
