@@ -12560,7 +12560,10 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
             // projected light filters in linear -- deferredUtil no longer decodes it in-shader.
             gGL.getTextureSlot(channel)->bindSampled(img, ALSamplers::AnisoWrapSRGB);
 
-            F32 lod_range = logf((F32)img->getWidth())/logf(2.f);
+            // At least 1: deferredUtil's cookie edge fade divides by it (lod / (proj_lod * 0.5)),
+            // and a cookie 1 px wide (or fetched no further than its smallest level) would make
+            // that 0 / 0. A one-texel image has no finer level for the extra range to select.
+            F32 lod_range = llmax(logf((F32)img->getWidth())/logf(2.f), 1.f);
 
             shader.uniform1f(LLShaderMgr::PROJECTOR_FOCUS, focus);
             shader.uniform1f(LLShaderMgr::PROJECTOR_LOD, lod_range);

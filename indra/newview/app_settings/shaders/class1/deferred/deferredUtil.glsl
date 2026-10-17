@@ -311,7 +311,9 @@ vec4 getTexture2DLodDiffuse(vec2 tc, float lod)
     float det = min(lod/(proj_lod*0.5), 1.0);
     float d = min(dist.x, dist.y);
     float edge = 0.25*det;
-    ret *= clamp(d/edge, 0.0, 1.0);
+    // At lod 0 there is no edge to fade over; the floor keeps a texel on the cookie's border
+    // at 0 rather than 0 / 0.
+    ret *= clamp(d/max(edge, 1e-6), 0.0, 1.0);
 
     return ret;
 }
@@ -356,7 +358,9 @@ vec4 texture2DLodSpecular(vec2 tc, float lod)
     float d = min(dist.x, dist.y);
     d *= min(1, d * (proj_lod - lod)); // BUG? extra factor compared to diffuse causes N repeats
     float edge = 0.25*det;
-    ret *= clamp(d/edge, 0.0, 1.0);
+    // At lod 0 there is no edge to fade over; the floor keeps a texel on the cookie's border
+    // at 0 rather than 0 / 0.
+    ret *= clamp(d/max(edge, 1e-6), 0.0, 1.0);
 
     return ret;
 }
