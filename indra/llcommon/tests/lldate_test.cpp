@@ -306,20 +306,13 @@ namespace
         }
     }
 
-    TEST_CASE("LLDate: fields and offsets past an S32 parse without overflowing", "[LLDate]")
+    TEST_CASE("LLDate: fields past nine digits fail, and offsets past an S32 parse without overflowing", "[LLDate]")
     {
         LLDate date;
-        // A year of eleven digits saturates rather than overflowing. Whether
-        // the platform's timegm() takes a year that far out is its own
-        // business; if it does, the year is still on the side it was written.
-        if (date.fromString("99999999999-01-01T00:00:00Z"))
-        {
-            CHECK(date.secondsSinceEpoch() > 1e15);
-        }
-        if (date.fromString("-99999999999-01-01T00:00:00Z"))
-        {
-            CHECK(date.secondsSinceEpoch() < -1e15);
-        }
+        // past an S32, and within one but carried by timegm() into another date
+        CHECK_FALSE(date.fromString("99999999999-01-01T00:00:00Z"));
+        CHECK_FALSE(date.fromString("-99999999999-01-01T00:00:00Z"));
+        CHECK_FALSE(date.fromString("2000-01-01T00:00:1000000000Z"));
 
         // an offset of a hundred million hours is worked out in full
         REQUIRE(date.fromString("2000-01-01T00:00:00+99999999"));
