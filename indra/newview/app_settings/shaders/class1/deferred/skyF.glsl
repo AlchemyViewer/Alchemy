@@ -47,10 +47,6 @@ uniform float ice_level;
 uniform vec3 camPosLocal;
 
 uniform vec3  lightnorm;
-uniform vec3  sunlight_color;
-uniform vec3  moonlight_color;
-uniform int   sun_up_factor;
-uniform vec3  ambient_color;
 // Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
 // and bound at UB_ENVIRONMENT. Members are read by bare name.
 //[ENGINE_BLOCK Environment]
@@ -146,7 +142,9 @@ void main()
         float rel_pos_lightnorm_dot = dot(rel_pos_norm, lightnorm.xyz);
 
         // Initialize temp variables
-        vec3 sunlight = (sun_up_factor == 1) ? sunlight_color : moonlight_color * 0.7; //magic 0.7 to match legacy color
+        // The sun, or the moon at 0.7 to match the legacy color, and the ambient: the Environment
+        // block's sky_light and sky_ambient (LLSettingsVOSky::applySpecial)
+        vec3 sunlight = sky_light;
 
         // Sunlight attenuation effect (hue and brightness) due to atmosphere
         // this is used later for sunlight modulation at various altitudes
@@ -182,14 +180,14 @@ void main()
         haze_glow = (sun_moon_glow_factor < 1.0) ? 0.0 : (sun_moon_glow_factor * (haze_glow + 0.25));
 
         // Haze color above cloud
-        color = (blue_horizon * blue_weight * (sunlight + ambient_color)
-                + (haze_horizon * haze_weight) * (sunlight * haze_glow + ambient_color));
+        color = (blue_horizon * blue_weight * (sunlight + sky_ambient)
+                + (haze_horizon * haze_weight) * (sunlight * haze_glow + sky_ambient));
 
         // Final atmosphere additive
         color *= (1. - combined_haze);
 
         // Increase ambient when there are more clouds
-        vec3 ambient = ambient_color + max(vec3(0), (1. - ambient_color)) * cloud_shadow * 0.5;
+        vec3 ambient = sky_ambient + max(vec3(0), (1. - sky_ambient)) * cloud_shadow * 0.5;
 
         // Dim sunlight by cloud shadow percentage
         sunlight *= max(0.0, (1. - cloud_shadow));

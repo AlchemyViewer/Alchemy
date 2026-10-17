@@ -6871,28 +6871,17 @@ void LLPipeline::setupHWLights()
         mSunDir.setVec(sun_dir);
         mMoonDir.setVec(moon_dir);
 
-        mSunDiffuse.setVec(psky->getSunlightColor());
-        mMoonDiffuse.setVec(psky->getMoonlightColor());
-
-        F32 max_color = llmax(mSunDiffuse.mV[0], mSunDiffuse.mV[1], mSunDiffuse.mV[2]);
-        if (max_color > 1.f)
-        {
-            mSunDiffuse *= 1.f/max_color;
-        }
-        mSunDiffuse.clamp();
-
-        max_color = llmax(mMoonDiffuse.mV[0], mMoonDiffuse.mV[1], mMoonDiffuse.mV[2]);
-        if (max_color > 1.f)
-        {
-            mMoonDiffuse *= 1.f/max_color;
-        }
-        mMoonDiffuse.clamp();
+        // The same light the Environment block's atmospheric terms take (LLSettingsVOSky::applySpecial),
+        // black while neither body is up.
+        LLColor3 sun_diffuse;
+        LLColor3 moon_diffuse;
+        psky->getLitLightColors(sun_diffuse, moon_diffuse);
+        mSunDiffuse.set(sun_diffuse, 1.f);
+        mMoonDiffuse.set(moon_diffuse, 1.f);
 
         // prevent underlighting from having neither lightsource facing us
         if (!sun_up && !moon_up)
         {
-            mSunDiffuse.setVec(LLColor4(0.0, 0.0, 0.0, 1.0));
-            mMoonDiffuse.setVec(LLColor4(0.0, 0.0, 0.0, 1.0));
             mSunDir.setVec(LLVector4(0.0, 1.0, 0.0, 0.0));
             mMoonDir.setVec(LLVector4(0.0, 1.0, 0.0, 0.0));
         }
@@ -11578,18 +11567,8 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
         shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_NORM_MATRIX, norm_mat);
     }
 
-    // auto adjust legacy sun color if needed
-    static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
-    static LLCachedControl<F32> auto_adjust_sun_color_scale(gSavedSettings, "RenderSkyAutoAdjustSunColorScale", 1.f);
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-    LLColor3 sun_diffuse(mSunDiffuse.mV);
-    if (should_auto_adjust && psky->canAutoAdjust())
-    {
-        sun_diffuse *= auto_adjust_sun_color_scale;
-    }
-
-    shader.uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, sun_diffuse.mV);
-    shader.uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, mMoonDiffuse.mV);
+    // The sun's, moon's and ambient light the atmospherics read are the Environment block's
+    // (LLSettingsVOSky::applySpecial), the one place they are set for every program.
 
     shader.uniform1f(LLShaderMgr::REFLECTION_PROBE_MAX_LOD, mReflectionMapManager.mMaxProbeLOD);
 }

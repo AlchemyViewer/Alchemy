@@ -421,12 +421,10 @@ PreviewSphere& get_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, co
 // Final, direct modifications to shader constants, just before render
 void fixup_shader_constants(LLGLSLShader& shader)
 {
-    // Sunlight intensity of 0 no matter what
+    // Lit by the sun, with no haze. Its white light is the Environment block's
+    // (bindEnvironmentUBOLitBy, around the draw).
     shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, 1);
-    shader.uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, LLColor3::white.mV);
     shader.uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, 0.0f);
-    // The sun's attenuation on its way down, worked from that density (LLSettingsVOSky::applySpecial)
-    shader.uniform3fv(LLShaderMgr::SUNLIGHT_ATTEN, 1, LLColor3::white.mV);
 
     // Ignore shadows (if enabled): the preview has none of the maps, the sun's four cascades and the spot pair, so each
     // reads lit without a sample. Their units keep the depth maps bindShadowMaps put there, under the sampler the
@@ -567,12 +565,17 @@ bool LLGLTFPreviewTexture::render()
         gPipeline.bindDeferredShader(shader);
         fixup_shader_constants(shader);
 
+        // A white sun through no atmosphere, whatever the sky's light is.
+        LLEnvironment::instance().bindEnvironmentUBOLitBy(LLColor3::white);
+
         LLFetchedGLTFMaterial* lastMat = nullptr;
         LLViewerTexture* lastTex = nullptr;
         for (PreviewSpherePart& part : preview_sphere)
         {
             LLRenderPass::pushGLTFBatch(*part->mDrawInfo, lastMat, lastTex);
         }
+
+        LLEnvironment::instance().bindEnvironmentUBO();
 
         gPipeline.unbindDeferredShader(shader);
 

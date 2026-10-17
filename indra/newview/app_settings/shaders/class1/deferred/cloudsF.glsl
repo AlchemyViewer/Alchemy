@@ -49,10 +49,6 @@ uniform float cloud_variance;
 uniform vec3 camPosLocal;
 
 uniform vec3 lightnorm;
-uniform vec3 sunlight_color;
-uniform vec3 moonlight_color;
-uniform int sun_up_factor;
-uniform vec3 ambient_color;
 
 uniform float density_multiplier;
 
@@ -117,7 +113,9 @@ void main()
     float rel_pos_len  = length(rel_pos);
 
     // Initialize temp variables
-    vec3 sunlight = sunlight_color;
+    // The sun lighting the clouds, and below the ambient raised under cloud: the Environment
+    // block's sky_sunlight and atmos_ambient (LLSettingsVOSky::applySpecial)
+    vec3 sunlight = sky_sunlight;
     vec3 light_atten;
 
     // Sunlight attenuation effect (hue and brightness) due to atmosphere
@@ -157,8 +155,7 @@ void main()
     haze_glow = (sun_moon_glow_factor < 1.0) ? 0.0 : (haze_glow + 0.25);
 
     // Increase ambient when there are more clouds
-    vec3 tmpAmbient = ambient_color;
-    tmpAmbient += (1. - tmpAmbient) * cloud_shadow * 0.5;
+    vec3 tmpAmbient = atmos_ambient;
 
     // Dim sunlight by cloud shadow percentage
     sunlight *= (1. - cloud_shadow);
@@ -168,7 +165,7 @@ void main()
         (blue_horizon * blue_weight * (sunlight + tmpAmbient) + (haze_horizon * haze_weight) * (sunlight * haze_glow + tmpAmbient));
 
     // CLOUDS
-    sunlight = sunlight_color;
+    sunlight = sky_sunlight;
     off_axis = 1.0 / max(1e-6, lightnorm.y * 2.);
     sunlight *= exp(-light_atten * off_axis);
 

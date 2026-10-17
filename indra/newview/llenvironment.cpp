@@ -1698,15 +1698,15 @@ namespace
     // The CPU block must exactly match the std140 layout the shaders declare. Each vec3 is
     // paired with a trailing scalar (fills the vec3's std140 tail), so the C++ float[3]+float
     // packing reproduces std140 with no manual padding; only the round to 16 bytes before
-    // eyeToSky needs it, a mat3's columns being vec4-aligned.
-    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 256,
-                  "Environment UBO layout must match std140 (256 bytes)");
+    // eyeToSky needs it, a mat3's columns being vec4-aligned, and the unpaired vec3s after it.
+    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 336,
+                  "Environment UBO layout must match std140 (336 bytes)");
     static_assert(offsetof(LLEnvironment::EnvironmentUBOData, eyeToSky) == 160,
                   "eyeToSky must start on a 16-byte boundary, as a std140 mat3 does");
     static_assert(offsetof(LLEnvironment::EnvironmentUBOData, haze_extinction) == 208 &&
-                  offsetof(LLEnvironment::EnvironmentUBOData, blue_weight) == 224 &&
-                  offsetof(LLEnvironment::EnvironmentUBOData, haze_weight) == 240,
-                  "the haze terms are vec3s after the mat3, each on a 16-byte boundary, as std140 lays them");
+                  offsetof(LLEnvironment::EnvironmentUBOData, atmos_sunlit) == 256 &&
+                  offsetof(LLEnvironment::EnvironmentUBOData, sky_ambient) == 320,
+                  "the atmospheric terms are vec3s after the mat3, each on a 16-byte boundary, as std140 lays them");
 
     // LLShaderMgr uniform enum -> (byte offset in the block, float component count). The pack
     // walks the per-frame LLShaderUniforms buckets and writes any setting whose enum appears
@@ -1742,6 +1742,11 @@ namespace
         LL_ENV_FIELD(HAZE_EXTINCTION,           haze_extinction),
         LL_ENV_FIELD(BLUE_WEIGHT,               blue_weight),
         LL_ENV_FIELD(HAZE_WEIGHT,               haze_weight),
+        LL_ENV_FIELD(ATMOS_SUNLIT,              atmos_sunlit),
+        LL_ENV_FIELD(ATMOS_AMBIENT,             atmos_ambient),
+        LL_ENV_FIELD(SKY_SUNLIGHT,              sky_sunlight),
+        LL_ENV_FIELD(SKY_LIGHT,                 sky_light),
+        LL_ENV_FIELD(SKY_AMBIENT,               sky_ambient),
     };
 #undef LL_ENV_FIELD
 
@@ -1934,9 +1939,21 @@ void LLEnvironment::bindEnvironmentUBO()
     mEnvUBO.bind(LLGLSLShader::UB_ENVIRONMENT);
 }
 
+void LLEnvironment::bindEnvironmentUBOLitBy(const LLColor3& sunlit)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    EnvironmentUBOData d = mEnvUBOData;
+    memcpy(d.atmos_sunlit, sunlit.mV, sizeof(d.atmos_sunlit));
+
+    mEnvLitByUBO.update(&d, sizeof(EnvironmentUBOData));
+    mEnvLitByUBO.bind(LLGLSLShader::UB_ENVIRONMENT);
+}
+
 void LLEnvironment::releaseGLBuffers()
 {
     mEnvUBO.release();
+    mEnvLitByUBO.release();
     mEnvUBODirty = true; // force a re-upload before the next bind
 }
 

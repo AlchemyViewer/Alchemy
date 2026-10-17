@@ -2207,6 +2207,29 @@ LLColor3 LLSettingsSky::getSunlightColorClamped() const
     return sunlight;
 }
 
+void LLSettingsSky::getLitLightColors(LLColor3& sun, LLColor3& moon) const
+{
+    if (!getIsSunUp() && !getIsMoonUp())
+    {
+        sun  = LLColor3::black;
+        moon = LLColor3::black;
+        return;
+    }
+
+    auto lit = [](LLColor3 color)
+    {
+        const F32 max_color = llmax(color.mV[0], color.mV[1], color.mV[2]);
+        if (max_color > 1.f)
+        {
+            color *= 1.f / max_color;
+        }
+        color.clamp();
+        return color;
+    };
+    sun  = lit(getSunlightColor());
+    moon = lit(getMoonlightColor());
+}
+
 void LLSettingsSky::setSunlightColor(const LLColor3 &val)
 {
     mSunlightColor = val;

@@ -724,7 +724,6 @@ void LLSettingsVOSky::applyToUniforms(void* ptarget)
 {
     LLShaderUniforms* shader = &((LLShaderUniforms*)ptarget)[LLGLSLShader::SG_ANY];
 
-    draw_color(shader, getAmbientColor(), LLShaderMgr::AMBIENT);
     draw_color(shader, getBlueDensity(), LLShaderMgr::BLUE_DENSITY);
     draw_color(shader, getBlueHorizon(), LLShaderMgr::BLUE_HORIZON);
     draw_real(shader, getHazeDensity(), LLShaderMgr::HAZE_DENSITY);
@@ -776,13 +775,6 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 
     LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
-    // TODO -- make these getters return vec3s
-    LLVector3 sun_light_color = LLVector3(psky->getSunlightColor().mV);
-    LLVector3 moon_light_color = LLVector3(psky->getMoonlightColor().mV);
-
-    shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, sun_light_color);
-    shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, moon_light_color);
-
     shader->uniform3fv(LLShaderMgr::CLOUD_COLOR, LLVector3(psky->getCloudColor().mV));
 
     shader = &((LLShaderUniforms*)ptarget)[LLGLSLShader::SG_ANY];
@@ -824,17 +816,19 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
     // pushes it, unless auto-adjust scales it below.
     LLColor3 blue_density = getBlueDensity();
 
+    // The ambient every program's atmospherics take (the Environment block's, below).
+    LLColor3 shader_ambient = ambient;
+
     static LLCachedControl<bool> desaturate_irradiance(gSavedSettings, "RenderDesaturateIrradiance", true);
     if (irradiance_pass && desaturate_irradiance)
     { // during an irradiance map update, disable ambient lighting (direct lighting only) and desaturate sky color (avoid tinting the world blue)
-        shader->uniform3fv(LLShaderMgr::AMBIENT, LLVector3::zero.mV);
-        blue_density = irradiance_grey(blue_density);
+        shader_ambient = LLColor3::black;
+        blue_density   = irradiance_grey(blue_density);
     }
     else
     {
         if (psky->getReflectionProbeAmbiance() != 0.f)
         {
-            shader->uniform3fv(LLShaderMgr::AMBIENT, LLVector3(ambient.mV));
             shader->uniform1f(LLShaderMgr::SKY_HDR_SCALE, sqrtf(g)*2.0f); // use a modifier here so 1.0 maps to the "most desirable" default and the maximum value doesn't go off the rails
 
             // Low quality setting
@@ -843,13 +837,11 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
         }
         else if (psky->canAutoAdjust() && should_auto_adjust)
         { // auto-adjust legacy sky to take advantage of probe ambiance
-            shader->uniform3fv(LLShaderMgr::AMBIENT, (ambient * auto_adjust_ambient_scale).mV);
+            shader_ambient = ambient * auto_adjust_ambient_scale;
             shader->uniform1f(LLShaderMgr::SKY_HDR_SCALE, auto_adjust_hdr_scale);
             LLColor3 blue_horizon = getBlueHorizon() * auto_adjust_blue_horizon_scale;
             blue_density = getBlueDensity() * auto_adjust_blue_density_scale;
-            sun_light_color = sun_light_color * auto_adjust_sun_color_scale;
 
-            shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, sun_light_color.mV);
             shader->uniform3fv(LLShaderMgr::BLUE_DENSITY, blue_density.mV);
             shader->uniform3fv(LLShaderMgr::BLUE_HORIZON, blue_horizon.mV);
 
@@ -858,7 +850,6 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
         else
         {
             shader->uniform1f(LLShaderMgr::SKY_HDR_SCALE, 1.f);
-            shader->uniform3fv(LLShaderMgr::AMBIENT, LLVector3(ambient.mV));
         }
     }
 
@@ -891,19 +882,44 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
         shader->uniform3fv(LLShaderMgr::BLUE_WEIGHT, blue_weight);
         shader->uniform3fv(LLShaderMgr::HAZE_WEIGHT, haze_weight);
 
-        // The sun's or moon's attenuation on its way down to a surface: light_atten over the
-        // sine of the light's elevation, lightnorm's y (OGL order). Loose rather than in the
-        // block, beside the density_multiplier it is worked from, which the GLTF material
-        // preview overrides along with it.
+        // The sun's, moon's and ambient light every program's atmospherics take, decided here and
+        // nowhere else. Lit geometry takes LLPipeline's light 0, the settings' colour held to
+        // [0, 1] (getLitLightColors), the sun's scaled when auto-adjust brightens a legacy sky,
+        // and attenuated on its way down: light_atten over the sine of the light's elevation,
+        // lightnorm's y (OGL order). The sky dome and the clouds take the settings' colour as it
+        // is, or under a classic sky the lit one, as the legacy renderer's sky did. Every one
+        // takes the ambient decided above.
+        LLColor3 lit_sun;
+        LLColor3 lit_moon;
+        psky->getLitLightColors(lit_sun, lit_moon);
+        if (should_auto_adjust && psky->canAutoAdjust())
+        {
+            lit_sun *= auto_adjust_sun_color_scale();
+        }
+
+        const bool sun_up              = getIsSunUp();
         const F32 density_mult         = getDensityMultiplier();
         const F32 above_horizon_factor = 1.f / llmax(1e-6f, light_direction.mV[1]);
-        LLVector3 sunlight_atten;
+        const F32 cloud_shadow         = getCloudShadow();
+        LLColor3 sunlit = sun_up ? lit_sun : lit_moon;
+        LLColor3 tmp_ambient;
         for (S32 c = 0; c < 3; ++c)
         {
             const F32 light_atten = (blue_density.mV[c] + haze_density * 0.25f) * (density_mult * getMaxY());
-            sunlight_atten.mV[c]  = expf(-light_atten * above_horizon_factor);
+            sunlit.mV[c]     *= expf(-light_atten * above_horizon_factor);
+            // more ambient under more cloud
+            tmp_ambient.mV[c] = shader_ambient.mV[c] + (1.f - shader_ambient.mV[c]) * cloud_shadow * 0.5f;
         }
-        shader->uniform3fv(LLShaderMgr::SUNLIGHT_ATTEN, sunlight_atten);
+        shader->uniform3fv(LLShaderMgr::ATMOS_SUNLIT, sunlit.mV);
+        shader->uniform3fv(LLShaderMgr::ATMOS_AMBIENT, tmp_ambient.mV);
+
+        const LLColor3 sky_sun  = classic_mode ? (sun_up ? lit_sun : lit_moon) : psky->getSunlightColor();
+        const LLColor3 sky_moon = classic_mode ? lit_moon : psky->getMoonlightColor();
+        // skyF's light: the moon's at 0.7 to match the legacy colour
+        const LLColor3 sky_light = sun_up ? sky_sun : sky_moon * 0.7f;
+        shader->uniform3fv(LLShaderMgr::SKY_SUNLIGHT, sky_sun.mV);
+        shader->uniform3fv(LLShaderMgr::SKY_LIGHT, sky_light.mV);
+        shader->uniform3fv(LLShaderMgr::SKY_AMBIENT, shader_ambient.mV);
     }
 
     shader->uniform1f(LLShaderMgr::GAMMA, g);

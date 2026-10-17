@@ -18,9 +18,18 @@
  * eyeToSky is the camera's, not the sky settings': the rotation from this view's
  * eye space to the sky dome's frame (north, up, east), ALFarPlane::eyeToSkyFrame.
  *
- * haze_extinction, blue_weight and haze_weight are the WindLight haze's terms of
- * blue_density and haze_density alone, worked once in LLSettingsVOSky::applySpecial:
- * max(|blue_density| + |haze_density|, 1e-6) and each density over it.
+ * The rest are the WindLight atmospherics' per-sky terms, worked once on the CPU
+ * (LLSettingsVOSky::applySpecial), the sun's, moon's and ambient light among them:
+ * nothing else sets those.
+ *   haze_extinction      max(|blue_density| + |haze_density|, 1e-6)
+ *   blue_weight          blue_density / haze_extinction
+ *   haze_weight          haze_density / haze_extinction
+ *   atmos_sunlit         the sun or moon lighting geometry (LLPipeline's light 0),
+ *                        attenuated on its way down
+ *   atmos_ambient        the ambient, raised under cloud: a + (1 - a) * cloud_shadow * 0.5
+ *   sky_sunlight         the sun lighting the clouds
+ *   sky_light            the sun or moon lighting the sky dome (the moon's at 0.7)
+ *   sky_ambient          the ambient lighting the sky dome
  */
 
 layout (std140) uniform Environment
@@ -43,4 +52,9 @@ layout (std140) uniform Environment
     vec3  haze_extinction;
     vec3  blue_weight;
     vec3  haze_weight;
+    vec3  atmos_sunlit;
+    vec3  atmos_ambient;
+    vec3  sky_sunlight;
+    vec3  sky_light;
+    vec3  sky_ambient;
 };

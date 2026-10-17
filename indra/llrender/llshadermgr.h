@@ -620,11 +620,16 @@ public:
         EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
         SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
 
-        // The WindLight haze's terms that only the sky settings set (LLSettingsVOSky::applySpecial)
+        // The WindLight atmospherics' terms that only the sky settings set, Environment block members
+        // (LLSettingsVOSky::applySpecial)
         HAZE_EXTINCTION,                    //  "haze_extinction"  blue plus haze density, floored, the haze's extinction
         BLUE_WEIGHT,                        //  "blue_weight"  blue density's share of it
         HAZE_WEIGHT,                        //  "haze_weight"  haze density's share of it
-        SUNLIGHT_ATTEN,                     //  "sunlight_atten"  the atmosphere's attenuation of the sun or moon on its way down
+        ATMOS_SUNLIT,                       //  "atmos_sunlit"  the sun or moon lighting geometry, attenuated on its way down
+        ATMOS_AMBIENT,                      //  "atmos_ambient"  the ambient, raised under cloud
+        SKY_SUNLIGHT,                       //  "sky_sunlight"  the sun lighting the clouds
+        SKY_LIGHT,                          //  "sky_light"  the sun or moon lighting the sky dome
+        SKY_AMBIENT,                        //  "sky_ambient"  the ambient lighting the sky dome
 
         MOON_QUAD_CENTER,                   //  "moonQuadCenter"  the moon quad's centre direction, for the stars it covers
         MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length

@@ -2209,7 +2209,11 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("haze_extinction");
     mReservedUniforms.push_back("blue_weight");
     mReservedUniforms.push_back("haze_weight");
-    mReservedUniforms.push_back("sunlight_atten");
+    mReservedUniforms.push_back("atmos_sunlit");
+    mReservedUniforms.push_back("atmos_ambient");
+    mReservedUniforms.push_back("sky_sunlight");
+    mReservedUniforms.push_back("sky_light");
+    mReservedUniforms.push_back("sky_ambient");
 
     mReservedUniforms.push_back("moonQuadCenter");
     mReservedUniforms.push_back("moonQuadU");
