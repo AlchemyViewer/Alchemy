@@ -291,6 +291,10 @@ private:
     U32 mSuperSample = 4;
     U32 superSample() const { return mSuperSample; }
 
+    // RenderHDREnabled as the cube array, the scratch target and the mip chain were allocated
+    // under: float colour or 8-bit. initReflectionMaps rebuilds all three when it changes.
+    bool mHDR = true;
+
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;
 
