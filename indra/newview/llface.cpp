@@ -1287,7 +1287,9 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
 
         if (tep->getGLTFRenderMaterial())
         {
-            color = tep->getGLTFRenderMaterial()->mBaseColor;
+            // baseColorFactor is linear; the PBR vertex stages linearise the attribute as
+            // they do a prim tint, so it keeps sRGB's 8-bit steps near black
+            color = srgbColor4(tep->getGLTFRenderMaterial()->mBaseColor);
         }
     }
 

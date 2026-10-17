@@ -289,7 +289,8 @@ PreviewSphere create_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, 
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-    const LLColor4U vertex_color(material->mBaseColor);
+    // sRGB in the attribute, as LLFace stores it; pbralphaV linearises it
+    const LLColor4U vertex_color(srgbColor4(material->mBaseColor));
 
     LLPrimitive prim;
     prim.init_primitive(LL_PCODE_VOLUME);
@@ -384,7 +385,7 @@ void set_preview_sphere_material(PreviewSphere& preview_sphere, LLPointer<LLFetc
     llassert(!preview_sphere.empty());
     if (preview_sphere.empty()) { return; }
 
-    const LLColor4U vertex_color(material->mBaseColor);
+    const LLColor4U vertex_color(srgbColor4(material->mBaseColor));
 
     // See comments about unmapBuffer in llvertexbuffer.h
     for (PreviewSpherePart& part : preview_sphere)

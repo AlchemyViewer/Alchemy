@@ -70,6 +70,7 @@ out vec3 vary_normal;
 out vec3 vary_position;
 
 vec2 texture_transform(vec2 vertex_texcoord, vec4[2] khr_gltf_transform, mat4 sl_animation_transform);
+vec4 linearizeVertexTint(vec4 tint);
 vec4 tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] khr_gltf_transform, mat4 sl_animation_transform);
 
 void main()
@@ -116,5 +117,5 @@ void main()
     vary_sign = transformed_tangent.w;
     vary_normal = n;
 
-    vertex_color = diffuse_color;
+    vertex_color = linearizeVertexTint(diffuse_color);
 }

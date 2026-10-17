@@ -68,6 +68,7 @@ flat out float vary_sign;
 out vec3 vary_normal;
 
 vec2 texture_transform(vec2 vertex_texcoord, vec4[2] khr_gltf_transform, mat4 sl_animation_transform);
+vec4 linearizeVertexTint(vec4 tint);
 vec4 tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] khr_gltf_transform, mat4 sl_animation_transform);
 
 
@@ -108,7 +109,7 @@ void main()
     vary_sign = transformed_tangent.w;
     vary_normal = n;
 
-    vertex_color = diffuse_color;
+    vertex_color = linearizeVertexTint(diffuse_color);
 
 #if !defined(HAS_SKIN)
     vary_position = (modelview_matrix*vec4(position.xyz, 1.0)).xyz;
@@ -137,6 +138,7 @@ out vec2 emissive_texcoord;
 out vec4 vertex_color;
 
 vec2 texture_transform(vec2 vertex_texcoord, vec4[2] khr_gltf_transform, mat4 sl_animation_transform);
+vec4 linearizeVertexTint(vec4 tint);
 
 
 void main()
@@ -149,7 +151,7 @@ void main()
     base_color_texcoord = texture_transform(texcoord0, texture_base_color_transform, texture_matrix0);
     emissive_texcoord = texture_transform(texcoord0, texture_emissive_transform, texture_matrix0);
 
-    vertex_color = diffuse_color;
+    vertex_color = linearizeVertexTint(diffuse_color);
 }
 
 #endif
