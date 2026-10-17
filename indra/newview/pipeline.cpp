@@ -1424,6 +1424,7 @@ void LLPipeline::releaseAllGLResources()
     releaseDerivedState();
 
     LLVOAvatar::resetImpostors();
+    gBumpImageList.destroyGL();
 
     mGLResourcesLive = false;
 }
@@ -1521,8 +1522,6 @@ void LLPipeline::releaseDerivedState()
 
     releaseScopeBuffers();
     clearReferenceStill();
-
-    gBumpImageList.destroyGL();
 }
 
 LLPipeline::RenderBuildState LLPipeline::renderBuildState() const
@@ -1551,7 +1550,7 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
 
     releaseRenderTargets();
     releaseDerivedState();
-    add(invalidated, "bump cache, hero probes, exposure and flare history, lens dirt, colour-grade LUT, noise, SMAA "
+    add(invalidated, "hero probes, exposure and flare history, lens dirt, colour-grade LUT, noise, SMAA "
                      "tables, tone curve, UBOs, query plots, BRDF LUT, reference still, scopes, depth pyramid, water "
                      "surface maps, selection outline, far-plane overlay");
 
@@ -1560,22 +1559,29 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
     mGLResourcesLive = true;
 
     const RenderBuildState after = renderBuildState();
+    const bool main_size = before.mMain.width != after.mMain.width || before.mMain.height != after.mMain.height;
+    const bool gbuffer_formats = before.mMain.color != after.mMain.color;
+    const bool depth_format = before.mMain.depth != after.mMain.depth;
+
     std::string changed;
     if (!before.mLive)
     {
+        // releaseAllGLResources dropped everything derived with the context's resources; what is not restored here
+        // is rebuilt where it is next wanted.
         add(changed, "new context");
+        gBumpImageList.restoreGL();
     }
     else
     {
-        if (before.mMain.width != after.mMain.width || before.mMain.height != after.mMain.height)
+        if (main_size)
         {
             add(changed, "main size");
         }
-        if (before.mMain.color != after.mMain.color)
+        if (gbuffer_formats)
         {
             add(changed, "G-buffer formats");
         }
-        if (before.mMain.depth != after.mMain.depth)
+        if (depth_format)
         {
             add(changed, "depth format");
         }
@@ -1594,7 +1600,7 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
 
         // An impostor is G-buffer channels and depth in the main G-buffer's formats (generateImpostor), so those
         // are what make one stale; its size is its own.
-        if (before.mMain.color != after.mMain.color || before.mMain.depth != after.mMain.depth)
+        if (gbuffer_formats || depth_format)
         {
             U32 baked = 0;
             for (LLCharacter* character : LLCharacter::sInstances)
@@ -1854,8 +1860,6 @@ void LLPipeline::createGLBuffers()
     createLUTBuffers();
 
     setupGradingLUT();
-
-    gBumpImageList.restoreGL();
 }
 
 F32 lerpf(F32 a, F32 b, F32 w)

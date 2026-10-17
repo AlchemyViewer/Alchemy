@@ -46,7 +46,6 @@
 #include "llagentcamera.h"
 #include "llconsole.h"
 #include "llf32uictrl.h"
-#include "lldrawpoolbump.h"
 #include "llfontgl.h"
 #include "lldrawpoolterrain.h"
 #include "llflexibleobject.h"
@@ -257,10 +256,6 @@ static bool handleNumpadControlChanged(const LLSD& newvalue)
 
 static bool handleSetShaderChanged(const LLSD& newvalue)
 {
-    // changing shader level may invalidate existing cached bump maps, as the shader type determines the format of the bump map it expects - clear and repopulate the bump cache
-    gBumpImageList.destroyGL();
-    gBumpImageList.restoreGL();
-
     if (gPipeline.isInit())
     {
         // ALM depends onto atmospheric shaders, state might have changed
