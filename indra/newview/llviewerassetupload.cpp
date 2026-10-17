@@ -50,6 +50,8 @@
 #include "lldatapacker.h"
 #include "llvoavatarself.h"
 #include "lldatapacker.h"
+
+#include <fmt/format.h>
 #include "llbvhloader.h"
 #include "llbvhconsts.h"
 
@@ -137,12 +139,12 @@ LLSD LLResourceUploadInfo::prepareUpload()
 
 std::string LLResourceUploadInfo::getAssetTypeString() const
 {
-    return LLAssetType::lookup(mAssetType);
+    return std::string(LLAssetType::lookup(mAssetType));
 }
 
 std::string LLResourceUploadInfo::getInventoryTypeString() const
 {
-    return LLInventoryType::lookup(mInventoryType);
+    return std::string(LLInventoryType::lookup(mInventoryType));
 }
 
 LLSD LLResourceUploadInfo::generatePostBody()
@@ -907,10 +909,8 @@ LLSD LLScriptAssetUpload::generatePostBody()
 /*static*/
 LLUUID LLViewerAssetUpload::EnqueueInventoryUpload(const std::string &url, const LLResourceUploadInfo::ptr_t &uploadInfo, const std::string& pool)
 {
-    std::string procName("LLViewerAssetUpload::AssetInventoryUploadCoproc(");
-
     LLUUID queueId = LLCoprocedureManager::instance().enqueueCoprocedure(pool,
-        procName + LLAssetType::lookup(uploadInfo->getAssetType()) + ")",
+        fmt::format("LLViewerAssetUpload::AssetInventoryUploadCoproc({})", LLAssetType::lookup(uploadInfo->getAssetType())),
         boost::bind(&LLViewerAssetUpload::AssetInventoryUploadCoproc, _1, _2, url, uploadInfo));
 
     return queueId;

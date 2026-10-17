@@ -168,7 +168,13 @@ LLAvatarAppearance::LLAvatarXmlInfo::~LLAvatarXmlInfo()
 //-----------------------------------------------------------------------------
 LLAvatarSkeletonInfo* LLAvatarAppearance::sAvatarSkeletonInfo = NULL;
 LLAvatarAppearance::LLAvatarXmlInfo* LLAvatarAppearance::sAvatarXmlInfo = NULL;
-LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary* LLAvatarAppearance::sAvatarDictionary = NULL;
+namespace
+{
+    // The dictionary's tables are constant; this is the object their
+    // accessors are called on, there from before main.
+    constexpr LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary sAvatarDictionaryInstance;
+}
+const LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary* const LLAvatarAppearance::sAvatarDictionary = &sAvatarDictionaryInstance;
 
 
 LLAvatarAppearance::LLAvatarAppearance(LLWearableData* wearable_data) :
@@ -196,12 +202,12 @@ void LLAvatarAppearance::initInstance()
     mRoot = createAvatarJoint();
     mRoot->setName( "mRoot" );
 
-    for (const LLAvatarAppearanceDictionary::MeshEntries::value_type& mesh_pair : sAvatarDictionary->getMeshEntries())
+    for (const LLAvatarAppearanceDictionary::MeshEntry& mesh_entry : sAvatarDictionary->getMeshEntries())
     {
-        const EMeshIndex mesh_index = mesh_pair.first;
-        const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_pair.second;
+        const EMeshIndex mesh_index = mesh_entry.mIndex;
+        const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = &mesh_entry;
         LLAvatarJoint* joint = createAvatarJoint();
-        joint->setName(mesh_dict->mName);
+        joint->setName(std::string(mesh_dict->mName));
         joint->setMeshID(mesh_index);
         mMeshLOD.push_back(joint);
 
@@ -212,7 +218,7 @@ void LLAvatarAppearance::initInstance()
         for (U32 lod = 0; lod < mesh_dict->mLOD; lod++)
         {
             LLAvatarJointMesh* mesh = createAvatarJointMesh();
-            std::string mesh_name = "m" + mesh_dict->mName + std::to_string(lod);
+            std::string mesh_name = "m" + std::string(mesh_dict->mName) + std::to_string(lod);
             // We pre-pended an m - need to capitalize first character for camelCase
             mesh_name[1] = toupper(mesh_name[1]);
             mesh->setName(mesh_name);
@@ -240,10 +246,10 @@ void LLAvatarAppearance::initInstance()
     //-------------------------------------------------------------------------
     // associate baked textures with meshes
     //-------------------------------------------------------------------------
-    for (const LLAvatarAppearanceDictionary::MeshEntries::value_type& mesh_pair : sAvatarDictionary->getMeshEntries())
+    for (const LLAvatarAppearanceDictionary::MeshEntry& mesh_entry : sAvatarDictionary->getMeshEntries())
     {
-        const EMeshIndex mesh_index = mesh_pair.first;
-        const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_pair.second;
+        const EMeshIndex mesh_index = mesh_entry.mIndex;
+        const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = &mesh_entry;
         const EBakedTextureIndex baked_texture_index = mesh_dict->mBakedID;
         // Skip it if there's no associated baked texture.
         if (baked_texture_index == BAKED_NUM_INDICES) continue;
@@ -310,12 +316,6 @@ void LLAvatarAppearance::initClass()
 //static
 void LLAvatarAppearance::initClass(const std::string& avatar_file_name_arg, const std::string& skeleton_file_name_arg)
 {
-    // init dictionary (don't repeat on second login attempt)
-    if (!sAvatarDictionary)
-    {
-        sAvatarDictionary = new LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary();
-    }
-
     std::string avatar_file_name;
 
     if (!avatar_file_name_arg.empty())
@@ -435,7 +435,6 @@ void LLAvatarAppearance::initClass(const std::string& avatar_file_name_arg, cons
 void LLAvatarAppearance::cleanupClass()
 {
     delete_and_clear(sAvatarXmlInfo);
-    delete_and_clear(sAvatarDictionary);
     delete_and_clear(sAvatarSkeletonInfo);
 }
 
@@ -1091,10 +1090,10 @@ bool LLAvatarAppearance::loadMeshNodes()
             switch(lod)
               case 0:
                 mesh = &mHairMesh0; */
-        for (const LLAvatarAppearanceDictionary::MeshEntries::value_type& mesh_pair : sAvatarDictionary->getMeshEntries())
+        for (const LLAvatarAppearanceDictionary::MeshEntry& mesh_entry : sAvatarDictionary->getMeshEntries())
         {
-            const EMeshIndex mesh_index = mesh_pair.first;
-            const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_pair.second;
+            const EMeshIndex mesh_index = mesh_entry.mIndex;
+            const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = &mesh_entry;
             if (type.compare(mesh_dict->mName) == 0)
             {
                 mesh_id = mesh_index;
@@ -1212,12 +1211,12 @@ bool LLAvatarAppearance::loadLayersets()
 
             // scan baked textures and associate the layerset with the appropriate one
             EBakedTextureIndex baked_index = BAKED_NUM_INDICES;
-            for (const LLAvatarAppearanceDictionary::BakedTextures::value_type& baked_pair : sAvatarDictionary->getBakedTextures())
+            for (const LLAvatarAppearanceDictionary::BakedEntry& baked_entry : sAvatarDictionary->getBakedTextures())
             {
-                const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_pair.second;
-                if (layer_set->isBodyRegion(baked_dict->mName))
+                const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = &baked_entry;
+                if (layer_set->isBodyRegion(std::string(baked_dict->mName)))
                 {
-                    baked_index = baked_pair.first;
+                    baked_index = baked_entry.mIndex;
                     // ensure both structures are aware of each other
                     mBakedTextureDatas[baked_index].mTexLayerSet = layer_set;
                     layer_set->setBakedTexIndex(baked_index);

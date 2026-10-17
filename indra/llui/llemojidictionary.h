@@ -26,9 +26,17 @@
 
 #pragma once
 
-#include "lldictionary.h"
 #include "llinitdestroyclass.h"
 #include "llsingleton.h"
+
+#include <cstddef>
+#include <functional>
+#include <list>
+#include <map>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 // ============================================================================
 // LLEmojiVariant / LLEmojiDescriptor classes

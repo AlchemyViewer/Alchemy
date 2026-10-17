@@ -29,6 +29,7 @@
 
 // library headers
 #include "llnotificationsutil.h"
+#include <array>
 #include <vector>
 #include <tuple>
 // project headers
@@ -38,7 +39,6 @@
 #include "llagentwearables.h"
 #include "llappearancemgr.h"
 #include "llavatarnamecache.h"
-#include "lldictionary.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
 #include "llgesturemgr.h"
@@ -235,56 +235,74 @@ void LLCategoryDropObserver::done()
 
 S32 LLToolDragAndDrop::sOperationId = 0;
 
-LLToolDragAndDrop::DragAndDropEntry::DragAndDropEntry(dragOrDrop3dImpl f_none,
-                                                      dragOrDrop3dImpl f_self,
-                                                      dragOrDrop3dImpl f_avatar,
-                                                      dragOrDrop3dImpl f_object,
-                                                      dragOrDrop3dImpl f_land) :
-    LLDictionaryEntry("")
+// static
+LLToolDragAndDrop::dragOrDrop3dImpl LLToolDragAndDrop::dad3dFunction(EDragAndDropType dad_type, EDropTarget drop_target)
 {
-    mFunctions[DT_NONE] = f_none;
-    mFunctions[DT_SELF] = f_self;
-    mFunctions[DT_AVATAR] = f_avatar;
-    mFunctions[DT_OBJECT] = f_object;
-    mFunctions[DT_LAND] = f_land;
-}
-
-LLToolDragAndDrop::dragOrDrop3dImpl LLToolDragAndDrop::LLDragAndDropDictionary::get(EDragAndDropType dad_type, LLToolDragAndDrop::EDropTarget drop_target)
-{
-    const DragAndDropEntry *entry = lookup(dad_type);
-    if (entry)
+    struct DragAndDropRow
     {
-        return (entry->mFunctions[(U8)drop_target]);
+        EDragAndDropType mType;
+        dragOrDrop3dImpl mFunctions[DT_COUNT]; // DT_NONE, DT_SELF, DT_AVATAR, DT_OBJECT, DT_LAND
+    };
+
+    using DAD = LLToolDragAndDrop;
+    static constexpr DragAndDropRow ROWS[] = {
+        //                    DT_NONE           DT_SELF                          DT_AVATAR                         DT_OBJECT                          DT_LAND
+        //                   |-----------------|--------------------------------|---------------------------------|----------------------------------|------------------------|
+        { DAD_NONE,          { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dNULL,                  &DAD::dad3dNULL,                   &DAD::dad3dNULL } },
+        { DAD_TEXTURE,       { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dGiveInventory,         &DAD::dad3dTextureObject,          &DAD::dad3dNULL } },
+        { DAD_MATERIAL,      { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dGiveInventory,         &DAD::dad3dMaterialObject,         &DAD::dad3dNULL } },
+        { DAD_SOUND,         { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dGiveInventory,         &DAD::dad3dUpdateInventory,        &DAD::dad3dNULL } },
+        { DAD_CALLINGCARD,   { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dGiveInventory,         &DAD::dad3dUpdateInventory,        &DAD::dad3dNULL } },
+        { DAD_LANDMARK,      { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dGiveInventory,         &DAD::dad3dUpdateInventory,        &DAD::dad3dNULL } },
+        { DAD_SCRIPT,        { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dGiveInventory,         &DAD::dad3dRezScript,              &DAD::dad3dNULL } },
+        { DAD_CLOTHING,      { &DAD::dad3dNULL, &DAD::dad3dWearItem,             &DAD::dad3dGiveInventory,         &DAD::dad3dUpdateInventory,        &DAD::dad3dNULL } },
+        { DAD_OBJECT,        { &DAD::dad3dNULL, &DAD::dad3dRezAttachmentFromInv, &DAD::dad3dGiveInventoryObject,   &DAD::dad3dRezObjectOnObject,      &DAD::dad3dRezObjectOnLand } },
+        { DAD_NOTECARD,      { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dGiveInventory,         &DAD::dad3dUpdateInventory,        &DAD::dad3dNULL } },
+        { DAD_CATEGORY,      { &DAD::dad3dNULL, &DAD::dad3dWearCategory,         &DAD::dad3dGiveInventoryCategory, &DAD::dad3dRezCategoryOnObject,    &DAD::dad3dNULL } },
+        { DAD_ROOT_CATEGORY, { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dNULL,                  &DAD::dad3dNULL,                   &DAD::dad3dNULL } },
+        { DAD_BODYPART,      { &DAD::dad3dNULL, &DAD::dad3dWearItem,             &DAD::dad3dGiveInventory,         &DAD::dad3dUpdateInventory,        &DAD::dad3dNULL } },
+        { DAD_ANIMATION,     { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dGiveInventory,         &DAD::dad3dUpdateInventory,        &DAD::dad3dNULL } },
+        { DAD_GESTURE,       { &DAD::dad3dNULL, &DAD::dad3dActivateGesture,      &DAD::dad3dGiveInventory,         &DAD::dad3dUpdateInventory,        &DAD::dad3dNULL } },
+        { DAD_LINK,          { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dNULL,                  &DAD::dad3dNULL,                   &DAD::dad3dNULL } },
+        { DAD_MESH,          { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dGiveInventory,         &DAD::dad3dMeshObject,             &DAD::dad3dNULL } },
+        { DAD_SETTINGS,      { &DAD::dad3dNULL, &DAD::dad3dNULL,                 &DAD::dad3dGiveInventory,         &DAD::dad3dUpdateInventory,        &DAD::dad3dNULL } },
+
+        // TODO: animation on self could play it?  edit it?
+        // TODO: gesture on self could play it?  edit it?
+    };
+
+    // Every type's functions, dad3dNULL where no row gives any. A row for a
+    // type past DAD_COUNT, or a second row for a type, does not compile.
+    static constexpr auto FUNCTIONS = []()
+    {
+        std::array<std::array<dragOrDrop3dImpl, DT_COUNT>, DAD_COUNT> functions{};
+        std::array<bool, DAD_COUNT> given{};
+        for (std::array<dragOrDrop3dImpl, DT_COUNT>& targets : functions)
+        {
+            targets.fill(&DAD::dad3dNULL);
+        }
+        for (const DragAndDropRow& row : ROWS)
+        {
+            const std::size_t type = std::size_t(row.mType);
+            if (type >= functions.size() || given[type])
+            {
+                throw "a cargo type has one row, below DAD_COUNT";
+            }
+            for (std::size_t target = 0; target < DT_COUNT; ++target)
+            {
+                functions[type][target] = row.mFunctions[target];
+            }
+            given[type] = true;
+        }
+        return functions;
+    }();
+
+    if (dad_type < 0 || dad_type >= DAD_COUNT || drop_target < 0 || drop_target >= DT_COUNT)
+    {
+        return &LLToolDragAndDrop::dad3dNULL;
     }
-    return &LLToolDragAndDrop::dad3dNULL;
+    return FUNCTIONS[dad_type][drop_target];
 }
-
-LLToolDragAndDrop::LLDragAndDropDictionary::LLDragAndDropDictionary()
-{
-    //                                               DT_NONE                         DT_SELF                                        DT_AVATAR                                       DT_OBJECT                                           DT_LAND
-    //                                              |-------------------------------|----------------------------------------------|-----------------------------------------------|---------------------------------------------------|--------------------------------|
-    addEntry(DAD_NONE,          new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dNULL,                      &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_TEXTURE,       new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dTextureObject,             &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_MATERIAL,      new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dMaterialObject,            &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_SOUND,         new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dUpdateInventory,           &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_CALLINGCARD,   new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dUpdateInventory,           &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_LANDMARK,      new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dUpdateInventory,           &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_SCRIPT,        new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dRezScript,                 &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_CLOTHING,      new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dWearItem,              &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dUpdateInventory,           &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_OBJECT,        new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dRezAttachmentFromInv,  &LLToolDragAndDrop::dad3dGiveInventoryObject,   &LLToolDragAndDrop::dad3dRezObjectOnObject,         &LLToolDragAndDrop::dad3dRezObjectOnLand));
-    addEntry(DAD_NOTECARD,      new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dUpdateInventory,           &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_CATEGORY,      new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dWearCategory,          &LLToolDragAndDrop::dad3dGiveInventoryCategory, &LLToolDragAndDrop::dad3dRezCategoryOnObject,       &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_ROOT_CATEGORY, new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dNULL,                      &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_BODYPART,      new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dWearItem,              &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dUpdateInventory,           &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_ANIMATION,     new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dUpdateInventory,           &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_GESTURE,       new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dActivateGesture,       &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dUpdateInventory,           &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_LINK,          new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dNULL,                      &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_MESH,          new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dMeshObject,                &LLToolDragAndDrop::dad3dNULL));
-    addEntry(DAD_SETTINGS,      new DragAndDropEntry(&LLToolDragAndDrop::dad3dNULL, &LLToolDragAndDrop::dad3dNULL,                  &LLToolDragAndDrop::dad3dGiveInventory,         &LLToolDragAndDrop::dad3dUpdateInventory,           &LLToolDragAndDrop::dad3dNULL));
-
-    // TODO: animation on self could play it?  edit it?
-    // TODO: gesture on self could play it?  edit it?
-};
 
 LLToolDragAndDrop::LLToolDragAndDrop()
 :   LLTool(std::string("draganddrop"), NULL),
@@ -894,7 +912,7 @@ void LLToolDragAndDrop::pick(const LLPickInfo& pick_info)
         mLastAccept = (EAcceptance)llmin(
             (U32)mLastAccept,
             (U32)callMemberFunction(*this,
-                                    LLDragAndDropDictionary::instance().get(dad_type, target))
+                                    dad3dFunction(dad_type, target))
                 (hit_obj, hit_face, pick_info.mKeyMask, false));
     }
 
@@ -909,7 +927,7 @@ void LLToolDragAndDrop::pick(const LLPickInfo& pick_info)
                 const S32 item_index = mCurItemIndex;
                 const EDragAndDropType dad_type = mCargoTypes[item_index];
                 // Call the right implementation function
-                callMemberFunction(*this, LLDragAndDropDictionary::instance().get(dad_type, target))
+                callMemberFunction(*this, dad3dFunction(dad_type, target))
                     (hit_obj, hit_face, pick_info.mKeyMask, true);
             }
         }

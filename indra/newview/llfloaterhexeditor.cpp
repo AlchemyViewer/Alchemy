@@ -73,11 +73,7 @@ void LLFloaterHexEditor::onOpen(const LLSD& key)
     if (mItem)
     {
         std::string title = "Hex editor: " + mItem->getName();
-        const char* asset_type_name = LLAssetType::lookup(mItem->getType());
-        if(asset_type_name)
-        {
-            title.append(llformat(" (%s)", asset_type_name));
-        }
+        title.append(" (").append(LLAssetType::lookup(mItem->getType())).append(")");
         setTitle(title);
     }
 

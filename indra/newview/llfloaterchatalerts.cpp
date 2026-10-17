@@ -527,7 +527,7 @@ void LLFloaterChatAlerts::refreshSound()
     const LLViewerInventoryItem* pItem = gInventory.getItem(m_idSoundItem);
     if (pItem)
     {
-        std::string strIconName = LLInventoryIcon::getIconName(pItem->getType(), pItem->getInventoryType(), pItem->getFlags());
+        std::string_view strIconName = LLInventoryIcon::getIconName(pItem->getType(), pItem->getInventoryType(), pItem->getFlags());
 
         m_idSoundItem = pItem->getUUID();
         m_pSoundIconCtrl->setValue(strIconName);

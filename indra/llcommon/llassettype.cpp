@@ -27,190 +27,131 @@
 #include "linden_common.h"
 
 #include "llassettype.h"
-#include "lldictionary.h"
-#include "llmemory.h"
+#include "alenumtable.h"
 #include "llsd.h"
-#include "llsingleton.h"
 
 ///----------------------------------------------------------------------------
 /// Class LLAssetType
 ///----------------------------------------------------------------------------
-struct AssetEntry : public LLDictionaryEntry
+namespace
 {
-    AssetEntry(const char *desc_name,
-               const char *type_name,   // 8 character limit!
-               const char *human_name,  // for decoding to human readable form; put any and as many printable characters you want in each one
-               bool can_link,           // can you create a link to this type?
-               bool can_fetch,          // can you fetch this asset by ID?
-               bool can_know)           // can you see this asset's ID?
-        :
-        LLDictionaryEntry(desc_name),
-        mTypeName(type_name),
-        mHumanName(human_name),
-        mCanLink(can_link),
-        mCanFetch(can_fetch),
-        mCanKnow(can_know)
+    struct AssetRow
     {
-        llassert(strlen(mTypeName) <= 8);
-    }
+        LLAssetType::EType mType;
+        std::string_view   mDesc;
+        std::string_view   mTypeName;  // 8 character limit!
+        std::string_view   mHumanName; // for decoding to human readable form; empty where a type has none
+        bool               mCanLink;   // can you create a link to this type?
+        bool               mCanFetch;  // can you fetch this asset by ID?
+        bool               mCanKnow;   // can you see this asset's ID?
+    };
 
-    const char *mTypeName;
-    const char *mHumanName;
-    bool mCanLink;
-    bool mCanFetch;
-    bool mCanKnow;
-};
+    // In key order, which the table enforces: of two rows sharing a human
+    // name, the one with the lower type is found by it.
+    constexpr AssetRow ASSET_ROWS[] = {
+        //  TYPE                            DESCRIPTION     TYPE NAME   HUMAN NAME          CAN LINK?  CAN FETCH?  CAN KNOW?
+        //  |------------------------------|---------------|-----------|-------------------|----------|-----------|---------|
+        { LLAssetType::AT_NONE,         "NONE",         "-1",       {},                 false,     false,      false },
+        { LLAssetType::AT_TEXTURE,      "TEXTURE",      "texture",  "texture",          true,      false,      true  },
+        { LLAssetType::AT_SOUND,        "SOUND",        "sound",    "sound",            true,      true,       true  },
+        { LLAssetType::AT_CALLINGCARD,  "CALLINGCARD",  "callcard", "calling card",     true,      false,      false },
+        { LLAssetType::AT_LANDMARK,     "LANDMARK",     "landmark", "landmark",         true,      true,       true  },
+        { LLAssetType::AT_SCRIPT,       "SCRIPT",       "script",   "legacy script",    true,      false,      false },
+        { LLAssetType::AT_CLOTHING,     "CLOTHING",     "clothing", "clothing",         true,      true,       true  },
+        { LLAssetType::AT_OBJECT,       "OBJECT",       "object",   "object",           true,      false,      false },
+        { LLAssetType::AT_NOTECARD,     "NOTECARD",     "notecard", "note card",        true,      false,      true  },
+        { LLAssetType::AT_CATEGORY,     "CATEGORY",     "category", "folder",           true,      false,      false },
+        { LLAssetType::AT_LSL_TEXT,     "LSL_TEXT",     "lsltext",  "lsl2 script",      true,      false,      false },
+        { LLAssetType::AT_LSL_BYTECODE, "LSL_BYTECODE", "lslbyte",  "lsl bytecode",     true,      false,      false },
+        { LLAssetType::AT_TEXTURE_TGA,  "TEXTURE_TGA",  "txtr_tga", "tga texture",      true,      false,      false },
+        { LLAssetType::AT_BODYPART,     "BODYPART",     "bodypart", "body part",        true,      true,       true  },
+        { LLAssetType::AT_SOUND_WAV,    "SOUND_WAV",    "snd_wav",  "sound",            true,      false,      false },
+        { LLAssetType::AT_IMAGE_TGA,    "IMAGE_TGA",    "img_tga",  "targa image",      true,      false,      false },
+        { LLAssetType::AT_IMAGE_JPEG,   "IMAGE_JPEG",   "jpeg",     "jpeg image",       true,      false,      false },
+        { LLAssetType::AT_ANIMATION,    "ANIMATION",    "animatn",  "animation",        true,      true,       true  },
+        { LLAssetType::AT_GESTURE,      "GESTURE",      "gesture",  "gesture",          true,      true,       true  },
+        { LLAssetType::AT_SIMSTATE,     "SIMSTATE",     "simstate", "simstate",         false,     false,      false },
 
-class LLAssetDictionary : public LLSingleton<LLAssetDictionary>,
-                          public LLDictionary<LLAssetType::EType, AssetEntry>
-{
-    LLSINGLETON(LLAssetDictionary);
-};
+        { LLAssetType::AT_LINK,         "LINK",         "link",     "sym link",         false,     false,      true  },
+        { LLAssetType::AT_LINK_FOLDER,  "FOLDER_LINK",  "link_f",   "sym folder link",  false,     false,      true  },
+        { LLAssetType::AT_WIDGET,       "WIDGET",       "widget",   "widget",           false,     false,      false },
+        { LLAssetType::AT_PERSON,       "PERSON",       "person",   "person",           false,     false,      false },
+        { LLAssetType::AT_MESH,         "MESH",         "mesh",     "mesh",             false,     false,      false },
+        { LLAssetType::AT_SETTINGS,     "SETTINGS",     "settings", "settings blob",    true,      true,       true  },
+        { LLAssetType::AT_MATERIAL,     "MATERIAL",     "material", "render material",  true,      true,       true  },
+        { LLAssetType::AT_GLTF,         "GLTF",         "gltf",     "GLTF",             true,      true,       true  },
+        { LLAssetType::AT_GLTF_BIN,     "GLTF_BIN",     "glbin",    "GLTF binary",      true,      true,       true  },
+        { LLAssetType::AT_UNKNOWN,      "UNKNOWN",      "invalid",  {},                 false,     false,      false },
+    };
 
-LLAssetDictionary::LLAssetDictionary()
-{
-    //                                                         DESCRIPTION          TYPE NAME   HUMAN NAME          CAN LINK?   CAN FETCH?  CAN KNOW?
-    //                                                        |--------------------|-----------|-------------------|-----------|-----------|---------|
-    addEntry(LLAssetType::AT_TEXTURE,           new AssetEntry("TEXTURE",           "texture",  "texture",          true,       false,      true));
-    addEntry(LLAssetType::AT_SOUND,             new AssetEntry("SOUND",             "sound",    "sound",            true,       true,       true));
-    addEntry(LLAssetType::AT_CALLINGCARD,       new AssetEntry("CALLINGCARD",       "callcard", "calling card",     true,       false,      false));
-    addEntry(LLAssetType::AT_LANDMARK,          new AssetEntry("LANDMARK",          "landmark", "landmark",         true,       true,       true));
-    addEntry(LLAssetType::AT_SCRIPT,            new AssetEntry("SCRIPT",            "script",   "legacy script",    true,       false,      false));
-    addEntry(LLAssetType::AT_CLOTHING,          new AssetEntry("CLOTHING",          "clothing", "clothing",         true,       true,       true));
-    addEntry(LLAssetType::AT_OBJECT,            new AssetEntry("OBJECT",            "object",   "object",           true,       false,      false));
-    addEntry(LLAssetType::AT_NOTECARD,          new AssetEntry("NOTECARD",          "notecard", "note card",        true,       false,      true));
-    addEntry(LLAssetType::AT_CATEGORY,          new AssetEntry("CATEGORY",          "category", "folder",           true,       false,      false));
-    addEntry(LLAssetType::AT_LSL_TEXT,          new AssetEntry("LSL_TEXT",          "lsltext",  "lsl2 script",      true,       false,      false));
-    addEntry(LLAssetType::AT_LSL_BYTECODE,      new AssetEntry("LSL_BYTECODE",      "lslbyte",  "lsl bytecode",     true,       false,      false));
-    addEntry(LLAssetType::AT_TEXTURE_TGA,       new AssetEntry("TEXTURE_TGA",       "txtr_tga", "tga texture",      true,       false,      false));
-    addEntry(LLAssetType::AT_BODYPART,          new AssetEntry("BODYPART",          "bodypart", "body part",        true,       true,       true));
-    addEntry(LLAssetType::AT_SOUND_WAV,         new AssetEntry("SOUND_WAV",         "snd_wav",  "sound",            true,       false,      false));
-    addEntry(LLAssetType::AT_IMAGE_TGA,         new AssetEntry("IMAGE_TGA",         "img_tga",  "targa image",      true,       false,      false));
-    addEntry(LLAssetType::AT_IMAGE_JPEG,        new AssetEntry("IMAGE_JPEG",        "jpeg",     "jpeg image",       true,       false,      false));
-    addEntry(LLAssetType::AT_ANIMATION,         new AssetEntry("ANIMATION",         "animatn",  "animation",        true,       true,       true));
-    addEntry(LLAssetType::AT_GESTURE,           new AssetEntry("GESTURE",           "gesture",  "gesture",          true,       true,       true));
-    addEntry(LLAssetType::AT_SIMSTATE,          new AssetEntry("SIMSTATE",          "simstate", "simstate",         false,      false,      false));
+    using Assets = ALEnumTable<ASSET_ROWS, &AssetRow::mType>;
 
-    addEntry(LLAssetType::AT_LINK,              new AssetEntry("LINK",              "link",     "sym link",         false,      false,      true));
-    addEntry(LLAssetType::AT_LINK_FOLDER,       new AssetEntry("FOLDER_LINK",       "link_f",   "sym folder link",  false,      false,      true));
-    addEntry(LLAssetType::AT_MESH,              new AssetEntry("MESH",              "mesh",     "mesh",             false,      false,      false));
-    addEntry(LLAssetType::AT_WIDGET,            new AssetEntry("WIDGET",            "widget",   "widget",           false,      false,      false));
-    addEntry(LLAssetType::AT_PERSON,            new AssetEntry("PERSON",            "person",   "person",           false,      false,      false));
-    addEntry(LLAssetType::AT_SETTINGS,          new AssetEntry("SETTINGS",          "settings", "settings blob",    true,       true,       true));
-    addEntry(LLAssetType::AT_MATERIAL,          new AssetEntry("MATERIAL",          "material", "render material",  true,       true,       true));
-    addEntry(LLAssetType::AT_GLTF,              new AssetEntry("GLTF",              "gltf",     "GLTF",             true,       true,       true));
-    addEntry(LLAssetType::AT_GLTF_BIN,          new AssetEntry("GLTF_BIN",          "glbin",    "GLTF binary",      true,       true,        true));
-    addEntry(LLAssetType::AT_UNKNOWN,           new AssetEntry("UNKNOWN",           "invalid",  NULL,               false,      false,      false));
-    addEntry(LLAssetType::AT_NONE,              new AssetEntry("NONE",              "-1",       NULL,               false,      false,      false));
-
-};
-
-const std::string LLAssetType::BADLOOKUP("llassettype_bad_lookup");
-
-// static
-LLAssetType::EType LLAssetType::getType(const std::string& desc_name)
-{
-    std::string s = desc_name;
-    LLStringUtil::toUpper(s);
-    return LLAssetDictionary::getInstance()->lookup(s);
-}
-
-// static
-const std::string &LLAssetType::getDesc(LLAssetType::EType asset_type)
-{
-    const AssetEntry *entry = LLAssetDictionary::getInstance()->lookup(asset_type);
-    if (entry)
+    consteval bool typeNamesFit()
     {
-        return entry->mName;
-    }
-    else
-    {
-        return BADLOOKUP;
-    }
-}
-
-// static
-const char *LLAssetType::lookup(LLAssetType::EType asset_type)
-{
-    const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
-    const AssetEntry *entry = dict->lookup(asset_type);
-    if (entry)
-    {
-        return entry->mTypeName;
-    }
-    else
-    {
-        return BADLOOKUP.c_str();
-    }
-}
-
-// static
-LLAssetType::EType LLAssetType::lookup(const char* name)
-{
-    return lookup(ll_safe_string(name));
-}
-
-// static
-LLAssetType::EType LLAssetType::lookup(const std::string& type_name)
-{
-    const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
-    for (const LLAssetDictionary::value_type& pair : *dict)
-    {
-        const AssetEntry *entry = pair.second;
-        if (type_name == entry->mTypeName)
+        for (const AssetRow& row : ASSET_ROWS)
         {
-            return pair.first;
+            if (row.mTypeName.size() > 8)
+            {
+                return false;
+            }
         }
+        return true;
     }
-    return AT_UNKNOWN;
+    static_assert(typeNamesFit(), "an asset type name is at most 8 characters");
+} // namespace
+
+// static
+std::string_view LLAssetType::getDesc(LLAssetType::EType asset_type)
+{
+    const AssetRow* row = Assets::find(asset_type);
+    return row ? row->mDesc : BADLOOKUP;
 }
 
 // static
-const char *LLAssetType::lookupHumanReadable(LLAssetType::EType asset_type)
+std::string_view LLAssetType::lookup(LLAssetType::EType asset_type)
 {
-    const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
-    const AssetEntry *entry = dict->lookup(asset_type);
-    if (entry)
-    {
-        return entry->mHumanName;
-    }
-    else
-    {
-        return BADLOOKUP.c_str();
-    }
+    const AssetRow* row = Assets::find(asset_type);
+    return row ? row->mTypeName : BADLOOKUP;
 }
 
 // static
-LLAssetType::EType LLAssetType::lookupHumanReadable(const char* name)
+LLAssetType::EType LLAssetType::lookup(std::string_view type_name)
 {
-    return lookupHumanReadable(ll_safe_string(name));
+    const AssetRow* row = Assets::findBy<&AssetRow::mTypeName>(type_name);
+    return row ? row->mType : AT_UNKNOWN;
 }
 
 // static
-LLAssetType::EType LLAssetType::lookupHumanReadable(const std::string& readable_name)
+std::string_view LLAssetType::lookupHumanReadable(LLAssetType::EType asset_type)
 {
-    const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
-    for (const LLAssetDictionary::value_type& pair : *dict)
+    const AssetRow* row = Assets::find(asset_type);
+    return row ? row->mHumanName : BADLOOKUP;
+}
+
+// static
+LLAssetType::EType LLAssetType::lookupHumanReadable(std::string_view readable_name)
+{
+    // Only the types with no human name have an empty one, and none of them
+    // is found by it.
+    if (readable_name.empty())
     {
-        const AssetEntry *entry = pair.second;
-        if (entry->mHumanName && (readable_name == entry->mHumanName))
-        {
-            return pair.first;
-        }
+        return AT_NONE;
     }
-    return AT_NONE;
+    const AssetRow* row = Assets::findBy<&AssetRow::mHumanName>(readable_name);
+    return row ? row->mType : AT_NONE;
+}
+
+// static
+bool LLAssetType::isKnown(EType asset_type)
+{
+    return Assets::find(asset_type) != nullptr;
 }
 
 // static
 bool LLAssetType::lookupCanLink(EType asset_type)
 {
-    const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
-    const AssetEntry *entry = dict->lookup(asset_type);
-    if (entry)
-    {
-        return entry->mCanLink;
-    }
-    return false;
+    const AssetRow* row = Assets::find(asset_type);
+    return row && row->mCanLink;
 }
 
 // static
@@ -227,38 +168,25 @@ bool LLAssetType::lookupIsLinkType(EType asset_type)
 // static
 bool LLAssetType::lookupIsAssetFetchByIDAllowed(EType asset_type)
 {
-    const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
-    const AssetEntry *entry = dict->lookup(asset_type);
-    if (entry)
-    {
-        return entry->mCanFetch;
-    }
-    return false;
+    const AssetRow* row = Assets::find(asset_type);
+    return row && row->mCanFetch;
 }
 
 // static
 bool LLAssetType::lookupIsAssetIDKnowable(EType asset_type)
 {
-    const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
-    const AssetEntry *entry = dict->lookup(asset_type);
-    if (entry)
-    {
-        return entry->mCanKnow;
-    }
-    return false;
+    const AssetRow* row = Assets::find(asset_type);
+    return row && row->mCanKnow;
 }
 
 LLSD LLAssetType::getTypeNames()
 {
     LLSD type_names;
-    const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
-    for (S32 type = AT_TEXTURE; type < AT_COUNT; ++type)
+    for (const AssetRow& row : Assets::rows())
     {
-        const AssetEntry *entry = dict->lookup((LLAssetType::EType) type);
-        // skip llassettype_bad_lookup
-        if (entry)
+        if (row.mType >= AT_TEXTURE && row.mType < AT_COUNT)
         {
-            type_names.append(entry->mTypeName);
+            type_names.append(row.mTypeName);
         }
     }
     return type_names;

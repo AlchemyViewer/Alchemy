@@ -3858,7 +3858,7 @@ ERlvCmdRet RlvHandler::onGetOutfit(const RlvCommand& rlvCmd, std::string& strRep
 
     // (Compatibility: RLV-1.16.1 will execute @getoutfit=<channel> if <layer> is invalid while we just return failure)
     LLWearableType::EType wtType = LLWearableType::WT_INVALID;
-    if ( (rlvCmd.hasOption()) && ((wtType = LLWearableType::instance().typeNameToType(rlvCmd.getOption())) == LLWearableType::WT_INVALID) )
+    if ( (rlvCmd.hasOption()) && ((wtType = LLWearableType::typeNameToType(rlvCmd.getOption())) == LLWearableType::WT_INVALID) )
         return RLV_RET_FAILED_OPTION;
 
     const LLWearableType::EType wtRlvTypes[] =
@@ -3878,7 +3878,7 @@ ERlvCmdRet RlvHandler::onGetOutfit(const RlvCommand& rlvCmd, std::string& strRep
             // (nor do we hide a layer if the issuing object is the only one that has this layer locked)
             bool fWorn = (gAgentWearables.getWearableCount(wtRlvTypes[idxType]) > 0) &&
                 ( (!RlvSettings::getHideLockedLayers()) ||
-                  (LLAssetType::AT_BODYPART == LLWearableType::instance().getAssetType(wtRlvTypes[idxType])) ||
+                  (LLAssetType::AT_BODYPART == LLWearableType::getAssetType(wtRlvTypes[idxType])) ||
                   (RlvForceWear::isForceRemovable(wtRlvTypes[idxType], true, rlvCmd.getObjectID())) );
             strReply.push_back( (fWorn) ? '1' : '0' );
         }
@@ -3919,7 +3919,7 @@ ERlvCmdRet RlvHandler::onGetOutfitNames(const RlvCommand& rlvCmd, std::string& s
         {
             if (!strReply.empty())
                 strReply.push_back(',');
-            strReply.append(LLWearableType::instance().getTypeName(wtType));
+            strReply.append(LLWearableType::getTypeName(wtType));
         }
     }
     return RLV_RET_SUCCESS;

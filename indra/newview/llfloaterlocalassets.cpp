@@ -498,7 +498,7 @@ protected:
     }
     std::string iconName() const override
     {
-        return LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT, LLInventoryType::IT_OBJECT);
+        return std::string(LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT, LLInventoryType::IT_OBJECT));
     }
     LLLocalAssetPaths::EType assetType() const override { return LLLocalAssetPaths::TYPE_MESH; }
     LLFilePicker::ELoadFilter getLoadFilter() const override { return LLFilePicker::FFLOAD_MODEL; }
@@ -916,7 +916,7 @@ protected:
     }
     std::string iconName() const override
     {
-        return LLInventoryIcon::getIconName(LLAssetType::AT_ANIMATION, LLInventoryType::IT_ANIMATION);
+        return std::string(LLInventoryIcon::getIconName(LLAssetType::AT_ANIMATION, LLInventoryType::IT_ANIMATION));
     }
     LLLocalAssetPaths::EType assetType() const override { return LLLocalAssetPaths::TYPE_ANIM; }
     LLFilePicker::ELoadFilter getLoadFilter() const override { return LLFilePicker::FFLOAD_ANIM; }
@@ -1248,7 +1248,7 @@ protected:
     }
     std::string iconName() const override
     {
-        return LLInventoryIcon::getIconName(LLAssetType::AT_TEXTURE, LLInventoryType::IT_TEXTURE);
+        return std::string(LLInventoryIcon::getIconName(LLAssetType::AT_TEXTURE, LLInventoryType::IT_TEXTURE));
     }
     LLLocalAssetPaths::EType assetType() const override { return LLLocalAssetPaths::TYPE_TEXTURE; }
     LLFilePicker::ELoadFilter getLoadFilter() const override { return LLFilePicker::FFLOAD_IMAGE; }
@@ -1317,7 +1317,7 @@ protected:
     }
     std::string iconName() const override
     {
-        return LLInventoryIcon::getIconName(LLAssetType::AT_MATERIAL, LLInventoryType::IT_MATERIAL);
+        return std::string(LLInventoryIcon::getIconName(LLAssetType::AT_MATERIAL, LLInventoryType::IT_MATERIAL));
     }
     LLLocalAssetPaths::EType assetType() const override { return LLLocalAssetPaths::TYPE_MATERIAL; }
     LLFilePicker::ELoadFilter getLoadFilter() const override { return LLFilePicker::FFLOAD_MATERIAL; }
@@ -1407,7 +1407,7 @@ void LLPanelLocalSpawned::refresh()
     mList->clearRows();
 
     LLLocalMeshMgr* mgr = LLLocalMeshMgr::getInstance();
-    const std::string icon = LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT, LLInventoryType::IT_OBJECT);
+    const std::string_view icon = LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT, LLInventoryType::IT_OBJECT);
     for (const LLLocalMeshMgr::SpawnedInstance& inst : mgr->getSpawnedInstances())
     {
         LLLocalMesh* unit = mgr->getUnit(inst.mTrackingID);

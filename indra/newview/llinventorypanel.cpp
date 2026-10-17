@@ -854,7 +854,7 @@ LLUUID LLInventoryPanel::getRootFolderID()
         {
             const LLFolderType::EType preferred_type = mParams.start_folder.type.isChosen()
                 ? mParams.start_folder.type
-                : LLViewerFolderType::lookupTypeFromNewCategoryName(mParams.start_folder.name);
+                : LLViewerFolderType::lookupTypeFromNewCategoryName(mParams.start_folder.name());
 
             if ("LIBRARY" == mParams.start_folder.name())
             {
@@ -3045,35 +3045,43 @@ namespace LLInitParam
 {
     void TypeValues<LLFolderType::EType>::declareValues()
     {
-        declare(LLFolderType::lookup(LLFolderType::FT_TEXTURE)          , LLFolderType::FT_TEXTURE);
-        declare(LLFolderType::lookup(LLFolderType::FT_SOUND)            , LLFolderType::FT_SOUND);
-        declare(LLFolderType::lookup(LLFolderType::FT_CALLINGCARD)      , LLFolderType::FT_CALLINGCARD);
-        declare(LLFolderType::lookup(LLFolderType::FT_LANDMARK)         , LLFolderType::FT_LANDMARK);
-        declare(LLFolderType::lookup(LLFolderType::FT_CLOTHING)         , LLFolderType::FT_CLOTHING);
-        declare(LLFolderType::lookup(LLFolderType::FT_OBJECT)           , LLFolderType::FT_OBJECT);
-        declare(LLFolderType::lookup(LLFolderType::FT_NOTECARD)         , LLFolderType::FT_NOTECARD);
-        declare(LLFolderType::lookup(LLFolderType::FT_ROOT_INVENTORY)   , LLFolderType::FT_ROOT_INVENTORY);
-        declare(LLFolderType::lookup(LLFolderType::FT_LSL_TEXT)         , LLFolderType::FT_LSL_TEXT);
-        declare(LLFolderType::lookup(LLFolderType::FT_BODYPART)         , LLFolderType::FT_BODYPART);
-        declare(LLFolderType::lookup(LLFolderType::FT_TRASH)            , LLFolderType::FT_TRASH);
-        declare(LLFolderType::lookup(LLFolderType::FT_SNAPSHOT_CATEGORY), LLFolderType::FT_SNAPSHOT_CATEGORY);
-        declare(LLFolderType::lookup(LLFolderType::FT_LOST_AND_FOUND)   , LLFolderType::FT_LOST_AND_FOUND);
-        declare(LLFolderType::lookup(LLFolderType::FT_ANIMATION)        , LLFolderType::FT_ANIMATION);
-        declare(LLFolderType::lookup(LLFolderType::FT_GESTURE)          , LLFolderType::FT_GESTURE);
-        declare(LLFolderType::lookup(LLFolderType::FT_FAVORITE)         , LLFolderType::FT_FAVORITE);
-        declare(LLFolderType::lookup(LLFolderType::FT_ENSEMBLE_START)   , LLFolderType::FT_ENSEMBLE_START);
-        declare(LLFolderType::lookup(LLFolderType::FT_ENSEMBLE_END)     , LLFolderType::FT_ENSEMBLE_END);
-        declare(LLFolderType::lookup(LLFolderType::FT_CURRENT_OUTFIT)   , LLFolderType::FT_CURRENT_OUTFIT);
-        declare(LLFolderType::lookup(LLFolderType::FT_OUTFIT)           , LLFolderType::FT_OUTFIT);
-        declare(LLFolderType::lookup(LLFolderType::FT_MY_OUTFITS)       , LLFolderType::FT_MY_OUTFITS);
-        declare(LLFolderType::lookup(LLFolderType::FT_MESH )            , LLFolderType::FT_MESH );
-        declare(LLFolderType::lookup(LLFolderType::FT_INBOX)            , LLFolderType::FT_INBOX);
-        declare(LLFolderType::lookup(LLFolderType::FT_OUTBOX)           , LLFolderType::FT_OUTBOX);
-        declare(LLFolderType::lookup(LLFolderType::FT_BASIC_ROOT)       , LLFolderType::FT_BASIC_ROOT);
-        declare(LLFolderType::lookup(LLFolderType::FT_SETTINGS)         , LLFolderType::FT_SETTINGS);
-        declare(LLFolderType::lookup(LLFolderType::FT_MATERIAL)         , LLFolderType::FT_MATERIAL);
-        declare(LLFolderType::lookup(LLFolderType::FT_MARKETPLACE_LISTINGS)   , LLFolderType::FT_MARKETPLACE_LISTINGS);
-        declare(LLFolderType::lookup(LLFolderType::FT_MARKETPLACE_STOCK), LLFolderType::FT_MARKETPLACE_STOCK);
-        declare(LLFolderType::lookup(LLFolderType::FT_MARKETPLACE_VERSION), LLFolderType::FT_MARKETPLACE_VERSION);
+        // In this order: FT_ENSEMBLE_START and FT_ENSEMBLE_END are both named
+        // "ensemble", and the later declaration, FT_ENSEMBLE_END, is the value
+        // the name gives.
+        for (const LLFolderType::EType type : {
+                 LLFolderType::FT_TEXTURE,
+                 LLFolderType::FT_SOUND,
+                 LLFolderType::FT_CALLINGCARD,
+                 LLFolderType::FT_LANDMARK,
+                 LLFolderType::FT_CLOTHING,
+                 LLFolderType::FT_OBJECT,
+                 LLFolderType::FT_NOTECARD,
+                 LLFolderType::FT_ROOT_INVENTORY,
+                 LLFolderType::FT_LSL_TEXT,
+                 LLFolderType::FT_BODYPART,
+                 LLFolderType::FT_TRASH,
+                 LLFolderType::FT_SNAPSHOT_CATEGORY,
+                 LLFolderType::FT_LOST_AND_FOUND,
+                 LLFolderType::FT_ANIMATION,
+                 LLFolderType::FT_GESTURE,
+                 LLFolderType::FT_FAVORITE,
+                 LLFolderType::FT_ENSEMBLE_START,
+                 LLFolderType::FT_ENSEMBLE_END,
+                 LLFolderType::FT_CURRENT_OUTFIT,
+                 LLFolderType::FT_OUTFIT,
+                 LLFolderType::FT_MY_OUTFITS,
+                 LLFolderType::FT_MESH,
+                 LLFolderType::FT_INBOX,
+                 LLFolderType::FT_OUTBOX,
+                 LLFolderType::FT_BASIC_ROOT,
+                 LLFolderType::FT_SETTINGS,
+                 LLFolderType::FT_MATERIAL,
+                 LLFolderType::FT_MARKETPLACE_LISTINGS,
+                 LLFolderType::FT_MARKETPLACE_STOCK,
+                 LLFolderType::FT_MARKETPLACE_VERSION,
+             })
+        {
+            declare(std::string(LLFolderType::lookup(type)), type);
+        }
     }
 }

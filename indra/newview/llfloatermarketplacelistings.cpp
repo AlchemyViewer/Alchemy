@@ -234,7 +234,7 @@ void LLPanelMarketplaceListings::onAddButtonClicked()
 {
     LLUUID marketplacelistings_id = gInventory.getMarketplaceListingsUUID();
     llassert(marketplacelistings_id.notNull());
-    LLFolderType::EType preferred_type = LLFolderType::lookup("category");
+    LLFolderType::EType preferred_type = LLFolderType::FT_NONE;
     LLHandle<LLPanel> handle = getHandle();
     gInventory.createNewCategory(
         marketplacelistings_id,

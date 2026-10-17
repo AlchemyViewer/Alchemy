@@ -692,7 +692,7 @@ void LLLocalGLTFMaterialMgr::feedScrollList(LLScrollListCtrl* ctrl)
     {
         if (!mMaterialList.empty())
         {
-            std::string icon_name = LLInventoryIcon::getIconName(
+            std::string_view icon_name = LLInventoryIcon::getIconName(
                 LLAssetType::AT_MATERIAL,
                 LLInventoryType::IT_NONE);
 

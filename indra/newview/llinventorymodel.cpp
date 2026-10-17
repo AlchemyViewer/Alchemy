@@ -1011,7 +1011,7 @@ void LLInventoryModel::createNewCategory(const LLUUID& parent_id,
         return;
     }
 
-    if(LLFolderType::lookup(preferred_type) == LLFolderType::badLookup())
+    if(!LLFolderType::isKnown(preferred_type))
     {
         LL_DEBUGS(LOG_INV) << "Attempt to create undefined category." << LL_ENDL;
         if (callback)
@@ -2708,7 +2708,7 @@ void LLInventoryModel::addItem(LLViewerInventoryItem* item)
             return;
         }
 
-        if (LLAssetType::lookup(item->getType()) == LLAssetType::BADLOOKUP)
+        if (!LLAssetType::isKnown(item->getType()))
         {
             if (item->getType() >= LLAssetType::AT_COUNT)
             {
@@ -5076,7 +5076,7 @@ LLPointer<LLInventoryValidationInfo> LLInventoryModel::validate() const
     for (S32 ft=LLFolderType::FT_TEXTURE; ft<LLFolderType::FT_COUNT; ft++)
     {
         LLFolderType::EType folder_type = static_cast<LLFolderType::EType>(ft);
-        if (LLFolderType::lookup(folder_type)==LLFolderType::badLookup())
+        if (!LLFolderType::isKnown(folder_type))
         {
             continue;
         }

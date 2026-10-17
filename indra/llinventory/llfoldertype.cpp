@@ -27,124 +27,153 @@
 #include "linden_common.h"
 
 #include "llfoldertype.h"
-#include "lldictionary.h"
-#include "llmemory.h"
+#include "alenumtable.h"
 #include "llsd.h"
-#include "llsingleton.h"
+
+#include <array>
+#include <iterator>
 
 ///----------------------------------------------------------------------------
 /// Class LLFolderType
 ///----------------------------------------------------------------------------
-struct FolderEntry : public LLDictionaryEntry
+namespace
 {
-    FolderEntry(const std::string &type_name, // 8 character limit!
-                bool is_protected, // can the viewer change categories of this type?
-                bool is_automatic, // always made before first login?
-                bool is_singleton  // should exist as a unique copy under root
-        )
-        :
-    LLDictionaryEntry(type_name),
-    mIsProtected(is_protected),
-    mIsAutomatic(is_automatic),
-    mIsSingleton(is_singleton)
+    struct FolderRow
     {
-        llassert(type_name.length() <= 8);
+        LLFolderType::EType mType;
+        std::string_view    mName;        // 8 character limit!
+        bool                mIsProtected; // can the viewer change categories of this type?
+        bool                mIsAutomatic; // always made before first login?
+        bool                mIsSingleton; // should exist as a unique copy under root
+    };
+
+    using FT = LLFolderType;
+
+    // Folder types
+    //
+    // PROTECTED means that folders of this type can't be moved, deleted
+    // or otherwise modified by the viewer.
+    //
+    // SINGLETON means that there should always be exactly one folder of
+    // this type, and it should be the root or a child of the root. This
+    // is true for most types of folders.
+    //
+    // AUTOMATIC means that a copy of this folder should be created under
+    // the root before the user ever logs in, and should never be created
+    // from the viewer. A missing AUTOMATIC folder should be treated as a
+    // fatal error by the viewer, since it indicates either corrupted
+    // inventory or a failure in the inventory services.
+    //
+    // In key order, the ensembles from FT_ENSEMBLE_START to FT_ENSEMBLE_END
+    // left out: buildFolderRows puts them in their place.
+    constexpr FolderRow NAMED_FOLDER_ROWS[] = {
+        //  TYPE                          TYPE NAME   PROTECTED  AUTOMATIC  SINGLETON
+        { FT::FT_NONE,                  "-1",       false,     false,     false },
+        { FT::FT_TEXTURE,               "texture",  true,      true,      true  },
+        { FT::FT_SOUND,                 "sound",    true,      true,      true  },
+        { FT::FT_CALLINGCARD,           "callcard", true,      true,      false },
+        { FT::FT_LANDMARK,              "landmark", true,      false,     false },
+        { FT::FT_CLOTHING,              "clothing", true,      true,      true  },
+        { FT::FT_OBJECT,                "object",   true,      true,      true  },
+        { FT::FT_NOTECARD,              "notecard", true,      true,      true  },
+        { FT::FT_ROOT_INVENTORY,        "root_inv", true,      true,      true  },
+        { FT::FT_LSL_TEXT,              "lsltext",  true,      true,      true  },
+        { FT::FT_BODYPART,              "bodypart", true,      true,      true  },
+        { FT::FT_TRASH,                 "trash",    true,      false,     true  },
+        { FT::FT_SNAPSHOT_CATEGORY,     "snapshot", true,      true,      true  },
+        { FT::FT_LOST_AND_FOUND,        "lstndfnd", true,      true,      true  },
+        { FT::FT_ANIMATION,             "animatn",  true,      true,      true  },
+        { FT::FT_GESTURE,               "gesture",  true,      true,      true  },
+        { FT::FT_FAVORITE,              "favorite", true,      false,     true  },
+
+        { FT::FT_CURRENT_OUTFIT,        "current",  true,      false,     true  },
+        { FT::FT_OUTFIT,                "outfit",   false,     false,     false },
+        { FT::FT_MY_OUTFITS,            "my_otfts", true,      false,     true  },
+
+        { FT::FT_MESH,                  "mesh",     true,      false,     false }, // Not used?
+
+        { FT::FT_INBOX,                 "inbox",    true,      false,     true  },
+        { FT::FT_OUTBOX,                "outbox",   true,      false,     false },
+
+        { FT::FT_BASIC_ROOT,            "basic_rt", true,      false,     false },
+
+        { FT::FT_MARKETPLACE_LISTINGS,  "merchant", false,     false,     false },
+        { FT::FT_MARKETPLACE_STOCK,     "stock",    false,     false,     false },
+        { FT::FT_MARKETPLACE_VERSION,   "version",  false,     false,     false },
+
+        { FT::FT_SETTINGS,              "settings", true,      false,     true  },
+        { FT::FT_MATERIAL,              "material", true,      false,     true  },
+
+        { FT::FT_ANIM_OVERRIDES,        "animover", true,      false,     false },
+
+        { FT::FT_RLV,                   "rlv",      true,      false,     false },
+    };
+
+    constexpr std::size_t ENSEMBLE_COUNT = std::size_t(FT::FT_ENSEMBLE_END - FT::FT_ENSEMBLE_START + 1);
+    constexpr std::size_t FOLDER_ROW_COUNT = std::size(NAMED_FOLDER_ROWS) + ENSEMBLE_COUNT;
+
+    // The named rows with the ensembles, which are not used, inserted in key
+    // order before the first named row past them.
+    consteval std::array<FolderRow, FOLDER_ROW_COUNT> buildFolderRows()
+    {
+        std::array<FolderRow, FOLDER_ROW_COUNT> rows{};
+        std::size_t out = 0;
+        bool ensembles_placed = false;
+        const auto place_ensembles = [&]()
+        {
+            for (S32 type = FT::FT_ENSEMBLE_START; type <= FT::FT_ENSEMBLE_END; ++type)
+            {
+                rows[out++] = { FT::EType(type), "ensemble", false, false, false };
+            }
+            ensembles_placed = true;
+        };
+        for (const FolderRow& row : NAMED_FOLDER_ROWS)
+        {
+            if (!ensembles_placed && row.mType > FT::FT_ENSEMBLE_END)
+            {
+                place_ensembles();
+            }
+            rows[out++] = row;
+        }
+        if (!ensembles_placed)
+        {
+            place_ensembles();
+        }
+        return rows;
     }
 
-    const bool mIsProtected;
-    const bool mIsAutomatic;
-    const bool mIsSingleton;
-};
+    constexpr std::array<FolderRow, FOLDER_ROW_COUNT> FOLDER_ROWS = buildFolderRows();
 
-class LLFolderDictionary : public LLSingleton<LLFolderDictionary>,
-                           public LLDictionary<LLFolderType::EType, FolderEntry>
-{
-    LLSINGLETON(LLFolderDictionary);
-protected:
-    virtual LLFolderType::EType notFound() const override
+    using Folders = ALEnumTable<FOLDER_ROWS, &FolderRow::mType>;
+
+    consteval bool typeNamesFit()
     {
-        return LLFolderType::FT_NONE;
+        for (const FolderRow& row : FOLDER_ROWS)
+        {
+            if (row.mName.size() > 8)
+            {
+                return false;
+            }
+        }
+        return true;
     }
-};
-
-// Folder types
-//
-// PROTECTED means that folders of this type can't be moved, deleted
-// or otherwise modified by the viewer.
-//
-// SINGLETON means that there should always be exactly one folder of
-// this type, and it should be the root or a child of the root. This
-// is true for most types of folders.
-//
-// AUTOMATIC means that a copy of this folder should be created under
-// the root before the user ever logs in, and should never be created
-// from the viewer. A missing AUTOMATIC folder should be treated as a
-// fatal error by the viewer, since it indicates either corrupted
-// inventory or a failure in the inventory services.
-//
-LLFolderDictionary::LLFolderDictionary()
-{
-    //                                                              TYPE NAME, PROTECTED, AUTOMATIC, SINGLETON
-    addEntry(LLFolderType::FT_TEXTURE,              new FolderEntry("texture",  true, true, true));
-    addEntry(LLFolderType::FT_SOUND,                new FolderEntry("sound",    true, true, true));
-    addEntry(LLFolderType::FT_CALLINGCARD,          new FolderEntry("callcard", true, true, false));
-    addEntry(LLFolderType::FT_LANDMARK,             new FolderEntry("landmark", true, false, false));
-    addEntry(LLFolderType::FT_CLOTHING,             new FolderEntry("clothing", true, true, true));
-    addEntry(LLFolderType::FT_OBJECT,               new FolderEntry("object",   true, true, true));
-    addEntry(LLFolderType::FT_NOTECARD,             new FolderEntry("notecard", true, true, true));
-    addEntry(LLFolderType::FT_ROOT_INVENTORY,       new FolderEntry("root_inv", true, true, true));
-    addEntry(LLFolderType::FT_LSL_TEXT,             new FolderEntry("lsltext",  true, true, true));
-    addEntry(LLFolderType::FT_BODYPART,             new FolderEntry("bodypart", true, true, true));
-    addEntry(LLFolderType::FT_TRASH,                new FolderEntry("trash",    true, false, true));
-    addEntry(LLFolderType::FT_SNAPSHOT_CATEGORY,    new FolderEntry("snapshot", true, true, true));
-    addEntry(LLFolderType::FT_LOST_AND_FOUND,       new FolderEntry("lstndfnd", true, true, true));
-    addEntry(LLFolderType::FT_ANIMATION,            new FolderEntry("animatn",  true, true, true));
-    addEntry(LLFolderType::FT_GESTURE,              new FolderEntry("gesture",  true, true, true));
-    addEntry(LLFolderType::FT_FAVORITE,             new FolderEntry("favorite", true, false, true));
-
-    for (S32 ensemble_num = S32(LLFolderType::FT_ENSEMBLE_START); ensemble_num <= S32(LLFolderType::FT_ENSEMBLE_END); ensemble_num++)
-    {
-        addEntry(LLFolderType::EType(ensemble_num), new FolderEntry("ensemble", false, false, false)); // Not used
-    }
-
-    addEntry(LLFolderType::FT_CURRENT_OUTFIT,       new FolderEntry("current",  true, false, true));
-    addEntry(LLFolderType::FT_OUTFIT,               new FolderEntry("outfit",   false, false, false));
-    addEntry(LLFolderType::FT_MY_OUTFITS,           new FolderEntry("my_otfts", true, false, true));
-
-    addEntry(LLFolderType::FT_MESH,                 new FolderEntry("mesh",     true, false, false)); // Not used?
-
-    addEntry(LLFolderType::FT_INBOX,                new FolderEntry("inbox",    true, false, true));
-    addEntry(LLFolderType::FT_OUTBOX,               new FolderEntry("outbox",   true, false, false));
-
-    addEntry(LLFolderType::FT_BASIC_ROOT,           new FolderEntry("basic_rt", true, false, false));
-
-    addEntry(LLFolderType::FT_MARKETPLACE_LISTINGS, new FolderEntry("merchant", false, false, false));
-    addEntry(LLFolderType::FT_MARKETPLACE_STOCK,    new FolderEntry("stock",    false, false, false));
-    addEntry(LLFolderType::FT_MARKETPLACE_VERSION,  new FolderEntry("version",  false, false, false));
-
-    addEntry(LLFolderType::FT_SETTINGS,             new FolderEntry("settings", true, false, true));
-    addEntry(LLFolderType::FT_MATERIAL,             new FolderEntry("material", true, false, true));
-
-    addEntry(LLFolderType::FT_ANIM_OVERRIDES,       new FolderEntry("animover", true, false, false));
-
-    addEntry(LLFolderType::FT_RLV,                  new FolderEntry("rlv",      true, false, false));
-
-    addEntry(LLFolderType::FT_NONE,                 new FolderEntry("-1",       false, false, false));
-};
+    static_assert(typeNamesFit(), "a folder type name is at most 8 characters");
+} // namespace
 
 // static
-LLFolderType::EType LLFolderType::lookup(const std::string& name)
+LLFolderType::EType LLFolderType::lookup(std::string_view name)
 {
-    return LLFolderDictionary::getInstance()->lookup(name);
+    const FolderRow* row = Folders::findBy<&FolderRow::mName>(name);
+    return row ? row->mType : FT_NONE;
 }
 
 // static
-const std::string &LLFolderType::lookup(LLFolderType::EType folder_type)
+std::string_view LLFolderType::lookup(LLFolderType::EType folder_type)
 {
-    const FolderEntry *entry = LLFolderDictionary::getInstance()->lookup(folder_type);
-    if (entry)
+    const FolderRow* row = Folders::find(folder_type);
+    if (row)
     {
-        return entry->mName;
+        return row->mName;
     }
     else
     {
@@ -153,43 +182,34 @@ const std::string &LLFolderType::lookup(LLFolderType::EType folder_type)
 }
 
 // static
+bool LLFolderType::isKnown(EType folder_type)
+{
+    return Folders::find(folder_type) != nullptr;
+}
+
+// static
 // Only plain folders and a few other types aren't protected.  "Protected" means
 // you can't move, deleted, or change certain properties such as their type.
 bool LLFolderType::lookupIsProtectedType(EType folder_type)
 {
-    const LLFolderDictionary *dict = LLFolderDictionary::getInstance();
-    const FolderEntry *entry = dict->lookup(folder_type);
-    if (entry)
-    {
-        return entry->mIsProtected;
-    }
-    return true;
+    const FolderRow* row = Folders::find(folder_type);
+    return row ? row->mIsProtected : true;
 }
 
 // static
 // Is this folder type automatically created outside the viewer?
 bool LLFolderType::lookupIsAutomaticType(EType folder_type)
 {
-    const LLFolderDictionary *dict = LLFolderDictionary::getInstance();
-    const FolderEntry *entry = dict->lookup(folder_type);
-    if (entry)
-    {
-        return entry->mIsAutomatic;
-    }
-    return true;
+    const FolderRow* row = Folders::find(folder_type);
+    return row ? row->mIsAutomatic : true;
 }
 
 // static
 // Should this folder always exist as a single copy under (or as) the root?
 bool LLFolderType::lookupIsSingletonType(EType folder_type)
 {
-    const LLFolderDictionary *dict = LLFolderDictionary::getInstance();
-    const FolderEntry *entry = dict->lookup(folder_type);
-    if (entry)
-    {
-        return entry->mIsSingleton;
-    }
-    return true;
+    const FolderRow* row = Folders::find(folder_type);
+    return row ? row->mIsSingleton : true;
 }
 
 // static
@@ -202,7 +222,7 @@ bool LLFolderType::lookupIsEnsembleType(EType folder_type)
 // static
 LLAssetType::EType LLFolderType::folderTypeToAssetType(LLFolderType::EType folder_type)
 {
-    if (LLAssetType::lookup(LLAssetType::EType(folder_type)) == LLAssetType::BADLOOKUP)
+    if (!LLAssetType::isKnown(LLAssetType::EType(folder_type)))
     {
         LL_WARNS() << "Converting to unknown asset type " << folder_type << LL_ENDL;
     }
@@ -212,7 +232,7 @@ LLAssetType::EType LLFolderType::folderTypeToAssetType(LLFolderType::EType folde
 // static
 LLFolderType::EType LLFolderType::assetTypeToFolderType(LLAssetType::EType asset_type)
 {
-    if (LLFolderType::lookup(LLFolderType::EType(asset_type)) == LLFolderType::badLookup())
+    if (!LLFolderType::isKnown(LLFolderType::EType(asset_type)))
     {
         LL_WARNS() << "Converting to unknown folder type " << asset_type << LL_ENDL;
     }
@@ -220,25 +240,19 @@ LLFolderType::EType LLFolderType::assetTypeToFolderType(LLAssetType::EType asset
 }
 
 // static
-const std::string &LLFolderType::badLookup()
+std::string_view LLFolderType::badLookup()
 {
-    static const std::string sBadLookup = "llfoldertype_bad_lookup";
-    return sBadLookup;
+    return "llfoldertype_bad_lookup";
 }
 
 LLSD LLFolderType::getTypeNames()
 {
     LLSD type_names;
-    for (S32 type = FT_TEXTURE; type < FT_COUNT; ++type)
+    for (const FolderRow& row : Folders::rows())
     {
-        if (lookupIsEnsembleType((LLFolderType::EType)type))
-            continue;
-
-        const FolderEntry* entry = LLFolderDictionary::getInstance()->lookup((LLFolderType::EType)type);
-        // skip llfoldertype_bad_lookup
-        if (entry)
+        if (row.mType >= FT_TEXTURE && row.mType < FT_COUNT && !lookupIsEnsembleType(row.mType))
         {
-            type_names.append(entry->mName);
+            type_names.append(row.mName);
         }
     }
     return type_names;

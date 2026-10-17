@@ -29,16 +29,11 @@
 #define LL_INVENTORY_SETTINGS_H
 
 #include "llinventorytype.h"
-#include "llinvtranslationbrdg.h"
-#include "llsingleton.h"
 
-class LLSettingsType : public LLParamSingleton<LLSettingsType>
+#include <string_view>
+
+class LLSettingsType
 {
-    LLSINGLETON(LLSettingsType, LLTranslationBridge::ptr_t &trans);
-    ~LLSettingsType();
-
-    friend struct SettingsEntry;
-
 public:
     enum type_e
     {
@@ -52,11 +47,11 @@ public:
 
     static type_e fromInventoryFlags(U32 flags);
     static LLInventoryType::EIconName getIconName(type_e type);
-    static std::string getDefaultName(type_e type);
+    static std::string_view getDefaultName(type_e type);
 
 protected:
-
-    LLTranslationBridge::ptr_t mTranslator;
+    LLSettingsType() {}
+    ~LLSettingsType() {}
 };
 
 

@@ -28,42 +28,71 @@
 #include "llwearabletype.h"
 #include "llinventorytype.h"
 #include "llinventorydefines.h"
+#include "alenumtable.h"
 
-
-LLWearableType::LLWearableDictionary::LLWearableDictionary(LLTranslationBridge::ptr_t& trans)
+namespace
 {
-    addEntry(LLWearableType::WT_SHAPE,        new WearableEntry(trans, "shape",       "New Shape",          LLAssetType::AT_BODYPART,   LLInventoryType::ICONNAME_BODYPART_SHAPE, false, false));
-    addEntry(LLWearableType::WT_SKIN,         new WearableEntry(trans, "skin",        "New Skin",           LLAssetType::AT_BODYPART,   LLInventoryType::ICONNAME_BODYPART_SKIN, false, false));
-    addEntry(LLWearableType::WT_HAIR,         new WearableEntry(trans, "hair",        "New Hair",           LLAssetType::AT_BODYPART,   LLInventoryType::ICONNAME_BODYPART_HAIR, false, false));
-    addEntry(LLWearableType::WT_EYES,         new WearableEntry(trans, "eyes",        "New Eyes",           LLAssetType::AT_BODYPART,   LLInventoryType::ICONNAME_BODYPART_EYES, false, false));
-    addEntry(LLWearableType::WT_SHIRT,        new WearableEntry(trans, "shirt",       "New Shirt",          LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_SHIRT, false, true));
-    addEntry(LLWearableType::WT_PANTS,        new WearableEntry(trans, "pants",       "New Pants",          LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_PANTS, false, true));
-    addEntry(LLWearableType::WT_SHOES,        new WearableEntry(trans, "shoes",       "New Shoes",          LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_SHOES, false, true));
-    addEntry(LLWearableType::WT_SOCKS,        new WearableEntry(trans, "socks",       "New Socks",          LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_SOCKS, false, true));
-    addEntry(LLWearableType::WT_JACKET,       new WearableEntry(trans, "jacket",      "New Jacket",     LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_JACKET, false, true));
-    addEntry(LLWearableType::WT_GLOVES,       new WearableEntry(trans, "gloves",      "New Gloves",     LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_GLOVES, false, true));
-    addEntry(LLWearableType::WT_UNDERSHIRT,   new WearableEntry(trans, "undershirt",  "New Undershirt", LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_UNDERSHIRT, false, true));
-    addEntry(LLWearableType::WT_UNDERPANTS,   new WearableEntry(trans, "underpants",  "New Underpants", LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_UNDERPANTS, false, true));
-    addEntry(LLWearableType::WT_SKIRT,        new WearableEntry(trans, "skirt",       "New Skirt",          LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_SKIRT, false, true));
-    addEntry(LLWearableType::WT_ALPHA,        new WearableEntry(trans, "alpha",       "New Alpha",          LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_ALPHA, false, true));
-    addEntry(LLWearableType::WT_TATTOO,       new WearableEntry(trans, "tattoo",      "New Tattoo",     LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_TATTOO, false, true));
-    addEntry(LLWearableType::WT_UNIVERSAL,    new WearableEntry(trans, "universal",   "New Universal",     LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_UNIVERSAL, false, true));
+    struct WearableRow
+    {
+        LLWearableType::EType      mType;
+        std::string_view           mName;           // also the key of its label's translation
+        std::string_view           mDefaultNewName;
+        LLAssetType::EType         mAssetType;
+        LLInventoryType::EIconName mIconName;
+        bool                       mDisableCameraSwitch;
+        bool                       mAllowMultiwear;
+    };
 
+    using WT = LLWearableType;
+    using AT = LLAssetType;
+    using IT = LLInventoryType;
+
+    // In key order, which the table enforces.
+    constexpr WearableRow WEARABLE_ROWS[] = {
+        //  TYPE               NAME          DEFAULT NEW NAME      ASSET TYPE        ICON                                CAMERA?  MULTIWEAR?
+        { WT::WT_NONE,       "none",       "Invalid Wearable",   AT::AT_NONE,      IT::ICONNAME_NONE,                  false,   false },
+        { WT::WT_SHAPE,      "shape",      "New Shape",          AT::AT_BODYPART,  IT::ICONNAME_BODYPART_SHAPE,        false,   false },
+        { WT::WT_SKIN,       "skin",       "New Skin",           AT::AT_BODYPART,  IT::ICONNAME_BODYPART_SKIN,         false,   false },
+        { WT::WT_HAIR,       "hair",       "New Hair",           AT::AT_BODYPART,  IT::ICONNAME_BODYPART_HAIR,         false,   false },
+        { WT::WT_EYES,       "eyes",       "New Eyes",           AT::AT_BODYPART,  IT::ICONNAME_BODYPART_EYES,         false,   false },
+        { WT::WT_SHIRT,      "shirt",      "New Shirt",          AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_SHIRT,        false,   true  },
+        { WT::WT_PANTS,      "pants",      "New Pants",          AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_PANTS,        false,   true  },
+        { WT::WT_SHOES,      "shoes",      "New Shoes",          AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_SHOES,        false,   true  },
+        { WT::WT_SOCKS,      "socks",      "New Socks",          AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_SOCKS,        false,   true  },
+        { WT::WT_JACKET,     "jacket",     "New Jacket",         AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_JACKET,       false,   true  },
+        { WT::WT_GLOVES,     "gloves",     "New Gloves",         AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_GLOVES,       false,   true  },
+        { WT::WT_UNDERSHIRT, "undershirt", "New Undershirt",     AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_UNDERSHIRT,   false,   true  },
+        { WT::WT_UNDERPANTS, "underpants", "New Underpants",     AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_UNDERPANTS,   false,   true  },
+        { WT::WT_SKIRT,      "skirt",      "New Skirt",          AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_SKIRT,        false,   true  },
+        { WT::WT_ALPHA,      "alpha",      "New Alpha",          AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_ALPHA,        false,   true  },
+        { WT::WT_TATTOO,     "tattoo",     "New Tattoo",         AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_TATTOO,       false,   true  },
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2011-05-29 (Catznip-2.6)
-    addEntry(LLWearableType::WT_PHYSICS,      new WearableEntry(trans, "physics",     "New Physics",        LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_PHYSICS, true, false));
+        { WT::WT_PHYSICS,    "physics",    "New Physics",        AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_PHYSICS,      true,    false },
 // [/SL:KB]
-//  addEntry(LLWearableType::WT_PHYSICS,      new WearableEntry(trans, "physics",     "New Physics",        LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_PHYSICS, true, true));
+//      { WT::WT_PHYSICS,    "physics",    "New Physics",        AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_PHYSICS,      true,    true  },
+        { WT::WT_UNIVERSAL,  "universal",  "New Universal",      AT::AT_CLOTHING,  IT::ICONNAME_CLOTHING_UNIVERSAL,    false,   true  },
+        { WT::WT_INVALID,    "invalid",    "Invalid Wearable",   AT::AT_NONE,      IT::ICONNAME_UNKNOWN,               false,   false },
+    };
 
-    addEntry(LLWearableType::WT_INVALID,      new WearableEntry(trans, "invalid",     "Invalid Wearable",   LLAssetType::AT_NONE,       LLInventoryType::ICONNAME_UNKNOWN, false, false));
-    addEntry(LLWearableType::WT_NONE,         new WearableEntry(trans, "none",        "Invalid Wearable",   LLAssetType::AT_NONE,       LLInventoryType::ICONNAME_NONE, false, false));
-}
+    using Wearables = ALEnumTable<WEARABLE_ROWS, &WearableRow::mType>;
+
+    const WearableRow& rowOrInvalid(LLWearableType::EType type)
+    {
+        const WearableRow* row = Wearables::find(type);
+        return row ? *row : *Wearables::find(WT::WT_INVALID);
+    }
+} // namespace
 
 
 // class LLWearableType
 
 LLWearableType::LLWearableType(LLTranslationBridge::ptr_t &trans)
-:   mDictionary(trans)
 {
+    static_assert(Wearables::ROW_COUNT == ENTRY_COUNT, "a label for each wearable type entry");
+    for (std::size_t i = 0; i < Wearables::ROW_COUNT; ++i)
+    {
+        mLabels[i] = trans->getString(std::string(Wearables::rows()[i].mName));
+    }
 }
 
 LLWearableType::~LLWearableType()
@@ -74,59 +103,58 @@ void LLWearableType::initSingleton()
 {
 }
 
-LLWearableType::EType LLWearableType::typeNameToType(const std::string& type_name)
+// [RLVa:KB] - Checked: 2010-03-03 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
+// A name no type has is WT_INVALID, not -1, which isn't a valid EWearableType
+// [/RLVa:KB]
+// static
+LLWearableType::EType LLWearableType::typeNameToType(std::string_view type_name)
 {
-    const LLWearableType::EType wearable = mDictionary.lookup(type_name);
-    return wearable;
+    const WearableRow* row = Wearables::findBy<&WearableRow::mName>(type_name);
+    return row ? row->mType : WT_INVALID;
 }
 
-const std::string& LLWearableType::getTypeName(LLWearableType::EType type)
+// static
+std::string_view LLWearableType::getTypeName(LLWearableType::EType type)
 {
-    const WearableEntry *entry = mDictionary.lookup(type);
-    if (!entry) return getTypeName(WT_INVALID);
-    return entry->mName;
+    return rowOrInvalid(type).mName;
 }
 
-const std::string& LLWearableType::getTypeDefaultNewName(LLWearableType::EType type)
+// static
+std::string_view LLWearableType::getTypeDefaultNewName(LLWearableType::EType type)
 {
-    const WearableEntry *entry = mDictionary.lookup(type);
-    if (!entry) return getTypeDefaultNewName(WT_INVALID);
-    return entry->mDefaultNewName;
+    return rowOrInvalid(type).mDefaultNewName;
 }
 
 const std::string& LLWearableType::getTypeLabel(LLWearableType::EType type)
 {
-    const WearableEntry *entry = mDictionary.lookup(type);
-    if (!entry) return getTypeLabel(WT_INVALID);
-    return entry->mLabel;
+    const std::size_t index = Wearables::indexOf(type);
+    return mLabels[index != Wearables::npos ? index : Wearables::indexOf(WT_INVALID)];
 }
 
+// static
 LLAssetType::EType LLWearableType::getAssetType(LLWearableType::EType type)
 {
-    const WearableEntry *entry = mDictionary.lookup(type);
-    if (!entry) return getAssetType(WT_INVALID);
-    return entry->mAssetType;
+    return rowOrInvalid(type).mAssetType;
 }
 
+// static
 LLInventoryType::EIconName LLWearableType::getIconName(LLWearableType::EType type)
 {
-    const WearableEntry *entry = mDictionary.lookup(type);
-    if (!entry) return getIconName(WT_INVALID);
-    return entry->mIconName;
+    return rowOrInvalid(type).mIconName;
 }
 
+// static
 bool LLWearableType::getDisableCameraSwitch(LLWearableType::EType type)
 {
-    const WearableEntry *entry = mDictionary.lookup(type);
-    if (!entry) return false;
-    return entry->mDisableCameraSwitch;
+    const WearableRow* row = Wearables::find(type);
+    return row && row->mDisableCameraSwitch;
 }
 
+// static
 bool LLWearableType::getAllowMultiwear(LLWearableType::EType type)
 {
-    const WearableEntry *entry = mDictionary.lookup(type);
-    if (!entry) return false;
-    return entry->mAllowMultiwear;
+    const WearableRow* row = Wearables::find(type);
+    return row && row->mAllowMultiwear;
 }
 
 // static
@@ -134,4 +162,3 @@ LLWearableType::EType LLWearableType::inventoryFlagsToWearableType(U32 flags)
 {
     return  (LLWearableType::EType)(flags & LLInventoryItemFlags::II_FLAGS_SUBTYPE_MASK);
 }
-

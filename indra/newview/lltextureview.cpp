@@ -456,11 +456,9 @@ void LLAvatarTexBar::draw()
     LLColor4 color;
 
     U32 line_num = 1;
-    for (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::BakedTextures::const_iterator baked_iter = LLAvatarAppearance::getDictionary()->getBakedTextures().begin();
-         baked_iter != LLAvatarAppearance::getDictionary()->getBakedTextures().end();
-         ++baked_iter)
+    for (const LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::BakedEntry& baked_entry : LLAvatarAppearance::getDictionary()->getBakedTextures())
     {
-        const LLAvatarAppearanceDefines::EBakedTextureIndex baked_index = baked_iter->first;
+        const LLAvatarAppearanceDefines::EBakedTextureIndex baked_index = baked_entry.mIndex;
         const LLViewerTexLayerSet *layerset = avatarp->debugGetLayerSet(baked_index);
         if (!layerset) continue;
         const LLViewerTexLayerSetBuffer *layerset_buffer = layerset->getViewerComposite();
@@ -505,11 +503,9 @@ LLRect LLAvatarTexBar::getRequiredRect()
     // Count exactly what draw() will render: one line per baked layerset that has
     // a viewer composite buffer, plus the two trailing header/section lines.
     S32 line_count = 0;
-    for (auto baked_iter = LLAvatarAppearance::getDictionary()->getBakedTextures().begin();
-         baked_iter != LLAvatarAppearance::getDictionary()->getBakedTextures().end();
-         ++baked_iter)
+    for (const LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::BakedEntry& baked_entry : LLAvatarAppearance::getDictionary()->getBakedTextures())
     {
-        const LLViewerTexLayerSet* layerset = avatarp->debugGetLayerSet(baked_iter->first);
+        const LLViewerTexLayerSet* layerset = avatarp->debugGetLayerSet(baked_entry.mIndex);
         if (!layerset) continue;
         if (!layerset->getViewerComposite()) continue;
         ++line_count;

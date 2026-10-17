@@ -231,7 +231,7 @@ LLFilteredCollector::LLFilteredCollector(LLSD const &data) :
 
     if (data.has("type"))
     {
-        mType = LLAssetType::lookup(data["type"]);
+        mType = LLAssetType::lookup(data["type"].asString());
     }
     if (data.has("filter_links"))
     {
