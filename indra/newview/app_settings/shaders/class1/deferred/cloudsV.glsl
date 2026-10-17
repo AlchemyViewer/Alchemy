@@ -75,9 +75,14 @@ void main()
     vary_texcoord0.xy /= cloud_scale;
     vary_texcoord0.xy += 0.5;
 
+    // The density sample toward the light, for self-shadowing. lightnorm is (north, up, east)
+    // (LLEnvironment::toLightNorm), the dome's local frame (lldrawpoolwlsky's 120 degree turn takes
+    // local x, y, z to north, up, east), and the dome's texcoords are u = (1 - east) / 2 and
+    // v = (1 - north) / 2 (llvowlsky), so after the mirror above u grows eastward and v shrinks
+    // northward.
     vary_texcoord1 = vary_texcoord0;
-    vary_texcoord1.x -= lightnorm.x * 0.0125; // u is mirrored above, so the offset toward the light is too
-    vary_texcoord1.y += lightnorm.z * 0.0125;
+    vary_texcoord1.x += lightnorm.z * 0.0125;
+    vary_texcoord1.y -= lightnorm.x * 0.0125;
 
     vary_texcoord2 = vary_texcoord0 * 16.;
     vary_texcoord3 = vary_texcoord1 * 16.;
