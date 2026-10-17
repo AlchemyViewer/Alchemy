@@ -445,13 +445,5 @@ RenderGLMultiThreadedMedia      1   1
 list NonAppleGPU
 RenderDeferredSSAO			1   0
 
-list GL3
-RenderFSAASamples           0   0
-RenderReflectionProbeDetail	0	0
-RenderReflectionsEnabled    0   0
-RenderMirrors				0	0
-RenderDisableVintageMode           1   0
-RenderReflectionProbeCount  0   0
-
 list VaryingVectors16orLess
 RenderTerrainPBRPlanarSampleCount 1   1

@@ -8240,7 +8240,7 @@
   <key>RenderEnableEmissiveBuffer</key>
   <map>
     <key>Comment</key>
-    <string>Enable emissive buffer in gbuffer.  Should only be disabled in GL3 mode.</string>
+    <string>Enable emissive buffer in gbuffer.  Should only be disabled in vintage mode.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>

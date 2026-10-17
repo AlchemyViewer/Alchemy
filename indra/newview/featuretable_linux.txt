@@ -427,7 +427,10 @@ RenderDownScaleMethod       1   0
 list NVIDIA
 RenderGLMultiThreadedTextures      1   0
 
-list GL3
+// Intel's drivers short of OpenGL 4.6 (LLFeatureManager::isIntelLegacy),
+// as on Windows. The viewer also keeps them from compute and the shader
+// cache, and the waves from users who already have them on.
+list IntelLegacy
 RenderFSAAType  			0	0
 RenderFSAASamples           0   0
 RenderReflectionsEnabled    0   0
@@ -435,8 +438,9 @@ RenderReflectionProbeDetail	0	0
 RenderMirrors				0	0
 RenderGLMultiThreadedTextures 0 0
 RenderGLMultiThreadedMedia 0 0
-RenderDisableVintageMode           1   0
+RenderDisableVintageMode           0   0
 RenderReflectionProbeCount  0   0
+AlchemyRenderWaterWaves     0   0
 
 list TexUnit16orLess
 RenderTerrainPBRDetail      1   -1
