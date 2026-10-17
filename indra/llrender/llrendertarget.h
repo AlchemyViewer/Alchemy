@@ -128,6 +128,22 @@ public:
     // Failed and leave the target released.
     EnsureResult ensure(const ALRenderTargetDesc& desc);
 
+    // Make this target what `desc` describes, its depth attachment the one `depth_from` allocated. `desc` describes
+    // this target's own storage, so it has no depth or stencil, and it is the size of depth_from.
+    //
+    // The colour is built only where it differs from the description, as ensure(desc) builds it, and the depth is
+    // attached only where this target shares none or depth_from's depth was built since it was attached. That is told
+    // by a serial each depth build takes, not by the texture name, which GL hands out again once a texture is deleted.
+    // So building a depth owner again re-points its sharers without building their colour again.
+    //
+    // Kept means no GL call; Built that the colour was built, the depth attached, or both. A description that cannot
+    // be built, one with depth of its own or a size other than depth_from's, and a depth_from with no depth of its
+    // own, return Failed and leave this target released.
+    EnsureResult ensure(const ALRenderTargetDesc& desc, const LLRenderTarget& depth_from);
+
+    // Whether the depth attachment is another target's, attached by shareDepthBuffer or ensure.
+    bool sharesDepth() const { return mUseDepth && !mDepth; }
+
     //resize existing attachments to use new resolution and color format
     // CAUTION: if the GL runs out of memory attempting to resize, this render target will be undefined
     // DO NOT use for screen space buffers or for scratch space for an image that might be uploaded
@@ -294,6 +310,10 @@ protected:
     LLRenderTarget* mPreviousRT = nullptr;
 
     U32 mDepth;
+    // Which build of the depth attachment mDepth is, unique for the process; 0 for none.
+    U64 mDepthSerial = 0;
+    // The serial of the depth attached from another target; 0 for none.
+    U64 mSharedDepthSerial = 0;
     bool mUseDepth;
     bool mStencil;
     eDepthFormat mDepthFormat;
@@ -311,6 +331,12 @@ protected:
 
     // Release what the target holds and allocate what `desc` describes, depth included. False leaves it released.
     bool build(const ALRenderTargetDesc& desc);
+
+    // Attach `owner`'s depth, in place of any depth this target shared before.
+    void attachSharedDepth(const LLRenderTarget& owner);
+
+    // The serial the last depth build took.
+    static U64 sLastDepthSerial;
 };
 
 #endif

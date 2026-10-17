@@ -44,6 +44,7 @@
 
 LLRenderTarget* LLRenderTarget::sBoundTarget = NULL;
 U32 LLRenderTarget::sBytesAllocated = 0;
+U64 LLRenderTarget::sLastDepthSerial = 0;
 
 namespace
 {
@@ -185,8 +186,9 @@ namespace
         return desc;
     }
 
-    // Why no target can be built from `desc`, or null when one can.
-    const char* unbuildable(const ALRenderTargetDesc& desc)
+    // Why no target can be built from `desc`, or null when one can. A target whose depth is shared needs no attachment
+    // of its own.
+    const char* unbuildable(const ALRenderTargetDesc& desc, bool depth_shared)
     {
         if (desc.width == 0 || desc.height == 0)
         {
@@ -200,7 +202,7 @@ namespace
                 return "a colour format follows a 0 in its colour list";
             }
         }
-        if (colors == 0 && desc.depth == ALRenderTargetDesc::Depth::None)
+        if (colors == 0 && desc.depth == ALRenderTargetDesc::Depth::None && !depth_shared)
         {
             return "it has no attachment";
         }
@@ -215,6 +217,28 @@ namespace
         if (desc.mips == ALRenderTargetDesc::Mips::Auto && LLImageGL::isIntegerFormat(desc.color[0]))
         {
             return "flush generates its first attachment's mips, and GL generates none of an integer texture's";
+        }
+        return nullptr;
+    }
+
+    // Why `sharer` cannot be what `desc` describes with `owner`'s depth, or null when it can.
+    const char* unshareable(const ALRenderTargetDesc& desc, const LLRenderTarget& sharer, const LLRenderTarget& owner)
+    {
+        if (&sharer == &owner)
+        {
+            return "it would share its own depth";
+        }
+        if (!owner.getDepth())
+        {
+            return "the target it shares depth from has none of its own";
+        }
+        if (desc.depth != ALRenderTargetDesc::Depth::None || desc.stencil)
+        {
+            return "it describes depth of its own";
+        }
+        if (desc.width != owner.getWidth() || desc.height != owner.getHeight())
+        {
+            return "its size is not the size of the depth it shares";
         }
         return nullptr;
     }
@@ -407,7 +431,7 @@ LLRenderTarget::EnsureResult LLRenderTarget::ensure(const ALRenderTargetDesc& wa
     llassert(!isBoundInStack());
 
     const ALRenderTargetDesc held = held_to_context(wanted);
-    if (const char* reason = unbuildable(held))
+    if (const char* reason = unbuildable(held, /*depth_shared=*/false))
     {
         LL_WARNS("RenderTarget") << "No render target can be built from the description: " << reason << LL_ENDL;
         release();
@@ -416,13 +440,50 @@ LLRenderTarget::EnsureResult LLRenderTarget::ensure(const ALRenderTargetDesc& wa
 
     // A depth attachment shared from another target, and a lent colour texture, are storage the description says
     // nothing of, so a target holding either is built again.
-    const bool holds_only_its_own = !(mUseDepth && !mDepth) && mTex.size() == mInternalFormat.size();
+    const bool holds_only_its_own = !sharesDepth() && mTex.size() == mInternalFormat.size();
     if (holds_only_its_own && held == desc())
     {
         return EnsureResult::Kept;
     }
 
     return build(held) ? EnsureResult::Built : EnsureResult::Failed;
+}
+
+LLRenderTarget::EnsureResult LLRenderTarget::ensure(const ALRenderTargetDesc& wanted, const LLRenderTarget& depth_from)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    llassert(!isBoundInStack());
+
+    const ALRenderTargetDesc held = held_to_context(wanted);
+    const char*              reason = unbuildable(held, /*depth_shared=*/true);
+    if (!reason)
+    {
+        reason = unshareable(held, *this, depth_from);
+    }
+    if (reason)
+    {
+        LL_WARNS("RenderTarget") << "No render target can be built from the description: " << reason << LL_ENDL;
+        release();
+        return EnsureResult::Failed;
+    }
+
+    bool built = false;
+    if (mTex.size() != mInternalFormat.size() || held != desc())
+    {
+        if (!build(held))
+        {
+            return EnsureResult::Failed;
+        }
+        built = true;
+    }
+
+    if (!built && mSharedDepthSerial == depth_from.mDepthSerial)
+    {
+        return EnsureResult::Kept;
+    }
+
+    attachSharedDepth(depth_from);
+    return EnsureResult::Built;
 }
 
 bool LLRenderTarget::build(const ALRenderTargetDesc& desc)
@@ -590,6 +651,7 @@ bool LLRenderTarget::allocateDepth()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     LLImageGL::generateTextures(1, &mDepth);
+    mDepthSerial = ++sLastDepthSerial;
     gGL.getTextureSlot(0)->bindManual(mUsage, mDepth);
 
     U32 internal_type = ALTextureSlot::getInternalType(mUsage);
@@ -631,19 +693,33 @@ void LLRenderTarget::shareDepthBuffer(LLRenderTarget& target)
 
     if (mDepth)
     {
-        glBindFramebuffer(GL_FRAMEBUFFER, target.mFBO);
-
-        GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
-        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), mDepth, 0);
-
-        check_framebuffer_status();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
-
-        target.mUseDepth = true;
-        target.mStencil = mStencil;
-        target.mDepthFormat = mDepthFormat;
+        target.attachSharedDepth(*this);
     }
+}
+
+void LLRenderTarget::attachSharedDepth(const LLRenderTarget& owner)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
+
+    if (mUseDepth)
+    {
+        // From the point it was attached at: a depth-stencil texture fills the depth and the stencil point, a depth
+        // texture the depth point alone, so attaching at the other point would leave it on one of them.
+        GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), 0, 0);
+    }
+
+    GLenum attachment = owner.mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+    glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(owner.mUsage), owner.mDepth, 0);
+
+    check_framebuffer_status();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
+
+    mUseDepth          = true;
+    mStencil           = owner.mStencil;
+    mDepthFormat       = owner.mDepthFormat;
+    mSharedDepthSerial = owner.mDepthSerial;
 }
 
 void LLRenderTarget::release()
@@ -659,8 +735,7 @@ void LLRenderTarget::release()
         sBytesAllocated -= mResX * mResY * info.bytes_per_pixel;
 
         mDepth = 0;
-        mStencil = false;
-        mDepthFormat = DEPTH_FMT_24;
+        mDepthSerial = 0;
     }
     else if (mFBO)
     {
@@ -670,13 +745,14 @@ void LLRenderTarget::release()
         { //detach shared depth buffer
             GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
             glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), 0, 0);
-            mUseDepth = false;
-            mStencil = false;
-            mDepthFormat = DEPTH_FMT_24;
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
     }
+    mUseDepth = false;
+    mStencil = false;
+    mDepthFormat = DEPTH_FMT_24;
+    mSharedDepthSerial = 0;
 
     // Detach any extra color buffers (e.g. SRGB spec buffers)
     //

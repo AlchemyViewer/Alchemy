@@ -37,6 +37,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -237,11 +238,12 @@ namespace
             CHECK(depth.format == depth_format_of(desc));
         }
 
-        // The target holds nothing: no textures, no framebuffer, and the description of no target.
+        // The target holds nothing: no textures, no depth of its own or shared, and the description of no target.
         void require_released(const LLRenderTarget& target)
         {
             CHECK(target.getNumTextures() == 0u);
             CHECK(target.getDepth() == 0u);
+            CHECK_FALSE(target.sharesDepth());
             CHECK_FALSE(target.isComplete());
             CHECK(target.desc() == ALRenderTargetDesc{});
         }
@@ -254,6 +256,36 @@ namespace
             glReadPixels(target.getWidth() / 2, target.getHeight() / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
             target.flush();
             return LLColor4U(pixel[0], pixel[1], pixel[2], pixel[3]);
+        }
+
+        // What the target's framebuffer has attached at `point`, 0 for nothing.
+        U32 attached_at(LLRenderTarget& target, GLenum point)
+        {
+            target.bindTarget();
+            GLint name = -1;
+            glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER, point, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &name);
+            target.flush();
+            return (U32)name;
+        }
+
+        // Clear the owner's depth to `value`, through the owner's framebuffer.
+        void clear_depth(LLRenderTarget& owner, F64 value)
+        {
+            LLGLDepthTest write(GL_TRUE, GL_TRUE);
+            glClearDepth(value);
+            owner.bindTarget();
+            owner.clear(GL_DEPTH_BUFFER_BIT);
+            owner.flush();
+        }
+
+        // The depth at the middle of the target, read through its own framebuffer.
+        F32 depth_through(LLRenderTarget& target)
+        {
+            target.bindTarget();
+            F32 depth = -1.f;
+            glReadPixels(target.getWidth() / 2, target.getHeight() / 2, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depth);
+            target.flush();
+            return depth;
         }
 
         // Puts back the context's largest texture size, however the case ends.
@@ -279,6 +311,7 @@ namespace
             mMixed.release();
             mLent.release();
             mCopy.release();
+            mSharer.release();
             mOwner.release();
             mWide.release();
             mLentImage = nullptr;
@@ -370,6 +403,7 @@ namespace
         LLRenderTarget mLent;
         LLRenderTarget mCopy;
         LLRenderTarget mOwner;
+        LLRenderTarget mSharer;
         LLRenderTarget mWide;
         LLPointer<LLImageGL> mLentImage;
         GLuint mVAO = 0;
@@ -684,6 +718,137 @@ namespace
 
         REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
         require_storage(mOwner, GBUFFER);
+        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A target sharing its depth: built, it has the owner's depth at the owner's attachment point and reads what the
+    // owner wrote there. Each time the owner is built again -- another depth format, no stencil, another colour
+    // format, released and built as it was -- the sharer's next ensure attaches the new depth and keeps its colour,
+    // names and contents both, and the one after that is kept. Built at another size with its owner, it follows too.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: ensure re-points a depth sharer when its owner is built again", "[llrendertarget_gl]")
+    {
+        const ALRenderTargetDesc sharer{ .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA16F } };
+        const U32 bytes = LLRenderTarget::sBytesAllocated;
+        REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+        REQUIRE(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
+        CHECK(mSharer.sharesDepth());
+        CHECK(mSharer.desc() == sharer);
+        UNSCOPED_INFO("the sharer counts its colour alone");
+        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER) + bytes_of(sharer));
+        CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == mOwner.getDepth());
+        CHECK(attached_at(mSharer, GL_STENCIL_ATTACHMENT) == mOwner.getDepth());
+        clear_depth(mOwner, 0.25);
+        CHECK(std::abs(depth_through(mSharer) - 0.25f) < 1.e-4f);
+        CHECK(mSharer.ensure(sharer, mOwner) == EnsureResult::Kept);
+
+        mSharer.bindTarget();
+        gGL.setClearColor(LLColor4(1.f, 0.f, 1.f, 1.f));
+        mSharer.clear(GL_COLOR_BUFFER_BIT);
+        mSharer.flush();
+        const U32 colour = mSharer.getTexture(0);
+
+        const NamedDesc owners[] = {
+            { "the depth format", { .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA8, GL_RGBA16F }, .depth = Depth::D32F, .stencil = true } },
+            { "no stencil", { .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA8, GL_RGBA16F }, .depth = Depth::D32F } },
+            { "stencil again", { .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA8, GL_RGBA16F }, .depth = Depth::D24, .stencil = true } },
+            { "a colour format", { .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA8, GL_RGB10_A2 }, .depth = Depth::D24, .stencil = true } },
+            { "released and built as it was", { .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA8, GL_RGB10_A2 }, .depth = Depth::D24, .stencil = true } },
+        };
+        F64 depth = 0.25;
+        for (const auto& [what, owner] : owners)
+        {
+            CAPTURE(what);
+            if (owner == mOwner.desc())
+            {
+                mOwner.release();
+            }
+            REQUIRE(mOwner.ensure(owner) == EnsureResult::Built);
+            CHECK(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
+            UNSCOPED_INFO("the sharer's colour kept");
+            CHECK(mSharer.getTexture(0) == colour);
+            CHECK(pixel_of(mSharer) == LLColor4U(255, 0, 255, 255));
+            CHECK(mSharer.desc() == sharer);
+            CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == mOwner.getDepth());
+            CHECK(attached_at(mSharer, GL_STENCIL_ATTACHMENT) == (owner.stencil ? mOwner.getDepth() : 0u));
+            depth += 0.125;
+            clear_depth(mOwner, depth);
+            UNSCOPED_INFO("what the owner wrote, read through the sharer");
+            CHECK(std::abs(depth_through(mSharer) - (F32)depth) < 1.e-4f);
+            CHECK(mSharer.ensure(sharer, mOwner) == EnsureResult::Kept);
+        }
+
+        const ALRenderTargetDesc owner_resized{ .width = 9, .height = 7, .color = { GL_RGBA8 }, .depth = Depth::D24, .stencil = true };
+        const ALRenderTargetDesc sharer_resized{ .width = 9, .height = 7, .color = { GL_RGBA16F } };
+        REQUIRE(mOwner.ensure(owner_resized) == EnsureResult::Built);
+        REQUIRE(mSharer.ensure(sharer_resized, mOwner) == EnsureResult::Built);
+        require_storage(mSharer, sharer_resized);
+        CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == mOwner.getDepth());
+        clear_depth(mOwner, 0.875);
+        CHECK(std::abs(depth_through(mSharer) - 0.875f) < 1.e-4f);
+        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(owner_resized) + bytes_of(sharer_resized));
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A target that shareDepthBuffer gave its owner's depth is kept by ensure as a sharer of that owner; asked to be
+    // a target with no shared depth, it is built again without it.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: ensure takes a depth shared by shareDepthBuffer as its own sharing", "[llrendertarget_gl]")
+    {
+        const ALRenderTargetDesc sharer{ .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA16F } };
+        REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+        REQUIRE(mSharer.allocate(GBUFFER.width, GBUFFER.height, GL_RGBA16F));
+        mOwner.shareDepthBuffer(mSharer);
+        CHECK(mSharer.sharesDepth());
+        CHECK(mSharer.ensure(sharer, mOwner) == EnsureResult::Kept);
+
+        CHECK(mSharer.ensure(sharer) == EnsureResult::Built);
+        CHECK_FALSE(mSharer.sharesDepth());
+        CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == 0u);
+        CHECK(mSharer.ensure(sharer) == EnsureResult::Kept);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A sharer that cannot share as described -- a size other than the owner's, depth of its own, an owner with no
+    // depth, itself as owner -- is released, and the byte count goes back to the owner's alone.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: a sharer that cannot share fails released", "[llrendertarget_gl]")
+    {
+        const ALRenderTargetDesc sharer{ .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA16F } };
+        const U32 bytes = LLRenderTarget::sBytesAllocated;
+        REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+
+        const NamedDesc refused[] = {
+            { "another size", { .width = GBUFFER.width + 1, .height = GBUFFER.height, .color = { GL_RGBA16F } } },
+            { "depth of its own", { .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA16F }, .depth = Depth::D24 } },
+            { "stencil of its own", { .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA16F }, .stencil = true } },
+            { "no size", { .color = { GL_RGBA16F } } },
+            { "generated mips with no colour", { .width = GBUFFER.width, .height = GBUFFER.height, .mips = Mips::Auto } },
+        };
+        for (const auto& [what, desc] : refused)
+        {
+            CAPTURE(what);
+            REQUIRE(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
+            CHECK(mSharer.ensure(desc, mOwner) == EnsureResult::Failed);
+            require_released(mSharer);
+            CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
+        }
+
+        UNSCOPED_INFO("its own owner");
+        REQUIRE(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
+        CHECK(mSharer.ensure(sharer, mSharer) == EnsureResult::Failed);
+        require_released(mSharer);
+
+        UNSCOPED_INFO("an owner with no depth");
+        REQUIRE(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
+        REQUIRE(mOwner.ensure({ .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA8 } }) == EnsureResult::Built);
+        CHECK(mSharer.ensure(sharer, mOwner) == EnsureResult::Failed);
+        require_released(mSharer);
+
+        UNSCOPED_INFO("a sharer with no colour of its own");
+        REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+        const ALRenderTargetDesc depth_only{ .width = GBUFFER.width, .height = GBUFFER.height };
+        CHECK(mSharer.ensure(depth_only, mOwner) == EnsureResult::Built);
+        CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == mOwner.getDepth());
+        CHECK(mSharer.ensure(depth_only, mOwner) == EnsureResult::Kept);
         CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
