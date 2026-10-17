@@ -28,6 +28,9 @@
 //[ENGINE_BLOCK Matrices]
 
 mat4 getSkinnedTransform();
+#ifdef AVATAR_CLOTH
+vec4 getClothedPosition(mat4 trans, vec4 pos_in, inout vec3 norm);
+#endif
 void passTextureIndex();
 
 in vec3 position;
@@ -43,15 +46,20 @@ void main()
 
     vec4 pos_in = vec4(position.xyz, 1.0);
     mat4 trans = getSkinnedTransform();
-    pos.x = dot(trans[0], pos_in);
-    pos.y = dot(trans[1], pos_in);
-    pos.z = dot(trans[2], pos_in);
-    pos.w = 1.0;
 
     norm.x = dot(trans[0].xyz, normal);
     norm.y = dot(trans[1].xyz, normal);
     norm.z = dot(trans[2].xyz, normal);
     norm = normalize(norm);
+
+#ifdef AVATAR_CLOTH
+    pos = getClothedPosition(trans, pos_in, norm);
+#else
+    pos.x = dot(trans[0], pos_in);
+    pos.y = dot(trans[1], pos_in);
+    pos.z = dot(trans[2], pos_in);
+    pos.w = 1.0;
+#endif
 
     pos = projection_matrix * pos;
 

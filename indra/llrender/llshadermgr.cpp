@@ -1871,6 +1871,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("gWindDir");
     mReservedUniforms.push_back("gSinWaveParams");
     mReservedUniforms.push_back("gGravity");
+    mReservedUniforms.push_back("gClothDepthRow");
 
     mReservedUniforms.push_back("detail_0");
     mReservedUniforms.push_back("detail_1");

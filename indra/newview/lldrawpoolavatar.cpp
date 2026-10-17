@@ -72,6 +72,44 @@ extern bool gUseGLPick;
 F32 CLOTHING_GRAVITY_EFFECT = 0.7f;
 F32 CLOTHING_ACCEL_FORCE_FACTOR = 0.2f;
 
+// The cloth uniforms (avatarSkinV's getClothedPosition) for one avatar, turned into the eye space getModelView()
+// skins it into: the camera's, or the shadow map's.
+static void set_cloth_uniforms(LLGLSLShader* shader, const LLVOAvatar* avatarp)
+{
+    const LLMatrix4& view = LLDrawPoolAvatar::getModelView();
+
+    LLVector4 wind;
+    wind.setVec(avatarp->mWindVec);
+    wind.mV[VW] = 0;
+    wind = wind * view;
+    wind.mV[VW] = avatarp->mWindVec.mV[VW];
+    shader->uniform4fv(LLViewerShaderMgr::AVATAR_WIND, 1, wind.mV);
+
+    F32 phase = -1.f * (avatarp->mRipplePhase);
+    F32 freq = 7.f + (noise1(avatarp->mRipplePhase) * 2.f);
+    LLVector4 sin_params(freq, freq, freq, phase);
+    shader->uniform4fv(LLViewerShaderMgr::AVATAR_SINWAVE, 1, sin_params.mV);
+
+    LLVector4 gravity(0.f, 0.f, -CLOTHING_GRAVITY_EFFECT, 0.f);
+    gravity = gravity * view;
+    shader->uniform4fv(LLViewerShaderMgr::AVATAR_GRAVITY, 1, gravity.mV);
+
+    // The ripple's phase runs along the main camera's depth: in a shadow or capture pass the depth column of the
+    // current eye space carried back to the agent's frame and on into the main camera's.
+    LLVector4 depth_row(0.f, 0.f, 1.f, 0.f);
+    LLViewerCamera* main_camera = LLViewerCamera::getInstance();
+    if (&LLViewerCamera::getCurrent() != main_camera)
+    {
+        LLMatrix4 main_view;
+        main_camera->getModelview().store(main_view);
+        LLMatrix4 to_main = view;
+        to_main.invert();
+        to_main *= main_view;
+        depth_row.set(to_main.mMatrix[0][2], to_main.mMatrix[1][2], to_main.mMatrix[2][2], to_main.mMatrix[3][2]);
+    }
+    shader->uniform4fv(LLViewerShaderMgr::AVATAR_CLOTH_DEPTH, 1, depth_row.mV);
+}
+
 // Format for gAGPVertices
 // vertex format for bumpmapping:
 //  vertices   12
@@ -355,6 +393,8 @@ void LLDrawPoolAvatar::beginShadowPass(S32 pass)
         sVertexProgram = &gDeferredAvatarAlphaMaskShadowProgram;
         if (pass == SHADOW_PASS_AVATAR_OPAQUE_CUT)
         {
+            // the alpha mask caster with the body's cloth
+            sVertexProgram = &gDeferredAvatarCutShadowProgram;
             sShadowBakes = SHADOW_BAKES_CUT;
         }
 
@@ -447,6 +487,12 @@ void LLDrawPoolAvatar::renderShadow(S32 pass)
     }
 
     LLDrawPoolAvatar::sShadowPass = pass;
+
+    // The bodies cast the cloth they are drawn with; hair, skirts and eyelashes have none.
+    if (gPipeline.shaderInputs().mLocal.mAvatarCloth && (pass == SHADOW_PASS_AVATAR_OPAQUE || (pass == SHADOW_PASS_AVATAR_OPAQUE_CUT && mShadowCutBakes)))
+    {
+        set_cloth_uniforms(sVertexProgram, avatarp);
+    }
 
     if (pass == SHADOW_PASS_AVATAR_OPAQUE)
     {
@@ -891,27 +937,7 @@ void LLDrawPoolAvatar::renderAvatars(LLVOAvatar* single_avatar, S32 pass)
 
     if (gPipeline.shaderInputs().mLocal.mAvatarCloth)
     {
-        LLMatrix4 rot_mat;
-        LLViewerCamera::getInstance()->getMatrixToLocal(rot_mat);
-        LLMatrix4 cfr(OGL_TO_CFR_ROTATION);
-        rot_mat *= cfr;
-
-        LLVector4 wind;
-        wind.setVec(avatarp->mWindVec);
-        wind.mV[VW] = 0;
-        wind = wind * rot_mat;
-        wind.mV[VW] = avatarp->mWindVec.mV[VW];
-
-        sVertexProgram->uniform4fv(LLViewerShaderMgr::AVATAR_WIND, 1, wind.mV);
-        F32 phase = -1.f * (avatarp->mRipplePhase);
-
-        F32 freq = 7.f + (noise1(avatarp->mRipplePhase) * 2.f);
-        LLVector4 sin_params(freq, freq, freq, phase);
-        sVertexProgram->uniform4fv(LLViewerShaderMgr::AVATAR_SINWAVE, 1, sin_params.mV);
-
-        LLVector4 gravity(0.f, 0.f, -CLOTHING_GRAVITY_EFFECT, 0.f);
-        gravity = gravity * rot_mat;
-        sVertexProgram->uniform4fv(LLViewerShaderMgr::AVATAR_GRAVITY, 1, gravity.mV);
+        set_cloth_uniforms(sVertexProgram, avatarp);
     }
 
     if( !single_avatar || (avatarp == single_avatar) )

@@ -282,6 +282,7 @@ public:
         AVATAR_WIND,                        //  "gWindDir"
         AVATAR_SINWAVE,                     //  "gSinWaveParams"
         AVATAR_GRAVITY,                     //  "gGravity"
+        AVATAR_CLOTH_DEPTH,                 //  "gClothDepthRow"
 
         TERRAIN_DETAIL0,                    //  "detail_0"
         TERRAIN_DETAIL1,                    //  "detail_1"

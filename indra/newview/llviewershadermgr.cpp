@@ -189,6 +189,7 @@ LLGLSLShader            gDeferredShadowMaterialIndexedProgram; // multi-material
 LLGLSLShader            gDeferredShadowGLTFAlphaBlendProgram;
 LLGLSLShader            gDeferredShadowFullbrightAlphaMaskProgram;
 LLGLSLShader            gDeferredAvatarShadowProgram;
+LLGLSLShader            gDeferredAvatarCutShadowProgram;
 LLGLSLShader            gDeferredAvatarAlphaShadowProgram;
 LLGLSLShader            gDeferredAvatarAlphaMaskShadowProgram;
 LLGLSLShader            gDeferredAlphaProgram;
@@ -1340,6 +1341,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredShadowMaterialIndexedProgram.unload();
         gDeferredShadowFullbrightAlphaMaskProgram.unload();
         gDeferredAvatarShadowProgram.unload();
+        gDeferredAvatarCutShadowProgram.unload();
         gDeferredAvatarAlphaShadowProgram.unload();
         gDeferredAvatarAlphaMaskShadowProgram.unload();
         gDeferredAvatarProgram.unload();
@@ -2687,7 +2689,30 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarShadowProgram.mShaderFiles.push_back(make_pair("deferred/avatarShadowV.glsl", GL_VERTEX_SHADER));
         gDeferredAvatarShadowProgram.mShaderFiles.push_back(make_pair("deferred/avatarShadowF.glsl", GL_FRAGMENT_SHADER));
         gDeferredAvatarShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        // The body casts the cloth gDeferredAvatarProgram draws
+        gDeferredAvatarShadowProgram.clearPermutations();
+        if (mInputs.mLocal.mAvatarCloth)
+        {
+            gDeferredAvatarShadowProgram.addPermutation("AVATAR_CLOTH", "1");
+        }
         built(gDeferredAvatarShadowProgram.createShader(), gDeferredAvatarShadowProgram);
+    }
+
+    {
+        // The bodies whose bakes the deferred pass cuts out (SHADOW_PASS_AVATAR_OPAQUE_CUT): the alpha mask caster's
+        // files, and the cloth a body is drawn with, which the hair, skirts and eyelashes that caster casts are not
+        gDeferredAvatarCutShadowProgram.mName = "Deferred Avatar Cut Shadow Shader";
+        gDeferredAvatarCutShadowProgram.mFeatures.hasSkinning = true;
+        gDeferredAvatarCutShadowProgram.mShaderFiles.clear();
+        gDeferredAvatarCutShadowProgram.mShaderFiles.push_back(make_pair("deferred/avatarAlphaShadowV.glsl", GL_VERTEX_SHADER));
+        gDeferredAvatarCutShadowProgram.mShaderFiles.push_back(make_pair("deferred/avatarAlphaMaskShadowF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredAvatarCutShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredAvatarCutShadowProgram.clearPermutations();
+        if (mInputs.mLocal.mAvatarCloth)
+        {
+            gDeferredAvatarCutShadowProgram.addPermutation("AVATAR_CLOTH", "1");
+        }
+        built(gDeferredAvatarCutShadowProgram.createShader(), gDeferredAvatarCutShadowProgram);
     }
 
     {

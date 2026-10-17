@@ -266,6 +266,7 @@ extern LLGLSLShader         gExposureHistogramProgram;
 extern LLGLSLShader         gLuminanceProgram;
 extern LLGLSLShader         gLensFlareStateProgram;
 extern LLGLSLShader         gDeferredAvatarShadowProgram;
+extern LLGLSLShader         gDeferredAvatarCutShadowProgram;
 extern LLGLSLShader         gDeferredAvatarAlphaShadowProgram;
 extern LLGLSLShader         gDeferredAvatarAlphaMaskShadowProgram;
 extern LLGLSLShader         gDeferredAlphaProgram;
