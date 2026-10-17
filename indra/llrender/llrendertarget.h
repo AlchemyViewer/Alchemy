@@ -63,8 +63,6 @@
 class LLRenderTarget
 {
 public:
-    // Whether or not to use FBO implementation
-    static bool sUseFBO;
     static U32 sBytesAllocated;
     static U32 sCurFBO;
     static U32 sCurResX;

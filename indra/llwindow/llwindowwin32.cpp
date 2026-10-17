@@ -1762,14 +1762,20 @@ const   S32   max_format  = (S32)num_formats - 1;
         << " Depth Bits " << S32(pfd.cDepthBits)
         << LL_ENDL;
 
-    mhRC = 0;
-    if (wglCreateContextAttribsARB)
-    { //attempt to create a specific versioned context
-        mhRC = (HGLRC) createSharedContext();
-        if (!mhRC)
-        {
-            return false;
-        }
+    // Only WGL_ARB_create_context asks for a version and a profile. Without it there is no context to
+    // make that can meet the floor, the same as without wgl_ARB_pixel_format above.
+    if (!wglCreateContextAttribsARB)
+    {
+        LL_WARNS("Window") << "No WGL_ARB_create_context extension!" << LL_ENDL;
+        LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBVideoDrvErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+        close();
+        return false;
+    }
+
+    mhRC = (HGLRC) createSharedContext();
+    if (!mhRC)
+    {
+        return false;
     }
 
     if (!wglMakeCurrent(mhDC, mhRC))
@@ -1783,7 +1789,7 @@ const   S32   max_format  = (S32)num_formats - 1;
 
     if (!gGLManager.initGL())
     {
-        LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBVideoDrvErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+        LLError::LLUserWarningMsg::show(glInitFailureMessage(), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
         close();
         return false;
     }
@@ -1950,7 +1956,9 @@ void LLWindowWin32::recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw
 
 void* LLWindowWin32::createSharedContext()
 {
-    mMaxGLVersion = llclamp(mMaxGLVersion, 3.f, 4.6f);
+    // From what RenderMaxOpenGLVersion allows down to the floor, 4.1 (GL_MINIMUM_VERSION): initGL
+    // refuses anything less, so there is no context worth having below it.
+    mMaxGLVersion = llclamp(mMaxGLVersion, 4.1f, 4.6f);
 
     S32 version_major = llfloor(mMaxGLVersion);
     S32 version_minor = (S32)ll_round((mMaxGLVersion-version_major)*10);
@@ -1965,40 +1973,31 @@ void* LLWindowWin32::createSharedContext()
     };
 
     HGLRC rc = 0;
-
-    bool done = false;
-    while (!done)
+    for (;;)
     {
         rc = wglCreateContextAttribsARB(mhDC, mhRC, attribs);
-
-        if (!rc)
+        if (rc || attribs[3] <= 1)
         {
-            if (attribs[3] > 0)
-            { //decrement minor version
-                attribs[3]--;
-            }
-            else if (attribs[1] > 3)
-            { //decrement major version and start minor version over at 3
-                attribs[1]--;
-                attribs[3] = 3;
-            }
-            else
-            { //we reached 3.0 and still failed, bail out
-                done = true;
-            }
+            break;
         }
-        else
-        {
-            LL_INFOS() << "Created OpenGL " << llformat("%d.%d", attribs[1], attribs[3]) <<
-                (LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
-            done = true;
-        }
+        attribs[3]--;
     }
 
-    if (!rc && !(rc = wglCreateContext(mhDC)))
+    if (rc)
     {
+        LL_INFOS() << "Created OpenGL " << llformat("%d.%d", attribs[1], attribs[3]) <<
+            (LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
+    }
+    else if (!mhRC)
+    {
+        // The window's own context: there is nothing to run on.
         close();
         LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBGLContextErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+    }
+    else
+    {
+        // A worker's, shared with the window's: its owner does without it.
+        LL_WARNS("Window") << "No OpenGL 4.1 context to share with the window's" << LL_ENDL;
     }
 
     return rc;

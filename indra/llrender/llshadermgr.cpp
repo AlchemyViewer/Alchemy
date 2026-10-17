@@ -773,55 +773,10 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
     BOOST_STATIC_ASSERT(LL_ARRAY_SIZE(extra_code_text) < LL_ARRAY_SIZE(shader_code_text));
 
 
-    S32 major_version = gGLManager.mGLSLVersionMajor;
-    S32 minor_version = gGLManager.mGLSLVersionMinor;
-
-    if (major_version == 1 && minor_version < 30)
-    {
-        llassert(false); // GL 3.1 or later required
-    }
-    else
-    {
-        if (major_version >= 4)
-        {
-            //set version to 400 or 420, or to what the stage requires past that
-            const U32 version = llmax(minor_version >= 20 ? 420u : 400u, required_version);
-            shader_code_text[shader_code_count++] = strdup(fmt::format("#version {}\n", version).c_str());
-        }
-        else if (major_version == 3)
-        {
-            if (minor_version <= 29)
-            {
-                // OpenGL 3.2 had GLSL version 1.50.  anything after that the version numbers match.
-                // https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)#OpenGL_and_GLSL_versions
-                shader_code_text[shader_code_count++] = strdup("#version 150\n");
-            }
-            else
-            {
-                shader_code_text[shader_code_count++] = strdup("#version 330\n");
-            }
-        }
-        else
-        {
-            // OpenGL 3.2 had GLSL version 1.50.  anything after that the version numbers match.
-            if (type == GL_GEOMETRY_SHADER || minor_version >= 50)
-            {
-                //set version to 1.50
-                shader_code_text[shader_code_count++] = strdup("#version 150\n");
-                //some implementations of GLSL 1.30 require integer precision be explicitly declared
-                extra_code_text[extra_code_count++] = strdup("precision mediump int;\n");
-                extra_code_text[extra_code_count++] = strdup("precision highp float;\n");
-            }
-            else
-            {
-                //set version to 1.40
-                shader_code_text[shader_code_count++] = strdup("#version 140\n");
-                //some implementations of GLSL 1.30 require integer precision be explicitly declared
-                extra_code_text[extra_code_count++] = strdup("precision mediump int;\n");
-                extra_code_text[extra_code_count++] = strdup("precision highp float;\n");
-            }
-        }
-    }
+    // 400, or 420 where the context has it, or what the stage requires past that. The floor's
+    // GLSL is 4.10 (GL_MINIMUM_VERSION), so nothing compiles lower.
+    const U32 version = llmax(gGLManager.mGLSLVersionMinor >= 20 ? 420u : 400u, required_version);
+    shader_code_text[shader_code_count++] = strdup(fmt::format("#version {}\n", version).c_str());
 
     extra_code_text[extra_code_count++] = strdup(stageDefine(type));
 
@@ -950,8 +905,8 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
             extra_code_text[extra_code_count++] = strdup("return texture(tex0, texcoord);\n");
             extra_code_text[extra_code_count++] = strdup("}\n");
         }
-        else if (major_version > 1 || minor_version >= 30)
-        {  //switches are supported in GLSL 1.30 and later
+        else
+        {
             if (gGLManager.mIsNVIDIA)
             { //switches are unreliable on some NVIDIA drivers
                 for (S32 i = 0; i < texture_index_channels; ++i)
@@ -979,11 +934,6 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
                 extra_code_text[extra_code_count++] = strdup("\treturn ret;\n");
                 extra_code_text[extra_code_count++] = strdup("}\n");
             }
-        }
-        else
-        { //should never get here.  Indexed texture rendering requires GLSL 1.30 or later
-            // (for passing integers between vertex and fragment shaders)
-            LL_ERRS() << "Indexed texture rendering requires GLSL 1.30 or later." << LL_ENDL;
         }
     }
 
@@ -1320,7 +1270,7 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
     LL_PROFILE_ZONE_SCOPED;
     LL_INFOS("ShaderMgr") << "Initializing shader cache" << LL_ENDL;
 
-    mShaderCacheEnabled = gGLManager.mGLVersion >= 4.09 && enabled;
+    mShaderCacheEnabled = enabled;
 
     // A 4.1 version string (or ARB_get_program_binary) is necessary but NOT
     // sufficient to actually retrieve/restore program binaries, and assuming it is

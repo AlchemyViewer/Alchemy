@@ -116,7 +116,6 @@ public:
     // may return 0 of benchmark has not been run or failed to run
     F32 getGPUMemoryBandwidth() { return mGPUMemoryBandwidth; }
     bool isGPUSupported()               { return mGPUSupported; }
-    F32 getExpectedGLVersion()          { return mExpectedGLVersion; }
 
     void cleanupFeatureTables();
 
@@ -147,6 +146,12 @@ public:
     void applyBaseMasks();
     void applyRecommendedSettings();
 
+    // Intel's drivers outside macOS short of GL 4.6: chiefly Haswell and Broadwell on Windows, which
+    // report 4.3 or 4.4 and claim more than they hold to. Their sessions run on the IntelLegacy list,
+    // and without what a list cannot hold off once a user has it: water waves, compute and the
+    // shader cache, each of which asks this where it decides.
+    static bool isIntelLegacy();
+
     // apply the basic masks.  Also, skip one saved
     // in the skip list if true
     void applyFeatures(bool skipFeatures);
@@ -168,7 +173,6 @@ protected:
     bool        mSafe;                  // Reinitialize everything to the "safe" mask
     EGPUClass   mGPUClass;
     F32         mGPUMemoryBandwidth = 0.f;  // measured memory bandwidth of GPU in GB/second
-    F32         mExpectedGLVersion;     //expected GL version according to gpu table
     std::string mGPUString;
     bool        mGPUSupported;
     bool        mSkipProfiling = false;
@@ -182,7 +186,6 @@ LLFeatureManager::LLFeatureManager()
     mTableVersion(0),
     mSafe(false),
     mGPUClass(GPU_CLASS_UNKNOWN),
-    mExpectedGLVersion(0.f),
     mGPUSupported(false)
 {
 }

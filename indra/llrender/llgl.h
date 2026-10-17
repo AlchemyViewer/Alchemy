@@ -62,10 +62,11 @@ void ll_close_fail_log();
 
 class LLSD;
 
-// Hard minimum OpenGL version. The renderer assumes this unconditionally rather than
-// degrading below it: deprecated formats are re-expressed through GL_TEXTURE_SWIZZLE_RGBA
-// instead of being repacked on the CPU, the texture upload thread is always enabled, and
-// the shader backend expects GLSL 4.10.
+// The viewer's floor: a GL 4.1 context with immutable texture storage (core in 4.2, or
+// GL_ARB_texture_storage) and GL_EXT_texture_sRGB_decode. LLGLManager::initGL refuses a context
+// below it, so nothing past initGL adapts to less: deprecated formats are re-expressed through
+// GL_TEXTURE_SWIZZLE_RGBA, every texture is allocated by glTexStorage*, sRGB decode is a sampler
+// decision, and the shader backend compiles GLSL 4.00 or later.
 //
 // Biased down by 0.01 like the other version checks in this file, because mGLVersion is
 // assembled as major + minor * 0.1f and 4.1f is not exactly representable.
@@ -111,24 +112,15 @@ public:
     S32 mMaxVaryingVectors = 0;
     LLVector2 mAliasedLineRange = LLVector2(1.f, 1.f);
 
-    // GL 4.x capabilities
-    bool mHasCubeMapArray = false;
+    // What a context may have past the floor (GL_MINIMUM_VERSION). What the floor includes --
+    // GL 4.1, immutable texture storage, sRGB decode -- every context past initGL has, so it
+    // has no flag.
+
     // Debug output and object labels (glDebugMessageCallback, glObjectLabel, ...). Core in
     // 4.3, also reachable as GL_KHR_debug. Only true once glDebugMessageCallback has
     // actually resolved, so callers may trust it directly.
     bool mHasDebugOutput = false;
-    bool mHasTransformFeedback = false;
     bool mHasAnisotropic = false;
-    // Immutable texture storage (glTexStorage*). Core in 4.2, but also reachable on a
-    // 4.1 context via GL_ARB_texture_storage -- which is how macOS gets it. Only true
-    // once the entry point has actually resolved, so callers may trust it directly.
-    bool mHasTextureStorage = false;
-    // GL_EXT_texture_sRGB_decode: sampler/texture control over whether an sRGB-format
-    // texture has its transfer function applied on read. Never promoted to core, but
-    // universally supported on the hardware this viewer runs on, and REQUIRED here --
-    // the renderer decodes explicitly rather than implicitly, so it needs to be able to
-    // turn the implicit decode off. See ALSampler::SRGBDecode.
-    bool mHasTextureSRGBDecode = false;
     // Direct state access (glBindTextureUnit, glCreateSamplers, glTextureStorage*, ...).
     // Core in 4.5, also reachable as GL_ARB_direct_state_access. Only true once the entry
     // points have actually resolved, so callers may trust it directly.
@@ -200,8 +192,10 @@ public:
     // hints to the render pipe
     U32 mDownScaleMethod = 0; // see settings.xml RenderDownScaleMethod
 
-    // Whether this version of GL is good enough for SL to use
+    // Whether the context meets the floor (GL_MINIMUM_VERSION). False once initGL has refused it, and
+    // mUnmetRequirement then names what it lacks: "OpenGL 4.1", or the extension it does not have.
     bool mHasRequirements;
+    std::string mUnmetRequirement;
 
     S32 mDriverVersionMajor;
     S32 mDriverVersionMinor;

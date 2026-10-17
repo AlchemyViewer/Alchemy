@@ -128,7 +128,6 @@ namespace
             mLent.release();
             mCopy.release();
             mLentImage = nullptr;
-            LLRenderTarget::sUseFBO = mUseFBO;
             if (mVAO)
             {
                 glDeleteVertexArrays(1, &mVAO);
@@ -217,8 +216,6 @@ namespace
         LLRenderTarget mLent;
         LLRenderTarget mCopy;
         LLPointer<LLImageGL> mLentImage;
-        // setColorAttachment is the FBO path's, which the viewer turns on and a test turns on for itself.
-        const bool mUseFBO = LLRenderTarget::sUseFBO;
         GLuint mVAO = 0;
         GLuint mProgram = 0;
         GLuint mIntegerProgram = 0;
@@ -356,7 +353,6 @@ namespace
         mLentImage->setExplicitFormat(GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
         CHECK(mLentImage->createGLTexture(0, reinterpret_cast<const U8*>(zeros.data())));
 
-        LLRenderTarget::sUseFBO = true;
         mLent.setColorAttachment(mLentImage.get());
         CHECK(mLent.getInternalFormat(0) == (U32)GL_R32UI);
 

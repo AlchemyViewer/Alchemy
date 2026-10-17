@@ -375,7 +375,7 @@ bool addDeferredAttachments(LLRenderTarget& target)
 
     static LLCachedControl<bool> has_emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
     static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
-    bool hdr = has_hdr() && gGLManager.mGLVersion > 4.05f;
+    bool hdr = has_hdr();
 
     if (!hdr)
     {
@@ -931,8 +931,7 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
 bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
-    bool has_hdr = gSavedSettings.getBOOL("RenderHDREnabled");
-    bool hdr = gGLManager.mGLVersion > 4.05f && has_hdr;
+    bool hdr = gSavedSettings.getBOOL("RenderHDREnabled");
 
     if (mRT == &mMainRT)
     { // hacky -- allocate auxillary buffer
@@ -1506,7 +1505,7 @@ void LLPipeline::createGLBuffers()
     GLuint resX = gViewerWindow->getWorldViewWidthRaw();
     GLuint resY = gViewerWindow->getWorldViewHeightRaw();
 
-    bool hdr = gGLManager.mGLVersion > 4.05f && gSavedSettings.getBOOL("RenderHDREnabled");
+    bool hdr = gSavedSettings.getBOOL("RenderHDREnabled");
     if (!hdr)
     {
         // allocate screen space glow buffers
@@ -9967,7 +9966,7 @@ void LLPipeline::renderDoF()
             // at zero full-frame targets of its own: two would be 44 MB at
             // 1440p.
             static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
-            const bool hdr = gGLManager.mGLVersion > 4.05f && has_hdr();
+            const bool hdr = has_hdr();
 
             LLRenderTarget* sharp = &mWaterDis;
             LLRenderTarget* blur  = hdr ? (bloomHDRReady() ? &mRT->bloomMip[0] : nullptr)
@@ -10309,7 +10308,7 @@ void LLPipeline::renderFinalize()
     gGL.setClearColor(LLColor4::transparent);
 
     static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
-    bool hdr = gGLManager.mGLVersion > 4.05f && has_hdr();
+    bool hdr = has_hdr();
 
     // A cutout frame measures nothing and leaves nothing behind. It is mostly
     // empty, so metering it would brighten the subject, and the next live frame

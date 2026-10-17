@@ -23,9 +23,6 @@
  * $/LicenseInfo$
  */
 
-#extension GL_ARB_texture_rectangle : enable
-#extension GL_ARB_shader_texture_lod : enable
-
 /*[EXTRA_CODE_HERE]*/
 
 #ifdef VERTEX_SHADER

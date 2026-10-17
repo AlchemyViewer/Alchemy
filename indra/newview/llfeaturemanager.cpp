@@ -924,6 +924,16 @@ void LLFeatureManager::setGraphicsLevel(U32 level, bool skipFeatures)
     gPipeline.refreshCachedSettings();
 }
 
+// static
+bool LLFeatureManager::isIntelLegacy()
+{
+#if LL_DARWIN
+    return false;
+#else
+    return gGLManager.mIsIntel && gGLManager.mGLVersion < 4.59f;
+#endif
+}
+
 void LLFeatureManager::applyBaseMasks()
 {
     // reapply masks
@@ -972,32 +982,6 @@ void LLFeatureManager::applyBaseMasks()
     if (gGLManager.mIsIntel)
     {
         maskFeatures("Intel");
-
-        static constexpr F32 TARGET_GL_VERSION =
-#if LL_DARWIN
-            4.09f;
-#else
-            4.59f;
-#endif
-
-        // check against 3.33 to avoid applying this fallback twice
-        if (gGLManager.mGLVersion < TARGET_GL_VERSION && gGLManager.mGLVersion > 3.33f)
-        {
-            // if we don't have OpenGL 4.6 on intel, set it to OpenGL 3.3
-            // we also want to trigger the GL3 fallbacks on these chipsets
-            // this is expected to be mainly pre-Haswell Intel HD Graphics 4X00 and 5X00.
-            // A lot of these chips claim 4.3 or 4.4 support, but don't seem to work.
-            // https://code.blender.org/2019/04/supported-gpus-in-blender-2-80/
-            // https://docs.blender.org/manual/en/latest/troubleshooting/gpu/windows/intel.html#legacy-intel-hd-4000-5000
-            // https://www.intel.com/content/www/us/en/support/articles/000005524/graphics.html
-            // this will disable things like reflection probes, HDR, FXAA and SMAA
-            LL_INFOS("RenderInit") << "Applying Intel integrated pre-Haswell fallback.  Downgrading feature usage to OpenGL 3.3" << LL_ENDL;
-            gGLManager.mGLVersion = llmin(gGLManager.mGLVersion, 3.33f);
-            gGLManager.mGLVersionString += " 3.3 fallback";  // for ViewerStats reporting
-            // and select GLSL version for OpenGL 3.2
-            gGLManager.mGLSLVersionMajor = 3;
-            gGLManager.mGLSLVersionMinor = 20;
-        }
     }
     if (gGLManager.mIsApple)
     {
@@ -1007,14 +991,7 @@ void LLFeatureManager::applyBaseMasks()
     {
         maskFeatures("NonAppleGPU");
     }
-    if (gGLManager.mGLVersion < 3.f)
-    {
-        maskFeatures("OpenGLPre30");
-    }
-    if (gGLManager.mNumTextureImageUnits <= 8)
-    {
-        maskFeatures("TexUnit8orLess");
-    }
+    // GL 4.1 has at least 16 texture units, so this is the fewest a context past initGL has.
     if (gGLManager.mNumTextureImageUnits <= 16)
     {
         maskFeatures("TexUnit16orLess");
@@ -1027,11 +1004,16 @@ void LLFeatureManager::applyBaseMasks()
     {
         maskFeatures("AnisotropicMissing");
     }
-    if (gGLManager.mGLVersion < 3.99f)
+    if (isIntelLegacy())
     {
-        maskFeatures("GL3");
+        // A lot of these chips claim 4.3 or 4.4 support, but don't seem to work.
+        // https://code.blender.org/2019/04/supported-gpus-in-blender-2-80/
+        // https://docs.blender.org/manual/en/latest/troubleshooting/gpu/windows/intel.html#legacy-intel-hd-4000-5000
+        // https://www.intel.com/content/www/us/en/support/articles/000005524/graphics.html
+        LL_INFOS("RenderInit") << "Intel driver below OpenGL 4.6: holding to the IntelLegacy list" << LL_ENDL;
+        maskFeatures("IntelLegacy");
 
-        // make sure to disable background context activity in GL3 mode
+        // No background context activity, whatever RenderGLMultiThreaded* say.
         LLImageGLThread::sEnabledMedia = false;
         LLImageGLThread::sEnabledTextures = false;
 

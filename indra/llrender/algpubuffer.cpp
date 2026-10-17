@@ -56,10 +56,10 @@ namespace
         return (value + multiple - 1) / multiple * multiple;
     }
 
-    // A store that stays mapped: GL 4.4's immutable storage, and a map of it.
+    // A store that stays mapped: GL 4.4's immutable storage, and a map of it, by name where DSA makes the store.
     bool can_map_persistent(bool dsa)
     {
-        return glBufferStorage && (dsa ? glNamedBufferStorage && glMapNamedBufferRange : glMapBufferRange != nullptr);
+        return glBufferStorage && (!dsa || (glNamedBufferStorage && glMapNamedBufferRange));
     }
 
     // Make a store of `size` bytes in buffer `name`, mapped persistently with `map_flags` unless they are 0. Returns the

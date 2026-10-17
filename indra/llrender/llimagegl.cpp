@@ -308,9 +308,10 @@ void LLImageGL::initClass(LLWindow* window, S32 num_catagories, bool skip_analyz
 
     if (thread_texture_loads || thread_media_updates)
     {
-        LLImageGLThread::createInstance(window);
         LLImageGLThread::sEnabledTextures = thread_texture_loads;
         LLImageGLThread::sEnabledMedia = thread_media_updates;
+        // Which clears both again if it gets no context to upload on.
+        LLImageGLThread::createInstance(window);
     }
 }
 
@@ -1805,10 +1806,7 @@ void LLImageGL::setManualSubImage(U32 target, S32 miplevel, S32 width, S32 heigh
 // quietly linearising. Harmless on a non-sRGB format: the state exists but nothing reads it.
 static void skipSRGBDecode(U32 target)
 {
-    if (gGLManager.mHasTextureSRGBDecode)
-    {
-        glTexParameteri(target, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
-    }
+    glTexParameteri(target, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
 }
 
 // Allocate a 2D texture on the currently-bound name and upload level 0.
@@ -3606,6 +3604,14 @@ LLImageGLThread::LLImageGLThread(LLWindow* window)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
     mContext = mWindow->createSharedContext();
+    if (!mContext)
+    {
+        // Nothing to upload on, so the thread never starts and textures and media keep to the main thread.
+        LL_WARNS("LLImageGL") << "No GL context shared with the window's; uploading on the main thread" << LL_ENDL;
+        sEnabledTextures = false;
+        sEnabledMedia = false;
+        return;
+    }
     LL::ThreadPool::start();
 }
 

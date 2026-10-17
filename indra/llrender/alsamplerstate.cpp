@@ -143,12 +143,9 @@ U32 ALSamplerCache::create(const ALSamplerDesc& desc)
         glSamplerParameteri(name, GL_TEXTURE_COMPARE_FUNC, desc.mCompareFunc);
     }
 
-    // Written unconditionally when supported, including where it matches GL's default, so a
-    // sampler's behaviour is fully described by its descriptor rather than partly inherited.
-    if (gGLManager.mHasTextureSRGBDecode)
-    {
-        glSamplerParameteri(name, GL_TEXTURE_SRGB_DECODE_EXT, desc.mSRGBDecode);
-    }
+    // Written unconditionally, including where it matches GL's default, so a sampler's
+    // behaviour is fully described by its descriptor rather than partly inherited.
+    glSamplerParameteri(name, GL_TEXTURE_SRGB_DECODE_EXT, desc.mSRGBDecode);
 
     stop_glerror();
 
@@ -157,24 +154,11 @@ U32 ALSamplerCache::create(const ALSamplerDesc& desc)
 
 U32 ALSamplerCache::createSlot(ALSampler key)
 {
-    // Samplers are GL 3.3 core and the viewer floor is 4.1, so this should never be
-    // null -- but a driver that failed to resolve them would otherwise crash here
-    // rather than fall back to texture-object state, which still works.
-    if (!glGenSamplers || !glSamplerParameteri)
-    {
-        return 0;
-    }
-
     return create(makeDesc(key));
 }
 
 U32 ALSamplerCache::get(const ALSamplerDesc& desc)
 {
-    if (!glGenSamplers || !glSamplerParameteri)
-    {
-        return 0;
-    }
-
     for (const auto& entry : mCustomSamplers)
     {
         if (entry.first == desc)
@@ -193,14 +177,6 @@ U32 ALSamplerCache::get(const ALSamplerDesc& desc)
 
 void ALSamplerCache::warmup()
 {
-    // Samplers are GL 3.3 core and the viewer floor is 4.1, so this should never bail -- but
-    // a driver that failed to resolve the entry points would otherwise leave every slot at 0
-    // and every bind on GL's defaults.
-    if (!glGenSamplers || !glSamplerParameteri)
-    {
-        return;
-    }
-
     for (U32 i = 0; i < NUM_SAMPLERS; ++i)
     {
         // The address field has four encodings and only three meanings. Slots with the fourth

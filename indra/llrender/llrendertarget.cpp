@@ -172,7 +172,6 @@ namespace
     }
 }
 
-bool LLRenderTarget::sUseFBO = false;
 U32 LLRenderTarget::sCurFBO = 0;
 
 
@@ -320,7 +319,6 @@ void LLRenderTarget::setColorAttachment(LLImageGL* img, LLGLuint use_name)
 {
     LL_PROFILE_ZONE_SCOPED;
     llassert(img != nullptr); // img must not be null
-    llassert(sUseFBO); // FBO support must be enabled
     llassert(mDepth == 0); // depth buffers not supported with this mode
     llassert(mTex.empty()); // mTex must be empty with this mode (binding target should be done via LLImageGL)
     llassert(!isBoundInStack());
@@ -1021,7 +1019,6 @@ void LLRenderTarget::swapFBORefs(LLRenderTarget& other)
     llassert(!other.isBoundInStack());
 
     // Must be same type
-    llassert(sUseFBO == other.sUseFBO);
     llassert(mResX == other.mResX);
     llassert(mResY == other.mResY);
     llassert(mInternalFormat == other.mInternalFormat);

@@ -175,24 +175,31 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     if(createContext(x, y, width, height, 32, fullscreen, enable_vsync))
     {
         gGLManager.initWGL();
-        gGLManager.initGL();
-#if LL_WINDOWS
-        // GL didn't always report a VRAM budget (notably Intel iGPUs); ask DXGI.
-        LLDXHardware::updateVRAMBudgetFromDXGI();
-#endif
-
-        // Tracy's GPU context makes GL calls, so it waits for initGL to load
-        // the entry points, as on Win32.
+        if (!gGLManager.initGL())
         {
-            LL_PROFILER_GPU_CONTEXT;
+            // Closes the window, which leaves it invalid, so the viewer does not start.
+            setupFailure(glInitFailureMessage(), "Error", OSMB_OK);
         }
-#if LL_LINUX
-        armGraphicsResetCheck();
+        else
+        {
+#if LL_WINDOWS
+            // GL didn't always report a VRAM budget (notably Intel iGPUs); ask DXGI.
+            LLDXHardware::updateVRAMBudgetFromDXGI();
 #endif
 
-        //start with arrow cursor
-        initCursors();
-        setCursor( UI_CURSOR_ARROW );
+            // Tracy's GPU context makes GL calls, so it waits for initGL to load
+            // the entry points, as on Win32.
+            {
+                LL_PROFILER_GPU_CONTEXT;
+            }
+#if LL_LINUX
+            armGraphicsResetCheck();
+#endif
+
+            //start with arrow cursor
+            initCursors();
+            setCursor( UI_CURSOR_ARROW );
+        }
     }
 
     stop_glerror();
@@ -298,24 +305,23 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
     }
 
+    // Always a core profile: only the native Win32 window makes a compatibility one.
     SDL_GLContextFlag context_flags{};
-    if(LLRender::sGLCoreProfile)
-    {
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 #if LL_DARWIN
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
-        context_flags |= SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG;
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    context_flags |= SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG;
 #else
-        // EGL only honors the core profile mask when the requested version
-        // is >= 3.2; without an explicit version SDL defaults to 2.1 and the
-        // driver silently returns a compatibility context (Mesa hands back 4.6
-        // Compatibility). Request the highest version the viewer targets; the
-        // create-context loop below steps this down if the driver caps lower.
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
+    // EGL only honors the core profile mask when the requested version
+    // is >= 3.2; without an explicit version SDL defaults to 2.1 and the
+    // driver silently returns a compatibility context (Mesa hands back 4.6
+    // Compatibility). Request the highest version the viewer targets; the
+    // create-context loop below steps this down to the floor, 4.1, if the
+    // driver caps lower.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
 #endif
-    }
 
     if (gDebugGL)
     {
@@ -364,8 +370,8 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
 
     // Create the context. A core profile requires an explicit >= 3.2 version
     // (set above); the exact 4.6 request fails on drivers that cap lower, so
-    // step the requested version down until creation succeeds, mirroring the
-    // WGL path in createSharedContext().
+    // step the requested version down to 4.1 until creation succeeds,
+    // mirroring the WGL path in createSharedContext(). initGL refuses less.
     auto create_context = [this]() -> SDL_GLContext
     {
 #if LL_LINUX
@@ -384,22 +390,13 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     };
     mContext = create_context();
 #if !LL_DARWIN
-    if (!mContext && LLRender::sGLCoreProfile)
+    for (S32 minor = 5; !mContext && minor >= 1; --minor)
     {
-        S32 major = 4, minor = 6;
-        while (!mContext)
-        {
-            if (minor > 0)      { --minor; }              // step minor down
-            else if (major > 3) { --major; minor = 3; }   // step major down
-            else                { break; }                // gave up at 3.0
-            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
-            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
-            mContext = create_context();
-        }
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
+        mContext = create_context();
         if (mContext)
         {
-            LL_INFOS() << "Created GL core context at fallback version "
-                       << major << "." << minor << LL_ENDL;
+            LL_INFOS() << "Created GL core context at fallback version 4." << minor << LL_ENDL;
         }
     }
 #endif

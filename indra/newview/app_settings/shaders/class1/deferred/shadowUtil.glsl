@@ -34,8 +34,7 @@
  *     a true separable Gaussian, not a box.
  *   - Fallback path: the "optimized PCF" of Castano/MJP -- fixed depth-compare taps whose
  *     bilinear footprints synthesise the same window with 4 (3x3) or 9 (5x5) fetches. Used
- *     wherever a gather-compare is unavailable or undesirable, including any context that
- *     compiles below #version 400 (see the __VERSION__ guard below).
+ *     where SHADOW_PCF_GATHER is defined 0.
  *   - SHADOW_PCSS: contact-hardening soft shadows. A blocker search sizes the penumbra per
  *     pixel, so a shadow is sharp where its caster meets the receiver and softens with the
  *     gap. Sampled on rotated Vogel discs. Needs raw depth, so it swaps the sampler type.
@@ -101,17 +100,6 @@
 #endif
 #ifndef SHADOW_PCSS_SEARCH
 #define SHADOW_PCSS_SEARCH 6.0  // blocker-search radius, texels
-#endif
-
-// textureGather on a shadow sampler is core in GLSL 4.00. The viewer's floor is GL 4.1, but
-// llshadermgr still emits #version 330/150 for a 3.x context, and a gather there would fail
-// to compile rather than fall back -- so pin both gather paths to 400+. PCSS has no
-// non-gather implementation, so below 400 it degrades to the fixed-kernel filter entirely.
-#if __VERSION__ < 400
-#undef SHADOW_PCF_GATHER
-#define SHADOW_PCF_GATHER 0
-#undef SHADOW_PCSS
-#define SHADOW_PCSS 0
 #endif
 
 #if SHADOW_PCSS

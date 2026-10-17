@@ -383,9 +383,10 @@ void* sdl_create_shared_context()
     // A version request derived from the live main context, clamped to the
     // range the viewer supports. WGL/EGL need this explicitly (mirroring
     // LLWindowWin32::createSharedContext); CGL inherits it from the share
-    // context, hence the guard against an unused-variable warning there.
+    // context, hence the guard against an unused-variable warning there. The
+    // profile is core, as the main context's always is on SDL.
 #if LL_WINDOWS || LL_LINUX
-    const F32 gl_ver = llclamp(gGLManager.mGLVersion, 3.0f, 4.6f);
+    const F32 gl_ver = llclamp(gGLManager.mGLVersion, 4.1f, 4.6f);
     const S32 ver_major = (S32)gl_ver;
     const S32 ver_minor = (S32)ll_round((gl_ver - ver_major) * 10.f);
 #endif
@@ -402,7 +403,7 @@ void* sdl_create_shared_context()
         {
             WGL_CONTEXT_MAJOR_VERSION_ARB, ver_major,
             WGL_CONTEXT_MINOR_VERSION_ARB, ver_minor,
-            WGL_CONTEXT_PROFILE_MASK_ARB,  LLRender::sGLCoreProfile ? WGL_CONTEXT_CORE_PROFILE_BIT_ARB : WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+            WGL_CONTEXT_PROFILE_MASK_ARB,  WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
             WGL_CONTEXT_FLAGS_ARB, gDebugGL ? WGL_CONTEXT_DEBUG_BIT_ARB : 0,
             0
         };
@@ -410,10 +411,8 @@ void* sdl_create_shared_context()
         for (;;)
         {
             rc = wglCreateContextAttribsARB(dc, share, attribs);
-            if (rc) break;
-            if (attribs[3] > 0)      { attribs[3]--; }                   // step minor down
-            else if (attribs[1] > 3) { attribs[1]--; attribs[3] = 3; }   // step major down
-            else                     { break; }                         // gave up at 3.0
+            if (rc || attribs[3] <= 1) break;   // made, or gave up at 4.1
+            attribs[3]--;                       // step minor down
         }
         if (rc)
         {
@@ -471,16 +470,14 @@ void* sdl_create_shared_context()
             // Must request the version explicitly — an empty attrib list defaults
             // to GL 1.0, which can't drive the modern texture/VBO uploads the
             // worker shares with the main context. (EGL 1.5 tokens.) The
-            // profile and the debug flag are the main context's, as on WGL:
-            // EGL's default profile is core, whatever the main context is.
+            // profile and the debug flag are the main context's, as on WGL.
             // Its reset strategy follows too, as EGL requires of a context
             // that shares with it.
             int ctx_attribs[8 + std::size(sResetAttribs)] =
             {
                 EGL_CONTEXT_MAJOR_VERSION, ver_major,
                 EGL_CONTEXT_MINOR_VERSION, ver_minor,
-                EGL_CONTEXT_OPENGL_PROFILE_MASK,
-                LLRender::sGLCoreProfile ? EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT : EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
+                EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
             };
             int attr = 6;
             if (gDebugGL)

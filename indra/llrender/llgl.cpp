@@ -451,11 +451,6 @@ void forget_program_samplers(U32 program)
 // must not perturb the state it is describing.
 static void log_texture_unit_state()
 {
-    if (!glGetSamplerParameteriv || !glGetTexLevelParameteriv)
-    {
-        return;
-    }
-
     GLint max_units = 0;
     glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &max_units);
     max_units = llmin(max_units, (GLint)AL_NUM_TEXTURE_SLOTS);
@@ -474,7 +469,7 @@ static void log_texture_unit_state()
 
     GLint program = 0;
     glGetIntegerv(GL_CURRENT_PROGRAM, &program);
-    if (program != 0 && glGetActiveUniform && glGetUniformiv)
+    if (program != 0)
     {
         for (const ProgramSampler& sampler : get_program_bindings((GLuint)program).mSamplers)
         {
@@ -602,7 +597,7 @@ static void log_texture_unit_state()
 // compiles out entirely otherwise. Enumerating a program's uniforms is cached per program.
 bool validate_bound_samplers()
 {
-    if (!gDebugGL || !glGetSamplerParameteriv || !glGetTexLevelParameteriv)
+    if (!gDebugGL)
     {
         return true;
     }
@@ -2110,22 +2105,23 @@ bool LLGLManager::initGL()
     }
 #endif
 
-    if (mGLVersion >= 2.f)
+    // The floor (GL_MINIMUM_VERSION). Nothing past here adapts to a context below it, so it is
+    // refused rather than run: the window tells the user what it lacks and the viewer quits.
+    const auto refuse = [this](const char* missing)
     {
-        parse_glsl_version(mGLSLVersionMajor, mGLSLVersionMinor);
-    }
+        mHasRequirements  = false;
+        mUnmetRequirement = missing;
+        LL_WARNS("RenderInit") << "Refusing OpenGL " << mGLVersionString << " on " << mGLRenderer
+                               << ": the viewer needs " << missing << LL_ENDL;
+        return false;
+    };
 
-    // The renderer assumes GL 4.1 unconditionally: deprecated formats are re-expressed
-    // via GL_TEXTURE_SWIZZLE_RGBA rather than repacked on the CPU, the texture upload
-    // thread is always enabled, and the shader backend expects GLSL 4.10. Below the
-    // floor those assumptions do not hold and behaviour is undefined rather than
-    // degraded. This is a diagnostic only -- refusing to launch is a separate change.
     if (mGLVersion < GL_MINIMUM_VERSION)
     {
-        LL_WARNS("RenderInit") << "OpenGL " << mGLVersionString << " is below the "
-                               << GL_MINIMUM_VERSION << " minimum this viewer requires. "
-                               << "Rendering will misbehave." << LL_ENDL;
+        return refuse("OpenGL 4.1");
     }
+
+    parse_glsl_version(mGLSLVersionMajor, mGLSLVersionMinor);
 
     // Trailing space necessary to keep "nVidia Corpor_ati_on" cards
     // from being recognized as ATI.
@@ -2166,8 +2162,23 @@ bool LLGLManager::initGL()
         mGLVendorShort = "MISC";
     }
 
-    // This is called here because it depends on the setting of mIsGF2or4MX, and sets up mHasMultitexture.
     initExtensions();
+
+    // The rest of the floor, once initExtensions has loaded what it could. Immutable texture
+    // storage: every texture is allocated with glTexStorage* and written by sub-image thereafter,
+    // which is the only model D3D11/12 and Vulkan have -- dimensions, format and mip count fixed at
+    // creation. initExtensions resolves glTexStorage2D only where the context offers it.
+    if (!glTexStorage2D)
+    {
+        return refuse("GL_ARB_texture_storage");
+    }
+    // sRGB decode: never promoted to core, so an extension at every version. Without it an
+    // sRGB-format texture applies its transfer function on every read and there is no way to say
+    // otherwise, which the renderer relies on being able to do -- see ALSampler::SRGBDecode.
+    if (!mGLExtensions.contains("GL_EXT_texture_sRGB_decode"))
+    {
+        return refuse("GL_EXT_texture_sRGB_decode");
+    }
 
     U32 old_vram = mVRAM;
     mVRAM = 0;
@@ -2346,18 +2357,9 @@ void LLGLManager::initCompute()
     glGetIntegerv(GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS, &mMaxComputeShaderStorageBlocks);
     glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &mShaderStorageBufferOffsetAlignment);
     // A block may be larger than an int can say.
-    if (glGetInteger64v)
-    {
-        GLint64 block_size = 0;
-        glGetInteger64v(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &block_size);
-        mMaxShaderStorageBlockSize = block_size;
-    }
-    else
-    {
-        GLint block_size = 0;
-        glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &block_size);
-        mMaxShaderStorageBlockSize = block_size;
-    }
+    GLint64 block_size = 0;
+    glGetInteger64v(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &block_size);
+    mMaxShaderStorageBlockSize = block_size;
     mShaderStorageBufferOffsetAlignment = llmax(mShaderStorageBufferOffsetAlignment, 1);
 
     LL_INFOS("RenderInit") << "Compute available (GL " << mGLVersion << "): work groups up to "
@@ -2553,9 +2555,8 @@ void LLGLManager::initExtensions()
 
     // NOTE: version checks against mGLVersion should bias down by 0.01 because of F32 errors
 
-    // OpenGL 4.x capabilities
-    mHasCubeMapArray = mGLVersion >= 3.99f;
-    mHasTransformFeedback = mGLVersion >= 3.99f;
+    // Past the floor: what a 4.1 context may or may not have.
+
     // Core in 4.3; also GL_KHR_debug, which names the same entry points without a suffix.
     // Downgraded below if glDebugMessageCallback doesn't resolve.
     mHasDebugOutput = mGLVersion >= 4.29f || mGLExtensions.contains("GL_KHR_debug");
@@ -2563,34 +2564,6 @@ void LLGLManager::initExtensions()
     if(!mHasAnisotropic)
     {
         mHasAnisotropic = mGLExtensions.contains("GL_EXT_texture_filter_anisotropic");
-    }
-
-    // Core in 4.2; on a 4.1 context (macOS) it is still reachable as an ARB extension.
-    // Downgraded below if the entry point turns out not to resolve.
-    //
-    // REQUIRED, alongside GL 4.1 -- not a capability the renderer adapts to. Every texture
-    // is allocated with glTexStorage2D and written by sub-image thereafter, which is the
-    // only model D3D11/12 and Vulkan have: dimensions, format and mip count fixed at
-    // creation. There is no mutable path left to fall back to. Diagnostic only, matching
-    // the GL_MINIMUM_VERSION check -- refusing to launch is a separate change.
-    mHasTextureStorage = mGLVersion >= 4.19f || mGLExtensions.contains("GL_ARB_texture_storage");
-    if (!mHasTextureStorage)
-    {
-        LL_WARNS("RenderInit") << "OpenGL " << mGLVersionString << " exposes neither GL 4.2 nor "
-                               << "GL_ARB_texture_storage, which this viewer requires. Texture "
-                               << "allocation will fail." << LL_ENDL;
-    }
-
-    // REQUIRED, like immutable storage. Never promoted to core, so it is an extension
-    // query at every version. Without it an sRGB-format texture always applies its
-    // transfer function on read and there is no way to say otherwise, which the renderer
-    // relies on being able to do -- see ALSampler::SRGBDecode.
-    mHasTextureSRGBDecode = mGLExtensions.contains("GL_EXT_texture_sRGB_decode");
-    if (!mHasTextureSRGBDecode)
-    {
-        LL_WARNS("RenderInit") << "GL_EXT_texture_sRGB_decode is missing. sRGB-format "
-                               << "textures will decode on every read regardless of what the "
-                               << "sampler asks for." << LL_ENDL;
     }
 
     // Core in 4.5; also an ARB extension. Downgraded below if the entry points don't resolve.
@@ -2618,16 +2591,18 @@ void LLGLManager::initExtensions()
     mInited = true;
 
 #if LL_GL_FUNC_POINTER
-    // Load entire OpenGL API through GetProcAddress, leaving sections beyond mGLVersion unloaded
+    // Load the OpenGL API through GetProcAddress: all of it to 4.1, the floor, and leaving the
+    // sections beyond mGLVersion unloaded.
     LL_DEBUGS("RenderInit") << "GL Probe: Getting symbols" << LL_ENDL;
 
     // Init EXT and ARB extensions FIRST, because they may be used in later GL versions
 
-    // Immutable texture storage. Resolved here rather than left to the GL_VERSION_4_2
-    // block below: that ladder early-outs before 4.2, so on a 4.1 context exposing
-    // GL_ARB_texture_storage -- macOS -- these would otherwise stay null. On 4.2+ the
-    // ladder resolves the same pointers again, which is harmless.
-    if (mHasTextureStorage)
+    // Immutable texture storage: core in 4.2, and GL_ARB_texture_storage on a 4.1 context (macOS,
+    // GLOn12). Resolved here rather than left to the GL_VERSION_4_2 block below, which a 4.1
+    // context returns before; on 4.2+ that block resolves the same pointers again, which is
+    // harmless. Only where the context offers it, since initGL refuses one whose glTexStorage2D
+    // stays null.
+    if (mGLVersion >= 4.19f || mGLExtensions.contains("GL_ARB_texture_storage"))
     {
         glTexStorage1D = (PFNGLTEXSTORAGE1DPROC)LL_GET_PROC_ADDRESS("glTexStorage1D");
         glTexStorage2D = (PFNGLTEXSTORAGE2DPROC)LL_GET_PROC_ADDRESS("glTexStorage2D");
@@ -2635,11 +2610,8 @@ void LLGLManager::initExtensions()
 
         if (!glTexStorage2D)
         {
-            // Advertised but not resolvable. Don't let callers trust the flag.
-            mHasTextureStorage = false;
             LL_WARNS("RenderInit") << "Immutable texture storage advertised (GL " << mGLVersion
-                                   << ") but glTexStorage2D did not resolve; using mutable textures."
-                                   << LL_ENDL;
+                                   << ") but glTexStorage2D did not resolve" << LL_ENDL;
         }
         else
         {
@@ -2647,11 +2619,6 @@ void LLGLManager::initExtensions()
                                    << (mGLVersion >= 4.19f ? ", core)" : ", GL_ARB_texture_storage)")
                                    << LL_ENDL;
         }
-    }
-    else
-    {
-        LL_INFOS("RenderInit") << "Immutable texture storage unavailable (GL " << mGLVersion
-                               << ", no GL_ARB_texture_storage); using mutable textures." << LL_ENDL;
     }
 
     // Immutable buffer storage. Resolved here for the same reason as glTexStorage above: the
@@ -2851,20 +2818,12 @@ void LLGLManager::initExtensions()
     LL_INFOS("RenderInit") << "Depth bounds test " << (mHasDepthBoundsTest ? "available" : "unavailable") << LL_ENDL;
 
     // GL_VERSION_1_2
-    if (mGLVersion < 1.19f)
-    {
-        return;
-    }
     glDrawRangeElements = (PFNGLDRAWRANGEELEMENTSPROC)LL_GET_PROC_ADDRESS("glDrawRangeElements");
     glTexImage3D = (PFNGLTEXIMAGE3DPROC)LL_GET_PROC_ADDRESS("glTexImage3D");
     glTexSubImage3D = (PFNGLTEXSUBIMAGE3DPROC)LL_GET_PROC_ADDRESS("glTexSubImage3D");
     glCopyTexSubImage3D = (PFNGLCOPYTEXSUBIMAGE3DPROC)LL_GET_PROC_ADDRESS("glCopyTexSubImage3D");
 
     // GL_VERSION_1_3
-    if (mGLVersion < 1.29f)
-    {
-        return;
-    }
     glActiveTexture = (PFNGLACTIVETEXTUREPROC)LL_GET_PROC_ADDRESS("glActiveTexture");
     glSampleCoverage = (PFNGLSAMPLECOVERAGEPROC)LL_GET_PROC_ADDRESS("glSampleCoverage");
     glCompressedTexImage3D = (PFNGLCOMPRESSEDTEXIMAGE3DPROC)LL_GET_PROC_ADDRESS("glCompressedTexImage3D");
@@ -2876,10 +2835,6 @@ void LLGLManager::initExtensions()
     glGetCompressedTexImage = (PFNGLGETCOMPRESSEDTEXIMAGEPROC)LL_GET_PROC_ADDRESS("glGetCompressedTexImage");
 
     // GL_VERSION_1_4
-    if (mGLVersion < 1.39f)
-    {
-        return;
-    }
     glBlendFuncSeparate = (PFNGLBLENDFUNCSEPARATEPROC)LL_GET_PROC_ADDRESS("glBlendFuncSeparate");
     glMultiDrawArrays = (PFNGLMULTIDRAWARRAYSPROC)LL_GET_PROC_ADDRESS("glMultiDrawArrays");
     glMultiDrawElements = (PFNGLMULTIDRAWELEMENTSPROC)LL_GET_PROC_ADDRESS("glMultiDrawElements");
@@ -2889,10 +2844,6 @@ void LLGLManager::initExtensions()
     glPointParameteriv = (PFNGLPOINTPARAMETERIVPROC)LL_GET_PROC_ADDRESS("glPointParameteriv");
 
     // GL_VERSION_1_5
-    if (mGLVersion < 1.49f)
-    {
-        return;
-    }
     glGenQueries = (PFNGLGENQUERIESPROC)LL_GET_PROC_ADDRESS("glGenQueries");
     glDeleteQueries = (PFNGLDELETEQUERIESPROC)LL_GET_PROC_ADDRESS("glDeleteQueries");
     glIsQuery = (PFNGLISQUERYPROC)LL_GET_PROC_ADDRESS("glIsQuery");
@@ -2914,10 +2865,6 @@ void LLGLManager::initExtensions()
     glGetBufferPointerv = (PFNGLGETBUFFERPOINTERVPROC)LL_GET_PROC_ADDRESS("glGetBufferPointerv");
 
     // GL_VERSION_2_0
-    if (mGLVersion < 1.9f)
-    {
-        return;
-    }
     glBlendEquationSeparate = (PFNGLBLENDEQUATIONSEPARATEPROC)LL_GET_PROC_ADDRESS("glBlendEquationSeparate");
     glDrawBuffers = (PFNGLDRAWBUFFERSPROC)LL_GET_PROC_ADDRESS("glDrawBuffers");
     glStencilOpSeparate = (PFNGLSTENCILOPSEPARATEPROC)LL_GET_PROC_ADDRESS("glStencilOpSeparate");
@@ -3013,10 +2960,6 @@ void LLGLManager::initExtensions()
     glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)LL_GET_PROC_ADDRESS("glVertexAttribPointer");
 
     // GL_VERSION_2_1
-    if (mGLVersion < 2.09f)
-    {
-        return;
-    }
     glUniformMatrix2x3fv = (PFNGLUNIFORMMATRIX2X3FVPROC)LL_GET_PROC_ADDRESS("glUniformMatrix2x3fv");
     glUniformMatrix3x2fv = (PFNGLUNIFORMMATRIX3X2FVPROC)LL_GET_PROC_ADDRESS("glUniformMatrix3x2fv");
     glUniformMatrix2x4fv = (PFNGLUNIFORMMATRIX2X4FVPROC)LL_GET_PROC_ADDRESS("glUniformMatrix2x4fv");
@@ -3025,10 +2968,6 @@ void LLGLManager::initExtensions()
     glUniformMatrix4x3fv = (PFNGLUNIFORMMATRIX4X3FVPROC)LL_GET_PROC_ADDRESS("glUniformMatrix4x3fv");
 
     // GL_VERSION_3_0
-    if (mGLVersion < 2.99f)
-    {
-        return;
-    }
     glColorMaski = (PFNGLCOLORMASKIPROC)LL_GET_PROC_ADDRESS("glColorMaski");
     glGetBooleani_v = (PFNGLGETBOOLEANI_VPROC)LL_GET_PROC_ADDRESS("glGetBooleani_v");
     glGetIntegeri_v = (PFNGLGETINTEGERI_VPROC)LL_GET_PROC_ADDRESS("glGetIntegeri_v");
@@ -3115,10 +3054,6 @@ void LLGLManager::initExtensions()
     glIsVertexArray = (PFNGLISVERTEXARRAYPROC)LL_GET_PROC_ADDRESS("glIsVertexArray");
 
     // GL_VERSION_3_1
-    if (mGLVersion < 3.09f)
-    {
-        return;
-    }
     glDrawArraysInstanced = (PFNGLDRAWARRAYSINSTANCEDPROC)LL_GET_PROC_ADDRESS("glDrawArraysInstanced");
     glDrawElementsInstanced = (PFNGLDRAWELEMENTSINSTANCEDPROC)LL_GET_PROC_ADDRESS("glDrawElementsInstanced");
     glTexBuffer = (PFNGLTEXBUFFERPROC)LL_GET_PROC_ADDRESS("glTexBuffer");
@@ -3133,10 +3068,6 @@ void LLGLManager::initExtensions()
     glUniformBlockBinding = (PFNGLUNIFORMBLOCKBINDINGPROC)LL_GET_PROC_ADDRESS("glUniformBlockBinding");
 
     // GL_VERSION_3_2
-    if (mGLVersion < 3.19f)
-    {
-        return;
-    }
     glDrawElementsBaseVertex = (PFNGLDRAWELEMENTSBASEVERTEXPROC)LL_GET_PROC_ADDRESS("glDrawElementsBaseVertex");
     glDrawRangeElementsBaseVertex = (PFNGLDRAWRANGEELEMENTSBASEVERTEXPROC)LL_GET_PROC_ADDRESS("glDrawRangeElementsBaseVertex");
     glDrawElementsInstancedBaseVertex = (PFNGLDRAWELEMENTSINSTANCEDBASEVERTEXPROC)LL_GET_PROC_ADDRESS("glDrawElementsInstancedBaseVertex");
@@ -3158,10 +3089,6 @@ void LLGLManager::initExtensions()
     glSampleMaski = (PFNGLSAMPLEMASKIPROC)LL_GET_PROC_ADDRESS("glSampleMaski");
 
     // GL_VERSION_3_3
-    if (mGLVersion < 3.29f)
-    {
-        return;
-    }
     glBindFragDataLocationIndexed = (PFNGLBINDFRAGDATALOCATIONINDEXEDPROC)LL_GET_PROC_ADDRESS("glBindFragDataLocationIndexed");
     glGetFragDataIndex = (PFNGLGETFRAGDATAINDEXPROC)LL_GET_PROC_ADDRESS("glGetFragDataIndex");
     glGenSamplers = (PFNGLGENSAMPLERSPROC)LL_GET_PROC_ADDRESS("glGenSamplers");
@@ -3192,10 +3119,6 @@ void LLGLManager::initExtensions()
     glVertexAttribP4uiv = (PFNGLVERTEXATTRIBP4UIVPROC)LL_GET_PROC_ADDRESS("glVertexAttribP4uiv");
 
     // GL_VERSION_4_0
-    if (mGLVersion < 3.99f)
-    {
-        return;
-    }
     glMinSampleShading = (PFNGLMINSAMPLESHADINGPROC)LL_GET_PROC_ADDRESS("glMinSampleShading");
     glBlendEquationi = (PFNGLBLENDEQUATIONIPROC)LL_GET_PROC_ADDRESS("glBlendEquationi");
     glBlendEquationSeparatei = (PFNGLBLENDEQUATIONSEPARATEIPROC)LL_GET_PROC_ADDRESS("glBlendEquationSeparatei");
@@ -3244,10 +3167,6 @@ void LLGLManager::initExtensions()
     glGetQueryIndexediv = (PFNGLGETQUERYINDEXEDIVPROC)LL_GET_PROC_ADDRESS("glGetQueryIndexediv");
 
     // GL_VERSION_4_1
-    if (mGLVersion < 4.09f)
-    {
-        return;
-    }
     glReleaseShaderCompiler = (PFNGLRELEASESHADERCOMPILERPROC)LL_GET_PROC_ADDRESS("glReleaseShaderCompiler");
     glShaderBinary = (PFNGLSHADERBINARYPROC)LL_GET_PROC_ADDRESS("glShaderBinary");
     glGetShaderPrecisionFormat = (PFNGLGETSHADERPRECISIONFORMATPROC)LL_GET_PROC_ADDRESS("glGetShaderPrecisionFormat");

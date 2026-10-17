@@ -91,10 +91,7 @@ void ALTextureSlot::refreshState(void)
     // The sampler binding is per-slot context state like the texture binding, so it has
     // to be re-asserted here too. Drop to the texture object's own state and let the next
     // bind re-select; mCurrSampler is cleared so that re-selection isn't cached away.
-    if (glBindSampler)
-    {
-        glBindSampler(mIndex, 0);
-    }
+    glBindSampler(mIndex, 0);
     mCurrSampler = 0;
 }
 

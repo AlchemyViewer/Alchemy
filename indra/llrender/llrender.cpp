@@ -107,7 +107,10 @@ U32 LLRender::sDrawCalls = 0;
 U64 LLRender::sDrawElements = 0;
 std::atomic<U32> ALTextureSlot::sWhiteTexture = 0;
 F32 LLRender::sAnisotropicFilteringLevel = 0.f;
-bool LLRender::sGLCoreProfile = false;
+// Read by the native Win32 window alone, which makes a compatibility context when it is false
+// (RenderGLContextCoreProfile, which Intel's Windows driver is recommended off). Every other window,
+// and anything that never sets it, as the appearance utility does not, is core.
+bool LLRender::sGLCoreProfile = true;
 bool LLRender::sNsightDebugSupport = false;
 LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
 bool LLRender::sClassicMode = false;
@@ -457,13 +460,6 @@ bool LLRender::init(bool needs_vertex_buffer)
         LLGLState::seedState(GL_TEXTURE_CUBE_MAP_SEAMLESS, GL_TRUE);
     }
 
-#if LL_WINDOWS
-    if (glGenVertexArrays == nullptr)
-    {
-        return false;
-    }
-#endif
-
     { //bind a dummy vertex array object so we're core profile compliant
         glGenVertexArrays(1, &mDummyVAO);
         glBindVertexArray(mDummyVAO);
@@ -614,11 +610,7 @@ void LLRender::refreshState(void)
 
     glLineWidth(mLineWidth);
 
-    // Loaded only on a context with tessellation, the one that has a patch size.
-    if (glPatchParameteri)
-    {
-        glPatchParameteri(GL_PATCH_VERTICES, mPatchVertices);
-    }
+    glPatchParameteri(GL_PATCH_VERTICES, mPatchVertices);
 
     rebasePolygonOffset();
 

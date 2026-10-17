@@ -60,22 +60,21 @@ ALWindowSDLHeadless::ALWindowSDLHeadless(LLWindowCallbacks* callbacks,
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
     }
 
+    // Always a core profile, as LLWindowSDL makes.
     SDL_GLContextFlag context_flags{};
-    if (LLRender::sGLCoreProfile)
-    {
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 #if LL_DARWIN
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
-        context_flags |= SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG;
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    context_flags |= SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG;
 #else
-        // A core profile needs an explicit version of 3.2 or better, or the
-        // driver hands back a compatibility context. Ask for the highest the
-        // viewer targets and step down below if the driver caps lower.
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
+    // A core profile needs an explicit version of 3.2 or better, or the
+    // driver hands back a compatibility context. Ask for the highest the
+    // viewer targets and step down below, to the floor of 4.1, if the
+    // driver caps lower.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
 #endif
-    }
     if (gDebugGL)
     {
         context_flags |= SDL_GL_CONTEXT_DEBUG_FLAG;
@@ -92,22 +91,13 @@ ALWindowSDLHeadless::ALWindowSDLHeadless(LLWindowCallbacks* callbacks,
 
     mContext = SDL_GL_CreateContext(mWindow);
 #if !LL_DARWIN
-    if (!mContext && LLRender::sGLCoreProfile)
+    for (S32 minor = 5; !mContext && minor >= 1; --minor)
     {
-        S32 major = 4, minor = 6;
-        while (!mContext)
-        {
-            if (minor > 0)      { --minor; }
-            else if (major > 3) { --major; minor = 3; }
-            else                { break; }
-            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
-            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
-            mContext = SDL_GL_CreateContext(mWindow);
-        }
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
+        mContext = SDL_GL_CreateContext(mWindow);
         if (mContext)
         {
-            LL_INFOS("Window") << "Created GL core context at fallback version "
-                               << major << "." << minor << LL_ENDL;
+            LL_INFOS("Window") << "Created GL core context at fallback version 4." << minor << LL_ENDL;
         }
     }
 #endif

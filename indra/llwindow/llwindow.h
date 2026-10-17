@@ -269,6 +269,11 @@ protected:
     virtual bool setSizeImpl(LLCoordScreen size) = 0;
     virtual bool setSizeImpl(LLCoordWindow size) = 0;
 
+    // What to tell the user when LLGLManager::initGL has refused the context: what it lacks of the
+    // floor, or, where it lacks nothing initGL names, that the driver is not usable. Reads the GL
+    // strings, so the refused context must still be current.
+    std::string glInitFailureMessage() const;
+
 protected:
     LLWindowCallbacks*  mCallbacks;
 
