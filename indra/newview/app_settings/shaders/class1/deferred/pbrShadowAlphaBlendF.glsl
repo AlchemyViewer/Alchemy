@@ -37,6 +37,13 @@ void main()
 {
     float alpha = texture(diffuseMap,vary_texcoord0.xy).a;
 
+    // The cutoff renderAlphaObjects sets for blended casters (ALPHA_BLEND_CUTOFF), on the
+    // texture's alpha, as shadowAlphaMaskF takes it for a legacy blended prim.
+    if (alpha < minimum_alpha)
+    {
+        discard;
+    }
+
     alpha *= vertex_color.a;
 
     if (alpha < 0.05) // treat as totally transparent
