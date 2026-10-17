@@ -288,6 +288,33 @@ namespace
             return depth;
         }
 
+        // The label the GL object `name` carries.
+        std::string label_of(GLenum identifier, U32 name)
+        {
+            char    label[256] = {};
+            GLsizei length     = 0;
+            glGetObjectLabel(identifier, name, (GLsizei)sizeof(label), &length, label);
+            return std::string(label, (size_t)length);
+        }
+
+        // The target's framebuffer is labelled `label`, each colour attachment `label.colorN`, and its own depth, where
+        // `depth` says it has one, `label.depth`; or, for an empty `label`, none of them is labelled.
+        void require_labels(LLRenderTarget& target, const std::string& label, bool depth)
+        {
+            CAPTURE(label);
+            auto expected = [&label](const std::string& suffix) { return label.empty() ? label : label + suffix; };
+            CHECK(label_of(GL_FRAMEBUFFER, names_of(target).framebuffer) == label);
+            for (U32 attachment = 0; attachment < target.getNumTextures(); ++attachment)
+            {
+                CAPTURE(attachment);
+                CHECK(label_of(GL_TEXTURE, target.getTexture(attachment)) == expected(".color" + std::to_string(attachment)));
+            }
+            if (depth)
+            {
+                CHECK(label_of(GL_TEXTURE, target.getDepth()) == expected(".depth"));
+            }
+        }
+
         // Puts back the context's largest texture size, however the case ends.
         struct MaxTextureSizeRestore
         {
@@ -312,6 +339,7 @@ namespace
             mLent.release();
             mCopy.release();
             mSharer.release();
+            mDepthSharer.release();
             mOwner.release();
             mWide.release();
             mLentImage = nullptr;
@@ -404,6 +432,7 @@ namespace
         LLRenderTarget mCopy;
         LLRenderTarget mOwner;
         LLRenderTarget mSharer;
+        LLRenderTarget mDepthSharer;
         LLRenderTarget mWide;
         LLPointer<LLImageGL> mLentImage;
         GLuint mVAO = 0;
@@ -850,6 +879,113 @@ namespace
         CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == mOwner.getDepth());
         CHECK(mSharer.ensure(depth_only, mOwner) == EnsureResult::Kept);
         CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A label names the framebuffer and each attachment a target allocated, on every build after it is set: built
+    // again at another size with an attachment more, all of them are named again. Set on a built target, it renames
+    // what is there. A sharer names its framebuffer and colour, a sharer with no colour its framebuffer, and neither
+    // renames the owner's depth; a target setColorAttachment lends a texture to names its framebuffer and leaves the
+    // texture as its owner named it. allocate and addColorAttachment name what they build as ensure does, and an
+    // empty label takes the names away.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: a label names what each build of a target makes", "[llrendertarget_gl]")
+    {
+        if (!gGLManager.mHasDebugOutput || !glGetObjectLabel)
+        {
+            SKIP("this context keeps no object labels");
+        }
+
+        mOwner.setLabel("test.gbuffer");
+        REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+        require_labels(mOwner, "test.gbuffer", true);
+
+        const ALRenderTargetDesc wider{ .width = 9, .height = 7, .color = { GL_RGBA8, GL_RGBA16F, GL_RGB10_A2 },
+                                        .depth = Depth::D32F, .stencil = true };
+        REQUIRE(mOwner.ensure(wider) == EnsureResult::Built);
+        require_labels(mOwner, "test.gbuffer", true);
+
+        mOwner.setLabel("test.renamed");
+        require_labels(mOwner, "test.renamed", true);
+
+        mSharer.setLabel("test.sharer");
+        REQUIRE(mSharer.ensure({ .width = 9, .height = 7, .color = { GL_RGBA16F } }, mOwner) == EnsureResult::Built);
+        require_labels(mSharer, "test.sharer", false);
+        CHECK(label_of(GL_TEXTURE, mOwner.getDepth()) == "test.renamed.depth");
+
+        mDepthSharer.setLabel("test.depth_only");
+        REQUIRE(mDepthSharer.ensure({ .width = 9, .height = 7 }, mOwner) == EnsureResult::Built);
+        require_labels(mDepthSharer, "test.depth_only", false);
+        CHECK(label_of(GL_TEXTURE, mOwner.getDepth()) == "test.renamed.depth");
+
+        const std::vector<U32> zeros((size_t)INT_W * INT_H, 0u);
+        mLentImage = new LLImageGL(INT_W, INT_H, 1, /*usemipmaps=*/false);
+        mLentImage->setExplicitFormat(GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
+        REQUIRE(mLentImage->createGLTexture(0, reinterpret_cast<const U8*>(zeros.data())));
+        mLent.setLabel("test.lent");
+        mLent.setColorAttachment(mLentImage.get());
+        CHECK(label_of(GL_FRAMEBUFFER, names_of(mLent).framebuffer) == "test.lent");
+        CHECK(label_of(GL_TEXTURE, mLentImage->getTexName()) == "");
+        mLent.releaseColorAttachment();
+
+        mTarget.setLabel("test.allocated");
+        REQUIRE(mTarget.allocate(SIZE, SIZE, GL_RGBA8, /*depth=*/true));
+        REQUIRE(mTarget.addColorAttachment(GL_RGBA16F));
+        require_labels(mTarget, "test.allocated", true);
+
+        mOwner.setLabel("");
+        require_labels(mOwner, "", true);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // Two sharers of two owners' depths that swap their framebuffers swap the depths they hold: each, ensured again
+    // as its own owner's sharer, attaches that owner's depth again rather than keeping the other's.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: swapFBORefs takes the shared depth with the framebuffer", "[llrendertarget_gl]")
+    {
+        const ALRenderTargetDesc sharer{ .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA16F } };
+        REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+        REQUIRE(mWide.ensure(GBUFFER) == EnsureResult::Built);
+        REQUIRE(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
+        REQUIRE(mDepthSharer.ensure(sharer, mWide) == EnsureResult::Built);
+
+        mSharer.swapFBORefs(mDepthSharer);
+        CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == mWide.getDepth());
+        CHECK(attached_at(mDepthSharer, GL_DEPTH_ATTACHMENT) == mOwner.getDepth());
+
+        // Each holds the other owner's depth now, which is not the one it is asked to share.
+        CHECK(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
+        CHECK(mDepthSharer.ensure(sharer, mWide) == EnsureResult::Built);
+        CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == mOwner.getDepth());
+        CHECK(attached_at(mDepthSharer, GL_DEPTH_ATTACHMENT) == mWide.getDepth());
+        CHECK(mSharer.ensure(sharer, mOwner) == EnsureResult::Kept);
+        CHECK(mDepthSharer.ensure(sharer, mWide) == EnsureResult::Kept);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A label names the target, so after a swap each target's label is on the objects it holds now, not on those it
+    // gave up: a swapped pair, the exposure's or the lens flare's, shows each target under its own name.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: swapFBORefs leaves each target's label on what it holds", "[llrendertarget_gl]")
+    {
+        if (!gGLManager.mHasDebugOutput || !glGetObjectLabel)
+        {
+            SKIP("this context keeps no object labels");
+        }
+
+        const ALRenderTargetDesc state{ .width = 2, .height = 1, .color = { GL_RGBA16F } };
+        mTarget.setLabel("test.current");
+        mCopy.setLabel("test.last");
+        REQUIRE(mTarget.ensure(state) == EnsureResult::Built);
+        REQUIRE(mCopy.ensure(state) == EnsureResult::Built);
+        const Names target_before = names_of(mTarget);
+
+        mTarget.swapFBORefs(mCopy);
+        REQUIRE(names_of(mCopy) == target_before);
+        require_labels(mTarget, "test.current", false);
+        require_labels(mCopy, "test.last", false);
+
+        mTarget.swapFBORefs(mCopy);
+        REQUIRE(names_of(mTarget) == target_before);
+        require_labels(mTarget, "test.current", false);
+        require_labels(mCopy, "test.last", false);
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 }

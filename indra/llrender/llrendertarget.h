@@ -34,6 +34,8 @@
 #include "llrender.h"
 
 #include <array>
+#include <string>
+#include <string_view>
 
 /*
  Wrapper around OpenGL framebuffer objects for use in render-to-texture
@@ -143,6 +145,13 @@ public:
 
     // Whether the depth attachment is another target's, attached by shareDepthBuffer or ensure.
     bool sharesDepth() const { return mUseDepth && !mDepth; }
+
+    // The name debuggers and the GL debug output show for this target: its framebuffer is labelled `label`, the
+    // colour attachments it allocated `label.color0` on, and the depth it allocated `label.depth`. The label is kept
+    // across builds and given to what each builds, so an owner names its target once; set on a built target, it
+    // names what the target holds now. Empty leaves the target unnamed.
+    void setLabel(std::string_view label);
+    const std::string& getLabel() const { return mLabel; }
 
     //resize existing attachments to use new resolution and color format
     // CAUTION: if the GL runs out of memory attempting to resize, this render target will be undefined
@@ -294,6 +303,9 @@ public:
     static LLRenderTarget* getCurrentBoundTarget() { return sBoundTarget; }
 
     // *HACK
+    // Trades framebuffers and colour textures with `other`, a target of the same description, and with them the shared
+    // depth each framebuffer holds. Each keeps its label, given to what it holds now: where the two differ, every object
+    // of both is labelled again, a glObjectLabel call each.
     void swapFBORefs(LLRenderTarget& other);
 
     static LLRenderTarget* sBoundTarget;
@@ -334,6 +346,13 @@ protected:
 
     // Attach `owner`'s depth, in place of any depth this target shared before.
     void attachSharedDepth(const LLRenderTarget& owner);
+
+    // Give the framebuffer and the depth this target allocated their labels.
+    void labelFramebuffer() const;
+    // Give the colour attachment this target allocated at `attachment` its label.
+    void labelColor(U32 attachment) const;
+
+    std::string mLabel;
 
     // The serial the last depth build took.
     static U64 sLastDepthSerial;

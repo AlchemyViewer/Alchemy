@@ -202,8 +202,9 @@ if(AL_BUILD_TESTS)
   #   order out to 100 km;
   # - the depth bounds test against the depth test it stands in for, and the
   #   depths a light's sphere spans;
-  # - which fragment output reaches a render target's colour attachment, and
-  #   integer attachments cleared and drawn;
+  # - which fragment output reaches a render target's colour attachment,
+  #   integer attachments cleared and drawn, targets kept, built again and
+  #   re-pointed at a shared depth by their descriptions, and their labels;
   # - LLRender's cached clear colour and scissor box, and LLGLSScissor;
   # - LLGLSLShader's cache key, its uniform value cache, the compute path
   #   (programs built through the shader manager, their images, storage

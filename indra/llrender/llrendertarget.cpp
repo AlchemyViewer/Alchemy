@@ -42,6 +42,8 @@
 #include <cmath>
 #include <limits>
 
+#include <fmt/format.h>
+
 LLRenderTarget* LLRenderTarget::sBoundTarget = NULL;
 U32 LLRenderTarget::sBytesAllocated = 0;
 U64 LLRenderTarget::sLastDepthSerial = 0;
@@ -243,6 +245,26 @@ namespace
         return nullptr;
     }
 
+    // Label the GL object `name` `label` followed by `suffix` and, where it is not negative, `index`; an empty `label`
+    // takes the object's label away. Nothing where the context keeps no labels.
+    void label_object(GLenum identifier, U32 name, std::string_view label, std::string_view suffix, S32 index = -1)
+    {
+        if (!name || !gGLManager.mHasDebugOutput || !glObjectLabel)
+        {
+            return;
+        }
+        if (label.empty())
+        {
+            glObjectLabel(identifier, name, 0, nullptr);
+            return;
+        }
+        // GL refuses a label as long as GL_MAX_LABEL_LENGTH, which is at least 256.
+        char text[255];
+        const auto result = index < 0 ? fmt::format_to_n(text, sizeof(text), "{}{}", label, suffix)
+                                      : fmt::format_to_n(text, sizeof(text), "{}{}{}", label, suffix, index);
+        glObjectLabel(identifier, name, (GLsizei)(result.out - text), text);
+    }
+
     void check_framebuffer_status()
     {
         if (gDebugGL)
@@ -386,20 +408,25 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
 
     glGenFramebuffers(1, (GLuint *) &mFBO);
 
+    // Bound once whatever it holds: a name is a framebuffer only from its first bind, and only a framebuffer takes a
+    // label.
+    glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
     if (mDepth)
     {
-        glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
-
         GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
         glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), mDepth, 0);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
     }
+    glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
 
     if (!addColorAttachment(color_fmt))
     {
         release();
         return false;
+    }
+
+    if (!mLabel.empty())
+    {
+        labelFramebuffer();
     }
     return true;
 }
@@ -433,7 +460,8 @@ LLRenderTarget::EnsureResult LLRenderTarget::ensure(const ALRenderTargetDesc& wa
     const ALRenderTargetDesc held = held_to_context(wanted);
     if (const char* reason = unbuildable(held, /*depth_shared=*/false))
     {
-        LL_WARNS("RenderTarget") << "No render target can be built from the description: " << reason << LL_ENDL;
+        LL_WARNS("RenderTarget") << "Render target '" << mLabel << "' cannot be built as described: " << reason
+                                 << LL_ENDL;
         release();
         return EnsureResult::Failed;
     }
@@ -462,7 +490,8 @@ LLRenderTarget::EnsureResult LLRenderTarget::ensure(const ALRenderTargetDesc& wa
     }
     if (reason)
     {
-        LL_WARNS("RenderTarget") << "No render target can be built from the description: " << reason << LL_ENDL;
+        LL_WARNS("RenderTarget") << "Render target '" << mLabel << "' cannot be built as described: " << reason
+                                 << LL_ENDL;
         release();
         return EnsureResult::Failed;
     }
@@ -540,6 +569,12 @@ void LLRenderTarget::setColorAttachment(LLImageGL* img, LLGLuint use_name)
     check_framebuffer_status();
 
     glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
+
+    // The lent texture keeps the name its owner gave it.
+    if (!mLabel.empty())
+    {
+        labelFramebuffer();
+    }
 }
 
 void LLRenderTarget::releaseColorAttachment()
@@ -637,6 +672,11 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
     mTex.push_back(tex);
     mInternalFormat.push_back(color_fmt);
 
+    if (!mLabel.empty())
+    {
+        labelColor(offset);
+    }
+
     if (gDebugGL)
     { //bind and unbind to validate target
         bindTarget();
@@ -694,6 +734,30 @@ void LLRenderTarget::shareDepthBuffer(LLRenderTarget& target)
     if (mDepth)
     {
         target.attachSharedDepth(*this);
+    }
+}
+
+void LLRenderTarget::setLabel(std::string_view label)
+{
+    mLabel = label;
+    labelFramebuffer();
+    for (U32 attachment = 0; attachment < mInternalFormat.size(); ++attachment)
+    {
+        labelColor(attachment);
+    }
+}
+
+void LLRenderTarget::labelFramebuffer() const
+{
+    label_object(GL_FRAMEBUFFER, mFBO, mLabel, "");
+    label_object(GL_TEXTURE, mDepth, mLabel, ".depth");
+}
+
+void LLRenderTarget::labelColor(U32 attachment) const
+{
+    if (attachment < mInternalFormat.size())
+    {
+        label_object(GL_TEXTURE, mTex[attachment], mLabel, ".color", (S32)attachment);
     }
 }
 
@@ -1240,4 +1304,19 @@ void LLRenderTarget::swapFBORefs(LLRenderTarget& other)
 
     std::swap(mFBO, other.mFBO);
     std::swap(mTex, other.mTex);
+    // A sharer's depth is attached to its framebuffer, so which build of it is attached goes with the framebuffer.
+    std::swap(mSharedDepthSerial, other.mSharedDepthSerial);
+
+    // A label names the target, and the objects each holds now were named for the other.
+    if (mLabel != other.mLabel)
+    {
+        for (const LLRenderTarget* target : { this, &other })
+        {
+            target->labelFramebuffer();
+            for (U32 attachment = 0; attachment < target->mInternalFormat.size(); ++attachment)
+            {
+                target->labelColor(attachment);
+            }
+        }
+    }
 }
