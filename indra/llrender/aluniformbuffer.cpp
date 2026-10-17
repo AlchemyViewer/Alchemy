@@ -534,11 +534,12 @@ namespace
         sPersistTried = true;
         sPersistTriedCoherent = coherent;
 
-        // Entry points must be resolved (core 4.4 / ARB_buffer_storage + ARB_sync).
-        if (!glBufferStorage || !glMapBufferRange || !glFenceSync || !glClientWaitSync || !glDeleteSync)
+        // Buffer storage must have resolved (core 4.4, or ARB_buffer_storage); the map and the
+        // sync objects it needs are the floor's.
+        if (!glBufferStorage)
         {
-            LL_WARNS("ShaderUniform") << "Persistent UBO: buffer-storage/sync entry points "
-                                         "unavailable; falling back to ORPHAN." << LL_ENDL;
+            LL_WARNS("ShaderUniform") << "Persistent UBO: buffer storage unavailable; falling back to ORPHAN."
+                                      << LL_ENDL;
             return false;
         }
 
@@ -584,7 +585,7 @@ namespace
         if (!sScratchPersistTried)
         {
             sScratchPersistTried = true;
-            if (glBufferStorage && glMapBufferRange && glFenceSync && glClientWaitSync && glDeleteSync)
+            if (glBufferStorage)
             {
                 // Storage and map flags are identical: WRITE + PERSISTENT + COHERENT.
                 const GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;

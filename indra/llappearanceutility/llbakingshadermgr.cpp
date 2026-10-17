@@ -116,12 +116,6 @@ void LLBakingShaderMgr::setShaders()
     //NEVER use more than 16 texture channels (work around for prevalent driver bug)
     LLGLSLShader::sIndexedTextureChannels = llmin(LLGLSLShader::sIndexedTextureChannels, 16);
 
-    if (gGLManager.mGLSLVersionMajor < 1 ||
-        (gGLManager.mGLSLVersionMajor == 1 && gGLManager.mGLSLVersionMinor <= 20))
-    { //NEVER use indexed texture rendering when GLSL version is 1.20 or earlier
-        LLGLSLShader::sIndexedTextureChannels = 1;
-    }
-
     reentrance = true;
 
     initAttribsAndUniforms();
@@ -137,52 +131,45 @@ void LLBakingShaderMgr::setShaders()
     mMaxAvatarShaderLevel = 0;
 
     LLVertexBuffer::unbind();
-    bool loaded = false;
-    if (gGLManager.mGLSLVersionMajor > 1 || gGLManager.mGLSLVersionMinor >= 10)
+    S32 light_class = 2;
+    mVertexShaderLevel[SHADER_INTERFACE] = light_class;
+
+    // loadBasicShaders
+    vector< pair<string, S32> > shaders;
+    shaders.push_back( make_pair( "objects/indexedTextureV.glsl",           1 ) );
+    shaders.push_back( make_pair( "objects/nonindexedTextureV.glsl",        1 ) );
+    shaders.push_back( make_pair( "deferred/textureUtilV.glsl",             1 ) );
+    bool loaded = true;
+    for (U32 i = 0; i < shaders.size(); i++)
     {
-        S32 light_class = 2;
-        mVertexShaderLevel[SHADER_INTERFACE] = light_class;
-
-        // loadBasicShaders
-        vector< pair<string, S32> > shaders;
-        if (gGLManager.mGLSLVersionMajor >= 2 || gGLManager.mGLSLVersionMinor >= 30)
+        // Note usage of GL_VERTEX_SHADER
+        if (loadShaderFile(shaders[i].first, shaders[i].second, GL_VERTEX_SHADER) == 0)
         {
-            shaders.push_back( make_pair( "objects/indexedTextureV.glsl",           1 ) );
+            LL_WARNS("Shader") << "Failed to load vertex shader " << shaders[i].first << LL_ENDL;
+            loaded = false;
+            break;
         }
-        shaders.push_back( make_pair( "objects/nonindexedTextureV.glsl",        1 ) );
-        shaders.push_back( make_pair( "deferred/textureUtilV.glsl",             1 ) );
-        loaded = true;
-        for (U32 i = 0; i < shaders.size(); i++)
+    }
+
+    shaders.clear();
+
+    // fragment shaders
+    shaders.push_back( make_pair( "deferred/globalF.glsl",             1 ) );
+
+    for (U32 i = 0; i < shaders.size(); i++)
+    {
+        // Note usage of GL_FRAGMENT_SHADER
+        if (loadShaderFile(shaders[i].first, shaders[i].second, GL_FRAGMENT_SHADER) == 0)
         {
-            // Note usage of GL_VERTEX_SHADER
-            if (loadShaderFile(shaders[i].first, shaders[i].second, GL_VERTEX_SHADER) == 0)
-            {
-                LL_WARNS("Shader") << "Failed to load vertex shader " << shaders[i].first << LL_ENDL;
-                loaded = false;
-                break;
-            }
+            LL_WARNS("Shader") << "Failed to load fragment shader " << shaders[i].first << LL_ENDL;
+            loaded = false;
+            break;
         }
+    }
 
-        shaders.clear();
-
-        // fragment shaders
-        shaders.push_back( make_pair( "deferred/globalF.glsl",             1 ) );
-
-        for (U32 i = 0; i < shaders.size(); i++)
-        {
-            // Note usage of GL_FRAGMENT_SHADER
-            if (loadShaderFile(shaders[i].first, shaders[i].second, GL_FRAGMENT_SHADER) == 0)
-            {
-                LL_WARNS("Shader") << "Failed to load fragment shader " << shaders[i].first << LL_ENDL;
-                loaded = false;
-                break;
-            }
-        }
-
-        if (loaded)
-        {
-            loaded = loadShadersInterface();
-        }
+    if (loaded)
+    {
+        loaded = loadShadersInterface();
     }
 
     if (!loaded)

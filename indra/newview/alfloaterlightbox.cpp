@@ -2268,14 +2268,14 @@ void ALFloaterLightBox::updateTonemapperRows()
 void ALFloaterLightBox::refreshBloomSections()
 {
     // The renderer's own test (LLPipeline::createGLBuffers, renderFinalize):
-    // HDR bloom runs with RenderHDREnabled on GL above 4.05, and the legacy
-    // glow runs whenever it does not. Keep the two in step. The cross filter
+    // HDR bloom runs with RenderHDREnabled on, and the legacy glow runs
+    // whenever it does not. Keep the two in step. The cross filter
     // is on the HDR side with the bloom it is seeded from: it streaks what
     // the bloom pyramid's top holds, and without the pyramid it draws nothing.
     // So is the auto exposure, which renderFinalize meters only under HDR.
     // The cross filter also needs a texture barrier (generateBloomHDR), which a
     // driver with neither GL 4.5 nor a texture barrier extension does not have.
-    const bool hdr = gGLManager.mGLVersion > 4.05f && gSavedSettings.getBOOL("RenderHDREnabled");
+    const bool hdr = gSavedSettings.getBOOL("RenderHDREnabled");
     const bool cross_filter = hdr && glTextureBarrier;
     const std::pair<const char*, bool> bloom_sections[] = {
         { "sec_autoexp", hdr },

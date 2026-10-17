@@ -112,24 +112,15 @@ public:
     S32 mMaxVaryingVectors = 0;
     LLVector2 mAliasedLineRange = LLVector2(1.f, 1.f);
 
-    // GL 4.x capabilities
-    bool mHasCubeMapArray = false;
+    // What a context may have past the floor (GL_MINIMUM_VERSION). What the floor includes --
+    // GL 4.1, immutable texture storage, sRGB decode -- every context past initGL has, so it
+    // has no flag.
+
     // Debug output and object labels (glDebugMessageCallback, glObjectLabel, ...). Core in
     // 4.3, also reachable as GL_KHR_debug. Only true once glDebugMessageCallback has
     // actually resolved, so callers may trust it directly.
     bool mHasDebugOutput = false;
-    bool mHasTransformFeedback = false;
     bool mHasAnisotropic = false;
-    // Immutable texture storage (glTexStorage*). Core in 4.2, but also reachable on a
-    // 4.1 context via GL_ARB_texture_storage -- which is how macOS gets it. Only true
-    // once the entry point has actually resolved, so callers may trust it directly.
-    bool mHasTextureStorage = false;
-    // GL_EXT_texture_sRGB_decode: sampler/texture control over whether an sRGB-format
-    // texture has its transfer function applied on read. Never promoted to core, but
-    // universally supported on the hardware this viewer runs on, and REQUIRED here --
-    // the renderer decodes explicitly rather than implicitly, so it needs to be able to
-    // turn the implicit decode off. See ALSampler::SRGBDecode.
-    bool mHasTextureSRGBDecode = false;
     // Direct state access (glBindTextureUnit, glCreateSamplers, glTextureStorage*, ...).
     // Core in 4.5, also reachable as GL_ARB_direct_state_access. Only true once the entry
     // points have actually resolved, so callers may trust it directly.

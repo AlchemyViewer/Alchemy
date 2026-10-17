@@ -991,14 +991,7 @@ void LLFeatureManager::applyBaseMasks()
     {
         maskFeatures("NonAppleGPU");
     }
-    if (gGLManager.mGLVersion < 3.f)
-    {
-        maskFeatures("OpenGLPre30");
-    }
-    if (gGLManager.mNumTextureImageUnits <= 8)
-    {
-        maskFeatures("TexUnit8orLess");
-    }
+    // GL 4.1 has at least 16 texture units, so this is the fewest a context past initGL has.
     if (gGLManager.mNumTextureImageUnits <= 16)
     {
         maskFeatures("TexUnit16orLess");

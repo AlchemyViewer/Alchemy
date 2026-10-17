@@ -1806,10 +1806,7 @@ void LLImageGL::setManualSubImage(U32 target, S32 miplevel, S32 width, S32 heigh
 // quietly linearising. Harmless on a non-sRGB format: the state exists but nothing reads it.
 static void skipSRGBDecode(U32 target)
 {
-    if (gGLManager.mHasTextureSRGBDecode)
-    {
-        glTexParameteri(target, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
-    }
+    glTexParameteri(target, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
 }
 
 // Allocate a 2D texture on the currently-bound name and upload level 0.

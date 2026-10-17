@@ -460,13 +460,6 @@ bool LLRender::init(bool needs_vertex_buffer)
         LLGLState::seedState(GL_TEXTURE_CUBE_MAP_SEAMLESS, GL_TRUE);
     }
 
-#if LL_WINDOWS
-    if (glGenVertexArrays == nullptr)
-    {
-        return false;
-    }
-#endif
-
     { //bind a dummy vertex array object so we're core profile compliant
         glGenVertexArrays(1, &mDummyVAO);
         glBindVertexArray(mDummyVAO);
@@ -617,11 +610,7 @@ void LLRender::refreshState(void)
 
     glLineWidth(mLineWidth);
 
-    // Loaded only on a context with tessellation, the one that has a patch size.
-    if (glPatchParameteri)
-    {
-        glPatchParameteri(GL_PATCH_VERTICES, mPatchVertices);
-    }
+    glPatchParameteri(GL_PATCH_VERTICES, mPatchVertices);
 
     rebasePolygonOffset();
 

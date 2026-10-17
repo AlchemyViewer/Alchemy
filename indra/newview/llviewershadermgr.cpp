@@ -83,8 +83,9 @@ static S32 water_hextile()
 
 bool water_waves_supported()
 {
-    // Tessellation is GL 4.0. Intel's legacy drivers keep the flat field (LLFeatureManager::isIntelLegacy).
-    return gGLManager.mGLVersion >= 4.f && !LLFeatureManager::isIntelLegacy();
+    // Tessellation is GL 4.0, under the floor. Intel's legacy drivers keep the flat field
+    // (LLFeatureManager::isIntelLegacy).
+    return !LLFeatureManager::isIntelLegacy();
 }
 
 // Whether the session computes: a context with compute and GLSL 4.30, not one of Intel's legacy drivers
@@ -684,8 +685,6 @@ void LLViewerShaderMgr::setShaders()
 
     LLVertexBuffer::unbind();
 
-    llassert((gGLManager.mGLSLVersionMajor > 1 || gGLManager.mGLSLVersionMinor >= 10));
-
 
     S32 light_class = 3;
     S32 interface_class = 2;
@@ -881,10 +880,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     shaders.push_back( make_pair( "avatar/objectSkinV.glsl",                1 ) );
     shaders.push_back( make_pair( "deferred/textureUtilV.glsl",             1 ) );
     shaders.push_back( make_pair( "environment/waterSurface.glsl",          1 ) );
-    if (gGLManager.mGLSLVersionMajor >= 2 || gGLManager.mGLSLVersionMinor >= 30)
-    {
-        shaders.push_back( make_pair( "objects/indexedTextureV.glsl",           1 ) );
-    }
+    shaders.push_back( make_pair( "objects/indexedTextureV.glsl",           1 ) );
     shaders.push_back( make_pair( "objects/nonindexedTextureV.glsl",        1 ) );
 
     std::map<std::string, std::string> attribs;
@@ -908,7 +904,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 
     bool mirrors = gSavedSettings.getBOOL("RenderMirrors");
 
-    bool has_reflection_probes = gSavedSettings.getBOOL("RenderReflectionsEnabled") && gGLManager.mGLVersion > 3.99f;
+    bool has_reflection_probes = gSavedSettings.getBOOL("RenderReflectionsEnabled");
 
     S32 probe_level = llclamp(gSavedSettings.getS32("RenderReflectionProbeLevel"), 0, 3);
 
@@ -1045,12 +1041,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     // (in order of shader function call depth for reference purposes, deepest level first)
 
     shaders.clear();
-    S32 ch = 1;
-
-    if (gGLManager.mGLSLVersionMajor > 1 || gGLManager.mGLSLVersionMinor >= 30)
-    { //use indexed texture rendering for GLSL >= 1.30
-        ch = llmax(LLGLSLShader::sIndexedTextureChannels, 1);
-    }
+    S32 ch = llmax(LLGLSLShader::sIndexedTextureChannels, 1);
 
 
     std::vector<S32> index_channels;
@@ -3089,7 +3080,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         llassert(success);
     }
 
-    if (success && gGLManager.mGLVersion > 3.9f)
+    if (success)
     {
         std::vector<std::pair<std::string, std::string>> quality_levels = { {"12", "Low"},
                                                                              {"23", "Medium"},
@@ -3109,14 +3100,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
                 gFXAAProgram[i].clearPermutations();
                 gFXAAProgram[i].addPermutation("FXAA_QUALITY_PRESET", quality_pair.first);
-                if (gGLManager.mGLVersion > 3.9)
-                {
-                    gFXAAProgram[i].addPermutation("FXAA_GLSL_400", "1");
-                }
-                else
-                {
-                    gFXAAProgram[i].addPermutation("FXAA_GLSL_130", "1");
-                }
+                gFXAAProgram[i].addPermutation("FXAA_GLSL_400", "1");
 
                 gFXAAProgram[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
                 success = gFXAAProgram[i].createShader();
@@ -3142,7 +3126,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
     }
 
-    if (gGLManager.mGLVersion > 3.15f && success)
+    if (success)
     {
         std::vector<std::pair<std::string, std::string>> quality_levels = { {"SMAA_PRESET_LOW", "Low"},
                                                                              {"SMAA_PRESET_MEDIUM", "Medium"},
@@ -3157,12 +3141,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         for (const auto& smaa_pair : quality_levels)
         {
             std::map<std::string, std::string> defines;
-            if (gGLManager.mGLVersion >= 4.f)
-                defines.emplace("SMAA_GLSL_4", "1");
-            else if (gGLManager.mGLVersion >= 3.1f)
-                defines.emplace("SMAA_GLSL_3", "1");
-            else
-                defines.emplace("SMAA_GLSL_2", "1");
+            defines.emplace("SMAA_GLSL_4", "1");
             defines.emplace("SMAA_PREDICATION", smaa_predication ? "1" : "0");
             if (smaa_predication)
             {
@@ -3264,7 +3243,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
     }
 
-    if (success && gGLManager.mGLVersion > 4.05f)
+    if (success)
     {
         gCASProgram.mName = "Contrast Adaptive Sharpening Shader";
         gCASProgram.mFeatures.hasSrgb = true;
@@ -4396,7 +4375,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         success = gGaussianProgram.createShader();
     }
 
-    if (success && gGLManager.mHasCubeMapArray)
+    if (success)
     {
         gRadianceGenProgram.mName = "Radiance Gen Shader";
         gRadianceGenProgram.mShaderFiles.clear();
@@ -4407,7 +4386,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         success = gRadianceGenProgram.createShader();
     }
 
-    if (success && gGLManager.mHasCubeMapArray)
+    if (success)
     {
         gHeroRadianceGenProgram.mName = "Hero Radiance Gen Shader";
         gHeroRadianceGenProgram.mShaderFiles.clear();
@@ -4419,7 +4398,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         success                              = gHeroRadianceGenProgram.createShader();
     }
 
-    if (success && gGLManager.mHasCubeMapArray)
+    if (success)
     {
         gSHProjectionProgram.mName = "SH Irradiance Projection Shader";
         gSHProjectionProgram.mShaderFiles.clear();
@@ -4431,7 +4410,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         success = gSHProjectionProgram.createShader();
     }
 
-    if (success && gGLManager.mHasCubeMapArray)
+    if (success)
     {
         // Row-parallel form of the projection above: one fragment per coefficient and face row,
         // then a reduce that adds the rows. The same integrand over 6 x R times more fragments
@@ -4445,7 +4424,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         success = gSHProjectionRowsProgram.createShader();
     }
 
-    if (success && gGLManager.mHasCubeMapArray)
+    if (success)
     {
         gSHProjectionReduceProgram.mName = "SH Irradiance Projection Reduce Shader";
         gSHProjectionReduceProgram.mShaderFiles.clear();

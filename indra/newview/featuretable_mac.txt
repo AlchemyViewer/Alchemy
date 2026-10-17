@@ -413,9 +413,6 @@ RenderDisableVintageMode           1   0
 RenderMaxTextureResolution         1   2048
 RenderReflectionProbeCount  0   0
 
-list TexUnit8orLess
-RenderDeferredSSAO			0	0
-
 list TexUnit16orLess
 RenderTerrainPBRDetail      1   -1
 

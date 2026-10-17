@@ -615,7 +615,6 @@ static void settings_modify()
 {
     LLPipeline::sRenderTransparentWater = gSavedSettings.getBOOL("RenderTransparentWater");
     LLPipeline::sRenderDeferred = true; // false is deprecated
-    LLRenderTarget::sUseFBO = LLPipeline::sRenderDeferred;
     LLDrawPoolTerrain::sLODFactor = gSavedSettings.getF32("RenderTerrainLODFactor");
     LLDrawPoolTerrain::sLODFactor *= LLDrawPoolTerrain::sLODFactor; //square lod factor to get exponential range of [1,4]
     gDebugGL       = gDebugGLSession || gDebugSession;
