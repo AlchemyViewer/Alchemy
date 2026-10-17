@@ -47,6 +47,7 @@ set(
   alimageslot.h
   alprimitiveplot.h
   alquerypool.h
+  alrendertargetdesc.h
   alsamplerstate.h
   altexture3d.h
   altextureslot.h
@@ -149,8 +150,8 @@ if(AL_BUILD_TESTS)
 
   # The suites that need no GL: arithmetic (where a local coordinate lands
   # under the UI transform; the matrix stack, the projection helpers and the
-  # clip-plane classes; the GL floor's version test), and the font tables and
-  # shaping. alfontshaping holds both Unicode tables against each other, so
+  # clip-plane classes; the GL floor's version test), the font tables and
+  # shaping, and render target descriptions. alfontshaping holds both Unicode tables against each other, so
   # this binary links ICU, which llrender itself has no need of.
   al_add_test_binary(
     llrender_tests
@@ -158,6 +159,7 @@ if(AL_BUILD_TESTS)
     SOURCES
       tests/alfontcolrv1_test.cpp
       tests/alfontshaping_test.cpp
+      tests/alrendertargetdesc_test.cpp
       tests/llfontbitmapcache_test.cpp
       tests/llfontfreetype_test.cpp
       tests/llfontregistry_test.cpp
