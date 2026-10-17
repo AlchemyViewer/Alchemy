@@ -94,10 +94,12 @@ void main()
     // where the haze has already taken the clouds most of the way to the horizon's colour.
     float altitude_blend_factor = smoothstep(0.0, 0.035, rel_pos.y / length(rel_pos));
 
-    // Set altitude
+    // Set altitude. max_y is held at 1 m or more, as skyF and calcAtmosphericVars hold it: the
+    // sky settings allow 0, which would scale every rising ray to the origin and normalize it
+    // into NaN.
     if (rel_pos.y > 0)
     {
-        rel_pos *= (max_y / rel_pos.y);
+        rel_pos *= (max(max_y, 1.0) / rel_pos.y);
     }
     if (rel_pos.y < 0)
     {
@@ -118,7 +120,9 @@ void main()
     light_atten = (blue_density + vec3(haze_density * 0.25)) * (density_multiplier * max_y);
 
     // Calculate relative weights
-    vec3 combined_haze = abs(blue_density) + vec3(abs(haze_density));
+    // Floored as skyF and calcAtmosphericVars floor it: a channel with both densities 0, which
+    // the settings allow, would otherwise weigh 0 / 0.
+    vec3 combined_haze = max(abs(blue_density) + vec3(abs(haze_density)), vec3(1e-6));
     vec3 blue_weight   = blue_density / combined_haze;
     vec3 haze_weight   = haze_density / combined_haze;
 

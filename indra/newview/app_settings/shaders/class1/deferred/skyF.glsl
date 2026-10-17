@@ -106,10 +106,12 @@ void main()
     // Get relative position
     vec3 rel_pos = pos.xyz - camPosLocal.xyz + vec3(0, 50, 0);
 
-    // Adj position vector to clamp altitude
+    // Adj position vector to clamp altitude. max_y is held at 1 m or more, as calcAtmosphericVars
+    // holds it: the sky settings allow 0, which would scale every rising ray to the origin and
+    // normalize it into NaN.
     if (rel_pos.y > 0.)
     {
-        rel_pos *= (max_y / rel_pos.y);
+        rel_pos *= (max(max_y, 1.0) / rel_pos.y);
     }
     if (rel_pos.y < 0.)
     {
