@@ -8994,7 +8994,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                     F32                         white = llmax(1.0f, tonemap_aces_white());
 
                     // These constants must match those in the shader code.
-                    const float exposure_bias = 1.8f;
+                    const float exposure_bias = 1.2f;
                     const float A             = 0.0245786f;
                     const float B             = 0.000090537f;
                     const float C             = 0.983729f;
