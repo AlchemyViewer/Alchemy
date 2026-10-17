@@ -81,6 +81,7 @@ float unpackRoughness(vec2 p);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 bool clipProjectedLightVars(vec3 center, vec3 pos, out float dist, out float l_dist, out vec3 lv, out vec4 proj_tc );
 vec4 getNorm(vec2 screenpos);
+vec4 getNormRaw(vec2 screenpos);
 vec3 getProjectedLightAmbiance(float amb_da, float attenuation, float lit, float nl, float noise, vec2 projected_uv);
 vec3 getProjectedLightDiffuseColor(float light_distance, vec2 projected_uv );
 vec2 getScreenCoord(vec4 clip);
@@ -124,6 +125,28 @@ void main()
         discard;
     }
 
+    float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
+    if (dist_atten <= 0.0)
+    {
+        discard;
+    }
+
+    // Outside the cookie's frustum the light adds nothing but a legacy surface's reflection of
+    // the projector (its envIntensity term below), so the normal texel alone, which carries the
+    // flag and envIntensity, decides whether the rest is read. The frustum is each branch's own:
+    // the PBR one lights within proj_tc's unit square, the legacy one in front of the light too.
+    {
+        vec4 norm_raw  = getNormRaw(tc);
+        bool pbr       = GET_GBUFFER_FLAG(norm_raw.w, GBUFFER_FLAG_HAS_PBR);
+        bool in_cookie = proj_tc.x > 0.0 && proj_tc.x < 1.0
+                      && proj_tc.y > 0.0 && proj_tc.y < 1.0
+                      && (pbr || proj_tc.z > 0.0);
+        if (!in_cookie && (pbr || !(norm_raw.b > 0.0)))
+        {
+            discard;
+        }
+    }
+
     float shadow = 1.0;
 
     if (proj_shadow_idx >= 0)
@@ -137,12 +160,6 @@ void main()
     GBufferInfo gb = getGBuffer(tc);
 
     vec3 n = gb.normal;
-
-    float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
-    if (dist_atten <= 0.0)
-    {
-        discard;
-    }
 
     lv = proj_origin-pos.xyz;
     vec3  h, l, v = -normalize(pos);
