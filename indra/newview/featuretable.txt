@@ -428,10 +428,10 @@ RenderGLMultiThreadedTextures       1   1
 list NVIDIA
 RenderGLMultiThreadedTextures      1   0
 
-// Intel's drivers short of OpenGL 4.6 (LLFeatureManager::isIntelLegacy):
-// chiefly Haswell and Broadwell, which report 4.3 or 4.4. The viewer also
-// keeps them from compute and the shader cache, and the waves from users
-// who already have them on.
+// Intel's drivers short of OpenGL 4.6 (LLGLManager::isIntelLegacy):
+// chiefly Haswell and Broadwell, which report 4.3 or 4.4. Every entry is
+// held at each start, not only when a level is applied (holdUnavailable).
+// The viewer also keeps them from compute and the shader cache.
 list IntelLegacy
 RenderFSAAType  			0	0
 RenderFSAASamples           0   0

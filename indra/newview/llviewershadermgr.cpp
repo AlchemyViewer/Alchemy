@@ -81,20 +81,13 @@ static S32 water_hextile()
     return (S32)llmin(gSavedSettings.getU32("AlchemyRenderWaterHextile"), 2U);
 }
 
-bool water_waves_supported()
-{
-    // Tessellation is GL 4.0, under the floor. Intel's legacy drivers keep the flat field
-    // (LLFeatureManager::isIntelLegacy).
-    return !LLFeatureManager::isIntelLegacy();
-}
-
 // Whether the session computes: a context with compute and GLSL 4.30, not one of Intel's legacy drivers
-// (LLFeatureManager::isIntelLegacy), and AlchemyRenderDisableCompute off. Read at shader load, as everything built on
+// (LLGLManager::isIntelLegacy), and AlchemyRenderDisableCompute off. Read at shader load, as everything built on
 // it is.
 static bool compute_enabled()
 {
     const S32 glsl = gGLManager.mGLSLVersionMajor * 100 + gGLManager.mGLSLVersionMinor;
-    return gGLManager.mHasCompute && glsl >= 430 && !LLFeatureManager::isIntelLegacy() &&
+    return gGLManager.mHasCompute && glsl >= 430 && !gGLManager.isIntelLegacy() &&
            !gSavedSettings.getBOOL("AlchemyRenderDisableCompute");
 }
 
@@ -618,9 +611,9 @@ void LLViewerShaderMgr::setShaders()
             gSavedSettings.setString("RenderShaderCacheVersion", current_cache_version.asString());
         }
 
-        // Intel's legacy drivers build every program from source (LLFeatureManager::isIntelLegacy).
+        // Intel's legacy drivers build every program from source (LLGLManager::isIntelLegacy).
         initShaderCache(
-            shader_cache_enabled && !LLFeatureManager::isIntelLegacy(),
+            shader_cache_enabled && !gGLManager.isIntelLegacy(),
             old_cache_version,
             current_cache_version,
             LLAppViewer::instance()->isSecondInstance());

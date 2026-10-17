@@ -2094,7 +2094,7 @@ bool LLGLManager::initGL()
         return false;
     };
 
-    if (mGLVersion < GL_MINIMUM_VERSION)
+    if (!meetsVersionFloor(mGLVersion))
     {
         return refuse("OpenGL 4.1");
     }
@@ -2469,6 +2469,21 @@ void LLGLManager::asLLSD(LLSD& info)
     info["is_intel"] = mIsIntel;
 
     info["gl_renderer"] = mGLRenderer;
+}
+
+// static
+bool LLGLManager::meetsVersionFloor(F32 gl_version)
+{
+    return gl_version >= GL_MINIMUM_VERSION;
+}
+
+bool LLGLManager::isIntelLegacy() const
+{
+#if LL_DARWIN
+    return false;
+#else
+    return mIsIntel && mGLVersion < 4.59f;
+#endif
 }
 
 void LLGLManager::shutdownGL()
