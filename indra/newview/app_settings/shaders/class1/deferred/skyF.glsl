@@ -87,14 +87,16 @@ vec3 rainbow(float d)
     d = clamp(d, 0.0, 0.25) + interior_coord;
 
     float rad = (droplet_radius - 5.0f) / 1024.0f;
-    return pow(texture(rainbow_map, vec2(rad+0.5, d)).rgb, vec3(1.8)) * moisture_level;
+    // Level 0, here and in halo22: both are read inside the HDRI split's per-pixel branch, where
+    // an implicit LOD's derivatives are undefined, and both lookups vary slowly across the dome.
+    return pow(textureLod(rainbow_map, vec2(rad+0.5, d), 0.0).rgb, vec3(1.8)) * moisture_level;
 }
 
 vec3 halo22(float d)
 {
     d       = clamp(d, 0.1, 1.0);
     float v = sqrt(clamp(1 - (d * d), 0, 1));
-    return texture(halo_map, vec2(0, v)).rgb * ice_level;
+    return textureLod(halo_map, vec2(0, v), 0.0).rgb * ice_level;
 }
 
 // Hides the R11F_G11F_B10F emissive attachment's 6/6/5-mantissa banding in this writer's
