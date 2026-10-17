@@ -144,6 +144,14 @@ void preProbeSample(vec3 pos)
     // TODO: make some sort of structure that reduces the number of distance checks
     for (int i = start; i < refmapCount && probeInfluences < REF_SAMPLE_COUNT; ++i)
     {
+        // The probes are sorted on the nearest depth their bounding sphere reaches (refParams.w),
+        // which the bucket's lower bound already relies on: from the first that lies wholly
+        // beyond this point on, none can hold it.
+        if (refParams[i].w > -pos.z)
+        {
+            break;
+        }
+
         // found an influencing probe
         if (shouldSampleProbe(i, pos))
         {

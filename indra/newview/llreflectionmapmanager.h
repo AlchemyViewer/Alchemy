@@ -77,7 +77,8 @@ public:
         //  x - irradiance scale
         //  y - radiance scale
         //  z - fade in
-        //  w - unused (std140 keeps this a vec4)
+        //  w - nearest view depth of the probe's bounding sphere (mMinDepth), which the list is
+        //      sorted on: the shader's scan stops at the first probe beyond the pixel
         LLVector4 refParams[LL_MAX_REFLECTION_PROBE_COUNT];
 
         LLVector4 heroSphere;
