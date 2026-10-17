@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "llavatarappearancedefines.h"
+#include "lldrawpoolalpha.h"
 #include "llenvironment.h"
 #include "llselectmgr.h"
 #include "llviewercamera.h"
@@ -429,6 +430,11 @@ void fixup_shader_constants(LLGLSLShader& shader)
     // program declares them for, and the next bind through bindShadowMaps hands the program its real set again.
     constexpr S32 every_shadow_map = (1 << 6) - 1;
     shader.uniform1i(LLShaderMgr::UNBUILT_SHADOW_MAPS, every_shadow_map);
+
+    // Every alpha mode draws through the alpha pool's program here, and the material's bind sets a
+    // mask or opaque cutoff but leaves a blended one to the pass: without this a blended sphere
+    // would keep the cutoff of whichever preview drew before it.
+    LLDrawPoolAlpha::setCoverageCutoff(&shader);
 }
 
 // Set a variable to a value temporarily, and restor the variable's old value

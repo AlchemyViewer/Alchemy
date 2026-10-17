@@ -60,6 +60,12 @@ LLVector4 LLDrawPoolAlpha::sWaterPlane;
 // minimum alpha before discarding a fragment
 static const F32 MINIMUM_ALPHA = 0.004f; // ~ 1/255
 
+// static
+void LLDrawPoolAlpha::setCoverageCutoff(LLGLSLShader* shader)
+{
+    shader->setMinimumAlpha(MINIMUM_ALPHA);
+}
+
 LLDrawPoolAlpha::LLDrawPoolAlpha(U32 type) :
         LLRenderPass(type), target_shader(NULL),
         mColorSFactor(LLRender::BF_UNDEF), mColorDFactor(LLRender::BF_UNDEF),
