@@ -968,8 +968,8 @@ public:
     bool                    mLensFlareStateValid = false;
     bool                    mLensFlareSunUp = true;    // which body the history describes
 
-    // FXAA helper target
-    LLRenderTarget          mFXAAMap;
+    // SMAA's intermediates: its edges and its blend weights
+    LLRenderTarget          mSMAAEdgeMap;
     LLRenderTarget          mSMAABlendBuffer;
 
     // downres scratch space for GPU downscaling of textures

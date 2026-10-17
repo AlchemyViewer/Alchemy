@@ -104,7 +104,6 @@ extern LLGLSLShader         gHeroRadianceGenProgram;
 extern LLGLSLShader         gSHProjectionProgram;
 extern LLGLSLShader         gSHProjectionRowsProgram;
 extern LLGLSLShader         gSHProjectionReduceProgram;
-extern LLGLSLShader         gGlowCombineFXAAProgram;
 extern LLGLSLShader         gDebugProgram;
 enum NormalDebugShaderVariant : S32
 {

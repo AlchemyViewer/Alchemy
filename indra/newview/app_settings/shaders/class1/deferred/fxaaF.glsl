@@ -31,6 +31,12 @@ out vec4 frag_color;
 //#define FXAA_GLSL_130 1
 //#define FXAA_QUALITY_PRESET 12
 
+// Luma is computed from the colour at each tap rather than read from a baked alpha, so FXAA reads
+// the post chain's own target at its own precision (RGB10_A2 under HDR) with no bake pass ahead of
+// it. A gather fetches a single channel, so the alpha gathers are off with it.
+#define FXAA_LUMA_FROM_RGB 1
+#define FXAA_GATHER4_ALPHA 0
+
 /*============================================================================
 
 
@@ -754,7 +760,12 @@ NOTE the other tuning knobs are now in the shader function inputs!
 /*============================================================================
                    GREEN AS LUMA OPTION SUPPORT FUNCTION
 ============================================================================*/
-#if (FXAA_GREEN_AS_LUMA == 0)
+#if (FXAA_LUMA_FROM_RGB == 1) && (FXAA_GATHER4_ALPHA == 1)
+    #error "FXAA_LUMA_FROM_RGB has no luma in alpha for the alpha gathers to read"
+#endif
+#if (FXAA_LUMA_FROM_RGB == 1)
+    FxaaFloat FxaaLuma(FxaaFloat4 rgba) { return dot(rgba.xyz, FxaaFloat3(0.299, 0.587, 0.114)); }
+#elif (FXAA_GREEN_AS_LUMA == 0)
     FxaaFloat FxaaLuma(FxaaFloat4 rgba) { return rgba.w; }
 #else
     FxaaFloat FxaaLuma(FxaaFloat4 rgba) { return rgba.y; }
@@ -959,7 +970,9 @@ FxaaFloat4 FxaaPixelShader(
         #define lumaW luma4B.x
     #else
         FxaaFloat4 rgbyM = FxaaTexTop(tex, posM);
-        #if (FXAA_GREEN_AS_LUMA == 0)
+        #if (FXAA_LUMA_FROM_RGB == 1)
+            FxaaFloat lumaM = FxaaLuma(rgbyM);
+        #elif (FXAA_GREEN_AS_LUMA == 0)
             #define lumaM rgbyM.w
         #else
             #define lumaM rgbyM.y
