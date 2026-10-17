@@ -1127,11 +1127,11 @@ bool LLAppViewer::init()
     ALCrashReporter::setTag("gpu_driver", gGLManager.mDriverVersionVendorString);
     ALCrashReporter::setTag("vram_mb", std::to_string(gGLManager.mVRAM));
 
-    // If we don't have the right GL requirements, exit.
-    // ? AG: It seems we never set mHasRequirements to false
+    // If we don't have the right GL requirements, exit. LLGLManager::initGL clears it when it refuses a
+    // context below the floor, and the window has failed to open by then.
     if (!gGLManager.mHasRequirements)
     {
-        // Already handled with a MBVideoDrvErr
+        // Already told to the user by the window, with MBGLVersionErr
         LL_WARNS("InitInfo") << "gGLManager.mHasRequirements is false." << LL_ENDL;
         // quit immediately
         LL_PROFILER_FRAME_END;

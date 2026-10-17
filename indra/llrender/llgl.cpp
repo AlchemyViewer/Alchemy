@@ -2115,16 +2115,20 @@ bool LLGLManager::initGL()
         parse_glsl_version(mGLSLVersionMajor, mGLSLVersionMinor);
     }
 
-    // The renderer assumes GL 4.1 unconditionally: deprecated formats are re-expressed
-    // via GL_TEXTURE_SWIZZLE_RGBA rather than repacked on the CPU, the texture upload
-    // thread is always enabled, and the shader backend expects GLSL 4.10. Below the
-    // floor those assumptions do not hold and behaviour is undefined rather than
-    // degraded. This is a diagnostic only -- refusing to launch is a separate change.
+    // The floor (GL_MINIMUM_VERSION). Nothing past here adapts to a context below it, so it is
+    // refused rather than run: the window tells the user what it lacks and the viewer quits.
+    const auto refuse = [this](const char* missing)
+    {
+        mHasRequirements  = false;
+        mUnmetRequirement = missing;
+        LL_WARNS("RenderInit") << "Refusing OpenGL " << mGLVersionString << " on " << mGLRenderer
+                               << ": the viewer needs " << missing << LL_ENDL;
+        return false;
+    };
+
     if (mGLVersion < GL_MINIMUM_VERSION)
     {
-        LL_WARNS("RenderInit") << "OpenGL " << mGLVersionString << " is below the "
-                               << GL_MINIMUM_VERSION << " minimum this viewer requires. "
-                               << "Rendering will misbehave." << LL_ENDL;
+        return refuse("OpenGL 4.1");
     }
 
     // Trailing space necessary to keep "nVidia Corpor_ati_on" cards
@@ -2168,6 +2172,16 @@ bool LLGLManager::initGL()
 
     // This is called here because it depends on the setting of mIsGF2or4MX, and sets up mHasMultitexture.
     initExtensions();
+
+    // The rest of the floor, once initExtensions has said whether the entry points resolved.
+    if (!mHasTextureStorage)
+    {
+        return refuse("GL_ARB_texture_storage");
+    }
+    if (!mHasTextureSRGBDecode)
+    {
+        return refuse("GL_EXT_texture_sRGB_decode");
+    }
 
     U32 old_vram = mVRAM;
     mVRAM = 0;
@@ -2565,33 +2579,19 @@ void LLGLManager::initExtensions()
         mHasAnisotropic = mGLExtensions.contains("GL_EXT_texture_filter_anisotropic");
     }
 
-    // Core in 4.2; on a 4.1 context (macOS) it is still reachable as an ARB extension.
+    // Core in 4.2; on a 4.1 context (macOS, GLOn12) it is still reachable as an ARB extension.
     // Downgraded below if the entry point turns out not to resolve.
     //
-    // REQUIRED, alongside GL 4.1 -- not a capability the renderer adapts to. Every texture
-    // is allocated with glTexStorage2D and written by sub-image thereafter, which is the
-    // only model D3D11/12 and Vulkan have: dimensions, format and mip count fixed at
-    // creation. There is no mutable path left to fall back to. Diagnostic only, matching
-    // the GL_MINIMUM_VERSION check -- refusing to launch is a separate change.
+    // Part of the floor: initGL refuses a context without it. Every texture is allocated with
+    // glTexStorage* and written by sub-image thereafter, which is the only model D3D11/12 and
+    // Vulkan have: dimensions, format and mip count fixed at creation.
     mHasTextureStorage = mGLVersion >= 4.19f || mGLExtensions.contains("GL_ARB_texture_storage");
-    if (!mHasTextureStorage)
-    {
-        LL_WARNS("RenderInit") << "OpenGL " << mGLVersionString << " exposes neither GL 4.2 nor "
-                               << "GL_ARB_texture_storage, which this viewer requires. Texture "
-                               << "allocation will fail." << LL_ENDL;
-    }
 
-    // REQUIRED, like immutable storage. Never promoted to core, so it is an extension
-    // query at every version. Without it an sRGB-format texture always applies its
-    // transfer function on read and there is no way to say otherwise, which the renderer
-    // relies on being able to do -- see ALSampler::SRGBDecode.
+    // Part of the floor too. Never promoted to core, so it is an extension query at every
+    // version. Without it an sRGB-format texture always applies its transfer function on read
+    // and there is no way to say otherwise, which the renderer relies on being able to do --
+    // see ALSampler::SRGBDecode.
     mHasTextureSRGBDecode = mGLExtensions.contains("GL_EXT_texture_sRGB_decode");
-    if (!mHasTextureSRGBDecode)
-    {
-        LL_WARNS("RenderInit") << "GL_EXT_texture_sRGB_decode is missing. sRGB-format "
-                               << "textures will decode on every read regardless of what the "
-                               << "sampler asks for." << LL_ENDL;
-    }
 
     // Core in 4.5; also an ARB extension. Downgraded below if the entry points don't resolve.
     mHasDirectStateAccess = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_direct_state_access");
@@ -2635,11 +2635,10 @@ void LLGLManager::initExtensions()
 
         if (!glTexStorage2D)
         {
-            // Advertised but not resolvable. Don't let callers trust the flag.
+            // Advertised but not resolvable, which initGL refuses as it would its absence.
             mHasTextureStorage = false;
             LL_WARNS("RenderInit") << "Immutable texture storage advertised (GL " << mGLVersion
-                                   << ") but glTexStorage2D did not resolve; using mutable textures."
-                                   << LL_ENDL;
+                                   << ") but glTexStorage2D did not resolve" << LL_ENDL;
         }
         else
         {
@@ -2647,11 +2646,6 @@ void LLGLManager::initExtensions()
                                    << (mGLVersion >= 4.19f ? ", core)" : ", GL_ARB_texture_storage)")
                                    << LL_ENDL;
         }
-    }
-    else
-    {
-        LL_INFOS("RenderInit") << "Immutable texture storage unavailable (GL " << mGLVersion
-                               << ", no GL_ARB_texture_storage); using mutable textures." << LL_ENDL;
     }
 
     // Immutable buffer storage. Resolved here for the same reason as glTexStorage above: the

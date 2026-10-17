@@ -175,24 +175,31 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     if(createContext(x, y, width, height, 32, fullscreen, enable_vsync))
     {
         gGLManager.initWGL();
-        gGLManager.initGL();
-#if LL_WINDOWS
-        // GL didn't always report a VRAM budget (notably Intel iGPUs); ask DXGI.
-        LLDXHardware::updateVRAMBudgetFromDXGI();
-#endif
-
-        // Tracy's GPU context makes GL calls, so it waits for initGL to load
-        // the entry points, as on Win32.
+        if (!gGLManager.initGL())
         {
-            LL_PROFILER_GPU_CONTEXT;
+            // Closes the window, which leaves it invalid, so the viewer does not start.
+            setupFailure(glInitFailureMessage(), "Error", OSMB_OK);
         }
-#if LL_LINUX
-        armGraphicsResetCheck();
+        else
+        {
+#if LL_WINDOWS
+            // GL didn't always report a VRAM budget (notably Intel iGPUs); ask DXGI.
+            LLDXHardware::updateVRAMBudgetFromDXGI();
 #endif
 
-        //start with arrow cursor
-        initCursors();
-        setCursor( UI_CURSOR_ARROW );
+            // Tracy's GPU context makes GL calls, so it waits for initGL to load
+            // the entry points, as on Win32.
+            {
+                LL_PROFILER_GPU_CONTEXT;
+            }
+#if LL_LINUX
+            armGraphicsResetCheck();
+#endif
+
+            //start with arrow cursor
+            initCursors();
+            setCursor( UI_CURSOR_ARROW );
+        }
     }
 
     stop_glerror();

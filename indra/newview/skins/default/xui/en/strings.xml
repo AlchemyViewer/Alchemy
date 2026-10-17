@@ -4007,6 +4007,13 @@ Running in window.
 
 If you continue to receive this message, contact the [SUPPORT_SITE].
 	</string>
+	<string name="MBGLVersionErr">
+		[APP_NAME] needs [MISSING], which this graphics driver does not provide:
+
+[RENDERER], OpenGL [VERSION]
+
+Installing the latest driver for this graphics card may provide it. If the latest driver does not, [APP_NAME] cannot run on this graphics card.
+	</string>
     <string name="MBOutOfMemoryTitle">Out Of Memory</string>
     <string name="MBOutOfMemoryErr">
         [APP_NAME]'s request for memory failed. Application can't proceed and will be closed.

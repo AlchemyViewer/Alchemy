@@ -583,7 +583,7 @@ void LLViewerShaderMgr::setShaders()
 
     if (!gGLManager.mHasRequirements)
     {
-        // Viewer will show 'hardware requirements' warning later
+        // The window refused the context and told the user why
         LL_INFOS("ShaderLoading") << "Not supported hardware/software" << LL_ENDL;
         return;
     }

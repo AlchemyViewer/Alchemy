@@ -1762,14 +1762,20 @@ const   S32   max_format  = (S32)num_formats - 1;
         << " Depth Bits " << S32(pfd.cDepthBits)
         << LL_ENDL;
 
-    mhRC = 0;
-    if (wglCreateContextAttribsARB)
-    { //attempt to create a specific versioned context
-        mhRC = (HGLRC) createSharedContext();
-        if (!mhRC)
-        {
-            return false;
-        }
+    // Only WGL_ARB_create_context asks for a version and a profile. Without it there is no context to
+    // make that can meet the floor, the same as without wgl_ARB_pixel_format above.
+    if (!wglCreateContextAttribsARB)
+    {
+        LL_WARNS("Window") << "No WGL_ARB_create_context extension!" << LL_ENDL;
+        LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBVideoDrvErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+        close();
+        return false;
+    }
+
+    mhRC = (HGLRC) createSharedContext();
+    if (!mhRC)
+    {
+        return false;
     }
 
     if (!wglMakeCurrent(mhDC, mhRC))
@@ -1783,7 +1789,7 @@ const   S32   max_format  = (S32)num_formats - 1;
 
     if (!gGLManager.initGL())
     {
-        LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBVideoDrvErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+        LLError::LLUserWarningMsg::show(glInitFailureMessage(), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
         close();
         return false;
     }

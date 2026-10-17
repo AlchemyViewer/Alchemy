@@ -62,10 +62,11 @@ void ll_close_fail_log();
 
 class LLSD;
 
-// Hard minimum OpenGL version. The renderer assumes this unconditionally rather than
-// degrading below it: deprecated formats are re-expressed through GL_TEXTURE_SWIZZLE_RGBA
-// instead of being repacked on the CPU, the texture upload thread is always enabled, and
-// the shader backend expects GLSL 4.10.
+// The viewer's floor: a GL 4.1 context with immutable texture storage (core in 4.2, or
+// GL_ARB_texture_storage) and GL_EXT_texture_sRGB_decode. LLGLManager::initGL refuses a context
+// below it, so nothing past initGL adapts to less: deprecated formats are re-expressed through
+// GL_TEXTURE_SWIZZLE_RGBA, every texture is allocated by glTexStorage*, sRGB decode is a sampler
+// decision, and the shader backend compiles GLSL 4.00 or later.
 //
 // Biased down by 0.01 like the other version checks in this file, because mGLVersion is
 // assembled as major + minor * 0.1f and 4.1f is not exactly representable.
@@ -200,8 +201,10 @@ public:
     // hints to the render pipe
     U32 mDownScaleMethod = 0; // see settings.xml RenderDownScaleMethod
 
-    // Whether this version of GL is good enough for SL to use
+    // Whether the context meets the floor (GL_MINIMUM_VERSION). False once initGL has refused it, and
+    // mUnmetRequirement then names what it lacks: "OpenGL 4.1", or the extension it does not have.
     bool mHasRequirements;
+    std::string mUnmetRequirement;
 
     S32 mDriverVersionMajor;
     S32 mDriverVersionMinor;
