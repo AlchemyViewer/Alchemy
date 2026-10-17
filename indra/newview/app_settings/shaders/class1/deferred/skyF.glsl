@@ -146,9 +146,9 @@ void main()
         // block's sky_light and sky_ambient (LLSettingsVOSky::applySpecial)
         vec3 sunlight = sky_light;
 
-        // Sunlight attenuation effect (hue and brightness) due to atmosphere
-        // this is used later for sunlight modulation at various altitudes
-        vec3 light_atten = (blue_density + vec3(haze_density * 0.25)) * (density_multiplier * max_y);
+        // Sunlight attenuation effect (hue and brightness) due to atmosphere, per unit of the
+        // light's path: the Environment block's sky_light_atten
+        vec3 light_atten = sky_light_atten;
 
         // The relative weights, blue_weight and haze_weight, and the haze_extinction they are
         // shares of, are the Environment block's (LLSettingsVOSky::applySpecial).
@@ -186,8 +186,8 @@ void main()
         // Final atmosphere additive
         color *= (1. - combined_haze);
 
-        // Increase ambient when there are more clouds
-        vec3 ambient = sky_ambient + max(vec3(0), (1. - sky_ambient)) * cloud_shadow * 0.5;
+        // Increase ambient when there are more clouds: the Environment block's sky_ambient_below
+        vec3 ambient = sky_ambient_below;
 
         // Dim sunlight by cloud shadow percentage
         sunlight *= max(0.0, (1. - cloud_shadow));

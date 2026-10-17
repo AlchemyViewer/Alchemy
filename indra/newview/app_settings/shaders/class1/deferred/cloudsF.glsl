@@ -118,9 +118,9 @@ void main()
     vec3 sunlight = sky_sunlight;
     vec3 light_atten;
 
-    // Sunlight attenuation effect (hue and brightness) due to atmosphere
-    // this is used later for sunlight modulation at various altitudes
-    light_atten = (blue_density + vec3(haze_density * 0.25)) * (density_multiplier * max_y);
+    // Sunlight attenuation effect (hue and brightness) due to atmosphere, per unit of the light's
+    // path: the Environment block's sky_light_atten
+    light_atten = sky_light_atten;
 
     // The relative weights, blue_weight and haze_weight, and the haze_extinction they are shares
     // of, are the Environment block's (LLSettingsVOSky::applySpecial), floored there so a channel
@@ -164,10 +164,8 @@ void main()
     vec3 additiveColorBelowCloud =
         (blue_horizon * blue_weight * (sunlight + tmpAmbient) + (haze_horizon * haze_weight) * (sunlight * haze_glow + tmpAmbient));
 
-    // CLOUDS
-    sunlight = sky_sunlight;
-    off_axis = 1.0 / max(1e-6, lightnorm.y * 2.);
-    sunlight *= exp(-light_atten * off_axis);
+    // CLOUDS: the sun attenuated over twice its elevation, the Environment block's cloud_sunlight
+    sunlight = cloud_sunlight;
 
     // Cloud color out
     vec3 cloudColorSun = (sunlight * haze_glow) * cloud_color;

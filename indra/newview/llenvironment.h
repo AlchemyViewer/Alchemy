@@ -278,10 +278,11 @@ public:
     // space to the sky dome's frame, taken from the camera update() is given -- the main view,
     // or each probe face -- so every shader that hazes geometry works in the sky's frame.
     //
-    // The sun's, moon's and ambient light the atmospherics read are here and nowhere else: the
-    // light lit geometry takes (LLSettingsSky::getLitLightColors, the same LLPipeline's light 0
-    // is), the sky dome's, and the ambient applySpecial decides. A pass that lights an object
-    // under a light of its own binds a copy (bindEnvironmentUBOLitBy).
+    // The sun's, moon's and ambient light the atmospherics read are here and nowhere else, as
+    // the terms worked from them: the light lit geometry takes (LLSettingsSky::getLitLightColors,
+    // the same LLPipeline's light 0 is), the sky dome's, and the ambient applySpecial decides,
+    // worked into calcAtmosphericVars' per-sky terms by packAtmosphericTerms. A pass that lights
+    // an object under a light of its own binds a copy (bindEnvironmentUBOLitBy).
     //
     // Field order/types/padding MUST byte-match the GLSL block. Each vec3 is paired with a
     // trailing scalar so that scalar fills the vec3's std140 tail (the next member lands at
@@ -318,10 +319,25 @@ public:
         F32 sky_sunlight[3];           F32 _pad6;
         F32 sky_light[3];              F32 _pad7;
         F32 sky_ambient[3];            F32 _pad8;
+        // calcAtmosphericVars' terms of atmos_sunlit and atmos_ambient (packAtmosphericTerms)
+        F32 atmos_sunlit_linear[3];    F32 _pad9;
+        F32 atmos_amblit[3];           F32 _pad10;
+        F32 haze_additive[3];          F32 _pad11;
+        F32 haze_additive_glow[3];     F32 _pad12;
+        // skyF's and cloudsF's terms of the sky's light and densities (applySpecial)
+        F32 sky_light_atten[3];        F32 _pad13;
+        F32 cloud_sunlight[3];         F32 _pad14;
+        F32 sky_ambient_below[3];      F32 _pad15;
     };
 
     // Pack mSky/mWaterUniforms into the CPU-side block and mark it for upload (no GL calls).
     void                        packEnvironmentUBO();
+
+    // calcAtmosphericVars' per-sky terms of atmos_sunlit and atmos_ambient, worked into d from
+    // them and from the block's haze members: atmos_sunlit_linear, atmos_amblit, haze_additive
+    // and haze_additive_glow. The one place these are worked, in the arithmetic the shader did
+    // them in.
+    static void                 packAtmosphericTerms(EnvironmentUBOData& d);
 
     EnvironmentUBOData          mEnvUBOData{};
     ALUniformBuffer             mEnvUBO;

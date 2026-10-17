@@ -25,7 +25,7 @@
 
 // Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
 // and bound at UB_ENVIRONMENT. Members are read by bare name. The sun's, moon's and ambient
-// light are there (atmos_sunlit, atmos_ambient).
+// light are there, and the terms of them that take nothing per pixel (atmos_*, haze_additive*).
 //[ENGINE_BLOCK Environment]
 uniform float density_multiplier;
 uniform float sun_moon_glow_factor;
@@ -108,14 +108,16 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     //     indra\llinventory\llsettingssky.cpp                                        -- LLSettingsSky::calculateLightSettings()
     //     indra\newview\app_settings\shaders\class1\windlight\atmosphericsFuncs.glsl -- calcAtmosphericVars()
     //     indra\newview\llsettingsvo.cpp                                             -- LLSettingsVOSky::applySpecial(), the per-sky terms
-    // haze color, from the ambient raised under cloud (atmos_ambient)
-    vec3 cs = atmos_sunlit * (1. - cloud_shadow);
-    additive = (blue_horizon.rgb * blue_weight.rgb) * (cs + atmos_ambient) + (haze_horizon * haze_weight.rgb) * (cs * haze_glow + atmos_ambient);
+    //     indra\newview\llenvironment.cpp                                            -- LLEnvironment::packAtmosphericTerms()
+    // haze color: the blue share lit by the light under cloud (cs) and the ambient raised under
+    // cloud, plus the haze share lit by the ambient and by cs times the glow toward the light,
+    // all but the glow worked per sky (packAtmosphericTerms)
+    additive = haze_additive + haze_additive_glow * haze_glow;
 
     // brightness of surface both sunlight and ambient
 
     sunlit = atmos_sunlit;
-    amblit = pow(atmos_ambient, vec3(0.9)) * 0.57;
+    amblit = atmos_amblit;
 
     additive *= vec3(1.0 - combined_haze);
 
@@ -148,7 +150,7 @@ void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, ou
     {
         amblit = srgb_to_linear(amblit);
         amblit = vec3(dot(amblit, vec3(0.2126, 0.7152, 0.0722)));
-        sunlit = srgb_to_linear(sunlit);
+        sunlit = atmos_sunlit_linear;
     }
 
     // multiply to get similar colors as when the "scaleSoftClip" implementation was doubling color values

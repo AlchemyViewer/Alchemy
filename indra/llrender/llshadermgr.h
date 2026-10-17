@@ -621,7 +621,7 @@ public:
         SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
 
         // The WindLight atmospherics' terms that only the sky settings set, Environment block members
-        // (LLSettingsVOSky::applySpecial)
+        // (LLSettingsVOSky::applySpecial, LLEnvironment::packAtmosphericTerms)
         HAZE_EXTINCTION,                    //  "haze_extinction"  blue plus haze density, floored, the haze's extinction
         BLUE_WEIGHT,                        //  "blue_weight"  blue density's share of it
         HAZE_WEIGHT,                        //  "haze_weight"  haze density's share of it
@@ -630,6 +630,13 @@ public:
         SKY_SUNLIGHT,                       //  "sky_sunlight"  the sun lighting the clouds
         SKY_LIGHT,                          //  "sky_light"  the sun or moon lighting the sky dome
         SKY_AMBIENT,                        //  "sky_ambient"  the ambient lighting the sky dome
+        ATMOS_SUNLIT_LINEAR,                //  "atmos_sunlit_linear"  atmos_sunlit, linear
+        ATMOS_AMBLIT,                       //  "atmos_amblit"  the ambient lighting geometry, before its facing
+        HAZE_ADDITIVE,                      //  "haze_additive"  the haze's colour, but for its glow toward the light
+        HAZE_ADDITIVE_GLOW,                 //  "haze_additive_glow"  the haze's colour per unit of that glow
+        SKY_LIGHT_ATTEN,                    //  "sky_light_atten"  the atmosphere's extinction of the light, per unit of its path
+        CLOUD_SUNLIGHT,                     //  "cloud_sunlight"  the sun lighting the clouds, attenuated on its way to them
+        SKY_AMBIENT_BELOW,                  //  "sky_ambient_below"  the sky dome's ambient, raised under cloud
 
         MOON_QUAD_CENTER,                   //  "moonQuadCenter"  the moon quad's centre direction, for the stars it covers
         MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length

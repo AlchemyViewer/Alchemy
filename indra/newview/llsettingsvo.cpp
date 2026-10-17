@@ -888,7 +888,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
         // and attenuated on its way down: light_atten over the sine of the light's elevation,
         // lightnorm's y (OGL order). The sky dome and the clouds take the settings' colour as it
         // is, or under a classic sky the lit one, as the legacy renderer's sky did. Every one
-        // takes the ambient decided above.
+        // takes the ambient decided above. LLEnvironment::packAtmosphericTerms works the rest.
         LLColor3 lit_sun;
         LLColor3 lit_moon;
         psky->getLitLightColors(lit_sun, lit_moon);
@@ -920,6 +920,24 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
         shader->uniform3fv(LLShaderMgr::SKY_SUNLIGHT, sky_sun.mV);
         shader->uniform3fv(LLShaderMgr::SKY_LIGHT, sky_light.mV);
         shader->uniform3fv(LLShaderMgr::SKY_AMBIENT, shader_ambient.mV);
+
+        // skyF's and cloudsF's: the light's extinction per unit of its path, which each pixel
+        // takes over its own ray; the clouds' sun, which takes it over twice the light's
+        // elevation; and the dome's ambient raised under cloud, unclamped above 1 as the dome
+        // has it.
+        const F32 cloud_factor = 1.f / llmax(1e-6f, light_direction.mV[1] * 2.f);
+        LLVector3 sky_light_atten;
+        LLColor3  cloud_sunlight;
+        LLColor3  sky_ambient_below;
+        for (S32 c = 0; c < 3; ++c)
+        {
+            sky_light_atten.mV[c]   = (blue_density.mV[c] + haze_density * 0.25f) * (density_mult * getMaxY());
+            cloud_sunlight.mV[c]    = sky_sun.mV[c] * expf(-sky_light_atten.mV[c] * cloud_factor);
+            sky_ambient_below.mV[c] = shader_ambient.mV[c] + llmax(0.f, 1.f - shader_ambient.mV[c]) * cloud_shadow * 0.5f;
+        }
+        shader->uniform3fv(LLShaderMgr::SKY_LIGHT_ATTEN, sky_light_atten);
+        shader->uniform3fv(LLShaderMgr::CLOUD_SUNLIGHT, cloud_sunlight.mV);
+        shader->uniform3fv(LLShaderMgr::SKY_AMBIENT_BELOW, sky_ambient_below.mV);
     }
 
     shader->uniform1f(LLShaderMgr::GAMMA, g);
