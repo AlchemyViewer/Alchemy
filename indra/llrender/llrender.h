@@ -575,9 +575,9 @@ public:
 
     // The GBuffer normal attachment is GL_RGBA16 when the deferred targets are HDR and
     // GL_RGB10_A2 when they are not, which changes how many bits its blue channel has to spend
-    // on the packed geometric normal -- 16 versus 10. Latched by addDeferredAttachments from the
-    // same decision that picks the format, because llrender cannot read settings and a shader
-    // compiled against the wrong assumption unpacks noise.
+    // on the packed geometric normal -- 16 versus 10. Latched by newview at shader load, before
+    // anything compiles (llrender cannot read settings), and the attachment's format is then picked
+    // from it, because a shader compiled against the wrong assumption unpacks noise.
     static bool sGBufferNormHDR;
 
 private:

@@ -1,6 +1,7 @@
 /**
  * @file llglslshader_gl_test.cpp
- * @brief LLGLSLShader on the hidden window. Its uniform value cache: what a program holds, read back from GL, after
+ * @brief LLGLSLShader on the hidden window. The latched layout flags its binary cache key folds in. Its uniform value
+ *        cache: what a program holds, read back from GL, after
  *        each kind of set, across a relink, and where two setters write one location. And the compute path,
  *        through the shader manager as the viewer builds programs: the #version a stage gets, a compute program's
  *        work group size, its dispatches direct, by thread count and indirect, the image units its reserved names
@@ -819,6 +820,34 @@ namespace
         LLPointer<LLImageGL> mUintImage;
     };
 
+
+    // The binary cache is keyed by hash(). REVERSE_Z and GBUFFER_NORM_HDR are injected at compile time from latched
+    // statics rather than carried in a defines map, so each has to reach the key on its own: a program compiled
+    // for RGBA16 normals and handed back for RGB10_A2 ones unpacks the geometric normal as noise.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: the cache key follows the normal layout and the depth convention", "[llglslshader_gl]")
+    {
+        const bool norm_hdr = LLRender::sGBufferNormHDR;
+        const bool reverse_z = LLRender::sReverseZ;
+        mShader.mName = "Cache Key Probe";
+
+        LLRender::sGBufferNormHDR = true;
+        LLRender::sReverseZ = false;
+        const LLUUID base = mShader.hash();
+        const LLUUID again = mShader.hash();
+        LLRender::sGBufferNormHDR = false;
+        const LLUUID packed_normals = mShader.hash();
+        LLRender::sGBufferNormHDR = true;
+        LLRender::sReverseZ = true;
+        const LLUUID reversed = mShader.hash();
+
+        LLRender::sGBufferNormHDR = norm_hdr;
+        LLRender::sReverseZ = reverse_z;
+
+        CHECK(again == base);
+        CHECK(packed_normals != base);
+        CHECK(reversed != base);
+        CHECK(packed_normals != reversed);
+    }
 
     // Ints and uints arrive exactly past 2^24: each set below differs from the one before only in values that
     // convert to the same float, and only in some of its components.

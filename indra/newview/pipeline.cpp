@@ -374,19 +374,18 @@ bool addDeferredAttachments(LLRenderTarget& target)
     U32 emissive = GL_R11F_G11F_B10F;
 
     static LLCachedControl<bool> has_emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
-    static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
-    bool hdr = has_hdr();
+
+    // The layout the shaders were compiled against. GBUFFER_NORM_HDR tells them how much room the
+    // packed geometric normal has in the normal attachment's blue channel, and setShaders latches it
+    // from RenderHDREnabled before it compiles anything, so the format follows that latch -- as
+    // mainDepthFormat follows reverse-Z's -- rather than the setting.
+    const bool hdr = LLRender::sGBufferNormHDR;
 
     if (!hdr)
     {
         norm = GL_RGB10_A2;
         emissive = GL_RGB8;
     }
-
-    // Tell the shader compiler how much room the packed geometric normal has in the normal
-    // attachment's blue channel. Shaders rebuild when RenderHDREnabled changes (handleEnableHDR),
-    // so this is latched before anything compiles against it.
-    LLRender::sGBufferNormHDR = hdr;
 
     bool valid = true;
     valid      = valid && target.addColorAttachment(orm);    // frag-data[1] specular OR PBR ORM

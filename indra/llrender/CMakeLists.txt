@@ -203,11 +203,11 @@ if(AL_BUILD_TESTS)
   # - which fragment output reaches a render target's colour attachment, and
   #   integer attachments cleared and drawn;
   # - LLRender's cached clear colour and scissor box, and LLGLSScissor;
-  # - LLGLSLShader's uniform value cache, the compute path (programs built
-  #   through the shader manager, their images, storage blocks and
-  #   dispatches), integer textures through reserved samplers, what the debug
-  #   validator says of images and stencil reads, and which shader objects a
-  #   program owns and which the manager does;
+  # - LLGLSLShader's cache key, its uniform value cache, the compute path
+  #   (programs built through the shader manager, their images, storage
+  #   blocks and dispatches), integer textures through reserved samplers,
+  #   what the debug validator says of images and stencil reads, and which
+  #   shader objects a program owns and which the manager does;
   # - LLRender::drawArraysInstanced: attribute-less instanced geometry, placed
   #   by the matrices the draw syncs;
   # - ALGPUBuffer's store, LLRender's indirect buffer bindings over its
