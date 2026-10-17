@@ -157,8 +157,9 @@ float bokehShapeWeight(float radius_norm, vec2 samp_dir, float apod, vec2 coma_v
 
 // 1.0 if this sample falls inside the aperture, 0.0 if a blade or the cat's-eye
 // clip excludes it. `radius_norm` is the sample's position across the disc,
-// 0 at the centre and 1 at the rim.
-float apertureMask(float ang, float radius_norm, vec2 cat_offset)
+// 0 at the centre and 1 at the rim; `sa` and `ca` are the sine and cosine of
+// `ang`, which the gather carries from tap to tap.
+float apertureMask(float ang, float sa, float ca, float radius_norm, vec2 cat_offset)
 {
     float edge = 1.0;
 
@@ -192,7 +193,7 @@ float apertureMask(float ang, float radius_norm, vec2 cat_offset)
         // second opening slides further off-centre the further the ray is from
         // the axis -- so discs near the frame edge are clipped into lens-shaped
         // slivers that lean away from centre, while the middle stays round.
-        vec2 p = vec2(sin(ang), cos(ang)) * radius_norm;
+        vec2 p = vec2(sa, ca) * radius_norm;
         vec2 d = p - cat_offset;
         if (dot(d, d) > 1.0)
         {
@@ -470,21 +471,23 @@ void main()
             while (sc > 0.5)
             {
                 int its = int(max(1.0,(sc*3.7*ring_density)));
+                // The ring's taps lie step_ang apart from sc on (sc is added
+                // for rotary perturbance), so one sine and cosine for the
+                // first and one for the step serve them all: each tap's
+                // (sin, cos) is the last one's turned by the step.
+                float step_ang = 2*PI/its;
+                vec2  turn     = vec2(sin(step_ang), cos(step_ang));
+                vec2  dir      = vec2(sin(sc), cos(sc));
                 for (int i=0; i<its; ++i)
                 {
-                    float ang = sc+i*2*PI/its; // sc is added for rotary perturbance
+                    float sa = dir.x, ca = dir.y;
+                    dir = vec2(sa * turn.y + ca * turn.x, ca * turn.y - sa * turn.x);
                     float rn  = sc / max_radius;
 #if DOF_SHAPED
-                    if (apertureMask(ang, rn, cat_offset) < 0.5)
+                    if (apertureMask(sc + i * step_ang, sa, ca, rn, cat_offset) < 0.5)
                     {
                         continue;   // blade or barrel clips this one
                     }
-#endif
-                    // Below the reject, not above it: a clipped sample should
-                    // not pay for trig it never uses, and apertureMask derives
-                    // its own sin/cos only on the cat's-eye path.
-                    float sa = sin(ang), ca = cos(ang);
-#if DOF_SHAPED
                     vec2  samp    = sc * (sa * ax + ca * ay);
                     float shape_w = bokehShapeWeight(rn, vec2(sa, ca), apod_signed, coma_vec);
 #else
@@ -509,21 +512,21 @@ void main()
             while (sc > 0.5)
             {
                 int its = int(max(1.0,(sc*3.7*ring_density)));
+                // As the near gather's rings: one sine and cosine for the
+                // first tap and one for the step, each tap turned from the last.
+                float step_ang = 2*PI/its;
+                vec2  turn     = vec2(sin(step_ang), cos(step_ang));
+                vec2  dir      = vec2(sin(sc), cos(sc));
                 for (int i=0; i<its; ++i)
                 {
-                    float ang = sc+i*2*PI/its; // sc is added for rotary perturbance
+                    float sa = dir.x, ca = dir.y;
+                    dir = vec2(sa * turn.y + ca * turn.x, ca * turn.y - sa * turn.x);
                     float rn  = sc / max_radius;
 #if DOF_SHAPED
-                    if (apertureMask(ang, rn, cat_offset) < 0.5)
+                    if (apertureMask(sc + i * step_ang, sa, ca, rn, cat_offset) < 0.5)
                     {
                         continue;   // blade or barrel clips this one
                     }
-#endif
-                    // Below the reject, not above it: a clipped sample should
-                    // not pay for trig it never uses, and apertureMask derives
-                    // its own sin/cos only on the cat's-eye path.
-                    float sa = sin(ang), ca = cos(ang);
-#if DOF_SHAPED
                     vec2  samp    = sc * (sa * ax + ca * ay);
                     float shape_w = bokehShapeWeight(rn, vec2(sa, ca), apod_signed, coma_vec);
 #else
