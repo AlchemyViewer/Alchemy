@@ -1054,11 +1054,15 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
             // Deliberately DEPTH_FMT_24 even under reverse-Z: this depth-stencil is a pure
             // SMAA stencil carrier, never receives scene depth nor blit-pairs with it, and
             // DEPTH32F_STENCIL8 would double it to 8 bytes/px for no benefit.
+            //
+            // GL_RGBA8 whatever post_color_fmt is, because both carry data in alpha: FXAA reads its luma
+            // from the alpha the bake writes (FXAA_GREEN_AS_LUMA is 0), and SMAA's neighborhood blend reads
+            // the right edge's weight from .a. RGB10_A2 would leave either four levels there.
             bool smaa_stencil = (RenderFSAAType == 2) && gSavedSettings.getBOOL("RenderSMAAUseStencil");
-            if (!mFXAAMap.allocate(resX, resY, post_color_fmt, smaa_stencil, smaa_stencil)) return false;
+            if (!mFXAAMap.allocate(resX, resY, GL_RGBA8, smaa_stencil, smaa_stencil)) return false;
             if (RenderFSAAType == 2)
             {
-                if (!mSMAABlendBuffer.allocate(resX, resY, post_color_fmt, false)) return false;
+                if (!mSMAABlendBuffer.allocate(resX, resY, GL_RGBA8, false)) return false;
                 if (smaa_stencil)
                 {
                     mFXAAMap.shareDepthBuffer(mSMAABlendBuffer);
