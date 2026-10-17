@@ -3668,9 +3668,6 @@
 	<global name="UnsupportedRAMAmount">
 		510
 	</global>
-	<global name="UnsupportedGPU">
-		- Графическая карта вашего компьютера не удовлетворяет минимальным требованиям.
-	</global>
 	<global name="UnsupportedRAM">
 		- Системная память вашего компьютера не удовлетворяет минимальным требованиям.
 	</global>

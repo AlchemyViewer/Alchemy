@@ -115,7 +115,6 @@ public:
     // get the measured GPU memory bandwidth in GB/sec
     // may return 0 of benchmark has not been run or failed to run
     F32 getGPUMemoryBandwidth() { return mGPUMemoryBandwidth; }
-    bool isGPUSupported()               { return mGPUSupported; }
 
     void cleanupFeatureTables();
 
@@ -174,7 +173,6 @@ protected:
     EGPUClass   mGPUClass;
     F32         mGPUMemoryBandwidth = 0.f;  // measured memory bandwidth of GPU in GB/second
     std::string mGPUString;
-    bool        mGPUSupported;
     bool        mSkipProfiling = false;
 };
 
@@ -185,8 +183,7 @@ LLFeatureManager::LLFeatureManager()
     mInited(false),
     mTableVersion(0),
     mSafe(false),
-    mGPUClass(GPU_CLASS_UNKNOWN),
-    mGPUSupported(false)
+    mGPUClass(GPU_CLASS_UNKNOWN)
 {
 }
 

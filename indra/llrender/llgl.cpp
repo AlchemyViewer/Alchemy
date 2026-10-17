@@ -918,8 +918,6 @@ void ll_close_fail_log()
 
 std::list<LLGLUpdate*> LLGLUpdate::sGLQ;
 
-#if LL_GL_FUNC_POINTER
-
 #if LL_WINDOWS
 // WGL_ARB_pixel_format
 PFNWGLGETPIXELFORMATATTRIBIVARBPROC wglGetPixelFormatAttribivARB = nullptr;
@@ -1659,29 +1657,8 @@ PFNGLMULTIDRAWARRAYSINDIRECTCOUNTPROC    glMultiDrawArraysIndirectCount = nullpt
 PFNGLMULTIDRAWELEMENTSINDIRECTCOUNTPROC  glMultiDrawElementsIndirectCount = nullptr;
 PFNGLPOLYGONOFFSETCLAMPPROC              glPolygonOffsetClamp = nullptr;
 
-// GL_EXT_memory_object
-PFNGLCREATEMEMORYOBJECTSEXTPROC        glCreateMemoryObjectsEXT        = nullptr;
-PFNGLDELETEMEMORYOBJECTSEXTPROC        glDeleteMemoryObjectsEXT        = nullptr;
-PFNGLMEMORYOBJECTPARAMETERIVEXTPROC    glMemoryObjectParameterivEXT    = nullptr;
-PFNGLTEXSTORAGEMEM2DEXTPROC            glTexStorageMem2DEXT            = nullptr;
-
-// GL_EXT_semaphore
-PFNGLGENSEMAPHORESEXTPROC              glGenSemaphoresEXT              = nullptr;
-PFNGLDELETESEMAPHORESEXTPROC           glDeleteSemaphoresEXT           = nullptr;
-PFNGLSEMAPHOREPARAMETERUI64VEXTPROC    glSemaphoreParameterui64vEXT    = nullptr;
-PFNGLWAITSEMAPHOREEXTPROC              glWaitSemaphoreEXT              = nullptr;
-PFNGLSIGNALSEMAPHOREEXTPROC            glSignalSemaphoreEXT            = nullptr;
-
-// GL_EXT_memory_object_win32
-PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC    glImportMemoryWin32HandleEXT    = nullptr;
-
-// GL_EXT_semaphore_win32
-PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC glImportSemaphoreWin32HandleEXT = nullptr;
-
 // GL_EXT_depth_bounds_test
 PFNGLDEPTHBOUNDSEXTPROC                glDepthBoundsEXT                = nullptr;
-
-#endif
 
 LLGLManager gGLManager;
 
@@ -1983,7 +1960,6 @@ bool LLGLManager::initGL()
         LL_ERRS("RenderInit") << "Calling init on LLGLManager after already initialized!" << LL_ENDL;
     }
 
-#if LL_GL_FUNC_POINTER
     // OpenGL 1.0 and 1.1 always exist
     // GL_VERSION_1_0
     glClearColor = (PFNGLCLEARCOLORPROC)LL_GET_PROC_ADDRESS("glClearColor");
@@ -2050,7 +2026,6 @@ bool LLGLManager::initGL()
     glDeleteTextures = (PFNGLDELETETEXTURESPROC)LL_GET_PROC_ADDRESS("glDeleteTextures");
     glGenTextures = (PFNGLGENTEXTURESPROC)LL_GET_PROC_ADDRESS("glGenTextures");
     glIsTexture = (PFNGLISTEXTUREPROC)LL_GET_PROC_ADDRESS("glIsTexture");
-#endif
 
     // Extract video card strings and convert to upper case to
     // work around driver-to-driver variation in capitalization.
@@ -2483,7 +2458,6 @@ void LLGLManager::reloadExtensionsString()
 
     //reload extensions string
     // I am deeply sorry for how ugly this is. - Rye
-#if LL_GL_FUNC_POINTER
     PFNGLGETSTRINGIPROC llglGetStringi = (PFNGLGETSTRINGIPROC)LL_GET_PROC_ADDRESS("glGetStringi");
     PFNGLGETINTEGERVPROC llglGetIntegerv = (PFNGLGETINTEGERVPROC)LL_GET_PROC_ADDRESS("glGetIntegerv");
     if (llglGetStringi && llglGetIntegerv)
@@ -2494,23 +2468,6 @@ void LLGLManager::reloadExtensionsString()
             mGLExtensions.insert(ll_safe_string((char const*)llglGetStringi(GL_EXTENSIONS, i)));
         }
     }
-#else
-    {
-        GLint num_extensions = 0;
-        glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
-        for (GLint i = 0; i < num_extensions; ++i) {
-            mGLExtensions.insert(ll_safe_string((char const*)glGetStringi(GL_EXTENSIONS, i)));
-        }
-#if LL_DARWIN
-        if (num_extensions > 0)
-        {
-            mGLExtensions.insert("GL_ARB_multitexture");
-            mGLExtensions.insert("GL_ARB_texture_cube_map");
-            mGLExtensions.insert("GL_ARB_texture_compression");
-        }
-#endif
-    }
-#endif
 
 #if LL_WINDOWS
     {
@@ -2578,10 +2535,6 @@ void LLGLManager::initExtensions()
 
     mHasNVXGpuMemoryInfo = mGLExtensions.contains("GL_NVX_gpu_memory_info");
     mHasATIMemInfo = mGLExtensions.contains("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
-    mHasEXTMemoryObject  = mGLExtensions.contains("GL_EXT_memory_object");
-    mHasEXTSemaphore     = mGLExtensions.contains("GL_EXT_semaphore");
-    mHasEXTMemoryObjectWin32 = mGLExtensions.contains("GL_EXT_memory_object_win32");
-    mHasEXTSemaphoreWin32 = mGLExtensions.contains("GL_EXT_semaphore_win32");
 
     // Misc
     glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
@@ -2590,7 +2543,6 @@ void LLGLManager::initExtensions()
 
     mInited = true;
 
-#if LL_GL_FUNC_POINTER
     // Load the OpenGL API through GetProcAddress: all of it to 4.1, the floor, and leaving the
     // sections beyond mGLVersion unloaded.
     LL_DEBUGS("RenderInit") << "GL Probe: Getting symbols" << LL_ENDL;
@@ -2768,41 +2720,6 @@ void LLGLManager::initExtensions()
     if (!glTextureBarrier && mGLExtensions.contains("GL_NV_texture_barrier"))
     {
         glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)LL_GET_PROC_ADDRESS("glTextureBarrierNV");
-    }
-
-    // GL_EXT_memory_object
-    if (mHasEXTMemoryObject)
-    {
-        glCreateMemoryObjectsEXT = (PFNGLCREATEMEMORYOBJECTSEXTPROC)LL_GET_PROC_ADDRESS("glCreateMemoryObjectsEXT");
-        glDeleteMemoryObjectsEXT = (PFNGLDELETEMEMORYOBJECTSEXTPROC)LL_GET_PROC_ADDRESS("glDeleteMemoryObjectsEXT");
-        glMemoryObjectParameterivEXT = (PFNGLMEMORYOBJECTPARAMETERIVEXTPROC)LL_GET_PROC_ADDRESS("glMemoryObjectParameterivEXT");
-        glTexStorageMem2DEXT = (PFNGLTEXSTORAGEMEM2DEXTPROC)LL_GET_PROC_ADDRESS("glTexStorageMem2DEXT");
-        LL_INFOS("RenderInit") << "GL_EXT_memory_object symbols loaded" << LL_ENDL;
-    }
-
-    // GL_EXT_semaphore
-    if (mHasEXTSemaphore)
-    {
-        glGenSemaphoresEXT = (PFNGLGENSEMAPHORESEXTPROC)LL_GET_PROC_ADDRESS("glGenSemaphoresEXT");
-        glDeleteSemaphoresEXT = (PFNGLDELETESEMAPHORESEXTPROC)LL_GET_PROC_ADDRESS("glDeleteSemaphoresEXT");
-        glSemaphoreParameterui64vEXT = (PFNGLSEMAPHOREPARAMETERUI64VEXTPROC)LL_GET_PROC_ADDRESS("glSemaphoreParameterui64vEXT");
-        glWaitSemaphoreEXT = (PFNGLWAITSEMAPHOREEXTPROC)LL_GET_PROC_ADDRESS("glWaitSemaphoreEXT");
-        glSignalSemaphoreEXT = (PFNGLSIGNALSEMAPHOREEXTPROC)LL_GET_PROC_ADDRESS("glSignalSemaphoreEXT");
-        LL_INFOS("RenderInit") << "GL_EXT_semaphore symbols loaded" << LL_ENDL;
-    }
-
-    // GL_EXT_memory_object_win32
-    if (mHasEXTMemoryObjectWin32)
-    {
-        glImportMemoryWin32HandleEXT = (PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC)LL_GET_PROC_ADDRESS("glImportMemoryWin32HandleEXT");
-        LL_INFOS("RenderInit") << "GL_EXT_memory_object_win32 symbols loaded" << LL_ENDL;
-    }
-
-    // GL_EXT_semaphore_win32
-    if (mHasEXTSemaphoreWin32)
-    {
-        glImportSemaphoreWin32HandleEXT = (PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC)LL_GET_PROC_ADDRESS("glImportSemaphoreWin32HandleEXT");
-        LL_INFOS("RenderInit") << "GL_EXT_semaphore_win32 symbols loaded" << LL_ENDL;
     }
 
     // GL_EXT_depth_bounds_test. Never core; a context has it or it does not.
@@ -3463,8 +3380,6 @@ void LLGLManager::initExtensions()
     glMultiDrawArraysIndirectCount = (PFNGLMULTIDRAWARRAYSINDIRECTCOUNTPROC)LL_GET_PROC_ADDRESS("glMultiDrawArraysIndirectCount");
     glMultiDrawElementsIndirectCount = (PFNGLMULTIDRAWELEMENTSINDIRECTCOUNTPROC)LL_GET_PROC_ADDRESS("glMultiDrawElementsIndirectCount");
     glPolygonOffsetClamp = (PFNGLPOLYGONOFFSETCLAMPPROC)LL_GET_PROC_ADDRESS("glPolygonOffsetClamp");
-
-#endif // LL_GL_FUNC_POINTER
 }
 
 void rotate_quat(LLQuaternion& rotation)

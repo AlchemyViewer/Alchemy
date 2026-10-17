@@ -3668,9 +3668,6 @@ Devam etmek istiyor musunuz?
 	<global name="UnsupportedRAMAmount">
 		510
 	</global>
-	<global name="UnsupportedGPU">
-		- Grafik kartınız minimum gereksinimleri karşılamıyor.
-	</global>
 	<global name="UnsupportedRAM">
 		- Sistem belleğiniz minimum gereksinimleri karşılamıyor.
 	</global>

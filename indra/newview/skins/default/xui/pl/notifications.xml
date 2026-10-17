@@ -3541,9 +3541,6 @@ Czy chcesz kontynuować?
 		Wybrany obiekt ma wpływ na Navmesh. Dodanie elastyczności spowoduje usunięcie go z Navmesha.
 		<usetemplate ignoretext="Wybrany obiekt ma wpływ na Navmesh. Dodanie elastyczności spowoduje usunięcie go z Navmesha." name="okcancelignore" notext="Anuluj" />
 	</notification>
-	<global name="UnsupportedGPU">
-		- Twoja karta graficzna nie spełnia minimalnych wymagań.
-	</global>
 	<global name="UnsupportedRAM">
 		- Pamięć Twojego systemu nie spełnia minimalnych wymagań.
 	</global>

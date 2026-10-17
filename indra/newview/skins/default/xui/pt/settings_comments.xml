@@ -1803,8 +1803,6 @@
   <string>Configuração obsoleta não utilizada.</string>
   <key>RenderCompressTextures</key>
   <string>Ativar compressão de texturas em implementações OpenGL 3.0 e posteriores (EXPERIMENTAL, requer reinício).</string>
-  <key>RenderCubeMap</key>
-  <string>Se podemos ou não renderizar o cube map.</string>
   <key>RenderDebugAlphaMask</key>
   <string>Testar os cortes de máscara alpha.</string>
   <key>RenderDebugGLSession</key>

@@ -2778,7 +2778,6 @@ Algunos de los linksets seleccionados no pueden configurarse como '[REQUESTED_TY
 	</notification>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
-	<global name="UnsupportedGPU">- Tu tarjeta gráfica no cumple los requerimientos mínimos.</global>
 	<global name="UnsupportedRAM">- La memoria de tu sistema no cumple los requerimientos mínimos.</global>
 	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">Si posees un terreno, puedes hacerlo tu Base.
 También puedes buscar en el Mapa lugares marcados como &quot;Puntos de Información&quot;.</global>

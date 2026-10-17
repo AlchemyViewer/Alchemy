@@ -35,7 +35,6 @@
 #include "llrender.h"
 
 #include "llagent.h"
-#include "llcubemap.h"
 #include "llviewertexturelist.h"
 #include "pipeline.h"
 #include "llviewershadermgr.h"
@@ -63,7 +62,7 @@ void LLDrawPoolWater::setNormalMaps(const LLUUID& normalMapId, const LLUUID& nex
 
 void LLDrawPoolWater::prerender()
 {
-    mShaderLevel = LLCubeMap::sUseCubeMaps ? LLViewerShaderMgr::instance()->getShaderLevel(LLViewerShaderMgr::SHADER_WATER) : 0;
+    mShaderLevel = LLViewerShaderMgr::instance()->getShaderLevel(LLViewerShaderMgr::SHADER_WATER);
 }
 
 S32 LLDrawPoolWater::getNumPostDeferredPasses()

@@ -2770,7 +2770,6 @@ Deseja continuar?
 	</notification>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
-	<global name="UnsupportedGPU">- A sua placa de vídeo não atende os requisitos mínimos exigidos.</global>
 	<global name="UnsupportedRAM">- A memória do seu sistema não suporta os requisitos mínimos exigidos.</global>
 	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">Se você tem um terreno, seu terreno pode ser seu início. 
 Outra opção é procurar por lugares com a tag 'Infohub' no mapa.</global>

@@ -1093,9 +1093,6 @@ bool LLAppViewer::init()
     // writeSystemInfo can be called after window is initialized (gViewerWindow non-null)
     writeSystemInfo();
 
-    // initWindow also initializes the Feature List, so now we can initialize this global.
-    LLCubeMap::sUseCubeMaps = LLFeatureManager::getInstance()->isFeatureAvailable("RenderCubeMap");
-
     // call all self-registered classes
     LLInitClassList::instance().fireCallbacks();
 
@@ -1169,13 +1166,6 @@ bool LLAppViewer::init()
         std::stringstream minRAMString(LLNotifications::instance().getGlobalString("UnsupportedRAMAmount"));
         U64Bytes minRAM;
         minRAMString >> minRAM;
-
-        if (!LLFeatureManager::getInstance()->isGPUSupported() && LLFeatureManager::getInstance()->getGPUClass() != GPU_CLASS_UNKNOWN)
-        {
-            minSpecs += LLNotifications::instance().getGlobalString("UnsupportedGPU");
-            minSpecs += "\n";
-            unsupported = true;
-        }
 
         // A clock the system would not report is unknown, not slow.
         if (gSysCPU.getMHz() > 0 && gSysCPU.getMHz() < minCPU)

@@ -2785,7 +2785,6 @@ Vuoi continuare?
 	</notification>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
-	<global name="UnsupportedGPU">- La tua scheda grafica non soddisfa i requisiti minimi.</global>
 	<global name="UnsupportedRAM">- La memoria del tuo sistema non soddisfa i requisiti minimi.</global>
 	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">Se sei proprietario di un appezzamento di terreno, puoi definirlo come la tua posizione iniziale.
 In alternativa, puoi guardare sulla mappa e trovare luoghi segnalati come &quot;Infohub&quot;.</global>
