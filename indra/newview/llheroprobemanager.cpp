@@ -567,8 +567,6 @@ void LLHeroProbeManager::initReflectionMaps()
         mDefaultProbe->mRadius = 4096.f;
         mDefaultProbe->mProbeIndex = 0;
         touch_default_probe(mDefaultProbe);
-
-        mProbes.push_back(mDefaultProbe);
     }
 
     if (mVertexBuffer.isNull())
