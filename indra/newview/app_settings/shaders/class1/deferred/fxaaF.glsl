@@ -999,6 +999,9 @@ FxaaFloat4 FxaaPixelShader(
     if(earlyExit)
         #if (FXAA_DISCARD == 1)
             FxaaDiscard;
+        #elif (FXAA_LUMA_FROM_RGB == 1)
+            // Luma in alpha, as an edge pixel returns it: the input's alpha is not FXAA's.
+            return FxaaFloat4(rgbyM.xyz, lumaM);
         #else
             return rgbyM;
         #endif
