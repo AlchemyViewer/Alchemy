@@ -41,6 +41,7 @@
 #include "llsd.h"
 #include "llsingleton.h"
 #include "lluuid.h"
+#include "llviewercontrol.h"  // for LLCachedControl
 
 static const F32 DND_TIMER = 3.0;
 const char * LLDoNotDisturbNotificationStorage::toastName = "IMToast";
@@ -218,7 +219,10 @@ void LLDoNotDisturbNotificationStorage::loadNotifications()
         LLFloaterReg::showInstance("conversation");
     }
 
-    if(imToastExists || group_ad_hoc_toast_exists || offerExists)
+    // Alchemy setting ALMuteGroupIMSound: the sound is for direct conversations only,
+    // so a stored group or ad-hoc toast does not play it when the setting is on.
+    static LLCachedControl<bool> mute_group_im_sound(gSavedSettings, "ALMuteGroupIMSound", false);
+    if(imToastExists || offerExists || (group_ad_hoc_toast_exists && !mute_group_im_sound))
     {
         make_ui_sound_deferred("UISndNewIncomingIMSession");
     }
@@ -238,7 +242,12 @@ void LLDoNotDisturbNotificationStorage::updateNotifications()
 
     LLNotifications& instance = LLNotifications::instance();
     bool imToastExists = false;
+    bool group_ad_hoc_toast_exists = false;
     bool offerExists = false;
+
+    // Alchemy setting ALMuteGroupIMSound: the sound is for direct conversations only,
+    // so a stored group or ad-hoc toast does not play it when the setting is on.
+    static LLCachedControl<bool> mute_group_im_sound(gSavedSettings, "ALMuteGroupIMSound", false);
 
     for (LLCommunicationChannel::history_list_t::const_iterator it = commChannel->beginHistory();
         it != commChannel->endHistory();
@@ -249,7 +258,16 @@ void LLDoNotDisturbNotificationStorage::updateNotifications()
 
         if(notificationName == toastName)
         {
-            imToastExists = true;
+            S32 toastSessionType = notification->getPayload()["SESSION_TYPE"];
+            if(toastSessionType == LLIMModel::LLIMSession::GROUP_SESSION
+                    || toastSessionType == LLIMModel::LLIMSession::ADHOC_SESSION)
+            {
+                group_ad_hoc_toast_exists = true;
+            }
+            else
+            {
+                imToastExists = true;
+            }
         }
         else if(notificationName == offerName)
         {
@@ -264,7 +282,7 @@ void LLDoNotDisturbNotificationStorage::updateNotifications()
         }
     }
 
-    if(imToastExists || offerExists)
+    if(imToastExists || offerExists || (group_ad_hoc_toast_exists && !mute_group_im_sound))
     {
         make_ui_sound("UISndNewIncomingIMSession");
     }
