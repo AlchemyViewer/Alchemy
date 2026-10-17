@@ -244,7 +244,7 @@ uniform float uLensFlareGhostSpacing;             // step size along the axis
 
 // ---- Halo: ring opposite the sun -------------------------------------------
 uniform float uLensFlareHalo;                     // 0 = off, else brightness
-uniform float uLensFlareHaloRadius;               // ring radius in UV space
+uniform float uLensFlareHaloRadius;               // ring radius in screen heights (aspect corrected, as the ghosts)
 uniform float uLensFlareHaloWidth;                // ring thickness
 
 // ---- Starburst: angular spikes radiating from the sun ----------------------
@@ -346,7 +346,9 @@ vec3 computeLensFlare(vec2 uv)
     if (uLensFlareHalo > 0.0 && uLensFlareHaloRadius > 0.0)
     {
         vec2  halo_center = vec2(0.5) + (vec2(0.5) - sun_uv);
-        float halo_dist   = length(uv - halo_center);
+        vec2  hd          = uv - halo_center;
+        hd.x *= aspect;
+        float halo_dist   = length(hd);
         float halo_w      = max(uLensFlareHaloWidth, 0.01);
         float halo        = 1.0 - abs(halo_dist - uLensFlareHaloRadius) / halo_w;
         halo  = clamp(halo, 0.0, 1.0);
