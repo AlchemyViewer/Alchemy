@@ -8824,6 +8824,16 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         shader->uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (GLfloat)src->getWidth(), (GLfloat)src->getHeight());
         shader->uniform1f(LLShaderMgr::CUTOUT_PREMULTIPLIED, sCutoutRender ? 1.f : 0.f);
 
+        // Without HDR these programs carry DITHER and the final blit does not
+        // (LLViewerShaderMgr), since dst is the post chain's first 8-bit target.
+        // With HDR nothing reads the dither uniforms and their sets fall away.
+        static LLCachedControl<bool> dither_enabled(gSavedSettings, "RenderDitherEnabled", true);
+        static LLCachedControl<bool> dither_animated(gSavedSettings, "RenderDitherAnimated", true);
+        shader->uniform1f(LLShaderMgr::DITHER_AMOUNT, dither_enabled() ? 1.0f : 0.0f);
+        shader->uniform1i(LLShaderMgr::DITHER_BITS, 8);
+        shader->uniform1i(LLShaderMgr::DITHER_ANIMATE, dither_animated ? 1 : 0);
+        shader->uniform1ui(LLShaderMgr::FRAME_ID, LLFrameTimer::getFrameCount());
+
         // The other half of the "No post-processing" contract. The grade is
         // gated where this pass's program is chosen and the print effects in
         // the final blit are gated in renderFinalize -- but chromatic
