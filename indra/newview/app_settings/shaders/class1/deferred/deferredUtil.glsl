@@ -622,7 +622,10 @@ void pbrIbl(vec3 diffuseColor,
     // nothing and keeps a degenerate one (a white metal against a fully absorbing tap) from
     // reaching the rest of the frame as an inf.
     vec3 FmsEms = Ems * FssEss * F_avg / max(vec3(1.0) - F_avg * Ems, vec3(1e-4));
-    vec3 k_D = diffuseColor * (1.0 - FssEss + FmsEms);
+    // The paper's E_dss = 1 - (FssEss + FmsEms): both specular terms leave the diffuse lobe,
+    // so the three sum to at most 1 under a white furnace. Held at 0 for a LUT tap whose two
+    // specular terms come to a hair over 1.
+    vec3 k_D = diffuseColor * max(vec3(1.0) - FssEss - FmsEms, vec3(0.0));
 
     // Both lobes off the one visibility.
     //
