@@ -119,10 +119,12 @@ void main()
     }
 
     vec3 color;
+    bool hdri = false;
 #ifdef HAS_HDRI
     vec3 frag_coord = vary_position.xyz/vary_position.w;
     if (-frag_coord.x > ((1.0-hdri_split_screen)*2.0-1.0))
     {
+        hdri = true;
         vec3 pos = normalize(rel_pos);
         pos = env_mat * pos;
         vec2 texCoord = vec2(atan(pos.z, pos.x) + PI, acos(pos.y)) / vec2(2.0 * PI, PI);
@@ -218,7 +220,10 @@ void main()
     frag_data[0] = vec4(0);
     frag_data[3] = vec4(ditherEmissive(color.rgb, gl_FragCoord.xy), 1.0);
 #else
-    frag_data[0] = vec4(color.rgb, 1.0);
+    // No emissive target (vintage mode): the albedo target carries the sky, and the soften pass
+    // reads it through sRGB decode. WindLight's colour is display encoded already; an HDRI's is
+    // linear, so it is encoded, within the 0..1 the target holds.
+    frag_data[0] = vec4(hdri ? linear_to_srgb(clamp(color.rgb, vec3(0.0), vec3(1.0))) : color.rgb, 1.0);
 #endif
 }
 
