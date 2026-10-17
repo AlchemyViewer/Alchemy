@@ -340,6 +340,8 @@ void LLDrawPoolAvatar::beginShadowPass(S32 pass)
         {
             sRenderingSkinned = true;
             sVertexProgram->bind();
+            // The deferred alpha pass's cutoff, so what casts is what draws.
+            sVertexProgram->setMinimumAlpha(LLDrawPoolAvatar::sMinimumAlpha);
         }
 
         gGL.diffuseColor4f(1, 1, 1, 1);
@@ -359,6 +361,7 @@ void LLDrawPoolAvatar::beginShadowPass(S32 pass)
         {
             sRenderingSkinned = true;
             sVertexProgram->bind();
+            sVertexProgram->setMinimumAlpha(LLDrawPoolAvatar::sMinimumAlpha);
         }
 
         gGL.diffuseColor4f(1, 1, 1, 1);
@@ -419,12 +422,17 @@ void LLDrawPoolAvatar::renderShadow(S32 pass)
 
     // Optionally skip the costlier avatar shadow passes (alpha blend is the most
     // expensive and least visually important; alpha mask next). Default 2 = full.
+    //
+    // The two alpha passes draw the same meshes (sSkipOpaque) into the same map, so
+    // at most one of them runs: at 1 the mask pass, whose shadow is solid wherever
+    // the alpha pass draws; at 2 the blend pass instead, which stipples the
+    // semi-transparent part. Run together, the mask pass would fill the stipple in.
     static LLCachedControl<S32> avatar_shadow_detail(gSavedSettings, "RenderAvatarShadowDetail", 2);
     if (pass == SHADOW_PASS_AVATAR_ALPHA_BLEND && avatar_shadow_detail() < 2)
     {
         return;
     }
-    if (pass == SHADOW_PASS_AVATAR_ALPHA_MASK && avatar_shadow_detail() < 1)
+    if (pass == SHADOW_PASS_AVATAR_ALPHA_MASK && avatar_shadow_detail() != 1)
     {
         return;
     }

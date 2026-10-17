@@ -3091,7 +3091,7 @@
         <key>RenderAvatarShadowDetail</key>
         <map>
             <key>Comment</key>
-            <string>Which avatar passes cast shadows. 0 = opaque only, 1 = opaque + alpha mask, 2 = full (also alpha blend). Lower values speed up crowd scenes by skipping the expensive alpha-blend avatar shadow pass across all cascades.</string>
+            <string>How an avatar's transparent parts (hair, eyelashes, skirts, alpha layers) cast shadows. 0 = they cast none, only the body does. 1 = solid wherever their alpha passes the cutoff. 2 = the same, with semi-transparent texels cast as a stippled half shadow. 1 and 2 cost about the same; 0 skips their pass across all cascades, which speeds up crowd scenes.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

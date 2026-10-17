@@ -26,7 +26,6 @@
 // Shared matrix stack + derived matrices, spliced from
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
-uniform float shadow_target_width;
 
 mat4 getSkinnedTransform();
 void passTextureIndex();
@@ -35,8 +34,6 @@ in vec3 position;
 in vec3 normal;
 in vec2 texcoord0;
 
-out float pos_w;
-out float target_pos_x;
 out vec2 vary_texcoord0;
 
 void main()
@@ -57,10 +54,6 @@ void main()
     norm = normalize(norm);
 
     pos = projection_matrix * pos;
-
-    target_pos_x = 0.5 * (shadow_target_width - 1.0) * pos.x;
-
-    pos_w = pos.w;
 
     vary_texcoord0 = (texture_matrix0 * vec4(texcoord0,0,1)).xy;
 
