@@ -3630,9 +3630,6 @@ SHA1 指紋：[MD5_DIGEST]
 	<global name="UnsupportedRAMAmount">
 		510
 	</global>
-	<global name="UnsupportedGPU">
-		- 你的顯示卡未達系統最低配備要求。
-	</global>
 	<global name="UnsupportedRAM">
 		- 你的系統記憶體卡未達系統最低配備要求。
 	</global>

@@ -802,9 +802,6 @@ bool LLFeatureManager::loadGPUClass()
     if (extractGLDeviceModel(mGPUString)) {
         LL_INFOS("RenderInit") << "GPU String has been stripped of driver identification" << LL_ENDL;
     }
-    // defaults
-    mGPUSupported = true;
-
     return true; // indicates that a gpu value was established
 }
 
@@ -948,21 +945,10 @@ void LLFeatureManager::applyBaseMasks()
 
     mFeatures = maskp->getFeatures();
 
-    // mask class
+    // The class has no list of its own: it picks the graphics level (applyRecommendedSettings).
     if (mGPUClass >= 0 && mGPUClass < 6)
     {
-        const char* class_table[] =
-        {
-            "Class0",
-            "Class1",
-            "Class2",
-            "Class3",
-            "Class4",
-            "Class5",
-        };
-
-        LL_INFOS("RenderInit") << "Setting GPU Class to " << class_table[mGPUClass] << LL_ENDL;
-        maskFeatures(class_table[mGPUClass]);
+        LL_INFOS("RenderInit") << "Setting GPU Class to Class" << (S32)mGPUClass << LL_ENDL;
     }
     else
     {
@@ -995,10 +981,6 @@ void LLFeatureManager::applyBaseMasks()
     if (gGLManager.mNumTextureImageUnits <= 16)
     {
         maskFeatures("TexUnit16orLess");
-    }
-    if (gGLManager.mVRAM < 2048)
-    {
-        maskFeatures("VRAMLT2GB");
     }
     if (!gGLManager.mHasAnisotropic || 2.f > gGLManager.mMaxAnisotropy)
     {

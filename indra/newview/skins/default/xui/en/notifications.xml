@@ -10957,10 +10957,6 @@ Do you wish to continue?
 510
   </global>
 
-  <global name="UnsupportedGPU">
-- Your graphics card does not meet the minimum requirements.
-  </global>
-
   <global name="UnsupportedRAM">
 - Your system memory does not meet the minimum requirements.
   </global>

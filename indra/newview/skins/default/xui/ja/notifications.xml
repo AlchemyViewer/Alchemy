@@ -3998,9 +3998,6 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	<global name="UnsupportedRAMAmount">
 		510
 	</global>
-	<global name="UnsupportedGPU">
-		－あなたのグラフィックカードは、必須動作環境の条件を満たしていません。
-	</global>
 	<global name="UnsupportedRAM">
 		－あなたのシステムメモリは、必須動作環境の条件を満たしていません。
 	</global>
