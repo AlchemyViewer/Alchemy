@@ -2082,10 +2082,13 @@ bool LLGLManager::initGL()
 
     // The floor (GL_MINIMUM_VERSION). Nothing past here adapts to a context below it, so it is
     // refused rather than run: the window tells the user what it lacks and the viewer quits.
+    // mInited goes back to false: initExtensions sets it, and a window that drops the refused context
+    // without shutdownGL would leave the next initGL taking itself for a second one.
     const auto refuse = [this](const char* missing)
     {
         mHasRequirements  = false;
         mUnmetRequirement = missing;
+        mInited           = false;
         LL_WARNS("RenderInit") << "Refusing OpenGL " << mGLVersionString << " on " << mGLRenderer
                                << ": the viewer needs " << missing << LL_ENDL;
         return false;
@@ -2153,6 +2156,35 @@ bool LLGLManager::initGL()
     if (!mGLExtensions.contains("GL_EXT_texture_sRGB_decode"))
     {
         return refuse("GL_EXT_texture_sRGB_decode");
+    }
+
+    // A context that reports the floor and leaves one of its core calls unresolved is a broken
+    // driver, not an old one, and nothing past here tests these before calling them. Refused with
+    // nothing named, so the window says the driver did not install properly (MBVideoDrvErr).
+    const std::pair<const char*, bool> core_calls[] = {
+        { "glGenVertexArrays", glGenVertexArrays != nullptr },
+        { "glPatchParameteri", glPatchParameteri != nullptr },
+        { "glGenSamplers", glGenSamplers != nullptr },
+        { "glSamplerParameteri", glSamplerParameteri != nullptr },
+        { "glGetSamplerParameteriv", glGetSamplerParameteriv != nullptr },
+        { "glBindSampler", glBindSampler != nullptr },
+        { "glGetTexLevelParameteriv", glGetTexLevelParameteriv != nullptr },
+        { "glGetActiveUniform", glGetActiveUniform != nullptr },
+        { "glGetUniformiv", glGetUniformiv != nullptr },
+        { "glGetInteger64v", glGetInteger64v != nullptr },
+        { "glMapBufferRange", glMapBufferRange != nullptr },
+        { "glFenceSync", glFenceSync != nullptr },
+        { "glClientWaitSync", glClientWaitSync != nullptr },
+        { "glDeleteSync", glDeleteSync != nullptr },
+    };
+    for (const auto& [name, resolved] : core_calls)
+    {
+        if (!resolved)
+        {
+            refuse(name);
+            mUnmetRequirement.clear();
+            return false;
+        }
     }
 
     U32 old_vram = mVRAM;
@@ -2553,7 +2585,10 @@ void LLGLManager::initExtensions()
     // GLOn12). Resolved here rather than left to the GL_VERSION_4_2 block below, which a 4.1
     // context returns before; on 4.2+ that block resolves the same pointers again, which is
     // harmless. Only where the context offers it, since initGL refuses one whose glTexStorage2D
-    // stays null.
+    // stays null -- and cleared first, since a pointer outlives the context that resolved it.
+    glTexStorage1D = nullptr;
+    glTexStorage2D = nullptr;
+    glTexStorage3D = nullptr;
     if (mGLVersion >= 4.19f || mGLExtensions.contains("GL_ARB_texture_storage"))
     {
         glTexStorage1D = (PFNGLTEXSTORAGE1DPROC)LL_GET_PROC_ADDRESS("glTexStorage1D");
