@@ -17,10 +17,18 @@ wrong and hard to see on screen, so they are checked here, statement for stateme
       fraction of a percent: nine coefficients are band-limited to degree two, so an 8x8
       face (the default) is already enough. This is the number that justified lowering the
       integrated resolution from 32 to 8.
+  (d) The packed row the projection's last draw writes (shPackTexel in shPackUtilF.glsl,
+      from the coefficients each texel holds a part of) must unpack, the way
+      evalSHIrradiance unpacks it, to every coefficient at half precision, with the padding
+      zero.
+  (e) The halves both files convert by hand below GLSL 4.20 (shHalfBits, shHalfValue) must be
+      IEEE binary16's: every half reads back as itself, and every single packs as round to
+      nearest even does, ties, denormals, overflow and NaN included.
 
-The weights, directions, basis functions and loop order here mirror shProjectF.glsl. If the
-shader's tiling, order or constants change, change them here in the same commit; the whole
-point of the mirror is that the two cannot drift apart unnoticed.
+The weights, directions, basis functions and loop order here mirror shProjectF.glsl, and the
+packing mirrors shPackUtilF.glsl and evalSHIrradiance. If the shader's tiling, order, layout
+or constants change, change them here in the same commit; the whole point of the mirror is
+that the two cannot drift apart unnoticed.
 
 Standard library only. Exit status 0 on RESULT: OK, 1 on RESULT: MISMATCH.
 """
@@ -237,6 +245,152 @@ def project_two_pass(faces, round_partials=False):
 
 
 # ---------------------------------------------------------------------------------------
+# shPackUtilF.glsl and evalSHIrradiance's unpack, statement for statement
+
+SH_PACKED_TEXELS = 4
+
+
+def pack_half2x16(a, b):
+    lo = struct.unpack("<H", struct.pack("<e", a))[0]
+    hi = struct.unpack("<H", struct.pack("<e", b))[0]
+    return lo | (hi << 16)
+
+
+def unpack_half2x16(u):
+    lo = struct.unpack("<e", struct.pack("<H", u & 0xFFFF))[0]
+    hi = struct.unpack("<e", struct.pack("<H", u >> 16))[0]
+    return (lo, hi)
+
+
+def sh_packed_first(t):
+    return (8 * t) // 3
+
+
+def sh_packed_last(t):
+    return min((8 * t + 7) // 3, 8)
+
+
+def sh_pack_texel(t, sums):
+    first = sh_packed_first(t)
+    h = []
+    for j in range(8):
+        k = 8 * t + j
+        coef = k // 3
+        h.append(sums[coef - first][k - 3 * coef] if coef < 9 else 0.0)
+    return (pack_half2x16(h[0], h[1]), pack_half2x16(h[2], h[3]),
+            pack_half2x16(h[4], h[5]), pack_half2x16(h[6], h[7]))
+
+
+def pack_row(coeffs):
+    """the last draw: one fragment per texel, its sums the coefficients it holds a part of and
+    zero past them, as both shProjectF (single pass) and shProjectReduceF fill them"""
+    row = []
+    for t in range(SH_PACKED_TEXELS):
+        first = sh_packed_first(t)
+        count = sh_packed_last(t) - first + 1
+        sums = [[0.0, 0.0, 0.0] for _ in range(4)]
+        for k in range(count):
+            sums[k] = list(coeffs[first + k])
+        row.append(sh_pack_texel(t, sums))
+    return row
+
+
+def unpack_row(row):
+    t0, t1, t2, t3 = row
+    h0 = unpack_half2x16(t0[0])
+    h1 = unpack_half2x16(t0[1])
+    h2 = unpack_half2x16(t0[2])
+    h3 = unpack_half2x16(t0[3])
+    h4 = unpack_half2x16(t1[0])
+    h5 = unpack_half2x16(t1[1])
+    h6 = unpack_half2x16(t1[2])
+    h7 = unpack_half2x16(t1[3])
+    h8 = unpack_half2x16(t2[0])
+    h9 = unpack_half2x16(t2[1])
+    h10 = unpack_half2x16(t2[2])
+    h11 = unpack_half2x16(t2[3])
+    h12 = unpack_half2x16(t3[0])
+    h13 = unpack_half2x16(t3[1])
+    return [
+        (h0[0], h0[1], h1[0]),
+        (h1[1], h2[0], h2[1]),
+        (h3[0], h3[1], h4[0]),
+        (h4[1], h5[0], h5[1]),
+        (h6[0], h6[1], h7[0]),
+        (h7[1], h8[0], h8[1]),
+        (h9[0], h9[1], h10[0]),
+        (h10[1], h11[0], h11[1]),
+        (h12[0], h12[1], h13[0]),
+    ]
+
+
+def f32_bits(f):
+    return struct.unpack("<I", struct.pack("<f", f))[0]
+
+
+def bits_f32(u):
+    return struct.unpack("<f", struct.pack("<I", u & 0xFFFFFFFF))[0]
+
+
+def sh_half_bits(f):
+    """shHalfBits, for a single's bits"""
+    x = f32_bits(f)
+    sign = (x >> 16) & 0x8000
+    e = (x >> 23) & 0xFF
+    m = x & 0x7FFFFF
+
+    if e == 0xFF:
+        return sign | 0x7C00 | (0x200 if m != 0 else 0)
+
+    he = e - 112
+    if he >= 31:
+        return sign | 0x7C00
+
+    if he <= 0:
+        if he < -10:
+            return sign
+        m |= 0x800000
+        shift = 14 - he
+        q = m >> shift
+        rest = m & ((1 << shift) - 1)
+        tie = 1 << (shift - 1)
+        q += 1 if (rest > tie or (rest == tie and (q & 1) != 0)) else 0
+        return sign | q
+
+    h = (he << 10) | (m >> 13)
+    rest = m & 0x1FFF
+    h += 1 if (rest > 0x1000 or (rest == 0x1000 and (h & 1) != 0)) else 0
+    return sign | h
+
+
+def sh_half_value(h):
+    """shHalfValue, returned as a single"""
+    sign = (h & 0x8000) << 16
+    e = (h >> 10) & 0x1F
+    m = h & 0x3FF
+    if e == 0:
+        v = bits_f32(f32_bits(float(m) * 5.9604644775390625e-8))
+        return -v if sign != 0 else v
+    if e == 31:
+        return bits_f32(sign | 0x7F800000 | (m << 13))
+    return bits_f32(sign | ((e + 112) << 23) | (m << 13))
+
+
+def ieee_half_bits(f):
+    """binary16 of a single, round to nearest even, past the largest half to infinity"""
+    if math.isnan(f):
+        return None
+    try:
+        return struct.unpack("<H", struct.pack("<e", f))[0]
+    except OverflowError:
+        return 0xFC00 if f < 0 else 0x7C00
+
+
+def half_is_nan(h):
+    return (h & 0x7C00) == 0x7C00 and (h & 0x3FF) != 0
+
+
+# ---------------------------------------------------------------------------------------
 
 
 def sample_normals():
@@ -323,6 +477,60 @@ def main():
             flag = "MISMATCH (gate %.1f%%)" % (gate * 100.0)
             ok = False
         print("  R=%3d  texels/coef=%6d  max rel err=%.3f%%  %s" % (res, 6 * res * res, err * 100.0, flag))
+
+    # (d) the packed row unpacks to every coefficient at half precision, padding zero
+    print("packed coefficient row (4 RGBA32UI texels) round trip:")
+    rng = random.Random(2)
+    sets = [project_single_pass(mips[8])]
+    for _ in range(200):
+        sets.append([[rng.uniform(-100.0, 100.0) for _ in range(3)] for _ in range(SH_COEFF_COUNT)])
+    worst = 0
+    for coeffs in sets:
+        row = pack_row(coeffs)
+        back = unpack_row(row)
+        for i in range(SH_COEFF_COUNT):
+            for c in range(3):
+                if back[i][c] != fp16(coeffs[i][c]):
+                    worst += 1
+        if unpack_half2x16(row[3][1])[1] != 0.0 or row[3][2] != 0 or row[3][3] != 0:
+            worst += 1
+    flag = "ok" if worst == 0 else "MISMATCH"
+    ok = ok and worst == 0
+    print("  %d coefficient sets  mismatched values=%d  %s" % (len(sets), worst, flag))
+
+    # (e) the hand-written halves below GLSL 4.20 are binary16's
+    print("hand-packed halves (below GLSL 4.20) vs IEEE binary16:")
+    bad = 0
+    for h in range(0x10000):
+        v = sh_half_value(h)
+        if half_is_nan(h):
+            bad += 0 if (math.isnan(v) and half_is_nan(sh_half_bits(v))) else 1
+            continue
+        ref = struct.unpack("<e", struct.pack("<H", h))[0]
+        if v != ref or f32_bits(v) >> 31 != h >> 15 or sh_half_bits(v) != h:
+            bad += 1
+    singles = []
+    for h in range(0x7C00 - 1):
+        a = struct.unpack("<e", struct.pack("<H", h))[0]
+        b = struct.unpack("<e", struct.pack("<H", h + 1))[0]
+        tie = (a + b) * 0.5
+        singles += [tie, -tie, bits_f32(f32_bits(tie) + 1), bits_f32(f32_bits(tie) - 1)]
+    rng = random.Random(3)
+    for _ in range(100000):
+        singles.append(bits_f32(rng.getrandbits(32)))
+    singles += [65504.0, 65519.99, 65520.0, 1e30, -1e30, 2.0 ** -25, 2.0 ** -26, 1.5 * 2.0 ** -25,
+                float("inf"), float("-inf"), 0.0, -0.0]
+    for f in singles:
+        f = bits_f32(f32_bits(f))
+        ref = ieee_half_bits(f)
+        got = sh_half_bits(f)
+        if ref is None:
+            bad += 0 if half_is_nan(got) else 1
+        elif got != ref:
+            bad += 1
+    flag = "ok" if bad == 0 else "MISMATCH"
+    ok = ok and bad == 0
+    print("  65536 halves, %d singles  mismatched=%d  %s" % (len(singles), bad, flag))
 
     print("RESULT: %s" % ("OK" if ok else "MISMATCH"))
     return 0 if ok else 1

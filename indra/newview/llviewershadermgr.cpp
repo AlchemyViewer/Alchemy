@@ -4079,6 +4079,8 @@ void LLViewerShaderMgr::loadShadersInterface()
         // sample direction it also computes is simply unused here.
         gSHProjectionProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenV.glsl", GL_VERTEX_SHADER));
         gSHProjectionProgram.mShaderFiles.push_back(make_pair("interface/shProjectF.glsl", GL_FRAGMENT_SHADER));
+        // It writes the packed coefficient row itself, as the reduce does.
+        gSHProjectionProgram.mShaderFiles.push_back(make_pair("interface/shPackUtilF.glsl", GL_FRAGMENT_SHADER));
         gSHProjectionProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         built(gSHProjectionProgram.createShader(), gSHProjectionProgram);
     }
@@ -4101,6 +4103,7 @@ void LLViewerShaderMgr::loadShadersInterface()
         gSHProjectionReduceProgram.mShaderFiles.clear();
         gSHProjectionReduceProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenV.glsl", GL_VERTEX_SHADER));
         gSHProjectionReduceProgram.mShaderFiles.push_back(make_pair("interface/shProjectReduceF.glsl", GL_FRAGMENT_SHADER));
+        gSHProjectionReduceProgram.mShaderFiles.push_back(make_pair("interface/shPackUtilF.glsl", GL_FRAGMENT_SHADER));
         gSHProjectionReduceProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         built(gSHProjectionReduceProgram.createShader(), gSHProjectionReduceProgram);
     }

@@ -1183,15 +1183,15 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
             S32 sh_mip = 0;
             const U32 sh_res = shProjectionRes(sh_mip);
 
-            // The last draw is the same for both forms below: nine fragments write this probe's
-            // row of mSHCoeffs. This probe owns one row and must not disturb any other, so the
-            // viewport is the write mask -- the target is never cleared.
+            // The last draw is the same for both forms below: four fragments write this probe's
+            // packed row of mSHCoeffs. This probe owns one row and must not disturb any other, so
+            // the viewport is the write mask -- the target is never cleared.
             auto draw_coefficients = [&](LLGLSLShader& program)
             {
                 program.uniform1i(LLShaderMgr::U_WIDTH, (S32)sh_res);
 
                 mSHCoeffs.bindTarget();
-                glViewport(0, probe->mCubeIndex, LL_SH_COEFF_COUNT, 1);
+                glViewport(0, probe->mCubeIndex, LL_SH_PACKED_TEXELS, 1);
 
                 mVertexBuffer->setBuffer();
                 mVertexBuffer->drawArrays(gGL.TRIANGLE_STRIP, 0, 4);
@@ -1205,8 +1205,8 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
             if (two_pass && mSHPartial.isComplete() && mSHPartial.getHeight() == sh_rows)
             {
                 // Row-parallel form: 9 x 6R fragments each integrate one face row into
-                // mSHPartial, then nine fragments add the rows. The single-pass form below
-                // serialises the whole cube inside each of nine fragments, which is what made
+                // mSHPartial, then four fragments add the rows and pack them. The single-pass form
+                // below serialises the whole cube inside each of four fragments, which is what made
                 // it a multi-millisecond stall however few texels it read.
                 {
                     LL_PROFILE_GPU_ZONE("probe sh rows");
@@ -1239,7 +1239,7 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
             }
             else
             {
-                // Single pass: nine fragments each walk the whole cube. Kept for A/B captures
+                // Single pass: four fragments each walk the whole cube. Kept for A/B captures
                 // and as the fallback when the partial target is not there.
                 gSHProjectionProgram.bind();
                 S32 channel = gSHProjectionProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
@@ -1756,11 +1756,12 @@ void LLReflectionMapManager::initReflectionMaps()
         mMaxProbeLOD = log2f((F32)mProbeResolution) - 1.f; // number of mips - 1
 
         // Signed storage: the linear and quadratic bands are negative over half the sphere, so
-        // none of the unsigned float formats the radiance chain uses can hold these. A row a
-        // probe, kept with what each row holds wherever the probe count leaves the size alone.
-        const ALRenderTargetDesc sh_desc{ .width  = LL_SH_COEFF_COUNT,
+        // none of the unsigned float formats the radiance chain uses can hold these. Halves
+        // packed in integer texels (shPackUtilF.glsl), so a pixel reads a probe in four fetches. A
+        // row a probe, kept with what each row holds wherever the probe count leaves the size alone.
+        const ALRenderTargetDesc sh_desc{ .width  = LL_SH_PACKED_TEXELS,
                                           .height = mReflectionProbeCount + 2,
-                                          .color  = { GL_RGBA16F } };
+                                          .color  = { GL_RGBA32UI } };
         const bool sh_kept = mSHCoeffs.ensure(sh_desc) == LLRenderTarget::EnsureResult::Kept;
 
         bool new_texture = false;

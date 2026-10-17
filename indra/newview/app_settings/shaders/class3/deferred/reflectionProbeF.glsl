@@ -32,11 +32,11 @@ float ssrMinGlossiness();
 
 uniform samplerCubeArray   reflectionProbes;
 
-// Second-order SH irradiance, nine RGB coefficients per probe in a 9-wide strip, one row per
-// cubemap layer. See class1/interface/shProjectF.glsl -- irradiance is band-limited to these
-// nine numbers, so the cubemap this replaces was storing a nine-degree-of-freedom function in
-// sixteen thousand texels.
-uniform sampler2D          shCoeffs;
+// Second-order SH irradiance, nine RGB coefficients per probe packed as halves into a row of
+// four RGBA32UI texels (class1/interface/shPackUtilF.glsl), one row per cubemap layer. See
+// class1/interface/shProjectF.glsl -- irradiance is band-limited to these nine numbers, so the
+// cubemap this replaces was storing a nine-degree-of-freedom function in sixteen thousand texels.
+uniform usampler2D         shCoeffs;
 
 uniform sampler2D sceneMap;
 uniform int cube_snapshot;
@@ -580,6 +580,39 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
     return ret.rgb;
 }
 
+// unpackHalf2x16 is GLSL 4.20's; below it, the halves shPackUtilF.glsl packed by hand are read
+// the same way.
+#if __VERSION__ >= 420
+vec2 shUnpackHalves(uint u)
+{
+    return unpackHalf2x16(u);
+}
+#else
+float shHalfValue(uint h)
+{
+    uint sign = (h & 0x8000u) << 16;
+    uint e    = (h >> 10) & 0x1Fu;
+    uint m    = h & 0x3FFu;
+
+    if (e == 0u)
+    {
+        // Zero or a denormal: m units of 2^-24.
+        float v = float(m) * 5.9604644775390625e-8;
+        return (sign != 0u) ? -v : v;
+    }
+    if (e == 31u)
+    {
+        return uintBitsToFloat(sign | 0x7F800000u | (m << 13));
+    }
+    return uintBitsToFloat(sign | ((e + 112u) << 23) | (m << 13));
+}
+
+vec2 shUnpackHalves(uint u)
+{
+    return vec2(shHalfValue(u & 0xFFFFu), shHalfValue(u >> 16));
+}
+#endif
+
 // Tap an irradiance map
 // pos - position of pixel
 // dir - pixel normal
@@ -595,15 +628,37 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
 // unchanged.
 vec3 evalSHIrradiance(vec3 n, int layer)
 {
-    vec3 L0 = texelFetch(shCoeffs, ivec2(0, layer), 0).rgb;
-    vec3 L1 = texelFetch(shCoeffs, ivec2(1, layer), 0).rgb;
-    vec3 L2 = texelFetch(shCoeffs, ivec2(2, layer), 0).rgb;
-    vec3 L3 = texelFetch(shCoeffs, ivec2(3, layer), 0).rgb;
-    vec3 L4 = texelFetch(shCoeffs, ivec2(4, layer), 0).rgb;
-    vec3 L5 = texelFetch(shCoeffs, ivec2(5, layer), 0).rgb;
-    vec3 L6 = texelFetch(shCoeffs, ivec2(6, layer), 0).rgb;
-    vec3 L7 = texelFetch(shCoeffs, ivec2(7, layer), 0).rgb;
-    vec3 L8 = texelFetch(shCoeffs, ivec2(8, layer), 0).rgb;
+    // The row's 27 halves, two to a uint, eight to a texel, in coefficient order and red, green,
+    // blue within each (shPackUtilF.glsl).
+    uvec4 t0 = texelFetch(shCoeffs, ivec2(0, layer), 0);
+    uvec4 t1 = texelFetch(shCoeffs, ivec2(1, layer), 0);
+    uvec4 t2 = texelFetch(shCoeffs, ivec2(2, layer), 0);
+    uvec4 t3 = texelFetch(shCoeffs, ivec2(3, layer), 0);
+
+    vec2 h0  = shUnpackHalves(t0.x);  // L0.r  L0.g
+    vec2 h1  = shUnpackHalves(t0.y);  // L0.b  L1.r
+    vec2 h2  = shUnpackHalves(t0.z);  // L1.g  L1.b
+    vec2 h3  = shUnpackHalves(t0.w);  // L2.r  L2.g
+    vec2 h4  = shUnpackHalves(t1.x);  // L2.b  L3.r
+    vec2 h5  = shUnpackHalves(t1.y);  // L3.g  L3.b
+    vec2 h6  = shUnpackHalves(t1.z);  // L4.r  L4.g
+    vec2 h7  = shUnpackHalves(t1.w);  // L4.b  L5.r
+    vec2 h8  = shUnpackHalves(t2.x);  // L5.g  L5.b
+    vec2 h9  = shUnpackHalves(t2.y);  // L6.r  L6.g
+    vec2 h10 = shUnpackHalves(t2.z);  // L6.b  L7.r
+    vec2 h11 = shUnpackHalves(t2.w);  // L7.g  L7.b
+    vec2 h12 = shUnpackHalves(t3.x);  // L8.r  L8.g
+    vec2 h13 = shUnpackHalves(t3.y);  // L8.b  (zero)
+
+    vec3 L0 = vec3(h0, h1.x);
+    vec3 L1 = vec3(h1.y, h2);
+    vec3 L2 = vec3(h3, h4.x);
+    vec3 L3 = vec3(h4.y, h5);
+    vec3 L4 = vec3(h6, h7.x);
+    vec3 L5 = vec3(h7.y, h8);
+    vec3 L6 = vec3(h9, h10.x);
+    vec3 L7 = vec3(h10.y, h11);
+    vec3 L8 = vec3(h12, h13.x);
 
     const float A0 = 1.0;        // pi   / pi
     const float A1 = 0.6666667;  // 2pi/3 / pi

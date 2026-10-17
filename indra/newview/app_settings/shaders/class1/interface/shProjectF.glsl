@@ -36,18 +36,27 @@
 // everything above the second band, so nine coefficients capture essentially all of it. The
 // cubemap was an expensive encoding of a function with nine degrees of freedom.
 //
-// One fragment per coefficient: gl_FragCoord.x selects which, and the whole set for one probe is
-// a 9x1 strip written into that probe's row. Nine fragments each walk the source, so the source
-// is read nine times over; that redundancy is still far cheaper than what it replaces, and it
-// needs no MRT juggling and no compute shader, which the GL floor here cannot assume. With
-// SH_ROW_PARTIAL defined the walk is split instead into one fragment per face row, and
-// shProjectReduceF.glsl adds the rows: the same terms in the same order, spread over enough
-// fragments to fill the GPU rather than nine lanes of it.
+// One fragment per texel of the probe's packed row (shPackUtilF.glsl): gl_FragCoord.x selects
+// which, and it integrates the up to four coefficients that texel holds a part of in one walk of
+// the source. Four fragments each walk the source, so it is read four times over; that
+// redundancy is still far cheaper than what it replaces, and it needs no MRT juggling and no
+// compute shader, which the GL floor here cannot assume. With SH_ROW_PARTIAL defined the walk is
+// split instead into one fragment per coefficient and face row, and shProjectReduceF.glsl adds
+// the rows and packs them: the same terms in the same order, spread over enough fragments to
+// fill the GPU rather than four lanes of it.
 //
 // scripts/content_tools/check_sh_projection.py mirrors this file -- weights, directions, basis
 // and both summation orders -- so change them together.
 
+#ifdef SH_ROW_PARTIAL
 out vec4 frag_color;
+#else
+out uvec4 frag_color;
+
+int shPackedFirst(int t);
+int shPackedLast(int t);
+uvec4 shPackTexel(int t, vec3 sums[4]);
+#endif
 
 uniform samplerCubeArray reflectionProbes;
 uniform int sourceIdx;
@@ -87,9 +96,8 @@ vec3 cubeDirection(int face, float u, float v)
                    return vec3(  -u,   -v, -1.0);
 }
 
-// Real second-order SH basis, evaluated for one index. Kept as a switch on a value that is
-// uniform across the whole draw (it comes from the fragment's x position, and each fragment
-// owns exactly one coefficient), so no lane in a quad disagrees about which branch it is in.
+// Real second-order SH basis, evaluated for one index. Kept as a switch on the index, which a
+// fragment holds the same for every texel of its walk, so each texel takes the same branch.
 float shBasis(int i, vec3 d)
 {
     if (i == 0) return 0.282095;
@@ -103,59 +111,73 @@ float shBasis(int i, vec3 d)
                 return 0.546274 * (d.x * d.x - d.y * d.y);
 }
 
-// One texel's contribution to coefficient `coef`: its radiance, weighted by the basis function in
-// its direction and by its solid angle. Both forms of main() sum exactly these terms; they differ
-// only in how the sum is split across fragments.
-vec3 texelTerm(int coef, int face, int x, int y, float inv_res)
+// One texel's radiance, unit direction and solid angle. Its contribution to coefficient `coef` is
+// its radiance, weighted by the basis function in its direction and by its solid angle; both forms
+// of main() sum exactly those terms and differ only in how the sum is split across fragments.
+vec3 texelRadiance(int face, int x, int y, float inv_res, out vec3 d, out float sa)
 {
     // Texel centre in [-1,1].
     float u = (2.0 * (float(x) + 0.5) * inv_res) - 1.0;
     float v = (2.0 * (float(y) + 0.5) * inv_res) - 1.0;
 
     vec3 dir = cubeDirection(face, u, v);
-    float sa = texelSolidAngle(u, v, inv_res);
+    sa = texelSolidAngle(u, v, inv_res);
+    d  = normalize(dir);
 
-    vec3 radiance = textureLod(reflectionProbes, vec4(dir, float(sourceIdx)), mipLevel).rgb;
-
-    return radiance * shBasis(coef, normalize(dir)) * sa;
+    return textureLod(reflectionProbes, vec4(dir, float(sourceIdx)), mipLevel).rgb;
 }
 
 void main()
 {
-    int coef = int(gl_FragCoord.x);
-
     float inv_res = 1.0 / float(u_width);
 
-    vec3 sum = vec3(0.0);
-
 #ifdef SH_ROW_PARTIAL
-    // Row-parallel form. This fragment owns one row of one face -- gl_FragCoord.y runs over the
-    // 6 * u_width face rows -- and integrates across it; shProjectReduceF.glsl adds the rows.
-    // The single-pass form below serialises the whole cube inside each of nine fragments, so
-    // nine lanes do all the work while the rest of the GPU idles; this spreads the same texel
-    // reads over 9 x 6 x u_width fragments and finishes in a fraction of the time.
+    // Row-parallel form. This fragment owns one coefficient, gl_FragCoord.x, over one row of one
+    // face -- gl_FragCoord.y runs over the 6 * u_width face rows -- and integrates across it;
+    // shProjectReduceF.glsl adds the rows. The single-pass form below serialises the whole cube
+    // inside each of four fragments, so four lanes do all the work while the rest of the GPU
+    // idles; this spreads the same texel reads over 9 x 6 x u_width fragments and finishes in a
+    // fraction of the time.
+    int coef = int(gl_FragCoord.x);
     int row  = int(gl_FragCoord.y);
     int face = row / u_width;
     int y    = row - face * u_width;
 
+    vec3 sum = vec3(0.0);
     for (int x = 0; x < u_width; ++x)
     {
-        sum += texelTerm(coef, face, x, y, inv_res);
+        vec3  d;
+        float sa;
+        vec3  radiance = texelRadiance(face, x, y, inv_res, d, sa);
+        sum += radiance * shBasis(coef, d) * sa;
     }
+
+    // Signed: bands 1 and 2 are negative over half the sphere by construction, which is why this
+    // target cannot be one of the unsigned float formats the radiance chain uses.
+    frag_color = vec4(sum, 1.0);
 #else
+    int texel = int(gl_FragCoord.x);
+    int first = shPackedFirst(texel);
+    int count = shPackedLast(texel) - first + 1;
+
+    vec3 sums[4] = vec3[4](vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
     for (int face = 0; face < 6; ++face)
     {
         for (int y = 0; y < u_width; ++y)
         {
             for (int x = 0; x < u_width; ++x)
             {
-                sum += texelTerm(coef, face, x, y, inv_res);
+                vec3  d;
+                float sa;
+                vec3  radiance = texelRadiance(face, x, y, inv_res, d, sa);
+                for (int k = 0; k < count; ++k)
+                {
+                    sums[k] += radiance * shBasis(first + k, d) * sa;
+                }
             }
         }
     }
-#endif
 
-    // Signed: bands 1 and 2 are negative over half the sphere by construction, which is why this
-    // target cannot be one of the unsigned float formats the radiance chain uses.
-    frag_color = vec4(sum, 1.0);
+    frag_color = shPackTexel(texel, sums);
+#endif
 }
