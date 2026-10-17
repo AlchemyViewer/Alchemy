@@ -308,9 +308,10 @@ void LLImageGL::initClass(LLWindow* window, S32 num_catagories, bool skip_analyz
 
     if (thread_texture_loads || thread_media_updates)
     {
-        LLImageGLThread::createInstance(window);
         LLImageGLThread::sEnabledTextures = thread_texture_loads;
         LLImageGLThread::sEnabledMedia = thread_media_updates;
+        // Which clears both again if it gets no context to upload on.
+        LLImageGLThread::createInstance(window);
     }
 }
 
@@ -3606,6 +3607,14 @@ LLImageGLThread::LLImageGLThread(LLWindow* window)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
     mContext = mWindow->createSharedContext();
+    if (!mContext)
+    {
+        // Nothing to upload on, so the thread never starts and textures and media keep to the main thread.
+        LL_WARNS("LLImageGL") << "No GL context shared with the window's; uploading on the main thread" << LL_ENDL;
+        sEnabledTextures = false;
+        sEnabledMedia = false;
+        return;
+    }
     LL::ThreadPool::start();
 }
 

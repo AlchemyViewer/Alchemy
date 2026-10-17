@@ -1956,7 +1956,9 @@ void LLWindowWin32::recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw
 
 void* LLWindowWin32::createSharedContext()
 {
-    mMaxGLVersion = llclamp(mMaxGLVersion, 3.f, 4.6f);
+    // From what RenderMaxOpenGLVersion allows down to the floor, 4.1 (GL_MINIMUM_VERSION): initGL
+    // refuses anything less, so there is no context worth having below it.
+    mMaxGLVersion = llclamp(mMaxGLVersion, 4.1f, 4.6f);
 
     S32 version_major = llfloor(mMaxGLVersion);
     S32 version_minor = (S32)ll_round((mMaxGLVersion-version_major)*10);
@@ -1971,40 +1973,31 @@ void* LLWindowWin32::createSharedContext()
     };
 
     HGLRC rc = 0;
-
-    bool done = false;
-    while (!done)
+    for (;;)
     {
         rc = wglCreateContextAttribsARB(mhDC, mhRC, attribs);
-
-        if (!rc)
+        if (rc || attribs[3] <= 1)
         {
-            if (attribs[3] > 0)
-            { //decrement minor version
-                attribs[3]--;
-            }
-            else if (attribs[1] > 3)
-            { //decrement major version and start minor version over at 3
-                attribs[1]--;
-                attribs[3] = 3;
-            }
-            else
-            { //we reached 3.0 and still failed, bail out
-                done = true;
-            }
+            break;
         }
-        else
-        {
-            LL_INFOS() << "Created OpenGL " << llformat("%d.%d", attribs[1], attribs[3]) <<
-                (LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
-            done = true;
-        }
+        attribs[3]--;
     }
 
-    if (!rc && !(rc = wglCreateContext(mhDC)))
+    if (rc)
     {
+        LL_INFOS() << "Created OpenGL " << llformat("%d.%d", attribs[1], attribs[3]) <<
+            (LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
+    }
+    else if (!mhRC)
+    {
+        // The window's own context: there is nothing to run on.
         close();
         LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBGLContextErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+    }
+    else
+    {
+        // A worker's, shared with the window's: its owner does without it.
+        LL_WARNS("Window") << "No OpenGL 4.1 context to share with the window's" << LL_ENDL;
     }
 
     return rc;

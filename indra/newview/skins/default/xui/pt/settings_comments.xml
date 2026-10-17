@@ -1876,7 +1876,7 @@
   <key>RenderFogRatio</key>
   <string>OBSOLETO - Distância da câmera onde a névoa atinge densidade máxima (fração ou múltiplo da distância de far clip).</string>
   <key>RenderGLContextCoreProfile</key>
-  <string>Não usar um contexto OpenGL de perfil de compatibilidade. Requer reinício.</string>
+  <string>Não usar um contexto OpenGL de perfil de compatibilidade. Requer reinício. Apenas Windows.</string>
   <key>RenderGLMultiThreadedMedia</key>
   <string>Permitir que o OpenGL use múltiplos contextos de renderização para reproduzir mídia (pode reduzir engasgos de quadros, não funciona bem com drivers Intel).</string>
   <key>RenderGLMultiThreadedTextures</key>
@@ -1972,7 +1972,7 @@
   <key>RenderMaxNodeSize</key>
   <string>Tamanho máximo dos dados de vértice de um único nó (em KB).</string>
   <key>RenderMaxOpenGLVersion</key>
-  <string>Versão máxima do OpenGL a tentar usar (mínimo 3.1, máximo 4.6). Requer reinício. Apenas Windows.</string>
+  <string>Versão máxima do OpenGL a tentar usar (mínimo 4.1, máximo 4.6). Requer reinício. Apenas Windows.</string>
   <key>RenderMaxPartCount</key>
   <string>Número máximo de partículas a exibir na tela.</string>
   <key>RenderMaxTextureIndex</key>
