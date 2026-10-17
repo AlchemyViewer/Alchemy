@@ -885,6 +885,7 @@ void LLImageGL::init(bool usemipmaps)
 
     mIsMask = false;
     mMaxAlpha = 255;
+    mMinAlpha = 0;
     mNeedsAlphaAndPickMask = true ;
     mAlphaAnalysisSerial = 0;
     mAlphaStride = 0 ;
@@ -2367,12 +2368,14 @@ void LLImageGL::setAlphaAnalysis(const AlphaAnalysis& analysis)
 
     mIsMask = analysis.mIsMask;
     mMaxAlpha = analysis.mMaxAlpha;
+    mMinAlpha = analysis.mMinAlpha;
 }
 
 void LLImageGL::clearAlphaAnalysis()
 {
     mIsMask = false;
     mMaxAlpha = 255;
+    mMinAlpha = 0;
 }
 
 void LLImageGL::publishPendingAlpha()
@@ -2389,6 +2392,7 @@ void LLImageGL::publishPendingAlpha()
     {
         mIsMask = mPendingAlpha.mAnalysis.mIsMask;
         mMaxAlpha = mPendingAlpha.mAnalysis.mMaxAlpha;
+        mMinAlpha = mPendingAlpha.mAnalysis.mMinAlpha;
     }
     mPendingAlpha = PendingAlpha();
 }
@@ -2762,7 +2766,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
         // The texture the format is for has no alpha. Staged while an upload is in flight:
         // the texture on screen keeps its own until the new one publishes.
         mNeedsAlphaAndPickMask = false;
-        setAlphaAnalysis(AlphaAnalysis());
+        setAlphaAnalysis(opaqueAlphaAnalysis());
         return; //no alpha channel.
     case GL_RED_INTEGER:
     case GL_RG_INTEGER:
@@ -2772,7 +2776,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
     case GL_BGRA_INTEGER:
         // Integers: even a fourth channel is a value, not coverage.
         mNeedsAlphaAndPickMask = false;
-        setAlphaAnalysis(AlphaAnalysis());
+        setAlphaAnalysis(opaqueAlphaAnalysis());
         return;
     case GL_RGBA:
     case GL_SRGB_ALPHA:
@@ -2968,6 +2972,7 @@ LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
     U32 length = w * h;
     U32 alphatotal = 0;
     U32 max_alpha = 0;
+    U32 min_alpha = 255;
 
     U32 sample[16];
     memset(sample, 0, sizeof(U32) * 16);
@@ -3014,6 +3019,7 @@ LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
                 sample[asum / (16 * 4)] += 4;
 
                 max_alpha = llmax(max_alpha, llmax(llmax(s1, s2), llmax(s3, s4)));
+                min_alpha = llmin(min_alpha, llmin(llmin(s1, s2), llmin(s3, s4)));
             }
 
             rowstart += 2 * w * alpha_stride;
@@ -3022,20 +3028,24 @@ LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
         length = 2 * paired_w * paired_h;
 
         // The trailing odd row and column are left out of the histogram, but one of their texels may be the only
-        // one with any alpha.
+        // one with any alpha, or the only one without.
         const GLubyte* alpha = ((const GLubyte*)data_in) + alpha_offset;
         if (paired_w < w)
         {
             for (U32 y = 0; y < h; ++y)
             {
-                max_alpha = llmax(max_alpha, (U32)alpha[((size_t)y * w + paired_w) * alpha_stride]);
+                const U32 a = alpha[((size_t)y * w + paired_w) * alpha_stride];
+                max_alpha = llmax(max_alpha, a);
+                min_alpha = llmin(min_alpha, a);
             }
         }
         if (paired_h < h)
         {
             for (U32 x = 0; x < w; ++x)
             {
-                max_alpha = llmax(max_alpha, (U32)alpha[((size_t)paired_h * w + x) * alpha_stride]);
+                const U32 a = alpha[((size_t)paired_h * w + x) * alpha_stride];
+                max_alpha = llmax(max_alpha, a);
+                min_alpha = llmin(min_alpha, a);
             }
         }
     }
@@ -3048,6 +3058,7 @@ LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
             alphatotal += s1;
             ++sample[s1 / 16];
             max_alpha = llmax(max_alpha, s1);
+            min_alpha = llmin(min_alpha, s1);
             current += alpha_stride;
         }
     }
@@ -3077,6 +3088,7 @@ LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
 
     AlphaAnalysis analysis;
     analysis.mMaxAlpha = (U8)max_alpha;
+    analysis.mMinAlpha = (U8)min_alpha;
     if (midrangetotal > length / 48 ||
         (lowerhalftotal == length && alphatotal != 0) ||
         (upperhalftotal == length && alphatotal != 255 * length))
@@ -3159,6 +3171,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
             {
                 mIsMask = analysis.mIsMask;
                 mMaxAlpha = analysis.mMaxAlpha;
+                mMinAlpha = analysis.mMinAlpha;
             }
             unref();
         }

@@ -59,6 +59,8 @@ LLGLSLShader* LLDrawPoolAvatar::sVertexProgram = NULL;
 bool    LLDrawPoolAvatar::sSkipOpaque = false;
 bool    LLDrawPoolAvatar::sSkipTransparent = false;
 S32     LLDrawPoolAvatar::sShadowPass = -1;
+LLDrawPoolAvatar::eShadowBakes LLDrawPoolAvatar::sShadowBakes = LLDrawPoolAvatar::SHADOW_BAKES_ALL;
+bool    LLDrawPoolAvatar::sShadowCutBakeLeft = false;
 S32 LLDrawPoolAvatar::sDiffuseChannel = 0;
 F32 LLDrawPoolAvatar::sMinimumAlpha = 0.2f;
 
@@ -316,6 +318,8 @@ void LLDrawPoolAvatar::beginShadowPass(S32 pass)
     if (pass == SHADOW_PASS_AVATAR_OPAQUE)
     {
         sVertexProgram = &gDeferredAvatarShadowProgram;
+        // The bakes the deferred pass cuts out wait for SHADOW_PASS_AVATAR_OPAQUE_CUT; the rest keep early Z.
+        sShadowBakes = SHADOW_BAKES_SOLID;
 
         if ((sShaderLevel > 0))  // for hardware blending
         {
@@ -346,9 +350,13 @@ void LLDrawPoolAvatar::beginShadowPass(S32 pass)
 
         gGL.diffuseColor4f(1, 1, 1, 1);
     }
-    else if (pass == SHADOW_PASS_AVATAR_ALPHA_MASK)
+    else if (pass == SHADOW_PASS_AVATAR_OPAQUE_CUT || pass == SHADOW_PASS_AVATAR_ALPHA_MASK)
     {
         sVertexProgram = &gDeferredAvatarAlphaMaskShadowProgram;
+        if (pass == SHADOW_PASS_AVATAR_OPAQUE_CUT)
+        {
+            sShadowBakes = SHADOW_BAKES_CUT;
+        }
 
         // bind diffuse tex so we can reference the alpha channel...
         sDiffuseChannel = 0;
@@ -378,6 +386,7 @@ void LLDrawPoolAvatar::endShadowPass(S32 pass)
     }
     sVertexProgram = NULL;
     sRenderingSkinned = false;
+    sShadowBakes = SHADOW_BAKES_ALL;
     LLDrawPoolAvatar::sShadowPass = -1;
 }
 
@@ -442,8 +451,20 @@ void LLDrawPoolAvatar::renderShadow(S32 pass)
     if (pass == SHADOW_PASS_AVATAR_OPAQUE)
     {
         LLDrawPoolAvatar::sSkipTransparent = true;
+        sShadowCutBakeLeft = false;
         avatarp->renderSkinned();
+        mShadowCutBakes = sShadowCutBakeLeft;
         LLDrawPoolAvatar::sSkipTransparent = false;
+    }
+    else if (pass == SHADOW_PASS_AVATAR_OPAQUE_CUT)
+    {
+        // Only where the opaque pass passed a mesh over, in this shadow map
+        if (mShadowCutBakes)
+        {
+            LLDrawPoolAvatar::sSkipTransparent = true;
+            avatarp->renderSkinned();
+            LLDrawPoolAvatar::sSkipTransparent = false;
+        }
     }
     else if (pass == SHADOW_PASS_AVATAR_ALPHA_BLEND)
     {
@@ -457,6 +478,26 @@ void LLDrawPoolAvatar::renderShadow(S32 pass)
         avatarp->renderSkinned();
         LLDrawPoolAvatar::sSkipOpaque = false;
     }
+}
+
+// static
+bool LLDrawPoolAvatar::shadowDrawsBake(const LLGLTexture* bake)
+{
+    if (sShadowBakes == SHADOW_BAKES_ALL)
+    {
+        return true;
+    }
+
+    // Cut where some texel is under the deferred pass's cutoff, or where the alpha is not known: a local
+    // composite, which is never analysed, or an analysis not yet back.
+    const LLImageGL* image = bake ? bake->getGLTexture() : nullptr;
+    const bool cut = !image || image->getMinAlpha() < sMinimumAlpha * 255.f;
+    if (sShadowBakes == SHADOW_BAKES_SOLID)
+    {
+        sShadowCutBakeLeft |= cut;
+        return !cut;
+    }
+    return cut;
 }
 
 S32 LLDrawPoolAvatar::getNumPasses()
