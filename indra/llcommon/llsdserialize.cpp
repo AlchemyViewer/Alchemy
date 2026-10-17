@@ -2892,7 +2892,9 @@ U8* unzip_llsdNavMesh( bool& valid, size_t& outsize, std::istream& is, S32 size 
     inflateEnd(&strm);
     delete [] in;
 
-    if (ret != Z_STREAM_END)
+    // A stream that inflates to nothing is no navmesh, and leaves no buffer to
+    // hand back: the caller reads the first byte of a valid one.
+    if (ret != Z_STREAM_END || cur_size == 0)
     {
         free(result);
         valid = false;
