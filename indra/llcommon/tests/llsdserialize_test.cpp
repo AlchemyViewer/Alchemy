@@ -2434,4 +2434,17 @@ namespace
         LLSD out;
         CHECK(LLUZipHelper::unzip_llsd(out, in, (S32)compressed.size()) == LLUZipHelper::ZR_SIZE_ERROR);
     }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: unzip_llsdNavMesh rejects a stream that inflates to nothing", "[llsd_serialization]")
+    {
+        // a well-formed gzip stream of no bytes is no navmesh, and the caller
+        // reads the first byte of what comes back valid
+        const std::string empty = deflate_zeros(0, 15 + 16);
+        std::istringstream in(empty);
+        bool valid = true;
+        size_t outsize = 1;
+        NavMeshBytes out(unzip_llsdNavMesh(valid, outsize, in, (S32)empty.size()));
+        CHECK_FALSE(valid);
+        CHECK(out.get() == nullptr);
+    }
 }
