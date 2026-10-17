@@ -2601,6 +2601,7 @@ if(AL_BUILD_TESTS)
       tests/alwhitebalancesolver_test.cpp
       tests/cppfeatures_test.cpp
       tests/llagentaccess_test.cpp
+      tests/llautoreplace_test.cpp
       tests/llhttpretrypolicy_test.cpp
       tests/llversioninfo_test.cpp
       tests/llviewerassetstats_test.cpp
@@ -2680,6 +2681,7 @@ if(AL_BUILD_TESTS)
       alwaterheightbake.cpp
       alwhitebalancesolver.cpp
       llagentaccess.cpp
+      llautoreplace.cpp
       llhttpretrypolicy.cpp
       llversioninfo.cpp
       llviewerassetstats.cpp
