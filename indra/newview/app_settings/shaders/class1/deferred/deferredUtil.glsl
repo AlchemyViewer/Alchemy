@@ -521,10 +521,15 @@ vec3 clampRadiance(vec3 c)
 //
 // Constant across the lights hitting a fragment, so callers evaluate it once and apply it to
 // the accumulated specular rather than paying a LUT fetch per light.
+//
+// nv is taken as pbrPunctual takes it, clamp(abs(n.v), 0.001, 1), so the compensation looks
+// up the same view angle as the lobe it scales, whichever form a caller hands in: where a
+// shading normal faces away from the view, the raw dot product would read the LUT at 0 while
+// the lobe uses |n.v|.
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv)
 {
     perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
-    vec2 brdf = BRDF(clamp(nv, 0.0, 1.0), 1.0 - perceptualRoughness);
+    vec2 brdf = BRDF(clamp(abs(nv), 0.001, 1.0), 1.0 - perceptualRoughness);
     float Ess = max(brdf.x + brdf.y, 1e-4);
     return 1.0 + specularColor * (1.0 / Ess - 1.0);
 }
