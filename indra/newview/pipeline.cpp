@@ -1432,6 +1432,7 @@ void LLPipeline::releaseAllGLResources()
     gBumpImageList.destroyGL();
     mHeroProbeManager.cleanup();
     releaseExposureBuffers();
+    mPbrBrdfLut.release();
 
     // Clearing the recorded parameters matters as much as the release: they are
     // what generateLensDirt compares against, so leaving them set would make it
@@ -1522,8 +1523,6 @@ void LLPipeline::releaseDerivedState()
     mWaterSurface.release();
     mDepthPyramid.release();
 
-    mPbrBrdfLut.release();
-
     ALFarPlaneOverlay::release();
     if (ALSelectionOutline::instanceExists())
     {
@@ -1560,7 +1559,7 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
 
     releaseRenderTargets();
     releaseDerivedState();
-    add(invalidated, "BRDF LUT, reference still, scopes, depth pyramid, water "
+    add(invalidated, "reference still, scopes, depth pyramid, water "
                      "surface maps, selection outline, far-plane overlay");
 
     createGLBuffers();
@@ -1607,6 +1606,13 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
         if (before.mHero != after.mHero)
         {
             add(changed, "hero pack");
+        }
+
+        // The table is what gDeferredGenBrdfLutProgram draws, so it is drawn again whenever that is relinked.
+        if (relinked)
+        {
+            createBrdfLut();
+            add(invalidated, "BRDF LUT");
         }
 
         // The exposure adapts in the HDR scene's units, and the flare's history is measured in them.
@@ -1848,7 +1854,10 @@ void LLPipeline::createGLBuffers()
         mToneCurveLutDirty = true;   // fresh storage holds nothing
     }
 
-    createBrdfLut();
+    if (!mPbrBrdfLut.isComplete())
+    {
+        createBrdfLut();
+    }
     createExposureBuffers();
 }
 
@@ -1908,7 +1917,10 @@ F32 lerpf(F32 a, F32 b, F32 w)
 
 void LLPipeline::createBrdfLut()
 {
-    mPbrBrdfLut.allocate(512, 512, GL_RG16F);
+    if (!mPbrBrdfLut.isComplete())
+    {
+        mPbrBrdfLut.allocate(512, 512, GL_RG16F);
+    }
     mPbrBrdfLut.bindTarget();
 
     if (gDeferredGenBrdfLutProgram.isComplete())

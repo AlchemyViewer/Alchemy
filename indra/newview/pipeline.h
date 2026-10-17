@@ -108,6 +108,7 @@ public:
     void releaseShadowBuffers();
 
     void createGLBuffers();
+    /// Draws the BRDF LUT with gDeferredGenBrdfLutProgram, allocating it first if it has no storage.
     void createBrdfLut();
     /// Whichever of the auto-exposure's targets and the lens flare's are missing, at their starting values.
     void createExposureBuffers();
