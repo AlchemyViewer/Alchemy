@@ -856,10 +856,9 @@ void LLPipeline::resizeShadowTexture()
 
     // The probe and hero packs' sun shadows ignore RenderShadowResolutionScale, but take the depth format
     // the main pack's do (AlchemyRenderShadowDepth32F), so they are rebuilt only when that changed under
-    // them. gCubeSnapshot keeps their scale at 1 and the spot shadows out, as for any capture pack.
+    // them. allocateShadowBuffer keeps their scale at 1 and the spot shadows out, as for any capture pack.
     const LLRenderTarget::eDepthFormat depth_fmt = shadow_depth_format();
     RenderTargetPack* const main_rt = mRT;
-    gCubeSnapshot = true;
     for (RenderTargetPack* rt : { &mAuxillaryRT, &mHeroProbeRT })
     {
         if (rt->deferredScreen.isComplete() && rt->shadow[0].isComplete() && rt->shadow[0].getDepthFormat() != depth_fmt)
@@ -869,7 +868,6 @@ void LLPipeline::resizeShadowTexture()
         }
     }
     mRT = main_rt;
-    gCubeSnapshot = false;
 
     gResizeShadowTexture = false;
 }
@@ -975,9 +973,6 @@ void LLPipeline::allocateProbeBuffers()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     llassert(mRT == &mMainRT);
 
-    // gCubeSnapshot keeps the main pack's spot shadows and screen-only targets out of these packs.
-    gCubeSnapshot = true;
-
     if (sReflectionProbesEnabled)
     {
         mReflectionMapManager.initReflectionMaps();
@@ -997,13 +992,16 @@ void LLPipeline::allocateProbeBuffers()
     }
 
     mRT = &mMainRT;
-    gCubeSnapshot = false;
 }
 
 bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     bool hdr = gSavedSettings.getBOOL("RenderHDREnabled");
+
+    // The pack mRT points at decides what this allocates, not gCubeSnapshot, which says a capture is
+    // rendering: the probe and hero packs are allocated by allocateProbeBuffers, outside any capture.
+    const bool main_pack = mRT == &mMainRT;
 
     // remember these dimensions
     mRT->width = resX;
@@ -1012,7 +1010,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
     // The main pack renders at the scaled size. A probe or hero pack is the size of the capture it
     // takes, which LLViewerWindow::cubeSnapshot reads back from its G-buffer and the managers
     // downsample to their probes from.
-    if (!gCubeSnapshot)
+    if (main_pack)
     {
         scaleToRenderResolution(resX, resY);
     }
@@ -1096,7 +1094,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
     allocateShadowBuffer(resX, resY);
 
-    if (!gCubeSnapshot) // hack to not re-allocate various targets for cube snapshots
+    if (main_pack) // the targets only the main view has
     {
         // SMAA's intermediates: its edges in mSMAAEdgeMap and its blend weights. FXAA has none; it reads
         // the post chain's target directly (applyFXAA).
@@ -1175,8 +1173,11 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     S32 shadow_detail = RenderShadowDetail;
 
-    F32 scale = gCubeSnapshot ? 1.0f : llmax(0.f, RenderShadowResolutionScale); // Don't scale probe shadow maps
-    if (gCubeSnapshot && mRT == &mAuxillaryRT)
+    // The probe and hero packs' shadows: never scaled, and no spot shadows (those are the main view's).
+    const bool capture_pack = mRT != &mMainRT;
+
+    F32 scale = capture_pack ? 1.0f : llmax(0.f, RenderShadowResolutionScale); // Don't scale probe shadow maps
+    if (mRT == &mAuxillaryRT)
     {
         // The probe pack's colour target follows ALProbeSuperSample, its shadow maps stay at
         // the size the full supersample gave them: a coarser capture is not a reason for
@@ -1207,7 +1208,7 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
         }
     }
 
-    if (!gCubeSnapshot) // hack to not allocate spot shadow maps during ReflectionMapManager init
+    if (!capture_pack)
     {
         U32 width = (U32)(resX * scale);
         U32 height = width;
@@ -1535,7 +1536,7 @@ void LLPipeline::releaseSunShadowTargets()
 
 void LLPipeline::releaseSpotShadowTargets()
 {
-    if (!gCubeSnapshot) // hack to avoid freeing spot shadows during ReflectionMapManager init
+    if (mRT == &mMainRT) // the spot shadows are the main view's, whichever pack allocateShadowBuffer is filling
     {
         for (U32 i = 0; i < 2; i++)
         {
