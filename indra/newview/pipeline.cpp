@@ -1433,6 +1433,12 @@ void LLPipeline::releaseAllGLResources()
     mHeroProbeManager.cleanup();
     releaseExposureBuffers();
 
+    // Clearing the recorded parameters matters as much as the release: they are
+    // what generateLensDirt compares against, so leaving them set would make it
+    // decide nothing had changed and skip rebuilding the plate it no longer has.
+    mLensDirtMap.release();
+    mLensDirtParams = LensDirtParams();
+
     mGLResourcesLive = false;
 }
 
@@ -1497,11 +1503,6 @@ void LLPipeline::releaseDerivedState()
         mSMAASearchMap = 0;
     }
 
-    // Clearing the recorded parameters matters as much as the release: they are
-    // what generateLensDirt compares against, so leaving them set would make it
-    // decide nothing had changed and skip rebuilding the plate it no longer has.
-    mLensDirtMap.release();
-    mLensDirtParams = LensDirtParams();
     if (mToneCurveLut)
     {
         LLImageGL::deleteTextures(1, &mToneCurveLut);
@@ -1555,7 +1556,7 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
 
     releaseRenderTargets();
     releaseDerivedState();
-    add(invalidated, "lens dirt, colour-grade LUT, noise, SMAA "
+    add(invalidated, "colour-grade LUT, noise, SMAA "
                      "tables, tone curve, UBOs, query plots, BRDF LUT, reference still, scopes, depth pyramid, water "
                      "surface maps, selection outline, far-plane overlay");
 
@@ -1609,6 +1610,12 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
             releaseExposureBuffers();
             createExposureBuffers();
             add(invalidated, "exposure and flare history");
+        }
+
+        // generateLensDirt rebuilds the plate itself when the frame's size or the plate's parameters move.
+        if (main_size && mLensDirtMap.isComplete())
+        {
+            add(invalidated, "lens dirt (next frame)");
         }
 
         // An impostor is G-buffer channels and depth in the main G-buffer's formats (generateImpostor), so those
