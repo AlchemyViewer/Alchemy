@@ -1439,6 +1439,8 @@ void LLPipeline::releaseAllGLResources()
     mLensDirtMap.release();
     mLensDirtParams = LensDirtParams();
 
+    mCGLut = nullptr;
+
     mGLResourcesLive = false;
 }
 
@@ -1556,7 +1558,7 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
 
     releaseRenderTargets();
     releaseDerivedState();
-    add(invalidated, "colour-grade LUT, noise, SMAA "
+    add(invalidated, "noise, SMAA "
                      "tables, tone curve, UBOs, query plots, BRDF LUT, reference still, scopes, depth pyramid, water "
                      "surface maps, selection outline, far-plane overlay");
 
@@ -1576,6 +1578,8 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
         // is rebuilt where it is next wanted.
         add(changed, "new context");
         gBumpImageList.restoreGL();
+        // Read again otherwise only when RenderColorGrade or RenderColorGradeLUT changes (LLPipeline::init).
+        setupGradingLUT();
     }
     else
     {
@@ -1877,8 +1881,6 @@ void LLPipeline::createGLBuffers()
 
     createBrdfLut();
     createExposureBuffers();
-
-    setupGradingLUT();
 }
 
 F32 lerpf(F32 a, F32 b, F32 w)
