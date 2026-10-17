@@ -136,6 +136,10 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
     // the moment an avatar impostors, then restores them when it stops.
     shader->setMinimumAlpha(MINIMUM_ALPHA);
 
+    // The alpha pool's faces carry coverage in their vertex alpha, which the masked fullbright
+    // program tests with the texture's when the pool draws with it (fullbrightF.glsl).
+    shader->uniform1f(LLShaderMgr::VERTEX_ALPHA_COVERAGE, 1.f);
+
     //also prepare rigged variant
     if (shader->mRiggedVariant && shader->mRiggedVariant != shader)
     {
@@ -231,6 +235,7 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
 
         simple_shader->bind();
         simple_shader->setMinimumAlpha(0.33f);
+        simple_shader->uniform1f(LLShaderMgr::VERTEX_ALPHA_COVERAGE, 1.f);
 
         // mask off color buffer writes as we're only writing to depth buffer
         gGL.setColorMask(false, false);

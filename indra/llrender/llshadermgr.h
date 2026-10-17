@@ -167,6 +167,7 @@ public:
 
         MINIMUM_ALPHA,                      //  "minimum_alpha"
         EMISSIVE_BRIGHTNESS,                //  "emissive_brightness"
+        VERTEX_ALPHA_COVERAGE,              //  "vertex_alpha_coverage"
 
         DEFERRED_SHADOW_MATRIX,             //  "shadow_matrix"
         DEFERRED_ENV_MAT,                   //  "env_mat"

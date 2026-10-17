@@ -242,14 +242,19 @@ void LLDrawPoolFullbrightAlphaMask::renderPostDeferred(S32 pass)
 
     LLGLDisable blend(GL_BLEND);
 
+    // Outside the alpha pool LLFace stores shininess in the vertex alpha, which the mask must not
+    // test (fullbrightF.glsl); the alpha pool, drawing with the same program, sets it back.
+
     // render static
     shader->bind();
+    shader->uniform1f(LLShaderMgr::VERTEX_ALPHA_COVERAGE, 0.f);
     pushMaskBatches(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, true, true);
 
     if (!LLPipeline::sRenderingHUDs)
     {
         // render rigged
         shader->bind(true);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::VERTEX_ALPHA_COVERAGE, 0.f);
         pushRiggedMaskBatches(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK_RIGGED, true, true);
     }
 }
