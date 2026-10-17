@@ -498,11 +498,17 @@ uniform float uGrainRange;                       // [0, 1]   luma position where
 uniform vec3  uGrainTint;                        // neutral gray; try (1, 0.9, 0.8) warm, (0.8, 0.9, 1) cool
 uniform bool  uGrainAnimate;                     // false = frozen pattern (static frame for stills)
 
+// Coarse grain's cells, in multiples of the size every other style uses.
+const float GRAIN_COARSE_SCALE = 2.5;
+
 // Noise sample in ~[-0.5, 0.5]. Style controls color vs luma and whether
 // cells are quantized for a coarser look. The caller scales by amplitude.
+// A cell is a whole number of pixels, so every cell on the screen is the
+// same size; a fractional one tiles as a fixed beat of wide and narrow cells.
 vec3 grainSample(vec2 fragCoord, int style, float size)
 {
-    float cell = max(size, 1.0);
+    float cell = (style == 2) ? size * GRAIN_COARSE_SCALE : size;
+    cell       = max(floor(cell + 0.5), 1.0);
     vec2  gp   = floor(fragCoord / cell) * cell;
     if (style == 1)
     {
@@ -526,8 +532,9 @@ vec3 applyFilmGrain(vec3 color, vec2 fragCoord)
     float gluma = dot(color, LUMA);
 
     // Scale grain cells by resolution so a "size 1" grain looks the same
-    // perceptual size on 1080p and 4K displays.
-    float pixelScale    = max(uResolution.x, uResolution.y) / 1080.0;
+    // perceptual size on 1080p and 4K displays. 1080p names the frame's
+    // height, so the height sets the scale, whatever the aspect ratio.
+    float pixelScale    = uResolution.y / 1080.0;
     float effectiveSize = uGrainSize * pixelScale;
     vec3  n = grainSample(fragCoord + frameNoiseOffset(uGrainAnimate),
                           uGrainStyle, effectiveSize);
