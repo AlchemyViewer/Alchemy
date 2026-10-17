@@ -716,10 +716,13 @@ vec3 applyPreview(vec3 color)
 // Dither — triangular PDF noise for banding suppression at the output stage
 // =============================================================================
 //
-// Interleaved Gradient Noise (Jimenez, COD:AW 2014) sampled twice with a
-// small offset to produce a TPDF-shaped noise in [-1, 1]. TPDF is
-// perceptually superior to rectangular PDF — it fully masks quantization
-// banding with no residual noise-floor shift.
+// Interleaved Gradient Noise (Jimenez, COD:AW 2014), one sample a pixel,
+// remapped through the triangular distribution's inverse CDF to a TPDF noise
+// in [-1, 1] (Gjøl, "Banding in Games", 2016). TPDF is perceptually superior
+// to rectangular PDF — it fully masks quantization banding with no residual
+// noise-floor shift. The sum of two IGN taps is not a substitute: IGN is a
+// gradient, so a second tap at a fixed offset is the first shifted by a
+// constant, and the pair sums to a rectangular ±0.5.
 //
 // Temporal decorrelation is handled by frameNoiseOffset() (see top of file):
 // the noise pattern fully reshuffles between frames instead of visibly
@@ -735,8 +738,7 @@ uniform bool  uDitherAnimate;           // false = freeze pattern. Almost always
 
 // Interleaved Gradient Noise core — hashes a 2D input to a well-distributed
 // [0, 1) sample. Frame decorrelation is applied at the call site via
-// frameNoiseOffset(); the TPDF pair must share the same offset so keeping it
-// outside IGN is essential, not just an optimization.
+// frameNoiseOffset().
 float ign(vec2 p)
 {
     return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
@@ -747,16 +749,19 @@ vec3 applyDither(vec3 color, vec2 fragCoord)
     if (uDitherAmount <= 0.0)
         return color;
 
-    // Compute the frame offset *once* and reuse for both TPDF taps — the
-    // IGN calls are cheap but factoring the per-frame hash out keeps the
-    // pattern coherent across the pair (otherwise the two taps would
-    // decorrelate from each other, not just from previous frames).
     vec2 p = fragCoord + frameNoiseOffset(uDitherAnimate);
 
-    float tpdf = ign(p) + ign(p + vec2(1.618, 2.414)) - 1.0;
+    // Uniform [-1, 1) to triangular [-1, 1]: |x| = 1 - sqrt(1 - |u|) has density
+    // 2(1 - |x|), and the sign carries over.
+    float u    = ign(p) * 2.0 - 1.0;
+    float tpdf = sign(u) * (1.0 - sqrt(1.0 - abs(u)));
 
     float levels = (uDitherBits >= 10) ? 1023.0 : 255.0;
-    return color + tpdf * (uDitherAmount / levels);
+
+    // Within a step of black or white the noise shrinks to nothing: a full step's either way
+    // would round an eighth of exact black up a code, and as much of exact white down one.
+    vec3 room = clamp(min(color, 1.0 - color) * levels, 0.0, 1.0);
+    return color + tpdf * (uDitherAmount / levels) * room;
 }
 
 
