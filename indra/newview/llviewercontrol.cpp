@@ -336,14 +336,10 @@ static bool handleReleaseGLBufferChanged(const LLSD& newvalue)
 
 static bool handleRenderGlowChanged(const LLSD& newvalue)
 {
-    // The glow programs load whatever this says, so a toggle reloads and allocates nothing. It changes
-    // the latch generateGlow reads, as setShaders sets it, and which faces register for the glow
-    // passes, which stands until their groups rebuild.
+    // The glow programs load whatever this says, and glowing faces register for the glow passes
+    // whatever it says, so a toggle reloads, allocates and rebuilds nothing. It is the latch the glow
+    // passes and generateGlow read, set as setShaders sets it.
     LLPipeline::sRenderGlow = newvalue.asBoolean() && gGlowProgram.isComplete() && gGlowExtractProgram.isComplete();
-    if (gPipeline.isInit())
-    {
-        gPipeline.rebuildDrawInfo();
-    }
     return true;
 }
 
