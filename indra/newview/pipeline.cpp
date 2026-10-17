@@ -827,9 +827,14 @@ void LLPipeline::resizeShadowTexture()
 {
     // Each pack's shadows at the size allocateScreenBufferInternal gives them, which is its G-buffer's:
     // after RenderResolutionDivisor or RenderResolutionMultiplier, not the logical size in mRT->width.
+    // Without a G-buffer there is no size to give them and nothing that would render with them: the
+    // next screen allocation that succeeds allocates the shadows with it.
     releaseSunShadowTargets();
     releaseSpotShadowTargets();
-    allocateShadowBuffer(mRT->deferredScreen.getWidth(), mRT->deferredScreen.getHeight());
+    if (mRT->deferredScreen.isComplete())
+    {
+        allocateShadowBuffer(mRT->deferredScreen.getWidth(), mRT->deferredScreen.getHeight());
+    }
 
     // The probe and hero packs' sun shadows ignore RenderShadowResolutionScale, but take the depth format
     // the main pack's do (AlchemyRenderShadowDepth32F), so they are rebuilt with them. gCubeSnapshot
