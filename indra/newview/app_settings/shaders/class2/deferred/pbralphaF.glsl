@@ -258,6 +258,14 @@ void main()
     // describes the surface behind this one, not this one.
     color = pbrBaseLight(diffuseColor, specularColor, metallic, v, norm.xyz, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, ao, additive, atten);
 
+    // A classic sky's 1.1 is on this term alone, as softenLightF's writeColor puts it on the
+    // opaque surface behind: the local lights below carry their own 0.9, and the fog adds what
+    // it adds unscaled, as the deferred light and haze passes do.
+    if (classic_mode > 0)
+    {
+        color *= 1.1;
+    }
+
     vec3 light = vec3(0);
 
     // Punctual lights
@@ -276,14 +284,11 @@ void main()
     color.rgb = applySkyAndWaterFog(pos.xyz, additive, atten, vec4(color, 1.0)).rgb;
 
     float a = basecolor.a*vertex_color.a;
-    float final_scale = 1;
-    if (classic_mode > 0)
-        final_scale = 1.1;
     // Scrubbed the same way softenLightF scrubs the opaque result. max() alone does not do it:
     // it passes an infinity through unchanged, and its answer for a NaN is undefined. This path
     // runs the same unbounded punctual lobe the opaque one does, so it can produce the same
     // values -- and whatever it writes goes on to the bloom pyramid.
-    frag_color = max(vec4(clampHDRRange(color.rgb * final_scale), a), vec4(0));
+    frag_color = max(vec4(clampHDRRange(color.rgb), a), vec4(0));
 #endif // FOR_IMPOSTOR
 }
 

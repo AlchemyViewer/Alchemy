@@ -241,6 +241,16 @@ void main()
 
     color.rgb *= diffuse_linear.rgb;
 
+#ifndef IS_HUD
+    // A classic sky's 1.1 is on the sun and ambient term alone, as softenLightF's writeColor
+    // puts it on the opaque surface behind: the local lights below carry their own 0.9, and
+    // the fog adds what it adds unscaled, as the deferred light and haze passes do.
+    if (classic_mode > 0)
+    {
+        color.rgb *= 1.1;
+    }
+#endif
+
     vec4 light = vec4(0,0,0,0);
 
     vec3 npos = normalize(-pos.xyz);
@@ -263,15 +273,10 @@ void main()
     color.rgb = applySkyAndWaterFog(pos.xyz, additive, atten, color).rgb;
 
 #endif // #else // FOR_IMPOSTOR
-    float final_scale = 1;
-    if (classic_mode > 0)
-        final_scale = 1.1;
 #ifdef IS_HUD
     color.rgb = linear_to_srgb(color.rgb);
-    final_scale = 1;
 #endif
 
-    color.rgb *= final_scale;
     frag_color = max(color, vec4(0));
 }
 

@@ -355,6 +355,14 @@ void main()
         glare += cur_glare;
     }
 
+    // A classic sky's 1.1 is on the sun, ambient and environment term alone, as softenLightF's
+    // writeColor puts it on an opaque material: the local lights below carry their own 0.9,
+    // and the fog adds what it adds unscaled, as the deferred light and haze passes do.
+    if (classic_mode > 0)
+    {
+        color *= 1.1;
+    }
+
     vec3 npos = normalize(-pos.xyz);
     vec3 light = vec3(0, 0, 0);
 
@@ -381,10 +389,7 @@ void main()
     {
         discard;
     }
-    float final_scale = 1;
-    if (classic_mode > 0)
-        final_scale = 1.1;
-    frag_color = max(vec4(color * final_scale, al), vec4(0));
+    frag_color = max(vec4(color, al), vec4(0));
 
 #else // mode is not DIFFUSE_ALPHA_MODE_BLEND, encode to gbuffer
     // deferred path               // See: C++: addDeferredAttachment(), shader: softenLightF.glsl
