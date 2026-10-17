@@ -182,7 +182,10 @@ static bool llsd_from_parsed(simdjson::simdjson_result<simdjson::dom::element> p
 
 bool LlsdFromJsonString(std::string_view json, LLSD& out, std::string* errmsg)
 {
-    return llsd_from_parsed(json_parser().parse(json.data(), json.size()), out, errmsg);
+    // simdjson copies the input with memcpy(), which takes no null pointer
+    // even for no bytes, and an empty view may have none
+    const char* data = json.data() ? json.data() : "";
+    return llsd_from_parsed(json_parser().parse(data, json.size()), out, errmsg);
 }
 
 bool LlsdFromJsonString(const simdjson::padded_string& json, LLSD& out, std::string* errmsg)
