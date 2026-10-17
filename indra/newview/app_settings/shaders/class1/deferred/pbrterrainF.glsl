@@ -87,6 +87,7 @@ PBRMix terrain_sample_and_multiply_pbr(
     TerrainPoint pt
     , mat2 uv_transform
     , vec2 uv_offset
+    , int material
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     , TerrainTriplanar tw
 #endif
@@ -313,6 +314,7 @@ void main()
             pt
             , terrain_uv_transform[0]
             , terrain_uv_offset[0]
+            , 0
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
             , tw
 #endif
@@ -353,6 +355,7 @@ void main()
             pt
             , terrain_uv_transform[1]
             , terrain_uv_offset[1]
+            , 1
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
             , tw
 #endif
@@ -393,6 +396,7 @@ void main()
             pt
             , terrain_uv_transform[2]
             , terrain_uv_offset[2]
+            , 2
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
             , tw
 #endif
@@ -433,6 +437,7 @@ void main()
             pt
             , terrain_uv_transform[3]
             , terrain_uv_offset[3]
+            , 3
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
             , tw
 #endif

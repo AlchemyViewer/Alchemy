@@ -28,6 +28,7 @@
 
 #include "lldrawpoolterrain.h"
 
+#include "alhexlattice.h"
 #include "alterrainsurfacemaps.h"
 
 #include "llviewercontrol.h"
@@ -311,6 +312,26 @@ void LLDrawPoolTerrain::renderFullShader()
     unbindSurface(sShader);
 }
 
+// static
+void LLDrawPoolTerrain::uploadHexPlaces(LLGLSLShader* shader, const F64 (*delta)[2], U32 materials)
+{
+    // The hex lattice's density in uv (pbrterrainUtilF's TERRAIN_HEX_GRID_SCALE), as the shader holds it
+    constexpr F64 HEX_GRID = (F64)3.4641016f;
+    // Two elements to a material: the top's place and the x slice's, then the y slice's
+    F32 frac[LLVLComposition::ASSET_COUNT * 2][4] = {};
+    S32 base[LLVLComposition::ASSET_COUNT * 2][4] = {};
+    for (U32 i = 0; i < materials * 3; ++i)
+    {
+        const U32 m = i / 3;
+        const U32 p = i % 3;
+        const U32 e = 2 * m + (p >> 1);
+        const U32 half = (p & 1) * 2;
+        ALHexLattice::place(HEX_GRID, delta[i][0], delta[i][1], &base[e][half], &frac[e][half]);
+    }
+    shader->uniform4fv(LLShaderMgr::TERRAIN_HEX_FRAC, materials * 2, (F32*)frac);
+    shader->uniform4iv(LLShaderMgr::TERRAIN_HEX_BASE, materials * 2, (S32*)base);
+}
+
 void LLDrawPoolTerrain::renderFullShaderTextures()
 {
     // Hack! Get the region that this draw pool is rendering from!
@@ -351,6 +372,17 @@ void LLDrawPoolTerrain::renderFullShaderTextures()
 
     shader->uniform4fv(LLShaderMgr::OBJECT_PLANE_S, 1, tp0.mV);
     shader->uniform4fv(LLShaderMgr::OBJECT_PLANE_T, 1, tp1.mV);
+
+    if (shader->hasUniform(LLShaderMgr::TERRAIN_HEX_FRAC))
+    {
+        // The world's uv less this region's, the same everywhere in the region: the origin's uv in the world's plane
+        // less its phase here. The top's, then the x and y slices', whose v is height and the same in every region.
+        const F64 scale = sDetailScale;
+        const F64 du = scale * region_origin_global.mdV[VX] - (F64)offset_x;
+        const F64 dv = scale * region_origin_global.mdV[VY] - (F64)offset_y;
+        const F64 delta[3][2] = { { du, dv }, { dv, 0.0 }, { du, 0.0 } };
+        uploadHexPlaces(shader, delta, 1);
+    }
 
     LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
 
@@ -556,6 +588,32 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
     }
     shader->uniformMatrix2fv(LLShaderMgr::TERRAIN_UV_TRANSFORM, terrain_material_count, GL_FALSE, (F32*)uv_transform);
     shader->uniform2fv(LLShaderMgr::TERRAIN_UV_OFFSET, terrain_material_count, (F32*)uv_offset);
+
+    if (shader->hasUniform(LLShaderMgr::TERRAIN_HEX_FRAC))
+    {
+        // A material's uv in the world less its uv in this region: its map of the region's origin, the offset
+        // cancelling. The x and y slices are (sx y, z) and (-sy x, z) for the side that does not turn them, and height
+        // is the same in every region, so theirs are the map's first column times the origin's y and its x.
+        const LLVector3d& origin = regionp->getOriginGlobal();
+        F64 delta[terrain_material_count * 3][2];
+        for (U32 i = 0; i < terrain_material_count; ++i)
+        {
+            const F64 a = uv_transform[i][0], b = uv_transform[i][1], c = uv_transform[i][2], d = uv_transform[i][3];
+            const F64 x = origin.mdV[VX];
+            const F64 y = origin.mdV[VY];
+            F64* top = delta[3 * i];
+            F64* yz = delta[3 * i + 1];
+            F64* xz = delta[3 * i + 2];
+            top[0] = a * x + c * y;
+            top[1] = b * x + d * y;
+            yz[0] = a * y;
+            yz[1] = b * y;
+            xz[0] = a * x;
+            xz[1] = b * x;
+        }
+        uploadHexPlaces(shader, delta, terrain_material_count);
+    }
+
     if (sPBRDetailMode >= TERRAIN_PBR_DETAIL_NORMAL)
     {
         shader->uniformMatrix2fv(LLShaderMgr::TERRAIN_NORMAL_AXES, terrain_material_count, GL_FALSE, (F32*)normal_axes);

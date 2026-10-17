@@ -1631,8 +1631,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("terrain_uv_transform");
     mReservedUniforms.push_back("terrain_uv_offset");
     mReservedUniforms.push_back("terrain_normal_axes");
+    mReservedUniforms.push_back("terrain_hex_frac");
+    mReservedUniforms.push_back("terrain_hex_base");
 
-    llassert(mReservedUniforms.size() == LLShaderMgr::TERRAIN_NORMAL_AXES +1);
+    llassert(mReservedUniforms.size() == LLShaderMgr::TERRAIN_HEX_BASE +1);
 
     mReservedUniforms.push_back("viewport");
 

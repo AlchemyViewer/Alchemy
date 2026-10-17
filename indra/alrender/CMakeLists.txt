@@ -29,6 +29,7 @@ set(
   alcutoutimage.h
   aldepthpyramid.h
   alfarplane.h
+  alhexlattice.h
   alhuddepth.h
   allightmapblur.h
   alondemandtarget.h

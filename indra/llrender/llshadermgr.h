@@ -71,6 +71,8 @@ public:
         TERRAIN_UV_TRANSFORM,                 //  "terrain_uv_transform"
         TERRAIN_UV_OFFSET,                    //  "terrain_uv_offset"
         TERRAIN_NORMAL_AXES,                  //  "terrain_normal_axes"
+        TERRAIN_HEX_FRAC,                     //  "terrain_hex_frac"  each projection's uv origin's place on the hex lattice, its fraction
+        TERRAIN_HEX_BASE,                     //  "terrain_hex_base"  and the low 32 bits of its floor
 
         VIEWPORT,                           //  "viewport"
         LIGHT_POSITION,                     //  "light_position"

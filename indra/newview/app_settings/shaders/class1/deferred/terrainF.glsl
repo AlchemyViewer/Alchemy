@@ -81,25 +81,34 @@ vec3 terrain_facet(vec2 p_region);
 #endif
 
 #ifdef TERRAIN_HEX_TILING
+struct HexPlace
+{
+    vec2 frac;
+    ivec2 base;
+};
 struct HexTile
 {
     ivec2 corner[3];
+    ivec2 base;
+    vec2 q;
     vec3 weight;
     int type;
 };
-HexTile hex_tile(vec2 uv);
-mat2 hex_cell(ivec2 corner, vec2 uv, out vec2 st);
+HexPlace terrain_hex_place(int m, int p, float side);
+HexTile hex_tile(vec2 uv, HexPlace place);
+mat2 hex_cell(HexTile ht, int i, out vec2 st);
 float hex_luma(vec3 rgb);
 vec3 hex_weights(HexTile ht, vec3 luma);
 #endif
 
 // One detail texture at one uv. Gradients arrive as parameters: every call sits inside a
 // branch on which textures and which projections cover the fragment, where an implicit-LOD
-// fetch has no derivative to take. See fetch_pbr() in pbrterrainUtilF.glsl.
-vec4 detail_fetch(sampler2D tex, vec2 uv, vec2 uv_ddx, vec2 uv_ddy)
+// fetch has no derivative to take. See fetch_pbr() in pbrterrainUtilF.glsl. Under hex tiling,
+// p and side name the projection, whose place on the lattice the four textures share.
+vec4 detail_fetch(sampler2D tex, vec2 uv, vec2 uv_ddx, vec2 uv_ddy, int p, float side)
 {
 #ifdef TERRAIN_HEX_TILING
-    HexTile ht = hex_tile(uv);
+    HexTile ht = hex_tile(uv, terrain_hex_place(0, p, side));
     vec4 cell[3];
     vec3 luma = vec3(0.0);
     for (int i = 0; i < 3; ++i)
@@ -108,7 +117,7 @@ vec4 detail_fetch(sampler2D tex, vec2 uv, vec2 uv_ddx, vec2 uv_ddy)
         if ((ht.type & (1 << i)) != 0)
         {
             vec2 st;
-            mat2 rot = hex_cell(ht.corner[i], uv, st);
+            mat2 rot = hex_cell(ht, i, st);
             cell[i] = textureGrad(tex, st, rot * uv_ddx, rot * uv_ddy);
             luma[i] = hex_luma(cell[i].rgb);
         }
@@ -132,22 +141,22 @@ vec4 detail_sample(sampler2D tex, TerrainTriplanar tw, float sx, float sy
     if ((tw.type & SAMPLE_X) != 0)
     {
         vec2 flip = vec2(sx, 1.0);
-        c += detail_fetch(tex, flip * side.xy, flip * side_ddx.xy, flip * side_ddy.xy) * tw.weight.x;
+        c += detail_fetch(tex, flip * side.xy, flip * side_ddx.xy, flip * side_ddy.xy, 1, sx) * tw.weight.x;
     }
     if ((tw.type & SAMPLE_Y) != 0)
     {
         vec2 flip = vec2(-sy, 1.0);
-        c += detail_fetch(tex, flip * side.zw, flip * side_ddx.zw, flip * side_ddy.zw) * tw.weight.y;
+        c += detail_fetch(tex, flip * side.zw, flip * side_ddx.zw, flip * side_ddy.zw, 2, -sy) * tw.weight.y;
     }
     if ((tw.type & SAMPLE_Z) != 0)
     {
-        c += detail_fetch(tex, uv, uv_ddx, uv_ddy) * tw.weight.z;
+        c += detail_fetch(tex, uv, uv_ddx, uv_ddy, 0, 1.0) * tw.weight.z;
     }
     return c;
 }
 #define TERRAIN_DETAIL(tex) detail_sample(tex, tw, sx, sy, vary_texcoord0.xy, uv_ddx, uv_ddy, vary_texcoord_side, side_ddx, side_ddy)
 #else
-#define TERRAIN_DETAIL(tex) detail_fetch(tex, vary_texcoord0.xy, uv_ddx, uv_ddy)
+#define TERRAIN_DETAIL(tex) detail_fetch(tex, vary_texcoord0.xy, uv_ddx, uv_ddy, 0, 1.0)
 #endif
 
 void main()
