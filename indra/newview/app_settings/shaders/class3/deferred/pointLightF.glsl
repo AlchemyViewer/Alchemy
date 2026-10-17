@@ -159,7 +159,7 @@ void main()
             float gtdenom = 2 * nh;
             float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
-            if (nh > 0.0)
+            if (dot(n, h) > 0.0) // raw: calcHalfVectors floors nh above 0
             {
                 float scol = fres*blinnPhongLobe(nh, spec.a)*gt/(nh*nl);
                 final_color += lit*scol*color.rgb*spec.rgb;

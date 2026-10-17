@@ -332,7 +332,9 @@ void main()
             vec3 n = gb.normal;
             calcHalfVectors(lv, n, v, h, l, nh, nl, nv, vh, lightDist);
 
-            if (nl > 0.0 && nh > 0.0)
+            // The raw dot products: calcHalfVectors floors nl and nh at a positive epsilon so
+            // the lobe can divide by them, which would leave this test always true.
+            if (dot(n, l) > 0.0 && dot(n, h) > 0.0)
             {
                 float lit = min(nl*6.0, 1.0);
 
