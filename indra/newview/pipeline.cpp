@@ -827,6 +827,20 @@ void LLPipeline::requestResizeShadowTexture()
     gResizeShadowTexture = true;
 }
 
+// Every pack's shadow maps, sun and spot. 32-bit float depth is the same 4 bytes/texel as DEPTH24
+// here but distributes precision differently (float, denser near the near plane). Opt-in; toggling
+// it re-runs resizeShadowTexture via handleShadowsResized. The compare sampler and PCF read it the
+// same either way.
+//
+// Reverse-Z forces it on regardless of the setting: reversed depth puts the dense end of the float
+// mantissa where the perspective spot cascades need it, and it is memory-free (DEPTH24 pads to 4
+// bytes anyway).
+static LLRenderTarget::eDepthFormat shadow_depth_format()
+{
+    static LLCachedControl<bool> shadow_depth_32f(gSavedSettings, "AlchemyRenderShadowDepth32F", false);
+    return (shadow_depth_32f || LLRender::sReverseZ) ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
+}
+
 void LLPipeline::resizeShadowTexture()
 {
     // Each pack's shadows at the size allocateScreenBufferInternal gives them, which is its G-buffer's:
@@ -841,13 +855,14 @@ void LLPipeline::resizeShadowTexture()
     }
 
     // The probe and hero packs' sun shadows ignore RenderShadowResolutionScale, but take the depth format
-    // the main pack's do (AlchemyRenderShadowDepth32F), so they are rebuilt with them. gCubeSnapshot
-    // keeps their scale at 1 and the spot shadows out, as for any capture pack.
+    // the main pack's do (AlchemyRenderShadowDepth32F), so they are rebuilt only when that changed under
+    // them. gCubeSnapshot keeps their scale at 1 and the spot shadows out, as for any capture pack.
+    const LLRenderTarget::eDepthFormat depth_fmt = shadow_depth_format();
     RenderTargetPack* const main_rt = mRT;
     gCubeSnapshot = true;
     for (RenderTargetPack* rt : { &mAuxillaryRT, &mHeroProbeRT })
     {
-        if (rt->deferredScreen.isComplete())
+        if (rt->deferredScreen.isComplete() && rt->shadow[0].isComplete() && rt->shadow[0].getDepthFormat() != depth_fmt)
         {
             mRT = rt;
             allocateShadowBuffer(rt->deferredScreen.getWidth(), rt->deferredScreen.getHeight());
@@ -1171,16 +1186,7 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
     U32 sun_shadow_map_width = BlurHappySize(resX, scale);
     U32 sun_shadow_map_height = BlurHappySize(resY, scale);
 
-    // 32-bit float depth is the same 4 bytes/texel as DEPTH24 here but distributes precision
-    // differently (float, denser near the near plane). Opt-in; toggling it re-runs this via
-    // handleShadowsResized. The compare sampler and PCF read it the same either way.
-    //
-    // Reverse-Z forces it on regardless of the setting: reversed depth puts the dense end of
-    // the float mantissa where the perspective spot cascades need it, and it is memory-free
-    // (DEPTH24 pads to 4 bytes anyway).
-    static LLCachedControl<bool> shadow_depth_32f(gSavedSettings, "AlchemyRenderShadowDepth32F", false);
-    const LLRenderTarget::eDepthFormat depth_fmt =
-        (shadow_depth_32f || LLRender::sReverseZ) ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
+    const LLRenderTarget::eDepthFormat depth_fmt = shadow_depth_format();
 
     if (shadow_detail > 0)
     { //allocate 4 sun shadow maps
