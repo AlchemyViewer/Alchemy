@@ -99,6 +99,7 @@ public:
         EMISSIVE_COLOR,                     //  "emissiveColor"
         METALLIC_FACTOR,                    //  "metallicFactor"
         ROUGHNESS_FACTOR,                   //  "roughnessFactor"
+        BASE_COLOR_ALPHA,                   //  "baseColorAlpha"
         CLIP_PLANE,                         //  "clipPlane"
         CLIP_SIGN,                          //  "clipSign"
         DIFFUSE_MAP,                        //  "diffuseMap"
@@ -332,6 +333,7 @@ public:
         GLTF_METALLIC_FACTOR,                      //  "gltf_metallic_factor" (GLTF)
         GLTF_NORMAL_TRANSFORM,                     // "gltf_normal_transform" (GLTF)
         GLTF_MR_TRANSFORM,                         // "gltf_mr_transform" (GLTF)
+        GLTF_BASE_COLOR_ALPHA,                     // "gltf_base_color_alpha" (GLTF)
 
         MAT_SPECULAR_COLOR,                     //  "mat_specular_color"
         MAT_ENV_INTENSITY,                      //  "mat_env_intensity"

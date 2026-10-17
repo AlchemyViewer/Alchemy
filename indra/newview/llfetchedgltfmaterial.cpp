@@ -163,7 +163,9 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
             shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_COLOR_SAMPLER);
         }
 
-        // NOTE: base color factor is baked into vertex stream
+        // NOTE: base color factor is baked into vertex stream, but the glow programs read the
+        // emissive stream in its place: they take its alpha here, and whether it weights the glow
+        shader->uniform2f(LLShaderMgr::BASE_COLOR_ALPHA, getStreamedBaseAlpha(), mAlphaMode == LLGLTFMaterial::ALPHA_MODE_BLEND ? 1.f : 0.f);
 
         shader->uniform1f(LLShaderMgr::ROUGHNESS_FACTOR, mRoughnessFactor);
         shader->uniform1f(LLShaderMgr::METALLIC_FACTOR, mMetallicFactor);

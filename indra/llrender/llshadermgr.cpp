@@ -1669,6 +1669,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("emissiveColor");
     mReservedUniforms.push_back("metallicFactor");
     mReservedUniforms.push_back("roughnessFactor");
+    mReservedUniforms.push_back("baseColorAlpha");
     mReservedUniforms.push_back("clipPlane");
     mReservedUniforms.push_back("clipSign");
 
@@ -1922,6 +1923,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("gltf_metallic_factor");
     mReservedUniforms.push_back("gltf_normal_transform");
     mReservedUniforms.push_back("gltf_mr_transform");
+    mReservedUniforms.push_back("gltf_base_color_alpha");
 
     mReservedUniforms.push_back("mat_specular_color");
     mReservedUniforms.push_back("mat_env_intensity");
