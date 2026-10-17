@@ -1252,10 +1252,6 @@ namespace
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: stages compile at the usual GLSL version unless they ask for 4.30", "[llglslshader_gl]")
     {
         setUpShaders();
-        if (gGLManager.mGLSLVersionMajor < 4)
-        {
-            SKIP("the context's GLSL is below 4.00");
-        }
         const std::string usual = gGLManager.mGLSLVersionMinor >= 20 ? "#version 420" : "#version 400";
 
         CHECK(buildProgram(mDraw, "ladder (test)",

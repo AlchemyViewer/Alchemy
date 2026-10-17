@@ -189,12 +189,6 @@ namespace
     // resolveDeprecatedFormat rewrites them at format-set time.
     TEST_CASE_METHOD(llimagegl_data, "LLImageGL: setExplicitFormat rewrites deprecated formats and keeps modern ones", "[LLImageGL]")
     {
-        if (gGLManager.mGLVersion < 3.29f)
-        {
-            SKIP("resolveDeprecatedFormat is gated on GL >= 3.3");
-            return;
-        }
-
         LLPointer<LLImageGL> la = new LLImageGL(/*usemipmaps=*/false);
         la->setExplicitFormat(GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE);
         CHECK((S32)la->getPrimaryFormat() == (S32)GL_RG);
@@ -265,12 +259,6 @@ namespace
     // means: 1 -> GL_RED, 2 -> GL_RG, 3 -> GL_RGB, 4 -> GL_RGBA.
     TEST_CASE_METHOD(llimagegl_data, "LLImageGL: createGLTexture picks the primary format from the component count", "[LLImageGL]")
     {
-        if (gGLManager.mGLVersion < 3.29f)
-        {
-            SKIP("resolveDeprecatedFormat is gated on GL >= 3.3");
-            return;
-        }
-
         // 2-component raw — exercises the LUMINANCE_ALPHA -> GL_RG
         // rewrite path. This is the format the greyscale font atlas
         // uses (see commit c99dcaa7d3 — "Restore greyscale font atlas
@@ -322,12 +310,6 @@ namespace
     // mask matches applySwizzleForDeprecatedFormat's table.
     TEST_CASE_METHOD(llimagegl_data, "LLImageGL: createGLTexture sets the RRRA swizzle for luminance-alpha", "[LLImageGL]")
     {
-        if (gGLManager.mGLVersion < 3.29f)
-        {
-            SKIP("swizzle apply is gated on GL >= 3.3");
-            return;
-        }
-
         // 2-component raw goes through LUMINANCE_ALPHA -> GL_RG
         // rewrite, which sets mDeprecatedSourceFormat=LUMINANCE_ALPHA.
         // createGLTexture then applies the matching swizzle.
