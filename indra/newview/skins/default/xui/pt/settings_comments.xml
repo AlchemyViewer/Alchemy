@@ -1860,7 +1860,7 @@
   <key>RenderEdgeNormCutoff</key>
   <string>Corte para a diferença de normal que constitui uma borda.</string>
   <key>RenderEnableEmissiveBuffer</key>
-  <string>Ativar o buffer emissivo no gbuffer. Só deve ser desativado no modo GL3.</string>
+  <string>Ativar o buffer emissivo no gbuffer. Só deve ser desativado no modo vintage.</string>
   <key>RenderExposure</key>
   <string>Valor de exposição a enviar ao mapeador de tons.</string>
   <key>RenderFSAASamples</key>
