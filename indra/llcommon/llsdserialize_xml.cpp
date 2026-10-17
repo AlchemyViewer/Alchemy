@@ -341,7 +341,7 @@ public:
     Impl(bool emit_errors);
     ~Impl() = default;
 
-    S32 parse(std::istream& input, LLSD& data);
+    S32 parse(std::istream& input, LLSD& data, S32 max_depth);
 
     void parsePart(const char* buf, llssize len);
 
@@ -399,11 +399,16 @@ private:
     std::string     takeContent();
     //@}
 
-    void    startElement(Element element, size_t attr_off, size_t attr_len);
+    /// False when the element would nest values deeper than mMaxDepth, which
+    /// fails the parse.
+    bool    startElement(Element element, size_t attr_off, size_t attr_len);
     void    endElement(Element element);
     void    startSkipping();
 
     bool mEmitErrors;
+    // The tree is built without recursion, but it is destroyed and formatted
+    // recursively, so its depth is held to what the other parsers allow.
+    S32  mMaxDepth{ LLSDParser::DEFAULT_MAX_DEPTH };
 
     std::istream*   mInput{ nullptr };
     std::string     mBuffer;
@@ -1211,7 +1216,7 @@ bool LLSDXMLParser::Impl::scanMarkup()
     const Element element = readElement(mBuffer.data() + name_off, name_len);
 
     mOpen.push_back(OpenElement{ element, (U32)name_off, (U32)name_len });
-    startElement(element, attr_off, attr_len);
+    if (!startElement(element, attr_off, attr_len)) return false;
 
     if (self_closing)
     {
@@ -1223,12 +1228,12 @@ bool LLSDXMLParser::Impl::scanMarkup()
 
 
 // ----------------------------------------------------------------- events
-void LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t attr_len)
+bool LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t attr_len)
 {
     ++mDepth;
     if (mSkipping)
     {
-        return;
+        return true;
     }
 
     clearContent();
@@ -1236,21 +1241,21 @@ void LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t 
     switch (element)
     {
         case ELEMENT_LLSD:
-            if (mInLLSDElement) { return startSkipping(); }
+            if (mInLLSDElement) { startSkipping(); return true; }
             mInLLSDElement = true;
             mSawLLSDElement = true;
-            return;
+            return true;
 
         case ELEMENT_KEY:
             if (mStack.empty()  ||  !(mStack.back()->isMap()))
             {
-                return startSkipping();
+                startSkipping();
             }
-            return;
+            return true;
 
         case ELEMENT_BINARY:
         {
-            if (!base64Encoded(mBuffer.data() + attr_off, attr_len)) { return startSkipping(); }
+            if (!base64Encoded(mBuffer.data() + attr_off, attr_len)) { startSkipping(); return true; }
             break;
         }
 
@@ -1260,7 +1265,13 @@ void LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t 
     }
 
 
-    if (!mInLLSDElement) { return startSkipping(); }
+    if (!mInLLSDElement) { startSkipping(); return true; }
+
+    // A value counts one level and each map or array open around it one more.
+    if ((S32)mStack.size() >= mMaxDepth)
+    {
+        return false;
+    }
 
     if (mStack.empty())
     {
@@ -1268,7 +1279,7 @@ void LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t 
     }
     else if (mStack.back()->isMap())
     {
-        if (mCurrentKey.empty()) { return startSkipping(); }
+        if (mCurrentKey.empty()) { startSkipping(); return true; }
 
         LLSD& map = *mStack.back();
         LLSD& newElement = map[std::move(mCurrentKey)];
@@ -1285,7 +1296,8 @@ void LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t 
     }
     else {
         // improperly nested value in a non-structure
-        return startSkipping();
+        startSkipping();
+        return true;
     }
 
     ++mParseCount;
@@ -1303,6 +1315,7 @@ void LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t 
             // all the other values will be set in the end element handler
             ;
     }
+    return true;
 }
 
 void LLSDXMLParser::Impl::endElement(Element element)
@@ -1517,8 +1530,9 @@ S32 LLSDXMLParser::Impl::run(std::istream& input, LLSD& data)
     return mParseCount;
 }
 
-S32 LLSDXMLParser::Impl::parse(std::istream& input, LLSD& data)
+S32 LLSDXMLParser::Impl::parse(std::istream& input, LLSD& data, S32 max_depth)
 {
+    mMaxDepth = max_depth;
     return run(input, data);
 }
 
@@ -1557,7 +1571,7 @@ S32 LLSDXMLParser::doParse(std::istream& input, LLSD& data, S32 max_depth) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
 
-    return impl.parse(input, data);
+    return impl.parse(input, data, max_depth);
 }
 
 //  virtual

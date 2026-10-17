@@ -42,8 +42,8 @@
 /// JSON Type     | LLSD Type
 /// --------------+--------------
 ///  null         |  undefined
-///  integer      |  LLSD::Integer
-///  unsigned     |  LLSD::Integer
+///  integer      |  LLSD::Integer, or LLSD::Real past its 32 bits
+///  unsigned     |  LLSD::Integer, or LLSD::Real past its 32 bits
 ///  real/numeric |  LLSD::Real
 ///  string       |  LLSD::String
 ///  boolean      |  LLSD::Boolean
@@ -55,8 +55,9 @@
 LL_COMMON_API LLSD LlsdFromJson(const simdjson::dom::element& val);
 
 /// Parse a JSON document from text and convert it into LLSD as above.
-/// Returns false (leaving out undefined) on a parse failure; if errmsg is
-/// non-null it receives a description of the failure.
+/// Returns false (leaving out undefined) on a parse failure, which includes
+/// nesting deeper than LLSDParser::DEFAULT_MAX_DEPTH; if errmsg is non-null
+/// it receives a description of the failure.
 LL_COMMON_API bool LlsdFromJsonString(std::string_view json, LLSD& out, std::string* errmsg = nullptr);
 
 /// As above, but parses the buffer in place with no internal copy. Callers
@@ -74,7 +75,7 @@ inline bool LlsdFromJsonString(const std::string& json, LLSD& out, std::string* 
 
 inline bool LlsdFromJsonString(const char* json, LLSD& out, std::string* errmsg = nullptr)
 {
-    return LlsdFromJsonString(std::string_view(json), out, errmsg);
+    return LlsdFromJsonString(json ? std::string_view(json) : std::string_view(), out, errmsg);
 }
 
 /// Serialize an LLSD object into compact JSON text maintaining member names
@@ -93,7 +94,7 @@ inline bool LlsdFromJsonString(const char* json, LLSD& out, std::string* errmsg 
 /// TypeUUID      | string
 /// TypeMap       | object
 /// TypeArray     | array
-/// TypeBinary    | unsupported
+/// TypeBinary    | string, base64
 LL_COMMON_API std::string LlsdToJson(const LLSD& val);
 
 #endif // LL_LLSDJSON_H

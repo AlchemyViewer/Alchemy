@@ -55,6 +55,8 @@ The codebase uses `LLSingleton<T>` (`indra/llcommon/llsingleton.h`) extensively.
 
 **LLSD** (`indra/llcommon/llsd.h`) is the universal data container used for event messages, network messages, settings, HTTP bodies, and capability responses. Supports: Boolean, Integer, Real, UUID, String, Date, URI, Binary, Map, Array, and Undefined. Value semantics. Not thread-safe — transfer ownership across threads.
 
+Every parser takes its input as hostile: an LLSD capability response picks its own format, notation included. The XML, notation and binary parsers and the JSON reader (`llsdjson.h`) hold nesting to `LLSDParser::DEFAULT_MAX_DEPTH` (256) unless the caller names a depth, since the notation and binary parsers recurse per level and every tree is destroyed and formatted recursively. A sized value (`s(N)`, `b(N)`, binary lengths) grows with the bytes that arrive rather than being allocated from its size field, and `unzip_llsd`/`unzip_llsdNavMesh` refuse to inflate past 256 MB.
+
 **LLEventPump** (`indra/llcommon/llevents.h`) is the pub/sub event bus. Subsystems communicate by posting LLSD events to named pumps. Listeners return true to stop propagation. `LLEventAPI` wraps C++ APIs as event-driven interfaces with introspection. The `LLEventDispatcher` dispatches events to methods by string name.
 
 ### Threading & Coroutines

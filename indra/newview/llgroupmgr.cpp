@@ -2268,7 +2268,9 @@ void LLGroupMgr::processCapGroupMembersResponse(const LLSD& response, const std:
     }
 
     LLSD members = response["members"];
-    LLSD titles = response["titles"];
+    // const: a member's title is an index the server sends, and a non-const
+    // lookup grows the array to reach it
+    const LLSD titles = response["titles"];
     LLSD defaults = response["defaults"];
 
     size_t members_before = group_datap->mMembers.size();

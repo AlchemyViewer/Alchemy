@@ -852,6 +852,61 @@ namespace
         CHECK(v.isString());
     }
 
+    TEST_CASE("LLSD(new): a value assigned from inside the value it replaces survives", "[LLSD_new]")
+    {
+        // Each right-hand side lives in storage the assignment releases, so
+        // the new value has to be taken before the old one goes.
+        const std::string text("a string long enough to be kept on the heap rather than in place");
+        require_cleaned_up([&]
+        {
+            // The value is also held outside, so one adopted without its
+            // reference shows up as an implementation let go too soon.
+            LLSD outside(text);
+            LLSD sd;
+            sd["k"] = outside;
+            sd = std::move(sd["k"]);
+            CHECK(sd.asString() == text);
+            if constexpr (llsd::COUNTS_IMPLS)
+            {
+                const U32 live = llsd::outstandingCount();
+                sd.clear();
+                CHECK(llsd::outstandingCount() == live);
+            }
+            CHECK(outside.asString() == text);
+        });
+
+        LLSD from_string;
+        from_string["k"] = text;
+        from_string = from_string["k"].asStringRef();
+        CHECK(from_string.asString() == text);
+
+        const LLSD::Binary bytes(64, 7);
+        LLSD from_binary;
+        from_binary[0] = bytes;
+        from_binary = from_binary[0].asBinary();
+        CHECK(from_binary.asBinary() == bytes);
+    }
+
+    TEST_CASE("LLSD(new): an element set or inserted past the end from its own array", "[LLSD_new]")
+    {
+        // Growing the array moves its elements, the one passed among them.
+        const std::string text("a string long enough to be kept on the heap rather than in place");
+
+        LLSD set = LLSD::emptyArray();
+        set.append(text);
+        set.set(5, set[0]);
+        CHECK(set.size() == 6);
+        CHECK(set[5].asString() == text);
+        CHECK(set[0].asString() == text);
+
+        LLSD inserted = LLSD::emptyArray();
+        inserted.append(text);
+        inserted.insert(9, inserted[0]);
+        CHECK(inserted.size() == 10);
+        CHECK(inserted[9].asString() == text);
+        CHECK(inserted[0].asString() == text);
+    }
+
     TEST_CASE("LLSD(new): asXMLRPCValue serializes each type", "[LLSD_new]")
     {
         require_cleaned_up([&]
