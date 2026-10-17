@@ -2350,6 +2350,34 @@ namespace
         CHECK(out.asStringRef() == big);
     }
 
+    TEST_CASE("llsd serialization: a sized value within the byte budget keeps no slack", "[llsd_serialization]")
+    {
+        // The budget holds the size to bytes the caller has, so the buffer is
+        // sized once rather than grown to it with room left over.
+        const std::string bytes(300000, 'x');
+        const std::string notation_doc = "b(" + std::to_string(bytes.size()) + ")\"" + bytes + "\"";
+        const std::string binary_doc = "b" + be32((U32)bytes.size()) + bytes;
+        const struct
+        {
+            const char* what;
+            LLPointer<LLSDParser> parser;
+            const std::string& input;
+        } cases[] =
+        {
+            { "notation", new LLSDNotationParser, notation_doc },
+            { "binary",   new LLSDBinaryParser,   binary_doc },
+        };
+        for (const auto& c : cases)
+        {
+            INFO(c.what);
+            std::istringstream in(c.input);
+            LLSD out;
+            REQUIRE(c.parser->parse(in, out, c.input.size()) == 1);
+            CHECK(out.asBinary().size() == bytes.size());
+            CHECK(out.asBinary().capacity() == bytes.size());
+        }
+    }
+
     TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a raw size closes with a paren and fits what is left of the budget", "[llsd_notation_parsing]")
     {
         // The length is read up to 18 characters. One that runs past them

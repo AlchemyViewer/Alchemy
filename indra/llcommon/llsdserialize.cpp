@@ -566,18 +566,21 @@ llssize LLSDParser::sizeBudget() const
 namespace
 {
     // Reads the len bytes of a sized value into out, which is left holding
-    // what was actually read. A size field is untrusted, so the buffer grows
-    // with the bytes that arrive rather than being sized from the field: a
-    // few bytes claiming two gigabytes must not allocate them. Doubling keeps
-    // the copying linear in what is read.
+    // what was actually read. A size field is untrusted. Within the parse's
+    // byte budget (budget < 0 is none) it is held to the bytes the caller said
+    // there are, and the buffer is sized from it once. With no budget the
+    // buffer grows with the bytes that arrive rather than being sized from the
+    // field: a few bytes claiming two gigabytes must not allocate them.
+    // Doubling keeps the copying linear in what is read.
     template <typename Bytes>
-    llssize read_sized(std::istream& istr, Bytes& out, llssize len)
+    llssize read_sized(std::istream& istr, Bytes& out, llssize len, llssize budget)
     {
         constexpr llssize FIRST_CHUNK = 64 * 1024;
+        const llssize first = (budget >= 0 && len <= budget) ? len : FIRST_CHUNK;
         llssize got = 0;
         while (got < len)
         {
-            const llssize want = llmin(len - got, llmax(got, FIRST_CHUNK));
+            const llssize want = llmin(len - got, llmax(got, first));
             out.resize((size_t)(got + want));
             const llssize n = (llssize)fullread(istr, (char*)out.data() + got, want);
             got += n;
@@ -1118,7 +1121,7 @@ LLSD_NOINLINE bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& dat
         const llssize budget = sizeBudget();
         if(budget >= 0 && len > budget) return false;
         std::vector<U8> value;
-        account(read_sized(istr, value, len));
+        account(read_sized(istr, value, len, budget));
         c = get(istr); // strip off the trailing double-quote
         if(c != '"') return false;
         data = std::move(value);
@@ -1417,7 +1420,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
         else
         {
             std::vector<U8> value;
-            account(read_sized(istr, value, size));
+            account(read_sized(istr, value, size, sizeBudget()));
             data = std::move(value);
         }
         if(istr.fail())
@@ -1557,7 +1560,7 @@ bool LLSDBinaryParser::parseString(
     S32 size = (S32)ntohl(value_nbo);
     if(mCheckLimits && (size > mMaxBytesLeft)) return false;
     if(size < 0) return false;
-    const llssize got = read_sized(istr, value, size);
+    const llssize got = read_sized(istr, value, size, sizeBudget());
     account(got);
     return got == size;
 }
@@ -2188,7 +2191,7 @@ llssize deserialize_string_raw(
         auto len = strtol(buf + 1, nullptr, 0);
         if(len < 0) return LLSDParser::PARSE_FAILURE;
         if((max_bytes >= 0) && (len > max_bytes)) return LLSDParser::PARSE_FAILURE;
-        count += read_sized(istr, value, len);
+        count += read_sized(istr, value, len, max_bytes);
         c = stream_bump(istr);
         ++count;
         if(!((c == '"') || (c == '\'')))
