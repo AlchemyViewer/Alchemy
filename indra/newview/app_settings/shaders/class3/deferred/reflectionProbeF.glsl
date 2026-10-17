@@ -855,8 +855,11 @@ void doProbeSample(inout vec3 ambenv, inout vec3 glossenv,
 
 #if defined(SSR)
     // Skip the march only where it would contribute nothing anyway. Asking the SSR unit for its
-    // own fade threshold keeps this from drifting away from it again.
-    if (cube_snapshot != 1 && glossiness > ssrMinGlossiness())
+    // own fade threshold keeps this from drifting away from it again. A transparent surface
+    // marches unfaded and is weighted by glossiness below, which is zero only at zero, so its
+    // gate is there too, as the legacy path's is; the fade's threshold would switch it on at
+    // full weight in one step.
+    if (cube_snapshot != 1 && (transparent ? glossiness > 0.0 : glossiness > ssrMinGlossiness()))
     {
         vec4 ssr = vec4(0);
         // refnormpersp, not norm: the march takes the same dominant direction the probe tap
