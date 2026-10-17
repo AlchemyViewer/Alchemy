@@ -33,6 +33,8 @@
 
 #include <vector>
 
+#include <fmt/format.h>
+
 #include "llviewercamera.h"
 #include "llspatialpartition.h"
 #include "llviewerregion.h"
@@ -179,6 +181,10 @@ LLReflectionMapManager::LLReflectionMapManager()
 {
     mDynamicProbeCount = LL_MAX_REFLECTION_PROBE_COUNT;
     initCubeFree();
+
+    mRenderTarget.setLabel("probe.snapshot");
+    mSHCoeffs.setLabel("probe.sh");
+    mSHPartial.setLabel("probe.sh.partial");
 }
 
 void LLReflectionMapManager::initCubeFree()
@@ -337,6 +343,9 @@ void LLReflectionMapManager::update()
         mMipChain.resize(count);
         for (U32 i = 0; i < count; ++i)
         {
+            char label[32];
+            const auto result = fmt::format_to_n(label, sizeof(label), "probe.mip{}", i);
+            mMipChain[i].setLabel(std::string_view(label, (size_t)(result.out - label)));
             mMipChain[i].allocate(res, res, mHDR ? GL_R11F_G11F_B10F : GL_RGB8);
             res /= 2;
         }

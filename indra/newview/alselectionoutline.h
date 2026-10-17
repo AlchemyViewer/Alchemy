@@ -150,7 +150,7 @@ class LLVOAvatar;
 /// (LLPipeline::releaseGLBuffers).
 class ALSelectionOutline : public LLSingleton<ALSelectionOutline>
 {
-    LLSINGLETON_EMPTY_CTOR(ALSelectionOutline);
+    LLSINGLETON(ALSelectionOutline);
 
 public:
     /// What an outline is for, the highest priority first. Where two objects' outlines meet, the higher one's

@@ -42,6 +42,8 @@
 #include "llviewerjoystick.h"
 #include "llviewermediafocus.h"
 
+#include <fmt/format.h>
+
 extern bool gCubeSnapshot;
 extern bool gTeleportDisplay;
 
@@ -62,6 +64,7 @@ static void touch_default_probe(LLReflectionMap* probe)
 
 LLHeroProbeManager::LLHeroProbeManager()
 {
+    mRenderTarget.setLabel("hero.snapshot");
 }
 
 LLHeroProbeManager::~LLHeroProbeManager()
@@ -115,6 +118,9 @@ void LLHeroProbeManager::update()
         mMipChain.resize(count);
         for (U32 i = 0; i < count; ++i)
         {
+            char label[32];
+            const auto result = fmt::format_to_n(label, sizeof(label), "hero.mip{}", i);
+            mMipChain[i].setLabel(std::string_view(label, (size_t)(result.out - label)));
             mMipChain[i].allocate(res, res, mHDR ? GL_RGBA16F : GL_RGBA8);
             res /= 2;
         }

@@ -694,6 +694,8 @@ void LLBumpImageList::init()
     llassert( mBrightnessEntries.size() == 0 );
     llassert( mDarknessEntries.size() == 0 );
 
+    sRenderTarget.setLabel("bump.normalmap");
+
     LLStandardBumpmap::restoreGL();
 }
 

@@ -32,6 +32,8 @@
 #include "pipeline.h"
 #include <algorithm>
 
+#include <fmt/format.h>
+
 // library includes
 #include "llimagebmp.h"
 #include "llimagejpeg.h"
@@ -472,11 +474,65 @@ void LLPipeline::connectRefreshCachedSettingsSafe(const std::string name)
     }
 }
 
+// Names a pack's targets for debuggers, each the pack's name followed by what the target holds: main.gbuffer,
+// probe.shadow.sun0.
+static void label_pack(LLPipeline::RenderTargetPack& rt, std::string_view pack)
+{
+    char label[64];
+    const auto set = [&](LLRenderTarget& target, std::string_view name, S32 index = -1)
+    {
+        const auto result = index < 0 ? fmt::format_to_n(label, sizeof(label), "{}.{}", pack, name)
+                                      : fmt::format_to_n(label, sizeof(label), "{}.{}{}", pack, name, index);
+        target.setLabel(std::string_view(label, (size_t)(result.out - label)));
+    };
+    set(rt.screen, "screen");
+    set(rt.deferredScreen, "gbuffer");
+    set(rt.deferredLight, "light");
+    set(rt.postPingMap, "post.ping");
+    set(rt.postPongMap, "post.pong");
+    for (S32 i = 0; i < 4; ++i)
+    {
+        set(rt.shadow[i], "shadow.sun", i);
+    }
+    for (S32 i = 0; i < (S32)LLPipeline::BLOOM_MAX_MIPS; ++i)
+    {
+        set(rt.bloomMip[i], "bloom.mip", i);
+    }
+}
+
 void LLPipeline::init()
 {
     refreshCachedSettings();
 
     mRT = &mMainRT;
+
+    label_pack(mMainRT, "main");
+    label_pack(mAuxillaryRT, "probe");
+    label_pack(mHeroProbeRT, "hero");
+    mSpotShadow[0].setLabel("shadow.spot0");
+    mSpotShadow[1].setLabel("shadow.spot1");
+    mPbrBrdfLut.setLabel("brdf.lut");
+    mSceneMap.setLabel("ssr.scene");
+    mLuminanceMap.setLabel("exposure.meter");
+    mExposureHistogram.setLabel("exposure.histogram");
+    mExposureMap.setLabel("exposure");
+    mLastExposure.setLabel("exposure.last");
+    // Swapped each frame, so neither name says which frame's state it holds.
+    mLensFlareState[0].setLabel("lens.flare.a");
+    mLensFlareState[1].setLabel("lens.flare.b");
+    mLensDirtMap.setLabel("lens.dirt");
+    mSMAAEdgeMap.setLabel("smaa.edges");
+    mSMAABlendBuffer.setLabel("smaa.blend");
+    mDownResMap.setLabel("downres");
+    mScopeSample.setLabel("scopes.sample");
+    mReferenceStill.setLabel("reference.still");
+    mPreviewMap.setLabel("preview");
+    mBakeMap.setLabel("bake");
+    mWaterDis.setLabel("water.distortion");
+    mSkyBehind.setLabel("sky.behind");
+    mGlow[0].setLabel("glow0");
+    mGlow[1].setLabel("glow1");
+    mGlow[2].setLabel("glow2");
 
     gOctreeMaxCapacity = gSavedSettings.getU32("OctreeMaxNodeCapacity");
     gOctreeMinSize = gSavedSettings.getF32("OctreeMinimumNodeSize");

@@ -853,6 +853,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 
     mImpostorDistance = 0;
     mImpostorPixelArea = 0;
+    mImpostor.setLabel("avatar.impostor");
 
     setNumTEs(TEX_NUM_INDICES);
 

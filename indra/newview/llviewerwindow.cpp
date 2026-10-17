@@ -5594,6 +5594,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
     // What the single-pass path below changes, recorded so the restore can undo it.
     LLRenderTarget scratch_space;
+    scratch_space.setLabel("snapshot.scratch");
     S32 original_width = 0;
     S32 original_height = 0;
     bool reset_deferred = false;
@@ -6061,6 +6062,7 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
     S32 original_height = LLPipeline::sRenderDeferred ? (S32)gPipeline.mRT->height : gViewerWindow->getWorldViewHeightRaw();
 
     LLRenderTarget scratch_space;
+    scratch_space.setLabel("snapshot.simple");
     // Sized format, for the reason spelled out in rawSnapshot: immutable storage means
     // glTexStorage2D sees this, and it rejects unsized formats. There is no tiled fallback on
     // this path -- a failure here means the screen buffers are never resized and the readback

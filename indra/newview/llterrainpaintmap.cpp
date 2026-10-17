@@ -77,6 +77,7 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
     // Bind the debug shader and render terrain to tex
     // Use a scratch render target because its dimensions may exceed the standard bake target, and this is a one-off bake
     LLRenderTarget scratch_target;
+    scratch_target.setLabel("terrain.paintmap.scratch");
     const S32 dim = llmin(tex.getWidth(), tex.getHeight());
     scratch_target.allocate(dim, dim, GL_RGB8, false, false, ALTextureSlot::eTextureType::TT_TEXTURE,
                                    LLRenderTarget::MIPS_NONE);

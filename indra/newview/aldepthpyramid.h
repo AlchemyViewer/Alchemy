@@ -49,6 +49,8 @@ public:
     /// of a 4K screen still lies under a few of its texels.
     static constexpr U32 LEVELS = 8;
 
+    ALDepthPyramid();
+
     /// Builds the pyramid from `depth`'s depth attachment with `program` (gDepthPyramidProgram), the depth final for
     /// what the pyramid's readers test and the view it holds drawn over the whole of it, into a bound target of its
     /// size. Allocates again when the depth's size changed. False, with nothing built, without compute or the program,
