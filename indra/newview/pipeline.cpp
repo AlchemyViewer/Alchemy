@@ -1045,6 +1045,11 @@ void LLPipeline::allocateProbeBuffers()
         mRT = &mHeroProbeRT;
         allocateScreenBufferInternal(res, res);
     }
+    else
+    {
+        // Nothing renders mirrors, so their probes go; initReflectionMaps builds them again when mirrors come back on.
+        mHeroProbeManager.cleanup();
+    }
 
     mRT = &mMainRT;
 }
@@ -1425,6 +1430,7 @@ void LLPipeline::releaseAllGLResources()
 
     LLVOAvatar::resetImpostors();
     gBumpImageList.destroyGL();
+    mHeroProbeManager.cleanup();
 
     mGLResourcesLive = false;
 }
@@ -1510,8 +1516,6 @@ void LLPipeline::releaseDerivedState()
         ALSelectionOutline::instance().release();
     }
 
-    mHeroProbeManager.cleanup(); // release hero probes
-
     mDeferredUBO.release(); // shared shadow/SSAO block (UB_DEFERRED); re-created lazily on next use
     mDeferredUBODirty = true;
 
@@ -1550,7 +1554,7 @@ void LLPipeline::rebuildGLBuffers(bool relinked)
 
     releaseRenderTargets();
     releaseDerivedState();
-    add(invalidated, "hero probes, exposure and flare history, lens dirt, colour-grade LUT, noise, SMAA "
+    add(invalidated, "exposure and flare history, lens dirt, colour-grade LUT, noise, SMAA "
                      "tables, tone curve, UBOs, query plots, BRDF LUT, reference still, scopes, depth pyramid, water "
                      "surface maps, selection outline, far-plane overlay");
 
