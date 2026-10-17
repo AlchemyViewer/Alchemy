@@ -185,9 +185,12 @@ namespace
     inline U32 uniform_bits(GLuint v)  { return v; }
     inline U32 uniform_bits(GLfloat v) { return std::bit_cast<U32>(v); }
 
-    // A value as GL takes it for a bool: false at zero, -0 included, and true anywhere else, NaN included.
-    inline GLint bool_value(GLfloat v) { return v != 0.f; }
+#if LL_WINDOWS
+    // A value as GL takes it for a bool: false at zero, -0 included, and true anywhere else, NaN included. A float is
+    // tested by its bits, since /fp:fast leaves a NaN's comparison with zero to the compiler.
+    inline GLint bool_value(GLfloat v) { return (std::bit_cast<U32>(v) & 0x7fffffffu) != 0; }
     inline GLint bool_value(GLuint v)  { return v != 0u; }
+#endif
 
     // Every sampler type GL has: the float ones, shadow included, and the int and unsigned forms of each dimension.
     bool is_sampler_type(GLenum type)
@@ -883,7 +886,9 @@ void LLGLSLShader::unloadInternal()
         size = 0;
     }
     mUniform.clear();
+#if LL_WINDOWS
     mBoolLocations.clear();
+#endif
     // program state is going away with the program
     mUniformCache.clear();
     mMinimumAlpha = MINIMUM_ALPHA_UNSET;
@@ -1286,10 +1291,12 @@ void LLGLSLShader::mapUniform(const gl_uniform_data_t& gl_uniform)
 
         LLStaticHashedString hashedName(name);
         mUniformMap[hashedName] = location;
-        if (type == GL_BOOL)
+#if LL_WINDOWS
+        if (type == GL_BOOL && gGLManager.mIsAMD)
         {
             mBoolLocations.push_back(location);
         }
+#endif
 
         LL_DEBUGS("ShaderUniform") << "Uniform " << name << " is at location " << location << LL_ENDL;
 
@@ -1498,7 +1505,9 @@ bool LLGLSLShader::mapUniforms()
     mActiveImageUnits = 0;
     mUniform.clear();
     mUniformMap.clear();
+#if LL_WINDOWS
     mBoolLocations.clear();
+#endif
     mTexture.clear();
     mImage.clear();
     mStorage.clear();
@@ -2099,47 +2108,66 @@ S32 LLGLSLShader::disableTexture(S32 uniform, ALTextureSlot::eTextureType mode)
     return index;
 }
 
+#if LL_WINDOWS
+// A plain loop: MSVC's std::find over ints calls its vectorized search out of line, an empty range included, and a
+// program has few bools.
 bool LLGLSLShader::isBoolLocation(GLint location) const
 {
-    return std::find(mBoolLocations.begin(), mBoolLocations.end(), location) != mBoolLocations.end();
+    for (GLint bool_location : mBoolLocations)
+    {
+        if (bool_location == location)
+        {
+            return true;
+        }
+    }
+    return false;
 }
+#endif
 
 void LLGLSLShader::uploadFloat(GLint location, GLfloat x) const
 {
+#if LL_WINDOWS
     if (isBoolLocation(location))
     {
         glUniform1i(location, bool_value(x));
+        return;
     }
-    else
-    {
-        glUniform1f(location, x);
-    }
+#endif
+    glUniform1f(location, x);
 }
 
 void LLGLSLShader::uploadFloats(GLint location, U32 count, const GLfloat* v) const
 {
+#if LL_WINDOWS
     if (isBoolLocation(location))
     {
-        std::vector<GLint> bools(count);
-        std::transform(v, v + count, bools.begin(), [](GLfloat x) { return bool_value(x); });
-        glUniform1iv(location, count, bools.data());
+        // Converted on the stack, the heap only for an array longer than a bool array is in practice.
+        GLint stack_bools[16];
+        std::vector<GLint> heap_bools;
+        GLint* bools = stack_bools;
+        if (count > std::size(stack_bools))
+        {
+            heap_bools.resize(count);
+            bools = heap_bools.data();
+        }
+        std::transform(v, v + count, bools, [](GLfloat x) { return bool_value(x); });
+        glUniform1iv(location, count, bools);
+        return;
     }
-    else
-    {
-        glUniform1fv(location, count, v);
-    }
+#endif
+    glUniform1fv(location, count, v);
 }
 
 void LLGLSLShader::uploadUInt(GLint location, GLuint x) const
 {
+#if LL_WINDOWS
     if (isBoolLocation(location))
     {
         glUniform1i(location, bool_value(x));
+        return;
     }
-    else
-    {
-        glUniform1ui(location, x);
-    }
+#endif
+    glUniform1ui(location, x);
 }
 
 void LLGLSLShader::uniform1i(U32 index, GLint x)

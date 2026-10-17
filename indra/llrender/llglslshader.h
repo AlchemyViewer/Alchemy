@@ -690,18 +690,22 @@ private:
     // Give the reserved storage blocks this program declares their binding points; see getStorageBinding.
     void mapStorageBlocks();
 
+#if LL_WINDOWS
     // The locations of this program's bools -- an array's at its first element, the one the setters reach -- filled by
-    // mapUniforms and emptied with mUniform.
+    // mapUniforms under AMD's Windows driver alone and emptied with mUniform.
     //
-    // Every set of a bool reaches GL as an int, whichever setter makes it: the float and uint setters convert as GL
-    // would, any value but zero true. AMD's driver drops an int set of a bool -- glUniform1i, glUniform1iv,
+    // There every set of a bool reaches GL as an int, whichever setter makes it: the float and uint setters convert as
+    // GL would, any value but zero true. AMD's Windows driver drops an int set of a bool -- glUniform1i, glUniform1iv,
     // glProgramUniform1i -- that matches, as a bool, the last int set of it, even when a float or uint set has changed
     // the bool since: glUniform1i(1), glUniform1f(0), glUniform1i(1) leaves it false, for draws and glGetUniformiv
     // alike, with no error. Its float and uint sets always arrive, and bvecs are unaffected (Radeon RX 6800, driver
     // 26.8.1). Sent as ints alone, a bool always holds its last int set, so a set the driver drops changes nothing.
+    // mIsAMD alone would also take in Mesa's and Apple's GL on AMD's cards, which are not that driver.
     std::vector<GLint> mBoolLocations;
     bool isBoolLocation(GLint location) const;
-    // The uploads of the setters that can reach a bool as another kind: as ints where `location` is a bool's.
+#endif
+    // The uploads of the setters that can reach a bool as another kind: as ints where `location` is in mBoolLocations,
+    // as the setter made them everywhere else.
     void uploadFloat(GLint location, GLfloat x) const;
     void uploadFloats(GLint location, U32 count, const GLfloat* v) const;
     void uploadUInt(GLint location, GLuint x) const;
@@ -714,8 +718,8 @@ private:
     // component type and count. A set matches only when both agree exactly, so ints and uints are compared as
     // themselves and floats by their bits -- +0 against -0, or two NaN payloads, cost an upload and never skip one.
     // A location written through one kind and then set through another uploads: what GL holds there was converted
-    // from the first kind's bytes. A bool's slot holds a set as its setter made it, though the set reached GL as an
-    // int (see mBoolLocations): a match still means GL holds what the set would leave.
+    // from the first kind's bytes. A bool's slot holds a set as its setter made it, though under AMD's Windows driver
+    // the set reached GL as an int (see mBoolLocations): a match still means GL holds what the set would leave.
     //
     // Indexed by location. Implementations number a program's uniforms from 0 at link, an array taking a location
     // an element, so a flat array sized past the largest location a setter can reach -- every active uniform's,
