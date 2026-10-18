@@ -417,9 +417,13 @@ void LLAvatarNameCache::legacyNameCallback(const LLUUID& agent_id,
     // Retrieve the name and set it to never (or almost never...) expire: when we are using the legacy
     // protocol, we do not get an expiration date for each name and there's no reason to ask the
     // data again and again so we set the expiration time to the largest value admissible.
-    cache_t::iterator av_record = LLAvatarNameCache::getInstance()->mCache.find(agent_id);
-    LLAvatarName& av_name = av_record->second;
-    av_name.setExpires(MAX_UNREFRESHED_TIME);
+    // The null id is answered at once and never cached, so there may be no record.
+    cache_t& cache = LLAvatarNameCache::getInstance()->mCache;
+    cache_t::iterator av_record = cache.find(agent_id);
+    if (av_record != cache.end())
+    {
+        av_record->second.setExpires(MAX_UNREFRESHED_TIME);
+    }
 }
 
 void LLAvatarNameCache::legacyNameFetch(const LLUUID& agent_id,
@@ -627,6 +631,12 @@ bool LLAvatarNameCache::get(const LLUUID& agent_id, LLAvatarName *av_name)
 // returns bool specifying  if av_name was filled, false otherwise
 bool LLAvatarNameCache::getName(const LLUUID& agent_id, LLAvatarName *av_name)
 {
+    // The null id names no one, and a request for it would never be answered.
+    if (agent_id.isNull())
+    {
+        return false;
+    }
+
     if (mRunning)
     {
         // ...only do immediate lookups when cache is running
@@ -677,6 +687,12 @@ LLAvatarNameCache::callback_connection_t LLAvatarNameCache::get(const LLUUID& ag
 LLAvatarNameCache::callback_connection_t LLAvatarNameCache::getNameCallback(const LLUUID& agent_id, callback_slot_t slot)
 {
     callback_connection_t connection;
+
+    // The null id is never fetched, so a callback for it would never be called.
+    if (agent_id.isNull())
+    {
+        return connection;
+    }
 
     if (mRunning)
     {

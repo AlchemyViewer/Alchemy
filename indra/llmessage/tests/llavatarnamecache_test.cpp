@@ -29,10 +29,40 @@
 
 #include "../llavatarnamecache.h"
 
+#include "httprequest.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 namespace
 {
+    // The cache holds an HTTP request, which needs the service up for as long as the cache lives.
+    struct NameCacheService
+    {
+        NameCacheService() { LLCore::HttpRequest::createService(); }
+        ~NameCacheService()
+        {
+            LLAvatarNameCache::deleteSingleton();
+            LLCore::HttpRequest::destroyService();
+        }
+    };
+
+    TEST_CASE("LLAvatarNameCache: a callback for an unknown agent is kept, one for the null id is not", "[LLAvatarNameCache]")
+    {
+        NameCacheService   service;
+        LLAvatarNameCache& cache = LLAvatarNameCache::instance();
+
+        S32  calls = 0;
+        auto count = [&calls](const LLUUID&, const LLAvatarName&) { ++calls; };
+
+        LLAvatarNameCache::callback_connection_t pending =
+            cache.getNameCallback(LLUUID("3941037e-78ab-45f0-b421-bd6e77c1804d"), count);
+        CHECK(pending.connected());
+        pending.disconnect();
+
+        CHECK_FALSE(cache.getNameCallback(LLUUID::null, count).connected());
+        CHECK(calls == 0);
+    }
+
     TEST_CASE("LLAvatarNameCache: max_age_from_cache_control parses a well-formed max-age", "[LLAvatarNameCache]")
     {
         bool valid = false;

@@ -78,6 +78,7 @@ public:
 
     // Fetches name information and calls callbacks.
     // If name information is in cache, callbacks will be called immediately.
+    // The null id is never fetched and its callbacks are never called or kept.
     static callback_connection_t get(const LLUUID& agent_id, callback_slot_t slot);
     callback_connection_t getNameCallback(const LLUUID& agent_id, callback_slot_t slot);
 
