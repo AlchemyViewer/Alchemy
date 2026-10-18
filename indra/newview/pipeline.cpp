@@ -856,12 +856,6 @@ void LLPipeline::resizeScreenTexture()
     }
 }
 
-bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY)
-{
-    mOneShotRenderSize.emplace(resX, resY);
-    return rebuildGLBuffers(RebuildCause::Snapshot);
-}
-
 // static
 void LLPipeline::scaleToRenderResolution(U32& resX, U32& resY)
 {
@@ -1026,13 +1020,7 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
     refreshCachedSettings();
 
     ALRenderResourceInputs inputs = ALRenderResourceInputs::fromSettings();
-    if (mOneShotRenderSize)
-    {
-        inputs.mWidth  = mOneShotRenderSize->first;
-        inputs.mHeight = mOneShotRenderSize->second;
-        mOneShotRenderSize.reset();
-    }
-    Plan plan = Plan::make(inputs);
+    Plan                   plan   = Plan::make(inputs);
 
     ResourceChanges changes;
     ensureResources(plan, IdSet().set(), changes);

@@ -214,6 +214,7 @@
 #include "llviewerwindowlistener.h"
 #include "alcutoutimage.h"
 #include "alrenderisolation.h"
+#include "alrendersizeoverride.h"
 #include "alsnapshotcutout.h"
 #include "llstatslistener.h"
 #include "llcleanup.h"
@@ -5593,10 +5594,9 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     }
 
     // What the single-pass path below changes, recorded so the restore can undo it.
+    std::optional<ALRenderSizeOverride> render_size;
     LLRenderTarget scratch_space;
     scratch_space.setLabel("snapshot.scratch");
-    S32 original_width = 0;
-    S32 original_height = 0;
     bool reset_deferred = false;
     LLRect window_rect;
 
@@ -5652,10 +5652,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
             scratch_space.flush();
             scratch_space.release();
-            gPipeline.allocateScreenBuffer(original_width, original_height);
-            // Reallocated, the SSR source holds whatever was in that memory,
-            // and the next live frame's reflections would trace it.
-            gPipeline.clearSceneMap();
+            render_size.reset();
         }
 
         setBalanceVisible(true);
@@ -5707,22 +5704,10 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             // This is the colour attachment, and it needs a colour format whatever the layer is.
             if (scratch_space.allocate(image_width, image_height, GL_RGBA8, true))
             {
-                // mRT->width/height, not the attachment's dimensions. allocateScreenBuffer
-                // takes a LOGICAL size, records it in mRT->width/height, and only then applies
-                // RenderResolutionDivisor / RenderResolutionMultiplier to arrive at the texture
-                // size. Reading the texture size back and handing it in as a logical size
-                // therefore applies the scale a second time, squaring it: at multiplier 2.0 the
-                // viewer comes back from a snapshot rendering four times the pixels, sixteen
-                // after the second, and at divisor 2 it halves away instead.
-                //
-                // Nothing corrects it afterwards either. resizeScreenTexture() would notice,
-                // but it is gated on gResizeScreenTexture, and the restore below assigns
-                // mWorldViewRectRaw directly rather than going through updateWorldViewRect(),
-                // which is what sets that flag. The wrong size survives until a window resize.
-                original_width = (S32)gPipeline.mRT->width;
-                original_height = (S32)gPipeline.mRT->height;
-
-                if (gPipeline.allocateScreenBuffer(image_width, image_height))
+                // The main view at the snapshot's size, before the resolution scale, until the
+                // restore ends the override and the world view's size is back.
+                render_size.emplace(image_width, image_height);
+                if (render_size->applied())
                 {
                     window_width = image_width;
                     window_height = image_height;
@@ -5737,7 +5722,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                 else
                 {
                     scratch_space.release();
-                    gPipeline.allocateScreenBuffer(original_width, original_height);
+                    render_size.reset();
                 }
             }
         }
@@ -6056,11 +6041,7 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
 
     LLRect window_rect = getWorldViewRectRaw();
 
-    // The logical size, not the attachment's -- see rawSnapshot for why handing a scaled
-    // texture size back to allocateScreenBuffer squares the resolution scale.
-    S32 original_width = LLPipeline::sRenderDeferred ? (S32)gPipeline.mRT->width : gViewerWindow->getWorldViewWidthRaw();
-    S32 original_height = LLPipeline::sRenderDeferred ? (S32)gPipeline.mRT->height : gViewerWindow->getWorldViewHeightRaw();
-
+    std::optional<ALRenderSizeOverride> render_size;
     LLRenderTarget scratch_space;
     scratch_space.setLabel("snapshot.simple");
     // Sized format, for the reason spelled out in rawSnapshot: immutable storage means
@@ -6069,7 +6050,8 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
     // below pulls image_width x image_height out of window-sized ones.
     if (scratch_space.allocate(image_width, image_height, GL_RGBA8, true))
     {
-        if (gPipeline.allocateScreenBuffer(image_width, image_height))
+        render_size.emplace(image_width, image_height);
+        if (render_size->applied())
         {
             mWorldViewRectRaw.set(0, image_height, image_width, 0);
 
@@ -6078,7 +6060,7 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
         else
         {
             scratch_space.release();
-            gPipeline.allocateScreenBuffer(original_width, original_height);
+            render_size.reset();
         }
     }
 
@@ -6142,7 +6124,7 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
     mWorldViewRectRaw = window_rect;
     scratch_space.flush();
     scratch_space.release();
-    gPipeline.allocateScreenBuffer(original_width, original_height);
+    render_size.reset();
 
     return true;
 }

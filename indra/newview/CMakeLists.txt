@@ -173,6 +173,7 @@ if(AL_BUILD_VIEWER)
     alrenderisolation.cpp
     alrenderresourceinputs.cpp
     alrenderresourceplan.cpp
+    alrendersizeoverride.cpp
     alsceneexplorerpredicate.cpp
     alsnapshotcutout.cpp
     alscopedata.cpp
@@ -1053,6 +1054,7 @@ if(AL_BUILD_VIEWER)
     alrenderisolation.h
     alrenderresourceinputs.h
     alrenderresourceplan.h
+    alrendersizeoverride.h
     alsceneexplorerpredicate.h
     alsnapshotcutout.h
     alscopedata.h

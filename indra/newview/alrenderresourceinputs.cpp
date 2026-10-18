@@ -26,6 +26,7 @@
 
 #include "alrenderresourceinputs.h"
 
+#include "alrendersizeoverride.h"
 #include "llavatarappearancedefines.h"
 #include "llfeaturemanager.h"
 #include "llgltfmaterialpreviewmgr.h"
@@ -38,7 +39,12 @@ ALRenderResourceInputs ALRenderResourceInputs::fromSettings()
 {
     ALRenderResourceInputs in;
 
-    if (gViewerWindow)
+    if (const std::optional<std::pair<U32, U32>>& size = ALRenderSizeOverride::current())
+    {
+        in.mWidth  = size->first;
+        in.mHeight = size->second;
+    }
+    else if (gViewerWindow)
     {
         in.mWidth  = (U32)gViewerWindow->getWorldViewWidthRaw();
         in.mHeight = (U32)gViewerWindow->getWorldViewHeightRaw();

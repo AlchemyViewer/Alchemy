@@ -102,17 +102,13 @@ public:
         Setting,
         ShaderReload, ///< the programs were reloaded just before
         Resize,
-        Snapshot,
+        Snapshot, ///< an ALRenderSizeOverride began or ended
     };
 
     /// Makes the render resources what the settings now describe (reconcileResources). State derived from them is
     /// dropped only where what it derives from changed, and one log line names both. Whether the render size was built
     /// in full rather than halved for want of memory.
     bool rebuildGLBuffers(RebuildCause cause);
-
-    /// Reconciles once with the main view at @a resX by @a resY, before the resolution scale: a snapshot's size, and
-    /// back. Whether that size was built in full.
-    bool allocateScreenBuffer(U32 resX, U32 resY);
 
     /// What reconcileResources did, and what it changed that state derived from the resources depends on.
     struct ResourceChanges
@@ -180,8 +176,6 @@ private:
     ALRenderResourceInputs mResourceInputs;
     ALRenderResourcePlan   mResourcePlan;
     bool                   mGLResourcesLive = false;
-    // The main view's size for the next reconcile alone, where allocateScreenBuffer gives one.
-    std::optional<std::pair<U32, U32>> mOneShotRenderSize;
 public:
 
     // rebuild all LLVOVolume render batches
