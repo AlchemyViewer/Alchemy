@@ -736,7 +736,7 @@ LLJoint* LLVOAvatarSelf::getJoint(std::string_view name)
             mJointMap[std::string(name)] = jointp;
         }
     }
-    if (jointp && jointp != mScreenp && jointp != mRoot)
+    if (jointp && jointp->getJointNum() >= 0)
     {
         llassert(LLVOAvatar::getJoint((S32)jointp->getJointNum())==jointp);
     }
