@@ -75,7 +75,7 @@ LLDrawPoolTerrain::LLDrawPoolTerrain(LLViewerTexture *texturep) :
     // Hack!
     sDetailScale = 1.f/gSavedSettings.getF32("RenderTerrainScale");
     sPBRDetailScale = 1.f/gSavedSettings.getF32("RenderTerrainPBRScale");
-    sPBRDetailMode = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
+    sPBRDetailMode = gPipeline.shaderInputs().mGlobal.mTerrainPBRDetail;
     mAlphaRampImagep = LLViewerTextureManager::getFetchedTexture(IMG_ALPHA_GRAD);
 
     //gGL.getTextureSlot(0)->bind(mAlphaRampImagep.get());
@@ -101,8 +101,8 @@ U32 LLDrawPoolTerrain::getVertexDataMask()
 
 void LLDrawPoolTerrain::prerender()
 {
-    static LLCachedControl<S32> render_terrain_pbr_detail(gSavedSettings, "RenderTerrainPBRDetail");
-    sPBRDetailMode = clamp_terrain_detail(render_terrain_pbr_detail);
+    // The detail the terrain programs were built for, so the maps bound match the samplers they declare.
+    sPBRDetailMode = gPipeline.shaderInputs().mGlobal.mTerrainPBRDetail;
 }
 
 void LLDrawPoolTerrain::boostTerrainDetailTextures()

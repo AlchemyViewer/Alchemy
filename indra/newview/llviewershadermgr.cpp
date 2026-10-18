@@ -74,63 +74,10 @@ bool                LLViewerShaderMgr::sInitialized = false;
 
 LLVector4           gShinyOrigin;
 
-// The water's hex-tiled wave layers: 0 none, 1 the big layer, 2 the mid layer too (waterSurface.glsl's WATER_HEXTILE).
-static S32 water_hextile()
+// The inputs the load running builds for.
+static const ALShaderInputs& load_inputs()
 {
-    return (S32)llmin(gSavedSettings.getU32("AlchemyRenderWaterHextile"), 2U);
-}
-
-// Whether the session computes: a context with compute and GLSL 4.30, not one of Intel's legacy drivers
-// (LLGLManager::isIntelLegacy), and AlchemyRenderDisableCompute off. Read at shader load, as everything built on
-// it is.
-static bool compute_enabled()
-{
-    const S32 glsl = gGLManager.mGLSLVersionMajor * 100 + gGLManager.mGLSLVersionMinor;
-    return gGLManager.mHasCompute && glsl >= 430 && !gGLManager.isIntelLegacy() &&
-           !gSavedSettings.getBOOL("AlchemyRenderDisableCompute");
-}
-
-S32 clamp_terrain_mapping(S32 mapping)
-{
-    // 1 = "flat", 2 not implemented, 3 = triplanar mapping
-    mapping = llclamp(mapping, 1, 3);
-    if (mapping == 2) { mapping = 1; }
-    return mapping;
-}
-
-S32 clamp_terrain_detail(S32 detail)
-{
-    const S32 requested = llclamp(detail, TERRAIN_PBR_DETAIL_MIN, TERRAIN_PBR_DETAIL_MAX);
-    detail = requested;
-
-    // The PBR terrain fragment shader declares one paint/ramp sampler (alpha_ramp or
-    // paint_map) plus, per detail level, 4 maps for each of the 4 materials. At full
-    // detail that is 17 samplers -- over the 16-per-stage floor that Apple's GL 4.1
-    // (every macOS context) and some older desktop GPUs report, where the program then
-    // fails to link. Drop detail until the count fits.
-    //
-    // The arithmetic mirrors pbrterrainF.glsl's #if guards exactly (detail 0 -> 17,
-    // -1 and -2 -> 13, -3 -> 9, -4 -> 5); if those guards change, this must too.
-    while (detail > TERRAIN_PBR_DETAIL_MIN)
-    {
-        S32 samplers = 1 + 4 * (1 + (detail >= TERRAIN_PBR_DETAIL_NORMAL)
-                                  + (detail >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
-                                  + (detail >= TERRAIN_PBR_DETAIL_EMISSIVE));
-        if (samplers <= gGLManager.mNumTextureImageUnits)
-        {
-            break;
-        }
-        --detail;
-    }
-
-    if (detail < requested)
-    {
-        LL_INFOS_ONCE("ShaderLoading") << "RenderTerrainPBRDetail " << requested << " clamped to " << detail
-                                       << ": full detail needs more fragment texture units than the "
-                                       << gGLManager.mNumTextureImageUnits
-                                       << " this GL implementation provides." << LL_ENDL;
-    }
-    return detail;
+    return LLViewerShaderMgr::instance()->inputs();
 }
 
 //utility shaders
@@ -318,7 +265,7 @@ LLGLSLShader            gDeferredPBRTerrainAlphaMaskProgram[TERRAIN_PAINT_TYPE_C
 // building them while it is off would be dozens of programs nothing can bind.
 static U32 mirror_variant()
 {
-    return gSavedSettings.getBOOL("RenderMirrors") ? (U32)LLGLSLShader::VARIANT_MIRROR : 0u;
+    return load_inputs().mGlobal.mMirrors ? (U32)LLGLSLShader::VARIANT_MIRROR : 0u;
 }
 
 // Digest of every shader source on disk, folded into the binary cache version.
@@ -434,9 +381,7 @@ static bool load_axis_copy(LLViewerShaderMgr& mgr,
 
 static void add_common_permutations(LLGLSLShader* shader)
 {
-    static LLCachedControl<bool> emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
-
-    if (emissive)
+    if (load_inputs().mGlobal.mEmissive)
     {
         shader->addPermutation("HAS_EMISSIVE", "1");
     }
@@ -583,6 +528,9 @@ void LLViewerShaderMgr::setShaders()
 
     gPipeline.shaderReloadBegins();
 
+    // Every loader below reads these, and nothing else of the settings.
+    mInputs = gPipeline.latchedShaderInputs();
+
     ALUniformBuffer::sUpdateMode = ALUniformBuffer::clampUpdateMode(gSavedSettings.getS32("AlchemyRenderUBOUpdateMode"));
 
     // Latch reverse-Z before anything downstream reads it: this same call releases and
@@ -594,11 +542,11 @@ void LLViewerShaderMgr::setShaders()
 
     // The same for the G-buffer's normal layout: every compile below injects GBUFFER_NORM_HDR from this latch, the
     // cache key folds it in, and the resources planned from the same inputs give the normal attachment its format.
-    LLRender::sGBufferNormHDR = gPipeline.latchedInputs().mGBufferNormHDR;
+    LLRender::sGBufferNormHDR = mInputs.mGlobal.mGBufferNormHDR;
 
     // The same for compute: the shared objects compiled for its stage and every program built on it follow the switch
     // as it stands for this load.
-    LLRender::sCompute = compute_enabled();
+    LLRender::sCompute = mInputs.mLocal.mCompute;
 
     {
         static LLCachedControl<bool> shader_cache_enabled(gSavedSettings, "RenderShaderCacheEnabled", true);
@@ -623,31 +571,14 @@ void LLViewerShaderMgr::setShaders()
             LLAppViewer::instance()->isSecondInstance());
     }
 
-    // when using indexed texture rendering, leave some texture units available for shadow and reflection maps
-    // We assume we always have atleast 16 texunits available, but we clamp the reserved units to ensure we don't end up with a negative
-    // number of texture channels
-    static LLCachedControl<S32> reserved_texture_units(gSavedSettings, "RenderReservedTextureIndices", 12);
-
-    LLGLSLShader::sIndexedTextureChannels = llmax(4, gGLManager.mNumTextureImageUnits - reserved_texture_units);
-
-    // Indexed GLTF PBR batches one material per four texture units (base color,
-    // normal, ORM, emissive). The PBR opaque GBuffer-write pass binds no
-    // shadow/reflection maps, so the full fragment texture-unit budget is
-    // available here -- unlike sIndexedTextureChannels above, no units are
-    // reserved. Capped at 8 to bound shader sampler declarations.
-    LLGLSLShader::sIndexedGLTFChannels = llclamp(gGLManager.mNumTextureImageUnits / 4, 1,
-                                                LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS);
-
-    // GLOn12 crashes inside the driver on the first indexed legacy material draw. Mesa's
-    // d3d12 links the program but translates it to DXIL lazily, at that draw, and its
-    // variant selection writes through the result without checking that the translation
-    // succeeded -- so no GL call can report the failure first. The indexed programs are not
-    // built there at all; zero channels is the state a failed load already leaves, and the
-    // pools fall back to their scalar paths.
+    // The texture units an indexed draw spreads its textures over, and the indexed material programs' slots, which the
+    // loaders below lower where a program cannot be built. Zero slots, as on GLOn12, is the state a failed load leaves,
+    // and the pools fall back to their scalar paths.
+    LLGLSLShader::sIndexedTextureChannels = mInputs.mGlobal.mIndexedTextureChannels;
+    LLGLSLShader::sIndexedGLTFChannels    = mInputs.mLocal.mIndexedGLTFChannels;
     if (gGLManager.mIsD3D12)
     {
         LL_INFOS("ShaderLoading") << "Indexed material batching disabled on GLOn12." << LL_ENDL;
-        LLGLSLShader::sIndexedGLTFChannels = 0;
     }
 
     reentrance = true;
@@ -848,11 +779,8 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     // Load basic dependency shaders first
     // All of these have to load for any shaders to function
 
-    S32 sum_lights_class = 3;
-
-    // Use the feature table to mask out the max light level to use.  Also make sure it's at least 1.
-    S32 max_light_class = gSavedSettings.getS32("RenderShaderLightingMaxLevel");
-    sum_lights_class = llclamp(sum_lights_class, 1, max_light_class);
+    // The feature table masks out the light level to use.
+    const S32 sum_lights_class = mInputs.mGlobal.mLightingClass;
 
     // Load the Basic Vertex Shaders at the appropriate level.
     // (in order of shader function call depth for reference purposes, deepest level first)
@@ -880,9 +808,9 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     attribs["MAX_JOINTS_PER_MESH_OBJECT"] =
         std::to_string(LLSkinningUtil::getMaxJointCount());
 
-    static LLCachedControl<bool> emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
+    const ALShaderInputs::Global& in = mInputs.mGlobal;
 
-    if (emissive)
+    if (in.mEmissive)
     {
         attribs["HAS_EMISSIVE"] = "1";
     }
@@ -891,17 +819,17 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     // rather than a uniform because it reaches a shared object -- this map is what compiles
     // those, and a program's own mShaderFiles never see it, which is fine: the lobe is
     // evaluated in deferredUtil and nowhere else.
-    attribs["SPECULAR_EXPONENT"] = llformat("%.1f", gSavedSettings.getF32("RenderSpecularExponent"));
+    attribs["SPECULAR_EXPONENT"] = llformat("%.1f", in.mSpecularExponent);
 
-    bool ssr = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
+    const bool ssr = in.mSSR;
 
-    bool mirrors = gSavedSettings.getBOOL("RenderMirrors");
+    const bool mirrors = in.mMirrors;
 
-    bool has_reflection_probes = gSavedSettings.getBOOL("RenderReflectionsEnabled");
+    const bool has_reflection_probes = in.mProbes;
 
-    S32 probe_level = llclamp(gSavedSettings.getS32("RenderReflectionProbeLevel"), 0, 3);
+    const S32 probe_level = in.mProbeLevel;
 
-    S32 shadow_detail            = gSavedSettings.getS32("RenderShadowDetail");
+    const S32 shadow_detail = in.mShadowDetail;
 
     if (shadow_detail >= 1)
     {
@@ -916,7 +844,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         // default (deferred/shadowUtil.glsl SHADOW_PCF_KERNEL == 4). Even values only: the
         // gather path tiles the kernel in 2x2 blocks, so K/2 gather-compare fetches per axis.
         static const S32 pcf_kernel[] = { 2, 4, 6, 4 }; // Low / Medium / High / Ultra(PCSS)
-        const S32 quality = llclamp((S32)gSavedSettings.getU32("AlchemyRenderShadowFilterQuality"), 0, 3);
+        const S32 quality = in.mShadowFilterQuality;
         attribs["SHADOW_PCF_KERNEL"] = std::to_string(pcf_kernel[quality]);
 
         if (quality >= 3)
@@ -924,10 +852,9 @@ std::string LLViewerShaderMgr::loadBasicShaders()
             // Ultra: contact-hardening PCSS. This ALSO switches the shadow maps from
             // depth-compare samplers to plain sampler2D reads (a blocker search needs the
             // raw depth), so LLPipeline::bindShadowMaps must bind a matching non-compare
-            // sampler -- it reads this same setting. Keep the two in step.
+            // sampler -- it reads this same input. Keep the two in step.
             attribs["SHADOW_PCSS"] = "1";
-            const F32 pcss_scale = gSavedSettings.getF32("AlchemyRenderShadowPCSSScale");
-            attribs["SHADOW_PCSS_SCALE"] = llformat("%.2f", pcss_scale);
+            attribs["SHADOW_PCSS_SCALE"] = llformat("%.2f", in.mShadowPCSSScale);
         }
     }
 
@@ -954,20 +881,17 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     // in directly so a toggle still invalidates cached binaries.
 
     { // PBR terrain
-        const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));
-        attribs["TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT"] = llformat("%d", mapping);
-        const F32 triplanar_factor = gSavedSettings.getF32("RenderTerrainPBRTriplanarBlendFactor");
-        attribs["TERRAIN_TRIPLANAR_BLEND_FACTOR"] = llformat("%.2f", triplanar_factor);
-        const S32 detail = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
-        attribs["TERRAIN_PBR_DETAIL"] = llformat("%d", detail);
-        if (gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling"))
+        attribs["TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT"] = llformat("%d", in.mTerrainPlanarSampleCount);
+        attribs["TERRAIN_TRIPLANAR_BLEND_FACTOR"] = llformat("%.2f", in.mTerrainTriplanarBlend);
+        attribs["TERRAIN_PBR_DETAIL"] = llformat("%d", in.mTerrainPBRDetail);
+        if (in.mTerrainHexTiling)
         {
             attribs["TERRAIN_HEX_TILING"] = "1";
         }
     }
 
     // The water's wave layers that hex-tile, read in waterSurface.glsl, a shared object.
-    attribs["WATER_HEXTILE"] = std::to_string(water_hextile());
+    attribs["WATER_HEXTILE"] = std::to_string(in.mWaterHextile);
 
     LLGLSLShader::sGlobalDefines = attribs;
 
@@ -1013,7 +937,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     // The water waves' stages, where they are wanted: the evaluation stage's surface and the lattice its heights are read
     // through, and the control stage's depth pyramid test, which culls the patches the scene hides. The waves are
     // optional, so these failing leaves only them off: their programs then fail to attach what is missing.
-    if (ALWaterSurface::wavesWanted())
+    if (mInputs.mLocal.mWaterWaves)
     {
         const std::pair<const char*, GLenum> water_objects[] = {
             { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
@@ -1108,8 +1032,7 @@ bool LLViewerShaderMgr::loadShadersWater()
     bool success = true;
     bool terrainWaterSuccess = true;
 
-    bool use_sun_shadow = mShaderLevel[SHADER_DEFERRED] > 1 &&
-        gSavedSettings.getS32("RenderShadowDetail") > 0;
+    bool use_sun_shadow = mShaderLevel[SHADER_DEFERRED] > 1 && mInputs.mGlobal.mShadowDetail > 0;
 
     if (mShaderLevel[SHADER_WATER] == 0)
     {
@@ -1159,7 +1082,7 @@ bool LLViewerShaderMgr::loadShadersWater()
             shader.mShaderLevel = mShaderLevel[SHADER_WATER];
             shader.mShaderGroup = LLGLSLShader::SG_WATER;
             shader.clearPermutations();
-            if (LLPipeline::sRenderTransparentWater)
+            if (mInputs.mLocal.mTransparentWater)
             {
                 shader.addPermutation("TRANSPARENT_WATER", "1");
             }
@@ -1169,7 +1092,7 @@ bool LLViewerShaderMgr::loadShadersWater()
             }
             // Read by waterSurface.glsl, a shared object, through the global define; the program's copy keeps its
             // hash honest.
-            shader.addPermutation("WATER_HEXTILE", std::to_string(water_hextile()));
+            shader.addPermutation("WATER_HEXTILE", std::to_string(mInputs.mGlobal.mWaterHextile));
             return shader.createShader((under ? 0 : LLGLSLShader::VARIANT_CLASSIC) | mirror_variant());
         };
 
@@ -1179,7 +1102,7 @@ bool LLViewerShaderMgr::loadShadersWater()
         // rather than the water or any shader after it.
         gWaterWavesProgram.unload();
         gUnderWaterWavesProgram.unload();
-        if (success && ALWaterSurface::wavesWanted())
+        if (success && mInputs.mLocal.mWaterWaves)
         {
             if (!setup(gWaterWavesProgram, false, true) || !setup(gUnderWaterWavesProgram, true, true))
             {
@@ -1279,7 +1202,7 @@ bool LLViewerShaderMgr::loadShadersEffects()
 
     if (success)
     {
-        const bool use_glow_noise = gSavedSettings.getBOOL("RenderGlowNoise");
+        const bool use_glow_noise = mInputs.mLocal.mGlowNoise;
         const std::string glow_noise_label = use_glow_noise ? " (+Noise)" : "";
 
         gGlowExtractProgram.mName = llformat("Glow Extract Shader (Post)%s", glow_noise_label.c_str());
@@ -1300,7 +1223,7 @@ bool LLViewerShaderMgr::loadShadersEffects()
         }
     }
 
-    const bool bloom_halation = gSavedSettings.getBOOL("RenderBloomHalation");
+    const bool bloom_halation = mInputs.mLocal.mBloomHalation;
 
     if (success)
     {
@@ -1392,8 +1315,7 @@ bool LLViewerShaderMgr::loadShadersEffects()
 bool LLViewerShaderMgr::loadShadersDeferred()
 {
     LL_PROFILE_ZONE_SCOPED;
-    bool use_sun_shadow = mShaderLevel[SHADER_DEFERRED] > 1 &&
-        gSavedSettings.getS32("RenderShadowDetail") > 0;
+    bool use_sun_shadow = mShaderLevel[SHADER_DEFERRED] > 1 && mInputs.mGlobal.mShadowDetail > 0;
 
     if (mShaderLevel[SHADER_DEFERRED] == 0)
     {
@@ -2002,16 +1924,16 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        const S32 detail = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
-        const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));
+        const S32 detail = mInputs.mGlobal.mTerrainPBRDetail;
+        const S32 mapping = mInputs.mGlobal.mTerrainPlanarSampleCount;
         // Faceted terrain shading is a fragment-stage choice, not a surface-data one: a
         // per-triangle normal has no per-vertex representation on a mesh whose vertices are
         // shared, so pbrterrainF derives it from position derivatives instead. See
         // terrain_geometric_normal().
-        const bool flat_normals = gSavedSettings.getBOOL("RenderTerrainPBRNormalsEnabled");
+        const bool flat_normals = mInputs.mLocal.mTerrainPBRNormals;
         // Read by pbrterrainUtilF, a shared object, so the define that matters is the global one
         // set above; the program's copy keeps its name and hash honest.
-        const bool hex_tiling = gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling");
+        const bool hex_tiling = mInputs.mGlobal.mTerrainHexTiling;
         // A region whose materials include a masked one is drawn by the program that can discard; every other by one
         // that cannot (LLDrawPoolTerrain::renderDeferred).
         for (U32 program = 0; program < 2 * TERRAIN_PAINT_TYPE_COUNT; ++program)
@@ -2193,7 +2115,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     if (success)
     {
         std::string fragment;
-        bool use_ao = gSavedSettings.getBOOL("RenderDeferredSSAO");
+        bool use_ao = mInputs.mLocal.mSSAO;
         if (use_ao)
         {
             fragment = "deferred/sunLightSSAOF.glsl";
@@ -2622,7 +2544,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 shader.addPermutation("HAS_SUN_SHADOW", "1");
             }
 
-            if (gSavedSettings.getBOOL("RenderDeferredSSAO"))
+            if (mInputs.mLocal.mSSAO)
             { //if using SSAO, take screen space light map into account as if shadows are enabled
                 shader.mShaderLevel = llmax(shader.mShaderLevel, 2);
                 shader.addPermutation("HAS_SSAO", "1");
@@ -2908,8 +2830,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         // The projection count and hex tiling apply to the four-texture terrain as they do to
         // the PBR one: terrainF blends its detail textures through pbrterrainUtilF's weights,
         // slices and cells, which isPBRTerrain links in.
-        const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));
-        const bool hex_tiling = gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling");
+        const S32 mapping = mInputs.mGlobal.mTerrainPlanarSampleCount;
+        const bool hex_tiling = mInputs.mGlobal.mTerrainHexTiling;
         gDeferredTerrainProgram.mName = llformat("Deferred Terrain Shader %s%s",
                 (mapping == 1 ? "flat" : "triplanar"),
                 (hex_tiling ? " hex" : ""));
@@ -2956,7 +2878,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarProgram.addPermutation("LINEAR_DIFFUSE", "1");
 
         add_common_permutations(&gDeferredAvatarProgram);
-        if (gSavedSettings.getBOOL("RenderAvatarCloth"))
+        if (mInputs.mLocal.mAvatarCloth)
         {
             gDeferredAvatarProgram.addPermutation("AVATAR_CLOTH", "1");
         }
@@ -3125,10 +3047,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                                                                              {"SMAA_PRESET_MEDIUM", "Medium"},
                                                                              {"SMAA_PRESET_HIGH", "High"},
                                                                           {"SMAA_PRESET_ULTRA", "Ultra"} };
-        const bool smaa_predication = gSavedSettings.getBOOL("RenderSMAAPredication");
-        const F32 smaa_pred_threshold = gSavedSettings.getF32("RenderSMAAPredicationThreshold");
-        const F32 smaa_pred_scale = llclamp(gSavedSettings.getF32("RenderSMAAPredicationScale"), 1.f, 5.f);
-        const F32 smaa_pred_strength = llclamp(gSavedSettings.getF32("RenderSMAAPredicationStrength"), 0.f, 1.f);
+        const bool smaa_predication = mInputs.mLocal.mSMAAPredication;
+        const F32 smaa_pred_threshold = mInputs.mLocal.mSMAAPredicationThreshold;
+        const F32 smaa_pred_scale = mInputs.mLocal.mSMAAPredicationScale;
+        const F32 smaa_pred_strength = mInputs.mLocal.mSMAAPredicationStrength;
         int i = 0;
         bool failed = false;
         for (const auto& smaa_pair : quality_levels)
@@ -3523,7 +3445,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     // The depth pyramid's levels, where the session computes and the water's waves, its reader, are wanted. Optional,
     // like them: its failing leaves the cull off (ALDepthPyramid::build), not the shaders after it.
     gDepthPyramidProgram.unload();
-    if (success && LLRender::sCompute && ALWaterSurface::wavesWanted())
+    if (success && mInputs.mLocal.mCompute && mInputs.mLocal.mWaterWaves)
     {
         gDepthPyramidProgram.mName = "Depth Pyramid Shader";
         gDepthPyramidProgram.mShaderFiles.clear();
@@ -3558,7 +3480,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gBlitWithEffectsProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gBlitWithEffectsProgram.mShaderFiles.push_back(make_pair("alchemy/blitWithEffectsF.glsl", GL_FRAGMENT_SHADER));
         gBlitWithEffectsProgram.clearPermutations();
-        if (gSavedSettings.getBOOL("RenderHDREnabled"))
+        if (mInputs.mLocal.mHDR)
         {
             gBlitWithEffectsProgram.addPermutation("DITHER", "1");
         }
@@ -3572,8 +3494,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     // bloom alpha channel when RenderBloomHalation is on — both settings trigger
     // shader rebuilds, so reading them at compile time stays in sync with the
     // bloom pyramid format.
-    const bool hdr_enabled         = gSavedSettings.getBOOL("RenderHDREnabled");
-    const bool bloom_halation_perm = gSavedSettings.getBOOL("RenderBloomHalation");
+    const bool hdr_enabled         = mInputs.mLocal.mHDR;
+    const bool bloom_halation_perm = mInputs.mLocal.mBloomHalation;
 
     if (success)
     {
@@ -4290,14 +4212,13 @@ bool LLViewerShaderMgr::loadShadersInterface()
         success = gDrawColorProgram.createShader();
     }
 
-    if (gSavedSettings.getBOOL("LocalTerrainPaintEnabled"))
+    if (mInputs.mLocal.mTerrainPaintBitDepth > 0)
     {
         if (success)
         {
             LLGLSLShader* shader = &gPBRTerrainBakeProgram;
-            U32 bit_depth = gSavedSettings.getU32("TerrainPaintBitDepth");
-            // LLTerrainPaintMap currently uses an RGB8 texture internally
-            bit_depth = llclamp(bit_depth, 1, 8);
+            // LLTerrainPaintMap currently uses an RGB8 texture internally, which the input's 1 to 8 bits follow.
+            const U32 bit_depth = mInputs.mLocal.mTerrainPaintBitDepth;
             shader->mName = llformat("Terrain Bake Shader RGB%o", bit_depth);
             shader->mFeatures.isPBRTerrain = true;
 

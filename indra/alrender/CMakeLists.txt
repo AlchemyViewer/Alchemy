@@ -1,10 +1,10 @@
 # -*- cmake -*-
 
 # Render infrastructure over llrender that holds no viewer state: what the
-# pipeline's render resources are and when they change, the far plane, the
-# water's field, wave heights and stencil bits, the depth pyramid, the depth
-# under the HUD and snapshot cutouts. Whatever reads settings or the scene
-# hands these their inputs as values.
+# pipeline's render resources and programs are built from and when they
+# change, the far plane, the water's field, wave heights and stencil bits,
+# the depth pyramid, the depth under the HUD and snapshot cutouts. Whatever
+# reads settings or the scene hands these their inputs as values.
 
 set(
   alrender_SOURCES
@@ -13,6 +13,7 @@ set(
   alfarplane.cpp
   alrenderinputrequests.cpp
   alrenderresourceplan.cpp
+  alshaderinputs.cpp
   alwaterfield.cpp
   alwaterheightbake.cpp
 )
@@ -26,6 +27,7 @@ set(
   alrenderinputrequests.h
   alrenderresourceinputs.h
   alrenderresourceplan.h
+  alshaderinputs.h
   alwaterfield.h
   alwaterheightbake.h
   alwaterstencil.h
@@ -51,9 +53,9 @@ if(AL_BUILD_TESTS)
   set(alrender_shader_dir "AL_TEST_SHADER_DIR=\"${INDRA_SOURCE_DIR}/newview/app_settings/shaders\"")
 
   # The suites that need no GL: the render resources' plan and the changes
-  # that ask for it again, the far plane and the constants its shaders share,
-  # the water's field and the wave heights a normal map's slopes integrate
-  # to, and snapshot cutouts.
+  # that ask for it again, what the programs are built from, the far plane
+  # and the constants its shaders share, the water's field and the wave
+  # heights a normal map's slopes integrate to, and snapshot cutouts.
   al_add_test_binary(
     alrender_tests
     PROJECT alrender
@@ -62,6 +64,7 @@ if(AL_BUILD_TESTS)
       tests/alfarplane_test.cpp
       tests/alrenderinputrequests_test.cpp
       tests/alrenderresourceplan_test.cpp
+      tests/alshaderinputs_test.cpp
       tests/alwaterfield_test.cpp
       tests/alwaterheightbake_test.cpp
     LIBRARIES alrender

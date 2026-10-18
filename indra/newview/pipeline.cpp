@@ -318,8 +318,6 @@ bool    LLPipeline::sRenderAttachedLights = true;
 bool    LLPipeline::sRenderAttachedParticles = true;
 bool    LLPipeline::sRenderDeferred = false;
 bool    LLPipeline::sReflectionProbesEnabled = false;
-bool    LLPipeline::RenderGlowNoise = false;
-bool    LLPipeline::RenderAvatarCloth = false;
 S32     LLPipeline::sVisibleLightCount = 0;
 bool    LLPipeline::sRenderingHUDs;
 F32     LLPipeline::sDistortionWaterClipPlaneMargin = 1.0125f;
@@ -829,12 +827,16 @@ void LLPipeline::applyRenderInputs()
 
 void LLPipeline::latchRenderInputs()
 {
-    mLatchedInputs = resourceInputsFromSettings();
+    mLatchedShaderInputs = shaderInputsFromSettings();
+    mLatchedInputs       = resourceInputsFromSettings(mLatchedShaderInputs);
 
     sReflectionProbesEnabled = mLatchedInputs.mProbes;
     sRenderTransparentWater  = mLatchedInputs.mTransparentWater;
-    RenderGlowNoise          = gSavedSettings.getBOOL("RenderGlowNoise");
-    RenderAvatarCloth        = gSavedSettings.getBOOL("RenderAvatarCloth");
+}
+
+const ALShaderInputs& LLPipeline::shaderInputs() const
+{
+    return LLViewerShaderMgr::instance()->inputs();
 }
 
 // static
@@ -991,7 +993,67 @@ void LLPipeline::ensureResources(const ALRenderResourcePlan& plan, const ALRende
 }
 
 // static
-ALRenderResourceInputs LLPipeline::resourceInputsFromSettings()
+ALShaderInputs LLPipeline::shaderInputsFromSettings()
+{
+    static_assert(ALShaderInputs::MAX_INDEXED_GLTF_CHANNELS == LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS);
+
+    ALShaderSettings s;
+    const S32 glsl = gGLManager.mGLSLVersionMajor * 100 + gGLManager.mGLSLVersionMinor;
+    s.mTextureImageUnits = gGLManager.mNumTextureImageUnits;
+    s.mHasClipControl    = gGLManager.mHasClipControl;
+    // Intel's legacy drivers are held back from compute (LLGLManager::isIntelLegacy).
+    s.mHasCompute = gGLManager.mHasCompute && glsl >= 430 && !gGLManager.isIntelLegacy();
+    s.mIsD3D12    = gGLManager.mIsD3D12;
+
+    s.mReverseZ                 = gSavedSettings.getBOOL("AlchemyRenderReverseZ");
+    s.mHDR                      = gSavedSettings.getBOOL("RenderHDREnabled");
+    s.mEmissive                 = gSavedSettings.getBOOL("RenderEnableEmissiveBuffer");
+    s.mLightingMaxLevel         = gSavedSettings.getS32("RenderShaderLightingMaxLevel");
+    s.mReservedTextureIndices   = gSavedSettings.getS32("RenderReservedTextureIndices");
+    s.mSpecularExponent         = gSavedSettings.getF32("RenderSpecularExponent");
+    s.mSSR                      = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
+    s.mMirrors                  = gSavedSettings.getBOOL("RenderMirrors");
+    s.mProbes                   = LLFeatureManager::getInstance()->isFeatureAvailable("RenderReflectionsEnabled") &&
+                                  gSavedSettings.getBOOL("RenderReflectionsEnabled");
+    s.mProbeLevel               = gSavedSettings.getS32("RenderReflectionProbeLevel");
+    s.mShadowDetail             = gSavedSettings.getS32("RenderShadowDetail");
+    s.mShadowFilterQuality      = gSavedSettings.getU32("AlchemyRenderShadowFilterQuality");
+    s.mShadowPCSSScale          = gSavedSettings.getF32("AlchemyRenderShadowPCSSScale");
+    s.mTerrainPlanarSampleCount = gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount");
+    s.mTerrainTriplanarBlend    = gSavedSettings.getF32("RenderTerrainPBRTriplanarBlendFactor");
+    s.mTerrainPBRDetail         = gSavedSettings.getS32("RenderTerrainPBRDetail");
+    s.mTerrainHexTiling         = gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling");
+    s.mTerrainPBRNormals        = gSavedSettings.getBOOL("RenderTerrainPBRNormalsEnabled");
+    s.mWaterHextile             = gSavedSettings.getU32("AlchemyRenderWaterHextile");
+    s.mWaterWaves               = gSavedSettings.getBOOL("AlchemyRenderWaterWaves");
+    s.mDisableCompute           = gSavedSettings.getBOOL("AlchemyRenderDisableCompute");
+    s.mTransparentWater         = gSavedSettings.getBOOL("RenderTransparentWater");
+    s.mSSAO                     = gSavedSettings.getBOOL("RenderDeferredSSAO");
+    s.mAvatarCloth              = gSavedSettings.getBOOL("RenderAvatarCloth");
+    s.mGlowNoise                = gSavedSettings.getBOOL("RenderGlowNoise");
+    s.mBloomHalation            = gSavedSettings.getBOOL("RenderBloomHalation");
+    s.mSMAAPredication          = gSavedSettings.getBOOL("RenderSMAAPredication");
+    s.mSMAAPredicationThreshold = gSavedSettings.getF32("RenderSMAAPredicationThreshold");
+    s.mSMAAPredicationScale     = gSavedSettings.getF32("RenderSMAAPredicationScale");
+    s.mSMAAPredicationStrength  = gSavedSettings.getF32("RenderSMAAPredicationStrength");
+    s.mLocalTerrainPaint        = gSavedSettings.getBOOL("LocalTerrainPaintEnabled");
+    s.mTerrainPaintBitDepth     = gSavedSettings.getU32("TerrainPaintBitDepth");
+
+    const ALShaderInputs in = ALShaderInputs::make(s);
+    const S32 requested_detail =
+        std::clamp(s.mTerrainPBRDetail, (S32)TERRAIN_PBR_DETAIL_MIN, (S32)TERRAIN_PBR_DETAIL_MAX);
+    if (in.mGlobal.mTerrainPBRDetail < requested_detail)
+    {
+        LL_INFOS_ONCE("ShaderLoading") << "RenderTerrainPBRDetail " << s.mTerrainPBRDetail << " clamped to "
+                                       << in.mGlobal.mTerrainPBRDetail
+                                       << ": full detail needs more fragment texture units than the "
+                                       << s.mTextureImageUnits << " this GL implementation provides." << LL_ENDL;
+    }
+    return in;
+}
+
+// static
+ALRenderResourceInputs LLPipeline::resourceInputsFromSettings(const ALShaderInputs& shaders)
 {
     ALRenderResourceInputs in;
 
@@ -1005,10 +1067,8 @@ ALRenderResourceInputs LLPipeline::resourceInputsFromSettings()
 
     in.mHDR      = gSavedSettings.getBOOL("RenderHDREnabled");
     in.mEmissive = gSavedSettings.getBOOL("RenderEnableEmissiveBuffer");
-    // What setShaders latches into LLRender before it compiles, from these inputs: the normal attachment's layout
-    // follows HDR, and reverse-Z is the setting where the context has clip control.
-    in.mGBufferNormHDR = in.mHDR;
-    in.mReverseZ       = gGLManager.mHasClipControl && gSavedSettings.getBOOL("AlchemyRenderReverseZ");
+    in.mGBufferNormHDR = shaders.mGlobal.mGBufferNormHDR;
+    in.mReverseZ       = shaders.mGlobal.mReverseZ;
 
     in.mShadowDetail     = gSavedSettings.getS32("RenderShadowDetail");
     in.mShadowScale      = gSavedSettings.getF32("RenderShadowResolutionScale");
@@ -3220,7 +3280,7 @@ void LLPipeline::updateReverseZ()
     // The latched state: the setting where the context has clip control. On a GPU without it the
     // setting can stay on but is inert, and every branch below then resolves to the forward
     // constants, so the forward path is never perturbed.
-    const bool effective = gPipeline.mLatchedInputs.mReverseZ;
+    const bool effective = gPipeline.mLatchedShaderInputs.mGlobal.mReverseZ;
     const bool changed   = (effective != LLRender::sReverseZ);
 
     LLRender::sReverseZ = effective;
@@ -5028,8 +5088,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     }
 
     // turn off atmospherics and water haze for low detail reflection probe
-    static LLCachedControl<S32> probe_level(gSavedSettings, "RenderReflectionProbeLevel", 0);
-    bool low_detail_probe = probe_level == 0 && gCubeSnapshot;
+    bool low_detail_probe = shaderInputs().mGlobal.mProbeLevel == 0 && gCubeSnapshot;
     done_atmospherics = done_atmospherics || low_detail_probe;
     done_water_haze   = done_water_haze || low_detail_probe;
 
@@ -9207,7 +9266,7 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
             warmthWeights.mV[2]);
         gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_WARMTH_AMOUNT, warmthAmount);
 
-        if (RenderGlowNoise)
+        if (shaderInputs().mLocal.mGlowNoise)
         {
             S32 channel = gGlowExtractProgram.enableTexture(LLShaderMgr::GLOW_NOISE_MAP);
             if (channel > -1)
@@ -9822,7 +9881,7 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
         LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
         static LLCachedControl<bool> use_sample(gSavedSettings, "RenderSMAAUseSample", false);
-        static LLCachedControl<bool> use_predication(gSavedSettings, "RenderSMAAPredication", true);
+        const bool use_predication = shaderInputs().mLocal.mSMAAPredication;
         // Stencil optimization requires all three passes to share the same stencil attachment.
         bool use_stencil = mResourceInputs.mSMAAStencil && mSMAAEdgeMap.hasStencil() && mSMAABlendBuffer.hasStencil();
         LLGLState stencil(GL_STENCIL_TEST, use_stencil);
@@ -10993,8 +11052,8 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     // compare sampler can never return, so shadowUtil.glsl declares the maps as plain
     // sampler2D there and does the compare in-shader. The sampler has to match the declared
     // type -- reading a depth texture through a compare sampler as sampler2D (or the reverse)
-    // is undefined -- so this selects on the SAME setting that injects SHADOW_PCSS in
-    // LLViewerShaderMgr::buildGlobalDefines(). Both must move together. Point filtering
+    // is undefined -- so this selects on the SAME input that injects SHADOW_PCSS in
+    // LLViewerShaderMgr::loadBasicShaders(), as the programs were loaded with it. Point filtering
     // because that path filters manually; textureGather ignores the filter regardless.
     //
     // NOTHING ELSE MAY ENTER THIS EXPRESSION. The declared type is fixed when the shader is
@@ -11003,8 +11062,7 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     // captures do run at the lowest tier, but they get there by taking a shorter path over this
     // same sampler (shadowUtil.glsl, filterShadow's cube_snapshot branch), which is the only
     // form that choice can take without a separate program.
-    static LLCachedControl<U32> shadow_filter_quality_cc(gSavedSettings, "AlchemyRenderShadowFilterQuality", 1);
-    const bool pcss = llclamp(shadow_filter_quality_cc(), 0u, 3u) >= 3;
+    const bool pcss = shaderInputs().mGlobal.mShadowFilterQuality >= 3;
     const U32 shadow_sampler = gGL.getSampler(pcss ? ALSamplers::PointClamp : ALSamplers::ShadowCompare);
 
     const U32 sampler_binds_before = ALTextureSlot::sSamplerBinds;
@@ -11578,9 +11636,7 @@ void LLPipeline::renderDeferredLighting()
         }
 
         static LLCachedControl<S32> local_light_count(gSavedSettings, "RenderLocalLightCount", 256);
-        static LLCachedControl<S32> probe_level(gSavedSettings, "RenderReflectionProbeLevel", 0);
-
-        if (local_light_count > 0 && (!gCubeSnapshot || probe_level > 0))
+        if (local_light_count > 0 && (!gCubeSnapshot || shaderInputs().mGlobal.mProbeLevel > 0))
         {
             // A projector's colour is worked out with its fade where it is sorted, and carried
             // to the pass that draws it.

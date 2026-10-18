@@ -45,6 +45,7 @@
 #include "alquerypool.h"
 #include "alrenderinputrequests.h"
 #include "alrenderresourceplan.h"
+#include "alshaderinputs.h"
 #include "alwatersurface.h"
 #include "altexture3d.h"
 #include "aluniformbuffer.h"
@@ -102,12 +103,16 @@ public:
     /// (rebuildGLBuffers).
     void applyRenderInputs();
 
-    /// Reads the render inputs from the settings, once for everything that applies them: the resources' plan, the
-    /// programs a reload builds and the passes, which read the latched statics set here. The frame's application
+    /// Reads the render inputs from the settings, once for everything that applies them: the programs a reload
+    /// builds, the resources' plan and the passes, which read the latched statics set here. The frame's application
     /// latches, and so does a reload outside one.
     void latchRenderInputs();
-    /// The inputs as they were last latched.
+    /// The inputs as they were last latched: the resources' and the programs'.
     const ALRenderResourceInputs& latchedInputs() const { return mLatchedInputs; }
+    const ALShaderInputs&         latchedShaderInputs() const { return mLatchedShaderInputs; }
+    /// The inputs the programs were last loaded for (LLViewerShaderMgr::setShaders), which a pass drawing with them
+    /// reads rather than the settings.
+    const ALShaderInputs& shaderInputs() const;
 
     /// Every GL resource the pipeline holds, and the state derived from them: on context teardown and at shutdown.
     void releaseAllGLResources();
@@ -170,9 +175,11 @@ public:
     static void scaleToRenderResolution(U32& resX, U32& resY);
 
 private:
-    // What the settings say the resources' inputs are now, read by latchRenderInputs alone, so every resource, program
-    // and pass is planned from the same reading of the settings.
-    static ALRenderResourceInputs resourceInputsFromSettings();
+    // What the settings say the programs' and the resources' inputs are now, read by latchRenderInputs alone, so every
+    // program, resource and pass is planned from the same reading of the settings. The resources take the G-buffer's
+    // normal layout and the depth convention from the programs' inputs, which compile for them.
+    static ALShaderInputs         shaderInputsFromSettings();
+    static ALRenderResourceInputs resourceInputsFromSettings(const ALShaderInputs& shaders);
     // @a inputs at the size an ALRenderSizeOverride holds, while one does.
     static ALRenderResourceInputs withSizeOverride(ALRenderResourceInputs inputs);
 
@@ -200,8 +207,9 @@ private:
     // memory. A change is applied only where the settings move from this, so a halved size is not retried in full for
     // every change that leaves the inputs as they were.
     ALRenderResourceInputs mRequestedInputs;
-    // The inputs as the last latch read them, which the next reconcile is asked for.
+    // The inputs as the last latch read them, which the next reconcile and reload are asked for.
     ALRenderResourceInputs mLatchedInputs;
+    ALShaderInputs         mLatchedShaderInputs;
 
     // The changes marked since the last application, and how many the one running applies, for the log line.
     ALRenderInputRequests mRenderInputRequests;
@@ -911,8 +919,6 @@ public:
     // commit, so a pass and the programs and targets it draws with agree on them.
     static bool             sRenderTransparentWater;
     static bool             sReflectionProbesEnabled;
-    static bool             RenderGlowNoise;
-    static bool             RenderAvatarCloth;
     static S32              sVisibleLightCount;
     static bool             sRenderingHUDs;
     static F32              sDistortionWaterClipPlaneMargin;

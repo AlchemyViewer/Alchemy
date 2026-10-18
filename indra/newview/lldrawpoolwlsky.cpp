@@ -267,8 +267,7 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
             behind.bindTarget();
             behind.clear();
             // skyF writes its colour to frag_data[3] with the emissive buffer, and to frag_data[0] without it.
-            static LLCachedControl<bool> has_emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
-            behind.setDrawOutput(has_emissive ? 3 : 0);
+            behind.setDrawOutput(gPipeline.shaderInputs().mGlobal.mEmissive ? 3 : 0);
             {
                 LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
                 LLGLDisable no_blend(GL_BLEND);
