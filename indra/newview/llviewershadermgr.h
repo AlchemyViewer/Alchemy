@@ -100,9 +100,15 @@ public:
     void updateShaderUniforms(LLGLSLShader * shader) override;
 
 private:
+    // A program a loader asked for: recorded where it did not build, and true either way, so the loader goes on to the
+    // next. A program that did not build draws nothing (LLGLSLShader::bind).
+    bool built(bool linked, const LLGLSLShader& shader);
+
     ALShaderInputs mInputs;
     // Whether the water waves' objects are compiled among the shared objects.
     bool mWaterWaveObjects = false;
+    // The programs the load running could not build, by name.
+    std::vector<std::string> mFailedPrograms;
 }; //LLViewerShaderMgr
 
 extern LLVector4            gShinyOrigin;

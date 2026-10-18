@@ -363,6 +363,10 @@ public:
     // draws.
     U32 linkCount() const { return mLinkCount; }
 
+    // The program bound in place of one that did not build, which draws nothing, released with the
+    // context's programs.
+    static void releaseStandIn();
+
     // The load running (LLViewerShaderMgr::setShaders), which every program its loaders configure is
     // stamped with by createShader: a program not stamped by a load was not asked for by it.
     static U32 sLoadGeneration;
@@ -703,6 +707,10 @@ private:
 
     // createShader's build: compiled, attached, linked, its hook run and its variants built.
     bool linkProgram(U32 variants);
+
+    // Bound in place of this program, or its skinned variant, where it did not build; warned of once a link.
+    void bindStandIn();
+    bool mStandInWarned = false;
 
     // What the program linked under, for createShader to keep it: its configuration's hash() as the
     // loader set it, its variants, and the level it linked at, which a fallback may have lowered.

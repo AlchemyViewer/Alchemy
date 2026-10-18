@@ -1119,7 +1119,8 @@ bool LLGLSLShader::linkProgram(U32 variants)
 
     if (success)
     {
-        mLinkedLevel = mShaderLevel;
+        mLinkedLevel   = mShaderLevel;
+        mStandInWarned = false;
         ++mLinkCount;
         ++sLinked;
         if (mOnLink)
@@ -1784,11 +1785,99 @@ void LLGLSLShader::releaseCompareSamplerUnits()
     ALTextureSlot::sSamplerBindsShadowCycle += ALTextureSlot::sSamplerBinds - binds_before;
 }
 
+namespace
+{
+    // The program a program that did not build binds in its place. It reads no attribute and places every vertex at
+    // one point, so its draws cover nothing, and discards whatever might be left: a failed program draws nothing rather
+    // than taking the viewer down. Built on first need in each context (LLGLSLShader::releaseStandIn).
+    GLuint sStandIn = 0;
+
+    GLuint stand_in_stage(GLenum type, const char* source)
+    {
+        const GLuint stage = glCreateShader(type);
+        glShaderSource(stage, 1, &source, nullptr);
+        glCompileShader(stage);
+        return stage;
+    }
+
+    GLuint stand_in()
+    {
+        if (sStandIn == 0)
+        {
+            const GLuint vertex =
+                stand_in_stage(GL_VERTEX_SHADER, "#version 400\nvoid main() { gl_Position = vec4(0.0, 0.0, 0.0, 1.0); }\n");
+            const GLuint fragment = stand_in_stage(GL_FRAGMENT_SHADER, "#version 400\nvoid main() { discard; }\n");
+            const GLuint program  = glCreateProgram();
+            glAttachShader(program, vertex);
+            glAttachShader(program, fragment);
+            glLinkProgram(program);
+            glDetachShader(program, vertex);
+            glDetachShader(program, fragment);
+            glDeleteShader(vertex);
+            glDeleteShader(fragment);
+
+            GLint linked = GL_FALSE;
+            glGetProgramiv(program, GL_LINK_STATUS, &linked);
+            if (linked == GL_TRUE)
+            {
+                sStandIn = program;
+            }
+            else
+            {
+                LL_WARNS("Shader") << "The stand-in for programs that did not build did not link either" << LL_ENDL;
+                glDeleteProgram(program);
+            }
+        }
+        return sStandIn;
+    }
+}
+
+// static
+void LLGLSLShader::releaseStandIn()
+{
+    if (sStandIn != 0)
+    {
+        if (sCurBoundShader == sStandIn)
+        {
+            unbind();
+        }
+        glDeleteProgram(sStandIn);
+        sStandIn = 0;
+    }
+}
+
+void LLGLSLShader::bindStandIn()
+{
+    gGL.flush();
+
+    const GLuint program = stand_in();
+    if (sCurBoundShader != program || sCurBoundShaderPtr != this)
+    {
+        endProfileQuery();
+        LLVertexBuffer::unbind();
+        glUseProgram(program);
+        sCurBoundShader    = program;
+        sCurBoundShaderPtr = this;
+        LLVertexBuffer::setupClientArrays(0);
+    }
+
+    if (!mStandInWarned)
+    {
+        LL_WARNS("Shader") << mName << " did not build: what it draws is not drawn" << LL_ENDL;
+        mStandInWarned = true;
+    }
+}
+
 void LLGLSLShader::bind()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
-    llassert_always(mProgramObject != 0);
+    // A program that did not build draws nothing, and its uniform and texture calls set nothing.
+    if (mProgramObject == 0)
+    {
+        bindStandIn();
+        return;
+    }
 
     gGL.flush();
 
@@ -1858,9 +1947,13 @@ void LLGLSLShader::warnIfVariantMissed() const
 
 void LLGLSLShader::bind(bool rigged)
 {
-    if (rigged)
+    if (rigged && !mRiggedVariant)
     {
-        llassert_always(mRiggedVariant);
+        // This program did not build, or the skinned variant asked of it did not: a skinned draw draws nothing.
+        bindStandIn();
+    }
+    else if (rigged)
+    {
         // Checked on THIS program, not on the corner about to be bound. A rigged corner carries
         // no per-pass variants of its own, so the check inside its bind() can never fire -- which
         // would let base.bind(true) skip a classic or mirror corner silently, the one route the
@@ -1891,6 +1984,10 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLTexture* texture, ALSampler key)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -1912,6 +2009,10 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLRenderTarget* texture, ALSampler ke
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -1933,6 +2034,10 @@ S32 LLGLSLShader::bindDepthTexture(S32 uniform, LLRenderTarget* texture, ALSampl
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -1959,6 +2064,10 @@ S32 LLGLSLShader::unbindTexture(S32 uniform)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -1978,7 +2087,7 @@ S32 LLGLSLShader::unbindTexture(S32 uniform)
 
 S32 LLGLSLShader::getTextureChannel(S32 uniform) const
 {
-    return mTexture[uniform];
+    return uniform >= 0 && uniform < (S32)mTexture.size() ? mTexture[uniform] : -1;
 }
 
 S32 LLGLSLShader::getImageUnit(S32 uniform, U32 element) const
@@ -2065,12 +2174,20 @@ void LLGLSLShader::bindStorageBuffer(S32 block, const ALGPUBuffer& buffer, size_
 
 void LLGLSLShader::dispatch(U32 groups_x, U32 groups_y, U32 groups_z)
 {
+    if (mProgramObject == 0)
+    {
+        return;
+    }
     llassert(sCurBoundShaderPtr == this && mIsCompute);
     gGL.dispatchCompute(groups_x, groups_y, groups_z);
 }
 
 void LLGLSLShader::dispatchThreads(U32 x, U32 y, U32 z)
 {
+    if (mProgramObject == 0)
+    {
+        return;
+    }
     llassert(mComputeLocalSize[0] > 0 && mComputeLocalSize[1] > 0 && mComputeLocalSize[2] > 0);
     if (mComputeLocalSize[0] == 0 || mComputeLocalSize[1] == 0 || mComputeLocalSize[2] == 0)
     {
@@ -2083,6 +2200,10 @@ void LLGLSLShader::dispatchThreads(U32 x, U32 y, U32 z)
 
 void LLGLSLShader::dispatchIndirect(const ALGPUBuffer& buffer, size_t offset)
 {
+    if (mProgramObject == 0)
+    {
+        return;
+    }
     llassert(sCurBoundShaderPtr == this && mIsCompute);
     gGL.dispatchComputeIndirect(buffer, offset);
 }
@@ -2099,6 +2220,10 @@ S32 LLGLSLShader::enableTexture(S32 uniform)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -2113,6 +2238,10 @@ S32 LLGLSLShader::disableTexture(S32 uniform, ALTextureSlot::eTextureType mode)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -2789,7 +2918,7 @@ void LLGLSLShader::uniform1i(const LLStaticHashedString& uniform, GLint v)
 }
 void LLGLSLShader::vertexAttrib4f(U32 index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 {
-    if (mAttribute[index] > 0)
+    if (index < mAttribute.size() && mAttribute[index] > 0)
     {
         glVertexAttrib4f(mAttribute[index], x, y, z, w);
     }
@@ -2797,7 +2926,7 @@ void LLGLSLShader::vertexAttrib4f(U32 index, GLfloat x, GLfloat y, GLfloat z, GL
 
 void LLGLSLShader::vertexAttrib4fv(U32 index, GLfloat* v)
 {
-    if (mAttribute[index] > 0)
+    if (index < mAttribute.size() && mAttribute[index] > 0)
     {
         glVertexAttrib4fv(mAttribute[index], v);
     }

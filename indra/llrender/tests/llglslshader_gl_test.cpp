@@ -501,6 +501,14 @@ namespace
               "    frag_color = test_global_stub(vec4(0.25, 0.5, 0.75, 1.0));\n"
               "}\n" },
 
+            // A fragment stage that does not compile.
+            { "test/brokenF.glsl",
+              "out vec4 frag_color;\n"
+              "void main()\n"
+              "{\n"
+              "    frag_color = not_declared_anywhere;\n"
+              "}\n" },
+
             // A bool array under a reserved name, both elements read so the whole array stays active.
             { "test/boolsF.glsl",
               "uniform bool testBools[2];\n"
@@ -936,6 +944,68 @@ namespace
         }
 
         CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // A program that did not build takes nothing down: bind() puts a stand-in in its place that draws nothing, skinned
+    // or not, and its uniform, texture and dispatch calls do nothing. A solid program drawn the same way first shows the
+    // draw would have covered the target.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a program that did not build draws nothing and its calls do nothing", "[llglslshader_gl]")
+    {
+        setUpShaders();
+        constexpr U32 SIDE = 4;
+        REQUIRE(mTargets[0].allocate(SIDE, SIDE, GL_RGBA8));
+        REQUIRE(buildProgram(mDraw2, "solid (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/solidF.glsl", GL_FRAGMENT_SHADER } }));
+
+        CHECK_FALSE(buildProgram(mDraw, "broken (test)",
+                                 { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/brokenF.glsl", GL_FRAGMENT_SHADER } }));
+        REQUIRE_FALSE(mDraw.isComplete());
+        // The failed compile's own error, which is not what is under test.
+        while (glGetError() != GL_NO_ERROR)
+        {
+        }
+
+        LLGLDisable blend(GL_BLEND);
+        const auto draw = [&](LLGLSLShader& shader, bool rigged)
+        {
+            mTargets[0].bindTarget();
+            gGL.setClearColor(LLColor4::transparent);
+            mTargets[0].clear();
+            shader.bind(rigged);
+            gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
+            const std::vector<F32> drawn = readBoundTarget(SIDE, SIDE, 4, GL_RGBA);
+            mTargets[0].flush();
+            LLGLSLShader::unbind();
+            return drawn;
+        };
+
+        UNSCOPED_INFO("the solid program covers the target");
+        CHECK(draw(mDraw2, false) == std::vector<F32>(SIDE * SIDE * 4, 1.f));
+
+        mDraw.bind();
+        CHECK(LLGLSLShader::sCurBoundShaderPtr == &mDraw);
+        GLint current = 0;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &current);
+        UNSCOPED_INFO("a linked program stands in");
+        CHECK(current != 0);
+        GLint linked = GL_FALSE;
+        glGetProgramiv((GLuint)llmax(current, 0), GL_LINK_STATUS, &linked);
+        CHECK(linked == GL_TRUE);
+        mDraw.uniform1f(LLShaderMgr::MINIMUM_ALPHA, 0.5f);
+        CHECK(mDraw.enableTexture(LLShaderMgr::DIFFUSE_MAP) == -1);
+        CHECK(mDraw.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mTargets[0]) == -1);
+        CHECK(mDraw.disableTexture(LLShaderMgr::DIFFUSE_MAP) == -1);
+        CHECK(mDraw.getTextureChannel(LLShaderMgr::DIFFUSE_MAP) == -1);
+        mDraw.dispatch(1);
+        LLGLSLShader::unbind();
+
+        UNSCOPED_INFO("it draws nothing");
+        CHECK(draw(mDraw, false) == std::vector<F32>(SIDE * SIDE * 4, 0.f));
+        UNSCOPED_INFO("nor skinned, having no skinned variant");
+        CHECK(draw(mDraw, true) == std::vector<F32>(SIDE * SIDE * 4, 0.f));
+
+        LLGLSLShader::releaseStandIn();
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // Ints and uints arrive exactly past 2^24: each set below differs from the one before only in values that
