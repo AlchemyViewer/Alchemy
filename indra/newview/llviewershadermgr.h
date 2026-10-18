@@ -71,12 +71,12 @@ public:
     std::string loadBasicShaders();
     // The objects only the water waves' programs attach, compiled with the global defines while the waves are wanted.
     void loadWaterWaveObjects();
-    bool loadShadersEffects();
-    bool loadShadersDeferred();
-    bool loadShadersObject();
-    bool loadShadersAvatar();
-    bool loadShadersWater();
-    bool loadShadersInterface();
+    void loadShadersEffects();
+    void loadShadersDeferred();
+    void loadShadersObject();
+    void loadShadersAvatar();
+    void loadShadersWater();
+    void loadShadersInterface();
 
     std::vector<S32> mShaderLevel;
     S32 mMaxAvatarShaderLevel;
@@ -100,8 +100,8 @@ public:
     void updateShaderUniforms(LLGLSLShader * shader) override;
 
 private:
-    // A program a loader asked for: recorded where it did not build, and true either way, so the loader goes on to the
-    // next. A program that did not build draws nothing (LLGLSLShader::bind).
+    // A program a loader asked for, recorded where it did not build; whether it built. The loader goes on to the next
+    // either way, and a program that did not build draws nothing (LLGLSLShader::bind).
     bool built(bool linked, const LLGLSLShader& shader);
 
     ALShaderInputs mInputs;
