@@ -14906,18 +14906,6 @@ void LLPipeline::skipRenderingShadows()
     }
 }
 
-void LLPipeline::handleShadowDetailChanged()
-{
-    if (RenderShadowDetail > gSavedSettings.getS32("RenderShadowDetail"))
-    {
-        skipRenderingShadows();
-    }
-    else
-    {
-        LLViewerShaderMgr::instance()->setShaders();
-    }
-}
-
 class LLOctreeDirty : public OctreeTraveler
 {
 public:

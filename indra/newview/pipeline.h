@@ -676,7 +676,6 @@ public:
     void skipRenderingOfTerrain( bool flag );
     void hideObject( const LLUUID& id );
     void restoreHiddenObject( const LLUUID& id );
-    void handleShadowDetailChanged();
 
     LLReflectionMapManager mReflectionMapManager;
     LLHeroProbeManager mHeroProbeManager;

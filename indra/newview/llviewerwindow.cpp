@@ -2149,7 +2149,6 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     mHideCursorPermanent( false ),
     mCursorHidden(false),
     mResDirty(false),
-    mStatesDirty(false),
     mProgressView(NULL)
 {
     // gKeyboard is still NULL, so it doesn't do LLWindowListener any good to
@@ -6700,13 +6699,6 @@ void LLViewerWindow::requestResolutionUpdate()
 void LLViewerWindow::checkSettings()
 {
     LL_PROFILE_ZONE_SCOPED;
-    if (mStatesDirty)
-    {
-        gGL.refreshState();
-        LLViewerShaderMgr::instance()->setShaders();
-        mStatesDirty = false;
-    }
-
     // Drain any pending font reload before doing anything else this frame.
     // The setting listener for AlchemyUIFontOverrides defers the reload
     // here so we never tear down LLFontFreetype state mid-render. Routes
