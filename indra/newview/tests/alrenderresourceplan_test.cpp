@@ -203,12 +203,12 @@ namespace
               [](const Plan&)
               {
                   return sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero }) |
-                         of({ Id::SpotShadow0, Id::SpotShadow1 });
+                         of({ Id::SpotShadow0, Id::SpotShadow1, Id::ProbeLight, Id::HeroLight });
               } },
             { "RenderDeferredSSAO with shadows", no_change, [](Inputs& in) { in.mSSAO = false; }, nothing },
             { "RenderDeferredSSAO without shadows", [](Inputs& in) { in.mShadowDetail = 0; },
               [](Inputs& in) { in.mSSAO = false; },
-              [](const Plan&) { return of({ Id::MainLight, Id::ProbeLight, Id::HeroLight }); } },
+              [](const Plan&) { return of({ Id::MainLight }); } },
             { "RenderShadowResolutionScale", no_change, [](Inputs& in) { in.mShadowScale = 0.5f; },
               [](const Plan&) { return sun_shadows({ Pack::Main }) | of({ Id::SpotShadow0, Id::SpotShadow1 }); } },
             { "AlchemyRenderShadowDepth32F under reverse-Z", no_change, [](Inputs& in) { in.mShadowDepth32F = true; },
@@ -495,6 +495,41 @@ namespace
             const IdSet changed = Plan::changed(Plan::make(defaults()), Plan::make(to));
             CHECK(changed.test((size_t)Id::HeroGBuffer));
             CHECK(names(changed & ~Plan::idsOf(Pack::Hero)) == "nothing");
+        }
+    }
+
+    TEST_CASE("alrenderresourceplan: a capture pack has a light map exactly when shadows are on", "[alrenderresourceplan]")
+    {
+        // The probe captures' sun pass writes the light map only for shadows, and their soften pass reads it whatever
+        // it holds; SSAO is the main view's alone.
+        for (S32 shadow_detail : { 0, 1, 2 })
+        {
+            for (bool ssao : { false, true })
+            {
+                INFO("shadow detail " << shadow_detail << ", SSAO " << ssao);
+                Inputs in        = defaults();
+                in.mShadowDetail = shadow_detail;
+                in.mSSAO         = ssao;
+                const Plan plan  = Plan::make(in);
+
+                CHECK(plan.wants(Id::ProbeLight) == (shadow_detail > 0));
+                CHECK(plan.wants(Id::HeroLight) == (shadow_detail > 0));
+                CHECK(plan.wants(Id::MainLight) == (shadow_detail > 0 || ssao));
+            }
+        }
+    }
+
+    TEST_CASE("alrenderresourceplan: SSAO alone never touches a capture pack", "[alrenderresourceplan]")
+    {
+        for (S32 shadow_detail : { 0, 1, 2 })
+        {
+            INFO("shadow detail " << shadow_detail);
+            Inputs from        = defaults();
+            from.mShadowDetail = shadow_detail;
+            Inputs to          = from;
+            to.mSSAO           = !from.mSSAO;
+            const IdSet changed = Plan::changed(Plan::make(from), Plan::make(to));
+            CHECK(names(changed & (Plan::idsOf(Pack::Probe) | Plan::idsOf(Pack::Hero))) == "nothing");
         }
     }
 

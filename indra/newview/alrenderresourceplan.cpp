@@ -185,19 +185,24 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     plan_pack(Pack::Main, { width, height, blur_happy_size(width, shadow_scale), blur_happy_size(height, shadow_scale),
                             light, true });
 
+    // A capture's light map is written by its sun pass, which runs for shadows alone: SSAO is the main view's, and a
+    // capture's soften pass reads the light map whatever it holds (renderDeferredLighting), so without shadows it reads
+    // the white a missing map binds.
+    const bool capture_light = in.mShadowDetail > 0;
+
     // A probe face renders at the probe resolution times its supersample, which the manager downsamples to its probe,
     // and its shadow maps at the size the full supersample of four gave them: a coarser capture is no reason for coarser
     // shadows in it. Its post targets and bloom are the GLTF material preview's.
     const U32 probe_size  = in.mProbeResolution * in.mProbeSuperSample;
     const U32 probe_shadow = blur_happy_size(in.mProbeResolution * 4, 1.f);
-    plan_pack(Pack::Probe, { probe_size, probe_size, probe_shadow, probe_shadow, light, true });
+    plan_pack(Pack::Probe, { probe_size, probe_size, probe_shadow, probe_shadow, capture_light, true });
 
     // A mirror's face renders at the hero resolution, never supersampled, and runs no post chain.
     if (in.mMirrors)
     {
         const U32 hero_size   = std::max(in.mHeroResolution, 1u);
         const U32 hero_shadow = blur_happy_size(hero_size, 1.f);
-        plan_pack(Pack::Hero, { hero_size, hero_size, hero_shadow, hero_shadow, light, false });
+        plan_pack(Pack::Hero, { hero_size, hero_size, hero_shadow, hero_shadow, capture_light, false });
     }
 
     // The spot lights' shadows are the main view's alone, square at its width times the shadow scale.
