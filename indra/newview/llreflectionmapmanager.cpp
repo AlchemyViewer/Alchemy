@@ -1744,9 +1744,12 @@ void LLReflectionMapManager::initReflectionMaps()
         mMaxProbeLOD = log2f((F32)mProbeResolution) - 1.f; // number of mips - 1
 
         // Signed storage: the linear and quadratic bands are negative over half the sphere, so
-        // none of the unsigned float formats the radiance chain uses can hold these.
-        mSHCoeffs.release();
-        mSHCoeffs.allocate(LL_SH_COEFF_COUNT, mReflectionProbeCount + 2, GL_RGBA16F);
+        // none of the unsigned float formats the radiance chain uses can hold these. A row a
+        // probe, kept with what each row holds wherever the probe count leaves the size alone.
+        const ALRenderTargetDesc sh_desc{ .width  = LL_SH_COEFF_COUNT,
+                                          .height = mReflectionProbeCount + 2,
+                                          .color  = { GL_RGBA16F } };
+        const bool sh_kept = mSHCoeffs.ensure(sh_desc) == LLRenderTarget::EnsureResult::Kept;
 
         bool new_texture = false;
         if (mTexture.isNull() || hdr_changed ||
@@ -1777,8 +1780,9 @@ void LLReflectionMapManager::initReflectionMaps()
         mRealtimeRadiancePass = false;
 
         // if default probe already exists, remember whether or not it's complete (SL-20498). Not over
-        // a new cube array, whose storage holds nothing until the default probe renders into it again.
-        bool default_complete = !new_texture && mDefaultProbe.notNull() && mDefaultProbe->mComplete;
+        // a new cube array or new coefficients, whose storage holds nothing until the default probe
+        // renders into it again.
+        bool default_complete = !new_texture && sh_kept && mDefaultProbe.notNull() && mDefaultProbe->mComplete;
 
         for (auto& probe : mProbes)
         {
