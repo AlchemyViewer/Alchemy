@@ -43,10 +43,10 @@
 
 namespace
 {
-    // A shader's source, found from this file so the test reads what the viewer compiles.
+    // A shader's source, read from the viewer's shader tree so the test reads what the viewer compiles.
     static std::string shader_source(const std::string& rel)
     {
-        const std::filesystem::path path = std::filesystem::path(__FILE__).parent_path() / ".." / "app_settings" / "shaders" / rel;
+        const std::filesystem::path path = std::filesystem::path(AL_TEST_SHADER_DIR) / rel;
         std::ifstream in(path);
         std::stringstream buf;
         buf << in.rdbuf();

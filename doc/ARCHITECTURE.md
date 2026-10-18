@@ -17,6 +17,7 @@
 **Rendering layer:**
 - **llrender** - OpenGL abstraction: shaders (`LLGLSLShader`, `LLShaderMgr`), vertex buffers (`LLVertexBuffer`), render targets (`LLRenderTarget`), textures, compute (`ALGPUBuffer`, `ALImageSlot`), font rendering (FreeType + HarfBuzz)
 - **llwindow** - Platform window management and input (native Win32/Cocoa, and SDL3 on Linux, where GL is EGL on Wayland and X11 alike -- the viewer includes no X11 or GLX header). Depends on llrender
+- **alrender** - Render infrastructure between llrender and newview that holds no viewer state: the render resources' plan (`ALRenderResourcePlan`, made from the values in `ALRenderResourceInputs`) and the changes that ask for it again (`ALRenderInputRequests`), the far plane (`ALFarPlane`), the water's field (`ALWaterField`), wave heights (`ALWaterHeightBake`, over pocketfft) and stencil bits (`ALWaterStencil`), the depth pyramid (`ALDepthPyramid`), the depth under the HUD (`ALHUDDepth`) and snapshot cutouts (`ALCutoutImage`). Depends on llrender, llimage, llmath and llcommon; it reads no settings, and the viewer hands it the settings and the scene as values
 
 **Content model layer:**
 - **llinventory** - Inventory item/folder data model
