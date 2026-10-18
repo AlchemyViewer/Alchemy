@@ -90,7 +90,7 @@ The deferred rendering pipeline is orchestrated by `LLPipeline` (`indra/newview/
 
 **Render passes** execute in this order:
 1. **Geometry/GBuffer** (`renderGeomDeferred()`) — Writes to multiple render targets
-2. **Shadows** (`renderGeomShadow()`) — 4 sun shadow cascades + 2 spot light shadow maps
+2. **Shadows** (`renderGeomShadow()`) — 4 sun shadow cascades + 2 spot light shadow maps. A probe or mirror capture renders 2 cascades, the second reaching past what the capture draws (4 for probes under `AlchemyRenderProbeAllShadowCascades`); its pack has maps for those alone (`ALRenderResourcePlan::sunCascades`), and `shadowUtil.glsl` reads as many as `sun_shadow_cascades` says. A map that could not be built is drawn into by no pass, and its shadows read lit without a sample (`LLPipeline::unbuiltShadowMaps`, `unbuilt_shadow_maps`)
 3. **Deferred Lighting** (`renderDeferredLighting()`) — Sun, point lights (up to 16 batched), spot lights, with reflection probe influence
 4. **Post-Deferred** (`renderGeomPostDeferred()`) — Alpha, water, atmospheric haze
 5. **Post-Processing** — Luminance/exposure, depth of field, bloom, then one pass doing tonemapping, color grading and the bloom composite together, then AA and CAS

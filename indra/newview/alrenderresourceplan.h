@@ -75,6 +75,8 @@ public:
     };
 
     static constexpr U32 SUN_CASCADES = 4;
+    /// A capture's sun cascades, unless a probe's renders them all (ALRenderResourceInputs::mProbeAllCascades).
+    static constexpr U32 CAPTURE_SUN_CASCADES = 2;
     static constexpr U32 BLOOM_MAX_MIPS = 7;
 
     // The fixed sizes, which the pipeline's passes read from here.
@@ -158,6 +160,18 @@ public:
     const Resource& operator[](Id id) const { return mResources[(size_t)id]; }
     bool wants(Id id) const { return mResources[(size_t)id].mDesc.has_value(); }
     const std::optional<ALRenderTargetDesc>& desc(Id id) const { return mResources[(size_t)id].mDesc; }
+
+    /// The sun cascades @a pack renders, which are those it has maps for, from the first: SUN_CASCADES in the main view,
+    /// CAPTURE_SUN_CASCADES in a capture unless a probe's renders them all, none without sun shadows.
+    U32 sunCascades(Pack pack) const
+    {
+        U32 cascades = 0;
+        while (cascades < SUN_CASCADES && wants(sunShadow(pack, cascades)))
+        {
+            ++cascades;
+        }
+        return cascades;
+    }
 
     /// The reflection probes' manager's resources, or nothing where they are not wanted and are freed.
     const std::optional<ProbeManager>& reflectionProbes() const { return mReflectionProbes; }

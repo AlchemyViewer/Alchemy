@@ -10950,33 +10950,32 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     const U32 sampler_binds_before = ALTextureSlot::sSamplerBinds;
     U32 bound_units = 0;
 
-    for (U32 i = 0; i < 4; i++)
+    // A map the pass has none of -- a cascade past a capture's two, or a map that could not be built -- the shader reads
+    // lit without sampling (unbuilt_shadow_maps), and its unit takes one the pass has, so each shadow sampler still sits
+    // on a depth texture under the sampler it was declared for while any was built.
+    const U32 unbuilt = unbuiltShadowMaps();
+    const auto shadow_map = [this](U32 i) { return i < 4 ? getSunShadowTarget(i) : getSpotShadowTarget(i - 4); };
+    LLRenderTarget* stand_in = nullptr;
+    for (U32 i = 0; i < 6 && !stand_in; i++)
     {
-        LLRenderTarget* shadow_target = getSunShadowTarget(i);
-        if (shadow_target)
+        if (!(unbuilt & (1u << i)))
         {
-            S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW0 + i);
-            if (channel > -1)
-            {
-                gGL.getTextureSlot(channel)->bind(shadow_target, true, shadow_sampler);
-                bound_units |= 1u << channel;
-            }
+            stand_in = shadow_map(i);
         }
     }
 
-    for (U32 i = 4; i < 6; i++)
+    for (U32 i = 0; i < 6; i++)
     {
+        LLRenderTarget* shadow_target = (unbuilt & (1u << i)) ? stand_in : shadow_map(i);
         S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW0 + i);
-        if (channel > -1)
+        if (shadow_target && channel > -1)
         {
-            LLRenderTarget* shadow_target = getSpotShadowTarget(i - 4);
-            if (shadow_target)
-            {
-                gGL.getTextureSlot(channel)->bind(shadow_target, true, shadow_sampler);
-                bound_units |= 1u << channel;
-            }
+            gGL.getTextureSlot(channel)->bind(shadow_target, true, shadow_sampler);
+            bound_units |= 1u << channel;
         }
     }
+
+    shader.uniform1i(LLShaderMgr::UNBUILT_SHADOW_MAPS, (S32)unbuilt);
 
     // Drop any unit the PREVIOUS program had a shadow map on that this one does not reuse.
     // Those units are about to be handed to a program that maps them to ordinary material
@@ -11042,10 +11041,23 @@ void LLPipeline::packDeferredUBO()
 
     memcpy(d.shadow_clip, mSunClipPlanes.mV, sizeof(d.shadow_clip));
 
-    d.shadow_res[0]      = (F32)mRT->shadow[0].getWidth();
-    d.shadow_res[1]      = (F32)mRT->shadow[0].getHeight();
-    d.proj_shadow_res[0] = (F32)mSpotShadow[0].getWidth();
-    d.proj_shadow_res[1] = (F32)mSpotShadow[0].getHeight();
+    // A pack's cascades share one size, and the spot pair another. Each is read from a map that was built: one that was
+    // not has no size, and the filters over the maps that were divide by it.
+    const U32 unbuilt = unbuiltShadowMaps();
+    const LLRenderTarget* sun_map  = &mRT->shadow[0];
+    const LLRenderTarget* spot_map = &mSpotShadow[(unbuilt & (1u << 4)) ? 1 : 0];
+    for (U32 i = 0; i < 4; ++i)
+    {
+        if (!(unbuilt & (1u << i)))
+        {
+            sun_map = &mRT->shadow[i];
+            break;
+        }
+    }
+    d.shadow_res[0]      = (F32)sun_map->getWidth();
+    d.shadow_res[1]      = (F32)sun_map->getHeight();
+    d.proj_shadow_res[0] = (F32)spot_map->getWidth();
+    d.proj_shadow_res[1] = (F32)spot_map->getHeight();
 
     // Reverse-Z shadow maps store reversed depth and sample with GEQUAL, so the receiver
     // reference is pushed the other way: negate the bias (incl. the camera-error term) at
@@ -11088,9 +11100,11 @@ void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
     { // was previously fully bound, use fast path
         shader.bind();
         // Not carried over from the full bind: a program fully bound outside a capture and fast
-        // bound inside one would still read 0. shadowUtil.glsl selects its filter tier on this,
-        // so a stale value is a pass rendering at the wrong tier rather than a missing update.
+        // bound inside one would still read the main view's. shadowUtil.glsl selects its filter
+        // tier and the cascades it reads on these, so a stale value is a pass rendering at the
+        // wrong tier, or reading maps its pack never rendered, rather than a missing update.
         shader.uniform1i(LLShaderMgr::CUBE_SNAPSHOT, gCubeSnapshot ? 1 : 0);
+        shader.uniform1i(LLShaderMgr::SUN_SHADOW_CASCADES, (S32)sunCascades());
         bindBrdfLut(shader);
         bindShadowMaps(shader);
         bindReflectionProbes(shader);
@@ -11248,6 +11262,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     shader.uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_DELTA_MATRIX, LLViewerCamera::getInstance()->getInverseDeltaModelview());
 
     shader.uniform1i(LLShaderMgr::CUBE_SNAPSHOT, gCubeSnapshot ? 1 : 0);
+    shader.uniform1i(LLShaderMgr::SUN_SHADOW_CASCADES, (S32)sunCascades());
 
     if (shader.hasUniform(LLShaderMgr::DEFERRED_NORM_MATRIX))
     {
@@ -12826,6 +12841,34 @@ void LLPipeline::renderHighlight(const LLViewerObject* obj, F32 fade)
 }
 
 
+U32 LLPipeline::sunCascades() const
+{
+    using Pack = ALRenderResourcePlan::Pack;
+    const Pack pack = mRT == &mMainRT ? Pack::Main : (mRT == &mAuxillaryRT ? Pack::Probe : Pack::Hero);
+    return mResourcePlan.sunCascades(pack);
+}
+
+U32 LLPipeline::unbuiltShadowMaps() const
+{
+    const U32 cascades = sunCascades();
+    U32 unbuilt = 0;
+    for (U32 i = 0; i < 4; ++i)
+    {
+        if (i >= cascades || !mRT->shadow[i].isComplete())
+        {
+            unbuilt |= 1u << i;
+        }
+    }
+    for (U32 i = 0; i < 2; ++i)
+    {
+        if (!mSpotShadow[i].isComplete())
+        {
+            unbuilt |= 1u << (4 + i);
+        }
+    }
+    return unbuilt;
+}
+
 LLRenderTarget* LLPipeline::getSunShadowTarget(U32 i)
 {
     llassert(i < 4);
@@ -13106,11 +13149,30 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         mSunClipPlanes.mV[0] *= 1.25f; //bump back first split for transition padding
     }
 
+    // The cascades this pass renders, which are those its pack has maps for.
+    const U32 cascades = sunCascades();
+
     if (gCubeSnapshot)
-    { // stretch clip planes for reflection probe renders to reduce number of shadow passes
-        mSunClipPlanes.mV[1] = mSunClipPlanes.mV[2];
-        mSunClipPlanes.mV[2] = mSunClipPlanes.mV[3];
-        mSunClipPlanes.mV[3] *= 1.5f;
+    {
+        if (cascades < ALRenderResourcePlan::SUN_CASCADES)
+        {
+            // Two cascades rather than four, so the shadow ends with cascade 1, which reaches the last split: twice the
+            // depth of what the capture sees, at least 16 m and at most its draw distance. Past it the shadow fades to lit over a fifth
+            // of that distance, where clip.z and clip.w place the fade (sampleDirectionalShadow), and is lit beyond,
+            // all inside cascade 1's map, which covers a quarter past its split.
+            const F32 last = mSunClipPlanes.mV[3];
+            mSunClipPlanes.mV[1] = last;
+            mSunClipPlanes.mV[2] = last * 0.8f;
+            mSunClipPlanes.mV[3] = last * 1.2f;
+        }
+        else
+        {
+            // Four, stretched so that the fade to lit lies past what the capture draws, as two cascades' does: cascade 1
+            // to the third split, 2 to the last, and 3 half as far again.
+            mSunClipPlanes.mV[1] = mSunClipPlanes.mV[2];
+            mSunClipPlanes.mV[2] = mSunClipPlanes.mV[3];
+            mSunClipPlanes.mV[3] *= 1.5f;
+        }
     }
 
 
@@ -13244,7 +13306,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             }
         }
 
-        for (S32 j = 0; j < (gCubeSnapshot ? 2 : 4); j++)
+        for (S32 j = 0; j < (S32)cascades; j++)
         {
             if (!hasRenderDebugMask(RENDER_DEBUG_SHADOW_FRUSTA) && !gCubeSnapshot)
             {
@@ -13307,12 +13369,15 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                     mShadowCamera[j+4] = shadow_cam;
                 }
 
-                mRT->shadow[j].bindTarget();
+                if (mRT->shadow[j].isComplete())
                 {
-                    LLGLDepthTest depth(GL_TRUE);
-                    mRT->shadow[j].clear();
+                    mRT->shadow[j].bindTarget();
+                    {
+                        LLGLDepthTest depth(GL_TRUE);
+                        mRT->shadow[j].clear();
+                    }
+                    mRT->shadow[j].flush();
                 }
-                mRT->shadow[j].flush();
 
                 mShadowError.mV[j] = 0.f;
                 mShadowFOV.mV[j] = 0.f;
@@ -13601,20 +13666,24 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
             stop_glerror();
 
-            mRT->shadow[j].bindTarget();
-            mRT->shadow[j].getViewport(gGLViewport);
-            mRT->shadow[j].clear();
-
+            // A cascade whose map could not be built is not drawn, and its shadows are read lit (unbuiltShadowMaps).
+            if (mRT->shadow[j].isComplete())
             {
-                static LLCullResult result[4];
-                if (have_union_cull)
-                {   // re-bucket the shared union cull down to this cascade's frustum
-                    bucketShadowCull(sUnionShadowResult, shadow_cam, result[j]);
-                }
-                renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull, sun_occlusion);
-            }
+                mRT->shadow[j].bindTarget();
+                mRT->shadow[j].getViewport(gGLViewport);
+                mRT->shadow[j].clear();
 
-            mRT->shadow[j].flush();
+                {
+                    static LLCullResult result[4];
+                    if (have_union_cull)
+                    {   // re-bucket the shared union cull down to this cascade's frustum
+                        bucketShadowCull(sUnionShadowResult, shadow_cam, result[j]);
+                    }
+                    renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull, sun_occlusion);
+                }
+
+                mRT->shadow[j].flush();
+            }
 
             if (!gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_SHADOW_FRUSTA) && !gCubeSnapshot)
             {
@@ -13736,7 +13805,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             mShadowModelview[i + 4] = view[i + 4];
             mShadowProjection[i + 4] = proj[i + 4];
 
-            if (!gCubeSnapshot) //skip updating spot shadow maps during cubemap updates
+            // Skipped during cubemap updates, and for a map that could not be built, whose shadows are read lit
+            // (unbuiltShadowMaps).
+            if (!gCubeSnapshot && mSpotShadow[i].isComplete())
             {
                 LLCamera shadow_cam = camera;
                 shadow_cam.setFar(far_clip);
@@ -14826,11 +14897,14 @@ void LLPipeline::skipRenderingShadows()
 {
     LLGLDepthTest depth(GL_TRUE);
 
-    for (S32 j = 0; j < 4; j++)
+    for (U32 j = 0, cascades = sunCascades(); j < cascades; j++)
     {
-        mRT->shadow[j].bindTarget();
-        mRT->shadow[j].clear();
-        mRT->shadow[j].flush();
+        if (mRT->shadow[j].isComplete())
+        {
+            mRT->shadow[j].bindTarget();
+            mRT->shadow[j].clear();
+            mRT->shadow[j].flush();
+        }
     }
 }
 

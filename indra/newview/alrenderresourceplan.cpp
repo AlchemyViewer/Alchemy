@@ -114,6 +114,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         U32  height;
         U32  shadow_width;
         U32  shadow_height;
+        U32  sun_cascades;
         bool light;
         bool post;
     };
@@ -164,7 +165,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
 
         if (in.mShadowDetail > 0)
         {
-            for (U32 cascade = 0; cascade < SUN_CASCADES; ++cascade)
+            for (U32 cascade = 0; cascade < shape.sun_cascades; ++cascade)
             {
                 plan.at(sunShadow(pack, cascade)).mDesc = ALRenderTargetDesc{ .width  = shape.shadow_width,
                                                                               .height = shape.shadow_height,
@@ -183,7 +184,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     const F32 shadow_scale = std::max(0.f, in.mShadowScale);
     const bool light = in.mShadowDetail > 0 || in.mSSAO;
     plan_pack(Pack::Main, { width, height, blur_happy_size(width, shadow_scale), blur_happy_size(height, shadow_scale),
-                            light, true });
+                            SUN_CASCADES, light, true });
 
     // A capture's light map is written by its sun pass, which runs for shadows alone: SSAO is the main view's, and a
     // capture's soften pass reads the light map whatever it holds (renderDeferredLighting), so without shadows it reads
@@ -192,15 +193,17 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
 
     // A probe face renders at the probe resolution times its supersample, which the manager downsamples to its probe,
     // and its shadow maps at the size the full supersample of four gave them: a coarser capture is no reason for coarser
-    // shadows in it. Its post targets and bloom are the GLTF material preview's, which the probes' captures never read,
-    // so they are there only while a preview is alive. The pack is there while probes are on or a preview is alive, and
-    // the manager's own resources while probes are.
+    // shadows in it. A capture renders two sun cascades, or a probe's all four where AlchemyRenderProbeAllShadowCascades
+    // asks (generateSunShadow), and has maps for those alone. Its post targets and bloom are the GLTF material preview's,
+    // which the probes' captures never read, so they are there only while a preview is alive. The pack is there while
+    // probes are on or a preview is alive, and the manager's own resources while probes are.
     if (in.mProbes || in.mMaterialPreview)
     {
-        const U32 probe_size   = in.mProbeResolution * in.mProbeSuperSample;
-        const U32 probe_shadow = blur_happy_size(in.mProbeResolution * 4, 1.f);
-        plan_pack(Pack::Probe,
-                  { probe_size, probe_size, probe_shadow, probe_shadow, capture_light, in.mMaterialPreview });
+        const U32 probe_size     = in.mProbeResolution * in.mProbeSuperSample;
+        const U32 probe_shadow   = blur_happy_size(in.mProbeResolution * 4, 1.f);
+        const U32 probe_cascades = in.mProbeAllCascades ? SUN_CASCADES : CAPTURE_SUN_CASCADES;
+        plan_pack(Pack::Probe, { probe_size, probe_size, probe_shadow, probe_shadow, probe_cascades, capture_light,
+                                 in.mMaterialPreview });
     }
     if (in.mProbes)
     {
@@ -209,14 +212,15 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
                                                .mHDR = hdr };
     }
 
-    // A mirror's face renders at the hero resolution, never supersampled, and runs no post chain. The mirrors render
-    // only with reflection probes on (LLHeroProbeManager::update), so the pack and the manager's resources are there
-    // only then.
+    // A mirror's face renders at the hero resolution, never supersampled, with two sun cascades, and runs no post chain.
+    // The mirrors render only with reflection probes on (LLHeroProbeManager::update), so the pack and the manager's
+    // resources are there only then.
     if (in.mMirrors && in.mProbes)
     {
         const U32 hero_size   = std::max(in.mHeroResolution, 1u);
         const U32 hero_shadow = blur_happy_size(hero_size, 1.f);
-        plan_pack(Pack::Hero, { hero_size, hero_size, hero_shadow, hero_shadow, capture_light, false });
+        plan_pack(Pack::Hero,
+                  { hero_size, hero_size, hero_shadow, hero_shadow, CAPTURE_SUN_CASCADES, capture_light, false });
         plan.mHeroProbes = ProbeManager{ .mResolution = hero_size, .mSuperSample = 1, .mHDR = hdr };
     }
 

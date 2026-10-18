@@ -125,6 +125,13 @@ uniform AL_SHADOW_SAMPLER shadowMap5;
 // Set by bindDeferredShader and bindDeferredShaderFast. Unset defaults to 0, which is the
 // full-quality path -- the safe way round for a program that never gets it written.
 uniform int cube_snapshot;
+// The sun cascades the pass rendered, set beside cube_snapshot: four in the main view, two in a capture unless
+// AlchemyRenderProbeAllShadowCascades gives a reflection probe's four. Unset reads 0, which takes the four's path.
+uniform int sun_shadow_cascades;
+// The maps the pass has none of, a bit each: sun cascades 0 to 3, then the spot pair (LLPipeline::unbuiltShadowMaps).
+// Their shadows read lit without a sample, as a map cleared for want of casters reads, and their units hold another map.
+// Unset it reads 0, and every map is read.
+uniform int unbuilt_shadow_maps;
 
 uniform vec3 sun_dir;
 uniform vec3 moon_dir;
@@ -138,6 +145,11 @@ uniform vec2 screen_res;
 uniform int sun_up_factor;
 
 #if defined(SUN_SHADOW) || defined(SPOT_SHADOW)
+
+bool shadowMapBuilt(int map)
+{
+    return (unbuilt_shadow_maps & (1 << map)) == 0;
+}
 
 // Solve the shadow-space depth gradient from the receiver's screen-space derivatives and
 // return it as a per-texel (du,dv) depth step, clamped so a runaway gradient at a depth
@@ -510,7 +522,17 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
         vec4 transition_domain = near_split - far_split;
         float weight = 0.0;
 
-        if (spos.z < near_split.z)
+        // Toward the far split the last cascade fades to lit, where the shadows end. A blend: added on top, it
+        // lifted a lit receiver up to twice its light there and dropped it back at the split, which sunLightF's
+        // clamp hides on opaque surfaces and the water and alpha, reading this raw, showed as a line.
+        float to_lit = clamp((pos.z + shadow_clip.z) / (shadow_clip.z - shadow_clip.w) * 2.0 - 1.0, 0.0, 1.0);
+
+        // A pass that rendered cascades 0 and 1 alone (a capture, generateSunShadow) has 1 as its last cascade and the
+        // one that fades; maps 2 and 3 hold nothing of it. Its clip planes put cascade 1's split at the last one and the
+        // fade past it, inside what cascade 1's map covers.
+        bool two_cascades = sun_shadow_cascades == 2;
+
+        if (!two_cascades && spos.z < near_split.z)
         {
             lpos = shadow_matrix[3] * spos;
             vec4 dLdx = shadow_matrix[3] * ddx4;
@@ -518,15 +540,12 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 
             float w = 1.0;
             w -= max(spos.z - far_split.z, 0.0) / transition_domain.z;
-            // Toward the far split the last cascade fades to lit, where the shadows end. A blend: added on top, it
-            // lifted a lit receiver up to twice its light there and dropped it back at the split, which sunLightF's
-            // clamp hides on opaque surfaces and the water and alpha, reading this raw, showed as a line.
-            float to_lit = clamp((pos.z + shadow_clip.z) / (shadow_clip.z - shadow_clip.w) * 2.0 - 1.0, 0.0, 1.0);
-            shadow += mix(filterShadow(shadowMap3, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen), 1.0, to_lit) * w;
+            float filtered = shadowMapBuilt(3) ? filterShadow(shadowMap3, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) : 1.0;
+            shadow += mix(filtered, 1.0, to_lit) * w;
             weight += w;
         }
 
-        if (spos.z < near_split.y && spos.z > far_split.z)
+        if (!two_cascades && spos.z < near_split.y && spos.z > far_split.z)
         {
             lpos = shadow_matrix[2] * spos;
             vec4 dLdx = shadow_matrix[2] * ddx4;
@@ -535,7 +554,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
             float w = 1.0;
             w -= max(spos.z - far_split.y, 0.0) / transition_domain.y;
             w -= max(near_split.z - spos.z, 0.0) / transition_domain.z;
-            shadow += filterShadow(shadowMap2, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) * w;
+            shadow += (shadowMapBuilt(2) ? filterShadow(shadowMap2, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) : 1.0) * w;
             weight += w;
         }
 
@@ -548,7 +567,8 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
             float w = 1.0;
             w -= max(spos.z - far_split.x, 0.0) / transition_domain.x;
             w -= max(near_split.y - spos.z, 0.0) / transition_domain.y;
-            shadow += filterShadow(shadowMap1, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) * w;
+            float filtered = shadowMapBuilt(1) ? filterShadow(shadowMap1, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) : 1.0;
+            shadow += (two_cascades ? mix(filtered, 1.0, to_lit) : filtered) * w;
             weight += w;
         }
 
@@ -560,7 +580,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 
             float w = 1.0;
             w -= max(near_split.x - spos.z, 0.0) / transition_domain.x;
-            shadow += filterShadow(shadowMap0, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) * w;
+            shadow += (shadowMapBuilt(0) ? filterShadow(shadowMap0, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) : 1.0) * w;
             weight += w;
         }
 
@@ -579,6 +599,11 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
 {
 #if defined(SPOT_SHADOW)
+    if (!shadowMapBuilt(4 + index))
+    {
+        return 1.0;
+    }
+
     vec3 dpos_dx = dFdx(pos);
     vec3 dpos_dy = dFdy(pos);
 

@@ -32,6 +32,7 @@
 #include <initializer_list>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -211,11 +212,11 @@ namespace
                          of({ Id::ProbeBloom0, Id::ProbeBloom1, Id::ProbeBloom2, Id::ProbeBloom3, Id::ProbeBloom4 });
               } },
             { "AlchemyRenderReverseZ", no_change, [](Inputs& in) { in.mReverseZ = false; },
-              [](const Plan&)
+              [](const Plan& before)
               {
                   return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::SpotShadow0, Id::SpotShadow1,
                               Id::WaterDistortion, Id::Preview }) |
-                         sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero });
+                         wanted(before, sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero }));
               } },
             { "AlchemyRenderReverseZ over 32-bit shadows", [](Inputs& in) { in.mShadowDepth32F = true; },
               [](Inputs& in) { in.mReverseZ = false; },
@@ -224,9 +225,9 @@ namespace
             { "RenderShadowDetail 2 to 1", no_change, [](Inputs& in) { in.mShadowDetail = 1; },
               [](const Plan&) { return of({ Id::SpotShadow0, Id::SpotShadow1 }); } },
             { "RenderShadowDetail 2 to 0", no_change, [](Inputs& in) { in.mShadowDetail = 0; },
-              [](const Plan&)
+              [](const Plan& before)
               {
-                  return sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero }) |
+                  return wanted(before, sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero })) |
                          of({ Id::SpotShadow0, Id::SpotShadow1, Id::ProbeLight, Id::HeroLight });
               } },
             { "RenderDeferredSSAO with shadows", no_change, [](Inputs& in) { in.mSSAO = false; }, nothing },
@@ -239,11 +240,17 @@ namespace
               nothing },
             { "AlchemyRenderShadowDepth32F under forward-Z", [](Inputs& in) { in.mReverseZ = false; },
               [](Inputs& in) { in.mShadowDepth32F = true; },
-              [](const Plan&)
+              [](const Plan& before)
               {
-                  return sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero }) |
+                  return wanted(before, sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero })) |
                          of({ Id::SpotShadow0, Id::SpotShadow1 });
               } },
+            { "AlchemyRenderProbeAllShadowCascades", no_change, [](Inputs& in) { in.mProbeAllCascades = true; },
+              [](const Plan&) { return of({ Id::ProbeSun2, Id::ProbeSun3 }); } },
+            { "AlchemyRenderProbeAllShadowCascades without shadows", [](Inputs& in) { in.mShadowDetail = 0; },
+              [](Inputs& in) { in.mProbeAllCascades = true; }, nothing },
+            { "AlchemyRenderProbeAllShadowCascades without probes", [](Inputs& in) { in.mProbes = false; },
+              [](Inputs& in) { in.mProbeAllCascades = true; }, nothing },
             { "ALProbeSuperSample", no_change, [](Inputs& in) { in.mProbeSuperSample = 4; },
               [](const Plan& before)
               {
@@ -451,7 +458,8 @@ namespace
                 const Depth expected = reverse_z || depth_32f ? Depth::D32F : Depth::D24;
                 for (Pack pack : { Pack::Main, Pack::Probe, Pack::Hero })
                 {
-                    for (U32 cascade = 0; cascade < Plan::SUN_CASCADES; ++cascade)
+                    REQUIRE(plan.sunCascades(pack) > 0);
+                    for (U32 cascade = 0; cascade < plan.sunCascades(pack); ++cascade)
                     {
                         REQUIRE(plan.desc(Plan::sunShadow(pack, cascade)));
                         CHECK(plan.desc(Plan::sunShadow(pack, cascade))->depth == expected);
@@ -459,6 +467,60 @@ namespace
                 }
                 REQUIRE(plan.desc(Id::SpotShadow0));
                 CHECK(plan.desc(Id::SpotShadow0)->depth == expected);
+            }
+        }
+    }
+
+    TEST_CASE("alrenderresourceplan: each pack has maps for the sun cascades it renders", "[alrenderresourceplan]")
+    {
+        struct Case
+        {
+            const char*                  configuration;
+            std::function<void(Inputs&)> configure;
+            U32                          main;
+            U32                          probe;
+            U32                          hero;
+        };
+        // Two in a capture, as sampleDirectionalShadow reads either all four or the first two.
+        const Case cases[] = {
+            { "the defaults", no_change, 4, 2, 2 },
+            { "all of a probe's cascades", [](Inputs& in) { in.mProbeAllCascades = true; }, 4, 4, 2 },
+            { "the sun's shadows alone", [](Inputs& in) { in.mShadowDetail = 1; }, 4, 2, 2 },
+            { "no shadows", [](Inputs& in) { in.mShadowDetail = 0; }, 0, 0, 0 },
+            { "no shadows, all of a probe's cascades",
+              [](Inputs& in)
+              {
+                  in.mShadowDetail     = 0;
+                  in.mProbeAllCascades = true;
+              },
+              0, 0, 0 },
+            { "no probes", [](Inputs& in) { in.mProbes = false; }, 4, 0, 0 },
+            { "a material preview without probes",
+              [](Inputs& in)
+              {
+                  in.mProbes          = false;
+                  in.mMaterialPreview = true;
+              },
+              4, 2, 0 },
+        };
+
+        for (const Case& c : cases)
+        {
+            Inputs in = defaults();
+            c.configure(in);
+            const Plan plan = Plan::make(in);
+
+            for (const auto& [pack, cascades] :
+                 { std::pair{ Pack::Main, c.main }, std::pair{ Pack::Probe, c.probe }, std::pair{ Pack::Hero, c.hero } })
+            {
+                INFO(c.configuration << ", pack " << (U32)pack);
+                CHECK(plan.sunCascades(pack) == cascades);
+                // From the first, and none past them.
+                for (U32 cascade = 0; cascade < Plan::SUN_CASCADES; ++cascade)
+                {
+                    INFO("cascade " << cascade);
+                    CHECK(plan.wants(Plan::sunShadow(pack, cascade)) == (cascade < cascades));
+                }
             }
         }
     }

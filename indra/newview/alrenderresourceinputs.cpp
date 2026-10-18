@@ -68,6 +68,7 @@ ALRenderResourceInputs ALRenderResourceInputs::fromSettings()
                  gSavedSettings.getBOOL("RenderReflectionsEnabled");
     in.mProbeResolution  = probeResolution(gSavedSettings.getU32("RenderReflectionProbeResolution"));
     in.mProbeSuperSample = probeSuperSample(gSavedSettings.getS32("ALProbeSuperSample"));
+    in.mProbeAllCascades = gSavedSettings.getBOOL("AlchemyRenderProbeAllShadowCascades");
     in.mMirrors          = gSavedSettings.getBOOL("RenderMirrors");
     in.mMaterialPreview  = LLGLTFPreviewTexture::liveCount() > 0;
     in.mHeroResolution   = (U32)llmax(gSavedSettings.getS32("RenderHeroProbeResolution"), 1);

@@ -1099,6 +1099,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowFilterQuality", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowPCSSScale", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowDepth32F", handleShadowsResized);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderProbeAllShadowCascades", handleShadowsResized);
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleSetShaderChanged);
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResolutionDivisorChanged);

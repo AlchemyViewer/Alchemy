@@ -56,6 +56,7 @@ struct ALRenderResourceInputs
     bool mProbes = true;          ///< RenderReflectionsEnabled, where the feature table allows it
     U32  mProbeResolution = 128;  ///< a probe's face edge, as probeResolution() takes RenderReflectionProbeResolution
     U32  mProbeSuperSample = 2;   ///< how much larger a probe face renders each way, as probeSuperSample() takes it
+    bool mProbeAllCascades = false; ///< AlchemyRenderProbeAllShadowCascades: a probe's face renders four sun cascades
     bool mMirrors = false;        ///< RenderMirrors
     bool mMaterialPreview = false; ///< a GLTF material preview is alive, which renders through the probe pack
     U32  mHeroResolution = 1024;  ///< RenderHeroProbeResolution

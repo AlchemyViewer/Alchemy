@@ -514,6 +514,12 @@ public:
     void postDeferredGammaCorrect(LLRenderTarget* screen_target);
 
     void generateSunShadow(LLCamera& camera);
+    // The sun cascades the pack being rendered through renders and has maps for (ALRenderResourcePlan::sunCascades).
+    U32 sunCascades() const;
+    // The shadow maps the pass being rendered has none of, a bit each: sun cascades 0 to 3, then the spot pair. A cascade
+    // past those its pack renders, or a map that could not be built, which reconcileResources leaves unbuilt: no pass
+    // draws into it, and the shader reads its shadows lit (unbuilt_shadow_maps).
+    U32 unbuiltShadowMaps() const;
     LLRenderTarget* getSunShadowTarget(U32 i);
     LLRenderTarget* getSpotShadowTarget(U32 i);
 

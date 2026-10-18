@@ -1771,6 +1771,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("modelview_delta");
     mReservedUniforms.push_back("inv_modelview_delta");
     mReservedUniforms.push_back("cube_snapshot");
+    mReservedUniforms.push_back("sun_shadow_cascades");
+    mReservedUniforms.push_back("unbuilt_shadow_maps");
 
     mReservedUniforms.push_back("tc_scale");
     mReservedUniforms.push_back("rcp_screen_res");

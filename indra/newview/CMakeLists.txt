@@ -2711,9 +2711,9 @@ if(AL_BUILD_TESTS)
   # The selection outline's id and edge passes, the window's depth under the
   # HUD, the water surface's draws over the cells the field lays out, with
   # the cull and the depth pyramid it reads and the waves displaced by heights
-  # the bake integrates from a normal map, and FXAA on an RGB10_A2 source: the
-  # viewer's own shader files read from the source tree, on llrender's shared
-  # hidden window.
+  # the bake integrates from a normal map, FXAA on an RGB10_A2 source, and the
+  # shadow samplers over a map the pass has none of: the viewer's own shader
+  # files read from the source tree, on llrender's shared hidden window.
   al_add_test_binary(
     newview_gl_tests
     PROJECT ${test_project}
@@ -2722,6 +2722,7 @@ if(AL_BUILD_TESTS)
       tests/alselectionoutline_gl_test.cpp
       tests/alwatersurface_gl_test.cpp
       tests/fxaa_gl_test.cpp
+      tests/shadowutil_gl_test.cpp
     UNIT aldepthpyramid.cpp alwaterfield.cpp alwaterheightbake.cpp
     LIBRARIES llrender ll::pocketfft
     SUPPORT llrender_test_checks llcommon_test_checks
