@@ -162,10 +162,6 @@ namespace
 }
 #endif // !LL_RELEASE_FOR_DOWNLOAD
 
-// get the next highest power of two of v (or v if v is already a power of two)
-//defined in llvertexbuffer.cpp
-extern U32 nhpo2(U32 v);
-
 static void touch_default_probe(LLReflectionMap* probe)
 {
     if (LLViewerCamera::getInstance())
@@ -263,7 +259,9 @@ static bool check_priority(LLReflectionMap* a, LLReflectionMap* b)
 // helper class to seed octree with probes
 void LLReflectionMapManager::update()
 {
-    if (!LLPipeline::sReflectionProbesEnabled || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
+    // Not until the resources are reconciled for probes, which a shader reload that stops short of it leaves undone.
+    if (!LLPipeline::sReflectionProbesEnabled || !gPipeline.resourcePlan().reflectionProbes() || gTeleportDisplay ||
+        LLStartUp::getStartupState() < STATE_PRECACHE)
     {
         return;
     }
@@ -1708,25 +1706,27 @@ void LLReflectionMapManager::renderDebug()
 
 void LLReflectionMapManager::initReflectionMaps()
 {
-    static LLCachedControl<U32> ref_probe_res(gSavedSettings, "RenderReflectionProbeResolution", 128U);
-    U32 probe_resolution = nhpo2(llclamp(ref_probe_res(), (U32)64, (U32)512));
-
-    // The supersample factor sizes the scratch target and, through LLPipeline, the aux pack a
-    // face renders into; a change is applied like a resolution change, by the listener that
-    // rebuilds the GL buffers (handleReflectionProbesChanged), so here it only has to be
-    // read. 1, 2 or 4: the blur and downsample below assume a power of two.
-    static LLCachedControl<S32> super_sample(gSavedSettings, "ALProbeSuperSample", 4);
-    const U32 supersample = super_sample >= 4 ? 4u : (super_sample >= 2 ? 2u : 1u);
-    if (supersample != mSuperSample)
+    // What the probe pack was planned for, which a face renders into at the probe resolution
+    // times the supersample (ALRenderResourcePlan::reflectionProbes): the manager builds what it
+    // reads from the same inputs, so the two cannot disagree. Nothing while probes are off.
+    const std::optional<ALRenderResourcePlan::ProbeManager>& planned = gPipeline.resourcePlan().reflectionProbes();
+    if (!planned)
     {
-        mSuperSample = supersample;
+        return;
+    }
+    const U32 probe_resolution = planned->mResolution;
+
+    // The supersample sizes the scratch target as it sizes the pack. 1, 2 or 4: the blur and
+    // downsample below assume a power of two.
+    if (planned->mSuperSample != mSuperSample)
+    {
+        mSuperSample = planned->mSuperSample;
         mRenderTarget.release();
     }
 
     // HDR picks the colour format of the cube array, the scratch target and the mip chain, so a
     // change rebuilds all three, and with the cube array every probe's contents.
-    static LLCachedControl<bool> render_hdr(gSavedSettings, "RenderHDREnabled", true);
-    const bool hdr = render_hdr();
+    const bool hdr = planned->mHDR;
     const bool hdr_changed = hdr != mHDR;
     if (hdr_changed)
     {

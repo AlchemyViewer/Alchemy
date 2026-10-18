@@ -77,7 +77,9 @@ LLHeroProbeManager::~LLHeroProbeManager()
 // helper class to seed octree with probes
 void LLHeroProbeManager::update()
 {
-    if (!LLPipeline::RenderMirrors || !LLPipeline::sReflectionProbesEnabled || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
+    // Not until the resources are reconciled for mirrors, which a shader reload that stops short of it leaves undone.
+    if (!LLPipeline::RenderMirrors || !LLPipeline::sReflectionProbesEnabled || !gPipeline.resourcePlan().heroProbes() ||
+        gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
     {
         return;
     }
@@ -538,15 +540,21 @@ void LLHeroProbeManager::initReflectionMaps()
 {
     U32 count = LL_MAX_HERO_PROBE_COUNT;
 
-    // HDR picks the colour format of the cube array, the scratch target and the mip chain, so a
-    // change rebuilds all three as a reset does.
-    static LLCachedControl<bool> render_hdr(gSavedSettings, "RenderHDREnabled", true);
-    if (mTexture.notNull() && render_hdr() != mHDR)
+    // What the hero pack was planned for (ALRenderResourcePlan::heroProbes): a mirror's face
+    // resolution, and HDR, which picks the colour format of the cube array, the scratch target and
+    // the mip chain. A change of either rebuilds all three as a reset does. Nothing while mirrors
+    // or probes are off.
+    const std::optional<ALRenderResourcePlan::ProbeManager>& planned = gPipeline.resourcePlan().heroProbes();
+    if (!planned)
+    {
+        return;
+    }
+    if (mTexture.notNull() && (planned->mHDR != mHDR || planned->mResolution != mProbeResolution))
     {
         mReset = true;
     }
 
-    if ((mTexture.isNull() || mReflectionProbeCount != count || mReset) && LLPipeline::RenderMirrors)
+    if (mTexture.isNull() || mReflectionProbeCount != count || mReset)
     {
 
         if (mReset)
@@ -556,11 +564,11 @@ void LLHeroProbeManager::initReflectionMaps()
 
         mReset = false;
         mReflectionProbeCount = count;
-        mProbeResolution      = gSavedSettings.getS32("RenderHeroProbeResolution");
+        mProbeResolution      = planned->mResolution;
         mMaxProbeLOD = log2f((F32)mProbeResolution) - 1.f; // number of mips - 1
 
         mTexture = new LLCubeMapArray();
-        mHDR = render_hdr;
+        mHDR = planned->mHDR;
 
         // store mReflectionProbeCount+2 cube maps, final two cube maps are used for render target and radiance map generation source)
         mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, mHDR);

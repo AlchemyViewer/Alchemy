@@ -699,17 +699,6 @@ static bool handleAppleUseMultGLChanged(const LLSD& newvalue)
 }
 #endif
 
-static bool handleHeroProbeResolutionChanged(const LLSD &newvalue)
-{
-    if (gPipeline.isInit())
-    {
-        LLPipeline::refreshCachedSettings();
-        gPipeline.mHeroProbeManager.reset();
-        gPipeline.rebuildGLBuffers(LLPipeline::RebuildCause::Setting);
-    }
-    return true;
-}
-
 static bool handleRenderDebugPipelineChanged(const LLSD& newvalue)
 {
     gDebugPipeline = newvalue.asBoolean();
@@ -1103,7 +1092,9 @@ void settings_setup_listeners()
 #endif
     setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbesChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleReflectionProbesChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleHeroProbeResolutionChanged);
+    // Each sizes a capture pack and its probe manager's own resources, both planned from it.
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeResolution", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowFilterQuality", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowPCSSScale", handleSetShaderChanged);

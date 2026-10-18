@@ -291,8 +291,8 @@ private:
     U32 mProbeResolution = 128;
 
     // Linear supersample factor of a capture: faces render at mProbeResolution times this,
-    // are Gaussian blurred and downsampled to the probe. ALProbeSuperSample, applied by
-    // initReflectionMaps like the resolution (the aux render target pack follows it).
+    // are Gaussian blurred and downsampled to the probe. ALProbeSuperSample, which
+    // initReflectionMaps takes from the plan with the resolution, as the probe pack is sized.
     U32 mSuperSample = 4;
     U32 superSample() const { return mSuperSample; }
 
