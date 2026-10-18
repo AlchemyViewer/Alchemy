@@ -318,7 +318,7 @@ bool LLSkinningUtil::initJointNumsFromPublished(LLMeshSkinInfo* skin)
             if (skin->mJointNums[j] == -1)
             {
                 auto found = nums->mByName.find(skin->mJointNames[j]);
-                num = found != nums->mByName.end() ? found->second : 0;
+                num = (found != nums->mByName.end() && found->second >= 0) ? found->second : 0;
             }
             else
             {
@@ -360,6 +360,7 @@ void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)
                     {
                         LL_WARNS_ONCE("Avatar") << avatar->getFullname() << " joint has unusual number " << skin->mJointNames[j] << ": " << skin->mJointNums[j] << LL_ENDL;
                         LL_WARNS_ONCE("Avatar") << avatar->getFullname() << " avatar build state: isBuilt() " << avatar->isBuilt() << " mInitFlags " << avatar->mInitFlags << LL_ENDL;
+                        skin->mJointNums[j] = 0;
                     }
                 }
                 else
@@ -372,7 +373,9 @@ void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)
             }
     #else
             LLJoint *joint = (skin->mJointNums[j] == -1) ? avatar->getJoint(skin->mJointNames[j]) : avatar->getJoint(skin->mJointNums[j]);
-            skin->mJointNums[j] = joint ? joint->getJointNum() : 0;
+            // A body mesh is found by name but has no number to skin to, so it
+            // falls to the pelvis as a name that is not found does.
+            skin->mJointNums[j] = (joint && joint->getJointNum() >= 0) ? joint->getJointNum() : 0;
     #endif
             // insure we have *a* valid joint to reference
             llassert(skin->mJointNums[j] >= 0);
