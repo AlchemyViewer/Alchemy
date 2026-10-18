@@ -1,11 +1,6 @@
 name: Tag a Build
 
 on:
-  # schedule event triggers always run on the default branch
-  # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
-  schedule:
-    # run "nightly" builds on default branch every fri
-    - cron: "21 2 * * 6"     # 2:21am UTC sat == 7:21pm PDT fri -- see https://crontab.guru/#21_01_*_*_2,4,6
   workflow_dispatch:
     inputs:
       channel:
@@ -49,8 +44,7 @@ jobs:
           TAG_OVERRIDE: ${{ inputs.tag_override }}
         with:
           script: |
-            // A scheduled run has no inputs: a Develop build tagged with the date.
-            const channel = process.env.CHANNEL || 'Develop';
+            const channel = process.env.CHANNEL;
             const project = (process.env.PROJECT || '').trim();
             if (channel === 'Project' && !project) {
               core.setFailed('A Project build needs a project name');
