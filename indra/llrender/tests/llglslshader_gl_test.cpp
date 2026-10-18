@@ -946,6 +946,70 @@ namespace
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
+    // A program takes the uniforms every program shares (LLShaderMgr::updateShaderUniforms) on its first bind after it
+    // links, with no environment change since: mapUniforms binds it before any location is known, and a set applied
+    // there would reach none of them.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a program's first bind after it links applies the uniforms every program shares", "[llglslshader_gl]")
+    {
+        setUpShaders();
+
+        mShaders.mUpdateUniforms = [](LLGLSLShader* shader)
+        {
+            const GLint ints[2] = { 0, 1 };
+            shader->uniform1iv(TEST_BOOLS, 2, ints);
+        };
+        const auto held = [this]()
+        {
+            GLint value = -1;
+            glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testBools[1]"), &value);
+            return value;
+        };
+        const auto configure = [this](bool define)
+        {
+            mDraw.clearConfiguration();
+            mDraw.mName = "shared uniforms (test)";
+            mDraw.mShaderLevel = 1;
+            mDraw.mShaderFiles.push_back({ "test/fullscreenV.glsl", GL_VERTEX_SHADER });
+            mDraw.mShaderFiles.push_back({ "test/boolsF.glsl", GL_FRAGMENT_SHADER });
+            if (define)
+            {
+                mDraw.addPermutation("TEST_DEFINE", "1");
+            }
+        };
+        const U32 generation = LLGLSLShader::sEnvironmentGeneration;
+
+        mDraw.unload();
+        configure(false);
+        REQUIRE(mDraw.createShader());
+        mDraw.bind();
+        mDraw.unbind();
+        CHECK(held() == 1);
+
+        SECTION("linked again in place")
+        {
+            const U32 links = mDraw.linkCount();
+            configure(true);
+            REQUIRE(mDraw.createShader());
+            REQUIRE(mDraw.linkCount() == links + 1);
+            UNSCOPED_INFO("a link resets what the program held");
+            CHECK(held() == 0);
+            mDraw.bind();
+            mDraw.unbind();
+            CHECK(held() == 1);
+        }
+
+        SECTION("kept")
+        {
+            configure(false);
+            REQUIRE(mDraw.createShader());
+            CHECK(held() == 1);
+        }
+
+        CHECK(LLGLSLShader::sEnvironmentGeneration == generation);
+        mShaders.mUpdateUniforms = nullptr;
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
     // A program that did not build takes nothing down: bind() puts a stand-in in its place that draws nothing, skinned
     // or not, and its uniform, texture and dispatch calls do nothing. A solid program drawn the same way first shows the
     // draw would have covered the target.

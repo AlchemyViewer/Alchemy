@@ -980,14 +980,6 @@ bool LLGLSLShader::linkProgram(U32 variants)
     // Recreating the program invalidates any variants built from the previous configuration.
     freeOwnedVariants();
 
-    // Start behind the current generation, so the program's first bind applies the uniform set every
-    // program shares: the environment's, and the settings read as uniforms. A program built during a
-    // frame is bound in it before the frame's environment update, the mirrors' pass among the first,
-    // and would otherwise draw with them unset. The viewer applies no environment before there is one
-    // (LLViewerShaderMgr::updateShaderUniforms): gpu_benchmark() builds and binds a program during
-    // feature detection, long before LLEnvironment exists.
-    mEnvUniformsGeneration = sEnvironmentGeneration - 1;
-
     unloadInternal();
 
     sInstances.insert(this);
@@ -1123,6 +1115,13 @@ bool LLGLSLShader::linkProgram(U32 variants)
         mStandInWarned = false;
         ++mLinkCount;
         ++sLinked;
+        // Behind the current generation once every uniform is mapped, so the program's next bind applies the
+        // environment's uniform set: mapUniforms binds the program before it knows a location, and a set applied
+        // there would reach none of them. A program built during a frame is bound in it before the frame's
+        // environment update, the mirrors' pass among the first, and would otherwise draw with them unset. The
+        // viewer applies no environment before there is one (LLViewerShaderMgr::updateShaderUniforms):
+        // gpu_benchmark() builds and binds a program during feature detection, long before LLEnvironment exists.
+        mEnvUniformsGeneration = sEnvironmentGeneration - 1;
         if (mOnLink)
         {
             mOnLink(*this);
