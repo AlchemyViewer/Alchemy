@@ -1148,13 +1148,13 @@ public:
     LLVector2               mScreenScale;
 
     // ---- Shared deferred uniform block (UB_DEFERRED) --------------------------------------
-    // std140-packed shadow/SSAO constants, uploaded once per deferred pass instead of being
-    // re-pushed by every bindDeferredShader call. Holds only what is constant across a pass:
-    // screen_res is overridden per call and sun_dir/moon_dir are entangled with atmospherics,
-    // so those stay loose.
+    // std140-packed shadow/SSAO constants and the specular exponent, uploaded once per deferred
+    // pass instead of being re-pushed by every bindDeferredShader call. Holds only what is
+    // constant across a pass: screen_res is overridden per call and sun_dir/moon_dir are
+    // entangled with atmospherics, so those stay loose.
     //
     // shadow_matrix@0, ssao_effect_mat@384, shadow_clip@432, shadow_res@448,
-    // proj_shadow_res@456, scalars @464..492, size 496. Matrices go up as they lie: an
+    // proj_shadow_res@456, scalars @464..500, size 512. Matrices go up as they lie: an
     // LLMatrix4a's rows are the columns std140 reads by default, and ssao_effect_mat is
     // symmetric either way. Checked against the driver at shader load by
     // validateEngineBlockLayouts() in debug builds.
@@ -1173,6 +1173,8 @@ public:
         F32 ssao_max_radius;
         F32 ssao_factor;
         F32 ssao_factor_inv;
+        F32 shadow_pcss_scale;
+        F32 specular_exponent;
     };
 
     DeferredUBOData             mDeferredUBOData{};

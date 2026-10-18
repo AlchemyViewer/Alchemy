@@ -101,8 +101,6 @@
 
 #if SHADOW_PCSS
 #define AL_SHADOW_SAMPLER sampler2D        // raw depth; compared in-shader
-// Receiver-blocker depth delta -> penumbra radius, in texels: AlchemyRenderShadowPCSSScale.
-uniform float shadowPCSSScale;
 #else
 #define AL_SHADOW_SAMPLER sampler2DShadow  // hardware depth compare
 #endif
@@ -284,9 +282,9 @@ float filterShadowPCSS(sampler2D shadowMap, vec3 uvz, vec2 res, vec2 dz_texel, v
     // depth forward and the smaller one under reverse-Z -- swap the operands so the gap stays
     // positive (a negative gap would clamp to the 1-texel floor and kill contact hardening).
 #ifdef REVERSE_Z
-    float radius = clamp((blocker - uvz.z) * shadowPCSSScale, 1.0, SHADOW_PCSS_MAX_RADIUS);
+    float radius = clamp((blocker - uvz.z) * shadow_pcss_scale, 1.0, SHADOW_PCSS_MAX_RADIUS);
 #else
-    float radius = clamp((uvz.z - blocker) * shadowPCSSScale, 1.0, SHADOW_PCSS_MAX_RADIUS);
+    float radius = clamp((uvz.z - blocker) * shadow_pcss_scale, 1.0, SHADOW_PCSS_MAX_RADIUS);
 #endif
 
     float shadow = 0.0;

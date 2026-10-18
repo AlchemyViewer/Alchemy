@@ -422,6 +422,8 @@ LLPipeline::LLPipeline() :
         LL_DEFERRED_LAYOUT("ssao_max_radius",    ssao_max_radius,    false),
         LL_DEFERRED_LAYOUT("ssao_factor",        ssao_factor,        false),
         LL_DEFERRED_LAYOUT("ssao_factor_inv",    ssao_factor_inv,    false),
+        LL_DEFERRED_LAYOUT("shadow_pcss_scale",  shadow_pcss_scale,  false),
+        LL_DEFERRED_LAYOUT("specular_exponent",  specular_exponent,  false),
     });
 #undef LL_DEFERRED_LAYOUT
 #endif // !LL_RELEASE_FOR_DOWNLOAD
@@ -9965,6 +9967,12 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
                     gGL.getTextureSlot(pred_channel)->bind(&mRT->deferredScreen, true,
                                                        gGL.getSampler(ALSamplers::PointClamp));
                 }
+                static LLCachedControl<F32> pred_threshold(gSavedSettings, "RenderSMAAPredicationThreshold", 0.01f);
+                static LLCachedControl<F32> pred_scale(gSavedSettings, "RenderSMAAPredicationScale", 2.f);
+                static LLCachedControl<F32> pred_strength(gSavedSettings, "RenderSMAAPredicationStrength", 0.4f);
+                edge_shader.uniform1f(LLShaderMgr::SMAA_PREDICATION_THRESHOLD, pred_threshold);
+                edge_shader.uniform1f(LLShaderMgr::SMAA_PREDICATION_SCALE, llclamp((F32)pred_scale, 1.f, 5.f));
+                edge_shader.uniform1f(LLShaderMgr::SMAA_PREDICATION_STRENGTH, llclamp((F32)pred_strength, 0.f, 1.f));
             }
 
             if (use_stencil)
@@ -11176,7 +11184,7 @@ void LLPipeline::packDeferredUBO()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 
-    static_assert(sizeof(DeferredUBOData) == 496, "DeferredUBOData must match std140 (496 bytes)");
+    static_assert(sizeof(DeferredUBOData) == 512, "DeferredUBOData must match std140 (512 bytes)");
 
     DeferredUBOData& d = mDeferredUBOData;
 
@@ -11233,6 +11241,12 @@ void LLPipeline::packDeferredUBO()
     d.ssao_max_radius    = (F32)RenderSSAOMaxScale;
     d.ssao_factor        = ssao_factor;
     d.ssao_factor_inv    = 1.0f / ssao_factor;
+
+    // Read by the programs as uniforms rather than compiled in, so that changing either reloads nothing.
+    static LLCachedControl<F32> pcss_scale(gSavedSettings, "AlchemyRenderShadowPCSSScale", 200.f);
+    static LLCachedControl<F32> specular_exponent(gSavedSettings, "RenderSpecularExponent", 128.f);
+    d.shadow_pcss_scale = pcss_scale;
+    d.specular_exponent = specular_exponent;
 
     mDeferredUBODirty = true;
 }

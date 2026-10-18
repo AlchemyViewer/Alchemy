@@ -674,10 +674,9 @@ public:
         WATER_OCCLUSION,                    //  "waterOcclusion"  int, whether the control stage culls against the depth pyramid
         WATER_PATCH_ORDER,                  //  "waterPatchOrder"  ivec4, the order the patches are drawn in
 
-        // Settings the programs read as uniforms, so that changing one reloads nothing (LLViewerShaderMgr::updateShaderUniforms)
-        SPECULAR_EXPONENT,                  //  "specularExponent"  the Blinn-Phong exponent at full glossiness (RenderSpecularExponent)
+        // Settings the programs read as uniforms, so that changing one reloads nothing, each set by the pass that binds
+        // its readers: the terrain's in LLDrawPoolTerrain::bindSurface, SMAA's in LLPipeline::generateSMAABuffers
         TERRAIN_TRIPLANAR_BLEND,            //  "terrainTriplanarBlend"  the triplanar weights' sharpness (RenderTerrainPBRTriplanarBlendFactor)
-        SHADOW_PCSS_SCALE,                  //  "shadowPCSSScale"  the receiver-blocker depth gap to penumbra radius, in texels (AlchemyRenderShadowPCSSScale)
         SMAA_PREDICATION_THRESHOLD,         //  "smaaPredicationThreshold"  the predication buffer's edge threshold (RenderSMAAPredicationThreshold)
         SMAA_PREDICATION_SCALE,             //  "smaaPredicationScale"  how much predication scales the edge threshold, 1 to 5
         SMAA_PREDICATION_STRENGTH,          //  "smaaPredicationStrength"  how much it lowers the threshold locally, 0 to 1

@@ -2246,9 +2246,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterPatchOrder");
 
     // Settings the programs read as uniforms
-    mReservedUniforms.push_back("specularExponent");
     mReservedUniforms.push_back("terrainTriplanarBlend");
-    mReservedUniforms.push_back("shadowPCSSScale");
     mReservedUniforms.push_back("smaaPredicationThreshold");
     mReservedUniforms.push_back("smaaPredicationScale");
     mReservedUniforms.push_back("smaaPredicationStrength");

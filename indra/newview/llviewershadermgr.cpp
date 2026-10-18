@@ -4364,21 +4364,5 @@ void LLViewerShaderMgr::updateShaderUniforms(LLGLSLShader * shader)
     {
         LLEnvironment::instance().updateShaderUniforms(shader);
     }
-
-    // The settings the programs read as uniforms rather than compile in, so that changing one reloads nothing. Each
-    // program takes them on its first bind after it links and on its first bind each frame, as it takes the
-    // environment's (LLGLSLShader::dirtyEnvironmentUniforms); one that declares none skips them.
-    static LLCachedControl<F32> specular_exponent(gSavedSettings, "RenderSpecularExponent", 128.f);
-    static LLCachedControl<F32> triplanar_blend(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", 8.f);
-    static LLCachedControl<F32> pcss_scale(gSavedSettings, "AlchemyRenderShadowPCSSScale", 200.f);
-    static LLCachedControl<F32> smaa_threshold(gSavedSettings, "RenderSMAAPredicationThreshold", 0.01f);
-    static LLCachedControl<F32> smaa_scale(gSavedSettings, "RenderSMAAPredicationScale", 2.f);
-    static LLCachedControl<F32> smaa_strength(gSavedSettings, "RenderSMAAPredicationStrength", 0.4f);
-    shader->uniform1f(LLShaderMgr::SPECULAR_EXPONENT, specular_exponent);
-    shader->uniform1f(LLShaderMgr::TERRAIN_TRIPLANAR_BLEND, triplanar_blend);
-    shader->uniform1f(LLShaderMgr::SHADOW_PCSS_SCALE, pcss_scale);
-    shader->uniform1f(LLShaderMgr::SMAA_PREDICATION_THRESHOLD, smaa_threshold);
-    shader->uniform1f(LLShaderMgr::SMAA_PREDICATION_SCALE, llclamp((F32)smaa_scale, 1.f, 5.f));
-    shader->uniform1f(LLShaderMgr::SMAA_PREDICATION_STRENGTH, llclamp((F32)smaa_strength, 0.f, 1.f));
 }
 

@@ -137,6 +137,11 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
     shader->uniform1f(LLShaderMgr::TERRAIN_GRID_SCALE, land.getMetersPerGrid());
     shader->uniform1i(LLShaderMgr::TERRAIN_SMOOTHING, LLSurface::isSmoothing() ? 1 : 0);
     shader->uniform1f(LLShaderMgr::REGION_SCALE, regionp->getWidth());
+
+    // The sharpness of the triplanar weights the detail of either lit program blends through (pbrterrainUtilF.glsl);
+    // the shadow program has none.
+    static LLCachedControl<F32> triplanar_blend(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", 8.f);
+    shader->uniform1f(LLShaderMgr::TERRAIN_TRIPLANAR_BLEND, triplanar_blend);
 }
 
 void LLDrawPoolTerrain::unbindSurface(LLGLSLShader* shader)

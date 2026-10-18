@@ -76,6 +76,9 @@ uniform float proj_ambiance;
 uniform vec3 color; // light_color
 uniform float size; // light_size
 
+// Shared shadow/SSAO constants and the specular exponent, spliced from
+// class1/deferred/deferredBlock.glsl and bound at UB_DEFERRED.
+//[ENGINE_BLOCK Deferred]
 // Shared matrix stack + derived matrices, spliced from
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
@@ -136,10 +139,8 @@ float calcLegacyDistanceAttenuation(float distance, float falloff)
     return dist_atten;
 }
 
-// The exponent at full glossiness, RenderSpecularExponent.
-uniform float specularExponent;
-
-// The normalized Blinn-Phong specular lobe for a legacy glossiness.
+// The normalized Blinn-Phong specular lobe for a legacy glossiness, at specular_exponent (RenderSpecularExponent) when
+// the glossiness is full.
 //
 // The square is this tree's mapping from an 8-bit material field to an exponent, and it is what
 // makes the top of the glossiness range spend most of its resolution on very tight lobes.
@@ -154,7 +155,7 @@ uniform float specularExponent;
 // zero, and every call site already gates on that being positive.
 float blinnPhongLobe(float nh, float glossiness)
 {
-    float n = glossiness * glossiness * specularExponent;
+    float n = glossiness * glossiness * specular_exponent;
     float norm = ((n + 2.0) * (n + 4.0)) / (8.0 * M_PI * (exp2(-n * 0.5) + n));
 
     return pow(nh, n) * norm;
