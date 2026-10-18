@@ -714,14 +714,18 @@ That surfaces as a rendering fault — a black screen, in the case that prompted
 this — a long way from the cause.
 
 **A step that needs a texture follows the tone curve LUT, not the 3D LUT.**
-`LLPipeline::bakeToneCurveLut` is the pattern: a raw GL name allocated empty in
-`createGLBuffers` (one-shot, immutable storage), released in `releaseGLBuffers`,
-a dirty flag set from the settings' commit signals in `init()`, and the bake
-itself run lazily at the top of `colorCorrect` — before that pass binds
-anything, because the upload borrows texture slot 0 — through
+`LLPipeline::bakeToneCurveLut` is the pattern: a raw GL name the render
+resources' plan describes (`ALRenderResourcePlan`'s `ToneCurve`), created
+empty by `reconcileResources` with immutable storage and released with the
+context's resources, a dirty flag set from the settings' commit signals in
+`init()`, and the bake itself run lazily at the top of `colorCorrect` — before
+that pass binds anything, because the upload borrows texture slot 0 — through
 `LLImageGL::setManualSubImage`. Lazy rather than in the signal handler because
-`setShaders()` releases and recreates every GL buffer behind the settings'
-back, and only a bake that runs on the way to drawing refills the texture. The
+a new context's reconcile recreates the texture behind the settings' back, and
+only a bake that runs on the way to drawing refills it. A setting a step's
+texture is sized or formatted from is a render input: it goes into
+`ALRenderResourceInputs` and the plan, and its listener only marks the change
+(`handleRenderInputChanged`). The
 3D LUT (`mCGLut`) is the older shape and is released only by reassignment; do
 not copy that. Bind the texture with a **clamp** sampler
 (`ALSamplers::BilinearClamp`): a lookup table must saturate past its ends.
