@@ -239,7 +239,6 @@ void swap();
 extern bool gDebugClicks;
 extern bool gDisplaySwapBuffers;
 extern bool gDepthDirty;
-extern bool gResizeScreenTexture;
 extern bool gCubeSnapshot;
 extern bool gSnapshotNoPost;
 
@@ -2836,7 +2835,7 @@ void LLViewerWindow::reshape(S32 width, S32 height, bool force_reshape)
     // may have been destructed.
     if (!LLApp::isExiting())
     {
-        gWindowResized = true;
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Window);
 
         // update our window rectangle
         mWindowRectRaw.mRight = mWindowRectRaw.mLeft + width;
@@ -4467,7 +4466,7 @@ void LLViewerWindow::updateWorldViewRect(bool use_full_window)
     if (mWorldViewRectRaw != new_world_rect)
     {
         mWorldViewRectRaw = new_world_rect;
-        gResizeScreenTexture = true;
+        gPipeline.markRenderInputsDirty();
         LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
         LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
 
@@ -6645,8 +6644,7 @@ void LLViewerWindow::restoreGL(const std::string& progress_message)
         LLVOAvatar::restoreGL();
         LLVOPartGroup::restoreGL();
 
-        gResizeScreenTexture = true;
-        gWindowResized = true;
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Window);
 
         if (isAgentAvatarValid() && gAgentAvatarp->isEditingAppearance())
         {

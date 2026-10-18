@@ -170,6 +170,7 @@ if(AL_BUILD_VIEWER)
     alfloatersceneexplorerfilters.cpp
     alfloaterscopes.cpp
     alfloatertransactionlog.cpp
+    alrenderinputrequests.cpp
     alrenderisolation.cpp
     alrenderresourceinputs.cpp
     alrenderresourceplan.cpp
@@ -1051,6 +1052,7 @@ if(AL_BUILD_VIEWER)
     alfloatersceneexplorerfilters.h
     alfloaterscopes.h
     alfloatertransactionlog.h
+    alrenderinputrequests.h
     alrenderisolation.h
     alrenderresourceinputs.h
     alrenderresourceplan.h
@@ -2553,6 +2555,7 @@ if(AL_BUILD_TESTS)
       tests/almotionpredictor_test.cpp
       tests/alnotecardembedded_test.cpp
       tests/alrecoverykeeper_test.cpp
+      tests/alrenderinputrequests_test.cpp
       tests/alrenderresourceplan_test.cpp
       tests/alsceneexplorerpredicate_test.cpp
       tests/alscopedata_test.cpp
@@ -2631,6 +2634,7 @@ if(AL_BUILD_TESTS)
       alnotecardembedded.cpp
       alrecovery.cpp
       alrecoverykeeper.cpp
+      alrenderinputrequests.cpp
       alrenderresourceplan.cpp
       alsceneexplorerpredicate.cpp
       alscopedata.cpp

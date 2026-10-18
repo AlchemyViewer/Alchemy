@@ -582,6 +582,8 @@ void LLViewerShaderMgr::setShaders()
         return;
     }
 
+    gPipeline.shaderReloadBegins();
+
     ALUniformBuffer::sUpdateMode = ALUniformBuffer::clampUpdateMode(gSavedSettings.getS32("AlchemyRenderUBOUpdateMode"));
 
     // Latch reverse-Z before anything downstream reads it: this same call releases and

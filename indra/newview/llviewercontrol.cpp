@@ -117,8 +117,6 @@ LLControlGroup gSkinSettings("SkinUI"); // [AL:CR] read only settings tied to sk
 
 std::string gLastRunVersion;
 
-extern bool gResizeScreenTexture;
-extern bool gResizeShadowTexture;
 extern bool gDebugGL;
 ////////////////////////////////////////////////////////////////////////////
 // Listeners
@@ -313,18 +311,10 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
 }
 
 
-static bool handleShadowsResized(const LLSD& newvalue)
+// An input of the render resources (ALRenderResourceInputs), applied with the frame's other changes.
+static bool handleRenderResourceInputChanged(const LLSD& newvalue)
 {
-    gPipeline.requestResizeShadowTexture();
-    return true;
-}
-
-static bool handleReleaseGLBufferChanged(const LLSD& newvalue)
-{
-    if (gPipeline.isInit())
-    {
-        gPipeline.rebuildGLBuffers(LLPipeline::RebuildCause::Setting);
-    }
+    gPipeline.markRenderInputsDirty();
     return true;
 }
 
@@ -705,12 +695,6 @@ static bool handleRenderDebugPipelineChanged(const LLSD& newvalue)
     return true;
 }
 
-static bool handleRenderResolutionDivisorChanged(const LLSD&)
-{
-    gResizeScreenTexture = true;
-    return true;
-}
-
 static bool handleRenderUBOUpdateModeChanged(const LLSD& newvalue)
 {
     // Applies live: the shadow always holds current contents, so the next
@@ -1045,8 +1029,8 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "OctreeMaxNodeCapacity", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAlphaDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeAttachmentSizeFactor", handleRepartition);
-    setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSMAAUseStencil", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleRenderResourceInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSMAAUseStencil", handleRenderResourceInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredication", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationThreshold", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationScale", handleSetShaderChanged);
@@ -1054,12 +1038,12 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
-    setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleShadowsResized);
+    setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleRenderResourceInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleRenderGlowChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderGlowResolutionPow", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderGlowHDR", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderBloomMipCount", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderBloomResolutionScale", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderGlowResolutionPow", handleRenderResourceInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderGlowHDR", handleRenderResourceInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderBloomMipCount", handleRenderResourceInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderBloomResolutionScale", handleRenderResourceInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderBloomHalation", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderEnableEmissiveBuffer", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderReverseZ", handleReverseZChanged);
@@ -1080,7 +1064,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderVSyncEnable", handleVSyncChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredNoise", handleDeferredNoiseChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResolutionDivisorChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResourceInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderUBOUpdateMode", handleRenderUBOUpdateModeChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbesChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeSettingsChanged);
@@ -1093,16 +1077,16 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbesChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleReflectionProbesChanged);
     // Each sizes a capture pack and its probe manager's own resources, both planned from it.
-    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeResolution", handleReleaseGLBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeResolution", handleRenderResourceInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleRenderResourceInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowFilterQuality", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowPCSSScale", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowDepth32F", handleShadowsResized);
-    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderProbeAllShadowCascades", handleShadowsResized);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowDepth32F", handleRenderResourceInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderProbeAllShadowCascades", handleRenderResourceInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleSetShaderChanged);
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-    setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResolutionDivisorChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResourceInputChanged);
 // [/SL:KB]
     setting_setup_signal_listener(gSavedSettings, "RenderPerformanceTest", handleRenderPerfTestChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarCloth", handleSetShaderChanged);

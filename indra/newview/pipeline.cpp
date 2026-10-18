@@ -806,54 +806,41 @@ void LLPipeline::destroyGL()
     releaseAllGLResources();
 }
 
-void LLPipeline::requestResizeScreenTexture()
+void LLPipeline::markRenderInputsDirty(ALRenderInputRequests::Change change)
 {
-    gResizeScreenTexture = true;
+    mRenderInputRequests.mark(change);
 }
 
-void LLPipeline::requestResizeShadowTexture()
+void LLPipeline::applyRenderInputs()
 {
-    gResizeShadowTexture = true;
-}
-
-void LLPipeline::resizeShadowTexture()
-{
-    // The shadow maps' sizes and depth format are inputs of the plan like the rest: those that changed are built, the
-    // others kept. Before the programs load there is nothing to build them for, and the first rebuild takes the settings
-    // as they are then.
-    if (shadersLoaded())
+    if (!mRenderInputRequests.pending())
     {
-        rebuildGLBuffers(RebuildCause::Setting);
+        return;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+
+    // Nothing is applied to resources that are not there. Before the pipeline's first load, and while a context is
+    // lost, the load that comes next (init, restoreGL) builds everything from the settings as they are then.
+    const bool live = mInitialized && mGLResourcesLive;
+    const ALRenderInputRequests::Application application =
+        mRenderInputRequests.take(live && ALRenderResourceInputs::fromSettings() != mRequestedInputs);
+    if (!live)
+    {
+        return;
     }
 
-    gResizeShadowTexture = false;
-}
-
-void LLPipeline::resizeScreenTexture()
-{
-    if (gPipeline.shadersLoaded())
+    mApplyingChanges = application.mChanges;
+    if (application.mReloadShaders)
     {
-        GLuint resX = gViewerWindow->getWorldViewWidthRaw();
-        GLuint resY = gViewerWindow->getWorldViewHeightRaw();
-
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-        GLuint scaledResX = resX;
-        GLuint scaledResY = resY;
-        scaleToRenderResolution(scaledResX, scaledResY);
-// [/SL:KB]
-
-//      if (gResizeScreenTexture || (resX != mRT->screen.getWidth()) || (resY != mRT->screen.getHeight()))
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-        if (gResizeScreenTexture || (scaledResX != mRT->screen.getWidth()) || (scaledResY != mRT->screen.getHeight()))
-// [/SL:KB]
-        {
-            // A request with no size change in it (requestResizeScreenTexture) asks for the resources as the settings
-            // now describe them.
-            const bool resized = scaledResX != mRT->screen.getWidth() || scaledResY != mRT->screen.getHeight();
-            rebuildGLBuffers(resized ? RebuildCause::Resize : RebuildCause::Setting);
-            gResizeScreenTexture = false;
-        }
+        // The loaders read the cached copies of the settings, as the passes do.
+        refreshCachedSettings();
+        LLViewerShaderMgr::instance()->setShaders();
     }
+    else if (application.mReconcile)
+    {
+        rebuildGLBuffers(application.mSkipFrame ? RebuildCause::Resize : RebuildCause::Setting);
+    }
+    mApplyingChanges = 0;
 }
 
 // static
@@ -1019,8 +1006,9 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
     // whatever order the settings' listeners ran in.
     refreshCachedSettings();
 
-    ALRenderResourceInputs inputs = ALRenderResourceInputs::fromSettings();
-    Plan                   plan   = Plan::make(inputs);
+    const ALRenderResourceInputs requested = ALRenderResourceInputs::fromSettings();
+    ALRenderResourceInputs       inputs    = requested;
+    Plan                         plan      = Plan::make(inputs);
 
     ResourceChanges changes;
     ensureResources(plan, IdSet().set(), changes);
@@ -1192,8 +1180,9 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
     changes.mProbePack      = (changed & Plan::idsOf(Plan::Pack::Probe) & ~Plan::idsWhere(Plan::forMaterialPreview)).any();
     changes.mHeroPack       = (changed & Plan::idsOf(Plan::Pack::Hero)).any();
 
-    mResourceInputs = inputs;
-    mResourcePlan   = plan;
+    mRequestedInputs = requested;
+    mResourceInputs  = inputs;
+    mResourcePlan    = plan;
 
     // The reflection manager's update runs after the frame is drawn, so the frame after probes come on would draw
     // through programs that read probes, with no cube array or coefficients to bind. Its update keeps them from then on.
@@ -1449,6 +1438,13 @@ bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
     };
     std::string invalidated;
 
+    // A reload is followed by this reconcile wherever it runs, and the two apply every shader and resource change marked
+    // before the reload began.
+    if (cause == RebuildCause::ShaderReload)
+    {
+        mRenderInputRequests.shadersReloaded();
+    }
+
     const bool new_context = !mGLResourcesLive;
     const ResourceChanges changes = reconcileResources();
     mGLResourcesLive = true;
@@ -1565,8 +1561,12 @@ bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
     {
         add(freed, "hero probes");
     }
+    // How many changes the frame's application gathered into this one.
+    const std::string applying = mApplyingChanges > 0
+        ? fmt::format(", applying {} {}", mApplyingChanges, mApplyingChanges == 1 ? "change" : "changes")
+        : std::string();
     LL_INFOS("RenderResources") << "Render resources reconciled at " << mMainRT.deferredScreen.getWidth() << "x"
-                                << mMainRT.deferredScreen.getHeight() << why
+                                << mMainRT.deferredScreen.getHeight() << why << applying
                                 << (changes.mFullSize                         ? std::string_view()
                                     : mMainRT.deferredScreen.isComplete() ? std::string_view(", halved for want of memory")
                                                                           : std::string_view(", built at no size"))

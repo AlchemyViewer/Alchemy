@@ -202,7 +202,7 @@ LLGLTFPreviewTexture::~LLGLTFPreviewTexture()
     // frame's resources, and with them the pack where reflection probes are off.
     if (--sLiveCount == 0)
     {
-        gPipeline.requestResizeScreenTexture();
+        gPipeline.markRenderInputsDirty();
     }
 }
 
@@ -219,7 +219,7 @@ LLPointer<LLGLTFPreviewTexture> LLGLTFPreviewTexture::create(LLPointer<LLFetched
     const U32 pack_width = inputs.mProbeResolution * inputs.mProbeSuperSample;
     if (!gPipeline.resourcePlan().wants(ALRenderResourcePlan::Id::ProbePostPing))
     {
-        gPipeline.requestResizeScreenTexture();
+        gPipeline.markRenderInputsDirty();
     }
     const U32 width = llmin(LLPipeline::MAX_PREVIEW_WIDTH, pack_width);
     return new LLGLTFPreviewTexture(material, (S32)width);

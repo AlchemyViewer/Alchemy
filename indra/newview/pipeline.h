@@ -43,6 +43,7 @@
 #include "aldepthpyramid.h"
 #include "alprimitiveplot.h"
 #include "alquerypool.h"
+#include "alrenderinputrequests.h"
 #include "alrenderresourceplan.h"
 #include "alwatersurface.h"
 #include "altexture3d.h"
@@ -87,11 +88,18 @@ public:
 
     void destroyGL();
     void restoreGL();
-    void requestResizeScreenTexture(); // set flag only, no work, safer for callbacks...
-    void requestResizeShadowTexture(); // set flag only, no work, safer for callbacks...
 
-    void resizeScreenTexture();
-    void resizeShadowTexture();
+    /// Marks a change to the render inputs for the next application (applyRenderInputs), and does nothing else.
+    void markRenderInputsDirty(ALRenderInputRequests::Change change = ALRenderInputRequests::Change::Resources);
+    /// A reload of every program begins (LLViewerShaderMgr::setShaders): it and the reconcile that ends it apply the
+    /// changes marked before now, and those marked while it runs wait for the next application.
+    void shaderReloadBegins() { mRenderInputRequests.reloadBegins(); }
+    /// Whether the window has been resized since the inputs were last applied: display() draws nothing that frame.
+    bool windowResizePending() const { return mRenderInputRequests.windowResized(); }
+    /// Applies every change marked since the last application, once, at the top of each frame: the programs reloaded
+    /// where a shader input changed (LLViewerShaderMgr::setShaders, which reconciles the resources after them),
+    /// otherwise the resources reconciled where their inputs changed (rebuildGLBuffers).
+    void applyRenderInputs();
 
     /// Every GL resource the pipeline holds, and the state derived from them: on context teardown and at shutdown.
     void releaseAllGLResources();
@@ -176,6 +184,14 @@ private:
     ALRenderResourceInputs mResourceInputs;
     ALRenderResourcePlan   mResourcePlan;
     bool                   mGLResourcesLive = false;
+    // What the settings asked of that reconcile: mResourceInputs at a lower size where it was halved for want of
+    // memory. A change is applied only where the settings move from this, so a halved size is not retried in full for
+    // every change that leaves the inputs as they were.
+    ALRenderResourceInputs mRequestedInputs;
+
+    // The changes marked since the last application, and how many the one running applies, for the log line.
+    ALRenderInputRequests mRenderInputRequests;
+    U32                   mApplyingChanges = 0;
 public:
 
     // rebuild all LLVOVolume render batches

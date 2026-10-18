@@ -113,9 +113,6 @@ constexpr F32 RESTORE_GL_TIME = 5.f;  // Wait this long while reloading textures
 bool gForceRenderLandFence = false;
 bool gDisplaySwapBuffers = false;
 bool gDepthDirty = false;
-bool gResizeScreenTexture = false;
-bool gResizeShadowTexture = false;
-bool gWindowResized = false;
 bool gSnapshot = false;
 bool gCubeSnapshot = false;
 bool gSnapshotNoPost = false;
@@ -444,25 +441,19 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     LLPerfStats::RecordSceneTime T (LLPerfStats::StatType_t::RENDER_DISPLAY); // render time capture - This is the main stat for overall rendering.
 
-    if (gWindowResized)
+    // What the settings and the window changed since the last frame, applied once, here, whatever the frame goes on to
+    // draw: the login screen's frames apply them as the world's do.
+    if (gPipeline.windowResizePending())
     { //skip render on frames where window has been resized
         LL_DEBUGS("Window") << "Resizing window" << LL_ENDL;
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Resize Window");
         gGL.flush();
         glClear(GL_COLOR_BUFFER_BIT);
         gViewerWindow->getWindow()->swapBuffers();
-        LLPipeline::refreshCachedSettings();
-        gPipeline.resizeScreenTexture();
-        gResizeScreenTexture = false;
-        gWindowResized = false;
+        gPipeline.applyRenderInputs();
         return;
     }
-
-    if (gResizeShadowTexture)
-    { //skip render on frames where window has been resized
-        gPipeline.resizeShadowTexture();
-        gResizeShadowTexture = false;
-    }
+    gPipeline.applyRenderInputs();
 
     gSnapshot = for_snapshot;
 
@@ -815,12 +806,6 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("display - 2")
-            if (gResizeScreenTexture)
-            {
-                gPipeline.resizeScreenTexture();
-                gResizeScreenTexture = false;
-            }
-
             gGL.setColorMask(true, true);
             gGL.setClearColor(LLColor4::transparent);
 
