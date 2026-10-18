@@ -1353,6 +1353,8 @@ void LLPipeline::releaseAllGLResources()
 
     LLVOAvatar::resetImpostors();
     gBumpImageList.destroyGL();
+    // The probes themselves stay, to render again into what the reconcile on the next context builds.
+    mReflectionMapManager.freeResources();
     mHeroProbeManager.cleanup();
 
     // Clearing the recorded parameters matters as much as the release: they are
