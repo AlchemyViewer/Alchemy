@@ -58,16 +58,13 @@ struct ALShaderSettings
     bool mEmissive               = true;  ///< RenderEnableEmissiveBuffer
     S32  mLightingMaxLevel       = 3;     ///< RenderShaderLightingMaxLevel
     S32  mReservedTextureIndices = 12;    ///< RenderReservedTextureIndices
-    F32  mSpecularExponent       = 128.f; ///< RenderSpecularExponent
     bool mSSR                    = false; ///< RenderScreenSpaceReflections
     bool mMirrors                = false; ///< RenderMirrors
     bool mProbes                 = true;  ///< RenderReflectionsEnabled, where the feature table allows it
     S32  mProbeLevel             = 3;     ///< RenderReflectionProbeLevel
     S32  mShadowDetail           = 2;     ///< RenderShadowDetail
     U32  mShadowFilterQuality    = 1;     ///< AlchemyRenderShadowFilterQuality
-    F32  mShadowPCSSScale        = 1.f;   ///< AlchemyRenderShadowPCSSScale
     S32  mTerrainPlanarSampleCount = 1;   ///< RenderTerrainPBRPlanarSampleCount
-    F32  mTerrainTriplanarBlend  = 8.f;   ///< RenderTerrainPBRTriplanarBlendFactor
     S32  mTerrainPBRDetail       = 0;     ///< RenderTerrainPBRDetail
     bool mTerrainHexTiling       = false; ///< AlchemyRenderTerrainHexTiling
     bool mTerrainPBRNormals      = false; ///< RenderTerrainPBRNormalsEnabled
@@ -80,9 +77,6 @@ struct ALShaderSettings
     bool mGlowNoise              = true;  ///< RenderGlowNoise
     bool mBloomHalation          = false; ///< RenderBloomHalation
     bool mSMAAPredication        = true;  ///< RenderSMAAPredication
-    F32  mSMAAPredicationThreshold = 0.01f; ///< RenderSMAAPredicationThreshold
-    F32  mSMAAPredicationScale   = 2.f;   ///< RenderSMAAPredicationScale
-    F32  mSMAAPredicationStrength = 0.4f; ///< RenderSMAAPredicationStrength
     bool mLocalTerrainPaint      = false; ///< LocalTerrainPaintEnabled
     U32  mTerrainPaintBitDepth   = 8;     ///< TerrainPaintBitDepth
 };
@@ -90,7 +84,7 @@ struct ALShaderSettings
 /// Everything the programs are built from, as the load takes it: the settings clamped to what the context can build
 /// and to what reaches a program, so that a setting no program reads under the others leaves them equal. Settings
 /// change it only where they change a program, so equal inputs need no reload; unequal ones reload only what they
-/// changed.
+/// changed. A setting the programs read as a uniform (LLViewerShaderMgr::updateShaderUniforms) is no input at all.
 ///
 /// Its two halves are what a change costs. The global inputs feed the defines every shared object compiles with
 /// (LLGLSLShader::sGlobalDefines), the defines injected into every compile (REVERSE_Z, GBUFFER_NORM_HDR) or the shared
@@ -108,16 +102,13 @@ struct ALShaderInputs
         bool mEmissive       = true;  ///< HAS_EMISSIVE
         S32  mLightingClass  = 3;     ///< the class the shared light-summing objects load at
         S32  mIndexedTextureChannels = 4; ///< the texture units an indexed draw spreads its textures over
-        F32  mSpecularExponent = 128.f; ///< SPECULAR_EXPONENT
         bool mSSR            = false; ///< SSR, and the screen-space reflections' class
         bool mMirrors        = false; ///< HERO_PROBES, the mirror-clip copy of a shared object and the mirror variants
         bool mProbes         = true;  ///< REFMAP_LEVEL, and the reflection probes' class
         S32  mProbeLevel     = 3;     ///< REFMAP_LEVEL, with probes on
         S32  mShadowDetail   = 2;     ///< SUN_SHADOW, SPOT_SHADOW: 0 none, 1 the sun's, 2 the spot lights' too
         S32  mShadowFilterQuality = 1; ///< SHADOW_PCF_KERNEL, and SHADOW_PCSS at 3, with shadows on
-        F32  mShadowPCSSScale = 0.f;  ///< SHADOW_PCSS_SCALE, with PCSS
         S32  mTerrainPlanarSampleCount = 1; ///< TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT: 1 flat, 3 triplanar
-        F32  mTerrainTriplanarBlend = 8.f; ///< TERRAIN_TRIPLANAR_BLEND_FACTOR
         S32  mTerrainPBRDetail = 0;   ///< TERRAIN_PBR_DETAIL, as much as the context's texture units can sample
         bool mTerrainHexTiling = false; ///< TERRAIN_HEX_TILING
         S32  mWaterHextile   = 1;     ///< WATER_HEXTILE: the hex-tiled wave layers, 0 to 2
@@ -138,9 +129,6 @@ struct ALShaderInputs
         bool mGlowNoise        = true;  ///< the glow extract's HAS_NOISE
         bool mBloomHalation    = false; ///< the bloom extract's and composites' BLOOM_HALATION
         bool mSMAAPredication  = true;  ///< the SMAA programs' predication
-        F32  mSMAAPredicationThreshold = 0.f; ///< with predication
-        F32  mSMAAPredicationScale     = 0.f; ///< with predication: 1 to 5
-        F32  mSMAAPredicationStrength  = 0.f; ///< with predication: 0 to 1
         bool mTerrainPBRNormals = false; ///< the PBR terrain programs' TERRAIN_FLAT_NORMALS
         bool mWaterWaves       = true;  ///< the water waves' programs and the three objects only they attach
         bool mCompute          = true;  ///< the compute programs, where the context has compute and it is not switched off

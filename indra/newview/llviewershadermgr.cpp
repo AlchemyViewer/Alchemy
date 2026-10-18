@@ -871,12 +871,6 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["HAS_EMISSIVE"] = "1";
     }
 
-    // Blinn-Phong exponent at full glossiness, for deferredUtil's blinnPhongLobe. A define
-    // rather than a uniform because it reaches a shared object -- this map is what compiles
-    // those, and a program's own mShaderFiles never see it, which is fine: the lobe is
-    // evaluated in deferredUtil and nowhere else.
-    attribs["SPECULAR_EXPONENT"] = llformat("%.1f", in.mSpecularExponent);
-
     const bool ssr = in.mSSR;
 
     const bool mirrors = in.mMirrors;
@@ -910,7 +904,6 @@ std::string LLViewerShaderMgr::loadBasicShaders()
             // raw depth), so LLPipeline::bindShadowMaps must bind a matching non-compare
             // sampler -- it reads this same input. Keep the two in step.
             attribs["SHADOW_PCSS"] = "1";
-            attribs["SHADOW_PCSS_SCALE"] = llformat("%.2f", in.mShadowPCSSScale);
         }
     }
 
@@ -938,7 +931,6 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 
     { // PBR terrain
         attribs["TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT"] = llformat("%d", in.mTerrainPlanarSampleCount);
-        attribs["TERRAIN_TRIPLANAR_BLEND_FACTOR"] = llformat("%.2f", in.mTerrainTriplanarBlend);
         attribs["TERRAIN_PBR_DETAIL"] = llformat("%d", in.mTerrainPBRDetail);
         if (in.mTerrainHexTiling)
         {
@@ -3085,9 +3077,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                                                                              {"SMAA_PRESET_HIGH", "High"},
                                                                           {"SMAA_PRESET_ULTRA", "Ultra"} };
         const bool smaa_predication = mInputs.mLocal.mSMAAPredication;
-        const F32 smaa_pred_threshold = mInputs.mLocal.mSMAAPredicationThreshold;
-        const F32 smaa_pred_scale = mInputs.mLocal.mSMAAPredicationScale;
-        const F32 smaa_pred_strength = mInputs.mLocal.mSMAAPredicationStrength;
         int i = 0;
         bool failed = false;
         for (const auto& smaa_pair : quality_levels)
@@ -3095,12 +3084,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             std::map<std::string, std::string> defines;
             defines.emplace("SMAA_GLSL_4", "1");
             defines.emplace("SMAA_PREDICATION", smaa_predication ? "1" : "0");
-            if (smaa_predication)
-            {
-                defines.emplace("SMAA_PREDICATION_THRESHOLD", llformat("%.6f", smaa_pred_threshold));
-                defines.emplace("SMAA_PREDICATION_SCALE", llformat("%.3f", smaa_pred_scale));
-                defines.emplace("SMAA_PREDICATION_STRENGTH", llformat("%.3f", smaa_pred_strength));
-            }
             defines.emplace("SMAA_REPROJECTION", "0");
             defines.emplace(smaa_pair.first, "1");
 
@@ -4391,6 +4374,25 @@ std::string LLViewerShaderMgr::getShaderDirPrefix(void)
 
 void LLViewerShaderMgr::updateShaderUniforms(LLGLSLShader * shader)
 {
-    LLEnvironment::instance().updateShaderUniforms(shader);
+    if (LLEnvironment::instanceExists())
+    {
+        LLEnvironment::instance().updateShaderUniforms(shader);
+    }
+
+    // The settings the programs read as uniforms rather than compile in, so that changing one reloads nothing. Each
+    // program takes them on its first bind after it links and on its first bind each frame, as it takes the
+    // environment's (LLGLSLShader::dirtyEnvironmentUniforms); one that declares none skips them.
+    static LLCachedControl<F32> specular_exponent(gSavedSettings, "RenderSpecularExponent", 128.f);
+    static LLCachedControl<F32> triplanar_blend(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", 8.f);
+    static LLCachedControl<F32> pcss_scale(gSavedSettings, "AlchemyRenderShadowPCSSScale", 200.f);
+    static LLCachedControl<F32> smaa_threshold(gSavedSettings, "RenderSMAAPredicationThreshold", 0.01f);
+    static LLCachedControl<F32> smaa_scale(gSavedSettings, "RenderSMAAPredicationScale", 2.f);
+    static LLCachedControl<F32> smaa_strength(gSavedSettings, "RenderSMAAPredicationStrength", 0.4f);
+    shader->uniform1f(LLShaderMgr::SPECULAR_EXPONENT, specular_exponent);
+    shader->uniform1f(LLShaderMgr::TERRAIN_TRIPLANAR_BLEND, triplanar_blend);
+    shader->uniform1f(LLShaderMgr::SHADOW_PCSS_SCALE, pcss_scale);
+    shader->uniform1f(LLShaderMgr::SMAA_PREDICATION_THRESHOLD, smaa_threshold);
+    shader->uniform1f(LLShaderMgr::SMAA_PREDICATION_SCALE, llclamp((F32)smaa_scale, 1.f, 5.f));
+    shader->uniform1f(LLShaderMgr::SMAA_PREDICATION_STRENGTH, llclamp((F32)smaa_strength, 0.f, 1.f));
 }
 

@@ -580,8 +580,7 @@ public:
     S32 mShaderLevel;
     S32 mShaderGroup; // see LLGLSLShader::eGroup
     // environment-uniform generation this program last applied; see sEnvironmentGeneration.
-    // Starts LEVEL with it, never behind -- a program built before LLEnvironment exists must
-    // not try to apply an environment on its first bind.
+    // A program starts one behind it when it links, so its first bind applies the set.
     U32 mEnvUniformsGeneration = 1;
     // cached in mapUniforms(); see declaresShadowSamplers()
     bool mDeclaresShadowSamplers = false;
@@ -686,8 +685,8 @@ public:
     // Generation of the shared environment uniform set. LLEnvironment bumps it via
     // dirtyEnvironmentUniforms(); a program re-applies on bind when its own generation is
     // behind. A counter rather than a per-program dirty flag so the per-frame environment
-    // update stays O(1) and reaches programs no list happens to hold. A new program starts
-    // level with it, never behind -- see createShader().
+    // update stays O(1) and reaches programs no list happens to hold. A program that links starts
+    // one behind it -- see linkProgram().
     static U32 sEnvironmentGeneration;
 
 

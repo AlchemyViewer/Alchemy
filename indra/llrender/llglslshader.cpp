@@ -980,12 +980,13 @@ bool LLGLSLShader::linkProgram(U32 variants)
     // Recreating the program invalidates any variants built from the previous configuration.
     freeOwnedVariants();
 
-    // Start level with the current generation rather than behind it: a program must not apply
-    // the environment uniform set before there IS an environment. gpu_benchmark() builds and
-    // binds a program during feature detection, which runs from LLViewerWindow's constructor,
-    // long before LLEnvironment exists. Nothing is lost by waiting -- LLEnvironment::update()
-    // bumps the generation every frame, so a program built mid-session applies on the next one.
-    mEnvUniformsGeneration = sEnvironmentGeneration;
+    // Start behind the current generation, so the program's first bind applies the uniform set every
+    // program shares: the environment's, and the settings read as uniforms. A program built during a
+    // frame is bound in it before the frame's environment update, the mirrors' pass among the first,
+    // and would otherwise draw with them unset. The viewer applies no environment before there is one
+    // (LLViewerShaderMgr::updateShaderUniforms): gpu_benchmark() builds and binds a program during
+    // feature detection, long before LLEnvironment exists.
+    mEnvUniformsGeneration = sEnvironmentGeneration - 1;
 
     unloadInternal();
 

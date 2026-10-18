@@ -982,7 +982,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRDetail", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRPlanarSampleCount", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRNormalsEnabled", handleRenderInputChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderTerrainHexTiling", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterHextile", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterWaves", handleRenderInputChanged);
@@ -995,10 +994,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAUseStencil", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredication", handleRenderInputChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationThreshold", handleRenderInputChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationScale", handleRenderInputChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationStrength", handleRenderInputChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleRenderInputChanged);
@@ -1046,7 +1041,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowFilterQuality", handleRenderInputChanged);
-    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowPCSSScale", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowDepth32F", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderProbeAllShadowCascades", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleRenderInputChanged);

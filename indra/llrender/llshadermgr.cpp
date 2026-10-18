@@ -2245,6 +2245,14 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterOcclusion");
     mReservedUniforms.push_back("waterPatchOrder");
 
+    // Settings the programs read as uniforms
+    mReservedUniforms.push_back("specularExponent");
+    mReservedUniforms.push_back("terrainTriplanarBlend");
+    mReservedUniforms.push_back("shadowPCSSScale");
+    mReservedUniforms.push_back("smaaPredicationThreshold");
+    mReservedUniforms.push_back("smaaPredicationScale");
+    mReservedUniforms.push_back("smaaPredicationStrength");
+
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a
     // wrong index still resolves to some other real uniform. Fatal, like the duplicate check

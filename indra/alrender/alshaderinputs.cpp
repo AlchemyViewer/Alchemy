@@ -33,7 +33,7 @@
 
 LLUUID ALShaderInputs::Global::digest() const
 {
-    static_assert(al_render_target_desc::field_count<Global>() == 18,
+    static_assert(al_render_target_desc::field_count<Global>() == 15,
                   "ALShaderInputs::Global gained or lost a field: fold it into digest()");
 
     HBXXH128   hash;
@@ -43,16 +43,13 @@ LLUUID ALShaderInputs::Global::digest() const
     add(mEmissive);
     add(mLightingClass);
     add(mIndexedTextureChannels);
-    add(mSpecularExponent);
     add(mSSR);
     add(mMirrors);
     add(mProbes);
     add(mProbeLevel);
     add(mShadowDetail);
     add(mShadowFilterQuality);
-    add(mShadowPCSSScale);
     add(mTerrainPlanarSampleCount);
-    add(mTerrainTriplanarBlend);
     add(mTerrainPBRDetail);
     add(mTerrainHexTiling);
     add(mWaterHextile);
@@ -99,27 +96,16 @@ ALShaderInputs ALShaderInputs::make(const ALShaderSettings& s)
     // An indexed draw leaves the texture units it reserves free for shadow and reflection maps, and spreads its
     // textures over four at the least.
     g.mIndexedTextureChannels = std::max(4, s.mTextureImageUnits - s.mReservedTextureIndices);
-    g.mSpecularExponent       = s.mSpecularExponent;
 
     g.mSSR        = s.mSSR;
     g.mMirrors    = s.mMirrors;
     g.mProbes     = s.mProbes;
     g.mProbeLevel = s.mProbes ? std::clamp(s.mProbeLevel, 0, 3) : 0;
 
-    g.mShadowDetail = std::clamp(s.mShadowDetail, 0, 2);
-    if (g.mShadowDetail > 0)
-    {
-        g.mShadowFilterQuality = std::clamp((S32)s.mShadowFilterQuality, 0, 3);
-        g.mShadowPCSSScale     = g.mShadowFilterQuality >= 3 ? s.mShadowPCSSScale : 0.f;
-    }
-    else
-    {
-        g.mShadowFilterQuality = 0;
-        g.mShadowPCSSScale     = 0.f;
-    }
+    g.mShadowDetail        = std::clamp(s.mShadowDetail, 0, 2);
+    g.mShadowFilterQuality = g.mShadowDetail > 0 ? std::clamp((S32)s.mShadowFilterQuality, 0, 3) : 0;
 
     g.mTerrainPlanarSampleCount = terrainMapping(s.mTerrainPlanarSampleCount);
-    g.mTerrainTriplanarBlend    = s.mTerrainTriplanarBlend;
     g.mTerrainPBRDetail         = terrainDetail(s.mTerrainPBRDetail, s.mTextureImageUnits);
     g.mTerrainHexTiling         = s.mTerrainHexTiling;
     g.mWaterHextile             = (S32)std::min(s.mWaterHextile, 2u);
@@ -131,12 +117,6 @@ ALShaderInputs ALShaderInputs::make(const ALShaderSettings& s)
     l.mGlowNoise        = s.mGlowNoise;
     l.mBloomHalation    = s.mBloomHalation;
     l.mSMAAPredication  = s.mSMAAPredication;
-    if (l.mSMAAPredication)
-    {
-        l.mSMAAPredicationThreshold = s.mSMAAPredicationThreshold;
-        l.mSMAAPredicationScale     = std::clamp(s.mSMAAPredicationScale, 1.f, 5.f);
-        l.mSMAAPredicationStrength  = std::clamp(s.mSMAAPredicationStrength, 0.f, 1.f);
-    }
     l.mTerrainPBRNormals = s.mTerrainPBRNormals;
     l.mWaterWaves        = s.mWaterWaves;
     l.mCompute           = s.mHasCompute && !s.mDisableCompute;

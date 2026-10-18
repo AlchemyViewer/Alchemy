@@ -1053,7 +1053,6 @@ ALShaderInputs LLPipeline::shaderInputsFromSettings()
     s.mEmissive                 = gSavedSettings.getBOOL("RenderEnableEmissiveBuffer");
     s.mLightingMaxLevel         = gSavedSettings.getS32("RenderShaderLightingMaxLevel");
     s.mReservedTextureIndices   = gSavedSettings.getS32("RenderReservedTextureIndices");
-    s.mSpecularExponent         = gSavedSettings.getF32("RenderSpecularExponent");
     s.mSSR                      = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
     s.mMirrors                  = gSavedSettings.getBOOL("RenderMirrors");
     s.mProbes                   = LLFeatureManager::getInstance()->isFeatureAvailable("RenderReflectionsEnabled") &&
@@ -1061,9 +1060,7 @@ ALShaderInputs LLPipeline::shaderInputsFromSettings()
     s.mProbeLevel               = gSavedSettings.getS32("RenderReflectionProbeLevel");
     s.mShadowDetail             = gSavedSettings.getS32("RenderShadowDetail");
     s.mShadowFilterQuality      = gSavedSettings.getU32("AlchemyRenderShadowFilterQuality");
-    s.mShadowPCSSScale          = gSavedSettings.getF32("AlchemyRenderShadowPCSSScale");
     s.mTerrainPlanarSampleCount = gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount");
-    s.mTerrainTriplanarBlend    = gSavedSettings.getF32("RenderTerrainPBRTriplanarBlendFactor");
     s.mTerrainPBRDetail         = gSavedSettings.getS32("RenderTerrainPBRDetail");
     s.mTerrainHexTiling         = gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling");
     s.mTerrainPBRNormals        = gSavedSettings.getBOOL("RenderTerrainPBRNormalsEnabled");
@@ -1076,9 +1073,6 @@ ALShaderInputs LLPipeline::shaderInputsFromSettings()
     s.mGlowNoise                = gSavedSettings.getBOOL("RenderGlowNoise");
     s.mBloomHalation            = gSavedSettings.getBOOL("RenderBloomHalation");
     s.mSMAAPredication          = gSavedSettings.getBOOL("RenderSMAAPredication");
-    s.mSMAAPredicationThreshold = gSavedSettings.getF32("RenderSMAAPredicationThreshold");
-    s.mSMAAPredicationScale     = gSavedSettings.getF32("RenderSMAAPredicationScale");
-    s.mSMAAPredicationStrength  = gSavedSettings.getF32("RenderSMAAPredicationStrength");
     s.mLocalTerrainPaint        = gSavedSettings.getBOOL("LocalTerrainPaintEnabled");
     s.mTerrainPaintBitDepth     = gSavedSettings.getU32("TerrainPaintBitDepth");
 

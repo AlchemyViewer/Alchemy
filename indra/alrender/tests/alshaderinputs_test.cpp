@@ -92,7 +92,6 @@ namespace
         check("emissive", s, [](Settings& x) { x.mEmissive = !x.mEmissive; }, Cost::Global);
         check("lighting class", s, [](Settings& x) { x.mLightingMaxLevel = 2; }, Cost::Global);
         check("reserved texture units", s, [](Settings& x) { x.mReservedTextureIndices = 10; }, Cost::Global);
-        check("specular exponent", s, [](Settings& x) { x.mSpecularExponent = 64.f; }, Cost::Global);
         check("SSR", s, [](Settings& x) { x.mSSR = !x.mSSR; }, Cost::Global);
         check("mirrors", s, [](Settings& x) { x.mMirrors = !x.mMirrors; }, Cost::Global);
         check("reflection probes", s, [](Settings& x) { x.mProbes = !x.mProbes; }, Cost::Global);
@@ -100,14 +99,9 @@ namespace
         check("shadow detail", s, [](Settings& x) { x.mShadowDetail = 1; }, Cost::Global);
         check("shadow filter quality", s, [](Settings& x) { x.mShadowFilterQuality = 2; }, Cost::Global);
         check("terrain mapping", s, [](Settings& x) { x.mTerrainPlanarSampleCount = 3; }, Cost::Global);
-        check("terrain triplanar blend", s, [](Settings& x) { x.mTerrainTriplanarBlend = 4.f; }, Cost::Global);
         check("terrain detail", s, [](Settings& x) { x.mTerrainPBRDetail = -3; }, Cost::Global);
         check("terrain hex tiling", s, [](Settings& x) { x.mTerrainHexTiling = !x.mTerrainHexTiling; }, Cost::Global);
         check("water hextile", s, [](Settings& x) { x.mWaterHextile = 2; }, Cost::Global);
-
-        Settings pcss = s;
-        pcss.mShadowFilterQuality = 3;
-        check("PCSS scale, with PCSS", pcss, [](Settings& x) { x.mShadowPCSSScale = 2.f; }, Cost::Global);
     }
 
     TEST_CASE("alshaderinputs: HDR changes the normal layout every program reads, and the post chain's permutations",
@@ -125,9 +119,6 @@ namespace
         check("glow noise", s, [](Settings& x) { x.mGlowNoise = !x.mGlowNoise; }, Cost::Local);
         check("bloom halation", s, [](Settings& x) { x.mBloomHalation = !x.mBloomHalation; }, Cost::Local);
         check("SMAA predication", s, [](Settings& x) { x.mSMAAPredication = !x.mSMAAPredication; }, Cost::Local);
-        check("SMAA predication threshold", s, [](Settings& x) { x.mSMAAPredicationThreshold = 0.02f; }, Cost::Local);
-        check("SMAA predication scale", s, [](Settings& x) { x.mSMAAPredicationScale = 3.f; }, Cost::Local);
-        check("SMAA predication strength", s, [](Settings& x) { x.mSMAAPredicationStrength = 0.8f; }, Cost::Local);
         check("terrain normals", s, [](Settings& x) { x.mTerrainPBRNormals = !x.mTerrainPBRNormals; }, Cost::Local);
         check("water waves", s, [](Settings& x) { x.mWaterWaves = !x.mWaterWaves; }, Cost::Local);
         check("compute switched off", s, [](Settings& x) { x.mDisableCompute = true; }, Cost::Local);
@@ -148,23 +139,13 @@ namespace
         no_clip.mHasClipControl = false;
         check("reverse-Z without clip control", no_clip, [](Settings& x) { x.mReverseZ = !x.mReverseZ; }, Cost::None);
 
-        // The level only with probes, the filter only with shadows, the PCSS scale only with PCSS.
+        // The level only with probes, the filter only with shadows.
         Settings no_probes = s;
         no_probes.mProbes = false;
         check("probe level without probes", no_probes, [](Settings& x) { x.mProbeLevel = 1; }, Cost::None);
         Settings no_shadows = s;
         no_shadows.mShadowDetail = 0;
         check("filter quality without shadows", no_shadows, [](Settings& x) { x.mShadowFilterQuality = 3; }, Cost::None);
-        check("PCSS scale without PCSS", s, [](Settings& x) { x.mShadowPCSSScale = 2.f; }, Cost::None);
-
-        // Predication's numbers only with predication, and its clamps.
-        Settings no_predication = s;
-        no_predication.mSMAAPredication = false;
-        check("predication threshold without predication", no_predication,
-              [](Settings& x) { x.mSMAAPredicationThreshold = 0.5f; }, Cost::None);
-        Settings wide_scale = s;
-        wide_scale.mSMAAPredicationScale = 6.f;
-        check("predication scale past 5", wide_scale, [](Settings& x) { x.mSMAAPredicationScale = 7.f; }, Cost::None);
 
         // The paint's precision only with local paint, and up to the paint map's 8 bits.
         check("terrain paint bit depth without paint", s, [](Settings& x) { x.mTerrainPaintBitDepth = 4; }, Cost::None);
