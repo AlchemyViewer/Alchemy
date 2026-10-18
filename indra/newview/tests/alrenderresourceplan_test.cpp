@@ -407,6 +407,35 @@ namespace
         }
     }
 
+    TEST_CASE("alrenderresourceplan: every target is planned with a size, whatever the shadow scale", "[alrenderresourceplan]")
+    {
+        // A target with no size cannot be built, and a target the render size sizes failing to build halves that size.
+        for (F32 scale : { 0.f, 0.0001f, 0.01f, 0.25f, 1.f, 4.f })
+        {
+            for (const auto& [width, height] : { std::pair{ 2560u, 1440u }, std::pair{ 64u, 48u }, std::pair{ 1u, 1u } })
+            {
+                INFO(width << "x" << height << ", shadow scale " << scale);
+                Inputs in       = defaults();
+                in.mWidth       = width;
+                in.mHeight      = height;
+                in.mShadowScale = scale;
+                const Plan plan = Plan::make(in);
+                for (size_t i = 0; i < Plan::ID_COUNT; ++i)
+                {
+                    const Id id = (Id)i;
+                    if (Plan::isTexture(id) || !plan.wants(id))
+                    {
+                        continue;
+                    }
+                    INFO(Plan::name(id));
+                    CHECK(plan.desc(id)->width > 0);
+                    CHECK(plan.desc(id)->height > 0);
+                }
+                CHECK(plan.wants(Id::SpotShadow0));
+            }
+        }
+    }
+
     TEST_CASE("alrenderresourceplan: every pack's shadows take one depth format", "[alrenderresourceplan]")
     {
         for (bool reverse_z : { false, true })
@@ -746,6 +775,48 @@ namespace
                 CHECK(sharer.mDesc->height == owner.mDesc->height);
             }
         }
+    }
+
+    TEST_CASE("alrenderresourceplan: only the main view's render-sized targets drive the render size down", "[alrenderresourceplan]")
+    {
+        const IdSet shadow_maps = sun_shadows({ Pack::Main }) | of({ Id::SpotShadow0, Id::SpotShadow1 });
+        for (size_t i = 0; i < Plan::ID_COUNT; ++i)
+        {
+            const Id id = (Id)i;
+            INFO(Plan::name(id));
+            const std::optional<Pack> pack = Plan::packOf(id);
+            const bool bloom_mip = pack && Plan::slotOf(id) >= Slot::Bloom0;
+            // What the render size sizes, but the pyramid, which loses levels instead, and the shadow maps, which are
+            // left unbuilt.
+            CHECK(Plan::drivesRenderSize(id) == (Plan::followsRenderSize(id) && !bloom_mip && !shadow_maps.test(i)));
+        }
+
+        // The fixed-size targets, the capture packs and the textures never do, nor do the shadow maps: halving the
+        // view would not make room for a square spot map sized from its width, nor for one with no size.
+        for (Id id : { Id::Preview, Id::DownRes, Id::Bake, Id::BrdfLut, Id::Exposure, Id::Glow0, Id::ProbeGBuffer,
+                       Id::ProbeSun0, Id::HeroGBuffer, Id::HeroLight, Id::Noise, Id::SMAAArea, Id::MainSun0, Id::MainSun3,
+                       Id::SpotShadow0, Id::SpotShadow1 })
+        {
+            INFO(Plan::name(id));
+            CHECK(!Plan::drivesRenderSize(id));
+        }
+        for (Id id : { Id::MainGBuffer, Id::MainScreen, Id::MainLight, Id::MainPostPing, Id::SMAABlend,
+                       Id::WaterDistortion, Id::SkyBehind, Id::SSRScene })
+        {
+            INFO(Plan::name(id));
+            CHECK(Plan::drivesRenderSize(id));
+        }
+
+        // The shadow maps are still sized from it, so a lower size builds them again smaller.
+        for (Id id : { Id::MainSun0, Id::MainSun3, Id::SpotShadow0, Id::SpotShadow1 })
+        {
+            INFO(Plan::name(id));
+            CHECK(Plan::followsRenderSize(id));
+        }
+
+        // Every pack's sun cascades and the spot pair, and nothing else.
+        CHECK(names(Plan::idsWhere(Plan::isShadowMap)) ==
+              names(sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero }) | of({ Id::SpotShadow0, Id::SpotShadow1 })));
     }
 
     TEST_CASE("alrenderresourceplan: every resource has its own debugger label", "[alrenderresourceplan]")

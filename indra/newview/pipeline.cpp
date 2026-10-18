@@ -1025,30 +1025,19 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
     ResourceChanges changes;
     ensureResources(plan, IdSet().set(), changes);
 
-    // A target the main view needs that cannot be built at the render size halves the size, the height first and then
-    // the width, until they can or there is no size left.
-    const auto of = [](std::initializer_list<Id> ids)
-    {
-        IdSet set;
-        for (Id id : ids)
-        {
-            set.set((size_t)id);
-        }
-        return set;
-    };
-    const IdSet required = of({ Id::MainGBuffer, Id::MainScreen, Id::MainLight, Id::MainSun0, Id::MainSun1, Id::MainSun2,
-                                Id::MainSun3, Id::SpotShadow0, Id::SpotShadow1, Id::SMAAEdges, Id::SMAABlend,
-                                Id::Preview });
-    const IdSet retried  = Plan::idsWhere(Plan::followsRenderSize) | of({ Id::DownRes, Id::Preview, Id::Bake });
-    const IdSet main_pack = Plan::idsOf(Plan::Pack::Main);
+    // A target the render size sizes that cannot be built at it halves the size, the height first and then the width,
+    // until they can be or there is no size left: any but a bloom level or a shadow map, which are left unbuilt. Only
+    // the targets the size sizes are freed and built again at each size: the rest neither drive the size nor follow it.
+    const IdSet required = Plan::idsWhere(Plan::drivesRenderSize);
+    const IdSet retried  = Plan::idsWhere(Plan::followsRenderSize);
 
     static LLCachedControl<bool> simulate_failure(gSavedSettings, "SimulateFBOFailure", false);
     const auto short_of_size = [&]() { return simulate_failure() || (changes.mFailed & required).any(); };
-    const auto release_main_pack = [&]()
+    const auto release_render_sized = [&]()
     {
         for (size_t i = 0; i < Plan::ID_COUNT; ++i)
         {
-            if (main_pack.test(i))
+            if (retried.test(i))
             {
                 resourceTarget((Id)i)->release();
             }
@@ -1056,7 +1045,7 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
     };
     const auto retry_at = [&](U32 width, U32 height)
     {
-        release_main_pack();
+        release_render_sized();
         if (width == 0 || height == 0)
         {
             return false;
@@ -1091,7 +1080,11 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
 
         if (!fitted)
         {
-            release_main_pack();
+            // Nothing the size sizes is kept, whatever the last attempt managed.
+            release_render_sized();
+            changes.mFailed |= (changes.mBuilt | changes.mKept) & retried;
+            changes.mBuilt &= ~retried;
+            changes.mKept &= ~retried;
             LL_WARNS() << "Unable to allocate screen buffer at any resolution!" << LL_ENDL;
         }
     }
@@ -1574,13 +1567,24 @@ bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
     }
     LL_INFOS("RenderResources") << "Render resources reconciled at " << mMainRT.deferredScreen.getWidth() << "x"
                                 << mMainRT.deferredScreen.getHeight() << why
-                                << (changes.mFullSize ? std::string_view() : std::string_view(", halved for want of memory"))
+                                << (changes.mFullSize                         ? std::string_view()
+                                    : mMainRT.deferredScreen.isComplete() ? std::string_view(", halved for want of memory")
+                                                                          : std::string_view(", built at no size"))
                                 << "; changed: " << (changed.empty() ? std::string_view("nothing") : changed)
                                 << "; built: " << built << "; freed: " << (freed.empty() ? std::string_view("nothing") : freed) << "; kept "
                                 << changes.mKept.count()
                                 << (changes.mFailed.any() ? "; failed: " + resource_names(changes.mFailed) : std::string())
                                 << "; invalidated: " << (invalidated.empty() ? std::string_view("nothing") : invalidated)
                                 << LL_ENDL;
+
+    // A shadow map that cannot be built leaves its shadows undrawn rather than the view smaller.
+    const ALRenderResourcePlan::IdSet shadows_failed =
+        changes.mFailed & ALRenderResourcePlan::idsWhere(ALRenderResourcePlan::isShadowMap);
+    if (shadows_failed.any())
+    {
+        LL_WARNS("RenderResources") << "Shadow maps not built, their shadows not drawn: " << resource_names(shadows_failed)
+                                    << LL_ENDL;
+    }
 
     return changes.mFullSize;
 }

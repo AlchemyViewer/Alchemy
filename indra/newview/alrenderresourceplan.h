@@ -181,6 +181,13 @@ public:
     /// Whether it is sized from the main view's render size, so that a resize, a snapshot and a retry at a lower size
     /// rebuild it, and its failing to build halves that size.
     static bool followsRenderSize(Id id);
+    /// Whether failing to build it halves the render size: every target the render size sizes but the bloom pyramid,
+    /// which is as deep as the levels that were built, and the shadow maps, which are left unbuilt and their shadows
+    /// undrawn. A fixed-size target or a capture pack's failing leaves the size alone, and a retry at a lower size
+    /// builds nothing but what the size sizes.
+    static bool drivesRenderSize(Id id);
+    /// Whether it is a shadow map: a pack's sun cascade or one of the spot lights' pair.
+    static bool isShadowMap(Id id);
     /// Whether it is a GL texture of the pipeline's own rather than a render target.
     static bool isTexture(Id id);
     /// Whether only the GLTF material preview renders through it: the probe pack's post targets and bloom, which the

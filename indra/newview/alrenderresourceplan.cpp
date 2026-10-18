@@ -220,10 +220,11 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         plan.mHeroProbes = ProbeManager{ .mResolution = hero_size, .mSuperSample = 1, .mHDR = hdr };
     }
 
-    // The spot lights' shadows are the main view's alone, square at its width times the shadow scale.
+    // The spot lights' shadows are the main view's alone, square at its width times the shadow scale, and a texel at
+    // the least: a scale near 0 takes the shadows' detail, not the maps.
     if (in.mShadowDetail > 1)
     {
-        const U32 spot = (U32)((F32)width * shadow_scale);
+        const U32 spot = std::max((U32)((F32)width * shadow_scale), 1u);
         for (Id id : { Id::SpotShadow0, Id::SpotShadow1 })
         {
             plan.at(id).mDesc = ALRenderTargetDesc{ .width = spot, .height = spot, .depth = shadow_depth };
@@ -372,6 +373,28 @@ bool ALRenderResourcePlan::followsRenderSize(Id id)
         default:
             return false;
     }
+}
+
+// static
+bool ALRenderResourcePlan::drivesRenderSize(Id id)
+{
+    if (!followsRenderSize(id) || isShadowMap(id))
+    {
+        return false;
+    }
+    const std::optional<Pack> pack = packOf(id);
+    return !pack || slotOf(id) < Slot::Bloom0;
+}
+
+// static
+bool ALRenderResourcePlan::isShadowMap(Id id)
+{
+    if (packOf(id))
+    {
+        const Slot slot = slotOf(id);
+        return slot >= Slot::Sun0 && slot <= Slot::Sun3;
+    }
+    return id == Id::SpotShadow0 || id == Id::SpotShadow1;
 }
 
 // static
