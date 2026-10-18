@@ -1,0 +1,201 @@
+/**
+ * @file alrenderresourceplan.h
+ * @brief What each of the pipeline's render resources is for a set of inputs.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include "alrenderresourceinputs.h"
+#include "alrendertargetdesc.h"
+
+#include <array>
+#include <bitset>
+#include <optional>
+#include <string_view>
+
+/// What each of the pipeline's render resources is for a set of inputs: a description where the resource is wanted,
+/// nothing where it is not, and for a target that takes its depth from another, which. A pure function of the inputs;
+/// LLPipeline::reconcileResources makes the GL objects what the plan says.
+///
+/// Three packs of targets render a view each (LLPipeline::RenderTargetPack): Main, the world view at the render size;
+/// Probe, a reflection probe's face at the probe resolution times its supersample; Hero, a mirror's face at the hero
+/// resolution. Each pack is planned from its own inputs, so what changes one leaves the others alone. The main view
+/// has targets of its own beside its pack, and the rest are fixed in size.
+class ALRenderResourcePlan
+{
+public:
+    enum class Pack : U8
+    {
+        Main,
+        Probe,
+        Hero,
+        COUNT
+    };
+
+    /// A pack's targets, the same in each. A pack plans only those it renders through.
+    enum class Slot : U8
+    {
+        GBuffer,
+        Screen,
+        Light,
+        PostPing,
+        PostPong,
+        Sun0,
+        Sun1,
+        Sun2,
+        Sun3,
+        Bloom0,
+        Bloom1,
+        Bloom2,
+        Bloom3,
+        Bloom4,
+        Bloom5,
+        Bloom6,
+        COUNT
+    };
+
+    static constexpr U32 SUN_CASCADES = 4;
+    static constexpr U32 BLOOM_MAX_MIPS = 7;
+
+    // The fixed sizes, which the pipeline's passes read from here.
+    static constexpr U32 DOWNRES_SIZE = 1024;
+    static constexpr U32 PREVIEW_SIZE = 512;
+    static constexpr U32 BRDF_LUT_SIZE = 512;
+    static constexpr U32 GLOW_WIDTH = 512;
+    static constexpr U32 EXPOSURE_METER_WIDTH = 128;
+    static constexpr U32 EXPOSURE_METER_HEIGHT = 72;
+    static constexpr U32 EXPOSURE_HISTOGRAM_BINS = 64;
+    static constexpr U32 NOISE_SIZE = 128;
+
+    /// Every resource, each pack's in Slot order first. The names are the debugger labels (name()).
+    enum class Id : U8
+    {
+        MainGBuffer, MainScreen, MainLight, MainPostPing, MainPostPong,
+        MainSun0, MainSun1, MainSun2, MainSun3,
+        MainBloom0, MainBloom1, MainBloom2, MainBloom3, MainBloom4, MainBloom5, MainBloom6,
+
+        ProbeGBuffer, ProbeScreen, ProbeLight, ProbePostPing, ProbePostPong,
+        ProbeSun0, ProbeSun1, ProbeSun2, ProbeSun3,
+        ProbeBloom0, ProbeBloom1, ProbeBloom2, ProbeBloom3, ProbeBloom4, ProbeBloom5, ProbeBloom6,
+
+        HeroGBuffer, HeroScreen, HeroLight, HeroPostPing, HeroPostPong,
+        HeroSun0, HeroSun1, HeroSun2, HeroSun3,
+        HeroBloom0, HeroBloom1, HeroBloom2, HeroBloom3, HeroBloom4, HeroBloom5, HeroBloom6,
+
+        // The main view's own, at its render size.
+        SpotShadow0, SpotShadow1,
+        SMAAEdges, SMAABlend,
+        WaterDistortion,
+        SkyBehind,
+        SSRScene,
+
+        // Fixed in size.
+        Glow0, Glow1, Glow2,
+        DownRes,
+        Preview,
+        Bake,
+        BrdfLut,
+        ExposureMeter, ExposureHistogram, Exposure, ExposureLast,
+        LensFlareA, LensFlareB,
+
+        // GL textures of the pipeline's own rather than render targets.
+        Noise,
+        TrueNoise,
+        SMAAArea,
+        SMAASearch,
+        SMAASample,
+        ToneCurve,
+
+        COUNT
+    };
+
+    static constexpr size_t ID_COUNT = (size_t)Id::COUNT;
+    using IdSet = std::bitset<ID_COUNT>;
+
+    struct Resource
+    {
+        /// What the resource is, or nothing where it is not wanted and is freed. A texture's (isTexture()) names only
+        /// its format: its size is its contents'.
+        std::optional<ALRenderTargetDesc> mDesc;
+        /// The resource whose depth this one's framebuffer shares; its own description then has no depth.
+        std::optional<Id> mDepthFrom;
+
+        friend bool operator==(const Resource&, const Resource&) = default;
+    };
+
+    static ALRenderResourcePlan make(const ALRenderResourceInputs& inputs);
+
+    const Resource& operator[](Id id) const { return mResources[(size_t)id]; }
+    bool wants(Id id) const { return mResources[(size_t)id].mDesc.has_value(); }
+    const std::optional<ALRenderTargetDesc>& desc(Id id) const { return mResources[(size_t)id].mDesc; }
+
+    /// The resources that differ between two plans: in their description, their depth's owner, or whether they are
+    /// wanted at all.
+    static IdSet changed(const ALRenderResourcePlan& before, const ALRenderResourcePlan& after);
+
+    static constexpr Id inPack(Pack pack, Slot slot) { return (Id)((U32)pack * (U32)Slot::COUNT + (U32)slot); }
+    static constexpr Id sunShadow(Pack pack, U32 cascade) { return inPack(pack, (Slot)((U32)Slot::Sun0 + cascade)); }
+    static constexpr Id bloomMip(Pack pack, U32 mip) { return inPack(pack, (Slot)((U32)Slot::Bloom0 + mip)); }
+
+    /// The pack @a id is a target of, or nothing for the main view's own and the fixed ones.
+    static std::optional<Pack> packOf(Id id);
+    /// Its slot in its pack; only for a pack's targets.
+    static Slot slotOf(Id id);
+    /// What debuggers call it: main.gbuffer, probe.shadow.sun1, shadow.spot0, smaa.edges, noise.
+    static std::string_view name(Id id);
+    /// Whether it is sized from the main view's render size, so that a resize, a snapshot and a retry at a lower size
+    /// rebuild it, and its failing to build halves that size.
+    static bool followsRenderSize(Id id);
+    /// Whether it is a GL texture of the pipeline's own rather than a render target.
+    static bool isTexture(Id id);
+    /// Whether only the GLTF material preview renders through it: the probe pack's post targets and bloom, which the
+    /// probes' captures never read.
+    static bool forMaterialPreview(Id id);
+
+    /// Every id of @a pack.
+    static IdSet idsOf(Pack pack);
+    /// Every id for which @a predicate holds.
+    template <typename Predicate> static IdSet idsWhere(Predicate predicate)
+    {
+        IdSet ids;
+        for (size_t i = 0; i < ID_COUNT; ++i)
+        {
+            ids.set(i, predicate((Id)i));
+        }
+        return ids;
+    }
+
+private:
+    Resource& at(Id id) { return mResources[(size_t)id]; }
+
+    std::array<Resource, ID_COUNT> mResources{};
+};
+
+static_assert(ALRenderResourcePlan::inPack(ALRenderResourcePlan::Pack::Probe, ALRenderResourcePlan::Slot::GBuffer) ==
+                  ALRenderResourcePlan::Id::ProbeGBuffer,
+              "the probe pack's ids follow the main pack's, in Slot order");
+static_assert(ALRenderResourcePlan::inPack(ALRenderResourcePlan::Pack::Hero, ALRenderResourcePlan::Slot::Bloom6) ==
+                  ALRenderResourcePlan::Id::HeroBloom6,
+              "the hero pack's ids follow the probe pack's, in Slot order");
+static_assert(ALRenderResourcePlan::bloomMip(ALRenderResourcePlan::Pack::Hero, ALRenderResourcePlan::BLOOM_MAX_MIPS) ==
+                  ALRenderResourcePlan::Id::SpotShadow0,
+              "the main view's own ids follow the packs'");

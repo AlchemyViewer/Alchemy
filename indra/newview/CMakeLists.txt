@@ -171,6 +171,8 @@ if(AL_BUILD_VIEWER)
     alfloaterscopes.cpp
     alfloatertransactionlog.cpp
     alrenderisolation.cpp
+    alrenderresourceinputs.cpp
+    alrenderresourceplan.cpp
     alsceneexplorerpredicate.cpp
     alsnapshotcutout.cpp
     alscopedata.cpp
@@ -1049,6 +1051,8 @@ if(AL_BUILD_VIEWER)
     alfloaterscopes.h
     alfloatertransactionlog.h
     alrenderisolation.h
+    alrenderresourceinputs.h
+    alrenderresourceplan.h
     alsceneexplorerpredicate.h
     alsnapshotcutout.h
     alscopedata.h
@@ -2547,6 +2551,7 @@ if(AL_BUILD_TESTS)
       tests/almotionpredictor_test.cpp
       tests/alnotecardembedded_test.cpp
       tests/alrecoverykeeper_test.cpp
+      tests/alrenderresourceplan_test.cpp
       tests/alsceneexplorerpredicate_test.cpp
       tests/alscopedata_test.cpp
       tests/alscriptanalysislane_test.cpp
@@ -2624,6 +2629,7 @@ if(AL_BUILD_TESTS)
       alnotecardembedded.cpp
       alrecovery.cpp
       alrecoverykeeper.cpp
+      alrenderresourceplan.cpp
       alsceneexplorerpredicate.cpp
       alscopedata.cpp
       alscriptanalysislane.cpp
