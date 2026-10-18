@@ -150,8 +150,6 @@ public:
     void createBrdfLut();
     /// The auto-exposure's adapted state and the lens flare's history, as a first frame finds them.
     void resetExposureHistory();
-    /// The deferred passes' noise map (DEFERRED_NOISE) again, at the current RenderDeferredNoise.
-    void regenerateNoiseMap();
     void setupGradingLUT();
     void generateLensDirt();
     /// Re-bake the tone curve lookup row from the four RenderColorGradeCurve*

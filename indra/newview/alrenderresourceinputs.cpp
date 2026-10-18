@@ -80,6 +80,7 @@ ALRenderResourceInputs ALRenderResourceInputs::fromSettings()
     in.mBloomHalation     = gSavedSettings.getBOOL("RenderBloomHalation");
     in.mGlowResolutionPow = gSavedSettings.getS32("RenderGlowResolutionPow");
     in.mGlowHDR           = gSavedSettings.getBOOL("RenderGlowHDR");
+    in.mDeferredNoise     = gSavedSettings.getF32("RenderDeferredNoise");
 
     in.mBakeWidth  = (U32)LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH;
     in.mBakeHeight = (U32)LLAvatarAppearanceDefines::SCRATCH_TEX_HEIGHT;

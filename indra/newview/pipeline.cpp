@@ -1013,6 +1013,25 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
     ResourceChanges changes;
     ensureResources(plan, IdSet().set(), changes);
 
+    // Storage kept whose contents an input makes is filled again where that input changed; storage built just now was
+    // filled as it was built.
+    const IdSet refill = Plan::refilled(mResourceInputs, inputs) & changes.mKept;
+    for (size_t i = 0; i < Plan::ID_COUNT; ++i)
+    {
+        if (U32* texture = refill.test(i) ? resourceTexture((Id)i) : nullptr)
+        {
+            LLImageGL::deleteTextures(1, texture);
+            *texture = 0;
+            createResourceTexture((Id)i);
+            changes.mKept.reset(i);
+            changes.mBuilt.set(i, *texture != 0);
+        }
+    }
+    if (refill.any())
+    {
+        gGL.getTextureSlot(0)->unbind();
+    }
+
     // A target the render size sizes that cannot be built at it halves the size, the height first and then the width,
     // until they can be or there is no size left: any but a bloom level or a shadow map, which are left unbuilt. Only
     // the targets the size sizes are freed and built again at each size: the rest neither drive the size nor follow it.
@@ -1711,19 +1730,6 @@ void LLPipeline::createResourceTexture(ALRenderResourcePlan::Id id)
         default:
             break;
     }
-}
-
-void LLPipeline::regenerateNoiseMap()
-{
-    if (mNoiseMap)
-    {
-        LLImageGL::deleteTextures(1, &mNoiseMap);
-        mNoiseMap = 0;
-    }
-    createResourceTexture(ALRenderResourcePlan::Id::Noise);
-    gGL.getTextureSlot(0)->unbind();
-    LL_INFOS("RenderResources") << "Noise map regenerated at RenderDeferredNoise "
-                                << gSavedSettings.getF32("RenderDeferredNoise") << LL_ENDL;
 }
 
 F32 lerpf(F32 a, F32 b, F32 w)

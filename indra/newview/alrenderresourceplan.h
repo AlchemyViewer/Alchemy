@@ -181,6 +181,9 @@ public:
     /// The resources that differ between two plans: in their description, their depth's owner, or whether they are
     /// wanted at all.
     static IdSet changed(const ALRenderResourcePlan& before, const ALRenderResourcePlan& after);
+    /// The resources whose contents, not their descriptions, are made from an input that differs between @a before
+    /// and @a after, so that storage kept for them is filled again: the deferred noise map, from RenderDeferredNoise.
+    static IdSet refilled(const ALRenderResourceInputs& before, const ALRenderResourceInputs& after);
 
     static constexpr Id inPack(Pack pack, Slot slot) { return (Id)((U32)pack * (U32)Slot::COUNT + (U32)slot); }
     static constexpr Id sunShadow(Pack pack, U32 cascade) { return inPack(pack, (Slot)((U32)Slot::Sun0 + cascade)); }

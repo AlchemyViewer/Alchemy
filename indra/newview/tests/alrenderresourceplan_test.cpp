@@ -321,6 +321,31 @@ namespace
         }
     }
 
+    TEST_CASE("alrenderresourceplan: the noise strength fills the noise map again and describes nothing",
+              "[alrenderresourceplan]")
+    {
+        const Inputs from = defaults();
+        Inputs       to   = from;
+        to.mDeferredNoise = from.mDeferredNoise * 2.f;
+
+        CHECK(names(Plan::changed(Plan::make(from), Plan::make(to))) == "nothing");
+        CHECK(names(Plan::refilled(from, to)) == names(of({ Id::Noise })));
+        CHECK(names(Plan::refilled(from, from)) == "nothing");
+    }
+
+    TEST_CASE("alrenderresourceplan: no other setting fills anything again", "[alrenderresourceplan]")
+    {
+        for (const Row& row : setting_rows())
+        {
+            INFO(row.setting);
+            Inputs from = defaults();
+            row.from(from);
+            Inputs to = from;
+            row.change(to);
+            CHECK(names(Plan::refilled(from, to)) == "nothing");
+        }
+    }
+
     TEST_CASE("alrenderresourceplan: a resize leaves the probe packs and the fixed-size targets alone", "[alrenderresourceplan]")
     {
         const std::vector<std::pair<const char*, std::function<void(Inputs&)>>> configurations = {

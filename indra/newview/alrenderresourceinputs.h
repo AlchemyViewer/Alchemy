@@ -68,6 +68,7 @@ struct ALRenderResourceInputs
     bool mBloomHalation = false;
     S32  mGlowResolutionPow = 9; ///< RenderGlowResolutionPow: the legacy glow's height, as a power of two
     bool mGlowHDR = false;       ///< RenderGlowHDR
+    F32  mDeferredNoise = 4.f;   ///< RenderDeferredNoise, which the deferred noise map's contents are made from
 
     /// The appearance bake's scratch target (LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH and _HEIGHT).
     U32 mBakeWidth = 2048;

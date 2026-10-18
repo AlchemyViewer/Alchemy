@@ -327,6 +327,15 @@ ALRenderResourcePlan::IdSet ALRenderResourcePlan::changed(const ALRenderResource
 }
 
 // static
+ALRenderResourcePlan::IdSet ALRenderResourcePlan::refilled(const ALRenderResourceInputs& before,
+                                                           const ALRenderResourceInputs& after)
+{
+    IdSet ids;
+    ids.set((size_t)Id::Noise, before.mDeferredNoise != after.mDeferredNoise);
+    return ids;
+}
+
+// static
 std::optional<ALRenderResourcePlan::Pack> ALRenderResourcePlan::packOf(Id id)
 {
     if ((size_t)id >= PACK_IDS)
