@@ -1859,6 +1859,35 @@ void LLReflectionMapManager::initReflectionMaps()
     }
 }
 
+bool LLReflectionMapManager::freeResources()
+{
+    const bool held = mTexture.notNull() || mRenderTarget.isComplete() || !mMipChain.empty() || mSHCoeffs.isComplete() ||
+                      mSHPartial.isComplete() || mUBO.allocated() || mVertexBuffer.notNull();
+
+    abandonProbeUpdate();
+
+    // A probe's own reference keeps the cube array alive, so each lets go of it.
+    for (auto& probe : mProbes)
+    {
+        probe->mCubeArray  = nullptr;
+        probe->mCubeIndex  = -1;
+        probe->mProbeIndex = -1;
+        probe->mComplete   = false;
+    }
+    mCubeFree.clear();
+    initCubeFree();
+
+    mTexture = nullptr;
+    mSHCoeffs.release();
+    mSHPartial.release();
+    mRenderTarget.release();
+    mMipChain.clear();
+    mUBO.release();
+    mVertexBuffer = nullptr;
+
+    return held;
+}
+
 void LLReflectionMapManager::cleanup()
 {
     mVertexBuffer = nullptr;

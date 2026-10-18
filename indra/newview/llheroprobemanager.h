@@ -64,6 +64,9 @@ public:
     // release any GL state
     void cleanup();
 
+    // Whether initReflectionMaps has built the cube array that cleanup frees.
+    bool holdsResources() const { return mTexture.notNull(); }
+
     // maintain reflection probes
     void update();
 

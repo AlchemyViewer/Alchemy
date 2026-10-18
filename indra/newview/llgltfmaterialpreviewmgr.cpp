@@ -187,10 +187,23 @@ namespace
 
 };  // namespace
 
+U32 LLGLTFPreviewTexture::sLiveCount = 0;
+
 LLGLTFPreviewTexture::LLGLTFPreviewTexture(LLPointer<LLFetchedGLTFMaterial> material, S32 width)
     : LLViewerDynamicTexture(width, width, 4, EOrder::ORDER_MIDDLE)
     , mGLTFMaterial(material)
 {
+    ++sLiveCount;
+}
+
+LLGLTFPreviewTexture::~LLGLTFPreviewTexture()
+{
+    // The last preview gone, the probe pack's post targets and bloom, there for previews alone, are freed with the next
+    // frame's resources, and with them the pack where reflection probes are off.
+    if (--sLiveCount == 0)
+    {
+        gPipeline.requestResizeScreenTexture();
+    }
 }
 
 // static
@@ -198,15 +211,30 @@ LLPointer<LLGLTFPreviewTexture> LLGLTFPreviewTexture::create(LLPointer<LLFetched
 {
     // No larger than the probe pack the preview renders through (render()): the probe resolution
     // times ALProbeSuperSample, which is below MAX_PREVIEW_WIDTH at a supersample under 4, and a
-    // larger viewport would render only the corner of the sphere that fits.
-    const U32 pack_width = gPipeline.mAuxillaryRT.deferredScreen.getWidth();
-    const U32 width = pack_width > 0 ? llmin(LLPipeline::MAX_PREVIEW_WIDTH, pack_width) : LLPipeline::MAX_PREVIEW_WIDTH;
+    // larger viewport would render only the corner of the sphere that fits. That is the size the
+    // pack is planned at whether or not it is built. Its post targets and bloom are planned only
+    // while a preview is alive, and with reflection probes off the rest of it too: they are built
+    // for the previews with the next frame's resources, and needsRender waits for them.
+    const ALRenderResourceInputs& inputs = gPipeline.resourceInputs();
+    const U32 pack_width = inputs.mProbeResolution * inputs.mProbeSuperSample;
+    if (!gPipeline.resourcePlan().wants(ALRenderResourcePlan::Id::ProbePostPing))
+    {
+        gPipeline.requestResizeScreenTexture();
+    }
+    const U32 width = llmin(LLPipeline::MAX_PREVIEW_WIDTH, pack_width);
     return new LLGLTFPreviewTexture(material, (S32)width);
 }
 
 bool LLGLTFPreviewTexture::needsRender()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    // Not before the probe pack it renders through is there, its post targets with it; asked again
+    // each frame until it is.
+    if (!gPipeline.mAuxillaryRT.screen.isComplete() || !gPipeline.mAuxillaryRT.postPingMap.isComplete())
+    {
+        return false;
+    }
 
     if (!mShouldRender && mBestLoad.isFullyLoaded()) { return false; }
     MaterialLoadLevels current_load = get_material_load_levels(*mGLTFMaterial.get());

@@ -72,7 +72,6 @@ LLHeroProbeManager::~LLHeroProbeManager()
     cleanup();
 
     mHeroVOList.clear();
-    mNearestHero = nullptr;
 }
 
 // helper class to seed octree with probes
@@ -240,8 +239,9 @@ void LLHeroProbeManager::renderProbes()
     static LLCachedControl<S32> sLevel(gSavedSettings, "RenderHeroReflectionProbeLevel", 3);
     static LLCachedControl<S32> sUpdateRate(gSavedSettings, "RenderHeroProbeUpdateRate", 0);
 
+    // Nothing to render into until update() has built the default probe again after cleanup().
     F32 near_clip = 0.01f;
-    if (mNearestHero != nullptr && !mNearestHero->isDead() &&
+    if (!mProbes.empty() && mProbes[0].notNull() && mNearestHero != nullptr && !mNearestHero->isDead() &&
         !gTeleportDisplay && !gDisconnected && !LLAppViewer::instance()->logoutRequestSent())
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("hpmu - realtime");
@@ -268,7 +268,7 @@ void LLHeroProbeManager::renderProbes()
 
         S32 face = gFrameCount % 6;
 
-        if (!mProbes.empty() && !mProbes[0].isNull() && !mProbes[0]->mOccluded)
+        if (!mProbes[0]->mOccluded)
         {
             LL_PROFILE_ZONE_NUM(gFrameCount % rate);
             LL_PROFILE_ZONE_NUM(rate);
@@ -493,7 +493,8 @@ void LLHeroProbeManager::updateUniforms()
     oa.set(0, 0, 0, 0);
     mHeroData.heroProbeCount = 1;
 
-    if (mNearestHero != nullptr && !mNearestHero->isDead())
+    // Called every frame while mirrors are on, whether or not update() has built the default probe since cleanup().
+    if (!mProbes.empty() && mProbes[0].notNull() && mNearestHero != nullptr && !mNearestHero->isDead())
     {
         if (mNearestHero->getReflectionProbeIsBox())
         {
@@ -620,6 +621,8 @@ void LLHeroProbeManager::cleanup()
     mProbes.clear();
 
     mDefaultProbe = nullptr;
+    // The mirror is found again by the next update() that builds a probe for it.
+    mNearestHero = nullptr;
 }
 
 void LLHeroProbeManager::doOcclusion()

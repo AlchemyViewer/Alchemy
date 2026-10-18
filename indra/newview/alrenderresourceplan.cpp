@@ -192,17 +192,32 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
 
     // A probe face renders at the probe resolution times its supersample, which the manager downsamples to its probe,
     // and its shadow maps at the size the full supersample of four gave them: a coarser capture is no reason for coarser
-    // shadows in it. Its post targets and bloom are the GLTF material preview's.
-    const U32 probe_size  = in.mProbeResolution * in.mProbeSuperSample;
-    const U32 probe_shadow = blur_happy_size(in.mProbeResolution * 4, 1.f);
-    plan_pack(Pack::Probe, { probe_size, probe_size, probe_shadow, probe_shadow, capture_light, true });
+    // shadows in it. Its post targets and bloom are the GLTF material preview's, which the probes' captures never read,
+    // so they are there only while a preview is alive. The pack is there while probes are on or a preview is alive, and
+    // the manager's own resources while probes are.
+    if (in.mProbes || in.mMaterialPreview)
+    {
+        const U32 probe_size   = in.mProbeResolution * in.mProbeSuperSample;
+        const U32 probe_shadow = blur_happy_size(in.mProbeResolution * 4, 1.f);
+        plan_pack(Pack::Probe,
+                  { probe_size, probe_size, probe_shadow, probe_shadow, capture_light, in.mMaterialPreview });
+    }
+    if (in.mProbes)
+    {
+        plan.mReflectionProbes = ProbeManager{ .mResolution = in.mProbeResolution,
+                                               .mSuperSample = in.mProbeSuperSample,
+                                               .mHDR = hdr };
+    }
 
-    // A mirror's face renders at the hero resolution, never supersampled, and runs no post chain.
-    if (in.mMirrors)
+    // A mirror's face renders at the hero resolution, never supersampled, and runs no post chain. The mirrors render
+    // only with reflection probes on (LLHeroProbeManager::update), so the pack and the manager's resources are there
+    // only then.
+    if (in.mMirrors && in.mProbes)
     {
         const U32 hero_size   = std::max(in.mHeroResolution, 1u);
         const U32 hero_shadow = blur_happy_size(hero_size, 1.f);
         plan_pack(Pack::Hero, { hero_size, hero_size, hero_shadow, hero_shadow, capture_light, false });
+        plan.mHeroProbes = ProbeManager{ .mResolution = hero_size, .mSuperSample = 1, .mHDR = hdr };
     }
 
     // The spot lights' shadows are the main view's alone, square at its width times the shadow scale.

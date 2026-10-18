@@ -127,6 +127,8 @@ public:
         bool mHDR            = false; ///< RenderHDREnabled
         bool mProbePack      = false; ///< a target the reflection probes' captures render through
         bool mHeroPack       = false; ///< a target the mirrors' captures render through
+        bool mReflectionProbesFreed = false; ///< the reflection probe manager's own resources were freed
+        bool mHeroProbesFreed       = false; ///< the hero probe manager's
         bool mFullSize       = true;  ///< the render size was built in full, not halved for want of memory
     };
 

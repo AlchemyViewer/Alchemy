@@ -39,7 +39,8 @@
 /// Three packs of targets render a view each (LLPipeline::RenderTargetPack): Main, the world view at the render size;
 /// Probe, a reflection probe's face at the probe resolution times its supersample; Hero, a mirror's face at the hero
 /// resolution. Each pack is planned from its own inputs, so what changes one leaves the others alone. The main view
-/// has targets of its own beside its pack, and the rest are fixed in size.
+/// has targets of its own beside its pack, and the rest are fixed in size. The two probe managers' own resources are
+/// planned beside their packs, from the same inputs.
 class ALRenderResourcePlan
 {
 public:
@@ -131,6 +132,16 @@ public:
     static constexpr size_t ID_COUNT = (size_t)Id::COUNT;
     using IdSet = std::bitset<ID_COUNT>;
 
+    /// What a probe manager's own resources are built for: its cube array, its scratch target and its mip chain.
+    struct ProbeManager
+    {
+        U32  mResolution  = 0; ///< a probe's face edge
+        U32  mSuperSample = 1; ///< how much larger than that a face renders each way
+        bool mHDR         = false;
+
+        friend bool operator==(const ProbeManager&, const ProbeManager&) = default;
+    };
+
     struct Resource
     {
         /// What the resource is, or nothing where it is not wanted and is freed. A texture's (isTexture()) names only
@@ -147,6 +158,11 @@ public:
     const Resource& operator[](Id id) const { return mResources[(size_t)id]; }
     bool wants(Id id) const { return mResources[(size_t)id].mDesc.has_value(); }
     const std::optional<ALRenderTargetDesc>& desc(Id id) const { return mResources[(size_t)id].mDesc; }
+
+    /// The reflection probes' manager's resources, or nothing where they are not wanted and are freed.
+    const std::optional<ProbeManager>& reflectionProbes() const { return mReflectionProbes; }
+    /// The mirrors' (LLHeroProbeManager's), likewise.
+    const std::optional<ProbeManager>& heroProbes() const { return mHeroProbes; }
 
     /// The resources that differ between two plans: in their description, their depth's owner, or whether they are
     /// wanted at all.
@@ -168,7 +184,7 @@ public:
     /// Whether it is a GL texture of the pipeline's own rather than a render target.
     static bool isTexture(Id id);
     /// Whether only the GLTF material preview renders through it: the probe pack's post targets and bloom, which the
-    /// probes' captures never read.
+    /// probes' captures never read, and which are planned only while a preview is alive.
     static bool forMaterialPreview(Id id);
 
     /// Every id of @a pack.
@@ -188,6 +204,8 @@ private:
     Resource& at(Id id) { return mResources[(size_t)id]; }
 
     std::array<Resource, ID_COUNT> mResources{};
+    std::optional<ProbeManager>    mReflectionProbes;
+    std::optional<ProbeManager>    mHeroProbes;
 };
 
 static_assert(ALRenderResourcePlan::inPack(ALRenderResourcePlan::Pack::Probe, ALRenderResourcePlan::Slot::GBuffer) ==

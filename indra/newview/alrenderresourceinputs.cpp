@@ -28,6 +28,7 @@
 
 #include "llavatarappearancedefines.h"
 #include "llfeaturemanager.h"
+#include "llgltfmaterialpreviewmgr.h"
 #include "llrender.h"
 #include "llviewercontrol.h"
 #include "llviewerwindow.h"
@@ -62,6 +63,7 @@ ALRenderResourceInputs ALRenderResourceInputs::fromSettings()
     in.mProbeResolution  = probeResolution(gSavedSettings.getU32("RenderReflectionProbeResolution"));
     in.mProbeSuperSample = probeSuperSample(gSavedSettings.getS32("ALProbeSuperSample"));
     in.mMirrors          = gSavedSettings.getBOOL("RenderMirrors");
+    in.mMaterialPreview  = LLGLTFPreviewTexture::liveCount() > 0;
     in.mHeroResolution   = (U32)llmax(gSavedSettings.getS32("RenderHeroProbeResolution"), 1);
 
     in.mFSAAType          = gSavedSettings.getU32("RenderFSAAType");

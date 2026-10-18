@@ -154,6 +154,7 @@ namespace
             in.mHDR           = false;
             in.mGBufferNormHDR = false;
         };
+        const auto previewed = [](Inputs& in) { in.mMaterialPreview = true; };
 
         return {
             { "RenderTransparentWater", no_change, [](Inputs& in) { in.mTransparentWater = false; }, nothing },
@@ -176,20 +177,38 @@ namespace
             { "RenderGlowHDR without HDR", hdr_off, [](Inputs& in) { in.mGlowHDR = true; },
               [](const Plan&) { return of({ Id::Glow0, Id::Glow1, Id::Glow2 }); } },
             { "RenderBloomMipCount", no_change, [](Inputs& in) { in.mBloomMips = 4; },
+              [](const Plan&) { return of({ Id::MainBloom4 }); } },
+            { "RenderBloomMipCount under a material preview", previewed, [](Inputs& in) { in.mBloomMips = 4; },
               [](const Plan&) { return of({ Id::MainBloom4, Id::ProbeBloom4 }); } },
             { "RenderBloomResolutionScale", no_change, [](Inputs& in) { in.mBloomScale = 2; },
+              [](const Plan& before) { return wanted(before, bloom({ Pack::Main })); } },
+            { "RenderBloomResolutionScale under a material preview", previewed, [](Inputs& in) { in.mBloomScale = 2; },
               [](const Plan& before) { return wanted(before, bloom({ Pack::Main, Pack::Probe })); } },
             { "RenderBloomHalation", no_change, [](Inputs& in) { in.mBloomHalation = true; },
-              [](const Plan& before) { return wanted(before, bloom({ Pack::Main, Pack::Probe })); } },
+              [](const Plan& before) { return wanted(before, bloom({ Pack::Main })); } },
             { "RenderEnableEmissiveBuffer", no_change, [](Inputs& in) { in.mEmissive = false; },
               [](const Plan&) { return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::SkyBehind }); } },
             { "RenderHDREnabled", no_change, hdr_off,
               [](const Plan& before)
               {
                   return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light }) |
+                         in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong }) |
+                         wanted(before, bloom({ Pack::Main })) |
+                         of({ Id::WaterDistortion, Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
+              } },
+            { "RenderHDREnabled under a material preview", previewed, hdr_off,
+              [](const Plan& before)
+              {
+                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light }) |
                          in_packs({ Pack::Main, Pack::Probe }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main, Pack::Probe })) |
                          of({ Id::WaterDistortion, Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
+              } },
+            { "a material preview made", no_change, previewed,
+              [](const Plan&)
+              {
+                  return in_packs({ Pack::Probe }, { Slot::PostPing, Slot::PostPong }) |
+                         of({ Id::ProbeBloom0, Id::ProbeBloom1, Id::ProbeBloom2, Id::ProbeBloom3, Id::ProbeBloom4 });
               } },
             { "AlchemyRenderReverseZ", no_change, [](Inputs& in) { in.mReverseZ = false; },
               [](const Plan&)
@@ -232,7 +251,8 @@ namespace
               } },
             { "RenderReflectionProbeResolution", no_change, [](Inputs& in) { in.mProbeResolution = 256; },
               [](const Plan& before) { return wanted(before, Plan::idsOf(Pack::Probe)); } },
-            { "RenderReflectionsEnabled", no_change, [](Inputs& in) { in.mProbes = false; }, nothing },
+            { "RenderReflectionsEnabled", no_change, [](Inputs& in) { in.mProbes = false; },
+              [](const Plan& before) { return wanted(before, Plan::idsOf(Pack::Probe) | Plan::idsOf(Pack::Hero)); } },
             { "RenderScreenSpaceReflections", no_change, [](Inputs& in) { in.mSSR = true; },
               [](const Plan&) { return of({ Id::SSRScene }); } },
             { "RenderMirrors", no_change, [](Inputs& in) { in.mMirrors = false; },
@@ -254,8 +274,8 @@ namespace
     }
 
     // The changes plan section 2.3a says must leave the probe and hero packs alone, other than the screen-only ones the
-    // rows already cover. The probe pack's post targets and bloom are the material preview's, not the probes': bloom's
-    // settings change those, and only those.
+    // rows already cover. The probe pack's post targets and bloom are the material preview's, there only while one is
+    // alive, so with none bloom's settings leave the pack alone too.
     std::vector<std::pair<const char*, std::function<void(Inputs&)>>> not_the_probes()
     {
         return {
@@ -427,9 +447,13 @@ namespace
                 Inputs to            = from;
                 apply(to);
 
-                const IdSet changed = Plan::changed(Plan::make(from), Plan::make(to));
+                const Plan before   = Plan::make(from);
+                const Plan after    = Plan::make(to);
+                const IdSet changed = Plan::changed(before, after);
                 CHECK(names(changed & Plan::idsOf(Pack::Hero)) == "nothing");
-                CHECK(names(changed & Plan::idsOf(Pack::Probe) & ~preview_targets()) == "nothing");
+                CHECK(names(changed & Plan::idsOf(Pack::Probe)) == "nothing");
+                CHECK(before.reflectionProbes() == after.reflectionProbes());
+                CHECK(before.heroProbes() == after.heroProbes());
             }
         }
     }
@@ -443,12 +467,17 @@ namespace
         };
         for (const auto& [change, apply] : changes)
         {
-            INFO(change);
-            Inputs to = defaults();
-            apply(to);
-            const IdSet changed = Plan::changed(Plan::make(defaults()), Plan::make(to));
-            CHECK((changed & bloom({ Pack::Probe })).any());
-            CHECK(names(changed & Plan::idsOf(Pack::Probe) & ~bloom({ Pack::Probe })) == "nothing");
+            for (bool previewed : { true, false })
+            {
+                INFO(change << (previewed ? " under a material preview" : " with none"));
+                Inputs from           = defaults();
+                from.mMaterialPreview = previewed;
+                Inputs to             = from;
+                apply(to);
+                const IdSet changed = Plan::changed(Plan::make(from), Plan::make(to));
+                CHECK((changed & bloom({ Pack::Probe })).any() == previewed);
+                CHECK(names(changed & Plan::idsOf(Pack::Probe) & ~bloom({ Pack::Probe })) == "nothing");
+            }
         }
     }
 
@@ -484,9 +513,13 @@ namespace
             INFO(change);
             Inputs to = defaults();
             apply(to);
-            const IdSet changed = Plan::changed(Plan::make(defaults()), Plan::make(to));
+            const Plan before   = Plan::make(defaults());
+            const Plan after    = Plan::make(to);
+            const IdSet changed = Plan::changed(before, after);
             CHECK(changed.test((size_t)Id::ProbeGBuffer));
             CHECK(names(changed & ~Plan::idsOf(Pack::Probe)) == "nothing");
+            CHECK(before.reflectionProbes() != after.reflectionProbes());
+            CHECK(before.heroProbes() == after.heroProbes());
         }
     }
 
@@ -497,9 +530,100 @@ namespace
             INFO("RenderHeroProbeResolution " << resolution);
             Inputs to          = defaults();
             to.mHeroResolution = resolution;
-            const IdSet changed = Plan::changed(Plan::make(defaults()), Plan::make(to));
+            const Plan before   = Plan::make(defaults());
+            const Plan after    = Plan::make(to);
+            const IdSet changed = Plan::changed(before, after);
             CHECK(changed.test((size_t)Id::HeroGBuffer));
             CHECK(names(changed & ~Plan::idsOf(Pack::Hero)) == "nothing");
+            CHECK(before.heroProbes() != after.heroProbes());
+            CHECK(before.reflectionProbes() == after.reflectionProbes());
+        }
+    }
+
+    TEST_CASE("alrenderresourceplan: with probes off there is no probe pack and no probe manager resources", "[alrenderresourceplan]")
+    {
+        for (bool mirrors : { false, true })
+        {
+            INFO("mirrors " << mirrors);
+            Inputs in       = defaults();
+            in.mProbes      = false;
+            in.mMirrors     = mirrors;
+            const Plan plan = Plan::make(in);
+
+            CHECK(names(wanted(plan, Plan::idsOf(Pack::Probe) | Plan::idsOf(Pack::Hero))) == "nothing");
+            CHECK(!plan.reflectionProbes());
+            CHECK(!plan.heroProbes());
+        }
+    }
+
+    TEST_CASE("alrenderresourceplan: a material preview keeps the probe pack and not the probes' own resources", "[alrenderresourceplan]")
+    {
+        Inputs off           = defaults();
+        off.mProbes          = false;
+        off.mMaterialPreview = true;
+        const Plan plan      = Plan::make(off);
+        for (Id id : { Id::ProbeGBuffer, Id::ProbeScreen, Id::ProbePostPing, Id::ProbeBloom0 })
+        {
+            INFO(Plan::name(id));
+            CHECK(plan.wants(id));
+        }
+        CHECK(!plan.reflectionProbes());
+        CHECK(names(wanted(plan, Plan::idsOf(Pack::Hero))) == "nothing");
+
+        // With probes on the pack is there already, and a preview adds the targets only it renders through.
+        Inputs on           = defaults();
+        Inputs on_previewed = on;
+        on_previewed.mMaterialPreview = true;
+        const Plan previewed = Plan::make(on_previewed);
+        CHECK(names(Plan::changed(Plan::make(on), previewed)) == names(wanted(previewed, preview_targets())));
+        CHECK(previewed.wants(Id::ProbePostPing));
+    }
+
+    TEST_CASE("alrenderresourceplan: the hero pack and its probes are there only with mirrors and probes both on", "[alrenderresourceplan]")
+    {
+        for (bool mirrors : { false, true })
+        {
+            for (bool probes : { false, true })
+            {
+                INFO("mirrors " << mirrors << ", probes " << probes);
+                Inputs in       = defaults();
+                in.mMirrors     = mirrors;
+                in.mProbes      = probes;
+                const Plan plan = Plan::make(in);
+                CHECK(plan.wants(Id::HeroGBuffer) == (mirrors && probes));
+                CHECK(plan.heroProbes().has_value() == (mirrors && probes));
+                CHECK(wanted(plan, Plan::idsOf(Pack::Hero)).any() == (mirrors && probes));
+            }
+        }
+    }
+
+    TEST_CASE("alrenderresourceplan: each probe manager is planned from its own inputs", "[alrenderresourceplan]")
+    {
+        for (bool hdr : { true, false })
+        {
+            INFO((hdr ? "under HDR" : "without HDR"));
+            Inputs in            = defaults();
+            in.mHDR              = hdr;
+            in.mGBufferNormHDR   = hdr;
+            in.mProbeResolution  = 256;
+            in.mProbeSuperSample = 4;
+            in.mHeroResolution   = 512;
+            const Plan plan      = Plan::make(in);
+
+            REQUIRE(plan.reflectionProbes());
+            CHECK(plan.reflectionProbes()->mResolution == 256);
+            CHECK(plan.reflectionProbes()->mSuperSample == 4);
+            CHECK(plan.reflectionProbes()->mHDR == hdr);
+            REQUIRE(plan.heroProbes());
+            CHECK(plan.heroProbes()->mResolution == 512);
+            CHECK(plan.heroProbes()->mSuperSample == 1);
+            CHECK(plan.heroProbes()->mHDR == hdr);
+
+            // A probe face is the probe pack's size, and a mirror's face the hero pack's.
+            REQUIRE(plan.desc(Id::ProbeGBuffer));
+            CHECK(plan.desc(Id::ProbeGBuffer)->width == 256 * 4);
+            REQUIRE(plan.desc(Id::HeroGBuffer));
+            CHECK(plan.desc(Id::HeroGBuffer)->width == 512);
         }
     }
 
@@ -564,18 +688,25 @@ namespace
     {
         for (bool hdr : { true, false })
         {
-            INFO((hdr ? "under HDR" : "without HDR"));
-            Inputs in          = defaults();
-            in.mHDR            = hdr;
-            in.mGBufferNormHDR = hdr;
-            const Plan plan    = Plan::make(in);
+            for (bool previewed : { false, true })
+            {
+                INFO((hdr ? "under HDR" : "without HDR") << (previewed ? ", a material preview alive" : ", none"));
+                Inputs in           = defaults();
+                in.mHDR             = hdr;
+                in.mGBufferNormHDR  = hdr;
+                in.mMaterialPreview = previewed;
+                const Plan plan     = Plan::make(in);
 
-            const IdSet post = in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::PostPing, Slot::PostPong }) |
-                               bloom({ Pack::Main, Pack::Probe, Pack::Hero });
-            CHECK(names(wanted(plan, post & Plan::idsOf(Pack::Hero))) == "nothing");
-            CHECK(names(wanted(plan, post & Plan::idsOf(Pack::Probe)) & ~preview_targets()) == "nothing");
-            CHECK(plan.wants(Id::MainPostPing));
-            CHECK(plan.wants(Id::MainPostPong));
+                const IdSet post = in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::PostPing, Slot::PostPong }) |
+                                   bloom({ Pack::Main, Pack::Probe, Pack::Hero });
+                CHECK(names(wanted(plan, post & Plan::idsOf(Pack::Hero))) == "nothing");
+                // The probes' captures never read the probe pack's: they are there for the preview alone.
+                CHECK(plan.wants(Id::ProbePostPing) == previewed);
+                CHECK(plan.wants(Id::ProbePostPong) == previewed);
+                CHECK(plan.wants(Id::ProbeBloom0) == (previewed && hdr));
+                CHECK(plan.wants(Id::MainPostPing));
+                CHECK(plan.wants(Id::MainPostPong));
+            }
         }
     }
 

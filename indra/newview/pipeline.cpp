@@ -847,7 +847,10 @@ void LLPipeline::resizeScreenTexture()
         if (gResizeScreenTexture || (scaledResX != mRT->screen.getWidth()) || (scaledResY != mRT->screen.getHeight()))
 // [/SL:KB]
         {
-            rebuildGLBuffers(RebuildCause::Resize);
+            // A request with no size change in it (requestResizeScreenTexture) asks for the resources as the settings
+            // now describe them.
+            const bool resized = scaledResX != mRT->screen.getWidth() || scaledResY != mRT->screen.getHeight();
+            rebuildGLBuffers(resized ? RebuildCause::Resize : RebuildCause::Setting);
             gResizeScreenTexture = false;
         }
     }
@@ -1182,18 +1185,16 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
         createBrdfLut();
     }
 
-    // The probe managers' own targets and cube arrays, beside their packs.
-    if (inputs.mProbes)
+    // The probe managers' own resources, planned beside their packs. They are freed here once nothing renders through
+    // them, and built by initReflectionMaps: the reflection probes' below, once this plan is the pipeline's, and the
+    // mirrors' by the hero manager's update, which runs in the frame before the world is drawn.
+    if (!plan.reflectionProbes())
     {
-        mReflectionMapManager.initReflectionMaps();
+        changes.mReflectionProbesFreed = mReflectionMapManager.freeResources();
     }
-    if (inputs.mMirrors)
+    if (!plan.heroProbes())
     {
-        mHeroProbeManager.initReflectionMaps();
-    }
-    else
-    {
-        // Nothing renders mirrors, so their probes go; initReflectionMaps builds them again when mirrors come back on.
+        changes.mHeroProbesFreed = mHeroProbeManager.holdsResources();
         mHeroProbeManager.cleanup();
     }
 
@@ -1212,6 +1213,13 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
 
     mResourceInputs = inputs;
     mResourcePlan   = plan;
+
+    // The reflection manager's update runs after the frame is drawn, so the frame after probes come on would draw
+    // through programs that read probes, with no cube array or coefficients to bind. Its update keeps them from then on.
+    if (plan.reflectionProbes())
+    {
+        mReflectionMapManager.initReflectionMaps();
+    }
 
     stop_glerror();
     return changes;
@@ -1565,11 +1573,20 @@ bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
     // A new context builds everything, which its count says better than sixty names.
     const std::string built = new_context ? fmt::format("{} resources", changes.mBuilt.count())
                                           : resource_names(changes.mBuilt);
+    std::string freed = changes.mFreed.any() ? resource_names(changes.mFreed) : std::string();
+    if (changes.mReflectionProbesFreed)
+    {
+        add(freed, "reflection probes");
+    }
+    if (changes.mHeroProbesFreed)
+    {
+        add(freed, "hero probes");
+    }
     LL_INFOS("RenderResources") << "Render resources reconciled at " << mMainRT.deferredScreen.getWidth() << "x"
                                 << mMainRT.deferredScreen.getHeight() << why
                                 << (changes.mFullSize ? std::string_view() : std::string_view(", halved for want of memory"))
                                 << "; changed: " << (changed.empty() ? std::string_view("nothing") : changed)
-                                << "; built: " << built << "; freed: " << resource_names(changes.mFreed) << "; kept "
+                                << "; built: " << built << "; freed: " << (freed.empty() ? std::string_view("nothing") : freed) << "; kept "
                                 << changes.mKept.count()
                                 << (changes.mFailed.any() ? "; failed: " + resource_names(changes.mFailed) : std::string())
                                 << "; invalidated: " << (invalidated.empty() ? std::string_view("nothing") : invalidated)

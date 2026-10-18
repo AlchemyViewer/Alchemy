@@ -57,6 +57,7 @@ struct ALRenderResourceInputs
     U32  mProbeResolution = 128;  ///< a probe's face edge, as probeResolution() takes RenderReflectionProbeResolution
     U32  mProbeSuperSample = 2;   ///< how much larger a probe face renders each way, as probeSuperSample() takes it
     bool mMirrors = false;        ///< RenderMirrors
+    bool mMaterialPreview = false; ///< a GLTF material preview is alive, which renders through the probe pack
     U32  mHeroResolution = 1024;  ///< RenderHeroProbeResolution
 
     U32  mFSAAType = 0;        ///< RenderFSAAType: 0 none, 1 FXAA, 2 SMAA

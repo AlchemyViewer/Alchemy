@@ -162,6 +162,11 @@ public:
     // call once at startup to allocate cubemap arrays
     void initReflectionMaps();
 
+    // The GL resources initReflectionMaps and update build: the cube array, the SH coefficients, the scratch target,
+    // the mip chain, the UBO and the vertex buffer. The probes stay, holding nothing, and start over once
+    // initReflectionMaps builds the resources again. Whether there was anything to free.
+    bool freeResources();
+
     // True if currently updating a radiance map, false if currently updating an irradiance map
     bool isRadiancePass() { return mRadiancePass; }
 
