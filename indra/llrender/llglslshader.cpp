@@ -68,6 +68,11 @@ U32 LLGLSLShader::sMaxGLTFMaterials = 0;
 U32 LLGLSLShader::sMaxGLTFNodes = 0;
 bool LLGLSLShader::sProfileEnabled = false;
 std::set<LLGLSLShader*>& LLGLSLShader::sInstances = *(new std::set<LLGLSLShader*>());
+std::set<LLGLSLShader*>& LLGLSLShader::sConfigured = *(new std::set<LLGLSLShader*>());
+U32 LLGLSLShader::sLoadGeneration = 0;
+U32 LLGLSLShader::sLinked = 0;
+U32 LLGLSLShader::sKept = 0;
+LLUUID LLGLSLShader::sSharedObjectsKey;
 LLGLSLShader::defines_map_t LLGLSLShader::sGlobalDefines;
 // Starts at 1, and a default-constructed program starts level with it (see the member's
 // initialiser) rather than behind: a program must not apply the environment uniform set before
@@ -679,6 +684,7 @@ LLGLSLShader::~LLGLSLShader()
     // dangle. It is walked for name uniqueness, so a stale entry is a use-after-free rather
     // than a leak. Recursion covers the subtree: each child erases itself on the way out.
     sInstances.erase(this);
+    sConfigured.erase(this);
     forget_profile_records(this);
 
     // Nor may the bound-program statics name this object. They are cleared without a GL call,
@@ -748,6 +754,7 @@ void LLGLSLShader::configureVariantClone(LLGLSLShader& dst, const std::string& n
     dst.mShaderFiles = mShaderFiles;
     dst.mShaderLevel = mShaderLevel;
     dst.mShaderGroup = mShaderGroup;
+    dst.mOnLink      = mOnLink;
 }
 
 // Build one corner: this program's config plus the requested defines, compiled. Deriving every
@@ -855,10 +862,16 @@ void LLGLSLShader::unload()
 
     // After unloadInternal: unbinding a bound program ends its profile queries by the
     // features they were begun with.
+    clearConfiguration();
+}
+
+void LLGLSLShader::clearConfiguration()
+{
     mShaderFiles.clear();
     mDefines.clear();
     mPermutationsAdded = false;
     mFeatures = LLShaderFeatures();
+    mOnLink = nullptr;
 }
 
 void LLGLSLShader::unloadInternal()
@@ -907,6 +920,8 @@ void LLGLSLShader::unloadInternal()
 
         mProgramObject = 0;
     }
+    mLinkedHash.setNull();
+    mLinkedVariants = 0;
 
     stop_glerror();
 }
@@ -937,6 +952,31 @@ bool LLGLSLShader::createShader(U32 variants)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    sConfigured.insert(this);
+    mLoadGeneration = sLoadGeneration;
+
+    // Linked as configured, its variants with it: nothing to build. The level is the one it linked at, which a
+    // fallback may have taken below the one asked for.
+    const LLUUID configured = hash();
+    if (mProgramObject != 0 && configured == mLinkedHash && variants == mLinkedVariants)
+    {
+        mShaderLevel       = mLinkedLevel;
+        mPermutationsAdded = false;
+        forEachVariant([](LLGLSLShader&) { ++sKept; });
+        return true;
+    }
+
+    if (!linkProgram(variants))
+    {
+        return false;
+    }
+    mLinkedHash     = configured;
+    mLinkedVariants = variants;
+    return true;
+}
+
+bool LLGLSLShader::linkProgram(U32 variants)
+{
     // Recreating the program invalidates any variants built from the previous configuration.
     freeOwnedVariants();
 
@@ -1041,7 +1081,7 @@ bool LLGLSLShader::createShader(U32 variants)
         {
             LL_SHADER_LOADING_WARNS() << "Failed to link using shader level " << mShaderLevel << " trying again using shader level " << (mShaderLevel - 1) << LL_ENDL;
             mShaderLevel--;
-            return createShader(variants);
+            return linkProgram(variants);
         }
         else
         {
@@ -1074,6 +1114,17 @@ bool LLGLSLShader::createShader(U32 variants)
     if (success && mFeatures.hasObjectSkinning)
     {
         mRiggedVariant = this;
+    }
+
+    if (success)
+    {
+        mLinkedLevel = mShaderLevel;
+        ++mLinkCount;
+        ++sLinked;
+        if (mOnLink)
+        {
+            mOnLink(*this);
+        }
     }
 
     for (EVariant axis : { VARIANT_RIGGED, VARIANT_CLASSIC, VARIANT_MIRROR })
@@ -2820,6 +2871,8 @@ LLUUID LLGLSLShader::hash()
     // (GBUFFER_NORM_HDR).
     hash_obj.update(&LLRender::sReverseZ, sizeof(LLRender::sReverseZ));
     hash_obj.update(&LLRender::sGBufferNormHDR, sizeof(LLRender::sGBufferNormHDR));
+    // The shared objects every program links against, which sGlobalDefines alone need not describe.
+    hash_obj.update(sSharedObjectsKey.mData, UUID_BYTES);
     hash_obj.update(&mFeatures, sizeof(LLShaderFeatures));
     // Not the raw renderer: radeonsi's carries the kernel release, and a kernel update would
     // orphan every binary.

@@ -193,6 +193,26 @@ namespace
         check("terrain detail 0 to -1 on 16 units", s, [](Settings& x) { x.mTerrainPBRDetail = -1; }, Cost::None);
     }
 
+    TEST_CASE("alshaderinputs: the shared objects' digest follows the global inputs alone", "[alshaderinputs]")
+    {
+        const Settings s = defaults();
+        const LLUUID   base = Inputs::make(s).mGlobal.digest();
+        CHECK(Inputs::make(s).mGlobal.digest() == base);
+
+        const auto digest_after = [&s](const std::function<void(Settings&)>& change)
+        {
+            Settings after = s;
+            change(after);
+            return Inputs::make(after).mGlobal.digest();
+        };
+        CHECK(digest_after([](Settings& x) { x.mLightingMaxLevel = 2; }) != base);
+        CHECK(digest_after([](Settings& x) { x.mReservedTextureIndices = 10; }) != base);
+        CHECK(digest_after([](Settings& x) { x.mWaterHextile = 2; }) != base);
+        CHECK(digest_after([](Settings& x) { x.mSSR = !x.mSSR; }) != base);
+        CHECK(digest_after([](Settings& x) { x.mAvatarCloth = !x.mAvatarCloth; }) == base);
+        CHECK(digest_after([](Settings& x) { x.mWaterWaves = !x.mWaterWaves; }) == base);
+    }
+
     TEST_CASE("alshaderinputs: the terrain's detail is what the context's texture units sample", "[alshaderinputs]")
     {
         // pbrterrainF.glsl: 17 samplers at detail 0, 13 at -1 and -2, 9 at -3, 5 at -4.

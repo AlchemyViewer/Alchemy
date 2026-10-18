@@ -188,6 +188,8 @@ private:
     bool rebuildGLBuffers(const ALRenderResourceInputs& requested, RebuildCause cause);
     // What the programs' reload alone invalidates, where no reconcile follows it, and its log line.
     void programsReloaded();
+    // Whether the BRDF LUT was drawn with a gDeferredGenBrdfLutProgram that has since linked again.
+    bool brdfLutStale() const;
 
     // What the settings say the programs' and the resources' inputs are now, read by latchRenderInputs alone, so every
     // program, resource and pass is planned from the same reading of the settings. The resources take the G-buffer's
@@ -224,6 +226,8 @@ private:
     ALShaderInputs         mLatchedShaderInputs;
     // Whether the last reconcile built the render size in full, which a snapshot at the size it was built for finds.
     bool                   mResourcesFullSize = true;
+    // The link of gDeferredGenBrdfLutProgram (LLGLSLShader::linkCount) the BRDF LUT was last drawn with.
+    U32                    mBrdfLutLinks = 0;
 
     // The changes marked since the last application, and how many the one running applies, for the log line.
     ALRenderInputRequests mRenderInputRequests;

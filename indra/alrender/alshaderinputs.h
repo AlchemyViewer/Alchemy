@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "lluuid.h"
 #include "stdtypes.h"
 
 // Encodes detail level for dropping textures, in accordance with the GLTF spec where possible
@@ -120,6 +121,10 @@ struct ALShaderInputs
         S32  mTerrainPBRDetail = 0;   ///< TERRAIN_PBR_DETAIL, as much as the context's texture units can sample
         bool mTerrainHexTiling = false; ///< TERRAIN_HEX_TILING
         S32  mWaterHextile   = 1;     ///< WATER_HEXTILE: the hex-tiled wave layers, 0 to 2
+
+        /// A digest of every field, which every program's hash folds in (LLGLSLShader::sSharedObjectsKey): the shared
+        /// objects they link against are compiled from these, some of which reach no define.
+        LLUUID digest() const;
 
         friend bool operator==(const Global&, const Global&) = default;
     };

@@ -829,7 +829,7 @@ void LLPipeline::applyRenderInputs(const ALRenderInputRequests::Application& tak
     mApplyingChanges = taken.mChanges;
     const bool reload = steps.mPrograms != Programs::Kept;
     // Programs first: the resources' plan takes the normal layout and the depth convention they compile for.
-    if (reload && !shaders->setShaders(mLatchedShaderInputs))
+    if (reload && !shaders->setShaders(mLatchedShaderInputs, steps))
     {
         mApplyingChanges = 0;
         return;
@@ -1638,7 +1638,7 @@ bool LLPipeline::rebuildGLBuffers(const ALRenderResourceInputs& requested, Rebui
 
         // The table is what gDeferredGenBrdfLutProgram draws, so it is drawn again whenever that is relinked; a table
         // built just now was drawn as it was built.
-        if (cause == RebuildCause::ShaderReload && !changes.mBuilt.test((size_t)ALRenderResourcePlan::Id::BrdfLut))
+        if (cause == RebuildCause::ShaderReload && brdfLutStale())
         {
             createBrdfLut();
             add(invalidated, "BRDF LUT");
@@ -1749,9 +1749,19 @@ bool LLPipeline::rebuildGLBuffers(const ALRenderResourceInputs& requested, Rebui
 void LLPipeline::programsReloaded()
 {
     // The table is what gDeferredGenBrdfLutProgram draws, so it is drawn again whenever that is relinked.
-    createBrdfLut();
+    const bool brdf_lut = brdfLutStale();
+    if (brdf_lut)
+    {
+        createBrdfLut();
+    }
     LL_INFOS("RenderResources") << "Programs reloaded" << applyingChanges(mApplyingChanges)
-                                << "; render resources kept; invalidated: BRDF LUT" << LL_ENDL;
+                                << "; render resources kept; invalidated: "
+                                << (brdf_lut ? std::string_view("BRDF LUT") : std::string_view("nothing")) << LL_ENDL;
+}
+
+bool LLPipeline::brdfLutStale() const
+{
+    return mPbrBrdfLut.isComplete() && gDeferredGenBrdfLutProgram.linkCount() != mBrdfLutLinks;
 }
 
 void LLPipeline::createResourceTexture(ALRenderResourcePlan::Id id)
@@ -1895,6 +1905,7 @@ void LLPipeline::createBrdfLut()
     {
         return;
     }
+    mBrdfLutLinks = gDeferredGenBrdfLutProgram.linkCount();
     mPbrBrdfLut.bindTarget();
 
     if (gDeferredGenBrdfLutProgram.isComplete())

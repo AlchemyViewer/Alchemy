@@ -26,7 +26,38 @@
 
 #include "alshaderinputs.h"
 
+#include "alrendertargetdesc.h"
+#include "hbxxh.h"
+
 #include <algorithm>
+
+LLUUID ALShaderInputs::Global::digest() const
+{
+    static_assert(al_render_target_desc::field_count<Global>() == 18,
+                  "ALShaderInputs::Global gained or lost a field: fold it into digest()");
+
+    HBXXH128   hash;
+    const auto add = [&hash](const auto& value) { hash.update(&value, sizeof(value)); };
+    add(mReverseZ);
+    add(mGBufferNormHDR);
+    add(mEmissive);
+    add(mLightingClass);
+    add(mIndexedTextureChannels);
+    add(mSpecularExponent);
+    add(mSSR);
+    add(mMirrors);
+    add(mProbes);
+    add(mProbeLevel);
+    add(mShadowDetail);
+    add(mShadowFilterQuality);
+    add(mShadowPCSSScale);
+    add(mTerrainPlanarSampleCount);
+    add(mTerrainTriplanarBlend);
+    add(mTerrainPBRDetail);
+    add(mTerrainHexTiling);
+    add(mWaterHextile);
+    return hash.digest();
+}
 
 // static
 S32 ALShaderInputs::terrainMapping(S32 setting)

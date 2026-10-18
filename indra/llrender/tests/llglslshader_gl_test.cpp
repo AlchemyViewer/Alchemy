@@ -849,6 +849,95 @@ namespace
         CHECK(packed_normals != reversed);
     }
 
+    // A load configures every program from nothing and asks createShader for it again (LLViewerShaderMgr::setShaders). One
+    // configured as it linked is kept: its name, its uniforms and its hook's work stand, and nothing is compiled. One
+    // configured otherwise links again. GL may hand a deleted program's name straight back out, so the link count, not
+    // the name, says which.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: createShader keeps a program configured as it linked and links one configured otherwise", "[llglslshader_gl]")
+    {
+        setUpShaders();
+
+        U32 hooks = 0;
+        const auto configure = [&](LLGLSLShader& shader)
+        {
+            shader.clearConfiguration();
+            shader.mName = "kept (test)";
+            shader.mShaderLevel = 1;
+            shader.mShaderFiles.push_back({ "test/fullscreenV.glsl", GL_VERTEX_SHADER });
+            shader.mShaderFiles.push_back({ "test/boolsF.glsl", GL_FRAGMENT_SHADER });
+            shader.mOnLink = [&hooks](LLGLSLShader&) { ++hooks; };
+        };
+        const auto held = [this]()
+        {
+            GLint value = -1;
+            glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testBools[1]"), &value);
+            return value;
+        };
+
+        mDraw.unload();
+        configure(mDraw);
+        REQUIRE(mDraw.createShader());
+        const GLuint name  = mDraw.mProgramObject;
+        const U32    links = mDraw.linkCount();
+        CHECK(hooks == 1);
+        mDraw.bind();
+        const GLint ints[2] = { 0, 1 };
+        mDraw.uniform1iv(TEST_BOOLS, 2, ints);
+        mDraw.unbind();
+        REQUIRE(held() == 1);
+
+        SECTION("configured as it linked")
+        {
+            configure(mDraw);
+            CHECK(mDraw.createShader());
+            CHECK(mDraw.mProgramObject == name);
+            CHECK(mDraw.linkCount() == links);
+            CHECK(hooks == 1);
+            CHECK(held() == 1);
+        }
+
+        SECTION("with a define of its own")
+        {
+            configure(mDraw);
+            mDraw.addPermutation("TEST_DEFINE", "1");
+            CHECK(mDraw.createShader());
+            CHECK(mDraw.linkCount() == links + 1);
+            CHECK(hooks == 2);
+            CHECK(held() == 0);
+        }
+
+        SECTION("with a feature")
+        {
+            // One that attaches nothing either way, so the program links with the objects the test has.
+            configure(mDraw);
+            mDraw.mFeatures.attachNothing = true;
+            CHECK(mDraw.createShader());
+            CHECK(mDraw.linkCount() == links + 1);
+            CHECK(hooks == 2);
+        }
+
+        SECTION("against shared objects compiled from other inputs")
+        {
+            const LLUUID key = LLGLSLShader::sSharedObjectsKey;
+            LLGLSLShader::sSharedObjectsKey.generate();
+            configure(mDraw);
+            CHECK(mDraw.createShader());
+            CHECK(mDraw.linkCount() == links + 1);
+            LLGLSLShader::sSharedObjectsKey = key;
+        }
+
+        SECTION("unloaded")
+        {
+            mDraw.unload();
+            configure(mDraw);
+            CHECK(mDraw.createShader());
+            CHECK(mDraw.linkCount() == links + 1);
+            CHECK(hooks == 2);
+        }
+
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
     // Ints and uints arrive exactly past 2^24: each set below differs from the one before only in values that
     // convert to the same float, and only in some of its components.
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: ints and uints arrive exactly past 2^24", "[llglslshader_gl]")

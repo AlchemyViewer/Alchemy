@@ -52,6 +52,7 @@
 #include "llfile.h"
 
 #include <filesystem>
+#include <fmt/format.h>
 #include "llviewerwindow.h"
 #include "llwindow.h"
 
@@ -508,7 +509,7 @@ S32 LLViewerShaderMgr::getShaderLevel(S32 type)
 //============================================================================
 // Shader Management
 
-bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs)
+bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs, const ALRenderApplication& application)
 {
     LL_PROFILE_ZONE_SCOPED;
     static bool reentrance = false;
@@ -580,12 +581,36 @@ bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs)
 
     reentrance = true;
 
-    // Make sure the compiled shader map is cleared before we recompile shaders.
-    clearShaderObjects();
+    const LLTimer timer;
+    LLGLSLShader::sLinked = 0;
+    LLGLSLShader::sKept   = 0;
+    ++LLGLSLShader::sLoadGeneration;
 
     initAttribsAndUniforms();
 
-    unloadShaders();
+    const bool rebuild        = application.mPrograms == ALRenderApplication::Programs::Rebuilt;
+    const bool shared_objects = rebuild || application.mSharedObjects;
+    if (rebuild)
+    {
+        // Every program built from its sources, and the shared objects with them.
+        unloadShaders();
+    }
+    else
+    {
+        // Every program configured again from nothing, as an unload leaves it, and still linked: createShader keeps
+        // each its loader configures as it linked. A variant is its program's, kept or built again with it.
+        for (LLGLSLShader* shader : LLGLSLShader::sConfigured)
+        {
+            if (!shader->mOwnedVariant)
+            {
+                shader->clearConfiguration();
+            }
+        }
+        if (shared_objects)
+        {
+            clearShaderObjects();
+        }
+    }
 
     LLPipeline::sRenderGlow = gSavedSettings.getBOOL("RenderGlow");
 
@@ -616,12 +641,6 @@ bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs)
     S32 water_class = 3;
     S32 deferred_class = 3;
 
-    // Trigger a full rebuild of the fallback skybox / cubemap if we've toggled windlight shaders
-    if (!wl_class || (mShaderLevel[SHADER_WINDLIGHT] != wl_class && gSky.mVOSkyp.notNull()))
-    {
-        gSky.mVOSkyp->forceSkyUpdate();
-    }
-
     // Load lighting shaders
     mShaderLevel[SHADER_LIGHTING] = light_class;
     mShaderLevel[SHADER_INTERFACE] = interface_class;
@@ -632,8 +651,12 @@ bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs)
     mShaderLevel[SHADER_WINDLIGHT] = wl_class;
     mShaderLevel[SHADER_DEFERRED] = deferred_class;
 
-    std::string shader_name = loadBasicShaders();
-    if (shader_name.empty())
+    std::string shader_name = shared_objects ? loadBasicShaders() : std::string();
+    if (!shared_objects)
+    {
+        LL_INFOS("Shader") << "Kept the basic shaders." << LL_ENDL;
+    }
+    else if (shader_name.empty())
     {
         LL_INFOS("Shader") << "Loaded basic shaders." << LL_ENDL;
     }
@@ -650,6 +673,13 @@ bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs)
         LL_ERRS() << "Unable to load basic shader " << shader_name << ", verify graphics driver installed and current." << LL_ENDL;
         reentrance = false; // For hygiene only, re-try probably helps nothing
         return false;
+    }
+
+    // The waves' objects, which no other program attaches, where the waves have come on since the shared objects were
+    // compiled; left compiled while they are off.
+    if (mInputs.mLocal.mWaterWaves && !mWaterWaveObjects)
+    {
+        loadWaterWaveObjects();
     }
 
     gPipeline.mShadersLoaded = true;
@@ -732,8 +762,29 @@ bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs)
         llassert(loaded);
     }
 
+    // A program this load's loaders configured nothing for was not asked for: a feature switched off, or a loader
+    // stopped short at a failure. It goes, as a load from nothing would leave it.
+    std::vector<LLGLSLShader*> unasked;
+    for (LLGLSLShader* shader : LLGLSLShader::sInstances)
+    {
+        if (!shader->mOwnedVariant && shader->mLoadGeneration != LLGLSLShader::sLoadGeneration)
+        {
+            unasked.push_back(shader);
+        }
+    }
+    for (LLGLSLShader* shader : unasked)
+    {
+        shader->unload();
+    }
+
+    // The fallback sky cube map is drawn with these programs, and again by the sky once it is told to.
+    if (LLGLSLShader::sLinked > 0 && gSky.mVOSkyp.notNull())
+    {
+        gSky.mVOSkyp->forceSkyUpdate();
+    }
+
     // We only want to persist shader cache metadata if we successfully loaded shaders, otherwise we might be caching failure states
-    if (loaded && !LLAppViewer::instance()->isSecondInstance())
+    if (loaded && LLGLSLShader::sLinked > 0 && !LLAppViewer::instance()->isSecondInstance())
     {
         persistShaderCacheMetadata();
     }
@@ -744,6 +795,14 @@ bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs)
     }
 
     finalizeShaderList();
+
+    LL_INFOS("ShaderLoading") << "Programs " << (rebuild ? "built from their sources" : "reloaded") << ": "
+                              << LLGLSLShader::sLinked << " linked, " << LLGLSLShader::sKept << " kept, "
+                              << unasked.size() << " unloaded; shared objects "
+                              << (shared_objects ? "compiled" : "kept") << ", in "
+                              << fmt::format("{:.1f}", timer.getElapsedTimeF64().value() * 1000.0) << " ms" << LL_ENDL;
+    LL_PROFILE_PLOT("programs linked", (int64_t)LLGLSLShader::sLinked);
+    LL_PROFILE_PLOT("programs kept", (int64_t)LLGLSLShader::sKept);
 
     reentrance = false;
     return true;
@@ -891,6 +950,9 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     attribs["WATER_HEXTILE"] = std::to_string(in.mWaterHextile);
 
     LLGLSLShader::sGlobalDefines = attribs;
+    // What the objects below compile from, which every program's hash follows.
+    LLGLSLShader::sSharedObjectsKey = in.digest();
+    mWaterWaveObjects = false;
 
     // Shared objects are compiled once and attached by name, so a per-program permutation
     // cannot reach them. Sources that read classic_mode therefore get a second copy compiled
@@ -928,26 +990,6 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         {
             LL_WARNS("Shader") << "Failed to load basic tessellation evaluation shader " << i << ": " << shaders[i].first << LL_ENDL;
             return shaders[i].first;
-        }
-    }
-
-    // The water waves' stages, where they are wanted: the evaluation stage's surface and the lattice its heights are read
-    // through, and the control stage's depth pyramid test, which culls the patches the scene hides. The waves are
-    // optional, so these failing leaves only them off: their programs then fail to attach what is missing.
-    if (mInputs.mLocal.mWaterWaves)
-    {
-        const std::pair<const char*, GLenum> water_objects[] = {
-            { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
-            { "deferred/hexLatticeUtil.glsl", GL_TESS_EVALUATION_SHADER },
-            { "deferred/depthPyramidUtil.glsl", GL_TESS_CONTROL_SHADER },
-        };
-        for (const auto& object : water_objects)
-        {
-            S32 level = 1;
-            if (loadShaderFile(object.first, level, object.second, &attribs) == 0)
-            {
-                LL_WARNS("Shader") << "Failed to load the water waves' " << object.first << "; the water is drawn flat" << LL_ENDL;
-            }
         }
     }
 
@@ -1023,6 +1065,27 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     return std::string();
 }
 
+void LLViewerShaderMgr::loadWaterWaveObjects()
+{
+    // The evaluation stage's surface and the lattice its heights are read through, and the control stage's depth
+    // pyramid test, which culls the patches the scene hides. The waves are optional, so these failing leaves only them
+    // off: their programs then fail to attach what is missing.
+    const std::pair<const char*, GLenum> water_objects[] = {
+        { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
+        { "deferred/hexLatticeUtil.glsl", GL_TESS_EVALUATION_SHADER },
+        { "deferred/depthPyramidUtil.glsl", GL_TESS_CONTROL_SHADER },
+    };
+    for (const auto& object : water_objects)
+    {
+        S32 level = 1;
+        if (loadShaderFile(object.first, level, object.second, &LLGLSLShader::sGlobalDefines) == 0)
+        {
+            LL_WARNS("Shader") << "Failed to load the water waves' " << object.first << "; the water is drawn flat" << LL_ENDL;
+        }
+    }
+    mWaterWaveObjects = true;
+}
+
 bool LLViewerShaderMgr::loadShadersWater()
 {
     LL_PROFILE_ZONE_SCOPED;
@@ -1096,9 +1159,8 @@ bool LLViewerShaderMgr::loadShadersWater()
         success = setup(gWaterProgram, false, false) && setup(gUnderWaterProgram, true, false);
         llassert(success);
         // The waves are optional: built only where they are wanted, and their failing leaves them off, the water flat,
-        // rather than the water or any shader after it.
-        gWaterWavesProgram.unload();
-        gUnderWaterWavesProgram.unload();
+        // rather than the water or any shader after it. Where they are not wanted the load unloads them, asking nothing
+        // of them.
         if (success && mInputs.mLocal.mWaterWaves)
         {
             if (!setup(gWaterWavesProgram, false, true) || !setup(gUnderWaterWavesProgram, true, true))
@@ -1630,14 +1692,11 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             prog.addPermutation("DIFFUSE_ALPHA_MODE", llformat("%d", alpha_mode));
             prog.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
             add_common_permutations(&prog);
+            const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+            prog.mOnLink = [n, has_normal, has_spec](LLGLSLShader& s)
+            { setup_material_indexed_samplers(s, n, has_normal, has_spec); };
 
             material_indexed_ok = prog.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
-            if (material_indexed_ok)
-            {
-                const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-                prog.forEachVariant([n, has_normal, has_spec](LLGLSLShader& s)
-                { setup_material_indexed_samplers(s, n, has_normal, has_spec); });
-            }
         }
 
         if (material_indexed_ok)
@@ -1703,15 +1762,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 shader->addPermutation("HAS_ALPHA_MASK", "1");
             }
 
+            // Map each slot's four material samplers to texture units, on every variant.
+            const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+            shader->mOnLink = [n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, true); };
+
             // rigged (skinned) variant for animesh / avatar attachments
             indexed_ok = indexed_ok && shader->createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
-
-            if (indexed_ok)
-            {
-                // Map each slot's four material samplers to texture units, on every variant.
-                const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-                shader->forEachVariant([n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, true); });
-            }
         }
 
         if (!indexed_ok)
@@ -1771,14 +1827,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gPBRGlowIndexedProgram.clearPermutations();
         gPBRGlowIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
         add_common_permutations(&gPBRGlowIndexedProgram);
+        const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+        gPBRGlowIndexedProgram.mOnLink = [n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, true); };
 
-        bool glow_indexed_ok = gPBRGlowIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
-        if (glow_indexed_ok)
-        {
-            S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            gPBRGlowIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, true); });
-        }
-        else
+        if (!gPBRGlowIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED))
         {
             LL_WARNS("ShaderLoading") << "Indexed PBR glow shader failed to load; multi-material glow falls back to scalar." << LL_ENDL;
             gPBRGlowIndexedProgram.unload();
@@ -2498,14 +2550,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredEmissiveIndexedProgram.clearPermutations();
         gDeferredEmissiveIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
         add_common_permutations(&gDeferredEmissiveIndexedProgram);
+        const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+        gDeferredEmissiveIndexedProgram.mOnLink = [n](LLGLSLShader& s) { setup_material_indexed_samplers(s, n, false, false); };
 
-        bool emissive_indexed_ok = gDeferredEmissiveIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
-        if (emissive_indexed_ok)
-        {
-            S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            gDeferredEmissiveIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_material_indexed_samplers(s, n, false, false); });
-        }
-        else
+        if (!gDeferredEmissiveIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED))
         {
             LL_WARNS("ShaderLoading") << "Indexed legacy glow shader failed to load; multi-material glow falls back to scalar." << LL_ENDL;
             gDeferredEmissiveIndexedProgram.unload();
@@ -2726,15 +2774,11 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredShadowGLTFAlphaMaskIndexedProgram.clearPermutations();
         gDeferredShadowGLTFAlphaMaskIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
         add_common_permutations(&gDeferredShadowGLTFAlphaMaskIndexedProgram);
+        // only base color is sampled for the shadow alpha test
+        const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+        gDeferredShadowGLTFAlphaMaskIndexedProgram.mOnLink = [n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, false); };
 
-        bool shadow_indexed_ok = gDeferredShadowGLTFAlphaMaskIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
-
-        if (shadow_indexed_ok)
-        { // only base color is sampled for the shadow alpha test
-            const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            gDeferredShadowGLTFAlphaMaskIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, false); });
-        }
-        else
+        if (!gDeferredShadowGLTFAlphaMaskIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED))
         {
             LL_WARNS("ShaderLoading") << "Indexed PBR shadow alpha mask shader failed to load." << LL_ENDL;
             gDeferredShadowGLTFAlphaMaskIndexedProgram.unload();
@@ -2755,15 +2799,11 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredShadowMaterialIndexedProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredShadowMaterialIndexedProgram.clearPermutations();
         gDeferredShadowMaterialIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
+        // only diffuse is sampled for the shadow alpha test
+        const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+        gDeferredShadowMaterialIndexedProgram.mOnLink = [n](LLGLSLShader& s) { setup_material_indexed_samplers(s, n, false, false); };
 
-        bool mat_shadow_ok = gDeferredShadowMaterialIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
-
-        if (mat_shadow_ok)
-        { // only diffuse is sampled for the shadow alpha test
-            const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            gDeferredShadowMaterialIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_material_indexed_samplers(s, n, false, false); });
-        }
-        else
+        if (!gDeferredShadowMaterialIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED))
         {
             LL_WARNS("ShaderLoading") << "Indexed legacy material shadow shader failed to load; legacy batching disabled." << LL_ENDL;
             gDeferredShadowMaterialIndexedProgram.unload();
@@ -3441,7 +3481,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     // The depth pyramid's levels, where the session computes and the water's waves, its reader, are wanted. Optional,
     // like them: its failing leaves the cull off (ALDepthPyramid::build), not the shaders after it.
-    gDepthPyramidProgram.unload();
     if (success && mInputs.mLocal.mCompute && mInputs.mLocal.mWaterWaves)
     {
         gDepthPyramidProgram.mName = "Depth Pyramid Shader";
@@ -3757,17 +3796,15 @@ bool LLViewerShaderMgr::loadShadersObject()
         gObjectBumpProgram.mShaderFiles.push_back(make_pair("objects/bumpV.glsl", GL_VERTEX_SHADER));
         gObjectBumpProgram.mShaderFiles.push_back(make_pair("objects/bumpF.glsl", GL_FRAGMENT_SHADER));
         gObjectBumpProgram.mShaderLevel = mShaderLevel[SHADER_OBJECT];
+        //lldrawpoolbump assumes "texture0" has channel 0 and "texture1" has channel 1
+        gObjectBumpProgram.mOnLink = [](LLGLSLShader& s)
+        {
+            s.bind();
+            s.uniform1i(sTexture0, 0);
+            s.uniform1i(sTexture1, 1);
+            s.unbind();
+        };
         success = gObjectBumpProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
-        if (success)
-        { //lldrawpoolbump assumes "texture0" has channel 0 and "texture1" has channel 1
-            gObjectBumpProgram.forEachVariant([](LLGLSLShader& s)
-            {
-                s.bind();
-                s.uniform1i(sTexture0, 0);
-                s.uniform1i(sTexture1, 1);
-                s.unbind();
-            });
-        }
     }
 
     if (success)
@@ -3985,19 +4022,19 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gUIProgram.mShaderFiles.push_back(make_pair("interface/uiV.glsl", GL_VERTEX_SHADER));
         gUIProgram.mShaderFiles.push_back(make_pair("interface/uiF.glsl", GL_FRAGMENT_SHADER));
         gUIProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gUIProgram.createShader();
-        if (success)
+        // Initialize the shadow-path uniform to passthrough so non-text UI
+        // and NO_SHADOW text take the early-return branch in uiF.glsl. GLSL
+        // already zero-initializes uniforms, but pushing an explicit default
+        // documents the contract and protects against driver quirks.
+        // textShadowMode is the shader's only shadow uniform — atlas texel size
+        // and channel layout derive from the bound texture in uiF.glsl.
+        gUIProgram.mOnLink = [](LLGLSLShader& s)
         {
-            // Initialize the shadow-path uniform to passthrough so non-text UI
-            // and NO_SHADOW text take the early-return branch in uiF.glsl. GLSL
-            // already zero-initializes uniforms, but pushing an explicit default
-            // documents the contract and protects against driver quirks.
-            // textShadowMode is the shader's only shadow uniform — atlas texel size
-            // and channel layout derive from the bound texture in uiF.glsl.
-            gUIProgram.bind();
-            gUIProgram.uniform1i(LLShaderMgr::TEXT_SHADOW_MODE, 0);
-            gUIProgram.unbind();
-        }
+            s.bind();
+            s.uniform1i(LLShaderMgr::TEXT_SHADOW_MODE, 0);
+            s.unbind();
+        };
+        success = gUIProgram.createShader();
     }
 
     if (success)
@@ -4038,14 +4075,15 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gTwoTextureCompareProgram.mShaderFiles.push_back(make_pair("interface/twotexturecompareV.glsl", GL_VERTEX_SHADER));
         gTwoTextureCompareProgram.mShaderFiles.push_back(make_pair("interface/twotexturecompareF.glsl", GL_FRAGMENT_SHADER));
         gTwoTextureCompareProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gTwoTextureCompareProgram.createShader();
-        if (success)
+        gTwoTextureCompareProgram.mOnLink = [](LLGLSLShader& s)
         {
-            gTwoTextureCompareProgram.bind();
-            gTwoTextureCompareProgram.uniform1i(sTex0, 0);
-            gTwoTextureCompareProgram.uniform1i(sTex1, 1);
-            gTwoTextureCompareProgram.uniform1i(sDitherTex, 2);
-        }
+            s.bind();
+            s.uniform1i(sTex0, 0);
+            s.uniform1i(sTex1, 1);
+            s.uniform1i(sDitherTex, 2);
+            s.unbind();
+        };
+        success = gTwoTextureCompareProgram.createShader();
     }
 
     if (success)
@@ -4055,12 +4093,13 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gOneTextureFilterProgram.mShaderFiles.push_back(make_pair("interface/onetexturefilterV.glsl", GL_VERTEX_SHADER));
         gOneTextureFilterProgram.mShaderFiles.push_back(make_pair("interface/onetexturefilterF.glsl", GL_FRAGMENT_SHADER));
         gOneTextureFilterProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gOneTextureFilterProgram.createShader();
-        if (success)
+        gOneTextureFilterProgram.mOnLink = [](LLGLSLShader& s)
         {
-            gOneTextureFilterProgram.bind();
-            gOneTextureFilterProgram.uniform1i(sTex0, 0);
-        }
+            s.bind();
+            s.uniform1i(sTex0, 0);
+            s.unbind();
+        };
+        success = gOneTextureFilterProgram.createShader();
     }
 #endif
 
@@ -4071,13 +4110,13 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gSolidColorProgram.mShaderFiles.push_back(make_pair("interface/solidcolorV.glsl", GL_VERTEX_SHADER));
         gSolidColorProgram.mShaderFiles.push_back(make_pair("interface/solidcolorF.glsl", GL_FRAGMENT_SHADER));
         gSolidColorProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gSolidColorProgram.createShader();
-        if (success)
+        gSolidColorProgram.mOnLink = [](LLGLSLShader& s)
         {
-            gSolidColorProgram.bind();
-            gSolidColorProgram.uniform1i(sTex0, 0);
-            gSolidColorProgram.unbind();
-        }
+            s.bind();
+            s.uniform1i(sTex0, 0);
+            s.unbind();
+        };
+        success = gSolidColorProgram.createShader();
     }
 
     if (success)

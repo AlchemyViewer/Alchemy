@@ -30,6 +30,7 @@
 #ifndef LL_VIEWER_SHADER_MGR_H
 #define LL_VIEWER_SHADER_MGR_H
 
+#include "alrenderinputrequests.h"
 #include "alshaderinputs.h"
 #include "llshadermgr.h"
 #include "llmaterial.h"
@@ -53,10 +54,12 @@ public:
     static void releaseInstance();
 
     void initAttribsAndUniforms(void) override;
-    /// Loads every program for @a inputs, which the pipeline's application latched (LLPipeline::applyRenderInputs), and
-    /// keeps them. Whether the programs were loaded: not before the pipeline is initialised, nor on a context that cannot
-    /// build them.
-    bool setShaders(const ALShaderInputs& inputs);
+    /// Loads the programs for @a inputs, which the pipeline's application latched (LLPipeline::applyRenderInputs), and
+    /// keeps them, as @a application says: every program built from its sources, or every loader run and only the
+    /// programs it configures otherwise than they linked linked again, the shared objects compiled again only where it
+    /// asks. A program no loader asks for is unloaded. Whether the programs were loaded: not before the pipeline is
+    /// initialised, nor on a context that cannot build them.
+    bool setShaders(const ALShaderInputs& inputs, const ALRenderApplication& application);
     /// The inputs the programs were last loaded for, which every loader reads in place of the settings.
     const ALShaderInputs& inputs() const { return mInputs; }
     void unloadShaders();
@@ -66,6 +69,8 @@ public:
     // name of a file error happened at, otherwise
     // returns an empty string
     std::string loadBasicShaders();
+    // The objects only the water waves' programs attach, compiled with the global defines while the waves are wanted.
+    void loadWaterWaveObjects();
     bool loadShadersEffects();
     bool loadShadersDeferred();
     bool loadShadersObject();
@@ -96,6 +101,8 @@ public:
 
 private:
     ALShaderInputs mInputs;
+    // Whether the water waves' objects are compiled among the shared objects.
+    bool mWaterWaveObjects = false;
 }; //LLViewerShaderMgr
 
 extern LLVector4            gShinyOrigin;
