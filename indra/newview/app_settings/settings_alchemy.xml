@@ -2322,6 +2322,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderMirrorShaderReload</key>
+        <map>
+            <key>Comment</key>
+            <string>Debug: the first mirror update of a session purges the program binary cache, builds every program from its sources and rebuilds the mirrors (the #3331 workaround). Turn off and restart to see whether mirrors work without it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderShadowDepth32F</key>
         <map>
             <key>Comment</key>

@@ -87,7 +87,8 @@ void LLHeroProbeManager::update()
     // For some reason clearing shaders will cause mirrors to actually work.
     // There's likely some deeper state issue that needs to be resolved.
     // - Geenz 2025-02-25
-    if (!mInitialized && LLStartUp::getStartupState() > STATE_PRECACHE)
+    static LLCachedControl<bool> shader_reload_workaround(gSavedSettings, "AlchemyRenderMirrorShaderReload", true);
+    if (!mInitialized && shader_reload_workaround && LLStartUp::getStartupState() > STATE_PRECACHE)
     {
         // The hero probes are rebuilt from nothing now, and every program from its sources by the next frame's
         // application: which of the two the workaround needs is not known.
