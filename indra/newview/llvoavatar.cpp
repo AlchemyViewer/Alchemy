@@ -7028,7 +7028,10 @@ LLJoint* LLVOAvatar::getJoint(std::string_view name)
     }
 
 #ifndef LL_RELEASE_FOR_DOWNLOAD
-    if (jointp && jointp->getName()!="mScreen" && jointp->getName()!="mRoot")
+    // Only bones, collision volumes and attachment points are numbered. The
+    // body meshes are in the tree by name with no number, as mRoot and
+    // mScreen are, and an animation or a rig can name one.
+    if (jointp && jointp->getJointNum() >= 0)
     {
         llassert(getJoint(jointp->getJointNum())==jointp);
     }
