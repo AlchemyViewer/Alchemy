@@ -423,15 +423,11 @@ void fixup_shader_constants(LLGLSLShader& shader)
     shader.uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, LLColor3::white.mV);
     shader.uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, 0.0f);
 
-    // Ignore sun shadow (if enabled)
-    for (U32 i = 0; i < 6; i++)
-    {
-        const S32 channel = shader.getTextureChannel(LLShaderMgr::DEFERRED_SHADOW0+i);
-        if (channel != -1)
-        {
-            gGL.getTextureSlot(channel)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap, true);
-        }
-    }
+    // Ignore shadows (if enabled): the preview has none of the maps, the sun's four cascades and the spot pair, so each
+    // reads lit without a sample. Their units keep the depth maps bindShadowMaps put there, under the sampler the
+    // program declares them for, and the next bind through bindShadowMaps hands the program its real set again.
+    constexpr S32 every_shadow_map = (1 << 6) - 1;
+    shader.uniform1i(LLShaderMgr::UNBUILT_SHADOW_MAPS, every_shadow_map);
 }
 
 // Set a variable to a value temporarily, and restor the variable's old value
