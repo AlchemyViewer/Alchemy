@@ -329,9 +329,8 @@ static bool handleDisableVintageMode(const LLSD& newvalue)
 static bool handleEnableHDR(const LLSD& newvalue)
 {
     // setShaders latches the G-buffer's normal layout before it compiles and reconciles the resources after, as it
-    // does reverse-Z's. The probes' cube arrays change format as well.
-    gPipeline.mReflectionMapManager.reset();
-    gPipeline.mHeroProbeManager.reset();
+    // does reverse-Z's. The probes' cube arrays change format as well, which each manager rebuilds, its probes with
+    // them, on finding the plan's HDR is not the one it built for.
     return handleSetShaderChanged(newvalue);
 }
 
@@ -632,6 +631,16 @@ static bool handleReflectionProbesChanged(const LLSD& newvalue)
     if (gPipeline.isInit())
     {
         gPipeline.mReflectionMapManager.reset();
+        gPipeline.mHeroProbeManager.reset();
+    }
+    return handleSetShaderChanged(newvalue);
+}
+
+// The mirrors are the hero probes' alone: the reflection probes render the same with them or without.
+static bool handleMirrorsChanged(const LLSD& newvalue)
+{
+    if (gPipeline.isInit())
+    {
         gPipeline.mHeroProbeManager.reset();
     }
     return handleSetShaderChanged(newvalue);
@@ -1038,13 +1047,15 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbesChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeSettingsChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeCount", handleReflectionProbeSettingsChanged);
-    setting_setup_signal_listener(gSavedSettings, "ALProbeSuperSample", handleReflectionProbesChanged);
+    // Sizes the probe pack and the manager's scratch target, both planned from it; no program reads it.
+    setting_setup_signal_listener(gSavedSettings, "ALProbeSuperSample", handleRenderResourceInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbesChanged);
 #if LL_DARWIN
     setting_setup_signal_listener(gSavedSettings, "RenderAppleUseMultGL", handleAppleUseMultGLChanged);
 #endif
-    setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbesChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleReflectionProbesChanged);
+    // The screen-space reflections' programs and the scene copy they march through; the probes are not theirs.
+    setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleMirrorsChanged);
     // Each sizes a capture pack and its probe manager's own resources, both planned from it.
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeResolution", handleRenderResourceInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleRenderResourceInputChanged);
