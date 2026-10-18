@@ -631,6 +631,12 @@ bool LLAvatarNameCache::get(const LLUUID& agent_id, LLAvatarName *av_name)
 // returns bool specifying  if av_name was filled, false otherwise
 bool LLAvatarNameCache::getName(const LLUUID& agent_id, LLAvatarName *av_name)
 {
+    // The null id names no one, and a request for it would never be answered.
+    if (agent_id.isNull())
+    {
+        return false;
+    }
+
     if (mRunning)
     {
         // ...only do immediate lookups when cache is running
@@ -681,6 +687,12 @@ LLAvatarNameCache::callback_connection_t LLAvatarNameCache::get(const LLUUID& ag
 LLAvatarNameCache::callback_connection_t LLAvatarNameCache::getNameCallback(const LLUUID& agent_id, callback_slot_t slot)
 {
     callback_connection_t connection;
+
+    // The null id is never fetched, so a callback for it would never be called.
+    if (agent_id.isNull())
+    {
+        return connection;
+    }
 
     if (mRunning)
     {
