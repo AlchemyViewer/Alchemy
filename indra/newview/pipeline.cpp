@@ -179,15 +179,7 @@ bool gShiftFrame = false;
 bool LLPipeline::WindLightUseAtmosShaders;
 bool LLPipeline::RenderDeferred;
 F32 LLPipeline::RenderDeferredSunWash;
-U32 LLPipeline::RenderFSAAType;
-U32 LLPipeline::RenderResolutionDivisor;
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-F32 LLPipeline::RenderResolutionMultiplier;
-// [/SL:KB]
-S32 LLPipeline::RenderShadowDetail;
 S32 LLPipeline::RenderShadowSplits;
-bool LLPipeline::RenderDeferredSSAO;
-F32 LLPipeline::RenderShadowResolutionScale;
 bool LLPipeline::RenderDelayCreation;
 bool LLPipeline::RenderAnimateRes;
 bool LLPipeline::FreezeTime;
@@ -210,11 +202,9 @@ F32 LLPipeline::RenderGlowMaxExtractAlpha;
 F32 LLPipeline::RenderGlowWarmthAmount;
 LLVector3 LLPipeline::RenderGlowLumWeights;
 LLVector3 LLPipeline::RenderGlowWarmthWeights;
-S32 LLPipeline::RenderGlowResolutionPow;
 S32 LLPipeline::RenderGlowIterations;
 F32 LLPipeline::RenderGlowWidth;
 F32 LLPipeline::RenderGlowStrength;
-bool LLPipeline::RenderGlowNoise;
 bool LLPipeline::RenderDepthOfField;
 F32 LLPipeline::CameraFocusTransitionTime;
 F32 LLPipeline::CameraFNumber;
@@ -247,7 +237,6 @@ bool LLPipeline::CameraOffset;
 F32 LLPipeline::CameraMaxCoF;
 F32 LLPipeline::CameraDoFResScale;
 F32 LLPipeline::RenderAutoHideSurfaceAreaLimit;
-bool LLPipeline::RenderScreenSpaceReflections;
 S32 LLPipeline::RenderScreenSpaceReflectionIterations;
 F32 LLPipeline::RenderScreenSpaceReflectionRayStep;
 F32 LLPipeline::RenderScreenSpaceReflectionDistanceBias;
@@ -255,10 +244,8 @@ F32 LLPipeline::RenderScreenSpaceReflectionDepthRejectBias;
 F32 LLPipeline::RenderScreenSpaceReflectionAdaptiveStepMultiplier;
 S32 LLPipeline::RenderScreenSpaceReflectionGlossySamples;
 S32 LLPipeline::RenderBufferVisualization;
-bool LLPipeline::RenderMirrors;
 S32 LLPipeline::RenderHeroProbeUpdateRate;
 S32 LLPipeline::RenderHeroProbeConservativeUpdateMultiplier;
-bool LLPipeline::RenderAvatarCloth;
 
 const F32 BACKLIGHT_DAY_MAGNITUDE_OBJECT = 0.1f;
 const F32 BACKLIGHT_NIGHT_MAGNITUDE_OBJECT = 0.08f;
@@ -331,6 +318,8 @@ bool    LLPipeline::sRenderAttachedLights = true;
 bool    LLPipeline::sRenderAttachedParticles = true;
 bool    LLPipeline::sRenderDeferred = false;
 bool    LLPipeline::sReflectionProbesEnabled = false;
+bool    LLPipeline::RenderGlowNoise = false;
+bool    LLPipeline::RenderAvatarCloth = false;
 S32     LLPipeline::sVisibleLightCount = 0;
 bool    LLPipeline::sRenderingHUDs;
 F32     LLPipeline::sDistortionWaterClipPlaneMargin = 1.0125f;
@@ -457,6 +446,8 @@ void LLPipeline::connectRefreshCachedSettingsSafe(const std::string name)
 void LLPipeline::init()
 {
     refreshCachedSettings();
+    // The first load builds every program and resource from the inputs as they are now.
+    latchRenderInputs();
 
     mRT = &mMainRT;
 
@@ -595,15 +586,7 @@ void LLPipeline::init()
     // DEPRECATED -- connectRefreshCachedSettingsSafe("WindLightUseAtmosShaders");
     // DEPRECATED -- connectRefreshCachedSettingsSafe("RenderDeferred");
     connectRefreshCachedSettingsSafe("RenderDeferredSunWash");
-    connectRefreshCachedSettingsSafe("RenderFSAAType");
-    connectRefreshCachedSettingsSafe("RenderResolutionDivisor");
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-    connectRefreshCachedSettingsSafe("RenderResolutionMultiplier");
-// [/SL:KB]
-    connectRefreshCachedSettingsSafe("RenderShadowDetail");
     connectRefreshCachedSettingsSafe("RenderShadowSplits");
-    connectRefreshCachedSettingsSafe("RenderDeferredSSAO");
-    connectRefreshCachedSettingsSafe("RenderShadowResolutionScale");
     connectRefreshCachedSettingsSafe("RenderDelayCreation");
     connectRefreshCachedSettingsSafe("RenderAnimateRes");
     connectRefreshCachedSettingsSafe("FreezeTime");
@@ -626,11 +609,9 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderGlowWarmthAmount");
     connectRefreshCachedSettingsSafe("RenderGlowLumWeights");
     connectRefreshCachedSettingsSafe("RenderGlowWarmthWeights");
-    connectRefreshCachedSettingsSafe("RenderGlowResolutionPow");
     connectRefreshCachedSettingsSafe("RenderGlowIterations");
     connectRefreshCachedSettingsSafe("RenderGlowWidth");
     connectRefreshCachedSettingsSafe("RenderGlowStrength");
-    connectRefreshCachedSettingsSafe("RenderGlowNoise");
     connectRefreshCachedSettingsSafe("RenderDepthOfField");
     connectRefreshCachedSettingsSafe("CameraFocusTransitionTime");
     connectRefreshCachedSettingsSafe("CameraFNumber");
@@ -662,7 +643,6 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("CameraMaxCoF");
     connectRefreshCachedSettingsSafe("CameraDoFResScale");
     connectRefreshCachedSettingsSafe("RenderAutoHideSurfaceAreaLimit");
-    connectRefreshCachedSettingsSafe("RenderScreenSpaceReflections");
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionIterations");
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionRayStep");
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionDistanceBias");
@@ -670,10 +650,8 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionAdaptiveStepMultiplier");
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionGlossySamples");
     connectRefreshCachedSettingsSafe("RenderBufferVisualization");
-    connectRefreshCachedSettingsSafe("RenderMirrors");
     connectRefreshCachedSettingsSafe("RenderHeroProbeUpdateRate");
     connectRefreshCachedSettingsSafe("RenderHeroProbeConservativeUpdateMultiplier");
-    connectRefreshCachedSettingsSafe("RenderAvatarCloth");
 
     LLPointer<LLControlVariable> cntrl_ptr = gSavedSettings.getControl("CollectFontVertexBuffers");
     if (cntrl_ptr.notNull())
@@ -824,10 +802,14 @@ void LLPipeline::applyRenderInputs()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 
     // Nothing is applied to resources that are not there. Before the pipeline's first load, and while a context is
-    // lost, the load that comes next (init, restoreGL) builds everything from the settings as they are then.
+    // lost, the load that comes next (init, restoreGL) latches and builds everything from the settings as they are then.
     const bool live = mInitialized && mGLResourcesLive;
+    if (live)
+    {
+        latchRenderInputs();
+    }
     const ALRenderInputRequests::Application application =
-        mRenderInputRequests.take(live && resourceInputsFromSettings() != mRequestedInputs);
+        mRenderInputRequests.take(live && withSizeOverride(mLatchedInputs) != mRequestedInputs);
     if (!live)
     {
         return;
@@ -836,8 +818,6 @@ void LLPipeline::applyRenderInputs()
     mApplyingChanges = application.mChanges;
     if (application.mReloadShaders)
     {
-        // The loaders read the cached copies of the settings, as the passes do.
-        refreshCachedSettings();
         LLViewerShaderMgr::instance()->setShaders();
     }
     else if (application.mReconcile)
@@ -847,10 +827,21 @@ void LLPipeline::applyRenderInputs()
     mApplyingChanges = 0;
 }
 
+void LLPipeline::latchRenderInputs()
+{
+    mLatchedInputs = resourceInputsFromSettings();
+
+    sReflectionProbesEnabled = mLatchedInputs.mProbes;
+    sRenderTransparentWater  = mLatchedInputs.mTransparentWater;
+    RenderGlowNoise          = gSavedSettings.getBOOL("RenderGlowNoise");
+    RenderAvatarCloth        = gSavedSettings.getBOOL("RenderAvatarCloth");
+}
+
 // static
 void LLPipeline::scaleToRenderResolution(U32& resX, U32& resY)
 {
-    ALRenderResourceInputs::scaleToRenderResolution(resX, resY, RenderResolutionDivisor, RenderResolutionMultiplier);
+    ALRenderResourceInputs::scaleToRenderResolution(resX, resY, gPipeline.mLatchedInputs.mResolutionDivisor,
+                                                    gPipeline.mLatchedInputs.mResolutionMultiplier);
 }
 
 LLRenderTarget* LLPipeline::resourceTarget(ALRenderResourcePlan::Id id)
@@ -1004,12 +995,7 @@ ALRenderResourceInputs LLPipeline::resourceInputsFromSettings()
 {
     ALRenderResourceInputs in;
 
-    if (const std::optional<std::pair<U32, U32>>& size = ALRenderSizeOverride::current())
-    {
-        in.mWidth  = size->first;
-        in.mHeight = size->second;
-    }
-    else if (gViewerWindow)
+    if (gViewerWindow)
     {
         in.mWidth  = (U32)gViewerWindow->getWorldViewWidthRaw();
         in.mHeight = (U32)gViewerWindow->getWorldViewHeightRaw();
@@ -1017,10 +1003,12 @@ ALRenderResourceInputs LLPipeline::resourceInputsFromSettings()
     in.mResolutionDivisor    = gSavedSettings.getU32("RenderResolutionDivisor");
     in.mResolutionMultiplier = gSavedSettings.getF32("RenderResolutionMultiplier");
 
-    in.mHDR            = gSavedSettings.getBOOL("RenderHDREnabled");
-    in.mEmissive       = gSavedSettings.getBOOL("RenderEnableEmissiveBuffer");
-    in.mGBufferNormHDR = LLRender::sGBufferNormHDR;
-    in.mReverseZ       = LLRender::sReverseZ;
+    in.mHDR      = gSavedSettings.getBOOL("RenderHDREnabled");
+    in.mEmissive = gSavedSettings.getBOOL("RenderEnableEmissiveBuffer");
+    // What setShaders latches into LLRender before it compiles, from these inputs: the normal attachment's layout
+    // follows HDR, and reverse-Z is the setting where the context has clip control.
+    in.mGBufferNormHDR = in.mHDR;
+    in.mReverseZ       = gGLManager.mHasClipControl && gSavedSettings.getBOOL("AlchemyRenderReverseZ");
 
     in.mShadowDetail     = gSavedSettings.getS32("RenderShadowDetail");
     in.mShadowScale      = gSavedSettings.getF32("RenderShadowResolutionScale");
@@ -1053,20 +1041,26 @@ ALRenderResourceInputs LLPipeline::resourceInputsFromSettings()
     return in;
 }
 
-LLPipeline::ResourceChanges LLPipeline::reconcileResources()
+// static
+ALRenderResourceInputs LLPipeline::withSizeOverride(ALRenderResourceInputs inputs)
+{
+    if (const std::optional<std::pair<U32, U32>>& size = ALRenderSizeOverride::current())
+    {
+        inputs.mWidth  = size->first;
+        inputs.mHeight = size->second;
+    }
+    return inputs;
+}
+
+LLPipeline::ResourceChanges LLPipeline::reconcileResources(const ALRenderResourceInputs& requested)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     using Plan  = ALRenderResourcePlan;
     using Id    = Plan::Id;
     using IdSet = Plan::IdSet;
 
-    // The passes read the cached copies of the settings the inputs are read from: refreshed here so the two agree
-    // whatever order the settings' listeners ran in.
-    refreshCachedSettings();
-
-    const ALRenderResourceInputs requested = resourceInputsFromSettings();
-    ALRenderResourceInputs       inputs    = requested;
-    Plan                         plan      = Plan::make(inputs);
+    ALRenderResourceInputs inputs = requested;
+    Plan                   plan   = Plan::make(inputs);
 
     ResourceChanges changes;
     ensureResources(plan, IdSet().set(), changes);
@@ -1290,15 +1284,7 @@ void LLPipeline::refreshCachedSettings()
     WindLightUseAtmosShaders = true; // DEPRECATED -- gSavedSettings.getBOOL("WindLightUseAtmosShaders");
     RenderDeferred = true; // DEPRECATED -- gSavedSettings.getBOOL("RenderDeferred");
     RenderDeferredSunWash = gSavedSettings.getF32("RenderDeferredSunWash");
-    RenderFSAAType = gSavedSettings.getU32("RenderFSAAType");
-    RenderResolutionDivisor = gSavedSettings.getU32("RenderResolutionDivisor");
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-    RenderResolutionMultiplier = gSavedSettings.getF32("RenderResolutionMultiplier");
-// [/SL:KB]
-    RenderShadowDetail = gSavedSettings.getS32("RenderShadowDetail");
     RenderShadowSplits = gSavedSettings.getS32("RenderShadowSplits");
-    RenderDeferredSSAO = gSavedSettings.getBOOL("RenderDeferredSSAO");
-    RenderShadowResolutionScale = gSavedSettings.getF32("RenderShadowResolutionScale");
     RenderDelayCreation = gSavedSettings.getBOOL("RenderDelayCreation");
     RenderAnimateRes = gSavedSettings.getBOOL("RenderAnimateRes");
     FreezeTime = gSavedSettings.getBOOL("FreezeTime");
@@ -1321,11 +1307,9 @@ void LLPipeline::refreshCachedSettings()
     RenderGlowWarmthAmount = gSavedSettings.getF32("RenderGlowWarmthAmount");
     RenderGlowLumWeights = gSavedSettings.getVector3("RenderGlowLumWeights");
     RenderGlowWarmthWeights = gSavedSettings.getVector3("RenderGlowWarmthWeights");
-    RenderGlowResolutionPow = gSavedSettings.getS32("RenderGlowResolutionPow");
     RenderGlowIterations = gSavedSettings.getS32("RenderGlowIterations");
     RenderGlowWidth = gSavedSettings.getF32("RenderGlowWidth");
     RenderGlowStrength = gSavedSettings.getF32("RenderGlowStrength");
-    RenderGlowNoise = gSavedSettings.getBOOL("RenderGlowNoise");
     RenderDepthOfField = gSavedSettings.getBOOL("RenderDepthOfField");
     CameraFocusTransitionTime = gSavedSettings.getF32("CameraFocusTransitionTime");
     CameraFNumber = gSavedSettings.getF32("CameraFNumber");
@@ -1357,7 +1341,6 @@ void LLPipeline::refreshCachedSettings()
     CameraMaxCoF = gSavedSettings.getF32("CameraMaxCoF");
     CameraDoFResScale = gSavedSettings.getF32("CameraDoFResScale");
     RenderAutoHideSurfaceAreaLimit = gSavedSettings.getF32("RenderAutoHideSurfaceAreaLimit");
-    RenderScreenSpaceReflections = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
     RenderScreenSpaceReflectionIterations = gSavedSettings.getS32("RenderScreenSpaceReflectionIterations");
     RenderScreenSpaceReflectionRayStep = gSavedSettings.getF32("RenderScreenSpaceReflectionRayStep");
     RenderScreenSpaceReflectionDistanceBias = gSavedSettings.getF32("RenderScreenSpaceReflectionDistanceBias");
@@ -1365,12 +1348,9 @@ void LLPipeline::refreshCachedSettings()
     RenderScreenSpaceReflectionAdaptiveStepMultiplier = gSavedSettings.getF32("RenderScreenSpaceReflectionAdaptiveStepMultiplier");
     RenderScreenSpaceReflectionGlossySamples = gSavedSettings.getS32("RenderScreenSpaceReflectionGlossySamples");
     RenderBufferVisualization = gSavedSettings.getS32("RenderBufferVisualization");
-    RenderMirrors = gSavedSettings.getBOOL("RenderMirrors");
     RenderHeroProbeUpdateRate = gSavedSettings.getS32("RenderHeroProbeUpdateRate");
     RenderHeroProbeConservativeUpdateMultiplier = gSavedSettings.getS32("RenderHeroProbeConservativeUpdateMultiplier");
-    RenderAvatarCloth = gSavedSettings.getBOOL("RenderAvatarCloth");
 
-    sReflectionProbesEnabled = LLFeatureManager::getInstance()->isFeatureAvailable("RenderReflectionsEnabled") && gSavedSettings.getBOOL("RenderReflectionsEnabled");
     RenderSpotLight = nullptr;
 
     if (gNonInteractive)
@@ -1524,7 +1504,7 @@ bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
     }
 
     const bool new_context = !mGLResourcesLive;
-    const ResourceChanges changes = reconcileResources();
+    const ResourceChanges changes = reconcileResources(withSizeOverride(mLatchedInputs));
     mGLResourcesLive = true;
 
     std::string changed;
@@ -2267,6 +2247,8 @@ void LLPipeline::restoreGL()
 {
     assertInitialized();
 
+    // The new context's programs and resources are built from the inputs as they are now.
+    latchRenderInputs();
     LLViewerShaderMgr::instance()->setShaders();
 
     for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin();
@@ -3224,8 +3206,7 @@ bool LLPipeline::isWaterClip()
 // static
 bool LLPipeline::hdrEnabled()
 {
-    static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
-    return has_hdr();
+    return gPipeline.mLatchedInputs.mHDR;
 }
 
 LLRenderTarget::eDepthFormat LLPipeline::mainDepthFormat()
@@ -3236,11 +3217,10 @@ LLRenderTarget::eDepthFormat LLPipeline::mainDepthFormat()
 // static
 void LLPipeline::updateReverseZ()
 {
-    // Effective state = setting AND the driver capability. On a GPU without clip control the
+    // The latched state: the setting where the context has clip control. On a GPU without it the
     // setting can stay on but is inert, and every branch below then resolves to the forward
     // constants, so the forward path is never perturbed.
-    const bool setting   = gSavedSettings.getBOOL("AlchemyRenderReverseZ");
-    const bool effective = gGLManager.mHasClipControl && setting;
+    const bool effective = gPipeline.mLatchedInputs.mReverseZ;
     const bool changed   = (effective != LLRender::sReverseZ);
 
     LLRender::sReverseZ = effective;
@@ -3285,7 +3265,7 @@ void LLPipeline::updateReverseZ()
         gGL.warmupSamplers();
 
         LL_INFOS("RenderInit") << "Reverse-Z depth " << (effective ? "ENABLED" : "disabled")
-                               << " (setting=" << setting
+                               << " (setting=" << gSavedSettings.getBOOL("AlchemyRenderReverseZ")
                                << ", clip control=" << gGLManager.mHasClipControl << ")" << LL_ENDL;
     }
 }
@@ -9260,7 +9240,7 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
         gGlowExtractProgram.unbind();
 
         // power of two between 1 and 1024
-        U32 glowResPow = RenderGlowResolutionPow;
+        U32 glowResPow = (U32)mResourceInputs.mGlowResolutionPow;
         const U32 glow_res = llmax(1, llmin(1024, 1 << glowResPow));
 
         S32 kernel = RenderGlowIterations * 2;
@@ -9765,7 +9745,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
     LL_PROFILE_GPU_ZONE("FXAA");
     {
         llassert(!gCubeSnapshot);
-        bool multisample = RenderFSAAType == 1 && gFXAAProgram[0].isComplete();
+        bool multisample = mResourceInputs.mFSAAType == 1 && gFXAAProgram[0].isComplete();
 
         // Present everything.
         if (multisample)
@@ -9825,7 +9805,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
 void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
 {
     llassert(!gCubeSnapshot);
-    bool multisample = RenderFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mSMAAEdgeMap.isComplete() && mSMAABlendBuffer.isComplete();
+    bool multisample = mResourceInputs.mFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mSMAAEdgeMap.isComplete() && mSMAABlendBuffer.isComplete();
 
     // Present everything.
     if (multisample)
@@ -9843,9 +9823,8 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
 
         static LLCachedControl<bool> use_sample(gSavedSettings, "RenderSMAAUseSample", false);
         static LLCachedControl<bool> use_predication(gSavedSettings, "RenderSMAAPredication", true);
-        static LLCachedControl<bool> use_stencil_setting(gSavedSettings, "RenderSMAAUseStencil", true);
         // Stencil optimization requires all three passes to share the same stencil attachment.
-        bool use_stencil = use_stencil_setting && mSMAAEdgeMap.hasStencil() && mSMAABlendBuffer.hasStencil();
+        bool use_stencil = mResourceInputs.mSMAAStencil && mSMAAEdgeMap.hasStencil() && mSMAABlendBuffer.hasStencil();
         LLGLState stencil(GL_STENCIL_TEST, use_stencil);
         {
             // Bind setup:
@@ -9962,7 +9941,7 @@ void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst)
 {
     LL_PROFILE_GPU_ZONE("SMAA");
     llassert(!gCubeSnapshot);
-    bool multisample = RenderFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mSMAAEdgeMap.isComplete() && mSMAABlendBuffer.isComplete();
+    bool multisample = mResourceInputs.mFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mSMAAEdgeMap.isComplete() && mSMAABlendBuffer.isComplete();
 
     // Present everything.
     if (multisample)
@@ -10563,12 +10542,12 @@ void LLPipeline::renderFinalize()
 
     // Anti-aliasing and sharpening both spread past a pixel, so a cutout
     // frame skips them (see above).
-    if (RenderFSAAType == 1 && !cutout)
+    if (mResourceInputs.mFSAAType == 1 && !cutout)
     {
         applyFXAA(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
-    else if (RenderFSAAType == 2 && !cutout)
+    else if (mResourceInputs.mFSAAType == 2 && !cutout)
     {
         generateSMAABuffers(sourceBuffer);
         applySMAA(sourceBuffer, targetBuffer);
@@ -10618,7 +10597,7 @@ void LLPipeline::renderFinalize()
             break;
         case 5:
         {
-            if (RenderFSAAType == 2)
+            if (mResourceInputs.mFSAAType == 2)
             {
                 visualizeBuffers(&mSMAAEdgeMap, sourceBuffer, 0);
             }
@@ -10626,7 +10605,7 @@ void LLPipeline::renderFinalize()
         }
         case 6:
         {
-            if (RenderFSAAType == 2)
+            if (mResourceInputs.mFSAAType == 2)
             {
                 visualizeBuffers(&mSMAABlendBuffer, sourceBuffer, 0);
             }
@@ -11452,7 +11431,8 @@ void LLPipeline::renderDeferredLighting()
         // ~13 constants from UB_DEFERRED instead of having them re-pushed on every bind.
         packDeferredUBO();
 
-        if ((RenderDeferredSSAO && !gCubeSnapshot) || RenderShadowDetail > 0)
+        // The light map's sun pass runs wherever the pack has a light map: for shadows, and in the main view for SSAO.
+        if (mResourcePlan.wants(ALRenderResourcePlan::inPack(renderPack(), ALRenderResourcePlan::Slot::Light)))
         {
             LL_PROFILE_GPU_ZONE("sun program");
             deferred_light_target->bindTarget();
@@ -11484,7 +11464,7 @@ void LLPipeline::renderDeferredLighting()
             deferred_light_target->flush();
         }
 
-        if (RenderDeferredSSAO && !gCubeSnapshot)
+        if (mResourceInputs.mSSAO && !gCubeSnapshot)
         {
             // soften direct lighting lightmap
             LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - soften shadow");
@@ -12412,7 +12392,7 @@ void LLPipeline::bindReflectionProbes(LLGLSLShader& shader)
         bound = true;
     }
 
-    if (RenderMirrors)
+    if (mResourcePlan.heroProbes())
     {
         channel = shader.enableTexture(LLShaderMgr::HERO_PROBE);
         if (channel > -1 && mHeroProbeManager.mTexture.notNull())
@@ -12554,7 +12534,7 @@ void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LL
 
         gGL.diffuseColor4f(1, 1, 1, 1);
 
-        S32 shadow_detail = RenderShadowDetail;
+        S32 shadow_detail = mResourceInputs.mShadowDetail;
 
         // if not using VSM, disable color writes
         if (shadow_detail <= 2)
@@ -12922,11 +12902,15 @@ void LLPipeline::renderHighlight(const LLViewerObject* obj, F32 fade)
 }
 
 
-U32 LLPipeline::sunCascades() const
+ALRenderResourcePlan::Pack LLPipeline::renderPack() const
 {
     using Pack = ALRenderResourcePlan::Pack;
-    const Pack pack = mRT == &mMainRT ? Pack::Main : (mRT == &mAuxillaryRT ? Pack::Probe : Pack::Hero);
-    return mResourcePlan.sunCascades(pack);
+    return mRT == &mMainRT ? Pack::Main : (mRT == &mAuxillaryRT ? Pack::Probe : Pack::Hero);
+}
+
+U32 LLPipeline::sunCascades() const
+{
+    return mResourcePlan.sunCascades(renderPack());
 }
 
 U32 LLPipeline::unbuiltShadowMaps() const
@@ -13007,7 +12991,7 @@ static void bucketShadowCull(LLCullResult& src, LLCamera& cam, LLCullResult& dst
 
 void LLPipeline::generateSunShadow(LLCamera& camera)
 {
-    if (!sRenderDeferred || RenderShadowDetail <= 0)
+    if (!sRenderDeferred || sunCascades() == 0)
     {
         return;
     }
@@ -13774,7 +13758,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     }
 
     //hack to disable projector shadows
-    bool gen_shadow = RenderShadowDetail > 1;
+    bool gen_shadow = mResourcePlan.wants(ALRenderResourcePlan::Id::SpotShadow0);
 
     if (gen_shadow)
     {

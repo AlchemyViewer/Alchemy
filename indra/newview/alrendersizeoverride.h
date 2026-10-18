@@ -45,7 +45,7 @@ public:
     /// Whether the size was built in full, rather than halved for want of memory.
     bool applied() const { return mApplied; }
 
-    /// The size a scope holds, while one does (LLPipeline::resourceInputsFromSettings).
+    /// The size a scope holds, while one does (LLPipeline::withSizeOverride).
     static const std::optional<std::pair<U32, U32>>& current() { return sSize; }
 
 private:

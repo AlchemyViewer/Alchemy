@@ -592,10 +592,9 @@ void LLViewerShaderMgr::setShaders()
     // whole next frame.
     LLPipeline::updateReverseZ();
 
-    // The same for the G-buffer's normal layout: every compile below injects GBUFFER_NORM_HDR from this latch,
-    // the cache key folds it in, and addDeferredAttachments takes the normal attachment's format from it when this
-    // call reallocates the GL buffers.
-    LLRender::sGBufferNormHDR = LLPipeline::hdrEnabled();
+    // The same for the G-buffer's normal layout: every compile below injects GBUFFER_NORM_HDR from this latch, the
+    // cache key folds it in, and the resources planned from the same inputs give the normal attachment its format.
+    LLRender::sGBufferNormHDR = gPipeline.latchedInputs().mGBufferNormHDR;
 
     // The same for compute: the shared objects compiled for its stage and every program built on it follow the switch
     // as it stands for this load.
@@ -661,7 +660,6 @@ void LLViewerShaderMgr::setShaders()
     unloadShaders();
 
     LLPipeline::sRenderGlow = gSavedSettings.getBOOL("RenderGlow");
-    LLPipeline::sRenderTransparentWater = gSavedSettings.getBOOL("RenderTransparentWater");
 
     if (gViewerWindow)
     {

@@ -2426,8 +2426,9 @@ class LLAdvancedPurgeShaderCache : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
+        // The programs are reloaded with the frame's other changes, from source now that their binaries are gone.
         LLViewerShaderMgr::instance()->clearShaderCache();
-        LLViewerShaderMgr::instance()->setShaders();
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Shaders);
         return true;
     }
 };
@@ -8883,7 +8884,7 @@ class LLToggleShaderControl : public view_listener_t
         bool checked = gSavedSettings.getBOOL( control_name );
         gSavedSettings.setBOOL( control_name, !checked );
         LLPipeline::refreshCachedSettings();
-        LLViewerShaderMgr::instance()->setShaders();
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Shaders);
         return !checked;
     }
 };

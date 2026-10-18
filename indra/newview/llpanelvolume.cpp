@@ -422,7 +422,7 @@ void LLPanelVolume::getState( )
 
     bool probe_enabled = is_probe && editable && single_volume;
 
-    bool mirrors_enabled = LLPipeline::RenderMirrors;
+    bool mirrors_enabled = gPipeline.resourceInputs().mMirrors;
 
     getChildView("Probe Update Type")->setVisible(mirrors_enabled);
     getChildView("Probe Update Label")->setVisible(mirrors_enabled);
@@ -1672,7 +1672,7 @@ void LLPanelVolume::onCommitProbe(LLUICtrl* ctrl, void* userdata)
     volobjp->setReflectionProbeAmbiance((F32)self->getChild<LLUICtrl>("Probe Ambiance")->getValue().asReal());
     volobjp->setReflectionProbeNearClip((F32)self->getChild<LLUICtrl>("Probe Near Clip")->getValue().asReal());
 
-    bool mirrors_enabled = LLPipeline::RenderMirrors;
+    bool mirrors_enabled = gPipeline.resourceInputs().mMirrors;
     bool is_mirror = false;
 
     if (mirrors_enabled)

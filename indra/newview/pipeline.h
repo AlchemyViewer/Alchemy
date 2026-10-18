@@ -96,10 +96,18 @@ public:
     void shaderReloadBegins() { mRenderInputRequests.reloadBegins(); }
     /// Whether the window has been resized since the inputs were last applied: display() draws nothing that frame.
     bool windowResizePending() const { return mRenderInputRequests.windowResized(); }
-    /// Applies every change marked since the last application, once, at the top of each frame: the programs reloaded
-    /// where a shader input changed (LLViewerShaderMgr::setShaders, which reconciles the resources after them),
-    /// otherwise the resources reconciled where their inputs changed (rebuildGLBuffers).
+    /// Applies every change marked since the last application, once, at the top of each frame: the inputs latched
+    /// (latchRenderInputs), then the programs reloaded where a shader input changed (LLViewerShaderMgr::setShaders,
+    /// which reconciles the resources after them), otherwise the resources reconciled where their inputs changed
+    /// (rebuildGLBuffers).
     void applyRenderInputs();
+
+    /// Reads the render inputs from the settings, once for everything that applies them: the resources' plan, the
+    /// programs a reload builds and the passes, which read the latched statics set here. The frame's application
+    /// latches, and so does a reload outside one.
+    void latchRenderInputs();
+    /// The inputs as they were last latched.
+    const ALRenderResourceInputs& latchedInputs() const { return mLatchedInputs; }
 
     /// Every GL resource the pipeline holds, and the state derived from them: on context teardown and at shutdown.
     void releaseAllGLResources();
@@ -113,9 +121,9 @@ public:
         Snapshot, ///< an ALRenderSizeOverride began or ended
     };
 
-    /// Makes the render resources what the settings now describe (reconcileResources). State derived from them is
-    /// dropped only where what it derives from changed, and one log line names both. Whether the render size was built
-    /// in full rather than halved for want of memory.
+    /// Makes the render resources what the latched inputs describe, at the size an ALRenderSizeOverride holds while
+    /// one does (reconcileResources). State derived from them is dropped only where what it derives from changed, and
+    /// one log line names both. Whether the render size was built in full rather than halved for want of memory.
     bool rebuildGLBuffers(RebuildCause cause);
 
     /// What reconcileResources did, and what it changed that state derived from the resources depends on.
@@ -136,11 +144,11 @@ public:
         bool mFullSize       = true;  ///< the render size was built in full, not halved for want of memory
     };
 
-    /// Plans the render resources from the settings (resourceInputsFromSettings, ALRenderResourcePlan::make)
-    /// and makes each what the plan says: built where it differs from its description, kept without a GL call where it
-    /// matches, freed where the plan no longer wants it. Depth owners are built before the targets sharing their depth.
-    /// Where a target the render size sizes cannot be built, the size is halved and those targets planned again.
-    ResourceChanges reconcileResources();
+    /// Plans the render resources from @a requested (ALRenderResourcePlan::make) and makes each what the plan says:
+    /// built where it differs from its description, kept without a GL call where it matches, freed where the plan no
+    /// longer wants it. Depth owners are built before the targets sharing their depth. Where a target the render size
+    /// sizes cannot be built, the size is halved and those targets planned again.
+    ResourceChanges reconcileResources(const ALRenderResourceInputs& requested);
 
     /// The inputs and the plan the resources were last reconciled to.
     const ALRenderResourceInputs& resourceInputs() const { return mResourceInputs; }
@@ -158,13 +166,15 @@ public:
     void bakeToneCurveLut();
 
     /// The size the main view renders a view of @a resX by @a resY at: RenderResolutionDivisor applied, or else
-    /// RenderResolutionMultiplier.
+    /// RenderResolutionMultiplier, as the inputs were last latched.
     static void scaleToRenderResolution(U32& resX, U32& resY);
 
 private:
-    // What the settings and the latches set from them say the resources' inputs are now. Read in this one place, so
-    // every resource is planned from the same reading of the settings.
+    // What the settings say the resources' inputs are now, read by latchRenderInputs alone, so every resource, program
+    // and pass is planned from the same reading of the settings.
     static ALRenderResourceInputs resourceInputsFromSettings();
+    // @a inputs at the size an ALRenderSizeOverride holds, while one does.
+    static ALRenderResourceInputs withSizeOverride(ALRenderResourceInputs inputs);
 
     // The render target, or the GL texture name, that each of the plan's resources is.
     LLRenderTarget* resourceTarget(ALRenderResourcePlan::Id id);
@@ -190,6 +200,8 @@ private:
     // memory. A change is applied only where the settings move from this, so a halved size is not retried in full for
     // every change that leaves the inputs as they were.
     ALRenderResourceInputs mRequestedInputs;
+    // The inputs as the last latch read them, which the next reconcile is asked for.
+    ALRenderResourceInputs mLatchedInputs;
 
     // The changes marked since the last application, and how many the one running applies, for the log line.
     ALRenderInputRequests mRenderInputRequests;
@@ -532,6 +544,8 @@ public:
     void postDeferredGammaCorrect(LLRenderTarget* screen_target);
 
     void generateSunShadow(LLCamera& camera);
+    // The pack being rendered through (mRT).
+    ALRenderResourcePlan::Pack renderPack() const;
     // The sun cascades the pack being rendered through renders and has maps for (ALRenderResourcePlan::sunCascades).
     U32 sunCascades() const;
     // The shadow maps the pass being rendered has none of, a bit each: sun cascades 0 to 3, then the spot pair. A cascade
@@ -600,14 +614,14 @@ public:
     // (same 4 bytes/px as DEPTH24 on desktop GPUs), fixed 24-bit otherwise.
     static LLRenderTarget::eDepthFormat mainDepthFormat();
 
-    // Latch reverse-Z on/off to match (setting && clip-control cap): flips LLRender::sReverseZ,
-    // sets glClipControl + clear depth, re-bases the ambient depth func, and clears the sampler
-    // cache. Idempotent; requires a current GL context. Called from setShaders() so the whole
-    // convention flip (clip control, clear depth, RT formats, shader define) is atomic.
+    // Latch reverse-Z on/off to the latched inputs (the setting where the context has clip control): flips
+    // LLRender::sReverseZ, sets glClipControl + clear depth, re-bases the ambient depth func, and clears the sampler
+    // cache. Idempotent; requires a current GL context. Called from setShaders() so the whole convention flip (clip
+    // control, clear depth, RT formats, shader define) is atomic.
     static void updateReverseZ();
 
-    /// RenderHDREnabled: what every HDR-dependent target and pass decides by. The G-buffer's normal
-    /// layout follows LLRender::sGBufferNormHDR, which setShaders latches from this.
+    /// RenderHDREnabled as the inputs were last latched: what every HDR-dependent target and pass decides by. The
+    /// G-buffer's normal layout follows LLRender::sGBufferNormHDR, which setShaders latches from the same inputs.
     static bool hdrEnabled();
 
     void setRenderTypeMask(U32 type, ...);
@@ -878,7 +892,6 @@ public:
     static S32              sUseOcclusion;  // 0 = no occlusion, 1 = read only, 2 = read/write
     static bool             sAutoMaskAlphaDeferred;
     static bool             sAutoMaskAlphaNonDeferred;
-    static bool             sRenderTransparentWater;
     static bool             sBakeSunlight;
     static bool             sNoAlpha;
     static bool             sUseFarClip;
@@ -894,7 +907,12 @@ public:
     static bool             sRenderAttachedLights;
     static bool             sRenderAttachedParticles;
     static bool             sRenderDeferred;
+    // Render inputs as the passes read them: set from the latched inputs (latchRenderInputs), never from a setting's
+    // commit, so a pass and the programs and targets it draws with agree on them.
+    static bool             sRenderTransparentWater;
     static bool             sReflectionProbesEnabled;
+    static bool             RenderGlowNoise;
+    static bool             RenderAvatarCloth;
     static S32              sVisibleLightCount;
     static bool             sRenderingHUDs;
     static F32              sDistortionWaterClipPlaneMargin;
@@ -1464,15 +1482,7 @@ public:
     static bool WindLightUseAtmosShaders;
     static bool RenderDeferred;
     static F32 RenderDeferredSunWash;
-    static U32 RenderFSAAType;
-    static U32 RenderResolutionDivisor;
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-    static F32 RenderResolutionMultiplier;
-// [/SL:KB]
-    static S32 RenderShadowDetail;
     static S32 RenderShadowSplits;
-    static bool RenderDeferredSSAO;
-    static F32 RenderShadowResolutionScale;
     static bool RenderDelayCreation;
     static bool RenderAnimateRes;
     static bool FreezeTime;
@@ -1496,11 +1506,9 @@ public:
     static F32 RenderGlowWarmthAmount;
     static LLVector3 RenderGlowLumWeights;
     static LLVector3 RenderGlowWarmthWeights;
-    static S32 RenderGlowResolutionPow;
     static S32 RenderGlowIterations;
     static F32 RenderGlowWidth;
     static F32 RenderGlowStrength;
-    static bool RenderGlowNoise;
     static bool RenderDepthOfField;
     static F32 CameraFocusTransitionTime;
     static F32 CameraFNumber;
@@ -1533,7 +1541,6 @@ public:
     static F32 CameraMaxCoF;
     static F32 CameraDoFResScale;
     static F32 RenderAutoHideSurfaceAreaLimit;
-    static bool RenderScreenSpaceReflections;
     static S32 RenderScreenSpaceReflectionIterations;
     static F32 RenderScreenSpaceReflectionRayStep;
     static F32 RenderScreenSpaceReflectionDistanceBias;
@@ -1541,10 +1548,8 @@ public:
     static F32 RenderScreenSpaceReflectionAdaptiveStepMultiplier;
     static S32 RenderScreenSpaceReflectionGlossySamples;
     static S32 RenderBufferVisualization;
-    static bool RenderMirrors;
     static S32 RenderHeroProbeUpdateRate;
     static S32 RenderHeroProbeConservativeUpdateMultiplier;
-    static bool RenderAvatarCloth;
 
 private:
     // The main camera's view of the world: not a shadow map, an impostor

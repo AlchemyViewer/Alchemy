@@ -470,8 +470,6 @@ bool LLGLTFPreviewTexture::render()
     LLGLDisable scissor(GL_SCISSOR_TEST);
     SetTemporarily<bool> no_dof(&LLPipeline::RenderDepthOfField, false);
     SetTemporarily<bool> no_glow(&LLPipeline::sRenderGlow, false);
-    SetTemporarily<bool> no_ssr(&LLPipeline::RenderScreenSpaceReflections, false);
-    SetTemporarily<U32> no_aa(&LLPipeline::RenderFSAAType, U32(0));
     SetTemporarily<LLPipeline::RenderTargetPack*> use_auxiliary_render_target(&gPipeline.mRT, &gPipeline.mAuxillaryRT);
 
     LLVector3 light_dir3(1.0f, 1.0f, 1.0f);
@@ -565,7 +563,7 @@ bool LLGLTFPreviewTexture::render()
     // *HACK: Hide mExposureMap from generateExposure
     gPipeline.mExposureMap.swapFBORefs(gPipeline.mLastExposure);
 
-    static LLCachedControl<bool> hdr(gSavedSettings, "RenderHDREnabled", false);
+    const bool hdr = LLPipeline::hdrEnabled();
     if (hdr)
     {
         gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);

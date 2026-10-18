@@ -78,8 +78,7 @@ LLHeroProbeManager::~LLHeroProbeManager()
 void LLHeroProbeManager::update()
 {
     // Not until the resources are reconciled for mirrors, which a shader reload that stops short of it leaves undone.
-    if (!LLPipeline::RenderMirrors || !LLPipeline::sReflectionProbesEnabled || !gPipeline.resourcePlan().heroProbes() ||
-        gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
+    if (!gPipeline.resourcePlan().heroProbes() || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
     {
         return;
     }
@@ -231,8 +230,7 @@ void LLHeroProbeManager::update()
 
 void LLHeroProbeManager::renderProbes()
 {
-    if (!LLPipeline::RenderMirrors || !LLPipeline::sReflectionProbesEnabled || gTeleportDisplay ||
-        LLStartUp::getStartupState() < STATE_PRECACHE)
+    if (!gPipeline.resourcePlan().heroProbes() || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
     {
         return;
     }
@@ -482,7 +480,7 @@ void LLHeroProbeManager::generateRadiance(LLReflectionMap* probe)
 
 void LLHeroProbeManager::updateUniforms()
 {
-    if (!gPipeline.RenderMirrors)
+    if (!gPipeline.resourceInputs().mMirrors)
     {
         return;
     }

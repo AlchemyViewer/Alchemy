@@ -43,8 +43,8 @@ struct ALRenderResourceInputs
 
     bool mHDR = true;            ///< RenderHDREnabled
     bool mEmissive = true;       ///< RenderEnableEmissiveBuffer
-    bool mGBufferNormHDR = true; ///< the G-buffer normal layout the programs were compiled for (LLRender::sGBufferNormHDR)
-    bool mReverseZ = true;       ///< the depth convention setShaders latched (LLRender::sReverseZ)
+    bool mGBufferNormHDR = true; ///< the G-buffer normal layout the programs compile for (LLRender::sGBufferNormHDR)
+    bool mReverseZ = true;       ///< the depth convention the programs compile for (LLRender::sReverseZ)
 
     S32  mShadowDetail = 2;       ///< RenderShadowDetail: 0 none, 1 the sun's, 2 the sun's and two spot lights'
     F32  mShadowScale = 1.f;      ///< RenderShadowResolutionScale, of the main view's sun and spot shadows
