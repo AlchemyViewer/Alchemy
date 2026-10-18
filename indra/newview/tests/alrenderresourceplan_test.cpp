@@ -159,7 +159,12 @@ namespace
             { "RenderTransparentWater", no_change, [](Inputs& in) { in.mTransparentWater = false; }, nothing },
             { "RenderFSAAType to FXAA", no_change, [](Inputs& in) { in.mFSAAType = 1; }, nothing },
             { "RenderFSAAType to SMAA", no_change, [](Inputs& in) { in.mFSAAType = 2; },
-              [](const Plan&) { return of({ Id::SMAAEdges, Id::SMAABlend }); } },
+              [](const Plan&)
+              { return of({ Id::SMAAEdges, Id::SMAABlend, Id::SMAAArea, Id::SMAASearch, Id::SMAASample }); } },
+            { "RenderFSAAType from SMAA to FXAA", [](Inputs& in) { in.mFSAAType = 2; },
+              [](Inputs& in) { in.mFSAAType = 1; },
+              [](const Plan&)
+              { return of({ Id::SMAAEdges, Id::SMAABlend, Id::SMAAArea, Id::SMAASearch, Id::SMAASample }); } },
             { "RenderSMAAUseStencil under SMAA", [](Inputs& in) { in.mFSAAType = 2; },
               [](Inputs& in) { in.mSMAAStencil = false; },
               [](const Plan&) { return of({ Id::SMAAEdges, Id::SMAABlend }); } },
@@ -530,6 +535,28 @@ namespace
             to.mSSAO           = !from.mSSAO;
             const IdSet changed = Plan::changed(Plan::make(from), Plan::make(to));
             CHECK(names(changed & (Plan::idsOf(Pack::Probe) | Plan::idsOf(Pack::Hero))) == "nothing");
+        }
+    }
+
+    TEST_CASE("alrenderresourceplan: the SMAA tables exist only while SMAA is the antialiasing", "[alrenderresourceplan]")
+    {
+        for (U32 fsaa : { 0u, 1u, 2u })
+        {
+            for (bool stencil : { false, true })
+            {
+                INFO("RenderFSAAType " << fsaa << ", stencil " << stencil);
+                Inputs in       = defaults();
+                in.mFSAAType    = fsaa;
+                in.mSMAAStencil = stencil;
+                const Plan plan = Plan::make(in);
+
+                for (Id table : { Id::SMAAArea, Id::SMAASearch, Id::SMAASample })
+                {
+                    INFO(Plan::name(table));
+                    CHECK(plan.wants(table) == (fsaa == 2));
+                    CHECK(plan.wants(table) == plan.wants(Id::SMAAEdges));
+                }
+            }
         }
     }
 

@@ -279,12 +279,18 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     plan.at(Id::LensFlareA).mDesc   = ALRenderTargetDesc{ .width = 2, .height = 1, .color = { GL_RGBA16F } };
     plan.at(Id::LensFlareB).mDesc   = ALRenderTargetDesc{ .width = 2, .height = 1, .color = { GL_RGBA16F } };
 
-    plan.at(Id::Noise).mDesc      = ALRenderTargetDesc{ .color = { GL_RGB16F } };
-    plan.at(Id::TrueNoise).mDesc  = ALRenderTargetDesc{ .color = { GL_RGB16F } };
-    plan.at(Id::SMAAArea).mDesc   = ALRenderTargetDesc{ .color = { GL_RG8 } };
-    plan.at(Id::SMAASearch).mDesc = ALRenderTargetDesc{ .color = { GL_R8 } };
-    plan.at(Id::SMAASample).mDesc = ALRenderTargetDesc{ .color = { GL_RGB8 } };
-    plan.at(Id::ToneCurve).mDesc  = ALRenderTargetDesc{ .color = { GL_RGBA16 } };
+    plan.at(Id::Noise).mDesc     = ALRenderTargetDesc{ .color = { GL_RGB16F } };
+    plan.at(Id::TrueNoise).mDesc = ALRenderTargetDesc{ .color = { GL_RGB16F } };
+    plan.at(Id::ToneCurve).mDesc = ALRenderTargetDesc{ .color = { GL_RGBA16 } };
+
+    // SMAA's area and search tables, and the debug image it can blend, for as long as SMAA is what antialiases, as its
+    // edges and blend weights are.
+    if (in.mFSAAType == 2)
+    {
+        plan.at(Id::SMAAArea).mDesc   = ALRenderTargetDesc{ .color = { GL_RG8 } };
+        plan.at(Id::SMAASearch).mDesc = ALRenderTargetDesc{ .color = { GL_R8 } };
+        plan.at(Id::SMAASample).mDesc = ALRenderTargetDesc{ .color = { GL_RGB8 } };
+    }
 
     return plan;
 }
