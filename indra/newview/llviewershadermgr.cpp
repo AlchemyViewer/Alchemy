@@ -71,7 +71,6 @@ using std::make_pair;
 using std::string;
 
 bool                LLViewerShaderMgr::sInitialized = false;
-bool                LLViewerShaderMgr::sSkipReload = false;
 
 LLVector4           gShinyOrigin;
 
@@ -570,7 +569,7 @@ void LLViewerShaderMgr::setShaders()
     //setShaders might be called redundantly by gSavedSettings, so return on reentrance
     static bool reentrance = false;
 
-    if (!gPipeline.mInitialized || !sInitialized || reentrance || sSkipReload)
+    if (!gPipeline.mInitialized || !sInitialized || reentrance)
     {
         return;
     }

@@ -667,7 +667,6 @@ public:
     static bool getRenderHighlights();
     static void setRenderHighlightTextureChannel(LLRender::eTexIndex channel); // sets which UV setup to display in highlight overlay
 
-    static void updateRenderTransparentWater();
     static void refreshCachedSettings();
 
     void addDebugBlip(const LLVector3& position, const LLColor4& color);

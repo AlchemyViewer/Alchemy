@@ -161,15 +161,14 @@ namespace
             bound->setValue(llmin((F32)control->getValue().asReal(), ceiling));
         }
     }
+}
 
-    // Caps again every draw distance control still alive, for the depth convention now in force.
-    void recap_draw_distance_controls()
+void recap_draw_distance_controls()
+{
+    std::erase_if(sDrawDistanceControls, [](const auto& c) { return c.first.isDead() || c.second.isDead(); });
+    for (const auto& [range, bound] : sDrawDistanceControls)
     {
-        std::erase_if(sDrawDistanceControls, [](const auto& c) { return c.first.isDead() || c.second.isDead(); });
-        for (const auto& [range, bound] : sDrawDistanceControls)
-        {
-            apply_draw_distance_cap(range.get(), bound.get());
-        }
+        apply_draw_distance_cap(range.get(), bound.get());
     }
 }
 
@@ -252,16 +251,10 @@ static bool handleNumpadControlChanged(const LLSD& newvalue)
 }
 
 
+// An input of the programs: every one is reloaded with the frame's other changes, once however many there are.
 static bool handleSetShaderChanged(const LLSD& newvalue)
 {
-    if (gPipeline.isInit())
-    {
-        // ALM depends onto atmospheric shaders, state might have changed
-        LLPipeline::refreshCachedSettings();
-    }
-
-    // else, leave terrain detail as is
-    LLViewerShaderMgr::instance()->setShaders();
+    gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Shaders);
     return true;
 }
 
@@ -300,16 +293,6 @@ static bool handleRenderPerfTestChanged(const LLSD& newvalue)
        return true;
 }
 
-bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
-{
-    if (gPipeline.isInit())
-    {
-        gPipeline.updateRenderTransparentWater();
-        LLViewerShaderMgr::instance()->setShaders();
-    }
-    return true;
-}
-
 
 // An input of the render resources (ALRenderResourceInputs), applied with the frame's other changes.
 static bool handleRenderResourceInputChanged(const LLSD& newvalue)
@@ -336,18 +319,6 @@ static bool handleRenderGlowChanged(const LLSD& newvalue)
     return true;
 }
 
-static bool handleReverseZChanged(const LLSD& newvalue)
-{
-    // setShaders() latches the reverse-Z state (LLPipeline::updateReverseZ) and then
-    // releases + recreates the GL buffers at the new depth format itself, so do NOT release
-    // buffers up front (that would rebuild them at the old format only to have setShaders
-    // rebuild them again).
-    const bool handled = handleSetShaderChanged(newvalue);
-    // The draw distance ceiling follows the convention setShaders latched; controls already shown take it now.
-    recap_draw_distance_controls();
-    return handled;
-}
-
 static bool handleDisableVintageMode(const LLSD& newvalue)
 {
     gSavedSettings.setBOOL("RenderEnableEmissiveBuffer", newvalue.asBoolean());
@@ -357,8 +328,8 @@ static bool handleDisableVintageMode(const LLSD& newvalue)
 
 static bool handleEnableHDR(const LLSD& newvalue)
 {
-    // setShaders latches the G-buffer's normal layout before it compiles and rebuilds the GL
-    // buffers after, as it does reverse-Z's. The probes' cube arrays change format as well.
+    // setShaders latches the G-buffer's normal layout before it compiles and reconciles the resources after, as it
+    // does reverse-Z's. The probes' cube arrays change format as well.
     gPipeline.mReflectionMapManager.reset();
     gPipeline.mHeroProbeManager.reset();
     return handleSetShaderChanged(newvalue);
@@ -660,12 +631,10 @@ static bool handleReflectionProbesChanged(const LLSD& newvalue)
     gPipeline.mReflectionMapManager.refreshSettings();
     if (gPipeline.isInit())
     {
-        LLPipeline::refreshCachedSettings();
         gPipeline.mReflectionMapManager.reset();
         gPipeline.mHeroProbeManager.reset();
-        LLViewerShaderMgr::instance()->setShaders();
     }
-    return true;
+    return handleSetShaderChanged(newvalue);
 }
 
 // Read by the probe manager's update, which applies them from the next frame: which probes update
@@ -1046,7 +1015,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderBloomResolutionScale", handleRenderResourceInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderBloomHalation", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderEnableEmissiveBuffer", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderReverseZ", handleReverseZChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderReverseZ", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDisableVintageMode", handleDisableVintageMode);
     setting_setup_signal_listener(gSavedSettings, "RenderHDREnabled", handleEnableHDR);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowNoise", handleSetShaderChanged);
@@ -1194,7 +1163,7 @@ void settings_setup_listeners()
     //setting_setup_signal_listener(gSavedSettings, "ShowMiniLocationPanel", toggle_show_mini_location_panel);
     setting_setup_signal_listener(gSavedSettings, "ShowObjectRenderingCost", toggle_show_object_render_cost);
     setting_setup_signal_listener(gSavedSettings, "ForceShowGrid", handleForceShowGrid);
-    setting_setup_signal_listener(gSavedSettings, "RenderTransparentWater", handleRenderTransparentWaterChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderTransparentWater", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "SpellCheck", handleSpellCheckChanged);
     setting_setup_signal_listener(gSavedSettings, "SpellCheckDictionary", handleSpellCheckChanged);
     setting_setup_signal_listener(gSavedSettings, "LoginLocation", handleLoginLocationChanged);

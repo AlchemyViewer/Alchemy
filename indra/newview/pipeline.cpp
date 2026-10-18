@@ -1195,12 +1195,6 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
     return changes;
 }
 
-//static
-void LLPipeline::updateRenderTransparentWater()
-{
-    sRenderTransparentWater = gSavedSettings.getBOOL("RenderTransparentWater");
-}
-
 // static
 void LLPipeline::refreshCachedSettings()
 {
@@ -3170,11 +3164,15 @@ void LLPipeline::updateReverseZ()
 
     LLRender::sReverseZ = effective;
 
-    // The draw distance ceiling follows the depth convention, for every consumer.
+    // The draw distance ceiling follows the depth convention, for every consumer, and controls already shown take it.
     if (changed && LLStartUp::getStartupState() >= STATE_STARTED)
     {
         gAgentCamera.mDrawDistance = ALFarPlane::clampDrawDistance(gSavedSettings.getF32("RenderFarClip"), effective);
         LLWorld::getInstance()->setLandFarClip(gAgentCamera.mDrawDistance);
+    }
+    if (changed)
+    {
+        recap_draw_distance_controls();
     }
 
     // Issued unconditionally, not just on a change. These are the only writers of clip control
