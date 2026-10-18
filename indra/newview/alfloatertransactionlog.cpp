@@ -81,6 +81,8 @@ void ALFloaterTransactionLog::addTransaction(const LLDate& date, const LLUUID& s
 
     updateLabels();
 
+    // A cell finds its column by name, not by its place in the row, so the
+    // name cell, written when the name arrives, goes after the amount.
     LLSD row;
     row["value"]               = sender;
     row["column"][0]["column"] = "time";
