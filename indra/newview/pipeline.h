@@ -43,6 +43,7 @@
 #include "aldepthpyramid.h"
 #include "alprimitiveplot.h"
 #include "alquerypool.h"
+#include "alrenderresourceplan.h"
 #include "alwatersurface.h"
 #include "altexture3d.h"
 #include "aluniformbuffer.h"
@@ -79,7 +80,7 @@ bool setup_hud_matrices(const LLRect& screen_region); // specify portion of scre
 class LLPipeline
 {
 public:
-    static constexpr U32 BLOOM_MAX_MIPS = 7;
+    static constexpr U32 BLOOM_MAX_MIPS = ALRenderResourcePlan::BLOOM_MAX_MIPS;
 
     LLPipeline();
     ~LLPipeline();
@@ -94,27 +95,55 @@ public:
 
     /// Every GL resource the pipeline holds, and the state derived from them: on context teardown and at shutdown.
     void releaseAllGLResources();
-    /// Rebuilds the render targets for the current settings. State derived from them is dropped only where what it
-    /// derives from changed across the rebuild, and one log line names both. @a relinked: the programs were reloaded
-    /// just before.
-    void rebuildGLBuffers(bool relinked);
-    /// The render targets createGLBuffers allocates.
-    void releaseRenderTargets();
-    /// The auto-exposure's targets and the lens flare's history.
-    void releaseExposureBuffers();
-    /// The main pack's screen targets, which follow the window, the resolution scale and snapshots.
-    void releaseScreenBuffers();
-    /// The probe and hero packs' screen targets (allocateProbeBuffers).
-    void releaseProbeBuffers();
-    void releaseShadowBuffers();
 
-    void createGLBuffers();
-    /// Draws the BRDF LUT with gDeferredGenBrdfLutProgram, allocating it first if it has no storage.
+    /// What a rebuildGLBuffers runs for, as its log line says.
+    enum class RebuildCause : U8
+    {
+        Setting,
+        ShaderReload, ///< the programs were reloaded just before
+        Resize,
+        Snapshot,
+    };
+
+    /// Makes the render resources what the settings now describe (reconcileResources). State derived from them is
+    /// dropped only where what it derives from changed, and one log line names both. Whether the render size was built
+    /// in full rather than halved for want of memory.
+    bool rebuildGLBuffers(RebuildCause cause);
+
+    /// Reconciles once with the main view at @a resX by @a resY, before the resolution scale: a snapshot's size, and
+    /// back. Whether that size was built in full.
+    bool allocateScreenBuffer(U32 resX, U32 resY);
+
+    /// What reconcileResources did, and what it changed that state derived from the resources depends on.
+    struct ResourceChanges
+    {
+        ALRenderResourcePlan::IdSet mBuilt;
+        ALRenderResourcePlan::IdSet mKept;
+        ALRenderResourcePlan::IdSet mFreed;
+        ALRenderResourcePlan::IdSet mFailed;
+        bool mMainSize       = false; ///< the main G-buffer's size
+        bool mGBufferFormats = false; ///< the main G-buffer's colour formats
+        bool mDepthFormat    = false; ///< the main G-buffer's depth format
+        bool mHDR            = false; ///< RenderHDREnabled
+        bool mProbePack      = false; ///< a target the reflection probes' captures render through
+        bool mHeroPack       = false; ///< a target the mirrors' captures render through
+        bool mFullSize       = true;  ///< the render size was built in full, not halved for want of memory
+    };
+
+    /// Plans the render resources from the settings (ALRenderResourceInputs::fromSettings, ALRenderResourcePlan::make)
+    /// and makes each what the plan says: built where it differs from its description, kept without a GL call where it
+    /// matches, freed where the plan no longer wants it. Depth owners are built before the targets sharing their depth.
+    /// Where a target the render size sizes cannot be built, the size is halved and those targets planned again.
+    ResourceChanges reconcileResources();
+
+    /// The inputs and the plan the resources were last reconciled to.
+    const ALRenderResourceInputs& resourceInputs() const { return mResourceInputs; }
+    const ALRenderResourcePlan& resourcePlan() const { return mResourcePlan; }
+
+    /// Draws the BRDF LUT with gDeferredGenBrdfLutProgram into its target.
     void createBrdfLut();
-    /// Whichever of the auto-exposure's targets and the lens flare's are missing, at their starting values.
-    void createExposureBuffers();
-    /// Whichever of the two noise maps is missing.
-    void createNoiseMaps();
+    /// The auto-exposure's adapted state and the lens flare's history, as a first frame finds them.
+    void resetExposureHistory();
     /// The deferred passes' noise map (DEFERRED_NOISE) again, at the current RenderDeferredNoise.
     void regenerateNoiseMap();
     void setupGradingLUT();
@@ -124,56 +153,34 @@ public:
     /// per change, never per frame.
     void bakeToneCurveLut();
 
-    //allocate the largest screen buffer possible up to resX, resY
-    //returns true if full size buffer allocated, false if some other size is allocated
-    bool allocateScreenBuffer(U32 resX, U32 resY);
-
-    /// Allocate the reflection probe (mAuxillaryRT) and hero probe (mHeroProbeRT) packs at the
-    /// sizes their captures render at: the probe resolution times ALProbeSuperSample, and
-    /// RenderHeroProbeResolution. Neither follows the window, the resolution scale or a snapshot,
-    /// so allocateScreenBuffer leaves them alone and createGLBuffers calls this.
-    void allocateProbeBuffers();
-
-    /// The size of the screen targets allocateScreenBuffer() makes for a view of
-    /// @a resX by @a resY: RenderResolutionDivisor applied, or else
+    /// The size the main view renders a view of @a resX by @a resY at: RenderResolutionDivisor applied, or else
     /// RenderResolutionMultiplier.
     static void scaleToRenderResolution(U32& resX, U32& resY);
 
-    typedef enum {
-        FBO_SUCCESS_FULLRES = 0,
-        FBO_SUCCESS_LOWRES,
-        FBO_FAILURE
-    } eFBOStatus;
-
 private:
-    //implementation of above, wrapped for easy error handling
-    eFBOStatus doAllocateScreenBuffer(U32 resX, U32 resY);
+    // The render target, or the GL texture name, that each of the plan's resources is.
+    LLRenderTarget* resourceTarget(ALRenderResourcePlan::Id id);
+    U32*            resourceTexture(ALRenderResourcePlan::Id id);
+
+    // Builds, keeps or frees each of @a ids as @a plan says, depth owners first, and records which in @a changes.
+    void ensureResources(const ALRenderResourcePlan& plan, const ALRenderResourcePlan::IdSet& ids,
+                         ResourceChanges& changes);
+    // One of the pipeline's own GL textures, with its contents.
+    void createResourceTexture(ALRenderResourcePlan::Id id);
+    // Every resource the plan names, and what the pipeline keeps about them.
+    void releaseRenderTargets();
 
     // What is built against the main depth format and rebuilt where it is next used: the depth pyramid, the water
     // surface's maps, the selection outline and the far-plane overlay.
     void releaseDepthDependents();
 
-    // What the render targets are and were built for: rebuildGLBuffers takes one before it builds and one after.
-    struct RenderBuildState
-    {
-        ALRenderTargetDesc mMain;
-        ALRenderTargetDesc mProbe;
-        ALRenderTargetDesc mHero;
-        bool mHDR = false;
-        bool mLive = false;
-    };
-    RenderBuildState renderBuildState() const;
-
-    // Whether the targets have been built since releaseAllGLResources last ran, and the RenderHDREnabled they were
-    // built for.
-    bool mGLResourcesLive = false;
-    bool mBuiltHDR = false;
+    // What the resources were last reconciled to, and whether they have been since releaseAllGLResources last ran.
+    ALRenderResourceInputs mResourceInputs;
+    ALRenderResourcePlan   mResourcePlan;
+    bool                   mGLResourcesLive = false;
+    // The main view's size for the next reconcile alone, where allocateScreenBuffer gives one.
+    std::optional<std::pair<U32, U32>> mOneShotRenderSize;
 public:
-
-    //attempt to allocate screen buffers at resX, resY
-    //returns true if allocation successful, false otherwise
-    bool allocateScreenBufferInternal(U32 resX, U32 resY);
-    bool allocateShadowBuffer(U32 resX, U32 resY);
 
     // rebuild all LLVOVolume render batches
     void rebuildDrawInfo();
@@ -392,9 +399,6 @@ public:
     U32         addObject(LLViewerObject *obj);
 
     void        enableShadows(const bool enable_shadows);
-    void        releaseSpotShadowTargets();
-    void        releaseSunShadowTargets();
-    void        releaseSunShadowTarget(U32 index);
 
     bool        shadersLoaded();
     bool        canUseWindLightShaders() const;
@@ -1144,7 +1148,7 @@ public:
     ALPrimitivePlot             mWaterPatchPrimitives{ "water patch primitives", true };
     U32                         mWaterDraws = 0;
 
-    static const U32 MAX_PREVIEW_WIDTH;
+    static constexpr U32 MAX_PREVIEW_WIDTH = ALRenderResourcePlan::PREVIEW_SIZE;
 
     //texture for making the glow
     LLRenderTarget              mGlow[3];
@@ -1223,7 +1227,7 @@ public:
     bool                mLensDirtSliderHeld = false;
     // Tone curve LUT: a 512x1 RGBA16 row (ALToneCurveSet::LUT_SIZE) whose R, G
     // and B texels hold master(channel(x)) for each channel. A raw GL name
-    // like the SMAA maps above: created empty in createGLBuffers, filled by
+    // like the SMAA maps above: created empty by reconcileResources, filled by
     // bakeToneCurveLut, released in releaseAllGLResources.
     U32                 mToneCurveLut = 0;
     bool                mToneCurveLutDirty = true;   // settings changed, or the texture was recreated, since the last bake

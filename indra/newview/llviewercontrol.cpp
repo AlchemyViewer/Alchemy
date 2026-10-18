@@ -323,7 +323,7 @@ static bool handleReleaseGLBufferChanged(const LLSD& newvalue)
 {
     if (gPipeline.isInit())
     {
-        gPipeline.rebuildGLBuffers(false);
+        gPipeline.rebuildGLBuffers(LLPipeline::RebuildCause::Setting);
     }
     return true;
 }
@@ -705,7 +705,7 @@ static bool handleHeroProbeResolutionChanged(const LLSD &newvalue)
     {
         LLPipeline::refreshCachedSettings();
         gPipeline.mHeroProbeManager.reset();
-        gPipeline.rebuildGLBuffers(false);
+        gPipeline.rebuildGLBuffers(LLPipeline::RebuildCause::Setting);
     }
     return true;
 }

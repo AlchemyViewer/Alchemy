@@ -27,7 +27,7 @@
 #include "llgl.h"
 #include "llglstates.h"
 
-/// The screen's depth carries stencil in every render-target pack (LLPipeline::allocateScreenBufferInternal), cleared
+/// The screen's depth carries stencil in every render-target pack (ALRenderResourcePlan::make), cleared
 /// with the G-buffer each frame. The water keeps its per-pixel facts there, each a bit, each a scoped state below.
 namespace ALWaterStencil
 {

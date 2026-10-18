@@ -815,7 +815,7 @@ void LLViewerShaderMgr::setShaders()
     {
         gViewerWindow->setCursor(UI_CURSOR_ARROW);
     }
-    gPipeline.rebuildGLBuffers(true);
+    gPipeline.rebuildGLBuffers(LLPipeline::RebuildCause::ShaderReload);
 
     finalizeShaderList();
 

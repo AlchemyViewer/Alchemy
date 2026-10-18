@@ -2267,7 +2267,7 @@ void ALFloaterLightBox::updateTonemapperRows()
 
 void ALFloaterLightBox::refreshBloomSections()
 {
-    // The renderer's own test (LLPipeline::createGLBuffers, renderFinalize):
+    // The renderer's own test (ALRenderResourcePlan::make, renderFinalize):
     // HDR bloom runs with RenderHDREnabled on, and the legacy glow runs
     // whenever it does not. Keep the two in step. The cross filter
     // is on the HDR side with the bloom it is seeded from: it streaks what
