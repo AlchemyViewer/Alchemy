@@ -64,7 +64,6 @@
 #include "alcurvemodel.h"
 #include "alfarplane.h"
 #include "alfarplaneoverlay.h"
-#include "alrendersizeoverride.h"
 #include "alselectionoutline.h"
 #include "alwaterstencil.h"
 #include "llrender.h"
@@ -444,8 +443,6 @@ void LLPipeline::connectRefreshCachedSettingsSafe(const std::string name)
 void LLPipeline::init()
 {
     refreshCachedSettings();
-    // The first load builds every program and resource from the inputs as they are now.
-    latchRenderInputs();
 
     mRT = &mMainRT;
 
@@ -526,8 +523,8 @@ void LLPipeline::init()
 
     mBackfaceCull = true;
 
-    // Enable features
-    LLViewerShaderMgr::instance()->setShaders();
+    // Every program and resource, from the inputs as they are now.
+    loadRenderInputs();
 
     for (U32 i = 0; i < 2; ++i)
     {
@@ -793,36 +790,82 @@ void LLPipeline::markRenderInputsDirty(ALRenderInputRequests::Change change)
 
 void LLPipeline::applyRenderInputs()
 {
-    if (!mRenderInputRequests.pending())
-    {
-        return;
-    }
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
-
     // Nothing is applied to resources that are not there. Before the pipeline's first load, and while a context is
-    // lost, the load that comes next (init, restoreGL) latches and builds everything from the settings as they are then.
-    const bool live = mInitialized && mGLResourcesLive;
-    if (live)
+    // lost, the load that comes next (loadRenderInputs) applies whatever was marked until then.
+    if (!mInitialized || !mGLResourcesLive)
     {
-        latchRenderInputs();
+        return;
     }
-    const ALRenderInputRequests::Application application =
-        mRenderInputRequests.take(live && withSizeOverride(mLatchedInputs) != mRequestedInputs);
-    if (!live)
+    if (const std::optional<ALRenderInputRequests::Application> taken = mRenderInputRequests.take())
+    {
+        applyRenderInputs(*taken);
+    }
+}
+
+void LLPipeline::loadRenderInputs()
+{
+    ALRenderInputRequests::Application taken = mRenderInputRequests.take().value_or(ALRenderInputRequests::Application{});
+    taken.mRebuildPrograms = true;
+    applyRenderInputs(taken);
+}
+
+void LLPipeline::applyRenderInputs(const ALRenderInputRequests::Application& taken)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    using Programs = ALRenderApplication::Programs;
+
+    latchRenderInputs();
+
+    LLViewerShaderMgr* shaders = LLViewerShaderMgr::instance();
+    const ALRenderApplication steps = ALRenderApplication::make(
+        taken.mRebuildPrograms, mShadersLoaded ? std::optional<ALShaderInputs>(shaders->inputs()) : std::nullopt,
+        mLatchedShaderInputs, mGLResourcesLive ? std::optional<ALRenderResourceInputs>(mRequestedInputs) : std::nullopt,
+        mLatchedInputs);
+    if (steps.idle())
     {
         return;
     }
 
-    mApplyingChanges = application.mChanges;
-    if (application.mReloadShaders)
+    mApplyingChanges = taken.mChanges;
+    const bool reload = steps.mPrograms != Programs::Kept;
+    // Programs first: the resources' plan takes the normal layout and the depth convention they compile for.
+    if (reload && !shaders->setShaders(mLatchedShaderInputs))
     {
-        LLViewerShaderMgr::instance()->setShaders();
+        mApplyingChanges = 0;
+        return;
     }
-    else if (application.mReconcile)
+    if (steps.mReconcile)
     {
-        rebuildGLBuffers(application.mSkipFrame ? RebuildCause::Resize : RebuildCause::Setting);
+        rebuildGLBuffers(mLatchedInputs, reload             ? RebuildCause::ShaderReload
+                                         : taken.mSkipFrame ? RebuildCause::Resize
+                                                            : RebuildCause::Setting);
+    }
+    else if (reload)
+    {
+        programsReloaded();
     }
     mApplyingChanges = 0;
+}
+
+bool LLPipeline::beginSizeOverride(U32 width, U32 height)
+{
+    llassert(!mRenderInputRequests.overriding());
+    mRenderInputRequests.overrideBegins();
+
+    ALRenderResourceInputs requested = mLatchedInputs;
+    requested.mWidth  = width;
+    requested.mHeight = height;
+    // The size the last snapshot built, which its end left in place: a 360 capture's next face.
+    if (mGLResourcesLive && requested == mRequestedInputs)
+    {
+        return mResourcesFullSize;
+    }
+    return rebuildGLBuffers(requested, RebuildCause::Snapshot);
+}
+
+void LLPipeline::endSizeOverride()
+{
+    mRenderInputRequests.overrideEnds();
 }
 
 void LLPipeline::latchRenderInputs()
@@ -1099,17 +1142,6 @@ ALRenderResourceInputs LLPipeline::resourceInputsFromSettings(const ALShaderInpu
     in.mBakeHeight = (U32)LLAvatarAppearanceDefines::SCRATCH_TEX_HEIGHT;
 
     return in;
-}
-
-// static
-ALRenderResourceInputs LLPipeline::withSizeOverride(ALRenderResourceInputs inputs)
-{
-    if (const std::optional<std::pair<U32, U32>>& size = ALRenderSizeOverride::current())
-    {
-        inputs.mWidth  = size->first;
-        inputs.mHeight = size->second;
-    }
-    return inputs;
 }
 
 LLPipeline::ResourceChanges LLPipeline::reconcileResources(const ALRenderResourceInputs& requested)
@@ -1514,6 +1546,12 @@ void LLPipeline::releaseDepthDependents()
 
 namespace
 {
+    // How many changes the frame's application gathered into one reload or reconcile, for its log line.
+    std::string applyingChanges(U32 changes)
+    {
+        return changes > 0 ? fmt::format(", applying {} {}", changes, changes == 1 ? "change" : "changes") : std::string();
+    }
+
     // The names of a set of resources, comma-separated, for the log line.
     std::string resource_names(const ALRenderResourcePlan::IdSet& ids)
     {
@@ -1540,7 +1578,7 @@ static bool resized_as_asked(LLPipeline::RebuildCause cause, const LLPipeline::R
     return cause == LLPipeline::RebuildCause::Resize && changes.mFullSize && changes.mFailed.none();
 }
 
-bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
+bool LLPipeline::rebuildGLBuffers(const ALRenderResourceInputs& requested, RebuildCause cause)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     assertInitialized();
@@ -1556,16 +1594,10 @@ bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
     };
     std::string invalidated;
 
-    // A reload is followed by this reconcile wherever it runs, and the two apply every shader and resource change marked
-    // before the reload began.
-    if (cause == RebuildCause::ShaderReload)
-    {
-        mRenderInputRequests.shadersReloaded();
-    }
-
     const bool new_context = !mGLResourcesLive;
-    const ResourceChanges changes = reconcileResources(withSizeOverride(mLatchedInputs));
-    mGLResourcesLive = true;
+    const ResourceChanges changes = reconcileResources(requested);
+    mGLResourcesLive   = true;
+    mResourcesFullSize = changes.mFullSize;
 
     std::string changed;
     if (new_context)
@@ -1679,10 +1711,7 @@ bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
     {
         add(freed, "hero probes");
     }
-    // How many changes the frame's application gathered into this one.
-    const std::string applying = mApplyingChanges > 0
-        ? fmt::format(", applying {} {}", mApplyingChanges, mApplyingChanges == 1 ? "change" : "changes")
-        : std::string();
+    const std::string applying = applyingChanges(mApplyingChanges);
     std::ostringstream line;
     line << "Render resources reconciled at " << mMainRT.deferredScreen.getWidth() << "x"
          << mMainRT.deferredScreen.getHeight() << why << applying
@@ -1715,6 +1744,14 @@ bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
     }
 
     return changes.mFullSize;
+}
+
+void LLPipeline::programsReloaded()
+{
+    // The table is what gDeferredGenBrdfLutProgram draws, so it is drawn again whenever that is relinked.
+    createBrdfLut();
+    LL_INFOS("RenderResources") << "Programs reloaded" << applyingChanges(mApplyingChanges)
+                                << "; render resources kept; invalidated: BRDF LUT" << LL_ENDL;
 }
 
 void LLPipeline::createResourceTexture(ALRenderResourcePlan::Id id)
@@ -2255,7 +2292,7 @@ void LLPipeline::setupGradingLUT()
 
 
 // Runs lazily from colorCorrect rather than from the settings signal for
-// three reasons. setShaders() releases and recreates the texture behind the
+// three reasons. A new context's reconcile recreates the texture behind the
 // settings' back, and only a bake that runs on the way to drawing can refill
 // it. A Look apply or an undo writes four curve settings in a row and a drag
 // on the graph commits per mouse move, so one bake per rendered frame is the
@@ -2307,9 +2344,8 @@ void LLPipeline::restoreGL()
 {
     assertInitialized();
 
-    // The new context's programs and resources are built from the inputs as they are now.
-    latchRenderInputs();
-    LLViewerShaderMgr::instance()->setShaders();
+    // The new context's programs and resources, from the inputs as they are now.
+    loadRenderInputs();
 
     for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin();
             iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
@@ -3275,12 +3311,12 @@ LLRenderTarget::eDepthFormat LLPipeline::mainDepthFormat()
 }
 
 // static
-void LLPipeline::updateReverseZ()
+void LLPipeline::updateReverseZ(bool reverse_z)
 {
-    // The latched state: the setting where the context has clip control. On a GPU without it the
+    // The setting where the context has clip control (ALShaderInputs). On a GPU without it the
     // setting can stay on but is inert, and every branch below then resolves to the forward
     // constants, so the forward path is never perturbed.
-    const bool effective = gPipeline.mLatchedShaderInputs.mGlobal.mReverseZ;
+    const bool effective = reverse_z;
     const bool changed   = (effective != LLRender::sReverseZ);
 
     LLRender::sReverseZ = effective;

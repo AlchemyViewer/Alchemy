@@ -938,7 +938,7 @@ void LLFeatureManager::setGraphicsLevel(U32 level, bool skipFeatures)
     // reload asked for here as well covers what changed without a listener.
     applyFeatures(skipFeatures);
 
-    gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Shaders);
+    gPipeline.markRenderInputsDirty();
     gPipeline.refreshCachedSettings();
 }
 

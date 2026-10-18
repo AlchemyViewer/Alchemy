@@ -508,28 +508,25 @@ S32 LLViewerShaderMgr::getShaderLevel(S32 type)
 //============================================================================
 // Shader Management
 
-void LLViewerShaderMgr::setShaders()
+bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs)
 {
     LL_PROFILE_ZONE_SCOPED;
-    //setShaders might be called redundantly by gSavedSettings, so return on reentrance
     static bool reentrance = false;
 
     if (!gPipeline.mInitialized || !sInitialized || reentrance)
     {
-        return;
+        return false;
     }
 
     if (!gGLManager.mHasRequirements)
     {
         // The window refused the context and told the user why
         LL_INFOS("ShaderLoading") << "Not supported hardware/software" << LL_ENDL;
-        return;
+        return false;
     }
 
-    gPipeline.shaderReloadBegins();
-
     // Every loader below reads these, and nothing else of the settings.
-    mInputs = gPipeline.latchedShaderInputs();
+    mInputs = inputs;
 
     ALUniformBuffer::sUpdateMode = ALUniformBuffer::clampUpdateMode(gSavedSettings.getS32("AlchemyRenderUBOUpdateMode"));
 
@@ -538,7 +535,7 @@ void LLViewerShaderMgr::setShaders()
     // from the latched state, and the cache key folds it in -- all within this one blocking
     // call, so clip control, clear depth, depth format and the shader define agree for the
     // whole next frame.
-    LLPipeline::updateReverseZ();
+    LLPipeline::updateReverseZ(mInputs.mGlobal.mReverseZ);
 
     // The same for the G-buffer's normal layout: every compile below injects GBUFFER_NORM_HDR from this latch, the
     // cache key folds it in, and the resources planned from the same inputs give the normal attachment its format.
@@ -652,7 +649,7 @@ void LLViewerShaderMgr::setShaders()
         gGLManager.printGLInfoString();
         LL_ERRS() << "Unable to load basic shader " << shader_name << ", verify graphics driver installed and current." << LL_ENDL;
         reentrance = false; // For hygiene only, re-try probably helps nothing
-        return;
+        return false;
     }
 
     gPipeline.mShadersLoaded = true;
@@ -745,11 +742,11 @@ void LLViewerShaderMgr::setShaders()
     {
         gViewerWindow->setCursor(UI_CURSOR_ARROW);
     }
-    gPipeline.rebuildGLBuffers(LLPipeline::RebuildCause::ShaderReload);
 
     finalizeShaderList();
 
     reentrance = false;
+    return true;
 }
 
 void LLViewerShaderMgr::unloadShaders()

@@ -26,13 +26,11 @@
 
 #include "stdtypes.h"
 
-#include <optional>
-#include <utility>
-
 /// The main view rendered at a size of its own while the scope lasts, before the resolution scale: a snapshot's. The
-/// render resources are reconciled to it on entry and to the world view's size again on exit, which rebuilds only the
+/// render resources are reconciled to the inputs as last latched at that size on entry, which rebuilds only the
 /// targets the render size sizes (ALRenderResourcePlan::followsRenderSize); the probe and hero packs and the fixed-size
-/// targets are kept. One at a time.
+/// targets are kept. No application runs while it lasts, and its end marks the world view's size for the next one, so
+/// scopes back to back at one size build it once (LLPipeline::beginSizeOverride). One at a time.
 class ALRenderSizeOverride
 {
 public:
@@ -45,11 +43,6 @@ public:
     /// Whether the size was built in full, rather than halved for want of memory.
     bool applied() const { return mApplied; }
 
-    /// The size a scope holds, while one does (LLPipeline::withSizeOverride).
-    static const std::optional<std::pair<U32, U32>>& current() { return sSize; }
-
 private:
     bool mApplied = false;
-
-    static std::optional<std::pair<U32, U32>> sSize;
 };

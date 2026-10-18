@@ -91,22 +91,26 @@ public:
     void restoreGL();
 
     /// Marks a change to the render inputs for the next application (applyRenderInputs), and does nothing else.
-    void markRenderInputsDirty(ALRenderInputRequests::Change change = ALRenderInputRequests::Change::Resources);
-    /// A reload of every program begins (LLViewerShaderMgr::setShaders): it and the reconcile that ends it apply the
-    /// changes marked before now, and those marked while it runs wait for the next application.
-    void shaderReloadBegins() { mRenderInputRequests.reloadBegins(); }
+    void markRenderInputsDirty(ALRenderInputRequests::Change change = ALRenderInputRequests::Change::Inputs);
     /// Whether the window has been resized since the inputs were last applied: display() draws nothing that frame.
     bool windowResizePending() const { return mRenderInputRequests.windowResized(); }
-    /// Applies every change marked since the last application, once, at the top of each frame: the inputs latched
-    /// (latchRenderInputs), then the programs reloaded where a shader input changed (LLViewerShaderMgr::setShaders,
-    /// which reconciles the resources after them), otherwise the resources reconciled where their inputs changed
-    /// (rebuildGLBuffers).
+    /// Applies every change marked since the last application, once, at the top of each frame, through the one path
+    /// into a reload or a reconcile: the inputs latched (latchRenderInputs), the programs loaded for the shader inputs
+    /// where they moved (LLViewerShaderMgr::setShaders), the resources reconciled where theirs moved
+    /// (rebuildGLBuffers), and what derives from either invalidated. Nothing while a snapshot holds the render size.
     void applyRenderInputs();
+    /// The same application for the pipeline's first load and a restored context: every program built and every
+    /// resource reconciled, with whatever was marked until then.
+    void loadRenderInputs();
 
-    /// Reads the render inputs from the settings, once for everything that applies them: the programs a reload
-    /// builds, the resources' plan and the passes, which read the latched statics set here. The frame's application
-    /// latches, and so does a reload outside one.
-    void latchRenderInputs();
+    /// A snapshot's render size, before the resolution scale, until endSizeOverride (ALRenderSizeOverride): the
+    /// resources reconciled to the latched inputs at that size, which rebuilds only what the size sizes, and no
+    /// application runs meanwhile. Whether the size was built in full rather than halved for want of memory.
+    bool beginSizeOverride(U32 width, U32 height);
+    /// The snapshot ends: the next application reconciles to the inputs as the settings say, the window's size among
+    /// them, so snapshots taken back to back at one size build that size once.
+    void endSizeOverride();
+
     /// The inputs as they were last latched: the resources' and the programs'.
     const ALRenderResourceInputs& latchedInputs() const { return mLatchedInputs; }
     const ALShaderInputs&         latchedShaderInputs() const { return mLatchedShaderInputs; }
@@ -123,13 +127,9 @@ public:
         Setting,
         ShaderReload, ///< the programs were reloaded just before
         Resize,
-        Snapshot, ///< an ALRenderSizeOverride began or ended
+        Snapshot, ///< an ALRenderSizeOverride began
     };
 
-    /// Makes the render resources what the latched inputs describe, at the size an ALRenderSizeOverride holds while
-    /// one does (reconcileResources). State derived from them is dropped only where what it derives from changed, and
-    /// one log line names both. Whether the render size was built in full rather than halved for want of memory.
-    bool rebuildGLBuffers(RebuildCause cause);
 
     /// What reconcileResources did, and what it changed that state derived from the resources depends on.
     struct ResourceChanges
@@ -175,13 +175,25 @@ public:
     static void scaleToRenderResolution(U32& resX, U32& resY);
 
 private:
+    // The one application, which applyRenderInputs and loadRenderInputs run.
+    void applyRenderInputs(const ALRenderInputRequests::Application& taken);
+
+    // Reads the render inputs from the settings, once for everything an application applies: the programs a reload
+    // builds, the resources' plan and the passes, which read the latched statics set here.
+    void latchRenderInputs();
+
+    // Makes the render resources what @a requested describes (reconcileResources). State derived from them, or from
+    // the programs where @a cause says they were reloaded, is dropped only where what it derives from changed, and one
+    // log line names both. Whether the render size was built in full rather than halved for want of memory.
+    bool rebuildGLBuffers(const ALRenderResourceInputs& requested, RebuildCause cause);
+    // What the programs' reload alone invalidates, where no reconcile follows it, and its log line.
+    void programsReloaded();
+
     // What the settings say the programs' and the resources' inputs are now, read by latchRenderInputs alone, so every
     // program, resource and pass is planned from the same reading of the settings. The resources take the G-buffer's
     // normal layout and the depth convention from the programs' inputs, which compile for them.
     static ALShaderInputs         shaderInputsFromSettings();
     static ALRenderResourceInputs resourceInputsFromSettings(const ALShaderInputs& shaders);
-    // @a inputs at the size an ALRenderSizeOverride holds, while one does.
-    static ALRenderResourceInputs withSizeOverride(ALRenderResourceInputs inputs);
 
     // The render target, or the GL texture name, that each of the plan's resources is.
     LLRenderTarget* resourceTarget(ALRenderResourcePlan::Id id);
@@ -210,6 +222,8 @@ private:
     // The inputs as the last latch read them, which the next reconcile and reload are asked for.
     ALRenderResourceInputs mLatchedInputs;
     ALShaderInputs         mLatchedShaderInputs;
+    // Whether the last reconcile built the render size in full, which a snapshot at the size it was built for finds.
+    bool                   mResourcesFullSize = true;
 
     // The changes marked since the last application, and how many the one running applies, for the log line.
     ALRenderInputRequests mRenderInputRequests;
@@ -622,11 +636,11 @@ public:
     // (same 4 bytes/px as DEPTH24 on desktop GPUs), fixed 24-bit otherwise.
     static LLRenderTarget::eDepthFormat mainDepthFormat();
 
-    // Latch reverse-Z on/off to the latched inputs (the setting where the context has clip control): flips
+    // Latch reverse-Z on/off as the shader inputs say (the setting where the context has clip control): flips
     // LLRender::sReverseZ, sets glClipControl + clear depth, re-bases the ambient depth func, and clears the sampler
     // cache. Idempotent; requires a current GL context. Called from setShaders() so the whole convention flip (clip
     // control, clear depth, RT formats, shader define) is atomic.
-    static void updateReverseZ();
+    static void updateReverseZ(bool reverse_z);
 
     /// RenderHDREnabled as the inputs were last latched: what every HDR-dependent target and pass decides by. The
     /// G-buffer's normal layout follows LLRender::sGBufferNormHDR, which setShaders latches from the same inputs.

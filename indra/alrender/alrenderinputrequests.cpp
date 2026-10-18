@@ -1,6 +1,6 @@
 /**
  * @file alrenderinputrequests.cpp
- * @brief What the render inputs' changes since they were last applied ask of the next application.
+ * @brief What the render inputs' changes since they were last applied ask of the next application, and what it does.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -26,7 +26,6 @@
 
 #include "alrenderinputrequests.h"
 
-#include <algorithm>
 #include <numeric>
 
 void ALRenderInputRequests::mark(Change change)
@@ -34,42 +33,63 @@ void ALRenderInputRequests::mark(Change change)
     ++mMarks[(size_t)change];
 }
 
+void ALRenderInputRequests::overrideBegins()
+{
+    ++mOverrides;
+}
+
+void ALRenderInputRequests::overrideEnds()
+{
+    llassert(mOverrides > 0);
+    mOverrides -= mOverrides > 0 ? 1 : 0;
+    mark(Change::Inputs);
+}
+
 bool ALRenderInputRequests::pending() const
 {
-    return mMarks[(size_t)Change::Resources] > 0 || mMarks[(size_t)Change::Shaders] > 0 ||
-           mMarks[(size_t)Change::Window] > 0;
+    return !overriding() && std::accumulate(mMarks.begin(), mMarks.end(), 0u) > 0;
 }
 
 bool ALRenderInputRequests::windowResized() const
 {
-    return mMarks[(size_t)Change::Window] > 0;
+    return !overriding() && mMarks[(size_t)Change::Window] > 0;
 }
 
-ALRenderInputRequests::Application ALRenderInputRequests::take(bool inputs_changed)
+std::optional<ALRenderInputRequests::Application> ALRenderInputRequests::take()
 {
+    if (!pending())
+    {
+        return std::nullopt;
+    }
+
     Application application;
-    application.mReloadShaders = mMarks[(size_t)Change::Shaders] > 0;
-    application.mReconcile     = !application.mReloadShaders && inputs_changed &&
-                                 (mMarks[(size_t)Change::Resources] > 0 || mMarks[(size_t)Change::Window] > 0);
-    application.mSkipFrame     = mMarks[(size_t)Change::Window] > 0;
-    application.mChanges       = std::accumulate(mMarks.begin(), mMarks.end(), 0u);
+    application.mRebuildPrograms = mMarks[(size_t)Change::Programs] > 0;
+    application.mSkipFrame       = mMarks[(size_t)Change::Window] > 0;
+    application.mChanges         = std::accumulate(mMarks.begin(), mMarks.end(), 0u);
 
     mMarks = {};
     return application;
 }
 
-void ALRenderInputRequests::reloadBegins()
+// static
+ALRenderApplication ALRenderApplication::make(bool rebuild_programs, const std::optional<ALShaderInputs>& loaded,
+                                              const ALShaderInputs& latched,
+                                              const std::optional<ALRenderResourceInputs>& reconciled,
+                                              const ALRenderResourceInputs& requested)
 {
-    mReloading = mMarks;
-}
-
-void ALRenderInputRequests::shadersReloaded()
-{
-    // An application taken while the reload ran would leave fewer marks than it began with.
-    for (Change change : { Change::Shaders, Change::Resources })
+    ALRenderApplication application;
+    if (rebuild_programs || !loaded)
     {
-        U32& marks = mMarks[(size_t)change];
-        marks -= std::min(marks, mReloading[(size_t)change]);
+        application.mPrograms      = Programs::Rebuilt;
+        application.mSharedObjects = true;
     }
-    mReloading = {};
+    else if (latched != *loaded)
+    {
+        application.mPrograms      = Programs::Reloaded;
+        application.mSharedObjects = latched.mGlobal != loaded->mGlobal;
+    }
+    // The resources' inputs carry the normal layout and the depth convention the programs compile for, so a reload that
+    // moves either reconciles after it.
+    application.mReconcile = !reconciled || requested != *reconciled;
+    return application;
 }

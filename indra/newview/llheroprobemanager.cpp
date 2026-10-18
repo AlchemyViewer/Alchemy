@@ -89,11 +89,11 @@ void LLHeroProbeManager::update()
     // - Geenz 2025-02-25
     if (!mInitialized && LLStartUp::getStartupState() > STATE_PRECACHE)
     {
-        // The hero probes are rebuilt from nothing along with the shaders: which of the two the workaround needs is
-        // not known.
+        // The hero probes are rebuilt from nothing now, and every program from its sources by the next frame's
+        // application: which of the two the workaround needs is not known.
         reset();
         LLViewerShaderMgr::instance()->clearShaderCache();
-        LLViewerShaderMgr::instance()->setShaders();
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Programs);
         mInitialized = true;
     }
 

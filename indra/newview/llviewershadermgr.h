@@ -53,8 +53,10 @@ public:
     static void releaseInstance();
 
     void initAttribsAndUniforms(void) override;
-    /// Loads every program for the inputs the pipeline latched (LLPipeline::latchedShaderInputs).
-    void setShaders();
+    /// Loads every program for @a inputs, which the pipeline's application latched (LLPipeline::applyRenderInputs), and
+    /// keeps them. Whether the programs were loaded: not before the pipeline is initialised, nor on a context that cannot
+    /// build them.
+    bool setShaders(const ALShaderInputs& inputs);
     /// The inputs the programs were last loaded for, which every loader reads in place of the settings.
     const ALShaderInputs& inputs() const { return mInputs; }
     void unloadShaders();

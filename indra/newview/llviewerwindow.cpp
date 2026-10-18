@@ -2213,9 +2213,8 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     }
     else if (!LLViewerShaderMgr::sInitialized)
     {
-        //immediately initialize shaders
+        // The programs are built by the pipeline's first load (LLPipeline::init), once it has a window to build them in.
         LLViewerShaderMgr::sInitialized = true;
-        LLViewerShaderMgr::instance()->setShaders();
     }
 
     if (!LLAppViewer::instance()->restoreErrorTrap())

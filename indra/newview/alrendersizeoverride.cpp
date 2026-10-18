@@ -28,17 +28,12 @@
 
 #include "pipeline.h"
 
-std::optional<std::pair<U32, U32>> ALRenderSizeOverride::sSize;
-
 ALRenderSizeOverride::ALRenderSizeOverride(U32 width, U32 height)
 {
-    llassert(!sSize);
-    sSize.emplace(width, height);
-    mApplied = gPipeline.rebuildGLBuffers(LLPipeline::RebuildCause::Snapshot);
+    mApplied = gPipeline.beginSizeOverride(width, height);
 }
 
 ALRenderSizeOverride::~ALRenderSizeOverride()
 {
-    sSize.reset();
-    gPipeline.rebuildGLBuffers(LLPipeline::RebuildCause::Snapshot);
+    gPipeline.endSizeOverride();
 }
