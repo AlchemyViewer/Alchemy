@@ -42,6 +42,7 @@
 #include "llimagetga.h"
 #include "llimagewebp.h"
 #include "llaudioengine.h" // For debugging.
+#include "llavatarappearancedefines.h"
 #include "llerror.h"
 #include "llfocusmgr.h"
 #include "llviewercontrol.h"
@@ -63,6 +64,7 @@
 #include "alcurvemodel.h"
 #include "alfarplane.h"
 #include "alfarplaneoverlay.h"
+#include "alrendersizeoverride.h"
 #include "alselectionoutline.h"
 #include "alwaterstencil.h"
 #include "llrender.h"
@@ -85,6 +87,7 @@
 #include "llface.h"
 #include "llfeaturemanager.h"
 #include "llfloatertelehub.h"
+#include "llgltfmaterialpreviewmgr.h"
 #include "llfloaterreg.h"
 #include "llhudmanager.h"
 #include "llhudnametag.h"
@@ -824,7 +827,7 @@ void LLPipeline::applyRenderInputs()
     // lost, the load that comes next (init, restoreGL) builds everything from the settings as they are then.
     const bool live = mInitialized && mGLResourcesLive;
     const ALRenderInputRequests::Application application =
-        mRenderInputRequests.take(live && ALRenderResourceInputs::fromSettings() != mRequestedInputs);
+        mRenderInputRequests.take(live && resourceInputsFromSettings() != mRequestedInputs);
     if (!live)
     {
         return;
@@ -996,6 +999,60 @@ void LLPipeline::ensureResources(const ALRenderResourcePlan& plan, const ALRende
     gGL.getTextureSlot(0)->unbind();
 }
 
+// static
+ALRenderResourceInputs LLPipeline::resourceInputsFromSettings()
+{
+    ALRenderResourceInputs in;
+
+    if (const std::optional<std::pair<U32, U32>>& size = ALRenderSizeOverride::current())
+    {
+        in.mWidth  = size->first;
+        in.mHeight = size->second;
+    }
+    else if (gViewerWindow)
+    {
+        in.mWidth  = (U32)gViewerWindow->getWorldViewWidthRaw();
+        in.mHeight = (U32)gViewerWindow->getWorldViewHeightRaw();
+    }
+    in.mResolutionDivisor    = gSavedSettings.getU32("RenderResolutionDivisor");
+    in.mResolutionMultiplier = gSavedSettings.getF32("RenderResolutionMultiplier");
+
+    in.mHDR            = gSavedSettings.getBOOL("RenderHDREnabled");
+    in.mEmissive       = gSavedSettings.getBOOL("RenderEnableEmissiveBuffer");
+    in.mGBufferNormHDR = LLRender::sGBufferNormHDR;
+    in.mReverseZ       = LLRender::sReverseZ;
+
+    in.mShadowDetail     = gSavedSettings.getS32("RenderShadowDetail");
+    in.mShadowScale      = gSavedSettings.getF32("RenderShadowResolutionScale");
+    in.mShadowDepth32F   = gSavedSettings.getBOOL("AlchemyRenderShadowDepth32F");
+    in.mSSAO             = gSavedSettings.getBOOL("RenderDeferredSSAO");
+    in.mSSR              = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
+    in.mTransparentWater = gSavedSettings.getBOOL("RenderTransparentWater");
+
+    in.mProbes = LLFeatureManager::getInstance()->isFeatureAvailable("RenderReflectionsEnabled") &&
+                 gSavedSettings.getBOOL("RenderReflectionsEnabled");
+    in.mProbeResolution  = ALRenderResourceInputs::probeResolution(gSavedSettings.getU32("RenderReflectionProbeResolution"));
+    in.mProbeSuperSample = ALRenderResourceInputs::probeSuperSample(gSavedSettings.getS32("ALProbeSuperSample"));
+    in.mProbeAllCascades = gSavedSettings.getBOOL("AlchemyRenderProbeAllShadowCascades");
+    in.mMirrors          = gSavedSettings.getBOOL("RenderMirrors");
+    in.mMaterialPreview  = LLGLTFPreviewTexture::liveCount() > 0;
+    in.mHeroResolution   = (U32)llmax(gSavedSettings.getS32("RenderHeroProbeResolution"), 1);
+
+    in.mFSAAType          = gSavedSettings.getU32("RenderFSAAType");
+    in.mSMAAStencil       = gSavedSettings.getBOOL("RenderSMAAUseStencil");
+    in.mBloomMips         = gSavedSettings.getS32("RenderBloomMipCount");
+    in.mBloomScale        = gSavedSettings.getS32("RenderBloomResolutionScale");
+    in.mBloomHalation     = gSavedSettings.getBOOL("RenderBloomHalation");
+    in.mGlowResolutionPow = gSavedSettings.getS32("RenderGlowResolutionPow");
+    in.mGlowHDR           = gSavedSettings.getBOOL("RenderGlowHDR");
+    in.mDeferredNoise     = gSavedSettings.getF32("RenderDeferredNoise");
+
+    in.mBakeWidth  = (U32)LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH;
+    in.mBakeHeight = (U32)LLAvatarAppearanceDefines::SCRATCH_TEX_HEIGHT;
+
+    return in;
+}
+
 LLPipeline::ResourceChanges LLPipeline::reconcileResources()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
@@ -1007,7 +1064,7 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources()
     // whatever order the settings' listeners ran in.
     refreshCachedSettings();
 
-    const ALRenderResourceInputs requested = ALRenderResourceInputs::fromSettings();
+    const ALRenderResourceInputs requested = resourceInputsFromSettings();
     ALRenderResourceInputs       inputs    = requested;
     Plan                         plan      = Plan::make(inputs);
 

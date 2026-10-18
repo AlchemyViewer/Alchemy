@@ -136,7 +136,7 @@ public:
         bool mFullSize       = true;  ///< the render size was built in full, not halved for want of memory
     };
 
-    /// Plans the render resources from the settings (ALRenderResourceInputs::fromSettings, ALRenderResourcePlan::make)
+    /// Plans the render resources from the settings (resourceInputsFromSettings, ALRenderResourcePlan::make)
     /// and makes each what the plan says: built where it differs from its description, kept without a GL call where it
     /// matches, freed where the plan no longer wants it. Depth owners are built before the targets sharing their depth.
     /// Where a target the render size sizes cannot be built, the size is halved and those targets planned again.
@@ -162,6 +162,10 @@ public:
     static void scaleToRenderResolution(U32& resX, U32& resY);
 
 private:
+    // What the settings and the latches set from them say the resources' inputs are now. Read in this one place, so
+    // every resource is planned from the same reading of the settings.
+    static ALRenderResourceInputs resourceInputsFromSettings();
+
     // The render target, or the GL texture name, that each of the plan's resources is.
     LLRenderTarget* resourceTarget(ALRenderResourcePlan::Id id);
     U32*            resourceTexture(ALRenderResourcePlan::Id id);

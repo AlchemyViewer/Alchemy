@@ -29,9 +29,9 @@
 #include <algorithm>
 #include <bit>
 
-/// Everything that decides what the pipeline's render resources are (ALRenderResourcePlan::make), as values. Built in
-/// one place, fromSettings(), so every resource is planned from the same reading of the settings; a plan's test builds
-/// one by hand.
+/// Everything that decides what the pipeline's render resources are (ALRenderResourcePlan::make), as values. The
+/// viewer builds one in one place from its settings and the latches set from them, so every resource is planned from
+/// the same reading of the settings; a plan's test builds one by hand.
 struct ALRenderResourceInputs
 {
     /// The render size before RenderResolutionDivisor and RenderResolutionMultiplier: the world view's, or a
@@ -73,9 +73,6 @@ struct ALRenderResourceInputs
     /// The appearance bake's scratch target (LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH and _HEIGHT).
     U32 mBakeWidth = 2048;
     U32 mBakeHeight = 2048;
-
-    /// What the settings and the latches set from them say now.
-    static ALRenderResourceInputs fromSettings();
 
     /// @a width by @a height as the main view renders it: divided by @a divisor where it divides both into more than
     /// one pixel, scaled by @a multiplier otherwise.

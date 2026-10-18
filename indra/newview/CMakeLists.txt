@@ -172,7 +172,6 @@ if(AL_BUILD_VIEWER)
     alfloatertransactionlog.cpp
     alrenderinputrequests.cpp
     alrenderisolation.cpp
-    alrenderresourceinputs.cpp
     alrenderresourceplan.cpp
     alrendersizeoverride.cpp
     alsceneexplorerpredicate.cpp
