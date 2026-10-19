@@ -9291,6 +9291,27 @@ void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget*
     }
 }
 
+// The pixels of a `width` x `height` screen the water reads its copy of the screen at, from the view drawn now: where
+// its field can be drawn (the surface's slab, A past the water each way), and as far again as a ripple moves a read.
+// waterF.glsl moves one by at most the scale above the water, a fraction of the screen, and its filter takes a texel
+// more. From below the surface, which fills most of the view and moves its reads by the scale below, the whole screen.
+static LLRect water_refraction_rect(const ALWaterSurface& surface, S32 width, S32 height)
+{
+    const LLRect whole(0, height, width, 0);
+    LLVector3 lo(F32_MAX, F32_MAX, F32_MAX);
+    LLVector3 hi(-F32_MAX, -F32_MAX, -F32_MAX);
+    surface.addExtents(lo, hi);
+    LLSettingsWater::ptr_t water = LLEnvironment::instance().getCurrentWater();
+    if (LLViewerCamera::getInstance()->cameraUnderWater() || lo.mV[VX] > hi.mV[VX] || !water)
+    {
+        return whole;
+    }
+    const F32 scale = llmax(water->getScaleAbove(), 0.f);
+    const LLCamera& view = LLViewerCamera::getCurrent();
+    return ALWaterField::screenRect(view.getModelview(), view.getProjection(), lo, hi, width, height,
+                                    (S32)ceilf(scale * (F32)width) + 1, (S32)ceilf(scale * (F32)height) + 1);
+}
+
 void LLPipeline::beginWaterTargets()
 {
     using Plan = ALRenderResourcePlan;
@@ -9300,12 +9321,18 @@ void LLPipeline::beginWaterTargets()
     mWaterRefraction = acquireResource(*mWaterTargets, Plan::inPack(renderPack(), Plan::Slot::Water));
     mWaterDepthCopy  = acquireResource(*mWaterTargets, Plan::inPack(renderPack(), Plan::Slot::DepthCopy));
 
-    // Each written whole: the blit covers the copy, and copySceneDepth draws over every texel of its target.
+    // The colour over the part of the screen the water reads it at, the blit covering that and the rest of the copy
+    // left as the pool gave it; the depth whole, which the waves' depth pyramid reduces, copySceneDepth drawing over
+    // every texel of its target.
     LLRenderTarget& src = mRT->screen;
     if (mWaterRefraction)
     {
-        mWaterRefraction->copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, mWaterRefraction->getWidth(),
-                                       mWaterRefraction->getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        const LLRect rect = water_refraction_rect(mWaterSurface, (S32)src.getWidth(), (S32)src.getHeight());
+        if (rect.notEmpty())
+        {
+            mWaterRefraction->copyContents(src, rect.mLeft, rect.mBottom, rect.mRight, rect.mTop, rect.mLeft, rect.mBottom,
+                                           rect.mRight, rect.mTop, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        }
     }
     if (mWaterDepthCopy)
     {

@@ -27,8 +27,11 @@
 #include "alwaterfield.h"
 
 #include "llmath.h"
+#include "llmatrix4a.h"
+#include "v3math.h"
 
 #include <bit>
+#include <cfloat>
 #include <cmath>
 #include <cstdlib>
 
@@ -279,6 +282,78 @@ void fillCells(const Layout& layout, const std::vector<Region>& regions, F32 def
             }
         }
     }
+}
+
+LLRect screenRect(const LLMatrix4a& view, const LLMatrix4a& proj, const LLVector3& lo, const LLVector3& hi, S32 width,
+                  S32 height, S32 margin_x, S32 margin_y)
+{
+    // The cut lies a hair ahead of the eye's plane, where clip w is 0, so that every point kept divides to a finite
+    // one. What lies between the cut and the near plane only widens the rectangle.
+    constexpr F32 W_CUT = 1e-6f;
+
+    LLVector4a clip[8];
+    for (U32 i = 0; i < 8; ++i)
+    {
+        const LLVector4a corner((i & 1) ? hi.mV[VX] : lo.mV[VX], (i & 2) ? hi.mV[VY] : lo.mV[VY],
+                                (i & 4) ? hi.mV[VZ] : lo.mV[VZ], 1.f);
+        LLVector4a eye;
+        view.affineTransform(corner, eye);
+        proj.transform4(LLVector4a(eye[0], eye[1], eye[2], 1.f), clip[i]);
+    }
+
+    F32  min_x = FLT_MAX;
+    F32  min_y = FLT_MAX;
+    F32  max_x = -FLT_MAX;
+    F32  max_y = -FLT_MAX;
+    bool ahead = false;
+    const auto add = [&](F32 x, F32 y, F32 w)
+    {
+        const F32 px = (x / w * 0.5f + 0.5f) * (F32)width;
+        const F32 py = (y / w * 0.5f + 0.5f) * (F32)height;
+        min_x = llmin(min_x, px);
+        min_y = llmin(min_y, py);
+        max_x = llmax(max_x, px);
+        max_y = llmax(max_y, py);
+        ahead = true;
+    };
+
+    // The corners ahead of the cut, and where each edge crosses it: clip space is affine along an edge.
+    for (U32 i = 0; i < 8; ++i)
+    {
+        if (clip[i][3] >= W_CUT)
+        {
+            add(clip[i][0], clip[i][1], clip[i][3]);
+        }
+        for (U32 axis = 1; axis < 8; axis <<= 1)
+        {
+            if (i & axis)
+            {
+                continue;
+            }
+            const LLVector4a& a = clip[i];
+            const LLVector4a& b = clip[i | axis];
+            if ((a[3] >= W_CUT) == (b[3] >= W_CUT))
+            {
+                continue;
+            }
+            const F32 t = (a[3] - W_CUT) / (a[3] - b[3]);
+            add(a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), W_CUT);
+        }
+    }
+    if (!ahead)
+    {
+        return LLRect();
+    }
+
+    // Points near the cut land far off the viewport: held to just past it before they become integers.
+    const F32 limit_x = (F32)(width + margin_x + 2);
+    const F32 limit_y = (F32)(height + margin_y + 2);
+    LLRect rect(llfloor(llclamp(min_x, -limit_x, limit_x)) - 1 - margin_x,
+                llceil(llclamp(max_y, -limit_y, limit_y)) + 1 + margin_y,
+                llceil(llclamp(max_x, -limit_x, limit_x)) + 1 + margin_x,
+                llfloor(llclamp(min_y, -limit_y, limit_y)) - 1 - margin_y);
+    rect.intersectWith(LLRect(0, height, width, 0));
+    return rect;
 }
 
 WaveScrolls waveScrolls(F64 uptime, const LLVector2& wave1, const LLVector2& wave2)

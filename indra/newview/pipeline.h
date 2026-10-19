@@ -1202,7 +1202,8 @@ public:
     bool                        mDeferredUBODirty{ true };
 
     // The water pool's copies of the scene under its surface, from the pool for its pass alone (beginWaterTargets to
-    // endWaterTargets) where the water is transparent: the screen's colour, and the scene's depth, copied since the
+    // endWaterTargets) where the water is transparent: the screen's colour over the part of the screen the surface
+    // reads it at (its field's screen rectangle and the ripples' reach past it), and the scene's depth, copied since the
     // surface writes its own depth over the scene's while it reads what lies beneath, and which the waves' depth
     // pyramid is built from. The frame's one copy of the depth: the haze passes, which write none, read the scene's in
     // place. Null outside that pass, and for opaque water, which reads neither.

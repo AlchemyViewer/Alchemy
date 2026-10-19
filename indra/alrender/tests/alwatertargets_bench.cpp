@@ -1,7 +1,7 @@
 /**
  * @file alwatertargets_bench.cpp
  * @brief What the water's copies of the scene cost the GPU at 2560x1440: the scene's depth copied for a haze pass
- *        against read where it is.
+ *        against read where it is, and the copy of the screen whole against over the field's screen rectangle.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -32,6 +32,7 @@
 #include "linden_common.h"
 
 #include "../alrenderresourceplan.h"
+#include "../alwaterfield.h"
 
 #include "aldepthbounds.h"
 #include "llgl.h"
@@ -51,6 +52,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <map>
 #include <string>
@@ -120,7 +122,7 @@ namespace
                 glDeleteQueries(1, &mQuery);
             }
             mTriangle = nullptr;
-            for (LLRenderTarget* target : { &mDepthCopy, &mScreen, &mGBuffer })
+            for (LLRenderTarget* target : { &mWater, &mDepthCopy, &mScreen, &mGBuffer })
             {
                 target->release();
             }
@@ -184,10 +186,11 @@ namespace
             vert[2].set(3.f, 1.f, 0.f);
             mTriangle->unmapBuffer();
 
-            // The plan's targets: the G-buffer, the screen over its depth, and the water's copy of the depth.
+            // The plan's targets: the G-buffer, the screen over its depth, and the water's two copies.
             REQUIRE(mGBuffer.ensure(*mPlan.desc(Id::MainGBuffer)) != LLRenderTarget::EnsureResult::Failed);
             REQUIRE(mScreen.ensure(*mPlan.desc(Id::MainScreen), mGBuffer) != LLRenderTarget::EnsureResult::Failed);
             REQUIRE(mDepthCopy.ensure(*mPlan.desc(Id::MainDepthCopy)) != LLRenderTarget::EnsureResult::Failed);
+            REQUIRE(mWater.ensure(*mPlan.desc(Id::MainWater), mGBuffer) != LLRenderTarget::EnsureResult::Failed);
 
             mWidth  = (S32)mScreen.getWidth();
             mHeight = (S32)mScreen.getHeight();
@@ -296,6 +299,31 @@ namespace
             mScreen.flush();
         }
 
+        // The water's copy of the screen over `rect`, as LLPipeline::beginWaterTargets blits it.
+        void copyScreen(LLRenderTarget& dst, const LLRect& rect)
+        {
+            dst.copyContents(mScreen, rect.mLeft, rect.mBottom, rect.mRight, rect.mTop, rect.mLeft, rect.mBottom, rect.mRight,
+                             rect.mTop, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        }
+
+        // The field's screen rectangle from a camera 20 m above the sea, `pitch` radians below level, with the margin
+        // the default scale above the water (0.03) asks for.
+        LLRect fieldRect(F32 pitch)
+        {
+            const LLVector3 eye(0.f, 0.f, 20.f);
+            LLVector3 f(cosf(pitch), 0.f, -sinf(pitch));
+            LLVector3 s = f % LLVector3::z_axis;
+            s.normalize();
+            const LLVector3 u = s % f;
+            const F32 m[16] = { s.mV[0], u.mV[0], -f.mV[0], 0.f, s.mV[1], u.mV[1], -f.mV[1], 0.f,
+                                s.mV[2], u.mV[2], -f.mV[2], 0.f, -(s * eye), -(u * eye), f * eye, 1.f };
+            LLMatrix4a view;
+            view.loadu(m);
+            const LLMatrix4a proj = LLMatrix4a::perspective(60.f * DEG_TO_RAD, (F32)mWidth / (F32)mHeight, 0.5f, 1000.f);
+            return ALWaterField::screenRect(view, proj, LLVector3(-262144.f, -262144.f, -1.f), LLVector3(262144.f, 262144.f, 1.f),
+                                            mWidth, mHeight, (S32)std::ceil(0.03f * mWidth) + 1, (S32)std::ceil(0.03f * mHeight) + 1);
+        }
+
         ll_test::SharedGLScope    mGL;
         ll_test::TestShaderMgr    mShaders;
         Plan                      mPlan;
@@ -305,6 +333,7 @@ namespace
         LLRenderTarget            mGBuffer;
         LLRenderTarget            mScreen;
         LLRenderTarget            mDepthCopy;
+        LLRenderTarget            mWater;
         S32                       mWidth  = 0;
         S32                       mHeight = 0;
         GLuint                    mQuery  = 0;
@@ -321,5 +350,18 @@ namespace
         report("a haze pass over a copy of its own, the copy included", copied);
         report("a haze pass reading the scene's depth in place", in_place);
         report("the frame's two haze passes, saved", 2.0 * (copied - in_place));
+    }
+
+    TEST_CASE_METHOD(alwatertargets_bench_data, "alwatertargets_bench: the water's copy of the screen, whole or over the field", "[alwatertargets_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        setUp();
+        const LLRect whole(0, mHeight, mWidth, 0);
+        const LLRect level = fieldRect(0.f);
+        const LLRect down  = fieldRect(20.f * DEG_TO_RAD);
+        WARN("the field's rectangle, level " << level << ", 20 degrees down " << down);
+        report("the copy of the screen, whole", time([&]() { copyScreen(mWater, whole); }));
+        report("the copy of the screen over the field, looking level", time([&]() { copyScreen(mWater, level); }));
+        report("the copy of the screen over the field, 20 degrees down", time([&]() { copyScreen(mWater, down); }));
     }
 }

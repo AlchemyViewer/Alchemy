@@ -1,7 +1,8 @@
 /**
  * @file alwatersurface_gl_test.cpp
- * @brief The water surface's draws on the hidden window: the water's field as the vertex stage lays it out; whether
- *        any of it shows, and the draws that wait on that; the water's stencil bits: where the exclusion pass removes
+ * @brief The water surface's draws on the hidden window: the water's field as the vertex stage lays it out, and the
+ *        screen rectangle its slab covers; whether any of it shows, and the draws that wait on that; the water's
+ *        stencil bits: where the exclusion pass removes
  *        the water, and which pixels the water shades, which the haze pass reads; and the waves' patches as the
  *        tessellation stages emit them, displaced by the heights baked from the normal map, and the depth pyramid
  *        that culls those the scene hides.
@@ -1732,6 +1733,107 @@ namespace
         const auto [rx, ry] = pixel_of(cx + 1800.0, cy);
         UNSCOPED_INFO("a ring");
         CHECK(fabsf(heightAt(rx, ry) - LOW) < 0.05f);
+    }
+
+    // The water's copy of the screen covers ALWaterField::screenRect of the field's slab: through a perspective view
+    // from above the sea, below it and between its regions' heights, under each depth convention, every pixel the field
+    // is drawn on, raised or lowered by A as the waves move it, lies inside that rectangle, which sits within a few
+    // pixels of what the field covers and leaves the sky out.
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: every pixel the field covers lies inside its slab's screen rectangle", "[alwatersurface_gl]")
+    {
+        constexpr F32 A = 6.f;
+        std::vector<bool> conventions = { false };
+        if (gGLManager.mHasClipControl)
+        {
+            conventions.push_back(true);
+        }
+        for (bool reverse : conventions)
+        {
+            reverse ? reverseZ() : forwardZ();
+            setUpField();
+            const F32 cx = (F32)mLayout.centreX();
+            const F32 cy = (F32)mLayout.centreY();
+            const F32 rim = (F32)mLayout.mRim;
+            const LLVector3 lo(cx - rim, cy - rim, LOW - A);
+            const LLVector3 hi(cx + rim, cy + rim, HIGH + A);
+            // The main view's projection: infinite under reverse-Z.
+            const LLMatrix4a proj =
+                al_perspective(60.f * DEG_TO_RAD, 1.f, 1.f, reverse ? std::numeric_limits<F32>::infinity() : 100000.f);
+
+            // The field's coverage from `eye` looking at `target`, against the rectangle; how many rows of the
+            // viewport the rectangle leaves out above the field. Only from outside the slab's heights is the box near
+            // the field all round: from within them its top or bottom face passes the eye, and reaches the
+            // viewport's edge whatever the field does.
+            const auto check = [&](const std::string& what, const LLVector3& eye, const LLVector3& target, bool tight = true)
+            {
+                INFO((reverse ? "reverse-Z, " : "forward-Z, ") + what);
+                const LLMatrix4a look = lookAt(eye, target);
+                mScene.clear();
+                gGL.matrixMode(LLRender::MM_PROJECTION);
+                gGL.loadMatrix(proj);
+                gGL.matrixMode(LLRender::MM_MODELVIEW);
+                gGL.loadMatrix(look);
+                {
+                    LLGLDepthTest depth(GL_FALSE);
+                    ALGLStencil count(GL_ALWAYS, 0, 0xFFu, GL_KEEP, GL_KEEP, GL_INCR, 0xFFu);
+                    drawField(true, A);
+                    drawField(true, -A);
+                }
+                std::vector<U8> counts((size_t)FIELD_SIZE * FIELD_SIZE);
+                glPixelStorei(GL_PACK_ALIGNMENT, 1);
+                glReadPixels(0, 0, FIELD_SIZE, FIELD_SIZE, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, counts.data());
+
+                const LLRect rect = ALWaterField::screenRect(look, proj, lo, hi, FIELD_SIZE, FIELD_SIZE, 0, 0);
+                LLRect covered(FIELD_SIZE, -1, -1, FIELD_SIZE);
+                for (S32 y = 0; y < FIELD_SIZE; ++y)
+                {
+                    for (S32 x = 0; x < FIELD_SIZE; ++x)
+                    {
+                        if (counts[(size_t)y * FIELD_SIZE + x] == 0)
+                        {
+                            continue;
+                        }
+                        covered.mLeft = llmin(covered.mLeft, x);
+                        covered.mRight = llmax(covered.mRight, x + 1);
+                        covered.mBottom = llmin(covered.mBottom, y);
+                        covered.mTop = llmax(covered.mTop, y + 1);
+                        if (!rect.pointInRect(x, y))
+                        {
+                            FAIL_CHECK("pixel " << x << ", " << y << " covered outside " << rect);
+                        }
+                    }
+                }
+                REQUIRE(covered.mRight > covered.mLeft);
+                if (tight)
+                {
+                    UNSCOPED_INFO("within three pixels of what the field covers: " << rect << " against " << covered);
+                    CHECK(covered.mLeft - rect.mLeft <= 3);
+                    CHECK(rect.mRight - covered.mRight <= 3);
+                    CHECK(covered.mBottom - rect.mBottom <= 3);
+                    CHECK(rect.mTop - covered.mTop <= 3);
+                }
+                return FIELD_SIZE - rect.mTop;
+            };
+
+            // A tenth of the way up and down from level.
+            const LLVector3 deck(cx, cy, LOW + 40.f);
+            CHECK(check("level, above the sea", deck, deck + LLVector3(1.f, 0.f, 0.f)) > FIELD_SIZE / 3);
+            CHECK(check("down a little, above the sea", deck, deck + LLVector3(1.f, 0.3f, -0.1f)) > 0);
+            CHECK(check("up a little, above the sea", deck, deck + LLVector3(-1.f, 0.f, 0.1f)) > FIELD_SIZE / 2);
+            // The camera over cell (1, 1) at 25 m: the south-east region's 30 m water stands over its eye.
+            const LLVector3 between(300.f, 300.f, 0.5f * (LOW + HIGH));
+            check("level, between the regions' heights", between, LLVector3(380.f, 0.f, between.mV[VZ]), false);
+            // High enough to see the rim all round, the field a square inside the viewport.
+            const LLVector3 high(cx, cy, 2.f * rim);
+            check("down from high above", high, LLVector3(cx + 1.f, cy, 0.f));
+            // Under the water looking up at it, as the pipeline copies the whole screen for anyway.
+            const LLVector3 diver(cx, cy, LOW - 10.f);
+            check("up from below", diver, diver + LLVector3(1.f, 0.f, 0.5f));
+
+            tearDownWater();
+            mField.unload();
+        }
+        forwardZ();
     }
 
     // The sky behind: the field's samples against the world's depth decide whether the target is cleared and drawn,

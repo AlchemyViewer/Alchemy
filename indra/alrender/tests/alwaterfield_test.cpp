@@ -31,6 +31,10 @@
 
 #include "../alwaterfield.h"
 
+#include "llmath.h"
+#include "llmatrix4a.h"
+#include "v3math.h"
+
 #include <cmath>
 #include <limits>
 #include <string>
@@ -882,5 +886,79 @@ namespace
         CHECK(fringed.mDraws[3].mVertices == 3 * (ALWaterField::PATCHES_PER_CELL + 1));
         UNSCOPED_INFO("a cell along each side");
         CHECK(fringed.mDraws[3].mInstances == 2 * ((rect.mEndX - rect.mMinX) + (rect.mEndY - rect.mMinY)));
+    }
+
+        // A camera at `eye` looking at `target`, z up: agent space to eye space, as LLViewerCamera's modelview is.
+        LLMatrix4a lookAt(const LLVector3& eye, const LLVector3& target)
+        {
+            LLVector3 f = target - eye;
+            f.normalize();
+            LLVector3 s = f % LLVector3::z_axis;
+            s.normalize();
+            const LLVector3 u = s % f;
+            const F32 m[16] = { s.mV[0], u.mV[0], -f.mV[0], 0.f,
+                                s.mV[1], u.mV[1], -f.mV[1], 0.f,
+                                s.mV[2], u.mV[2], -f.mV[2], 0.f,
+                                -(s * eye), -(u * eye), f * eye, 1.f };
+            LLMatrix4a out;
+            out.loadu(m);
+            return out;
+        }
+
+    // Under an orthographic view a box covers the pixels its corners span, a pixel past each side, and then the margins,
+    // held to the viewport.
+    TEST_CASE("alwaterfield: a box's screen rectangle, orthographic", "[alwaterfield]")
+    {
+        LLMatrix4a view;
+        view.setIdentity();
+        // 16 x 16 pixels over [-8, 8] metres: two pixels a metre.
+        const LLMatrix4a proj = LLMatrix4a::ortho(-8.f, 8.f, -8.f, 8.f, 0.5f, 20.f);
+        const LLVector3 lo(-4.f, 0.f, -5.f);
+        const LLVector3 hi(1.f, 3.f, -1.f);
+
+        // x from pixel 4 to 9, y from 8 to 11.
+        CHECK(ALWaterField::screenRect(view, proj, lo, hi, 16, 16, 0, 0) == LLRect(3, 12, 10, 7));
+        CHECK(ALWaterField::screenRect(view, proj, lo, hi, 16, 16, 2, 1) == LLRect(1, 13, 12, 6));
+        UNSCOPED_INFO("margins past the viewport are held to it");
+        CHECK(ALWaterField::screenRect(view, proj, lo, hi, 16, 16, 40, 40) == LLRect(0, 16, 16, 0));
+        UNSCOPED_INFO("a box off the viewport covers none of it");
+        CHECK(ALWaterField::screenRect(view, proj, LLVector3(9.f, 0.f, -5.f), LLVector3(12.f, 3.f, -1.f), 16, 16, 0, 0).isEmpty());
+    }
+
+    // Under a perspective view the part of a box behind the eye is cut away before it projects: a box wholly behind
+    // covers nothing, one about the eye covers everything, and one beside the eye covers what its part ahead does.
+    TEST_CASE("alwaterfield: a box's screen rectangle, behind and about the eye", "[alwaterfield]")
+    {
+        const LLMatrix4a view = lookAt(LLVector3::zero, LLVector3(0.f, 1.f, 0.f));
+        const LLMatrix4a proj = LLMatrix4a::perspective(60.f * DEG_TO_RAD, 1.f, 0.5f, 1000.f);
+
+        UNSCOPED_INFO("wholly behind");
+        CHECK(ALWaterField::screenRect(view, proj, LLVector3(-5.f, -9.f, -5.f), LLVector3(5.f, -1.f, 5.f), 64, 64, 0, 0).isEmpty());
+        UNSCOPED_INFO("about the eye");
+        CHECK(ALWaterField::screenRect(view, proj, LLVector3(-5.f, -5.f, -5.f), LLVector3(5.f, 5.f, 5.f), 64, 64, 0, 0) ==
+              LLRect(0, 64, 64, 0));
+        // Ahead, it lies right of the view at every depth, from its far end's 50 / 10 out to the eye's plane, where it
+        // goes off without end; behind, it would project to the left.
+        UNSCOPED_INFO("beside the eye, reaching behind it");
+        CHECK(ALWaterField::screenRect(view, proj, LLVector3(50.f, -10.f, -1.f), LLVector3(60.f, 10.f, 1.f), 64, 64, 0, 0).isEmpty());
+    }
+
+    // The sea about a camera ten metres above it, looking level: the slab reaches the viewport's sides and bottom
+    // through the eye's plane, and its top is its far edge, a hundred kilometres off, a hair under the horizon's row.
+    TEST_CASE("alwaterfield: the sea's screen rectangle from above, looking level", "[alwaterfield]")
+    {
+        const LLMatrix4a view = lookAt(LLVector3(0.f, 0.f, 10.f), LLVector3(1.f, 0.f, 10.f));
+        const LLMatrix4a proj = LLMatrix4a::perspective(60.f * DEG_TO_RAD, 16.f / 9.f, 0.5f, 1000.f);
+        const LLVector3 lo(-100000.f, -100000.f, -1.f);
+        const LLVector3 hi(100000.f, 100000.f, 0.f);
+
+        // The horizon is row 72 of 144; the far edge 10 m under it at 100 km is 0.0125 of a row lower.
+        CHECK(ALWaterField::screenRect(view, proj, lo, hi, 256, 144, 0, 0) == LLRect(0, 73, 256, 0));
+        UNSCOPED_INFO("the refraction's margin above it");
+        CHECK(ALWaterField::screenRect(view, proj, lo, hi, 256, 144, 8, 5) == LLRect(0, 78, 256, 0));
+        // A tenth down puts the horizon 0.1 / tan 30 of the half height up: row 84.47.
+        UNSCOPED_INFO("looking down raises the horizon on the screen");
+        const LLMatrix4a down = lookAt(LLVector3(0.f, 0.f, 10.f), LLVector3(1.f, 0.f, 10.f - 0.1f));
+        CHECK(ALWaterField::screenRect(down, proj, lo, hi, 256, 144, 0, 0) == LLRect(0, 86, 256, 0));
     }
 }
