@@ -9476,9 +9476,10 @@ LLRenderTarget* LLPipeline::generateGlow(LLRenderTarget* src, ALTransientTargets
 
         gGlowExtractProgram.unbind();
 
-        // power of two between 1 and 1024
+        // Power of two between 1 and 512: the clamp ALRenderResourcePlan sizes
+        // the glow targets with, so the step is in texels of the targets drawn here.
         U32 glowResPow = (U32)mResourceInputs.mGlowResolutionPow;
-        const U32 glow_res = llmax(1, llmin(1024, 1 << glowResPow));
+        const U32 glow_res = llmax(1, llmin(512, 1 << glowResPow));
 
         F32 delta = RenderGlowWidth / glow_res;
         // Use half the glow width if we have the res set to less than 9 so that it looks
