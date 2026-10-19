@@ -1502,7 +1502,9 @@ void LLPipeline::refreshCachedSettings()
     RenderShadowErrorCutoff = gSavedSettings.getF32("RenderShadowErrorCutoff");
     RenderShadowFOVCutoff = gSavedSettings.getF32("RenderShadowFOVCutoff");
     CameraOffset = gSavedSettings.getBOOL("CameraOffset");
-    CameraMaxCoF = gSavedSettings.getF32("CameraMaxCoF");
+    // The Lightbox's range: the depth of field gather takes about 11 * CoF^2 taps a pixel, so a typed value past it
+    // could stall the GPU until the driver resets it.
+    CameraMaxCoF = llclamp(gSavedSettings.getF32("CameraMaxCoF"), 1.f, 32.f);
     CameraDoFResScale = gSavedSettings.getF32("CameraDoFResScale");
     RenderAutoHideSurfaceAreaLimit = gSavedSettings.getF32("RenderAutoHideSurfaceAreaLimit");
     RenderScreenSpaceReflectionIterations = gSavedSettings.getS32("RenderScreenSpaceReflectionIterations");
