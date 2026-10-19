@@ -242,7 +242,7 @@ bool LLGLTFPreviewTexture::needsRender()
     if (current_load < mBestLoad)
     {
         mShouldRender = true;
-        mBestLoad = current_load;
+        mPendingLoad = current_load;
         return true;
     }
     return false;
@@ -634,6 +634,10 @@ void LLGLTFPreviewTexture::postRender(bool success)
 
     if (!mShouldRender) { return; }
     mShouldRender = false;
+    if (success)
+    {
+        mBestLoad = mPendingLoad;
+    }
 
     LLViewerDynamicTexture::postRender(success);
 }

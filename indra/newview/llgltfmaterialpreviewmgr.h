@@ -71,7 +71,10 @@ private:
 
     LLPointer<LLFetchedGLTFMaterial> mGLTFMaterial;
     bool mShouldRender = true;
+    // The material's load levels the preview was last drawn at, and those the render asked for draws at: a render that
+    // finds no target to draw into leaves the first as it was, so the next frame asks again.
     MaterialLoadLevels mBestLoad;
+    MaterialLoadLevels mPendingLoad;
 };
 
 class LLGLTFMaterialPreviewMgr
