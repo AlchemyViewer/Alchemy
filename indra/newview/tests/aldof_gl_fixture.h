@@ -125,17 +125,29 @@ void main()
     };
 
     // The scene under reverse-Z, as the viewer renders it: the depth convention the programs compile against is set
-    // before any of them is built.
+    // before any of them is built, and the one before it put back after, for the tests the binary runs next on the
+    // context it shares.
     struct ReverseZScope
     {
         ReverseZScope()
         {
             REQUIRE(gGLManager.mHasClipControl);
-            LLRender::sReverseZ = true;
-            glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
-            glClearDepth(0.0);
+            set(true);
+        }
+        ~ReverseZScope() { set(mWas); }
+
+        ReverseZScope(const ReverseZScope&)            = delete;
+        ReverseZScope& operator=(const ReverseZScope&) = delete;
+
+        static void set(bool reverse)
+        {
+            LLRender::sReverseZ = reverse;
+            glClipControl(GL_LOWER_LEFT, reverse ? GL_ZERO_TO_ONE : GL_NEGATIVE_ONE_TO_ONE);
+            glClearDepth(reverse ? 0.0 : 1.0);
             LLGLDepthTest::rebase();
         }
+
+        const bool mWas = LLRender::sReverseZ;
     };
 
     class DoFPasses
