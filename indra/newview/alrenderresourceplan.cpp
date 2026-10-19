@@ -196,14 +196,15 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     // shadows in it. A capture renders two sun cascades, or a probe's all four where AlchemyRenderProbeAllShadowCascades
     // asks (generateSunShadow), and has maps for those alone. Its post targets and bloom are the GLTF material preview's,
     // which the probes' captures never read, so they are there only while a preview is alive. The pack is there while
-    // probes are on or a preview is alive, and the manager's own resources while probes are.
+    // probes are on or a preview is alive, and the manager's own resources while probes are. Its sun shadows and light
+    // map are the captures' alone: a preview draws without the sun's shadows (LLGLTFPreviewTexture::render).
     if (in.mProbes || in.mMaterialPreview)
     {
         const U32 probe_size     = in.mProbeResolution * in.mProbeSuperSample;
         const U32 probe_shadow   = blur_happy_size(in.mProbeResolution * 4, 1.f);
-        const U32 probe_cascades = in.mProbeAllCascades ? SUN_CASCADES : CAPTURE_SUN_CASCADES;
-        plan_pack(Pack::Probe, { probe_size, probe_size, probe_shadow, probe_shadow, probe_cascades, capture_light,
-                                 in.mMaterialPreview });
+        const U32 probe_cascades = !in.mProbes ? 0 : in.mProbeAllCascades ? SUN_CASCADES : CAPTURE_SUN_CASCADES;
+        plan_pack(Pack::Probe, { probe_size, probe_size, probe_shadow, probe_shadow, probe_cascades,
+                                 capture_light && in.mProbes, in.mMaterialPreview });
     }
     if (in.mProbes)
     {

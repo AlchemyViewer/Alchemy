@@ -526,7 +526,7 @@ namespace
                   in.mProbes          = false;
                   in.mMaterialPreview = true;
               },
-              4, 2, 0 },
+              4, 0, 0 },
         };
 
         for (const Case& c : cases)
@@ -683,6 +683,8 @@ namespace
             INFO(Plan::name(id));
             CHECK(plan.wants(id));
         }
+        UNSCOPED_INFO("a preview draws without the sun's shadows, so the pack has no light map or sun shadows for it");
+        CHECK(names(wanted(plan, sun_shadows({ Pack::Probe }) | of({ Id::ProbeLight }))) == "nothing");
         CHECK(!plan.reflectionProbes());
         CHECK(names(wanted(plan, Plan::idsOf(Pack::Hero))) == "nothing");
 
