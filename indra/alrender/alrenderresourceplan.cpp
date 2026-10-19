@@ -151,8 +151,8 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         // and nothing reads its alpha (waterF.glsl and underWaterF.glsl take the colour alone), so under HDR it is
         // R11F_G11F_B10F, half the screen's bandwidth, and with no depth of its own or the scene's: bloom level 0's
         // description at full scale without halation, whose target the pool hands it, bloom's pass coming after the
-        // water's. Without HDR 8 bits, the post chain's description.
-        if (shape.water)
+        // water's. Without HDR 8 bits, the post chain's description. Opaque water reads neither (beginWaterTargets).
+        if (shape.water && in.mTransparentWater)
         {
             plan.at(inPack(pack, Slot::Water)).mDesc = ALRenderTargetDesc{
                 .width = shape.width, .height = shape.height, .color = { hdr ? (U32)GL_R11F_G11F_B10F : screen_format }

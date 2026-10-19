@@ -52,7 +52,7 @@ struct ALRenderResourceInputs
     bool mShadowDepth32F = false; ///< AlchemyRenderShadowDepth32F
     bool mSSAO = true;            ///< RenderDeferredSSAO
     bool mSSR = false;            ///< RenderScreenSpaceReflections
-    bool mTransparentWater = true;
+    bool mTransparentWater = true; ///< RenderTransparentWater: the water's copies of the scene are for it alone
 
     bool mProbes = true;          ///< RenderReflectionsEnabled, where the feature table allows it
     U32  mProbeResolution = 128;  ///< a probe's face edge, as probeResolution() takes RenderReflectionProbeResolution

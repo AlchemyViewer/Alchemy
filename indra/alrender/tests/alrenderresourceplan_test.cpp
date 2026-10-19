@@ -163,7 +163,9 @@ namespace
         const auto previewed = [](Inputs& in) { in.mMaterialPreview = true; };
 
         return {
-            { "RenderTransparentWater", no_change, [](Inputs& in) { in.mTransparentWater = false; }, nothing },
+            { "RenderTransparentWater", no_change, [](Inputs& in) { in.mTransparentWater = false; },
+              [](const Plan& before)
+              { return wanted(before, in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::Water, Slot::DepthCopy })); } },
             { "RenderFSAAType to FXAA", no_change, [](Inputs& in) { in.mFSAAType = 1; }, nothing },
             { "RenderFSAAType to SMAA", no_change, [](Inputs& in) { in.mFSAAType = 2; },
               [](const Plan&)
@@ -316,7 +318,6 @@ namespace
             { "RenderGlowResolutionPow", [](Inputs& in) { in.mGlowResolutionPow = 7; } },
             { "RenderGlowHDR", [](Inputs& in) { in.mGlowHDR = true; } },
             { "RenderScreenSpaceReflections", [](Inputs& in) { in.mSSR = true; } },
-            { "RenderTransparentWater", [](Inputs& in) { in.mTransparentWater = false; } },
             { "RenderDeferredSSAO with shadows", [](Inputs& in) { in.mSSAO = false; } },
             { "RenderShadowResolutionScale", [](Inputs& in) { in.mShadowScale = 2.f; } },
         };
