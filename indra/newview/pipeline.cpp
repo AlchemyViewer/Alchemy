@@ -1667,8 +1667,12 @@ bool LLPipeline::rebuildGLBuffers(const ALRenderResourceInputs& requested, Rebui
     const ResourceChanges changes = reconcileResources(requested);
     mGLResourcesLive   = true;
     mResourcesFullSize = changes.mFullSize;
-    // Which resource each pooled target serves over the next whole frame, for the log.
-    mTransientTargets.recordNames();
+    // Which resource each pooled target serves over the next whole frame, for the log; not for a resize that built what
+    // it asked, which is logged at debug level alone and comes every frame of a window's drag.
+    if (!resized_as_asked(cause, changes))
+    {
+        mTransientTargets.recordNames();
+    }
 
     std::string changed;
     if (new_context)
