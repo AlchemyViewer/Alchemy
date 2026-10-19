@@ -419,6 +419,16 @@ bool ALRenderResourcePlan::isTexture(Id id)
 }
 
 // static
+bool ALRenderResourcePlan::isTransient(Id id)
+{
+    if (packOf(id))
+    {
+        return slotOf(id) == Slot::Light;
+    }
+    return false;
+}
+
+// static
 bool ALRenderResourcePlan::forMaterialPreview(Id id)
 {
     if (packOf(id) != Pack::Probe)

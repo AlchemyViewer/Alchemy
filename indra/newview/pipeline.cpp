@@ -792,6 +792,17 @@ void LLPipeline::markRenderInputsDirty(ALRenderInputRequests::Change change)
 
 void LLPipeline::applyRenderInputs()
 {
+    // A frame starts here, with every transient target the last one acquired back in the pool. RenderDebugGL poisons
+    // each as it is released, and names each for whoever acquires it.
+    mTransientTargets.setValidation(gDebugGL);
+    mTransientTargets.beginFrame();
+    if (mTransientTargets.namesRecorded())
+    {
+        LL_INFOS("RenderResources") << "Transient targets over the frame after the reconcile, "
+                                    << (mTransientTargets.lastFrame().mBytes >> 20) << " MiB:\n"
+                                    << mTransientTargets.describe() << LL_ENDL;
+    }
+
     // Nothing is applied to resources that are not there. Before the pipeline's first load, and while a context is
     // lost, the load that comes next (loadRenderInputs) applies whatever was marked until then.
     if (!mInitialized || !mGLResourcesLive)
@@ -897,6 +908,12 @@ LLRenderTarget* LLPipeline::resourceTarget(ALRenderResourcePlan::Id id)
     using Id   = Plan::Id;
     using Slot = Plan::Slot;
 
+    // The pool's, acquired by the passes that use them.
+    if (Plan::isTransient(id))
+    {
+        return nullptr;
+    }
+
     if (const std::optional<Plan::Pack> pack = Plan::packOf(id))
     {
         RenderTargetPack& rt = *pack == Plan::Pack::Main ? mMainRT : (*pack == Plan::Pack::Probe ? mAuxillaryRT : mHeroProbeRT);
@@ -905,7 +922,6 @@ LLRenderTarget* LLPipeline::resourceTarget(ALRenderResourcePlan::Id id)
         {
             case Slot::GBuffer:  return &rt.deferredScreen;
             case Slot::Screen:   return &rt.screen;
-            case Slot::Light:    return &rt.deferredLight;
             case Slot::PostPing: return &rt.postPingMap;
             case Slot::PostPong: return &rt.postPongMap;
             default:
@@ -975,7 +991,7 @@ void LLPipeline::ensureResources(const ALRenderResourcePlan& plan, const ALRende
         {
             const Id              id       = (Id)i;
             const Plan::Resource& resource = plan[id];
-            if (!ids.test(i) || resource.mDepthFrom.has_value() != sharers)
+            if (!ids.test(i) || resource.mDepthFrom.has_value() != sharers || Plan::isTransient(id))
             {
                 continue;
             }
@@ -1035,6 +1051,92 @@ void LLPipeline::ensureResources(const ALRenderResourcePlan& plan, const ALRende
     }
 
     gGL.getTextureSlot(0)->unbind();
+}
+
+void LLPipeline::prewarmTransients(const ALRenderResourcePlan& plan, const ALRenderResourcePlan::IdSet& ids,
+                                   ResourceChanges& changes)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    using Plan = ALRenderResourcePlan;
+    using Id   = Plan::Id;
+
+    // Nearly every target the pool holds is the main view's size, and a pooled target over a depth the reconcile built
+    // again could be matched by nothing.
+    const std::optional<ALRenderTargetDesc>& gbuffer = plan.desc(Id::MainGBuffer);
+    mTransientTargets.setMainSize(gbuffer ? gbuffer->width : 0, gbuffer ? gbuffer->height : 0);
+    mTransientTargets.dropStaleDepth();
+
+    // Each is given back before the next is asked for, so a description several resources share is built once. One
+    // whose depth another transient resource shares is held until that one has it.
+    Plan::IdSet owners;
+    for (size_t i = 0; i < Plan::ID_COUNT; ++i)
+    {
+        const Plan::Resource& resource = plan[(Id)i];
+        if (Plan::isTransient((Id)i) && resource.mDesc && resource.mDepthFrom && Plan::isTransient(*resource.mDepthFrom))
+        {
+            owners.set((size_t)*resource.mDepthFrom);
+        }
+    }
+
+    ALTransientTargets                          scope(mTransientTargets);
+    std::array<LLRenderTarget*, Plan::ID_COUNT> held{};
+    for (const bool sharers : { false, true })
+    {
+        for (size_t i = 0; i < Plan::ID_COUNT; ++i)
+        {
+            const Id              id       = (Id)i;
+            const Plan::Resource& resource = plan[id];
+            if (!ids.test(i) || !Plan::isTransient(id) || !resource.mDesc || resource.mDepthFrom.has_value() != sharers)
+            {
+                continue;
+            }
+
+            LLRenderTarget* target = nullptr;
+            if (!resource.mDepthFrom)
+            {
+                target = scope.acquire(*resource.mDesc, Plan::name(id));
+            }
+            else if (LLRenderTarget* owner = Plan::isTransient(*resource.mDepthFrom) ? held[(size_t)*resource.mDepthFrom]
+                                                                                    : resourceTarget(*resource.mDepthFrom))
+            {
+                target = scope.acquire(*resource.mDesc, *owner, Plan::name(id));
+            }
+
+            if (!target)
+            {
+                changes.mFailed.set(i);
+                continue;
+            }
+            changes.mPooled.set(i);
+            if (owners.test(i))
+            {
+                held[i] = target;
+            }
+            else
+            {
+                scope.release(target);
+            }
+        }
+    }
+}
+
+LLRenderTarget* LLPipeline::acquireResource(ALTransientTargets& scope, ALRenderResourcePlan::Id id, std::string_view name)
+{
+    const ALRenderResourcePlan::Resource& resource = mResourcePlan[id];
+    if (!resource.mDesc)
+    {
+        return nullptr;
+    }
+    if (name.empty())
+    {
+        name = ALRenderResourcePlan::name(id);
+    }
+    if (!resource.mDepthFrom)
+    {
+        return scope.acquire(*resource.mDesc, name);
+    }
+    LLRenderTarget* owner = resourceTarget(*resource.mDepthFrom);
+    return owner ? scope.acquire(*resource.mDesc, *owner, name) : nullptr;
 }
 
 // static
@@ -1152,6 +1254,7 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources(const ALRenderResourc
 
     ResourceChanges changes;
     ensureResources(plan, IdSet().set(), changes);
+    prewarmTransients(plan, IdSet().set(), changes);
 
     // Storage kept whose contents an input makes is filled again where that input changed; storage built just now was
     // filled as it was built.
@@ -1184,11 +1287,12 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources(const ALRenderResourc
     {
         for (size_t i = 0; i < Plan::ID_COUNT; ++i)
         {
-            if (retried.test(i))
+            if (LLRenderTarget* target = retried.test(i) ? resourceTarget((Id)i) : nullptr)
             {
-                resourceTarget((Id)i)->release();
+                target->release();
             }
         }
+        mTransientTargets.clear();
     };
     const auto retry_at = [&](U32 width, U32 height)
     {
@@ -1203,7 +1307,9 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources(const ALRenderResourc
         changes.mBuilt &= ~retried;
         changes.mKept &= ~retried;
         changes.mFailed &= ~retried;
+        changes.mPooled &= ~retried;
         ensureResources(plan, retried, changes);
+        prewarmTransients(plan, retried, changes);
         return !short_of_size();
     };
 
@@ -1229,9 +1335,10 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources(const ALRenderResourc
         {
             // Nothing the size sizes is kept, whatever the last attempt managed.
             release_render_sized();
-            changes.mFailed |= (changes.mBuilt | changes.mKept) & retried;
+            changes.mFailed |= (changes.mBuilt | changes.mKept | changes.mPooled) & retried;
             changes.mBuilt &= ~retried;
             changes.mKept &= ~retried;
+            changes.mPooled &= ~retried;
             LL_WARNS() << "Unable to allocate screen buffer at any resolution!" << LL_ENDL;
         }
     }
@@ -1497,6 +1604,7 @@ void LLPipeline::releaseAllGLResources()
 void LLPipeline::releaseRenderTargets()
 {
     using Plan = ALRenderResourcePlan;
+    mTransientTargets.clear();
     for (size_t i = 0; i < Plan::ID_COUNT; ++i)
     {
         const Plan::Id id = (Plan::Id)i;
@@ -1594,6 +1702,8 @@ bool LLPipeline::rebuildGLBuffers(const ALRenderResourceInputs& requested, Rebui
     const ResourceChanges changes = reconcileResources(requested);
     mGLResourcesLive   = true;
     mResourcesFullSize = changes.mFullSize;
+    // Which resource each pooled target serves over the next whole frame, for the log.
+    mTransientTargets.recordNames();
 
     std::string changed;
     if (new_context)
@@ -1716,7 +1826,8 @@ bool LLPipeline::rebuildGLBuffers(const ALRenderResourceInputs& requested, Rebui
                                                    : std::string_view(", built at no size"))
          << "; changed: " << (changed.empty() ? std::string_view("nothing") : changed)
          << "; built: " << built << "; freed: " << (freed.empty() ? std::string_view("nothing") : freed) << "; kept "
-         << changes.mKept.count()
+         << changes.mKept.count() << "; pooled " << changes.mPooled.count() << ", "
+         << (mTransientTargets.stats().mBytes >> 20) << " MiB"
          << (changes.mFailed.any() ? "; failed: " + resource_names(changes.mFailed) : std::string())
          << "; invalidated: " << (invalidated.empty() ? std::string_view("nothing") : invalidated);
     // A window dragged by its edge, or a panel sliding beside the world view, resizes it every frame: a resize that
@@ -4948,6 +5059,10 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
             LL_PROFILE_PLOT("water patches", (int64_t)mWaterSurface.patchCount());
             LL_PROFILE_PLOT("water waves cm", (int64_t)(mWaterSurface.maxDisplacement() * 100.f));
             LL_PROFILE_PLOT("render target MB", (int64_t)(LLRenderTarget::sBytesAllocated >> 20));
+            // The pool's share of those, and how the last frame's acquisitions found it.
+            LL_PROFILE_PLOT("transient target MB", (int64_t)(mTransientTargets.lastFrame().mBytes >> 20));
+            LL_PROFILE_PLOT("transient target hits", (int64_t)mTransientTargets.lastFrame().mHits);
+            LL_PROFILE_PLOT("transient target misses", (int64_t)mTransientTargets.lastFrame().mMisses);
         }
     }
 
@@ -11294,7 +11409,6 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LLRenderTarget* deferred_target       = &mRT->deferredScreen;
-    LLRenderTarget* deferred_light_target = &mRT->deferredLight;
 
     shader.bind();
 
@@ -11373,11 +11487,11 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
     stop_glerror();
 
-    light_target = light_target ? light_target : deferred_light_target;
+    light_target = light_target ? light_target : mLightMap;
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_LIGHT);
     if (channel > -1)
     {
-        if (light_target->isComplete())
+        if (light_target && light_target->isComplete())
         {
             light_target->bindTexture(0, channel, ALSamplers::PointMirror);
         }
@@ -11506,7 +11620,14 @@ void LLPipeline::renderDeferredLighting()
     }
 
     LLRenderTarget *screen_target         = &mRT->screen;
-    LLRenderTarget* deferred_light_target = &mRT->deferredLight;
+
+    // The light map, the pack's where it has one, for the lighting alone: nothing after the local lights reads it, and
+    // where a later pass's program has the sampler, bindDeferredShader gives it white.
+    ALTransientTargets lighting(mTransientTargets);
+    LLRenderTarget* deferred_light_target =
+        acquireResource(lighting, ALRenderResourcePlan::inPack(renderPack(), ALRenderResourcePlan::Slot::Light));
+    LLRenderTarget* const outer_light_map = mLightMap;
+    mLightMap = deferred_light_target;
 
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("deferred");
@@ -11545,7 +11666,8 @@ void LLPipeline::renderDeferredLighting()
         packDeferredUBO();
 
         // The light map's sun pass runs wherever the pack has a light map: for shadows, and in the main view for SSAO.
-        if (mResourcePlan.wants(ALRenderResourcePlan::inPack(renderPack(), ALRenderResourcePlan::Slot::Light)))
+        // It clears the map, so whatever the pool's target held before is gone.
+        if (deferred_light_target)
         {
             LL_PROFILE_GPU_ZONE("sun program");
             deferred_light_target->bindTarget();
@@ -11577,15 +11699,20 @@ void LLPipeline::renderDeferredLighting()
             deferred_light_target->flush();
         }
 
-        if (mResourceInputs.mSSAO && !gCubeSnapshot)
+        // Across into a scratch of the light map's description, cleared as the sun pass clears the map, and back down
+        // into the map.
+        LLRenderTarget* blur_scratch = mResourceInputs.mSSAO && !gCubeSnapshot && deferred_light_target
+            ? acquireResource(lighting, ALRenderResourcePlan::Id::MainLight, "main.light.scratch")
+            : nullptr;
+        if (blur_scratch)
         {
             // soften direct lighting lightmap
             LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - soften shadow");
             LL_PROFILE_GPU_ZONE("soften shadow");
             // blur lightmap
-            screen_target->bindTarget();
+            blur_scratch->bindTarget();
             gGL.setClearColor(LLColor4::white);
-            screen_target->clear(GL_COLOR_BUFFER_BIT);
+            blur_scratch->clear(GL_COLOR_BUFFER_BIT);
             gGL.setClearColor(LLColor4::transparent);
 
             bindDeferredShader(gDeferredBlurLightProgram);
@@ -11622,10 +11749,10 @@ void LLPipeline::renderDeferredLighting()
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
 
-            screen_target->flush();
+            blur_scratch->flush();
             unbindDeferredShader(gDeferredBlurLightProgram);
 
-            bindDeferredShader(gDeferredBlurLightProgram, screen_target);
+            bindDeferredShader(gDeferredBlurLightProgram, blur_scratch);
 
             deferred_light_target->bindTarget();
 
@@ -11639,6 +11766,7 @@ void LLPipeline::renderDeferredLighting()
             }
             deferred_light_target->flush();
             unbindDeferredShader(gDeferredBlurLightProgram);
+            lighting.release(blur_scratch);
         }
 
         screen_target->bindTarget();
@@ -12019,6 +12147,10 @@ void LLPipeline::renderDeferredLighting()
 
         gGL.setColorMask(true, true);
     }
+
+    // Back to the pool: GL draws the lighting before whatever acquires the map next.
+    mLightMap = outer_light_map;
+    lighting.releaseAll();
 
     {  // render non-deferred geometry (alpha, fullbright, glow)
         LLGLDisable blend(GL_BLEND);
@@ -12417,7 +12549,6 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
 void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
 {
     LLRenderTarget* deferred_target       = &mRT->deferredScreen;
-    LLRenderTarget* deferred_light_target = &mRT->deferredLight;
 
     stop_glerror();
     shader.disableTexture(LLShaderMgr::NORMAL_MAP, deferred_target->getUsage());
@@ -12427,7 +12558,7 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
     shader.disableTexture(LLShaderMgr::DEFERRED_BRDF_LUT);
     //shader.disableTexture(LLShaderMgr::DEFERRED_DEPTH, deferred_depth_target->getUsage());
     shader.disableTexture(LLShaderMgr::DEFERRED_DEPTH, deferred_target->getUsage());
-    shader.disableTexture(LLShaderMgr::DEFERRED_LIGHT, deferred_light_target->getUsage());
+    shader.disableTexture(LLShaderMgr::DEFERRED_LIGHT, ALTextureSlot::TT_TEXTURE);
     shader.disableTexture(LLShaderMgr::DIFFUSE_MAP);
 
     // Unbind the shadow channels this shader declares, then any unit bindShadowMaps

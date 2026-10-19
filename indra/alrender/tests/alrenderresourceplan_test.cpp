@@ -910,6 +910,20 @@ namespace
               names(sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero }) | of({ Id::SpotShadow0, Id::SpotShadow1 })));
     }
 
+    TEST_CASE("alrenderresourceplan: the passes acquire what lives for one phase of a frame from the pool", "[alrenderresourceplan]")
+    {
+        const IdSet transient = in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::Light });
+        CHECK(names(Plan::idsWhere(Plan::isTransient)) == names(transient));
+
+        // What holds anything across frames, or between the phases of one, is built to keep.
+        for (Id id : { Id::MainGBuffer, Id::MainScreen, Id::SSRScene, Id::Exposure, Id::ExposureLast, Id::LensFlareA,
+                       Id::MainSun0, Id::SpotShadow0, Id::BrdfLut, Id::Preview, Id::Bake, Id::DownRes, Id::Noise })
+        {
+            INFO(Plan::name(id));
+            CHECK_FALSE(Plan::isTransient(id));
+        }
+    }
+
     TEST_CASE("alrenderresourceplan: every resource has its own debugger label", "[alrenderresourceplan]")
     {
         CHECK(Plan::name(Id::MainGBuffer) == "main.gbuffer");

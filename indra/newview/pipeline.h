@@ -46,6 +46,8 @@
 #include "alrenderinputrequests.h"
 #include "alrenderresourceplan.h"
 #include "alshaderinputs.h"
+#include "altransienttargetpool.h"
+#include "altransienttargets.h"
 #include "alwatersurface.h"
 #include "altexture3d.h"
 #include "aluniformbuffer.h"
@@ -138,6 +140,8 @@ public:
         ALRenderResourcePlan::IdSet mKept;
         ALRenderResourcePlan::IdSet mFreed;
         ALRenderResourcePlan::IdSet mFailed;
+        /// The transient resources the pool holds one of, or built one of, for the frames to acquire.
+        ALRenderResourcePlan::IdSet mPooled;
         bool mMainSize       = false; ///< the main G-buffer's size
         bool mGBufferFormats = false; ///< the main G-buffer's colour formats
         bool mDepthFormat    = false; ///< the main G-buffer's depth format
@@ -201,9 +205,16 @@ private:
     LLRenderTarget* resourceTarget(ALRenderResourcePlan::Id id);
     U32*            resourceTexture(ALRenderResourcePlan::Id id);
 
-    // Builds, keeps or frees each of @a ids as @a plan says, depth owners first, and records which in @a changes.
+    // Builds, keeps or frees each of @a ids as @a plan says, depth owners first, and records which in @a changes. The
+    // transient resources are the pool's, which prewarmTransients readies.
     void ensureResources(const ALRenderResourcePlan& plan, const ALRenderResourcePlan::IdSet& ids,
                          ResourceChanges& changes);
+    // Readies the pool for @a plan's transient resources among @a ids: everything it holds dropped where the main size
+    // changed, and what shares a depth built again since, and one of each description built where it holds none, so
+    // that a description that cannot be built drives the render size down as a persistent target's does and the next
+    // frame finds them. Records which in @a changes.
+    void prewarmTransients(const ALRenderResourcePlan& plan, const ALRenderResourcePlan::IdSet& ids,
+                           ResourceChanges& changes);
     // One of the pipeline's own GL textures, with its contents.
     void createResourceTexture(ALRenderResourcePlan::Id id);
     // Every resource the plan names, and what the pipeline keeps about them.
@@ -1005,7 +1016,6 @@ public:
         //screen texture
         LLRenderTarget          screen;
         LLRenderTarget          deferredScreen;
-        LLRenderTarget          deferredLight;
 
         // tonemapped and gamma corrected render ready for post
         LLRenderTarget          postPingMap;
@@ -1048,6 +1058,20 @@ public:
 
     // currently used render target pack
     RenderTargetPack* mRT;
+
+    // The frame's short-lived targets, lent by description to the passes and effects that use them: the plan's
+    // transient resources (ALRenderResourcePlan::isTransient) and the scratch an effect takes in a resource's
+    // description. Each is a pass's from its acquisition to its scope's end, and the next pass's after that.
+    ALTransientTargetPool mTransientTargets;
+
+    // A target of the description the plan gives @a id, from @a scope, named @a name or else as the plan names it: the
+    // transient resource itself, or scratch in a resource's description. Null where the plan wants none, or none can be
+    // built. One sharing a persistent resource's depth is attached to it.
+    LLRenderTarget* acquireResource(ALTransientTargets& scope, ALRenderResourcePlan::Id id, std::string_view name = {});
+
+    // The light map of the view whose deferred lighting is running, which bindDeferredShader binds where it is given
+    // none; null outside that lighting, where a program reading it reads white.
+    LLRenderTarget* mLightMap = nullptr;
 
     LLRenderTarget          mSpotShadow[2];
 

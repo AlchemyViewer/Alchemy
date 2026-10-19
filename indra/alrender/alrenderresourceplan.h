@@ -34,7 +34,8 @@
 
 /// What each of the pipeline's render resources is for a set of inputs: a description where the resource is wanted,
 /// nothing where it is not, and for a target that takes its depth from another, which. A pure function of the inputs;
-/// LLPipeline::reconcileResources makes the GL objects what the plan says.
+/// LLPipeline::reconcileResources makes the GL objects what the plan says, but for the transient ones (isTransient),
+/// which the passes acquire by their descriptions from a pool of targets shared by lifetime (ALTransientTargetPool).
 ///
 /// Three packs of targets render a view each (LLPipeline::RenderTargetPack): Main, the world view at the render size;
 /// Probe, a reflection probe's face at the probe resolution times its supersample; Hero, a mirror's face at the hero
@@ -207,6 +208,10 @@ public:
     static bool isShadowMap(Id id);
     /// Whether it is a GL texture of the pipeline's own rather than a render target.
     static bool isTexture(Id id);
+    /// Whether the passes that use it acquire it from the transient pool for as long as they need it, rather than the
+    /// reconcile building it to keep: a target that lives for one phase of a frame, and holds nothing across frames. A
+    /// pack's light map is one.
+    static bool isTransient(Id id);
     /// Whether only the GLTF material preview renders through it: the probe pack's post targets and bloom, which the
     /// probes' captures never read, and which are planned only while a preview is alive.
     static bool forMaterialPreview(Id id);
