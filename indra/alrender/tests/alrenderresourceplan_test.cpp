@@ -25,6 +25,10 @@
 #include "linden_common.h"
 
 #include "../alrenderresourceplan.h"
+#include "../altransienttargetpool.h"
+#include "../altransienttargets.h"
+
+#include "llrendertarget.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -32,6 +36,7 @@
 #include <initializer_list>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -960,6 +965,151 @@ namespace
             INFO(Plan::name(id));
             CHECK_FALSE(Plan::isTransient(id));
         }
+    }
+
+    // A pool's backing that builds nothing: what a frame holds is worked out from the descriptions alone, as the pool
+    // counts them.
+    struct CountingBacking final : ALTransientTargetPool::Backing
+    {
+        bool build(LLRenderTarget&, const ALTransientTargetPool::Key&, std::string_view) override { return true; }
+        void rename(LLRenderTarget&, std::string_view) override {}
+        void poison(LLRenderTarget&, const ALTransientTargetPool::Key&) override {}
+        void free(LLRenderTarget&) override {}
+        U64  depthSerial(const LLRenderTarget&) const override { return 1; }
+    };
+
+    // The main view's targets through one frame at @a in, acquired and given back in the order the pipeline's passes
+    // take them, over a pool that keeps what each frame left it. What the pool holds once a frame finds everything it
+    // needs there, and which targets served which resources.
+    struct WorkingSet
+    {
+        U64 mPersistent = 0; ///< the G-buffer and the screen, built to keep
+        U64 mPooled     = 0; ///< what the pool holds
+        U64 mOneEach    = 0; ///< the same resources, each a target of its own
+        U32 mTargets    = 0;
+        U32 mLastMisses = 0; ///< acquisitions the last frame had to build for
+        bool mLightIsWater     = false;
+        bool mSkyBehindIsBloom = false;
+    };
+
+    WorkingSet main_view_frame(const Inputs& in)
+    {
+        const Plan plan = Plan::make(in);
+        CountingBacking       backing;
+        ALTransientTargetPool pool(backing);
+        LLRenderTarget        gbuffer; // stands in for main.gbuffer, whose depth the light map and the water's copy share
+
+        const auto acquire = [&](ALTransientTargets& scope, Id id, std::string_view name = {}) -> LLRenderTarget*
+        {
+            const Plan::Resource& resource = plan[id];
+            REQUIRE(resource.mDesc);
+            const std::string_view label = name.empty() ? Plan::name(id) : name;
+            return resource.mDepthFrom ? scope.acquire(*resource.mDesc, gbuffer, label) : scope.acquire(*resource.mDesc, label);
+        };
+
+        WorkingSet set;
+        for (int frame = 0; frame < 2; ++frame)
+        {
+            pool.beginFrame();
+
+            // The sky pool draws the sky behind (LLDrawPoolWLSky), held to the end of the deferred lighting.
+            ALTransientTargets sky(pool);
+            LLRenderTarget*    sky_behind = acquire(sky, Id::SkyBehind);
+
+            LLRenderTarget* light = nullptr;
+            {
+                // renderDeferredLighting: the light map, and SSAO's blur through a scratch of its description.
+                ALTransientTargets lighting(pool);
+                light = plan.wants(Id::MainLight) ? acquire(lighting, Id::MainLight) : nullptr;
+                if (light && in.mSSAO)
+                {
+                    lighting.release(acquire(lighting, Id::MainLight, "main.light.scratch"));
+                }
+            }
+
+            // renderGeomPostDeferred: the water haze, the water pool's pass with its two copies, then the haze.
+            {
+                ALTransientTargets haze(pool);
+                acquire(haze, Id::MainDepthCopy);
+            }
+            LLRenderTarget* water = nullptr;
+            {
+                ALTransientTargets pass(pool);
+                water = acquire(pass, Id::MainWater);
+                acquire(pass, Id::MainDepthCopy);
+            }
+            {
+                ALTransientTargets haze(pool);
+                acquire(haze, Id::MainDepthCopy);
+            }
+            sky.releaseAll();
+
+            // renderFinalize: the bloom pyramid, then the post chain's two, held until the frame is presented.
+            LLRenderTarget* bloom1 = nullptr;
+            {
+                ALTransientTargets post(pool);
+                for (U32 mip = 0; mip < Plan::BLOOM_MAX_MIPS && plan.wants(Plan::bloomMip(Pack::Main, mip)); ++mip)
+                {
+                    LLRenderTarget* level = acquire(post, Plan::bloomMip(Pack::Main, mip));
+                    bloom1 = mip == 1 ? level : bloom1;
+                }
+                acquire(post, Id::MainPostPing);
+                acquire(post, Id::MainPostPong);
+            }
+
+            set.mLightIsWater     = light && light == water;
+            set.mSkyBehindIsBloom = sky_behind && sky_behind == bloom1;
+            set.mLastMisses       = pool.stats().mMisses;
+        }
+
+        set.mPooled  = pool.stats().mBytes;
+        set.mTargets = pool.stats().mTargets;
+        set.mPersistent = LLRenderTarget::bytesFor(*plan.desc(Id::MainGBuffer)) + LLRenderTarget::bytesFor(*plan.desc(Id::MainScreen));
+        set.mOneEach    = set.mPersistent;
+        for (Id id : { Id::MainLight, Id::MainWater, Id::MainDepthCopy, Id::MainPostPing, Id::MainPostPong, Id::SkyBehind })
+        {
+            set.mOneEach += plan.wants(id) ? LLRenderTarget::bytesFor(*plan.desc(id)) : 0;
+        }
+        for (U32 mip = 0; mip < Plan::BLOOM_MAX_MIPS && plan.wants(Plan::bloomMip(Pack::Main, mip)); ++mip)
+        {
+            set.mOneEach += LLRenderTarget::bytesFor(*plan.desc(Plan::bloomMip(Pack::Main, mip)));
+        }
+        return set;
+    }
+
+    TEST_CASE("alrenderresourceplan: the main view's working set at 1440p defaults, worked out from the descriptions",
+              "[alrenderresourceplan]")
+    {
+        // 2560x1440 at the defaults: HDR, reverse-Z, the emissive buffer, bloom at full scale with five levels, shadow
+        // detail 2, SSAO and transparent water. 36 B/px kept: the G-buffer's 20 and its 8 of depth and stencil, and the
+        // screen's 8.
+        constexpr U64 PIXELS = 2560ull * 1440ull;
+        const WorkingSet set = main_view_frame(defaults());
+        CHECK(set.mPersistent == 36 * PIXELS);
+
+        UNSCOPED_INFO("exact-description reuse finds the plan's two matches by itself");
+        CHECK(set.mLightIsWater);
+        CHECK(set.mSkyBehindIsBloom);
+        UNSCOPED_INFO("a frame finds what it needs where the last one left it");
+        CHECK(set.mLastMisses == 0);
+
+        // The light map's description twice over (the light map and SSAO's scratch through the lighting, then the
+        // water's copy), the depth copy, bloom mip 0 and mips 2 to 4, mip 1 with the sky behind, and the post chain's
+        // two: 16 + 4 + 4 + 1 + 0.33 + 8 B/px.
+        CHECK(set.mTargets == 10);
+        CHECK(set.mPooled == 122860800);
+        // Each its own target, as each was: 70.3 B/px, 247.3 MiB.
+        CHECK(set.mOneEach == 259257600);
+        CHECK(set.mPersistent + set.mPooled == 255571200); // 243.7 MiB
+
+        // Without SSAO the lighting needs one target of the light map's description, not two.
+        Inputs no_ssao = defaults();
+        no_ssao.mSSAO  = false;
+        const WorkingSet without = main_view_frame(no_ssao);
+        CHECK(without.mLightIsWater);
+        CHECK(without.mSkyBehindIsBloom);
+        CHECK(without.mOneEach == 259257600);
+        CHECK(without.mPersistent + without.mPooled == 226080000); // 215.6 MiB
     }
 
     TEST_CASE("alrenderresourceplan: every resource has its own debugger label", "[alrenderresourceplan]")
