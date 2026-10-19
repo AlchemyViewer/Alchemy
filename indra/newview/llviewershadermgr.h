@@ -294,6 +294,7 @@ extern LLGLSLShader         gNormalMapGenProgram;
 extern LLGLSLShader         gDeferredGenBrdfLutProgram;
 extern LLGLSLShader         gDeferredBufferVisualProgram;
 extern LLGLSLShader         gBlitWithEffectsProgram;
+extern LLGLSLShader         gBlitWithEffectsSharpenProgram;
 extern LLGLSLShader         gCGGammaProgram;
 extern LLGLSLShader         gCGLegacyGammaProgram;
 extern LLGLSLShader         gCGTonemapProgram;

@@ -233,6 +233,7 @@ LLGLSLShader            gNormalMapGenProgram;
 LLGLSLShader            gDeferredGenBrdfLutProgram;
 LLGLSLShader            gDeferredBufferVisualProgram;
 LLGLSLShader            gBlitWithEffectsProgram;
+LLGLSLShader            gBlitWithEffectsSharpenProgram;
 LLGLSLShader            gCGGammaProgram;
 LLGLSLShader            gCGLegacyGammaProgram;
 LLGLSLShader            gCGTonemapProgram;
@@ -3247,6 +3248,26 @@ void LLViewerShaderMgr::loadShadersDeferred()
         }
         gBlitWithEffectsProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         built(gBlitWithEffectsProgram.createShader(), gBlitWithEffectsProgram);
+    }
+
+    {
+        // The same blit sharpening the frame as it samples it, CASF.glsl's filter linked in. While it is incomplete
+        // the frame is sharpened by CAS's own pass.
+        gBlitWithEffectsSharpenProgram.mName = "Blit With Post Effects Shader (Sharpened)";
+        gBlitWithEffectsSharpenProgram.mFeatures.isDeferred = true;
+        gBlitWithEffectsSharpenProgram.mFeatures.hasPostEffects = true;
+        gBlitWithEffectsSharpenProgram.mShaderFiles.clear();
+        gBlitWithEffectsSharpenProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gBlitWithEffectsSharpenProgram.mShaderFiles.push_back(make_pair("alchemy/blitWithEffectsF.glsl", GL_FRAGMENT_SHADER));
+        gBlitWithEffectsSharpenProgram.mShaderFiles.push_back(make_pair("deferred/CASF.glsl", GL_FRAGMENT_SHADER));
+        gBlitWithEffectsSharpenProgram.clearPermutations();
+        gBlitWithEffectsSharpenProgram.addPermutation("CAS_LIBRARY", "1");
+        if (mInputs.mLocal.mHDR)
+        {
+            gBlitWithEffectsSharpenProgram.addPermutation("DITHER", "1");
+        }
+        gBlitWithEffectsSharpenProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        built(gBlitWithEffectsSharpenProgram.createShader(), gBlitWithEffectsSharpenProgram);
     }
 
     // HDR-only: the bloom pyramid is allocated in the HDR path, so the tonemap

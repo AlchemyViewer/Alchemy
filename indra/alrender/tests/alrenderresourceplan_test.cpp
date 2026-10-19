@@ -1067,8 +1067,10 @@ namespace
             sky.releaseAll();
 
             // renderFinalize: depth of field, its sharp copy where it keeps one and its blur in bloom level 0's
-            // description (the post chain's without HDR), given back before the bloom pyramid, then the post chain's
-            // two, held until the frame is presented.
+            // description (the post chain's without HDR), given back before the bloom pyramid; then the post chain's
+            // first target, and its other only where a pass after colorCorrect draws into one: antialiasing, or the
+            // legacy glow's combine without HDR. At the defaults none does, as the blit sharpens the frame itself. All
+            // held until the frame is presented.
             LLRenderTarget* sharp = nullptr;
             if (dof != DoF::Off)
             {
@@ -1087,7 +1089,10 @@ namespace
                     bloom1 = mip == 1 ? level : bloom1;
                 }
                 acquire(post, Id::MainPostPing);
-                acquire(post, Id::MainPostPong);
+                if (in.mFSAAType != 0 || !in.mHDR)
+                {
+                    acquire(post, Id::MainPostPong);
+                }
             }
 
             set.mWaterIsBloom     = water && water == bloom0;
@@ -1128,13 +1133,13 @@ namespace
         CHECK(set.mLastMisses == 0);
 
         // The light map's description twice over (the light map and SSAO's scratch through the lighting), the depth
-        // copy, bloom mip 0 with the water's copy and mips 2 to 4, mip 1 with the sky behind, and the post chain's two:
-        // 16 + 4 + 4 + 1 + 0.33 + 8 B/px.
-        CHECK(set.mTargets == 10);
-        CHECK(set.mPooled == 122860800);
-        // Each its own target: 66.3 B/px, 233.2 MiB.
+        // copy, bloom mip 0 with the water's copy and mips 2 to 4, mip 1 with the sky behind, and the post chain's
+        // first: 16 + 4 + 4 + 1 + 0.33 + 4 B/px.
+        CHECK(set.mTargets == 9);
+        CHECK(set.mPooled == 108115200);
+        // Each its own target, as each was: 66.3 B/px, 233.2 MiB.
         CHECK(set.mOneEach == 244512000);
-        CHECK(set.mPersistent + set.mPooled == 255571200); // 243.7 MiB
+        CHECK(set.mPersistent + set.mPooled == 240825600); // 229.7 MiB
 
         // Without SSAO the lighting needs one target of the light map's description, not two.
         Inputs no_ssao = defaults();
@@ -1143,7 +1148,14 @@ namespace
         CHECK(without.mWaterIsBloom);
         CHECK(without.mSkyBehindIsBloom);
         CHECK(without.mOneEach == 244512000);
-        CHECK(without.mPersistent + without.mPooled == 226080000); // 215.6 MiB
+        CHECK(without.mPersistent + without.mPooled == 211334400); // 201.5 MiB
+
+        // With antialiasing the post chain's other target is drawn into, and pooled beside the first: 4 B/px more.
+        Inputs fxaa    = defaults();
+        fxaa.mFSAAType = 1;
+        const WorkingSet antialiased = main_view_frame(fxaa);
+        CHECK(antialiased.mTargets == 10);
+        CHECK(antialiased.mPooled - set.mPooled == 4 * PIXELS);
     }
 
     // Depth of field takes nothing the frame did not already hold: its sharp copy a target of the light map's
@@ -1159,7 +1171,7 @@ namespace
             CHECK(on.mSharpIsLight == (dof == DoF::WithSharpCopy));
             CHECK(on.mLastMisses == 0);
             CHECK(on.mTargets == off.mTargets);
-            CHECK(on.mPersistent + on.mPooled == 255571200); // 243.7 MiB
+            CHECK(on.mPersistent + on.mPooled == 240825600); // 229.7 MiB
         }
     }
 

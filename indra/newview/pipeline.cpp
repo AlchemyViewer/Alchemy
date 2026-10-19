@@ -10674,12 +10674,10 @@ void LLPipeline::renderFinalize()
     // block above because the dirt is lit by the lens flare as well as by bloom.
     generateLensDirt();
 
-    // The post chain's two targets, from the pool until the frame is presented: colorCorrect writes the first whole,
-    // and each pass after it writes the other whole before the two swap. Without both, the frame goes out as the screen
-    // holds it rather than not at all.
+    // The post chain's first target, from the pool until the frame is presented, which colorCorrect writes whole.
+    // Without it, the frame goes out as the screen holds it rather than not at all.
     LLRenderTarget* const post_ping = acquireResource(post, ALRenderResourcePlan::Id::MainPostPing);
-    LLRenderTarget* const post_pong = acquireResource(post, ALRenderResourcePlan::Id::MainPostPong);
-    const bool            chain     = post_ping && post_pong;
+    const bool            chain     = post_ping != nullptr;
     if (chain)
     {
         colorCorrect(&mRT->screen, post_ping, hdr, true, &bloom);
@@ -10691,21 +10689,31 @@ void LLPipeline::renderFinalize()
     // bloom process and composited back in after tonemapping.
     LLRenderTarget* glow = !hdr && !cutout && chain ? generateGlow(post_ping, post) : nullptr;
 
+    // The chain's other target, from the pool once a pass after colorCorrect draws, each such pass writing it whole
+    // before the two swap. A pass with no target to draw into is left out.
     LLRenderTarget* sourceBuffer = chain ? post_ping : &mRT->screen;
-    LLRenderTarget* targetBuffer = post_pong;
-    SMAATargets     smaa;
+    LLRenderTarget* targetBuffer = nullptr;
+    const auto      other_target = [&]() -> LLRenderTarget*
+    {
+        if (!targetBuffer && chain)
+        {
+            targetBuffer = acquireResource(post, ALRenderResourcePlan::Id::MainPostPong);
+        }
+        return targetBuffer;
+    };
+    SMAATargets smaa;
 
     // Anti-aliasing and sharpening both spread past a pixel, so a cutout
     // frame skips them (see above). A pass that draws nothing leaves the frame
     // where it was, and the next reads it there.
-    if (mResourceInputs.mFSAAType == 1 && !cutout && chain)
+    if (mResourceInputs.mFSAAType == 1 && !cutout && other_target())
     {
         if (applyFXAA(sourceBuffer, targetBuffer))
         {
             std::swap(sourceBuffer, targetBuffer);
         }
     }
-    else if (mResourceInputs.mFSAAType == 2 && !cutout && chain)
+    else if (mResourceInputs.mFSAAType == 2 && !cutout && other_target())
     {
         smaa = generateSMAABuffers(sourceBuffer, post);
         if (applySMAA(sourceBuffer, targetBuffer, smaa))
@@ -10714,14 +10722,45 @@ void LLPipeline::renderFinalize()
         }
     }
 
-    if (!cutout && chain && applyCAS(sourceBuffer, targetBuffer))
+    // The print effects had no snapshot gate at all, so "No post-processing"
+    // produced an image that was still vignetted, still grainy, still
+    // CVD-compensated and, with a preview mode on, still false-coloured.
+    // They are the print effects; a clean plate is exactly the frame
+    // without them.
+    //
+    // Dither is not in the list on purpose. It is a quantisation aid rather
+    // than a look, and an 8-bit PNG wants it whether or not the rest is
+    // wanted.
+    const bool suppress_effects = suppressesLensAndPrintEffects();
+
+    static LLCachedControl<F32> distort_amount(gSavedSettings, "RenderLensDistortionAmount", 0.0f, "[0, 1] default 0.");
+    const F32 distort = suppress_effects ? 0.f : llclamp(distort_amount(), 0.f, 1.f);
+
+    // Sharpening. Where the blit reads the frame next and draws it one to one, through no lens and in no side-by-side
+    // pane, the blit sharpens as it samples (blitWithEffectsF.glsl): CAS's pass is left out, and the chain's other
+    // target with it where nothing else draws into one. CAS's pass sharpens the frame instead where something reads or
+    // draws over it before the blit -- the glow, RLVa's sphere, a buffer shown in its place, a scope sample or a
+    // reference still taken this frame -- and where the blit resamples it, at another size or through the lens, which
+    // costs the blit more to sharpen than the pass does.
+    static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
+    static LLCachedControl<S32> ref_wipe_mode(gSavedSettings, "RenderReferenceWipeMode", 0);
+    const LLRect& world_view    = gViewerWindow->getWorldViewRectRaw();
+    const bool    rlv_sphere    = chain && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE);
+    const bool    visualize     = RenderBufferVisualization > -1 && !cutout;
+    const bool    side_by_side  = ref_wipe_mode == 2 && !suppress_effects;
+    const bool    blit_sharpens = cas_sharpness > 0.f && !cutout && chain && gBlitWithEffectsSharpenProgram.isComplete() &&
+                                  !glow && !rlv_sphere && !visualize && !sScopeCapture && !mReferenceStillWanted &&
+                                  distort <= 0.f && !side_by_side && (S32)sourceBuffer->getWidth() == world_view.getWidth() &&
+                                  (S32)sourceBuffer->getHeight() == world_view.getHeight();
+    if (!blit_sharpens && cas_sharpness > 0.f && gCASProgram.isComplete() && !cutout && other_target() &&
+        applyCAS(sourceBuffer, targetBuffer))
     {
         std::swap(sourceBuffer, targetBuffer);
     }
 
     // The other target is the pool's, its contents undefined until a pass writes it: a pass whose program did not build
     // draws nothing into it, and the frame stays where it is rather than going out as that target holds it.
-    if (glow && gGlowCombineProgram.isComplete())
+    if (glow && gGlowCombineProgram.isComplete() && other_target())
     {
         combineGlow(sourceBuffer, targetBuffer, glow);
         std::swap(sourceBuffer, targetBuffer);
@@ -10734,7 +10773,7 @@ void LLPipeline::renderFinalize()
     glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
 
 // [RLVa:KB] - @setsphere
-    if (chain && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE) && gRlvSphereProgram.isComplete())
+    if (rlv_sphere && gRlvSphereProgram.isComplete() && other_target())
     {
         LLShaderEffectParams params(sourceBuffer, targetBuffer, false);
         LLVfxManager::instance().runEffect(EVisualEffect::RlvSphere, &params);
@@ -10794,27 +10833,28 @@ void LLPipeline::renderFinalize()
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderFinalize - final blit");
         LL_PROFILE_GPU_ZONE("renderFinalize - final blit");
 
-        gBlitWithEffectsProgram.bind();
+        LLGLSLShader& blit = blit_sharpens ? gBlitWithEffectsSharpenProgram : gBlitWithEffectsProgram;
+        blit.bind();
 
         // Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems.
-        gBlitWithEffectsProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, sourceBuffer);
-        gBlitWithEffectsProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen);
+        blit.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, sourceBuffer);
+        blit.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen);
 
         // Setup Uniforms
-        gBlitWithEffectsProgram.uniform1ui(LLShaderMgr::FRAME_ID, LLFrameTimer::getFrameCount());
-        gBlitWithEffectsProgram.uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (F32)gViewerWindow->getWorldViewRectRaw().getWidth(),
-                                          (F32)gViewerWindow->getWorldViewRectRaw().getHeight());
+        blit.uniform1ui(LLShaderMgr::FRAME_ID, LLFrameTimer::getFrameCount());
+        blit.uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (F32)gViewerWindow->getWorldViewRectRaw().getWidth(),
+                       (F32)gViewerWindow->getWorldViewRectRaw().getHeight());
 
-        // The effects below had no snapshot gate at all, so "No post-processing"
-        // produced an image that was still vignetted, still grainy, still
-        // CVD-compensated and, with a preview mode on, still false-coloured.
-        // They are the print effects; a clean plate is exactly the frame
-        // without them.
-        //
-        // Dither is not in the list on purpose. It is a quantisation aid rather
-        // than a look, and an 8-bit PNG wants it whether or not the rest is
-        // wanted.
-        const bool suppress_effects = suppressesLensAndPrintEffects();
+        // CAS, sharpening the frame at its own size as its pass does.
+        if (blit_sharpens)
+        {
+            varAU4(const0);
+            varAU4(const1);
+            CasSetup(const0, const1, cas_sharpness(), (AF1)sourceBuffer->getWidth(), (AF1)sourceBuffer->getHeight(),
+                     (AF1)sourceBuffer->getWidth(), (AF1)sourceBuffer->getHeight());
+            blit.uniform4uiv(LLShaderMgr::CAS_PARAM_0, 1, const0);
+            blit.uniform4uiv(LLShaderMgr::CAS_PARAM_1, 1, const1);
+        }
 
         // Lens distortion
         //
@@ -10831,7 +10871,6 @@ void LLPipeline::renderFinalize()
         // positive as pincushion, matching a lens profile, and it is
         // *pincushion* that pushes samples off the source and would show
         // black corners without a fit.
-        static LLCachedControl<F32> distort_amount(gSavedSettings, "RenderLensDistortionAmount", 0.0f, "[0, 1] default 0.");
         static LLCachedControl<F32> distort_k1(gSavedSettings, "RenderLensDistortionK1", -0.2f);
         static LLCachedControl<F32> distort_k2(gSavedSettings, "RenderLensDistortionK2", 0.0f);
         static LLCachedControl<F32> distort_squeeze(gSavedSettings, "RenderLensDistortionSqueeze", 1.0f);
@@ -10839,8 +10878,7 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<LLVector3> distort_center(gSavedSettings, "RenderLensDistortionCenter", LLVector3(0.f, 0.f, 0.f));
         static LLCachedControl<LLVector3> distort_tangential(gSavedSettings, "RenderLensDistortionTangential", LLVector3(0.f, 0.f, 0.f));
 
-        const F32 distort = suppress_effects ? 0.f : llclamp(distort_amount(), 0.f, 1.f);
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::LENS_DISTORT_AMOUNT, distort);
+        blit.uniform1f(LLShaderMgr::LENS_DISTORT_AMOUNT, distort);
 
         // Zeroing the master both hits the shader's early-out and skips the
         // whole solve below, exactly as the lens flare does with its strength.
@@ -11008,11 +11046,11 @@ void LLPipeline::renderFinalize()
             mLensDistortFit.inputs = inputs;
             mLensDistortFit.scale = fit_scale;
 
-            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::LENS_DISTORT_K, k1, k2);
-            gBlitWithEffectsProgram.uniform1f(LLShaderMgr::LENS_DISTORT_SCALE, fit_scale);
-            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::LENS_DISTORT_SQUEEZE, sq_x, sq_y);
-            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::LENS_DISTORT_CENTER, cx, cy);
-            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::LENS_DISTORT_TANGENTIAL, p1, p2);
+            blit.uniform2f(LLShaderMgr::LENS_DISTORT_K, k1, k2);
+            blit.uniform1f(LLShaderMgr::LENS_DISTORT_SCALE, fit_scale);
+            blit.uniform2f(LLShaderMgr::LENS_DISTORT_SQUEEZE, sq_x, sq_y);
+            blit.uniform2f(LLShaderMgr::LENS_DISTORT_CENTER, cx, cy);
+            blit.uniform2f(LLShaderMgr::LENS_DISTORT_TANGENTIAL, p1, p2);
         }
 
         // Vignette
@@ -11026,29 +11064,29 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<LLVector3> vignette_center(gSavedSettings, "RenderVignetteCenter", LLVector3(0.0f, 0.0f, 0.0f));
         static LLCachedControl<bool>      vignette_correct_aspect(gSavedSettings, "RenderVignetteCorrectAspect", false);
         static LLCachedControl<F32>       vignette_feather(gSavedSettings, "RenderVignetteFeather", 1.0f);
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_AMOUNT, suppress_effects ? 0.0f : llclamp(vignette_amount(), 0.0f, 1.0f));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_RADIUS, llclamp(vignette_radius(), 0.25f, 1.5f));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_SOFT, llclamp(vignette_soft(), 0.05f, 1.0f));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_SHAPE, llclamp(vignette_shape(), 0.0f, 1.0f));
-        gBlitWithEffectsProgram.uniform3fv(LLShaderMgr::VIGNETTE_COLOR, 1, vignette_color().mV);
-        gBlitWithEffectsProgram.uniform3fv(LLShaderMgr::VIGNETTE_MID_COLOR, 1, vignette_mid_color().mV);
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_MID_POINT, llclamp(vignette_mid_point(), 0.0f, 1.0f));
+        blit.uniform1f(LLShaderMgr::VIGNETTE_AMOUNT, suppress_effects ? 0.0f : llclamp(vignette_amount(), 0.0f, 1.0f));
+        blit.uniform1f(LLShaderMgr::VIGNETTE_RADIUS, llclamp(vignette_radius(), 0.25f, 1.5f));
+        blit.uniform1f(LLShaderMgr::VIGNETTE_SOFT, llclamp(vignette_soft(), 0.05f, 1.0f));
+        blit.uniform1f(LLShaderMgr::VIGNETTE_SHAPE, llclamp(vignette_shape(), 0.0f, 1.0f));
+        blit.uniform3fv(LLShaderMgr::VIGNETTE_COLOR, 1, vignette_color().mV);
+        blit.uniform3fv(LLShaderMgr::VIGNETTE_MID_COLOR, 1, vignette_mid_color().mV);
+        blit.uniform1f(LLShaderMgr::VIGNETTE_MID_POINT, llclamp(vignette_mid_point(), 0.0f, 1.0f));
         if (vignette_correct_aspect)
         {
-            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::VIGNETTE_ASPECT, (F32)sourceBuffer->getWidth(), (F32)sourceBuffer->getHeight());
+            blit.uniform2f(LLShaderMgr::VIGNETTE_ASPECT, (F32)sourceBuffer->getWidth(), (F32)sourceBuffer->getHeight());
         }
         else
         {
-            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::VIGNETTE_ASPECT, 1.f, 1.f);
+            blit.uniform2f(LLShaderMgr::VIGNETTE_ASPECT, 1.f, 1.f);
         }
-        gBlitWithEffectsProgram.uniform2fv(LLShaderMgr::VIGNETTE_CENTER, 1, vignette_center().mV);
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_FEATHER, llclamp(vignette_feather(), 0.2f, 4.0f));
+        blit.uniform2fv(LLShaderMgr::VIGNETTE_CENTER, 1, vignette_center().mV);
+        blit.uniform1f(LLShaderMgr::VIGNETTE_FEATHER, llclamp(vignette_feather(), 0.2f, 4.0f));
 
         // CVD Compensation
         static LLCachedControl<S32> cvd_mode(gSavedSettings, "RenderCVDMode", 0);
         static LLCachedControl<F32> cvd_amount(gSavedSettings, "RenderCVDAmount", 0.0f);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::CVD_MODE, suppress_effects ? 0 : llclamp(cvd_mode(), 0, 3));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::CVD_AMOUNT, suppress_effects ? 0.0f : llclamp(cvd_amount(), 0.0f, 1.0f));
+        blit.uniform1i(LLShaderMgr::CVD_MODE, suppress_effects ? 0 : llclamp(cvd_mode(), 0, 3));
+        blit.uniform1f(LLShaderMgr::CVD_AMOUNT, suppress_effects ? 0.0f : llclamp(cvd_amount(), 0.0f, 1.0f));
 
         // Film Grain
         static LLCachedControl<bool>     film_grain_animated(gSavedSettings, "RenderFilmGrainAnimated", true);
@@ -11057,23 +11095,23 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<F32>      film_grain_size(gSavedSettings, "RenderFilmGrainSize", 1.0f);
         static LLCachedControl<F32>      film_grain_range(gSavedSettings, "RenderFilmGrainRange", 0.5f);
         static LLCachedControl<LLColor3> film_grain_tint(gSavedSettings, "RenderFilmGrainTint", LLColor3(1.0f, 1.0f, 1.0f));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_AMOUNT, suppress_effects ? 0.0f : llclamp(film_grain_amount(), 0.0f, 1.0f));
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::GRAIN_STYLE, llclamp(film_grain_style(), 0, 3));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_SIZE, llclamp(film_grain_size(), 1.0f, 8.0f));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_RANGE, llclamp(film_grain_range(), 0.0f, 1.0f));
-        gBlitWithEffectsProgram.uniform3fv(LLShaderMgr::GRAIN_TINT, 1, film_grain_tint().mV);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::GRAIN_ANIMATE, film_grain_animated ? 1 : 0);
+        blit.uniform1f(LLShaderMgr::GRAIN_AMOUNT, suppress_effects ? 0.0f : llclamp(film_grain_amount(), 0.0f, 1.0f));
+        blit.uniform1i(LLShaderMgr::GRAIN_STYLE, llclamp(film_grain_style(), 0, 3));
+        blit.uniform1f(LLShaderMgr::GRAIN_SIZE, llclamp(film_grain_size(), 1.0f, 8.0f));
+        blit.uniform1f(LLShaderMgr::GRAIN_RANGE, llclamp(film_grain_range(), 0.0f, 1.0f));
+        blit.uniform3fv(LLShaderMgr::GRAIN_TINT, 1, film_grain_tint().mV);
+        blit.uniform1i(LLShaderMgr::GRAIN_ANIMATE, film_grain_animated ? 1 : 0);
 
         // Dithering
         static LLCachedControl<bool> dither_enabled(gSavedSettings, "RenderDitherEnabled", true);
         static LLCachedControl<bool> dither_animated(gSavedSettings, "RenderDitherAnimated", true);
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::DITHER_AMOUNT, dither_enabled() ? 1.0f : 0.0f);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::DITHER_BITS, LLRender::s10bitBackBuffer ? 10 : 8);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::DITHER_ANIMATE, dither_animated ? 1 : 0);
+        blit.uniform1f(LLShaderMgr::DITHER_AMOUNT, dither_enabled() ? 1.0f : 0.0f);
+        blit.uniform1i(LLShaderMgr::DITHER_BITS, LLRender::s10bitBackBuffer ? 10 : 8);
+        blit.uniform1i(LLShaderMgr::DITHER_ANIMATE, dither_animated ? 1 : 0);
 
         // Previews
         static LLCachedControl<S32> preview_mode(gSavedSettings, "RenderEffectPreviewMode", 0);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::PREVIEW_MODE, suppress_effects ? 0 : llclamp(preview_mode(), 0, 7));
+        blit.uniform1i(LLShaderMgr::PREVIEW_MODE, suppress_effects ? 0 : llclamp(preview_mode(), 0, 7));
 
         // Reference still. The mode is forced off unless a still actually
         // exists, which is what lets the shader read the sampler without
@@ -11081,14 +11119,13 @@ void LLPipeline::renderFinalize()
         // drops the still) shows the live frame rather than a stale or unbound
         // texture. Off for a clean plate too: a snapshot of a comparison is
         // not a snapshot of the image.
-        static LLCachedControl<S32> ref_wipe_mode(gSavedSettings, "RenderReferenceWipeMode", 0);
         static LLCachedControl<F32> ref_wipe_pos(gSavedSettings, "RenderReferenceWipePosition", 0.5f);
         const S32 wipe_mode = (hasReferenceStill() && !suppress_effects) ? llclamp(ref_wipe_mode(), 0, 2) : 0;
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::REFERENCE_WIPE_MODE, wipe_mode);
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::REFERENCE_WIPE_POS, llclamp(ref_wipe_pos(), 0.f, 1.f));
+        blit.uniform1i(LLShaderMgr::REFERENCE_WIPE_MODE, wipe_mode);
+        blit.uniform1f(LLShaderMgr::REFERENCE_WIPE_POS, llclamp(ref_wipe_pos(), 0.f, 1.f));
         if (wipe_mode != 0)
         {
-            gBlitWithEffectsProgram.bindTexture(LLShaderMgr::REFERENCE_STILL, &mReferenceStill);
+            blit.bindTexture(LLShaderMgr::REFERENCE_STILL, &mReferenceStill);
         }
 
         {
@@ -11097,7 +11134,7 @@ void LLPipeline::renderFinalize()
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
         }
 
-        gBlitWithEffectsProgram.unbind();
+        blit.unbind();
     }
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
