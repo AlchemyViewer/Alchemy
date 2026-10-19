@@ -192,17 +192,16 @@ namespace
             { "RenderHDREnabled", no_change, hdr_off,
               [](const Plan& before)
               {
-                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light }) |
-                         in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong, Slot::Water }) |
+                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light, Slot::Water }) |
+                         in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main })) |
                          of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
               } },
             { "RenderHDREnabled under a material preview", previewed, hdr_off,
               [](const Plan& before)
               {
-                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light }) |
+                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light, Slot::Water }) |
                          in_packs({ Pack::Main, Pack::Probe }, { Slot::PostPing, Slot::PostPong }) |
-                         in_packs({ Pack::Main }, { Slot::Water }) |
                          wanted(before, bloom({ Pack::Main, Pack::Probe })) |
                          of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
               } },
@@ -216,13 +215,16 @@ namespace
               [](const Plan& before)
               {
                   return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::SpotShadow0, Id::SpotShadow1,
-                              Id::MainDepthCopy, Id::Preview }) |
+                              Id::MainDepthCopy, Id::ProbeDepthCopy, Id::HeroDepthCopy, Id::Preview }) |
                          wanted(before, sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero }));
               } },
             { "AlchemyRenderReverseZ over 32-bit shadows", [](Inputs& in) { in.mShadowDepth32F = true; },
               [](Inputs& in) { in.mReverseZ = false; },
               [](const Plan&)
-              { return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::MainDepthCopy, Id::Preview }); } },
+              {
+                  return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::MainDepthCopy, Id::ProbeDepthCopy,
+                              Id::HeroDepthCopy, Id::Preview });
+              } },
             { "RenderShadowDetail 2 to 1", no_change, [](Inputs& in) { in.mShadowDetail = 1; },
               [](const Plan&) { return of({ Id::SpotShadow0, Id::SpotShadow1 }); } },
             { "RenderShadowDetail 2 to 0", no_change, [](Inputs& in) { in.mShadowDetail = 0; },
@@ -746,6 +748,38 @@ namespace
             REQUIRE(plan.desc(Id::HeroGBuffer));
             CHECK(plan.desc(Id::HeroGBuffer)->width == 512);
         }
+    }
+
+    TEST_CASE("alrenderresourceplan: a capture's water copies the scene at its own pack's size", "[alrenderresourceplan]")
+    {
+        Inputs in            = defaults();
+        in.mProbeSuperSample = 2;
+        in.mHeroResolution   = 512;
+        const Plan plan      = Plan::make(in);
+        for (Pack pack : { Pack::Main, Pack::Probe, Pack::Hero })
+        {
+            INFO("pack " << (U32)pack);
+            const Plan::Resource& gbuffer = plan[Plan::inPack(pack, Slot::GBuffer)];
+            const Plan::Resource& water   = plan[Plan::inPack(pack, Slot::Water)];
+            const Plan::Resource& depth   = plan[Plan::inPack(pack, Slot::DepthCopy)];
+            REQUIRE(gbuffer.mDesc);
+            REQUIRE(water.mDesc);
+            REQUIRE(depth.mDesc);
+            CHECK(water.mDesc->width == gbuffer.mDesc->width);
+            CHECK(water.mDesc->height == gbuffer.mDesc->height);
+            CHECK(water.mDepthFrom == Plan::inPack(pack, Slot::GBuffer));
+            CHECK(depth.mDesc->width == gbuffer.mDesc->width);
+            CHECK(depth.mDesc->depth == gbuffer.mDesc->depth);
+            CHECK(depth.mDesc->colorCount() == 0);
+            CHECK_FALSE(depth.mDesc->stencil);
+            UNSCOPED_INFO("the light map's description, so the pool hands the two one target");
+            if (plan.wants(Plan::inPack(pack, Slot::Light)))
+            {
+                CHECK(plan[Plan::inPack(pack, Slot::Light)] == water);
+            }
+        }
+        CHECK(plan.desc(Id::ProbeWater)->width == in.mProbeResolution * 2);
+        CHECK(plan.desc(Id::HeroWater)->width == 512);
     }
 
     TEST_CASE("alrenderresourceplan: a capture pack has a light map exactly when shadows are on", "[alrenderresourceplan]")

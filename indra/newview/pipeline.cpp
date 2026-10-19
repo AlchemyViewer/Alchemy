@@ -9281,11 +9281,12 @@ void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget*
 
 void LLPipeline::beginWaterTargets()
 {
+    using Plan = ALRenderResourcePlan;
     llassert(!mWaterTargets);
     mWaterTargets.emplace(mTransientTargets);
-    // The main view's, which a capture's screen is stretched into.
-    mWaterRefraction = acquireResource(*mWaterTargets, ALRenderResourcePlan::Id::MainWater);
-    mWaterDepthCopy  = acquireResource(*mWaterTargets, ALRenderResourcePlan::Id::MainDepthCopy);
+    // The pack's own, at the size its screen renders at.
+    mWaterRefraction = acquireResource(*mWaterTargets, Plan::inPack(renderPack(), Plan::Slot::Water));
+    mWaterDepthCopy  = acquireResource(*mWaterTargets, Plan::inPack(renderPack(), Plan::Slot::DepthCopy));
 
     // Each written whole: the blit covers the copy, and copySceneDepth draws over every texel of its target.
     LLRenderTarget& src = mRT->screen;
@@ -12173,7 +12174,8 @@ void LLPipeline::doAtmospherics()
     {
         // The scene's depth as the haze reads it, copied for the pass alone while the screen holds the scene's own.
         ALTransientTargets haze(mTransientTargets);
-        LLRenderTarget*    depth_copy = acquireResource(haze, ALRenderResourcePlan::Id::MainDepthCopy);
+        LLRenderTarget*    depth_copy =
+            acquireResource(haze, ALRenderResourcePlan::inPack(renderPack(), ALRenderResourcePlan::Slot::DepthCopy));
         {
             mRT->screen.flush();
             if (depth_copy)
@@ -12266,7 +12268,8 @@ void LLPipeline::doWaterHaze()
     {
         // The scene's depth as the haze reads it, copied for the pass alone while the screen holds the scene's own.
         ALTransientTargets haze(mTransientTargets);
-        LLRenderTarget*    depth_copy = acquireResource(haze, ALRenderResourcePlan::Id::MainDepthCopy);
+        LLRenderTarget*    depth_copy =
+            acquireResource(haze, ALRenderResourcePlan::inPack(renderPack(), ALRenderResourcePlan::Slot::DepthCopy));
         {
             mRT->screen.flush();
             if (depth_copy)

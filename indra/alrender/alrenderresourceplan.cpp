@@ -222,7 +222,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         const U32 probe_shadow   = blur_happy_size(in.mProbeResolution * 4, 1.f);
         const U32 probe_cascades = !in.mProbes ? 0 : in.mProbeAllCascades ? SUN_CASCADES : CAPTURE_SUN_CASCADES;
         plan_pack(Pack::Probe, { probe_size, probe_size, probe_shadow, probe_shadow, probe_cascades,
-                                 capture_light && in.mProbes, in.mMaterialPreview, false });
+                                 capture_light && in.mProbes, in.mMaterialPreview, true });
     }
     if (in.mProbes)
     {
@@ -239,7 +239,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         const U32 hero_size   = std::max(in.mHeroResolution, 1u);
         const U32 hero_shadow = blur_happy_size(hero_size, 1.f);
         plan_pack(Pack::Hero,
-                  { hero_size, hero_size, hero_shadow, hero_shadow, CAPTURE_SUN_CASCADES, capture_light, false, false });
+                  { hero_size, hero_size, hero_shadow, hero_shadow, CAPTURE_SUN_CASCADES, capture_light, false, true });
         plan.mHeroProbes = ProbeManager{ .mResolution = hero_size, .mSuperSample = 1, .mHDR = hdr };
     }
 
