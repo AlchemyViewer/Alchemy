@@ -8510,11 +8510,11 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
         mExposureHistogram.flush();
     }
 
-    if (use_history)
+    if (use_history && dst->isComplete() && mLastExposure.isComplete())
     {
-        // last frame's exposure, which this one adapts from
-        mLastExposure.copyContents(*dst, 0, 0, dst->getWidth(), dst->getHeight(), 0, 0, mLastExposure.getWidth(), mLastExposure.getHeight(),
-                                   GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        // Last frame's exposure, which this one adapts from, is what the target holds: the two trade their storage, and
+        // this frame's is drawn whole into what was the frame before's.
+        dst->swapFBORefs(mLastExposure);
     }
 
     dst->bindTarget();

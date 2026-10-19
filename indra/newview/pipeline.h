@@ -1084,7 +1084,8 @@ public:
 
     // The auto-exposure: the meter grid (luminanceF.glsl), its 64-bin histogram
     // (exposureHistogramV.glsl), and the exposure, 1x1: x the scale, y the EV the next
-    // frame adapts from (exposureF.glsl). mLastExposure is last frame's.
+    // frame adapts from (exposureF.glsl). mLastExposure is last frame's: the two swap their
+    // storage as each frame's exposure is made.
     LLRenderTarget          mLuminanceMap;
     LLRenderTarget          mExposureHistogram;
     LLRenderTarget          mExposureMap;
