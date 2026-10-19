@@ -146,6 +146,14 @@ public:
     // Whether the depth attachment is another target's, attached by shareDepthBuffer or ensure.
     bool sharesDepth() const { return mUseDepth && !mDepth; }
 
+    // Which build of its own depth this target holds, unique for the process: a target sharing it can tell the depth
+    // it attached from one built since in its place. 0 for none.
+    U64 getDepthSerial() const { return mDepthSerial; }
+
+    // What sBytesAllocated counts for a target built from `desc`: each colour attachment's first level and the depth
+    // of its own, not a depth it shares.
+    static U64 bytesFor(const ALRenderTargetDesc& desc);
+
     // The name debuggers and the GL debug output show for this target: its framebuffer is labelled `label`, the
     // colour attachments it allocated `label.color0` on, and the depth it allocated `label.depth`. The label is kept
     // across builds and given to what each builds, so an owner names its target once; set on a built target, it

@@ -3,7 +3,8 @@
 # Render infrastructure over llrender that holds no viewer state: what the
 # pipeline's render resources and programs are built from and when they
 # change, the far plane, the water's field, wave heights and stencil bits,
-# the depth pyramid, the depth under the HUD and snapshot cutouts. Whatever
+# the depth pyramid, the depth under the HUD and snapshot cutouts; and the pool
+# that lends the frame's short-lived render targets by description. Whatever
 # reads settings or the scene hands these their inputs as values.
 
 set(
@@ -14,6 +15,8 @@ set(
   alrenderinputrequests.cpp
   alrenderresourceplan.cpp
   alshaderinputs.cpp
+  altransienttargetpool.cpp
+  altransienttargets.cpp
   alwaterfield.cpp
   alwaterheightbake.cpp
 )
@@ -28,6 +31,8 @@ set(
   alrenderresourceinputs.h
   alrenderresourceplan.h
   alshaderinputs.h
+  altransienttargetpool.h
+  altransienttargets.h
   alwaterfield.h
   alwaterheightbake.h
   alwaterstencil.h
@@ -53,7 +58,7 @@ if(AL_BUILD_TESTS)
   set(alrender_shader_dir "AL_TEST_SHADER_DIR=\"${INDRA_SOURCE_DIR}/newview/app_settings/shaders\"")
 
   # The suites that need no GL: the render resources' plan and the changes
-  # that ask for it again, what the programs are built from, the far plane
+  # that ask for it again, the transient target pool's policy, what the programs are built from, the far plane
   # and the constants its shaders share, the water's field and the wave
   # heights a normal map's slopes integrate to, and snapshot cutouts.
   al_add_test_binary(
@@ -65,6 +70,7 @@ if(AL_BUILD_TESTS)
       tests/alrenderinputrequests_test.cpp
       tests/alrenderresourceplan_test.cpp
       tests/alshaderinputs_test.cpp
+      tests/altransienttargetpool_test.cpp
       tests/alwaterfield_test.cpp
       tests/alwaterheightbake_test.cpp
     LIBRARIES alrender
@@ -75,11 +81,16 @@ if(AL_BUILD_TESTS)
   # The window's depth under the HUD, the water surface's draws over the
   # cells the field lays out, with the cull and the depth pyramid it reads
   # and the waves displaced by heights the bake integrates from a normal map,
-  # and FXAA on an RGB10_A2 source, on llrender's shared hidden window.
+  # FXAA on an RGB10_A2 source, and the transient target pool's GL objects,
+  # shared depth and poison, on llrender's shared hidden window.
   al_add_test_binary(
     alrender_gl_tests
     PROJECT alrender
-    SOURCES tests/alhuddepth_gl_test.cpp tests/alwatersurface_gl_test.cpp tests/fxaa_gl_test.cpp
+    SOURCES
+      tests/alhuddepth_gl_test.cpp
+      tests/altransienttargetpool_gl_test.cpp
+      tests/alwatersurface_gl_test.cpp
+      tests/fxaa_gl_test.cpp
     LIBRARIES alrender
     SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${alrender_shader_dir}

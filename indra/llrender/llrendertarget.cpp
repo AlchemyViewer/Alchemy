@@ -438,6 +438,22 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
     return true;
 }
 
+// static
+U64 LLRenderTarget::bytesFor(const ALRenderTargetDesc& desc)
+{
+    U64 per_pixel = 0;
+    for (U32 attachment = 0; attachment < desc.colorCount(); ++attachment)
+    {
+        per_pixel += get_color_format_bytes_per_pixel(desc.color[attachment]);
+    }
+    if (desc.depth != ALRenderTargetDesc::Depth::None)
+    {
+        const eDepthFormat format = desc.depth == ALRenderTargetDesc::Depth::D32F ? DEPTH_FMT_32F : DEPTH_FMT_24;
+        per_pixel += get_depth_format_info(format, desc.stencil).bytes_per_pixel;
+    }
+    return (U64)desc.width * desc.height * per_pixel;
+}
+
 ALRenderTargetDesc LLRenderTarget::desc() const
 {
     if (!mFBO)
