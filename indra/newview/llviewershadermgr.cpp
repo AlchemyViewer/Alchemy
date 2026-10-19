@@ -314,7 +314,7 @@ LLGLSLShader            gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
 LLGLSLShader            gDeferredPBRTerrainAlphaMaskProgram[TERRAIN_PAINT_TYPE_COUNT];
 
 // Mirror corners are only reachable during the hero-probe mirror pass, which RenderMirrors
-// gates entirely; toggling it re-runs setShaders (handleReflectionProbesChanged), so
+// gates entirely; toggling it reloads the programs (handleMirrorsChanged), so
 // building them while it is off would be dozens of programs nothing can bind.
 static U32 mirror_variant()
 {
