@@ -184,8 +184,10 @@ private:
         bool           mDoomed   = false;
         /// Freed by the next sweep.
         bool           mFree     = false;
-        /// What debuggers call it now.
+        /// What whoever holds it, or held it last, calls it: what a leak or a bad release is reported under.
         std::string    mName;
+        /// What debuggers were last told it is called: its builder's name, and under validation its holder's.
+        std::string    mLabel;
         /// The names it served while names are recorded, comma-separated, and those of the frame last recorded.
         std::string    mServed;
         std::string    mLastServed;

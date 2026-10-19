@@ -174,9 +174,14 @@ LLRenderTarget* ALTransientTargetPool::acquire(const Key& key, std::string_view 
     if (match)
     {
         ++mThisFrame.mHits;
-        if (mValidation && match->mName != name)
+        // Its holder's name, which a leak is reported under; debuggers are told it where the pool validates.
+        if (match->mName != name)
         {
             match->mName = name;
+        }
+        if (mValidation && match->mLabel != name)
+        {
+            match->mLabel = name;
             mBacking.rename(match->mTarget, name);
         }
     }
@@ -194,6 +199,7 @@ LLRenderTarget* ALTransientTargetPool::acquire(const Key& key, std::string_view 
         }
         ++mThisFrame.mMisses;
         entry->mName  = name;
+        entry->mLabel = name;
         entry->mBytes = LLRenderTarget::bytesFor(key.mDesc);
         mBytes += entry->mBytes;
         match = entry.get();
