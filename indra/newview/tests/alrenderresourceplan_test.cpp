@@ -262,6 +262,8 @@ namespace
               [](const Plan& before) { return wanted(before, Plan::idsOf(Pack::Probe) | Plan::idsOf(Pack::Hero)); } },
             { "RenderScreenSpaceReflections", no_change, [](Inputs& in) { in.mSSR = true; },
               [](const Plan&) { return of({ Id::SSRScene }); } },
+            { "RenderScreenSpaceReflections without probes", [](Inputs& in) { in.mProbes = false; },
+              [](Inputs& in) { in.mSSR = true; }, nothing },
             { "RenderMirrors", no_change, [](Inputs& in) { in.mMirrors = false; },
               [](const Plan& before) { return wanted(before, Plan::idsOf(Pack::Hero)); } },
             { "RenderHeroProbeResolution", no_change, [](Inputs& in) { in.mHeroResolution = 512; },

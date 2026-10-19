@@ -9090,7 +9090,8 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst)
 {
 
-    if (RenderScreenSpaceReflections && !gCubeSnapshot)
+    // Where the plan has the copy: SSR with probes to trace it through.
+    if (mResourcePlan.wants(ALRenderResourcePlan::Id::SSRScene) && !gCubeSnapshot)
     {
         LL_PROFILE_GPU_ZONE("ssr copy");
         dst->copyContents(*src, 0, 0, src->getWidth(), src->getHeight(), 0, 0, dst->getWidth(), dst->getHeight(),

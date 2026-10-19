@@ -251,10 +251,11 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     }
 
     // The water's refraction, scratch whether or not the water is transparent, and the reflections' source take the
-    // scene's depth without its stencil, in its format.
+    // scene's depth without its stencil, in its format. The reflections trace it only through the probes
+    // (bindReflectionProbes): without them no program reads it.
     plan.at(Id::WaterDistortion).mDesc =
         ALRenderTargetDesc{ .width = width, .height = height, .color = { screen_format }, .depth = main_depth };
-    if (in.mSSR)
+    if (in.mSSR && in.mProbes)
     {
         plan.at(Id::SSRScene).mDesc =
             ALRenderTargetDesc{ .width = width, .height = height, .color = { screen_format }, .depth = main_depth };
