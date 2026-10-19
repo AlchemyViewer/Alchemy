@@ -100,7 +100,7 @@ if(AL_BUILD_TESTS)
       tests/altransienttargetpool_gl_test.cpp
       tests/alwatersurface_gl_test.cpp
       tests/fxaa_gl_test.cpp
-    BENCH_SOURCES tests/alcompute_gl_bench.cpp tests/alwatertargets_bench.cpp
+    BENCH_SOURCES tests/alcompute_gl_bench.cpp tests/alondemandtarget_bench.cpp tests/alwatertargets_bench.cpp
     LIBRARIES alrender
     SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${alrender_shader_dir}
