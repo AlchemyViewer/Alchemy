@@ -927,10 +927,6 @@ LLRenderTarget* LLPipeline::resourceTarget(ALRenderResourcePlan::Id id)
             default:
                 break;
         }
-        if (slot >= Slot::Bloom0)
-        {
-            return &rt.bloomMip[(U32)slot - (U32)Slot::Bloom0];
-        }
         return &rt.shadow[(U32)slot - (U32)Slot::Sun0];
     }
 
@@ -1365,29 +1361,11 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources(const ALRenderResourc
             rt.height = gbuffer ? gbuffer->height : 0;
         }
 
-        // The pyramid is as deep as its levels were built without a gap; those past one are not kept.
+        // The pyramid is as deep as the levels the pool could build, from the first.
         rt.bloomMipCount = 0;
-        bool gap         = false;
-        for (U32 mip = 0; mip < BLOOM_MAX_MIPS; ++mip)
+        while (rt.bloomMipCount < BLOOM_MAX_MIPS && changes.mPooled.test((size_t)Plan::bloomMip(pack, rt.bloomMipCount)))
         {
-            const Id id = Plan::bloomMip(pack, mip);
-            if (!plan.wants(id))
-            {
-                break;
-            }
-            if (!gap && rt.bloomMip[mip].isComplete())
-            {
-                ++rt.bloomMipCount;
-                continue;
-            }
-            gap = true;
-            if (rt.bloomMip[mip].isComplete())
-            {
-                rt.bloomMip[mip].release();
-                changes.mBuilt.reset((size_t)id);
-                changes.mKept.reset((size_t)id);
-                changes.mFailed.set((size_t)id);
-            }
+            ++rt.bloomMipCount;
         }
     }
 
@@ -8793,53 +8771,53 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // (permutation BLOOM_COMPOSITE). Bind the pyramid top + strength here so
         // the composite no longer needs its own pass. When HDR is off the shader
         // variant lacks the sampler and bindTexture is a no-op via getTextureChannel.
-        S32 bloom_channel = -1;
+        //
+        // A frame that made no pyramid -- a cutout frame makes none -- binds
+        // black in its place at no strength, for the variants that sample it
+        // whatever the strength.
+        const bool bloomed = bloom && bloom->mMipCount > 0;
+        S32 bloom_channel = bloomed ? shader->bindTexture(LLShaderMgr::BLOOM_SAMPLER, bloom->mMips[0], ALSamplers::BilinearMirror)
+                                    : shader->bindTexture(LLShaderMgr::BLOOM_SAMPLER, LLViewerFetchedTexture::sBlackImagep,
+                                                          ALSamplers::BilinearMirror);
         S32 cross_channel = -1;
         S32 state_channel = -1;
-        if (mRT->bloomMipCount > 0)
+        if (bloom_channel > -1)
         {
-            bloom_channel = shader->bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mRT->bloomMip[0], ALSamplers::BilinearMirror);
-            if (bloom_channel > -1)
-            {
-                static LLCachedControl<F32>      bloom_strength(gSavedSettings, "RenderBloomStrength", 0.325f);
-                static LLCachedControl<F32>      halation_strength(gSavedSettings, "RenderBloomHalationStrength", 0.0f);
-                static LLCachedControl<LLColor3> halation_tint(gSavedSettings, "RenderBloomHalationTint", LLColor3(1.0f, 0.35f, 0.15f));
-                // Pyramid needs at least 3 mips for the downsample/upsample chain
-                // to be meaningful; otherwise gate the signal to zero so a partial
-                // allocation doesn't leak an unfiltered mip into the scene.
-                // A cutout frame builds no pyramid, so what is in it is an
-                // earlier frame's.
-                const F32 strength_gate = (mRT->bloomMipCount >= 3 && !sCutoutRender) ? 1.0f : 0.0f;
-                shader->uniform1f(LLShaderMgr::BLOOM_STRENGTH,    llmax(bloom_strength(), 0.0f)    * strength_gate);
-                shader->uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f) * strength_gate);
-                const LLColor3& tint = halation_tint();
-                shader->uniform3f(LLShaderMgr::HALATION_TINT, tint.mV[0], tint.mV[1], tint.mV[2]);
+            static LLCachedControl<F32>      bloom_strength(gSavedSettings, "RenderBloomStrength", 0.325f);
+            static LLCachedControl<F32>      halation_strength(gSavedSettings, "RenderBloomHalationStrength", 0.0f);
+            static LLCachedControl<LLColor3> halation_tint(gSavedSettings, "RenderBloomHalationTint", LLColor3(1.0f, 0.35f, 0.15f));
+            // generateBloomHDR makes none shallower than the three levels its
+            // downsample and upsample chain needs to mean anything.
+            const F32 strength_gate = bloomed ? 1.0f : 0.0f;
+            shader->uniform1f(LLShaderMgr::BLOOM_STRENGTH,    llmax(bloom_strength(), 0.0f)    * strength_gate);
+            shader->uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f) * strength_gate);
+            const LLColor3& tint = halation_tint();
+            shader->uniform3f(LLShaderMgr::HALATION_TINT, tint.mV[0], tint.mV[1], tint.mV[2]);
 
-                // Cross-filter streaks fold in here rather than in a fullscreen
-                // pass of their own. That pass existed only to add a half-size
-                // buffer into bloomMip[0], which cost a full-resolution
-                // read-modify-write of the pyramid top every frame; this pass
-                // already samples that pyramid, so one more sampler replaces all
-                // of it.
-                //
-                // Added to bloom_term inside the shader rather than to the scene
-                // directly, which keeps two couplings that were previously free:
-                // the streaks stay scaled by bloom strength, and they keep
-                // lighting the lens dirt through lens_light.
-                static LLCachedControl<F32> streak_strength_setting(gSavedSettings, "RenderCrossFilterStrength", 0.f);
-                // Drawn this frame: generateBloomHDR hands back the sum only
-                // where it drew the arms.
-                const bool streaks_live = bloom && bloom->mStreaks;
-                const F32  streaks      = (streaks_live && !suppressesLensAndPrintEffects())
-                                        ? llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH) * strength_gate
-                                        : 0.f;
-                shader->uniform1f(LLShaderMgr::CROSS_STRENGTH, streaks);
-                if (streaks > 0.f)
-                {
-                    cross_channel = shader->bindTexture(LLShaderMgr::CROSS_FILTER_MAP,
-                                                        bloom->mStreaks,
-                                                        ALSamplers::BilinearClamp);
-                }
+            // Cross-filter streaks fold in here rather than in a fullscreen
+            // pass of their own. That pass existed only to add a half-size
+            // buffer into bloomMip[0], which cost a full-resolution
+            // read-modify-write of the pyramid top every frame; this pass
+            // already samples that pyramid, so one more sampler replaces all
+            // of it.
+            //
+            // Added to bloom_term inside the shader rather than to the scene
+            // directly, which keeps two couplings that were previously free:
+            // the streaks stay scaled by bloom strength, and they keep
+            // lighting the lens dirt through lens_light.
+            static LLCachedControl<F32> streak_strength_setting(gSavedSettings, "RenderCrossFilterStrength", 0.f);
+            // Drawn this frame: generateBloomHDR hands back the sum only
+            // where it drew the arms.
+            const bool streaks_live = bloom && bloom->mStreaks;
+            const F32  streaks      = (streaks_live && !suppressesLensAndPrintEffects())
+                                    ? llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH) * strength_gate
+                                    : 0.f;
+            shader->uniform1f(LLShaderMgr::CROSS_STRENGTH, streaks);
+            if (streaks > 0.f)
+            {
+                cross_channel = shader->bindTexture(LLShaderMgr::CROSS_FILTER_MAP,
+                                                    bloom->mStreaks,
+                                                    ALSamplers::BilinearClamp);
             }
         }
 
@@ -9503,6 +9481,22 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
         return bloom;
     }
 
+    // The pyramid from the caller's scope, held until colorCorrect has composited mip 0. Each level is cleared and drawn
+    // whole below, whatever the pool's target held before.
+    for (U32 mip = 0; mip < mRT->bloomMipCount; ++mip)
+    {
+        bloom.mMips[mip] = acquireResource(scope, ALRenderResourcePlan::bloomMip(renderPack(), mip));
+        if (!bloom.mMips[mip])
+        {
+            break;
+        }
+        ++bloom.mMipCount;
+    }
+    if (bloom.mMipCount < 3)
+    {
+        return Bloom{};
+    }
+
     static LLCachedControl<F32> bloom_threshold(gSavedSettings, "RenderBloomThreshold", 1.0f);
     static LLCachedControl<F32> bloom_knee(gSavedSettings, "RenderBloomKnee", 0.5f);
     static LLCachedControl<F32> bloom_firefly_clamp(gSavedSettings, "RenderBloomFireflyClamp", 24.f);
@@ -9521,8 +9515,8 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
     // Extract pass: write thresholded bloom + halation into mip 0.
     {
         LLGLDisable blend(GL_BLEND);
-        mRT->bloomMip[0].bindTarget();
-        mRT->bloomMip[0].clear();
+        bloom.mMips[0]->bindTarget();
+        bloom.mMips[0]->clear();
 
         gBloomExtractProgram.bind();
         gBloomExtractProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, src);
@@ -9541,7 +9535,7 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-        mRT->bloomMip[0].flush();
+        bloom.mMips[0]->flush();
         gBloomExtractProgram.unbind();
     }
 
@@ -9552,14 +9546,14 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
     // averaged data where firefly energy has been amortized out.
     {
         LLGLDisable blend(GL_BLEND);
-        for (U32 i = 1; i < mRT->bloomMipCount; ++i)
+        for (U32 i = 1; i < bloom.mMipCount; ++i)
         {
             LLGLSLShader* shader = (i == 1) ? &gBloomDownsampleFirstProgram
                                             : &gBloomDownsampleProgram;
-            LLRenderTarget* srcMip = &mRT->bloomMip[i - 1];
+            LLRenderTarget* srcMip = bloom.mMips[i - 1];
 
-            mRT->bloomMip[i].bindTarget();
-            mRT->bloomMip[i].clear();
+            bloom.mMips[i]->bindTarget();
+            bloom.mMips[i]->clear();
 
             shader->bind();
             shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, srcMip, ALSamplers::BilinearMirror);
@@ -9570,7 +9564,7 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
             mScreenTriangleVB->setBuffer();
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-            mRT->bloomMip[i].flush();
+            bloom.mMips[i]->flush();
             shader->unbind();
         }
     }
@@ -9626,8 +9620,8 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
         // The first pass gets a proper box downsample for free: a half-res texel
         // centre lands exactly on the corner between two full-res texels, so the
         // bilinear fetch averages the 2x2 group rather than point-sampling it.
-        const U32 streak_w = llmax(1u, mRT->bloomMip[0].getWidth() / 2);
-        const U32 streak_h = llmax(1u, mRT->bloomMip[0].getHeight() / 2);
+        const U32 streak_w = llmax(1u, bloom.mMips[0]->getWidth() / 2);
+        const U32 streak_h = llmax(1u, bloom.mMips[0]->getHeight() / 2);
 
         // Three buffers, not two: each arm needs its own ping-pong chain, and
         // the arms have to accumulate somewhere that is neither the chain's
@@ -9688,7 +9682,7 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
                 gCrossFilterProgram.uniform2f(LLShaderMgr::CROSS_DIR, dir_x, dir_y);
 
                 // Pass 0 reads mip 0; passes 1 and 2 read the pass before.
-                LLRenderTarget* sources[3]      = { &mRT->bloomMip[0], scratch_a, scratch_b };
+                LLRenderTarget* sources[3]      = { bloom.mMips[0], scratch_a, scratch_b };
                 LLRenderTarget* destinations[3] = { scratch_a, scratch_b, sum };
                 const F32       scales[3]       = { 1.f, (F32)CROSS_FILTER_TAPS,
                                                     (F32)(CROSS_FILTER_TAPS * CROSS_FILTER_TAPS) };
@@ -9762,10 +9756,10 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
         gBloomUpsampleProgram.bind();
         gBloomUpsampleProgram.uniform1f(LLShaderMgr::BLOOM_SCATTER, llmax(bloom_scatter(), 0.0f));
 
-        for (S32 i = (S32)mRT->bloomMipCount - 1; i > 0; --i)
+        for (S32 i = (S32)bloom.mMipCount - 1; i > 0; --i)
         {
-            LLRenderTarget* srcMip = &mRT->bloomMip[i];
-            LLRenderTarget* dstMip = &mRT->bloomMip[i - 1];
+            LLRenderTarget* srcMip = bloom.mMips[i];
+            LLRenderTarget* dstMip = bloom.mMips[i - 1];
 
             dstMip->bindTarget();
 
@@ -9796,11 +9790,11 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
 // function has never had a caller anywhere in the tree; it is kept as a
 // standalone equivalent, but note it is no longer equivalent -- cross-filter
 // streaks are composited only in colorCorrectF, so this path would drop them.
-void LLPipeline::compositeBloomHDR(LLRenderTarget* scene)
+void LLPipeline::compositeBloomHDR(LLRenderTarget* scene, const Bloom& bloom)
 {
     LL_PROFILE_GPU_ZONE("bloom hdr composite");
 
-    if (mRT->bloomMipCount < 3 || !gBloomCompositeProgram.isComplete())
+    if (bloom.mMipCount < 3 || !gBloomCompositeProgram.isComplete())
     {
         return;
     }
@@ -9817,7 +9811,7 @@ void LLPipeline::compositeBloomHDR(LLRenderTarget* scene)
     scene->bindTarget();
 
     gBloomCompositeProgram.bind();
-    gBloomCompositeProgram.bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mRT->bloomMip[0], ALSamplers::BilinearMirror);
+    gBloomCompositeProgram.bindTexture(LLShaderMgr::BLOOM_SAMPLER, bloom.mMips[0], ALSamplers::BilinearMirror);
     gBloomCompositeProgram.uniform1f(LLShaderMgr::BLOOM_STRENGTH, llmax(bloom_strength(), 0.0f));
     gBloomCompositeProgram.uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f));
     const LLColor3& tint = halation_tint();

@@ -301,6 +301,11 @@ public:
     // What generateBloomHDR makes for colorCorrect to composite, each held by the scope it was given until that ends.
     struct Bloom
     {
+        // The HDR pyramid (RGB = bloom, A = halation intensity): mMips[0] the
+        // extract at its base, each level after it half the one before, and
+        // mMips[0] the bloom once the upsample is done. None where none was made.
+        std::array<LLRenderTarget*, ALRenderResourcePlan::BLOOM_MAX_MIPS> mMips{};
+        U32                                                         mMipCount = 0;
         // The cross-screen filter's arms summed, where they were drawn this frame.
         LLRenderTarget* mStreaks = nullptr;
     };
@@ -311,7 +316,7 @@ public:
     // enough and every shader it needs built.
     bool bloomHDRReady() const;
     Bloom generateBloomHDR(LLRenderTarget* src, ALTransientTargets& scope);
-    void compositeBloomHDR(LLRenderTarget* scene);
+    void compositeBloomHDR(LLRenderTarget* scene, const Bloom& bloom);
     void applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
     void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
     void generateSMAABuffers(LLRenderTarget* src);
@@ -1029,9 +1034,8 @@ public:
         //sun shadow map
         LLRenderTarget          shadow[4];
 
-        // HDR bloom pyramid (RGB = bloom, A = halation intensity).
-        // mBloomMip[0] is full-res extract; subsequent levels are halved.
-        LLRenderTarget              bloomMip[BLOOM_MAX_MIPS];
+        // How deep the HDR bloom pyramid generateBloomHDR acquires is: the
+        // levels the plan describes, from the first, that the pool can build.
         U32                         bloomMipCount = 0;
     };
 

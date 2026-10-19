@@ -438,7 +438,7 @@ bool ALRenderResourcePlan::isTransient(Id id)
     if (packOf(id))
     {
         const Slot slot = slotOf(id);
-        return slot == Slot::Light || slot == Slot::Water || slot == Slot::DepthCopy;
+        return slot == Slot::Light || slot == Slot::Water || slot == Slot::DepthCopy || slot >= Slot::Bloom0;
     }
     return false;
 }

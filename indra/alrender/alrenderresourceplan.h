@@ -211,7 +211,7 @@ public:
     static bool isTexture(Id id);
     /// Whether the passes that use it acquire it from the transient pool for as long as they need it, rather than the
     /// reconcile building it to keep: a target that lives for one phase of a frame, and holds nothing across frames. A
-    /// pack's light map is one, and the water's copies of the scene.
+    /// pack's light map is one, the water's copies of the scene, and the bloom pyramid.
     static bool isTransient(Id id);
     /// Whether only the GLTF material preview renders through it: the probe pack's post targets and bloom, which the
     /// probes' captures never read, and which are planned only while a preview is alive.
