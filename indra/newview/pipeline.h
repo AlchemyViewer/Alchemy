@@ -1218,9 +1218,13 @@ public:
     LLRenderTarget*                   mWaterDepthCopy  = nullptr;
 
     // The sky dome behind everything at half resolution: the sky pool draws it again here, with no depth, and the
-    // haze pass converges far water on it (hazeF.glsl). Holds the main view's sky for mSkyBehindFrame only.
-    LLRenderTarget              mSkyBehind;
-    U32                         mSkyBehindFrame = 0;
+    // haze pass converges far water on it (hazeF.glsl). The main view's alone, from the pool from the sky pool's draw
+    // (acquireSkyBehind) to the end of the deferred lighting its haze runs in (releaseSkyBehind): null outside that,
+    // and in a frame that has none to draw.
+    LLRenderTarget*             acquireSkyBehind();
+    void                        releaseSkyBehind();
+    ALTransientTargets          mSkyBehindTargets{ mTransientTargets };
+    LLRenderTarget*             mSkyBehind = nullptr;
     // Whether any water was in front of the sky's depth when the sky pool drew: the sky behind is drawn only then, and
     // the haze shades the water's pixels only then. An occlusion query of gGL's, asked in mSkyBehindQueryFrame.
     ALQueryTicket               mSkyBehindQuery;

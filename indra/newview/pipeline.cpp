@@ -934,7 +934,6 @@ LLRenderTarget* LLPipeline::resourceTarget(ALRenderResourcePlan::Id id)
     {
         case Id::SpotShadow0:       return &mSpotShadow[0];
         case Id::SpotShadow1:       return &mSpotShadow[1];
-        case Id::SkyBehind:         return &mSkyBehind;
         case Id::SSRScene:          return &mSceneMap;
         case Id::DownRes:           return &mDownResMap;
         case Id::Preview:           return &mPreviewMap;
@@ -1367,13 +1366,6 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources(const ALRenderResourc
         }
     }
 
-    const IdSet touched = changes.mBuilt | changes.mFreed;
-    if (touched.test((size_t)Id::SkyBehind))
-    {
-        mSkyBehindFrame      = 0;
-        mSkyBehindQuery      = {};
-        mSkyBehindQueryFrame = 0;
-    }
     // The reflections march through last frame's scene, which a new target does not hold.
     if (changes.mBuilt.test((size_t)Id::SSRScene))
     {
@@ -1574,6 +1566,7 @@ void LLPipeline::releaseAllGLResources()
 void LLPipeline::releaseRenderTargets()
 {
     using Plan = ALRenderResourcePlan;
+    releaseSkyBehind();
     mTransientTargets.clear();
     for (size_t i = 0; i < Plan::ID_COUNT; ++i)
     {
@@ -1594,7 +1587,6 @@ void LLPipeline::releaseRenderTargets()
         rt->bloomMipCount = 0;
     }
 
-    mSkyBehindFrame      = 0;
     mSkyBehindQuery      = {};
     mSkyBehindQueryFrame = 0;
     mLensFlareStateValid = false;
@@ -11521,6 +11513,22 @@ void LLPipeline::renderDeferredLighting()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("renderDeferredLighting");
+
+    // The main view's sky behind is this frame's: given back once the haze that reads it has run, however the lighting
+    // ends.
+    struct SkyBehindRelease
+    {
+        LLPipeline& mPipeline;
+        bool        mMainView;
+        ~SkyBehindRelease()
+        {
+            if (mMainView)
+            {
+                mPipeline.releaseSkyBehind();
+            }
+        }
+    } sky_behind_release{ *this, !gCubeSnapshot && !sImpostorRender && mRT == &mMainRT };
+
     if (!sCull)
     {
         return;
@@ -12127,10 +12135,25 @@ void LLPipeline::renderDeferredLighting()
     gGL.setColorMask(true, true);
 }
 
+LLRenderTarget* LLPipeline::acquireSkyBehind()
+{
+    // What a frame whose lighting never ran left held goes back first.
+    releaseSkyBehind();
+    mSkyBehind = acquireResource(mSkyBehindTargets, ALRenderResourcePlan::Id::SkyBehind);
+    return mSkyBehind;
+}
+
+void LLPipeline::releaseSkyBehind()
+{
+    mSkyBehind = nullptr;
+    mSkyBehindTargets.releaseAll();
+}
+
 bool LLPipeline::skyBehindWanted() const
 {
     // The haze pass converges only the water surface seen from above it (hazeF.glsl).
-    if (gCubeSnapshot || sImpostorRender || mRT != &mMainRT || !RenderDeferredAtmospheric || sUnderWaterRender || !mSkyBehind.isComplete())
+    if (gCubeSnapshot || sImpostorRender || mRT != &mMainRT || !RenderDeferredAtmospheric || sUnderWaterRender ||
+        !mResourcePlan.wants(ALRenderResourcePlan::Id::SkyBehind))
     {
         return false;
     }
@@ -12189,7 +12212,7 @@ void LLPipeline::doAtmospherics()
 
             if (on_water)
             {
-                haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, &mSkyBehind, ALSamplers::BilinearClamp);
+                haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, mSkyBehind, ALSamplers::BilinearClamp);
             }
 
             // full screen blit
@@ -12207,7 +12230,7 @@ void LLPipeline::doAtmospherics()
         // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit). The water
         // marked its own pixels in the stencil, so the two draws shade each pixel once. The water's draw runs only if
         // the sky pool's query saw water: its field covers every pixel the water marked, and inland none is.
-        const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind.isComplete() && mSkyBehindFrame == gFrameCount;
+        const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind;
         if (sky_behind)
         {
             {
