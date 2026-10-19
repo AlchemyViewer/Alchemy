@@ -1215,7 +1215,8 @@ void LLRenderTarget::copyFromBound(S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S
 
 bool LLRenderTarget::isComplete() const
 {
-    return !mTex.empty() || mDepth;
+    // A sharer with no colour of its own renders into its owner's depth.
+    return !mTex.empty() || mDepth || sharesDepth();
 }
 
 void LLRenderTarget::getViewport(S32* viewport)

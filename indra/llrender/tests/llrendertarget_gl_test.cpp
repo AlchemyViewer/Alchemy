@@ -885,6 +885,8 @@ namespace
         const ALRenderTargetDesc depth_only{ .width = GBUFFER.width, .height = GBUFFER.height };
         CHECK(mSharer.ensure(depth_only, mOwner) == EnsureResult::Built);
         CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == mOwner.getDepth());
+        UNSCOPED_INFO("its owner's depth is what it renders into");
+        CHECK(mSharer.isComplete());
         CHECK(mSharer.ensure(depth_only, mOwner) == EnsureResult::Kept);
         CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
