@@ -936,9 +936,6 @@ LLRenderTarget* LLPipeline::resourceTarget(ALRenderResourcePlan::Id id)
         case Id::SpotShadow1:       return &mSpotShadow[1];
         case Id::SkyBehind:         return &mSkyBehind;
         case Id::SSRScene:          return &mSceneMap;
-        case Id::Glow0:             return &mGlow[0];
-        case Id::Glow1:             return &mGlow[1];
-        case Id::Glow2:             return &mGlow[2];
         case Id::DownRes:           return &mDownResMap;
         case Id::Preview:           return &mPreviewMap;
         case Id::Bake:              return &mBakeMap;
@@ -9348,13 +9345,28 @@ void LLPipeline::copySceneDepth(LLRenderTarget& dst)
     dst.flush();
 }
 
-void LLPipeline::generateGlow(LLRenderTarget* src)
+LLRenderTarget* LLPipeline::generateGlow(LLRenderTarget* src, ALTransientTargets& scope)
 {
     LL_PROFILE_GPU_ZONE("glow generate");
-    if (sRenderGlow)
+
+    // The glow from the caller's scope, until combineGlow has added it; the extract and the blur's other buffer for the
+    // blur alone. Each is cleared before it is drawn.
+    LLRenderTarget* glow = acquireResource(scope, ALRenderResourcePlan::Id::Glow1);
+    if (!glow)
     {
-        mGlow[2].bindTarget();
-        mGlow[2].clear();
+        return nullptr;
+    }
+    ALTransientTargets blur(mTransientTargets);
+    LLRenderTarget*    extract = sRenderGlow ? acquireResource(blur, ALRenderResourcePlan::Id::Glow2) : nullptr;
+    LLRenderTarget*    other   = extract ? acquireResource(blur, ALRenderResourcePlan::Id::Glow0) : nullptr;
+    // The blur ping-pongs between the two, ending in the glow, as the iterations it runs are an even count.
+    LLRenderTarget* const buffers[2] = { other, glow };
+    const S32 kernel = RenderGlowIterations * 2;
+
+    if (other && kernel > 0)
+    {
+        extract->bindTarget();
+        extract->clear();
 
         gGlowExtractProgram.bind();
         F32 maxAlpha = RenderGlowMaxExtractAlpha;
@@ -9380,8 +9392,8 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
                                                     gGL.getSampler(ALSamplers::PointWrap));
             }
             gGlowExtractProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
-                                          (GLfloat)mGlow[2].getWidth(),
-                                          (GLfloat)mGlow[2].getHeight());
+                                          (GLfloat)extract->getWidth(),
+                                          (GLfloat)extract->getHeight());
         }
 
         {
@@ -9397,7 +9409,7 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
             mScreenTriangleVB->setBuffer();
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-            mGlow[2].flush();
+            extract->flush();
         }
 
         gGlowExtractProgram.unbind();
@@ -9406,7 +9418,6 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
         U32 glowResPow = (U32)mResourceInputs.mGlowResolutionPow;
         const U32 glow_res = llmax(1, llmin(1024, 1 << glowResPow));
 
-        S32 kernel = RenderGlowIterations * 2;
         F32 delta = RenderGlowWidth / glow_res;
         // Use half the glow width if we have the res set to less than 9 so that it looks
         // almost the same in either case.
@@ -9421,16 +9432,16 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
 
         for (S32 i = 0; i < kernel; i++)
         {
-            mGlow[i % 2].bindTarget();
-            mGlow[i % 2].clear();
+            buffers[i % 2]->bindTarget();
+            buffers[i % 2]->clear();
 
             if (i == 0)
             {
-                gGlowProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mGlow[2]);
+                gGlowProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, extract);
             }
             else
             {
-                gGlowProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mGlow[(i - 1) % 2]);
+                gGlowProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, buffers[(i - 1) % 2]);
             }
 
             if (i % 2 == 0)
@@ -9445,18 +9456,19 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
             mScreenTriangleVB->setBuffer();
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-            mGlow[i % 2].flush();
+            buffers[i % 2]->flush();
         }
 
         gGlowProgram.unbind();
 
     }
-    else // !sRenderGlow, skip the glow ping-pong and just clear the result target
+    else // no glow, or no blur to run: skip the glow ping-pong and just clear the result target
     {
-        mGlow[1].bindTarget();
-        mGlow[1].clear();
-        mGlow[1].flush();
+        glow->bindTarget();
+        glow->clear();
+        glow->flush();
     }
+    return glow;
 }
 
 // HDR bloom pyramid: threshold-extract into mBloomMip[0], downsample down the
@@ -10161,7 +10173,7 @@ void LLPipeline::copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst)
     dst->flush();
 }
 
-void LLPipeline::combineGlow(LLRenderTarget* src, LLRenderTarget* dst)
+void LLPipeline::combineGlow(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* glow)
 {
     LL_PROFILE_GPU_ZONE("glow combine");
 
@@ -10173,7 +10185,7 @@ void LLPipeline::combineGlow(LLRenderTarget* src, LLRenderTarget* dst)
         gGlowCombineProgram.bind();
 
         gGlowCombineProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src);
-        gGlowCombineProgram.bindTexture(LLShaderMgr::DEFERRED_EMISSIVE, &mGlow[1]);
+        gGlowCombineProgram.bindTexture(LLShaderMgr::DEFERRED_EMISSIVE, glow);
 
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -10669,10 +10681,7 @@ void LLPipeline::renderFinalize()
 
     // Legacy glow for non-HDR path.  In the HDR path, glow is extracted as part of the
     // bloom process and composited back in after tonemapping.
-    if (!hdr && !cutout && chain)
-    {
-        generateGlow(post_ping);
-    }
+    LLRenderTarget* glow = !hdr && !cutout && chain ? generateGlow(post_ping, post) : nullptr;
 
     LLRenderTarget* sourceBuffer = chain ? post_ping : &mRT->screen;
     LLRenderTarget* targetBuffer = post_pong;
@@ -10699,9 +10708,9 @@ void LLPipeline::renderFinalize()
         std::swap(sourceBuffer, targetBuffer);
     }
 
-    if (!hdr && !cutout && chain)
+    if (glow)
     {
-        combineGlow(sourceBuffer, targetBuffer);
+        combineGlow(sourceBuffer, targetBuffer, glow);
         std::swap(sourceBuffer, targetBuffer);
     }
 

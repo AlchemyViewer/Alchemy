@@ -581,8 +581,10 @@ bool LLGLTFPreviewTexture::render()
 
     if (!hdr)
     {
-        gPipeline.generateGlow(&gPipeline.mRT->postPingMap);
-        gPipeline.combineGlow(&gPipeline.mRT->postPingMap, &screen);
+        if (LLRenderTarget* glow = gPipeline.generateGlow(&gPipeline.mRT->postPingMap, post))
+        {
+            gPipeline.combineGlow(&gPipeline.mRT->postPingMap, &screen, glow);
+        }
     }
 
     // *HACK: Restore mExposureMap (it will be consumed by generateExposure next frame)

@@ -311,7 +311,9 @@ public:
     };
     void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade,
                       const Bloom* bloom = nullptr);
-    void generateGlow(LLRenderTarget* src);
+    // The legacy glow extracted from @a src and blurred, held by @a scope until combineGlow has added it; null where
+    // none could be had.
+    LLRenderTarget* generateGlow(LLRenderTarget* src, ALTransientTargets& scope);
     // Whether generateBloomHDR will run this frame: the pyramid is deep
     // enough and every shader it needs built.
     bool bloomHDRReady() const;
@@ -333,7 +335,7 @@ public:
     // buffers nor swap afterwards.
     void renderDoF();
     void copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst);
-    void combineGlow(LLRenderTarget* src, LLRenderTarget* dst);
+    void combineGlow(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* glow);
     void visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex);
 
     /// Take a point-sampled copy of the presented frame for the scopes floater
@@ -1243,8 +1245,6 @@ public:
 
     static constexpr U32 MAX_PREVIEW_WIDTH = ALRenderResourcePlan::PREVIEW_SIZE;
 
-    //texture for making the glow
-    LLRenderTarget              mGlow[3];
 
     //noise map
     U32                 mNoiseMap;

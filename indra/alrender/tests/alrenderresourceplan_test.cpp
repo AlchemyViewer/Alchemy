@@ -915,7 +915,8 @@ namespace
     {
         const IdSet transient = in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::Light, Slot::Water, Slot::DepthCopy }) |
                                 in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong }) |
-                                bloom({ Pack::Main, Pack::Probe, Pack::Hero }) | of({ Id::SMAAEdges, Id::SMAABlend });
+                                bloom({ Pack::Main, Pack::Probe, Pack::Hero }) |
+                                of({ Id::SMAAEdges, Id::SMAABlend, Id::Glow0, Id::Glow1, Id::Glow2 });
         CHECK(names(Plan::idsWhere(Plan::isTransient)) == names(transient));
 
         // What holds anything across frames, or between the phases of one, is built to keep.
