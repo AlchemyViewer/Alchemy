@@ -1,7 +1,8 @@
 /**
  * @file alwatertargets_bench.cpp
  * @brief What the water's copies of the scene cost the GPU at 2560x1440: the scene's depth copied for a haze pass
- *        against read where it is, and the copy of the screen whole against over the field's screen rectangle.
+ *        against read where it is, the copy of the screen whole against over the field's screen rectangle, and that
+ *        copy in RGBA16F over the scene's depth, as it was, against the plan's own, written and read.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -91,6 +92,21 @@ namespace
             "    frag_color = vec4(vec3(1.0 - fog) * 0.25, fog);\n"
             "}\n";
 
+        // The water's read of the copy of the screen: its own pixel moved by a ripple of up to 3% of the screen, as
+        // waterF.glsl moves it by the default scale above the water.
+        const char* kRefractionFragment =
+            "#version 400\n"
+            "uniform sampler2D screenTex;\n"
+            "uniform vec2 screen_res;\n"
+            "out vec4 frag_color;\n"
+            "void main()\n"
+            "{\n"
+            "    vec2 tc = gl_FragCoord.xy / screen_res;\n"
+            "    vec2 ripple = vec2(sin(gl_FragCoord.y * 0.05), cos(gl_FragCoord.x * 0.05)) * 0.03;\n"
+            "    vec4 fb = texture(screenTex, clamp(tc + ripple, vec2(0.0), vec2(0.999)));\n"
+            "    frag_color = vec4(fb.rgb * 0.9, 0.0);\n"
+            "}\n";
+
         ALRenderResourceInputs defaults()
         {
             ALRenderResourceInputs in;
@@ -116,13 +132,14 @@ namespace
             LLGLSLShader::unbind();
             mCopyDepth.unload();
             mHaze.unload();
+            mRefraction.unload();
             mShaders.clearShaderObjects();
             if (mQuery)
             {
                 glDeleteQueries(1, &mQuery);
             }
             mTriangle = nullptr;
-            for (LLRenderTarget* target : { &mWater, &mDepthCopy, &mScreen, &mGBuffer })
+            for (LLRenderTarget* target : { &mWaterWide, &mWater, &mDepthCopy, &mScreen, &mOut, &mGBuffer })
             {
                 target->release();
             }
@@ -176,6 +193,7 @@ namespace
             REQUIRE(mCopyDepth.createShader());
 
             build(mHaze, "haze (bench)", kFarTriangleVertex, kHazeFragment);
+            build(mRefraction, "refraction (bench)", kFarTriangleVertex, kRefractionFragment);
 
             mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
             REQUIRE(mTriangle->allocateBuffer(3, 0));
@@ -186,11 +204,19 @@ namespace
             vert[2].set(3.f, 1.f, 0.f);
             mTriangle->unmapBuffer();
 
-            // The plan's targets: the G-buffer, the screen over its depth, and the water's two copies.
+            // The plan's targets: the G-buffer, the screen over its depth and the water's two copies; and beside them
+            // the copy of the screen as it was, the screen's format over the scene's depth.
             REQUIRE(mGBuffer.ensure(*mPlan.desc(Id::MainGBuffer)) != LLRenderTarget::EnsureResult::Failed);
             REQUIRE(mScreen.ensure(*mPlan.desc(Id::MainScreen), mGBuffer) != LLRenderTarget::EnsureResult::Failed);
             REQUIRE(mDepthCopy.ensure(*mPlan.desc(Id::MainDepthCopy)) != LLRenderTarget::EnsureResult::Failed);
-            REQUIRE(mWater.ensure(*mPlan.desc(Id::MainWater), mGBuffer) != LLRenderTarget::EnsureResult::Failed);
+            const Plan::Resource& water = mPlan[Id::MainWater];
+            REQUIRE((water.mDepthFrom ? mWater.ensure(*water.mDesc, mGBuffer) : mWater.ensure(*water.mDesc)) !=
+                    LLRenderTarget::EnsureResult::Failed);
+            const ALRenderTargetDesc wide{ .width = (U32)mScreen.getWidth(), .height = (U32)mScreen.getHeight(), .color = { GL_RGBA16F } };
+            REQUIRE(mWaterWide.ensure(wide, mGBuffer) != LLRenderTarget::EnsureResult::Failed);
+            // Where the water draws, in the water copy's own colour: a target the refraction reads do not feed back into.
+            ALRenderTargetDesc out = *mPlan.desc(Id::MainScreen);
+            REQUIRE(mOut.ensure(out) != LLRenderTarget::EnsureResult::Failed);
 
             mWidth  = (S32)mScreen.getWidth();
             mHeight = (S32)mScreen.getHeight();
@@ -306,6 +332,24 @@ namespace
                              rect.mTop, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
 
+        // The water's reads of the copy, over the whole of a target of the screen's size.
+        void refract(LLRenderTarget& copy)
+        {
+            mOut.bindTarget();
+            {
+                LLGLDisable no_blend(GL_BLEND);
+                LLGLDepthTest no_depth(GL_FALSE);
+                LLGLDisable no_cull(GL_CULL_FACE);
+                mRefraction.bind();
+                mRefraction.bindTexture(LLShaderMgr::WATER_SCREENTEX, &copy);
+                mRefraction.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)mWidth, (F32)mHeight);
+                gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
+                mRefraction.unbindTexture(LLShaderMgr::WATER_SCREENTEX);
+                mRefraction.unbind();
+            }
+            mOut.flush();
+        }
+
         // The field's screen rectangle from a camera 20 m above the sea, `pitch` radians below level, with the margin
         // the default scale above the water (0.03) asks for.
         LLRect fieldRect(F32 pitch)
@@ -329,11 +373,14 @@ namespace
         Plan                      mPlan;
         LLGLSLShader              mCopyDepth;
         LLGLSLShader              mHaze;
+        LLGLSLShader              mRefraction;
         LLPointer<LLVertexBuffer> mTriangle;
         LLRenderTarget            mGBuffer;
         LLRenderTarget            mScreen;
         LLRenderTarget            mDepthCopy;
         LLRenderTarget            mWater;
+        LLRenderTarget            mWaterWide;
+        LLRenderTarget            mOut;
         S32                       mWidth  = 0;
         S32                       mHeight = 0;
         GLuint                    mQuery  = 0;
@@ -363,5 +410,21 @@ namespace
         report("the copy of the screen, whole", time([&]() { copyScreen(mWater, whole); }));
         report("the copy of the screen over the field, looking level", time([&]() { copyScreen(mWater, level); }));
         report("the copy of the screen over the field, 20 degrees down", time([&]() { copyScreen(mWater, down); }));
+    }
+
+    TEST_CASE_METHOD(alwatertargets_bench_data, "alwatertargets_bench: the water's copy of the screen as it was or as the plan has it", "[alwatertargets_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        setUp();
+        const LLRect whole(0, mHeight, mWidth, 0);
+        const LLRect level = fieldRect(0.f);
+        WARN("the plan's copy: colour format " << std::hex << mPlan.desc(Id::MainWater)->color[0] << std::dec
+                                               << (mPlan[Id::MainWater].mDepthFrom ? ", over the scene's depth" : ", no depth"));
+        report("RGBA16F over the scene's depth, the copy whole", time([&]() { copyScreen(mWaterWide, whole); }));
+        report("the plan's, the copy whole", time([&]() { copyScreen(mWater, whole); }));
+        report("RGBA16F over the scene's depth, the copy over the field, looking level", time([&]() { copyScreen(mWaterWide, level); }));
+        report("the plan's, the copy over the field, looking level", time([&]() { copyScreen(mWater, level); }));
+        report("RGBA16F over the scene's depth, the water's reads over the whole screen", time([&]() { refract(mWaterWide); }));
+        report("the plan's, the water's reads over the whole screen", time([&]() { refract(mWater); }));
     }
 }

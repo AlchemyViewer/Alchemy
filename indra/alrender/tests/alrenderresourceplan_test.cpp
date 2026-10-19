@@ -774,19 +774,33 @@ namespace
             REQUIRE(depth.mDesc);
             CHECK(water.mDesc->width == gbuffer.mDesc->width);
             CHECK(water.mDesc->height == gbuffer.mDesc->height);
-            CHECK(water.mDepthFrom == Plan::inPack(pack, Slot::GBuffer));
             CHECK(depth.mDesc->width == gbuffer.mDesc->width);
             CHECK(depth.mDesc->depth == gbuffer.mDesc->depth);
             CHECK(depth.mDesc->colorCount() == 0);
             CHECK_FALSE(depth.mDesc->stencil);
-            UNSCOPED_INFO("the light map's description, so the pool hands the two one target");
-            if (plan.wants(Plan::inPack(pack, Slot::Light)))
-            {
-                CHECK(plan[Plan::inPack(pack, Slot::Light)] == water);
-            }
+            UNSCOPED_INFO("the colour alone, with no depth: a blit's destination, its alpha read by nothing");
+            CHECK(water.mDesc->colorCount() == 1);
+            CHECK(water.mDesc->color[0] == (U32)GL_R11F_G11F_B10F);
+            CHECK(water.mDesc->depth == Depth::None);
+            CHECK(!water.mDepthFrom);
         }
         CHECK(plan.desc(Id::ProbeWater)->width == in.mProbeResolution * 2);
         CHECK(plan.desc(Id::HeroWater)->width == 512);
+    }
+
+    // The water's copy of the screen takes another pass's target: bloom level 0's under HDR, at full scale without
+    // halation, and the post chain's without HDR, both drawn after the water's pass.
+    TEST_CASE("alrenderresourceplan: the water's copy of the screen is a later pass's description", "[alrenderresourceplan]")
+    {
+        const Plan hdr = Plan::make(defaults());
+        CHECK(hdr[Id::MainWater] == hdr[Plan::bloomMip(Pack::Main, 0)]);
+
+        Inputs ldr          = defaults();
+        ldr.mHDR            = false;
+        ldr.mGBufferNormHDR = false;
+        const Plan plain    = Plan::make(ldr);
+        CHECK(plain.desc(Id::MainWater)->color[0] == (U32)GL_RGBA8);
+        CHECK(plain[Id::MainWater] == plain[Id::MainPostPing]);
     }
 
     TEST_CASE("alrenderresourceplan: a capture pack has a light map exactly when shadows are on", "[alrenderresourceplan]")
@@ -991,7 +1005,7 @@ namespace
         U64 mOneEach    = 0; ///< the same resources, each a target of its own
         U32 mTargets    = 0;
         U32 mLastMisses = 0; ///< acquisitions the last frame had to build for
-        bool mLightIsWater     = false;
+        bool mWaterIsBloom     = false;
         bool mSkyBehindIsBloom = false;
         bool mSharpIsLight     = false; ///< depth of field's sharp copy took a target the lighting used
     };
@@ -1062,19 +1076,21 @@ namespace
                 sharp = dof == DoF::WithSharpCopy ? acquire(effect, Id::DoFSharp) : nullptr;
                 acquire(effect, in.mHDR ? Plan::bloomMip(Pack::Main, 0) : Id::MainPostPong, "dof.blur");
             }
+            LLRenderTarget* bloom0 = nullptr;
             LLRenderTarget* bloom1 = nullptr;
             {
                 ALTransientTargets post(pool);
                 for (U32 mip = 0; mip < Plan::BLOOM_MAX_MIPS && plan.wants(Plan::bloomMip(Pack::Main, mip)); ++mip)
                 {
                     LLRenderTarget* level = acquire(post, Plan::bloomMip(Pack::Main, mip));
+                    bloom0 = mip == 0 ? level : bloom0;
                     bloom1 = mip == 1 ? level : bloom1;
                 }
                 acquire(post, Id::MainPostPing);
                 acquire(post, Id::MainPostPong);
             }
 
-            set.mLightIsWater     = light && light == water;
+            set.mWaterIsBloom     = water && water == bloom0;
             set.mSkyBehindIsBloom = sky_behind && sky_behind == bloom1;
             set.mSharpIsLight     = sharp && (sharp == light || sharp == scratch);
             set.mLastMisses       = pool.stats().mMisses;
@@ -1106,27 +1122,27 @@ namespace
         CHECK(set.mPersistent == 36 * PIXELS);
 
         UNSCOPED_INFO("exact-description reuse finds the plan's two matches by itself");
-        CHECK(set.mLightIsWater);
+        CHECK(set.mWaterIsBloom);
         CHECK(set.mSkyBehindIsBloom);
         UNSCOPED_INFO("a frame finds what it needs where the last one left it");
         CHECK(set.mLastMisses == 0);
 
-        // The light map's description twice over (the light map and SSAO's scratch through the lighting, then the
-        // water's copy), the depth copy, bloom mip 0 and mips 2 to 4, mip 1 with the sky behind, and the post chain's
-        // two: 16 + 4 + 4 + 1 + 0.33 + 8 B/px.
+        // The light map's description twice over (the light map and SSAO's scratch through the lighting), the depth
+        // copy, bloom mip 0 with the water's copy and mips 2 to 4, mip 1 with the sky behind, and the post chain's two:
+        // 16 + 4 + 4 + 1 + 0.33 + 8 B/px.
         CHECK(set.mTargets == 10);
         CHECK(set.mPooled == 122860800);
-        // Each its own target, as each was: 70.3 B/px, 247.3 MiB.
-        CHECK(set.mOneEach == 259257600);
+        // Each its own target: 66.3 B/px, 233.2 MiB.
+        CHECK(set.mOneEach == 244512000);
         CHECK(set.mPersistent + set.mPooled == 255571200); // 243.7 MiB
 
         // Without SSAO the lighting needs one target of the light map's description, not two.
         Inputs no_ssao = defaults();
         no_ssao.mSSAO  = false;
         const WorkingSet without = main_view_frame(no_ssao);
-        CHECK(without.mLightIsWater);
+        CHECK(without.mWaterIsBloom);
         CHECK(without.mSkyBehindIsBloom);
-        CHECK(without.mOneEach == 259257600);
+        CHECK(without.mOneEach == 244512000);
         CHECK(without.mPersistent + without.mPooled == 226080000); // 215.6 MiB
     }
 

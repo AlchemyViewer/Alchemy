@@ -145,14 +145,15 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
 
         // The scene as it stood before the water, which the water reads under its surface: the screen's colour,
         // copied where the water is transparent over the part of the screen the surface can read it at, and the
-        // scene's depth, whole, which the surface writes over while it reads it. The colour is a blit's destination,
-        // so the depth attached to it is never read or written. It takes the scene's, which makes it the light map's
-        // description: the pool hands the two one target, the light map's lighting over before the water's pass
-        // begins.
+        // scene's depth, whole, which the surface writes over while it reads it. The colour is a blit's destination
+        // and nothing reads its alpha (waterF.glsl and underWaterF.glsl take the colour alone), so under HDR it is
+        // R11F_G11F_B10F, half the screen's bandwidth, and with no depth of its own or the scene's: bloom level 0's
+        // description at full scale without halation, whose target the pool hands it, bloom's pass coming after the
+        // water's. Without HDR 8 bits, the post chain's description.
         if (shape.water)
         {
-            plan.at(inPack(pack, Slot::Water)) = {
-                ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .color = { screen_format } }, gbuffer
+            plan.at(inPack(pack, Slot::Water)).mDesc = ALRenderTargetDesc{
+                .width = shape.width, .height = shape.height, .color = { hdr ? (U32)GL_R11F_G11F_B10F : screen_format }
             };
             plan.at(inPack(pack, Slot::DepthCopy)).mDesc =
                 ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .depth = main_depth };
