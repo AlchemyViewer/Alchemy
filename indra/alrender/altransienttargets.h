@@ -49,10 +49,13 @@ public:
 
     /// A target that is what `desc` describes, held until the scope ends; null where none can be built. `name` is what
     /// debuggers call it. A target the pool has to build for it leaves texture unit 0 unbound, so a pass acquires what
-    /// it needs before it binds.
-    LLRenderTarget* acquire(const ALRenderTargetDesc& desc, std::string_view name);
+    /// it needs before it binds. The pool keeps it through `trim_frames` whole frames unacquired after
+    /// (ALTransientTargetPool::acquire).
+    LLRenderTarget* acquire(const ALRenderTargetDesc& desc, std::string_view name,
+                            U32 trim_frames = ALTransientTargetPool::TRIM_FRAMES);
     /// The same with `depth_from`'s depth attached, `desc` describing the colour alone at depth_from's size.
-    LLRenderTarget* acquire(const ALRenderTargetDesc& desc, const LLRenderTarget& depth_from, std::string_view name);
+    LLRenderTarget* acquire(const ALRenderTargetDesc& desc, const LLRenderTarget& depth_from, std::string_view name,
+                            U32 trim_frames = ALTransientTargetPool::TRIM_FRAMES);
 
     /// Give `target` back before the scope ends. False, and counted by the pool as a bad release, for a target this
     /// scope does not hold, null included.

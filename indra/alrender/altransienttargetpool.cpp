@@ -33,6 +33,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <iterator>
 
 namespace
@@ -144,19 +145,19 @@ ALTransientTargetPool::~ALTransientTargetPool()
     }
 }
 
-LLRenderTarget* ALTransientTargetPool::acquire(const ALRenderTargetDesc& desc, std::string_view name)
+LLRenderTarget* ALTransientTargetPool::acquire(const ALRenderTargetDesc& desc, std::string_view name, U32 trim_frames)
 {
-    return acquire(Key{ .mDesc = desc }, name);
+    return acquire(Key{ .mDesc = desc }, name, trim_frames);
 }
 
 LLRenderTarget* ALTransientTargetPool::acquire(const ALRenderTargetDesc& desc, const LLRenderTarget& depth_from,
-                                               std::string_view name)
+                                               std::string_view name, U32 trim_frames)
 {
     return acquire(Key{ .mDesc = desc, .mDepthFrom = &depth_from, .mDepthSerial = mBacking.depthSerial(depth_from) },
-                   name);
+                   name, trim_frames);
 }
 
-LLRenderTarget* ALTransientTargetPool::acquire(const Key& key, std::string_view name)
+LLRenderTarget* ALTransientTargetPool::acquire(const Key& key, std::string_view name, U32 trim_frames)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
 
@@ -206,9 +207,10 @@ LLRenderTarget* ALTransientTargetPool::acquire(const Key& key, std::string_view 
         mEntries.push_back(std::move(entry));
     }
 
-    match->mHeld     = true;
-    match->mLastUsed = mFrame;
-    match->mLease    = ++mLeases;
+    match->mHeld       = true;
+    match->mLastUsed   = mFrame;
+    match->mLease      = ++mLeases;
+    match->mTrimFrames = std::max(match->mTrimFrames, trim_frames);
     if (mRecording)
     {
         if (!match->mServed.empty())
@@ -288,15 +290,15 @@ void ALTransientTargetPool::beginFrame()
     mThisFrame = {};
     ++mFrame;
 
-    // Freed once TRIM_FRAMES whole frames have gone by since the one it was last used in. While trimming is held, every
-    // target counts as used in this one.
+    // Freed once as many whole frames as it is kept through have gone by since the one it was last used in. While
+    // trimming is held, every target counts as used in this one.
     for (const std::unique_ptr<Entry>& entry : mEntries)
     {
         if (mTrimHeld)
         {
             entry->mLastUsed = mFrame;
         }
-        entry->mFree = entry->mFree || mFrame - entry->mLastUsed > TRIM_FRAMES;
+        entry->mFree = entry->mFree || mFrame - entry->mLastUsed > entry->mTrimFrames;
     }
     mThisFrame.mTrimmed = sweep();
 }

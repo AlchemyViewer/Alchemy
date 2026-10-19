@@ -46,14 +46,14 @@
 /// second's writes. A backend whose commands are not ordered so keeps a released target from reuse until the frame that
 /// last used it has retired.
 ///
-/// A target no one has acquired for TRIM_FRAMES frames is freed, and every target when the main view changes size,
-/// which sizes nearly all of them.
+/// A target no one has acquired for TRIM_FRAMES frames, or for as many as an acquisition of it asked, is freed, and
+/// every target when the main view changes size, which sizes nearly all of them.
 class ALTransientTargetPool
 {
 public:
-    /// How many whole frames a free target may go unacquired before it is freed: two seconds at 60 fps, which keeps a
-    /// target through a feature switched off and on again, or an effect that runs every few frames, without holding a
-    /// screen's worth of memory for long behind a feature left off.
+    /// How many whole frames a free target may go unacquired before it is freed, unless an acquisition of it asked for
+    /// more: two seconds at 60 fps, which keeps a target through a feature switched off and on again, or an effect that
+    /// runs every few frames, without holding a screen's worth of memory for long behind a feature left off.
     static constexpr U32 TRIM_FRAMES = 120;
 
     /// What a target's own attachments hold once it is released under validation: a colour no pass writes, and a depth
@@ -114,12 +114,15 @@ public:
     ALTransientTargetPool& operator=(const ALTransientTargetPool&) = delete;
 
     /// A target that is what `desc` describes, depth included, for the caller alone until it is released; null where
-    /// none can be built. `name` is what debuggers call it, and what describe() lists it under.
-    LLRenderTarget* acquire(const ALRenderTargetDesc& desc, std::string_view name);
+    /// none can be built. `name` is what debuggers call it, and what describe() lists it under. Released, it is kept
+    /// through as many whole frames unacquired as the most any acquisition of it asked (`trim_frames`), and never
+    /// fewer than TRIM_FRAMES: a user that draws seconds apart asks for more, to take it again without building it.
+    LLRenderTarget* acquire(const ALRenderTargetDesc& desc, std::string_view name, U32 trim_frames = TRIM_FRAMES);
     /// A target that is what `desc` describes with `depth_from`'s depth attached. `desc` has no depth of its own and is
     /// depth_from's size. depth_from outlives every target the pool holds against it: the pool is cleared, or its
     /// targets against a depth built again dropped (dropStaleDepth), before it goes.
-    LLRenderTarget* acquire(const ALRenderTargetDesc& desc, const LLRenderTarget& depth_from, std::string_view name);
+    LLRenderTarget* acquire(const ALRenderTargetDesc& desc, const LLRenderTarget& depth_from, std::string_view name,
+                            U32 trim_frames = TRIM_FRAMES);
     /// Give `target` back. One the pool holds and has not lent is a release of a target released already, and one it
     /// does not hold a release of what it never lent: either is refused, counted (badReleases) and reported.
     bool release(LLRenderTarget* target);
@@ -130,13 +133,14 @@ public:
     U64 lease(const LLRenderTarget* target) const;
 
     /// Start a frame. A target still acquired from the last one is a leak: reported, counted (leaks) and taken back.
-    /// Free targets no one has acquired for TRIM_FRAMES whole frames are freed, unless trimming is held. The frame's
-    /// counts start again, those of the frame that ended kept as lastFrame().
+    /// Free targets no one has acquired for as many whole frames as each is kept through are freed, unless trimming is
+    /// held. The frame's counts start again, those of the frame that ended kept as lastFrame().
     void beginFrame();
 
     /// While held, each frame begun counts as one every target was acquired in: none is freed for going unacquired, and
-    /// once the hold ends each is kept TRIM_FRAMES whole frames more. The viewer holds it until the user is logged in,
-    /// so that the frames of the login, which draw no world, keep what the reconcile readied for the world's first.
+    /// once the hold ends each is kept as many whole frames more as it is kept through. The viewer holds it until the
+    /// user is logged in, so that the frames of the login, which draw no world, keep what the reconcile readied for the
+    /// world's first.
     void holdTrimming(bool hold) { mTrimHeld = hold; }
 
     /// The main view's render size, which sizes nearly every target the pool holds: where it differs from the last,
@@ -185,7 +189,9 @@ private:
         U64            mBytes    = 0;
         U32            mLastUsed = 0;
         /// The acquisition it was last lent under.
-        U64            mLease    = 0;
+        U64            mLease      = 0;
+        /// How many whole frames it is kept through unacquired: the most any acquisition of it asked.
+        U32            mTrimFrames = TRIM_FRAMES;
         bool           mHeld     = false;
         /// Freed as it is released: a drop found it acquired.
         bool           mDoomed   = false;
@@ -200,7 +206,7 @@ private:
         std::string    mLastServed;
     };
 
-    LLRenderTarget* acquire(const Key& key, std::string_view name);
+    LLRenderTarget* acquire(const Key& key, std::string_view name, U32 trim_frames);
     Entry*          find(const LLRenderTarget* target);
     /// Free `entry` at the next sweep, or as it is released where it is acquired.
     void            drop(Entry& entry);

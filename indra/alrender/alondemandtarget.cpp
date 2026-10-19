@@ -27,8 +27,8 @@
 #include "alondemandtarget.h"
 
 ALOnDemandTarget::ALOnDemandTarget(ALTransientTargetPool& pool, const std::optional<ALRenderTargetDesc>& desc,
-                                   std::string_view name)
-: mScope(pool), mDesc(desc), mName(name)
+                                   std::string_view name, U32 trim_frames)
+: mScope(pool), mDesc(desc), mName(name), mTrimFrames(trim_frames)
 {
 }
 
@@ -39,7 +39,7 @@ LLRenderTarget* ALOnDemandTarget::bind()
         return mTarget;
     }
 
-    mTarget = mDesc ? mScope.acquire(*mDesc, mName) : nullptr;
+    mTarget = mDesc ? mScope.acquire(*mDesc, mName, mTrimFrames) : nullptr;
     if (!mTarget)
     {
         mDone = true;

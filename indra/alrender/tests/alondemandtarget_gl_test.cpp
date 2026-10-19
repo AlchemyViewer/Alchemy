@@ -1,8 +1,9 @@
 /**
  * @file alondemandtarget_gl_test.cpp
  * @brief An on-demand target on the hidden window: a run with nothing to draw takes, binds and clears nothing, a run
- *        that draws takes its target once, and the previews and the bakes draw through the plan's descriptions and
- *        copy out what they drew, as LLViewerDynamicTexture::updateAllInstances has them.
+ *        that draws takes its target once, the pool keeps it as long as the run asked, and the previews and the bakes
+ *        draw through the plan's descriptions and copy out what they drew, as LLViewerDynamicTexture::updateAllInstances
+ *        has them.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -308,6 +309,40 @@ namespace
         CHECK(items[3].mDrawn == 1u);
         CHECK(pool.stats().mTargets == 1u);
         CHECK(pool.badReleases() == 0u);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A preview drawn seconds apart, as updateAllInstances asks for its targets: the pool keeps the target through the
+    // frames the run asked for, and the next draw finds it without a build.
+    TEST_CASE_METHOD(on_demand_gl_data, "alondemandtarget_gl: the pool keeps a run's target as long as the run asked",
+                     "[alondemandtarget_gl]")
+    {
+        constexpr U32 KEEP = 300;
+        const auto run = [&]() -> LLRenderTarget*
+        {
+            ALOnDemandTarget target(pool, plan().desc(Id::Preview), "preview", KEEP);
+            return target.bind();
+        };
+
+        LLRenderTarget* first = run();
+        REQUIRE(first);
+        for (U32 frame = 1; frame <= KEEP; ++frame)
+        {
+            pool.beginFrame();
+        }
+        UNSCOPED_INFO("unused for 300 whole frames, past the pool's 120: still there, and the next run's");
+        CHECK(pool.stats().mTargets == 1u);
+        CHECK(run() == first);
+        CHECK(pool.stats().mMisses == 0u);
+        CHECK(pool.stats().mHits == 1u);
+
+        for (U32 frame = 0; frame <= KEEP; ++frame)
+        {
+            pool.beginFrame();
+        }
+        UNSCOPED_INFO("301 unused: freed");
+        CHECK(pool.stats().mTargets == 0u);
+        CHECK(pool.stats().mTrimmed == 1u);
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 

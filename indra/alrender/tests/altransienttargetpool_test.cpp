@@ -32,6 +32,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -279,6 +280,54 @@ namespace
         CHECK(backing.freed.back() == (used == a ? b : a));
         CHECK(pool.acquire(LIGHT, "main.light") == used);
         CHECK(pool.release(used));
+    }
+
+    TEST_CASE_METHOD(pool_data, "altransienttargetpool: an acquisition may keep its target unused for longer than 120 frames",
+                     "[altransienttargetpool]")
+    {
+        constexpr U32 KEEP = 300;
+
+        LLRenderTarget* kept = pool.acquire(LIGHT, "preview", KEEP);
+        CHECK(pool.release(kept));
+        LLRenderTarget* normal = pool.acquire(POST, "main.post.ping");
+        CHECK(pool.release(normal));
+        UNSCOPED_INFO("an ask under 120 frames keeps it 120");
+        LLRenderTarget* short_ask = pool.acquire(HALF, "short", 10);
+        CHECK(pool.release(short_ask));
+
+        for (U32 frame = 1; frame <= Pool::TRIM_FRAMES; ++frame)
+        {
+            pool.beginFrame();
+        }
+        CHECK(pool.stats().mTargets == 3);
+
+        UNSCOPED_INFO("121 frames unused: the two kept 120 go, the one kept 300 stays");
+        pool.beginFrame();
+        CHECK(pool.stats().mTrimmed == 2);
+        CHECK(pool.stats().mTargets == 1);
+        CHECK(std::find(backing.freed.begin(), backing.freed.end(), kept) == backing.freed.end());
+
+        for (U32 frame = Pool::TRIM_FRAMES + 2; frame <= KEEP; ++frame)
+        {
+            pool.beginFrame();
+        }
+        UNSCOPED_INFO("300 whole frames unused: still kept, and found without a build");
+        CHECK(pool.stats().mTargets == 1);
+        CHECK(backing.freed.size() == 2);
+        CHECK(pool.acquire(LIGHT, "preview") == kept);
+        CHECK(pool.release(kept));
+        CHECK(backing.builds.size() == 3);
+
+        UNSCOPED_INFO("taken again without asking: the most any acquisition of it asked still holds");
+        for (U32 frame = 1; frame <= KEEP; ++frame)
+        {
+            pool.beginFrame();
+        }
+        CHECK(pool.stats().mTargets == 1);
+        pool.beginFrame();
+        CHECK(pool.stats().mTargets == 0);
+        CHECK(pool.stats().mTrimmed == 1);
+        CHECK(backing.freed.back() == kept);
     }
 
     // The login's frames acquire nothing: held, the pool keeps what was readied through as many of them as there are,

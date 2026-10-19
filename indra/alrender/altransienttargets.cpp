@@ -28,15 +28,15 @@
 
 #include <algorithm>
 
-LLRenderTarget* ALTransientTargets::acquire(const ALRenderTargetDesc& desc, std::string_view name)
+LLRenderTarget* ALTransientTargets::acquire(const ALRenderTargetDesc& desc, std::string_view name, U32 trim_frames)
 {
-    return held(mPool.acquire(desc, name));
+    return held(mPool.acquire(desc, name, trim_frames));
 }
 
 LLRenderTarget* ALTransientTargets::acquire(const ALRenderTargetDesc& desc, const LLRenderTarget& depth_from,
-                                            std::string_view name)
+                                            std::string_view name, U32 trim_frames)
 {
-    return held(mPool.acquire(desc, depth_from, name));
+    return held(mPool.acquire(desc, depth_from, name, trim_frames));
 }
 
 bool ALTransientTargets::release(LLRenderTarget* target)

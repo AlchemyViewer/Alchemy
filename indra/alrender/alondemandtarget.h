@@ -38,8 +38,10 @@
 class ALOnDemandTarget
 {
 public:
-    /// A target of `desc` named `name`, which outlives the run; without a description, one that cannot be had.
-    ALOnDemandTarget(ALTransientTargetPool& pool, const std::optional<ALRenderTargetDesc>& desc, std::string_view name);
+    /// A target of `desc` named `name`, which outlives the run; without a description, one that cannot be had. The pool
+    /// keeps it through `trim_frames` whole frames unacquired after the run (ALTransientTargetPool::acquire).
+    ALOnDemandTarget(ALTransientTargetPool& pool, const std::optional<ALRenderTargetDesc>& desc, std::string_view name,
+                     U32 trim_frames = ALTransientTargetPool::TRIM_FRAMES);
     /// Ends the run.
     ~ALOnDemandTarget() { end(); }
 
@@ -79,6 +81,7 @@ private:
     ALTransientTargets                mScope;
     std::optional<ALRenderTargetDesc> mDesc;
     std::string_view                  mName;
+    U32                               mTrimFrames;
     LLRenderTarget*                   mTarget = nullptr;
     /// Acquiring failed, or the run ended.
     bool                              mDone = false;
