@@ -170,6 +170,16 @@ public:
     /*virtual*/ void        asLLSD(LLSD& sd) const;
 
     static void             calculateTexLayerColor(const param_color_list_t &param_list, LLColor4 &net_color);
+
+    // The scratch readBackAlpha takes for a rectangle (width, height), in bytes: the RGBA of the whole of
+    // bound_target's texture when from_texture, as glGetTexImage reads no less, else of the rectangle alone.
+    static size_t           alphaReadbackScratchBytes(const LLRenderTarget* bound_target, S32 width, S32 height, bool from_texture);
+    // Reads the alpha of the rectangle (x, y, width, height) of the bound target into alpha, width * height bytes with
+    // rows bottom to top, through scratch. from_texture reads bound_target's texture rather than the bound framebuffer.
+    // Reads nothing and answers GL_INVALID_VALUE when scratch_bytes is short of what the read writes; else
+    // GL_NO_ERROR, or what glGetError says after a read from the texture.
+    static GLenum           readBackAlpha(LLRenderTarget* bound_target, S32 x, S32 y, S32 width, S32 height, bool from_texture,
+                                          U8* scratch, size_t scratch_bytes, U8* alpha);
 protected:
     LLUUID                  getUUID() const;
     typedef std::map<U32, U8*> alpha_cache_t;
