@@ -986,6 +986,8 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterHextile", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterWaves", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderDisableCompute", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderShaderLightingMaxLevel", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReservedTextureIndices", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "OctreeStaticObjectSizeFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeDistanceFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeMaxNodeCapacity", handleRepartition);
