@@ -34,6 +34,7 @@
 #include "llglslshader.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 class LLShaderMgr
 {
@@ -790,6 +791,9 @@ public:
     // distinct key an axis copy was stored under (see loadShaderFile). The
     // manager owns them: unloading a program that attached one leaves it here.
     boost::unordered_flat_map<std::string, GLuint> mShaderObjects[STAGE_COUNT];
+    // The keys of the copies loadShaderFile compiled under a key of their own that did not build, per stage, until
+    // clearShaderObjects or the copy builds.
+    boost::unordered_flat_set<std::string> mFailedCopies[STAGE_COUNT];
 
     //global (reserved slot) shader parameters
     std::vector<std::string> mReservedAttribs;

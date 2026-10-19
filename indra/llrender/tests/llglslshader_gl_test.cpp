@@ -1125,6 +1125,51 @@ namespace
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
+    // A copy of a shared object compiled under a key of its own that does not build is attached by that key all the
+    // same, so a program wanting it fails rather than linking the base object in its place: only a copy never compiled
+    // falls back to the base, as a source that does not vary on the axis needs no second object. A copy that builds
+    // under the key later, or the objects cleared, forgets the failure.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a shared object's copy that does not build is not replaced by the base", "[llglslshader_gl]")
+    {
+        setUpShaders();
+        const std::string base = "test/brokenF.glsl";
+        const std::string copy = base + LLShaderMgr::CLASSIC_OBJECT_SUFFIX;
+        LLGLSLShader classic;
+        classic.addPermutation("CLASSIC_MODE", "1");
+        const auto key = [&]()
+        { return mShaders.variantObjectKey(base, LLShaderMgr::OBJ_AXIS_CLASSIC, &classic, GL_FRAGMENT_SHADER); };
+
+        UNSCOPED_INFO("no copy compiled: the base object");
+        CHECK(key() == base);
+
+        S32 level = 1;
+        std::map<std::string, std::string> defines{ { "CLASSIC_MODE", "1" } };
+        CHECK(mShaders.loadShaderFile(base, level, GL_FRAGMENT_SHADER, &defines, -1, copy) == 0);
+        while (glGetError() != GL_NO_ERROR)
+        {
+        }
+        UNSCOPED_INFO("a copy that did not build: its own key, which attaches nothing");
+        CHECK(key() == copy);
+        CHECK_FALSE(mShaders.mShaderObjects[LLShaderMgr::STAGE_FRAGMENT].contains(copy));
+
+        level = 1;
+        CHECK(mShaders.loadShaderFile("test/solidF.glsl", level, GL_FRAGMENT_SHADER, &defines, -1, copy) != 0);
+        UNSCOPED_INFO("a copy built under the key since");
+        CHECK(key() == copy);
+        CHECK(mShaders.mShaderObjects[LLShaderMgr::STAGE_FRAGMENT].contains(copy));
+
+        mShaders.clearShaderObjects();
+        level = 1;
+        CHECK(mShaders.loadShaderFile(base, level, GL_FRAGMENT_SHADER, &defines, -1, copy) == 0);
+        while (glGetError() != GL_NO_ERROR)
+        {
+        }
+        mShaders.clearShaderObjects();
+        UNSCOPED_INFO("cleared, the failure goes with the objects");
+        CHECK(key() == base);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
     // Ints and uints arrive exactly past 2^24: each set below differs from the one before only in values that
     // convert to the same float, and only in some of its components.
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: ints and uints arrive exactly past 2^24", "[llglslshader_gl]")

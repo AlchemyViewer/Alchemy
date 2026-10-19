@@ -87,13 +87,15 @@ std::string LLShaderMgr::variantObjectKey(const std::string& path, U32 axes, con
         return path;
     }
 
-    // No object under the variant key means the loader decided this source could not vary on
-    // the axis at the class level it resolved to -- deferred/reflectionProbeF.glsl reads
-    // CLASSIC_MODE at class3 and not at class2 -- so the base object already IS the right one
-    // and no second copy was compiled. Absence is always that decision and never a failure:
-    // loadBasicShaders aborts the whole load if a copy it did want fails to build.
-    const std::string key = path + suffix;
-    return mShaderObjects[stageIndex(stage)].contains(key) ? key : path;
+    // No object under the variant key means either that the loader decided this source could not
+    // vary on the axis at the class level it resolved to -- deferred/reflectionProbeF.glsl reads
+    // CLASSIC_MODE at class3 and not at class2 -- so the base object already IS the right one and
+    // no second copy was compiled, or that the copy it compiled did not build. A copy that did not
+    // build is attached by its own key all the same, which attaches nothing, so the programs
+    // wanting it fail rather than linking the base object in its place.
+    const std::string key   = path + suffix;
+    const S32         index = stageIndex(stage);
+    return mShaderObjects[index].contains(key) || mFailedCopies[index].contains(key) ? key : path;
 }
 
 // static
@@ -137,6 +139,10 @@ void LLShaderMgr::clearShaderObjects()
             deleteShaderObject(object.second);
         }
         objects.clear();
+    }
+    for (auto& failed : mFailedCopies)
+    {
+        failed.clear();
     }
 }
 
@@ -656,6 +662,16 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             deleteShaderObject(slot);
         }
         slot = object;
+        if (!cache_key.empty())
+        {
+            mFailedCopies[stageIndex(type)].erase(cache_key);
+        }
+    }
+    else if (!cache_key.empty())
+    {
+        // A copy under keys of its own that did not build: variantObjectKey attaches it by its key, which fails the
+        // programs that want it.
+        mFailedCopies[stageIndex(type)].insert(cache_key);
     }
     return object;
 }
