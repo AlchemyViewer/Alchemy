@@ -9558,6 +9558,18 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
         return bloom;
     }
 
+    // At zero strength nothing the pyramid holds reaches the frame: colorCorrect scales the
+    // bloom and the streaks by bloom strength and the halation by its own, which only the
+    // BLOOM_HALATION programs composite, and samples none of it while those are zero.
+    // Nothing else reads the pyramid, so none is taken from the pool.
+    static LLCachedControl<F32>  bloom_strength(gSavedSettings, "RenderBloomStrength", 0.325f);
+    static LLCachedControl<F32>  halation_strength(gSavedSettings, "RenderBloomHalationStrength", 0.0f);
+    static LLCachedControl<bool> halation_enabled(gSavedSettings, "RenderBloomHalation", false);
+    if (bloom_strength() <= 0.f && !(halation_enabled() && halation_strength() > 0.f))
+    {
+        return bloom;
+    }
+
     // The pyramid from the caller's scope, held until colorCorrect has composited mip 0. Each level is cleared and drawn
     // whole below, whatever the pool's target held before.
     for (U32 mip = 0; mip < mRT->bloomMipCount; ++mip)
@@ -9664,13 +9676,9 @@ LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientT
     static LLCachedControl<F32> cross_chromatic(gSavedSettings, "RenderCrossFilterChromatic", 0.f);
 
     // Streaks ride the bloom pyramid and are scaled by bloom strength where
-    // they are composited, so at strength 0 they are invisible -- and the whole
-    // twelve-draw chain was still running to produce them. Folding the bloom
-    // strength into the gate reuses the release path below rather than adding a
-    // second one.
-    static LLCachedControl<F32> bloom_strength_gate(gSavedSettings, "RenderBloomStrength", 0.325f);
-
-    const F32  streak_strength = (no_post || bloom_strength_gate() <= 0.f)
+    // they are composited, so at bloom strength 0 they are invisible even while
+    // halation keeps the pyramid running, and the twelve-draw chain is skipped.
+    const F32  streak_strength = (no_post || bloom_strength() <= 0.f)
                                ? 0.f
                                : llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH);
     const bool streaks_on      = (streak_strength > 0.f) && gCrossFilterProgram.isComplete();

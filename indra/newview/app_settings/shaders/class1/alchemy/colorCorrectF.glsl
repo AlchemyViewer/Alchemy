@@ -152,6 +152,13 @@ void main()
 #ifdef BLOOM_COMPOSITE
     // Additively composite the HDR bloom pyramid before exposure/tonemap so the
     // glow is rolled through the same exposure curve as the underlying scene.
+    // Nothing of the pyramid is read at zero strength, where generateBloomHDR
+    // builds none.
+#ifdef BLOOM_HALATION
+    if (bloom_strength > 0.0 || halation_strength > 0.0)
+#else
+    if (bloom_strength > 0.0)
+#endif
     {
         vec4 bloom_sample = texture(bloomMap, vary_fragcoord);
     #ifdef BLOOM_HALATION

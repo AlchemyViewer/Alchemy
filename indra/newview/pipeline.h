@@ -314,8 +314,8 @@ public:
     // The legacy glow extracted from @a src and blurred, held by @a scope until combineGlow has added it; null where
     // there is none to draw, glow being off or its blur running no iterations, or none could be had.
     LLRenderTarget* generateGlow(LLRenderTarget* src, ALTransientTargets& scope);
-    // Whether generateBloomHDR will run this frame: the pyramid is deep
-    // enough and every shader it needs built.
+    // Whether generateBloomHDR can run: the pyramid is deep enough and every
+    // shader it needs built. It makes none at zero bloom and halation strength.
     bool bloomHDRReady() const;
     Bloom generateBloomHDR(LLRenderTarget* src, ALTransientTargets& scope);
     void compositeBloomHDR(LLRenderTarget* scene, const Bloom& bloom);
