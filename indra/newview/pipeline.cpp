@@ -9682,8 +9682,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         // base, so all three fit as quadrants of one full-frame target, and
         // mWaterDis is that target: the water passes copy the scene into it
         // afresh each frame and read it back before post begins, so from here
-        // until the next frame it is idle -- depth of field borrowed it for
-        // its sharp copy a few passes ago and is finished with it. RGBA16F
+        // until the next frame it is idle. RGBA16F
         // under HDR, which is the only path with a pyramid. Sampling a
         // quadrant rather than a texture is the one thing the shader has to
         // know about, through uCrossRegion and uCrossClamp.
@@ -10294,41 +10293,21 @@ void LLPipeline::renderDoF()
         {
             LLGLDisable blend(GL_BLEND);
 
-            // Scratch is borrowed rather than owned. Both passes below run
-            // inside renderFinalize, where two of the frame's full-size
-            // targets are idle:
-            //
-            //   mWaterDis    the water passes copy the scene into it afresh
-            //                each frame and read it back before this point, so
-            //                it carries nothing across frames and nothing reads
-            //                it again until the next one. RGBA16F under HDR,
-            //                which is what the sharp copy plus signed CoF in
-            //                alpha wants; RGBA8 otherwise, the precision the
-            //                pre-linear DoF had from deferredLight.
-            //
-            //   bloomMip[0]  holds last frame's bloom, which generateLuminance
-            //                read at the top of renderFinalize and the extract
-            //                pass overwrites after this. The pyramid's own
-            //                R11F_G11F_B10F (RGBA16F with halation), and the
-            //                blur carries no alpha anyway. Only while the
-            //                extract is actually going to run: a blur left in
-            //                there otherwise would be composited as bloom.
-            //
-            // Without HDR there is no pyramid, so the blur goes to postPongMap
-            // (RGBA8, idle until the AA chain). Together this is what keeps DoF
-            // at zero full-frame targets of its own: two would be 44 MB at
-            // 1440p.
+            // Both from the pool, for the effect alone. The sharp copy, with its
+            // signed CoF in alpha, in the water's copy's description: the
+            // screen's format, RGBA16F under HDR for the linear scene. The blur
+            // in bloom mip 0's under HDR, R11F_G11F_B10F (RGBA16F with
+            // halation), and the post chain's without; it carries no alpha.
             const bool hdr = hdrEnabled();
 
-            LLRenderTarget* sharp = &mWaterDis;
-            LLRenderTarget* blur  = hdr ? (bloomHDRReady() ? &mRT->bloomMip[0] : nullptr)
-                                        : &mRT->postPongMap;
-
-            if (!blur || !blur->isComplete() || !sharp->isComplete())
+            ALTransientTargets dof(mTransientTargets);
+            LLRenderTarget*    sharp = acquireResource(dof, ALRenderResourcePlan::Id::WaterDistortion, "dof.sharp");
+            LLRenderTarget*    blur  = acquireResource(dof,
+                                                       hdr ? ALRenderResourcePlan::bloomMip(ALRenderResourcePlan::Pack::Main, 0)
+                                                           : ALRenderResourcePlan::Id::MainPostPong,
+                                                       "dof.blur");
+            if (!sharp || !blur)
             {
-                // Nothing safe to borrow this frame -- a bloom shader failed
-                // to build, or the targets are mid-reallocation. Skip the
-                // effect rather than draw into something another pass reads.
                 return;
             }
 
@@ -10465,8 +10444,8 @@ void LLPipeline::renderDoF()
             }
 
             // The blur runs at CameraDoFResScale of the screen, in a corner of
-            // the borrowed target. Under a reduced RenderBloomResolutionScale
-            // mip 0 is smaller than the screen, so the viewport is clamped to
+            // its target. Under a reduced RenderBloomResolutionScale mip 0's
+            // description is smaller than the screen, so the viewport is clamped to
             // what it can hold and the combine is told the fraction the blur
             // actually covers; the only effect of the clamp is a softer blur.
             const U32 dof_width  = llmax(1u, llmin((U32)(mRT->screen.getWidth() * CameraDoFResScale), blur->getWidth()));
@@ -10474,7 +10453,7 @@ void LLPipeline::renderDoF()
             const F32 res_scale  = llmin((F32)dof_width / (F32)mRT->screen.getWidth(),
                                          (F32)dof_height / (F32)mRT->screen.getHeight());
 
-            { // gather blur at CameraDoFResScale into the borrowed scratch
+            { // gather blur at CameraDoFResScale into its scratch
                 // Writes to a separate target rather than in place, so no
                 // colour mask is needed to preserve alpha: the CoF it reads
                 // lives in the sharp copy's alpha.
@@ -10613,11 +10592,11 @@ void LLPipeline::renderDoF()
                 // The fraction of the screen the blur covers, for the CoF
                 // arithmetic -- CameraDoFResScale unless the clamp above bit.
                 combine_program.uniform1f(LLShaderMgr::DOF_RES_SCALE, res_scale);
-                // Where the blur sits inside the borrowed texture: the scale
-                // that maps a screen coordinate onto it, and the extent it is
-                // clamped to. Both normalised against the target the blur
-                // actually rendered into, which is no longer screen-sized --
-                // mip 0 shrinks with RenderBloomResolutionScale.
+                // Where the blur sits inside its texture: the scale that maps a
+                // screen coordinate onto it, and the extent it is clamped to.
+                // Both normalised against the target the blur rendered into,
+                // which is not screen-sized where mip 0's description shrinks
+                // with RenderBloomResolutionScale.
                 combine_program.uniform2f(LLShaderMgr::DOF_UV_SCALE,
                                           (F32)dof_width / (F32)blur->getWidth(),
                                           (F32)dof_height / (F32)blur->getHeight());

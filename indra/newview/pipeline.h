@@ -301,9 +301,7 @@ public:
     void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade);
     void generateGlow(LLRenderTarget* src);
     // Whether generateBloomHDR will run this frame: the pyramid is deep
-    // enough and every shader it needs built. renderDoF asks before it
-    // borrows bloomMip[0], because a blur left in there would be composited
-    // as bloom if the extract never overwrote it.
+    // enough and every shader it needs built.
     bool bloomHDRReady() const;
     void generateBloomHDR(LLRenderTarget* src);
     void compositeBloomHDR(LLRenderTarget* scene);
@@ -1020,13 +1018,6 @@ public:
         // tonemapped and gamma corrected render ready for post
         LLRenderTarget          postPingMap;
         LLRenderTarget          postPongMap;
-
-        // Depth of field owns no scratch. It runs pre-tonemap on linear HDR,
-        // so it cannot use postPingMap (GL_RGB10_A2 under HDR), and it does
-        // not widen deferredLight to serve one late pass. It borrows two
-        // full-frame targets that are idle for exactly the stretch of
-        // renderFinalize it runs in: mWaterDis for the sharp copy plus CoF,
-        // bloomMip[0] for the blur. renderDoF says why each is free.
 
         //sun shadow map
         LLRenderTarget          shadow[4];
