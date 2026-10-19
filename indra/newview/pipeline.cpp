@@ -10437,6 +10437,16 @@ LLRenderTarget* LLPipeline::renderDoF(ALTransientTargets& scope)
                     ? (shaped ? gDeferredPostProgramShaped : gDeferredPostProgram)
                     : (shaped ? gDeferredPostProgramNoNearShaped : gDeferredPostProgramNoNear);
 
+                // A gather or a combine that did not build would leave the blur, or the defocused scene the chain reads
+                // in the screen's place, as the pool holds it: the frame goes on in focus instead.
+                const LLGLSLShader& combine_program =
+                    RenderDepthOfFieldNearBlur ? gDeferredDoFCombineProgram : gDeferredDoFCombineProgramNoNear;
+                if (!post_program.isComplete() || !combine_program.isComplete())
+                {
+                    blur->flush();
+                    return nullptr;
+                }
+
                 post_program.bind();
                 post_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->screen, ALSamplers::PointMirror);
                 set_cof_uniforms(post_program);
