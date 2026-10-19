@@ -27,7 +27,15 @@
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
 
+// Pinned to the grid (no dynamic LOD), equal spacing, the one that cuts an edge at level 16
+// into the grid's 16 segments; otherwise fractional odd, which morphs as the level moves.
+// Pinned, every vertex is a grid point; which diagonal splits each cell is still the
+// tessellator's to choose, which GL leaves to the implementation.
+#ifdef TERRAIN_TESS_PINNED
+layout(quads, equal_spacing, ccw) in;
+#else
 layout(quads, fractional_odd_spacing, ccw) in;
+#endif
 
 out vec3 pos;
 out vec3 vary_normal;

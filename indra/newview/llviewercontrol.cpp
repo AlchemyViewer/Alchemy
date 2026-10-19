@@ -607,6 +607,8 @@ static bool handleRepartition(const LLSD&)
 static bool handleRenderDynamicLODChanged(const LLSD& newvalue)
 {
     LLPipeline::sDynamicLOD = newvalue.asBoolean();
+    // The terrain's tessellation spacing is compiled in by it (TERRAIN_TESS_PINNED).
+    gPipeline.markRenderInputsDirty();
     return true;
 }
 

@@ -118,6 +118,7 @@ ALShaderInputs ALShaderInputs::make(const ALShaderSettings& s)
     l.mBloomHalation    = s.mBloomHalation;
     l.mSMAAPredication  = s.mSMAAPredication;
     l.mTerrainPBRNormals = s.mTerrainPBRNormals;
+    l.mTerrainTessPinned = !s.mDynamicLOD;
     l.mWaterWaves        = s.mWaterWaves;
     l.mCompute           = s.mHasCompute && !s.mDisableCompute;
     // One material per four texture units (base colour, normal, ORM, emissive), with no units reserved: the passes

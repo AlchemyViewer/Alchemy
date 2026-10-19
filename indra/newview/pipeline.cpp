@@ -1160,6 +1160,7 @@ ALShaderInputs LLPipeline::shaderInputsFromSettings()
     s.mTerrainPBRDetail         = gSavedSettings.getS32("RenderTerrainPBRDetail");
     s.mTerrainHexTiling         = gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling");
     s.mTerrainPBRNormals        = gSavedSettings.getBOOL("RenderTerrainPBRNormalsEnabled");
+    s.mDynamicLOD               = gSavedSettings.getBOOL("RenderDynamicLOD");
     s.mWaterHextile             = gSavedSettings.getU32("AlchemyRenderWaterHextile");
     s.mWaterWaves               = gSavedSettings.getBOOL("AlchemyRenderWaterWaves");
     s.mDisableCompute           = gSavedSettings.getBOOL("AlchemyRenderDisableCompute");

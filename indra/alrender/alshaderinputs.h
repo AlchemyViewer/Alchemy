@@ -68,6 +68,7 @@ struct ALShaderSettings
     S32  mTerrainPBRDetail       = 0;     ///< RenderTerrainPBRDetail
     bool mTerrainHexTiling       = false; ///< AlchemyRenderTerrainHexTiling
     bool mTerrainPBRNormals      = false; ///< RenderTerrainPBRNormalsEnabled
+    bool mDynamicLOD             = true;  ///< RenderDynamicLOD
     U32  mWaterHextile           = 1;     ///< AlchemyRenderWaterHextile
     bool mWaterWaves             = true;  ///< AlchemyRenderWaterWaves
     bool mDisableCompute         = false; ///< AlchemyRenderDisableCompute
@@ -130,6 +131,7 @@ struct ALShaderInputs
         bool mBloomHalation    = false; ///< the bloom extract's and composites' BLOOM_HALATION
         bool mSMAAPredication  = true;  ///< the SMAA programs' predication
         bool mTerrainPBRNormals = false; ///< the PBR terrain programs' TERRAIN_FLAT_NORMALS
+        bool mTerrainTessPinned = false; ///< the terrain tessellation programs' TERRAIN_TESS_PINNED, without dynamic LOD
         bool mWaterWaves       = true;  ///< the water waves' programs and the three objects only they attach
         bool mCompute          = true;  ///< the compute programs, where the context has compute and it is not switched off
         S32  mIndexedGLTFChannels = 4;  ///< the indexed material programs' GLTF_INDEXED_CHANNELS, 0 for none

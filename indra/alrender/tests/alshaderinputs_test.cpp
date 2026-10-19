@@ -120,6 +120,7 @@ namespace
         check("bloom halation", s, [](Settings& x) { x.mBloomHalation = !x.mBloomHalation; }, Cost::Local);
         check("SMAA predication", s, [](Settings& x) { x.mSMAAPredication = !x.mSMAAPredication; }, Cost::Local);
         check("terrain normals", s, [](Settings& x) { x.mTerrainPBRNormals = !x.mTerrainPBRNormals; }, Cost::Local);
+        check("dynamic LOD", s, [](Settings& x) { x.mDynamicLOD = !x.mDynamicLOD; }, Cost::Local);
         check("water waves", s, [](Settings& x) { x.mWaterWaves = !x.mWaterWaves; }, Cost::Local);
         check("compute switched off", s, [](Settings& x) { x.mDisableCompute = true; }, Cost::Local);
         check("local terrain paint", s, [](Settings& x) { x.mLocalTerrainPaint = true; }, Cost::Local);

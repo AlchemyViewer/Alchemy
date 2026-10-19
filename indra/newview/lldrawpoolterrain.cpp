@@ -129,10 +129,13 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
     // which is what a probe wants.
     const LLVector3 origin = LLViewerCamera::getInstance()->getOrigin() - regionp->getOriginAgent();
     shader->uniform3fv(LLShaderMgr::TERRAIN_TESS_ORIGIN, 1, origin.mV);
+    // Pinned (density 0, which terrainTC reads as the grid's level) exactly when the programs were built with the
+    // spacing that cuts the grid's level into its segments (TERRAIN_TESS_PINNED), from the same latched input, and
+    // above 0 otherwise whatever a debug RenderTerrainLODFactor says.
     static LLCachedControl<F32> tess_density(gSavedSettings, "AlchemyRenderTerrainTessDensity", 64.f);
-    const F32 density = LLPipeline::sDynamicLOD
-        ? llclamp((F32)tess_density, TESS_DENSITY_MIN, TESS_DENSITY_MAX) * sLODFactor
-        : 0.f;
+    const F32 density = gPipeline.shaderInputs().mLocal.mTerrainTessPinned
+        ? 0.f
+        : llmax(llclamp((F32)tess_density, TESS_DENSITY_MIN, TESS_DENSITY_MAX) * sLODFactor, F_APPROXIMATELY_ZERO);
     shader->uniform1f(LLShaderMgr::TERRAIN_TESS_DENSITY, density);
     shader->uniform1f(LLShaderMgr::TERRAIN_GRID_SCALE, land.getMetersPerGrid());
     shader->uniform1i(LLShaderMgr::TERRAIN_SMOOTHING, LLSurface::isSmoothing() ? 1 : 0);

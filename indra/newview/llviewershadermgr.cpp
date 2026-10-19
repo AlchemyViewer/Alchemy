@@ -389,6 +389,17 @@ static void add_common_permutations(LLGLSLShader* shader)
     }
 }
 
+// Every program that tessellates terrain. Without dynamic LOD the levels are pinned to the
+// grid (lldrawpoolterrain sends density 0), and only equal spacing cuts an edge at level 16
+// into 16 equal segments, on the grid's vertices; fractional odd spacing rounds 16 up to 17.
+static void add_terrain_tess_permutations(LLGLSLShader* shader, bool pinned)
+{
+    if (pinned)
+    {
+        shader->addPermutation("TERRAIN_TESS_PINNED", "1");
+    }
+}
+
 // Map an indexed GLTF PBR program's per-slot samplers to texture units. Slot s
 // uses base color unit s; when full (the GBuffer-write shaders, not the shadow
 // alpha-mask shader) it also uses normal N+s, ORM 2N+s and emissive 3N+s. Inactive
@@ -1915,6 +1926,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
             }
 
             add_common_permutations(shader);
+            add_terrain_tess_permutations(shader, mInputs.mLocal.mTerrainTessPinned);
 
             built(shader->createShader(mirror_variant()), *shader);
         }
@@ -2544,6 +2556,8 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredTerrainShadowProgram.mShaderFiles.push_back(make_pair("deferred/terrainShadowTE.glsl", GL_TESS_EVALUATION_SHADER));
         gDeferredTerrainShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowF.glsl", GL_FRAGMENT_SHADER));
         gDeferredTerrainShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredTerrainShadowProgram.clearPermutations();
+        add_terrain_tess_permutations(&gDeferredTerrainShadowProgram, mInputs.mLocal.mTerrainTessPinned);
         built(gDeferredTerrainShadowProgram.createShader(), gDeferredTerrainShadowProgram);
     }
 
@@ -2726,6 +2740,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         }
 
         add_common_permutations(&gDeferredTerrainProgram);
+        add_terrain_tess_permutations(&gDeferredTerrainProgram, mInputs.mLocal.mTerrainTessPinned);
 
         gDeferredTerrainProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         built(gDeferredTerrainProgram.createShader(mirror_variant()), gDeferredTerrainProgram);
