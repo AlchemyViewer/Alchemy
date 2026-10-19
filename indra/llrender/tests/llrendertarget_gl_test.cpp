@@ -315,6 +315,14 @@ namespace
             }
         }
 
+        // Debug GL, under which alone GL objects are labelled, for as long as it lives.
+        struct DebugGLScope
+        {
+            bool mWas = gDebugGL;
+            DebugGLScope() { gDebugGL = true; }
+            ~DebugGLScope() { gDebugGL = mWas; }
+        };
+
         // Puts back the context's largest texture size, however the case ends.
         struct MaxTextureSizeRestore
         {
@@ -894,6 +902,7 @@ namespace
         {
             SKIP("this context keeps no object labels");
         }
+        const DebugGLScope debug_gl;
 
         mOwner.setLabel("test.gbuffer");
         REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
@@ -969,6 +978,7 @@ namespace
         {
             SKIP("this context keeps no object labels");
         }
+        const DebugGLScope debug_gl;
 
         const ALRenderTargetDesc state{ .width = 2, .height = 1, .color = { GL_RGBA16F } };
         mTarget.setLabel("test.current");
@@ -986,6 +996,35 @@ namespace
         REQUIRE(names_of(mTarget) == target_before);
         require_labels(mTarget, "test.current", false);
         require_labels(mCopy, "test.last", false);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // Outside debug GL nothing is labelled: a label set before a build, or on a built target, names none of what the
+    // target makes, and a swapped pair whose labels differ is not labelled again each swap, as the exposure's is every
+    // frame. The target keeps its label for when it is.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: outside debug GL a label names nothing", "[llrendertarget_gl]")
+    {
+        if (!gGLManager.mHasDebugOutput || !glGetObjectLabel)
+        {
+            SKIP("this context keeps no object labels");
+        }
+        REQUIRE_FALSE(gDebugGL);
+
+        mOwner.setLabel("test.gbuffer");
+        REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
+        require_labels(mOwner, "", true);
+        mOwner.setLabel("test.renamed");
+        require_labels(mOwner, "", true);
+        CHECK(mOwner.getLabel() == "test.renamed");
+
+        const ALRenderTargetDesc state{ .width = 2, .height = 1, .color = { GL_RGBA16F } };
+        mTarget.setLabel("test.current");
+        mCopy.setLabel("test.last");
+        REQUIRE(mTarget.ensure(state) == EnsureResult::Built);
+        REQUIRE(mCopy.ensure(state) == EnsureResult::Built);
+        mTarget.swapFBORefs(mCopy);
+        require_labels(mTarget, "", false);
+        require_labels(mCopy, "", false);
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 }

@@ -149,7 +149,8 @@ public:
     // The name debuggers and the GL debug output show for this target: its framebuffer is labelled `label`, the
     // colour attachments it allocated `label.color0` on, and the depth it allocated `label.depth`. The label is kept
     // across builds and given to what each builds, so an owner names its target once; set on a built target, it
-    // names what the target holds now. Empty leaves the target unnamed.
+    // names what the target holds now. Empty leaves the target unnamed. Objects are labelled under debug GL (gDebugGL)
+    // alone; the label is kept either way.
     void setLabel(std::string_view label);
     const std::string& getLabel() const { return mLabel; }
 
@@ -304,8 +305,8 @@ public:
 
     // *HACK
     // Trades framebuffers and colour textures with `other`, a target of the same description, and with them the shared
-    // depth each framebuffer holds. Each keeps its label, given to what it holds now: where the two differ, every object
-    // of both is labelled again, a glObjectLabel call each.
+    // depth each framebuffer holds. Each keeps its label, given to what it holds now: where the two differ under debug
+    // GL, every object of both is labelled again, a glObjectLabel call each.
     void swapFBORefs(LLRenderTarget& other);
 
     static LLRenderTarget* sBoundTarget;

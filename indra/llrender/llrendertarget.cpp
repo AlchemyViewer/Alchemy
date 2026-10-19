@@ -245,11 +245,18 @@ namespace
         return nullptr;
     }
 
+    // Whether GL objects are labelled: under debug GL alone, where the context keeps labels. A label is a driver call
+    // that copies the string, and only a debugger reads it.
+    bool labels_objects()
+    {
+        return gDebugGL && gGLManager.mHasDebugOutput && glObjectLabel;
+    }
+
     // Label the GL object `name` `label` followed by `suffix` and, where it is not negative, `index`; an empty `label`
-    // takes the object's label away. Nothing where the context keeps no labels.
+    // takes the object's label away. Nothing where objects are not labelled (labels_objects).
     void label_object(GLenum identifier, U32 name, std::string_view label, std::string_view suffix, S32 index = -1)
     {
-        if (!name || !gGLManager.mHasDebugOutput || !glObjectLabel)
+        if (!name || !labels_objects())
         {
             return;
         }
@@ -1308,7 +1315,7 @@ void LLRenderTarget::swapFBORefs(LLRenderTarget& other)
     std::swap(mSharedDepthSerial, other.mSharedDepthSerial);
 
     // A label names the target, and the objects each holds now were named for the other.
-    if (mLabel != other.mLabel)
+    if (labels_objects() && mLabel != other.mLabel)
     {
         for (const LLRenderTarget* target : { this, &other })
         {
