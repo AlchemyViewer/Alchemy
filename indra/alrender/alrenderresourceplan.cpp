@@ -45,13 +45,16 @@ namespace
 
     // Each pack's slot names under its own prefix, laid out as Id lays the packs out.
     constexpr std::string_view PACK_NAMES[(size_t)Pack::COUNT][(size_t)Slot::COUNT] = {
-        { "main.gbuffer", "main.screen", "main.light", "main.post.ping", "main.post.pong", "main.shadow.sun0",
+        { "main.gbuffer", "main.screen", "main.light", "main.post.ping", "main.post.pong", "main.water.refraction",
+          "main.depth.copy", "main.shadow.sun0",
           "main.shadow.sun1", "main.shadow.sun2", "main.shadow.sun3", "main.bloom.mip0", "main.bloom.mip1",
           "main.bloom.mip2", "main.bloom.mip3", "main.bloom.mip4", "main.bloom.mip5", "main.bloom.mip6" },
-        { "probe.gbuffer", "probe.screen", "probe.light", "probe.post.ping", "probe.post.pong", "probe.shadow.sun0",
+        { "probe.gbuffer", "probe.screen", "probe.light", "probe.post.ping", "probe.post.pong", "probe.water.refraction",
+          "probe.depth.copy", "probe.shadow.sun0",
           "probe.shadow.sun1", "probe.shadow.sun2", "probe.shadow.sun3", "probe.bloom.mip0", "probe.bloom.mip1",
           "probe.bloom.mip2", "probe.bloom.mip3", "probe.bloom.mip4", "probe.bloom.mip5", "probe.bloom.mip6" },
-        { "hero.gbuffer", "hero.screen", "hero.light", "hero.post.ping", "hero.post.pong", "hero.shadow.sun0",
+        { "hero.gbuffer", "hero.screen", "hero.light", "hero.post.ping", "hero.post.pong", "hero.water.refraction",
+          "hero.depth.copy", "hero.shadow.sun0",
           "hero.shadow.sun1", "hero.shadow.sun2", "hero.shadow.sun3", "hero.bloom.mip0", "hero.bloom.mip1",
           "hero.bloom.mip2", "hero.bloom.mip3", "hero.bloom.mip4", "hero.bloom.mip5", "hero.bloom.mip6" },
     };
@@ -60,7 +63,7 @@ namespace
 
     // Everything after the packs, in Id order.
     constexpr std::string_view OWN_NAMES[Plan::ID_COUNT - PACK_IDS] = {
-        "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "water.distortion", "sky.behind", "ssr.scene",
+        "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "sky.behind", "ssr.scene",
         "glow0", "glow1", "glow2", "downres", "preview", "bake", "brdf.lut", "exposure.meter", "exposure.histogram",
         "exposure", "exposure.last", "lens.flare.a", "lens.flare.b", "noise", "noise.true", "smaa.area", "smaa.search",
         "smaa.sample", "tone.curve",
@@ -117,6 +120,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         U32  sun_cascades;
         bool light;
         bool post;
+        bool water;
     };
 
     const auto plan_pack = [&](Pack pack, const PackShape& shape)
@@ -137,6 +141,20 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
             plan.at(inPack(pack, Slot::Light)) = {
                 ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .color = { screen_format } }, gbuffer
             };
+        }
+
+        // The scene as it stood before the water, which the water reads under its surface: the screen's colour,
+        // copied where the water is transparent, and the scene's depth, which the water and the haze passes each copy
+        // anew while the screen holds the scene's own. The colour is a blit's destination, so the depth attached to it
+        // is never read or written. It takes the scene's, which makes it the light map's description: the pool hands
+        // the two one target, the light map's lighting over before the water's pass begins.
+        if (shape.water)
+        {
+            plan.at(inPack(pack, Slot::Water)) = {
+                ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .color = { screen_format } }, gbuffer
+            };
+            plan.at(inPack(pack, Slot::DepthCopy)).mDesc =
+                ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .depth = main_depth };
         }
 
         if (shape.post)
@@ -184,7 +202,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     const F32 shadow_scale = std::max(0.f, in.mShadowScale);
     const bool light = in.mShadowDetail > 0 || in.mSSAO;
     plan_pack(Pack::Main, { width, height, blur_happy_size(width, shadow_scale), blur_happy_size(height, shadow_scale),
-                            SUN_CASCADES, light, true });
+                            SUN_CASCADES, light, true, true });
 
     // A capture's light map is written by its sun pass, which runs for shadows alone: SSAO is the main view's, and a
     // capture's soften pass reads the light map whatever it holds (renderDeferredLighting), so without shadows it reads
@@ -204,7 +222,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         const U32 probe_shadow   = blur_happy_size(in.mProbeResolution * 4, 1.f);
         const U32 probe_cascades = !in.mProbes ? 0 : in.mProbeAllCascades ? SUN_CASCADES : CAPTURE_SUN_CASCADES;
         plan_pack(Pack::Probe, { probe_size, probe_size, probe_shadow, probe_shadow, probe_cascades,
-                                 capture_light && in.mProbes, in.mMaterialPreview });
+                                 capture_light && in.mProbes, in.mMaterialPreview, false });
     }
     if (in.mProbes)
     {
@@ -221,7 +239,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         const U32 hero_size   = std::max(in.mHeroResolution, 1u);
         const U32 hero_shadow = blur_happy_size(hero_size, 1.f);
         plan_pack(Pack::Hero,
-                  { hero_size, hero_size, hero_shadow, hero_shadow, CAPTURE_SUN_CASCADES, capture_light, false });
+                  { hero_size, hero_size, hero_shadow, hero_shadow, CAPTURE_SUN_CASCADES, capture_light, false, false });
         plan.mHeroProbes = ProbeManager{ .mResolution = hero_size, .mSuperSample = 1, .mHDR = hdr };
     }
 
@@ -250,11 +268,8 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
                                    in.mSMAAStencil ? std::optional<Id>(Id::SMAAEdges) : std::nullopt };
     }
 
-    // The water's refraction, scratch whether or not the water is transparent, and the reflections' source take the
-    // scene's depth without its stencil, in its format. The reflections trace it only through the probes
-    // (bindReflectionProbes): without them no program reads it.
-    plan.at(Id::WaterDistortion).mDesc =
-        ALRenderTargetDesc{ .width = width, .height = height, .color = { screen_format }, .depth = main_depth };
+    // The reflections' source takes the scene's depth without its stencil, in its format. They trace it only
+    // through the probes (bindReflectionProbes): without them no program reads it.
     if (in.mSSR && in.mProbes)
     {
         plan.at(Id::SSRScene).mDesc =
@@ -381,7 +396,6 @@ bool ALRenderResourcePlan::followsRenderSize(Id id)
         case Id::SpotShadow1:
         case Id::SMAAEdges:
         case Id::SMAABlend:
-        case Id::WaterDistortion:
         case Id::SkyBehind:
         case Id::SSRScene:
             return true;
@@ -423,7 +437,8 @@ bool ALRenderResourcePlan::isTransient(Id id)
 {
     if (packOf(id))
     {
-        return slotOf(id) == Slot::Light;
+        const Slot slot = slotOf(id);
+        return slot == Slot::Light || slot == Slot::Water || slot == Slot::DepthCopy;
     }
     return false;
 }

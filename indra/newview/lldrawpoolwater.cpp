@@ -95,14 +95,14 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
     if (LLPipeline::sRenderTransparentWater)
     {
         // copy framebuffer contents so far to a texture to be used for
-        // reflections and refractions
-        LLRenderTarget& src = gPipeline.mRT->screen;
-        LLRenderTarget& dst = gPipeline.mWaterDis;
-
-        dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
-                    GL_COLOR_BUFFER_BIT, GL_NEAREST);
-        gPipeline.copySceneDepth(dst);
+        // reflections and refractions, and the depth under them
+        gPipeline.beginWaterTargets();
     }
+}
+
+void LLDrawPoolWater::endPostDeferredPass(S32 pass)
+{
+    gPipeline.endWaterTargets();
 }
 
 void LLDrawPoolWater::renderPostDeferred(S32 pass)
@@ -207,7 +207,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     {
         if (waves && occlusion_cull && LLRender::sCompute)
         {
-            LLRenderTarget& depth = LLPipeline::sRenderTransparentWater ? gPipeline.mWaterDis : gPipeline.mRT->deferredScreen;
+            LLRenderTarget& depth = gPipeline.waterDepthCopy() ? *gPipeline.waterDepthCopy() : gPipeline.mRT->deferredScreen;
             occlusion = gPipeline.mDepthPyramid.build(gDepthPyramidProgram, depth);
         }
         else if (!occlusion_cull || !surface.wavesDrawn())
@@ -224,7 +224,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     // Everything one of the water's programs takes, the flat field's or the waves' patches'.
     const auto setup = [&](LLGLSLShader* shader, bool patches)
     {
-        gPipeline.bindDeferredShader(*shader, nullptr, &gPipeline.mWaterDis);
+        gPipeline.bindDeferredShader(*shader, nullptr, gPipeline.waterDepthCopy());
 
         if (bound_a)
         {
@@ -237,7 +237,10 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
         shader->uniform4fv(LLShaderMgr::WATER_MAP_MEAN, 1, surface.mapMeans(bound_a, bound_b).mV);
 
-        shader->bindTexture(LLShaderMgr::WATER_SCREENTEX, &gPipeline.mWaterDis);
+        if (LLRenderTarget* refraction = gPipeline.waterRefraction())
+        {
+            shader->bindTexture(LLShaderMgr::WATER_SCREENTEX, refraction);
+        }
 
         shader->uniform3fv(LLShaderMgr::WATER_EYEVEC, 1, eye.mV);
 

@@ -193,17 +193,18 @@ namespace
               [](const Plan& before)
               {
                   return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light }) |
-                         in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong }) |
+                         in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong, Slot::Water }) |
                          wanted(before, bloom({ Pack::Main })) |
-                         of({ Id::WaterDistortion, Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
+                         of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
               } },
             { "RenderHDREnabled under a material preview", previewed, hdr_off,
               [](const Plan& before)
               {
                   return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light }) |
                          in_packs({ Pack::Main, Pack::Probe }, { Slot::PostPing, Slot::PostPong }) |
+                         in_packs({ Pack::Main }, { Slot::Water }) |
                          wanted(before, bloom({ Pack::Main, Pack::Probe })) |
-                         of({ Id::WaterDistortion, Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
+                         of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
               } },
             { "a material preview made", no_change, previewed,
               [](const Plan&)
@@ -215,13 +216,13 @@ namespace
               [](const Plan& before)
               {
                   return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::SpotShadow0, Id::SpotShadow1,
-                              Id::WaterDistortion, Id::Preview }) |
+                              Id::MainDepthCopy, Id::Preview }) |
                          wanted(before, sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero }));
               } },
             { "AlchemyRenderReverseZ over 32-bit shadows", [](Inputs& in) { in.mShadowDepth32F = true; },
               [](Inputs& in) { in.mReverseZ = false; },
               [](const Plan&)
-              { return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::WaterDistortion, Id::Preview }); } },
+              { return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::MainDepthCopy, Id::Preview }); } },
             { "RenderShadowDetail 2 to 1", no_change, [](Inputs& in) { in.mShadowDetail = 1; },
               [](const Plan&) { return of({ Id::SpotShadow0, Id::SpotShadow1 }); } },
             { "RenderShadowDetail 2 to 0", no_change, [](Inputs& in) { in.mShadowDetail = 0; },
@@ -892,7 +893,7 @@ namespace
             CHECK(!Plan::drivesRenderSize(id));
         }
         for (Id id : { Id::MainGBuffer, Id::MainScreen, Id::MainLight, Id::MainPostPing, Id::SMAABlend,
-                       Id::WaterDistortion, Id::SkyBehind, Id::SSRScene })
+                       Id::MainWater, Id::MainDepthCopy, Id::SkyBehind, Id::SSRScene })
         {
             INFO(Plan::name(id));
             CHECK(Plan::drivesRenderSize(id));
@@ -912,7 +913,7 @@ namespace
 
     TEST_CASE("alrenderresourceplan: the passes acquire what lives for one phase of a frame from the pool", "[alrenderresourceplan]")
     {
-        const IdSet transient = in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::Light });
+        const IdSet transient = in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::Light, Slot::Water, Slot::DepthCopy });
         CHECK(names(Plan::idsWhere(Plan::isTransient)) == names(transient));
 
         // What holds anything across frames, or between the phases of one, is built to keep.

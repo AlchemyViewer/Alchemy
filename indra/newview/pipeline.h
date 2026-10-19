@@ -291,8 +291,8 @@ public:
     void renderFinalize();
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);
     // The current pack's scene depth (mRT->deferredScreen's, which mRT->screen shares) over the whole of `dst`'s,
-    // stretched as a nearest blit would, through gCopyDepthProgram: mWaterDis and mSceneMap keep depth without the
-    // screen's stencil, which a blit's matching formats would make them carry.
+    // stretched as a nearest blit would, through gCopyDepthProgram: the water's depth copy and mSceneMap keep depth
+    // without the screen's stencil, which a blit's matching formats would make them carry.
     void copySceneDepth(LLRenderTarget& dst);
     void generateLuminance(LLRenderTarget* src, LLRenderTarget* dst);
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
@@ -1194,8 +1194,16 @@ public:
     ALUniformBuffer             mDeferredUBO;
     bool                        mDeferredUBODirty{ true };
 
-    //water distortion texture (refraction)
-    LLRenderTarget              mWaterDis;
+    // The water pool's copies of the scene under its surface, from the pool for its pass alone (beginWaterTargets to
+    // endWaterTargets) where the water is transparent: the screen's colour, and the scene's depth, which the waves'
+    // depth pyramid is built from. Null outside that pass, and for opaque water, which reads neither.
+    void            beginWaterTargets();
+    void            endWaterTargets();
+    LLRenderTarget* waterRefraction() const { return mWaterRefraction; }
+    LLRenderTarget* waterDepthCopy() const { return mWaterDepthCopy; }
+    std::optional<ALTransientTargets> mWaterTargets;
+    LLRenderTarget*                   mWaterRefraction = nullptr;
+    LLRenderTarget*                   mWaterDepthCopy  = nullptr;
 
     // The sky dome behind everything at half resolution: the sky pool draws it again here, with no depth, and the
     // haze pass converges far water on it (hazeF.glsl). Holds the main view's sky for mSkyBehindFrame only.

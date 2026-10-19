@@ -940,7 +940,6 @@ LLRenderTarget* LLPipeline::resourceTarget(ALRenderResourcePlan::Id id)
         case Id::SpotShadow1:       return &mSpotShadow[1];
         case Id::SMAAEdges:         return &mSMAAEdgeMap;
         case Id::SMAABlend:         return &mSMAABlendBuffer;
-        case Id::WaterDistortion:   return &mWaterDis;
         case Id::SkyBehind:         return &mSkyBehind;
         case Id::SSRScene:          return &mSceneMap;
         case Id::Glow0:             return &mGlow[0];
@@ -9314,6 +9313,34 @@ void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget*
     }
 }
 
+void LLPipeline::beginWaterTargets()
+{
+    llassert(!mWaterTargets);
+    mWaterTargets.emplace(mTransientTargets);
+    // The main view's, which a capture's screen is stretched into.
+    mWaterRefraction = acquireResource(*mWaterTargets, ALRenderResourcePlan::Id::MainWater);
+    mWaterDepthCopy  = acquireResource(*mWaterTargets, ALRenderResourcePlan::Id::MainDepthCopy);
+
+    // Each written whole: the blit covers the copy, and copySceneDepth draws over every texel of its target.
+    LLRenderTarget& src = mRT->screen;
+    if (mWaterRefraction)
+    {
+        mWaterRefraction->copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, mWaterRefraction->getWidth(),
+                                       mWaterRefraction->getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    }
+    if (mWaterDepthCopy)
+    {
+        copySceneDepth(*mWaterDepthCopy);
+    }
+}
+
+void LLPipeline::endWaterTargets()
+{
+    mWaterRefraction = nullptr;
+    mWaterDepthCopy  = nullptr;
+    mWaterTargets.reset();
+}
+
 void LLPipeline::copySceneDepth(LLRenderTarget& dst)
 {
     LL_PROFILE_GPU_ZONE("depth copy");
@@ -10185,13 +10212,14 @@ void LLPipeline::renderDoF()
 
             // Both from the pool, for the effect alone. The sharp copy, with its
             // signed CoF in alpha, in the water's copy's description: the
-            // screen's format, RGBA16F under HDR for the linear scene. The blur
+            // screen's format, RGBA16F under HDR for the linear scene, over the
+            // scene's depth, which the CoF pass, testing none, leaves be. The blur
             // in bloom mip 0's under HDR, R11F_G11F_B10F (RGBA16F with
             // halation), and the post chain's without; it carries no alpha.
             const bool hdr = hdrEnabled();
 
             ALTransientTargets dof(mTransientTargets);
-            LLRenderTarget*    sharp = acquireResource(dof, ALRenderResourcePlan::Id::WaterDistortion, "dof.sharp");
+            LLRenderTarget*    sharp = acquireResource(dof, ALRenderResourcePlan::Id::MainWater, "dof.sharp");
             LLRenderTarget*    blur  = acquireResource(dof,
                                                        hdr ? ALRenderResourcePlan::bloomMip(ALRenderResourcePlan::Pack::Main, 0)
                                                            : ALRenderResourcePlan::Id::MainPostPong,
@@ -12097,10 +12125,15 @@ void LLPipeline::doAtmospherics()
 
     if (RenderDeferredAtmospheric)
     {
+        // The scene's depth as the haze reads it, copied for the pass alone while the screen holds the scene's own.
+        ALTransientTargets haze(mTransientTargets);
+        LLRenderTarget*    depth_copy = acquireResource(haze, ALRenderResourcePlan::Id::MainDepthCopy);
         {
-            // copy depth buffer for use in haze shader (use water displacement map as temp storage)
             mRT->screen.flush();
-            copySceneDepth(mWaterDis);
+            if (depth_copy)
+            {
+                copySceneDepth(*depth_copy);
+            }
             mRT->screen.bindTarget();
         }
 
@@ -12116,12 +12149,12 @@ void LLPipeline::doAtmospherics()
 
         // The triangle lies on the far plane (hazeV.glsl), level with the depth the sky leaves cleared: it passes
         // only where the world drew something, so the sky is rejected before it is shaded. The screen target shares
-        // the G-buffer's depth; the shader reads its copy in mWaterDis.
+        // the G-buffer's depth; the shader reads the copy.
         ALDrawnOnly drawn;
 
-        const auto apply_haze = [this](LLGLSLShader& haze_shader, bool on_water)
+        const auto apply_haze = [this, depth_copy](LLGLSLShader& haze_shader, bool on_water)
         {
-            bindDeferredShader(haze_shader, nullptr, &mWaterDis);
+            bindDeferredShader(haze_shader, nullptr, depth_copy);
 
             LLEnvironment& environment = LLEnvironment::instance();
             haze_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
@@ -12185,10 +12218,15 @@ void LLPipeline::doWaterHaze()
 
     if (RenderDeferredAtmospheric)
     {
-        // copy depth buffer for use in haze shader (use water displacement map as temp storage)
+        // The scene's depth as the haze reads it, copied for the pass alone while the screen holds the scene's own.
+        ALTransientTargets haze(mTransientTargets);
+        LLRenderTarget*    depth_copy = acquireResource(haze, ALRenderResourcePlan::Id::MainDepthCopy);
         {
             mRT->screen.flush();
-            copySceneDepth(mWaterDis);
+            if (depth_copy)
+            {
+                copySceneDepth(*depth_copy);
+            }
             mRT->screen.bindTarget();
         }
 
@@ -12202,7 +12240,7 @@ void LLPipeline::doWaterHaze()
         LLGLSLShader& haze_shader = gHazeWaterProgram;
 
         LL_PROFILE_GPU_ZONE("water haze");
-        bindDeferredShader(haze_shader, nullptr, &mWaterDis);
+        bindDeferredShader(haze_shader, nullptr, depth_copy);
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
         haze_shader.uniform1i(LLShaderMgr::WATER_ABOVE_WATER, sUnderWaterRender ? -1 : 1);

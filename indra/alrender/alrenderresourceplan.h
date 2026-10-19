@@ -61,6 +61,8 @@ public:
         Light,
         PostPing,
         PostPong,
+        Water,
+        DepthCopy,
         Sun0,
         Sun1,
         Sun2,
@@ -93,22 +95,21 @@ public:
     /// Every resource, each pack's in Slot order first. The names are the debugger labels (name()).
     enum class Id : U8
     {
-        MainGBuffer, MainScreen, MainLight, MainPostPing, MainPostPong,
+        MainGBuffer, MainScreen, MainLight, MainPostPing, MainPostPong, MainWater, MainDepthCopy,
         MainSun0, MainSun1, MainSun2, MainSun3,
         MainBloom0, MainBloom1, MainBloom2, MainBloom3, MainBloom4, MainBloom5, MainBloom6,
 
-        ProbeGBuffer, ProbeScreen, ProbeLight, ProbePostPing, ProbePostPong,
+        ProbeGBuffer, ProbeScreen, ProbeLight, ProbePostPing, ProbePostPong, ProbeWater, ProbeDepthCopy,
         ProbeSun0, ProbeSun1, ProbeSun2, ProbeSun3,
         ProbeBloom0, ProbeBloom1, ProbeBloom2, ProbeBloom3, ProbeBloom4, ProbeBloom5, ProbeBloom6,
 
-        HeroGBuffer, HeroScreen, HeroLight, HeroPostPing, HeroPostPong,
+        HeroGBuffer, HeroScreen, HeroLight, HeroPostPing, HeroPostPong, HeroWater, HeroDepthCopy,
         HeroSun0, HeroSun1, HeroSun2, HeroSun3,
         HeroBloom0, HeroBloom1, HeroBloom2, HeroBloom3, HeroBloom4, HeroBloom5, HeroBloom6,
 
         // The main view's own, at its render size.
         SpotShadow0, SpotShadow1,
         SMAAEdges, SMAABlend,
-        WaterDistortion,
         SkyBehind,
         SSRScene,
 
@@ -210,7 +211,7 @@ public:
     static bool isTexture(Id id);
     /// Whether the passes that use it acquire it from the transient pool for as long as they need it, rather than the
     /// reconcile building it to keep: a target that lives for one phase of a frame, and holds nothing across frames. A
-    /// pack's light map is one.
+    /// pack's light map is one, and the water's copies of the scene.
     static bool isTransient(Id id);
     /// Whether only the GLTF material preview renders through it: the probe pack's post targets and bloom, which the
     /// probes' captures never read, and which are planned only while a preview is alive.
