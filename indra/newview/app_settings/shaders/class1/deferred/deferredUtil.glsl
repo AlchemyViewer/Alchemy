@@ -1041,7 +1041,9 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
 uniform vec4 waterPlane;
 uniform float waterSign;
 
-// discard if given position in eye space is on the wrong side of the waterPlane according to waterSign
+// discard if given position in eye space is on the wrong side of the waterPlane according to waterSign. Fragments
+// alone discard: a compute program attaches this object for its depth and normal reads.
+#ifdef FRAGMENT_SHADER
 void waterClip(vec3 pos)
 {
     // TODO: make this less branchy
@@ -1061,4 +1063,5 @@ void waterClip(vec3 pos)
     }
 
 }
+#endif
 

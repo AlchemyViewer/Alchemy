@@ -198,7 +198,9 @@ vec3 ditherEmissive(vec3 v, vec2 frag_px)
 // Variance is added in alpha (roughness squared) space, which is where a Gaussian lobe width
 // composes linearly. Returns perceptual roughness, the space everything else here works in.
 //
-// Derivatives, so uniform control flow only.
+// Derivatives, so uniform control flow only, and only in the fragment stage: a compute program attaches this object
+// for its normal decoding.
+#ifdef FRAGMENT_SHADER
 float filterSpecularRoughness(float perceptualRoughness, vec3 n)
 {
     // Filament's defaults: how much of the measured variance to trust, and a ceiling so a
@@ -215,3 +217,4 @@ float filterSpecularRoughness(float perceptualRoughness, vec3 n)
     float alpha = perceptualRoughness * perceptualRoughness;
     return sqrt(sqrt(clamp(alpha * alpha + kernel, 0.0, 1.0)));
 }
+#endif

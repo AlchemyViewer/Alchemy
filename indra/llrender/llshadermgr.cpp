@@ -2255,6 +2255,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("depthPyramidSize");
     mReservedUniforms.push_back("depthPyramidCount");
 
+    // The light map's ambient occlusion blur in one dispatch
+    mReservedUniforms.push_back("blur_light_apron");
+    mReservedUniforms.push_back("blurLightTarget");
+
     // The waves' patches
     mReservedUniforms.push_back("waterOcclusion");
     mReservedUniforms.push_back("waterPatchOrder");

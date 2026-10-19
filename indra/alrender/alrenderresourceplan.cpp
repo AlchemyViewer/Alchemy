@@ -63,7 +63,7 @@ namespace
 
     // Everything after the packs, in Id order.
     constexpr std::string_view OWN_NAMES[Plan::ID_COUNT - PACK_IDS] = {
-        "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "sky.behind", "ssr.scene",
+        "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "sky.behind", "ssr.scene", "main.light.blurred",
         "glow0", "glow1", "glow2", "downres", "preview", "bake", "brdf.lut", "exposure.meter", "exposure.histogram",
         "exposure", "exposure.last", "lens.flare.a", "lens.flare.b", "noise", "noise.true", "smaa.area", "smaa.search",
         "smaa.sample", "tone.curve",
@@ -271,6 +271,14 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
                                    in.mSMAAStencil ? std::optional<Id>(Id::SMAAEdges) : std::nullopt };
     }
 
+    // Where the session computes, SSAO's blur writes the sun's shadow and the blurred occlusion here, which the soften
+    // pass reads in place of the light map (ALLightMapBlur): it takes no scratch, and no depth, as a dispatch's
+    // destination. Half float, the precision of the light map with HDR, and the format blurLightC.glsl stores.
+    if (in.mSSAO && in.mCompute)
+    {
+        plan.at(Id::MainLightBlurred).mDesc = ALRenderTargetDesc{ .width = width, .height = height, .color = { GL_RG16F } };
+    }
+
     // The reflections' source: last frame's scene, without the alpha the reflections drop, so R11F_G11F_B10F under HDR
     // (unsigned, which the lit scene is), and the scene's depth without its stencil, in its format. They trace it
     // only through the probes (bindReflectionProbes): without them no program reads it.
@@ -404,6 +412,7 @@ bool ALRenderResourcePlan::followsRenderSize(Id id)
         case Id::SMAABlend:
         case Id::SkyBehind:
         case Id::SSRScene:
+        case Id::MainLightBlurred:
             return true;
         default:
             return false;
@@ -448,7 +457,7 @@ bool ALRenderResourcePlan::isTransient(Id id)
                slot == Slot::DepthCopy || slot >= Slot::Bloom0;
     }
     return id == Id::SMAAEdges || id == Id::SMAABlend || id == Id::Glow0 || id == Id::Glow1 || id == Id::Glow2 ||
-           id == Id::SkyBehind;
+           id == Id::SkyBehind || id == Id::MainLightBlurred;
 }
 
 // static

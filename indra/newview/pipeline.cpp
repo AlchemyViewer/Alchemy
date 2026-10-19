@@ -57,6 +57,7 @@
 #include "llui.h"
 #include "llglheaders.h"
 #include "aldepthbounds.h"
+#include "allightmapblur.h"
 #include "alrenderisolation.h"
 #include "alsamplerstate.h"
 #include "aluniformbuffer.h"
@@ -1203,6 +1204,7 @@ ALRenderResourceInputs LLPipeline::resourceInputsFromSettings(const ALShaderInpu
     in.mEmissive = gSavedSettings.getBOOL("RenderEnableEmissiveBuffer");
     in.mGBufferNormHDR = shaders.mGlobal.mGBufferNormHDR;
     in.mReverseZ       = shaders.mGlobal.mReverseZ;
+    in.mCompute        = shaders.mLocal.mCompute;
 
     in.mShadowDetail     = gSavedSettings.getS32("RenderShadowDetail");
     in.mShadowScale      = gSavedSettings.getF32("RenderShadowResolutionScale");
@@ -11662,74 +11664,76 @@ void LLPipeline::renderDeferredLighting()
             deferred_light_target->flush();
         }
 
-        // Across into a scratch of the light map's description, cleared as the sun pass clears the map, and back down
-        // into the map.
-        LLRenderTarget* blur_scratch = mResourceInputs.mSSAO && !gCubeSnapshot && deferred_light_target
-            ? acquireResource(lighting, ALRenderResourcePlan::Id::MainLight, "main.light.scratch")
-            : nullptr;
-        if (blur_scratch)
+        // SSAO's blur of the light map's occlusion, in the main view (ALLightMapBlur): where the session computes, one
+        // dispatch into the blurred light map, which the soften pass reads in place of the light map; otherwise across
+        // into a scratch of the light map's description, cleared as the sun pass clears the map, and back down into the
+        // map.
+        LLRenderTarget* light_blurred = nullptr;
+        if (mResourceInputs.mSSAO && !gCubeSnapshot && deferred_light_target)
         {
-            // soften direct lighting lightmap
             LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - soften shadow");
             LL_PROFILE_GPU_ZONE("soften shadow");
-            // blur lightmap
-            blur_scratch->bindTarget();
-            gGL.setClearColor(LLColor4::white);
-            blur_scratch->clear(GL_COLOR_BUFFER_BIT);
-            gGL.setClearColor(LLColor4::transparent);
+            const ALLightMapBlur::Kernel kernel =
+                ALLightMapBlur::kernel(RenderShadowGaussian, RenderShadowBlurSize, RenderShadowBlurDistFactor);
 
-            bindDeferredShader(gDeferredBlurLightProgram);
-
-            LLVector3 go = RenderShadowGaussian;
-            const U32 kern_length = 4;
-            F32       blur_size = RenderShadowBlurSize;
-            F32       dist_factor = RenderShadowBlurDistFactor;
-
-            // sample symmetrically with the middle sample falling exactly on 0.0
-            F32 x = 0.f;
-
-            LLVector3 gauss[32];  // xweight, yweight, offset
-
-            for (U32 i = 0; i < kern_length; i++)
+            if (LLRender::sCompute && gDeferredBlurLightComputeProgram.isComplete() && ALLightMapBlur::apron(kernel) >= 0)
             {
-                gauss[i].mV[0] = llgaussian(x, go.mV[0]);
-                gauss[i].mV[1] = llgaussian(x, go.mV[1]);
-                gauss[i].mV[2] = x;
-                x += 1.f;
+                light_blurred = acquireResource(lighting, ALRenderResourcePlan::Id::MainLightBlurred);
+                if (light_blurred)
+                {
+                    bindDeferredShader(gDeferredBlurLightComputeProgram, deferred_light_target);
+                    ALLightMapBlur::setKernel(gDeferredBlurLightComputeProgram, kernel);
+                    if (!ALLightMapBlur::dispatch(gDeferredBlurLightComputeProgram, kernel, *light_blurred))
+                    {
+                        lighting.release(light_blurred);
+                        light_blurred = nullptr;
+                    }
+                    unbindDeferredShader(gDeferredBlurLightComputeProgram);
+                }
             }
 
-            gDeferredBlurLightProgram.uniform2f(LLShaderMgr::DELTA, 1.f, 0.f);
-            gDeferredBlurLightProgram.uniform1f(LLShaderMgr::DIST_FACTOR, dist_factor);
-            gDeferredBlurLightProgram.uniform3fv(LLShaderMgr::KERN, kern_length, gauss[0].mV);
-            gDeferredBlurLightProgram.uniform1f(LLShaderMgr::KERN_SCALE, blur_size * (kern_length / 2.f - 0.5f));
-
-            // Both blurs on the far plane (blurLightV.glsl), over geometry alone: the sky stays the clear's white
-            // in either target.
+            LLRenderTarget* blur_scratch = light_blurred
+                ? nullptr
+                : acquireResource(lighting, ALRenderResourcePlan::Id::MainLight, "main.light.scratch");
+            if (blur_scratch)
             {
-                LLGLDisable   blend(GL_BLEND);
-                ALDrawnOnly   drawn;
-                mScreenTriangleVB->setBuffer();
-                mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+                blur_scratch->bindTarget();
+                gGL.setClearColor(LLColor4::white);
+                blur_scratch->clear(GL_COLOR_BUFFER_BIT);
+                gGL.setClearColor(LLColor4::transparent);
+
+                bindDeferredShader(gDeferredBlurLightProgram);
+                ALLightMapBlur::setKernel(gDeferredBlurLightProgram, kernel);
+                gDeferredBlurLightProgram.uniform2f(LLShaderMgr::DELTA, 1.f, 0.f);
+
+                // Both blurs on the far plane (blurLightV.glsl), over geometry alone: the sky stays the clear's white
+                // in either target.
+                {
+                    LLGLDisable   blend(GL_BLEND);
+                    ALDrawnOnly   drawn;
+                    mScreenTriangleVB->setBuffer();
+                    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+                }
+
+                blur_scratch->flush();
+                unbindDeferredShader(gDeferredBlurLightProgram);
+
+                bindDeferredShader(gDeferredBlurLightProgram, blur_scratch);
+
+                deferred_light_target->bindTarget();
+
+                gDeferredBlurLightProgram.uniform2f(LLShaderMgr::DELTA, 0.f, 1.f);
+
+                {
+                    LLGLDisable   blend(GL_BLEND);
+                    ALDrawnOnly   drawn;
+                    mScreenTriangleVB->setBuffer();
+                    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+                }
+                deferred_light_target->flush();
+                unbindDeferredShader(gDeferredBlurLightProgram);
+                lighting.release(blur_scratch);
             }
-
-            blur_scratch->flush();
-            unbindDeferredShader(gDeferredBlurLightProgram);
-
-            bindDeferredShader(gDeferredBlurLightProgram, blur_scratch);
-
-            deferred_light_target->bindTarget();
-
-            gDeferredBlurLightProgram.uniform2f(LLShaderMgr::DELTA, 0.f, 1.f);
-
-            {
-                LLGLDisable   blend(GL_BLEND);
-                ALDrawnOnly   drawn;
-                mScreenTriangleVB->setBuffer();
-                mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-            }
-            deferred_light_target->flush();
-            unbindDeferredShader(gDeferredBlurLightProgram);
-            lighting.release(blur_scratch);
         }
 
         screen_target->bindTarget();
@@ -11743,7 +11747,8 @@ void LLPipeline::renderDeferredLighting()
 
             LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - atmospherics");
             LL_PROFILE_GPU_ZONE("atmospherics");
-            bindDeferredShader(soften_shader);
+            // The sun's shadow and the occlusion, blurred where the dispatch blurred them.
+            bindDeferredShader(soften_shader, light_blurred);
 
             static LLCachedControl<F32> ssao_scale(gSavedSettings, "RenderSSAOIrradianceScale", 0.5f);
             static LLCachedControl<F32> ssao_max(gSavedSettings, "RenderSSAOIrradianceMax", 0.25f);

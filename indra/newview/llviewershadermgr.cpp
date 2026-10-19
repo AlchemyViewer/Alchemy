@@ -176,6 +176,7 @@ LLGLSLShader            gHazeProgram;
 LLGLSLShader            gHazeOnWaterProgram;
 LLGLSLShader            gHazeWaterProgram;
 LLGLSLShader            gDeferredBlurLightProgram;
+LLGLSLShader            gDeferredBlurLightComputeProgram;
 LLGLSLShader            gDeferredSoftenProgram;
 LLGLSLShader            gDeferredSoftenSkyProgram;
 LLGLSLShader            gDeferredShadowProgram;
@@ -1316,6 +1317,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredMultiSpotLightProgram.unload();
         gDeferredSunProgram.unload();
         gDeferredBlurLightProgram.unload();
+        gDeferredBlurLightComputeProgram.unload();
         gDeferredSoftenProgram.unload();
         gDeferredSoftenSkyProgram.unload();
         gDeferredShadowProgram.unload();
@@ -2078,11 +2080,32 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredBlurLightProgram.mShaderFiles.clear();
         gDeferredBlurLightProgram.mShaderFiles.push_back(make_pair("deferred/blurLightV.glsl", GL_VERTEX_SHADER));
         gDeferredBlurLightProgram.mShaderFiles.push_back(make_pair("deferred/blurLightF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredBlurLightProgram.mShaderFiles.push_back(make_pair("deferred/blurLightUtil.glsl", GL_FRAGMENT_SHADER));
         gDeferredBlurLightProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
         add_common_permutations(&gDeferredBlurLightProgram);
 
         built(gDeferredBlurLightProgram.createShader(), gDeferredBlurLightProgram);
+    }
+
+    // SSAO's blur in one dispatch, where the session computes and SSAO is wanted. Optional: its failing leaves the blur
+    // to the fragment passes above (ALLightMapBlur), not the shaders after it. A compute program attaches no features,
+    // so it takes the deferred objects the taps read as files of its own, compiled for its stage.
+    if (mInputs.mLocal.mCompute && mInputs.mLocal.mSSAO)
+    {
+        gDeferredBlurLightComputeProgram.mName = "Deferred Blur Light Compute Shader";
+        gDeferredBlurLightComputeProgram.mShaderFiles.clear();
+        gDeferredBlurLightComputeProgram.mShaderFiles.push_back(make_pair("deferred/blurLightC.glsl", GL_COMPUTE_SHADER));
+        gDeferredBlurLightComputeProgram.mShaderFiles.push_back(make_pair("deferred/blurLightUtil.glsl", GL_COMPUTE_SHADER));
+        gDeferredBlurLightComputeProgram.mShaderFiles.push_back(make_pair("deferred/deferredUtil.glsl", GL_COMPUTE_SHADER));
+        gDeferredBlurLightComputeProgram.mShaderFiles.push_back(make_pair("deferred/globalF.glsl", GL_COMPUTE_SHADER));
+        gDeferredBlurLightComputeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredBlurLightComputeProgram.clearPermutations();
+        if (!gDeferredBlurLightComputeProgram.createShader())
+        {
+            LL_WARNS("Shader") << "SSAO's blur dispatch did not build; the fragment passes blur instead" << LL_ENDL;
+            gDeferredBlurLightComputeProgram.unload();
+        }
     }
 
     {

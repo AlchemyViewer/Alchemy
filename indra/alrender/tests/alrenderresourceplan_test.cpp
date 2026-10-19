@@ -238,10 +238,17 @@ namespace
                   return wanted(before, sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero })) |
                          of({ Id::SpotShadow0, Id::SpotShadow1, Id::ProbeLight, Id::HeroLight });
               } },
-            { "RenderDeferredSSAO with shadows", no_change, [](Inputs& in) { in.mSSAO = false; }, nothing },
+            { "RenderDeferredSSAO with shadows", no_change, [](Inputs& in) { in.mSSAO = false; },
+              [](const Plan&) { return of({ Id::MainLightBlurred }); } },
             { "RenderDeferredSSAO without shadows", [](Inputs& in) { in.mShadowDetail = 0; },
               [](Inputs& in) { in.mSSAO = false; },
-              [](const Plan&) { return of({ Id::MainLight }); } },
+              [](const Plan&) { return of({ Id::MainLight, Id::MainLightBlurred }); } },
+            { "RenderDeferredSSAO without compute", [](Inputs& in) { in.mCompute = false; },
+              [](Inputs& in) { in.mSSAO = false; }, nothing },
+            { "AlchemyRenderDisableCompute", no_change, [](Inputs& in) { in.mCompute = false; },
+              [](const Plan&) { return of({ Id::MainLightBlurred }); } },
+            { "AlchemyRenderDisableCompute without SSAO", [](Inputs& in) { in.mSSAO = false; },
+              [](Inputs& in) { in.mCompute = false; }, nothing },
             { "RenderShadowResolutionScale", no_change, [](Inputs& in) { in.mShadowScale = 0.5f; },
               [](const Plan&) { return sun_shadows({ Pack::Main }) | of({ Id::SpotShadow0, Id::SpotShadow1 }); } },
             { "AlchemyRenderShadowDepth32F under reverse-Z", no_change, [](Inputs& in) { in.mShadowDepth32F = true; },
@@ -824,6 +831,40 @@ namespace
         }
     }
 
+    TEST_CASE("alrenderresourceplan: the blurred light map is the main view's, with SSAO where the session computes",
+              "[alrenderresourceplan]")
+    {
+        // The dispatch blurs into it in place of a scratch of the light map's description; the fragment passes need
+        // the scratch instead, and nothing blurs without SSAO.
+        for (S32 shadow_detail : { 0, 2 })
+        {
+            for (bool ssao : { false, true })
+            {
+                for (bool compute : { false, true })
+                {
+                    INFO("shadow detail " << shadow_detail << ", SSAO " << ssao << ", compute " << compute);
+                    Inputs in        = defaults();
+                    in.mShadowDetail = shadow_detail;
+                    in.mSSAO         = ssao;
+                    in.mCompute      = compute;
+                    const Plan plan  = Plan::make(in);
+                    REQUIRE(plan.wants(Id::MainLightBlurred) == (ssao && compute));
+                    if (plan.wants(Id::MainLightBlurred))
+                    {
+                        // The light map's size, two half-float channels, no depth: an image a dispatch stores to.
+                        const ALRenderTargetDesc& blurred = *plan.desc(Id::MainLightBlurred);
+                        CHECK(blurred.width == plan.desc(Id::MainLight)->width);
+                        CHECK(blurred.height == plan.desc(Id::MainLight)->height);
+                        CHECK(blurred.colorCount() == 1);
+                        CHECK(blurred.color[0] == (U32)GL_RG16F);
+                        CHECK(blurred.depth == Depth::None);
+                        CHECK(!plan[Id::MainLightBlurred].mDepthFrom);
+                    }
+                }
+            }
+        }
+    }
+
     TEST_CASE("alrenderresourceplan: SSAO alone never touches a capture pack", "[alrenderresourceplan]")
     {
         for (S32 shadow_detail : { 0, 1, 2 })
@@ -975,7 +1016,7 @@ namespace
             CHECK(!Plan::drivesRenderSize(id));
         }
         for (Id id : { Id::MainGBuffer, Id::MainScreen, Id::MainLight, Id::MainPostPing, Id::SMAABlend,
-                       Id::MainWater, Id::MainDepthCopy, Id::SkyBehind, Id::SSRScene })
+                       Id::MainWater, Id::MainDepthCopy, Id::SkyBehind, Id::SSRScene, Id::MainLightBlurred })
         {
             INFO(Plan::name(id));
             CHECK(Plan::drivesRenderSize(id));
@@ -998,7 +1039,8 @@ namespace
         const IdSet transient = in_packs({ Pack::Main, Pack::Probe, Pack::Hero },
                                          { Slot::Light, Slot::PostPing, Slot::PostPong, Slot::Water, Slot::DepthCopy }) |
                                 bloom({ Pack::Main, Pack::Probe, Pack::Hero }) |
-                                of({ Id::SMAAEdges, Id::SMAABlend, Id::Glow0, Id::Glow1, Id::Glow2, Id::SkyBehind });
+                                of({ Id::SMAAEdges, Id::SMAABlend, Id::Glow0, Id::Glow1, Id::Glow2, Id::SkyBehind,
+                                     Id::MainLightBlurred });
         CHECK(names(Plan::idsWhere(Plan::isTransient)) == names(transient));
 
         // What holds anything across frames, or between the phases of one, is built to keep.
@@ -1066,10 +1108,15 @@ namespace
             LLRenderTarget* light   = nullptr;
             LLRenderTarget* scratch = nullptr;
             {
-                // renderDeferredLighting: the light map, and SSAO's blur through a scratch of its description.
+                // renderDeferredLighting: the light map, and SSAO's blur, by one dispatch into the blurred light map
+                // the soften pass reads, or without compute through a scratch of the light map's description.
                 ALTransientTargets lighting(pool);
                 light = plan.wants(Id::MainLight) ? acquire(lighting, Id::MainLight) : nullptr;
-                if (light && in.mSSAO)
+                if (light && plan.wants(Id::MainLightBlurred))
+                {
+                    acquire(lighting, Id::MainLightBlurred);
+                }
+                else if (light && in.mSSAO)
                 {
                     scratch = acquire(lighting, Id::MainLight, "main.light.scratch");
                     lighting.release(scratch);
@@ -1130,7 +1177,8 @@ namespace
         set.mTargets = pool.stats().mTargets;
         set.mPersistent = LLRenderTarget::bytesFor(*plan.desc(Id::MainGBuffer)) + LLRenderTarget::bytesFor(*plan.desc(Id::MainScreen));
         set.mOneEach    = set.mPersistent;
-        for (Id id : { Id::MainLight, Id::MainWater, Id::MainDepthCopy, Id::MainPostPing, Id::MainPostPong, Id::SkyBehind })
+        for (Id id : { Id::MainLight, Id::MainLightBlurred, Id::MainWater, Id::MainDepthCopy, Id::MainPostPing,
+                       Id::MainPostPong, Id::SkyBehind })
         {
             set.mOneEach += plan.wants(id) ? LLRenderTarget::bytesFor(*plan.desc(id)) : 0;
         }
@@ -1157,16 +1205,26 @@ namespace
         UNSCOPED_INFO("a frame finds what it needs where the last one left it");
         CHECK(set.mLastMisses == 0);
 
-        // The light map's description twice over (the light map and SSAO's scratch through the lighting), the depth
-        // copy, bloom mip 0 with the water's copy and mips 2 to 4, mip 1 with the sky behind, and the post chain's
-        // first: 16 + 4 + 4 + 1 + 0.33 + 4 B/px.
+        // The light map, SSAO's blurred light map, the depth copy, bloom mip 0 with the water's copy and mips 2 to
+        // 4, mip 1 with the sky behind, and the post chain's first: 8 + 4 + 4 + 4 + 1 + 0.33 + 4 B/px.
         CHECK(set.mTargets == 9);
-        CHECK(set.mPooled == 108115200);
-        // Each its own target, as each was: 66.3 B/px, 233.2 MiB.
-        CHECK(set.mOneEach == 244512000);
-        CHECK(set.mPersistent + set.mPooled == 240825600); // 229.7 MiB
+        CHECK(set.mPooled == 93369600);
+        // Each its own target, as each was: 70.3 B/px, 247.3 MiB.
+        CHECK(set.mOneEach == 259257600);
+        CHECK(set.mPersistent + set.mPooled == 226080000); // 215.6 MiB
 
-        // Without SSAO the lighting needs one target of the light map's description, not two.
+        // Without compute, the fragment passes blur through a scratch of the light map's description: two of it
+        // through the lighting, 16 B/px where the dispatch takes 12.
+        Inputs fragment  = defaults();
+        fragment.mCompute = false;
+        const WorkingSet passes = main_view_frame(fragment);
+        CHECK(passes.mWaterIsBloom);
+        CHECK(passes.mSkyBehindIsBloom);
+        CHECK(passes.mTargets == 9);
+        CHECK(passes.mOneEach == 244512000); // 233.2 MiB
+        CHECK(passes.mPersistent + passes.mPooled == 240825600); // 229.7 MiB
+
+        // Without SSAO the lighting needs one target of the light map's description, and no blurred one.
         Inputs no_ssao = defaults();
         no_ssao.mSSAO  = false;
         const WorkingSet without = main_view_frame(no_ssao);
@@ -1195,7 +1253,7 @@ namespace
         CHECK(on.mTargets == off.mTargets + 1);
         // 1792x1008 of R11F_G11F_B10F.
         CHECK(on.mPooled - off.mPooled == 7225344);
-        CHECK(on.mPersistent + on.mPooled == 248050944); // 236.6 MiB
+        CHECK(on.mPersistent + on.mPooled == 233305344); // 222.5 MiB
     }
 
     TEST_CASE("alrenderresourceplan: every resource has its own debugger label", "[alrenderresourceplan]")

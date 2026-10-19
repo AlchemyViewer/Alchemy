@@ -669,6 +669,10 @@ public:
         DEPTH_PYRAMID_SIZE,                 //  "depthPyramidSize"  ivec4, the depth's size in pixels (xy) and the pyramid's levels (z)
         DEPTH_PYRAMID_COUNT,                //  "depthPyramidCount"  int, the levels a build dispatch writes
 
+        // The light map's ambient occlusion blur in one dispatch (ALLightMapBlur)
+        BLUR_LIGHT_APRON,                   //  "blur_light_apron"  int, the rows above and below a tile its taps down reach
+        BLUR_LIGHT_TARGET,                  //  "blurLightTarget"  image2D, the sun's shadow and the blurred occlusion
+
         // The waves' patches
         WATER_OCCLUSION,                    //  "waterOcclusion"  int, whether the control stage culls against the depth pyramid
         WATER_PATCH_ORDER,                  //  "waterPatchOrder"  ivec4, the order the patches are drawn in
