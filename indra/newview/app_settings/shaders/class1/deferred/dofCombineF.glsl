@@ -44,11 +44,21 @@ in vec2 vary_fragcoord;
 // The circle of confusion at a point of the scene (dofCoFUtilF.glsl).
 float dofCoF(vec2 tc);
 
+// The blur carries sqrt(colour) under DOF_SQRT_ENCODED; see postDeferredF.glsl.
+vec3 dofDecode(vec3 c)
+{
+#ifdef DOF_SQRT_ENCODED
+    return c * c;
+#else
+    return c;
+#endif
+}
+
 void main()
 {
     vec2 tc = vary_fragcoord.xy;
 
-    vec4 dof = texture(diffuseRect, tc);
+    vec3 dof = dofDecode(texture(diffuseRect, tc).rgb);
 
     vec4 sharp = texture(lightMap, tc);
     vec3 diff  = sharp.rgb;
@@ -74,5 +84,5 @@ void main()
     }
 
     // The scene's alpha as it was: it carries the legacy prim-glow tag, which the passes after this one read.
-    frag_color = vec4(mix(diff, dof.rgb, a), sharp.a);
+    frag_color = vec4(mix(diff, dof, a), sharp.a);
 }

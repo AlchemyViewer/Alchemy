@@ -10263,7 +10263,9 @@ LLRenderTarget* LLPipeline::renderDoF(ALTransientTargets& scope)
             // The blur runs at CameraDoFResScale of the screen, in a target of
             // exactly that size, for the effect alone: in bloom mip 0's format
             // under HDR, R11F_G11F_B10F (RGBA16F with halation), and the post
-            // chain's without. It carries no alpha.
+            // chain's RGBA8 without, which the gather fills with sqrt(colour)
+            // (DOF_SQRT_ENCODED), since 8-bit linear bands near black. It
+            // carries no alpha.
             const bool hdr = hdrEnabled();
             const std::optional<ALRenderTargetDesc>& blur_like =
                 mResourcePlan.desc(hdr ? ALRenderResourcePlan::bloomMip(ALRenderResourcePlan::Pack::Main, 0)

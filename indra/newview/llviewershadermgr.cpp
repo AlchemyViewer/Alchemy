@@ -2993,6 +2993,10 @@ void LLViewerShaderMgr::loadShadersDeferred()
         }
     }
 
+    // Without HDR, LLPipeline::renderDoF's blur is in the post chain's RGBA8, so the gather and combine programs keep it
+    // square-root encoded.
+    const bool dof_sqrt_encoded = !mInputs.mLocal.mHDR;
+
     {
         // Four DoF gather variants across two orthogonal axes. Both are value
         // tests in the shader, so the "off" build defines the symbol as "0"
@@ -3026,6 +3030,10 @@ void LLViewerShaderMgr::loadShadersDeferred()
             variant.shader->clearPermutations();
             variant.shader->addPermutation("FRONT_BLUR", variant.front_blur);
             variant.shader->addPermutation("DOF_SHAPED", variant.dof_shaped);
+            if (dof_sqrt_encoded)
+            {
+                variant.shader->addPermutation("DOF_SQRT_ENCODED", "1");
+            }
 
             built(variant.shader->createShader(), *variant.shader);
         }
@@ -3041,6 +3049,10 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDoFCombineProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredDoFCombineProgram.clearPermutations();
         gDeferredDoFCombineProgram.addPermutation("FRONT_BLUR", "1");
+        if (dof_sqrt_encoded)
+        {
+            gDeferredDoFCombineProgram.addPermutation("DOF_SQRT_ENCODED", "1");
+        }
         built(gDeferredDoFCombineProgram.createShader(), gDeferredDoFCombineProgram);
     }
 
@@ -3054,6 +3066,10 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDoFCombineProgramNoNear.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredDoFCombineProgramNoNear.clearPermutations();
         gDeferredDoFCombineProgramNoNear.addPermutation("FRONT_BLUR", "0");
+        if (dof_sqrt_encoded)
+        {
+            gDeferredDoFCombineProgramNoNear.addPermutation("DOF_SQRT_ENCODED", "1");
+        }
         built(gDeferredDoFCombineProgramNoNear.createShader(), gDeferredDoFCombineProgramNoNear);
     }
 

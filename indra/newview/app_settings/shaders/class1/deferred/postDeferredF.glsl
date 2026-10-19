@@ -278,6 +278,17 @@ void dofSampleNear(inout vec4 diff, inout float w, vec2 tc, float radius_norm, f
     dofAccumulate(diff, w, texture(diffuseRect, tc), radius_norm, cof_sign, shape_w);
 }
 
+// Without HDR the blur's target is in the post chain's RGBA8 (LLPipeline::renderDoF), which holds linear light too
+// coarsely near black, so under DOF_SQRT_ENCODED it carries sqrt(colour) and dofCombineF squares it back.
+vec4 dofEncode(vec4 c)
+{
+#ifdef DOF_SQRT_ENCODED
+    return vec4(sqrt(max(c.rgb, vec3(0.0))), c.a);
+#else
+    return c;
+#endif
+}
+
 vec3 clampHDRRange(vec3 color);
 
 void main()
@@ -537,5 +548,5 @@ void main()
     }
 
     diff.rgb = clampHDRRange(diff.rgb);
-    frag_color = diff;
+    frag_color = dofEncode(diff);
 }
