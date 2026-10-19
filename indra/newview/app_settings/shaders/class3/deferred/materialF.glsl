@@ -69,7 +69,7 @@ float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 out vec4 frag_color;
 
 #ifdef HAS_SUN_SHADOW
-float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
+float sampleDirectionalShadowGrad(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy);
 #endif
 
 void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout vec3 legacyenv,
@@ -205,11 +205,12 @@ float getEmissive(vec4 diffcol)
 #endif
 }
 
-float getShadow(vec3 pos, vec3 norm)
+// dpos_dx and dpos_dy are pos's, taken before the discards main may take.
+float getShadow(vec3 pos, vec3 norm, vec3 dpos_dx, vec3 dpos_dy)
 {
 #ifdef HAS_SUN_SHADOW
     #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
-        return sampleDirectionalShadow(pos, norm, gl_FragCoord.xy / screen_res); // screen position, as alphaF passes: it seeds the PCSS rotation
+        return sampleDirectionalShadowGrad(pos, norm, gl_FragCoord.xy / screen_res, dpos_dx, dpos_dy); // screen position, as alphaF passes: it seeds the PCSS rotation
     #else
         return 1.0;
     #endif
@@ -220,6 +221,10 @@ float getShadow(vec3 pos, vec3 norm)
 
 void main()
 {
+    // Before every discard below, for the shadow's receiver-plane bias (getShadow).
+    vec3 dpos_dx = dFdx(vary_position);
+    vec3 dpos_dy = dFdy(vary_position);
+
     mirrorClip(vary_position);
     applyWaterClip();
 
@@ -267,7 +272,7 @@ void main()
 
     vec3 pos = vary_position;
 
-    float shadow = getShadow(pos, norm);
+    float shadow = getShadow(pos, norm, dpos_dx, dpos_dy);
 
     vec4 diffuse = diffcol;
 

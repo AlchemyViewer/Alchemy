@@ -97,7 +97,7 @@ vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
-float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
+float sampleDirectionalShadowGrad(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy);
 void sampleReflectionProbes(inout vec3 ambenv, inout vec3 glossenv,
         vec2 tc, vec3 pos, vec3 norm, float glossiness, bool transparent, vec3 amblit_linear);
 
@@ -140,6 +140,12 @@ vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
 
 void main()
 {
+#ifdef HAS_SUN_SHADOW
+    // Before every discard below, for the shadow's receiver-plane bias.
+    vec3 dpos_dx = dFdx(vary_position);
+    vec3 dpos_dy = dFdy(vary_position);
+#endif
+
     mirrorClip(vary_position);
 
     vec3 color = vec3(0,0,0);
@@ -229,7 +235,7 @@ void main()
     vec2 frag = vary_fragcoord.xy/vary_fragcoord.z*0.5+0.5;
 
 #ifdef HAS_SUN_SHADOW
-    scol = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
+    scol = sampleDirectionalShadowGrad(pos.xyz, norm.xyz, frag, dpos_dx, dpos_dy);
 #endif
 
     // PBR IBL

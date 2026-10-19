@@ -80,7 +80,7 @@ vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 
 #ifdef HAS_SUN_SHADOW
-float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
+float sampleDirectionalShadowGrad(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy);
 #endif
 
 float getAmbientClamp();
@@ -100,6 +100,12 @@ vec3 calcLegacyPointLightDiffuse(vec3 diffuse,
 
 void main()
 {
+#ifdef HAS_SUN_SHADOW
+    // Before every discard below, for the shadow's receiver-plane bias.
+    vec3 dpos_dx = dFdx(vary_position);
+    vec3 dpos_dy = dFdy(vary_position);
+#endif
+
     mirrorClip(vary_position);
 
     vec2 frag = vary_fragcoord.xy/vary_fragcoord.z*0.5+0.5;
@@ -196,7 +202,7 @@ void main()
     float shadow = 1.0f;
 
 #ifdef HAS_SUN_SHADOW
-    shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
+    shadow = sampleDirectionalShadowGrad(pos.xyz, norm.xyz, frag, dpos_dx, dpos_dy);
 #endif
 
     vec3 sunlit;

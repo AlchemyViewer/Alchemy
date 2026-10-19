@@ -598,6 +598,18 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 #endif
 }
 
+// sampleDirectionalShadow for a caller that took pos's derivatives itself, before a discard only
+// some of its quad's pixels take: after one, GLSL leaves the derivatives the shadow would take
+// undefined for the pixels that survive it.
+float sampleDirectionalShadowGrad(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy)
+{
+#if defined(SUN_SHADOW)
+    return directionalShadow(pos, norm, pos_screen, dpos_dx, dpos_dy);
+#else
+    return 1.0;
+#endif
+}
+
 #if defined(SPOT_SHADOW)
 // Spot map `index` for a receiver whose derivatives the caller took in uniform control flow.
 // With frustum_lit, a receiver the map's frustum does not hold (outside its unit square, or
@@ -672,8 +684,9 @@ float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
 
 // The sun pass's (sunLightF, sunLightSSAOF), which fills the light map the deferred lights read:
 // each takes its derivatives as the shared samplers do, then leaves out the filter where no
-// reader of the map uses what it would give. The forward passes read sampleDirectionalShadow's
-// raw value and keep it; no pass reads sampleSpotShadow's now, which shadowutil_gl_test checks.
+// reader of the map uses what it would give. The forward passes read the directional shadow's
+// raw value (sampleDirectionalShadowGrad, or sampleDirectionalShadow on the water) and keep it; no
+// pass reads sampleSpotShadow's now, which shadowutil_gl_test checks.
 
 // Set by the sun pass: 1 for each spot shadow map a shadowing spot light (mShadowSpotLight) owns.
 // No spot light reads the other's channel.
