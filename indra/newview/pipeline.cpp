@@ -792,8 +792,8 @@ void LLPipeline::markRenderInputsDirty(ALRenderInputRequests::Change change)
 
 void LLPipeline::applyRenderInputs()
 {
-    // A frame starts here, with every transient target the last one acquired back in the pool. RenderDebugGL poisons
-    // each as it is released, and names each for whoever acquires it.
+    // A frame starts here, with every transient target the last one acquired back in the pool. Debug GL poisons each
+    // as it is released, and names each for whoever acquires it.
     mTransientTargets.setValidation(gDebugGL);
     mTransientTargets.beginFrame();
     if (mTransientTargets.namesRecorded())

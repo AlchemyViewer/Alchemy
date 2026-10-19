@@ -140,8 +140,8 @@ public:
 
     // Whatever frees a target frees with it the targets that share its depth: their framebuffers attach it.
 
-    /// Poison each target as it is released, and name each for whoever acquires it, not only whoever built it. The
-    /// viewer's RenderDebugGL.
+    /// Poison each target as it is released, and name each for whoever acquires it, not only whoever built it: the
+    /// viewer asks for it under debug GL (gDebugGL, from RenderDebugGLSession or DebugSession).
     void setValidation(bool validation) { mValidation = validation; }
     bool validation() const { return mValidation; }
 
