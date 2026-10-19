@@ -444,7 +444,7 @@ bool ALRenderResourcePlan::isTransient(Id id)
         }
         return slot == Slot::Light || slot == Slot::Water || slot == Slot::DepthCopy || slot >= Slot::Bloom0;
     }
-    return false;
+    return id == Id::SMAAEdges || id == Id::SMAABlend;
 }
 
 // static

@@ -319,8 +319,15 @@ public:
     void compositeBloomHDR(LLRenderTarget* scene, const Bloom& bloom);
     void applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
     void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
-    void generateSMAABuffers(LLRenderTarget* src);
-    void applySMAA(LLRenderTarget* src, LLRenderTarget* dst);
+    // SMAA's edges and blend weights for one frame, held by the scope generateSMAABuffers was given; neither where it
+    // drew none.
+    struct SMAATargets
+    {
+        LLRenderTarget* mEdges = nullptr;
+        LLRenderTarget* mBlend = nullptr;
+    };
+    SMAATargets generateSMAABuffers(LLRenderTarget* src, ALTransientTargets& scope);
+    void applySMAA(LLRenderTarget* src, LLRenderTarget* dst, const SMAATargets& smaa);
     // Operates in place on mRT->screen: the combine writes colour back under a
     // mask that leaves the prim-glow alpha untouched, so callers neither pass
     // buffers nor swap afterwards.
@@ -1060,8 +1067,10 @@ public:
 
     // A target of the description the plan gives @a id, from @a scope, named @a name or else as the plan names it: the
     // transient resource itself, or scratch in a resource's description. Null where the plan wants none, or none can be
-    // built. One sharing a persistent resource's depth is attached to it.
-    LLRenderTarget* acquireResource(ALTransientTargets& scope, ALRenderResourcePlan::Id id, std::string_view name = {});
+    // built. One sharing a persistent resource's depth is attached to it; one sharing a transient resource's, to
+    // @a depth_from, the target the caller acquired for it.
+    LLRenderTarget* acquireResource(ALTransientTargets& scope, ALRenderResourcePlan::Id id, std::string_view name = {},
+                                    LLRenderTarget* depth_from = nullptr);
 
     // The light map of the view whose deferred lighting is running, which bindDeferredShader binds where it is given
     // none; null outside that lighting, where a program reading it reads white.
@@ -1088,10 +1097,6 @@ public:
     LLRenderTarget          mLensFlareState[2];
     bool                    mLensFlareStateValid = false;
     bool                    mLensFlareSunUp = true;    // which body the history describes
-
-    // SMAA's intermediates: its edges and its blend weights
-    LLRenderTarget          mSMAAEdgeMap;
-    LLRenderTarget          mSMAABlendBuffer;
 
     // downres scratch space for GPU downscaling of textures
     LLRenderTarget          mDownResMap;

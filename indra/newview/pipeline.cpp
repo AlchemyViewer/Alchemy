@@ -934,8 +934,6 @@ LLRenderTarget* LLPipeline::resourceTarget(ALRenderResourcePlan::Id id)
     {
         case Id::SpotShadow0:       return &mSpotShadow[0];
         case Id::SpotShadow1:       return &mSpotShadow[1];
-        case Id::SMAAEdges:         return &mSMAAEdgeMap;
-        case Id::SMAABlend:         return &mSMAABlendBuffer;
         case Id::SkyBehind:         return &mSkyBehind;
         case Id::SSRScene:          return &mSceneMap;
         case Id::Glow0:             return &mGlow[0];
@@ -1115,7 +1113,8 @@ void LLPipeline::prewarmTransients(const ALRenderResourcePlan& plan, const ALRen
     }
 }
 
-LLRenderTarget* LLPipeline::acquireResource(ALTransientTargets& scope, ALRenderResourcePlan::Id id, std::string_view name)
+LLRenderTarget* LLPipeline::acquireResource(ALTransientTargets& scope, ALRenderResourcePlan::Id id, std::string_view name,
+                                            LLRenderTarget* depth_from)
 {
     const ALRenderResourcePlan::Resource& resource = mResourcePlan[id];
     if (!resource.mDesc)
@@ -1130,7 +1129,8 @@ LLRenderTarget* LLPipeline::acquireResource(ALTransientTargets& scope, ALRenderR
     {
         return scope.acquire(*resource.mDesc, name);
     }
-    LLRenderTarget* owner = resourceTarget(*resource.mDepthFrom);
+    LLRenderTarget* owner = ALRenderResourcePlan::isTransient(*resource.mDepthFrom) ? depth_from
+                                                                                     : resourceTarget(*resource.mDepthFrom);
     return owner ? scope.acquire(*resource.mDesc, *owner, name) : nullptr;
 }
 
@@ -9929,10 +9929,20 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
     }
 }
 
-void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
+LLPipeline::SMAATargets LLPipeline::generateSMAABuffers(LLRenderTarget* src, ALTransientTargets& scope)
 {
     llassert(!gCubeSnapshot);
-    bool multisample = mResourceInputs.mFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mSMAAEdgeMap.isComplete() && mSMAABlendBuffer.isComplete();
+    SMAATargets smaa;
+    if (mResourceInputs.mFSAAType != 2 || !gSMAAEdgeDetectProgram[0].isComplete())
+    {
+        return smaa;
+    }
+
+    // Both from the caller's scope until the neighbourhood blend has read the weights, the weights over the edges'
+    // stencil where the plan shares it. Each is cleared below before it is drawn.
+    smaa.mEdges = acquireResource(scope, ALRenderResourcePlan::Id::SMAAEdges);
+    smaa.mBlend = smaa.mEdges ? acquireResource(scope, ALRenderResourcePlan::Id::SMAABlend, {}, smaa.mEdges) : nullptr;
+    const bool multisample = smaa.mEdges && smaa.mBlend;
 
     // Present everything.
     if (multisample)
@@ -9951,11 +9961,11 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
         static LLCachedControl<bool> use_sample(gSavedSettings, "RenderSMAAUseSample", false);
         const bool use_predication = shaderInputs().mLocal.mSMAAPredication;
         // Stencil optimization requires all three passes to share the same stencil attachment.
-        bool use_stencil = mResourceInputs.mSMAAStencil && mSMAAEdgeMap.hasStencil() && mSMAABlendBuffer.hasStencil();
+        bool use_stencil = mResourceInputs.mSMAAStencil && smaa.mEdges->hasStencil() && smaa.mBlend->hasStencil();
         LLGLState stencil(GL_STENCIL_TEST, use_stencil);
         {
             // Bind setup:
-            LLRenderTarget& dest = mSMAAEdgeMap;
+            LLRenderTarget& dest = *smaa.mEdges;
             LLGLSLShader& edge_shader = gSMAAEdgeDetectProgram[fsaa_quality];
 
             dest.bindTarget();
@@ -10021,7 +10031,7 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
 
         {
             // Bind setup:
-            LLRenderTarget& dest = mSMAABlendBuffer;
+            LLRenderTarget& dest = *smaa.mBlend;
             LLGLSLShader& blend_weights_shader = gSMAABlendWeightsProgram[fsaa_quality];
 
             dest.bindTarget();
@@ -10034,7 +10044,7 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
             S32 edge_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_EDGE_TEX);
             if (edge_tex_channel > -1)
             {
-                mSMAAEdgeMap.bindTexture(0, edge_tex_channel, ALSamplers::BilinearClamp);
+                smaa.mEdges->bindTexture(0, edge_tex_channel, ALSamplers::BilinearClamp);
             }
             S32 area_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_AREA_TEX);
             if (area_tex_channel > -1)
@@ -10068,13 +10078,14 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
             gGL.getTextureSlot(search_tex_channel)->unbindFast();
         }
     }
+    return multisample ? smaa : SMAATargets{};
 }
 
-void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst)
+void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst, const SMAATargets& smaa)
 {
     LL_PROFILE_GPU_ZONE("SMAA");
     llassert(!gCubeSnapshot);
-    bool multisample = mResourceInputs.mFSAAType == 2 && gSMAAEdgeDetectProgram[0].isComplete() && mSMAAEdgeMap.isComplete() && mSMAABlendBuffer.isComplete();
+    const bool multisample = smaa.mBlend != nullptr;
 
     // Present everything.
     if (multisample)
@@ -10111,7 +10122,7 @@ void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst)
             S32 blend_channel = blend_shader.enableTexture(LLShaderMgr::SMAA_BLEND_TEX);
             if (blend_channel > -1)
             {
-                mSMAABlendBuffer.bindTexture(0, blend_channel, ALSamplers::BilinearMirror);
+                smaa.mBlend->bindTexture(0, blend_channel, ALSamplers::BilinearMirror);
             }
 
             mScreenTriangleVB->setBuffer();
@@ -10665,6 +10676,7 @@ void LLPipeline::renderFinalize()
 
     LLRenderTarget* sourceBuffer = chain ? post_ping : &mRT->screen;
     LLRenderTarget* targetBuffer = post_pong;
+    SMAATargets     smaa;
 
     // Anti-aliasing and sharpening both spread past a pixel, so a cutout
     // frame skips them (see above).
@@ -10675,8 +10687,8 @@ void LLPipeline::renderFinalize()
     }
     else if (mResourceInputs.mFSAAType == 2 && !cutout && chain)
     {
-        generateSMAABuffers(sourceBuffer);
-        applySMAA(sourceBuffer, targetBuffer);
+        smaa = generateSMAABuffers(sourceBuffer, post);
+        applySMAA(sourceBuffer, targetBuffer, smaa);
         std::swap(sourceBuffer, targetBuffer);
     }
 
@@ -10723,17 +10735,17 @@ void LLPipeline::renderFinalize()
             break;
         case 5:
         {
-            if (mResourceInputs.mFSAAType == 2)
+            if (smaa.mEdges)
             {
-                visualizeBuffers(&mSMAAEdgeMap, sourceBuffer, 0);
+                visualizeBuffers(smaa.mEdges, sourceBuffer, 0);
             }
             break;
         }
         case 6:
         {
-            if (mResourceInputs.mFSAAType == 2)
+            if (smaa.mBlend)
             {
-                visualizeBuffers(&mSMAABlendBuffer, sourceBuffer, 0);
+                visualizeBuffers(smaa.mBlend, sourceBuffer, 0);
             }
             break;
         }
