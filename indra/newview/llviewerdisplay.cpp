@@ -785,6 +785,12 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         { //depth buffer is invalid, don't overwrite occlusion state
             LLPipeline::sUseOcclusion = llmin(occlusion, 1);
         }
+        // The queries draw through gOcclusionCubeProgram. One that did not build would draw them through the stand-in,
+        // which passes no sample, so that every group queried read as occluded: the frame culls by no occlusion.
+        if (!gOcclusionCubeProgram.isComplete())
+        {
+            LLPipeline::sUseOcclusion = 0;
+        }
         gDepthDirty = false;
 
         LLGLState::checkStates();
