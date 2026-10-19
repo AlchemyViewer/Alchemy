@@ -10553,7 +10553,11 @@ LLRenderTarget* LLPipeline::renderDoF(ALTransientTargets& scope)
                 out->bindTarget();
 
                 combine_program.bind();
-                combine_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, blur, ALSamplers::PointMirror);
+                // The blur is smaller than the screen (CameraDoFResScale), so it
+                // is upsampled filtered: point sampling repeats its texels in an
+                // irregular pattern that shimmers as the CoF moves. Its target is
+                // exactly its size, so the edge clamp keeps every tap inside it.
+                combine_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, blur, ALSamplers::BilinearClamp);
                 combine_program.bindTexture(LLShaderMgr::DEFERRED_LIGHT, &mRT->screen, ALSamplers::PointMirror);
                 set_cof_uniforms(combine_program);
                 combine_program.uniform1f(LLShaderMgr::DOF_RES_SCALE, res_scale);

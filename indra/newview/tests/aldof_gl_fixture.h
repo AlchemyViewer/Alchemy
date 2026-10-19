@@ -80,9 +80,37 @@ uniform vec2 screen_res;
 uniform float max_cof;
 uniform float res_scale;
 in vec2 vary_fragcoord;
+// dofCombineF's dofBlur, the near field told from the sharp copy's circle.
+vec3 refBlur(vec2 tc)
+{
+#if FRONT_BLUR
+    return textureLod(diffuseRect, tc, 0.0).rgb;
+#else
+    vec2  size = vec2(textureSize(diffuseRect, 0));
+    vec2  p    = tc * size - 0.5;
+    vec2  f    = fract(p);
+    ivec2 i0   = ivec2(floor(p));
+    ivec2 hi   = ivec2(size) - 1;
+    ivec2 t[4] = ivec2[4](i0, i0 + ivec2(1, 0), i0 + ivec2(0, 1), i0 + ivec2(1, 1));
+    float w[4] = float[4]((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
+    vec3  sum      = vec3(0.0);
+    float sum_w    = 0.0;
+    vec3  filtered = vec3(0.0);
+    for (int k = 0; k < 4; ++k)
+    {
+        ivec2 c = clamp(t[k], ivec2(0), hi);
+        vec3  v = texelFetch(diffuseRect, c, 0).rgb;
+        filtered += v * w[k];
+        float wk = (texture(lightMap, (vec2(c) + 0.5) / size).a > 0.0) ? 0.0 : w[k];
+        sum   += v * wk;
+        sum_w += wk;
+    }
+    return (sum_w > 0.0) ? sum / sum_w : filtered;
+#endif
+}
 void main()
 {
-    vec4 dof = texture(diffuseRect, vary_fragcoord.xy);
+    vec4 dof = vec4(refBlur(vary_fragcoord.xy), 0.0);
     vec4 diff = texture(lightMap, vary_fragcoord.xy);
 #if FRONT_BLUR
     float a = min(abs(diff.a) * res_scale*res_scale, 1.0);
