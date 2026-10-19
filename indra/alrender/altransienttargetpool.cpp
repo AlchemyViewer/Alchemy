@@ -75,19 +75,17 @@ namespace
                 {
                     glClearTexImage(target.getDepth(), 0, GL_DEPTH_COMPONENT, GL_FLOAT, &Pool::POISON_DEPTH);
                 }
-                else if (depth && desc.depth == ALRenderTargetDesc::Depth::D32F)
+                else if (depth)
                 {
+                    // Given as a float depth and a stencil byte for D24S8 as for D32F_S8: AMD's driver writes the
+                    // 24-bit integer of GL_UNSIGNED_INT_24_8 into the depth without normalising it, and drops the
+                    // stencil.
                     const struct
                     {
                         F32 depth;
                         U32 stencil;
                     } value{ Pool::POISON_DEPTH, Pool::POISON_STENCIL };
                     glClearTexImage(target.getDepth(), 0, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, &value);
-                }
-                else if (depth)
-                {
-                    const U32 value = ((U32)(Pool::POISON_DEPTH * 0xffffff) << 8) | Pool::POISON_STENCIL;
-                    glClearTexImage(target.getDepth(), 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, &value);
                 }
                 return;
             }
