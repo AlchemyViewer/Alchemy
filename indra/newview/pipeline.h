@@ -319,8 +319,10 @@ public:
     bool bloomHDRReady() const;
     Bloom generateBloomHDR(LLRenderTarget* src, ALTransientTargets& scope);
     void compositeBloomHDR(LLRenderTarget* scene, const Bloom& bloom);
-    void applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
-    void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
+    // The post chain's passes after colorCorrect: each draws @a src into @a dst and returns true, or draws nothing and
+    // returns false where it has nothing to draw with, so the caller goes on reading @a src.
+    bool applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
+    bool applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
     // SMAA's edges and blend weights for one frame, held by the scope generateSMAABuffers was given; neither where it
     // drew none.
     struct SMAATargets
@@ -329,12 +331,11 @@ public:
         LLRenderTarget* mBlend = nullptr;
     };
     SMAATargets generateSMAABuffers(LLRenderTarget* src, ALTransientTargets& scope);
-    void applySMAA(LLRenderTarget* src, LLRenderTarget* dst, const SMAATargets& smaa);
+    bool applySMAA(LLRenderTarget* src, LLRenderTarget* dst, const SMAATargets& smaa);
     // Operates in place on mRT->screen: the combine writes colour back under a
     // mask that leaves the prim-glow alpha untouched, so callers neither pass
     // buffers nor swap afterwards.
     void renderDoF();
-    void copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst);
     void combineGlow(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* glow);
     void visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex);
 

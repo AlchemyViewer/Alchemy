@@ -9870,14 +9870,13 @@ void LLPipeline::compositeBloomHDR(LLRenderTarget* scene, const Bloom& bloom)
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 }
 
-void LLPipeline::applyCAS(LLRenderTarget* src, LLRenderTarget* dst)
+bool LLPipeline::applyCAS(LLRenderTarget* src, LLRenderTarget* dst)
 {
     static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
     LL_PROFILE_GPU_ZONE("cas");
     if (cas_sharpness == 0.0f || !gCASProgram.isComplete())
     {
-        gPipeline.copyRenderTarget(src, dst);
-        return;
+        return false;
     }
 
     // Bind setup:
@@ -9908,17 +9907,20 @@ void LLPipeline::applyCAS(LLRenderTarget* src, LLRenderTarget* dst)
     gCASProgram.unbind();
 
     dst->flush();
+    return true;
 }
 
-void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
+bool LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
 {
     LL_PROFILE_GPU_ZONE("FXAA");
     {
         llassert(!gCubeSnapshot);
         bool multisample = mResourceInputs.mFSAAType == 1 && gFXAAProgram[0].isComplete();
+        if (!multisample)
+        {
+            return false;
+        }
 
-        // Present everything.
-        if (multisample)
         {
             LL_PROFILE_GPU_ZONE("aa");
             S32 width = dst->getWidth();
@@ -9966,10 +9968,8 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
             shader->unbind();
             dst->flush();
         }
-        else {
-            copyRenderTarget(src, dst);
-        }
     }
+    return true;
 }
 
 LLPipeline::SMAATargets LLPipeline::generateSMAABuffers(LLRenderTarget* src, ALTransientTargets& scope)
@@ -10124,14 +10124,15 @@ LLPipeline::SMAATargets LLPipeline::generateSMAABuffers(LLRenderTarget* src, ALT
     return multisample ? smaa : SMAATargets{};
 }
 
-void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst, const SMAATargets& smaa)
+bool LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst, const SMAATargets& smaa)
 {
     LL_PROFILE_GPU_ZONE("SMAA");
     llassert(!gCubeSnapshot);
-    const bool multisample = smaa.mBlend != nullptr;
+    if (!smaa.mBlend)
+    {
+        return false;
+    }
 
-    // Present everything.
-    if (multisample)
     {
         static LLCachedControl<U32> aa_quality(gSavedSettings, "RenderFSAASamples", 0U);
         U32 fsaa_quality = std::clamp(aa_quality(), 0U, 3U);
@@ -10177,31 +10178,7 @@ void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst, const SMAAT
             gGL.getTextureSlot(blend_channel)->unbindFast();
         }
     }
-    else
-    {
-        copyRenderTarget(src, dst);
-    }
-}
-
-void LLPipeline::copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst)
-{
-
-    LL_PROFILE_GPU_ZONE("copyRenderTarget");
-    dst->bindTarget();
-
-    gDeferredPostNoDoFProgram.bind();
-
-    gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src);
-    gDeferredPostNoDoFProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen);
-
-    {
-        mScreenTriangleVB->setBuffer();
-        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-    }
-
-    gDeferredPostNoDoFProgram.unbind();
-
-    dst->flush();
+    return true;
 }
 
 void LLPipeline::combineGlow(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* glow)
@@ -10719,23 +10696,26 @@ void LLPipeline::renderFinalize()
     SMAATargets     smaa;
 
     // Anti-aliasing and sharpening both spread past a pixel, so a cutout
-    // frame skips them (see above).
+    // frame skips them (see above). A pass that draws nothing leaves the frame
+    // where it was, and the next reads it there.
     if (mResourceInputs.mFSAAType == 1 && !cutout && chain)
     {
-        applyFXAA(sourceBuffer, targetBuffer);
-        std::swap(sourceBuffer, targetBuffer);
+        if (applyFXAA(sourceBuffer, targetBuffer))
+        {
+            std::swap(sourceBuffer, targetBuffer);
+        }
     }
     else if (mResourceInputs.mFSAAType == 2 && !cutout && chain)
     {
         smaa = generateSMAABuffers(sourceBuffer, post);
-        applySMAA(sourceBuffer, targetBuffer, smaa);
-        std::swap(sourceBuffer, targetBuffer);
+        if (applySMAA(sourceBuffer, targetBuffer, smaa))
+        {
+            std::swap(sourceBuffer, targetBuffer);
+        }
     }
 
-    static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
-    if (cas_sharpness > 0.0f && gCASProgram.isComplete() && !cutout && chain)
+    if (!cutout && chain && applyCAS(sourceBuffer, targetBuffer))
     {
-        applyCAS(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
 
