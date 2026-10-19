@@ -10712,7 +10712,9 @@ void LLPipeline::renderFinalize()
         std::swap(sourceBuffer, targetBuffer);
     }
 
-    if (glow)
+    // The other target is the pool's, its contents undefined until a pass writes it: a pass whose program did not build
+    // draws nothing into it, and the frame stays where it is rather than going out as that target holds it.
+    if (glow && gGlowCombineProgram.isComplete())
     {
         combineGlow(sourceBuffer, targetBuffer, glow);
         std::swap(sourceBuffer, targetBuffer);
@@ -10725,7 +10727,7 @@ void LLPipeline::renderFinalize()
     glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
 
 // [RLVa:KB] - @setsphere
-    if (chain && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))
+    if (chain && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE) && gRlvSphereProgram.isComplete())
     {
         LLShaderEffectParams params(sourceBuffer, targetBuffer, false);
         LLVfxManager::instance().runEffect(EVisualEffect::RlvSphere, &params);
