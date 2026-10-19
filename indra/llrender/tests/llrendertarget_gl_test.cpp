@@ -28,6 +28,7 @@
 #include "../llgl.h"
 #include "../llglheaders.h"
 #include "../llglstates.h"
+#include "../llgltexture.h"
 #include "../llimagegl.h"
 #include "../llrendertarget.h"
 
@@ -321,6 +322,53 @@ namespace
             bool mWas = gDebugGL;
             DebugGLScope() { gDebugGL = true; }
             ~DebugGLScope() { gDebugGL = mWas; }
+        };
+
+        // Makes `name`, a texture released already, the next name LLImageGL::generateTextures hands out, as a driver
+        // that reuses names may make it of its own accord. The texture is deleted now rather than frames on; every name
+        // GL would hand out before it is taken and held while this lives, so that it is the lowest free name; and the
+        // thread's pool of names is emptied and refilled from GL, all of the refill taken but its first, which is it.
+        // mHandedBack is false where GL never hands the name out again.
+        struct NextTextureName
+        {
+            static constexpr int DELETE_FRAMES = 4;    // LLImageGL deletes a texture DELETE_DELAY (3) frames after it
+            static constexpr S32 POOL_SIZE     = 1024; // the names LLImageGL::generateTextures takes from GL at a time
+
+            explicit NextTextureName(U32 name)
+            {
+                for (int frame = 0; frame < DELETE_FRAMES; ++frame)
+                {
+                    LLImageGL::updateClass();
+                }
+                for (U32 tries = 0; tries < (1u << 16); ++tries)
+                {
+                    GLuint next = 0;
+                    glGenTextures(1, &next);
+                    if (next == name)
+                    {
+                        glDeleteTextures(1, &next);
+                        mHandedBack = true;
+                        break;
+                    }
+                    mHeld.push_back(next);
+                }
+                if (mHandedBack)
+                {
+                    // The pool's names are its context's, and a new class starts it afresh.
+                    LLImageGL::cleanupClass();
+                    LLImageGL::initClass(nullptr, LLGLTexture::MAX_GL_IMAGE_CATEGORY, false, false, false);
+                    std::vector<U32> pooled(POOL_SIZE - 1);
+                    LLImageGL::generateTextures((S32)pooled.size(), pooled.data());
+                    mHeld.insert(mHeld.end(), pooled.begin(), pooled.end());
+                }
+            }
+            ~NextTextureName() { glDeleteTextures((GLsizei)mHeld.size(), mHeld.data()); }
+
+            NextTextureName(const NextTextureName&)            = delete;
+            NextTextureName& operator=(const NextTextureName&) = delete;
+
+            bool                mHandedBack = false;
+            std::vector<GLuint> mHeld;
         };
 
         // Puts back the context's largest texture size, however the case ends.
@@ -824,6 +872,41 @@ namespace
         clear_depth(mOwner, 0.875);
         CHECK(std::abs(depth_through(mSharer) - 0.875f) < 1.e-4f);
         CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(owner_resized) + bytes_of(sharer_resized));
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // GL may hand a deleted texture's name to the next texture made, so an owner built again can hold its new depth
+    // under its last depth's name. A sharer attached to the last depth still holds that texture, which a framebuffer
+    // keeps alive past its name, and is attached again all the same: which build it holds is told by the owner's
+    // serial, never by the name. Where GL does not hand the name back there is nothing to show.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: a sharer is attached again to an owner's depth built under the old one's name", "[llrendertarget_gl]")
+    {
+        const ALRenderTargetDesc owner{ .width = 8, .height = 8, .depth = Depth::D32F };
+        const ALRenderTargetDesc sharer{ .width = 8, .height = 8, .color = { GL_RGBA8 } };
+        REQUIRE(mOwner.ensure(owner) == EnsureResult::Built);
+        REQUIRE(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
+        clear_depth(mOwner, 0.25);
+        REQUIRE(std::abs(depth_through(mSharer) - 0.25f) < 1.e-4f);
+        const U32 name = mOwner.getDepth();
+
+        mOwner.release();
+        const NextTextureName next(name);
+        if (!next.mHandedBack)
+        {
+            SKIP("GL does not hand a deleted texture's name out again");
+        }
+        REQUIRE(mOwner.ensure(owner) == EnsureResult::Built);
+        if (mOwner.getDepth() != name)
+        {
+            SKIP("GL handed the deleted depth's name to another texture first");
+        }
+
+        CHECK(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
+        CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == name);
+        clear_depth(mOwner, 0.75);
+        UNSCOPED_INFO("what the owner's new depth holds, read through the sharer");
+        CHECK(std::abs(depth_through(mSharer) - 0.75f) < 1.e-4f);
+        CHECK(mSharer.ensure(sharer, mOwner) == EnsureResult::Kept);
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
