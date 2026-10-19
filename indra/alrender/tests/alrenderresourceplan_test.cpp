@@ -197,7 +197,7 @@ namespace
             { "RenderHDREnabled", no_change, hdr_off,
               [](const Plan& before)
               {
-                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light, Slot::Water }) |
+                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Water }) |
                          in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main })) |
                          of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
@@ -205,7 +205,7 @@ namespace
             { "RenderHDREnabled under a material preview", previewed, hdr_off,
               [](const Plan& before)
               {
-                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light, Slot::Water }) |
+                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Water }) |
                          in_packs({ Pack::Main, Pack::Probe }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main, Pack::Probe })) |
                          of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
@@ -810,6 +810,26 @@ namespace
         CHECK(plain[Id::MainWater] == plain[Id::MainPostPing]);
     }
 
+    TEST_CASE("alrenderresourceplan: every light map is 8 bits a channel, whatever HDR says", "[alrenderresourceplan]")
+    {
+        // Its four channels are factors the sun pass, the blur and the probes' sun pass clamp to [0, 1].
+        for (bool hdr : { true, false })
+        {
+            INFO("HDR " << hdr);
+            Inputs in          = defaults();
+            in.mHDR            = hdr;
+            in.mGBufferNormHDR = hdr;
+            const Plan plan    = Plan::make(in);
+            for (Id id : { Id::MainLight, Id::ProbeLight, Id::HeroLight })
+            {
+                INFO(Plan::name(id));
+                REQUIRE(plan.wants(id));
+                CHECK(plan.desc(id)->colorCount() == 1);
+                CHECK(plan.desc(id)->color[0] == (U32)GL_RGBA8);
+            }
+        }
+    }
+
     TEST_CASE("alrenderresourceplan: a capture pack has a light map exactly when shadows are on", "[alrenderresourceplan]")
     {
         // The probe captures' sun pass writes the light map only for shadows, and their soften pass reads it whatever
@@ -851,12 +871,12 @@ namespace
                     REQUIRE(plan.wants(Id::MainLightBlurred) == (ssao && compute));
                     if (plan.wants(Id::MainLightBlurred))
                     {
-                        // The light map's size, two half-float channels, no depth: an image a dispatch stores to.
+                        // The light map's size, its 8 bits in two channels, no depth: an image a dispatch stores to.
                         const ALRenderTargetDesc& blurred = *plan.desc(Id::MainLightBlurred);
                         CHECK(blurred.width == plan.desc(Id::MainLight)->width);
                         CHECK(blurred.height == plan.desc(Id::MainLight)->height);
                         CHECK(blurred.colorCount() == 1);
-                        CHECK(blurred.color[0] == (U32)GL_RG16F);
+                        CHECK(blurred.color[0] == (U32)GL_RG8);
                         CHECK(blurred.depth == Depth::None);
                         CHECK(!plan[Id::MainLightBlurred].mDepthFrom);
                     }
@@ -1206,23 +1226,23 @@ namespace
         CHECK(set.mLastMisses == 0);
 
         // The light map, SSAO's blurred light map, the depth copy, bloom mip 0 with the water's copy and mips 2 to
-        // 4, mip 1 with the sky behind, and the post chain's first: 8 + 4 + 4 + 4 + 1 + 0.33 + 4 B/px.
+        // 4, mip 1 with the sky behind, and the post chain's first: 4 + 2 + 4 + 4 + 1 + 0.33 + 4 B/px.
         CHECK(set.mTargets == 9);
-        CHECK(set.mPooled == 93369600);
-        // Each its own target, as each was: 70.3 B/px, 247.3 MiB.
-        CHECK(set.mOneEach == 259257600);
-        CHECK(set.mPersistent + set.mPooled == 226080000); // 215.6 MiB
+        CHECK(set.mPooled == 71251200);
+        // Each its own target, as each was: 64.3 B/px, 226.2 MiB.
+        CHECK(set.mOneEach == 237139200);
+        CHECK(set.mPersistent + set.mPooled == 203961600); // 194.5 MiB
 
         // Without compute, the fragment passes blur through a scratch of the light map's description: two of it
-        // through the lighting, 16 B/px where the dispatch takes 12.
+        // through the lighting, 8 B/px where the dispatch takes 6.
         Inputs fragment  = defaults();
         fragment.mCompute = false;
         const WorkingSet passes = main_view_frame(fragment);
         CHECK(passes.mWaterIsBloom);
         CHECK(passes.mSkyBehindIsBloom);
         CHECK(passes.mTargets == 9);
-        CHECK(passes.mOneEach == 244512000); // 233.2 MiB
-        CHECK(passes.mPersistent + passes.mPooled == 240825600); // 229.7 MiB
+        CHECK(passes.mOneEach == 229766400); // 219.1 MiB
+        CHECK(passes.mPersistent + passes.mPooled == 211334400); // 201.5 MiB
 
         // Without SSAO the lighting needs one target of the light map's description, and no blurred one.
         Inputs no_ssao = defaults();
@@ -1230,8 +1250,8 @@ namespace
         const WorkingSet without = main_view_frame(no_ssao);
         CHECK(without.mWaterIsBloom);
         CHECK(without.mSkyBehindIsBloom);
-        CHECK(without.mOneEach == 244512000);
-        CHECK(without.mPersistent + without.mPooled == 211334400); // 201.5 MiB
+        CHECK(without.mOneEach == 229766400);
+        CHECK(without.mPersistent + without.mPooled == 196588800); // 187.5 MiB
 
         // With antialiasing the post chain's other target is drawn into, and pooled beside the first: 4 B/px more.
         Inputs fxaa    = defaults();
@@ -1241,19 +1261,18 @@ namespace
         CHECK(antialiased.mPooled - set.mPooled == 4 * PIXELS);
     }
 
-    // Depth of field adds its blur to what the frame holds, a target of its own size; its defocused scene, in the
-    // screen's description, takes a target of the light map's, which is the screen's under HDR, the lighting over by
-    // then.
+    // Depth of field adds two targets to what the frame holds: its defocused scene, in the screen's description, which
+    // no other target of the frame's has, the light map being 8 bits a channel, and its blur, of its own size.
     TEST_CASE("alrenderresourceplan: the main view's working set with depth of field", "[alrenderresourceplan]")
     {
         const WorkingSet off = main_view_frame(defaults());
         const WorkingSet on  = main_view_frame(defaults(), true);
-        CHECK(on.mDefocusedIsLight);
+        CHECK_FALSE(on.mDefocusedIsLight);
         CHECK(on.mLastMisses == 0);
-        CHECK(on.mTargets == off.mTargets + 1);
-        // 1792x1008 of R11F_G11F_B10F.
-        CHECK(on.mPooled - off.mPooled == 7225344);
-        CHECK(on.mPersistent + on.mPooled == 233305344); // 222.5 MiB
+        CHECK(on.mTargets == off.mTargets + 2);
+        // 2560x1440 of RGBA16F, and 1792x1008 of R11F_G11F_B10F.
+        CHECK(on.mPooled - off.mPooled == 29491200 + 7225344);
+        CHECK(on.mPersistent + on.mPooled == 240678144); // 229.5 MiB
     }
 
     TEST_CASE("alrenderresourceplan: every resource has its own debugger label", "[alrenderresourceplan]")

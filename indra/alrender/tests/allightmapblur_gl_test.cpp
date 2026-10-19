@@ -73,9 +73,9 @@ TEST_CASE_METHOD(Scene, "allightmapblur_gl: one dispatch blurs as the fragment p
     const std::vector<F32> fragment = read(mLight);
     const std::vector<F32> compute = read(mBlurred);
 
-    // The occlusion within two half-float steps below 1 (2^-10) of the fragment passes': theirs passes through the
-    // scratch's half floats between the axes, and both store it as half floats; measured, one step apart at worst. The
-    // shadow passes through untouched. Somewhere the blur moved the occlusion, or there is nothing to compare.
+    // The occlusion within one 8-bit step of the fragment passes': theirs passes through the scratch's 8 bits between
+    // the axes, half a step from the dispatch's single precision at most, and both round it to 8 bits. The shadow
+    // passes through untouched. Somewhere the blur moved the occlusion, or there is nothing to compare.
     F32 worst = 0.f;
     S32 blurred = 0;
     S32 sky = 0;
@@ -88,7 +88,7 @@ TEST_CASE_METHOD(Scene, "allightmapblur_gl: one dispatch blurs as the fragment p
             REQUIRE(compute[i] == fragment[i]);
             const F32 diff = std::fabs(compute[i + 1] - fragment[i + 1]);
             worst = llmax(worst, diff);
-            if (diff > 1.f / 1024.f)
+            if (diff > 1.001f / 255.f)
             {
                 FAIL_CHECK("occlusion " << compute[i + 1] << " against " << fragment[i + 1]);
             }
@@ -107,7 +107,7 @@ TEST_CASE_METHOD(Scene, "allightmapblur_gl: one dispatch blurs as the fragment p
     CHECK(sky > 0);
 }
 
-TEST_CASE_METHOD(Scene, "allightmapblur_gl: a kernel reaching past the apron is left to the fragment passes",
+TEST_CASE_METHOD(Scene, "allightmapblur_gl: a kernel reaching past the apron, or a target of another format, is left to the fragment passes",
                  "[allightmapblur_gl]")
 {
     if (!gGLManager.mHasCompute)
@@ -122,4 +122,13 @@ TEST_CASE_METHOD(Scene, "allightmapblur_gl: a kernel reaching past the apron is 
     const ALLightMapBlur::Kernel wide = ALLightMapBlur::kernel(LLVector3(3.f, 2.f, 0.f), 3.4f, 0.f);
     CHECK(ALLightMapBlur::apron(wide) == -1);
     CHECK_FALSE(blurCompute(wide));
+
+    // The dispatch stores through an rg8 image, which no other format may be bound to.
+    LLRenderTarget half;
+    REQUIRE(half.ensure({ .width = (U32)W, .height = (U32)H, .color = { GL_RG16F } }) == LLRenderTarget::EnsureResult::Built);
+    const ALLightMapBlur::Kernel kernel = ALLightMapBlur::kernel(LLVector3(3.f, 2.f, 0.f), 1.4f, 0.f);
+    bindDeferred(mCompute, mComputeLight, kernel);
+    CHECK_FALSE(ALLightMapBlur::dispatch(mCompute, kernel, half));
+    mCompute.unbind();
+    half.release();
 }

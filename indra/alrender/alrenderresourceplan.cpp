@@ -86,7 +86,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     const Depth main_depth   = in.mReverseZ ? Depth::D32F : Depth::D24;
     const Depth shadow_depth = (in.mShadowDepth32F || in.mReverseZ) ? Depth::D32F : Depth::D24;
 
-    // The light map and the water's colour under the scene are float with HDR.
+    // The scene's colour in a target of its own: float with HDR, 8 bits without.
     const U32 screen_format = hdr ? GL_RGBA16F : GL_RGBA8;
     // The tonemapped image the post chain carries.
     const U32 post_format = hdr ? GL_RGB10_A2 : GL_RGBA8;
@@ -135,11 +135,13 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         plan.at(inPack(pack, Slot::Screen)) = {
             ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .color = { GL_RGBA16F } }, gbuffer
         };
-        // The light map shares the scene's depth for the far-plane test that keeps its passes off the sky.
+        // The light map shares the scene's depth for the far-plane test that keeps its passes off the sky. Its four
+        // channels are the sun's shadow, the occlusion and the spot lights' two shadows, each a factor its writers clamp
+        // to [0, 1], so 8 bits a channel whatever HDR says.
         if (shape.light)
         {
             plan.at(inPack(pack, Slot::Light)) = {
-                ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .color = { screen_format } }, gbuffer
+                ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .color = { GL_RGBA8 } }, gbuffer
             };
         }
 
@@ -273,10 +275,10 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
 
     // Where the session computes, SSAO's blur writes the sun's shadow and the blurred occlusion here, which the soften
     // pass reads in place of the light map (ALLightMapBlur): it takes no scratch, and no depth, as a dispatch's
-    // destination. Half float, the precision of the light map with HDR, and the format blurLightC.glsl stores.
+    // destination. The light map's 8 bits a channel, the format blurLightC.glsl stores.
     if (in.mSSAO && in.mCompute)
     {
-        plan.at(Id::MainLightBlurred).mDesc = ALRenderTargetDesc{ .width = width, .height = height, .color = { GL_RG16F } };
+        plan.at(Id::MainLightBlurred).mDesc = ALRenderTargetDesc{ .width = width, .height = height, .color = { GL_RG8 } };
     }
 
     // The reflections' source: last frame's scene, without the alpha the reflections drop, so R11F_G11F_B10F under HDR

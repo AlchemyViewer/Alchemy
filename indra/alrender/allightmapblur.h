@@ -66,9 +66,10 @@ public:
     static S32 apron(const Kernel& kernel);
 
     /// Dispatches @a program, bound as a deferred program over the light map with @a kernel set
-    /// (LLPipeline::bindDeferredShader), over the light map's size, into @a target: the sun's shadow and the blurred
-    /// occlusion, read wherever the light map is, and the sky the light map's own. Fetches of @a target after it see
-    /// what it stored. False, with nothing dispatched, where @a kernel reaches past MAX_APRON or the program has no
-    /// image for @a target, which is then the fragment passes'.
+    /// (LLPipeline::bindDeferredShader), over the light map's size, into @a target, an RG8 target, the format
+    /// blurLightC.glsl stores: the sun's shadow and the blurred occlusion, read wherever the light map is, and the sky
+    /// the light map's own. Fetches of @a target after it see what it stored. False, with nothing dispatched, where
+    /// @a kernel reaches past MAX_APRON, @a target is of another format, or the program has no image for it, which is
+    /// then the fragment passes'.
     static bool dispatch(LLGLSLShader& program, const Kernel& kernel, LLRenderTarget& target);
 };

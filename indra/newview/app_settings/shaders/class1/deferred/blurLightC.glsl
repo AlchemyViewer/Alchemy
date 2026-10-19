@@ -38,7 +38,7 @@ uniform sampler2D lightMap;
 // The rows above and below the tile its taps down reach, at most MAX_APRON.
 uniform int blur_light_apron;
 // The sun's shadow and the blurred occlusion, which the soften pass reads where it would read the light map's.
-layout(rg16f) writeonly uniform image2D blurLightTarget;
+layout(rg8) writeonly uniform image2D blurLightTarget;
 
 // Each row of the tile, and the apron's above and below it, blurred across: what the fragment passes keep in their
 // scratch between the two. Row 0 is the tile's first less the apron.

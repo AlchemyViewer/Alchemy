@@ -156,7 +156,7 @@ namespace allightmapblur_gl
         }
 
         // The programs as LLViewerShaderMgr builds them, under the convention, and at `width` by `height` a G-buffer, a
-        // light map of the sun pass's format at HDR and the blurred occlusion's target, filled with the scene.
+        // light map and the blurred occlusion's target, in ALRenderResourcePlan's formats, filled with the scene.
         void setUp(bool reverse, S32 width, S32 height)
         {
             mW = width;
@@ -203,12 +203,12 @@ namespace allightmapblur_gl
             const U32 h = (U32)mH;
             const ALRenderTargetDesc gbuffer{ .width = w, .height = h, .color = { GL_RGBA16 },
                                               .depth = reverse ? Depth::D32F : Depth::D24 };
-            const ALRenderTargetDesc light{ .width = w, .height = h, .color = { GL_RGBA16F } };
+            const ALRenderTargetDesc light{ .width = w, .height = h, .color = { GL_RGBA8 } };
             REQUIRE(mGBuffer.ensure(gbuffer) == LLRenderTarget::EnsureResult::Built);
             REQUIRE(mLight.ensure(light, mGBuffer) == LLRenderTarget::EnsureResult::Built);
             REQUIRE(mScratch.ensure(light, mGBuffer) == LLRenderTarget::EnsureResult::Built);
             REQUIRE(mComputeLight.ensure(light, mGBuffer) == LLRenderTarget::EnsureResult::Built);
-            REQUIRE(mBlurred.ensure({ .width = w, .height = h, .color = { GL_RG16F } }) == LLRenderTarget::EnsureResult::Built);
+            REQUIRE(mBlurred.ensure({ .width = w, .height = h, .color = { GL_RG8 } }) == LLRenderTarget::EnsureResult::Built);
 
             // The projection the depth is stored through, and whose inverse places it.
             LLMatrix4a proj;
@@ -322,11 +322,11 @@ namespace allightmapblur_gl
             mFragment.unbind();
         }
 
-        // The blurred target cleared to a value neither path writes, so a texel the dispatch leaves unwritten shows.
+        // The blurred target cleared to a value the scene puts nowhere, so a texel the dispatch leaves unwritten shows.
         void poisonBlurred()
         {
             mBlurred.bindTarget();
-            gGL.setClearColor(LLColor4(-7.f, -7.f, -7.f, -7.f));
+            gGL.setClearColor(LLColor4(0.f, 0.f, 0.f, 0.f));
             mBlurred.clear(GL_COLOR_BUFFER_BIT);
             gGL.setClearColor(LLColor4::transparent);
             mBlurred.flush();

@@ -79,8 +79,10 @@ S32 ALLightMapBlur::apron(const Kernel& kernel)
 // static
 bool ALLightMapBlur::dispatch(LLGLSLShader& program, const Kernel& kernel, LLRenderTarget& target)
 {
+    // blurLightC.glsl stores through an rg8 image: the unit's format must be its.
     const S32 rows = apron(kernel);
-    if (rows < 0 || program.bindImage(LLShaderMgr::BLUR_LIGHT_TARGET, &target, ALImageSlot::WRITE_ONLY) < 0)
+    if (rows < 0 || target.getInternalFormat() != GL_RG8 ||
+        program.bindImage(LLShaderMgr::BLUR_LIGHT_TARGET, &target, ALImageSlot::WRITE_ONLY) < 0)
     {
         return false;
     }
