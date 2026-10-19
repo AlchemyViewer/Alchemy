@@ -208,6 +208,7 @@ LLRenderTarget* ALTransientTargetPool::acquire(const Key& key, std::string_view 
 
     match->mHeld     = true;
     match->mLastUsed = mFrame;
+    match->mLease    = ++mLeases;
     if (mRecording)
     {
         if (!match->mServed.empty())
@@ -221,8 +222,13 @@ LLRenderTarget* ALTransientTargetPool::acquire(const Key& key, std::string_view 
 
 bool ALTransientTargetPool::release(LLRenderTarget* target)
 {
+    return release(target, lease(target));
+}
+
+bool ALTransientTargetPool::release(LLRenderTarget* target, U64 lease)
+{
     Entry* entry = find(target);
-    if (!entry || !entry->mHeld)
+    if (!entry || !entry->mHeld || entry->mLease != lease)
     {
         noteBadRelease(target);
         return false;
@@ -249,7 +255,9 @@ void ALTransientTargetPool::noteBadRelease(const LLRenderTarget* target)
     const Entry* entry = find(target);
     LL_WARNS("RenderResources") << "Transient target '" << (entry ? std::string_view(entry->mName) : std::string_view("unknown"))
                                 << "' released "
-                                << (entry ? "again, or by a scope that never acquired it" : "but never acquired")
+                                << (entry ? "again, by a scope that never acquired it, or by one whose loan of it was taken "
+                                            "back as a leak"
+                                          : "but never acquired")
                                 << LL_ENDL;
 }
 
@@ -347,6 +355,18 @@ ALTransientTargetPool::Stats ALTransientTargetPool::stats() const
     stats.mBytes   = mBytes;
     stats.mTargets = (U32)mEntries.size();
     return stats;
+}
+
+U64 ALTransientTargetPool::lease(const LLRenderTarget* target) const
+{
+    for (const std::unique_ptr<Entry>& entry : mEntries)
+    {
+        if (&entry->mTarget == target)
+        {
+            return entry->mHeld ? entry->mLease : 0;
+        }
+    }
+    return 0;
 }
 
 ALTransientTargetPool::Entry* ALTransientTargetPool::find(const LLRenderTarget* target)

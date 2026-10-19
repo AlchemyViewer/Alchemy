@@ -41,14 +41,16 @@ LLRenderTarget* ALTransientTargets::acquire(const ALRenderTargetDesc& desc, cons
 
 bool ALTransientTargets::release(LLRenderTarget* target)
 {
-    const auto found = std::find(mHeld.begin(), mHeld.end(), target);
+    const auto found =
+        std::find_if(mHeld.begin(), mHeld.end(), [target](const Held& held) { return held.mTarget == target; });
     if (!target || found == mHeld.end())
     {
         mPool.noteBadRelease(target);
         return false;
     }
+    const U64 lease = found->mLease;
     mHeld.erase(found);
-    return mPool.release(target);
+    return mPool.release(target, lease);
 }
 
 void ALTransientTargets::releaseAll()
@@ -56,22 +58,23 @@ void ALTransientTargets::releaseAll()
     // Last acquired first, as nested lifetimes end.
     while (!mHeld.empty())
     {
-        LLRenderTarget* target = mHeld.back();
+        const Held held = mHeld.back();
         mHeld.pop_back();
-        mPool.release(target);
+        mPool.release(held.mTarget, held.mLease);
     }
 }
 
 bool ALTransientTargets::holds(const LLRenderTarget* target) const
 {
-    return target && std::find(mHeld.begin(), mHeld.end(), target) != mHeld.end();
+    return target &&
+           std::any_of(mHeld.begin(), mHeld.end(), [target](const Held& held) { return held.mTarget == target; });
 }
 
 LLRenderTarget* ALTransientTargets::held(LLRenderTarget* target)
 {
     if (target)
     {
-        mHeld.push_back(target);
+        mHeld.push_back({ target, mPool.lease(target) });
     }
     return target;
 }

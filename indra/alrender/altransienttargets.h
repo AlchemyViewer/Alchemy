@@ -65,6 +65,14 @@ public:
 private:
     LLRenderTarget* held(LLRenderTarget* target);
 
-    ALTransientTargetPool&                            mPool;
-    boost::container::small_vector<LLRenderTarget*, 8> mHeld;
+    /// A target the scope holds, and the lease it was lent under: released by it, so that one the pool took back from
+    /// a leak by this scope, and lent again, stays its new holder's.
+    struct Held
+    {
+        LLRenderTarget* mTarget;
+        U64             mLease;
+    };
+
+    ALTransientTargetPool&                  mPool;
+    boost::container::small_vector<Held, 8> mHeld;
 };

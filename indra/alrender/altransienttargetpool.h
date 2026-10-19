@@ -123,6 +123,11 @@ public:
     /// Give `target` back. One the pool holds and has not lent is a release of a target released already, and one it
     /// does not hold a release of what it never lent: either is refused, counted (badReleases) and reported.
     bool release(LLRenderTarget* target);
+    /// Give `target` back where it is lent under `lease` (lease()): one lent again since, after the pool took it back
+    /// from a leak, is refused as the others are, and stays its new holder's.
+    bool release(LLRenderTarget* target, U64 lease);
+    /// The acquisition `target` is lent under while it is held, each a number of its own; 0 for one not held.
+    U64 lease(const LLRenderTarget* target) const;
 
     /// Start a frame. A target still acquired from the last one is a leak: reported, counted (leaks) and taken back.
     /// Free targets no one has acquired for TRIM_FRAMES whole frames are freed, unless trimming is held. The frame's
@@ -179,6 +184,8 @@ private:
         LLRenderTarget mTarget;
         U64            mBytes    = 0;
         U32            mLastUsed = 0;
+        /// The acquisition it was last lent under.
+        U64            mLease    = 0;
         bool           mHeld     = false;
         /// Freed as it is released: a drop found it acquired.
         bool           mDoomed   = false;
@@ -203,6 +210,7 @@ private:
     Backing&                            mBacking;
     std::vector<std::unique_ptr<Entry>> mEntries;
     U64                                 mBytes       = 0;
+    U64                                 mLeases      = 0;
     U32                                 mFrame       = 0;
     U32                                 mMainWidth   = 0;
     U32                                 mMainHeight  = 0;

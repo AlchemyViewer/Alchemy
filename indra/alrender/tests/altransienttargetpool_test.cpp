@@ -210,6 +210,29 @@ namespace
         pool.beginFrame();
         CHECK(pool.leaks() == 1);
         CHECK(pool.badReleases() == 5);
+
+        UNSCOPED_INFO("a scope's target taken back as a leak and lent again: the scope's release is refused, and it stays its "
+                      "new holder's");
+        LLRenderTarget* lost = nullptr;
+        {
+            ALTransientTargets holder(pool);
+            {
+                ALTransientTargets leaky(pool);
+                lost = leaky.acquire(POST, "main.post.ping");
+                REQUIRE(lost);
+                pool.beginFrame();
+                CHECK(pool.leaks() == 2);
+                CHECK(holder.acquire(POST, "main.post.pong") == lost);
+            }
+            CHECK(pool.badReleases() == 6);
+            CHECK(holder.holds(lost));
+            LLRenderTarget* other = pool.acquire(POST, "main.post.ping");
+            CHECK(other != lost);
+            CHECK(pool.release(other));
+        }
+        UNSCOPED_INFO("given back by its new holder");
+        CHECK(pool.badReleases() == 6);
+        CHECK(pool.lease(lost) == 0);
     }
 
     TEST_CASE_METHOD(pool_data, "altransienttargetpool: a target no one acquires for 120 frames is freed", "[altransienttargetpool]")
