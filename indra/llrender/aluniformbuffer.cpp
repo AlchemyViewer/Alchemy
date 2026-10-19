@@ -272,9 +272,14 @@ namespace
     // Write `src` into [offset, offset+size) via an UNSYNCHRONIZED map (skips the GPU sync on a
     // fresh, never-in-flight ring region), falling back to glBufferSubData if the map fails.
     // DSA-aware. Shared by the two orphan-on-wrap rings (sRing and the scratch fallback).
+    //
+    // The map also discards the range (INVALIDATE_RANGE): every byte of it is written here, and
+    // without the discard a driver keeps what the range held -- NVIDIA's by a copy on the GPU at
+    // each unmap, about 8 us of GPU time a write that no CPU timing shows. With it a write costs
+    // the GPU next to nothing.
     void buffer_write_unsync(GLuint name, GLintptr offset, GLsizeiptr size, const void* src)
     {
-        const GLbitfield map_flags = GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
+        const GLbitfield map_flags = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
         void* dst = nullptr;
         if (dsa_ok())
         {
