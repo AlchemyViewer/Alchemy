@@ -148,11 +148,12 @@ struct ALShaderInputs
 
     /// RenderTerrainPBRPlanarSampleCount as the terrain takes it: 1 flat or 3 triplanar, 2 being flat.
     static S32 terrainMapping(S32 setting);
-    /// RenderTerrainPBRDetail as much as @a texture_units can sample: the PBR terrain's fragment stage declares a paint
-    /// or ramp sampler, and per detail level four maps for each of its four materials, so full detail needs 17 units,
-    /// one past the 16 Apple's GL 4.1 gives. Mirrors pbrterrainF.glsl's #if guards: detail 0 needs 17, -1 and -2 need 13,
-    /// -3 needs 9, -4 needs 5.
-    static S32 terrainDetail(S32 setting, S32 texture_units);
+    /// RenderTerrainPBRDetail as much as @a texture_units can sample under @a mapping (terrainMapping's): the PBR
+    /// terrain's fragment stage reads a paint or ramp sampler, parcel_overlay, terrain_height_map when it maps
+    /// triplanar (terrainSurface's terrain_facet), and per detail level four maps for each of its four materials, so
+    /// full detail needs 18 units flat and 19 triplanar, past the 16 Apple's GL 4.1 gives. Mirrors pbrterrainF.glsl's
+    /// #if guards: the materials take 16 units at detail 0, 12 at -1 and -2, 8 at -3, 4 at -4.
+    static S32 terrainDetail(S32 setting, S32 mapping, S32 texture_units);
 
     friend bool operator==(const ALShaderInputs&, const ALShaderInputs&) = default;
 };

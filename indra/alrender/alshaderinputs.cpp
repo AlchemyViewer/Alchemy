@@ -64,14 +64,15 @@ S32 ALShaderInputs::terrainMapping(S32 setting)
 }
 
 // static
-S32 ALShaderInputs::terrainDetail(S32 setting, S32 texture_units)
+S32 ALShaderInputs::terrainDetail(S32 setting, S32 mapping, S32 texture_units)
 {
+    const S32 fixed_samplers = 2 + (mapping == 3 ? 1 : 0);
     S32 detail = std::clamp(setting, (S32)TERRAIN_PBR_DETAIL_MIN, (S32)TERRAIN_PBR_DETAIL_MAX);
     while (detail > TERRAIN_PBR_DETAIL_MIN)
     {
-        const S32 samplers = 1 + 4 * (1 + (detail >= TERRAIN_PBR_DETAIL_NORMAL) +
-                                      (detail >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS) +
-                                      (detail >= TERRAIN_PBR_DETAIL_EMISSIVE));
+        const S32 samplers = fixed_samplers + 4 * (1 + (detail >= TERRAIN_PBR_DETAIL_NORMAL) +
+                                                   (detail >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS) +
+                                                   (detail >= TERRAIN_PBR_DETAIL_EMISSIVE));
         if (samplers <= texture_units)
         {
             break;
@@ -106,7 +107,7 @@ ALShaderInputs ALShaderInputs::make(const ALShaderSettings& s)
     g.mShadowFilterQuality = g.mShadowDetail > 0 ? std::clamp((S32)s.mShadowFilterQuality, 0, 3) : 0;
 
     g.mTerrainPlanarSampleCount = terrainMapping(s.mTerrainPlanarSampleCount);
-    g.mTerrainPBRDetail         = terrainDetail(s.mTerrainPBRDetail, s.mTextureImageUnits);
+    g.mTerrainPBRDetail         = terrainDetail(s.mTerrainPBRDetail, g.mTerrainPlanarSampleCount, s.mTextureImageUnits);
     g.mTerrainHexTiling         = s.mTerrainHexTiling;
     g.mWaterHextile             = (S32)std::min(s.mWaterHextile, 2u);
 

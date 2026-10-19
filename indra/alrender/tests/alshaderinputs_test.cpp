@@ -197,16 +197,22 @@ namespace
 
     TEST_CASE("alshaderinputs: the terrain's detail is what the context's texture units sample", "[alshaderinputs]")
     {
-        // pbrterrainF.glsl: 17 samplers at detail 0, 13 at -1 and -2, 9 at -3, 5 at -4.
-        CHECK(Inputs::terrainDetail(0, 32) == 0);
-        CHECK(Inputs::terrainDetail(0, 17) == 0);
-        CHECK(Inputs::terrainDetail(0, 16) == -1);
-        CHECK(Inputs::terrainDetail(0, 12) == -3);
-        CHECK(Inputs::terrainDetail(0, 8) == -4);
-        CHECK(Inputs::terrainDetail(0, 4) == -4);
-        CHECK(Inputs::terrainDetail(-2, 32) == -2);
-        CHECK(Inputs::terrainDetail(5, 32) == 0);
-        CHECK(Inputs::terrainDetail(-9, 32) == -4);
+        // pbrterrainF.glsl, flat: 18 samplers at detail 0, 14 at -1 and -2, 10 at -3, 6 at -4.
+        CHECK(Inputs::terrainDetail(0, 1, 32) == 0);
+        CHECK(Inputs::terrainDetail(0, 1, 18) == 0);
+        CHECK(Inputs::terrainDetail(0, 1, 17) == -1);
+        CHECK(Inputs::terrainDetail(0, 1, 16) == -1);
+        CHECK(Inputs::terrainDetail(0, 1, 13) == -3);
+        CHECK(Inputs::terrainDetail(0, 1, 9) == -4);
+        CHECK(Inputs::terrainDetail(0, 1, 4) == -4);
+        CHECK(Inputs::terrainDetail(-2, 1, 32) == -2);
+        CHECK(Inputs::terrainDetail(5, 1, 32) == 0);
+        CHECK(Inputs::terrainDetail(-9, 1, 32) == -4);
+        // Triplanar reads the height map too: 19 at detail 0, 15 at -1 and -2, 11 at -3.
+        CHECK(Inputs::terrainDetail(0, 3, 19) == 0);
+        CHECK(Inputs::terrainDetail(0, 3, 18) == -1);
+        CHECK(Inputs::terrainDetail(0, 3, 14) == -3);
+        CHECK(Inputs::terrainDetail(0, 3, 10) == -4);
     }
 
     TEST_CASE("alshaderinputs: the terrain's mapping is flat or triplanar", "[alshaderinputs]")
