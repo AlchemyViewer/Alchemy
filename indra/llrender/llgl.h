@@ -94,6 +94,15 @@ public:
         return !tessellated || !mIsApple;
     }
 
+    // Whether a GL version, as initGL assembles it from GL_VERSION, meets the floor (GL_MINIMUM_VERSION).
+    static bool meetsVersionFloor(F32 gl_version);
+
+    // Intel's drivers outside macOS short of GL 4.6: chiefly Haswell and Broadwell on Windows, which
+    // report 4.3 or 4.4 and claim more than they hold to. The feature manager holds them to its
+    // IntelLegacy list at every start, and the shader manager keeps them from compute and the shader
+    // cache, which no list can hold.
+    bool isIntelLegacy() const;
+
     bool mInited;
     bool mIsDisabled;
 

@@ -1957,7 +1957,7 @@ void LLWindowWin32::recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw
 void* LLWindowWin32::createSharedContext()
 {
     // From what RenderMaxOpenGLVersion allows down to the floor, 4.1 (GL_MINIMUM_VERSION): initGL
-    // refuses anything less, so there is no context worth having below it.
+    // refuses anything less, so no version below it is asked for.
     mMaxGLVersion = llclamp(mMaxGLVersion, 4.1f, 4.6f);
 
     S32 version_major = llfloor(mMaxGLVersion);
@@ -1990,9 +1990,16 @@ void* LLWindowWin32::createSharedContext()
     }
     else if (!mhRC)
     {
-        // The window's own context: there is nothing to run on.
-        close();
-        LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBGLContextErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+        // The window's own context, on a driver that offers no 4.1. The context it makes by default is
+        // what tells the user which version they have: initGL refuses it, naming the floor and the
+        // version (MBGLVersionErr), where failing here could only say no context was made.
+        LL_WARNS("Window") << "No OpenGL 4.1 context; making the driver's default one for initGL to judge" << LL_ENDL;
+        rc = wglCreateContext(mhDC);
+        if (!rc)
+        {
+            close();
+            LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBGLContextErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+        }
     }
     else
     {

@@ -848,6 +848,39 @@ void LLFeatureManager::applyRecommendedSettings()
     }
 }
 
+// Sets the control a feature names to a value, in the control's own type.
+static void set_feature_control(const std::string& name, F32 value)
+{
+    LLControlVariable* ctrl = gSavedSettings.getControl(name);
+    if(ctrl == NULL)
+    {
+        LL_WARNS("RenderInit") << "AHHH! Control setting " << name << " does not exist!" << LL_ENDL;
+        return;
+    }
+
+    // handle all the different types
+    if(ctrl->isType(TYPE_BOOLEAN))
+    {
+        gSavedSettings.setBOOL(name, (bool)value);
+    }
+    else if (ctrl->isType(TYPE_S32))
+    {
+        gSavedSettings.setS32(name, (S32)value);
+    }
+    else if (ctrl->isType(TYPE_U32))
+    {
+        gSavedSettings.setU32(name, (U32)value);
+    }
+    else if (ctrl->isType(TYPE_F32))
+    {
+        gSavedSettings.setF32(name, value);
+    }
+    else
+    {
+        LL_WARNS("RenderInit") << "AHHH! Control variable is not a numeric type!" << LL_ENDL;
+    }
+}
+
 void LLFeatureManager::applyFeatures(bool skipFeatures)
 {
     // see featuretable.txt / featuretable_linux.txt / featuretable_mac.txt
@@ -871,34 +904,22 @@ void LLFeatureManager::applyFeatures(bool skipFeatures)
             }
         }
 
-        // get the control setting
-        LLControlVariable* ctrl = gSavedSettings.getControl(mIt->first);
-        if(ctrl == NULL)
-        {
-            LL_WARNS("RenderInit") << "AHHH! Control setting " << mIt->first << " does not exist!" << LL_ENDL;
-            continue;
-        }
+        set_feature_control(mIt->first, getRecommendedValue(mIt->first));
+    }
+}
 
-        // handle all the different types
-        if(ctrl->isType(TYPE_BOOLEAN))
+void LLFeatureManager::holdUnavailable(const std::string& name)
+{
+    LLFeatureList* maskp = findMask(name);
+    if (!maskp)
+    {
+        return;
+    }
+    for (const auto& [feature, info] : maskp->getFeatures())
+    {
+        if (!info.mAvailable)
         {
-            gSavedSettings.setBOOL(mIt->first, (bool)getRecommendedValue(mIt->first));
-        }
-        else if (ctrl->isType(TYPE_S32))
-        {
-            gSavedSettings.setS32(mIt->first, (S32)getRecommendedValue(mIt->first));
-        }
-        else if (ctrl->isType(TYPE_U32))
-        {
-            gSavedSettings.setU32(mIt->first, (U32)getRecommendedValue(mIt->first));
-        }
-        else if (ctrl->isType(TYPE_F32))
-        {
-            gSavedSettings.setF32(mIt->first, (F32)getRecommendedValue(mIt->first));
-        }
-        else
-        {
-            LL_WARNS("RenderInit") << "AHHH! Control variable is not a numeric type!" << LL_ENDL;
+            set_feature_control(feature, info.mRecommendedLevel);
         }
     }
 }
@@ -919,16 +940,6 @@ void LLFeatureManager::setGraphicsLevel(U32 level, bool skipFeatures)
     LLViewerShaderMgr::sSkipReload = false;
     LLViewerShaderMgr::instance()->setShaders();
     gPipeline.refreshCachedSettings();
-}
-
-// static
-bool LLFeatureManager::isIntelLegacy()
-{
-#if LL_DARWIN
-    return false;
-#else
-    return gGLManager.mIsIntel && gGLManager.mGLVersion < 4.59f;
-#endif
 }
 
 void LLFeatureManager::applyBaseMasks()
@@ -986,7 +997,7 @@ void LLFeatureManager::applyBaseMasks()
     {
         maskFeatures("AnisotropicMissing");
     }
-    if (isIntelLegacy())
+    if (gGLManager.isIntelLegacy())
     {
         // A lot of these chips claim 4.3 or 4.4 support, but don't seem to work.
         // https://code.blender.org/2019/04/supported-gpus-in-blender-2-80/
@@ -995,12 +1006,14 @@ void LLFeatureManager::applyBaseMasks()
         LL_INFOS("RenderInit") << "Intel driver below OpenGL 4.6: holding to the IntelLegacy list" << LL_ENDL;
         maskFeatures("IntelLegacy");
 
-        // No background context activity, whatever RenderGLMultiThreaded* say.
-        LLImageGLThread::sEnabledMedia = false;
-        LLImageGLThread::sEnabledTextures = false;
+        // At every start, before anything reads the settings, and not only when a graphics level is
+        // applied: what the list holds is held for a user who already had it on, as the false GL
+        // version once held it whatever the settings said. The upload threads, vintage mode, the
+        // probes and the waves are all on the list.
+        holdUnavailable("IntelLegacy");
 
-        // Make extra sure that vintage mode also gets enabled.
-        gSavedSettings.setBOOL("RenderDisableVintageMode", false);
+        // HDR is on no list: vintage mode switches it, and only when vintage mode changes.
+        gSavedSettings.setBOOL("RenderHDREnabled", false);
     }
     if (gGLManager.mMaxVaryingVectors <= 16)
     {

@@ -145,12 +145,6 @@ public:
     void applyBaseMasks();
     void applyRecommendedSettings();
 
-    // Intel's drivers outside macOS short of GL 4.6: chiefly Haswell and Broadwell on Windows, which
-    // report 4.3 or 4.4 and claim more than they hold to. Their sessions run on the IntelLegacy list,
-    // and without what a list cannot hold off once a user has it: water waves, compute and the
-    // shader cache, each of which asks this where it decides.
-    static bool isIntelLegacy();
-
     // apply the basic masks.  Also, skip one saved
     // in the skip list if true
     void applyFeatures(bool skipFeatures);
@@ -164,6 +158,11 @@ protected:
     ///< @returns true is file parsed correctly, false if not
 
     void initBaseMask();
+
+    // Sets each feature the named list makes unavailable to the value it recommends, as applyFeatures
+    // does, so the list holds a setting a user already has on rather than only the next graphics level
+    // applied.
+    void holdUnavailable(const std::string& name);
 
     std::map<std::string, LLFeatureList *> mMaskList;
     std::set<std::string> mSkippedFeatures;
