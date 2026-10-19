@@ -319,7 +319,7 @@ void LLDrawPoolAlpha::renderDebugAlpha()
         gGL.diffuseColor4f(0, 1, 0, 1);
         pushUntexturedBatches(LLRenderPass::PASS_INVISIBLE);
 
-        gHighlightProgram.mRiggedVariant->bind();
+        gHighlightProgram.riggedVariant()->bind();
         gGL.diffuseColor4f(1, 0, 0, 1);
 
         pushRiggedBatches(LLRenderPass::PASS_ALPHA_MASK_RIGGED, false);
@@ -552,7 +552,7 @@ void LLDrawPoolAlpha::renderPbrEmissives(std::vector<LLDrawInfo*>& emissives)
 void LLDrawPoolAlpha::renderRiggedEmissives(std::vector<LLDrawInfo*>& emissives)
 {
     LLGLDepthTest depth(GL_TRUE, GL_FALSE); //disable depth writes since "emissive" is additive so sorting doesn't matter
-    LLGLSLShader* shader = emissive_shader->mRiggedVariant;
+    LLGLSLShader* shader = emissive_shader->riggedVariant();
     shader->bind();
     shader->uniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, 1.f);
 
@@ -708,7 +708,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     target_shader = pbr_shader;
                     if (params.mAvatar != nullptr)
                     {
-                        target_shader = target_shader->mRiggedVariant;
+                        target_shader = target_shader->riggedVariant();
                     }
 
                     // shader must be bound before LLGLTFMaterial::bind
@@ -786,8 +786,8 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                     if (params.mAvatar != nullptr)
                     {
-                        llassert(target_shader->mRiggedVariant != nullptr);
-                        target_shader = target_shader->mRiggedVariant;
+                        llassert(target_shader->mRiggedVariant || !target_shader->isComplete());
+                        target_shader = target_shader->riggedVariant();
                     }
 
                     if (current_shader != target_shader)

@@ -85,7 +85,7 @@ void LLDrawPoolGlow::renderPostDeferred(S32 pass)
     }
 
     // second pass -- rigged objects
-    shader = shader->mRiggedVariant;
+    shader = shader->riggedVariant();
     shader->bind();
     if (glow_indexed)
     {

@@ -2695,7 +2695,7 @@ void renderBatchSize(LLDrawInfo* params)
         gGL.pushMatrix();
         gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
         bind = true;
-        old_shader->mRiggedVariant->bind();
+        old_shader->riggedVariant()->bind();
         LLRenderPass::uploadMatrixPalette(*params);
     }
 

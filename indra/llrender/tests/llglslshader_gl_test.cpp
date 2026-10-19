@@ -51,6 +51,7 @@
 #include <bit>
 #include <climits>
 #include <initializer_list>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -507,6 +508,17 @@ namespace
               "void main()\n"
               "{\n"
               "    frag_color = not_declared_anywhere;\n"
+              "}\n" },
+            // A fragment stage that compiles for a program and not for its skinned variant.
+            { "test/skinBrokenF.glsl",
+              "out vec4 frag_color;\n"
+              "void main()\n"
+              "{\n"
+              "#ifdef HAS_SKIN\n"
+              "    frag_color = not_declared_anywhere;\n"
+              "#else\n"
+              "    frag_color = vec4(1.0);\n"
+              "#endif\n"
               "}\n" },
 
             // A bool array under a reserved name, both elements read so the whole array stays active.
@@ -1069,6 +1081,47 @@ namespace
         CHECK(draw(mDraw, true) == std::vector<F32>(SIDE * SIDE * 4, 0.f));
 
         LLGLSLShader::releaseStandIn();
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A program whose skinned variant does not build fails whole. The passes bind the variant for skinned draws and set
+    // its uniforms through the program, so a base left built would set them on the stand-in bound in the variant's
+    // place. A program with no variant is its own riggedVariant(), and binding that binds the stand-in, its calls doing
+    // nothing. Asked for without the variant, the same sources build.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a program whose skinned variant does not build fails whole", "[llglslshader_gl]")
+    {
+        setUpShaders();
+        const auto configure = [&]()
+        {
+            mDraw.unload();
+            mDraw.mName        = "skin broken (test)";
+            mDraw.mShaderLevel = 1;
+            mDraw.mShaderFiles = { { "test/fullscreenV.glsl", GL_VERTEX_SHADER },
+                                   { "test/skinBrokenF.glsl", GL_FRAGMENT_SHADER } };
+        };
+
+        configure();
+        CHECK_FALSE(mDraw.createShader(LLGLSLShader::VARIANT_RIGGED));
+        // The failed compile's own error, which is not what is under test.
+        while (glGetError() != GL_NO_ERROR)
+        {
+        }
+        CHECK_FALSE(mDraw.isComplete());
+        CHECK(mDraw.mRiggedVariant == nullptr);
+        CHECK(mDraw.riggedVariant() == &mDraw);
+
+        mDraw.riggedVariant()->bind();
+        CHECK(LLGLSLShader::sCurBoundShaderPtr == &mDraw);
+        mDraw.uniform1f(LLShaderMgr::MINIMUM_ALPHA, 0.5f);
+        CHECK(mDraw.enableTexture(LLShaderMgr::DIFFUSE_MAP) == -1);
+        LLGLSLShader::unbind();
+        LLGLSLShader::releaseStandIn();
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+
+        configure();
+        CHECK(mDraw.createShader());
+        CHECK(mDraw.isComplete());
+        CHECK(mDraw.riggedVariant() == &mDraw);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 

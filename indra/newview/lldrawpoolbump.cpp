@@ -292,8 +292,8 @@ void LLDrawPoolBump::beginFullbrightShiny()
 
     if (mRigged)
     {
-        llassert(shader->mRiggedVariant);
-        shader = shader->mRiggedVariant;
+        llassert(shader->mRiggedVariant || !shader->isComplete());
+        shader = shader->riggedVariant();
     }
 
     // bind exposure map so fullbright shader can cancel out exposure
@@ -495,8 +495,8 @@ void LLDrawPoolBump::beginBump()
 
     if (mRigged)
     {
-        llassert(shader->mRiggedVariant);
-        shader = shader->mRiggedVariant;
+        llassert(shader->mRiggedVariant || !shader->isComplete());
+        shader = shader->riggedVariant();
     }
 
     shader->bind();

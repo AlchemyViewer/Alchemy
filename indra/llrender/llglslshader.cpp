@@ -1136,6 +1136,15 @@ bool LLGLSLShader::linkProgram(U32 variants)
         }
     }
 
+    // A variant it was asked for that did not build fails the program with it. The passes bind the variants they draw
+    // with and set their uniforms through this program, so a base left built without one would draw skinned geometry
+    // unskinned, or set its uniforms on the stand-in bind(true) binds in the variant's place.
+    if (!success && mProgramObject != 0)
+    {
+        freeOwnedVariants();
+        unloadInternal();
+    }
+
     return success;
 }
 

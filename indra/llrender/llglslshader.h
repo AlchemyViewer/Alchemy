@@ -643,6 +643,11 @@ public:
     LLGLSLShader* mClassicVariant = nullptr;
     LLGLSLShader* mMirrorVariant = nullptr;
 
+    // The program a pass binds for skinned draws of this one: its rigged variant, or, where it has none, this program.
+    // A program that did not build has none, and binding it binds the stand-in, which draws nothing, while the uniform
+    // and texture calls the pass then makes set nothing.
+    LLGLSLShader* riggedVariant() { return mRiggedVariant ? mRiggedVariant : this; }
+
     // true when this program was heap-allocated as a variant and is owned by its parent
     bool mOwnedVariant = false;
 
