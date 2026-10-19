@@ -564,6 +564,8 @@ bool LLGLTFPreviewTexture::render()
     gPipeline.mExposureMap.swapFBORefs(gPipeline.mLastExposure);
 
     const bool hdr = LLPipeline::hdrEnabled();
+    ALTransientTargets post(gPipeline.mTransientTargets);
+    LLPipeline::Bloom  bloom;
     if (hdr)
     {
         gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);
@@ -571,10 +573,10 @@ bool LLGLTFPreviewTexture::render()
 
         // Bloom composite is folded into colorCorrect's tonemap variants, so we
         // only generate the pyramid here.
-        gPipeline.generateBloomHDR(&screen);
+        bloom = gPipeline.generateBloomHDR(&screen, post);
     }
 
-    gPipeline.colorCorrect(&screen, &gPipeline.mRT->postPingMap, true, false);
+    gPipeline.colorCorrect(&screen, &gPipeline.mRT->postPingMap, true, false, &bloom);
     LLVertexBuffer::unbind();
 
     if (!hdr)

@@ -298,12 +298,19 @@ public:
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
     void generateLensFlareState(LLRenderTarget* src);
     void clearLensFlareState();
-    void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade);
+    // What generateBloomHDR makes for colorCorrect to composite, each held by the scope it was given until that ends.
+    struct Bloom
+    {
+        // The cross-screen filter's arms summed, where they were drawn this frame.
+        LLRenderTarget* mStreaks = nullptr;
+    };
+    void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade,
+                      const Bloom* bloom = nullptr);
     void generateGlow(LLRenderTarget* src);
     // Whether generateBloomHDR will run this frame: the pyramid is deep
     // enough and every shader it needs built.
     bool bloomHDRReady() const;
-    void generateBloomHDR(LLRenderTarget* src);
+    Bloom generateBloomHDR(LLRenderTarget* src, ALTransientTargets& scope);
     void compositeBloomHDR(LLRenderTarget* scene);
     void applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
     void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
@@ -1026,15 +1033,6 @@ public:
         // mBloomMip[0] is full-res extract; subsequent levels are halved.
         LLRenderTarget              bloomMip[BLOOM_MAX_MIPS];
         U32                         bloomMipCount = 0;
-
-        // Cross-screen filter state for this frame. The three streak buffers
-        // own no memory: they are quadrants of mWaterDis, which is idle from
-        // the water pass to the next frame -- see generateBloomHDR. What
-        // colorCorrect needs to know is whether streaks were drawn this frame
-        // and at what size, to find the accumulator's quadrant.
-        bool                        crossFilterReady = false;
-        U32                         crossFilterWidth = 0;
-        U32                         crossFilterHeight = 0;
     };
 
     // main full resoltuion render target

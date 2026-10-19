@@ -1390,11 +1390,6 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources(const ALRenderResourc
                 changes.mFailed.set((size_t)id);
             }
         }
-
-        // Where this frame's streaks are, in quadrants of a target that may just have been built again.
-        rt.crossFilterReady  = false;
-        rt.crossFilterWidth  = 0;
-        rt.crossFilterHeight = 0;
     }
 
     const IdSet touched = changes.mBuilt | changes.mFreed;
@@ -1621,10 +1616,7 @@ void LLPipeline::releaseRenderTargets()
 
     for (RenderTargetPack* rt : { &mMainRT, &mAuxillaryRT, &mHeroProbeRT })
     {
-        rt->bloomMipCount     = 0;
-        rt->crossFilterReady  = false;
-        rt->crossFilterWidth  = 0;
-        rt->crossFilterHeight = 0;
+        rt->bloomMipCount = 0;
     }
 
     mSkyBehindFrame      = 0;
@@ -8735,51 +8727,8 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
     mLensFlareStateValid = true;
 }
 
-namespace
-{
-    // Which quadrant of the borrowed target each cross filter buffer lives in.
-    enum ECrossFilterQuadrant : S32
-    {
-        CROSS_FILTER_SCRATCH_A    = 0,   // top-left: the first pass of every arm
-        CROSS_FILTER_SCRATCH_B    = 1,   // top-right: the second
-        CROSS_FILTER_ACCUMULATOR  = 2,   // bottom-left: what every arm adds into
-    };
-
-    // A streak buffer's place inside the texture that holds it, as the two
-    // shaders want it: an origin and scale that map a region-relative
-    // coordinate into the texture, and the half-texel margin the coordinate
-    // is clamped to first. The defaults describe a whole texture.
-    struct CrossFilterRegion
-    {
-        U32 mPixelX  = 0;      // the quadrant's origin in texels, for the viewport
-        U32 mPixelY  = 0;
-        F32 mOriginX = 0.f;
-        F32 mOriginY = 0.f;
-        F32 mScaleX  = 1.f;
-        F32 mScaleY  = 1.f;
-        F32 mClampX  = 0.f;
-        F32 mClampY  = 0.f;
-    };
-
-    CrossFilterRegion cross_filter_region(S32 quad, U32 streak_w, U32 streak_h, const LLRenderTarget& holder)
-    {
-        const F32 tex_w = (F32)llmax(holder.getWidth(), 1u);
-        const F32 tex_h = (F32)llmax(holder.getHeight(), 1u);
-
-        CrossFilterRegion region;
-        region.mPixelX  = (quad == CROSS_FILTER_SCRATCH_B)   ? streak_w : 0u;
-        region.mPixelY  = (quad == CROSS_FILTER_ACCUMULATOR) ? streak_h : 0u;
-        region.mOriginX = (F32)region.mPixelX / tex_w;
-        region.mOriginY = (F32)region.mPixelY / tex_h;
-        region.mScaleX  = (F32)streak_w / tex_w;
-        region.mScaleY  = (F32)streak_h / tex_h;
-        region.mClampX  = 0.5f / (F32)llmax(streak_w, 1u);
-        region.mClampY  = 0.5f / (F32)llmax(streak_h, 1u);
-        return region;
-    }
-}
-
-void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool apply_tonemap, bool apply_color_grade)
+void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool apply_tonemap, bool apply_color_grade,
+                              const Bloom* bloom)
 {
     LL_PROFILE_GPU_ZONE("colorcorrect");
 
@@ -8879,10 +8828,9 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 // the streaks stay scaled by bloom strength, and they keep
                 // lighting the lens dirt through lens_light.
                 static LLCachedControl<F32> streak_strength_setting(gSavedSettings, "RenderCrossFilterStrength", 0.f);
-                // Drawn this frame, not merely allocated: the accumulator is a
-                // quadrant of mWaterDis, whose completeness says nothing about
-                // what is in it.
-                const bool streaks_live = mRT->crossFilterReady && mWaterDis.isComplete();
+                // Drawn this frame: generateBloomHDR hands back the sum only
+                // where it drew the arms.
+                const bool streaks_live = bloom && bloom->mStreaks;
                 const F32  streaks      = (streaks_live && !suppressesLensAndPrintEffects())
                                         ? llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH) * strength_gate
                                         : 0.f;
@@ -8890,15 +8838,8 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 if (streaks > 0.f)
                 {
                     cross_channel = shader->bindTexture(LLShaderMgr::CROSS_FILTER_MAP,
-                                                        &mWaterDis,
+                                                        bloom->mStreaks,
                                                         ALSamplers::BilinearClamp);
-                    const CrossFilterRegion region = cross_filter_region(CROSS_FILTER_ACCUMULATOR,
-                                                                         mRT->crossFilterWidth,
-                                                                         mRT->crossFilterHeight,
-                                                                         mWaterDis);
-                    shader->uniform4f(LLShaderMgr::CROSS_REGION,
-                                      region.mOriginX, region.mOriginY, region.mScaleX, region.mScaleY);
-                    shader->uniform2f(LLShaderMgr::CROSS_CLAMP, region.mClampX, region.mClampY);
                 }
             }
         }
@@ -9525,17 +9466,14 @@ bool LLPipeline::bloomHDRReady() const
            gBloomUpsampleProgram.isComplete();
 }
 
-void LLPipeline::generateBloomHDR(LLRenderTarget* src)
+LLPipeline::Bloom LLPipeline::generateBloomHDR(LLRenderTarget* src, ALTransientTargets& scope)
 {
     LL_PROFILE_GPU_ZONE("bloom hdr generate");
 
-    // Whatever streaks were in mWaterDis's quadrants belong to a previous
-    // frame; colorCorrect only reads them if this frame draws new ones.
-    mRT->crossFilterReady = false;
-
+    Bloom bloom;
     if (!bloomHDRReady())
     {
-        return;
+        return bloom;
     }
 
     static LLCachedControl<F32> bloom_threshold(gSavedSettings, "RenderBloomThreshold", 1.0f);
@@ -9632,21 +9570,12 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
     // twelve-draw chain was still running to produce them. Folding the bloom
     // strength into the gate reuses the release path below rather than adding a
     // second one.
-    //
-    // Only the streaks, not the pyramid: generateLuminance binds bloomMip[0] as
-    // the emissive term for auto-exposure, so skipping the pyramid would meter
-    // the scene against a stale buffer.
     static LLCachedControl<F32> bloom_strength_gate(gSavedSettings, "RenderBloomStrength", 0.325f);
 
     const F32  streak_strength = (no_post || bloom_strength_gate() <= 0.f)
                                ? 0.f
                                : llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH);
-    // And only with a texture barrier: the chain reads quadrants of mWaterDis that the draw
-    // before it wrote while the texture is still attached, which GL defines only across one.
-    // glTextureBarrier is null where the driver has neither GL 4.5 nor a texture barrier
-    // extension, and there the streaks are off rather than undefined.
-    const bool streaks_on      = (streak_strength > 0.f) && gCrossFilterProgram.isComplete() && glTextureBarrier;
-    bool       streaks_ready   = false;
+    const bool streaks_on      = (streak_strength > 0.f) && gCrossFilterProgram.isComplete();
 
     if (streaks_on)
     {
@@ -9678,24 +9607,17 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         // scratch nor its source. Accumulating straight into bloomMip[0] would
         // work for the first arm and then feed the second arm its own output.
         //
-        // None of the three is a target of its own. Each is half the pyramid
-        // base, so all three fit as quadrants of one full-frame target, and
-        // mWaterDis is that target: the water passes copy the scene into it
-        // afresh each frame and read it back before post begins, so from here
-        // until the next frame it is idle. RGBA16F
-        // under HDR, which is the only path with a pyramid. Sampling a
-        // quadrant rather than a texture is the one thing the shader has to
-        // know about, through uCrossRegion and uCrossClamp.
-        //
-        // Always fits: the pyramid base is at most the screen, and mWaterDis
-        // is the screen. Checked anyway, so a future resolution divisor or
-        // multiplier that breaks the assumption disables the effect rather
-        // than drawing over the wrong quadrant.
-        streaks_ready = mWaterDis.isComplete()
-                     && (2 * streak_w <= mWaterDis.getWidth())
-                     && (2 * streak_h <= mWaterDis.getHeight());
+        // All three from the pool, RGBA16F as the HDR scene they streak: the
+        // chain's two for the chain alone, and the sum from the caller's scope
+        // until colorCorrect has composited it. Each pass reads one texture and
+        // writes another, so no read waits on a barrier.
+        const ALRenderTargetDesc streak_desc{ .width = streak_w, .height = streak_h, .color = { GL_RGBA16F } };
+        ALTransientTargets       chain(mTransientTargets);
+        LLRenderTarget*          scratch_a = chain.acquire(streak_desc, "bloom.cross.a");
+        LLRenderTarget*          scratch_b = chain.acquire(streak_desc, "bloom.cross.b");
+        LLRenderTarget*          sum       = scope.acquire(streak_desc, "bloom.cross.sum");
 
-        if (streaks_ready)
+        if (scratch_a && scratch_b && sum)
         {
             const F32 angle_rad = llclamp(cross_angle(), 0.f, 360.f) * DEG_TO_RAD;
             const S32 arms      = llclamp(cross_points(), 2, 12);
@@ -9738,38 +9660,19 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
                 const F32 dir_y = sinf(theta);
                 gCrossFilterProgram.uniform2f(LLShaderMgr::CROSS_DIR, dir_x, dir_y);
 
-                // Pass 0 reads mip 0 whole; passes 1 and 2 read the previous
-                // pass's quadrant. Every pass writes a quadrant.
-                LLRenderTarget* sources[3]      = { &mRT->bloomMip[0], &mWaterDis, &mWaterDis };
-                const S32       source_quads[3] = { -1, CROSS_FILTER_SCRATCH_A, CROSS_FILTER_SCRATCH_B };
-                const S32       dest_quads[3]   = { CROSS_FILTER_SCRATCH_A, CROSS_FILTER_SCRATCH_B, CROSS_FILTER_ACCUMULATOR };
+                // Pass 0 reads mip 0; passes 1 and 2 read the pass before.
+                LLRenderTarget* sources[3]      = { &mRT->bloomMip[0], scratch_a, scratch_b };
+                LLRenderTarget* destinations[3] = { scratch_a, scratch_b, sum };
                 const F32       scales[3]       = { 1.f, (F32)CROSS_FILTER_TAPS,
                                                     (F32)(CROSS_FILTER_TAPS * CROSS_FILTER_TAPS) };
-
-                auto bind_quadrant = [&](S32 quad)
-                {
-                    const CrossFilterRegion region = cross_filter_region(quad, streak_w, streak_h, mWaterDis);
-                    mWaterDis.bindTarget();
-                    glViewport((GLint)region.mPixelX, (GLint)region.mPixelY, (GLsizei)streak_w, (GLsizei)streak_h);
-                };
 
                 auto streak_pass = [&](S32 pass)
                 {
                     LLRenderTarget* src = sources[pass];
 
+                    // The sampler's edge clamp keeps every tap on the source.
                     gCrossFilterProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, src, ALSamplers::BilinearClamp);
 
-                    // Where the source sits in its texture. A whole texture is
-                    // the identity region with no clamp of its own: the
-                    // sampler's edge clamp does that job, as it always did.
-                    CrossFilterRegion region;
-                    if (source_quads[pass] >= 0)
-                    {
-                        region = cross_filter_region(source_quads[pass], streak_w, streak_h, mWaterDis);
-                    }
-                    gCrossFilterProgram.uniform4f(LLShaderMgr::CROSS_REGION,
-                                                  region.mOriginX, region.mOriginY, region.mScaleX, region.mScaleY);
-                    gCrossFilterProgram.uniform2f(LLShaderMgr::CROSS_CLAMP, region.mClampX, region.mClampY);
                     // Always the *streak target's* texel, never the source's.
                     // The base-4 tiling only holds if every pass steps in the
                     // same unit, and pass 0 reads a full-resolution mip while
@@ -9782,31 +9685,20 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
                                                   1.f / (F32)streak_h);
                     gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_PASS_SCALE, scales[pass]);
 
-                    // Passes 1 and 2 sample a quadrant the previous draw wrote while
-                    // mWaterDis is still attached to the bound framebuffer, a read GL
-                    // defines only across a texture barrier. The same barriers put each
-                    // arm's reads of a scratch quadrant before the next arm's write to it.
-                    // Never null here: streaks_on requires it.
-                    if (src == &mWaterDis)
-                    {
-                        glTextureBarrier();
-                    }
-
                     mScreenTriangleVB->setBuffer();
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 };
 
                 // Two scratch passes overwrite; blending stays off. No clear:
-                // the fullscreen triangle writes every texel of the quadrant
-                // with blending disabled, so a clear would be pure redundant
-                // fill.
+                // the fullscreen triangle writes every texel of the target with
+                // blending disabled, whatever the pool's target held before.
                 {
                     LLGLDisable blend(GL_BLEND);
                     for (S32 pass = 0; pass < 2; ++pass)
                     {
-                        bind_quadrant(dest_quads[pass]);
+                        destinations[pass]->bindTarget();
                         streak_pass(pass);
-                        mWaterDis.flush();
+                        destinations[pass]->flush();
                     }
                 }
 
@@ -9820,9 +9712,9 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
                     LLGLState blend(GL_BLEND, arm > 0);
                     gGL.setSceneBlendType(LLRender::BT_ADD);
 
-                    bind_quadrant(dest_quads[2]);
+                    sum->bindTarget();
                     streak_pass(2);
-                    mWaterDis.flush();
+                    sum->flush();
 
                     gGL.setSceneBlendType(LLRender::BT_ALPHA);
                 }
@@ -9830,10 +9722,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 
             gCrossFilterProgram.unbind();
 
-            // Tell colorCorrect where to look.
-            mRT->crossFilterReady  = true;
-            mRT->crossFilterWidth  = streak_w;
-            mRT->crossFilterHeight = streak_h;
+            bloom.mStreaks = sum;
         }
     }
 
@@ -9868,9 +9757,10 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
 
-    // The summed arms stay in their quadrant of mWaterDis. colorCorrect samples
-    // them alongside the pyramid, so there is no composite pass here to write
-    // them into mip 0.
+    // The summed arms stay in their own target. colorCorrect samples them
+    // alongside the pyramid, so there is no composite pass here to write them
+    // into mip 0.
+    return bloom;
 }
 
 // Composite the bloom pyramid (mBloomMip[0]) additively into the pre-tonemap
@@ -10710,6 +10600,9 @@ void LLPipeline::renderFinalize()
         glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
     }
 
+    // What the bloom makes for colorCorrect, held until the frame is presented.
+    ALTransientTargets post(mTransientTargets);
+    Bloom              bloom;
     if (hdr && !cutout)
     {
         // HDR bloom runs pre-tonemap against the linear scene buffer -- now the
@@ -10718,7 +10611,7 @@ void LLPipeline::renderFinalize()
         // permutation) so we avoid a separate fullscreen pass over the scene
         // buffer. The legacy alpha-tagged prim-glow signal is carried into the
         // extract pass, so prim glow survives the migration.
-        generateBloomHDR(&mRT->screen);
+        bloom = generateBloomHDR(&mRT->screen, post);
     }
 
     // Handles tonemap, colorgrading, and gamma correction in one pass. In the HDR
@@ -10728,7 +10621,7 @@ void LLPipeline::renderFinalize()
     // block above because the dirt is lit by the lens flare as well as by bloom.
     generateLensDirt();
 
-    colorCorrect(&mRT->screen, &mRT->postPingMap, hdr, true);
+    colorCorrect(&mRT->screen, &mRT->postPingMap, hdr, true, &bloom);
 
     LLVertexBuffer::unbind();
 

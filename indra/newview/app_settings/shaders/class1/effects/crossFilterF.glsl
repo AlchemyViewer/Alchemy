@@ -51,17 +51,6 @@ uniform float uCrossFalloff;      // per-step attenuation; > 1 decays faster
 uniform float uCrossChromatic;    // 0 = white streaks, 1 = full dispersion
 uniform float uCrossPassScale;    // 1, TAPS, TAPS^2 across the three iterations
 
-// The source need not be a texture of its own. From the second pass on it is
-// a quadrant of a larger borrowed target (see generateBloomHDR), so a
-// region-relative coordinate is mapped into the texture through uCrossRegion
-// (xy origin, zw scale) -- and clamped first to the region's texel-centre
-// range, which is exactly what CLAMP_TO_EDGE did at the edge of a dedicated
-// target and what stops a tap near the edge reading the neighbouring
-// quadrant. A whole texture is region (0,0,1,1) with a clamp of 0, where the
-// sampler's own edge clamp still applies.
-uniform vec4  uCrossRegion;
-uniform vec2  uCrossClamp;
-
 in vec2 vary_texcoord0;
 
 // Four taps per pass with the stride quadrupling to match is not a tuning
@@ -147,8 +136,7 @@ void main()
             tint = mix(vec3(1.0), sp, uCrossChromatic * t);
         }
 
-        vec2 tc  = clamp(vary_texcoord0 + offset, uCrossClamp, vec2(1.0) - uCrossClamp);
-        accum   += texture(diffuseMap, uCrossRegion.xy + tc * uCrossRegion.zw).rgb * weight * tint;
+        accum   += texture(diffuseMap, vary_texcoord0 + offset).rgb * weight * tint;
         total_w += weight;
     }
 
