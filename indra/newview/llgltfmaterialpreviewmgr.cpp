@@ -229,9 +229,10 @@ bool LLGLTFPreviewTexture::needsRender()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-    // Not before the probe pack it renders through is there, its post targets with it; asked again
-    // each frame until it is.
-    if (!gPipeline.mAuxillaryRT.screen.isComplete() || !gPipeline.mAuxillaryRT.postPingMap.isComplete())
+    // Not before the probe pack it renders through is there, and planned with the post target the
+    // preview takes from the pool; asked again each frame until it is.
+    if (!gPipeline.mAuxillaryRT.screen.isComplete() ||
+        !gPipeline.resourcePlan().wants(ALRenderResourcePlan::Id::ProbePostPing))
     {
         return false;
     }
@@ -457,6 +458,15 @@ bool LLGLTFPreviewTexture::render()
 
     if (!mShouldRender) { return false; }
 
+    // The probe pack's post target the colour correction writes, from the pool with the bloom
+    // until the preview is drawn; acquired ahead of every bind below.
+    ALTransientTargets    post(gPipeline.mTransientTargets);
+    LLRenderTarget* const post_ping = gPipeline.acquireResource(post, ALRenderResourcePlan::Id::ProbePostPing);
+    if (!post_ping)
+    {
+        return false;
+    }
+
     // The swatch's alpha is its coverage, drawn over a checkerboard. Without this the
     // preview takes whatever mask the last frame ended on, and after a HUD pass that leaves
     // alpha unwritten from the clears through the final blit.
@@ -564,8 +574,7 @@ bool LLGLTFPreviewTexture::render()
     gPipeline.mExposureMap.swapFBORefs(gPipeline.mLastExposure);
 
     const bool hdr = LLPipeline::hdrEnabled();
-    ALTransientTargets post(gPipeline.mTransientTargets);
-    LLPipeline::Bloom  bloom;
+    LLPipeline::Bloom bloom;
     if (hdr)
     {
         gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);
@@ -576,14 +585,14 @@ bool LLGLTFPreviewTexture::render()
         bloom = gPipeline.generateBloomHDR(&screen, post);
     }
 
-    gPipeline.colorCorrect(&screen, &gPipeline.mRT->postPingMap, true, false, &bloom);
+    gPipeline.colorCorrect(&screen, post_ping, true, false, &bloom);
     LLVertexBuffer::unbind();
 
     if (!hdr)
     {
-        if (LLRenderTarget* glow = gPipeline.generateGlow(&gPipeline.mRT->postPingMap, post))
+        if (LLRenderTarget* glow = gPipeline.generateGlow(post_ping, post))
         {
-            gPipeline.combineGlow(&gPipeline.mRT->postPingMap, &screen, glow);
+            gPipeline.combineGlow(post_ping, &screen, glow);
         }
     }
 
@@ -596,9 +605,9 @@ bool LLGLTFPreviewTexture::render()
     gDeferredPostNoDoFProgram.bind();
 
     // From LLPipeline::renderFinalize: "Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems."
-    // Under HDR that is colorCorrect's output in postPingMap; otherwise the glow combine has
+    // Under HDR that is colorCorrect's output in post_ping; otherwise the glow combine has
     // written the result back to the screen.
-    LLRenderTarget* last_in_chain = hdr ? &gPipeline.mRT->postPingMap : &screen;
+    LLRenderTarget* last_in_chain = hdr ? post_ping : &screen;
     gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, last_in_chain);
     gDeferredPostNoDoFProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &gPipeline.mAuxillaryRT.deferredScreen);
 

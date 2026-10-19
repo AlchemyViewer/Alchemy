@@ -1036,11 +1036,6 @@ public:
         LLRenderTarget          screen;
         LLRenderTarget          deferredScreen;
 
-        // The material preview's tonemapped render, ready for post, in the
-        // probe pack: the main view's post chain is the pool's.
-        LLRenderTarget          postPingMap;
-        LLRenderTarget          postPongMap;
-
         //sun shadow map
         LLRenderTarget          shadow[4];
 

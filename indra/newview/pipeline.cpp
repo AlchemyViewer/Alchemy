@@ -922,8 +922,6 @@ LLRenderTarget* LLPipeline::resourceTarget(ALRenderResourcePlan::Id id)
         {
             case Slot::GBuffer:  return &rt.deferredScreen;
             case Slot::Screen:   return &rt.screen;
-            case Slot::PostPing: return &rt.postPingMap;
-            case Slot::PostPong: return &rt.postPongMap;
             default:
                 break;
         }

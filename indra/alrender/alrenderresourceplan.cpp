@@ -438,11 +438,8 @@ bool ALRenderResourcePlan::isTransient(Id id)
     if (packOf(id))
     {
         const Slot slot = slotOf(id);
-        if (slot == Slot::PostPing || slot == Slot::PostPong)
-        {
-            return packOf(id) == Pack::Main;
-        }
-        return slot == Slot::Light || slot == Slot::Water || slot == Slot::DepthCopy || slot >= Slot::Bloom0;
+        return slot == Slot::Light || slot == Slot::PostPing || slot == Slot::PostPong || slot == Slot::Water ||
+               slot == Slot::DepthCopy || slot >= Slot::Bloom0;
     }
     return id == Id::SMAAEdges || id == Id::SMAABlend || id == Id::Glow0 || id == Id::Glow1 || id == Id::Glow2 ||
            id == Id::SkyBehind;
