@@ -222,11 +222,16 @@ bool LLViewerDynamicTexture::updateAllInstances()
 
     // Each range of orders draws into a target of its own from the pool, acquired, bound and cleared for the first of
     // its instances that needs a render, and given back once they are drawn: a frame with nothing to draw takes, binds
-    // and clears neither. Where one cannot be had, the range's instances wait for a later frame.
+    // and clears neither. Where one cannot be had, the range's instances wait for a later frame. A preview or a bake
+    // can go seconds between draws, as a slider waits on the hand dragging it, and building its target again costs
+    // the frame that draws next around half a millisecond of CPU and more of the GPU's: the pool keeps each through
+    // 1800 frames unacquired, 30 seconds at 60 fps.
     using Plan = ALRenderResourcePlan;
+    constexpr U32 KEEP_FRAMES = 1800;
     const auto update_orders = [&](S32 first, S32 last, Plan::Id id)
         {
-            ALOnDemandTarget target(gPipeline.mTransientTargets, gPipeline.resourcePlan().desc(id), Plan::name(id));
+            ALOnDemandTarget target(gPipeline.mTransientTargets, gPipeline.resourcePlan().desc(id), Plan::name(id),
+                                    KEEP_FRAMES);
             bool drawn = true;
             for (S32 order = first; drawn && order < last; ++order)
             {
