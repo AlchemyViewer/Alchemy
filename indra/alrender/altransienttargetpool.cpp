@@ -274,9 +274,14 @@ void ALTransientTargetPool::beginFrame()
     mThisFrame = {};
     ++mFrame;
 
-    // Freed once TRIM_FRAMES whole frames have gone by since the one it was last used in.
+    // Freed once TRIM_FRAMES whole frames have gone by since the one it was last used in. While trimming is held, every
+    // target counts as used in this one.
     for (const std::unique_ptr<Entry>& entry : mEntries)
     {
+        if (mTrimHeld)
+        {
+            entry->mLastUsed = mFrame;
+        }
         entry->mFree = entry->mFree || mFrame - entry->mLastUsed > TRIM_FRAMES;
     }
     mThisFrame.mTrimmed = sweep();

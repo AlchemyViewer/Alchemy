@@ -793,8 +793,11 @@ void LLPipeline::markRenderInputsDirty(ALRenderInputRequests::Change change)
 void LLPipeline::applyRenderInputs()
 {
     // A frame starts here, with every transient target the last one acquired back in the pool. Debug GL poisons each
-    // as it is released, and names each for whoever acquires it.
+    // as it is released, and names each for whoever acquires it. Nothing is trimmed until the user is logged in: the
+    // login's frames draw no world, and the world's first frame takes what the reconcile readied for it rather than
+    // building it mid-pass.
     mTransientTargets.setValidation(gDebugGL);
+    mTransientTargets.holdTrimming(LLStartUp::getStartupState() < STATE_STARTED);
     mTransientTargets.beginFrame();
     if (mTransientTargets.namesRecorded())
     {

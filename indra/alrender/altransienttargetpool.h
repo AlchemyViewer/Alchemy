@@ -125,9 +125,14 @@ public:
     bool release(LLRenderTarget* target);
 
     /// Start a frame. A target still acquired from the last one is a leak: reported, counted (leaks) and taken back.
-    /// Free targets no one has acquired for TRIM_FRAMES whole frames are freed. The frame's counts start again, those of
-    /// the frame that ended kept as lastFrame().
+    /// Free targets no one has acquired for TRIM_FRAMES whole frames are freed, unless trimming is held. The frame's
+    /// counts start again, those of the frame that ended kept as lastFrame().
     void beginFrame();
+
+    /// While held, each frame begun counts as one every target was acquired in: none is freed for going unacquired, and
+    /// once the hold ends each is kept TRIM_FRAMES whole frames more. The viewer holds it until the user is logged in,
+    /// so that the frames of the login, which draw no world, keep what the reconcile readied for the world's first.
+    void holdTrimming(bool hold) { mTrimHeld = hold; }
 
     /// The main view's render size, which sizes nearly every target the pool holds: where it differs from the last,
     /// every target is freed.
@@ -204,6 +209,7 @@ private:
     Stats                               mThisFrame;
     Stats                               mLastFrame;
     bool                                mValidation    = false;
+    bool                                mTrimHeld      = false;
     bool                                mRecordNext    = false;
     bool                                mRecording     = false;
     bool                                mNamesRecorded = false;

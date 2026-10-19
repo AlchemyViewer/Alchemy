@@ -258,6 +258,51 @@ namespace
         CHECK(pool.release(used));
     }
 
+    // The login's frames acquire nothing: held, the pool keeps what was readied through as many of them as there are,
+    // and from the hold's end a target goes TRIM_FRAMES whole frames unacquired before it is freed. A leak is still
+    // taken back, and a size change still frees everything.
+    TEST_CASE_METHOD(pool_data, "altransienttargetpool: nothing is trimmed while trimming is held", "[altransienttargetpool]")
+    {
+        LLRenderTarget* readied = pool.acquire(LIGHT, "main.light");
+        CHECK(pool.release(readied));
+
+        pool.holdTrimming(true);
+        for (U32 frame = 1; frame <= 4 * Pool::TRIM_FRAMES; ++frame)
+        {
+            pool.beginFrame();
+        }
+        CHECK(pool.stats().mTargets == 1);
+        CHECK(backing.freed.empty());
+
+        LLRenderTarget* leaked = pool.acquire(POST, "main.post.ping");
+        REQUIRE(leaked);
+        pool.beginFrame();
+        CHECK(pool.leaks() == 1);
+        CHECK(pool.acquire(POST, "main.post.ping") == leaked);
+        CHECK(pool.release(leaked));
+
+        pool.holdTrimming(false);
+        for (U32 frame = 1; frame <= Pool::TRIM_FRAMES; ++frame)
+        {
+            pool.beginFrame();
+        }
+        UNSCOPED_INFO("120 whole frames unused since the hold ended: kept");
+        CHECK(pool.stats().mTargets == 2);
+        CHECK(backing.freed.empty());
+        pool.beginFrame();
+        CHECK(pool.stats().mTargets == 0);
+        CHECK(backing.freed.size() == 2);
+
+        UNSCOPED_INFO("held, a change of the main size still frees everything");
+        pool.holdTrimming(true);
+        pool.setMainSize(2560, 1440);
+        readied = pool.acquire(LIGHT, "main.light");
+        CHECK(pool.release(readied));
+        pool.setMainSize(1280, 720);
+        pool.beginFrame();
+        CHECK(pool.stats().mTargets == 0);
+    }
+
     TEST_CASE_METHOD(pool_data, "altransienttargetpool: a change of the main size frees everything", "[altransienttargetpool]")
     {
         pool.setMainSize(2560, 1440);
