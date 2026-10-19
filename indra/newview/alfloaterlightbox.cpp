@@ -2275,7 +2275,9 @@ void ALFloaterLightBox::refreshBloomSections()
     // So is the auto exposure, which renderFinalize meters only under HDR.
     // The cross filter also needs a texture barrier (generateBloomHDR), which a
     // driver with neither GL 4.5 nor a texture barrier extension does not have.
-    const bool hdr = LLPipeline::hdrEnabled();
+    // The setting, not LLPipeline::hdrEnabled(): this runs inside the setting's
+    // own signal, and the renderer takes the new value up at the next frame.
+    const bool hdr = gSavedSettings.getBOOL("RenderHDREnabled");
     const bool cross_filter = hdr && glTextureBarrier;
     const std::pair<const char*, bool> bloom_sections[] = {
         { "sec_autoexp", hdr },
