@@ -330,6 +330,46 @@ namespace
         CHECK(backing.freed.back() == kept);
     }
 
+    // A Keep makes every acquisition while it lives ask for at least its frames, the asks of callees that know nothing
+    // of it included; one inside another keeps the larger, and each puts back what it found.
+    TEST_CASE_METHOD(pool_data, "altransienttargetpool: a keep scope keeps what is acquired within it", "[altransienttargetpool]")
+    {
+        constexpr U32 KEEP = 300;
+
+        LLRenderTarget* kept = nullptr;
+        LLRenderTarget* nested = nullptr;
+        {
+            const Pool::Keep keep(pool, KEEP);
+            kept = pool.acquire(LIGHT, "preview.post");
+            CHECK(pool.release(kept));
+            {
+                const Pool::Keep shorter(pool, 10);
+                nested = pool.acquire(HALF, "preview.bloom");
+                CHECK(pool.release(nested));
+            }
+        }
+        LLRenderTarget* after = pool.acquire(POST, "main.post.ping");
+        CHECK(pool.release(after));
+
+        for (U32 frame = 1; frame <= Pool::TRIM_FRAMES + 1; ++frame)
+        {
+            pool.beginFrame();
+        }
+        UNSCOPED_INFO("121 frames unused: the one acquired after the scope goes, the two within it stay");
+        CHECK(pool.stats().mTargets == 2);
+        REQUIRE(backing.freed.size() == 1);
+        CHECK(backing.freed[0] == after);
+
+        for (U32 frame = Pool::TRIM_FRAMES + 2; frame <= KEEP + 1; ++frame)
+        {
+            pool.beginFrame();
+        }
+        UNSCOPED_INFO("301 frames unused: they go too");
+        CHECK(pool.stats().mTargets == 0);
+        CHECK(std::find(backing.freed.begin(), backing.freed.end(), kept) != backing.freed.end());
+        CHECK(std::find(backing.freed.begin(), backing.freed.end(), nested) != backing.freed.end());
+    }
+
     // The login's frames acquire nothing: held, the pool keeps what was readied through as many of them as there are,
     // and from the hold's end a target goes TRIM_FRAMES whole frames unacquired before it is freed. A leak is still
     // taken back, and a size change still frees everything.

@@ -27,6 +27,7 @@
 #include "alrendertargetdesc.h"
 #include "llrendertarget.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -137,6 +138,26 @@ public:
     /// held. The frame's counts start again, those of the frame that ended kept as lastFrame().
     void beginFrame();
 
+    /// While it lives, every acquisition from the pool asks to be kept through at least `frames` whole frames unacquired,
+    /// as though each had asked it: for a caller whose callees acquire for it, as a preview drawn through the post chain
+    /// does, or whose targets go unused seconds at a time.
+    class Keep
+    {
+    public:
+        Keep(ALTransientTargetPool& pool, U32 frames) : mPool(pool), mWas(pool.mKeepAtLeast)
+        {
+            pool.mKeepAtLeast = std::max(mWas, frames);
+        }
+        ~Keep() { mPool.mKeepAtLeast = mWas; }
+
+        Keep(const Keep&)            = delete;
+        Keep& operator=(const Keep&) = delete;
+
+    private:
+        ALTransientTargetPool& mPool;
+        const U32              mWas;
+    };
+
     /// While held, each frame begun counts as one every target was acquired in: none is freed for going unacquired, and
     /// once the hold ends each is kept as many whole frames more as it is kept through. The viewer holds it until the
     /// user is logged in, so that the frames of the login, which draw no world, keep what the reconcile readied for the
@@ -226,6 +247,8 @@ private:
     Stats                               mLastFrame;
     bool                                mValidation    = false;
     bool                                mTrimHeld      = false;
+    /// The fewest whole frames every acquisition asks to be kept through, while a Keep lives.
+    U32                                 mKeepAtLeast   = 0;
     bool                                mRecordNext    = false;
     bool                                mRecording     = false;
     bool                                mNamesRecorded = false;

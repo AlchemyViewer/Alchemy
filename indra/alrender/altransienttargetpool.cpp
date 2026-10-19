@@ -210,7 +210,7 @@ LLRenderTarget* ALTransientTargetPool::acquire(const Key& key, std::string_view 
     match->mHeld       = true;
     match->mLastUsed   = mFrame;
     match->mLease      = ++mLeases;
-    match->mTrimFrames = std::max(match->mTrimFrames, trim_frames);
+    match->mTrimFrames = std::max({ match->mTrimFrames, trim_frames, mKeepAtLeast });
     if (mRecording)
     {
         if (!match->mServed.empty())

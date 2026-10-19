@@ -225,11 +225,13 @@ bool LLViewerDynamicTexture::updateAllInstances()
     // and clears neither. Where one cannot be had, the range's instances wait for a later frame. A preview or a bake
     // can go seconds between draws, as a slider waits on the hand dragging it, and building its target again costs
     // the frame that draws next around half a millisecond of CPU and more of the GPU's: the pool keeps each through
-    // 1800 frames unacquired, 30 seconds at 60 fps.
+    // 1800 frames unacquired, 30 seconds at 60 fps, and with it whatever a draw takes for itself, as a GLTF material
+    // preview takes the probe pack's post target and bloom.
     using Plan = ALRenderResourcePlan;
     constexpr U32 KEEP_FRAMES = 1800;
     const auto update_orders = [&](S32 first, S32 last, Plan::Id id)
         {
+            const ALTransientTargetPool::Keep keep(gPipeline.mTransientTargets, KEEP_FRAMES);
             ALOnDemandTarget target(gPipeline.mTransientTargets, gPipeline.resourcePlan().desc(id), Plan::name(id),
                                     KEEP_FRAMES);
             bool drawn = true;

@@ -9317,7 +9317,11 @@ void LLPipeline::beginWaterTargets()
     using Plan = ALRenderResourcePlan;
     llassert(!mWaterTargets);
     mWaterTargets.emplace(mTransientTargets);
-    // The pack's own, at the size its screen renders at.
+    // The pack's own, at the size its screen renders at, and kept through 1800 frames unacquired, 30 seconds at 60 fps:
+    // a view that looks up from the sea, or a capture that comes round again, would otherwise find the depth copy
+    // freed, and the frame that draws the water next build it mid-pass.
+    constexpr U32                     WATER_KEEP_FRAMES = 1800;
+    const ALTransientTargetPool::Keep keep(mTransientTargets, WATER_KEEP_FRAMES);
     mWaterRefraction = acquireResource(*mWaterTargets, Plan::inPack(renderPack(), Plan::Slot::Water));
     mWaterDepthCopy  = acquireResource(*mWaterTargets, Plan::inPack(renderPack(), Plan::Slot::DepthCopy));
 
