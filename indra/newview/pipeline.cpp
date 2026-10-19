@@ -9380,21 +9380,27 @@ LLRenderTarget* LLPipeline::generateGlow(LLRenderTarget* src, ALTransientTargets
 {
     LL_PROFILE_GPU_ZONE("glow generate");
 
-    // The glow from the caller's scope, until combineGlow has added it; the extract and the blur's other buffer for the
-    // blur alone. Each is cleared before it is drawn.
-    LLRenderTarget* glow = acquireResource(scope, ALRenderResourcePlan::Id::Glow1);
+    // No glow, or no blur to run, is no glow: nothing for combineGlow to add, and no pass of it to keep the final blit
+    // from sharpening the frame.
+    const S32 kernel = RenderGlowIterations * 2;
+    if (!sRenderGlow || kernel <= 0)
+    {
+        return nullptr;
+    }
+
+    // The extract and the blur's other buffer for the blur alone; the glow from the caller's scope, until combineGlow
+    // has added it. Each is cleared before it is drawn.
+    ALTransientTargets blur(mTransientTargets);
+    LLRenderTarget*    extract = acquireResource(blur, ALRenderResourcePlan::Id::Glow2);
+    LLRenderTarget*    other   = extract ? acquireResource(blur, ALRenderResourcePlan::Id::Glow0) : nullptr;
+    LLRenderTarget*    glow    = other ? acquireResource(scope, ALRenderResourcePlan::Id::Glow1) : nullptr;
     if (!glow)
     {
         return nullptr;
     }
-    ALTransientTargets blur(mTransientTargets);
-    LLRenderTarget*    extract = sRenderGlow ? acquireResource(blur, ALRenderResourcePlan::Id::Glow2) : nullptr;
-    LLRenderTarget*    other   = extract ? acquireResource(blur, ALRenderResourcePlan::Id::Glow0) : nullptr;
     // The blur ping-pongs between the two, ending in the glow, as the iterations it runs are an even count.
     LLRenderTarget* const buffers[2] = { other, glow };
-    const S32 kernel = RenderGlowIterations * 2;
 
-    if (other && kernel > 0)
     {
         extract->bindTarget();
         extract->clear();
@@ -9491,13 +9497,6 @@ LLRenderTarget* LLPipeline::generateGlow(LLRenderTarget* src, ALTransientTargets
         }
 
         gGlowProgram.unbind();
-
-    }
-    else // no glow, or no blur to run: skip the glow ping-pong and just clear the result target
-    {
-        glow->bindTarget();
-        glow->clear();
-        glow->flush();
     }
     return glow;
 }

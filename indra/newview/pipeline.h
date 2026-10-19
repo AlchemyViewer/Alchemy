@@ -312,7 +312,7 @@ public:
     void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade,
                       const Bloom* bloom = nullptr);
     // The legacy glow extracted from @a src and blurred, held by @a scope until combineGlow has added it; null where
-    // none could be had.
+    // there is none to draw, glow being off or its blur running no iterations, or none could be had.
     LLRenderTarget* generateGlow(LLRenderTarget* src, ALTransientTargets& scope);
     // Whether generateBloomHDR will run this frame: the pyramid is deep
     // enough and every shader it needs built.
