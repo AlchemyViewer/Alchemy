@@ -10259,15 +10259,15 @@ void LLPipeline::renderDoF()
             LLGLDisable blend(GL_BLEND);
 
             // Both from the pool, for the effect alone. The sharp copy, with its
-            // signed CoF in alpha, in the water's copy's description: the
-            // screen's format, RGBA16F under HDR for the linear scene, over the
-            // scene's depth, which the CoF pass, testing none, leaves be. The blur
+            // signed CoF in alpha, in a description of its own: the screen's
+            // format, RGBA16F under HDR for the linear scene, over the scene's
+            // depth, which the CoF pass, testing none, leaves be. The blur
             // in bloom mip 0's under HDR, R11F_G11F_B10F (RGBA16F with
             // halation), and the post chain's without; it carries no alpha.
             const bool hdr = hdrEnabled();
 
             ALTransientTargets dof(mTransientTargets);
-            LLRenderTarget*    sharp = acquireResource(dof, ALRenderResourcePlan::Id::MainWater, "dof.sharp");
+            LLRenderTarget*    sharp = acquireResource(dof, ALRenderResourcePlan::Id::DoFSharp);
             LLRenderTarget*    blur  = acquireResource(dof,
                                                        hdr ? ALRenderResourcePlan::bloomMip(ALRenderResourcePlan::Pack::Main, 0)
                                                            : ALRenderResourcePlan::Id::MainPostPong,

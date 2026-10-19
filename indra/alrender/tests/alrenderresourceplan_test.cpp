@@ -200,7 +200,7 @@ namespace
                   return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light, Slot::Water }) |
                          in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main })) |
-                         of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
+                         of({ Id::SkyBehind, Id::DoFSharp, Id::Glow0, Id::Glow1, Id::Glow2 });
               } },
             { "RenderHDREnabled under a material preview", previewed, hdr_off,
               [](const Plan& before)
@@ -208,7 +208,7 @@ namespace
                   return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light, Slot::Water }) |
                          in_packs({ Pack::Main, Pack::Probe }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main, Pack::Probe })) |
-                         of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
+                         of({ Id::SkyBehind, Id::DoFSharp, Id::Glow0, Id::Glow1, Id::Glow2 });
               } },
             { "a material preview made", no_change, previewed,
               [](const Plan&)
@@ -934,7 +934,7 @@ namespace
             CHECK(!Plan::drivesRenderSize(id));
         }
         for (Id id : { Id::MainGBuffer, Id::MainScreen, Id::MainLight, Id::MainPostPing, Id::SMAABlend,
-                       Id::MainWater, Id::MainDepthCopy, Id::SkyBehind, Id::SSRScene })
+                       Id::MainWater, Id::MainDepthCopy, Id::SkyBehind, Id::SSRScene, Id::DoFSharp })
         {
             INFO(Plan::name(id));
             CHECK(Plan::drivesRenderSize(id));
@@ -957,7 +957,8 @@ namespace
         const IdSet transient = in_packs({ Pack::Main, Pack::Probe, Pack::Hero },
                                          { Slot::Light, Slot::PostPing, Slot::PostPong, Slot::Water, Slot::DepthCopy }) |
                                 bloom({ Pack::Main, Pack::Probe, Pack::Hero }) |
-                                of({ Id::SMAAEdges, Id::SMAABlend, Id::Glow0, Id::Glow1, Id::Glow2, Id::SkyBehind });
+                                of({ Id::SMAAEdges, Id::SMAABlend, Id::Glow0, Id::Glow1, Id::Glow2, Id::SkyBehind,
+                                     Id::DoFSharp });
         CHECK(names(Plan::idsWhere(Plan::isTransient)) == names(transient));
 
         // What holds anything across frames, or between the phases of one, is built to keep.
@@ -992,9 +993,19 @@ namespace
         U32 mLastMisses = 0; ///< acquisitions the last frame had to build for
         bool mLightIsWater     = false;
         bool mSkyBehindIsBloom = false;
+        bool mSharpIsLight     = false; ///< depth of field's sharp copy took a target the lighting used
     };
 
-    WorkingSet main_view_frame(const Inputs& in)
+    // Depth of field through the frame: off, as at the defaults; on, with its sharp copy; and on as section 2.8.4 of
+    // the plan would have it, its circle of confusion worked from depth, with no sharp copy.
+    enum class DoF
+    {
+        Off,
+        WithSharpCopy,
+        WithoutSharpCopy,
+    };
+
+    WorkingSet main_view_frame(const Inputs& in, DoF dof = DoF::Off)
     {
         const Plan plan = Plan::make(in);
         CountingBacking       backing;
@@ -1018,14 +1029,16 @@ namespace
             ALTransientTargets sky(pool);
             LLRenderTarget*    sky_behind = acquire(sky, Id::SkyBehind);
 
-            LLRenderTarget* light = nullptr;
+            LLRenderTarget* light   = nullptr;
+            LLRenderTarget* scratch = nullptr;
             {
                 // renderDeferredLighting: the light map, and SSAO's blur through a scratch of its description.
                 ALTransientTargets lighting(pool);
                 light = plan.wants(Id::MainLight) ? acquire(lighting, Id::MainLight) : nullptr;
                 if (light && in.mSSAO)
                 {
-                    lighting.release(acquire(lighting, Id::MainLight, "main.light.scratch"));
+                    scratch = acquire(lighting, Id::MainLight, "main.light.scratch");
+                    lighting.release(scratch);
                 }
             }
 
@@ -1039,7 +1052,16 @@ namespace
             }
             sky.releaseAll();
 
-            // renderFinalize: the bloom pyramid, then the post chain's two, held until the frame is presented.
+            // renderFinalize: depth of field, its sharp copy where it keeps one and its blur in bloom level 0's
+            // description (the post chain's without HDR), given back before the bloom pyramid, then the post chain's
+            // two, held until the frame is presented.
+            LLRenderTarget* sharp = nullptr;
+            if (dof != DoF::Off)
+            {
+                ALTransientTargets effect(pool);
+                sharp = dof == DoF::WithSharpCopy ? acquire(effect, Id::DoFSharp) : nullptr;
+                acquire(effect, in.mHDR ? Plan::bloomMip(Pack::Main, 0) : Id::MainPostPong, "dof.blur");
+            }
             LLRenderTarget* bloom1 = nullptr;
             {
                 ALTransientTargets post(pool);
@@ -1054,6 +1076,7 @@ namespace
 
             set.mLightIsWater     = light && light == water;
             set.mSkyBehindIsBloom = sky_behind && sky_behind == bloom1;
+            set.mSharpIsLight     = sharp && (sharp == light || sharp == scratch);
             set.mLastMisses       = pool.stats().mMisses;
         }
 
@@ -1107,6 +1130,44 @@ namespace
         CHECK(without.mPersistent + without.mPooled == 226080000); // 215.6 MiB
     }
 
+    // Depth of field takes nothing the frame did not already hold: its sharp copy a target of the light map's
+    // description, which the lighting has given back by then, and its blur bloom level 0's before the pyramid takes it.
+    TEST_CASE("alrenderresourceplan: the main view's working set with depth of field, its sharp copy kept or not",
+              "[alrenderresourceplan]")
+    {
+        const WorkingSet off = main_view_frame(defaults());
+        for (DoF dof : { DoF::WithSharpCopy, DoF::WithoutSharpCopy })
+        {
+            INFO((dof == DoF::WithSharpCopy ? "with its sharp copy" : "with its CoF from depth"));
+            const WorkingSet on = main_view_frame(defaults(), dof);
+            CHECK(on.mSharpIsLight == (dof == DoF::WithSharpCopy));
+            CHECK(on.mLastMisses == 0);
+            CHECK(on.mTargets == off.mTargets);
+            CHECK(on.mPersistent + on.mPooled == 255571200); // 243.7 MiB
+        }
+    }
+
+    // Depth of field's sharp copy keeps its circle of confusion in alpha, whatever the water's copy is: the screen's
+    // format over the scene's depth, the light map's description.
+    TEST_CASE("alrenderresourceplan: depth of field's sharp copy has a description of its own, with alpha", "[alrenderresourceplan]")
+    {
+        for (bool hdr : { true, false })
+        {
+            INFO((hdr ? "under HDR" : "without HDR"));
+            Inputs in          = defaults();
+            in.mHDR            = hdr;
+            in.mGBufferNormHDR = hdr;
+            const Plan plan    = Plan::make(in);
+            const Plan::Resource& sharp = plan[Id::DoFSharp];
+            REQUIRE(sharp.mDesc);
+            CHECK(sharp.mDesc->colorCount() == 1);
+            CHECK(sharp.mDesc->color[0] == (hdr ? (U32)GL_RGBA16F : (U32)GL_RGBA8));
+            CHECK(sharp.mDesc->width == plan.desc(Id::MainScreen)->width);
+            CHECK(sharp.mDepthFrom == Id::MainGBuffer);
+            CHECK(sharp == plan[Id::MainLight]);
+        }
+    }
+
     TEST_CASE("alrenderresourceplan: every resource has its own debugger label", "[alrenderresourceplan]")
     {
         CHECK(Plan::name(Id::MainGBuffer) == "main.gbuffer");
@@ -1114,6 +1175,7 @@ namespace
         CHECK(Plan::name(Id::HeroBloom6) == "hero.bloom.mip6");
         CHECK(Plan::name(Id::SpotShadow0) == "shadow.spot0");
         CHECK(Plan::name(Id::SMAAEdges) == "smaa.edges");
+        CHECK(Plan::name(Id::DoFSharp) == "dof.sharp");
         CHECK(Plan::name(Id::LensFlareB) == "lens.flare.b");
         CHECK(Plan::name(Id::ToneCurve) == "tone.curve");
 
