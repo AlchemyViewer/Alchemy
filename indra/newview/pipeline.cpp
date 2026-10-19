@@ -31,6 +31,7 @@
 
 #include "pipeline.h"
 #include <algorithm>
+#include <sstream>
 
 #include <fmt/format.h>
 
@@ -1435,6 +1436,13 @@ namespace
     }
 }
 
+// Whether a rebuild for a resize built every target at the size it was asked for, the rebuild a window dragged by its
+// edge makes every frame.
+static bool resized_as_asked(LLPipeline::RebuildCause cause, const LLPipeline::ResourceChanges& changes)
+{
+    return cause == LLPipeline::RebuildCause::Resize && changes.mFullSize && changes.mFailed.none();
+}
+
 bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -1578,17 +1586,27 @@ bool LLPipeline::rebuildGLBuffers(RebuildCause cause)
     const std::string applying = mApplyingChanges > 0
         ? fmt::format(", applying {} {}", mApplyingChanges, mApplyingChanges == 1 ? "change" : "changes")
         : std::string();
-    LL_INFOS("RenderResources") << "Render resources reconciled at " << mMainRT.deferredScreen.getWidth() << "x"
-                                << mMainRT.deferredScreen.getHeight() << why << applying
-                                << (changes.mFullSize                         ? std::string_view()
-                                    : mMainRT.deferredScreen.isComplete() ? std::string_view(", halved for want of memory")
-                                                                          : std::string_view(", built at no size"))
-                                << "; changed: " << (changed.empty() ? std::string_view("nothing") : changed)
-                                << "; built: " << built << "; freed: " << (freed.empty() ? std::string_view("nothing") : freed) << "; kept "
-                                << changes.mKept.count()
-                                << (changes.mFailed.any() ? "; failed: " + resource_names(changes.mFailed) : std::string())
-                                << "; invalidated: " << (invalidated.empty() ? std::string_view("nothing") : invalidated)
-                                << LL_ENDL;
+    std::ostringstream line;
+    line << "Render resources reconciled at " << mMainRT.deferredScreen.getWidth() << "x"
+         << mMainRT.deferredScreen.getHeight() << why << applying
+         << (changes.mFullSize                         ? std::string_view()
+             : mMainRT.deferredScreen.isComplete() ? std::string_view(", halved for want of memory")
+                                                   : std::string_view(", built at no size"))
+         << "; changed: " << (changed.empty() ? std::string_view("nothing") : changed)
+         << "; built: " << built << "; freed: " << (freed.empty() ? std::string_view("nothing") : freed) << "; kept "
+         << changes.mKept.count()
+         << (changes.mFailed.any() ? "; failed: " + resource_names(changes.mFailed) : std::string())
+         << "; invalidated: " << (invalidated.empty() ? std::string_view("nothing") : invalidated);
+    // A window dragged by its edge, or a panel sliding beside the world view, resizes it every frame: a resize that
+    // built everything at the size asked is logged at debug level, so the log is not written every frame of it.
+    if (resized_as_asked(cause, changes))
+    {
+        LL_DEBUGS("RenderResources") << line.str() << LL_ENDL;
+    }
+    else
+    {
+        LL_INFOS("RenderResources") << line.str() << LL_ENDL;
+    }
 
     // A shadow map that cannot be built leaves its shadows undrawn rather than the view smaller.
     const ALRenderResourcePlan::IdSet shadows_failed =
