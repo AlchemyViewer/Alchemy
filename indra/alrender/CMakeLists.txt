@@ -14,6 +14,7 @@ set(
   aldepthpyramid.cpp
   alfarplane.cpp
   allightmapblur.cpp
+  alondemandtarget.cpp
   alrenderinputrequests.cpp
   alrenderresourceplan.cpp
   alshaderinputs.cpp
@@ -30,6 +31,7 @@ set(
   alfarplane.h
   alhuddepth.h
   allightmapblur.h
+  alondemandtarget.h
   alrenderinputrequests.h
   alrenderresourceinputs.h
   alrenderresourceplan.h
@@ -85,14 +87,16 @@ if(AL_BUILD_TESTS)
   # cells the field lays out, with the cull and the depth pyramid it reads
   # and the waves displaced by heights the bake integrates from a normal map,
   # the light map's blur by one dispatch against its two fragment passes,
-  # FXAA on an RGB10_A2 source, and the transient target pool's GL objects,
-  # shared depth and poison, on llrender's shared hidden window.
+  # FXAA on an RGB10_A2 source, the transient target pool's GL objects,
+  # shared depth and poison, and the previews' and bakes' targets taken from
+  # it only when one draws, on llrender's shared hidden window.
   al_add_test_binary(
     alrender_gl_tests
     PROJECT alrender
     SOURCES
       tests/alhuddepth_gl_test.cpp
       tests/allightmapblur_gl_test.cpp
+      tests/alondemandtarget_gl_test.cpp
       tests/altransienttargetpool_gl_test.cpp
       tests/alwatersurface_gl_test.cpp
       tests/fxaa_gl_test.cpp
