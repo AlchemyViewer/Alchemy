@@ -252,8 +252,15 @@ namespace allightmapblur_gl
                     mSource[i * 4 + 3] = noise(x, y, 3);
                 }
             }
-            glBindTexture(GL_TEXTURE_2D, mGBuffer.getDepth());
+            // The depth reaches the G-buffer by a blit, as the viewer's passes lay it, not by an upload into it: AMD's
+            // driver leaves its per-tile depth summary as it was across an upload, and the depth bounds test of
+            // ALDrawnOnly then lets the fragment passes draw over sky that holds exactly the cleared value.
+            LLRenderTarget staging;
+            REQUIRE(staging.ensure({ .width = w, .height = h, .depth = gbuffer.depth }) == LLRenderTarget::EnsureResult::Built);
+            glBindTexture(GL_TEXTURE_2D, staging.getDepth());
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW, mH, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
+            glBindTexture(GL_TEXTURE_2D, 0);
+            mGBuffer.copyContents(staging, 0, 0, mW, mH, 0, 0, mW, mH, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
             glBindTexture(GL_TEXTURE_2D, mGBuffer.getTexture());
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW, mH, GL_RGBA, GL_UNSIGNED_SHORT, normals.data());
             for (LLRenderTarget* target : { &mLight, &mComputeLight })
