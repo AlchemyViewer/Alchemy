@@ -163,6 +163,8 @@ public:
     const Resource& operator[](Id id) const { return mResources[(size_t)id]; }
     bool wants(Id id) const { return mResources[(size_t)id].mDesc.has_value(); }
     const std::optional<ALRenderTargetDesc>& desc(Id id) const { return mResources[(size_t)id].mDesc; }
+    /// Whether some resource the plan wants is what `desc` describes, sharing no depth.
+    bool describes(const ALRenderTargetDesc& desc) const;
 
     /// The sun cascades @a pack renders, which are those it has maps for, from the first: SUN_CASCADES in the main view,
     /// CAPTURE_SUN_CASCADES in a capture unless a probe's renders them all, none without sun shadows.

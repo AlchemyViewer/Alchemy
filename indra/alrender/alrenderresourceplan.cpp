@@ -28,6 +28,8 @@
 
 #include "llglheaders.h"
 
+#include <algorithm>
+
 namespace
 {
     using Plan  = ALRenderResourcePlan;
@@ -463,6 +465,12 @@ bool ALRenderResourcePlan::isTransient(Id id)
 }
 
 // static
+bool ALRenderResourcePlan::describes(const ALRenderTargetDesc& desc) const
+{
+    return std::any_of(mResources.begin(), mResources.end(),
+                       [&desc](const Resource& resource) { return resource.mDesc == desc && !resource.mDepthFrom; });
+}
+
 bool ALRenderResourcePlan::isPrewarmed(Id id)
 {
     return isTransient(id) && id != Id::Preview && id != Id::Bake;

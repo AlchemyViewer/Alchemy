@@ -170,6 +170,10 @@ public:
     /// Free each target whose shared depth has been built again since it attached it, and which no acquisition can
     /// match any more.
     void dropStaleDepth();
+    /// Free now the free targets that are what `desc` describes, sharing no depth, rather than once they have gone
+    /// unused as long as they are kept through: for a caller that knows it will not ask for that description again.
+    /// One held is left to its holder.
+    void trim(const ALRenderTargetDesc& desc);
     /// Free every target. One still acquired is freed when it is released.
     void clear();
 

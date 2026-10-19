@@ -336,6 +336,8 @@ public:
     // from @a scope, which the post chain reads in the screen's place; null where
     // it does not run. The screen keeps the sharp scene.
     LLRenderTarget* renderDoF(ALTransientTargets& scope);
+    // The description depth of field's blur was last taken at, freed from the pool when its scale moves on.
+    std::optional<ALRenderTargetDesc> mDoFBlurDesc;
     void combineGlow(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* glow);
     void visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex);
 

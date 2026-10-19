@@ -415,6 +415,37 @@ namespace
         CHECK(pool.stats().mTargets == 0);
     }
 
+    // A description its users will not ask for again is freed at once: every free target of it, and none held, and none
+    // of the same description sharing a depth.
+    TEST_CASE_METHOD(pool_data, "altransienttargetpool: trimming a description frees its free targets now", "[altransienttargetpool]")
+    {
+        LLRenderTarget* free_a = pool.acquire(HALF, "dof.blur");
+        LLRenderTarget* free_b = pool.acquire(HALF, "dof.blur");
+        LLRenderTarget* held   = pool.acquire(HALF, "dof.blur");
+        LLRenderTarget* other  = pool.acquire(POST, "main.post.ping");
+        LLRenderTarget* shared = pool.acquire(LIGHT, gbuffer, "main.light");
+        REQUIRE((free_a && free_b && held && other && shared));
+        for (LLRenderTarget* target : { free_a, free_b, other, shared })
+        {
+            CHECK(pool.release(target));
+        }
+        CHECK(pool.stats().mTargets == 5);
+
+        pool.trim(HALF);
+        CHECK(pool.stats().mTargets == 3);
+        CHECK(pool.stats().mTrimmed == 2);
+        CHECK(std::find(backing.freed.begin(), backing.freed.end(), free_a) != backing.freed.end());
+        CHECK(std::find(backing.freed.begin(), backing.freed.end(), free_b) != backing.freed.end());
+        UNSCOPED_INFO("the held one is its holder's, and is given back as ever");
+        CHECK(pool.release(held));
+        CHECK(pool.acquire(HALF, "dof.blur") == held);
+        CHECK(pool.release(held));
+
+        UNSCOPED_INFO("a description shared over a depth is another key");
+        pool.trim(ALRenderTargetDesc{ .width = LIGHT.width, .height = LIGHT.height, .color = LIGHT.color });
+        CHECK(pool.stats().mTargets == 3);
+    }
+
     TEST_CASE_METHOD(pool_data, "altransienttargetpool: a change of the main size frees everything", "[altransienttargetpool]")
     {
         pool.setMainSize(2560, 1440);

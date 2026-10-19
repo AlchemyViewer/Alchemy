@@ -10254,12 +10254,21 @@ LLRenderTarget* LLPipeline::renderDoF(ALTransientTargets& scope)
             const F32 dof_scale  = llmin((F32)CameraDoFResScale, 1.f);
             const U32 dof_width  = llmax(1u, (U32)(mRT->screen.getWidth() * dof_scale));
             const U32 dof_height = llmax(1u, (U32)(mRT->screen.getHeight() * dof_scale));
+            std::optional<ALRenderTargetDesc> blur_desc;
+            if (blur_like)
+            {
+                blur_desc = ALRenderTargetDesc{ .width = dof_width, .height = dof_height, .color = { blur_like->color[0] } };
+            }
+            // Another scale is another description, and the blur at the last one is wanted no more: freed now, so a
+            // drag of the slider through its steps holds one blur at a time, not one a step until each is trimmed. One
+            // the plan has a resource of, as bloom level 0's at full scale, stays for that resource.
+            if (mDoFBlurDesc && mDoFBlurDesc != blur_desc && !mResourcePlan.describes(*mDoFBlurDesc))
+            {
+                mTransientTargets.trim(*mDoFBlurDesc);
+            }
+            mDoFBlurDesc = blur_desc;
             ALTransientTargets dof(mTransientTargets);
-            LLRenderTarget*    blur = blur_like ? dof.acquire(ALRenderTargetDesc{ .width  = dof_width,
-                                                                                  .height = dof_height,
-                                                                                  .color  = { blur_like->color[0] } },
-                                                              "dof.blur")
-                                                : nullptr;
+            LLRenderTarget*    blur = blur_desc ? dof.acquire(*blur_desc, "dof.blur") : nullptr;
             if (!out || !blur)
             {
                 return nullptr;

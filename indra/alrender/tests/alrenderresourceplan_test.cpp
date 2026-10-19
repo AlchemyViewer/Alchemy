@@ -690,6 +690,21 @@ namespace
         }
     }
 
+    // What depth of field asks of describes() before it frees the last scale's blur: a description is the plan's where a
+    // resource it wants has it and shares no depth.
+    TEST_CASE("alrenderresourceplan: describes() knows the descriptions of the resources it wants", "[alrenderresourceplan]")
+    {
+        const Plan plan = Plan::make(defaults());
+        const ALRenderTargetDesc& bloom0 = *plan.desc(Plan::bloomMip(Pack::Main, 0));
+        CHECK(plan.describes(bloom0));
+        ALRenderTargetDesc smaller = bloom0;
+        smaller.width /= 2;
+        CHECK_FALSE(plan.describes(smaller));
+        UNSCOPED_INFO("the screen shares the G-buffer's depth, so its colour alone is no resource's description");
+        REQUIRE(plan[Id::MainScreen].mDepthFrom);
+        CHECK_FALSE(plan.describes(*plan.desc(Id::MainScreen)));
+    }
+
     TEST_CASE("alrenderresourceplan: a material preview keeps the probe pack and not the probes' own resources", "[alrenderresourceplan]")
     {
         Inputs off           = defaults();

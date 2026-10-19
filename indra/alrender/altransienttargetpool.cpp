@@ -327,6 +327,19 @@ void ALTransientTargetPool::dropStaleDepth()
     sweep();
 }
 
+void ALTransientTargetPool::trim(const ALRenderTargetDesc& desc)
+{
+    const Key key{ .mDesc = desc };
+    for (const std::unique_ptr<Entry>& entry : mEntries)
+    {
+        if (!entry->mHeld && entry->mKey == key)
+        {
+            entry->mFree = true;
+        }
+    }
+    mThisFrame.mTrimmed += sweep();
+}
+
 void ALTransientTargetPool::clear()
 {
     for (const std::unique_ptr<Entry>& entry : mEntries)
