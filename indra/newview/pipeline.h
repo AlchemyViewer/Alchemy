@@ -209,10 +209,10 @@ private:
     // transient resources are the pool's, which prewarmTransients readies.
     void ensureResources(const ALRenderResourcePlan& plan, const ALRenderResourcePlan::IdSet& ids,
                          ResourceChanges& changes);
-    // Readies the pool for @a plan's transient resources among @a ids: everything it holds dropped where the main size
-    // changed, and what shares a depth built again since, and one of each description built where it holds none, so
-    // that a description that cannot be built drives the render size down as a persistent target's does and the next
-    // frame finds them. Records which in @a changes.
+    // Readies the pool for @a plan's transient resources among @a ids that it prewarms (isPrewarmed): everything it
+    // holds dropped where the main size changed, and what shares a depth built again since, and one of each
+    // description built where it holds none, so that a description that cannot be built drives the render size down
+    // as a persistent target's does and the next frame finds them. Records which in @a changes.
     void prewarmTransients(const ALRenderResourcePlan& plan, const ALRenderResourcePlan::IdSet& ids,
                            ResourceChanges& changes);
     // One of the pipeline's own GL textures, with its contents.
@@ -1123,12 +1123,6 @@ public:
     S32                     mScenePixelX = 0;
     S32                     mScenePixelY = 0;
     bool                    mScenePixelPending = false;
-
-    // UI previews must not inherit reflection-probe resolution or scene scaling.
-    LLRenderTarget          mPreviewMap;
-
-    // 2k bom scratch target
-    LLRenderTarget          mBakeMap;
 
     LLCullResult            mSky;
     LLCullResult            mReflectedObjects;

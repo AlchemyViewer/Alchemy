@@ -938,8 +938,6 @@ LLRenderTarget* LLPipeline::resourceTarget(ALRenderResourcePlan::Id id)
         case Id::SpotShadow1:       return &mSpotShadow[1];
         case Id::SSRScene:          return &mSceneMap;
         case Id::DownRes:           return &mDownResMap;
-        case Id::Preview:           return &mPreviewMap;
-        case Id::Bake:              return &mBakeMap;
         case Id::BrdfLut:           return &mPbrBrdfLut;
         case Id::ExposureMeter:     return &mLuminanceMap;
         case Id::ExposureHistogram: return &mExposureHistogram;
@@ -1063,7 +1061,7 @@ void LLPipeline::prewarmTransients(const ALRenderResourcePlan& plan, const ALRen
     for (size_t i = 0; i < Plan::ID_COUNT; ++i)
     {
         const Plan::Resource& resource = plan[(Id)i];
-        if (Plan::isTransient((Id)i) && resource.mDesc && resource.mDepthFrom && Plan::isTransient(*resource.mDepthFrom))
+        if (Plan::isPrewarmed((Id)i) && resource.mDesc && resource.mDepthFrom && Plan::isTransient(*resource.mDepthFrom))
         {
             owners.set((size_t)*resource.mDepthFrom);
         }
@@ -1077,7 +1075,7 @@ void LLPipeline::prewarmTransients(const ALRenderResourcePlan& plan, const ALRen
         {
             const Id              id       = (Id)i;
             const Plan::Resource& resource = plan[id];
-            if (!ids.test(i) || !Plan::isTransient(id) || !resource.mDesc || resource.mDepthFrom.has_value() != sharers)
+            if (!ids.test(i) || !Plan::isPrewarmed(id) || !resource.mDesc || resource.mDepthFrom.has_value() != sharers)
             {
                 continue;
             }

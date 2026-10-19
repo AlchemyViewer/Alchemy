@@ -1060,15 +1060,44 @@ namespace
                                          { Slot::Light, Slot::PostPing, Slot::PostPong, Slot::Water, Slot::DepthCopy }) |
                                 bloom({ Pack::Main, Pack::Probe, Pack::Hero }) |
                                 of({ Id::SMAAEdges, Id::SMAABlend, Id::Glow0, Id::Glow1, Id::Glow2, Id::SkyBehind,
-                                     Id::MainLightBlurred });
+                                     Id::MainLightBlurred, Id::Preview, Id::Bake });
         CHECK(names(Plan::idsWhere(Plan::isTransient)) == names(transient));
 
         // What holds anything across frames, or between the phases of one, is built to keep.
         for (Id id : { Id::MainGBuffer, Id::MainScreen, Id::SSRScene, Id::Exposure, Id::ExposureLast, Id::LensFlareA,
-                       Id::MainSun0, Id::SpotShadow0, Id::BrdfLut, Id::Preview, Id::Bake, Id::DownRes, Id::Noise })
+                       Id::MainSun0, Id::SpotShadow0, Id::BrdfLut, Id::DownRes, Id::Noise })
         {
             INFO(Plan::name(id));
             CHECK_FALSE(Plan::isTransient(id));
+        }
+    }
+
+    TEST_CASE("alrenderresourceplan: the reconcile readies every transient target but the previews' and the bakes'",
+              "[alrenderresourceplan]")
+    {
+        // A preview or a bake draws only while one is open or changing, so nothing builds their targets before one
+        // does, and a frame without one holds neither.
+        const IdSet on_demand = of({ Id::Preview, Id::Bake });
+        CHECK(names(Plan::idsWhere(Plan::isPrewarmed)) == names(Plan::idsWhere(Plan::isTransient) & ~on_demand));
+        for (Id id : { Id::Preview, Id::Bake })
+        {
+            INFO(Plan::name(id));
+            CHECK(Plan::isTransient(id));
+            CHECK_FALSE(Plan::isPrewarmed(id));
+        }
+
+        // Neither shares a depth, nor has a depth shared: each is acquired alone, against nothing the reconcile builds.
+        const Plan plan = Plan::make(defaults());
+        for (Id id : { Id::Preview, Id::Bake })
+        {
+            INFO(Plan::name(id));
+            REQUIRE(plan.wants(id));
+            CHECK_FALSE(plan[id].mDepthFrom.has_value());
+        }
+        for (size_t i = 0; i < Plan::ID_COUNT; ++i)
+        {
+            const std::optional<Id> owner = plan[(Id)i].mDepthFrom;
+            CHECK_FALSE((owner == Id::Preview || owner == Id::Bake));
         }
     }
 

@@ -213,8 +213,12 @@ public:
     /// Whether the passes that use it acquire it from the transient pool for as long as they need it, rather than the
     /// reconcile building it to keep: a target that lives for one phase of a frame, and holds nothing across frames. A
     /// pack's light map is one, the main view's blurred light map, the water's copies of the scene, the bloom pyramid,
-    /// the post chain, SMAA's edges and blend weights, the legacy glow, and the sky behind the water.
+    /// the post chain, SMAA's edges and blend weights, the legacy glow, the sky behind the water, and the targets the
+    /// UI previews and the appearance bakes draw into.
     static bool isTransient(Id id);
+    /// Whether the reconcile readies it in the pool for the next frame to find: every transient resource but the
+    /// previews' and the bakes' targets, which only a dynamic texture with something to draw acquires.
+    static bool isPrewarmed(Id id);
     /// Whether only the GLTF material preview renders through it: the probe pack's post targets and bloom, which the
     /// probes' captures never read, and which are planned only while a preview is alive.
     static bool forMaterialPreview(Id id);

@@ -459,7 +459,13 @@ bool ALRenderResourcePlan::isTransient(Id id)
                slot == Slot::DepthCopy || slot >= Slot::Bloom0;
     }
     return id == Id::SMAAEdges || id == Id::SMAABlend || id == Id::Glow0 || id == Id::Glow1 || id == Id::Glow2 ||
-           id == Id::SkyBehind || id == Id::MainLightBlurred;
+           id == Id::SkyBehind || id == Id::MainLightBlurred || id == Id::Preview || id == Id::Bake;
+}
+
+// static
+bool ALRenderResourcePlan::isPrewarmed(Id id)
+{
+    return isTransient(id) && id != Id::Preview && id != Id::Bake;
 }
 
 // static
