@@ -693,8 +693,10 @@ namespace
             INFO(Plan::name(id));
             CHECK(plan.wants(id));
         }
-        UNSCOPED_INFO("a preview draws without the sun's shadows, so the pack has no light map or sun shadows for it");
-        CHECK(names(wanted(plan, sun_shadows({ Pack::Probe }) | of({ Id::ProbeLight }))) == "nothing");
+        UNSCOPED_INFO("a preview draws without the sun's shadows and draws no water, so the pack has no light map, sun "
+                      "shadows or water copies for it");
+        CHECK(names(wanted(plan, sun_shadows({ Pack::Probe }) | of({ Id::ProbeLight, Id::ProbeWater, Id::ProbeDepthCopy }))) ==
+              "nothing");
         CHECK(!plan.reflectionProbes());
         CHECK(names(wanted(plan, Plan::idsOf(Pack::Hero))) == "nothing");
 
