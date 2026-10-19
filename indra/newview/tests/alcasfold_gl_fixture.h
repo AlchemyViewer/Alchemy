@@ -33,12 +33,31 @@
 
 #include <cmath>
 
-// CasSetup, as the pipeline takes it, each including file's own.
+// CasSetup, as the pipeline takes it, each including file's own, and included as pipeline.cpp includes it: A_GCC
+// picks the CPU half's GCC and Clang spellings off Windows, and the helpers no caller here uses are let be.
+#if LL_CLANG
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#elif LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wrestrict"
+#endif
+#ifndef LL_WINDOWS
+#define A_GCC 1
+#endif
 #define A_CPU 1
 namespace
 {
 #include "../app_settings/shaders/class1/deferred/CASF.glsl"
 }
+#if LL_CLANG
+#pragma clang diagnostic pop
+#elif LL_GNUC
+#pragma GCC diagnostic pop
+#endif
 
 namespace ll_test
 {
