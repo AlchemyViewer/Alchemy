@@ -84,7 +84,7 @@ struct ALShaderSettings
 /// Everything the programs are built from, as the load takes it: the settings clamped to what the context can build
 /// and to what reaches a program, so that a setting no program reads under the others leaves them equal. Settings
 /// change it only where they change a program, so equal inputs need no reload; unequal ones reload only what they
-/// changed. A setting the programs read as a uniform (LLViewerShaderMgr::updateShaderUniforms) is no input at all.
+/// changed. A setting the programs read as a uniform, set by the passes that bind its readers, is no input at all.
 ///
 /// Its two halves are what a change costs. The global inputs feed the defines every shared object compiles with
 /// (LLGLSLShader::sGlobalDefines), the defines injected into every compile (REVERSE_Z, GBUFFER_NORM_HDR) or the shared

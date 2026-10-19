@@ -462,7 +462,7 @@ uniform vec4 SMAA_RT_METRICS;
 
 /**
  * With predication, the three settings below are uniforms, set from RenderSMAAPredicationThreshold, Scale and
- * Strength (LLViewerShaderMgr::updateShaderUniforms).
+ * Strength on the edge detection program, the one that reads them (LLPipeline::generateSMAABuffers).
  */
 #if SMAA_PREDICATION
 uniform float smaaPredicationThreshold;

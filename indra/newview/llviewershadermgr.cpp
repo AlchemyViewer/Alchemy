@@ -531,11 +531,11 @@ bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs, const ALRenderA
 
     ALUniformBuffer::sUpdateMode = ALUniformBuffer::clampUpdateMode(gSavedSettings.getS32("AlchemyRenderUBOUpdateMode"));
 
-    // Latch reverse-Z before anything downstream reads it: this same call releases and
-    // reallocates GL buffers (mainDepthFormat), every shader compile below injects REVERSE_Z
-    // from the latched state, and the cache key folds it in -- all within this one blocking
-    // call, so clip control, clear depth, depth format and the shader define agree for the
-    // whole next frame.
+    // Latch reverse-Z before anything downstream reads it: every shader compile below injects
+    // REVERSE_Z from the latched state and the cache key folds it in, and the reconcile that
+    // follows in the same application builds the depth format (mainDepthFormat) from it, so
+    // clip control, clear depth, depth format and the shader define agree for the whole next
+    // frame.
     LLPipeline::updateReverseZ(mInputs.mGlobal.mReverseZ);
 
     // The same for the G-buffer's normal layout: every compile below injects GBUFFER_NORM_HDR from this latch, the
