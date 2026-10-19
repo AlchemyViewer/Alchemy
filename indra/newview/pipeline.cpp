@@ -10643,28 +10643,37 @@ void LLPipeline::renderFinalize()
     // block above because the dirt is lit by the lens flare as well as by bloom.
     generateLensDirt();
 
-    colorCorrect(&mRT->screen, &mRT->postPingMap, hdr, true, &bloom);
+    // The post chain's two targets, from the pool until the frame is presented: colorCorrect writes the first whole,
+    // and each pass after it writes the other whole before the two swap. Without both, the frame goes out as the screen
+    // holds it rather than not at all.
+    LLRenderTarget* const post_ping = acquireResource(post, ALRenderResourcePlan::Id::MainPostPing);
+    LLRenderTarget* const post_pong = acquireResource(post, ALRenderResourcePlan::Id::MainPostPong);
+    const bool            chain     = post_ping && post_pong;
+    if (chain)
+    {
+        colorCorrect(&mRT->screen, post_ping, hdr, true, &bloom);
+    }
 
     LLVertexBuffer::unbind();
 
     // Legacy glow for non-HDR path.  In the HDR path, glow is extracted as part of the
     // bloom process and composited back in after tonemapping.
-    if (!hdr && !cutout)
+    if (!hdr && !cutout && chain)
     {
-        generateGlow(&mRT->postPingMap);
+        generateGlow(post_ping);
     }
 
-    LLRenderTarget* sourceBuffer = &mRT->postPingMap;
-    LLRenderTarget* targetBuffer = &mRT->postPongMap;
+    LLRenderTarget* sourceBuffer = chain ? post_ping : &mRT->screen;
+    LLRenderTarget* targetBuffer = post_pong;
 
     // Anti-aliasing and sharpening both spread past a pixel, so a cutout
     // frame skips them (see above).
-    if (mResourceInputs.mFSAAType == 1 && !cutout)
+    if (mResourceInputs.mFSAAType == 1 && !cutout && chain)
     {
         applyFXAA(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
-    else if (mResourceInputs.mFSAAType == 2 && !cutout)
+    else if (mResourceInputs.mFSAAType == 2 && !cutout && chain)
     {
         generateSMAABuffers(sourceBuffer);
         applySMAA(sourceBuffer, targetBuffer);
@@ -10672,13 +10681,13 @@ void LLPipeline::renderFinalize()
     }
 
     static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
-    if (cas_sharpness > 0.0f && gCASProgram.isComplete() && !cutout)
+    if (cas_sharpness > 0.0f && gCASProgram.isComplete() && !cutout && chain)
     {
         applyCAS(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
 
-    if (!hdr && !cutout)
+    if (!hdr && !cutout && chain)
     {
         combineGlow(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
@@ -10691,7 +10700,7 @@ void LLPipeline::renderFinalize()
     glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
 
 // [RLVa:KB] - @setsphere
-    if (RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))
+    if (chain && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))
     {
         LLShaderEffectParams params(sourceBuffer, targetBuffer, false);
         LLVfxManager::instance().runEffect(EVisualEffect::RlvSphere, &params);

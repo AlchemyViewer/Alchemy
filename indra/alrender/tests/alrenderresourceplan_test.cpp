@@ -914,6 +914,7 @@ namespace
     TEST_CASE("alrenderresourceplan: the passes acquire what lives for one phase of a frame from the pool", "[alrenderresourceplan]")
     {
         const IdSet transient = in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::Light, Slot::Water, Slot::DepthCopy }) |
+                                in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong }) |
                                 bloom({ Pack::Main, Pack::Probe, Pack::Hero });
         CHECK(names(Plan::idsWhere(Plan::isTransient)) == names(transient));
 

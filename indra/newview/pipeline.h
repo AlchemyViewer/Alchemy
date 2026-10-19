@@ -1027,7 +1027,8 @@ public:
         LLRenderTarget          screen;
         LLRenderTarget          deferredScreen;
 
-        // tonemapped and gamma corrected render ready for post
+        // The material preview's tonemapped render, ready for post, in the
+        // probe pack: the main view's post chain is the pool's.
         LLRenderTarget          postPingMap;
         LLRenderTarget          postPongMap;
 
