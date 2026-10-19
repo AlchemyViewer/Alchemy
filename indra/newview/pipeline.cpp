@@ -9108,8 +9108,9 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst)
 {
 
-    // Where the plan has the copy: SSR with probes to trace it through.
-    if (mResourcePlan.wants(ALRenderResourcePlan::Id::SSRScene) && !gCubeSnapshot)
+    // Where the plan has the copy, SSR with probes to trace it through, and the copy is built: a reconcile that could
+    // build the render size at no size at all leaves it unbuilt under a plan that wants it.
+    if (mResourcePlan.wants(ALRenderResourcePlan::Id::SSRScene) && dst->isComplete() && !gCubeSnapshot)
     {
         LL_PROFILE_GPU_ZONE("ssr copy");
         dst->copyContents(*src, 0, 0, src->getWidth(), src->getHeight(), 0, 0, dst->getWidth(), dst->getHeight(),
