@@ -29,6 +29,9 @@ out vec4 frag_color;
 
 uniform sampler2D diffuseRect;
 
+// The circle of confusion at a point of the scene (dofCoFUtilF.glsl).
+float dofCoF(vec2 tc);
+
 // Shared matrix stack + derived matrices, spliced from
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
@@ -252,10 +255,12 @@ void dofAccumulate(inout vec4 diff, inout float w, vec4 s, float radius_norm, fl
 void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc, float radius_norm, float cof_sign, float shape_w)
 {
     vec4 s = texture(diffuseRect, tc);
+    float sc = abs(dofCoF(tc));
 
-    float sc = abs(s.a*2.0-1.0)*max_cof;
-
-    if (sc > min_sc) //sampled pixel is more "out of focus" than current sample radius
+    // Sampled pixel is more "out of focus" than current sample radius. The centre's circle and this one are worked out
+    // in copies the compiler optimises apart, so a tap on the centre's own depth can come out a rounding error past
+    // it; the margin keeps that tap out of the outermost ring, since it lies no further out of focus than the centre.
+    if (sc > min_sc + 0.001)
     {
         dofAccumulate(diff, w, s, radius_norm, cof_sign, shape_w);
     }
@@ -275,7 +280,7 @@ void main()
     vec4 diff = texture(diffuseRect, vary_fragcoord.xy);
 
     {
-        float sc = (diff.a*2.0-1.0)*max_cof;
+        float sc = dofCoF(tc);
 
         float PI = 3.14159265358979323846264;
 

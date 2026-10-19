@@ -27,8 +27,8 @@
 
 out vec4 frag_color;
 
-uniform sampler2D diffuseRect;
-uniform sampler2D lightMap;
+uniform sampler2D diffuseRect; // the blur
+uniform sampler2D lightMap;    // the scene, sharp
 
 // Shared matrix stack + derived matrices, spliced from
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
@@ -36,53 +36,43 @@ uniform sampler2D lightMap;
 uniform vec2 screen_res;
 
 uniform float max_cof;
-// Fraction of the screen the blur was rendered at: CameraDoFResScale, or less
-// if the borrowed target could not hold that. Drives the CoF arithmetic.
+// Fraction of the screen the blur was rendered at: CameraDoFResScale. Drives the CoF arithmetic.
 uniform float res_scale;
-// Where the blur sits inside the texture it was rendered into. The blur is
-// drawn into a corner of a borrowed target that need not be screen-sized, so a
-// screen coordinate is scaled by dof_uv_scale to land on it, and clamped to
-// dof_width/dof_height, the last texel it wrote.
-uniform vec2  dof_uv_scale;
-uniform float dof_width;
-uniform float dof_height;
 
 in vec2 vary_fragcoord;
 
-vec4 dofSample(sampler2D tex, vec2 tc)
-{
-    tc.x = min(tc.x, dof_width);
-    tc.y = min(tc.y, dof_height);
-
-    return texture(tex, tc);
-}
+// The circle of confusion at a point of the scene (dofCoFUtilF.glsl).
+float dofCoF(vec2 tc);
 
 void main()
 {
     vec2 tc = vary_fragcoord.xy;
 
-    vec4 dof = dofSample(diffuseRect, vary_fragcoord.xy*dof_uv_scale);
+    vec4 dof = texture(diffuseRect, tc);
 
-    vec4 diff = texture(lightMap, vary_fragcoord.xy);
+    vec4 sharp = texture(lightMap, tc);
+    vec3 diff  = sharp.rgb;
+    float sc   = dofCoF(tc);
 
     #if FRONT_BLUR
-        float a = min(abs(diff.a*2.0-1.0) * max_cof*res_scale*res_scale, 1.0);
+        float a = min(abs(sc) * res_scale*res_scale, 1.0);
     #else
-        float a = (diff.a > 0.5) ? 0.0 : min(abs(diff.a*2.0-1.0) * max_cof*res_scale*res_scale, 1.0);
+        float a = (sc > 0.0) ? 0.0 : min(abs(sc) * res_scale*res_scale, 1.0);
     #endif
 
     if (a > 0.25 && a < 0.75)
     { //help out the transition a bit
         float sc = a/res_scale;
 
-        vec4 col;
-        col = texture(lightMap, vary_fragcoord.xy+vec2(sc,sc)/screen_res);
-        col += texture(lightMap, vary_fragcoord.xy+vec2(-sc,sc)/screen_res);
-        col += texture(lightMap, vary_fragcoord.xy+vec2(sc,-sc)/screen_res);
-        col += texture(lightMap, vary_fragcoord.xy+vec2(-sc,-sc)/screen_res);
+        vec3 col;
+        col = texture(lightMap, vary_fragcoord.xy+vec2(sc,sc)/screen_res).rgb;
+        col += texture(lightMap, vary_fragcoord.xy+vec2(-sc,sc)/screen_res).rgb;
+        col += texture(lightMap, vary_fragcoord.xy+vec2(sc,-sc)/screen_res).rgb;
+        col += texture(lightMap, vary_fragcoord.xy+vec2(-sc,-sc)/screen_res).rgb;
 
         diff = mix(diff, col*0.25, a);
     }
 
-    frag_color = mix(diff, dof, a);
+    // The scene's alpha as it was: it carries the legacy prim-glow tag, which the passes after this one read.
+    frag_color = vec4(mix(diff, dof.rgb, a), sharp.a);
 }

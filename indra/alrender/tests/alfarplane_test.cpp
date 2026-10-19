@@ -170,7 +170,7 @@ namespace
         UNSCOPED_INFO("deferredUtil floor");
         CHECK(literal_after(util, "#define RECONSTRUCT_W_FLOOR ") == floor);
         CHECK(literal_after(shader_source("class1/deferred/aoUtil.glsl"), "pos.w = max(pos.w, ") == floor);
-        CHECK(literal_after(shader_source("class1/deferred/cofF.glsl"), "p.z/max(p.w, ") == floor);
+        CHECK(literal_after(shader_source("class1/deferred/dofCoFUtilF.glsl"), "*max(p.w, ") == floor);
     }
 
     // The sky is the cleared far depth and nothing else: every pass that tells sky from geometry tests for exactly

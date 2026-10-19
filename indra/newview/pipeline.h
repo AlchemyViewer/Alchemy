@@ -332,10 +332,10 @@ public:
     };
     SMAATargets generateSMAABuffers(LLRenderTarget* src, ALTransientTargets& scope);
     bool applySMAA(LLRenderTarget* src, LLRenderTarget* dst, const SMAATargets& smaa);
-    // Operates in place on mRT->screen: the combine writes colour back under a
-    // mask that leaves the prim-glow alpha untouched, so callers neither pass
-    // buffers nor swap afterwards.
-    void renderDoF();
+    // Depth of field from mRT->screen into a target of the screen's description
+    // from @a scope, which the post chain reads in the screen's place; null where
+    // it does not run. The screen keeps the sharp scene.
+    LLRenderTarget* renderDoF(ALTransientTargets& scope);
     void combineGlow(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* glow);
     void visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex);
 

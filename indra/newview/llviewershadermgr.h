@@ -251,7 +251,6 @@ extern LLGLSLShader         gDeferredPostProgram;
 extern LLGLSLShader         gDeferredPostProgramNoNear;
 extern LLGLSLShader         gDeferredPostProgramShaped;
 extern LLGLSLShader         gDeferredPostProgramNoNearShaped;
-extern LLGLSLShader         gDeferredCoFProgram;
 extern LLGLSLShader         gDeferredDoFCombineProgram;
 extern LLGLSLShader         gDeferredDoFCombineProgramNoNear;
 extern LLGLSLShader         gFXAAProgram[4];

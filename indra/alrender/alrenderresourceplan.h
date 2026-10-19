@@ -112,7 +112,6 @@ public:
         SMAAEdges, SMAABlend,
         SkyBehind,
         SSRScene,
-        DoFSharp,
 
         // Fixed in size.
         Glow0, Glow1, Glow2,
@@ -213,7 +212,7 @@ public:
     /// Whether the passes that use it acquire it from the transient pool for as long as they need it, rather than the
     /// reconcile building it to keep: a target that lives for one phase of a frame, and holds nothing across frames. A
     /// pack's light map is one, the water's copies of the scene, the bloom pyramid, the post chain, SMAA's
-    /// edges and blend weights, the legacy glow, the sky behind the water, and depth of field's sharp copy.
+    /// edges and blend weights, the legacy glow, and the sky behind the water.
     static bool isTransient(Id id);
     /// Whether only the GLTF material preview renders through it: the probe pack's post targets and bloom, which the
     /// probes' captures never read, and which are planned only while a preview is alive.

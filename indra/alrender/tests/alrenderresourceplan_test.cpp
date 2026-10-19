@@ -200,7 +200,7 @@ namespace
                   return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light, Slot::Water }) |
                          in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main })) |
-                         of({ Id::SkyBehind, Id::DoFSharp, Id::Glow0, Id::Glow1, Id::Glow2 });
+                         of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
               } },
             { "RenderHDREnabled under a material preview", previewed, hdr_off,
               [](const Plan& before)
@@ -208,7 +208,7 @@ namespace
                   return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Light, Slot::Water }) |
                          in_packs({ Pack::Main, Pack::Probe }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main, Pack::Probe })) |
-                         of({ Id::SkyBehind, Id::DoFSharp, Id::Glow0, Id::Glow1, Id::Glow2 });
+                         of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
               } },
             { "a material preview made", no_change, previewed,
               [](const Plan&)
@@ -948,7 +948,7 @@ namespace
             CHECK(!Plan::drivesRenderSize(id));
         }
         for (Id id : { Id::MainGBuffer, Id::MainScreen, Id::MainLight, Id::MainPostPing, Id::SMAABlend,
-                       Id::MainWater, Id::MainDepthCopy, Id::SkyBehind, Id::SSRScene, Id::DoFSharp })
+                       Id::MainWater, Id::MainDepthCopy, Id::SkyBehind, Id::SSRScene })
         {
             INFO(Plan::name(id));
             CHECK(Plan::drivesRenderSize(id));
@@ -971,8 +971,7 @@ namespace
         const IdSet transient = in_packs({ Pack::Main, Pack::Probe, Pack::Hero },
                                          { Slot::Light, Slot::PostPing, Slot::PostPong, Slot::Water, Slot::DepthCopy }) |
                                 bloom({ Pack::Main, Pack::Probe, Pack::Hero }) |
-                                of({ Id::SMAAEdges, Id::SMAABlend, Id::Glow0, Id::Glow1, Id::Glow2, Id::SkyBehind,
-                                     Id::DoFSharp });
+                                of({ Id::SMAAEdges, Id::SMAABlend, Id::Glow0, Id::Glow1, Id::Glow2, Id::SkyBehind });
         CHECK(names(Plan::idsWhere(Plan::isTransient)) == names(transient));
 
         // What holds anything across frames, or between the phases of one, is built to keep.
@@ -1007,24 +1006,18 @@ namespace
         U32 mLastMisses = 0; ///< acquisitions the last frame had to build for
         bool mWaterIsBloom     = false;
         bool mSkyBehindIsBloom = false;
-        bool mSharpIsLight     = false; ///< depth of field's sharp copy took a target the lighting used
+        bool mDefocusedIsLight = false; ///< depth of field's defocused scene took a target the lighting used
     };
 
-    // Depth of field through the frame: off, as at the defaults; on, with its sharp copy; and on as section 2.8.4 of
-    // the plan would have it, its circle of confusion worked from depth, with no sharp copy.
-    enum class DoF
-    {
-        Off,
-        WithSharpCopy,
-        WithoutSharpCopy,
-    };
+    // CameraDoFResScale's default, the fraction of the screen depth of field's blur covers each way.
+    constexpr F32 DOF_RES_SCALE = 0.7f;
 
-    WorkingSet main_view_frame(const Inputs& in, DoF dof = DoF::Off)
+    WorkingSet main_view_frame(const Inputs& in, bool dof = false)
     {
         const Plan plan = Plan::make(in);
         CountingBacking       backing;
         ALTransientTargetPool pool(backing);
-        LLRenderTarget        gbuffer; // stands in for main.gbuffer, whose depth the light map and the water's copy share
+        LLRenderTarget        gbuffer; // stands in for main.gbuffer, whose depth the light map and the screen's description share
 
         const auto acquire = [&](ALTransientTargets& scope, Id id, std::string_view name = {}) -> LLRenderTarget*
         {
@@ -1066,22 +1059,27 @@ namespace
             }
             sky.releaseAll();
 
-            // renderFinalize: depth of field, its sharp copy where it keeps one and its blur in bloom level 0's
-            // description (the post chain's without HDR), given back before the bloom pyramid; then the post chain's
-            // first target, and its other only where a pass after colorCorrect draws into one: antialiasing, or the
-            // legacy glow's combine without HDR. At the defaults none does, as the blit sharpens the frame itself. All
-            // held until the frame is presented.
-            LLRenderTarget* sharp = nullptr;
-            if (dof != DoF::Off)
-            {
-                ALTransientTargets effect(pool);
-                sharp = dof == DoF::WithSharpCopy ? acquire(effect, Id::DoFSharp) : nullptr;
-                acquire(effect, in.mHDR ? Plan::bloomMip(Pack::Main, 0) : Id::MainPostPong, "dof.blur");
-            }
-            LLRenderTarget* bloom0 = nullptr;
-            LLRenderTarget* bloom1 = nullptr;
+            // renderFinalize: depth of field's defocused scene, in the screen's description, and its blur at
+            // CameraDoFResScale in bloom level 0's format (the post chain's without HDR), given back before the bloom
+            // pyramid; then the pyramid, the post chain's first target, and its other only where a pass after
+            // colorCorrect draws into one: antialiasing, or the legacy glow's combine without HDR. At the defaults none
+            // does, as the blit sharpens the frame itself. All but the blur held until the frame is presented.
+            LLRenderTarget* defocused = nullptr;
+            LLRenderTarget* bloom0    = nullptr;
+            LLRenderTarget* bloom1    = nullptr;
             {
                 ALTransientTargets post(pool);
+                if (dof)
+                {
+                    defocused = acquire(post, Id::MainScreen, "dof.out");
+                    const ALRenderTargetDesc& screen = *plan.desc(Id::MainScreen);
+                    const ALRenderTargetDesc& like   = *plan.desc(in.mHDR ? Plan::bloomMip(Pack::Main, 0) : Id::MainPostPong);
+                    ALTransientTargets        effect(pool);
+                    effect.acquire(ALRenderTargetDesc{ .width  = llmax(1u, (U32)(screen.width * DOF_RES_SCALE)),
+                                                       .height = llmax(1u, (U32)(screen.height * DOF_RES_SCALE)),
+                                                       .color  = { like.color[0] } },
+                                   "dof.blur");
+                }
                 for (U32 mip = 0; mip < Plan::BLOOM_MAX_MIPS && plan.wants(Plan::bloomMip(Pack::Main, mip)); ++mip)
                 {
                     LLRenderTarget* level = acquire(post, Plan::bloomMip(Pack::Main, mip));
@@ -1097,7 +1095,7 @@ namespace
 
             set.mWaterIsBloom     = water && water == bloom0;
             set.mSkyBehindIsBloom = sky_behind && sky_behind == bloom1;
-            set.mSharpIsLight     = sharp && (sharp == light || sharp == scratch);
+            set.mDefocusedIsLight = defocused && (defocused == light || defocused == scratch);
             set.mLastMisses       = pool.stats().mMisses;
         }
 
@@ -1158,42 +1156,19 @@ namespace
         CHECK(antialiased.mPooled - set.mPooled == 4 * PIXELS);
     }
 
-    // Depth of field takes nothing the frame did not already hold: its sharp copy a target of the light map's
-    // description, which the lighting has given back by then, and its blur bloom level 0's before the pyramid takes it.
-    TEST_CASE("alrenderresourceplan: the main view's working set with depth of field, its sharp copy kept or not",
-              "[alrenderresourceplan]")
+    // Depth of field adds its blur to what the frame holds, a target of its own size; its defocused scene, in the
+    // screen's description, takes a target of the light map's, which is the screen's under HDR, the lighting over by
+    // then.
+    TEST_CASE("alrenderresourceplan: the main view's working set with depth of field", "[alrenderresourceplan]")
     {
         const WorkingSet off = main_view_frame(defaults());
-        for (DoF dof : { DoF::WithSharpCopy, DoF::WithoutSharpCopy })
-        {
-            INFO((dof == DoF::WithSharpCopy ? "with its sharp copy" : "with its CoF from depth"));
-            const WorkingSet on = main_view_frame(defaults(), dof);
-            CHECK(on.mSharpIsLight == (dof == DoF::WithSharpCopy));
-            CHECK(on.mLastMisses == 0);
-            CHECK(on.mTargets == off.mTargets);
-            CHECK(on.mPersistent + on.mPooled == 240825600); // 229.7 MiB
-        }
-    }
-
-    // Depth of field's sharp copy keeps its circle of confusion in alpha, whatever the water's copy is: the screen's
-    // format over the scene's depth, the light map's description.
-    TEST_CASE("alrenderresourceplan: depth of field's sharp copy has a description of its own, with alpha", "[alrenderresourceplan]")
-    {
-        for (bool hdr : { true, false })
-        {
-            INFO((hdr ? "under HDR" : "without HDR"));
-            Inputs in          = defaults();
-            in.mHDR            = hdr;
-            in.mGBufferNormHDR = hdr;
-            const Plan plan    = Plan::make(in);
-            const Plan::Resource& sharp = plan[Id::DoFSharp];
-            REQUIRE(sharp.mDesc);
-            CHECK(sharp.mDesc->colorCount() == 1);
-            CHECK(sharp.mDesc->color[0] == (hdr ? (U32)GL_RGBA16F : (U32)GL_RGBA8));
-            CHECK(sharp.mDesc->width == plan.desc(Id::MainScreen)->width);
-            CHECK(sharp.mDepthFrom == Id::MainGBuffer);
-            CHECK(sharp == plan[Id::MainLight]);
-        }
+        const WorkingSet on  = main_view_frame(defaults(), true);
+        CHECK(on.mDefocusedIsLight);
+        CHECK(on.mLastMisses == 0);
+        CHECK(on.mTargets == off.mTargets + 1);
+        // 1792x1008 of R11F_G11F_B10F.
+        CHECK(on.mPooled - off.mPooled == 7225344);
+        CHECK(on.mPersistent + on.mPooled == 248050944); // 236.6 MiB
     }
 
     TEST_CASE("alrenderresourceplan: every resource has its own debugger label", "[alrenderresourceplan]")
@@ -1203,7 +1178,6 @@ namespace
         CHECK(Plan::name(Id::HeroBloom6) == "hero.bloom.mip6");
         CHECK(Plan::name(Id::SpotShadow0) == "shadow.spot0");
         CHECK(Plan::name(Id::SMAAEdges) == "smaa.edges");
-        CHECK(Plan::name(Id::DoFSharp) == "dof.sharp");
         CHECK(Plan::name(Id::LensFlareB) == "lens.flare.b");
         CHECK(Plan::name(Id::ToneCurve) == "tone.curve");
 

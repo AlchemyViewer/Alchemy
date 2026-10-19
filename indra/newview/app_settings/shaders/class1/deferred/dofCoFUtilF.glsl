@@ -1,5 +1,5 @@
 /**
- * @file cofF.glsl
+ * @file dofCoFUtilF.glsl
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -25,13 +25,12 @@
 
 /*[EXTRA_CODE_HERE]*/
 
-out vec4 frag_color;
+// Depth of field's circle of confusion, worked from the scene's depth wherever a pass needs it: the gather at its
+// centre and at each tap whose own blur it compares, and the combine at its pixel. Point sampled with the mirrored
+// repeat the gather reads the scene through, so a tap past the frame's edge reads the depth under the colour it reads.
 
-uniform sampler2D diffuseRect;
 uniform sampler2D depthMap;
 
-uniform float depth_cutoff;
-uniform float norm_cutoff;
 uniform float focal_distance;
 uniform float blur_constant;
 uniform float tan_pixel_angle;
@@ -41,42 +40,24 @@ uniform float max_cof;
 // Shared matrix stack + derived matrices, spliced from
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
-uniform vec2 screen_res;
 
 float ndcZFromScreenDepth(float d);   // deferredUtil.glsl -- depth-convention aware
 
-in vec2 vary_fragcoord;
-
-float calc_cof(float depth)
+// The signed circle of confusion at tc, in pixels of the screen: positive in front of the focal plane, negative behind
+// it, and max_cof across at the most.
+float dofCoF(vec2 tc)
 {
-    float sc = (depth-focal_distance)/-depth*blur_constant;
-
-    sc /= magnification;
-
-    // tan_pixel_angle = pixel_length/-depth;
-    float pixel_length =  tan_pixel_angle*-focal_distance;
-
-    sc = sc/pixel_length;
-    sc *= 1.414;
-
-    return sc;
-}
-
-void main()
-{
-    vec2 tc = vary_fragcoord.xy;
-
     float z = ndcZFromScreenDepth(texture(depthMap, tc).r);
     vec4 ndc = vec4(0.0, 0.0, z, 1.0);
     vec4 p = inv_proj*ndc;
-    float depth = p.z/max(p.w, 0.000001); // deferredUtil's RECONSTRUCT_W_FLOOR
 
-    vec4 diff = texture(diffuseRect, vary_fragcoord.xy);
+    // (depth - focal_distance) / -depth, for the eye-space depth p.z/max(p.w, ...), in one divide.
+    float defocus = focal_distance*max(p.w, 0.000001)/p.z - 1.0; // deferredUtil's RECONSTRUCT_W_FLOOR
 
-    float sc = calc_cof(depth);
-    sc = min(sc, max_cof);
-    sc = max(sc, -max_cof);
+    // The lens's scale, the same for every pixel: blur_constant / magnification / pixel_length * 1.414, where
+    // tan_pixel_angle = pixel_length/-depth at the focal distance.
+    float pixel_length = tan_pixel_angle*-focal_distance;
+    float sc = defocus*(blur_constant*1.414/(magnification*pixel_length));
 
-    frag_color.rgb = diff.rgb;
-    frag_color.a = sc/max_cof*0.5+0.5;
+    return clamp(sc, -max_cof, max_cof);
 }

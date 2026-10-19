@@ -205,7 +205,6 @@ LLGLSLShader            gDeferredPostProgram;
 LLGLSLShader            gDeferredPostProgramNoNear;
 LLGLSLShader            gDeferredPostProgramShaped;
 LLGLSLShader            gDeferredPostProgramNoNearShaped;
-LLGLSLShader            gDeferredCoFProgram;
 LLGLSLShader            gDeferredDoFCombineProgram;
 LLGLSLShader            gDeferredDoFCombineProgramNoNear;
 LLGLSLShader            gExposureProgram;
@@ -1346,7 +1345,6 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostProgramNoNear.unload();
         gDeferredPostProgramShaped.unload();
         gDeferredPostProgramNoNearShaped.unload();
-        gDeferredCoFProgram.unload();
         gDeferredDoFCombineProgram.unload();
         gDeferredDoFCombineProgramNoNear.unload();
         gExposureProgram.unload();
@@ -3000,6 +2998,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
             variant.shader->mShaderFiles.clear();
             variant.shader->mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
             variant.shader->mShaderFiles.push_back(make_pair("deferred/postDeferredF.glsl", GL_FRAGMENT_SHADER));
+            variant.shader->mShaderFiles.push_back(make_pair("deferred/dofCoFUtilF.glsl", GL_FRAGMENT_SHADER));
             variant.shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
             variant.shader->clearPermutations();
             variant.shader->addPermutation("FRONT_BLUR", variant.front_blur);
@@ -3010,21 +3009,12 @@ void LLViewerShaderMgr::loadShadersDeferred()
     }
 
     {
-        gDeferredCoFProgram.mName = "Deferred CoF Shader";
-        gDeferredCoFProgram.mShaderFiles.clear();
-        gDeferredCoFProgram.mFeatures.isDeferred = true;
-        gDeferredCoFProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
-        gDeferredCoFProgram.mShaderFiles.push_back(make_pair("deferred/cofF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredCoFProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        built(gDeferredCoFProgram.createShader(), gDeferredCoFProgram);
-    }
-
-    {
         gDeferredDoFCombineProgram.mName = "Deferred DoFCombine Shader";
         gDeferredDoFCombineProgram.mFeatures.isDeferred = true;
         gDeferredDoFCombineProgram.mShaderFiles.clear();
         gDeferredDoFCombineProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gDeferredDoFCombineProgram.mShaderFiles.push_back(make_pair("deferred/dofCombineF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredDoFCombineProgram.mShaderFiles.push_back(make_pair("deferred/dofCoFUtilF.glsl", GL_FRAGMENT_SHADER));
         gDeferredDoFCombineProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredDoFCombineProgram.clearPermutations();
         gDeferredDoFCombineProgram.addPermutation("FRONT_BLUR", "1");
@@ -3037,6 +3027,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDoFCombineProgramNoNear.mShaderFiles.clear();
         gDeferredDoFCombineProgramNoNear.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gDeferredDoFCombineProgramNoNear.mShaderFiles.push_back(make_pair("deferred/dofCombineF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredDoFCombineProgramNoNear.mShaderFiles.push_back(make_pair("deferred/dofCoFUtilF.glsl", GL_FRAGMENT_SHADER));
         gDeferredDoFCombineProgramNoNear.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredDoFCombineProgramNoNear.clearPermutations();
         gDeferredDoFCombineProgramNoNear.addPermutation("FRONT_BLUR", "0");

@@ -10202,22 +10202,22 @@ void LLPipeline::combineGlow(LLRenderTarget* src, LLRenderTarget* dst, LLRenderT
     dst->flush();
 }
 
-// Depth of field, run pre-tonemap on linear HDR and in place on mRT->screen.
+// Depth of field, run pre-tonemap on linear HDR, from mRT->screen into a target
+// of the screen's description from `scope`, which it returns; null where it does
+// not run.
 //
-// The three passes are: CoF (sharp copy + signed circle-of-confusion packed
-// into alpha), a reduced-resolution gather blur, then a combine that mixes the
-// two by CoF. The combine writes back into mRT->screen under
-// setColorMask(true, false).
+// The two passes are a reduced-resolution gather blur, then a combine that mixes
+// the blur with the sharp scene by CoF. Both work the signed circle of
+// confusion out from the scene's depth wherever they read it
+// (dofCoFUtilF.glsl), so nothing carries it between them.
 //
-// That mask is the whole reason this can run before the tonemapper without
-// touching a shader. mRT->screen.a carries the legacy alpha-tagged prim glow,
-// which bloomExtractF reads in the HDR path and -- after colorCorrect passes
-// alpha straight through -- glowExtractF reads as its *only* live key in the
-// non-HDR path. dofCombineF's alpha output is CoF-flavoured garbage, so letting
-// it land would feed circle-of-confusion into the glow key on every frame.
-// Masking alpha off preserves prim glow exactly and leaves every alpha contract
-// in the chain unchanged.
-void LLPipeline::renderDoF()
+// The combine writes every channel, the scene's alpha as the scene holds it.
+// mRT->screen.a carries the legacy alpha-tagged prim glow, which bloomExtractF
+// reads in the HDR path and -- after colorCorrect passes alpha straight
+// through -- glowExtractF reads as its *only* live key in the non-HDR path, so
+// the defocused scene has to carry it exactly for every alpha contract in the
+// chain to hold.
+LLRenderTarget* LLPipeline::renderDoF(ALTransientTargets& scope)
 {
     LL_PROFILE_GPU_ZONE("dof");
     {
@@ -10235,23 +10235,31 @@ void LLPipeline::renderDoF()
         {
             LLGLDisable blend(GL_BLEND);
 
-            // Both from the pool, for the effect alone. The sharp copy, with its
-            // signed CoF in alpha, in a description of its own: the screen's
-            // format, RGBA16F under HDR for the linear scene, over the scene's
-            // depth, which the CoF pass, testing none, leaves be. The blur
-            // in bloom mip 0's under HDR, R11F_G11F_B10F (RGBA16F with
-            // halation), and the post chain's without; it carries no alpha.
-            const bool hdr = hdrEnabled();
+            // The defocused scene, in the screen's own description, over the
+            // scene's depth, which neither pass tests or writes: from the
+            // caller's scope, until the frame is presented.
+            LLRenderTarget* out = acquireResource(scope, ALRenderResourcePlan::Id::MainScreen, "dof.out");
 
+            // The blur runs at CameraDoFResScale of the screen, in a target of
+            // exactly that size, for the effect alone: in bloom mip 0's format
+            // under HDR, R11F_G11F_B10F (RGBA16F with halation), and the post
+            // chain's without. It carries no alpha.
+            const bool hdr = hdrEnabled();
+            const std::optional<ALRenderTargetDesc>& blur_like =
+                mResourcePlan.desc(hdr ? ALRenderResourcePlan::bloomMip(ALRenderResourcePlan::Pack::Main, 0)
+                                       : ALRenderResourcePlan::Id::MainPostPong);
+            const F32 dof_scale  = llmin((F32)CameraDoFResScale, 1.f);
+            const U32 dof_width  = llmax(1u, (U32)(mRT->screen.getWidth() * dof_scale));
+            const U32 dof_height = llmax(1u, (U32)(mRT->screen.getHeight() * dof_scale));
             ALTransientTargets dof(mTransientTargets);
-            LLRenderTarget*    sharp = acquireResource(dof, ALRenderResourcePlan::Id::DoFSharp);
-            LLRenderTarget*    blur  = acquireResource(dof,
-                                                       hdr ? ALRenderResourcePlan::bloomMip(ALRenderResourcePlan::Pack::Main, 0)
-                                                           : ALRenderResourcePlan::Id::MainPostPong,
-                                                       "dof.blur");
-            if (!sharp || !blur)
+            LLRenderTarget*    blur = blur_like ? dof.acquire(ALRenderTargetDesc{ .width  = dof_width,
+                                                                                  .height = dof_height,
+                                                                                  .color  = { blur_like->color[0] } },
+                                                              "dof.blur")
+                                                : nullptr;
+            if (!out || !blur)
             {
-                return;
+                return nullptr;
             }
 
             // depth of field focal plane calculations
@@ -10362,46 +10370,25 @@ void LLPipeline::renderDoF()
             blur_constant /= 1000.f; // convert to meters for shader
             F32 magnification = focal_length / (subject_distance - focal_length);
 
-            { // build sharp copy + CoF
-                sharp->bindTarget();
+            // The circle of confusion's, which both passes work it out from.
+            const F32  tan_pixel_angle = tanf(1.f / LLDrawable::sCurPixelAngle);
+            const auto set_cof_uniforms = [&](LLGLSLShader& program)
+            {
+                program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, ALSamplers::PointMirror);
+                program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mRT->screen.getWidth(), (GLfloat)mRT->screen.getHeight());
+                program.uniform1f(LLShaderMgr::DOF_FOCAL_DISTANCE, -subject_distance / 1000.f);
+                program.uniform1f(LLShaderMgr::DOF_BLUR_CONSTANT, blur_constant);
+                program.uniform1f(LLShaderMgr::DOF_TAN_PIXEL_ANGLE, tan_pixel_angle);
+                program.uniform1f(LLShaderMgr::DOF_MAGNIFICATION, magnification);
+                program.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
+            };
 
-                gDeferredCoFProgram.bind();
+            // The fraction of the screen the blur covers, for the CoF arithmetic.
+            const F32 res_scale = llmin((F32)dof_width / (F32)mRT->screen.getWidth(),
+                                        (F32)dof_height / (F32)mRT->screen.getHeight());
 
-                gDeferredCoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->screen, ALSamplers::PointMirror);
-                gDeferredCoFProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen);
-
-                gDeferredCoFProgram.uniform1f(LLShaderMgr::DEFERRED_DEPTH_CUTOFF, RenderEdgeDepthCutoff);
-                gDeferredCoFProgram.uniform1f(LLShaderMgr::DEFERRED_NORM_CUTOFF, RenderEdgeNormCutoff);
-                gDeferredCoFProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mRT->screen.getWidth(), (GLfloat)mRT->screen.getHeight());
-                gDeferredCoFProgram.uniform1f(LLShaderMgr::DOF_FOCAL_DISTANCE, -subject_distance / 1000.f);
-                gDeferredCoFProgram.uniform1f(LLShaderMgr::DOF_BLUR_CONSTANT, blur_constant);
-                gDeferredCoFProgram.uniform1f(LLShaderMgr::DOF_TAN_PIXEL_ANGLE, tanf(1.f / LLDrawable::sCurPixelAngle));
-                gDeferredCoFProgram.uniform1f(LLShaderMgr::DOF_MAGNIFICATION, magnification);
-                gDeferredCoFProgram.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
-                gDeferredCoFProgram.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
-
-                mScreenTriangleVB->setBuffer();
-                mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-                gDeferredCoFProgram.unbind();
-                sharp->flush();
-            }
-
-            // The blur runs at CameraDoFResScale of the screen, in a corner of
-            // its target. Under a reduced RenderBloomResolutionScale mip 0's
-            // description is smaller than the screen, so the viewport is clamped to
-            // what it can hold and the combine is told the fraction the blur
-            // actually covers; the only effect of the clamp is a softer blur.
-            const U32 dof_width  = llmax(1u, llmin((U32)(mRT->screen.getWidth() * CameraDoFResScale), blur->getWidth()));
-            const U32 dof_height = llmax(1u, llmin((U32)(mRT->screen.getHeight() * CameraDoFResScale), blur->getHeight()));
-            const F32 res_scale  = llmin((F32)dof_width / (F32)mRT->screen.getWidth(),
-                                         (F32)dof_height / (F32)mRT->screen.getHeight());
-
-            { // gather blur at CameraDoFResScale into its scratch
-                // Writes to a separate target rather than in place, so no
-                // colour mask is needed to preserve alpha: the CoF it reads
-                // lives in the sharp copy's alpha.
+            { // gather blur at CameraDoFResScale into its own target, every texel of it
                 blur->bindTarget();
-                glViewport(0, 0, dof_width, dof_height);
 
                 static LLCachedControl<bool> RenderDepthOfFieldNearBlur(gSavedSettings, "RenderDepthOfFieldNearBlur", false);
 
@@ -10451,10 +10438,8 @@ void LLPipeline::renderDoF()
                     : (shaped ? gDeferredPostProgramNoNearShaped : gDeferredPostProgramNoNear);
 
                 post_program.bind();
-                post_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, sharp, ALSamplers::PointMirror);
-
-                post_program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mRT->screen.getWidth(), (GLfloat)mRT->screen.getHeight());
-                post_program.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
+                post_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->screen, ALSamplers::PointMirror);
+                set_cof_uniforms(post_program);
 
                 // Gather weighting. Defaults are a plain energy-conserving
                 // average plus a firefly ceiling; the highlight boost is
@@ -10515,49 +10500,29 @@ void LLPipeline::renderDoF()
                 blur->flush();
             }
 
-            { // combine result based on alpha, back into the scene buffer
+            { // combine result based on CoF, into the defocused scene, every texel of it
                 static LLCachedControl<bool> RenderDepthOfFieldNearBlur(gSavedSettings, "RenderDepthOfFieldNearBlur", false);
                 LLGLSLShader& combine_program = RenderDepthOfFieldNearBlur ? gDeferredDoFCombineProgram : gDeferredDoFCombineProgramNoNear;
 
-                mRT->screen.bindTarget();
-                glViewport(0, 0, mRT->screen.getWidth(), mRT->screen.getHeight());
-
-                // Colour only. See the note above renderDoF: screen.a is the
-                // prim-glow tag, and dofCombineF's alpha is CoF garbage.
-                gGL.setColorMask(true, false);
+                out->bindTarget();
 
                 combine_program.bind();
                 combine_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, blur, ALSamplers::PointMirror);
-                combine_program.bindTexture(LLShaderMgr::DEFERRED_LIGHT, sharp, ALSamplers::PointMirror);
-
-                combine_program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mRT->screen.getWidth(), (GLfloat)mRT->screen.getHeight());
-                combine_program.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
-                // The fraction of the screen the blur covers, for the CoF
-                // arithmetic -- CameraDoFResScale unless the clamp above bit.
+                combine_program.bindTexture(LLShaderMgr::DEFERRED_LIGHT, &mRT->screen, ALSamplers::PointMirror);
+                set_cof_uniforms(combine_program);
                 combine_program.uniform1f(LLShaderMgr::DOF_RES_SCALE, res_scale);
-                // Where the blur sits inside its texture: the scale that maps a
-                // screen coordinate onto it, and the extent it is clamped to.
-                // Both normalised against the target the blur rendered into,
-                // which is not screen-sized where mip 0's description shrinks
-                // with RenderBloomResolutionScale.
-                combine_program.uniform2f(LLShaderMgr::DOF_UV_SCALE,
-                                          (F32)dof_width / (F32)blur->getWidth(),
-                                          (F32)dof_height / (F32)blur->getHeight());
-                combine_program.uniform1f(LLShaderMgr::DOF_WIDTH, (dof_width - 1) / (F32)blur->getWidth());
-                combine_program.uniform1f(LLShaderMgr::DOF_HEIGHT, (dof_height - 1) / (F32)blur->getHeight());
 
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
                 combine_program.unbind();
 
-                mRT->screen.flush();
-                gGL.setColorMask(true, true);
+                out->flush();
             }
+            return out;
         }
-        // No else: the pass is in place on mRT->screen, so when DoF is off
-        // there is nothing to copy and nothing to swap.
     }
+    return nullptr;
 }
 
 void LLPipeline::renderFinalize()
@@ -10619,7 +10584,9 @@ void LLPipeline::renderFinalize()
         serviceScenePixelProbe(&mRT->screen);
     }
 
-    // Depth of field, in place on mRT->screen.
+    // Depth of field, from mRT->screen into a target of the pool's, which the
+    // rest of the chain reads in its place: the screen keeps the scene as it
+    // was, for the reflections to trace next frame.
     //
     // Ahead of both the tonemapper and bloom. Pre-tonemap because gathering
     // over display-space values is gathering over already-compressed
@@ -10639,10 +10606,18 @@ void LLPipeline::renderFinalize()
     //
     // SSR, luminance and exposure stay above deliberately: reflections keep
     // their detail, and a blur conserves mean energy so metering is unaffected.
+    //
+    // The defocused scene, what the bloom makes for colorCorrect and the post
+    // chain's targets are all held until the frame is presented.
+    ALTransientTargets post(mTransientTargets);
+    LLRenderTarget*    scene = &mRT->screen;
     static LLCachedControl<bool> RenderDepthOfFieldInEditMode(gSavedSettings, "RenderDepthOfFieldInEditMode", false);
     if (RenderDepthOfField && (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) && !gCubeSnapshot && !cutout)
     {
-        renderDoF();
+        if (LLRenderTarget* defocused = renderDoF(post))
+        {
+            scene = defocused;
+        }
 
         // renderDoF calls setup3DViewport and runs a reduced viewport
         // internally, so restore the world view before anything else draws.
@@ -10653,9 +10628,7 @@ void LLPipeline::renderFinalize()
         glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
     }
 
-    // What the bloom makes for colorCorrect, held until the frame is presented.
-    ALTransientTargets post(mTransientTargets);
-    Bloom              bloom;
+    Bloom bloom;
     if (hdr && !cutout)
     {
         // HDR bloom runs pre-tonemap against the linear scene buffer -- now the
@@ -10664,7 +10637,7 @@ void LLPipeline::renderFinalize()
         // permutation) so we avoid a separate fullscreen pass over the scene
         // buffer. The legacy alpha-tagged prim-glow signal is carried into the
         // extract pass, so prim glow survives the migration.
-        bloom = generateBloomHDR(&mRT->screen, post);
+        bloom = generateBloomHDR(scene, post);
     }
 
     // Handles tonemap, colorgrading, and gamma correction in one pass. In the HDR
@@ -10675,12 +10648,12 @@ void LLPipeline::renderFinalize()
     generateLensDirt();
 
     // The post chain's first target, from the pool until the frame is presented, which colorCorrect writes whole.
-    // Without it, the frame goes out as the screen holds it rather than not at all.
+    // Without it, the frame goes out as the scene stands rather than not at all.
     LLRenderTarget* const post_ping = acquireResource(post, ALRenderResourcePlan::Id::MainPostPing);
     const bool            chain     = post_ping != nullptr;
     if (chain)
     {
-        colorCorrect(&mRT->screen, post_ping, hdr, true, &bloom);
+        colorCorrect(scene, post_ping, hdr, true, &bloom);
     }
 
     LLVertexBuffer::unbind();
@@ -10691,7 +10664,7 @@ void LLPipeline::renderFinalize()
 
     // The chain's other target, from the pool once a pass after colorCorrect draws, each such pass writing it whole
     // before the two swap. A pass with no target to draw into is left out.
-    LLRenderTarget* sourceBuffer = chain ? post_ping : &mRT->screen;
+    LLRenderTarget* sourceBuffer = chain ? post_ping : scene;
     LLRenderTarget* targetBuffer = nullptr;
     const auto      other_target = [&]() -> LLRenderTarget*
     {

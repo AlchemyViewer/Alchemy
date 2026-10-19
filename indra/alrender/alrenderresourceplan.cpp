@@ -63,7 +63,7 @@ namespace
 
     // Everything after the packs, in Id order.
     constexpr std::string_view OWN_NAMES[Plan::ID_COUNT - PACK_IDS] = {
-        "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "sky.behind", "ssr.scene", "dof.sharp",
+        "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "sky.behind", "ssr.scene",
         "glow0", "glow1", "glow2", "downres", "preview", "bake", "brdf.lut", "exposure.meter", "exposure.histogram",
         "exposure", "exposure.last", "lens.flare.a", "lens.flare.b", "noise", "noise.true", "smaa.area", "smaa.search",
         "smaa.sample", "tone.curve",
@@ -279,12 +279,6 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
             ALRenderTargetDesc{ .width = width, .height = height, .color = { screen_format }, .depth = main_depth };
     }
 
-    // Depth of field's copy of the scene, sharp, with its signed circle of confusion in alpha: the screen's format, over
-    // the scene's depth, which the CoF pass, testing none, leaves be. The light map's description, whose target the pool
-    // hands it, the lighting over before the post chain begins.
-    plan.at(Id::DoFSharp) = { ALRenderTargetDesc{ .width = width, .height = height, .color = { screen_format } },
-                              Id::MainGBuffer };
-
     // The sky behind everything at half size, in the format the sky's colour lands in: the emissive attachment's float
     // with HDR, 8 bits otherwise.
     plan.at(Id::SkyBehind).mDesc = ALRenderTargetDesc{ .width  = std::max(width / 2, 1u),
@@ -407,7 +401,6 @@ bool ALRenderResourcePlan::followsRenderSize(Id id)
         case Id::SMAABlend:
         case Id::SkyBehind:
         case Id::SSRScene:
-        case Id::DoFSharp:
             return true;
         default:
             return false;
@@ -452,7 +445,7 @@ bool ALRenderResourcePlan::isTransient(Id id)
                slot == Slot::DepthCopy || slot >= Slot::Bloom0;
     }
     return id == Id::SMAAEdges || id == Id::SMAABlend || id == Id::Glow0 || id == Id::Glow1 || id == Id::Glow2 ||
-           id == Id::SkyBehind || id == Id::DoFSharp;
+           id == Id::SkyBehind;
 }
 
 // static
