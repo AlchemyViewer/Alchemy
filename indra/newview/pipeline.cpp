@@ -1334,6 +1334,11 @@ LLPipeline::ResourceChanges LLPipeline::reconcileResources(const ALRenderResourc
             changes.mPooled &= ~retried;
             LL_WARNS() << "Unable to allocate screen buffer at any resolution!" << LL_ENDL;
         }
+
+        // Each attempt emptied the pool, a change of the main size freeing every target in it, the capture packs'
+        // with the rest: they are readied again, so that one that cannot be built is known now and not mid-capture.
+        changes.mPooled &= retried;
+        prewarmTransients(plan, ~retried, changes);
     }
 
     // What each pack's passes keep about its targets.
