@@ -144,10 +144,10 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         }
 
         // The scene as it stood before the water, which the water reads under its surface: the screen's colour,
-        // copied where the water is transparent, and the scene's depth, which the water and the haze passes each copy
-        // anew while the screen holds the scene's own. The colour is a blit's destination, so the depth attached to it
-        // is never read or written. It takes the scene's, which makes it the light map's description: the pool hands
-        // the two one target, the light map's lighting over before the water's pass begins.
+        // copied where the water is transparent, and the scene's depth, which the surface writes over while it reads
+        // it. The colour is a blit's destination, so the depth attached to it is never read or written. It takes the
+        // scene's, which makes it the light map's description: the pool hands the two one target, the light map's
+        // lighting over before the water's pass begins.
         if (shape.water)
         {
             plan.at(inPack(pack, Slot::Water)) = {

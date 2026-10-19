@@ -12186,19 +12186,6 @@ void LLPipeline::doAtmospherics()
 
     if (RenderDeferredAtmospheric)
     {
-        // The scene's depth as the haze reads it, copied for the pass alone while the screen holds the scene's own.
-        ALTransientTargets haze(mTransientTargets);
-        LLRenderTarget*    depth_copy =
-            acquireResource(haze, ALRenderResourcePlan::inPack(renderPack(), ALRenderResourcePlan::Slot::DepthCopy));
-        {
-            mRT->screen.flush();
-            if (depth_copy)
-            {
-                copySceneDepth(*depth_copy);
-            }
-            mRT->screen.bindTarget();
-        }
-
         LLGLEnable blend(GL_BLEND);
         // The haze dims the glow in the alpha as it dims what is lit. In a cutout frame the alpha is the subject's
         // coverage, seeded before this pass, and haze in front of the subject leaves it no less covered.
@@ -12211,12 +12198,12 @@ void LLPipeline::doAtmospherics()
 
         // The triangle lies on the far plane (hazeV.glsl), level with the depth the sky leaves cleared: it passes
         // only where the world drew something, so the sky is rejected before it is shaded. The screen target shares
-        // the G-buffer's depth; the shader reads the copy.
+        // the G-buffer's depth, which the shader reads where it is, as the lighting passes do: neither draw writes it.
         ALDrawnOnly drawn;
 
-        const auto apply_haze = [this, depth_copy](LLGLSLShader& haze_shader, bool on_water)
+        const auto apply_haze = [this](LLGLSLShader& haze_shader, bool on_water)
         {
-            bindDeferredShader(haze_shader, nullptr, depth_copy);
+            bindDeferredShader(haze_shader);
 
             LLEnvironment& environment = LLEnvironment::instance();
             haze_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
@@ -12280,19 +12267,6 @@ void LLPipeline::doWaterHaze()
 
     if (RenderDeferredAtmospheric)
     {
-        // The scene's depth as the haze reads it, copied for the pass alone while the screen holds the scene's own.
-        ALTransientTargets haze(mTransientTargets);
-        LLRenderTarget*    depth_copy =
-            acquireResource(haze, ALRenderResourcePlan::inPack(renderPack(), ALRenderResourcePlan::Slot::DepthCopy));
-        {
-            mRT->screen.flush();
-            if (depth_copy)
-            {
-                copySceneDepth(*depth_copy);
-            }
-            mRT->screen.bindTarget();
-        }
-
         LLGLEnable blend(GL_BLEND);
         gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO, LLRender::BF_SOURCE_ALPHA);
 
@@ -12303,7 +12277,9 @@ void LLPipeline::doWaterHaze()
         LLGLSLShader& haze_shader = gHazeWaterProgram;
 
         LL_PROFILE_GPU_ZONE("water haze");
-        bindDeferredShader(haze_shader, nullptr, depth_copy);
+        // The scene's depth where it is, the G-buffer's, which the screen shares: the haze tests against it and
+        // writes none, from above or below.
+        bindDeferredShader(haze_shader);
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
         haze_shader.uniform1i(LLShaderMgr::WATER_ABOVE_WATER, sUnderWaterRender ? -1 : 1);

@@ -130,7 +130,7 @@ Depth of field runs **before** bloom and before the tonemapper, on linear HDR. G
 
 **Transient targets** (`ALTransientTargetPool`, `altransienttargetpool.h`, in `LLPipeline::mTransientTargets`): what lives for one phase of a frame is not a target of its own, but lent to the pass or effect that needs it for as long as an `ALTransientTargets` scope holds it:
 - each pack's light map, and the scratch SSAO's blur passes through in its description;
-- the water's copy of the screen and the scene's depth copy, each pack's own (`beginWaterTargets`; the haze passes take a depth copy each);
+- the water's copy of the screen and the scene's depth copy, each pack's own (`beginWaterTargets`), the frame's one copy of the depth: the surface writes its own over the scene's while it reads beneath it, where the haze passes, writing none, read the scene's in place;
 - the HDR bloom pyramid (`LLPipeline::Bloom`, as deep as `bloomMipCount`), the post chain's ping and pong, SMAA's edges and blend weights (`SMAATargets`), and the legacy non-HDR glow's three;
 - `mSkyBehind`, the sky dome redrawn at half resolution with no depth, so it covers what the world hides, for the haze pass to converge far water on. It is drawn for the main view only, while its frustum holds the water and the camera is above it, and then on the GPU only if an occlusion query over the water field saw any of it (`mSkyBehindQuery`). It is held from the sky pool's draw to the end of the deferred lighting;
 - depth of field's sharp copy and blur, and the cross-screen filter's two scratch buffers and sum.

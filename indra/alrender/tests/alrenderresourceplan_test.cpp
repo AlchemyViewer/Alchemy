@@ -1029,20 +1029,13 @@ namespace
                 }
             }
 
-            // renderGeomPostDeferred: the water haze, the water pool's pass with its two copies, then the haze.
-            {
-                ALTransientTargets haze(pool);
-                acquire(haze, Id::MainDepthCopy);
-            }
+            // renderGeomPostDeferred: the water pool's pass with its two copies. The haze passes either side of it read
+            // the scene's depth in place.
             LLRenderTarget* water = nullptr;
             {
                 ALTransientTargets pass(pool);
                 water = acquire(pass, Id::MainWater);
                 acquire(pass, Id::MainDepthCopy);
-            }
-            {
-                ALTransientTargets haze(pool);
-                acquire(haze, Id::MainDepthCopy);
             }
             sky.releaseAll();
 
