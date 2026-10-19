@@ -860,6 +860,33 @@ namespace
         }
     }
 
+    TEST_CASE("alrenderresourceplan: the reflections' source keeps last frame's colour without its alpha, and its depth",
+              "[alrenderresourceplan]")
+    {
+        for (bool reverse_z : { false, true })
+        {
+            INFO("reverse-Z " << reverse_z);
+            Inputs in    = defaults();
+            in.mSSR      = true;
+            in.mReverseZ = reverse_z;
+            const Plan plan = Plan::make(in);
+            REQUIRE(plan.desc(Id::SSRScene));
+            const ALRenderTargetDesc& scene = *plan.desc(Id::SSRScene);
+
+            // The reflections read its colour alone, unsigned and float under HDR.
+            CHECK(scene.color[0] == (U32)GL_R11F_G11F_B10F);
+            CHECK(scene.color[1] == 0u);
+            // The scene's depth in its format, without the stencil.
+            CHECK(scene.depth == (reverse_z ? Depth::D32F : Depth::D24));
+            CHECK_FALSE(scene.stencil);
+            CHECK(!plan[Id::SSRScene].mDepthFrom);
+            // 8 B/px at the render size.
+            CHECK(LLRenderTarget::bytesFor(scene) == 8ull * scene.width * scene.height);
+            CHECK(scene.width == plan.desc(Id::MainScreen)->width);
+            CHECK(scene.height == plan.desc(Id::MainScreen)->height);
+        }
+    }
+
     TEST_CASE("alrenderresourceplan: only the main view and the material preview have post targets", "[alrenderresourceplan]")
     {
         for (bool hdr : { true, false })

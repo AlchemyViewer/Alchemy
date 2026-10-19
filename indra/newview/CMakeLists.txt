@@ -2695,7 +2695,7 @@ if(AL_BUILD_TESTS)
       tests/aldof_gl_test.cpp
       tests/alselectionoutline_gl_test.cpp
       tests/shadowutil_gl_test.cpp
-    BENCH_SOURCES tests/alcasfold_bench.cpp tests/aldof_bench.cpp
+    BENCH_SOURCES tests/alcasfold_bench.cpp tests/aldof_bench.cpp tests/alssrhistory_bench.cpp
     LIBRARIES llrender
     SUPPORT llrender_test_checks llcommon_test_checks
     INCLUDES ${INDRA_SOURCE_DIR}/llprimitive

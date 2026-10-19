@@ -86,7 +86,7 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     const Depth main_depth   = in.mReverseZ ? Depth::D32F : Depth::D24;
     const Depth shadow_depth = (in.mShadowDepth32F || in.mReverseZ) ? Depth::D32F : Depth::D24;
 
-    // The light map, the water's colour under the scene and the reflections' source are float with HDR.
+    // The light map and the water's colour under the scene are float with HDR.
     const U32 screen_format = hdr ? GL_RGBA16F : GL_RGBA8;
     // The tonemapped image the post chain carries.
     const U32 post_format = hdr ? GL_RGB10_A2 : GL_RGBA8;
@@ -271,12 +271,15 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
                                    in.mSMAAStencil ? std::optional<Id>(Id::SMAAEdges) : std::nullopt };
     }
 
-    // The reflections' source takes the scene's depth without its stencil, in its format. They trace it only
-    // through the probes (bindReflectionProbes): without them no program reads it.
+    // The reflections' source: last frame's scene, without the alpha the reflections drop, so R11F_G11F_B10F under HDR
+    // (unsigned, which the lit scene is), and the scene's depth without its stencil, in its format. They trace it
+    // only through the probes (bindReflectionProbes): without them no program reads it.
     if (in.mSSR && in.mProbes)
     {
-        plan.at(Id::SSRScene).mDesc =
-            ALRenderTargetDesc{ .width = width, .height = height, .color = { screen_format }, .depth = main_depth };
+        plan.at(Id::SSRScene).mDesc = ALRenderTargetDesc{ .width  = width,
+                                                          .height = height,
+                                                          .color  = { hdr ? (U32)GL_R11F_G11F_B10F : screen_format },
+                                                          .depth  = main_depth };
     }
 
     // The sky behind everything at half size, in the format the sky's colour lands in: the emissive attachment's float
