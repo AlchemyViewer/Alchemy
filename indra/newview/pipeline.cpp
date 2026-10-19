@@ -10729,7 +10729,7 @@ void LLPipeline::renderFinalize()
     const LLRect& world_view    = gViewerWindow->getWorldViewRectRaw();
     const bool    rlv_sphere    = chain && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE);
     const bool    visualize     = RenderBufferVisualization > -1 && !cutout;
-    const bool    side_by_side  = ref_wipe_mode == 2 && !suppress_effects;
+    const bool    side_by_side  = hasReferenceStill() && ref_wipe_mode == 2 && !suppress_effects;
     const bool    blit_sharpens = cas_sharpness > 0.f && !cutout && chain && gBlitWithEffectsSharpenProgram.isComplete() &&
                                   !glow && !rlv_sphere && !visualize && !sScopeCapture && !mReferenceStillWanted &&
                                   distort <= 0.f && !side_by_side && (S32)sourceBuffer->getWidth() == world_view.getWidth() &&
