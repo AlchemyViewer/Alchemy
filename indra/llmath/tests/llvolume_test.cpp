@@ -2535,8 +2535,8 @@ namespace
         // Vertices transformed a triangle with a 16-entry FIFO cache, and
         // bytes fetched over the buffer's, per LOD.
         const Bound bounds[] = {
-            { "box", { 2.0000, 2.0000, 1.1250, 0.8889 }, { 1.2000, 1.2000, 1.0667, 1.0000 } },
-            { "cylinder", { 1.2500, 1.1667, 1.0889, 1.0625 }, { 1.0133, 1.0286, 1.0146, 1.0211 } },
+            { "box", { 2.0000, 2.0000, 2.0000, 2.0000 }, { 1.2000, 1.2000, 1.2000, 1.2000 } },
+            { "cylinder", { 1.2500, 1.1667, 1.1000, 1.0833 }, { 1.0133, 1.0286, 1.0182, 1.0353 } },
             { "sphere", { 0.7778, 0.6944, 0.6429, 1.0833 }, { 1.0286, 1.0240, 1.0000, 1.0043 } },
             { "torus", { 0.6806, 1.1111, 1.0667, 1.0417 }, { 1.0122, 1.0080, 1.0000, 1.0010 } },
             { "sculpt sphere", { 0.6806, 1.1250, 1.0625, 1.0312 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
@@ -3504,5 +3504,129 @@ namespace
         }
         INFO(report.text());
         CHECK(report.failures == 0);
+    }
+
+    // ------------------------------------------------------------------
+    // Vertex and triangle counts
+
+    struct Counts
+    {
+        S32 vertices = 0;
+        S32 triangles = 0;
+
+        bool operator==(const Counts& other) const { return vertices == other.vertices && triangles == other.triangles; }
+    };
+
+    Counts countsOf(const LLVolume& volume)
+    {
+        Counts counts;
+        counts.triangles = volume.getNumTriangles(&counts.vertices);
+        return counts;
+    }
+
+    struct ExpectedCounts
+    {
+        Shape shape;
+        Counts lods[LOD_COUNT];
+    };
+
+    void checkCounts(const ExpectedCounts& expected)
+    {
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            LLPointer<LLVolume> volume = build(expected.shape, lod);
+            const Counts counts = countsOf(*volume);
+            INFO(fmt::format("{}: {} vertices and {} triangles, where {} and {} are expected", lodName(expected.shape, lod), counts.vertices,
+                             counts.triangles, expected.lods[lod].vertices, expected.lods[lod].triangles));
+            CHECK(counts == expected.lods[lod]);
+        }
+    }
+
+    // A straight path that neither twists nor tapers sweeps every profile
+    // edge into a parallelogram, which two triangles map exactly: a flat
+    // side is one quad, an uncut box's cap is one, and the path has its two
+    // ends alone. A path that twists or tapers, a circle and a flexible path
+    // keep the points they lay out.
+    TEST_CASE("llvolume: a straight path that neither twists nor tapers is one quad a profile edge", "[llvolume]")
+    {
+        Shape twisted = box();
+        twisted.name = "twisted box";
+        twisted.twist_begin = -0.5f;
+        twisted.twist_end = 0.5f;
+        Shape cone = cylinder();
+        cone.name = "cone";
+        cone.scale_x = cone.scale_y = 0.f;
+        const ExpectedCounts table[] = {
+            { box(), { { 24, 12 }, { 24, 12 }, { 24, 12 }, { 24, 12 } } },
+            { cylinder(), { { 30, 24 }, { 42, 36 }, { 66, 60 }, { 102, 96 } } },
+            { twisted, { { 32, 20 }, { 48, 36 }, { 126, 144 }, { 256, 348 } } },
+            { cone, { { 30, 24 }, { 42, 36 }, { 82, 90 }, { 152, 192 } } },
+            { torus(), { { 49, 72 }, { 100, 162 }, { 256, 450 }, { 625, 1152 } } },
+        };
+        for (const ExpectedCounts& expected : table)
+        {
+            checkCounts(expected);
+        }
+
+        Report report;
+        for (const Shape& s : sweepShapes())
+        {
+            if (s.path != LL_PCODE_PATH_LINE || s.twist_begin != s.twist_end || s.scale_x != 1.f || s.scale_y != 1.f)
+            {
+                continue;
+            }
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                const std::string name = lodName(s, lod);
+                if (volume->getPath().getPathLength() != 2)
+                {
+                    report.fail(fmt::format("{}: {} path points", name, volume->getPath().getPathLength()));
+                    continue;
+                }
+                // A hole drawn in to its wall is not straight between its
+                // corners, and keeps its split points; its outer sides
+                // keep theirs with it.
+                const bool drawn_in = volume->getProfile().holeTouchesWall();
+                for (S32 i = 0; i < volume->getNumVolumeFaces(); ++i)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(i);
+                    const LLProfile::Face& outline = volume->getProfile().mFaces[i];
+                    const bool flat_outer = (face.mTypeMask & LLVolumeFace::OUTER_MASK) && (face.mTypeMask & LLVolumeFace::FLAT_MASK);
+                    if (flat_outer && !drawn_in && outline.mCount != 2)
+                    {
+                        report.fail(fmt::format("{}: {} has {} profile points", name, faceName(face), outline.mCount));
+                    }
+                    if (isCap(face) && !(face.mTypeMask & (LLVolumeFace::HOLLOW_MASK | LLVolumeFace::OPEN_MASK)) && s.profile == LL_PCODE_PROFILE_SQUARE &&
+                        s.path_begin == 0.f && s.path_end == 1.f && face.mNumVertices != 4)
+                    {
+                        report.fail(fmt::format("{}: {} has {} vertices", name, faceName(face), face.mNumVertices));
+                    }
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+
+        // A square hole in a cylinder: its corners alone where it stays clear
+        // of the wall, and every split point where it is drawn in to it.
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            const S32 split = (S32)(LOD_DETAIL[lod] * 0.66f);
+            for (F32 hollow : { 0.5f, 0.85f })
+            {
+                Shape s = cylinder();
+                s.hole = LL_PCODE_HOLE_SQUARE;
+                s.hollow = hollow;
+                s.name = fmt::format("cylinder with a square hole at {}", hollow);
+                LLPointer<LLVolume> volume = build(s, lod);
+                const LLProfile& outline = volume->getProfile();
+                const S32 hole = outline.getTotal() - outline.getTotalOut();
+                INFO(fmt::format("{}: {} hole points", lodName(s, lod), hole));
+                CHECK(outline.holeTouchesWall() == (hollow > 0.75f));
+                CHECK(hole == (outline.holeTouchesWall() ? 4 * (split + 1) + 1 : 5));
+                CHECK(volume->getPath().getPathLength() == 2);
+            }
+        }
     }
 }

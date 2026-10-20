@@ -2105,13 +2105,27 @@ bool LLVolume::generate()
     // stretched due to twisting or scaling on the path.
     S32 split = (S32) ((mDetail)*0.66f);
 
-    if (mParams.getPathParams().getCurveType() == LL_PCODE_PATH_LINE &&
-        (mParams.getPathParams().getScale().mV[0] != 1.0f ||
-         mParams.getPathParams().getScale().mV[1] != 1.0f) &&
+    const LLPathParams& path_params = mParams.getPathParams();
+    const bool tapered = path_params.getScale().mV[0] != 1.0f || path_params.getScale().mV[1] != 1.0f;
+    if (path_params.getCurveType() == LL_PCODE_PATH_LINE &&
+        tapered &&
         (mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_SQUARE ||
          mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_ISOTRI ||
          mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_EQUALTRI ||
          mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_RIGHTTRI))
+    {
+        split = 0;
+    }
+
+    // A straight path that neither twists nor tapers sweeps every profile
+    // edge into a parallelogram, and every face is flat or ruled straight
+    // along the path: positions and UVs are affine over each quad, and the
+    // split points and the rings between the ends lie on the triangles the
+    // ends make. A hole drawn in to its wall is the exception: its split
+    // points are drawn in too, where the edges they split are not, and
+    // they shape it.
+    const S32 lighting_split = split;
+    if (path_params.getCurveType() == LL_PCODE_PATH_LINE && !tapered && path_params.getTwistBegin() == path_params.getTwist())
     {
         split = 0;
     }
@@ -2138,6 +2152,11 @@ bool LLVolume::generate()
 
     bool regenPath = mPathp->generate(mParams.getPathParams(), path_detail, split);
     bool regenProf = mProfilep->generate(mParams.getProfileParams(), mPathp->isOpen(),profile_detail, split);
+    if (regenProf && split < lighting_split && mProfilep->holeTouchesWall())
+    {
+        mProfilep->setDirty();
+        mProfilep->generate(mParams.getProfileParams(), mPathp->isOpen(), profile_detail, lighting_split);
+    }
 
     if (regenPath || regenProf )
     {
