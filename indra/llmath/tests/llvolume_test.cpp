@@ -33,13 +33,11 @@
 // mesh corpus is built here and goes through cacheOptimize as a decoded LOD
 // does.
 //
-// What the generator gets wrong today is a case of its own, tagged
-// [!shouldfail]: the case holds the generator to what it should do, so it
-// fails, as expected, while the defect stands, and the fix that clears the
-// defect removes the tag. Where a defect breaks one of the sweep's checks on
-// some faces, the sweep leaves that check on those faces to the defect's
-// case: a region below names the faces by what they are, not by how they
-// come out, and the fix removes the region with the tag.
+// What the generator gets wrong is a case of its own, tagged [!shouldfail]:
+// the case holds the generator to what it should do, so it fails, as
+// expected, while the defect stands, and the fix that clears the defect
+// removes the tag. A case may inspect only the faces of a region, which
+// names them by what they are, not by how they come out.
 
 #include "linden_common.h"
 
@@ -579,19 +577,8 @@ namespace
 
     namespace Regions
     {
-        // A cap with no area. Where its path leaves it within its plane, its
-        // normal is far from the way its wall runs.
+        // A cap with no area.
         constexpr U32 CapNoArea = 1 << 2;
-    }
-
-    U32 excusedBy(U32 regions)
-    {
-        U32 checks = 0;
-        if (regions & Regions::CapNoArea)
-        {
-            checks |= Checks::CapFacing;
-        }
-        return checks;
     }
 
     // Vertices that no triangle with area uses.
@@ -629,13 +616,8 @@ namespace
     struct Inspect
     {
         U32 checks = Checks::Sweep;
-        // Nonzero: inspect only the faces in these regions, nothing of them
-        // excused. Either way, on each face the checks that its other
-        // regions break are excused.
+        // Nonzero: inspect only the faces in these regions.
         U32 only_regions = 0;
-        // How far a cap may lean from the direction its wall runs in: the
-        // cosine of the widest angle allowed.
-        F32 cap_facing = 0.f;
         // Check inversion also where the surface folds at a point.
         bool inversion_any_spread = false;
     };
@@ -779,10 +761,10 @@ namespace
         }
     }
 
-    // A cap faces along the path, away from the wall it closes: from the
-    // ring of the station next to it toward its own.
-    void checkCapFacing(const LLVolume& volume, const LLVolumeFace& face, const std::vector<LLVector3>& normals, F32 min_cos, Report& report,
-                        const std::string& where)
+    // A cap faces away from the wall it closes: its normal is on the side of
+    // its plane the path leaves the wall by, from the ring of the station
+    // next to it toward its own.
+    void checkCapFacing(const LLVolume& volume, const LLVolumeFace& face, const std::vector<LLVector3>& normals, Report& report, const std::string& where)
     {
         const LLAlignedArray<LLVector4a, 64>& mesh = volume.getMesh();
         const S32 ring = volume.getProfile().getTotal();
@@ -806,7 +788,7 @@ namespace
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
             const LLVector3& n = normals[v];
-            if (!(n * away > min_cos * n.length() * away.length()))
+            if (!(n * away > 0.f))
             {
                 report.fail(fmt::format("{}: vertex {}'s normal is {:.1f} degrees from the way the path leaves its wall", where, v, degreesBetween(n, away)));
                 return;
@@ -1205,9 +1187,7 @@ namespace
                 continue;
             }
             state.inspected = true;
-            // A face in another defect's region still has that defect's
-            // checks excused.
-            state.checks = how.checks & ~excusedBy(state.regions & ~how.only_regions);
+            state.checks = how.checks;
             state.raw.resize(face.mNumVertices);
             for (S32 v = 0; v < face.mNumVertices; ++v)
             {
@@ -1228,7 +1208,7 @@ namespace
             }
             if ((state.checks & Checks::CapFacing) && isCap(face))
             {
-                checkCapFacing(volume, face, state.raw, how.cap_facing, report, where);
+                checkCapFacing(volume, face, state.raw, report, where);
             }
             // A sculpt's UVs are its grid, wherever the map puts the points.
             if ((state.checks & Checks::AffineUV) && !isSculpt(volume))
@@ -2634,17 +2614,17 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // A cap with no area, as on a pyramid or a prism, still faces along the
-    // path. A cap's normal is its station's plane's, which a circle2 path's
-    // alternating stations, and a half circle on a circle path tapered to a
-    // point, leave the cap at 70 to 90 degrees from: their walls run off
-    // within the plane, not along its normal.
-    TEST_CASE("llvolume: a cap with no area still faces away from its wall", "[llvolume][!shouldfail]")
+    // A cap with no area, as on a pyramid or a prism, has no triangle to
+    // take a normal from, and still has a unit normal facing away from its
+    // wall. Where a circle2 path's alternating stations, or a half circle
+    // on a circle path tapered to a point, leave the cap within its plane,
+    // that normal is close to square to the way the wall runs, but on its
+    // far side.
+    TEST_CASE("llvolume: a cap with no area still faces away from its wall", "[llvolume]")
     {
         Inspect how;
-        how.checks = Checks::Finite | Checks::CapFacing | Checks::Tangents;
+        how.checks = Checks::Finite | Checks::RawUnit | Checks::CapFacing | Checks::Tangents;
         how.only_regions = Regions::CapNoArea;
-        how.cap_facing = 0.5f;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
