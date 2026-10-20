@@ -272,6 +272,7 @@ namespace
     {
         const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
                                                         "    integer a = 7; integer b = 2; float f = 1.5; string s = \"x\"; list l = [1, 2];\n"
+                                                        "    if (llGetLinkNumber()) { a = -a; b = -b; }\n"
                                                         "    integer same = a == b;\n"
                                                         "    if (a) llOwnerSay(\"a\");\n"
                                                         "    if (s) llOwnerSay(\"said\");\n"
@@ -4848,6 +4849,51 @@ namespace
             CHECK(has(r, "-- jump out"));
             CHECK(has(r, "-- @out"));
             CHECK(noted(r, "SluaJump"));
+        }
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a quotient of numbers never below nought is rounded down by //", "[ALLSLToSLua]")
+    {
+        const std::string lsl = "integer PARTICIPANTS_STRIDE = 3;\n"
+                                "list participants;\n"
+                                "printFreeMemory() {\n"
+                                "    integer freemem = llGetFreeMemory();\n"
+                                "    integer memory = (integer)((float)freemem * 100.0 / llGetMemoryLimit());\n"
+                                "    llOwnerSay(llGetScriptName() + \": \" + (string)memory + \"% memory free (\" + (string)freemem + \" Bytes)\");\n"
+                                "}\n"
+                                "integer last(integer stride, float scale) {\n"
+                                "    integer i = llGetListLength(participants) / PARTICIPANTS_STRIDE - 1;\n"
+                                "    integer k = llGetListLength(participants) / stride;\n"
+                                "    integer left = llGetListLength(participants) % PARTICIPANTS_STRIDE;\n"
+                                "    integer used = llGetUsedMemory();\n"
+                                "    used = used - 70000;\n"
+                                "    integer part = (integer)((float)used / 2.0);\n"
+                                "    integer scaled = (integer)(scale / 2.0);\n"
+                                "    return i + k + left + part + scaled;\n"
+                                "}\n"
+                                "default { state_entry() { printFreeMemory(); llOwnerSay((string)last(2, 1.5)); } }\n";
+        ALLSLToSLua::Options o;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("Tapple's: a list's length over a global never set; and what is left over");
+            CHECK(has(r, "local i: number = #participants // PARTICIPANTS_STRIDE - 1\n"));
+            CHECK(has(r, "local left: number = #participants % PARTICIPANTS_STRIDE\n"));
+        }
+        {
+            INFO("Tapple's: a float quotient cut, from a local never set again and ll's limit");
+            CHECK(has(r, "local memory: number = freemem * 100.0 // ll.GetMemoryLimit()\n"));
+            CHECK_FALSE(has(r, "bit32.s32(freemem"));
+        }
+        {
+            INFO("a divisor that may be below nought, a local set again, a parameter: toward nought as before");
+            CHECK(has(r, "local k: number = bit32.s32(#participants / stride)\n"));
+            CHECK(has(r, "local part: number = bit32.s32(used / 2.0)\n"));
+            CHECK(has(r, "local scaled: number = bit32.s32(scale / 2.0)\n"));
+            CHECK(noted(r, "SluaFloatToInteger"));
         }
         require_checks_clean(r);
     }

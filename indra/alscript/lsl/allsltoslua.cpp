@@ -711,8 +711,10 @@ namespace
         // bit32's answer LSL's.
         bool mSaidHexSign = false;
         bool mSaidSigned  = false;
-        // A number not below nought: as nonNegative says, or a global the
-        // script never sets, declared one.
+        // A number not below nought: as nonNegative says; a global the
+        // script never sets, declared one, or a local never set after its
+        // declaration; one of ll's answers that never is (ALLSLTraits::
+        // bounds); and what is made of those that cannot be.
         bool notBelowZero(LSLExpression* e) const;
         Expr unary(LSLUnaryExpression* e);
         Expr typecast(LSLTypecastExpression* e);
@@ -1095,6 +1097,10 @@ namespace
         // The globals the script never sets, declared a number not below
         // nought; and declared any whole number, by what it is.
         boost::unordered_flat_set<LSLSymbol*>      mSteadyNonNegative;
+        // The locals the script never sets after their declaration, by
+        // what they are declared (null for none, LSL's 0).
+        boost::unordered_flat_map<LSLSymbol*, LSLExpression*> mSteadyLocals;
+        mutable boost::unordered_flat_set<LSLSymbol*>         mSteadyAsked;
         boost::unordered_flat_map<LSLSymbol*, int> mSteadyWhole;
         bool mLslInteger = false;
         bool mLslFloat   = false;
@@ -4010,21 +4016,93 @@ namespace
             return true;
         }
         e = unbracketed(e);
-        if (e && e->getNodeSubType() == NODE_BINARY_EXPRESSION)
+        if (!e)
         {
-            // An & with one, an | or ^ of two, a >> of one.
-            auto* b = static_cast<LSLBinaryExpression*>(e);
-            switch (b->getOperation())
-            {
-                case OP_BIT_AND: return notBelowZero(b->getLHS()) || notBelowZero(b->getRHS());
-                case OP_BIT_OR:
-                case OP_BIT_XOR: return notBelowZero(b->getLHS()) && notBelowZero(b->getRHS());
-                case OP_SHIFT_RIGHT: return notBelowZero(b->getLHS());
-                default: return false;
-            }
+            return false;
         }
-        return e && e->getNodeSubType() == NODE_LVALUE_EXPRESSION && !static_cast<LSLLValueExpression*>(e)->getMember() &&
-               mSteadyNonNegative.contains(static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol());
+        switch (e->getNodeSubType())
+        {
+            case NODE_BINARY_EXPRESSION:
+            {
+                // An & with one, an | or ^ of two, a >> of one; an integer
+                // quotient of two; and a float's sum, product or quotient
+                // of two, which no wrap takes below nought.
+                auto*      b     = static_cast<LSLBinaryExpression*>(e);
+                const bool both  = notBelowZero(b->getLHS()) && notBelowZero(b->getRHS());
+                const bool whole = e->getIType() == LST_INTEGER;
+                switch (b->getOperation())
+                {
+                    case OP_BIT_AND: return notBelowZero(b->getLHS()) || notBelowZero(b->getRHS());
+                    case OP_BIT_OR:
+                    case OP_BIT_XOR: return both;
+                    case OP_SHIFT_RIGHT: return notBelowZero(b->getLHS());
+                    case OP_DIV: return both && (whole || e->getIType() == LST_FLOATINGPOINT);
+                    case OP_PLUS:
+                    case OP_MUL: return both && e->getIType() == LST_FLOATINGPOINT;
+                    default: return false;
+                }
+            }
+            case NODE_CONSTANT_EXPRESSION:
+            {
+                // A float written out, not -0.
+                LSLASTNode* c = e->getChild(0);
+                if (c && c->getNodeSubType() == NODE_FLOAT_CONSTANT)
+                {
+                    const double v = static_cast<LSLFloatConstant*>(c)->getValue();
+                    return v >= 0 && !std::signbit(v);
+                }
+                return false;
+            }
+            case NODE_TYPECAST_EXPRESSION:
+            {
+                // A number made a float, or a whole number kept one. Not a
+                // float cut to a whole one, which past the 32-bit range LSL
+                // made -2147483648.
+                LSLExpression* child = static_cast<LSLTypecastExpression*>(e)->getChildExpr();
+                const LSLIType to    = e->getIType();
+                return (to == LST_FLOATINGPOINT || (to == LST_INTEGER && child->getIType() == LST_INTEGER)) && notBelowZero(child);
+            }
+            case NODE_FUNCTION_EXPRESSION:
+            {
+                // One of ll's that answers nothing below nought.
+                LSLSymbol* f     = static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getSymbol();
+                S32        least = 0;
+                S32        most  = 0;
+                return f && f->getSubType() == SYM_BUILTIN && ALLSLTraits::bounds(f->getName(), least, most) && least >= 0;
+            }
+            case NODE_LVALUE_EXPRESSION:
+            {
+                // A global never set, declared one; a local never set
+                // after it is declared one, or declared with nothing.
+                if (static_cast<LSLLValueExpression*>(e)->getMember())
+                {
+                    return false;
+                }
+                LSLSymbol* var = static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
+                if (mSteadyNonNegative.contains(var))
+                {
+                    return true;
+                }
+                const auto steady = mSteadyLocals.find(var);
+                if (steady == mSteadyLocals.end() || (e->getIType() != LST_INTEGER && e->getIType() != LST_FLOATINGPOINT))
+                {
+                    return false;
+                }
+                // Not again for a local its own declaration reads.
+                if (!steady->second)
+                {
+                    return true;
+                }
+                if (!mSteadyAsked.insert(var).second)
+                {
+                    return false;
+                }
+                const bool held = notBelowZero(steady->second);
+                mSteadyAsked.erase(var);
+                return held;
+            }
+            default: return false;
+        }
     }
 
     Expr Writer::binary(LSLBinaryExpression* e)
@@ -4386,6 +4464,19 @@ namespace
             case LST_INTEGER:
                 if (from == LST_FLOATINGPOINT)
                 {
+                    // A quotient not below nought rounded down by //, which
+                    // is cutting it toward nought there.
+                    LSLExpression* inner = unbracketed(child);
+                    if (inner && inner->getNodeSubType() == NODE_BINARY_EXPRESSION && inner->getOperation() == OP_DIV)
+                    {
+                        auto* q = static_cast<LSLBinaryExpression*>(inner);
+                        if (notBelowZero(q->getLHS()) && notBelowZero(q->getRHS()))
+                        {
+                            const Expr a = oneValue(value(q->getLHS()));
+                            const Expr b = oneValue(value(q->getRHS()));
+                            return { bracketed(a, MUL) + " // " + bracketed(b, MUL + 1), MUL };
+                        }
+                    }
                     // Toward zero, as LSL cuts a float, by bit32.s32, which
                     // gives 0 where math.modf would give a -0 that tostring
                     // writes, and LSL's -2147483648 for NaN and the
@@ -8450,6 +8541,17 @@ end
                 }
             }
         }
+        walk(mScript, [&](LSLASTNode* node) {
+            if (node->getNodeSubType() == NODE_DECLARATION)
+            {
+                auto*      d   = static_cast<LSLDeclaration*>(node);
+                LSLSymbol* sym = d->getIdentifier()->getSymbol();
+                if (sym && !written.writes(sym))
+                {
+                    mSteadyLocals.emplace(sym, isNull(d->getInitializer()) ? nullptr : d->getInitializer());
+                }
+            }
+        });
         findBitsOnly();
         globals();
         functions();
