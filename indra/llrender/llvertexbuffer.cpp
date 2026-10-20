@@ -1090,6 +1090,28 @@ void LLVertexBuffer::drawArrays(U32 mode, U32 first, U32 count) const
     LLRender::sDrawElements += count;
 }
 
+void LLVertexBuffer::drawMultiArrays(U32 mode, const S32* first, const S32* count, U32 draws) const
+{
+    llassert(validate_bound_samplers());
+    llassert(mGLBuffer == sGLRenderBuffer);
+    llassert(mGLIndices == sGLRenderIndices);
+    if (draws == 0)
+    {
+        return;
+    }
+
+    gGL.syncMatrices();
+    STOP_GLERROR;
+    glMultiDrawArrays(sGLMode[mode], first, count, draws);
+    STOP_GLERROR;
+    ++LLRender::sDrawCalls;
+    for (U32 i = 0; i < draws; ++i)
+    {
+        llassert(first[i] >= 0 && count[i] >= 0 && (U32)(first[i] + count[i]) <= mNumVerts);
+        LLRender::sDrawElements += count[i];
+    }
+}
+
 //static
 void LLVertexBuffer::initClass(LLWindow* window)
 {

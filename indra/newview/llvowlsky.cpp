@@ -235,12 +235,22 @@ bool LLVOWLSky::updateGeometry(LLDrawable * drawable)
     return true;
 }
 
-void LLVOWLSky::drawStarPoints()
+void LLVOWLSky::drawStarPoints(const ALStarField::Frustum& frustum)
 {
-    if (mStarsVerts.notNull() && mStarLayout.mPoints > 0)
+    if (mStarsVerts.isNull() || mStarLayout.mPoints == 0)
+    {
+        return;
+    }
+
+    {
+        LL_PROFILE_ZONE_NAMED("sky stars cull");
+        ALStarField::pointDraws(mStarLayout, frustum, mStarDraws);
+    }
+    if (!mStarDraws.mFirst.empty())
     {
         mStarsVerts->setBuffer();
-        mStarsVerts->drawArrays(LLRender::POINTS, mStarLayout.firstPoint(), mStarLayout.mPoints);
+        mStarsVerts->drawMultiArrays(LLRender::POINTS, mStarDraws.mFirst.data(), mStarDraws.mCount.data(),
+                                     (U32)mStarDraws.mFirst.size());
     }
 }
 

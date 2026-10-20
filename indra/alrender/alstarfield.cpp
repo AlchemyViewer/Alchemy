@@ -28,6 +28,7 @@
 
 #include "alstarfieldgenerate.h"
 #include "llmath.h"
+#include "llmatrix4a.h"
 #include "v3color.h"
 #include "v4color.h"
 
@@ -108,6 +109,20 @@ std::vector<Star> generate(U32 count, F32 dome_radius)
     return detail::generate(count, dome_radius, [](const LLVector3& direction) { return milkyWayDensity(direction); });
 }
 
+U32 cellOf(const LLVector3& direction)
+{
+    const F32 length = direction.length();
+    const F32 z = length > 0.f ? llclamp(direction.mV[VZ] / length, 0.f, 1.f) : 0.f;
+    const U32 band = llmin((U32)(z * (F32)BANDS), BANDS - 1);
+    F32 azimuth = atan2f(direction.mV[VY], direction.mV[VX]);
+    if (azimuth < 0.f)
+    {
+        azimuth += F_TWO_PI;
+    }
+    const U32 segment = llmin((U32)(azimuth / F_TWO_PI * (F32)SEGMENTS), SEGMENTS - 1);
+    return band * SEGMENTS + segment;
+}
+
 Layout layOut(std::vector<Star>& stars)
 {
     const auto points = std::stable_partition(stars.begin(), stars.end(), spiked);
@@ -115,6 +130,59 @@ Layout layOut(std::vector<Star>& stars)
     Layout layout;
     layout.mQuads  = (U32)(points - stars.begin());
     layout.mPoints = (U32)(stars.end() - points);
+
+    // The points by cell.
+    std::vector<U32> cell(layout.mPoints);
+    std::vector<U32> order(layout.mPoints);
+    for (U32 p = 0; p < layout.mPoints; ++p)
+    {
+        cell[p]  = cellOf(points[p].mPosition);
+        order[p] = p;
+    }
+    std::stable_sort(order.begin(), order.end(), [&cell](U32 a, U32 b) { return cell[a] < cell[b]; });
+    std::vector<Star> sorted;
+    sorted.reserve(layout.mPoints);
+    for (U32 p : order)
+    {
+        sorted.push_back(points[p]);
+    }
+    std::copy(sorted.begin(), sorted.end(), points);
+
+    // Each cell's run, and the cone its stars' directions lie in: about their mean, as wide as the farthest.
+    layout.mCells.resize(CELLS);
+    U32 first = 0;
+    for (U32 c = 0; c < CELLS; ++c)
+    {
+        Cell& run = layout.mCells[c];
+        run.mFirst = layout.firstPoint() + first;
+        while (first + run.mCount < layout.mPoints && cell[order[first + run.mCount]] == c)
+        {
+            ++run.mCount;
+        }
+
+        LLVector3 sum;
+        for (U32 p = first; p < first + run.mCount; ++p)
+        {
+            sum += points[p].mPosition / points[p].mPosition.length();
+        }
+        if (run.mCount == 0 || sum.normalize() == 0.f)
+        {
+            run.mAxis.set(0.f, 0.f, 1.f);
+            run.mSinRadius = run.mCount == 0 ? 0.f : 1.f;
+        }
+        else
+        {
+            run.mAxis = sum;
+            F32 least_cos = 1.f;
+            for (U32 p = first; p < first + run.mCount; ++p)
+            {
+                least_cos = llmin(least_cos, run.mAxis * (points[p].mPosition / points[p].mPosition.length()));
+            }
+            run.mSinRadius = least_cos > 0.f ? sqrtf(llmax(0.f, 1.f - least_cos * least_cos)) : 1.f;
+        }
+        first += run.mCount;
+    }
+    llassert(first == layout.mPoints);
     return layout;
 }
 
@@ -140,6 +208,73 @@ void fillVertices(const std::vector<Star>& stars, const Layout& layout, LLStride
     for (U32 s = layout.mQuads; s < layout.mQuads + layout.mPoints; ++s)
     {
         put(stars[s]);
+    }
+}
+
+Frustum frustum(const LLMatrix4a& mvp, F32 margin_x, F32 margin_y)
+{
+    // The clip coordinates' x, y and w as products with a point of the stars' frame, through the lanes the matrix's
+    // rows weight them by.
+    const LLVector4a x = mvp.getColumn<0>();
+    const LLVector4a y = mvp.getColumn<1>();
+    const LLVector4a w = mvp.getColumn<3>();
+    const auto plane = [&w](F32 margin, const LLVector4a& axis, F32 sign)
+    {
+        LLVector3 normal;
+        for (S32 i = 0; i < 3; ++i)
+        {
+            normal.mV[i] = (1.f + margin) * w[i] + sign * axis[i];
+        }
+        normal.normalize();
+        return normal;
+    };
+
+    Frustum frustum;
+    frustum.mNormals[0] = plane(margin_x, x, 1.f);
+    frustum.mNormals[1] = plane(margin_x, x, -1.f);
+    frustum.mNormals[2] = plane(margin_y, y, 1.f);
+    frustum.mNormals[3] = plane(margin_y, y, -1.f);
+    return frustum;
+}
+
+Frustum pointFrustum(const LLMatrix4a& mvp, U32 width, U32 height)
+{
+    return frustum(mvp, 2.f * POINT_REACH / (F32)llmax(width, 1u), 2.f * POINT_REACH / (F32)llmax(height, 1u));
+}
+
+bool inView(const Frustum& frustum, const Cell& cell)
+{
+    // The cone lies wholly outside a plane through its apex where its axis makes more than 90 degrees and its
+    // half-angle with the plane's normal; the slack keeps a star rounding onto the plane in view.
+    constexpr F32 SLACK = 1e-4f;
+    for (const LLVector3& normal : frustum.mNormals)
+    {
+        if (normal * cell.mAxis < -(cell.mSinRadius + SLACK))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+void pointDraws(const Layout& layout, const Frustum& frustum, Draws& draws)
+{
+    draws.clear();
+    for (const Cell& cell : layout.mCells)
+    {
+        if (cell.mCount == 0 || !inView(frustum, cell))
+        {
+            continue;
+        }
+        if (!draws.mFirst.empty() && (U32)(draws.mFirst.back() + draws.mCount.back()) == cell.mFirst)
+        {
+            draws.mCount.back() += (S32)cell.mCount;
+        }
+        else
+        {
+            draws.mFirst.push_back((S32)cell.mFirst);
+            draws.mCount.push_back((S32)cell.mCount);
+        }
     }
 }
 

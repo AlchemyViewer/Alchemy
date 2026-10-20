@@ -338,10 +338,16 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
         gSky.mVOWLSkyp->drawStarQuads();
         unbind_stars(gDeferredStarQuadProgram);
 
-        // Every other star as a point, sized by its vertex shader.
+        // Every other star as a point, sized by its vertex shader, from the cells the view takes in: its frustum in
+        // the stars' frame, through the matrices that draw them.
+        LLMatrix4a mvp;
+        mvp.setMul(gGL.getModelviewMatrix(), gGL.getProjectionMatrix());
+        const ALStarField::Frustum frustum =
+            ALStarField::pointFrustum(mvp, LLRenderTarget::sCurResX, LLRenderTarget::sCurResY);
+
         LLGLEnable point_size(GL_PROGRAM_POINT_SIZE);
         bind_stars(gDeferredStarProgram);
-        gSky.mVOWLSkyp->drawStarPoints();
+        gSky.mVOWLSkyp->drawStarPoints(frustum);
         unbind_stars(gDeferredStarProgram);
     }
 

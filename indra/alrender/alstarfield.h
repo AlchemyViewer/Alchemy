@@ -35,6 +35,8 @@
 #include <cmath>
 #include <vector>
 
+class LLMatrix4a;
+
 /// The star field, worked from a star count and the dome's radius alone: no GL and no settings, so LLVOWLSky's buffer
 /// and the GL tests that draw it share one definition.
 ///
@@ -88,8 +90,8 @@ std::vector<Star> generate(U32 count, F32 dome_radius);
 
 /// The faintest intensity, as the colour's alpha holds it, that has diffraction spikes: starsV.glsl's
 /// smoothstep(0.90, 1.0, intensity) is above 0 past 0.90, and 230 / 255 is the first step past it. Such a star reaches
-/// up to 19 pixels across, and GL drops a point whose centre leaves the screen, so its arms would pop at the edge: it is
-/// drawn as a quad instead. Every other star is a point, at most 7 pixels across.
+/// up to 19 pixels across, and GL drops a point whose centre leaves the screen, so its arms would pop at the edge: it
+/// is drawn as a quad instead. Every other star is a point, at most 7 pixels across.
 constexpr U8 SPIKE_INTENSITY = 230;
 
 inline bool spiked(const Star& star)
@@ -101,19 +103,76 @@ inline bool spiked(const Star& star)
 /// lying first in the buffer, from vertex 0.
 constexpr U32 QUAD_VERTICES = 6;
 
-/// Where the stars lie in the buffer: the spiked stars' quads first, QUAD_VERTICES vertices each, then every other star,
-/// one vertex each, drawn as points.
+/// The sky's cells, which the points are binned into so a view draws only those it can see: BANDS bands of equal height
+/// in z, so of equal area, over the upper hemisphere, each cut into SEGMENTS equal arcs of azimuth. Each is about 6
+/// degrees across, but those of the top band, which are wedges 20 degrees long.
+constexpr U32 BANDS    = 16;
+constexpr U32 SEGMENTS = 32;
+constexpr U32 CELLS    = BANDS * SEGMENTS;
+
+/// The cell a direction from the camera lies in; one below the horizon counts in the lowest band.
+U32 cellOf(const LLVector3& direction);
+
+/// A cell's points in the buffer, and a cone about the camera holding every one of their directions.
+struct Cell
+{
+    U32       mFirst = 0;        ///< its first vertex
+    U32       mCount = 0;        ///< its stars
+    LLVector3 mAxis;             ///< the cone's axis, unit
+    F32       mSinRadius = 0.f;  ///< the sine of its half-angle, which is under 90 degrees
+};
+
+/// Where the stars lie in the buffer: the spiked stars' quads first, QUAD_VERTICES vertices each, then every other
+/// star, one vertex each, drawn as points, cell by cell.
 struct Layout
 {
     U32 mQuads = 0;  ///< spiked stars
     U32 mPoints = 0; ///< the rest
+    std::vector<Cell> mCells; ///< CELLS of them, in order, each starting where the one before ends
 
     U32 firstPoint() const { return mQuads * QUAD_VERTICES; }
     U32 vertices() const { return firstPoint() + mPoints; }
 };
 
-/// Orders @a stars as the buffer lays them out, and says where each kind lies.
+/// Orders @a stars as the buffer lays them out, and says where each kind and each cell lies.
 Layout layOut(std::vector<Star>& stars);
+
+/// The most a point reaches past its centre, in pixels: half the widest star drawn as a point (6.5 pixels across, just
+/// under SPIKE_INTENSITY) and the half pixel starsV.glsl widens each side by. GL drops a point whose centre leaves the
+/// clip volume, but a view's cull keeps every point this near the edge, so nothing a driver would draw is left out.
+constexpr F32 POINT_REACH = 4.f;
+
+/// The side planes of a view, in the stars' frame and through the camera at its origin: the inward normals, unit, of
+/// x = -w, x = w, y = -w and y = w through @a mvp (the stars' frame to clip space), each plane moved out by @a margin_x
+/// or @a margin_y of normalized device coordinates. A star is thousands of times farther from the camera than the
+/// camera is from the stars' origin, so a direction is in view where each normal makes a non-negative product with it.
+struct Frustum
+{
+    LLVector3 mNormals[4];
+};
+Frustum frustum(const LLMatrix4a& mvp, F32 margin_x, F32 margin_y);
+
+/// The frustum of a view @a width x @a height pixels through @a mvp, each side moved out by POINT_REACH pixels.
+Frustum pointFrustum(const LLMatrix4a& mvp, U32 width, U32 height);
+
+/// Whether any direction of @a cell's cone may lie inside @a frustum: false only where one plane has every one outside.
+bool inView(const Frustum& frustum, const Cell& cell);
+
+/// The runs of points a view draws, for glMultiDrawArrays: each cell in view, and runs that meet merged.
+struct Draws
+{
+    std::vector<S32> mFirst;
+    std::vector<S32> mCount;
+
+    void clear()
+    {
+        mFirst.clear();
+        mCount.clear();
+    }
+};
+
+/// The points of @a layout that a view through @a frustum draws, into @a draws.
+void pointDraws(const Layout& layout, const Frustum& frustum, Draws& draws);
 
 /// The buffer's vertices for @a stars laid out as @a layout, layout.vertices() of them: a star's centre in xyz and its
 /// colour's four bytes in w, the word where LLVertexBuffer keeps the texture index, so a star is 16 bytes. A quad's

@@ -34,7 +34,7 @@
 // drops a point whose centre leaves the screen, which would pop a spiked star's arms at the edge
 // (LLDrawPoolWLSky::renderStarsDeferred, ALStarField).
 in vec3 position;       // the star's centre, in the stars' frame
-in int texture_index;   // its colour, in the position's fourth word: rgb = sRGB black-body colour, a = intrinsic intensity
+in int texture_index;   // its colour, in the position's fourth word: rgb = sRGB black-body colour, a = intensity
 
 uniform vec2 screen_res;       // the viewport the stars draw into, in pixels
 #ifdef STAR_QUADS

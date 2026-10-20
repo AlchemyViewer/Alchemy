@@ -42,6 +42,7 @@
 #include "llvertexbuffer.h"
 
 #include "../../llrender/tests/llheadlessgl_fixture.h"
+#include "alstarfield_draws.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/format.h>
@@ -304,7 +305,10 @@ void main()
     {
         std::vector<std::vector<F32>> mAttachments;
 
-        const F32* pixel(S32 attachment, S32 x, S32 y) const { return &mAttachments[attachment][(size_t(y) * W + x) * 4]; }
+        const F32* pixel(S32 attachment, S32 x, S32 y) const
+        {
+            return &mAttachments[attachment][(size_t(y) * W + x) * 4];
+        }
     };
 
     // A step of the attachment's storage at @a value: a step of 8 bits, or of R11G11B10F's mantissa, six bits for red
@@ -475,7 +479,8 @@ void main()
 
             static const LLVector2 CORNERS[6] = { LLVector2(-1.f, -1.f), LLVector2(1.f, -1.f), LLVector2(1.f, 1.f),
                                                   LLVector2(-1.f, -1.f), LLVector2(1.f, 1.f), LLVector2(-1.f, 1.f) };
-            mOldQuads = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_TEXCOORD0);
+            mOldQuads = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_COLOR
+                                           | LLVertexBuffer::MAP_TEXCOORD0);
             REQUIRE(mOldQuads->allocateBuffer((U32)mField.size() * 6, 0));
             LLStrider<LLVector3> vertices;
             LLStrider<LLColor4U> colours;
@@ -636,8 +641,9 @@ void main()
             return picture;
         }
 
-        // The stars drawn as LLDrawPoolWLSky::renderStarsDeferred draws them, into the G-buffer of @a emissive's path.
-        Picture drawStars(const Scene& scene, bool emissive)
+        // The stars drawn as LLDrawPoolWLSky::renderStarsDeferred draws them, into the G-buffer of @a emissive's path;
+        // every point, the cull's aside, where @a everything.
+        Picture drawStars(const Scene& scene, bool emissive, bool everything = false)
         {
             LLRenderTarget& target = mTarget[emissive];
             target.bindTarget();
@@ -660,12 +666,24 @@ void main()
                 mStarBuffer->drawArrays(LLRender::TRIANGLES, 0, mLayout.firstPoint());
                 quads.unbind();
 
+                LLMatrix4a mvp;
+                mvp.setMul(gGL.getModelviewMatrix(), gGL.getProjectionMatrix());
+                ALStarField::pointDraws(mLayout, ALStarField::pointFrustum(mvp, W, H), mDraws);
+                if (everything)
+                {
+                    mDraws.clear();
+                    mDraws.mFirst.push_back((S32)mLayout.firstPoint());
+                    mDraws.mCount.push_back((S32)mLayout.mPoints);
+                    mDraws.mPoints = mLayout.mPoints;
+                }
+
                 LLGLEnable    point_size(GL_PROGRAM_POINT_SIZE);
                 LLGLSLShader& points = mStarPoints[emissive];
                 points.bind();
                 bindUniforms(points, scene);
                 mStarBuffer->setBuffer();
-                mStarBuffer->drawArrays(LLRender::POINTS, mLayout.firstPoint(), mLayout.mPoints);
+                mStarBuffer->drawMultiArrays(LLRender::POINTS, mDraws.mFirst.data(), mDraws.mCount.data(),
+                                             (U32)mDraws.mFirst.size());
                 points.unbind();
                 gGL.popMatrix();
                 gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -710,7 +728,8 @@ void main()
                         const F32 diff = fabsf(pa[c] - pb[c]);
                         most = llmax(most, diff);
                         lit = lit || pa[c] != pn[c] || pb[c] != pn[c];
-                        beyond = beyond || diff > storageStep(llmax(pa[c], pb[c]), emissive, c) + HALF_QUANTUM + allowance;
+                        const F32 bound = storageStep(llmax(pa[c], pb[c]), emissive, c) + HALF_QUANTUM + allowance;
+                        beyond = beyond || diff > bound;
                     }
                     d.mMost = llmax(d.mMost, most);
                     d.mDiffer += most > 0.f;
@@ -728,6 +747,7 @@ void main()
         std::vector<ALStarField::Star> mField;
         std::vector<ALStarField::Star> mLaidOut;
         ALStarField::Layout mLayout;
+        ALStarField::Draws mDraws;
         LLPointer<LLVertexBuffer> mOldQuads;
         LLPointer<LLVertexBuffer> mStarBuffer;
         LLPointer<LLImageGL> mMoonTexture;
@@ -775,6 +795,30 @@ TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the stars leave the pictu
                 UNSCOPED_INFO("the moon hides stars");
                 CHECK(moon.mDiffer > 10);
             }
+        }
+    }
+}
+
+TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the cull leaves out only cells that draw nothing", "[alstarfield_gl]")
+{
+    setUp();
+    for (const Scene& scene : SCENES)
+    {
+        for (S32 path = 0; path < 2; ++path)
+        {
+            const bool emissive = path == 1;
+            const S32 attachment = emissive ? 3 : 0;
+            CAPTURE(scene.mName, emissive);
+            const Picture blank = drawNothing(emissive);
+            const Picture all   = drawStars(scene, emissive, true);
+            const Picture culled = drawStars(scene, emissive);
+            const U32 drawn = al_star_test::drawnPoints(mDraws);
+            const Difference d = compare(all, culled, blank, attachment);
+            const std::string summary = d.summary();
+            CAPTURE(summary, drawn, mLayout.mPoints);
+            CHECK(d.mDiffer == 0);
+            UNSCOPED_INFO("the cull leaves cells out");
+            CHECK(drawn < mLayout.mPoints * 3 / 4);
         }
     }
 }

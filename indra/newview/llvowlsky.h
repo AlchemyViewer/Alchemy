@@ -45,8 +45,9 @@ public:
     /*virtual*/ LLDrawable * createDrawable(LLPipeline *pipeline);
     /*virtual*/ bool         updateGeometry(LLDrawable *drawable);
 
-    // The stars drawn as points, and the spiked stars as quads (ALStarField::Layout), each with its own program bound.
-    void drawStarPoints();
+    // The stars drawn as points, those of the cells in view through @a frustum, and the spiked stars as quads
+    // (ALStarField::Layout), each with its own program bound.
+    void drawStarPoints(const ALStarField::Frustum& frustum);
     void drawStarQuads();
     void drawDome(void);
     void resetVertexBuffers(void);
@@ -77,6 +78,7 @@ private:
     // The star field RenderStarCount asked for, in the order the buffer takes it, and where each kind lies in it.
     std::vector<ALStarField::Star> mStars;
     ALStarField::Layout            mStarLayout;
+    ALStarField::Draws             mStarDraws; // the frame's runs of points, kept for their storage
 
     struct MeteorState
     {

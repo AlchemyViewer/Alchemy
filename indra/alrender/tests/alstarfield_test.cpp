@@ -1,7 +1,7 @@
 /**
  * @file alstarfield_test.cpp
  * @brief The star field: the same field from the same count in every session, laid out in its tiers, and the
- *        buffer it is drawn from.
+ *        buffer it is drawn from, binned into cells a view culls.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -31,15 +31,19 @@
 
 #include "../alstarfieldgenerate.h"
 #include "../alstarfield.h"
+#include "alstarfield_draws.h"
 
+#include "llmatrix4a.h"
 #include "llrand.h"
 #include "llstrider.h"
 #include "llvector4a.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -303,13 +307,16 @@ TEST_CASE("alstarfield: the layout puts the spiked stars first and keeps every s
     CHECK(layout.firstPoint() == layout.mQuads * ALStarField::QUAD_VERTICES);
     CHECK(layout.vertices() == layout.firstPoint() + layout.mPoints);
 
-    // Each part holds its kind, in the field's own order.
+    // Each part holds its kind: the quads in the field's own order, the points cell by cell, in the field's order
+    // within a cell.
     std::vector<ALStarField::Star> quads;
     std::vector<ALStarField::Star> points;
     for (const ALStarField::Star& star : field)
     {
         (ALStarField::spiked(star) ? quads : points).push_back(star);
     }
+    std::stable_sort(points.begin(), points.end(), [](const ALStarField::Star& a, const ALStarField::Star& b)
+                     { return ALStarField::cellOf(a.mPosition) < ALStarField::cellOf(b.mPosition); });
     REQUIRE(quads.size() == layout.mQuads);
     size_t differ = 0;
     for (size_t s = 0; s < stars.size(); ++s)
@@ -344,11 +351,197 @@ TEST_CASE("alstarfield: a star's vertex is its centre and its colour's bytes and
     size_t wrong = 0;
     for (U32 v = 0; v < layout.vertices(); ++v)
     {
-        const size_t star = v < layout.firstPoint() ? v / ALStarField::QUAD_VERTICES : v - layout.firstPoint() + layout.mQuads;
+        const size_t star = v < layout.firstPoint() ? v / ALStarField::QUAD_VERTICES
+                                                    : v - layout.firstPoint() + layout.mQuads;
         wrong += !holds(vertices[v], stars[star]);
     }
     CHECK(wrong == 0);
     U8 untouched[sizeof(LLVector4a)];
     std::memset(untouched, 0xA5, sizeof(untouched));
     CHECK(std::memcmp(&vertices.back(), untouched, sizeof(untouched)) == 0);
+}
+
+namespace
+{
+    // A camera: its bearing clockwise from north and pitch above the horizon, its roll, its vertical field of view and
+    // aspect, all in degrees but the aspect; and how far the stars have turned about z.
+    struct View
+    {
+        F32 mBearing;
+        F32 mPitch;
+        F32 mRoll;
+        F32 mFov;
+        F32 mAspect;
+        F32 mRotation;
+    };
+
+    // The stars' frame to clip space for @a view, built as LLRender builds it for the star draw: the view from a camera
+    // in the agent's frame, then the stars taken to the camera and turned (LLDrawPoolWLSky::renderStarsDeferred).
+    LLMatrix4a starMVP(const View& view)
+    {
+        const LLVector3 camera(118.f, -43.f, 27.f);
+        LLMatrix4a mv;
+        mv.setIdentity();
+        const auto apply = [&mv](const LLMatrix4a& m) { mv.setMul(m, mv); };
+        apply(LLMatrix4a::rotation(view.mRoll * DEG_TO_RAD, LLVector4a(0.f, 0.f, 1.f)));
+        apply(LLMatrix4a::rotation(-view.mPitch * DEG_TO_RAD, LLVector4a(1.f, 0.f, 0.f)));
+        apply(LLMatrix4a::rotation(-90.f * DEG_TO_RAD, LLVector4a(1.f, 0.f, 0.f)));
+        apply(LLMatrix4a::rotation(view.mBearing * DEG_TO_RAD, LLVector4a(0.f, 0.f, 1.f)));
+        apply(LLMatrix4a::translation(-camera.mV[VX], -camera.mV[VY], -camera.mV[VZ]));
+        apply(LLMatrix4a::translation(camera.mV[VX], camera.mV[VY], camera.mV[VZ]));
+        apply(LLMatrix4a::rotation(view.mRotation * DEG_TO_RAD, LLVector4a(0.f, 0.f, 1.f)));
+
+        constexpr F32 NEAR_CLIP = 0.5f;
+        constexpr F32 FAR_CLIP  = 1024.f;
+        const F32 tan_half = tanf(view.mFov * 0.5f * DEG_TO_RAD);
+        LLMatrix4a proj;
+        proj.clear();
+        F32* p = proj.getF32ptr();
+        p[0]  = 1.f / (tan_half * view.mAspect);
+        p[5]  = 1.f / tan_half;
+        p[10] = (FAR_CLIP + NEAR_CLIP) / (NEAR_CLIP - FAR_CLIP);
+        p[11] = -1.f;
+        p[14] = 2.f * FAR_CLIP * NEAR_CLIP / (NEAR_CLIP - FAR_CLIP);
+
+        LLMatrix4a mvp;
+        mvp.setMul(mv, proj);
+        return mvp;
+    }
+
+    // Whether @a position lands within the clip square widened by @a margin_x and @a margin_y.
+    bool inClip(const LLMatrix4a& mvp, const LLVector3& position, F32 margin_x, F32 margin_y)
+    {
+        LLVector4a clip;
+        mvp.transform4(LLVector4a(position.mV[VX], position.mV[VY], position.mV[VZ], 1.f), clip);
+        const F32 w = clip[3];
+        return w > 0.f && fabsf(clip[0]) <= (1.f + margin_x) * w && fabsf(clip[1]) <= (1.f + margin_y) * w;
+    }
+
+    // Views about the sky: level, up, at the zenith, below the horizon, rolled, wide and narrow, and many at random.
+    std::vector<View> views()
+    {
+        std::vector<View> out = {
+            { 30.f, 35.f, 0.f, 60.f, 16.f / 9.f, 17.f },  { 200.f, -3.f, 0.f, 60.f, 16.f / 9.f, 245.f },
+            { 75.f, 89.f, 0.f, 100.f, 1.5f, 3.f },        { 300.f, -40.f, 0.f, 60.f, 16.f / 9.f, 90.f },
+            { 10.f, 20.f, 33.f, 45.f, 1.f, 300.f },       { 160.f, 60.f, -70.f, 120.f, 2.4f, 12.f },
+            { 0.f, 0.f, 0.f, 10.f, 16.f / 9.f, 0.f },
+        };
+        std::mt19937 draw(7);
+        std::uniform_real_distribution<F32> unit(0.f, 1.f);
+        for (S32 i = 0; i < 40; ++i)
+        {
+            out.push_back({ 360.f * unit(draw), -30.f + 120.f * unit(draw), -45.f + 90.f * unit(draw),
+                            15.f + 100.f * unit(draw), 1.f + 1.5f * unit(draw), 360.f * unit(draw) });
+        }
+        return out;
+    }
+}
+
+TEST_CASE("alstarfield: the cells lay the points out in order with each star inside its cell's cone", "[alstarfield]")
+{
+    std::vector<ALStarField::Star> stars = ALStarField::generate(ALStarField::DEFAULT_COUNT, DOME_RADIUS);
+    const ALStarField::Layout layout = ALStarField::layOut(stars);
+    REQUIRE(layout.mCells.size() == ALStarField::CELLS);
+
+    U32 next = layout.firstPoint();
+    U32 empty = 0;
+    size_t wrong_cell = 0;
+    size_t outside_cone = 0;
+    for (U32 c = 0; c < ALStarField::CELLS; ++c)
+    {
+        const ALStarField::Cell& cell = layout.mCells[c];
+        CAPTURE(c);
+        REQUIRE(cell.mFirst == next);
+        next += cell.mCount;
+        empty += cell.mCount == 0;
+        CHECK(fabsf(cell.mAxis.length() - 1.f) < 1e-4f);
+        CHECK(cell.mSinRadius >= 0.f);
+        CHECK(cell.mSinRadius < 0.5f);
+        const F32 cos_radius = sqrtf(1.f - cell.mSinRadius * cell.mSinRadius);
+        for (U32 v = cell.mFirst; v < cell.mFirst + cell.mCount; ++v)
+        {
+            const ALStarField::Star& star = stars[v - layout.firstPoint() + layout.mQuads];
+            REQUIRE(!ALStarField::spiked(star));
+            wrong_cell += ALStarField::cellOf(star.mPosition) != c;
+            const LLVector3 direction = star.mPosition / star.mPosition.length();
+            outside_cone += cell.mAxis * direction < cos_radius - 1e-5f;
+        }
+    }
+    CHECK(next == layout.vertices());
+    CHECK(wrong_cell == 0);
+    CHECK(outside_cone == 0);
+    // The default field leaves no cell of the sky empty.
+    CHECK(empty == 0);
+}
+
+TEST_CASE("alstarfield: the cull keeps every cell with a point in view and leaves most of the sky out", "[alstarfield]")
+{
+    std::vector<ALStarField::Star> stars = ALStarField::generate(ALStarField::DEFAULT_COUNT, DOME_RADIUS);
+    const ALStarField::Layout layout = ALStarField::layOut(stars);
+    constexpr U32 WIDTH  = 1920;
+    constexpr U32 HEIGHT = 1080;
+    const F32 margin_x = 2.f * ALStarField::POINT_REACH / (F32)WIDTH;
+    const F32 margin_y = 2.f * ALStarField::POINT_REACH / (F32)HEIGHT;
+
+    ALStarField::Draws draws;
+    for (const View& view : views())
+    {
+        CAPTURE(view.mBearing, view.mPitch, view.mRoll, view.mFov, view.mAspect, view.mRotation);
+        const LLMatrix4a mvp = starMVP(view);
+        const ALStarField::Frustum frustum = ALStarField::pointFrustum(mvp, WIDTH, HEIGHT);
+
+        size_t lost = 0;
+        size_t in_view = 0;
+        for (const ALStarField::Cell& cell : layout.mCells)
+        {
+            const bool kept = ALStarField::inView(frustum, cell);
+            for (U32 v = cell.mFirst; v < cell.mFirst + cell.mCount; ++v)
+            {
+                const ALStarField::Star& star = stars[v - layout.firstPoint() + layout.mQuads];
+                if (inClip(mvp, star.mPosition, margin_x, margin_y))
+                {
+                    ++in_view;
+                    lost += !kept;
+                }
+            }
+        }
+        CAPTURE(in_view);
+        CHECK(lost == 0);
+
+        // The draws are the cells kept, in order, the runs that meet merged.
+        ALStarField::pointDraws(layout, frustum, draws);
+        REQUIRE(draws.mFirst.size() == draws.mCount.size());
+        U32 drawn = 0;
+        for (size_t r = 0; r < draws.mFirst.size(); ++r)
+        {
+            CHECK(draws.mCount[r] > 0);
+            if (r > 0)
+            {
+                CHECK(draws.mFirst[r] > draws.mFirst[r - 1] + draws.mCount[r - 1]);
+            }
+            drawn += (U32)draws.mCount[r];
+        }
+        U32 kept_points = 0;
+        for (const ALStarField::Cell& cell : layout.mCells)
+        {
+            kept_points += ALStarField::inView(frustum, cell) ? cell.mCount : 0;
+        }
+        CHECK(drawn == kept_points);
+        CHECK(drawn >= in_view);
+    }
+
+    // Looking 35 degrees up through 60 degrees at 16:9, the view draws under a third of the field, and the cells it
+    // draws are mostly in view.
+    const View level = { 30.f, 35.f, 0.f, 60.f, 16.f / 9.f, 17.f };
+    const LLMatrix4a mvp = starMVP(level);
+    ALStarField::pointDraws(layout, ALStarField::pointFrustum(mvp, WIDTH, HEIGHT), draws);
+    size_t in_view = 0;
+    for (size_t p = layout.mQuads; p < stars.size(); ++p)
+    {
+        in_view += inClip(mvp, stars[p].mPosition, margin_x, margin_y);
+    }
+    const U32 drawn = al_star_test::drawnPoints(draws);
+    CAPTURE(drawn, in_view, draws.mFirst.size());
+    CHECK(drawn * 3 < layout.mPoints);
+    CHECK(drawn < in_view * 3 / 2);
 }
