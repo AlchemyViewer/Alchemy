@@ -11945,6 +11945,7 @@ void LLPipeline::renderDeferredLighting()
             LLGLSLShader& sky_shader = *gDeferredSoftenSkyProgram.selectVariant();
             bindDeferredShader(sky_shader);
             {
+                LL_PROFILE_GPU_ZONE("sky resolve");
                 LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_EQUAL);
 
                 mScreenTriangleVB->setBuffer();

@@ -153,6 +153,7 @@ static bool query_water_in_view()
     field.bind();
     gPipeline.mWaterSurface.bind(field);
     {
+        LL_PROFILE_GPU_ZONE("sky behind query");
         LLGLDepthTest depth(GL_TRUE, GL_FALSE);
         LLGLSColorMask no_color(false, false);
         LLGLDisable no_cull(GL_CULL_FACE);
@@ -250,8 +251,10 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
 
         sky_shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, psky->getIsSunUp() ? 1 : 0);
 
-        /// Render the skydome
-        renderDome(origin, camHeightLocal, sky_shader);
+        {
+            LL_PROFILE_GPU_ZONE("sky dome");
+            renderDome(origin, camHeightLocal, sky_shader);
+        }
 
         // Again into the sky behind, with the same program and uniforms and no depth, so it covers what the world hides.
         // The GPU clears and draws it only if the query saw water, with no readback: a frame late, the far water would
@@ -371,7 +374,10 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
         gDeferredStarProgram.uniform3f(LLShaderMgr::MOON_QUAD_CENTER, 0.f, 0.f, 0.f);
     }
 
-    gSky.mVOWLSkyp->drawStars();
+    {
+        LL_PROFILE_GPU_ZONE("sky stars");
+        gSky.mVOWLSkyp->drawStars();
+    }
 
     if (mask_moon)
     {
@@ -418,7 +424,10 @@ void LLDrawPoolWLSky::renderMeteorsDeferred(const LLVector3& camPosLocal) const
                                      (GLfloat)deferred_target->getHeight());
     gDeferredMeteorProgram.uniform1f(LLShaderMgr::METEOR_WIDTH_PIXELS, 1.5f);
 
-    gSky.mVOWLSkyp->drawMeteors();
+    {
+        LL_PROFILE_GPU_ZONE("sky meteors");
+        gSky.mVOWLSkyp->drawMeteors();
+    }
 
     gDeferredMeteorProgram.unbind();
     gGL.popMatrix();
@@ -460,7 +469,10 @@ void LLDrawPoolWLSky::renderAuroraDeferred(const LLVector3& camPosLocal, F32 cam
 
     // Re-use the WL sky dome mesh — a ready-made hemisphere. Aurora shader
     // discards the zenith cap and below-horizon region.
-    renderDome(camPosLocal, camHeightLocal, &gDeferredAuroraProgram);
+    {
+        LL_PROFILE_GPU_ZONE("sky aurora");
+        renderDome(camPosLocal, camHeightLocal, &gDeferredAuroraProgram);
+    }
 
     gDeferredAuroraProgram.unbind();
 }
@@ -520,8 +532,10 @@ void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 
         cloudshader->uniform1f(LLShaderMgr::CLOUD_VARIANCE, cloud_variance);
         cloudshader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, psky->getSunMoonGlowFactor());
 
-        /// Render the skydome
-        renderDome(camPosLocal, camHeightLocal, cloudshader);
+        {
+            LL_PROFILE_GPU_ZONE("sky clouds");
+            renderDome(camPosLocal, camHeightLocal, cloudshader);
+        }
 
         cloudshader->unbind();
 
@@ -591,7 +605,10 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
                 sun_shader->uniform4fv(LLShaderMgr::DIFFUSE_COLOR, 1, color.mV);
                 sun_shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
 
-                face->renderIndexed();
+                {
+                    LL_PROFILE_GPU_ZONE("sky sun");
+                    face->renderIndexed();
+                }
 
                 gGL.getTextureSlot(0)->unbind();
                 gGL.getTextureSlot(1)->unbind();
@@ -640,7 +657,10 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
             //moon_shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
             moon_shader->uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, psky->getMoonDirection().mV); // shader: moon_dir
 
-            face->renderIndexed();
+            {
+                LL_PROFILE_GPU_ZONE("sky moon");
+                face->renderIndexed();
+            }
 
             gGL.getTextureSlot(0)->unbind();
             gGL.getTextureSlot(1)->unbind();
