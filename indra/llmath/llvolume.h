@@ -1001,6 +1001,10 @@ private:
     LLVolumeOctree* mOctree;
     LLVolumeTriangle* mOctreeTriangles;
 
+    // The tangents were made for positions a partial build has since moved:
+    // createTangents makes them again, in the buffer they have.
+    bool mTangentsStale = false;
+
     bool createUnCutCubeCap(LLVolume* volume, bool partial_build = false);
     bool createCap(LLVolume* volume, bool partial_build = false);
     bool createSide(LLVolume* volume, bool partial_build = false);

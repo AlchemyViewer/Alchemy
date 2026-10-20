@@ -2841,69 +2841,67 @@ void LLVolume::createVolumeFaces()
     }
     else
     {
+        // A partial build rewrites each face's vertices in the buffers it
+        // has and keeps its indices, so it is made only where every face is
+        // laid out as the last build laid it out: the same type, profile
+        // range and path length, and so the same counts. Anything else is a
+        // full build of every face.
         S32 num_faces = getNumFaces();
-        bool partial_build = true;
-        if (num_faces != mVolumeFaces.size())
-        {
-            partial_build = false;
-            mVolumeFaces.resize(num_faces);
-        }
+        bool partial_build = num_faces == (S32)mVolumeFaces.size();
+        mVolumeFaces.resize(num_faces);
+
         // Initialize volume faces with parameter data
         for (S32 i = 0; i < (S32)mVolumeFaces.size(); i++)
         {
             LLVolumeFace& vf = mVolumeFaces[i];
             LLProfile::Face& face = mProfilep->mFaces[i];
-            vf.mBeginS = face.mIndex;
-            vf.mNumS = face.mCount;
-            if (vf.mNumS < 0)
+            S32 num_s = face.mCount;
+            if (num_s < 0)
             {
                 LL_ERRS() << "Volume face corruption detected." << LL_ENDL;
             }
 
-            vf.mBeginT = 0;
-            vf.mNumT= getPath().mPath.size();
-            vf.mID = i;
-
             // Set the type mask bits correctly
+            U32 type_mask = 0;
             if (mParams.getProfileParams().getHollow() > 0)
             {
-                vf.mTypeMask |= LLVolumeFace::HOLLOW_MASK;
+                type_mask |= LLVolumeFace::HOLLOW_MASK;
             }
             if (mProfilep->isOpen())
             {
-                vf.mTypeMask |= LLVolumeFace::OPEN_MASK;
+                type_mask |= LLVolumeFace::OPEN_MASK;
             }
             if (face.mCap)
             {
-                vf.mTypeMask |= LLVolumeFace::CAP_MASK;
+                type_mask |= LLVolumeFace::CAP_MASK;
                 if (face.mFaceID == LL_FACE_PATH_BEGIN)
                 {
-                    vf.mTypeMask |= LLVolumeFace::TOP_MASK;
+                    type_mask |= LLVolumeFace::TOP_MASK;
                 }
                 else
                 {
                     llassert(face.mFaceID == LL_FACE_PATH_END);
-                    vf.mTypeMask |= LLVolumeFace::BOTTOM_MASK;
+                    type_mask |= LLVolumeFace::BOTTOM_MASK;
                 }
             }
             else if (face.mFaceID & (LL_FACE_PROFILE_BEGIN | LL_FACE_PROFILE_END))
             {
-                vf.mTypeMask |= LLVolumeFace::FLAT_MASK | LLVolumeFace::END_MASK;
+                type_mask |= LLVolumeFace::FLAT_MASK | LLVolumeFace::END_MASK;
             }
             else
             {
-                vf.mTypeMask |= LLVolumeFace::SIDE_MASK;
+                type_mask |= LLVolumeFace::SIDE_MASK;
                 if (face.mFlat)
                 {
-                    vf.mTypeMask |= LLVolumeFace::FLAT_MASK;
+                    type_mask |= LLVolumeFace::FLAT_MASK;
                 }
                 if (face.mFaceID & LL_FACE_INNER_SIDE)
                 {
-                    vf.mTypeMask |= LLVolumeFace::INNER_MASK;
-                    if (face.mFlat && vf.mNumS > 2)
+                    type_mask |= LLVolumeFace::INNER_MASK;
+                    if (face.mFlat && num_s > 2)
                     { //flat inner faces have to copy vert normals
-                        vf.mNumS = vf.mNumS*2;
-                        if (vf.mNumS < 0)
+                        num_s = num_s*2;
+                        if (num_s < 0)
                         {
                             LL_ERRS() << "Volume face corruption detected." << LL_ENDL;
                         }
@@ -2911,9 +2909,22 @@ void LLVolume::createVolumeFaces()
                 }
                 else
                 {
-                    vf.mTypeMask |= LLVolumeFace::OUTER_MASK;
+                    type_mask |= LLVolumeFace::OUTER_MASK;
                 }
             }
+
+            const S32 num_t = getPath().mPath.size();
+            if (vf.mTypeMask != type_mask || vf.mBeginS != face.mIndex || vf.mNumS != num_s || vf.mNumT != num_t)
+            {
+                partial_build = false;
+            }
+
+            vf.mTypeMask = type_mask;
+            vf.mBeginS = face.mIndex;
+            vf.mNumS = num_s;
+            vf.mBeginT = 0;
+            vf.mNumT = num_t;
+            vf.mID = i;
         }
 
         for (face_list_t::iterator iter = mVolumeFaces.begin();
@@ -4578,6 +4589,7 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
         {
             allocateTangents(src.mNumVertices);
             LLVector4a::memcpyNonAliased16((F32*) mTangents, (F32*) src.mTangents, vert_size);
+            mTangentsStale = src.mTangentsStale;
         }
         else
         {
@@ -4675,6 +4687,10 @@ bool LLVolumeFace::create(LLVolume* volume, bool partial_build)
 
     //tree for this face is no longer valid
     destroyOctree();
+
+    // A partial build moves the positions under the tangents and keeps their
+    // buffer; a full build frees it.
+    mTangentsStale = partial_build;
 
     bool ret = false ;
     if (mTypeMask & CAP_MASK)
@@ -5542,6 +5558,7 @@ void LLVolumeFace::swapData(LLVolumeFace& rhs)
     llswap(rhs.mPositions, mPositions);
     llswap(rhs.mNormals, mNormals);
     llswap(rhs.mTangents, mTangents);
+    llswap(rhs.mTangentsStale, mTangentsStale);
     llswap(rhs.mTexCoords, mTexCoords);
     llswap(rhs.mIndices,mIndices);
     llswap(rhs.mNumVertices, mNumVertices);
@@ -5898,8 +5915,10 @@ bool LLVolumeFace::createUnCutCubeCap(LLVolume* volume, bool partial_build)
             corners[2].mTexCoord=swap;
         }
 
-        S32 size = (grid_size+1)*(grid_size+1);
-        resizeVertices(size);
+        if (!partial_build)
+        {
+            resizeVertices((grid_size+1)*(grid_size+1));
+        }
 
         LLVector4a* pos = (LLVector4a*) mPositions;
         LLVector4a* norm = (LLVector4a*) mNormals;
@@ -6002,20 +6021,16 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
     num_vertices = profile.size();
     num_indices = (profile.size() - 2)*3;
 
-    if (!(mTypeMask & HOLLOW_MASK) && !(mTypeMask & OPEN_MASK))
+    if (!partial_build)
     {
-        resizeVertices(num_vertices+1);
-
-        //if (!partial_build)
+        if (!(mTypeMask & HOLLOW_MASK) && !(mTypeMask & OPEN_MASK))
         {
+            resizeVertices(num_vertices+1);
             resizeIndices(num_indices+3);
         }
-    }
-    else
-    {
-        resizeVertices(num_vertices);
-        //if (!partial_build)
+        else
         {
+            resizeVertices(num_vertices);
             resizeIndices(num_indices);
         }
     }
@@ -6147,10 +6162,26 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
         num_vertices++;
     }
 
-    //if (partial_build)
-    //{
-    //  return true;
-    //}
+    const LLVector4a normal = cap_normal(volume, mTypeMask & TOP_MASK, !partial_build, mReversed);
+
+    llassert(llfinite(normal.getF32ptr()[0]));
+    llassert(llfinite(normal.getF32ptr()[1]));
+    llassert(llfinite(normal.getF32ptr()[2]));
+
+    llassert(!llisnan(normal.getF32ptr()[0]));
+    llassert(!llisnan(normal.getF32ptr()[1]));
+    llassert(!llisnan(normal.getF32ptr()[2]));
+
+    for (S32 i = 0; i < num_vertices; i++)
+    {
+        norm[i].load4a(normal.getF32ptr());
+    }
+
+    // A partial build keeps the indices it has.
+    if (partial_build)
+    {
+        return true;
+    }
 
     if (mTypeMask & HOLLOW_MASK)
     {
@@ -6392,23 +6423,9 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
 
     }
 
-    const LLVector4a normal = cap_normal(volume, mTypeMask & TOP_MASK, !partial_build, mReversed);
     if (mReversed)
     {
         reverse_winding(mIndices, mNumIndices);
-    }
-
-    llassert(llfinite(normal.getF32ptr()[0]));
-    llassert(llfinite(normal.getF32ptr()[1]));
-    llassert(llfinite(normal.getF32ptr()[2]));
-
-    llassert(!llisnan(normal.getF32ptr()[0]));
-    llassert(!llisnan(normal.getF32ptr()[1]));
-    llassert(!llisnan(normal.getF32ptr()[2]));
-
-    for (S32 i = 0; i < num_vertices; i++)
-    {
-        norm[i].load4a(normal.getF32ptr());
     }
 
     return true;
@@ -6418,9 +6435,13 @@ void LLVolumeFace::createTangents()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
 
-    if (!mTangents)
+    if (!mTangents || mTangentsStale)
     {
-        allocateTangents(mNumVertices);
+        if (!mTangents)
+        {
+            allocateTangents(mNumVertices);
+        }
+        mTangentsStale = false;
 
         //generate tangents
         LLVector4a* ptr = (LLVector4a*)mTangents;
@@ -6675,7 +6696,13 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     num_vertices = mNumS*mNumT;
     num_indices = (mNumS-1)*(mNumT-1)*6;
 
-    partial_build = (num_vertices > mNumVertices || num_indices > mNumIndices) ? false : partial_build;
+    // createVolumeFaces builds partially only where the layout, and so the
+    // counts, are the last build's.
+    llassert(!partial_build || (num_vertices == mNumVertices && num_indices == mNumIndices));
+    if (num_vertices != mNumVertices || num_indices != mNumIndices)
+    {
+        partial_build = false;
+    }
 
     if (!partial_build)
     {

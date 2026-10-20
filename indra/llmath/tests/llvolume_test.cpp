@@ -1991,9 +1991,9 @@ namespace
     }
 
     // A flexible prim's frame, as the rebuild runs it: the path moves, the
-    // volume is rebuilt in place, and its faces' tangents are taken again
-    // where a face lost them. The rebuild must come out as a fresh volume
-    // built in full on the moved path, in the buffers it had.
+    // volume is rebuilt in place, and genTangents brings its faces'
+    // tangents up to the moved positions. The rebuild must come out as a
+    // fresh volume built in full on the moved path, in the buffers it had.
     void checkFlexiFrame(U8 profile, U8 hole, F32 hollow, S32 sections, S32 lod, Report& report, const std::string& name)
     {
         LLPointer<LLVolume> volume = flexiVolume(profile, hole, hollow, lod);
@@ -2822,7 +2822,7 @@ namespace
 
     // Partial builds: a flexible prim's every frame rebuilds its volume in
     // place, and must come out as a full build would, in the buffers it had.
-    TEST_CASE("llvolume: a flexible box's partial build equals a full one", "[llvolume][!shouldfail]")
+    TEST_CASE("llvolume: a flexible box's partial build equals a full one", "[llvolume]")
     {
         Report report;
         for (S32 sections : { 4, 16 })
@@ -2836,7 +2836,7 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    TEST_CASE("llvolume: a flexible cylinder's partial build equals a full one", "[llvolume][!shouldfail]")
+    TEST_CASE("llvolume: a flexible cylinder's partial build equals a full one", "[llvolume]")
     {
         Report report;
         for (S32 sections : { 4, 16 })
@@ -2851,7 +2851,7 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    TEST_CASE("llvolume: a flexible box with a square hole has a partial build equal to a full one", "[llvolume][!shouldfail]")
+    TEST_CASE("llvolume: a flexible box with a square hole has a partial build equal to a full one", "[llvolume]")
     {
         Report report;
         for (S32 sections : { 4, 16 })
@@ -2868,7 +2868,7 @@ namespace
 
     // The uncut cube cap is built only on a line path, which flexi never
     // has; its partial build is the one a regen of an unmoved box makes.
-    TEST_CASE("llvolume: an uncut cube cap's partial build keeps its buffers", "[llvolume][!shouldfail]")
+    TEST_CASE("llvolume: an uncut cube cap's partial build keeps its buffers", "[llvolume]")
     {
         Report report;
         for (S32 lod = 0; lod < LOD_COUNT; ++lod)
