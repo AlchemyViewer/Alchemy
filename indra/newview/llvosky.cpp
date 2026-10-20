@@ -28,6 +28,7 @@
 
 #include "llvosky.h"
 
+#include "alskylayers.h"
 #include "llfeaturemanager.h"
 #include "llviewercontrol.h"
 #include "llframetimer.h"
@@ -988,37 +989,8 @@ bool LLVOSky::updateHeavenlyBodyGeometry(LLDrawable *drawable, F32 scale, const 
     LLFace *facep;
 
 
-    LLQuaternion rot    = hb.getRotation();
-    LLVector3 to_dir    = LLVector3::x_axis * rot;
-
-    LLVector3 hb_right = to_dir % LLVector3::z_axis;
-    LLVector3 hb_up    = hb_right % to_dir;
-
-    // at zenith so math below fails spectacularly
-    if ((to_dir * LLVector3::z_axis) > 0.99f)
-    {
-        hb_right  = LLVector3::y_axis_neg * rot;
-        hb_up     = LLVector3::z_axis     * rot;
-    }
-
-    LLVector3 draw_pos = to_dir * HEAVENLY_BODY_DIST;
-
-    hb_right.normalize();
-    hb_up.normalize();
-
-    const F32 enlargm_factor = ( 1 - to_dir.mV[2] );
-    F32 horiz_enlargement = 1 + enlargm_factor * 0.3f;
-    F32 vert_enlargement = 1 + enlargm_factor * 0.2f;
-
-    const LLVector3 scaled_right = horiz_enlargement * scale * HEAVENLY_BODY_DIST * HEAVENLY_BODY_FACTOR * hb.getDiskRadius() * hb_right;
-    const LLVector3 scaled_up    = vert_enlargement  * scale * HEAVENLY_BODY_DIST * HEAVENLY_BODY_FACTOR * hb.getDiskRadius() * hb_up;
-
-    LLVector3 v_clipped[4];
-
-    v_clipped[0] = draw_pos - scaled_right + scaled_up;
-    v_clipped[1] = draw_pos - scaled_right - scaled_up;
-    v_clipped[2] = draw_pos + scaled_right + scaled_up;
-    v_clipped[3] = draw_pos + scaled_right - scaled_up;
+    const ALSkyLayers::Corners v_clipped =
+        ALSkyLayers::bodyCorners(hb.getRotation(), HEAVENLY_BODY_DIST, scale, hb.getDiskRadius());
 
     hb.setVisible(true);
 

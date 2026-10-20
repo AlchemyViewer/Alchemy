@@ -1532,8 +1532,9 @@ LLVector4 LLEnvironment::toCFR(const LLVector3 vec) const
 
 LLVector4 LLEnvironment::toLightNorm(const LLVector3 vec) const
 {
-    LLVector4 vec_ogl(vec.mV[1], vec.mV[2], vec.mV[0], 0.0f);
-    return vec_ogl;
+    // The light's direction in the sky dome's frame, which WindLight's shaders take it in.
+    const LLVector3 sky = ALFarPlane::skyFrame(vec);
+    return LLVector4(sky.mV[VX], sky.mV[VY], sky.mV[VZ], 0.0f);
 }
 
 LLVector3 LLEnvironment::getLightDirection() const

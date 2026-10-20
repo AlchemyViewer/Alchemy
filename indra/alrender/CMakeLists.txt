@@ -5,10 +5,10 @@
 # change, the far plane, the water's field, wave heights and stencil bits,
 # the depth pyramid, the light map's blur, the depth under the HUD,
 # which placed reflection probes swallow automatic ones, snapshot cutouts,
-# whether a spot light's shadow map is drawn again and the sky dome's mesh;
-# and the pool that lends the frame's short-lived render targets by
-# description. Whatever reads settings or the scene hands these their inputs
-# as values.
+# whether a spot light's shadow map is drawn again, the sky dome's mesh and
+# what the sky's other layers are worked out from along the view ray; and
+# the pool that lends the frame's short-lived render targets by description.
+# Whatever reads settings or the scene hands these their inputs as values.
 
 set(
   alrender_SOURCES
@@ -22,6 +22,7 @@ set(
   alrenderresourceplan.cpp
   alshaderinputs.cpp
   alskydome.cpp
+  alskylayers.cpp
   alspotshadowcache.cpp
   alstarfield.cpp
   altransienttargetpool.cpp
@@ -46,6 +47,7 @@ set(
   alrenderresourceplan.h
   alshaderinputs.h
   alskydome.h
+  alskylayers.h
   alspotshadowcache.h
   alstarfield.h
   alstarfieldgenerate.h
@@ -72,14 +74,19 @@ target_link_libraries(
 target_precompile_headers(alrender REUSE_FROM llprecompiled)
 
 if(AL_BUILD_TESTS)
-  # The viewer's own shader files, read from the source tree.
+  # The viewer's own shader files, read from the source tree, and the sky's as they were drawn before its composite.
   set(alrender_shader_dir "AL_TEST_SHADER_DIR=\"${INDRA_SOURCE_DIR}/newview/app_settings/shaders\"")
+  set(
+    alrender_skyraster_dir
+    "AL_TEST_SKYRASTER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/skyraster\""
+  )
 
   # The suites that need no GL: the render resources' plan and the changes
   # that ask for it again, the transient target pool's policy, what the programs are built from, the far plane
   # and the constants its shaders share, the water's field and the wave
   # heights a normal map's slopes integrate to, snapshot cutouts, the spot
-  # shadows' cache, how a display pass ends its frame, and the star field.
+  # shadows' cache, how a display pass ends its frame, the star field and the
+  # sky's layers.
   al_add_test_binary(
     alrender_tests
     PROJECT alrender
@@ -91,6 +98,7 @@ if(AL_BUILD_TESTS)
       tests/alrenderinputrequests_test.cpp
       tests/alrenderresourceplan_test.cpp
       tests/alshaderinputs_test.cpp
+      tests/alskylayers_test.cpp
       tests/alspotshadowcache_test.cpp
       tests/alstarfield_test.cpp
       tests/altransienttargetpool_test.cpp
@@ -107,7 +115,8 @@ if(AL_BUILD_TESTS)
   # and the waves displaced by heights the bake integrates from a normal map,
   # a spot shadow draw's geometry from a real vertex buffer,
   # the light map's blur by one dispatch against its two fragment passes,
-  # WindLight's dome along the view ray against the dome's mesh, the stars
+  # WindLight's dome along the view ray against the dome's mesh, the sky's
+  # other layers along it against the programs that drew them, the stars
   # against the picture they left before their rework, FXAA on an RGB10_A2
   # source, the reflection probes' taps in one pass over them against their
   # list, the transient target pool's GL objects, shared depth and poison,
@@ -121,6 +130,7 @@ if(AL_BUILD_TESTS)
       tests/allightmapblur_gl_test.cpp
       tests/alondemandtarget_gl_test.cpp
       tests/alskydome_gl_test.cpp
+      tests/alskylayers_gl_test.cpp
       tests/alspotshadowcache_gl_test.cpp
       tests/alstarfield_gl_test.cpp
       tests/altransienttargetpool_gl_test.cpp
@@ -134,7 +144,7 @@ if(AL_BUILD_TESTS)
       tests/reflectionprobe_gl_bench.cpp
     LIBRARIES alrender
     SUPPORT llrender_test_checks llcommon_test_checks
-    DEFINES ${alrender_shader_dir}
+    DEFINES ${alrender_shader_dir} ${alrender_skyraster_dir}
     GL
   )
 endif()

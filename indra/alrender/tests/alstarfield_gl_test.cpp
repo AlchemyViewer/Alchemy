@@ -28,6 +28,7 @@
 #include "linden_common.h"
 
 #include "alstarfield.h"
+#include "alskyraster_gl.h"
 
 #include "llgl.h"
 #include "llglheaders.h"
@@ -50,7 +51,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
 #include <map>
 #include <string>
 #include <utility>
@@ -347,31 +347,16 @@ void main()
 
     struct alstarfield_gl_data
     {
-        // The programs build from a tree holding the viewer's class1 shaders and the old ones beside them (setUp).
+        // The programs build from the sky tests' shader tree, the old stars' beside its files (setUp).
         alstarfield_gl_data()
         : mShaders(mTree.prefix())
         {
         }
 
-        // Every file of the viewer's class1 tree into the tree the programs build from, and the old stars' beside them.
+        // The tree the programs build from, and the old stars' files in it.
         void populateTree()
         {
-            const std::filesystem::path root = fsyspath(std::string(AL_TEST_SHADER_DIR) + "/class1");
-            std::error_code ec;
-            for (std::filesystem::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
-            {
-                if (!it->is_regular_file())
-                {
-                    continue;
-                }
-                std::string relative = fsyspath(std::filesystem::relative(it->path(), root)).string();
-                std::replace(relative.begin(), relative.end(), '\\', '/');
-                std::error_code read_ec;
-                const std::string source = LLFile::getContents(fsyspath(it->path()).string(), read_ec);
-                REQUIRE(!read_ec);
-                REQUIRE(mTree.write(relative, source));
-            }
-            REQUIRE(!ec);
+            mTree.populate();
             REQUIRE(mTree.write("startest/starsOldV.glsl", kOldVertex));
             REQUIRE(mTree.write("startest/starsOldF.glsl", kOldFragment));
         }
@@ -756,9 +741,9 @@ void main()
             return d;
         }
 
-        ll_test::SharedGLScope mGL;
-        ll_test::TestShaderDir mTree;
-        ll_test::TestShaderMgr mShaders;
+        ll_test::SharedGLScope     mGL;
+        al_sky_test::SkyShaderTree mTree;
+        ll_test::TestShaderMgr     mShaders;
         std::vector<ALStarField::Star> mField;
         std::vector<ALStarField::Star> mLaidOut;
         ALStarField::Layout mLayout;

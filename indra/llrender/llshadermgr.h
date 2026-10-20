@@ -645,6 +645,15 @@ public:
         MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length
         MOON_QUAD_V,                        //  "moonQuadV"  its up half-extent over its squared length
 
+        // The sky's layers along the view ray (deferred/skyBodiesF.glsl), each quad as ALSkyLayers::rayQuad gives it
+        SKY_SUN_MAP,                        //  "skySunMap"  the sun disc's texture
+        SKY_SUN_MAP_NEXT,                   //  "skySunMapNext"  the sun disc's texture the sky blends toward
+        SKY_SUN_BLEND,                      //  "skySunBlend"  how far the sky has blended toward it, 0 for one texture
+        SKY_SUN_QUAD,                       //  "skySunQuad"  vec3[3], the sun's quad: its centre, and its axes over their squared lengths
+        SKY_MOON_MAP,                       //  "skyMoonMap"  the moon's texture
+        SKY_MOON_QUAD,                      //  "skyMoonQuad"  vec3[3], the moon's quad
+        SKY_MOON_FADE,                      //  "skyMoonFade"  the moon's opacity toward the horizon (ALSkyLayers::moonFade)
+
         // Selection outlines, hover glow and wireframe (ALSelectionOutline)
         SELECTION_ID,                       //  "selection_id"  the object's id, 1 to 65535
         SELECTION_PRIORITY,                 //  "selection_priority"  ALSelectionOutline::EPriority
