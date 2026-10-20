@@ -1264,8 +1264,9 @@ S32 LLPath::getNumNGonPoints(const LLPathParams& params, S32 sides, F32 startOff
     // affect most sample points.
     t = ((S32)(t * sides)) / (F32)sides;
 
-    // Run through the non-cut dependent points.
-    while (t < params.getEnd())
+    // Run through the non-cut dependent points, as genNGon does.
+    const F32 end_before = params.getEnd() - step * 0.01f;
+    while (t < end_before)
     {
         ret++;
         t+=step;

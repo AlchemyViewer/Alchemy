@@ -3194,6 +3194,37 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // The streaming cost counts a circle2 path's points with
+    // getNumNGonPoints, which walks the stations as genNGon places them. An
+    // end cut on a step, which the summed steps reach a rounding short of,
+    // is one station to both.
+    TEST_CASE("llvolume: a circle2 path's point count is its stations", "[llvolume]")
+    {
+        Report report;
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            const S32 sides = llfloor(MIN_DETAIL_FACES * LOD_DETAIL[lod]);
+            for (S32 k = 1; k <= sides; ++k)
+            {
+                Shape s = torus();
+                s.name = "circle2 torus";
+                s.path = LL_PCODE_PATH_CIRCLE2;
+                s.path_end = (F32)k / (F32)sides;
+                const LLVolumeParams params = s.params();
+                LLPointer<LLVolume> volume = new LLVolume(params, LOD_DETAIL[lod]);
+                const S32 counted = LLPath::getNumPoints(params.getPathParams(), LOD_DETAIL[lod]);
+                const S32 stations = (S32)volume->getPath().mPath.size();
+                if (counted != stations)
+                {
+                    report.fail(fmt::format("{} cut to {} of {} sides at LOD {}: {} points counted, {} stations", s.name, k, sides, lod,
+                                            counted, stations));
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
     // A triangle whose UVs have no area has no dP/du, and one whose
     // positions have no area has no surface to give one: neither adds to
     // its corners' tangents, so a real neighbour's tangent stands alone.
