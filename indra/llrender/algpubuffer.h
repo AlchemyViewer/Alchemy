@@ -94,8 +94,8 @@ public:
     ALGPUBuffer& operator=(ALGPUBuffer&& other) noexcept;
 
     // Replaces any store this held. `data` may be null (contents undefined until written or cleared).
-    // `label` names it for debug output (glObjectLabel when gGLManager.mHasDebugOutput). False, and empty, if GL could
-    // not make the store.
+    // `label` names it for debug output (glObjectLabel under debug GL, gDebugGL, where the context keeps labels). False,
+    // and empty, if GL could not make the store.
     bool allocate(size_t bytes, U32 flags = 0, const void* data = nullptr, const char* label = nullptr);
 
     // Delete the GL object, if any. Call from an explicit teardown that still has a live GL context rather than

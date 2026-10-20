@@ -137,8 +137,8 @@ public:
     };
     static WaveSettings waveSettings();
 
-    /// Whether the waves are wanted this session: AlchemyRenderWaterWaves, where tessellation is (GL 4.0). The waves'
-    /// programs, and the heights they read, exist only then.
+    /// Whether the programs were loaded for the waves (AlchemyRenderWaterWaves). The waves' programs, and the heights
+    /// they read, exist only then.
     static bool wavesWanted();
 
     const ALWaterField::Layout& getLayout() const { return mLayout; }

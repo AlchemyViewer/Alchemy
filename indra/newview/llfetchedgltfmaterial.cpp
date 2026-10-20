@@ -105,7 +105,12 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
     // to skip is exactly what the bake needs.
     const bool depth_only_pass = LLPipeline::sShadowRender && !LLPipeline::sImpostorRender;
 
-    if (!depth_only_pass || (mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK))
+    // A blended material's cutoff belongs to the pass that blends it: the alpha pool's
+    // MINIMUM_ALPHA (prepare_alpha_shader) below which a texel is not drawn at all, or 0 under a
+    // custom blend function. Only blended materials are drawn with the pool's programs, so
+    // leaving the value alone never leaves a mask cutoff behind for one.
+    if (mAlphaMode != LLGLTFMaterial::ALPHA_MODE_BLEND &&
+        (!depth_only_pass || (mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK)))
     {
         if (mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK)
         {
@@ -158,7 +163,9 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
             shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_COLOR_SAMPLER);
         }
 
-        // NOTE: base color factor is baked into vertex stream
+        // NOTE: base color factor is baked into vertex stream, but the glow programs read the
+        // emissive stream in its place: they take its alpha here, and whether it weights the glow
+        shader->uniform2f(LLShaderMgr::BASE_COLOR_ALPHA, getStreamedBaseAlpha(), mAlphaMode == LLGLTFMaterial::ALPHA_MODE_BLEND ? 1.f : 0.f);
 
         shader->uniform1f(LLShaderMgr::ROUGHNESS_FACTOR, mRoughnessFactor);
         shader->uniform1f(LLShaderMgr::METALLIC_FACTOR, mMetallicFactor);

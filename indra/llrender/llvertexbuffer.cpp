@@ -1924,7 +1924,10 @@ void LLVertexBuffer::setupVertexBuffer()
     {
         AttributeType loc = TYPE_TEXTURE_INDEX;
         void* ptr = buffer_offset(mOffsets[TYPE_VERTEX] + 12);
-        glVertexAttribIPointer(loc, 1, GL_UNSIGNED_INT, LLVertexBuffer::sTypeSize[TYPE_VERTEX], ptr);
+        // GL_INT: the shaders declare `in int texture_index`, and GL defines a signed integer
+        // input only when it is sourced as BYTE, SHORT or INT. The indices are small, so the
+        // bits read the same either way.
+        glVertexAttribIPointer(loc, 1, GL_INT, LLVertexBuffer::sTypeSize[TYPE_VERTEX], ptr);
     }
     if (data_mask & MAP_VERTEX)
     {

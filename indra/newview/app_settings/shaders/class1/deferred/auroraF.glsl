@@ -135,8 +135,10 @@ void main()
     // applied uniformly across body/halo/base_line. The ranges extend
     // slightly past the visible regions so both ends ease out below the
     // perceptual threshold rather than ending on a smoothstep knee.
+    // Falling edges are written 1 - smoothstep(lo, hi, x): GLSL leaves smoothstep undefined for
+    // edge0 >= edge1.
     float horizon_fade = smoothstep(-0.03, 0.28, elev);
-    float zenith_fade  = smoothstep(0.88, 0.38, elev);
+    float zenith_fade  = 1.0 - smoothstep(0.38, 0.88, elev);
     float elev_env     = horizon_fade * zenith_fade;
 
     // ----- Body envelope --------------------------------------------------
@@ -144,7 +146,7 @@ void main()
     // gradually toward the horizon with no visible edge.
     float body_top = 0.30;
     float body_env = exp(min(d_above, 0.0) * 3.5)
-                   * smoothstep(body_top, body_top * 0.15, d_above);
+                   * (1.0 - smoothstep(body_top * 0.15, body_top, d_above));
     body_env *= elev_env;
 
     // ----- Top halo -------------------------------------------------------
@@ -154,7 +156,7 @@ void main()
     float halo_lo  = 0.18;
     float halo_hi  = 0.45;
     float halo_env = smoothstep(halo_lo * 0.40, halo_lo,        d_above)
-                   * smoothstep(halo_hi * 1.15, halo_hi * 0.55, d_above);
+                   * (1.0 - smoothstep(halo_hi * 0.55, halo_hi * 1.15, d_above));
     halo_env *= elev_env;
 
     // Halo modulation is a softened version of the curtain mask — some
@@ -167,7 +169,10 @@ void main()
     // but modulated along azimuth so it isn't a painted stripe. Lower
     // smoothstep extended so the line has a gentle skirt rather than a
     // hard lower cut-off.
-    float base_line = exp(-pow((d_above - 0.02) * 20.0, 2.0));
+    // Squared by multiplying: the argument is negative below the line, and pow of a negative
+    // base is undefined in GLSL (exp2(2 * log2(x)) gives NaN).
+    float bl        = (d_above - 0.02) * 20.0;
+    float base_line = exp(-bl * bl);
     base_line *= smoothstep(-0.22, -0.02, d_above);
     base_line *= 0.45 + 0.55 * valueNoise3D(vec3(az * 6.0, t * 0.10));
     base_line *= elev_env;

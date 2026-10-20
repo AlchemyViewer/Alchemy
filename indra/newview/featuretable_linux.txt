@@ -84,7 +84,6 @@ RenderDisableVintageMode           1   1
 RenderMaxTextureResolution         1   2048
 RenderReflectionProbeCount  1   256
 AlchemyRenderWaterWaves    1   1
-RenderReflectionProbeIrradianceResolution 1 16
 AlchemyRenderUBOUpdateMode 1 4
 
 //

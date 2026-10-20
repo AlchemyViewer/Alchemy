@@ -283,11 +283,10 @@ public:
     // the same ~672 bytes re-derived and re-written once per program. Packed once and bound at
     // a fixed engine point instead, so a light-state change costs one upload total.
     //
-    // Holds ONLY what LLRender owns exclusively. sun_up_factor and the sClassicMode
-    // ambient/sunlight/moonlight overrides stay LOOSE: those names have other writers
-    // (LLPipeline::bindDeferredShader pushes an auto-adjusted sunlight_color, and
-    // sun_up_factor is written from many sites across the pipeline, draw pools and
-    // LLSettingsVO), and a shared block would let one writer silently stomp another's value.
+    // Holds ONLY what LLRender owns exclusively. sun_up_factor stays LOOSE: it is written from
+    // many sites across the pipeline, draw pools and LLSettingsVO, and a shared block would let
+    // one writer silently stomp another's value. The sun's, moon's and ambient light the
+    // atmospherics read are the Environment block's (LLSettingsVOSky::applySpecial).
     //
     // std140 pads every array element to 16 bytes regardless of the element type, hence the
     // float[4] rows for the vec3/vec2 arrays -- the C++ mirror carries that padding explicitly
@@ -575,9 +574,9 @@ public:
 
     // The GBuffer normal attachment is GL_RGBA16 when the deferred targets are HDR and
     // GL_RGB10_A2 when they are not, which changes how many bits its blue channel has to spend
-    // on the packed geometric normal -- 16 versus 10. Latched by addDeferredAttachments from the
-    // same decision that picks the format, because llrender cannot read settings and a shader
-    // compiled against the wrong assumption unpacks noise.
+    // on the packed geometric normal -- 16 versus 10. Latched by newview at shader load, before
+    // anything compiles (llrender cannot read settings), and the attachment's format is then picked
+    // from it, because a shader compiled against the wrong assumption unpacks noise.
     static bool sGBufferNormHDR;
 
 private:

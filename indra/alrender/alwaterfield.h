@@ -24,11 +24,16 @@
 
 #pragma once
 
+#include "alhexlattice.h"
+#include "llrect.h"
 #include "stdtypes.h"
 #include "v2math.h"
 #include "v4math.h"
 
 #include <vector>
+
+class LLMatrix4a;
+class LLVector3;
 
 /// The water's layout on the plane and the phases of its wave coordinates, worked from the camera's global position
 /// alone: no GL and no world, so the water's draws and their tests share one definition.
@@ -219,6 +224,15 @@ LLVector4 cellSquare(const Layout& layout, F64 origin_x, F64 origin_y);
 /// regions claim a cell the first listed has it. Texels past the square are filled the same way and never read.
 void fillCells(const Layout& layout, const std::vector<Region>& regions, F32 default_height, std::vector<F32>& texels);
 
+/// The pixels of a `width` x `height` viewport a box covers, the box from `lo` to `hi` in agent space seen through
+/// `view` (agent to eye) and `proj` (eye to clip): for a box that holds the field (ALWaterSurface's slab), every pixel
+/// the field can be drawn on. The part of the box behind the eye's plane is cut away first, so a box about the camera,
+/// as the sea's is, reaches the viewport's edges wherever its part ahead does. Grown by a pixel each way, then by
+/// `margin_x` and `margin_y` pixels, and clipped to the viewport; empty where nothing of the box lies ahead of the eye
+/// or none of it on the viewport.
+LLRect screenRect(const LLMatrix4a& view, const LLMatrix4a& proj, const LLVector3& lo, const LLVector3& hi, S32 width,
+                  S32 height, S32 margin_x, S32 margin_y);
+
 /// How far each wave layer has scrolled at `uptime` seconds, as a fraction of its repeat, for the wave directions an
 /// environment sets: the big layer, and the little map's xy and zw reads.
 struct WaveScrolls
@@ -247,8 +261,8 @@ constexpr F64 HEX_GRID = 1.0;
 
 /// The lattice's skew, hexLatticeUtil.glsl's hex_skew: (x, y) to (x - y / sqrt(3), 2 y / sqrt(3)), where every
 /// triangle is half of a unit square.
-constexpr F64 HEX_SKEW_XY = -0.57735026918962576;
-constexpr F64 HEX_SKEW_YY = 1.1547005383792515;
+constexpr F64 HEX_SKEW_XY = ALHexLattice::SKEW_XY;
+constexpr F64 HEX_SKEW_YY = ALHexLattice::SKEW_YY;
 
 /// The camera's place on the lattices of the tiled layers, the big layer and the mid one (the little map's zw read):
 /// skew(position scaled to the layer, times HEX_GRID), split into the low 32 bits of its floor and its fraction. A shader

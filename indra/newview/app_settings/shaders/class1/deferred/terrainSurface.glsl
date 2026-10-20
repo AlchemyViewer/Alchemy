@@ -69,22 +69,27 @@ vec2 terrain_patch_xy()
 }
 #endif
 
-// Grid sample, clamped to the map: a cell's far corner lands one past the
-// apron only at the region's edge, where its weight is zero.
-float terrain_sample(ivec2 g)
+// The grid samples of the 2x2 block from grid point i, gathered at the texel
+// corner their four texels share, half a texel from any other footprint: (0,1)
+// in x, (1,1) in y, (1,0) in z and (0,0) in w. The height map's PointClamp
+// sampler clamps each texel to the edge, which holds a grid point to the map:
+// a cell's far corner lands one past the apron only at the region's edge,
+// where its weight is zero.
+vec4 terrain_gather(ivec2 i)
 {
-    ivec2 last = textureSize(terrain_height_map, 0) - 1 - TERRAIN_APRON;
-    return texelFetch(terrain_height_map, clamp(g, ivec2(-TERRAIN_APRON), last) + TERRAIN_APRON, 0).r;
+    vec2 texel = 1.0 / vec2(textureSize(terrain_height_map, 0));
+    return textureGather(terrain_height_map, vec2(i + (TERRAIN_APRON + 1)) * texel);
 }
 
 float terrain_height_linear(vec2 g)
 {
     ivec2 i = ivec2(floor(g));
     vec2  f = g - vec2(i);
-    float lb = terrain_sample(i);
-    float rb = terrain_sample(i + ivec2(1, 0));
-    float lt = terrain_sample(i + ivec2(0, 1));
-    float rt = terrain_sample(i + ivec2(1, 1));
+    vec4  q = terrain_gather(i);
+    float lb = q.w;
+    float rb = q.z;
+    float lt = q.x;
+    float rt = q.y;
     return (f.y > f.x) ? lb + f.y * (lt - lb) + f.x * (rt - lt)
                        : lb + f.x * (rb - lb) + f.y * (rt - rb);
 }
@@ -144,18 +149,21 @@ float terrain_height_smooth(vec2 g, out vec2 gradient)
     ivec2 i = ivec2(floor(g));
     vec2  f = g - vec2(i);
 
+    // The twelve samples are the 4x4 block from i - 1 less its corners, read as four
+    // gathers of its 2x2 quarters (terrain_gather).
+    vec4 q00 = terrain_gather(i + ivec2(-1, -1));
+    vec4 q10 = terrain_gather(i + ivec2( 1, -1));
+    vec4 q01 = terrain_gather(i + ivec2(-1,  1));
+    vec4 q11 = terrain_gather(i + ivec2( 1,  1));
+
     // Rows j and j+1, four samples each; the outer two feed the x tangents.
-    float r0[4], r1[4];
-    for (int k = 0; k < 4; ++k)
-    {
-        r0[k] = terrain_sample(i + ivec2(k - 1, 0));
-        r1[k] = terrain_sample(i + ivec2(k - 1, 1));
-    }
+    float r0[4] = float[4](q00.x, q00.y, q10.x, q10.y);
+    float r1[4] = float[4](q01.w, q01.z, q11.w, q11.z);
     // Columns i and i+1, the samples above and below the cell.
-    float c0m = terrain_sample(i + ivec2(0, -1));
-    float c0p = terrain_sample(i + ivec2(0,  2));
-    float c1m = terrain_sample(i + ivec2(1, -1));
-    float c1p = terrain_sample(i + ivec2(1,  2));
+    float c0m = q00.z;
+    float c0p = q01.y;
+    float c1m = q10.w;
+    float c1p = q11.x;
 
     float f00 = r0[1], f10 = r0[2], f01 = r1[1], f11 = r1[2];
     float fx00 = terrain_limited_slope(r0[0], f00, f10);

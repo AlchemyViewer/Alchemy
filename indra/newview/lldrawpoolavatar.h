@@ -35,6 +35,7 @@
 class LLVOAvatar;
 class LLVOVolume;
 class LLGLSLShader;
+class LLGLTexture;
 class LLFace;
 class LLVolume;
 class LLVolumeFace;
@@ -59,6 +60,7 @@ public:
 typedef enum
     {
         SHADOW_PASS_AVATAR_OPAQUE,
+        SHADOW_PASS_AVATAR_OPAQUE_CUT,
         SHADOW_PASS_AVATAR_ALPHA_BLEND,
         SHADOW_PASS_AVATAR_ALPHA_MASK,
         NUM_SHADOW_PASSES
@@ -114,13 +116,29 @@ typedef enum
 
     void renderAvatars(LLVOAvatar *single_avatar, S32 pass = -1); // renders only one avatar if single_avatar is not null.
 
+    // Which body meshes the pass drawing now draws. The opaque shadow pass casts a body through the depth-only
+    // program, and SHADOW_PASS_AVATAR_OPAQUE_CUT the bodies whose bakes the deferred pass cuts out (sMinimumAlpha)
+    // through the alpha-tested one.
+    enum eShadowBakes
+    {
+        SHADOW_BAKES_ALL,
+        SHADOW_BAKES_SOLID,
+        SHADOW_BAKES_CUT
+    };
+    static bool shadowDrawsBake(const LLGLTexture* bake);
+
     static bool sSkipOpaque;
     static bool sSkipTransparent;
     static S32  sShadowPass;
+    static eShadowBakes sShadowBakes;
+    static bool sShadowCutBakeLeft; // a SHADOW_BAKES_SOLID draw passed over a cut bake
     static S32 sDiffuseChannel;
     static F32 sMinimumAlpha;
 
     static LLGLSLShader* sVertexProgram;
+
+private:
+    bool mShadowCutBakes = false; // the opaque pass left a mesh for the cut pass, in the shadow map being drawn
 };
 
 extern S32 AVATAR_OFFSET_POS;

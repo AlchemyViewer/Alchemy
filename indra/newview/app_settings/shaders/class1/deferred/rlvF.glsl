@@ -65,9 +65,14 @@ vec3 blur13(sampler2D source, vec2 tc, vec2 direction)
 
 const float pi = 3.14159265;
 
+// The widest blur a sphere may ask for, in taps either side of centre. kernelSize is a script's
+// @setsphere_param, unvalidated, and an unbounded loop on it can hang the GPU until the driver
+// resets it; min/max take an infinity to the bound and a NaN fails the loop test outright.
+const float MAX_BLUR_PIXELS_PER_SIDE = 32.0;
+
 // http://callumhay.blogspot.com/2010/09/gaussian-blur-shader-glsl.html
 vec3 blurVariable(sampler2D source, vec2 tc, float kernelSize, vec2 direction, float strength) {
-  float numBlurPixelsPerSide = float(kernelSize / 2);
+  float numBlurPixelsPerSide = min(max(floor(kernelSize * 0.5), 0.0), MAX_BLUR_PIXELS_PER_SIDE);
 
   // Incremental Gaussian Coefficent Calculation (See GPU Gems 3 pp. 877 - 889)
   vec3 incrementalGaussian;
@@ -133,8 +138,16 @@ void main()
             fragColor = blur13(diffuseRect, fragTC, BLUR_DIRECTION * vec2(effectStrength));
             break;
         case 2:     // Blur (variable)
-            fragColor = texture(diffuseRect, fragTC).rgb;
-            fragColor = mix(fragColor, blurVariable(diffuseRect, fragTC, SPHERE_PARAMS.x, BLUR_DIRECTION, effectStrength), bvec3(effectStrength > 0.0));
+            // Only where the sphere blurs at all: a mix argument is evaluated whichever
+            // operand it selects.
+            if (effectStrength > 0.0)
+            {
+                fragColor = blurVariable(diffuseRect, fragTC, SPHERE_PARAMS.x, BLUR_DIRECTION, effectStrength);
+            }
+            else
+            {
+                fragColor = texture(diffuseRect, fragTC).rgb;
+            }
             break;
         case 3:     // ChromaticAberration
             fragColor = chromaticAberration(diffuseRect, fragTC, SPHERE_PARAMS.xy, SPHERE_PARAMS.zw, effectStrength);

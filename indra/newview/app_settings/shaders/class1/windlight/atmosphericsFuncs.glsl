@@ -23,13 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform vec3  lightnorm;
-uniform vec3  sunlight_color;
-uniform vec3  moonlight_color;
-uniform int   sun_up_factor;
-uniform vec3  ambient_color;
 // Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
-// and bound at UB_ENVIRONMENT. Members are read by bare name.
+// and bound at UB_ENVIRONMENT. Members are read by bare name. The sun's, moon's and ambient
+// light are there, and the terms of them that take nothing per pixel (atmos_*, haze_additive*).
 //[ENGINE_BLOCK Environment]
 uniform float density_multiplier;
 uniform float sun_moon_glow_factor;
@@ -74,21 +70,9 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     vec3  rel_pos_norm = normalize(rel_pos);
     float rel_pos_len  = length(rel_pos);
 
-    vec3  sunlight     = (sun_up_factor == 1) ? sunlight_color: moonlight_color;
-
-    // sunlight attenuation effect (hue and brightness) due to atmosphere
-    // this is used later for sunlight modulation at various altitudes
-    vec3 light_atten = (blue_density + vec3(haze_density * 0.25)) * (density_multiplier * max_y);
-    // I had thought blue_density and haze_density should have equal weighting,
-    // but attenuation due to haze_density tends to seem too strong
-
-    vec3 combined_haze = max(blue_density + vec3(haze_density), vec3(1e-6));
-    vec3 blue_weight   = blue_density / combined_haze;
-    vec3 haze_weight   = vec3(haze_density) / combined_haze;
-
-    //(TERRAIN) compute sunlight from lightnorm y component. Factor is roughly cosecant(sun elevation) (for short rays like terrain)
-    float above_horizon_factor = 1.0 / max(1e-6, lightnorm.y);
-    sunlight *= exp(-light_atten * above_horizon_factor);  // for sun [horizon..overhead] this maps to an exp curve [0..1]
+    // The sun or moon, whichever is up, with the (TERRAIN) sunlight attenuation effect (hue and
+    // brightness) due to atmosphere already on it, along a path of roughly cosecant(sun
+    // elevation) (for short rays like terrain): atmos_sunlit (LLSettingsVOSky::applySpecial).
 
     // main atmospheric scattering line integral
     float density_dist = rel_pos_len * density_multiplier;
@@ -96,7 +80,7 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     // Transparency (-> combined_haze)
     // ATI Bugfix -- can't store combined_haze*density_dist*distance_multiplier in a variable because the ati
     // compiler gets confused.
-    combined_haze = exp(-combined_haze * density_dist * distance_multiplier);
+    vec3 combined_haze = exp(-haze_extinction * density_dist * distance_multiplier);
 
     // final atmosphere attenuation factor
     atten = combined_haze.rgb;
@@ -104,7 +88,7 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     // compute haze glow
     // the angle to the light, against light_dir: rel_pos and light_dir are in the same frame, the sky's,
     // turned there together above. lightnorm, held no lower than 0.1 below the horizon, is for the
-    // sunlight's path above.
+    // sunlight's path, in atmos_sunlit.
     float haze_glow = 1. - dot(rel_pos_norm, light_dir);
     // haze_glow is 0 at the sun and increases away from sun
     // set a minimum "angle" (smaller allows a tighter, brighter hotspot). WindLight's objects used .03;
@@ -120,22 +104,20 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
 
     haze_glow *= sun_moon_glow_factor;
 
-    vec3 amb_color = ambient_color;
-
-    // increase ambient when there are more clouds
-    vec3 tmpAmbient = amb_color + (vec3(1.) - amb_color) * cloud_shadow * 0.5;
-
     // Similar/Shared Algorithms:
     //     indra\llinventory\llsettingssky.cpp                                        -- LLSettingsSky::calculateLightSettings()
     //     indra\newview\app_settings\shaders\class1\windlight\atmosphericsFuncs.glsl -- calcAtmosphericVars()
-    // haze color
-    vec3 cs = sunlight.rgb * (1. - cloud_shadow);
-    additive = (blue_horizon.rgb * blue_weight.rgb) * (cs + tmpAmbient.rgb) + (haze_horizon * haze_weight.rgb) * (cs * haze_glow + tmpAmbient.rgb);
+    //     indra\newview\llsettingsvo.cpp                                             -- LLSettingsVOSky::applySpecial(), the per-sky terms
+    //     indra\newview\llenvironment.cpp                                            -- LLEnvironment::packAtmosphericTerms()
+    // haze color: the blue share lit by the light under cloud (cs) and the ambient raised under
+    // cloud, plus the haze share lit by the ambient and by cs times the glow toward the light,
+    // all but the glow worked per sky (packAtmosphericTerms)
+    additive = haze_additive + haze_additive_glow * haze_glow;
 
     // brightness of surface both sunlight and ambient
 
-    sunlit = sunlight.rgb;
-    amblit = pow(tmpAmbient.rgb, vec3(0.9)) * 0.57;
+    sunlit = atmos_sunlit;
+    amblit = atmos_amblit;
 
     additive *= vec3(1.0 - combined_haze);
 
@@ -168,7 +150,7 @@ void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, ou
     {
         amblit = srgb_to_linear(amblit);
         amblit = vec3(dot(amblit, vec3(0.2126, 0.7152, 0.0722)));
-        sunlit = srgb_to_linear(sunlit);
+        sunlit = atmos_sunlit_linear;
     }
 
     // multiply to get similar colors as when the "scaleSoftClip" implementation was doubling color values

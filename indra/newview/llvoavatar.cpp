@@ -853,6 +853,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 
     mImpostorDistance = 0;
     mImpostorPixelArea = 0;
+    mImpostor.setLabel("avatar.impostor");
 
     setNumTEs(TEX_NUM_INDICES);
 
@@ -3529,7 +3530,7 @@ void LLVOAvatar::idleUpdateWindEffect()
     }
 
     // update wind effect
-    if (LLPipeline::RenderAvatarCloth)
+    if (gPipeline.shaderInputs().mLocal.mAvatarCloth)
     {
         F32 hover_strength = 0.f;
         const F64 ripple_time = mRippleTimer.getElapsedTimeF64();

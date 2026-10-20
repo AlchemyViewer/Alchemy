@@ -43,10 +43,10 @@
 
 namespace
 {
-    // A shader's source, found from this file so the test reads what the viewer compiles.
+    // A shader's source, read from the viewer's shader tree so the test reads what the viewer compiles.
     static std::string shader_source(const std::string& rel)
     {
-        const std::filesystem::path path = std::filesystem::path(__FILE__).parent_path() / ".." / "app_settings" / "shaders" / rel;
+        const std::filesystem::path path = std::filesystem::path(AL_TEST_SHADER_DIR) / rel;
         std::ifstream in(path);
         std::stringstream buf;
         buf << in.rdbuf();
@@ -170,7 +170,7 @@ namespace
         UNSCOPED_INFO("deferredUtil floor");
         CHECK(literal_after(util, "#define RECONSTRUCT_W_FLOOR ") == floor);
         CHECK(literal_after(shader_source("class1/deferred/aoUtil.glsl"), "pos.w = max(pos.w, ") == floor);
-        CHECK(literal_after(shader_source("class1/deferred/cofF.glsl"), "p.z/max(p.w, ") == floor);
+        CHECK(literal_after(shader_source("class1/deferred/dofCoFUtilF.glsl"), "*max(p.w, ") == floor);
     }
 
     // The sky is the cleared far depth and nothing else: every pass that tells sky from geometry tests for exactly

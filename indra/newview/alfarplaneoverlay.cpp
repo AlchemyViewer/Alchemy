@@ -104,6 +104,7 @@ void render()
     if (!sTarget)
     {
         sTarget = new LLRenderTarget();
+        sTarget->setLabel("farplane.overlay");
     }
     if ((!sTarget->isComplete() || sTarget->getWidth() != width || sTarget->getHeight() != height) &&
         !sTarget->allocate(width, height, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, LLPipeline::mainDepthFormat()))

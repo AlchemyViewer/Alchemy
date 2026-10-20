@@ -128,6 +128,13 @@ LLAvatarNameCache::~LLAvatarNameCache()
     sHttpHeaders.reset();
     sHttpOptions.reset();
     mCache.clear();
+
+    // getNameCallback allocates a signal for each id still waiting on a name.
+    for (auto& [agent_id, signal] : mSignalMap)
+    {
+        delete signal;
+    }
+    mSignalMap.clear();
 }
 
 void LLAvatarNameCache::requestAvatarNameCache_(std::string url, std::vector<LLUUID> agentIds)

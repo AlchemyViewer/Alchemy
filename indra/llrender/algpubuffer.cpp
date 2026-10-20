@@ -223,7 +223,7 @@ bool ALGPUBuffer::allocate(size_t bytes, U32 flags, const void* data, const char
         return false;
     }
 
-    if (label && gGLManager.mHasDebugOutput && glObjectLabel)
+    if (label && gDebugGL && gGLManager.mHasDebugOutput && glObjectLabel)
     {
         glObjectLabel(GL_BUFFER, name, -1, label);
     }

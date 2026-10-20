@@ -80,7 +80,7 @@ vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 
 #ifdef HAS_SUN_SHADOW
-float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
+float sampleDirectionalShadowGrad(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy);
 #endif
 
 float getAmbientClamp();
@@ -100,6 +100,12 @@ vec3 calcLegacyPointLightDiffuse(vec3 diffuse,
 
 void main()
 {
+#ifdef HAS_SUN_SHADOW
+    // Before every discard below, for the shadow's receiver-plane bias.
+    vec3 dpos_dx = dFdx(vary_position);
+    vec3 dpos_dy = dFdy(vary_position);
+#endif
+
     mirrorClip(vary_position);
 
     vec2 frag = vary_fragcoord.xy/vary_fragcoord.z*0.5+0.5;
@@ -114,12 +120,6 @@ void main()
     // normal out of the GBuffer, so leaving it raw made this the one surface whose NdotL was
     // scaled by an accident of where it sat within its triangle.
     vec3 norm = normalize(vary_norm);
-
-    float shadow = 1.0f;
-
-#ifdef HAS_SUN_SHADOW
-    shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
-#endif
 
 #ifdef USE_DIFFUSE_TEX
     vec4 diffuse_tap = texture(diffuseMap,vary_texcoord0.xy);
@@ -197,6 +197,14 @@ void main()
 #endif
 #endif // USE_VERTEX_COLOR
 
+    // Below the discards, as pbralphaF samples it, so a fragment they drop filters no shadow.
+    // The impostor branch above is unlit and takes none.
+    float shadow = 1.0f;
+
+#ifdef HAS_SUN_SHADOW
+    shadow = sampleDirectionalShadowGrad(pos.xyz, norm.xyz, frag, dpos_dx, dpos_dy);
+#endif
+
     vec3 sunlit;
     vec3 amblit;
     vec3 additive;
@@ -241,6 +249,16 @@ void main()
 
     color.rgb *= diffuse_linear.rgb;
 
+#ifndef IS_HUD
+    // A classic sky's 1.1 is on the sun and ambient term alone, as softenLightF's writeColor
+    // puts it on the opaque surface behind: the local lights below carry their own 0.9, and
+    // the fog adds what it adds unscaled, as the deferred light and haze passes do.
+    if (classic_mode > 0)
+    {
+        color.rgb *= 1.1;
+    }
+#endif
+
     vec4 light = vec4(0,0,0,0);
 
     vec3 npos = normalize(-pos.xyz);
@@ -263,15 +281,10 @@ void main()
     color.rgb = applySkyAndWaterFog(pos.xyz, additive, atten, color).rgb;
 
 #endif // #else // FOR_IMPOSTOR
-    float final_scale = 1;
-    if (classic_mode > 0)
-        final_scale = 1.1;
 #ifdef IS_HUD
     color.rgb = linear_to_srgb(color.rgb);
-    final_scale = 1;
 #endif
 
-    color.rgb *= final_scale;
     frag_color = max(color, vec4(0));
 }
 

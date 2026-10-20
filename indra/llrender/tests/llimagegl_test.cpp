@@ -608,6 +608,48 @@ namespace
         CHECK(rgb->getMaxAlpha() == 255);
     }
 
+    // And the lowest, which the avatar shadow asks to tell a bake that cuts out from one that does not: the odd
+    // row and column counted again, 255 where there is no alpha channel, and 0 where nothing was analysed.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: the alpha analysis reports the lowest alpha, odd edges included", "[LLImageGL]")
+    {
+        // An opaque w x h RGBA image with alpha `alpha` at (x, y).
+        auto analysed = [](U16 w, U16 h, S32 x, S32 y, U8 alpha)
+        {
+            LLPointer<LLImageRaw> raw = makeRaw(w, h, 4, 0xFF);
+            if (x >= 0)
+            {
+                raw->getData()[((size_t)y * w + x) * 4 + 3] = alpha;
+            }
+            LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+            REQUIRE(img->createGLTexture(0, raw.get()));
+            return img->getMinAlpha();
+        };
+
+        UNSCOPED_INFO("an opaque texture");
+        CHECK(analysed(16, 16, -1, -1, 0) == 255);
+        UNSCOPED_INFO("one texel inside");
+        CHECK(analysed(16, 16, 5, 7, 40) == 40);
+        UNSCOPED_INFO("a texel in the odd column");
+        CHECK(analysed(15, 15, 14, 3, 90) == 90);
+        UNSCOPED_INFO("a texel in the odd row");
+        CHECK(analysed(15, 15, 6, 14, 60) == 60);
+        UNSCOPED_INFO("the odd corner");
+        CHECK(analysed(15, 15, 14, 14, 30) == 30);
+        UNSCOPED_INFO("a single row");
+        CHECK(analysed(9, 1, 8, 0, 120) == 120);
+
+        LLPointer<LLImageGL> rgb = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(rgb->createGLTexture(0, makeRaw(16, 16, 3, 0x00).get()));
+        UNSCOPED_INFO("no alpha channel reads as opaque");
+        CHECK(rgb->getMinAlpha() == 255);
+
+        LLPointer<LLImageGL> unread = new LLImageGL(/*usemipmaps=*/false);
+        unread->setNeedsAlphaAndPickMask(false);
+        REQUIRE(unread->createGLTexture(0, makeRaw(16, 16, 4, 0xFF).get()));
+        UNSCOPED_INFO("an alpha not analysed may be anything");
+        CHECK(unread->getMinAlpha() == 0);
+    }
+
     // The alpha layout is worked out with the format, once for a component count. An image
     // that comes to want its mask after an upload works both out again on the next, and
     // reads alpha from the fourth channel rather than the first.

@@ -46,6 +46,11 @@ namespace
     }
 }
 
+ALDepthPyramid::ALDepthPyramid()
+{
+    mTexture.setLabel("depth.pyramid");
+}
+
 bool ALDepthPyramid::build(LLGLSLShader& program, LLRenderTarget& depth)
 {
     if (!LLRender::sCompute || !program.isComplete() || !depth.getDepth())

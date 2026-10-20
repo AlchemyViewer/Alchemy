@@ -42,6 +42,8 @@
 #include "llviewerjoystick.h"
 #include "llviewermediafocus.h"
 
+#include <fmt/format.h>
+
 extern bool gCubeSnapshot;
 extern bool gTeleportDisplay;
 
@@ -62,6 +64,7 @@ static void touch_default_probe(LLReflectionMap* probe)
 
 LLHeroProbeManager::LLHeroProbeManager()
 {
+    mRenderTarget.setLabel("hero.snapshot");
 }
 
 LLHeroProbeManager::~LLHeroProbeManager()
@@ -69,13 +72,13 @@ LLHeroProbeManager::~LLHeroProbeManager()
     cleanup();
 
     mHeroVOList.clear();
-    mNearestHero = nullptr;
 }
 
 // helper class to seed octree with probes
 void LLHeroProbeManager::update()
 {
-    if (!LLPipeline::RenderMirrors || !LLPipeline::sReflectionProbesEnabled || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
+    // Not until the resources are reconciled for mirrors, which a shader reload that stops short of it leaves undone.
+    if (!gPipeline.resourcePlan().heroProbes() || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
     {
         return;
     }
@@ -84,10 +87,14 @@ void LLHeroProbeManager::update()
     // For some reason clearing shaders will cause mirrors to actually work.
     // There's likely some deeper state issue that needs to be resolved.
     // - Geenz 2025-02-25
-    if (!mInitialized && LLStartUp::getStartupState() > STATE_PRECACHE)
+    static LLCachedControl<bool> shader_reload_workaround(gSavedSettings, "AlchemyRenderMirrorShaderReload", true);
+    if (!mInitialized && shader_reload_workaround && LLStartUp::getStartupState() > STATE_PRECACHE)
     {
+        // The hero probes are rebuilt from nothing now, and every program from its sources by the next frame's
+        // application: which of the two the workaround needs is not known.
+        reset();
         LLViewerShaderMgr::instance()->clearShaderCache();
-        LLViewerShaderMgr::instance()->setShaders();
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Programs);
         mInitialized = true;
     }
 
@@ -101,11 +108,9 @@ void LLHeroProbeManager::update()
 
     initReflectionMaps();
 
-    static LLCachedControl<bool> render_hdr(gSavedSettings, "RenderHDREnabled", true);
-
     if (!mRenderTarget.isComplete())
     {
-        U32 color_fmt = render_hdr ? GL_RGBA16F : GL_RGBA8;
+        U32 color_fmt = mHDR ? GL_RGBA16F : GL_RGBA8;
         mRenderTarget.allocate(mProbeResolution, mProbeResolution, color_fmt, true);
     }
 
@@ -117,7 +122,10 @@ void LLHeroProbeManager::update()
         mMipChain.resize(count);
         for (U32 i = 0; i < count; ++i)
         {
-            mMipChain[i].allocate(res, res, render_hdr ? GL_RGBA16F : GL_RGBA8);
+            char label[32];
+            const auto result = fmt::format_to_n(label, sizeof(label), "hero.mip{}", i);
+            mMipChain[i].setLabel(std::string_view(label, (size_t)(result.out - label)));
+            mMipChain[i].allocate(res, res, mHDR ? GL_RGBA16F : GL_RGBA8);
             res /= 2;
         }
     }
@@ -223,8 +231,7 @@ void LLHeroProbeManager::update()
 
 void LLHeroProbeManager::renderProbes()
 {
-    if (!LLPipeline::RenderMirrors || !LLPipeline::sReflectionProbesEnabled || gTeleportDisplay ||
-        LLStartUp::getStartupState() < STATE_PRECACHE)
+    if (!gPipeline.resourcePlan().heroProbes() || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
     {
         return;
     }
@@ -233,8 +240,9 @@ void LLHeroProbeManager::renderProbes()
     static LLCachedControl<S32> sLevel(gSavedSettings, "RenderHeroReflectionProbeLevel", 3);
     static LLCachedControl<S32> sUpdateRate(gSavedSettings, "RenderHeroProbeUpdateRate", 0);
 
+    // Nothing to render into until update() has built the default probe again after cleanup().
     F32 near_clip = 0.01f;
-    if (mNearestHero != nullptr && !mNearestHero->isDead() &&
+    if (!mProbes.empty() && mProbes[0].notNull() && mNearestHero != nullptr && !mNearestHero->isDead() &&
         !gTeleportDisplay && !gDisconnected && !LLAppViewer::instance()->logoutRequestSent())
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("hpmu - realtime");
@@ -261,7 +269,7 @@ void LLHeroProbeManager::renderProbes()
 
         S32 face = gFrameCount % 6;
 
-        if (!mProbes.empty() && !mProbes[0].isNull() && !mProbes[0]->mOccluded)
+        if (!mProbes[0]->mOccluded)
         {
             LL_PROFILE_ZONE_NUM(gFrameCount % rate);
             LL_PROFILE_ZONE_NUM(rate);
@@ -334,7 +342,10 @@ void LLHeroProbeManager::updateProbeFace(LLReflectionMap* probe, U32 face, bool 
         LLRenderTarget *screen_rt = &gPipeline.mHeroProbeRT.screen;
         LLRenderTarget *depth_rt  = &gPipeline.mHeroProbeRT.deferredScreen;
 
-        // perform a gaussian blur on the super sampled render before downsampling
+        // perform a gaussian blur on the super sampled render before downsampling. A capture the
+        // size of mip 0, which the hero pack is, has nothing to downsample, and the blur would
+        // only soften it.
+        if (screen_rt->getWidth() != mMipChain[0].getWidth())
         {
             gGaussianProgram.bind();
             gGaussianProgram.uniform1f(LLShaderMgr::RES_SCALE, 1.f / (mProbeResolution * 2));
@@ -436,7 +447,12 @@ void LLHeroProbeManager::generateRadiance(LLReflectionMap* probe)
 
             U32 res = mMipChain[0].getWidth();
 
-            for (int i = 0; i < mMipChain.size() / 4; ++i)
+            // tapHeroProbe weighs the hero probe in only above glossiness 0.75, so it reads LODs
+            // up to a quarter of heroMaxLod (mMaxProbeLOD, the LOD radianceGenF maps to roughness
+            // 1); those mips and the next one up, for the trilinear blend, are what is generated.
+            const S32 radiance_mips = llmin(S32(mMipChain.size()), S32(ceilf(0.25f * mMaxProbeLOD)) + 1);
+
+            for (int i = 0; i < radiance_mips; ++i)
             {
                 LL_PROFILE_GPU_ZONE("hero probe radiance gen");
                 gHeroRadianceGenProgram.uniform1f(LLShaderMgr::ROUGHNESS, (F32) i / (F32) (mMipChain.size() - 1));
@@ -473,7 +489,7 @@ void LLHeroProbeManager::generateRadiance(LLReflectionMap* probe)
 
 void LLHeroProbeManager::updateUniforms()
 {
-    if (!gPipeline.RenderMirrors)
+    if (!gPipeline.resourceInputs().mMirrors)
     {
         return;
     }
@@ -484,10 +500,14 @@ void LLHeroProbeManager::updateUniforms()
     const LLMatrix4a& modelview = LLViewerCamera::getCurrent().getModelview();
     LLVector4a oa; // scratch space for transformed origin
     oa.set(0, 0, 0, 0);
-    mHeroData.heroProbeCount = 1;
+    // With no mirror, the box and sphere below keep the last one's, and the cube array its
+    // picture; 0 tells tapHeroProbe there is nothing to reflect.
+    mHeroData.heroProbeCount = 0;
 
-    if (mNearestHero != nullptr && !mNearestHero->isDead())
+    // Called every frame while mirrors are on, whether or not update() has built the default probe since cleanup().
+    if (!mProbes.empty() && mProbes[0].notNull() && mNearestHero != nullptr && !mNearestHero->isDead())
     {
+        mHeroData.heroProbeCount = 1;
         if (mNearestHero->getReflectionProbeIsBox())
         {
             LLVector3 s = mNearestHero->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
@@ -509,8 +529,7 @@ void LLHeroProbeManager::updateUniforms()
         mHeroData.heroSphere.mV[3] = mProbes[0]->mRadius;
     }
 
-    llassert(mMipChain.size() <= size_t(S32_MAX));
-    mHeroData.heroMipCount = S32(mMipChain.size());
+    mHeroData.heroMaxLod = mMaxProbeLOD;
 }
 
 void LLHeroProbeManager::renderDebug()
@@ -530,7 +549,21 @@ void LLHeroProbeManager::initReflectionMaps()
 {
     U32 count = LL_MAX_HERO_PROBE_COUNT;
 
-    if ((mTexture.isNull() || mReflectionProbeCount != count || mReset) && LLPipeline::RenderMirrors)
+    // What the hero pack was planned for (ALRenderResourcePlan::heroProbes): a mirror's face
+    // resolution, and HDR, which picks the colour format of the cube array, the scratch target and
+    // the mip chain. A change of either rebuilds all three as a reset does. Nothing while mirrors
+    // or probes are off.
+    const std::optional<ALRenderResourcePlan::ProbeManager>& planned = gPipeline.resourcePlan().heroProbes();
+    if (!planned)
+    {
+        return;
+    }
+    if (mTexture.notNull() && (planned->mHDR != mHDR || planned->mResolution != mProbeResolution))
+    {
+        mReset = true;
+    }
+
+    if (mTexture.isNull() || mReflectionProbeCount != count || mReset)
     {
 
         if (mReset)
@@ -540,15 +573,14 @@ void LLHeroProbeManager::initReflectionMaps()
 
         mReset = false;
         mReflectionProbeCount = count;
-        mProbeResolution      = gSavedSettings.getS32("RenderHeroProbeResolution");
+        mProbeResolution      = planned->mResolution;
         mMaxProbeLOD = log2f((F32)mProbeResolution) - 1.f; // number of mips - 1
 
         mTexture = new LLCubeMapArray();
-
-        static LLCachedControl<bool> render_hdr(gSavedSettings, "RenderHDREnabled", true);
+        mHDR = planned->mHDR;
 
         // store mReflectionProbeCount+2 cube maps, final two cube maps are used for render target and radiance map generation source)
-        mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, render_hdr);
+        mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, mHDR);
 
         if (mDefaultProbe.isNull())
         {
@@ -567,8 +599,6 @@ void LLHeroProbeManager::initReflectionMaps()
         mDefaultProbe->mRadius = 4096.f;
         mDefaultProbe->mProbeIndex = 0;
         touch_default_probe(mDefaultProbe);
-
-        mProbes.push_back(mDefaultProbe);
     }
 
     if (mVertexBuffer.isNull())
@@ -608,6 +638,8 @@ void LLHeroProbeManager::cleanup()
     mProbes.clear();
 
     mDefaultProbe = nullptr;
+    // The mirror is found again by the next update() that builds a probe for it.
+    mNearestHero = nullptr;
 }
 
 void LLHeroProbeManager::doOcclusion()

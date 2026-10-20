@@ -63,8 +63,7 @@ ALWaterSurface::WaveSettings ALWaterSurface::waveSettings()
 
 bool ALWaterSurface::wavesWanted()
 {
-    static LLCachedControl<bool> waves(gSavedSettings, "AlchemyRenderWaterWaves", true);
-    return waves;
+    return gPipeline.shaderInputs().mLocal.mWaterWaves;
 }
 
 void ALWaterSurface::update()
@@ -104,7 +103,7 @@ void ALWaterSurface::update()
 
     // The maps the pool binds this frame, followed before anything is drawn, so the waves' bound is the bound maps'.
     // Their means are read only by the tiled reads.
-    static LLCachedControl<U32> hextile(gSavedSettings, "AlchemyRenderWaterHextile", 1);
+    const S32 hextile = gPipeline.shaderInputs().mGlobal.mWaterHextile;
     const bool waves = wavesWanted() && gWaterWavesProgram.mProgramObject != 0;
     if (LLDrawPoolWater* pool = static_cast<LLDrawPoolWater*>(gPipeline.findPool(LLDrawPool::POOL_WATER)))
     {

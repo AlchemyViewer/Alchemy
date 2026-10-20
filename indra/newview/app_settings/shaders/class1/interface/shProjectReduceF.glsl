@@ -27,15 +27,16 @@
 
 // Second half of the row-parallel SH projection. shProjectF.glsl with SH_ROW_PARTIAL wrote one
 // partial coefficient per face row into shPartial (9 columns, 6 * u_width rows); this adds the
-// rows, one fragment per coefficient, into the probe's nine-texel row of the coefficient target.
+// rows into the probe's packed row of the coefficient target (shPackUtilF.glsl), one fragment
+// per texel, each adding the up to four coefficients that texel holds a part of.
 //
 // Blending is off while probes update, so the sum lives here rather than in additive blending,
-// and 6 * u_width texel fetches per fragment is a trivial draw. Rows are added from 0 upward,
-// the order the single-pass form visits faces and rows, so the two forms agree to floating-point
-// rounding -- and scripts/content_tools/check_sh_projection.py shows the 16-bit partials move a
-// coefficient by less than 1e-3 of the DC term.
+// and at most 4 * 6 * u_width texel fetches per fragment is a trivial draw. Rows are added from 0
+// upward, the order the single-pass form visits faces and rows, so the two forms agree to
+// floating-point rounding -- and scripts/content_tools/check_sh_projection.py shows the 16-bit
+// partials move a coefficient by less than 1e-3 of the DC term.
 
-out vec4 frag_color;
+out uvec4 frag_color;
 
 uniform sampler2D shPartial;
 uniform int u_width;   // face edge length that was integrated; shPartial has 6 * u_width rows
@@ -43,16 +44,25 @@ uniform int u_width;   // face edge length that was integrated; shPartial has 6 
 // Unused, but the shared vertex stage emits it.
 in vec3 vary_dir;
 
+int shPackedFirst(int t);
+int shPackedLast(int t);
+uvec4 shPackTexel(int t, vec3 sums[4]);
+
 void main()
 {
-    int coef = int(gl_FragCoord.x);
-    int rows = 6 * u_width;
+    int texel = int(gl_FragCoord.x);
+    int first = shPackedFirst(texel);
+    int count = shPackedLast(texel) - first + 1;
+    int rows  = 6 * u_width;
 
-    vec3 sum = vec3(0.0);
-    for (int r = 0; r < rows; ++r)
+    vec3 sums[4] = vec3[4](vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
+    for (int k = 0; k < count; ++k)
     {
-        sum += texelFetch(shPartial, ivec2(coef, r), 0).rgb;
+        for (int r = 0; r < rows; ++r)
+        {
+            sums[k] += texelFetch(shPartial, ivec2(first + k, r), 0).rgb;
+        }
     }
 
-    frag_color = vec4(sum, 1.0);
+    frag_color = shPackTexel(texel, sums);
 }

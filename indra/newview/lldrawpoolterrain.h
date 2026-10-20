@@ -82,6 +82,10 @@ protected:
     void renderFullShaderTextures();
     void renderFullShaderPBR(bool use_local_materials = false);
     void drawLoop();
+
+    // Each projection's uv origin's place on the world's hex lattice (pbrterrainUtilF's terrain_hex_place), from
+    // delta, three to a material (the top, the x slice, the y slice): the world's uv less the region's.
+    static void uploadHexPlaces(LLGLSLShader* shader, const F64 (*delta)[2], U32 materials);
 };
 
 #endif // LL_LLDRAWPOOLSIMPLE_H

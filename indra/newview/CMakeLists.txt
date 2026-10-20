@@ -146,12 +146,9 @@ if(AL_BUILD_VIEWER)
     alcolorwheelmodel.cpp
     alcurveeditorctrl.cpp
     alcurvemodel.cpp
-    alcutoutimage.cpp
     aldaycyclelandmarks.cpp
-    aldepthpyramid.cpp
     alderenderlist.cpp
     aldroptarget.cpp
-    alfarplane.cpp
     alfarplaneoverlay.cpp
     alfloaterblocked.cpp
     alfloaterdirectory.cpp
@@ -171,6 +168,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscopes.cpp
     alfloatertransactionlog.cpp
     alrenderisolation.cpp
+    alrendersizeoverride.cpp
     alsceneexplorerpredicate.cpp
     alsnapshotcutout.cpp
     alscopedata.cpp
@@ -252,8 +250,6 @@ if(AL_BUILD_VIEWER)
     alscriptweightspane.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
-    alwaterfield.cpp
-    alwaterheightbake.cpp
     alwatersurface.cpp
     alfloaterscriptstudio.cpp
     alfloaterwebprofile.cpp
@@ -1024,12 +1020,9 @@ if(AL_BUILD_VIEWER)
     alcolorwheelmodel.h
     alcurveeditorctrl.h
     alcurvemodel.h
-    alcutoutimage.h
     aldaycyclelandmarks.h
-    aldepthpyramid.h
     alderenderlist.h
     aldroptarget.h
-    alfarplane.h
     alfarplaneoverlay.h
     alfloaterblocked.h
     alfloaterdirectory.h
@@ -1049,6 +1042,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscopes.h
     alfloatertransactionlog.h
     alrenderisolation.h
+    alrendersizeoverride.h
     alsceneexplorerpredicate.h
     alsnapshotcutout.h
     alscopedata.h
@@ -1137,9 +1131,6 @@ if(AL_BUILD_VIEWER)
     alscriptweightspane.h
     alscriptworkspace.h
     alterrainsurfacemaps.h
-    alwaterfield.h
-    alwaterheightbake.h
-    alwaterstencil.h
     alwatersurface.h
     altexturetable.h
     alfloaterscriptstudio.h
@@ -1149,7 +1140,6 @@ if(AL_BUILD_VIEWER)
     alviewcapture.h
     algradehistory.h
     alhoverglow.h
-    alhuddepth.h
     allegacynotificationwellwindow.h
     allightboxdirectory.h
     almotionpredictor.h
@@ -2123,6 +2113,7 @@ if(AL_BUILD_VIEWER)
     ${AL_VIEWER_BINARY_NAME}
     PRIVATE
       al::flags
+      alrender
       alscript
       llaudio
       llcharacter
@@ -2149,7 +2140,6 @@ if(AL_BUILD_VIEWER)
       ll::nvapi
       ll::tinygltf
       ll::tinyexr
-      ll::pocketfft
       ll::minizip
       ll::pugixml
       ll::velopack
@@ -2546,9 +2536,7 @@ if(AL_BUILD_TESTS)
       tests/alcolorwheelmodel_test.cpp
       tests/alcrashreporter_test.cpp
       tests/alcurvemodel_test.cpp
-      tests/alcutoutimage_test.cpp
       tests/aldaycyclelandmarks_test.cpp
-      tests/alfarplane_test.cpp
       tests/alfeedback_test.cpp
       tests/alfeedbackoutbox_test.cpp
       tests/algradehistory_test.cpp
@@ -2604,8 +2592,6 @@ if(AL_BUILD_TESTS)
       tests/alscriptweightspane_test.cpp
       tests/alterrainsurfacemaps_test.cpp
       tests/altexturetable_test.cpp
-      tests/alwaterfield_test.cpp
-      tests/alwaterheightbake_test.cpp
       tests/alwhitebalancesolver_test.cpp
       tests/cppfeatures_test.cpp
       tests/llagentaccess_test.cpp
@@ -2622,9 +2608,7 @@ if(AL_BUILD_TESTS)
       alcolorwheelmodel.cpp
       alcrashreporter.cpp
       alcurvemodel.cpp
-      alcutoutimage.cpp
       aldaycyclelandmarks.cpp
-      alfarplane.cpp
       alfeedback.cpp
       alfeedbackoutbox.cpp
       algradehistory.cpp
@@ -2684,8 +2668,6 @@ if(AL_BUILD_TESTS)
       alscripttheme.cpp
       alscripttypes.cpp
       alscriptweightspane.cpp
-      alwaterfield.cpp
-      alwaterheightbake.cpp
       alwhitebalancesolver.cpp
       llagentaccess.cpp
       llhttpretrypolicy.cpp
@@ -2694,7 +2676,7 @@ if(AL_BUILD_TESTS)
       llviewercontrollistener.cpp
       lutcube.cpp
       noise.cpp
-    LIBRARIES llui alscript ll::slua llxml ll::pocketfft ${test_libs}
+    LIBRARIES llui alscript ll::slua llxml ${test_libs}
     SUPPORT
       newview_test_fakes
       newview_test_settings
@@ -2708,20 +2690,21 @@ if(AL_BUILD_TESTS)
       "AL_LSL_DEFINITIONS_DIR=\"${LSL_DEFINITIONS_DIR}\""
   )
 
-  # The selection outline's id and edge passes, the window's depth under the
-  # HUD, and the water surface's draws over the cells the field lays out, with
-  # the cull and the depth pyramid it reads and the waves displaced by heights
-  # the bake integrates from a normal map: the viewer's own shader files read
-  # from the source tree, on llrender's shared hidden window.
+  # The selection outline's id and edge passes, the shadow samplers over a
+  # map the pass has none of, and the post chain's passes held against what
+  # they replaced: the viewer's own shader files read from the source tree,
+  # on llrender's shared hidden window. The post chain's passes are timed
+  # there too, by the GPU's own clock.
   al_add_test_binary(
     newview_gl_tests
     PROJECT ${test_project}
     SOURCES
-      tests/alhuddepth_gl_test.cpp
+      tests/alcasfold_gl_test.cpp
+      tests/aldof_gl_test.cpp
       tests/alselectionoutline_gl_test.cpp
-      tests/alwatersurface_gl_test.cpp
-    UNIT aldepthpyramid.cpp alwaterfield.cpp alwaterheightbake.cpp
-    LIBRARIES llrender ll::pocketfft
+      tests/shadowutil_gl_test.cpp
+    BENCH_SOURCES tests/alcasfold_bench.cpp tests/aldof_bench.cpp tests/alssrhistory_bench.cpp
+    LIBRARIES llrender
     SUPPORT llrender_test_checks llcommon_test_checks
     INCLUDES ${INDRA_SOURCE_DIR}/llprimitive
     DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""

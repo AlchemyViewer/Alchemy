@@ -47,6 +47,18 @@ void mirrorClip(vec3 pos)
 #endif
 }
 
+// mirrorClip's test without the discard, for a shader that takes derivatives or implicit-LOD
+// samples after it and so discards at its end instead: a lane that discards takes no further part
+// in the quad's derivatives, which GLSL then leaves undefined for its neighbours.
+bool mirrorClipped(vec3 pos)
+{
+#ifdef MIRROR_CLIP
+    return (dot(pos.xyz, clipPlane.xyz) + clipPlane.w) < 0.0;
+#else
+    return false;
+#endif
+}
+
  // Octahedron normal vector encoding
  // https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
  //
@@ -97,7 +109,10 @@ float packGeoNormal(vec3 g)
 
 vec3 unpackGeoNormal(float v)
 {
-    float f = v * GEO_OCT_RANGE;
+    // Rounded to the integer the channel stores before it is split: a UNORM read can land an
+    // ulp below k / RANGE, and floor would then take the code below for x and leave y near
+    // LEVELS + 1, a normal from the far side of the octahedron.
+    float f = floor(v * GEO_OCT_RANGE + 0.5);
     float x = floor(f / (GEO_OCT_LEVELS + 1.0));
     float y = f - x * (GEO_OCT_LEVELS + 1.0);
     return octDecode(vec2(x, y) / GEO_OCT_LEVELS);
@@ -198,7 +213,9 @@ vec3 ditherEmissive(vec3 v, vec2 frag_px)
 // Variance is added in alpha (roughness squared) space, which is where a Gaussian lobe width
 // composes linearly. Returns perceptual roughness, the space everything else here works in.
 //
-// Derivatives, so uniform control flow only.
+// Derivatives, so uniform control flow only, and only in the fragment stage: a compute program attaches this object
+// for its normal decoding.
+#ifdef FRAGMENT_SHADER
 float filterSpecularRoughness(float perceptualRoughness, vec3 n)
 {
     // Filament's defaults: how much of the measured variance to trust, and a ceiling so a
@@ -215,3 +232,4 @@ float filterSpecularRoughness(float perceptualRoughness, vec3 n)
     float alpha = perceptualRoughness * perceptualRoughness;
     return sqrt(sqrt(clamp(alpha * alpha + kernel, 0.0, 1.0)));
 }
+#endif

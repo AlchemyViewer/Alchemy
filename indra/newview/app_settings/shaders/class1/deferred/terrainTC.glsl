@@ -46,15 +46,19 @@ vec3 corner(int i)
     return vec3(p, texelFetch(terrain_height_map, g, 0).r);
 }
 
+// Precise, as waterTC's is: a shared edge is worked by two patches at different call sites (one's
+// Outer[2] is the other's Outer[0]), which the compiler may otherwise contract or reorder apart by
+// an ulp, and an ulp of level moves every vertex along the edge.
 float edgeLevel(vec3 a, vec3 b)
 {
     if (terrain_tess_density <= 0.0)
     {
         return TERRAIN_GRID_LEVEL;
     }
-    float len = distance(a, b);
-    float d   = distance(0.5 * (a + b), terrain_tess_origin);
-    return clamp(len * terrain_tess_density / max(d, 1.0), 1.0, TERRAIN_MAX_LEVEL);
+    precise float len   = distance(a, b);
+    precise float d     = distance(0.5 * (a + b), terrain_tess_origin);
+    precise float level = clamp(len * terrain_tess_density / max(d, 1.0), 1.0, TERRAIN_MAX_LEVEL);
+    return level;
 }
 
 void main()

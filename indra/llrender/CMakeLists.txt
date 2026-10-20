@@ -47,6 +47,7 @@ set(
   alimageslot.h
   alprimitiveplot.h
   alquerypool.h
+  alrendertargetdesc.h
   alsamplerstate.h
   altexture3d.h
   altextureslot.h
@@ -149,8 +150,8 @@ if(AL_BUILD_TESTS)
 
   # The suites that need no GL: arithmetic (where a local coordinate lands
   # under the UI transform; the matrix stack, the projection helpers and the
-  # clip-plane classes; the GL floor's version test), and the font tables and
-  # shaping. alfontshaping holds both Unicode tables against each other, so
+  # clip-plane classes; the GL floor's version test), the font tables and
+  # shaping, and render target descriptions. alfontshaping holds both Unicode tables against each other, so
   # this binary links ICU, which llrender itself has no need of.
   al_add_test_binary(
     llrender_tests
@@ -158,6 +159,7 @@ if(AL_BUILD_TESTS)
     SOURCES
       tests/alfontcolrv1_test.cpp
       tests/alfontshaping_test.cpp
+      tests/alrendertargetdesc_test.cpp
       tests/llfontbitmapcache_test.cpp
       tests/llfontfreetype_test.cpp
       tests/llfontregistry_test.cpp
@@ -200,14 +202,15 @@ if(AL_BUILD_TESTS)
   #   order out to 100 km;
   # - the depth bounds test against the depth test it stands in for, and the
   #   depths a light's sphere spans;
-  # - which fragment output reaches a render target's colour attachment, and
-  #   integer attachments cleared and drawn;
+  # - which fragment output reaches a render target's colour attachment,
+  #   integer attachments cleared and drawn, targets kept, built again and
+  #   re-pointed at a shared depth by their descriptions, and their labels;
   # - LLRender's cached clear colour and scissor box, and LLGLSScissor;
-  # - LLGLSLShader's uniform value cache, the compute path (programs built
-  #   through the shader manager, their images, storage blocks and
-  #   dispatches), integer textures through reserved samplers, what the debug
-  #   validator says of images and stencil reads, and which shader objects a
-  #   program owns and which the manager does;
+  # - LLGLSLShader's cache key, its uniform value cache, the compute path
+  #   (programs built through the shader manager, their images, storage
+  #   blocks and dispatches), integer textures through reserved samplers,
+  #   what the debug validator says of images and stencil reads, and which
+  #   shader objects a program owns and which the manager does;
   # - LLRender::drawArraysInstanced: attribute-less instanced geometry, placed
   #   by the matrices the draw syncs;
   # - ALGPUBuffer's store, LLRender's indirect buffer bindings over its

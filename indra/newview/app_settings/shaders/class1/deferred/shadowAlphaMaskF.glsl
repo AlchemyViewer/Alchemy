@@ -32,6 +32,9 @@ in float target_pos_x;
 in vec4 vertex_color;
 in vec2 vary_texcoord0;
 uniform float minimum_alpha;
+// 1 for blended content, whose semi-transparent part casts a stippled half shadow; 0 for
+// masked content, opaque wherever it is drawn at all. The same program serves both passes.
+uniform float shadow_stipple;
 
 void main()
 {
@@ -51,9 +54,12 @@ void main()
         discard;
     }
 
-    if (alpha < 0.88) // treat as semi-transparent
+    // Semi-transparent: a half-density shadow, every other texel of the shadow map in a
+    // checkerboard. The shadow filter all but averages a checkerboard flat, where a pattern
+    // of columns leaves lines along them.
+    if (shadow_stipple > 0.0 && alpha < 0.88)
     {
-        if (fract(0.5*floor(target_pos_x / post_pos.w )) < 0.25)
+        if (((int(gl_FragCoord.x) + int(gl_FragCoord.y)) & 1) == 0)
         {
             discard;
         }

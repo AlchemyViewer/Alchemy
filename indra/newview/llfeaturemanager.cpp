@@ -926,7 +926,6 @@ void LLFeatureManager::holdUnavailable(const std::string& name)
 
 void LLFeatureManager::setGraphicsLevel(U32 level, bool skipFeatures)
 {
-    LLViewerShaderMgr::sSkipReload = true;
     flush_glerror(); // Whatever may have already happened (e.g., to cause us to change), don't let confuse it with new initializations.
     applyBaseMasks();
 
@@ -935,10 +934,11 @@ void LLFeatureManager::setGraphicsLevel(U32 level, bool skipFeatures)
 
     maskFeatures(features);
 
+    // Each feature's setting marks what it changes as it is set; the frame applies them all with one reload, and the
+    // reload asked for here as well covers what changed without a listener.
     applyFeatures(skipFeatures);
 
-    LLViewerShaderMgr::sSkipReload = false;
-    LLViewerShaderMgr::instance()->setShaders();
+    gPipeline.markRenderInputsDirty();
     gPipeline.refreshCachedSettings();
 }
 

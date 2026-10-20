@@ -461,6 +461,19 @@ uniform vec4 SMAA_RT_METRICS;
 #endif
 
 /**
+ * With predication, the three settings below are uniforms, set from RenderSMAAPredicationThreshold, Scale and
+ * Strength on the edge detection program, the one that reads them (LLPipeline::generateSMAABuffers).
+ */
+#if SMAA_PREDICATION
+uniform float smaaPredicationThreshold;
+uniform float smaaPredicationScale;
+uniform float smaaPredicationStrength;
+#define SMAA_PREDICATION_THRESHOLD smaaPredicationThreshold
+#define SMAA_PREDICATION_SCALE smaaPredicationScale
+#define SMAA_PREDICATION_STRENGTH smaaPredicationStrength
+#endif
+
+/**
  * Threshold to be used in the additional predication buffer.
  *
  * Range: depends on the input, so you'll have to find the magic number that

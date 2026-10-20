@@ -54,7 +54,7 @@ float calcDirectionalLight(vec3 n, vec3 l)
 
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
-vec3 skinDirection(mat3x4 b, vec3 dir);
+vec3 skinNormal(mat3x4 b, vec3 n);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #endif
 
@@ -65,7 +65,7 @@ void main()
     mat3x4 skin = getSkinBlend();
     vec4 pos = skinTransformH(skin, position.xyz, modelview_matrix);
     gl_Position = projection_matrix * pos;
-    norm = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
+    norm = normalize(mat3(modelview_matrix) * skinNormal(skin, normal.xyz));
 #else
     gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);
     norm = normalize(normal_matrix * normal);

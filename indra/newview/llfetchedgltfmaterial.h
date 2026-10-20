@@ -54,6 +54,10 @@ public:
     //   media_tex - optional media texture that may override the base color texture
     void bind(LLViewerTexture* media_tex = nullptr);
 
+    // baseColorFactor's alpha at the 8 bits LLFace streams it in, for the passes that cannot read
+    // the stream, so they cut at the texels the G-buffer and shadow passes cut at
+    F32 getStreamedBaseAlpha() const { return (F32)llclampb(ll_round(mBaseColor.mV[VALPHA] * 255.f)) / 255.f; }
+
     bool isFetching() const { return mFetching; }
     bool isLoaded() const { return !mFetching && mFetchSuccess; }
 

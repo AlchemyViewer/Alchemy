@@ -42,6 +42,11 @@ public:
     // set by llsettingsvo so lldrawpoolalpha has quick access to the water plane in eye space
     static LLVector4 sWaterPlane;
 
+    // Gives the bound @a shader the coverage below which this pool draws no blended texel, for a
+    // caller drawing blended materials with its programs outside the pool (the material preview):
+    // LLFetchedGLTFMaterial::bind leaves a blended material's cutoff to the pass.
+    static void setCoverageCutoff(LLGLSLShader* shader);
+
     enum
     {
         VERTEX_DATA_MASK =  LLVertexBuffer::MAP_VERTEX |

@@ -172,12 +172,16 @@ public:
         bool mIsMask = false;
         // The highest alpha of any texel.
         U8 mMaxAlpha = 255;
+        // The lowest alpha of any texel. With mMaxAlpha's default, an analysis that read nothing bounds every alpha.
+        U8 mMinAlpha = 0;
     };
 
 protected:
     virtual ~LLImageGL();
 
     static AlphaAnalysis analyzeAlphaData(const void* data_in, U32 w, U32 h, S8 alpha_offset, S8 alpha_stride);
+    // What a texture with no alpha channel analyses as: every texel opaque.
+    static AlphaAnalysis opaqueAlphaAnalysis() { AlphaAnalysis analysis; analysis.mMinAlpha = 255; return analysis; }
     void analyzeAlpha(const void* data_in, U32 w, U32 h);
     void calcAlphaChannelOffsetAndStride();
 
@@ -309,6 +313,9 @@ public:
     // The highest alpha of the level its alpha was last analysed at (analyzeAlpha), or 255 where it was not: no
     // alpha channel, an alpha it cannot read, or an analysis not yet back.
     U8 getMaxAlpha() const { return mMaxAlpha; }
+    // The lowest alpha of that level, 255 where there is no alpha channel, or 0 where it was not analysed: an alpha
+    // it cannot read, or an analysis not yet back.
+    U8 getMinAlpha() const { return mMinAlpha; }
 
     bool getIsResident(bool test_now = false); // not const
 
@@ -419,6 +426,7 @@ private:
 
     bool mIsMask;
     U8   mMaxAlpha;
+    U8   mMinAlpha;
     bool mNeedsAlphaAndPickMask;
     LLAtomicU32 mAlphaAnalysisSerial; // for request tracking.
     S8   mAlphaStride ;

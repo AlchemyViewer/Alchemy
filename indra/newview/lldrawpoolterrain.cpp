@@ -28,6 +28,7 @@
 
 #include "lldrawpoolterrain.h"
 
+#include "alhexlattice.h"
 #include "alterrainsurfacemaps.h"
 
 #include "llviewercontrol.h"
@@ -75,7 +76,7 @@ LLDrawPoolTerrain::LLDrawPoolTerrain(LLViewerTexture *texturep) :
     // Hack!
     sDetailScale = 1.f/gSavedSettings.getF32("RenderTerrainScale");
     sPBRDetailScale = 1.f/gSavedSettings.getF32("RenderTerrainPBRScale");
-    sPBRDetailMode = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
+    sPBRDetailMode = gPipeline.shaderInputs().mGlobal.mTerrainPBRDetail;
     mAlphaRampImagep = LLViewerTextureManager::getFetchedTexture(IMG_ALPHA_GRAD);
 
     //gGL.getTextureSlot(0)->bind(mAlphaRampImagep.get());
@@ -101,8 +102,8 @@ U32 LLDrawPoolTerrain::getVertexDataMask()
 
 void LLDrawPoolTerrain::prerender()
 {
-    static LLCachedControl<S32> render_terrain_pbr_detail(gSavedSettings, "RenderTerrainPBRDetail");
-    sPBRDetailMode = clamp_terrain_detail(render_terrain_pbr_detail);
+    // The detail the terrain programs were built for, so the maps bound match the samplers they declare.
+    sPBRDetailMode = gPipeline.shaderInputs().mGlobal.mTerrainPBRDetail;
 }
 
 void LLDrawPoolTerrain::boostTerrainDetailTextures()
@@ -129,14 +130,22 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
     // which is what a probe wants.
     const LLVector3 origin = LLViewerCamera::getInstance()->getOrigin() - regionp->getOriginAgent();
     shader->uniform3fv(LLShaderMgr::TERRAIN_TESS_ORIGIN, 1, origin.mV);
+    // Pinned (density 0, which terrainTC reads as the grid's level) exactly when the programs were built with the
+    // spacing that cuts the grid's level into its segments (TERRAIN_TESS_PINNED), from the same latched input, and
+    // above 0 otherwise whatever a debug RenderTerrainLODFactor says.
     static LLCachedControl<F32> tess_density(gSavedSettings, "AlchemyRenderTerrainTessDensity", 64.f);
-    const F32 density = LLPipeline::sDynamicLOD
-        ? llclamp((F32)tess_density, TESS_DENSITY_MIN, TESS_DENSITY_MAX) * sLODFactor
-        : 0.f;
+    const F32 density = gPipeline.shaderInputs().mLocal.mTerrainTessPinned
+        ? 0.f
+        : llmax(llclamp((F32)tess_density, TESS_DENSITY_MIN, TESS_DENSITY_MAX) * sLODFactor, F_APPROXIMATELY_ZERO);
     shader->uniform1f(LLShaderMgr::TERRAIN_TESS_DENSITY, density);
     shader->uniform1f(LLShaderMgr::TERRAIN_GRID_SCALE, land.getMetersPerGrid());
     shader->uniform1i(LLShaderMgr::TERRAIN_SMOOTHING, LLSurface::isSmoothing() ? 1 : 0);
     shader->uniform1f(LLShaderMgr::REGION_SCALE, regionp->getWidth());
+
+    // The sharpness of the triplanar weights the detail of either lit program blends through (pbrterrainUtilF.glsl);
+    // the shadow program has none.
+    static LLCachedControl<F32> triplanar_blend(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", 8.f);
+    shader->uniform1f(LLShaderMgr::TERRAIN_TRIPLANAR_BLEND, triplanar_blend);
 }
 
 void LLDrawPoolTerrain::unbindSurface(LLGLSLShader* shader)
@@ -235,6 +244,13 @@ void LLDrawPoolTerrain::renderShadow(S32 pass)
 
 void LLDrawPoolTerrain::drawLoop()
 {
+    // A patch is drawn through the bound program's tessellation stages. A terrain program that did not build binds the
+    // stand-in, which has none, and a patch drawn through that is a GL error rather than a draw of nothing.
+    const LLGLSLShader* program = LLGLSLShader::sCurBoundShaderPtr;
+    if (!program || !program->isComplete())
+    {
+        return;
+    }
     if (!mDrawFace.empty())
     {
         for (std::vector<LLFace*>::iterator iter = mDrawFace.begin();
@@ -296,6 +312,26 @@ void LLDrawPoolTerrain::renderFullShader()
     unbindSurface(sShader);
 }
 
+// static
+void LLDrawPoolTerrain::uploadHexPlaces(LLGLSLShader* shader, const F64 (*delta)[2], U32 materials)
+{
+    // The hex lattice's density in uv (pbrterrainUtilF's TERRAIN_HEX_GRID_SCALE), as the shader holds it
+    constexpr F64 HEX_GRID = (F64)3.4641016f;
+    // Two elements to a material: the top's place and the x slice's, then the y slice's
+    F32 frac[LLVLComposition::ASSET_COUNT * 2][4] = {};
+    S32 base[LLVLComposition::ASSET_COUNT * 2][4] = {};
+    for (U32 i = 0; i < materials * 3; ++i)
+    {
+        const U32 m = i / 3;
+        const U32 p = i % 3;
+        const U32 e = 2 * m + (p >> 1);
+        const U32 half = (p & 1) * 2;
+        ALHexLattice::place(HEX_GRID, delta[i][0], delta[i][1], &base[e][half], &frac[e][half]);
+    }
+    shader->uniform4fv(LLShaderMgr::TERRAIN_HEX_FRAC, materials * 2, (F32*)frac);
+    shader->uniform4iv(LLShaderMgr::TERRAIN_HEX_BASE, materials * 2, (S32*)base);
+}
+
 void LLDrawPoolTerrain::renderFullShaderTextures()
 {
     // Hack! Get the region that this draw pool is rendering from!
@@ -336,6 +372,17 @@ void LLDrawPoolTerrain::renderFullShaderTextures()
 
     shader->uniform4fv(LLShaderMgr::OBJECT_PLANE_S, 1, tp0.mV);
     shader->uniform4fv(LLShaderMgr::OBJECT_PLANE_T, 1, tp1.mV);
+
+    if (shader->hasUniform(LLShaderMgr::TERRAIN_HEX_FRAC))
+    {
+        // The world's uv less this region's, the same everywhere in the region: the origin's uv in the world's plane
+        // less its phase here. The top's, then the x and y slices', whose v is height and the same in every region.
+        const F64 scale = sDetailScale;
+        const F64 du = scale * region_origin_global.mdV[VX] - (F64)offset_x;
+        const F64 dv = scale * region_origin_global.mdV[VY] - (F64)offset_y;
+        const F64 delta[3][2] = { { du, dv }, { dv, 0.0 }, { du, 0.0 } };
+        uploadHexPlaces(shader, delta, 1);
+    }
 
     LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
 
@@ -541,6 +588,32 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
     }
     shader->uniformMatrix2fv(LLShaderMgr::TERRAIN_UV_TRANSFORM, terrain_material_count, GL_FALSE, (F32*)uv_transform);
     shader->uniform2fv(LLShaderMgr::TERRAIN_UV_OFFSET, terrain_material_count, (F32*)uv_offset);
+
+    if (shader->hasUniform(LLShaderMgr::TERRAIN_HEX_FRAC))
+    {
+        // A material's uv in the world less its uv in this region: its map of the region's origin, the offset
+        // cancelling. The x and y slices are (sx y, z) and (-sy x, z) for the side that does not turn them, and height
+        // is the same in every region, so theirs are the map's first column times the origin's y and its x.
+        const LLVector3d& origin = regionp->getOriginGlobal();
+        F64 delta[terrain_material_count * 3][2];
+        for (U32 i = 0; i < terrain_material_count; ++i)
+        {
+            const F64 a = uv_transform[i][0], b = uv_transform[i][1], c = uv_transform[i][2], d = uv_transform[i][3];
+            const F64 x = origin.mdV[VX];
+            const F64 y = origin.mdV[VY];
+            F64* top = delta[3 * i];
+            F64* yz = delta[3 * i + 1];
+            F64* xz = delta[3 * i + 2];
+            top[0] = a * x + c * y;
+            top[1] = b * x + d * y;
+            yz[0] = a * y;
+            yz[1] = b * y;
+            xz[0] = a * x;
+            xz[1] = b * x;
+        }
+        uploadHexPlaces(shader, delta, terrain_material_count);
+    }
+
     if (sPBRDetailMode >= TERRAIN_PBR_DETAIL_NORMAL)
     {
         shader->uniformMatrix2fv(LLShaderMgr::TERRAIN_NORMAL_AXES, terrain_material_count, GL_FALSE, (F32*)normal_axes);
@@ -589,17 +662,10 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
         roughness_factors[i] = material->mRoughnessFactor;
         emissive_colors[i] = material->mEmissiveColor;
         // glTF 2.0 Specification 3.9.4. Alpha Coverage
-        // mAlphaCutoff is only valid for LLGLTFMaterial::ALPHA_MODE_MASK
-        // Use 0 here due to GLTF terrain blending (LLGLTFMaterial::bind uses
-        // -1 for easier debugging)
-        F32 min_alpha = -0.0f;
-        if (material->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK)
-        {
-            // dividing the alpha cutoff by transparency here allows the shader to compare against
-            // the alpha value of the texture without needing the transparency value
-            min_alpha = material->mAlphaCutoff/material->mBaseColor.mV[3];
-        }
-        minimum_alphas[i] = min_alpha;
+        // mAlphaCutoff is only valid for LLGLTFMaterial::ALPHA_MODE_MASK. The shader compares
+        // it with the alpha its base colour factor has already scaled, as pbropaqueF does for
+        // a prim, and reads a negative cutoff as a material whose alpha does not count.
+        minimum_alphas[i] = (material->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK) ? material->mAlphaCutoff : -1.f;
     }
     // Go through .mV (a real F32[4] member) instead of casting the LLColor4
     // array to F32* directly -- the latter trips -Wstrict-aliasing=2 even

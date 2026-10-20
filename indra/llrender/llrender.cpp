@@ -691,10 +691,10 @@ void LLRender::syncLightState()
     }
 
     // Everything below is still a LOOSE per-program uniform, so it keeps the per-shader hash
-    // gate. These names have writers outside LLRender (LLPipeline::bindDeferredShader pushes
-    // an auto-adjusted sunlight_color; sun_up_factor is written from the pipeline, the draw
-    // pools and LLSettingsVO), so folding them into the shared block would let one writer
-    // stomp another.
+    // gate. sun_up_factor has writers outside LLRender (the pipeline, the draw pools and
+    // LLSettingsVO), so folding it into the shared block would let one writer stomp another.
+    // The sun's, moon's and ambient light the atmospherics read are the Environment block's,
+    // classic sky or not: the sky settings set them there, in one place for every program.
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
     if (!shader || shader->mLightHash == mLightHash)
@@ -705,16 +705,6 @@ void LLRender::syncLightState()
     shader->mLightHash = mLightHash;
 
     shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, mLightState[0].mSunIsPrimary ? 1 : 0);
-
-    if (sClassicMode)
-    {
-        LLVector3 diffuse(mLightState[0].mDiffuse.mV);
-        LLVector3 diffuse_b(mLightState[0].mDiffuseB.mV);
-
-        shader->uniform3fv(LLShaderMgr::AMBIENT, 1, mAmbientLightColor.mV);
-        shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, diffuse.mV);
-        shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, diffuse_b.mV);
-    }
 }
 
 void LLRender::packMatricesUBO()

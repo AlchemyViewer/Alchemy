@@ -34,6 +34,7 @@
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
 vec3 skinDirection(mat3x4 b, vec3 dir);
+vec3 skinNormal(mat3x4 b, vec3 n);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 #endif
@@ -68,6 +69,7 @@ flat out float vary_sign;
 out vec3 vary_normal;
 
 vec2 texture_transform(vec2 vertex_texcoord, vec4[2] khr_gltf_transform, mat4 sl_animation_transform);
+vec4 linearizeVertexTint(vec4 tint);
 vec4 tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] khr_gltf_transform, mat4 sl_animation_transform);
 
 
@@ -84,13 +86,9 @@ void main()
 #endif
     gl_Position = vert;
 
-    // FS derives a screen UV as vary_fragcoord.xy / .z; carry true clip w under reverse-Z
-    // so the divide stays clip.xy/clip.w == ndc.xy (clip.z -> ~0 at the far plane).
-#ifdef REVERSE_Z
+    // FS derives a screen UV as vary_fragcoord.xy / .z, so z carries clip w: clip.xy / clip.w
+    // is the NDC position under either depth convention.
     vary_fragcoord.xyz = vec3(vert.xy, vert.w);
-#else
-    vary_fragcoord.xyz = vert.xyz;
-#endif
 
     base_color_texcoord = texture_transform(texcoord0, texture_base_color_transform, texture_matrix0);
     normal_texcoord = texture_transform(texcoord0, texture_normal_transform, texture_matrix0);
@@ -98,7 +96,7 @@ void main()
     emissive_texcoord = texture_transform(texcoord0, texture_emissive_transform, texture_matrix0);
 
 #ifdef HAS_SKIN
-    vec3 n = mat3(modelview_matrix) * skinDirection(skin, normal.xyz);
+    vec3 n = mat3(modelview_matrix) * skinNormal(skin, normal.xyz);
     vec3 t = mat3(modelview_matrix) * skinDirection(skin, tangent.xyz);
 #else //HAS_SKIN
     vec3 n = normal_matrix * normal;
@@ -112,7 +110,7 @@ void main()
     vary_sign = transformed_tangent.w;
     vary_normal = n;
 
-    vertex_color = diffuse_color;
+    vertex_color = linearizeVertexTint(diffuse_color);
 
 #if !defined(HAS_SKIN)
     vary_position = (modelview_matrix*vec4(position.xyz, 1.0)).xyz;
@@ -141,6 +139,7 @@ out vec2 emissive_texcoord;
 out vec4 vertex_color;
 
 vec2 texture_transform(vec2 vertex_texcoord, vec4[2] khr_gltf_transform, mat4 sl_animation_transform);
+vec4 linearizeVertexTint(vec4 tint);
 
 
 void main()
@@ -153,7 +152,7 @@ void main()
     base_color_texcoord = texture_transform(texcoord0, texture_base_color_transform, texture_matrix0);
     emissive_texcoord = texture_transform(texcoord0, texture_emissive_transform, texture_matrix0);
 
-    vertex_color = diffuse_color;
+    vertex_color = linearizeVertexTint(diffuse_color);
 }
 
 #endif

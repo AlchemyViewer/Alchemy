@@ -38,7 +38,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
 #endif
 
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
-vec4 applyWaterFogViewLinear(vec3 pos, vec4 color);
+vec4 applyWaterFogViewLinearNoClip(vec3 pos, vec4 color);
 
 void mirrorClip(vec3 pos);
 
@@ -236,7 +236,11 @@ void main()
     vec4 fb = texture(screenTex, distort2);
 
 #else
-    vec4 fb = applyWaterFogViewLinear(viewVec*2048.0, vec4(1.0));
+    // Opaque water: the "refraction" is the fog of 2048 m of water behind the surface, as
+    // waterHazeF fogs the void past the field. Measured from the surface, not from the eye: a
+    // point 2048 m from the eye lies above the plane wherever the surface is farther than that,
+    // and there the clipping fog returned its input, white.
+    vec4 fb = applyWaterFogViewLinearNoClip(pos + viewVec*2048.0, vec4(1.0));
 #endif
 
     // The environment's blur, for the reflections and refractions alone.
@@ -277,7 +281,9 @@ void main()
     // straight behind the camera, where pow would take a negative base.
     float vh = sqrt(max(0.5 + 0.5 * dot(v, l), 0.0));
     float fresnel = 0.02 + 0.98 * pow(max(1.0 - vh, 0.0), 5.0);
-    vec3 punctual = min(glint * fresnel, 10.0) * sunlit_linear * shadow * atten;
+    // Not dimmed by the eye path's haze here: the haze pass dims every water pixel by it
+    // afterwards (doAtmospherics), the glint along with the reflection and refraction.
+    vec3 punctual = min(glint * fresnel, 10.0) * sunlit_linear * shadow;
 
     // The glint's glow, as WindLight's water wrote it: the lobe at its peak of 1, by 0.1 rising to 0.3 as the light
     // climbs, which the glow and bloom spread into a soft halo about the sparkles. Shadowed glints have none.

@@ -32,11 +32,11 @@ float ssrMinGlossiness();
 
 uniform samplerCubeArray   reflectionProbes;
 
-// Second-order SH irradiance, nine RGB coefficients per probe in a 9-wide strip, one row per
-// cubemap layer. See class1/interface/shProjectF.glsl -- irradiance is band-limited to these
-// nine numbers, so the cubemap this replaces was storing a nine-degree-of-freedom function in
-// sixteen thousand texels.
-uniform sampler2D          shCoeffs;
+// Second-order SH irradiance, nine RGB coefficients per probe packed as halves into a row of
+// four RGBA32UI texels (class1/interface/shPackUtilF.glsl), one row per cubemap layer. See
+// class1/interface/shProjectF.glsl -- irradiance is band-limited to these nine numbers, so the
+// cubemap this replaces was storing a nine-degree-of-freedom function in sixteen thousand texels.
+uniform usampler2D         shCoeffs;
 
 uniform sampler2D sceneMap;
 uniform int cube_snapshot;
@@ -144,6 +144,14 @@ void preProbeSample(vec3 pos)
     // TODO: make some sort of structure that reduces the number of distance checks
     for (int i = start; i < refmapCount && probeInfluences < REF_SAMPLE_COUNT; ++i)
     {
+        // The probes are sorted on the nearest depth their bounding sphere reaches (refParams.w),
+        // which the bucket's lower bound already relies on: from the first that lies wholly
+        // beyond this point on, none can hold it.
+        if (refParams[i].w > -pos.z)
+        {
+            break;
+        }
+
         // found an influencing probe
         if (shouldSampleProbe(i, pos))
         {
@@ -572,6 +580,39 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
     return ret.rgb;
 }
 
+// unpackHalf2x16 is GLSL 4.20's; below it, the halves shPackUtilF.glsl packed by hand are read
+// the same way.
+#if __VERSION__ >= 420
+vec2 shUnpackHalves(uint u)
+{
+    return unpackHalf2x16(u);
+}
+#else
+float shHalfValue(uint h)
+{
+    uint sign = (h & 0x8000u) << 16;
+    uint e    = (h >> 10) & 0x1Fu;
+    uint m    = h & 0x3FFu;
+
+    if (e == 0u)
+    {
+        // Zero or a denormal: m units of 2^-24.
+        float v = float(m) * 5.9604644775390625e-8;
+        return (sign != 0u) ? -v : v;
+    }
+    if (e == 31u)
+    {
+        return uintBitsToFloat(sign | 0x7F800000u | (m << 13));
+    }
+    return uintBitsToFloat(sign | ((e + 112u) << 23) | (m << 13));
+}
+
+vec2 shUnpackHalves(uint u)
+{
+    return vec2(shHalfValue(u & 0xFFFFu), shHalfValue(u >> 16));
+}
+#endif
+
 // Tap an irradiance map
 // pos - position of pixel
 // dir - pixel normal
@@ -587,15 +628,37 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
 // unchanged.
 vec3 evalSHIrradiance(vec3 n, int layer)
 {
-    vec3 L0 = texelFetch(shCoeffs, ivec2(0, layer), 0).rgb;
-    vec3 L1 = texelFetch(shCoeffs, ivec2(1, layer), 0).rgb;
-    vec3 L2 = texelFetch(shCoeffs, ivec2(2, layer), 0).rgb;
-    vec3 L3 = texelFetch(shCoeffs, ivec2(3, layer), 0).rgb;
-    vec3 L4 = texelFetch(shCoeffs, ivec2(4, layer), 0).rgb;
-    vec3 L5 = texelFetch(shCoeffs, ivec2(5, layer), 0).rgb;
-    vec3 L6 = texelFetch(shCoeffs, ivec2(6, layer), 0).rgb;
-    vec3 L7 = texelFetch(shCoeffs, ivec2(7, layer), 0).rgb;
-    vec3 L8 = texelFetch(shCoeffs, ivec2(8, layer), 0).rgb;
+    // The row's 27 halves, two to a uint, eight to a texel, in coefficient order and red, green,
+    // blue within each (shPackUtilF.glsl).
+    uvec4 t0 = texelFetch(shCoeffs, ivec2(0, layer), 0);
+    uvec4 t1 = texelFetch(shCoeffs, ivec2(1, layer), 0);
+    uvec4 t2 = texelFetch(shCoeffs, ivec2(2, layer), 0);
+    uvec4 t3 = texelFetch(shCoeffs, ivec2(3, layer), 0);
+
+    vec2 h0  = shUnpackHalves(t0.x);  // L0.r  L0.g
+    vec2 h1  = shUnpackHalves(t0.y);  // L0.b  L1.r
+    vec2 h2  = shUnpackHalves(t0.z);  // L1.g  L1.b
+    vec2 h3  = shUnpackHalves(t0.w);  // L2.r  L2.g
+    vec2 h4  = shUnpackHalves(t1.x);  // L2.b  L3.r
+    vec2 h5  = shUnpackHalves(t1.y);  // L3.g  L3.b
+    vec2 h6  = shUnpackHalves(t1.z);  // L4.r  L4.g
+    vec2 h7  = shUnpackHalves(t1.w);  // L4.b  L5.r
+    vec2 h8  = shUnpackHalves(t2.x);  // L5.g  L5.b
+    vec2 h9  = shUnpackHalves(t2.y);  // L6.r  L6.g
+    vec2 h10 = shUnpackHalves(t2.z);  // L6.b  L7.r
+    vec2 h11 = shUnpackHalves(t2.w);  // L7.g  L7.b
+    vec2 h12 = shUnpackHalves(t3.x);  // L8.r  L8.g
+    vec2 h13 = shUnpackHalves(t3.y);  // L8.b  (zero)
+
+    vec3 L0 = vec3(h0, h1.x);
+    vec3 L1 = vec3(h1.y, h2);
+    vec3 L2 = vec3(h3, h4.x);
+    vec3 L3 = vec3(h4.y, h5);
+    vec3 L4 = vec3(h6, h7.x);
+    vec3 L5 = vec3(h7.y, h8);
+    vec3 L6 = vec3(h9, h10.x);
+    vec3 L7 = vec3(h10.y, h11);
+    vec3 L8 = vec3(h12, h13.x);
 
     const float A0 = 1.0;        // pi   / pi
     const float A1 = 0.6666667;  // 2pi/3 / pi
@@ -795,6 +858,12 @@ uniform samplerCubeArray   heroProbes;
 
 void tapHeroProbe(inout vec3 glossenv, vec3 pos, vec3 norm, float glossiness)
 {
+    // No mirror this frame: the box, sphere and cube layer still hold the last one's.
+    if (heroProbeCount < 1)
+    {
+        return;
+    }
+
     float clipDist = dot(pos.xyz, clipPlane.xyz) + clipPlane.w;
     float w = 0;
     float dw = 0;
@@ -818,7 +887,14 @@ void tapHeroProbe(inout vec3 glossenv, vec3 pos, vec3 norm, float glossiness)
     clipDist = clamp(clipDist * falloffMult, 0, 1);
     w = clamp(w * falloffMult * clipDist, 0, 1);
     w = mix(0, w, clamp(glossiness - 0.75, 0, 1) * 4); // We only generate a quarter of the mips for the hero probes.  Linearly interpolate between normal probes and hero probes based upon glossiness.
-    glossenv = mix(glossenv, textureLod(heroProbes, vec4(env_mat * refnormpersp, 0), (1.0-glossiness)*heroMipCount).xyz, w);
+
+    // Only the glossiest quarter's mips exist (LLHeroProbeManager::generateRadiance), and a
+    // weight of 0 does not keep an undefined texel out of mix, so the fetch is skipped there.
+    if (w <= 0.0)
+    {
+        return;
+    }
+    glossenv = mix(glossenv, textureLod(heroProbes, vec4(env_mat * refnormpersp, 0), (1.0-glossiness)*heroMaxLod).xyz, w);
 }
 
 #else
@@ -855,8 +931,11 @@ void doProbeSample(inout vec3 ambenv, inout vec3 glossenv,
 
 #if defined(SSR)
     // Skip the march only where it would contribute nothing anyway. Asking the SSR unit for its
-    // own fade threshold keeps this from drifting away from it again.
-    if (cube_snapshot != 1 && glossiness > ssrMinGlossiness())
+    // own fade threshold keeps this from drifting away from it again. A transparent surface
+    // marches unfaded and is weighted by glossiness below, which is zero only at zero, so its
+    // gate is there too, as the legacy path's is; the fade's threshold would switch it on at
+    // full weight in one step.
+    if (cube_snapshot != 1 && (transparent ? glossiness > 0.0 : glossiness > ssrMinGlossiness()))
     {
         vec4 ssr = vec4(0);
         // refnormpersp, not norm: the march takes the same dominant direction the probe tap

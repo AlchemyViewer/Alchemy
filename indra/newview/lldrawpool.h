@@ -485,6 +485,11 @@ public:
     virtual void renderRiggedGroup(LLSpatialGroup* group, U32 type, bool texture = true);
 };
 
+// A GLTF draw's texture animation, loaded into MM_TEXTURE0 for the draw and cleared after it, as
+// pushGLTFBatch brackets its own. A draw that binds a GLTF material by itself brackets itself.
+void setup_texture_matrix(LLDrawInfo& params);
+void teardown_texture_matrix(LLDrawInfo& params);
+
 class LLFacePool : public LLDrawPool
 {
 public:

@@ -63,6 +63,7 @@
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -118,9 +119,10 @@ namespace ll_test
     };
 
     // Concrete LLShaderMgr for render-output tests. They don't pump the
-    // per-frame uniform updates the viewer does, so updateShaderUniforms is a
-    // no-op. LLRender::syncMatrices still pushes matrix uniforms directly each
-    // draw — that path lives in llrender.cpp and doesn't go through the mgr.
+    // per-frame uniform updates the viewer does, so updateShaderUniforms does
+    // only what a test hands it in mUpdateUniforms, and nothing by default.
+    // LLRender::syncMatrices still pushes matrix uniforms directly each draw —
+    // that path lives in llrender.cpp and doesn't go through the mgr.
     // A test that loads the viewer's own shader files passes the tree's class
     // prefix ("<app_settings>/shaders/class"), which loadShaderFile completes
     // with the class number and the file's path; the rest load none.
@@ -139,7 +141,15 @@ namespace ll_test
         ~TestShaderMgr() override { if (sInstance == this) sInstance = mPrevious; }
 
         std::string getShaderDirPrefix() override { return mDirPrefix; }
-        void updateShaderUniforms(LLGLSLShader* /*shader*/) override {}
+        void updateShaderUniforms(LLGLSLShader* shader) override
+        {
+            if (mUpdateUniforms)
+            {
+                mUpdateUniforms(shader);
+            }
+        }
+
+        std::function<void(LLGLSLShader*)> mUpdateUniforms;
 
     private:
         std::string mDirPrefix;

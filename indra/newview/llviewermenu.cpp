@@ -120,7 +120,7 @@
 #include "lltoolpie.h"
 #include "lltoolselectland.h"
 #include "lltrans.h"
-#include "llviewerdisplay.h" //for gWindowResized
+#include "llviewerdisplay.h"
 #include "llviewergenericmessage.h"
 #include "llviewerhelp.h"
 #include "llviewermenufile.h"   // init_menu_file()
@@ -2426,8 +2426,9 @@ class LLAdvancedPurgeShaderCache : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
+        // Every program is built again with the frame's other changes, from source now that its binary is gone.
         LLViewerShaderMgr::instance()->clearShaderCache();
-        LLViewerShaderMgr::instance()->setShaders();
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Programs);
         return true;
     }
 };
@@ -8883,7 +8884,8 @@ class LLToggleShaderControl : public view_listener_t
         bool checked = gSavedSettings.getBOOL( control_name );
         gSavedSettings.setBOOL( control_name, !checked );
         LLPipeline::refreshCachedSettings();
-        LLViewerShaderMgr::instance()->setShaders();
+        // The programs are built from the binary cache, or not, as the setting now says.
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Programs);
         return !checked;
     }
 };

@@ -43,8 +43,8 @@ struct HeroProbeData
     LLMatrix4 heroBox;
     LLVector4 heroSphere;
     GLint     heroShape;
-    GLint     heroMipCount;
-    GLint     heroProbeCount;
+    GLfloat   heroMaxLod;     // the LOD radiance generation maps to roughness 1
+    GLint     heroProbeCount; // 1 while there is a mirror to reflect, else 0
 };
 
 class alignas(16) LLHeroProbeManager
@@ -63,6 +63,9 @@ public:
 
     // release any GL state
     void cleanup();
+
+    // Whether initReflectionMaps has built the cube array that cleanup frees.
+    bool holdsResources() const { return mTexture.notNull(); }
 
     // maintain reflection probes
     void update();
@@ -128,6 +131,10 @@ private:
 
     // resolution of reflection probes
     U32 mProbeResolution = 1024;
+
+    // RenderHDREnabled as the cube array, the scratch target and the mip chain were allocated
+    // under: float colour or 8-bit. initReflectionMaps rebuilds all three when it changes.
+    bool mHDR = true;
 
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;
