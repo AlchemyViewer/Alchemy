@@ -4799,6 +4799,59 @@ namespace
         require_checks_clean(off);
     }
 
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a jump after an inner loop is its outer loop's break or continue", "[ALLSLToSLua]")
+    {
+        // Tapple's: the second jump end follows the for inside the while.
+        const std::string lsl = "default { state_entry() {\n"
+                                "    list sync = [1, 4];\n"
+                                "    integer invCount = llGetInventoryNumber(INVENTORY_NOTECARD);\n"
+                                "    integer i;\n"
+                                "    while (TRUE) {\n"
+                                "        if (5 >= invCount) {\n"
+                                "            jump end;\n"
+                                "        } else {\n"
+                                "            for (; i < invCount; i++) {\n"
+                                "                string invName = llGetInventoryName(INVENTORY_NOTECARD, i);\n"
+                                "            }\n"
+                                "            jump end;\n"
+                                "        }\n"
+                                "    }\n"
+                                "    @end;\n"
+                                "    integer n;\n"
+                                "    while (n < 10) {\n"
+                                "        n++;\n"
+                                "        while (llFrand(1.0) < 0.5) { llOwnerSay(\"spin\"); }\n"
+                                "        if (n == 5) jump next;\n"
+                                "        do { llOwnerSay(\"a\"); } while (FALSE);\n"
+                                "        while (llFrand(1.0) < 0.5) { if (n == 7) jump out; }\n"
+                                "        llOwnerSay((string)n);\n"
+                                "        @next;\n"
+                                "    }\n"
+                                "    @out;\n"
+                                "    llOwnerSay(\"done\");\n"
+                                "} }\n";
+        ALLSLToSLua::Options o;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("Tapple's: both jumps a break, and the label gone");
+            CHECK(count(r, "break\n") == 2);
+            CHECK_FALSE(has(r, "-- jump end"));
+            CHECK_FALSE(has(r, "-- @end"));
+        }
+        UNSCOPED_INFO("after two inner loops, a jump to the end of the body its continue");
+        CHECK(has(r, "if n == 5 then continue end"));
+        {
+            INFO("out of two loops at once, still noted");
+            CHECK(has(r, "-- jump out"));
+            CHECK(has(r, "-- @out"));
+            CHECK(noted(r, "SluaJump"));
+        }
+        require_checks_clean(r);
+    }
+
     TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: with uuidKeys off llList2Key's item is read as text as List2String reads it", "[ALLSLToSLua]")
     {
         const std::string lsl = "list gMixed;\n"

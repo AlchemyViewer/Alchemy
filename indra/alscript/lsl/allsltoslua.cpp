@@ -1123,6 +1123,12 @@ namespace
         std::vector<LSLASTNode*> mLoops;
         // The labels a jump reaches that SLua has nothing for.
         boost::unordered_flat_set<LSLSymbol*> mUnstructured;
+        // Each jump that is a loop's break, or its continue: as Tailslide
+        // says, or as it would say where it lost the loop around the jump
+        // (findJumps).
+        boost::unordered_flat_set<LSLASTNode*> mBreaks;
+        boost::unordered_flat_set<LSLASTNode*> mContinues;
+        void                                   findJumps();
         // Whether a `return` from the handler being written ends the
         // script's setup: state_entry of a script of one state, written at
         // the top level.
@@ -5392,12 +5398,12 @@ namespace
             case NODE_JUMP_STATEMENT:
             {
                 auto* j = static_cast<LSLJumpStatement*>(s);
-                if (j->getIsBreakLike() && !mLoops.empty())
+                if (mBreaks.contains(j) && !mLoops.empty())
                 {
                     line("break");
                     return;
                 }
-                if (j->getIsContinueLike() && !mLoops.empty())
+                if (mContinues.contains(j) && !mLoops.empty())
                 {
                     // A for's steps run before its next turn, as they would
                     // at the end of its body.
@@ -8284,20 +8290,114 @@ end
         }
     }
 
-    std::string Writer::write()
+    void Writer::findJumps()
     {
+        // Tailslide says which jumps are a loop's break or its continue,
+        // but it forgets the loop it is in once a loop inside that one
+        // ends: a jump after an inner loop reads as in no loop, and SLua
+        // got no break for it. Where it found neither, the same is asked
+        // again of the innermost loop around the jump, found by walking up:
+        // a break where the label follows that loop, a continue where
+        // nothing but labels follows the label in it. Not in a body with a
+        // label named twice, where Tailslide works out nothing.
+        const auto loopOf = [](LSLASTNode* node) -> LSLASTNode* {
+            for (node = node->getParent(); node; node = node->getParent())
+            {
+                const LSLNodeSubType sub = node->getNodeSubType();
+                if (sub == NODE_WHILE_STATEMENT || sub == NODE_DO_STATEMENT || sub == NODE_FOR_STATEMENT)
+                {
+                    return node;
+                }
+                if (node->getNodeType() == NODE_GLOBAL_FUNCTION || node->getNodeType() == NODE_EVENT_HANDLER)
+                {
+                    return nullptr;
+                }
+            }
+            return nullptr;
+        };
+        const auto bodyOf = [](LSLASTNode* node) -> LSLASTNode* {
+            while (node && node->getNodeType() != NODE_GLOBAL_FUNCTION && node->getNodeType() != NODE_EVENT_HANDLER)
+            {
+                node = node->getParent();
+            }
+            return node;
+        };
+        boost::unordered_flat_set<LSLASTNode*> twice;
+        {
+            boost::unordered_flat_set<std::pair<LSLASTNode*, std::string>> seen;
+            walk(mScript, [&](LSLASTNode* node) {
+                if (node->getNodeSubType() == NODE_LABEL)
+                {
+                    LSLASTNode* body = bodyOf(node);
+                    if (!seen.emplace(body, static_cast<LSLLabel*>(node)->getIdentifier()->getName()).second)
+                    {
+                        twice.insert(body);
+                    }
+                }
+            });
+        }
+        const auto kind = [&](LSLJumpStatement* j, bool& breaks, bool& continues) {
+            breaks    = j->getIsBreakLike();
+            continues = j->getIsContinueLike();
+            LSLSymbol*  sym   = j->getSymbol();
+            LSLASTNode* label = sym ? sym->getLabelDecl() : nullptr;
+            LSLASTNode* loop  = loopOf(j);
+            if (breaks || continues || !label || !loop || twice.contains(bodyOf(j)))
+            {
+                return;
+            }
+            for (LSLASTNode* after = loop->getNext(); after && after->getNodeSubType() == NODE_LABEL; after = after->getNext())
+            {
+                if (after == label)
+                {
+                    breaks = true;
+                    return;
+                }
+            }
+            if (loopOf(label) != loop)
+            {
+                return;
+            }
+            for (LSLASTNode* at = label; at != loop; at = at->getParent())
+            {
+                for (LSLASTNode* next = at->getNext(); next; next = next->getNext())
+                {
+                    if (next->getNodeType() == NODE_STATEMENT && next->getNodeSubType() != NODE_LABEL)
+                    {
+                        return;
+                    }
+                }
+            }
+            continues = true;
+        };
         // The jumps SLua has nothing for, whose labels are kept as a mark.
         walk(mScript, [&](LSLASTNode* node) {
             if (node->getNodeSubType() != NODE_JUMP_STATEMENT)
             {
                 return;
             }
-            auto* j = static_cast<LSLJumpStatement*>(node);
-            if (!j->getIsBreakLike() && !j->getIsContinueLike())
+            auto* j         = static_cast<LSLJumpStatement*>(node);
+            bool  breaks    = false;
+            bool  continues = false;
+            kind(j, breaks, continues);
+            if (breaks)
+            {
+                mBreaks.insert(j);
+            }
+            else if (continues)
+            {
+                mContinues.insert(j);
+            }
+            else
             {
                 mUnstructured.insert(j->getIdentifier()->getSymbol());
             }
         });
+    }
+
+    std::string Writer::write()
+    {
+        findJumps();
         // What the script sets going: a timer on LLTimers where it sets one.
         LSLASTNode* first = mScript->getStates()->getChild(0);
         mManyStates       = first && first->getNext();
