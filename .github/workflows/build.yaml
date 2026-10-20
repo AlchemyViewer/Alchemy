@@ -620,6 +620,7 @@ jobs:
       # made from the staged tree, after the package is.
       - name: Upload debug files to Sentry
         if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.sentry_dsn != ''
+        timeout-minutes: 30
         shell: bash
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -636,7 +637,27 @@ jobs:
 
           # sentry-cli is one of the setup's Python tools.
           cmake --build "$BUILD_DIRECTORY" --config Release --target symbols
-          sentry-cli debug-files upload --include-sources --wait "$BUILD_DIRECTORY/symbols/Release"
+
+          # sentry-cli tries a request again on a 5xx for only a few seconds,
+          # which an outage of Sentry's API outlasts, so the upload is run
+          # again over several minutes; a run sends only what Sentry does not
+          # have yet. A client error, short of a timeout or a rate limit,
+          # would come back the same and ends the step.
+          log="$RUNNER_TEMP/sentry-upload.log"
+          attempts=5
+          attempt=1
+          delay=30
+          until sentry-cli debug-files upload --include-sources --wait "$BUILD_DIRECTORY/symbols/Release" 2>&1 | tee "$log"; do
+            status=$(sed -nE 's/.*http status: ([0-9]+).*/\1/p' "$log" | tail -n 1)
+            if [[ $status == 4?? && $status != 408 && $status != 429 ]] || (( attempt == attempts )); then
+              echo "::error::Sentry did not take the debug files${status:+ (HTTP $status)}; crash reports from this build would go unsymbolicated"
+              exit 1
+            fi
+            echo "::warning::Upload $attempt of $attempts to Sentry failed${status:+ (HTTP $status)}; trying again in $delay s"
+            sleep "$delay"
+            attempt=$((attempt + 1))
+            delay=$((delay * 2))
+          done
 
       # The headroom the row finished with, failed or not.
       - name: Report disk space
