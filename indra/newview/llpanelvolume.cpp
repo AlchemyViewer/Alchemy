@@ -1030,10 +1030,18 @@ void LLPanelVolume::onLightSelectColor(const LLSD& data)
     }
     LLVOVolume *volobjp = (LLVOVolume *)objectp;
 
-    LLColor4    clr = mLightColorSwatch->get();
-    LLColor3    clr3( clr );
-    volobjp->setLightSRGBColor(clr3);
-    mLightSavedColor = clr;
+    applyLightSwatchColor(volobjp);
+    mLightSavedColor = mLightColorSwatch->get();
+}
+
+void LLPanelVolume::applyLightSwatchColor(LLVOVolume* volobjp)
+{
+    volobjp->setLightSRGBColor(LLColor3(mLightColorSwatch->get()));
+    if (volobjp->getIsLight())
+    {
+        // Leaves an open picker where it is, so a drag through colors the wire cannot tell apart stays smooth.
+        mLightColorSwatch->set(volobjp->getLightSRGBBaseColor());
+    }
 }
 
 void LLPanelVolume::onLightSelectTexture(const LLSD& data)
@@ -1616,8 +1624,7 @@ void LLPanelVolume::onCommitLight( LLUICtrl* ctrl, void* userdata )
     volobjp->setLightRadius((F32)self->mLightRadius->getValue().asReal());
     volobjp->setLightFalloff((F32)self->mLightFalloff->getValue().asReal());
 
-    LLColor4    clr = self->mLightColorSwatch->get();
-    volobjp->setLightSRGBColor(LLColor3(clr));
+    self->applyLightSwatchColor(volobjp);
 
     {
         LLUUID id = self->mLightTextureCtrl->getImageAssetID();
