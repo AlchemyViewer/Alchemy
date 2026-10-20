@@ -290,6 +290,7 @@ extern LLGLSLShader         gDeferredWLCloudProgram;
 extern LLGLSLShader         gDeferredWLSunProgram;
 extern LLGLSLShader         gDeferredWLMoonProgram;
 extern LLGLSLShader         gDeferredStarProgram;
+extern LLGLSLShader         gDeferredStarQuadProgram;
 extern LLGLSLShader         gDeferredMeteorProgram;
 extern LLGLSLShader         gDeferredAuroraProgram;
 extern LLGLSLShader         gDeferredFullbrightShinyProgram;

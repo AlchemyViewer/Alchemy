@@ -31,7 +31,9 @@
 #include "v3color.h"
 #include "v4color.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <random>
 
 namespace
@@ -104,6 +106,41 @@ F32 milkyWayDensity(const LLVector3& direction)
 std::vector<Star> generate(U32 count, F32 dome_radius)
 {
     return detail::generate(count, dome_radius, [](const LLVector3& direction) { return milkyWayDensity(direction); });
+}
+
+Layout layOut(std::vector<Star>& stars)
+{
+    const auto points = std::stable_partition(stars.begin(), stars.end(), spiked);
+
+    Layout layout;
+    layout.mQuads  = (U32)(points - stars.begin());
+    layout.mPoints = (U32)(stars.end() - points);
+    return layout;
+}
+
+void fillVertices(const std::vector<Star>& stars, const Layout& layout, LLStrider<LLVector4a> vertices)
+{
+    llassert(stars.size() == (size_t)layout.mQuads + layout.mPoints);
+
+    const auto put = [&vertices](const Star& star)
+    {
+        LLVector4a& vertex = *(vertices++);
+        vertex.load3(star.mPosition.mV);
+        // The colour's bytes as they are, never through a float: an F32 with these bits may be a NaN.
+        std::memcpy(reinterpret_cast<U8*>(&vertex) + 3 * sizeof(F32), star.mColour.mV, sizeof(star.mColour.mV));
+    };
+
+    for (U32 s = 0; s < layout.mQuads; ++s)
+    {
+        for (U32 v = 0; v < QUAD_VERTICES; ++v)
+        {
+            put(stars[s]);
+        }
+    }
+    for (U32 s = layout.mQuads; s < layout.mQuads + layout.mPoints; ++s)
+    {
+        put(stars[s]);
+    }
 }
 
 } // namespace ALStarField

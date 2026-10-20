@@ -29,13 +29,19 @@
 // Shared matrix stack + derived matrices, spliced from
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
-uniform vec2 screen_res;
 
-in vec3 position;       // star center world position (shared by all 6 verts of a star)
-in vec4 diffuse_color;  // RGB = sRGB black-body color, A = intrinsic intensity (0..1)
-in vec2 texcoord0;      // corner offset in [-1, 1] for GPU-side billboarding
+// One vertex a star, drawn as a point; or, for the stars with diffraction spikes (STAR_QUADS), six, drawn as a quad: GL
+// drops a point whose centre leaves the screen, which would pop a spiked star's arms at the edge
+// (LLDrawPoolWLSky::renderStarsDeferred, ALStarField).
+in vec3 position;       // the star's centre, in the stars' frame
+in int texture_index;   // its colour, in the position's fourth word: rgb = sRGB black-body colour, a = intrinsic intensity
 
+uniform vec2 screen_res;       // the viewport the stars draw into, in pixels
+#ifdef STAR_QUADS
 out vec2 vary_corner;          // corner offset, pass-through for fragment shape
+#else
+flat out vec3 vary_point;      // the star's centre in window coordinates, and half its extent in pixels
+#endif
 flat out vec3 vary_star_color; // what the star adds where its shape is 1: every per-star term but the shape
 flat out float vary_spike;     // the diffraction spikes' strength
 
@@ -122,18 +128,24 @@ void main()
     {
         // Outside the clip volume: nothing of the star is drawn.
         gl_Position     = vec4(2.0, 2.0, 2.0, 1.0);
+#ifdef STAR_QUADS
         vary_corner     = vec2(0.0);
+#else
+        gl_PointSize    = 1.0;
+        vary_point      = vec3(0.0, 0.0, 1.0);
+#endif
         vary_star_color = vec3(0.0);
         vary_spike      = 0.0;
         return;
     }
 
-    // Transform the star center to clip space. All 6 verts of a star share
-    // the same input position, so the center projects identically; the only
+    // Transform the star center to clip space. A quad's 6 verts share the
+    // same input position, so the center projects identically; the only
     // per-vertex change is the screen-space corner offset we add below.
     vec4 clip_center = modelview_projection_matrix * vec4(position, 1.0);
 
-    float intensity = diffuse_color.a;
+    vec4 star = unpackUnorm4x8(uint(texture_index));
+    float intensity = star.a;
 
     // Resolution-adaptive pixel size. Base curve keeps the faint/mid majority
     // in the original 2..7px range (crisp point-sources), and only the very
@@ -153,11 +165,24 @@ void main()
     float quad_pixels      = max(ideal_px, min_px);
     float subpixel_fade    = (ideal_px * ideal_px) / (quad_pixels * quad_pixels);
 
-    vec2 pixel_offset = texcoord0 * (quad_pixels * 0.5);
+#ifdef STAR_QUADS
+    // The corner, from the vertex's place among its star's six: two triangles, BL BR TR and BL TR TL.
+    const vec2 CORNERS[6] = vec2[6](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(1.0, 1.0),
+                                    vec2(-1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0));
+    vec2 corner = CORNERS[gl_VertexID % 6];
+    vec2 pixel_offset = corner * (quad_pixels * 0.5);
 
     // Convert pixels to NDC then to clip space (clip = ndc * w).
     vec2 ndc_offset = pixel_offset * (2.0 / max(screen_res, vec2(1.0)));
     clip_center.xy += ndc_offset * clip_center.w;
+#else
+    // The star covers what its quad would: the pixels whose centres lie in a square quad_pixels a side about its
+    // centre. GL rounds a point's size to its granularity (0.125 pixels on NVIDIA) and measures gl_PointCoord across
+    // the rounded square, which would scale a 2.6-pixel star's shape by up to 5%; so the point is drawn a pixel wider,
+    // and starsF.glsl works each pixel's offset from the star's own centre and leaves out those past its square.
+    gl_PointSize = quad_pixels + 1.0;
+    vary_point = vec3((clip_center.xy / clip_center.w * 0.5 + 0.5) * screen_res, quad_pixels * 0.5);
+#endif
 
     // On the far plane with the rest of the sky, so geometry occludes stars and the sun and
     // moon, drawn after them, cover them. Reverse-Z (glClipControl ZERO_TO_ONE) puts the far
@@ -170,7 +195,9 @@ void main()
 #endif
 
     gl_Position = clip_center;
-    vary_corner = texcoord0;
+#ifdef STAR_QUADS
+    vary_corner = corner;
+#endif
 
     // NB: this linearises the sRGB black-body colour, and softenLight's SKIP_ATMOS branch
     // then srgb_to_linear's it a SECOND time and multiplies by sky_hdr_scale (the sky dome's
@@ -178,7 +205,7 @@ void main()
     // Long-standing upstream behaviour. Net star brightness balances that double-decode
     // against the gains here (bloom_boost, the (1 + intensity) gain) and sky_hdr_scale -- if
     // star brightness is ever retuned, this whole chain is the place to look, not one line.
-    vec3 color = srgb_to_linear(diffuse_color.rgb);
+    vec3 color = srgb_to_linear(star.rgb);
 
     // --- Atmospheric extinction ----------------------------------------------
     // Airmass grows sharply near the horizon. The wavelength-dependent
@@ -253,7 +280,7 @@ void main()
     vary_star_color = star_color;
 
     // Diffraction spikes on the brightest tail only. Gated tight (0.90..1.0)
-    // so only real stand-out stars get crosses — the quad expands above for
-    // those stars, so the spike has room to render.
+    // so only real stand-out stars get crosses — their quads expand above,
+    // so the spike has room to render.
     vary_spike = smoothstep(0.90, 1.0, intensity);
 }

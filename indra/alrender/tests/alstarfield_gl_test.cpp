@@ -322,9 +322,8 @@ void main()
     }
 
     // How two pictures' star attachment differ, over the colour channels: the most, the pixels where it differs at
-    // all, by half a step of 8 bits or more, and by more than a step of the storage and half a step of 8 bits (a
-    // rounding the order of the maths may flip, and what the brightness cull may leave out), and the pixels a star lit
-    // in either.
+    // all, by half a step of 8 bits or more, and past the bound compare() is given, and the pixels a star lit in
+    // either.
     struct Difference
     {
         F32 mMost = 0.f;
@@ -378,11 +377,13 @@ void main()
             for (S32 path = 0; path < 2; ++path)
             {
                 mOld[path].unload();
-                mStars[path].unload();
+                mStarPoints[path].unload();
+                mStarQuads[path].unload();
                 mTarget[path].release();
             }
             mShaders.clearShaderObjects();
             mOldQuads = nullptr;
+            mStarBuffer = nullptr;
             mMoonTexture = nullptr;
             gGL.matrixMode(LLRender::MM_PROJECTION);
             gGL.loadIdentity();
@@ -407,16 +408,20 @@ void main()
             REQUIRE(program.createShader());
         }
 
-        // The star program as LLViewerShaderMgr builds it.
-        void buildStars(LLGLSLShader& program, bool emissive)
+        // A star program as LLViewerShaderMgr builds it: the points', or the spiked stars' quads'.
+        void buildStars(LLGLSLShader& program, bool emissive, bool quads)
         {
-            program.mName = "Deferred Star Program";
+            program.mName = quads ? "Deferred Star Quad Program" : "Deferred Star Program";
             program.mShaderFiles.clear();
             program.mShaderFiles.push_back(std::make_pair("deferred/starsV.glsl", GL_VERTEX_SHADER));
             program.mShaderFiles.push_back(std::make_pair("deferred/starsF.glsl", GL_FRAGMENT_SHADER));
             program.mShaderLevel = 1;
             program.mShaderGroup = LLGLSLShader::SG_SKY;
             program.addConstant(LLGLSLShader::SHADER_CONST_STAR_DEPTH);
+            if (quads)
+            {
+                program.addPermutation("STAR_QUADS", "1");
+            }
             if (emissive)
             {
                 program.addPermutation("HAS_EMISSIVE", "1");
@@ -448,8 +453,8 @@ void main()
         }
 
         // The field at the default count; the old buffer, six vertices a star with their corner offsets, as
-        // LLVOWLSky::updateStarGeometry filled it; both paths' programs; and a G-buffer for each, the emissive one with
-        // four attachments and the albedo's with three.
+        // LLVOWLSky::updateStarGeometry filled it, and the buffer it fills now; both paths' programs; and a G-buffer
+        // for each, the emissive one with four attachments and the albedo's with three.
         void setUp()
         {
             populateTree();
@@ -489,12 +494,22 @@ void main()
             }
             mOldQuads->unmapBuffer();
 
+            mLaidOut = mField;
+            mLayout = ALStarField::layOut(mLaidOut);
+            mStarBuffer = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXTURE_INDEX);
+            REQUIRE(mStarBuffer->allocateBuffer(mLayout.vertices(), 0));
+            LLStrider<LLVector4a> star_vertices;
+            REQUIRE(mStarBuffer->getVertexStrider(star_vertices));
+            ALStarField::fillVertices(mLaidOut, mLayout, star_vertices);
+            mStarBuffer->unmapBuffer();
+
             mMoonTexture = moonDisc();
 
             for (S32 path = 0; path < 2; ++path)
             {
                 buildOld(mOld[path], path == 1);
-                buildStars(mStars[path], path == 1);
+                buildStars(mStarPoints[path], path == 1, false);
+                buildStars(mStarQuads[path], path == 1, true);
                 REQUIRE(mTarget[path].allocate(W, H, GL_RGBA8));
                 REQUIRE(mTarget[path].addColorAttachment(GL_RGBA8));
                 REQUIRE(mTarget[path].addColorAttachment(GL_RGB10_A2));
@@ -505,8 +520,9 @@ void main()
             }
         }
 
-        // The camera looking along @a scene from CAMERA: the agent's frame (east, north, up) turned to the eye's.
-        static void loadView(const Scene& scene)
+        // The camera looking along @a scene from CAMERA: the agent's frame (east, north, up) turned to the eye's, the
+        // picture moved @a shift pixels right and half that up.
+        static void loadView(const Scene& scene, F32 shift = 0.f)
         {
             gGL.matrixMode(LLRender::MM_PROJECTION);
             const F32 tan_half = tanf(scene.mFov * 0.5f * DEG_TO_RAD);
@@ -518,6 +534,8 @@ void main()
             p[10] = (FAR_CLIP + NEAR_CLIP) / (NEAR_CLIP - FAR_CLIP);
             p[11] = -1.f;
             p[14] = 2.f * FAR_CLIP * NEAR_CLIP / (NEAR_CLIP - FAR_CLIP);
+            p[8]  = -shift * 2.f / (F32)W;
+            p[9]  = -shift / (F32)H;
             gGL.loadMatrix(proj);
             gGL.matrixMode(LLRender::MM_MODELVIEW);
             gGL.loadIdentity();
@@ -588,13 +606,13 @@ void main()
         }
 
         // The stars drawn the old way, every star a quad of six vertices, into the G-buffer of @a emissive's path; the
-        // moon's mask only where @a mask_moon.
-        Picture drawOld(const Scene& scene, bool emissive, bool mask_moon = true)
+        // moon's mask only where @a mask_moon, the picture moved @a shift pixels.
+        Picture drawOld(const Scene& scene, bool emissive, bool mask_moon = true, F32 shift = 0.f)
         {
             LLRenderTarget& target = mTarget[emissive];
             target.bindTarget();
             clearDome(emissive);
-            loadView(scene);
+            loadView(scene, shift);
             {
                 LLGLEnable    blend(GL_BLEND);
                 LLGLDisable   cull(GL_CULL_FACE);
@@ -634,12 +652,21 @@ void main()
                 gGL.pushMatrix();
                 gGL.translatef(CAMERA.mV[VX], CAMERA.mV[VY], CAMERA.mV[VZ]);
                 gGL.rotatef(scene.mRotation, 0.f, 0.f, 1.f);
-                LLGLSLShader& program = mStars[emissive];
-                program.bind();
-                bindUniforms(program, scene);
-                mOldQuads->setBuffer();
-                mOldQuads->drawArrays(LLRender::TRIANGLES, 0, mOldQuads->getNumVerts());
-                program.unbind();
+                // The spiked stars as quads, then the rest as points.
+                LLGLSLShader& quads = mStarQuads[emissive];
+                quads.bind();
+                bindUniforms(quads, scene);
+                mStarBuffer->setBuffer();
+                mStarBuffer->drawArrays(LLRender::TRIANGLES, 0, mLayout.firstPoint());
+                quads.unbind();
+
+                LLGLEnable    point_size(GL_PROGRAM_POINT_SIZE);
+                LLGLSLShader& points = mStarPoints[emissive];
+                points.bind();
+                bindUniforms(points, scene);
+                mStarBuffer->setBuffer();
+                mStarBuffer->drawArrays(LLRender::POINTS, mLayout.firstPoint(), mLayout.mPoints);
+                points.unbind();
                 gGL.popMatrix();
                 gGL.setSceneBlendType(LLRender::BT_ALPHA);
             }
@@ -660,8 +687,11 @@ void main()
         }
 
         // How the stars' attachment of two pictures differ, a star lighting a pixel where either differs from
-        // @a blank.
-        static Difference compare(const Picture& a, const Picture& b, const Picture& blank, S32 attachment)
+        // @a blank. Each channel of a pixel may differ by a step of its storage (where an addition rounds the other
+        // way: the order of the maths, or of the stars' blends), half a step of 8 bits (what the brightness cull may
+        // leave out of it) and @a allowance.
+        static Difference compare(const Picture& a, const Picture& b, const Picture& blank, S32 attachment,
+                                  F32 allowance = 0.f)
         {
             const bool emissive = attachment == 3;
             Difference d;
@@ -680,7 +710,7 @@ void main()
                         const F32 diff = fabsf(pa[c] - pb[c]);
                         most = llmax(most, diff);
                         lit = lit || pa[c] != pn[c] || pb[c] != pn[c];
-                        beyond = beyond || diff > storageStep(llmax(pa[c], pb[c]), emissive, c) + HALF_QUANTUM;
+                        beyond = beyond || diff > storageStep(llmax(pa[c], pb[c]), emissive, c) + HALF_QUANTUM + allowance;
                     }
                     d.mMost = llmax(d.mMost, most);
                     d.mDiffer += most > 0.f;
@@ -696,10 +726,14 @@ void main()
         ll_test::TestShaderDir mTree;
         ll_test::TestShaderMgr mShaders;
         std::vector<ALStarField::Star> mField;
+        std::vector<ALStarField::Star> mLaidOut;
+        ALStarField::Layout mLayout;
         LLPointer<LLVertexBuffer> mOldQuads;
+        LLPointer<LLVertexBuffer> mStarBuffer;
         LLPointer<LLImageGL> mMoonTexture;
         LLGLSLShader   mOld[2];
-        LLGLSLShader   mStars[2];
+        LLGLSLShader   mStarPoints[2];
+        LLGLSLShader   mStarQuads[2];
         LLRenderTarget mTarget[2];
     };
 }
@@ -707,6 +741,12 @@ void main()
 TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the stars leave the picture they left before their rework",
                  "[alstarfield_gl]")
 {
+    // The old quads' corners are snapped to the rasterizer's sub-pixel grid, 1/256 of a pixel, where a point's centre
+    // is worked exactly; so the old picture moved by one step of that grid is the measure of what may differ. The new
+    // picture may differ from the old at no more pixels than that, and at no pixel by more than the most it moves any
+    // pixel, besides the roundings compare() allows.
+    constexpr F32 SUBPIXEL = 1.f / 256.f;
+
     setUp();
     for (const Scene& scene : SCENES)
     {
@@ -715,15 +755,19 @@ TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the stars leave the pictu
             const bool emissive = path == 1;
             const S32 attachment = emissive ? 3 : 0;
             CAPTURE(scene.mName, emissive);
-            const Picture blank  = drawNothing(emissive);
-            const Picture before = drawOld(scene, emissive);
-            const Picture after  = drawStars(scene, emissive);
-            const Difference d = compare(before, after, blank, attachment);
+            const Picture blank   = drawNothing(emissive);
+            const Picture before  = drawOld(scene, emissive);
+            const Picture shifted = drawOld(scene, emissive, true, SUBPIXEL);
+            const Picture after   = drawStars(scene, emissive);
+            const Difference jitter = compare(before, shifted, blank, attachment);
+            const Difference d = compare(before, after, blank, attachment, jitter.mMost);
             const std::string summary = d.summary();
-            CAPTURE(summary);
+            const std::string old_moved = jitter.summary();
+            CAPTURE(summary, old_moved);
             UNSCOPED_INFO("the scene shows stars");
             CHECK(d.mLit > 100);
             CHECK(d.mBeyond == 0);
+            CHECK(d.mDiffer <= jitter.mDiffer);
             if (scene.mMoonBrightness > 0.f)
             {
                 const Difference moon = compare(before, drawOld(scene, emissive, false), blank, attachment);

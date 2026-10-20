@@ -245,24 +245,14 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
         return;
     }
 
-    gDeferredStarProgram.bind();
-
     gGL.pushMatrix();
     gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
     // Subtle rotation so fixed patterns drift over long time scales.
     const F32 star_rotation = (F32)fmod(gFrameTimeSeconds * 0.01, 360.0);
     gGL.rotatef(star_rotation, 0.f, 0.f, 1.f);
 
-    gDeferredStarProgram.uniform1f(LLShaderMgr::CUSTOM_ALPHA, star_alpha);
-
-    // Screen resolution for GPU-side pixel-sized billboarding.
-    LLRenderTarget* deferred_target = &gPipeline.mRT->deferredScreen;
-    gDeferredStarProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
-                                   (GLfloat)deferred_target->getWidth(),
-                                   (GLfloat)deferred_target->getHeight());
-
-    // The stars' frame is the agent's turned by the rotation above, and the fragment shader works in it
-    // (vary_world_dir), so agent directions are turned back by the rotation's transpose.
+    // The stars' frame is the agent's turned by the rotation above, and the vertex shader works in it, so agent
+    // directions are turned back by the rotation's transpose.
     LLMatrix4a to_stars = LLMatrix4a::rotation(star_rotation * DEG_TO_RAD, LLVector4a(0.f, 0.f, 1.f));
     to_stars.transpose();
     const auto in_stars = [&to_stars](const LLVector3& v)
@@ -274,9 +264,8 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
 
     // Moon glare inputs, in the stars' frame so the glare stays on the moon however far the stars have turned.
     LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-    gDeferredStarProgram.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, in_stars(psky->getMoonDirection()).mV);
-    gDeferredStarProgram.uniform1f(LLShaderMgr::MOON_BRIGHTNESS,
-                                   psky->getIsMoonUp() ? (F32)psky->getMoonBrightness() : 0.0f);
+    const LLVector3 moon_dir = in_stars(psky->getMoonDirection());
+    const F32 moon_brightness = psky->getIsMoonUp() ? (F32)psky->getMoonBrightness() : 0.0f;
 
     // Wrapped time for scintillation noise. 86400s is long enough that a
     // typical session never hits the wrap boundary (where the non-periodic
@@ -284,14 +273,15 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
     // precision stays good for the scaled time term in the shader.
     sStarTime = (F32)fmod(LLFrameTimer::getUptimeSeconds() * 0.5, 86400.0);
 
-    gDeferredStarProgram.uniform1f(LLShaderMgr::WATER_TIME, sStarTime);
-
     // The moon draws after the stars and fades low in the sky, so the stars leave out what its quad and texture cover
-    // (starsF.glsl). Its corners lie around the camera in agent space.
+    // (starsV.glsl). Its corners lie around the camera in agent space.
     LLFace* moon_face = gSky.mVOSkyp->mFace[LLVOSky::FACE_MOON];
     LLViewerTexture* moon_tex = moon_face ? moon_face->getTexture(LLRender::DIFFUSE_MAP) : nullptr;
     const LLHeavenBody& moon = gSky.mVOSkyp->getMoon();
     const bool mask_moon = moon.getDraw() && moon_tex && moon_face->getGeomCount();
+    LLVector3 moon_centre;
+    LLVector3 moon_u;
+    LLVector3 moon_v;
     if (mask_moon)
     {
         // Corners 0..3 are (-right, +up), (-right, -up), (+right, +up), (+right, -up) (LLVOSky::updateHeavenlyBodyGeometry).
@@ -302,27 +292,58 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
         half_u /= half_u.lengthSquared();
         half_v /= half_v.lengthSquared();
 
-        gDeferredStarProgram.uniform3fv(LLShaderMgr::MOON_QUAD_CENTER, 1, in_stars(centre / dist).mV);
-        gDeferredStarProgram.uniform3fv(LLShaderMgr::MOON_QUAD_U, 1, in_stars(half_u).mV);
-        gDeferredStarProgram.uniform3fv(LLShaderMgr::MOON_QUAD_V, 1, in_stars(half_v).mV);
-        gDeferredStarProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, moon_tex, ALSamplers::AnisoClamp);
+        moon_centre = in_stars(centre / dist);
+        moon_u      = in_stars(half_u);
+        moon_v      = in_stars(half_v);
     }
-    else
+
+    // Both star programs take the same inputs.
+    const auto bind_stars = [&](LLGLSLShader& program)
     {
-        gDeferredStarProgram.uniform3f(LLShaderMgr::MOON_QUAD_CENTER, 0.f, 0.f, 0.f);
-    }
+        program.bind();
+        program.uniform1f(LLShaderMgr::CUSTOM_ALPHA, star_alpha);
+        // The viewport the stars draw into, which the vertex stage sizes them in and the points find their centres
+        // by.
+        program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)LLRenderTarget::sCurResX,
+                          (GLfloat)LLRenderTarget::sCurResY);
+        program.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, moon_dir.mV);
+        program.uniform1f(LLShaderMgr::MOON_BRIGHTNESS, moon_brightness);
+        program.uniform1f(LLShaderMgr::WATER_TIME, sStarTime);
+        if (mask_moon)
+        {
+            program.uniform3fv(LLShaderMgr::MOON_QUAD_CENTER, 1, moon_centre.mV);
+            program.uniform3fv(LLShaderMgr::MOON_QUAD_U, 1, moon_u.mV);
+            program.uniform3fv(LLShaderMgr::MOON_QUAD_V, 1, moon_v.mV);
+            program.bindTexture(LLShaderMgr::DIFFUSE_MAP, moon_tex, ALSamplers::AnisoClamp);
+        }
+        else
+        {
+            program.uniform3f(LLShaderMgr::MOON_QUAD_CENTER, 0.f, 0.f, 0.f);
+        }
+    };
+    const auto unbind_stars = [&](LLGLSLShader& program)
+    {
+        if (mask_moon)
+        {
+            program.disableTexture(LLShaderMgr::DIFFUSE_MAP);
+        }
+        program.unbind();
+    };
 
     {
         LL_PROFILE_GPU_ZONE("sky stars");
-        gSky.mVOWLSkyp->drawStars();
-    }
 
-    if (mask_moon)
-    {
-        gDeferredStarProgram.disableTexture(LLShaderMgr::DIFFUSE_MAP);
-    }
+        // The spiked stars, few and bright, as quads (ALStarField::SPIKE_INTENSITY).
+        bind_stars(gDeferredStarQuadProgram);
+        gSky.mVOWLSkyp->drawStarQuads();
+        unbind_stars(gDeferredStarQuadProgram);
 
-    gDeferredStarProgram.unbind();
+        // Every other star as a point, sized by its vertex shader.
+        LLGLEnable point_size(GL_PROGRAM_POINT_SIZE);
+        bind_stars(gDeferredStarProgram);
+        gSky.mVOWLSkyp->drawStarPoints();
+        unbind_stars(gDeferredStarProgram);
+    }
 
     gGL.popMatrix();
 }

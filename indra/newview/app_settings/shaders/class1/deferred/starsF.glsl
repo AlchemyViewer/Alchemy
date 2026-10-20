@@ -30,30 +30,43 @@
 
 out vec4 frag_data[4];
 
+#ifdef STAR_QUADS
 in vec2 vary_corner;          // corner offset in [-1, 1] — radial mask source
+#else
+flat in vec3 vary_point;      // the star's centre in window coordinates, and half its extent in pixels
+#endif
 flat in vec3 vary_star_color; // the star's colour where its shape is 1 (starsV.glsl)
 flat in float vary_spike;     // the diffraction spikes' strength
 
 void main()
 {
+#ifdef STAR_QUADS
+    vec2 corner = vary_corner;
+#else
+    // The pixel's offset from the star's centre, in [-1, 1] across the star with y up, as a quad's corner offset runs;
+    // the point is drawn wider than the star (starsV.glsl), and a pixel past the star's square is not its.
+    vec2 corner = (gl_FragCoord.xy - vary_point.xy) / vary_point.z;
+    if (max(abs(corner.x), abs(corner.y)) >= 1.0) discard;
+#endif
+
     // Procedural star shape. Using squared radius keeps falloff radial without
     // a sqrt; the small halo term adds a soft skirt that helps bright stars
     // integrate into the HDR/bloom pipeline.
-    float r2   = dot(vary_corner, vary_corner);
+    float r2   = dot(corner, corner);
     float core = exp(-r2 * 9.0);
     float halo = exp(-r2 * 1.8) * 0.06;
 
     // Diffraction spikes on the brightest tail only (starsV.glsl).
-    float ax = 1.0 - abs(vary_corner.x);
-    float ay = 1.0 - abs(vary_corner.y);
-    float spike_h = exp(-abs(vary_corner.y) * 32.0) * ax;
-    float spike_v = exp(-abs(vary_corner.x) * 32.0) * ay;
+    float ax = 1.0 - abs(corner.x);
+    float ay = 1.0 - abs(corner.y);
+    float spike_h = exp(-abs(corner.y) * 32.0) * ax;
+    float spike_v = exp(-abs(corner.x) * 32.0) * ay;
     float spike = (spike_h + spike_v) * vary_spike * 0.30;
 
     float shape = core + halo + spike;
 
-    // Discard pixels where the quad contributes effectively nothing - keeps
-    // the overdraw budget in check given how many tiny quads we render.
+    // Discard pixels where the star contributes effectively nothing - keeps
+    // the overdraw budget in check given how many stars we render.
     if (shape < 0.002) discard;
 
     // Shape is our final alpha mask. Pre-multiply RGB so we can blend additively

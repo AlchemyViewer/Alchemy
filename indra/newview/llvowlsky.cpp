@@ -70,14 +70,6 @@ namespace
     }
 }
 
-U32 LLVOWLSky::getStarsNumVerts(void) const
-{
-    // mStars is the source of truth — its size reflects whatever
-    // RenderStarCount asked for at the last initStars() call (after
-    // proportional scaling and rounding).
-    return (U32)mStars.size();
-}
-
 LLVOWLSky::LLVOWLSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
     : LLStaticViewerObject(id, pcode, regionp, true)
 {
@@ -243,13 +235,21 @@ bool LLVOWLSky::updateGeometry(LLDrawable * drawable)
     return true;
 }
 
-void LLVOWLSky::drawStars(void)
+void LLVOWLSky::drawStarPoints()
 {
-    //  render the stars as a sphere centered at viewer camera
-    if (mStarsVerts.notNull())
+    if (mStarsVerts.notNull() && mStarLayout.mPoints > 0)
     {
         mStarsVerts->setBuffer();
-        mStarsVerts->drawArrays(LLRender::TRIANGLES, 0, (S32)(getStarsNumVerts() * 6));
+        mStarsVerts->drawArrays(LLRender::POINTS, mStarLayout.firstPoint(), mStarLayout.mPoints);
+    }
+}
+
+void LLVOWLSky::drawStarQuads()
+{
+    if (mStarsVerts.notNull() && mStarLayout.mQuads > 0)
+    {
+        mStarsVerts->setBuffer();
+        mStarsVerts->drawArrays(LLRender::TRIANGLES, 0, mStarLayout.firstPoint());
     }
 }
 
@@ -287,6 +287,7 @@ void LLVOWLSky::initStars()
     const S32 requested = gSavedSettings.getS32("RenderStarCount");
     mStars = ALStarField::generate((U32)llmax(requested, 0),
                                    LLEnvironment::instance().getCurrentSky()->getDomeRadius());
+    mStarLayout = ALStarField::layOut(mStars);
 }
 
 bool LLVOWLSky::updateStarGeometry(LLDrawable *drawable)
@@ -301,15 +302,10 @@ bool LLVOWLSky::updateStarGeometry(LLDrawable *drawable)
         return true;
     }
 
-    LLStrider<LLVector3> verticesp;
-    LLStrider<LLColor4U> colorsp;
-    LLStrider<LLVector2> texcoordsp;
-
-    const U32 num_stars = getStarsNumVerts();
-    const U32 num_verts = num_stars * 6;
+    const U32 num_verts = mStarLayout.vertices();
 
     // RenderStarCount = 0 disables stars entirely. Leave mStarsVerts null so
-    // drawStars short-circuits.
+    // the star draws short-circuit.
     if (num_verts == 0)
     {
         return true;
@@ -319,43 +315,19 @@ bool LLVOWLSky::updateStarGeometry(LLDrawable *drawable)
     if (!mStarsVerts->allocateBuffer(num_verts, 0))
     {
         LL_WARNS() << "Failed to allocate Vertex Buffer for Sky to " << num_verts << " vertices" << LL_ENDL;
+        mStarsVerts = nullptr;
         return false;
     }
 
-    bool success = mStarsVerts->getVertexStrider(verticesp)
-        && mStarsVerts->getColorStrider(colorsp)
-        && mStarsVerts->getTexCoord0Strider(texcoordsp);
-
-    if(!success)
+    LLStrider<LLVector4a> verticesp;
+    if (!mStarsVerts->getVertexStrider(verticesp))
     {
         LL_ERRS() << "Failed updating star geometry." << LL_ENDL;
     }
 
-    // Two-triangle quad. Corner offsets are in [-1, 1] — the vertex shader
-    // turns them into pixel-sized screen-space offsets, so the actual CPU
-    // "position" of every vertex of a star is identical (the star center).
-    // This trades a small amount of memory for full resolution/FOV control on
-    // the GPU side.
-    static const LLVector2 kCornerOffsets[6] = {
-        LLVector2(-1.f, -1.f), // 0: BL
-        LLVector2( 1.f, -1.f), // 1: BR
-        LLVector2( 1.f,  1.f), // 2: TR
-        LLVector2(-1.f, -1.f), // 3: BL
-        LLVector2( 1.f,  1.f), // 4: TR
-        LLVector2(-1.f,  1.f), // 5: TL
-    };
-
-    for (U32 s = 0; s < num_stars; ++s)
-    {
-        const ALStarField::Star& star = mStars[s];
-
-        for (U32 v = 0; v < 6; ++v)
-        {
-            *(verticesp++)  = star.mPosition;
-            *(colorsp++)    = star.mColour;
-            *(texcoordsp++) = kCornerOffsets[v];
-        }
-    }
+    // One vertex a star, drawn as a point the vertex shader sizes; six for each spiked star, which it spreads into a
+    // quad.
+    ALStarField::fillVertices(mStars, mStarLayout, verticesp);
 
     mStarsVerts->unmapBuffer();
     return true;

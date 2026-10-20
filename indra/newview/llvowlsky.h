@@ -37,9 +37,6 @@
 #include <boost/signals2/connection.hpp>
 
 class LLVOWLSky : public LLStaticViewerObject {
-private:
-    U32 getStarsNumVerts(void) const;
-
 public:
     LLVOWLSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
 
@@ -48,7 +45,9 @@ public:
     /*virtual*/ LLDrawable * createDrawable(LLPipeline *pipeline);
     /*virtual*/ bool         updateGeometry(LLDrawable *drawable);
 
-    void drawStars(void);
+    // The stars drawn as points, and the spiked stars as quads (ALStarField::Layout), each with its own program bound.
+    void drawStarPoints();
+    void drawStarQuads();
     void drawDome(void);
     void resetVertexBuffers(void);
 
@@ -75,8 +74,9 @@ private:
     LLPointer<LLVertexBuffer>                   mStarsVerts;
     LLPointer<LLVertexBuffer>                   mMeteorVerts;
 
-    // The star field RenderStarCount asked for, in the order the buffer takes it.
+    // The star field RenderStarCount asked for, in the order the buffer takes it, and where each kind lies in it.
     std::vector<ALStarField::Star> mStars;
+    ALStarField::Layout            mStarLayout;
 
     struct MeteorState
     {

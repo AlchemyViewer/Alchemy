@@ -227,6 +227,7 @@ LLGLSLShader            gDeferredWLCloudProgram;
 LLGLSLShader            gDeferredWLSunProgram;
 LLGLSLShader            gDeferredWLMoonProgram;
 LLGLSLShader            gDeferredStarProgram;
+LLGLSLShader            gDeferredStarQuadProgram;
 LLGLSLShader            gDeferredMeteorProgram;
 LLGLSLShader            gDeferredAuroraProgram;
 LLGLSLShader            gDeferredFullbrightShinyProgram;
@@ -1392,6 +1393,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredWLSunProgram.unload();
         gDeferredWLMoonProgram.unload();
         gDeferredStarProgram.unload();
+        gDeferredStarQuadProgram.unload();
         gDeferredMeteorProgram.unload();
         gDeferredAuroraProgram.unload();
         gDeferredFullbrightShinyProgram.unload();
@@ -3246,6 +3248,21 @@ void LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredStarProgram);
 
         built(gDeferredStarProgram.createShader(), gDeferredStarProgram);
+    }
+
+    {
+        // The stars with diffraction spikes, as quads (ALStarField::SPIKE_INTENSITY).
+        gDeferredStarQuadProgram.mName = "Deferred Star Quad Program";
+        gDeferredStarQuadProgram.mShaderFiles.clear();
+        gDeferredStarQuadProgram.mShaderFiles.push_back(make_pair("deferred/starsV.glsl", GL_VERTEX_SHADER));
+        gDeferredStarQuadProgram.mShaderFiles.push_back(make_pair("deferred/starsF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredStarQuadProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredStarQuadProgram.mShaderGroup = LLGLSLShader::SG_SKY;
+        gDeferredStarQuadProgram.addPermutation("STAR_QUADS", "1");
+
+        add_common_permutations(&gDeferredStarQuadProgram);
+
+        built(gDeferredStarQuadProgram.createShader(), gDeferredStarQuadProgram);
     }
 
     {

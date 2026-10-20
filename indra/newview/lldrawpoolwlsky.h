@@ -39,8 +39,9 @@ public:
 
     static const U32 SKY_VERTEX_DATA_MASK = LLVertexBuffer::MAP_VERTEX |
                             LLVertexBuffer::MAP_TEXCOORD0;
+    // A star's centre, and its colour in the position's fourth word, where the texture index goes (ALStarField).
     static const U32 STAR_VERTEX_DATA_MASK =    LLVertexBuffer::MAP_VERTEX |
-        LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_TEXCOORD0;
+        LLVertexBuffer::MAP_TEXTURE_INDEX;
     static const U32 METEOR_VERTEX_DATA_MASK =  LLVertexBuffer::MAP_VERTEX |
         LLVertexBuffer::MAP_NORMAL | LLVertexBuffer::MAP_COLOR |
         LLVertexBuffer::MAP_TEXCOORD0;

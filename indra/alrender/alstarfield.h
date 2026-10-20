@@ -25,6 +25,8 @@
 #pragma once
 
 #include "llmath.h"
+#include "llstrider.h"
+#include "llvector4a.h"
 #include "stdtypes.h"
 #include "v3color.h"
 #include "v3math.h"
@@ -83,5 +85,39 @@ F32 milkyWayDensity(const LLVector3& direction);
 /// where a platform's maths rounds one of a star's comparisons the other way, as expf may for the band's, that star may
 /// differ, and no other does.
 std::vector<Star> generate(U32 count, F32 dome_radius);
+
+/// The faintest intensity, as the colour's alpha holds it, that has diffraction spikes: starsV.glsl's
+/// smoothstep(0.90, 1.0, intensity) is above 0 past 0.90, and 230 / 255 is the first step past it. Such a star reaches
+/// up to 19 pixels across, and GL drops a point whose centre leaves the screen, so its arms would pop at the edge: it is
+/// drawn as a quad instead. Every other star is a point, at most 7 pixels across.
+constexpr U8 SPIKE_INTENSITY = 230;
+
+inline bool spiked(const Star& star)
+{
+    return star.mColour.mV[VALPHA] >= SPIKE_INTENSITY;
+}
+
+/// The vertices of a spiked star's quad: two triangles, whose corners starsV.glsl takes from gl_VertexID, the quads
+/// lying first in the buffer, from vertex 0.
+constexpr U32 QUAD_VERTICES = 6;
+
+/// Where the stars lie in the buffer: the spiked stars' quads first, QUAD_VERTICES vertices each, then every other star,
+/// one vertex each, drawn as points.
+struct Layout
+{
+    U32 mQuads = 0;  ///< spiked stars
+    U32 mPoints = 0; ///< the rest
+
+    U32 firstPoint() const { return mQuads * QUAD_VERTICES; }
+    U32 vertices() const { return firstPoint() + mPoints; }
+};
+
+/// Orders @a stars as the buffer lays them out, and says where each kind lies.
+Layout layOut(std::vector<Star>& stars);
+
+/// The buffer's vertices for @a stars laid out as @a layout, layout.vertices() of them: a star's centre in xyz and its
+/// colour's four bytes in w, the word where LLVertexBuffer keeps the texture index, so a star is 16 bytes. A quad's
+/// star is written QUAD_VERTICES times.
+void fillVertices(const std::vector<Star>& stars, const Layout& layout, LLStrider<LLVector4a> vertices);
 
 } // namespace ALStarField
