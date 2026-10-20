@@ -346,7 +346,6 @@ void LLVOWLSky::resetVertexBuffers()
 {
     mStripsVerts.clear();
     mStarsVerts = nullptr;
-    mFsSkyVerts = nullptr;
     mMeteorVerts = nullptr;
 
     gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
@@ -356,7 +355,6 @@ void LLVOWLSky::cleanupGL()
 {
     mStripsVerts.clear();
     mStarsVerts = nullptr;
-    mFsSkyVerts = nullptr;
     mMeteorVerts = nullptr;
 
     LLDrawPoolWLSky::cleanupGL();
@@ -374,44 +372,6 @@ bool LLVOWLSky::updateGeometry(LLDrawable * drawable)
     LLStrider<LLVector3>    vertices;
     LLStrider<LLVector2>    texCoords;
     LLStrider<U16>          indices;
-
-    if (mFsSkyVerts.isNull())
-    {
-        mFsSkyVerts = new LLVertexBuffer(LLDrawPoolWLSky::ADV_ATMO_SKY_VERTEX_DATA_MASK);
-
-        if (!mFsSkyVerts->allocateBuffer(4, 6))
-        {
-            LL_WARNS() << "Failed to allocate Vertex Buffer on full screen sky update" << LL_ENDL;
-        }
-
-        bool success = mFsSkyVerts->getVertexStrider(vertices)
-                    && mFsSkyVerts->getTexCoord0Strider(texCoords)
-                    && mFsSkyVerts->getIndexStrider(indices);
-
-        if(!success)
-        {
-            LL_ERRS() << "Failed updating WindLight fullscreen sky geometry." << LL_ENDL;
-        }
-
-        *vertices++ = LLVector3(-1.0f, -1.0f, 0.0f);
-        *vertices++ = LLVector3( 1.0f, -1.0f, 0.0f);
-        *vertices++ = LLVector3(-1.0f,  1.0f, 0.0f);
-        *vertices++ = LLVector3( 1.0f,  1.0f, 0.0f);
-
-        *texCoords++ = LLVector2(0.0f, 0.0f);
-        *texCoords++ = LLVector2(1.0f, 0.0f);
-        *texCoords++ = LLVector2(0.0f, 1.0f);
-        *texCoords++ = LLVector2(1.0f, 1.0f);
-
-        *indices++ = 0;
-        *indices++ = 1;
-        *indices++ = 2;
-        *indices++ = 1;
-        *indices++ = 3;
-        *indices++ = 2;
-
-        mFsSkyVerts->unmapBuffer();
-    }
 
     {
         const F32 dome_radius = LLEnvironment::instance().getCurrentSky()->getDomeRadius();
@@ -516,21 +476,6 @@ void LLVOWLSky::drawStars(void)
         mStarsVerts->setBuffer();
         mStarsVerts->drawArrays(LLRender::TRIANGLES, 0, (S32)(getStarsNumVerts() * 6));
     }
-}
-
-void LLVOWLSky::drawFsSky(void)
-{
-    if (mFsSkyVerts.isNull())
-    {
-        updateGeometry(mDrawable);
-    }
-
-    LLGLDisable disable_blend(GL_BLEND);
-
-    mFsSkyVerts->setBuffer();
-    mFsSkyVerts->drawRange(LLRender::TRIANGLES, 0, mFsSkyVerts->getNumVerts() - 1, mFsSkyVerts->getNumIndices(), 0);
-    gPipeline.addTrianglesDrawn(mFsSkyVerts->getNumIndices());
-    LLVertexBuffer::unbind();
 }
 
 void LLVOWLSky::drawDome(void)

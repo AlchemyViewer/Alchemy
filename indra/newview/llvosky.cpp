@@ -840,11 +840,6 @@ LLDrawable *LLVOSky::createDrawable(LLPipeline *pipeline)
     poolp->setSkyTex(mSkyTex);
     mDrawable->setRenderType(LLPipeline::RENDER_TYPE_SKY);
 
-    for (S32 i = 0; i < NUM_CUBEMAP_FACES; ++i)
-    {
-        mFace[FACE_SIDE0 + i] = mDrawable->addFace(poolp, NULL);
-    }
-
     mFace[FACE_SUN]   = mDrawable->addFace(poolp, nullptr);
     mFace[FACE_MOON]  = mDrawable->addFace(poolp, nullptr);
     mFace[FACE_BLOOM] = mDrawable->addFace(poolp, nullptr);
@@ -945,71 +940,6 @@ bool LLVOSky::updateGeometry(LLDrawable *drawable)
 
     mEarthCenter.mV[0] = mCameraPosAgent.mV[0];
     mEarthCenter.mV[1] = mCameraPosAgent.mV[1];
-
-    LLVector3 v_agent[8];
-    for (S32 i = 0; i < 8; ++i)
-    {
-        F32 x_sgn = (i&1) ? 1.f : -1.f;
-        F32 y_sgn = (i&2) ? 1.f : -1.f;
-        F32 z_sgn = (i&4) ? 1.f : -1.f;
-        v_agent[i] = HORIZON_DIST * SKY_BOX_MULT * LLVector3(x_sgn, y_sgn, z_sgn);
-    }
-
-    LLStrider<LLVector3> verticesp;
-    LLStrider<LLVector3> normalsp;
-    LLStrider<LLVector2> texCoordsp;
-    LLStrider<U16> indicesp;
-    U16 index_offset;
-    LLFace *face;
-
-    for (S32 side = 0; side < NUM_CUBEMAP_FACES; ++side)
-    {
-        face = mFace[FACE_SIDE0 + side];
-
-        if (!face->getVertexBuffer())
-        {
-            face->setSize(4, 6);
-            face->setGeomIndex(0);
-            face->setIndicesIndex(0);
-            LLVertexBuffer* buff = new LLVertexBuffer(LLDrawPoolSky::VERTEX_DATA_MASK);
-            buff->allocateBuffer(4, 6);
-            face->setVertexBuffer(buff);
-
-            index_offset = face->getGeometry(verticesp,normalsp,texCoordsp, indicesp);
-
-            S32 vtx = 0;
-            S32 curr_bit = side >> 1; // 0/1 = Z axis, 2/3 = Y, 4/5 = X
-            S32 side_dir = side & 1;  // even - 0, odd - 1
-            S32 i_bit = (curr_bit + 2) % 3;
-            S32 j_bit = (i_bit + 2) % 3;
-
-            LLVector3 axis;
-            axis.mV[curr_bit] = 1;
-            face->mCenterAgent = (F32)((side_dir << 1) - 1) * axis * HORIZON_DIST;
-
-            vtx = side_dir << curr_bit;
-            *(verticesp++)  = v_agent[vtx];
-            *(verticesp++)  = v_agent[vtx | 1 << j_bit];
-            *(verticesp++)  = v_agent[vtx | 1 << i_bit];
-            *(verticesp++)  = v_agent[vtx | 1 << i_bit | 1 << j_bit];
-
-            *(texCoordsp++) = TEX00;
-            *(texCoordsp++) = TEX01;
-            *(texCoordsp++) = TEX10;
-            *(texCoordsp++) = TEX11;
-
-            // Triangles for each side
-            *indicesp++ = index_offset + 0;
-            *indicesp++ = index_offset + 1;
-            *indicesp++ = index_offset + 3;
-
-            *indicesp++ = index_offset + 0;
-            *indicesp++ = index_offset + 3;
-            *indicesp++ = index_offset + 2;
-
-            buff->unmapBuffer();
-        }
-    }
 
     const LLVector3 &look_at = LLViewerCamera::getInstance()->getAtAxis();
     LLVector3 right = look_at % LLVector3::z_axis;

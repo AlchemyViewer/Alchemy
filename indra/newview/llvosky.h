@@ -38,7 +38,6 @@
 #include "llsettingssky.h"
 #include "lllegacyatmospherics.h"
 
-const F32 SKY_BOX_MULT          = 16.0f;
 const F32 HEAVENLY_BODY_DIST    = HORIZON_DIST - 20.f;
 const F32 HEAVENLY_BODY_FACTOR  = 0.1f;
 const F32 HEAVENLY_BODY_SCALE   = HEAVENLY_BODY_DIST * HEAVENLY_BODY_FACTOR;
@@ -199,15 +198,9 @@ class LLVOSky : public LLStaticViewerObject
 public:
     enum
     {
-        FACE_SIDE0,
-        FACE_SIDE1,
-        FACE_SIDE2,
-        FACE_SIDE3,
-        FACE_SIDE4,
-        FACE_SIDE5,
-        FACE_SUN, // was 6
-        FACE_MOON, // was 7
-        FACE_BLOOM, // was 8
+        FACE_SUN,
+        FACE_MOON,
+        FACE_BLOOM,
         FACE_COUNT
     };
 

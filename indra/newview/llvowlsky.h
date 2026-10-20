@@ -52,7 +52,6 @@ public:
 
     void drawStars(void);
     void drawDome(void);
-    void drawFsSky(void); // fullscreen sky for advanced atmo
     void resetVertexBuffers(void);
 
     // Meteors: CPU-side simulation of short-lived streaks. Tick once per
@@ -86,7 +85,6 @@ private:
     bool updateStarGeometry(LLDrawable *drawable);
 
 private:
-    LLPointer<LLVertexBuffer>                   mFsSkyVerts;
     std::vector< LLPointer<LLVertexBuffer> >    mStripsVerts;
     LLPointer<LLVertexBuffer>                   mStarsVerts;
     LLPointer<LLVertexBuffer>                   mMeteorVerts;
