@@ -1003,7 +1003,8 @@ namespace
         // link_message's id -- and the key variables given text that is no
         // UUID, or such a parameter, or another such, which SLua holds as
         // strings; and a key that may hold any text -- given a string --
-        // given on to one of those.
+        // given on to one of those. A key function of the script's own is
+        // one more, given what it returns.
         void findTextKeys();
         // An expression's type as SLua has it: LSL's, but a key for the
         // constants SLua types a uuid, and a string for those above.
@@ -1018,11 +1019,11 @@ namespace
         // text, which uuid() would stop the script on where it is no UUID.
         LSLIType itemType(LSLExpression* e) const { return e->getIType() == LST_KEY && slType(e) == LST_STRING ? LST_STRING : e->getIType(); }
         // What a function of the script's own gives, as SLua holds it: a
-        // key as text where the script's keys are.
+        // key as text where the script's keys are, or where it returns text.
         LSLIType givenType(LSLSymbol* function) const
         {
             const LSLIType lsl = function ? function->getIType() : LST_NULL;
-            return lsl == LST_KEY && !mOptions.uuidKeys ? LST_STRING : lsl;
+            return lsl == LST_KEY && (!mOptions.uuidKeys || mTextKeys.contains(function)) ? LST_STRING : lsl;
         }
 
         // x = x op y, which Luau writes x op= y: the compound operator and
@@ -7587,6 +7588,11 @@ namespace
         {
             return LST_STRING;
         }
+        // A key function of the script's own that returns text.
+        if (inner && e->getIType() == LST_KEY && inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION && mTextKeys.contains(readOf(inner)))
+        {
+            return LST_STRING;
+        }
         if (inner && inner->getNodeSubType() == NODE_LVALUE_EXPRESSION && isNull(static_cast<LSLLValueExpression*>(inner)->getMember()))
         {
             return varType(static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol(), e->getIType());
@@ -7624,9 +7630,10 @@ namespace
                 }
             }
         });
-        // What each key variable is given; each that is given text, until
-        // none more is. One declared with nothing holds LSL's "", no UUID,
-        // which a uuid cannot: uuid("") is NULL_KEY.
+        // What each key variable is given, and each key function of the
+        // script's own returns; each that is given text, until none more
+        // is. One declared with nothing holds LSL's "", no UUID, which a
+        // uuid cannot: uuid("") is NULL_KEY.
         std::vector<std::pair<LSLSymbol*, LSLExpression*>> given;
         std::vector<LSLSymbol*>                            unset;
         const auto key = [&](LSLIdentifier* id, LSLExpression* init) {
@@ -7670,6 +7677,16 @@ namespace
                     key(target->getIdentifier(), b->getRHS());
                 }
             }
+            else if (node->getNodeSubType() == NODE_RETURN_STATEMENT)
+            {
+                // What a key function of the script's own returns, given it.
+                LSLExpression* e = static_cast<LSLReturnStatement*>(node)->getExpr();
+                LSLSymbol*     f = enclosingFunction(node);
+                if (f && f->getIType() == LST_KEY && !isNull(e))
+                {
+                    given.emplace_back(f, e);
+                }
+            }
             else if (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
             {
                 // Each argument to a parameter of the script's own.
@@ -7699,11 +7716,20 @@ namespace
                 LSLSymbol* var = static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
                 return mTextParams.contains(var) || mTextKeys.contains(var);
             }
+            if (e && e->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                return mTextKeys.contains(readOf(e));
+            }
             return false;
         };
-        // A key variable, as given whole.
+        // A key variable, as given whole; or a key function of the script's
+        // own, as called.
         const auto keyVar = [](LSLExpression* e) -> LSLSymbol* {
             e = unbracketed(e);
+            if (e && e->getIType() == LST_KEY && e->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                return readOf(e);
+            }
             if (!e || e->getIType() != LST_KEY || e->getNodeSubType() != NODE_LVALUE_EXPRESSION ||
                 !isNull(static_cast<LSLLValueExpression*>(e)->getMember()))
             {

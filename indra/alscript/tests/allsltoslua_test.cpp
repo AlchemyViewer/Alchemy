@@ -4668,6 +4668,92 @@ namespace
         require_checks_clean(r);
     }
 
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key function that returns text returns it as text", "[ALLSLToSLua]")
+    {
+        // Tapple's, with the global given each way they tried.
+        const std::string body = "onDriverChange(key newDriver) {\n"
+                                 "    driver = newDriver;\n"
+                                 "    if (driver == \"\") {\n"
+                                 "        llOwnerSay(\"no driver\");\n"
+                                 "    } else {\n"
+                                 "        llOwnerSay(\"driver\");\n"
+                                 "    }\n"
+                                 "}\n"
+                                 "onStateChange(string value) {\n"
+                                 "    onDriverChange(value);\n"
+                                 "}\n"
+                                 "key newDriver() {\n"
+                                 "    return \"\";\n"
+                                 "}\n"
+                                 "key owner() {\n"
+                                 "    return llGetOwner();\n"
+                                 "}\n"
+                                 "key echo(string s) {\n"
+                                 "    return s;\n"
+                                 "}\n"
+                                 "key passed(string s) {\n"
+                                 "    return s;\n"
+                                 "}\n"
+                                 "default {\n"
+                                 "    state_entry() {\n"
+                                 "        onStateChange(newDriver());\n"
+                                 "        key o = owner();\n"
+                                 "        llGiveInventory(echo(llGetObjectDesc()), \"x\");\n"
+                                 "        driver = passed(llGetObjectDesc());\n"
+                                 "    }\n"
+                                 "}\n";
+        ALLSLToSLua::Options o;
+        o.types = true;
+        for (const char* global : { "key driver = \"\";\n", "key driver;\n" })
+        {
+            const ALLSLToSLua::Result r = ALLSLToSLua::convert(global + body, o);
+            CAPTURE(global, r.text);
+            REQUIRE(r.converted);
+            {
+                INFO("the function's \"\" kept, and handed on as it is");
+                CHECK(has(r, "local function newDriver(): string\n"));
+                CHECK(has(r, "    return \"\"\n"));
+                CHECK(has(r, "onStateChange(newDriver())\n"));
+                CHECK_FALSE(has(r, "tostring(newDriver())"));
+                CHECK_FALSE(has(r, "uuid(\"\")"));
+            }
+            {
+                INFO("the driver, its parameter, and the string param, all text");
+                CHECK(has(r, "local driver: string = \"\"\n"));
+                CHECK(has(r, "local function onDriverChange(newDriver: string)"));
+                CHECK(has(r, "    onDriverChange(value)\n"));
+            }
+            {
+                INFO("one returning a UUID, a uuid");
+                CHECK(has(r, "local function owner(): uuid\n"));
+                CHECK(has(r, "local o: uuid = owner()\n"));
+            }
+            {
+                INFO("one that may hold any text, a uuid unless given on to text");
+                CHECK(has(r, "local function echo(s: string): uuid\n"));
+                CHECK(has(r, "    return uuid(s)\n"));
+                CHECK(has(r, "local function passed(s: string): string\n"));
+                CHECK(has(r, "    return s\n"));
+                CHECK(has(r, "driver = passed(ll.GetObjectDesc())\n"));
+            }
+            require_checks_clean(r);
+        }
+        for (const char* global : { "key driver = NULL_KEY;\n", "key driver = \"00000000-0000-0000-0000-000000000000\";\n" })
+        {
+            const ALLSLToSLua::Result r = ALLSLToSLua::convert(global + body, o);
+            CAPTURE(global, r.text);
+            REQUIRE(r.converted);
+            {
+                INFO("a driver held as a uuid: the \"\" made one on the way in, and compared as one");
+                CHECK(has(r, "local function newDriver(): string\n"));
+                CHECK(has(r, "onStateChange(newDriver())\n"));
+                CHECK(has(r, "    onDriverChange(uuid(value))\n"));
+                CHECK(has(r, "if driver == uuid(\"\") then"));
+            }
+            require_checks_clean(r);
+        }
+    }
+
     TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: with uuidKeys off llList2Key's item is read as text as List2String reads it", "[ALLSLToSLua]")
     {
         const std::string lsl = "list gMixed;\n"
