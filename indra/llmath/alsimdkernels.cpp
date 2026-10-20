@@ -95,4 +95,17 @@ void morph_apply(const MorphApply& m)
     kernels::morph_apply_impl(m);
 }
 
+void grid_tangents(const LLVector4a* positions, const LLVector4a* normals, const LLVector2* uvs, size_t columns, size_t rows,
+                   LLVector4a* tangents)
+{
+    thread_local std::vector<F32> scratch;
+    kernels::grid_tangents_impl<ALSimdLanes>(positions, normals, uvs, columns, rows, tangents, scratch);
+}
+
+void indexed_tangents(const LLVector4a* positions, const LLVector4a* normals, const LLVector2* uvs, size_t vertex_count,
+                      const U16* indices, size_t index_count, LLVector4a* tangents)
+{
+    kernels::indexed_tangents_impl<ALSimdLanes>(positions, normals, uvs, vertex_count, indices, index_count, tangents);
+}
+
 } // namespace alsimd

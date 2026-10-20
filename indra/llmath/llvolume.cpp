@@ -6436,18 +6436,32 @@ void LLVolumeFace::createTangents()
         }
         mTangentsStale = false;
 
-        //generate tangents
-        LLVector4a* ptr = (LLVector4a*)mTangents;
-
-        LLVector4a* end = mTangents + mNumVertices;
-        while (ptr < end)
+        if (mOptimized)
         {
-            (*ptr++).clear();
+            // A face cacheOptimize has taken is a mesh LOD's, too large
+            // for its weld or not welded at all: Lengyel's tangents, which
+            // add no vertices.
+            LLVector4a* ptr = (LLVector4a*)mTangents;
+
+            LLVector4a* end = mTangents + mNumVertices;
+            while (ptr < end)
+            {
+                (*ptr++).clear();
+            }
+
+            LLCalculateTangentArray(mNumVertices, mPositions, mNormals, mTexCoords, mNumIndices / 3, mIndices, mTangents);
         }
-
-        LLCalculateTangentArray(mNumVertices, mPositions, mNormals, mTexCoords, mNumIndices / 3, mIndices, mTangents);
+        else if (!(mTypeMask & CAP_MASK) && mNumS > 0 && mNumT > 0 && mNumS * mNumT == mNumVertices &&
+                 mNumIndices == (mNumS - 1) * (mNumT - 1) * 6)
+        {
+            // A side is createSide's grid.
+            alsimd::grid_tangents(mPositions, mNormals, mTexCoords, mNumS, mNumT, mTangents);
+        }
+        else
+        {
+            alsimd::indexed_tangents(mPositions, mNormals, mTexCoords, mNumVertices, mIndices, mNumIndices, mTangents);
+        }
     }
-
 }
 
 void LLVolumeFace::resizeVertices(S32 num_verts)

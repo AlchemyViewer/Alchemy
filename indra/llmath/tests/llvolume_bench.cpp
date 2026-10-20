@@ -368,6 +368,21 @@ namespace
         }
     };
 
+    // A face's tangents by Lengyel's generator, into a buffer of their
+    // own, allocated and cleared as createTangents did.
+    F32 lengyel(const LLVolumeFace& face)
+    {
+        LLVector4a* tangents = (LLVector4a*)ll_aligned_malloc_16(face.mNumVertices * sizeof(LLVector4a));
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            tangents[v].clear();
+        }
+        LLCalculateTangentArray(face.mNumVertices, face.mPositions, face.mNormals, face.mTexCoords, face.mNumIndices / 3, face.mIndices, tangents);
+        const F32 first = tangents[0][0];
+        ll_aligned_free_16(tangents);
+        return first;
+    }
+
     struct FaceClass
     {
         std::string name;
@@ -592,22 +607,29 @@ namespace
         }
     }
 
-    // createTangents is Lengyel's generator; meshoptimizer's default mode
-    // weights by angle times the edges' lengths, its compatible mode by
-    // angle alone, as MikkTSpace does. Each row makes one face's tangents
-    // a vertex.
+    // createTangents sums meshoptimizer's default weighting a vertex at a
+    // time, over the grid on a side and over the indices elsewhere; Lengyel
+    // is the generator a face cacheOptimize has taken keeps, and the one
+    // createTangents was. meshoptimizer's default mode weights by angle
+    // times the edges' lengths a corner at a time, its compatible mode by
+    // angle alone, as MikkTSpace does. Each row makes one face's tangents a
+    // vertex, the allocation included where the generator makes one.
     TEST_CASE("llvolume_bench: one face's tangents from each generator", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
         for (const FaceClass& face_class : faceClasses())
         {
             LLVolumeFace& face = face_class.volume->getVolumeFace(face_class.face);
-            BENCHMARK(fmt::format("Lengyel (createTangents), {}", face_class.name))
+            BENCHMARK(fmt::format("createTangents, {}", face_class.name))
             {
                 ll_aligned_free_16(face.mTangents);
                 face.mTangents = nullptr;
                 face.createTangents();
                 return face.mTangents[0][0];
+            };
+            BENCHMARK(fmt::format("Lengyel, {}", face_class.name))
+            {
+                return lengyel(face);
             };
             TangentInputs inputs(face);
             BENCHMARK(fmt::format("meshoptimizer default, {}", face_class.name))
@@ -623,12 +645,16 @@ namespace
         {
             LLVolumeFace face = mesh.face();
             const std::string name = fmt::format("{}, {} vertices", mesh.name, face.mNumVertices);
-            BENCHMARK(fmt::format("Lengyel (createTangents), {}", name))
+            BENCHMARK(fmt::format("createTangents, {}", name))
             {
                 ll_aligned_free_16(face.mTangents);
                 face.mTangents = nullptr;
                 face.createTangents();
                 return face.mTangents[0][0];
+            };
+            BENCHMARK(fmt::format("Lengyel, {}", name))
+            {
+                return lengyel(face);
             };
             TangentInputs inputs(face);
             BENCHMARK(fmt::format("meshoptimizer default, {}", name))

@@ -1,8 +1,8 @@
 /**
  * @file alsimdkernels.h
  * @brief Batch kernels over arrays of vectors: transforms, dequantization,
- *        index offsets, skinning and bounds, at the register width the
- *        build was compiled for.
+ *        index offsets, skinning, bounds and tangents, at the register
+ *        width the build was compiled for.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -119,6 +119,34 @@ struct MorphApply
 };
 
 void morph_apply(const MorphApply& m);
+
+// Every vertex's tangent by meshoptimizer's default weighting, summed into
+// the vertex itself rather than into groups of its corners. A triangle's
+// tangent is dP/du by the chain rule. It adds nothing where the triangle
+// has no area, in positions or in UVs, to within rounding: twice the area
+// under 1e-5 of the sum of the squares of the two edges from its first
+// corner, as when two corners are one point. At each corner it is put in
+// the plane of that corner's normal, renormalized, and weighted by the
+// angle between the corner's edges in that plane times the product of
+// their lengths there. Each vertex's sum is put back in its normal's plane
+// and normalized; where nothing was added it is +x in that plane, or +y
+// where the normal is within 45 degrees of x. w is the sign of the UV
+// area of the vertex's triangles in index order, the sign of the most of
+// them where they differ; a vertex in none of them takes the face's, and
+// -1 where the face has none either. The normals are taken as unit length.
+//
+// The grid form is a grid of columns by rows, vertex s + columns * t, each
+// quad two triangles: bottom left, top right, top left and bottom left,
+// bottom right, top right, as LLVolumeFace::createSide indexes them. It
+// needs no index buffer, and keeps the grid as lanes in a scratch buffer
+// of each thread's, which grows to the largest grid the thread has made
+// tangents for.
+void grid_tangents(const LLVector4a* positions, const LLVector4a* normals, const LLVector2* uvs, size_t columns, size_t rows,
+                   LLVector4a* tangents);
+
+// The same over triangles from an index buffer.
+void indexed_tangents(const LLVector4a* positions, const LLVector4a* normals, const LLVector2* uvs, size_t vertex_count,
+                      const U16* indices, size_t index_count, LLVector4a* tangents);
 
 } // namespace alsimd
 

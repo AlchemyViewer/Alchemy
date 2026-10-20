@@ -751,4 +751,148 @@ namespace
             }
         }
     }
+
+    // ------------------------------------------------------------------
+    // Tangents
+
+    // The widths the lane kernels have.
+    template <class Body>
+    void for_each_lane_width(Body body)
+    {
+        body.template operator()<ALSimd4>("ALSimd4");
+#if AL_SIMD_AVX
+        body.template operator()<ALSimd8>("ALSimd8");
+#endif
+    }
+
+    // A grid of columns by rows over a wavy sheet, with the sheet's normals
+    // and the grid's UVs, indexed as createSide indexes one. Column 2 lies
+    // on column 1 and row 2 has row 1's UVs, so that some quads are lines
+    // and some triangles have no UV area.
+    struct TangentGrid
+    {
+        std::vector<LLVector4a> positions;
+        std::vector<LLVector4a> normals;
+        std::vector<LLVector2> uvs;
+        std::vector<U16> indices;
+    };
+
+    TangentGrid tangent_grid(size_t columns, size_t rows, U32 seed)
+    {
+        std::mt19937 rng(seed);
+        std::uniform_real_distribution<F32> jitter(-0.2f, 0.2f);
+        TangentGrid g;
+        g.positions.resize(columns * rows);
+        g.normals.resize(columns * rows);
+        g.uvs.resize(columns * rows);
+        for (size_t t = 0; t < rows; ++t)
+        {
+            for (size_t s = 0; s < columns; ++s)
+            {
+                const size_t at = s + columns * t;
+                const size_t column = (s == 2) ? 1 : s;
+                const F32 x = F32(column) * 0.3f + (column == s ? jitter(rng) * 0.3f : 0.f);
+                const F32 y = F32(t) * 0.25f + jitter(rng) * 0.25f;
+                g.positions[at].set(x, y, 0.3f * sinf(x) * cosf(y), 0.f);
+                LLVector4a normal(-0.3f * cosf(x) * cosf(y), 0.3f * sinf(x) * sinf(y), 1.f, 0.f);
+                normal.normalize3();
+                g.normals[at] = normal;
+                const size_t row = (t == 2) ? 1 : t;
+                g.uvs[at].set(F32(s) / F32(llmax(columns, size_t(2)) - 1), F32(row) / F32(llmax(rows, size_t(2)) - 1));
+            }
+            if (columns > 2)
+            {
+                g.positions[2 + columns * t] = g.positions[1 + columns * t];
+            }
+        }
+        for (size_t t = 0; t + 1 < rows; ++t)
+        {
+            for (size_t s = 0; s + 1 < columns; ++s)
+            {
+                const U16 bl = U16(s + columns * t);
+                const U16 br = U16(bl + 1);
+                const U16 tl = U16(bl + columns);
+                const U16 tr = U16(tl + 1);
+                for (U16 i : { bl, tr, tl, bl, br, tr })
+                {
+                    g.indices.push_back(i);
+                }
+            }
+        }
+        return g;
+    }
+
+    F64 degrees_apart(const LLVector4a& a, const LLVector4a& b)
+    {
+        const F64 cx = (F64)a[1] * b[2] - (F64)a[2] * b[1];
+        const F64 cy = (F64)a[2] * b[0] - (F64)a[0] * b[2];
+        const F64 cz = (F64)a[0] * b[1] - (F64)a[1] * b[0];
+        const F64 dot = (F64)a[0] * b[0] + (F64)a[1] * b[1] + (F64)a[2] * b[2];
+        return std::atan2(std::sqrt(cx * cx + cy * cy + cz * cz), dot) * 180.0 / F_PI;
+    }
+
+    // The grid and indexed forms at every width against the 128-bit ones,
+    // over grids that leave every tail: each lane runs the same
+    // instructions, but the compiler may reassociate the reciprocal square
+    // root's refinement differently in each, so to within a few ulps, with
+    // the same w. And against each other, which differ only in the order of
+    // their sums: within rounding, the same w, unit length and orthogonal
+    // to the normal. Nothing is written past the grid.
+    TEST_CASE("alsimdkernels: tangents at every width, and the grid form against the indexed", "[alsimdkernels]")
+    {
+        std::vector<F32> scratch;
+        U32 seed = 20;
+        for (size_t columns : { 1, 2, 3, 4, 5, 8, 9, 16, 17, 23 })
+        {
+            for (size_t rows : { 1, 2, 3, 6 })
+            {
+                const TangentGrid g = tangent_grid(columns, rows, ++seed);
+                const size_t n = columns * rows;
+                std::vector<LLVector4a> grid(n + 1, SENTINEL);
+                std::vector<LLVector4a> indexed(n + 1, SENTINEL);
+                grid_tangents_impl<ALSimd4>(g.positions.data(), g.normals.data(), g.uvs.data(), columns, rows, grid.data(), scratch);
+                indexed_tangents_impl<ALSimd4>(g.positions.data(), g.normals.data(), g.uvs.data(), n, g.indices.data(), g.indices.size(),
+                                               indexed.data());
+                CAPTURE(columns, rows);
+                require_same_bits("past the grid form's end", grid[n], SENTINEL);
+                require_same_bits("past the indexed form's end", indexed[n], SENTINEL);
+                for (size_t v = 0; v < n; ++v)
+                {
+                    CAPTURE(v);
+                    const F64 apart = degrees_apart(grid[v], indexed[v]);
+                    INFO("grid (" << precise(grid[v][0]) << ", " << precise(grid[v][1]) << ", " << precise(grid[v][2]) << ", " << grid[v][3]
+                                  << ") and indexed (" << precise(indexed[v][0]) << ", " << precise(indexed[v][1]) << ", "
+                                  << precise(indexed[v][2]) << ", " << indexed[v][3] << ") are " << precise(apart) << " degrees apart");
+                    REQUIRE(apart <= 1e-3);
+                    REQUIRE(grid[v][3] == indexed[v][3]);
+                    REQUIRE((grid[v][3] == 1.f || grid[v][3] == -1.f));
+                    REQUIRE(std::fabs(grid[v].getLength3().getF32() - 1.f) <= 1e-5f);
+                    REQUIRE(std::fabs(grid[v].dot3(g.normals[v]).getF32()) <= 1e-5f);
+                }
+
+                for_each_lane_width([&]<class W>(const char* width)
+                {
+                    CAPTURE(width);
+                    std::vector<LLVector4a> wide_grid(n + 1, SENTINEL);
+                    std::vector<LLVector4a> wide_indexed(n + 1, SENTINEL);
+                    grid_tangents_impl<W>(g.positions.data(), g.normals.data(), g.uvs.data(), columns, rows, wide_grid.data(), scratch);
+                    indexed_tangents_impl<W>(g.positions.data(), g.normals.data(), g.uvs.data(), n, g.indices.data(), g.indices.size(),
+                                             wide_indexed.data());
+                    require_same_bits("past the grid form's end", wide_grid[n], SENTINEL);
+                    require_same_bits("past the indexed form's end", wide_indexed[n], SENTINEL);
+                    for (size_t v = 0; v < n; ++v)
+                    {
+                        CAPTURE(v);
+                        for (int lane = 0; lane < 3; ++lane)
+                        {
+                            require_close("grid form", wide_grid[v][lane], grid[v][lane], 4.0 * std::numeric_limits<F32>::epsilon());
+                            require_close("indexed form", wide_indexed[v][lane], indexed[v][lane], 4.0 * std::numeric_limits<F32>::epsilon());
+                        }
+                        REQUIRE(wide_grid[v][3] == grid[v][3]);
+                        REQUIRE(wide_indexed[v][3] == indexed[v][3]);
+                    }
+                });
+            }
+        }
+    }
 }

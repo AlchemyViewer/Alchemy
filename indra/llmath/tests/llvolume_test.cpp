@@ -567,6 +567,7 @@ namespace
         constexpr U32 Tangents = 1 << 9;    // after genTangents: unit normals, unit tangents, w = +/-1
         constexpr U32 Orthogonal = 1 << 10; // after genTangents: tangent orthogonal to normal
         constexpr U32 LoneNormals = 1 << 11; // a vertex in no triangle with area takes a normal the face has
+        constexpr U32 Meshopt = 1 << 12;     // after genTangents: meshoptimizer's tangents, where it gives a vertex one
 
         // What the sweep holds every face to. Orthogonal is broken wherever
         // the tangent generator makes a tangent up, and has a case of its
@@ -620,6 +621,8 @@ namespace
         U32 only_regions = 0;
         // Check inversion also where the surface folds at a point.
         bool inversion_any_spread = false;
+        // Where Checks::Meshopt keeps what it found.
+        struct TangentAgreement* agreement = nullptr;
     };
 
     // ------------------------------------------------------------------
@@ -1157,6 +1160,271 @@ namespace
         }
     }
 
+    // What comparing tangents with meshoptimizer's found over a run.
+    struct TangentAgreement
+    {
+        S32 compared = 0; // vertices it gives one tangent with a length
+        S32 split = 0;    // vertices whose corners it gives more than one
+        S32 lone = 0;     // vertices it gives no tangent
+        S32 unsure = 0;   // vertices whose tangent rounding decides
+        F64 widest = 0.0; // degrees between the two, at most
+        std::string widest_at;
+        F64 nearest_bound = 0.0; // the most of a vertex's bound the two came apart by
+        std::string nearest_bound_at;
+    };
+
+    F64 degreesApart(const LLVector3& a, const LLVector3& b)
+    {
+        const F64 cx = (F64)a.mV[1] * b.mV[2] - (F64)a.mV[2] * b.mV[1];
+        const F64 cy = (F64)a.mV[2] * b.mV[0] - (F64)a.mV[0] * b.mV[2];
+        const F64 cz = (F64)a.mV[0] * b.mV[1] - (F64)a.mV[1] * b.mV[0];
+        const F64 dot = (F64)a.mV[0] * b.mV[0] + (F64)a.mV[1] * b.mV[1] + (F64)a.mV[2] * b.mV[2];
+        return atan2(sqrt(cx * cx + cy * cy + cz * cz), dot) * 180.0 / F_PI;
+    }
+
+    // Whether a triangle adds nothing to tangents: twice its area, in
+    // positions or in UVs, under 1e-5 of the sum of the squares of the two
+    // edges from its first corner.
+    bool tangentFlat(const LLVolumeFace& face, U32 a, U32 b, U32 c)
+    {
+        const LLVector3 pa = v3(face.mPositions[a]);
+        const LLVector3 ab = v3(face.mPositions[b]) - pa;
+        const LLVector3 ac = v3(face.mPositions[c]) - pa;
+        const LLVector2 uv_ab = face.mTexCoords[b] - face.mTexCoords[a];
+        const LLVector2 uv_ac = face.mTexCoords[c] - face.mTexCoords[a];
+        const F64 edges = (F64)ab.lengthSquared() + ac.lengthSquared();
+        const F64 uv_edges = (F64)uv_ab.lengthSquared() + uv_ac.lengthSquared();
+        const F64 area = (F64)uv_ab.mV[0] * uv_ac.mV[1] - (F64)uv_ab.mV[1] * uv_ac.mV[0];
+        return (F64)(ab % ac).lengthSquared() <= 1e-10 * edges * edges || area * area <= 1e-10 * uv_edges * uv_edges;
+    }
+
+    // How far rounding can turn each vertex's tangent, in degrees: its sum
+    // of corner shares worked again in double, as meshoptimizer's default
+    // mode makes them, and each share's size times how far rounding can
+    // move the share, against the size of the sum. A share's direction
+    // moves as far as its triangle's tangent can, from the rounding of the
+    // positions and UVs it is made from and of the chain rule's two terms,
+    // over the share's length in the normal's plane, short where the
+    // tangent nearly lies along the normal. Its weight moves as far as its
+    // edges' lengths in that plane can: short where an edge nearly lies
+    // along the normal, and shorter still to round where the square is
+    // taken as the edge's own less its square along the normal, as
+    // createTangents takes it. And as far as their angle can: near 0 or
+    // pi, where the arc cosine is a square root, by the square root of the
+    // cosine's rounding, however small the weight; and at a right angle by
+    // the step its arc cosine takes there, about 1e-3, where rounding
+    // decides the cosine's sign. 180 where the sum is
+    // nothing, or where a triangle's UVs wind one way or the other only by
+    // rounding, or it is nearly flat enough for one of the two to leave out
+    // and not the other.
+    std::vector<F64> tangentRoundingDegrees(const LLVolumeFace& face)
+    {
+        constexpr F64 EPSILON = 1.0 / (1 << 24);
+        using V = std::array<F64, 3>;
+        auto at = [](const LLVector4a& v) { return V{ v[0], v[1], v[2] }; };
+        auto sub = [](const V& a, const V& b) { return V{ a[0] - b[0], a[1] - b[1], a[2] - b[2] }; };
+        auto dot = [](const V& a, const V& b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
+        auto size = [&](const V& a) { return sqrt(dot(a, a)); };
+        auto less = [&](const V& v, const V& n)
+        {
+            const F64 d = dot(v, n);
+            return V{ v[0] - n[0] * d, v[1] - n[1] * d, v[2] - n[2] * d };
+        };
+        std::vector<V> sums(face.mNumVertices, { 0.0, 0.0, 0.0 });
+        std::vector<F64> spread(face.mNumVertices, 0.0);
+        std::vector<bool> unsure(face.mNumVertices, false);
+        for (S32 i = 0; i + 2 < face.mNumIndices; i += 3)
+        {
+            const U32 corner[3] = { face.mIndices[i], face.mIndices[i + 1], face.mIndices[i + 2] };
+            const V pa = at(face.mPositions[corner[0]]);
+            const V pb = at(face.mPositions[corner[1]]);
+            const V pc = at(face.mPositions[corner[2]]);
+            const LLVector2& ta = face.mTexCoords[corner[0]];
+            const LLVector2& tb = face.mTexCoords[corner[1]];
+            const LLVector2& tc = face.mTexCoords[corner[2]];
+            const V dp1 = sub(pb, pa);
+            const V dp2 = sub(pc, pa);
+            const F64 dt1x = (F64)tb.mV[0] - ta.mV[0];
+            const F64 dt1y = (F64)tb.mV[1] - ta.mV[1];
+            const F64 dt2x = (F64)tc.mV[0] - ta.mV[0];
+            const F64 dt2y = (F64)tc.mV[1] - ta.mV[1];
+
+            // How flat it is, in positions and in UVs, against the flat
+            // triangle's bound.
+            const V normal = { dp1[1] * dp2[2] - dp1[2] * dp2[1], dp1[2] * dp2[0] - dp1[0] * dp2[2], dp1[0] * dp2[1] - dp1[1] * dp2[0] };
+            const F64 det = dt1x * dt2y - dt1y * dt2x;
+            const F64 flat = llmin(size(normal) / (dot(dp1, dp1) + dot(dp2, dp2)), fabs(det) / (dt1x * dt1x + dt1y * dt1y + dt2x * dt2x + dt2y * dt2y));
+            // How far the UVs' rounding can move the UV area.
+            const F64 det_noise = EPSILON * ((fabs(ta.mV[0]) + fabs(tb.mV[0])) * fabs(dt2y) + fabs(dt1x) * (fabs(ta.mV[1]) + fabs(tc.mV[1])) +
+                                             (fabs(ta.mV[1]) + fabs(tb.mV[1])) * fabs(dt2x) + fabs(dt1y) * (fabs(ta.mV[0]) + fabs(tc.mV[0])) +
+                                             2.0 * fabs(dt1x * dt2y) + 2.0 * fabs(dt1y * dt2x));
+            const bool uncertain = (flat > 0.25e-5 && flat < 4e-5) || (fabs(det) <= 4.0 * det_noise && !(flat <= 0.25e-5));
+            if (uncertain)
+            {
+                for (U32 v : corner)
+                {
+                    unsure[v] = true;
+                }
+            }
+            if (flat <= 1e-5)
+            {
+                continue;
+            }
+
+            const V r = { dt2y * dp1[0] - dt1y * dp2[0], dt2y * dp1[1] - dt1y * dp2[1], dt2y * dp1[2] - dt1y * dp2[2] };
+            const F64 length = size(r);
+            if (length == 0.0)
+            {
+                continue;
+            }
+            const F64 scale = (det > 0.0 ? 1.0 : -1.0) / length;
+            const V t = { r[0] * scale, r[1] * scale, r[2] * scale };
+            // How far r can turn, against its length, in units of EPSILON:
+            // the rounding of its terms and of the differences they are
+            // made from.
+            const F64 noise_dt1y = fabs(ta.mV[1]) + fabs(tb.mV[1]) + fabs(dt1y);
+            const F64 noise_dt2y = fabs(ta.mV[1]) + fabs(tc.mV[1]) + fabs(dt2y);
+            const F64 noise_dp1 = size(pa) + size(pb) + size(dp1);
+            const F64 noise_dp2 = size(pa) + size(pc) + size(dp2);
+            const F64 turn = (noise_dt2y * size(dp1) + fabs(dt2y) * noise_dp1 + noise_dt1y * size(dp2) + fabs(dt1y) * noise_dp2 +
+                              2.0 * (fabs(dt2y) * size(dp1) + fabs(dt1y) * size(dp2))) / length;
+            for (int k = 0; k < 3; ++k)
+            {
+                const U32 v = corner[k];
+                const V n = at(face.mNormals[v]);
+                const V e1 = sub(at(face.mPositions[corner[(k + 1) % 3]]), at(face.mPositions[v]));
+                const V e2 = sub(at(face.mPositions[corner[(k + 2) % 3]]), at(face.mPositions[v]));
+                const V st = less(t, n);
+                const V p1 = less(e1, n);
+                const V p2 = less(e2, n);
+                const F64 sl = size(st);
+                const F64 l1 = size(p1);
+                const F64 l2 = size(p2);
+                if (sl == 0.0 || l1 == 0.0 || l2 == 0.0)
+                {
+                    continue;
+                }
+                const F64 cosine = llclamp(dot(p1, p2) / (l1 * l2), -1.0, 1.0);
+                const F64 ax = fabs(cosine);
+                F64 angle = (1.570337 + ax * (-0.2053972 + ax * 0.05147786)) * sqrt(1.0 - ax);
+                angle = cosine < 0.0 ? 3.1415926 - angle : angle;
+                const F64 weight = angle * l1 * l2;
+                for (int j = 0; j < 3; ++j)
+                {
+                    sums[v][j] += st[j] * weight / sl;
+                }
+                const F64 lengths = 1.0 + (size(e1) + size(at(face.mPositions[v]))) / l1 + (size(e2) + size(at(face.mPositions[v]))) / l2 +
+                                    dot(e1, e1) / (l1 * l1) + dot(e2, e2) / (l2 * l2);
+                const F64 cosine_noise = 2.0 * EPSILON * lengths;
+                const F64 angle_noise = cosine_noise + 1.570337 * (sqrt(1.0 - ax + cosine_noise) - sqrt(1.0 - ax)) +
+                                        (ax <= cosine_noise ? 3.1415926 - 2.0 * 1.570337 : 0.0);
+                spread[v] += weight * EPSILON * ((turn + 4.0) / sl + lengths) + l1 * l2 * angle_noise;
+            }
+        }
+        std::vector<F64> degrees(face.mNumVertices, 180.0);
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            const F64 length = size(sums[v]);
+            if (length > 0.0 && !unsure[v])
+            {
+                degrees[v] = llmin(180.0, 4.0 * spread[v] / length * 180.0 / F_PI);
+            }
+        }
+        return degrees;
+    }
+
+    // A face's tangents against meshoptimizer's default mode over its
+    // triangles that are not flat, which makes one tangent for each corner,
+    // and none where nothing adds to it: a vertex whose corners it gives
+    // one tangent must have that tangent's w, and its direction to within
+    // rounding, the larger of a thousandth of a degree and how far
+    // rounding can turn the vertex's sum.
+    constexpr F64 MESHOPT_TANGENT_DEGREES = 0.001;
+
+    void checkMeshoptTangents(const LLVolumeFace& face, TangentAgreement& agreement, Report& report, const std::string& where)
+    {
+        if (!face.mTangents || !face.mNumIndices)
+        {
+            return;
+        }
+        std::vector<U32> indices;
+        for (S32 i = 0; i + 2 < face.mNumIndices; i += 3)
+        {
+            if (!tangentFlat(face, face.mIndices[i], face.mIndices[i + 1], face.mIndices[i + 2]))
+            {
+                indices.insert(indices.end(), face.mIndices + i, face.mIndices + i + 3);
+            }
+        }
+        if (indices.empty())
+        {
+            return;
+        }
+        std::vector<F32> corners(indices.size() * 4);
+        meshopt_generateTangents(corners.data(), indices.data(), indices.size(), face.mPositions[0].getF32ptr(), face.mNumVertices,
+                                 sizeof(LLVector4a), face.mNormals[0].getF32ptr(), sizeof(LLVector4a), face.mTexCoords[0].mV,
+                                 sizeof(LLVector2), meshopt_TangentZeroFallback);
+        const std::vector<F64> rounding = tangentRoundingDegrees(face);
+        std::vector<S32> first(face.mNumVertices, -1);
+        std::vector<bool> split(face.mNumVertices, false);
+        for (size_t c = 0; c < indices.size(); ++c)
+        {
+            const U32 v = indices[c];
+            if (first[v] < 0)
+            {
+                first[v] = (S32)c;
+            }
+            else if (std::memcmp(&corners[c * 4], &corners[first[v] * 4], 4 * sizeof(F32)) != 0)
+            {
+                split[v] = true;
+            }
+        }
+        bool failed = false;
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            if (first[v] < 0)
+            {
+                continue;
+            }
+            if (split[v])
+            {
+                ++agreement.split;
+                continue;
+            }
+            const F32* theirs = &corners[first[v] * 4];
+            const LLVector3 direction(theirs[0], theirs[1], theirs[2]);
+            if (direction.isExactlyZero())
+            {
+                ++agreement.lone;
+                continue;
+            }
+            if (rounding[v] >= 180.0)
+            {
+                ++agreement.unsure;
+                continue;
+            }
+            ++agreement.compared;
+            const F64 apart = degreesApart(v3(face.mTangents[v]), direction);
+            const F64 bound = llmax(MESHOPT_TANGENT_DEGREES, rounding[v]);
+            if (apart > agreement.widest)
+            {
+                agreement.widest = apart;
+                agreement.widest_at = fmt::format("{}: vertex {}, bound {} degrees", where, v, bound);
+            }
+            if (apart / bound > agreement.nearest_bound)
+            {
+                agreement.nearest_bound = apart / bound;
+                agreement.nearest_bound_at = fmt::format("{}: vertex {}, {} of {} degrees", where, v, apart, bound);
+            }
+            if (!failed && (!(apart <= bound) || (bound < 180.0 && face.mTangents[v][3] != theirs[3])))
+            {
+                report.fail(fmt::format("{}: vertex {} has the tangent ({}, {}, {}, {}), {} degrees from meshoptimizer's ({}, {}, {}, {}), past {}", where, v,
+                                        face.mTangents[v][0], face.mTangents[v][1], face.mTangents[v][2], face.mTangents[v][3], apart,
+                                        theirs[0], theirs[1], theirs[2], theirs[3], bound));
+                failed = true;
+            }
+        }
+    }
+
     // Every check the inspection asks for, on every face of the volume.
     // Tangents come last, from genTangents, once every face's normals have
     // been checked as generation left them.
@@ -1236,13 +1504,17 @@ namespace
         for (S32 i = 0; i < faces; ++i)
         {
             const State& state = states[i];
-            if (!state.inspected || !(state.checks & (Checks::Tangents | Checks::Orthogonal)))
+            if (!state.inspected || !(state.checks & (Checks::Tangents | Checks::Orthogonal | Checks::Meshopt)))
             {
                 continue;
             }
             volume.genTangents(i);
             const LLVolumeFace& face = volume.getVolumeFace(i);
             checkTangents(face, state.checks, report, fmt::format("{}: {}", name, faceName(face)));
+            if (state.checks & Checks::Meshopt)
+            {
+                checkMeshoptTangents(face, *how.agreement, report, fmt::format("{}: {}", name, faceName(face)));
+            }
         }
     }
 
@@ -2653,13 +2925,13 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // Lengyel's Gram-Schmidt step removes only |n|^2 of the normal's part,
-    // so it needs unit normals, or a tangent leans out of the plane its
-    // normal makes. Where a vertex's triangles give its tangent no
-    // direction, it makes one up, +Z whatever the normal: at a cap with no
-    // area, a vertex in no triangle with area, and the point where a
-    // twisted half circle's pole crosses the axis it sweeps about.
-    TEST_CASE("llvolume: every prim tangent is orthogonal to its normal", "[llvolume][!shouldfail]")
+    // A tangent is a sum of shares each in the plane of its vertex's
+    // normal, put back in that plane once summed; where nothing adds to it,
+    // it is an axis put in that plane. Either way it is orthogonal to the
+    // normal: at a cap with no area, at a vertex in no triangle with area,
+    // and at the point where a twisted half circle's pole crosses the axis
+    // it sweeps about.
+    TEST_CASE("llvolume: every prim tangent is orthogonal to its normal", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::Orthogonal;
@@ -2671,10 +2943,32 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // A triangle whose UVs have no area gets an invented ratio of
-    // 1024 and outweighs its real neighbours, and one whose positions have
-    // no area still adds a tangent. Neither has a tangent to give.
-    TEST_CASE("llvolume: a triangle with no area or no UV area adds nothing to a tangent", "[llvolume][!shouldfail]")
+    // Prims' and sculpts' tangents are meshoptimizer's default mode summed
+    // a vertex at a time, which is its sum over the vertex's corners
+    // wherever it gives them all one tangent.
+    TEST_CASE("llvolume: prim and sculpt tangents agree with meshoptimizer's", "[llvolume]")
+    {
+        TangentAgreement agreement;
+        Inspect how;
+        how.checks = Checks::Meshopt;
+        how.agreement = &agreement;
+        Report report;
+        S32 volumes = 0;
+        inspectSweep(how, report, volumes);
+        inspectSculpts(how, report);
+        INFO(fmt::format("{} vertices compared, {} whose corners meshoptimizer splits, {} it gives no tangent, {} whose tangent rounding "
+                         "decides; at most {} degrees apart, at {}; at most {} of a vertex's bound, at {}",
+                         agreement.compared, agreement.split, agreement.lone, agreement.unsure, agreement.widest, agreement.widest_at,
+                         agreement.nearest_bound, agreement.nearest_bound_at));
+        INFO(report.text());
+        CHECK(report.failures == 0);
+        CHECK(agreement.compared > 0);
+    }
+
+    // A triangle whose UVs have no area has no dP/du, and one whose
+    // positions have no area has no surface to give one: neither adds to
+    // its corners' tangents, so a real neighbour's tangent stands alone.
+    TEST_CASE("llvolume: a triangle with no area or no UV area adds nothing to a tangent", "[llvolume]")
     {
         // Vertex 0 is in one real triangle, whose tangent is +X, and in one
         // other: a triangle whose UVs lie in a line, or one whose first two
