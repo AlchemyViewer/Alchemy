@@ -399,6 +399,9 @@ public:
     virtual     void    changeTEImage(S32 index, LLViewerTexture* new_image)  ;
     virtual     void    changeTENormalMap(S32 index, LLViewerTexture* new_image)  ;
     virtual     void    changeTESpecularMap(S32 index, LLViewerTexture* new_image)  ;
+    // Resolve a face's render material textures again (updateTEMaterialTextures), as when a bake
+    // proxy it names resolves to another texture
+    virtual     void    changeTEMaterialTextures(S32 index);
     LLViewerTexture     *getTEImage(const U8 te) const;
     LLViewerTexture     *getTENormalMap(const U8 te) const;
     LLViewerTexture     *getTESpecularMap(const U8 te) const;

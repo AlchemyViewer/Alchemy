@@ -214,6 +214,7 @@ public:
     /*virtual*/ void    setScale(const LLVector3 &scale, bool damped) override;
 
     /*virtual*/ void    changeTEImage(S32 index, LLViewerTexture* new_image) override;
+    /*virtual*/ void    changeTEMaterialTextures(S32 index) override;
     /*virtual*/ void    setNumTEs(const U8 num_tes) override;
     /*virtual*/ void    setTEImage(const U8 te, LLViewerTexture *imagep) override;
     /*virtual*/ S32     setTETexture(const U8 te, const LLUUID &uuid) override;
