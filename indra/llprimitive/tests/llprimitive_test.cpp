@@ -33,6 +33,7 @@
 #include "../llprimitive.h"
 
 #include "../../llmath/llvolumemgr.h"
+#include "../../llmessage/lldatapacker.h"
 
 namespace
 {
@@ -256,6 +257,65 @@ namespace
 
         // Ensure that we now have a different volume
         CHECK(new_volume != primitive.getVolume());
+    }
+
+    // As LLViewerObject::setParameterEntry compares a block it is given with the one it holds.
+    bool same_block(const LLNetworkData& given, const LLNetworkData& held)
+    {
+        return given == held;
+    }
+
+    TEST_CASE("LLLightParams: a light's color comes back from the wire as it is held", "[LLLightParams]")
+    {
+        LLLightParams sent;
+        sent.setLinearColor(LLColor4(0.31f, 0.02f, 0.9f, 0.43f));
+
+        U8 buffer[64];
+        LLDataPackerBinaryBuffer out(buffer, sizeof(buffer));
+        REQUIRE(sent.pack(out));
+
+        LLLightParams received;
+        LLDataPackerBinaryBuffer in(buffer, out.getCurrentSize());
+        REQUIRE(received.unpack(in));
+
+        CHECK(received.getLinearColor() == sent.getLinearColor());
+        CHECK(same_block(received, sent));
+    }
+
+    TEST_CASE("LLLightParams: colors that pack to the same bytes are the same light", "[LLLightParams]")
+    {
+        LLLightParams light;
+        light.setLinearColor(LLColor4(0.31f, 0.6f, 0.2f, 1.f));
+        LLLightParams same;
+        same.setLinearColor(LLColor4(0.311f, 0.6f, 0.2f, 1.f));
+        LLLightParams next;
+        next.setLinearColor(LLColor4(0.32f, 0.6f, 0.2f, 1.f));
+
+        CHECK(same_block(same, light));
+        CHECK_FALSE(same_block(next, light));
+    }
+
+    TEST_CASE("LLLightParams: a color read back in sRGB and set again holds the same", "[LLLightParams]")
+    {
+        for (S32 code = 0; code < 256; ++code)
+        {
+            const F32 channel = code / 255.f;
+            LLLightParams held;
+            held.setLinearColor(LLColor4(channel, channel, channel, channel));
+            LLLightParams again;
+            again.setSRGBColor(held.getSRGBColor());
+
+            CAPTURE(code);
+            CHECK(same_block(again, held));
+        }
+    }
+
+    TEST_CASE("LLLightParams: a color out of range is held at the ends of the range", "[LLLightParams]")
+    {
+        LLLightParams light;
+        light.setLinearColor(LLColor4(1e30f, -1.f, 0.f, 3.f));
+
+        CHECK(light.getLinearColor() == LLColor4(1.f, 0.f, 0.f, 1.f));
     }
 }
 

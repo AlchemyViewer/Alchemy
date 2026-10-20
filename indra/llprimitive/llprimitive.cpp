@@ -1726,6 +1726,13 @@ LLLightParams::LLLightParams()
     mType = PARAMS_LIGHT;
 }
 
+void LLLightParams::setLinearColor(const LLColor4& color)
+{
+    mColor = color;
+    mColor.clamp();
+    mColor = LLColor4(LLColor4U(mColor));
+}
+
 bool LLLightParams::pack(LLDataPacker &dp) const
 {
     LLColor4U color4u(mColor);
