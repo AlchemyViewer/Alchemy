@@ -4541,6 +4541,8 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
     mBeginT = src.mBeginT;
     mNumS = src.mNumS;
     mNumT = src.mNumT;
+    mJoinsS = src.mJoinsS;
+    mJoinsT = src.mJoinsT;
 
     mExtents[0] = src.mExtents[0];
     mExtents[1] = src.mExtents[1];
@@ -6373,6 +6375,58 @@ size_t LLVolumeFace::weldVertices(VertexData* destination_vertices, U32* destina
 
 namespace
 {
+    // Points closer than this are one place: far above the rounding that a
+    // closed loop carries from its first point around to its last, far below
+    // the step between any two points the generator means to be apart.
+    constexpr F32 SAME_PLACE = 1e-5f;
+
+    bool same_place(const LLVector4a& a, const LLVector4a& b)
+    {
+        LLVector4a d;
+        d.setSub(a, b);
+        return d.dot3(d).getF32() <= SAME_PLACE * SAME_PLACE;
+    }
+
+    // Whether every row of a grid has the same place in column a as in
+    // column b.
+    bool columns_meet(const LLVector4a* pos, S32 num_s, S32 num_t, S32 a, S32 b)
+    {
+        for (S32 t = 0; t < num_t; ++t)
+        {
+            if (!same_place(pos[num_s * t + a], pos[num_s * t + b]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Whether every column of a grid has the same place in row a as in row b.
+    bool rows_meet(const LLVector4a* pos, S32 num_s, S32 a, S32 b)
+    {
+        for (S32 s = 0; s < num_s; ++s)
+        {
+            if (!same_place(pos[num_s * a + s], pos[num_s * b + s]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Whether a column of a grid is one place in every row: a pole.
+    bool column_is_point(const LLVector4a* pos, S32 num_s, S32 num_t, S32 s)
+    {
+        for (S32 t = 1; t < num_t; ++t)
+        {
+            if (!same_place(pos[s], pos[num_s * t + s]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // Adds a grid quad to its corners' normals. Its two triangles, (bl, br,
     // tr) and (bl, tr, tl), share the diagonal from bl to tr: each gives its
     // corner off the diagonal its cross product, twice its area along its
@@ -6638,135 +6692,103 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         }
     }
 
-    // adjust normals based on wrapping and stitching
-
-    LLVector4a top;
-    top.setSub(pos[0], pos[mNumS*(mNumT-2)]);
-    bool s_bottom_converges = (top.dot3(top) < 0.000001f);
-
-    top.setSub(pos[mNumS-1], pos[mNumS*(mNumT-2)+mNumS-1]);
-    bool s_top_converges = (top.dot3(top) < 0.000001f);
-
-    if (sculpt_stitching == LL_SCULPT_TYPE_NONE)  // logic for non-sculpt volumes
+    // A side's normals join across an edge where its first and last columns
+    // are one seam, or its first and last rows: a prim's where they are one
+    // place in every row or column, which the face tells from its own
+    // positions and not from whether the profile or the path counts as
+    // closed; a sculpt's where its stitching samples them from one column
+    // or row of the map.
+    if (!partial_build)
     {
-        if (!volume->getPath().isOpen())
-        { //wrap normals on T
-            for (S32 i = 0; i < mNumS; i++)
-            {
-                LLVector4a n;
-                n.setAdd(norm[i], norm[mNumS*(mNumT-1)+i]);
-                norm[i] = n;
-                norm[mNumS*(mNumT-1)+i] = n;
-            }
-        }
-
-        if (!volume->getProfile().isOpen() && !s_bottom_converges)
-        { //wrap normals on S
-            for (S32 i = 0; i < mNumT; i++)
-            {
-                LLVector4a n;
-                n.setAdd(norm[mNumS*i], norm[mNumS*i+mNumS-1]);
-                norm[mNumS * i] = n;
-                norm[mNumS * i+mNumS-1] = n;
-            }
-        }
-
-        if (volume->getPathType() == LL_PCODE_PATH_CIRCLE &&
-            ((volume->getProfileType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF))
+        if (sculpt_stitching == LL_SCULPT_TYPE_NONE)
         {
-            if (s_bottom_converges)
-            { //all lower S have same normal
-                for (S32 i = 0; i < mNumT; i++)
-                {
-                    norm[mNumS*i].set(1,0,0);
-                }
-            }
-
-            if (s_top_converges)
-            { //all upper S have same normal
-                for (S32 i = 0; i < mNumT; i++)
-                {
-                    norm[mNumS*i+mNumS-1].set(-1,0,0);
-                }
-            }
+            mJoinsS = columns_meet(pos, mNumS, mNumT, 0, mNumS - 1);
+            mJoinsT = rows_meet(pos, mNumS, 0, mNumT - 1);
+        }
+        else
+        {
+            mJoinsS = sculpt_stitching == LL_SCULPT_TYPE_SPHERE || sculpt_stitching == LL_SCULPT_TYPE_TORUS ||
+                      sculpt_stitching == LL_SCULPT_TYPE_CYLINDER;
+            mJoinsT = sculpt_stitching == LL_SCULPT_TYPE_TORUS;
         }
     }
-    else  // logic for sculpt volumes
+
+    if (sculpt_stitching == LL_SCULPT_TYPE_SPHERE)
     {
-        bool average_poles = false;
-        bool wrap_s = false;
-        bool wrap_t = false;
+        // average normals for north pole
 
-        if (sculpt_stitching == LL_SCULPT_TYPE_SPHERE)
-            average_poles = true;
+        LLVector4a average;
+        average.clear();
 
-        if ((sculpt_stitching == LL_SCULPT_TYPE_SPHERE) ||
-            (sculpt_stitching == LL_SCULPT_TYPE_TORUS) ||
-            (sculpt_stitching == LL_SCULPT_TYPE_CYLINDER))
-            wrap_s = true;
-
-        if (sculpt_stitching == LL_SCULPT_TYPE_TORUS)
-            wrap_t = true;
-
-
-        if (average_poles)
+        for (S32 i = 0; i < mNumS; i++)
         {
-            // average normals for north pole
-
-            LLVector4a average;
-            average.clear();
-
-            for (S32 i = 0; i < mNumS; i++)
-            {
-                average.add(norm[i]);
-            }
-
-            // set average
-            for (S32 i = 0; i < mNumS; i++)
-            {
-                norm[i] = average;
-            }
-
-            // average normals for south pole
-
-            average.clear();
-
-            for (S32 i = 0; i < mNumS; i++)
-            {
-                average.add(norm[i + mNumS * (mNumT - 1)]);
-            }
-
-            // set average
-            for (S32 i = 0; i < mNumS; i++)
-            {
-                norm[i + mNumS * (mNumT - 1)] = average;
-            }
-
+            average.add(norm[i]);
         }
 
-
-        if (wrap_s)
+        // set average
+        for (S32 i = 0; i < mNumS; i++)
         {
+            norm[i] = average;
+        }
+
+        // average normals for south pole
+
+        average.clear();
+
+        for (S32 i = 0; i < mNumS; i++)
+        {
+            average.add(norm[i + mNumS * (mNumT - 1)]);
+        }
+
+        // set average
+        for (S32 i = 0; i < mNumS; i++)
+        {
+            norm[i + mNumS * (mNumT - 1)] = average;
+        }
+    }
+
+    if (mJoinsS)
+    {
+        for (S32 i = 0; i < mNumT; i++)
+        {
+            LLVector4a n;
+            n.setAdd(norm[mNumS*i], norm[mNumS*i+mNumS-1]);
+            norm[mNumS * i] = n;
+            norm[mNumS * i+mNumS-1] = n;
+        }
+    }
+
+    if (mJoinsT)
+    {
+        for (S32 i = 0; i < mNumS; i++)
+        {
+            LLVector4a n;
+            n.setAdd(norm[i], norm[mNumS*(mNumT-1)+i]);
+            norm[i] = n;
+            norm[mNumS*(mNumT-1)+i] = n;
+        }
+    }
+
+    // On a sphere, a column that is one place in every row is a pole on the
+    // axis the half circle sweeps about, and takes the axis.
+    if (sculpt_stitching == LL_SCULPT_TYPE_NONE && volume->getPathType() == LL_PCODE_PATH_CIRCLE &&
+        ((volume->getProfileType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF))
+    {
+        if (column_is_point(pos, mNumS, mNumT, 0))
+        { //all lower S have same normal
             for (S32 i = 0; i < mNumT; i++)
             {
-                LLVector4a n;
-                n.setAdd(norm[mNumS*i], norm[mNumS*i+mNumS-1]);
-                norm[mNumS * i] = n;
-                norm[mNumS * i+mNumS-1] = n;
+                norm[mNumS*i].set(1,0,0);
             }
         }
 
-        if (wrap_t)
-        {
-            for (S32 i = 0; i < mNumS; i++)
+        if (column_is_point(pos, mNumS, mNumT, mNumS - 1))
+        { //all upper S have same normal
+            for (S32 i = 0; i < mNumT; i++)
             {
-                LLVector4a n;
-                n.setAdd(norm[i], norm[mNumS*(mNumT-1)+i]);
-                norm[i] = n;
-                norm[mNumS*(mNumT-1)+i] = n;
+                norm[mNumS*i+mNumS-1].set(-1,0,0);
             }
         }
-
     }
 
     return true;

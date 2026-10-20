@@ -582,26 +582,12 @@ namespace
 
     namespace Regions
     {
-        // A side of a closed profile whose first and last columns are
-        // apart, as each side of a box is, and of more than two rows, where
-        // the S wrap runs: it averages the side's two edges together.
-        constexpr U32 OpenSWrap = 1 << 0;
-        // A side whose path's openness disagrees with its rows. A path
-        // that counts as closed but whose first and last rows are apart, a
-        // torus at one and a half turns, has the T wrap sum rows half a
-        // turn apart; one that counts as open but whose rows meet, a
-        // skewed circle2 path, is never wrapped.
-        constexpr U32 TWrapByOpenness = 1 << 1;
         // A cap with no area, which has no triangle to take a normal
         // from.
         constexpr U32 CapNoArea = 1 << 2;
         // A square hole above 0.707 in a round or triangular profile,
         // whose corners go through the wall.
         constexpr U32 SquareHole = 1 << 3;
-        // A smooth closed side of two rows: the S wrap's test for a pole
-        // compares the first row with itself and passes, so the seam is
-        // not wrapped.
-        constexpr U32 TwoRowSeam = 1 << 4;
         // A vertex in no triangle with area sums to no normal, or to the
         // rounding left of one, which createTangents' normalize turns into
         // NaN or infinity where its copies are exactly one point: the copied
@@ -621,14 +607,6 @@ namespace
     U32 excusedBy(U32 regions)
     {
         U32 checks = 0;
-        if (regions & Regions::OpenSWrap)
-        {
-            checks |= Checks::Oracle | Checks::Inversion;
-        }
-        if (regions & Regions::TWrapByOpenness)
-        {
-            checks |= Checks::Oracle | Checks::Inversion | Checks::SeamsAgree | Checks::HardEdges;
-        }
         if (regions & Regions::CapNoArea)
         {
             checks |= Checks::Finite | Checks::RawUnit | Checks::CapFacing | Checks::Tangents | Checks::Orthogonal;
@@ -636,10 +614,6 @@ namespace
         if (regions & Regions::SquareHole)
         {
             checks |= Checks::Inversion | Checks::CapFacing | Checks::Oracle;
-        }
-        if (regions & Regions::TwoRowSeam)
-        {
-            checks |= Checks::SeamsAgree;
         }
         if (regions & Regions::TwistedCapHub)
         {
@@ -698,23 +672,6 @@ namespace
             if (twisted && profile == LL_PCODE_PROFILE_CIRCLE_HALF && params.getPathParams().getCurveType() != LL_PCODE_PATH_LINE)
             {
                 regions |= Regions::InsideOutCap;
-            }
-        }
-        else if (!isSculpt(volume) && isGrid(face))
-        {
-            const bool profile_closed = !volume.getProfile().isOpen();
-            const bool columns_meet = columnsMeet(face);
-            if (profile_closed && face.mNumT > 2 && !columns_meet)
-            {
-                regions |= Regions::OpenSWrap;
-            }
-            if (volume.getPath().isOpen() == rowsMeet(face))
-            {
-                regions |= Regions::TWrapByOpenness;
-            }
-            if (columns_meet && face.mNumT == 2 && !isDoubled(face))
-            {
-                regions |= Regions::TwoRowSeam;
             }
         }
         if (std::find(lone.begin(), lone.end(), true) != lone.end())
@@ -2637,16 +2594,15 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // Every side of a closed profile has its first and last columns
-    // summed, so on a twisted box or tube each side's two edges take one
-    // averaged normal. A half cylinder's side, from one pole of its arc to
-    // the other, sums two opposite rims at LOD 2 and 3, as a skewed
-    // sphere's sums its poles, and their normals turn over.
-    TEST_CASE("llvolume: the S wrap joins only edges that meet", "[llvolume][!shouldfail]")
+    // A side's first and last columns are joined only where they are one
+    // place. A wrap by the profile's closing alone would average each side
+    // of a twisted box or tube with its own other edge, sum a half
+    // cylinder's two opposite rims at LOD 2 and 3, and a skewed sphere's
+    // two poles, and turn their normals over.
+    TEST_CASE("llvolume: the S wrap joins only edges that meet", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::Oracle | Checks::Inversion;
-        how.only_regions = Regions::OpenSWrap;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
@@ -2664,15 +2620,14 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // The T wrap trusts the path's openness, which ignores revolutions:
-    // at one and a half turns the first and last rows are half a turn
-    // apart, and their normals are summed. The other way, a skewed circle2
-    // path counts as open though its rows meet, and is never wrapped.
-    TEST_CASE("llvolume: the T wrap follows whether the first and last rows meet", "[llvolume][!shouldfail]")
+    // A path's openness ignores revolutions: at one and a half turns its
+    // first and last rows are half a turn apart, and a wrap by openness would
+    // sum their normals. The other way, a skewed circle2 path counts as open
+    // though its rows meet, and would never be wrapped.
+    TEST_CASE("llvolume: the T wrap follows whether the first and last rows meet", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::Oracle | Checks::Inversion | Checks::SeamsAgree | Checks::HardEdges;
-        how.only_regions = Regions::TWrapByOpenness;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
@@ -2927,15 +2882,15 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // createSide takes a side's first column as a pole where it meets the
-    // row before the last; on a side of two rows that row is the first, so
-    // every closed side of two rows passes, and its seam is never wrapped:
-    // a cylinder's seam at LOD 0 and 1 is two one-sided normals.
-    TEST_CASE("llvolume: a closed side of two rows has one normal at its seam", "[llvolume][!shouldfail]")
+    // A pole test that compared a side's first row with the row before its
+    // last would compare the first row with itself on a side of two rows,
+    // take every such side's first column for a pole and leave its seam
+    // unwrapped: a cylinder's seam at LOD 0 and 1 would be two one-sided
+    // normals.
+    TEST_CASE("llvolume: a closed side of two rows has one normal at its seam", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::SeamsAgree;
-        how.only_regions = Regions::TwoRowSeam;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);

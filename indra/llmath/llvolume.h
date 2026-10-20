@@ -941,6 +941,12 @@ public:
     S32 mNumS;
     S32 mNumT;
 
+    // Whether a side's first and last columns, and its first and last rows,
+    // are one seam whose normals are joined. A full build decides them and a
+    // partial build keeps them.
+    bool mJoinsS = false;
+    bool mJoinsT = false;
+
     LLVector4a* mExtents; //minimum and maximum point of face
     LLVector4a* mCenter;
     LLVector2   mTexCoordExtents[2]; //minimum and maximum of texture coordinates of the face.
