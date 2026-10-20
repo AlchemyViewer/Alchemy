@@ -1,7 +1,7 @@
 /**
  * @file alskylayers.h
  * @brief What the sky's composite takes of the layers it works out along each view ray from a few values a frame: the
- *        sun's and moon's quads.
+ *        sun's and moon's quads, and the sun bloom's square.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -52,12 +52,17 @@ using Corners = std::array<LLVector3, 4>;
 /// it): wider by up to 30% and taller by up to 20% as the body nears the horizon.
 Corners bodyCorners(const LLQuaternion& rotation, F32 distance, F32 scale, F32 disk_radius);
 
+/// The sun bloom's square about the sun's quad @a sun: centred on it, a half-extent every way of four times the disc's
+/// half-width, along the disc's axes. The square the sun's halo was drawn in before WindLight
+/// (LLVOSky::updateSunHaloGeometry at the open-source import).
+Corners bloomCorners(const Corners& sun);
+
 /// The moon's opacity as it nears the horizon, from @a moon_z, the agent's z of its direction: four times its square,
 /// to 1, the pre-EEP fade the moon's program restored; 1 below the horizon, where the moon is not drawn.
 F32 moonFade(F32 moon_z);
 
 /// How far below its quad the sun disc was drawn, in metres down the agent's z: the sun's vertex stage lowered every
-/// corner by it.
+/// corner by it. The bloom is lowered with it, so the two stay centred on each other.
 constexpr F32 SUN_DROP = 50.f;
 
 /// What the composite's ray test takes of a quad (deferred/skyBodiesF.glsl's skyQuadCoord), the quad moved by

@@ -653,6 +653,11 @@ public:
         SKY_MOON_MAP,                       //  "skyMoonMap"  the moon's texture
         SKY_MOON_QUAD,                      //  "skyMoonQuad"  vec3[3], the moon's quad
         SKY_MOON_FADE,                      //  "skyMoonFade"  the moon's opacity toward the horizon (ALSkyLayers::moonFade)
+        SKY_BLOOM_MAP,                      //  "skyBloomMap"  the sun bloom's texture
+        SKY_BLOOM_MAP_NEXT,                 //  "skyBloomMapNext"  the sun bloom's texture the sky blends toward
+        SKY_BLOOM_BLEND,                    //  "skyBloomBlend"  how far the sky has blended toward it, 0 for one texture
+        SKY_BLOOM_QUAD,                     //  "skyBloomQuad"  vec3[3], the bloom's square (ALSkyLayers::bloomCorners)
+        SKY_BLOOM_COLOR,                    //  "skyBloomColor"  the sun's colour the bloom is tinted by
 
         // Selection outlines, hover glow and wireframe (ALSelectionOutline)
         SELECTION_ID,                       //  "selection_id"  the object's id, 1 to 65535

@@ -77,6 +77,17 @@ Corners bodyCorners(const LLQuaternion& rotation, F32 distance, F32 scale, F32 d
              centre + half_right - half_up };
 }
 
+Corners bloomCorners(const Corners& sun)
+{
+    const LLVector3 right = 2.f * (sun[2] - sun[0]);
+    LLVector3       up    = 2.f * (sun[2] - sun[3]);
+    up.normVec();
+    up *= right.magVec();
+    const LLVector3 centre = 0.25f * (sun[0] + sun[1] + sun[2] + sun[3]);
+
+    return { centre - right + up, centre - right - up, centre + right + up, centre + right - up };
+}
+
 F32 moonFade(F32 moon_z)
 {
     return moon_z > 0.f ? llclamp(moon_z * moon_z * 4.f, 0.f, 1.f) : 1.f;

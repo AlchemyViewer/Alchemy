@@ -1,7 +1,7 @@
 /**
  * @file class1/deferred/skyBodiesF.glsl
- * @brief The sun disc and the moon as functions of the view ray: what each laid over the sky where a ray from the
- *        camera crosses its quad, for the sky's composite.
+ * @brief The sun disc, the moon and the sun's bloom as functions of the view ray: what each lays over the sky where
+ *        a ray from the camera crosses its quad, for the sky's composite.
  *
  * $LicenseInfo:firstyear=2005&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -42,6 +42,16 @@ uniform sampler2D skyMoonMap;
 uniform vec3      skyMoonQuad[3];
 uniform float     skyMoonFade;
 uniform float     moon_brightness;
+
+#ifdef SUN_BLOOM
+// The sun bloom's texture pair and their blend, its square (ALSkyLayers::bloomCorners) and the sun's colour it is
+// tinted by.
+uniform sampler2D skyBloomMap;
+uniform sampler2D skyBloomMapNext;
+uniform float     skyBloomBlend;
+uniform vec3      skyBloomQuad[3];
+uniform vec3      skyBloomColor;
+#endif
 
 // Where the ray along dir, a unit vector in the dome's frame, meets the plane of quad: its texture coordinates there,
 // (0, 0) to (1, 1) across the quad and continuing past it, and in hit whether the ray crosses the quad itself. The
@@ -101,3 +111,27 @@ vec4 skyMoon(vec3 dir)
     }
     return c;
 }
+
+#ifdef SUN_BLOOM
+// The sun's bloom along dir: a halo laid under the sun disc, its texture tinted by the sun's colour, at up to 0.9
+// opacity. Uniform control flow only.
+vec4 skyBloom(vec3 dir)
+{
+    bool hit;
+    vec2 uv = skyQuadCoord(dir, skyBloomQuad, hit);
+    vec2 uv_dx = dFdx(uv);
+    vec2 uv_dy = dFdy(uv);
+    vec4 c = vec4(0.0);
+    if (hit)
+    {
+        c = textureGrad(skyBloomMap, uv, uv_dx, uv_dy);
+        if (skyBloomBlend > 0.0)
+        {
+            c = mix(c, textureGrad(skyBloomMapNext, uv, uv_dx, uv_dy), skyBloomBlend);
+        }
+        c.rgb *= skyBloomColor;
+        c.a   *= 0.9;
+    }
+    return c;
+}
+#endif

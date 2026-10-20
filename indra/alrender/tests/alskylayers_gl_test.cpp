@@ -42,8 +42,9 @@ namespace
     // The layer the test program lays over its background (kLayerTest's test_layer).
     enum TestLayer : S32
     {
-        TEST_SUN  = 1,
-        TEST_MOON = 2,
+        TEST_SUN   = 1,
+        TEST_MOON  = 2,
+        TEST_BLOOM = 3,
     };
 
     // The screen triangle the layers are drawn over.
@@ -73,6 +74,7 @@ uniform vec3 test_background;
 
 vec4 skySun(vec3 dir);
 vec4 skyMoon(vec3 dir);
+vec4 skyBloom(vec3 dir);
 
 void main()
 {
@@ -89,7 +91,57 @@ void main()
         vec4 layer = skyMoon(dir);
         color = mix(color, layer.rgb, layer.a);
     }
+    else if (test_layer == 3)
+    {
+        vec4 layer = skyBloom(dir);
+        color = mix(color, layer.rgb, layer.a);
+    }
     frag_color = vec4(color, 1.0);
+}
+)";
+
+    // The sun's halo as it was drawn before WindLight (LLDrawPoolSky::renderSunHalo at the open-source import), which
+    // no shader ever drew: its square about the sun, textured and tinted by the sun's colour at the halo's opacity,
+    // alpha blended. Its texture pair is blended as the sun's is, and the square lowered with the sun disc, as the
+    // composite lays the bloom.
+    const char* kHaloVertex = R"(//[ENGINE_BLOCK Matrices]
+
+in vec3 position;
+in vec2 texcoord0;
+
+out vec2 vary_texcoord0;
+
+void main()
+{
+    vec4 pos = modelview_projection_matrix * vec4(position - vec3(0.0, 0.0, 50.0), 1.0);
+    pos.z = pos.w;
+    gl_Position = pos;
+    vary_texcoord0 = texcoord0;
+}
+)";
+
+    const char* kHaloFragment = R"(/*[EXTRA_CODE_HERE]*/
+
+out vec4 frag_data[4];
+
+uniform sampler2D diffuseMap;
+uniform sampler2D altDiffuseMap;
+uniform float blend_factor;
+uniform vec4 color;
+
+in vec2 vary_texcoord0;
+
+void main()
+{
+    vec4 c = mix(texture(diffuseMap, vary_texcoord0), texture(altDiffuseMap, vary_texcoord0), blend_factor) * color;
+    frag_data[0] = vec4(0.0);
+    frag_data[1] = vec4(0.0);
+    frag_data[2] = vec4(0.0);
+#if defined(HAS_EMISSIVE)
+    frag_data[3] = c;
+#else
+    frag_data[0] = c;
+#endif
 }
 )";
 
@@ -126,6 +178,16 @@ void main()
         { "moon bright", 30.f, 200.f, 1.5f, { 205.f, 28.f, 35.f }, 0.f, 1.6f },
     };
 
+    // Over the sun at midday and on the horizon, blending toward the next pair, and about a large sun.
+    const BodyCase BLOOMS[] = {
+        { "bloom at midday", 60.f, 80.f, 1.f, { 80.f, 57.f, 50.f }, 0.f, 1.f },
+        { "bloom on the horizon, blending", 3.f, 260.f, 1.f, { 255.f, 2.f, 50.f }, 0.5f, 1.f },
+        { "bloom about a large sun", 35.f, 120.f, 2.5f, { 140.f, 25.f, 90.f }, 0.f, 1.f },
+    };
+
+    // The sun's colour the bloom is tinted by, held to 1 as the fixed-function halo's vertex colour was.
+    const LLVector3 BLOOM_COLOR(1.f, 0.82f, 0.6f);
+
     // How a layer drawn two ways differs, over the colour channels: the most, the pixels past the bound compare() is
     // given, and the pixels the layer reached in either.
     struct Difference
@@ -155,6 +217,7 @@ void main()
             {
                 mOldSun[path].unload();
                 mOldMoon[path].unload();
+                mHalo[path].unload();
                 mLayers[path].unload();
                 for (LLRenderTarget& target : mGBuffer[path])
                 {
@@ -167,6 +230,8 @@ void main()
             mSunTexture = nullptr;
             mSunTextureNext = nullptr;
             mMoonTexture = nullptr;
+            mBloomTexture = nullptr;
+            mBloomTextureNext = nullptr;
             if (mEnvironment)
             {
                 glDeleteBuffers(1, &mEnvironment);
@@ -185,6 +250,8 @@ void main()
             mTree.populate();
             REQUIRE(mTree.write("skytest/skyLayerTestV.glsl", kLayerTestVertex));
             REQUIRE(mTree.write("skytest/skyLayerTestF.glsl", kLayerTest));
+            REQUIRE(mTree.write("skytest/sunHaloV.glsl", kHaloVertex));
+            REQUIRE(mTree.write("skytest/sunHaloF.glsl", kHaloFragment));
             loadSharedObjects(mShaders);
 
             for (S32 path = 0; path < 2; ++path)
@@ -198,11 +265,15 @@ void main()
                              { { "skyraster/deferred/moonV.glsl", GL_VERTEX_SHADER },
                                { "skyraster/deferred/moonF.glsl", GL_FRAGMENT_SHADER } },
                              emissive);
+                buildProgram(mHalo[path], "The sun's halo before WindLight (test)",
+                             { { "skytest/sunHaloV.glsl", GL_VERTEX_SHADER },
+                               { "skytest/sunHaloF.glsl", GL_FRAGMENT_SHADER } },
+                             emissive);
                 buildProgram(mLayers[path], "The sky's layers along the view ray (test)",
                              { { "skytest/skyLayerTestV.glsl", GL_VERTEX_SHADER },
                                { "skytest/skyLayerTestF.glsl", GL_FRAGMENT_SHADER },
                                { "deferred/skyBodiesF.glsl", GL_FRAGMENT_SHADER } },
-                             emissive);
+                             emissive, { { "SUN_BLOOM", "1" } });
 
                 for (S32 storage = 0; storage < 2; ++storage)
                 {
@@ -220,6 +291,8 @@ void main()
             mSunTexture     = disc(1, 0.8f);
             mSunTextureNext = disc(5, 0.6f);
             mMoonTexture    = disc(3, 0.9f);
+            mBloomTexture     = disc(7, 1.f);
+            mBloomTextureNext = disc(9, 0.7f);
             glGenBuffers(1, &mEnvironment);
         }
 
@@ -357,6 +430,40 @@ void main()
             });
         }
 
+        // The sun's halo as it was drawn before WindLight: its square about the sun's quad, alpha blended.
+        std::vector<F32> oldBloom(const BodyCase& sun, bool emissive, bool stored)
+        {
+            LLPointer<LLVertexBuffer> quad = bodyQuad(ALSkyLayers::bloomCorners(sunCorners(sun)));
+            return drawOld(sun.mView, emissive, stored, [&]
+            {
+                gGL.setSceneBlendType(LLRender::BT_ALPHA);
+                LLGLSLShader& program = mHalo[emissive];
+                program.bind();
+                bindMap(program, LLShaderMgr::DIFFUSE_MAP, mBloomTexture, ALSamplers::AnisoClamp);
+                bindMap(program, LLShaderMgr::ALTERNATE_DIFFUSE_MAP, mBloomTextureNext, ALSamplers::AnisoClamp);
+                program.uniform1f(LLShaderMgr::BLEND_FACTOR, sun.mBlend);
+                program.uniform4f(LLShaderMgr::DIFFUSE_COLOR, BLOOM_COLOR.mV[VRED], BLOOM_COLOR.mV[VGREEN],
+                                  BLOOM_COLOR.mV[VBLUE], BLOOM_OPACITY);
+                drawQuad(quad);
+                program.unbind();
+            });
+        }
+
+        // The bloom along each pixel's ray, its square lowered with the sun disc.
+        std::vector<F32> rayBloom(const BodyCase& sun, bool emissive)
+        {
+            const std::array<LLVector3, 3> quad = ALSkyLayers::rayQuad(ALSkyLayers::bloomCorners(sunCorners(sun)),
+                                                                       LLVector3(0.f, 0.f, -ALSkyLayers::SUN_DROP));
+            return drawLayer(sun.mView, emissive, TEST_BLOOM, [&](LLGLSLShader& program)
+            {
+                bindMap(program, LLShaderMgr::SKY_BLOOM_MAP, mBloomTexture, ALSamplers::AnisoClamp);
+                bindMap(program, LLShaderMgr::SKY_BLOOM_MAP_NEXT, mBloomTextureNext, ALSamplers::AnisoClamp);
+                program.uniform1f(LLShaderMgr::SKY_BLOOM_BLEND, sun.mBlend);
+                program.uniform3fv(LLShaderMgr::SKY_BLOOM_QUAD, 3, quad[0].mV);
+                program.uniform3fv(LLShaderMgr::SKY_BLOOM_COLOR, 1, BLOOM_COLOR.mV);
+            });
+        }
+
         // How pictures @a a and @a b differ where either differs from the background, each channel allowed
         // @a allowance plus @a steps of the path's storage at the larger value; pixels @a skip marks are left out.
         static Difference compare(const std::vector<F32>& a, const std::vector<F32>& b, bool emissive, F32 allowance,
@@ -404,11 +511,14 @@ void main()
         // Compare a layer's three pictures: the per-ray one against the old program's float one within @a maths, and
         // against its stored one within a step of the storage besides, where the blend rounded: GL leaves the
         // precision of a blend into an 8-bit attachment, and the rounding of a conversion to R11G11B10F, to the
-        // implementation. The 8-bit albedo also clamped (D6); R11G11B10F holds the layer's whole range.
+        // implementation. Where the layer @a can_clamp, writing past 1, the 8-bit albedo also clamped it (D6), and
+        // those pixels are counted into @a clamped_pixels and left out; R11G11B10F holds the layer's whole range.
         static void check(const std::vector<F32>& ray, const std::vector<F32>& old_float,
-                          const std::vector<F32>& old_stored, bool emissive, F32 maths, S32& clamped_pixels)
+                          const std::vector<F32>& old_stored, bool emissive, F32 maths, S32& clamped_pixels,
+                          bool can_clamp = false)
         {
-            const std::vector<bool> clamps = emissive ? std::vector<bool>() : clamped(old_stored, old_float);
+            const std::vector<bool> clamps =
+                emissive || !can_clamp ? std::vector<bool>() : clamped(old_stored, old_float);
             const S32 clamp_count = (S32)std::count(clamps.begin(), clamps.end(), true);
             const F32 rounding = 1.f;
             const Difference d_maths = compare(ray, old_float, emissive, maths, 0.f);
@@ -430,6 +540,7 @@ void main()
         ll_test::TestShaderMgr mShaders;
         LLGLSLShader           mOldSun[2];
         LLGLSLShader           mOldMoon[2];
+        LLGLSLShader           mHalo[2];
         LLGLSLShader           mLayers[2];
         LLRenderTarget         mGBuffer[2][2];
         LLRenderTarget         mFloat;
@@ -437,6 +548,8 @@ void main()
         LLPointer<LLImageGL>   mSunTexture;
         LLPointer<LLImageGL>   mSunTextureNext;
         LLPointer<LLImageGL>   mMoonTexture;
+        LLPointer<LLImageGL>   mBloomTexture;
+        LLPointer<LLImageGL>   mBloomTextureNext;
         GLuint                 mEnvironment = 0;
     };
 
@@ -459,9 +572,6 @@ TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the sun along the view ra
                   BODY_MATHS, clamped_pixels);
         }
     }
-    // The sun's texture is held to 1, and so is what it blends to: a few pixels at most where an 8-bit blend rounds
-    // past a step.
-    CHECK(clamped_pixels < 50);
 }
 
 TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the sun behind the camera draws nothing", "[alskylayers_gl]")
@@ -494,10 +604,26 @@ TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the moon along the view r
             const bool emissive = path == 1;
             CAPTURE(moon.mName, emissive);
             check(rayMoon(moon, emissive), oldMoon(moon, emissive, false), oldMoon(moon, emissive, true), emissive,
-                  BODY_MATHS, clamped_pixels);
+                  BODY_MATHS, clamped_pixels, true);
         }
     }
     // The bright moon passes 1, which the albedo clamped.
     UNSCOPED_INFO("the 8-bit albedo clamped the bright moon");
     CHECK(clamped_pixels > 0);
+}
+
+TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the bloom along the view ray is the sun's halo", "[alskylayers_gl]")
+{
+    setUp();
+    S32 clamped_pixels = 0;
+    for (const BodyCase& sun : BLOOMS)
+    {
+        for (S32 path = 0; path < 2; ++path)
+        {
+            const bool emissive = path == 1;
+            CAPTURE(sun.mName, emissive);
+            check(rayBloom(sun, emissive), oldBloom(sun, emissive, false), oldBloom(sun, emissive, true), emissive,
+                  BODY_MATHS, clamped_pixels);
+        }
+    }
 }

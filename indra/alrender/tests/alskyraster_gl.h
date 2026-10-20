@@ -68,6 +68,10 @@ namespace al_sky_test
     constexpr F32 SUN_DISK_RADIUS  = 0.5f;
     constexpr F32 MOON_DISK_RADIUS = SUN_DISK_RADIUS * 0.9f;
 
+    // The opacity the composite lays the sun bloom at, at most (deferred/skyBodiesF.glsl's skyBloom): the halo's,
+    // which the old picture draws it at.
+    constexpr F32 BLOOM_OPACITY = 0.9f;
+
     constexpr F32 NEAR_CLIP = 0.5f;
     constexpr F32 FAR_CLIP  = 1024.f;
 

@@ -1,6 +1,7 @@
 /**
  * @file alskylayers_test.cpp
- * @brief What the sky's composite takes of its layers: the sun's and moon's quads, and where a ray meets one.
+ * @brief What the sky's composite takes of its layers: the sun's and moon's quads, where a ray meets one, and the
+ *        sun bloom's square.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -129,6 +130,28 @@ TEST_CASE("alskylayers: a ray meets a quad at the texture coordinates of the poi
     CHECK(dome(LLVector3(1.f, 0.f, 0.f)) == LLVector3(0.f, 0.f, 1.f));
     CHECK(dome(LLVector3(0.f, 1.f, 0.f)) == LLVector3(1.f, 0.f, 0.f));
     CHECK(dome(LLVector3(0.f, 0.f, 1.f)) == LLVector3(0.f, 1.f, 0.f));
+}
+
+TEST_CASE("alskylayers: the bloom is a square four times the sun disc's half-width every way", "[alskylayers]")
+{
+    for (const F32 elevation : { 3.f, 45.f, 89.f })
+    {
+        CAPTURE(elevation);
+        const F32 el = elevation * DEG_TO_RAD;
+        const LLVector3 dir(cosf(el) * 0.8f, cosf(el) * -0.6f, sinf(el));
+        const ALSkyLayers::Corners sun = ALSkyLayers::bodyCorners(turnTo(dir), BODY_DISTANCE, 1.5f, SUN_DISK_RADIUS);
+        const ALSkyLayers::Corners bloom = ALSkyLayers::bloomCorners(sun);
+
+        CHECK(dist_vec((bloom[0] + bloom[3]) * 0.5f, (sun[0] + sun[3]) * 0.5f) < 1e-2f);
+        const LLVector3 sun_right   = (sun[2] - sun[0]) * 0.5f;
+        const LLVector3 sun_up      = (sun[0] - sun[1]) * 0.5f;
+        const LLVector3 bloom_right = (bloom[2] - bloom[0]) * 0.5f;
+        const LLVector3 bloom_up    = (bloom[0] - bloom[1]) * 0.5f;
+        CHECK(fabsf(bloom_right.length() - 4.f * sun_right.length()) < 1e-2f);
+        CHECK(fabsf(bloom_up.length() - 4.f * sun_right.length()) < 1e-2f);
+        CHECK(dist_vec(bloom_right / bloom_right.length(), sun_right / sun_right.length()) < 1e-4f);
+        CHECK(dist_vec(bloom_up / bloom_up.length(), sun_up / sun_up.length()) < 1e-4f);
+    }
 }
 
 TEST_CASE("alskylayers: the moon fades as the square of its height near the horizon", "[alskylayers]")
