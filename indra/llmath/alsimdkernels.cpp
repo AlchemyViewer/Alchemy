@@ -122,6 +122,12 @@ void indexed_tangents(const LLVector4a* positions, const LLVector4a* normals, co
     kernels::indexed_tangents_impl<ALSimdLanes>(positions, normals, uvs, vertex_count, indices, index_count, tangents);
 }
 
+bool grid_tangents_central(const LLVector4a* positions, const LLVector4a* normals, size_t columns, size_t rows, bool joins, F32 same, F32 sign,
+                           F32 w, LLVector4a* tangents)
+{
+    return kernels::grid_tangents_central_impl<ALSimdLanes>(positions, normals, columns, rows, joins, same, sign, w, tangents);
+}
+
 bool normalize3_or_mark(LLVector4a* v, size_t n)
 {
     return kernels::normalize3_or_mark_impl<ALSimdLanes>(v, n);

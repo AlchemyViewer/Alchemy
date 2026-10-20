@@ -49,6 +49,7 @@
 #include "v3math.h"
 #include "v4math.h"
 #include "llvector4a.h"
+#include "alsimdkernels.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/format.h>
@@ -2963,6 +2964,168 @@ namespace
         INFO(report.text());
         CHECK(report.failures == 0);
         CHECK(agreement.compared > 0);
+    }
+
+    // The flexible prims the partial-build cases build: the sweep's
+    // line-path shapes, plain and profile cut, on paths of 4 and 16
+    // sections, straight and bent, at every LOD, rebuilt in place once.
+    template <class Each>
+    void forEachFlexiFrame(Each each)
+    {
+        for (const Shape& base : sweepShapes())
+        {
+            if (base.path != LL_PCODE_PATH_LINE || (base.name.find(", plain") == std::string::npos && base.name.find(", profile cut") == std::string::npos))
+            {
+                continue;
+            }
+            for (S32 sections : { 4, 16 })
+            {
+                for (F32 bend : { 0.f, 1.1f })
+                {
+                    for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+                    {
+                        LLPointer<LLVolume> volume = flexiVolume(base, lod);
+                        bendPath(*volume, sections, 0.4f);
+                        volume->regen();
+                        genAllTangents(*volume);
+                        bendPath(*volume, sections, bend);
+                        volume->regen();
+                        genAllTangents(*volume);
+                        each(*volume, fmt::format("flexible {}, {} sections bent {} at LOD {}", base.name, sections, bend, lod), sections, bend);
+                    }
+                }
+            }
+        }
+    }
+
+    // A flexible prim's tangents are its cheap ones: unit length, finite,
+    // orthogonal to their normals, and with the w each triangle's UVs wind
+    // for, where the triangle has area in positions and in UVs.
+    TEST_CASE("llvolume: a flexible prim's tangents are unit and orthogonal and wind with its UVs", "[llvolume]")
+    {
+        Report report;
+        S32 faces = 0;
+        forEachFlexiFrame([&](LLVolume& volume, const std::string& name, S32, F32)
+        {
+            for (S32 i = 0; i < volume.getNumVolumeFaces(); ++i)
+            {
+                const LLVolumeFace& face = volume.getVolumeFace(i);
+                const std::string where = fmt::format("{}: {}", name, faceName(face));
+                ++faces;
+                checkTangents(face, Checks::Tangents | Checks::Orthogonal, report, where);
+                for (S32 t = 0; t + 2 < face.mNumIndices; t += 3)
+                {
+                    const U16 a = face.mIndices[t], b = face.mIndices[t + 1], c = face.mIndices[t + 2];
+                    // The generator takes points within 1e-5 of each other
+                    // as one place: a strip that narrow, as a cut end where
+                    // the hole meets its wall, winds as rounding has it.
+                    auto apart = [&](U16 p, U16 q) { return (v3(face.mPositions[p]) - v3(face.mPositions[q])).lengthSquared() > 1e-10f; };
+                    if (tangentFlat(face, a, b, c) || !apart(a, b) || !apart(b, c) || !apart(a, c))
+                    {
+                        continue;
+                    }
+                    const LLVector2 uv_ab = face.mTexCoords[b] - face.mTexCoords[a];
+                    const LLVector2 uv_ac = face.mTexCoords[c] - face.mTexCoords[a];
+                    const F32 uv_area = uv_ab.mV[0] * uv_ac.mV[1] - uv_ab.mV[1] * uv_ac.mV[0];
+                    const LLVector3 geometric = (v3(face.mPositions[b]) - v3(face.mPositions[a])) % (v3(face.mPositions[c]) - v3(face.mPositions[a]));
+                    bool failed = false;
+                    for (U16 v : { a, b, c })
+                    {
+                        const F32 facing = geometric * v3(face.mNormals[v]);
+                        if (fabsf(facing) <= 1e-3f * geometric.length())
+                        {
+                            continue;
+                        }
+                        const F32 expected = (uv_area > 0.f) == (facing > 0.f) ? 1.f : -1.f;
+                        if (face.mTangents[v][3] != expected)
+                        {
+                            report.fail(fmt::format("{}: triangle {}'s UVs wind for w = {} at vertex {}, which has {}", where, t / 3, expected, v,
+                                                    face.mTangents[v][3]));
+                            failed = true;
+                            break;
+                        }
+                    }
+                    if (failed)
+                    {
+                        break;
+                    }
+                }
+            }
+        });
+        INFO(fmt::format("{} faces", faces));
+        INFO(report.text());
+        CHECK(faces > 0);
+        CHECK(report.failures == 0);
+    }
+
+    // The cheap tangents stay near the meshoptimizer-weighted ones every
+    // other prim takes, on the same geometry, away from the points where
+    // either has nothing to go by: a vertex in a triangle with no area or
+    // no UV area, and one whose weighted tangent rounding decides. A cap's
+    // and a straight side's are the weighted ones to within rounding. On a
+    // bent path a side's row turns from one station to the next, and the
+    // weighted tangent takes in the edges of the rows beside a vertex's
+    // own, where the cheap one follows its own row: they are as far apart
+    // as the path turns over a section, at most.
+    TEST_CASE("llvolume: a flexible prim's tangents stay near the weighted ones", "[llvolume]")
+    {
+        Report report;
+        F64 widest = 0.0;
+        std::string widest_at;
+        S32 compared = 0;
+        forEachFlexiFrame([&](LLVolume& volume, const std::string& name, S32 sections, F32 bend)
+        {
+            const F64 bound = llmax(0.01, fabs((F64)bend) / sections * 180.0 / F_PI);
+            for (S32 i = 0; i < volume.getNumVolumeFaces(); ++i)
+            {
+                const LLVolumeFace& face = volume.getVolumeFace(i);
+                const std::string where = fmt::format("{}: {}", name, faceName(face));
+                std::vector<LLVector4a> weighted(face.mNumVertices);
+                const bool grid = !(face.mTypeMask & LLVolumeFace::CAP_MASK) && face.mNumS * face.mNumT == face.mNumVertices;
+                if (grid)
+                {
+                    alsimd::grid_tangents(face.mPositions, face.mNormals, face.mTexCoords, face.mNumS, face.mNumT, weighted.data());
+                }
+                else
+                {
+                    alsimd::indexed_tangents(face.mPositions, face.mNormals, face.mTexCoords, face.mNumVertices, face.mIndices, face.mNumIndices,
+                                             weighted.data());
+                }
+                std::vector<bool> skip(face.mNumVertices, false);
+                for (S32 t = 0; t + 2 < face.mNumIndices; t += 3)
+                {
+                    if (tangentFlat(face, face.mIndices[t], face.mIndices[t + 1], face.mIndices[t + 2]))
+                    {
+                        skip[face.mIndices[t]] = skip[face.mIndices[t + 1]] = skip[face.mIndices[t + 2]] = true;
+                    }
+                }
+                const std::vector<F64> rounding = tangentRoundingDegrees(face);
+                for (S32 v = 0; v < face.mNumVertices; ++v)
+                {
+                    if (skip[v] || rounding[v] >= 1.0)
+                    {
+                        continue;
+                    }
+                    ++compared;
+                    const F64 apart = degreesApart(v3(face.mTangents[v]), v3(weighted[v]));
+                    if (apart > widest)
+                    {
+                        widest = apart;
+                        widest_at = fmt::format("{}: vertex {}", where, v);
+                    }
+                    if (!(apart <= bound) || face.mTangents[v][3] != weighted[v][3])
+                    {
+                        report.fail(fmt::format("{}: vertex {} is {} degrees from the weighted tangent, past {}, w {} against {}", where, v, apart,
+                                                bound, face.mTangents[v][3], weighted[v][3]));
+                        break;
+                    }
+                }
+            }
+        });
+        INFO(fmt::format("{} vertices compared; at most {} degrees apart, at {}", compared, widest, widest_at));
+        INFO(report.text());
+        CHECK(compared > 0);
+        CHECK(report.failures == 0);
     }
 
     // Lengyel's tangents, which a mesh LOD too large for meshoptimizer's

@@ -1378,6 +1378,83 @@ void grid_tangents_impl(const LLVector4a* positions, const LLVector4a* normals, 
 }
 
 ////////////////////////////////////
+// Tangents by central difference
+////////////////////////////////////
+
+// a . b in x, y and z, in every lane of each vector.
+template <class K>
+AL_SIMD_INLINE typename K::reg dot3_replicated(typename K::reg a, typename K::reg b)
+{
+    const typename K::reg m = K::mul(a, b);
+    return K::add(K::add(K::template splat<0>(m), K::template splat<1>(m)), K::template splat<2>(m));
+}
+
+// The tangents of K::lanes vertices from their chords' ends, as
+// grid_tangents_central makes them; true in a vector whose chord gives no
+// direction.
+template <class K>
+AL_SIMD_INLINE typename K::mask central_tangent(const F32* left, const F32* right, const F32* normal, F32* out, typename K::reg sign,
+                                                typename K::reg w, typename K::reg same2)
+{
+    using reg = typename K::reg;
+    const reg chord = K::mul(K::sub(K::loadu(right), K::loadu(left)), sign);
+    const reg n = K::loadu(normal);
+    const reg in_plane = K::fnmadd(n, dot3_replicated<K>(chord, n), chord);
+    const reg length2 = dot3_replicated<K>(in_plane, in_plane);
+    // Short, or within about a tenth of a degree of the normal.
+    const typename K::mask none = K::cmple(length2, K::max(same2, K::mul(K::set1(1e-6f), dot3_replicated<K>(chord, chord))));
+    const reg tangent = K::mul(in_plane, K::rsqrt(K::max(length2, K::set1(FLT_MIN))));
+    K::storeu(out, K::select_w(tangent, K::select(none, K::zero(), w)));
+    return none;
+}
+
+template <class W>
+bool grid_tangents_central_impl(const LLVector4a* positions, const LLVector4a* normals, size_t columns, size_t rows, bool joins, F32 same,
+                                F32 sign, F32 w, LLVector4a* tangents)
+{
+    using K4 = ALSimd4;
+    const auto at = [](const LLVector4a* v, size_t i) { return v[i].getF32ptr(); };
+    const typename K4::reg sign4 = K4::set1(sign);
+    const typename K4::reg w4 = K4::set1(w);
+    const typename K4::reg same4 = K4::set1(same * same);
+    const typename W::reg sign_w = W::set1(sign);
+    const typename W::reg w_w = W::set1(w);
+    const typename W::reg same_w = W::set1(same * same);
+    typename K4::mask none4 = K4::none();
+    typename W::mask none_w = W::none();
+    if (columns < 2)
+    {
+        for (size_t v = 0; v < columns * rows; ++v)
+        {
+            tangents[v].set(0.f, 0.f, 0.f, 0.f);
+        }
+        return columns * rows > 0;
+    }
+    const size_t last = columns - 1;
+    for (size_t t = 0; t < rows; ++t)
+    {
+        const size_t row = t * columns;
+        const LLVector4a* p = positions + row;
+        const LLVector4a* n = normals + row;
+        LLVector4a* out = tangents + row;
+        // The ends: across the seam to the column beside the other end, or
+        // from the end itself.
+        none4 = K4::or_(none4, central_tangent<K4>(at(p, joins ? last - 1 : 0), at(p, 1), at(n, 0), out[0].getF32ptr(), sign4, w4, same4));
+        none4 = K4::or_(none4, central_tangent<K4>(at(p, last - 1), at(p, joins ? 1 : last), at(n, last), out[last].getF32ptr(), sign4, w4, same4));
+        size_t s = 1;
+        for (; s + W::lanes <= last; s += W::lanes)
+        {
+            none_w = W::or_(none_w, central_tangent<W>(at(p, s - 1), at(p, s + 1), at(n, s), out[s].getF32ptr(), sign_w, w_w, same_w));
+        }
+        for (; s < last; ++s)
+        {
+            none4 = K4::or_(none4, central_tangent<K4>(at(p, s - 1), at(p, s + 1), at(n, s), out[s].getF32ptr(), sign4, w4, same4));
+        }
+    }
+    return K4::any(none4) || W::any(none_w);
+}
+
+////////////////////////////////////
 // Normalizing
 ////////////////////////////////////
 

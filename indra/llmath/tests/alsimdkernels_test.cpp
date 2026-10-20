@@ -942,6 +942,102 @@ namespace
     }
 
     // ------------------------------------------------------------------
+    // Tangents by central difference
+
+    // The chord tangents as the rule gives them, a vertex at a time in
+    // double: the chord between a vertex's row neighbours, across the seam
+    // or one-sided at the ends, in the plane of its normal; none where that
+    // is shorter than `same` or within 1e-3 of the chord's length.
+    std::vector<LLVector4a> central_tangents(const TangentGrid& g, size_t columns, size_t rows, bool joins, F32 same, F32 sign, F32 w)
+    {
+        std::vector<LLVector4a> out(columns * rows);
+        for (size_t t = 0; t < rows; ++t)
+        {
+            for (size_t s = 0; s < columns; ++s)
+            {
+                size_t left = s == 0 ? (joins ? columns - 2 : 0) : s - 1;
+                size_t right = s == columns - 1 ? (joins ? 1 : columns - 1) : s + 1;
+                if (columns < 2)
+                {
+                    left = right = 0;
+                }
+                const LLVector4a& a = g.positions[left + columns * t];
+                const LLVector4a& b = g.positions[right + columns * t];
+                const LLVector4a& n = g.normals[s + columns * t];
+                F64 chord[3], length2 = 0.0, chord2 = 0.0, dn = 0.0;
+                for (int k = 0; k < 3; ++k)
+                {
+                    chord[k] = ((F64)b[k] - a[k]) * sign;
+                    dn += chord[k] * n[k];
+                    chord2 += chord[k] * chord[k];
+                }
+                for (int k = 0; k < 3; ++k)
+                {
+                    chord[k] -= n[k] * dn;
+                    length2 += chord[k] * chord[k];
+                }
+                if (length2 <= std::max((F64)same * same, 1e-6 * chord2))
+                {
+                    out[s + columns * t].set(0.f, 0.f, 0.f, 0.f);
+                    continue;
+                }
+                const F64 scale = 1.0 / std::sqrt(length2);
+                out[s + columns * t].set(F32(chord[0] * scale), F32(chord[1] * scale), F32(chord[2] * scale), w);
+            }
+        }
+        return out;
+    }
+
+    // The chord tangents at every width against the rule worked in double,
+    // with and without a seam, either way along the rows: directions to
+    // within rounding, w as given, and w 0 where the chord gives no
+    // direction, as where both neighbours are one point in a row of three
+    // with a seam, or a row of one. Nothing is written past the grid.
+    TEST_CASE("alsimdkernels: grid_tangents_central against the rule in double at every width", "[alsimdkernels]")
+    {
+        U32 seed = 90;
+        for (size_t columns : { 1, 2, 3, 4, 5, 8, 9, 16, 17 })
+        {
+            for (size_t rows : { 1, 2, 5 })
+            {
+                const TangentGrid g = tangent_grid(columns, rows, ++seed);
+                const size_t n = columns * rows;
+                for (bool joins : { false, true })
+                {
+                    for (F32 sign : { 1.f, -1.f })
+                    {
+                        const std::vector<LLVector4a> expected = central_tangents(g, columns, rows, joins, 1e-5f, sign, -sign);
+                        bool any_expected = false;
+                        for (const LLVector4a& e : expected)
+                        {
+                            any_expected = any_expected || e[3] == 0.f;
+                        }
+                        for_each_lane_width([&]<class W>(const char* width)
+                        {
+                            std::vector<LLVector4a> got(n + 1, SENTINEL);
+                            const bool any = grid_tangents_central_impl<W>(g.positions.data(), g.normals.data(), columns, rows, joins, 1e-5f, sign, -sign,
+                                                                           got.data());
+                            CAPTURE(width, columns, rows, joins, sign);
+                            REQUIRE(any == any_expected);
+                            require_same_bits("past the grid", got[n], SENTINEL);
+                            for (size_t v = 0; v < n; ++v)
+                            {
+                                CAPTURE(v);
+                                REQUIRE(got[v][3] == expected[v][3]);
+                                if (expected[v][3] != 0.f)
+                                {
+                                    REQUIRE(degrees_apart(got[v], expected[v]) <= 1e-3);
+                                    REQUIRE(std::fabs(got[v].getLength3().getF32() - 1.f) <= 1e-5f);
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Normalizing
 
     // Vectors at unit length, or marked (0, 0, 0, 1) where they have none,

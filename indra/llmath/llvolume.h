@@ -957,6 +957,14 @@ public:
     // partial build keeps it.
     bool mReversed = false;
 
+    // Whether the face is a flexible prim's. Its tangents are then the cheap
+    // ones, on every build, so that they do not change in kind between its
+    // first build and the partial builds of its frames: along a side's rows
+    // by central difference, and over a cap the one tangent its end
+    // station's frame gives, which every build of the cap sets here.
+    bool mFlexible = false;
+    F32 mCapTangent[4] = { 1.f, 0.f, 0.f, 1.f };
+
     LLVector4a* mExtents; //minimum and maximum point of face
     LLVector4a* mCenter;
     LLVector2   mTexCoordExtents[2]; //minimum and maximum of texture coordinates of the face.

@@ -626,8 +626,9 @@ LLProfile::Face* LLProfile::addHole(const LLProfileParams& params, bool flat, F3
         {
             continue;
         }
-        // The line is toward / |e| from the origin.
-        may_reach = toward < 0.f || farthest2 * length2 * 1.0001f >= toward * toward;
+        // The line is |toward| / |e| from the origin, whichever way the
+        // profile winds.
+        may_reach = farthest2 * length2 * 1.0001f >= toward * toward;
     }
     for (S32 i=mTotalOut;i<mTotal && may_reach;i++)
     {
@@ -4616,6 +4617,8 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
     mJoinsS = src.mJoinsS;
     mJoinsT = src.mJoinsT;
     mReversed = src.mReversed;
+    mFlexible = src.mFlexible;
+    std::copy(std::begin(src.mCapTangent), std::end(src.mCapTangent), mCapTangent);
 
     mExtents[0] = src.mExtents[0];
     mExtents[1] = src.mExtents[1];
@@ -4752,6 +4755,7 @@ bool LLVolumeFace::create(LLVolume* volume, bool partial_build)
     // A partial build moves the positions under the tangents and keeps their
     // buffer; a full build frees it.
     mTangentsStale = partial_build;
+    mFlexible = volume->getParams().getPathParams().getCurveType() == LL_PCODE_PATH_FLEXIBLE;
 
     bool ret = false ;
     if (mTypeMask & CAP_MASK)
@@ -5827,9 +5831,11 @@ namespace
     // outer chain, rather than (2, 1, b), a step along its inner one. A
     // triangle that faces the wrong way will not do, nor one that contains
     // the other chain's next point; of two that will, the one whose new edge
-    // is shorter. Areas within the tolerance count as none, and so, with a
-    // tolerance, a triangle of no area contains nothing.
-    bool cap_strip_takes_outer(F32 area_1a2, F32 area_2ab, F32 area_21b, F32 area_1ba, bool outer_shorter, F32 tolerance)
+    // is shorter, which outer_shorter says where it is asked. Areas within the
+    // tolerance count as none, and so, with a tolerance, a triangle of no
+    // area contains nothing.
+    template <class OuterShorter>
+    bool cap_strip_takes_outer(F32 area_1a2, F32 area_2ab, F32 area_21b, F32 area_1ba, OuterShorter outer_shorter, F32 tolerance)
     {
         bool tri_1a2 = !(area_1a2 < -tolerance);
         bool tri_21b = !(area_21b < -tolerance);
@@ -5849,7 +5855,7 @@ namespace
         {
             return true;
         }
-        return outer_shorter;
+        return outer_shorter();
     }
 
     // The path station a cap closes: the last for a top cap, the first for a
@@ -5883,8 +5889,12 @@ namespace
         if (decide)
         {
             reversed = false;
+            // A line's or a flexible path's end faces along the path, away
+            // from the ring beside it, whatever the shear, taper or twist:
+            // only a circle's end can turn past the axis it sweeps about.
+            const U8 curve = volume->getParams().getPathParams().getCurveType();
             const S32 count = (S32)path.size();
-            if (count > 1)
+            if (count > 1 && curve != LL_PCODE_PATH_LINE && curve != LL_PCODE_PATH_FLEXIBLE)
             {
                 const S32 next = top ? own - 1 : own + 1;
                 const S32 ring = volume->getProfile().getTotal();
@@ -5906,6 +5916,137 @@ namespace
             normal.negate();
         }
         return normal;
+    }
+
+    // +x in the plane of a normal, or +y where the normal is within 45
+    // degrees of x: a tangent where nothing gives one a direction, unit
+    // length and orthogonal to the normal. w is 1.
+    LLVector4a plane_axis(const LLVector4a& normal)
+    {
+        LLVector4a axis;
+        if (normal[0] * normal[0] > 0.5f)
+        {
+            axis.set(0.f, 1.f, 0.f);
+        }
+        else
+        {
+            axis.set(1.f, 0.f, 0.f);
+        }
+        LLVector4a along = normal;
+        along.mul(axis.dot3(normal).getF32());
+        axis.sub(along);
+        axis.normalize3fast();
+        axis.getF32ptr()[3] = 1.f;
+        return axis;
+    }
+
+    // A flexible cap's tangent: dP/du of its end station's frame, u running
+    // along the profile's x as the cap's UVs map it, put in the plane of the
+    // cap's normal, and w the side of the normal x dP/du that dP/dv lies on,
+    // v running along the profile's y on a top cap and against it on a
+    // bottom one. Where the station scales x to nothing, an axis in the
+    // plane.
+    LLVector4a cap_tangent(const LLVolume* volume, bool top, const LLVector4a& normal)
+    {
+        const LLPath::PathPt& station = volume->getPath().mPath[cap_station(volume, top)];
+        const F32* scale = station.mScale.getF32ptr();
+        LLVector4a du = station.mRot.getRow<0>();
+        du.mul(scale[0]);
+        LLVector4a dv = station.mRot.getRow<1>();
+        dv.mul(top ? scale[1] : -scale[1]);
+
+        LLVector4a tangent = du;
+        LLVector4a along = normal;
+        along.mul(du.dot3(normal).getF32());
+        tangent.sub(along);
+        if (tangent.dot3(tangent).getF32() <= SAME_PLACE * SAME_PLACE)
+        {
+            return plane_axis(normal);
+        }
+        tangent.normalize3fast();
+        LLVector4a turned;
+        turned.setCross3(normal, tangent);
+        tangent.getF32ptr()[3] = turned.dot3(dv).getF32() < 0.f ? -1.f : 1.f;
+        return tangent;
+    }
+
+    // Gives each vertex of a grid whose tangent has no direction, marked by
+    // a w of 0, the nearest own tangent up or down its column, else along
+    // its row, else around it, put in the plane of its normal, or an axis
+    // in that plane where none serves; w becomes w. A donor is a tangent of
+    // the grid's own, never one given, so that none is passed on twice.
+    void fill_grid_tangents(LLVector4a* tangents, const LLVector4a* normals, S32 num_s, S32 num_t, F32 w)
+    {
+        const auto own = [](const LLVector4a& t) { return t[3] == 1.f || t[3] == -1.f; };
+        for (S32 t = 0; t < num_t; ++t)
+        {
+            for (S32 s = 0; s < num_s; ++s)
+            {
+                LLVector4a& tangent = tangents[s + num_s * t];
+                if (own(tangent))
+                {
+                    continue;
+                }
+                const LLVector4a* donor = nullptr;
+                for (S32 d = 1; d < num_t && !donor; ++d)
+                {
+                    for (S32 row : { t - d, t + d })
+                    {
+                        if (row >= 0 && row < num_t && own(tangents[s + num_s * row]))
+                        {
+                            donor = &tangents[s + num_s * row];
+                            break;
+                        }
+                    }
+                }
+                for (S32 d = 1; d < num_s && !donor; ++d)
+                {
+                    for (S32 column : { s - d, s + d })
+                    {
+                        if (column >= 0 && column < num_s && own(tangents[column + num_s * t]))
+                        {
+                            donor = &tangents[column + num_s * t];
+                            break;
+                        }
+                    }
+                }
+                for (S32 d = 1; d < llmax(num_s, num_t) && !donor; ++d)
+                {
+                    for (S32 row = llmax(t - d, 0); row <= llmin(t + d, num_t - 1) && !donor; ++row)
+                    {
+                        for (S32 column = llmax(s - d, 0); column <= llmin(s + d, num_s - 1); ++column)
+                        {
+                            if (own(tangents[column + num_s * row]))
+                            {
+                                donor = &tangents[column + num_s * row];
+                                break;
+                            }
+                        }
+                    }
+                }
+                const LLVector4a& normal = normals[s + num_s * t];
+                LLVector4a given = plane_axis(normal);
+                if (donor)
+                {
+                    LLVector4a in_plane = *donor;
+                    LLVector4a along = normal;
+                    along.mul(in_plane.dot3(normal).getF32());
+                    in_plane.sub(along);
+                    if (in_plane.dot3(in_plane).getF32() > SAME_PLACE * SAME_PLACE)
+                    {
+                        in_plane.normalize3fast();
+                        given = in_plane;
+                    }
+                }
+                // Marked as given, so that it is no donor.
+                given.getF32ptr()[3] = 2.f * w;
+                tangent = given;
+            }
+        }
+        for (S32 v = 0; v < num_s * num_t; ++v)
+        {
+            tangents[v].getF32ptr()[3] = w;
+        }
     }
 
     // Turns every triangle of an index list over.
@@ -6237,6 +6378,12 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
     }
 
     const LLVector4a normal = cap_normal(volume, mTypeMask & TOP_MASK, !partial_build, mReversed);
+    if (mFlexible)
+    {
+        // mCapTangent is plain floats, not aligned as a vector stores.
+        const LLVector4a tangent = cap_tangent(volume, mTypeMask & TOP_MASK, normal);
+        std::copy_n(tangent.getF32ptr(), 4, mCapTangent);
+    }
 
     llassert(llfinite(normal.getF32ptr()[0]));
     llassert(llfinite(normal.getF32ptr()[1]));
@@ -6307,12 +6454,14 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
                             (paV[0]*pbV[1] - pbV[0]*paV[1]) +
                             (pbV[0]*p2V[1] - p2V[0]*pbV[1]);
 
-                LLVector4a d1;
-                d1.setSub(p1, pa);
-                LLVector4a d2;
-                d2.setSub(p2, pb);
-                const bool outer_shorter = d1.dot3(d1) < d2.dot3(d2);
-
+                const auto outer_shorter = [&]()
+                {
+                    LLVector4a d1;
+                    d1.setSub(p1, pa);
+                    LLVector4a d2;
+                    d2.setSub(p2, pb);
+                    return d1.dot3(d1) < d2.dot3(d2);
+                };
                 const bool use_tri1a2 = cap_strip_takes_outer(area_1a2, area_2ab, area_21b, area_1ba, outer_shorter, zero_area);
 
                 if (use_tri1a2)
@@ -6372,12 +6521,14 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
                             (paV[0]*pbV[1] - pbV[0]*paV[1]) +
                             (pbV[0]*p2V[1] - p2V[0]*pbV[1]);
 
-                LLVector4a d1;
-                d1.setSub(p1, pa);
-                LLVector4a d2;
-                d2.setSub(p2, pb);
-                const bool outer_shorter = d1.dot3(d1) < d2.dot3(d2);
-
+                const auto outer_shorter = [&]()
+                {
+                    LLVector4a d1;
+                    d1.setSub(p1, pa);
+                    LLVector4a d2;
+                    d2.setSub(p2, pb);
+                    return d1.dot3(d1) < d2.dot3(d2);
+                };
                 const bool use_tri1a2 = cap_strip_takes_outer(area_1a2, area_2ab, area_21b, area_1ba, outer_shorter, zero_area);
 
                 // Flipped backfacing from top
@@ -6455,11 +6606,41 @@ void LLVolumeFace::createTangents()
 
             LLCalculateTangentArray(mNumVertices, mPositions, mNormals, mTexCoords, mNumIndices / 3, mIndices, mTangents);
         }
+        else if (mFlexible && (mTypeMask & CAP_MASK))
+        {
+            LLVector4a tangent;
+            tangent.loadua(mCapTangent);
+            std::fill(mTangents, mTangents + mNumVertices, tangent);
+        }
         else if (!(mTypeMask & CAP_MASK) && mNumS > 0 && mNumT > 0 && mNumS * mNumT == mNumVertices &&
                  mNumIndices == (mNumS - 1) * (mNumT - 1) * 6)
         {
             // A side is createSide's grid.
-            alsimd::grid_tangents(mPositions, mNormals, mTexCoords, mNumS, mNumT, mTangents);
+            if (mFlexible)
+            {
+                // Along the rows, the way u runs across the face, and w as
+                // the face's UVs wind: u runs along a row and v down a
+                // column, each the one way over the grid, but for a closing
+                // copy whose u starts the profile over: the way most of a
+                // row's steps run.
+                S32 rising = 0;
+                for (S32 s = 0; s + 1 < mNumS; ++s)
+                {
+                    const F32 step = mTexCoords[s + 1].mV[0] - mTexCoords[s].mV[0];
+                    rising += step > 0.f ? 1 : (step < 0.f ? -1 : 0);
+                }
+                const F32 dv = mTexCoords[mNumS * (mNumT - 1)].mV[1] - mTexCoords[0].mV[1];
+                const F32 sign = rising < 0 ? -1.f : 1.f;
+                const F32 w = (rising < 0) == (dv < 0.f) ? 1.f : -1.f;
+                if (alsimd::grid_tangents_central(mPositions, mNormals, mNumS, mNumT, mJoinsS, SAME_PLACE, sign, w, mTangents))
+                {
+                    fill_grid_tangents(mTangents, mNormals, mNumS, mNumT, w);
+                }
+            }
+            else
+            {
+                alsimd::grid_tangents(mPositions, mNormals, mTexCoords, mNumS, mNumT, mTangents);
+            }
         }
         else
         {
@@ -7110,26 +7291,9 @@ void LLCalculateTangentArray(U32 vertexCount, const LLVector4a *vertex, const LL
         }
         else
         {
-            // Nothing gives the tangent a direction: +x in the plane of the
-            // normal, or +y where the normal is within 45 degrees of x, as
-            // the prims' tangents take it.
-            const LLVector4a& normal_a = normal[a];
-            const F32 nx = normal_a[0];
-            LLVector4a axis;
-            if (nx * nx > 0.5f)
-            {
-                axis.set(0.f, 1.f, 0.f);
-            }
-            else
-            {
-                axis.set(1.f, 0.f, 0.f);
-            }
-            LLVector4a along = normal_a;
-            along.mul(axis.dot3(normal_a).getF32());
-            axis.sub(along);
-            axis.normalize3fast();
-            axis.getF32ptr()[3] = 1.f;
-            tangent[a] = axis;
+            // Nothing gives the tangent a direction: an axis in the plane
+            // of the normal, as the prims' tangents take it.
+            tangent[a] = plane_axis(normal[a]);
         }
     }
 

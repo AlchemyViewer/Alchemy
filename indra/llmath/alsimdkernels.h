@@ -154,6 +154,17 @@ void grid_tangents(const LLVector4a* positions, const LLVector4a* normals, const
 void indexed_tangents(const LLVector4a* positions, const LLVector4a* normals, const LLVector2* uvs, size_t vertex_count,
                       const U16* indices, size_t index_count, LLVector4a* tangents);
 
+// A grid's tangents along its rows, cheaply: each vertex's is the chord
+// from its left neighbour in its row to its right one, times sign, put in
+// the plane of its normal and normalized, with w set to w. At a row's
+// ends the chord reaches across the seam to the column beside the other
+// end where joins is set, and is one-sided where it is not. A chord whose
+// part in that plane is shorter than `same`, or nearly along the normal,
+// gives no direction: the vertex is left with w 0, for the caller to fill.
+// Returns whether any was. The grid is laid out as grid_tangents takes it.
+bool grid_tangents_central(const LLVector4a* positions, const LLVector4a* normals, size_t columns, size_t rows, bool joins, F32 same, F32 sign,
+                           F32 w, LLVector4a* tangents);
+
 // Every vector at unit length in x, y and z, w scaled with them, where its
 // squared length in x, y and z is above FLT_MIN; elsewhere (0, 0, 0, 1).
 // Returns whether any was set so.
