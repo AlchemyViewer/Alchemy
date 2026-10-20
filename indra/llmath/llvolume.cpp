@@ -6347,6 +6347,29 @@ void LLVolumeFace::fillFromLegacyData(std::vector<LLVolumeFace::VertexData>& v, 
     }
 }
 
+//static
+size_t LLVolumeFace::weldVertices(VertexData* destination_vertices, U32* destination_indices,
+                                  const VertexData* vertices, size_t vertex_count,
+                                  const U32* indices, size_t index_count)
+{
+    static_assert(std::is_trivially_copyable_v<VertexData>, "meshopt_remapVertexBuffer copies vertices byte for byte");
+
+    const meshopt_Stream streams[] = {
+        { vertices[0].getPosition().getF32ptr(), sizeof(F32) * 3, sizeof(VertexData) },
+        { vertices[0].getNormal().getF32ptr(), sizeof(F32) * 3, sizeof(VertexData) },
+        { vertices[0].mTexCoord.mV, sizeof(F32) * 2, sizeof(VertexData) },
+    };
+
+    // remap[old] is the vertex's new index, or ~0u where no index uses it
+    std::vector<unsigned int> remap(vertex_count);
+    size_t unique = meshopt_generateVertexRemapMulti(&remap[0], indices, index_count, vertex_count, streams, sizeof(streams) / sizeof(streams[0]));
+
+    meshopt_remapVertexBuffer(destination_vertices, vertices, vertex_count, sizeof(VertexData), &remap[0]);
+    meshopt_remapIndexBuffer<unsigned int>(destination_indices, indices, index_count, &remap[0]);
+
+    return unique;
+}
+
 bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;

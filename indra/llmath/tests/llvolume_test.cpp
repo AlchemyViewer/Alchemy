@@ -2423,6 +2423,42 @@ namespace
         }
     }
 
+    // meshoptimizer's remap table gives each vertex's new index at its old
+    // one, and numbers the welded vertices in the order the indices first
+    // use them. A weld gives every corner back the vertex it had, whatever
+    // that order is, with copies made one and unused vertices gone.
+    TEST_CASE("llvolume: a weld keeps every corner's vertex when first use is out of vertex order", "[llvolume]")
+    {
+        // Position, normal and texture coordinate each differ from those of
+        // a vertex made from another n.
+        const auto vertex = [](F32 n)
+        {
+            LLVolumeFace::VertexData v;
+            v.setPosition(LLVector4a(n, n + 0.25f, n + 0.5f));
+            v.setNormal(LLVector4a(-n, 1.f, n * 2.f));
+            v.mTexCoord = LLVector2(n * 0.125f, 1.f - n * 0.125f);
+            return v;
+        };
+        // 5 is a copy of 0, and no index uses 6.
+        const std::vector<LLVolumeFace::VertexData> vertices = { vertex(1.f), vertex(2.f), vertex(3.f), vertex(4.f),
+                                                                 vertex(5.f), vertex(1.f), vertex(6.f) };
+        const std::vector<U32> indices = { 3, 5, 1, 0, 2, 4 };
+
+        std::vector<LLVolumeFace::VertexData> welded(vertices.size());
+        std::vector<U32> welded_indices(indices.size());
+        const size_t count = LLVolumeFace::weldVertices(welded.data(), welded_indices.data(), vertices.data(), vertices.size(),
+                                                        indices.data(), indices.size());
+
+        CHECK(count == 5);
+        CHECK(welded_indices[1] == welded_indices[3]);
+        for (size_t i = 0; i < indices.size(); ++i)
+        {
+            INFO(fmt::format("corner {}, vertex {}, welded {}", i, indices[i], welded_indices[i]));
+            REQUIRE(welded_indices[i] < count);
+            CHECK(welded[welded_indices[i]] == vertices[indices[i]]);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Today's defects
 
