@@ -173,6 +173,40 @@ static bool query_water_in_view()
     return gPipeline.mSkyBehindQuery.isValid();
 }
 
+// static
+void LLDrawPoolWLSky::bindDome(LLGLSLShader& shader)
+{
+    LLEnvironment&             environment = LLEnvironment::instance();
+    const LLSettingsSky::ptr_t psky        = environment.getCurrentSky();
+
+    shader.bindTexture(LLShaderMgr::RAINBOW_MAP, gSky.mVOSkyp->getRainbowTex(), ALSamplers::AnisoWrap);
+    shader.bindTexture(LLShaderMgr::HALO_MAP, gSky.mVOSkyp->getHaloTex(), ALSamplers::AnisoWrap);
+
+    F32 moisture_level  = (float)psky->getSkyMoistureLevel();
+    F32 droplet_radius  = (float)psky->getSkyDropletRadius();
+    F32 ice_level       = (float)psky->getSkyIceLevel();
+
+    // hobble halos and rainbows when there's no light source to generate them
+    if (!psky->getIsSunUp() && !psky->getIsMoonUp())
+    {
+        moisture_level = 0.0f;
+        ice_level      = 0.0f;
+    }
+
+    shader.uniform1f(LLShaderMgr::MOISTURE_LEVEL, moisture_level);
+    shader.uniform1f(LLShaderMgr::DROPLET_RADIUS, droplet_radius);
+    shader.uniform1f(LLShaderMgr::ICE_LEVEL, ice_level);
+
+    shader.uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, psky->getSunMoonGlowFactor());
+    shader.uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, psky->getDensityMultiplier());
+    shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
+
+    // The dome's geometry: the camera's place in its frame, which renderDome lowers the mesh by, and the radius
+    // LLVOWLSky builds the mesh at.
+    shader.uniform3f(LLShaderMgr::WL_CAMPOSLOCAL, 0.f, environment.getCamHeight(), 0.f);
+    shader.uniform1f(LLShaderMgr::SKY_DOME_RADIUS, psky->getDomeRadius());
+}
+
 void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const
 {
     if (!gSky.mVOSkyp)
@@ -224,32 +258,9 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
 
         sky_shader->uniform1i(LLShaderMgr::CUBE_SNAPSHOT, gCubeSnapshot ? 1 : 0);
 
-        LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+        bindDome(*sky_shader);
 
-        LLViewerTexture* rainbow_tex = gSky.mVOSkyp->getRainbowTex();
-        LLViewerTexture* halo_tex  = gSky.mVOSkyp->getHaloTex();
-
-        sky_shader->bindTexture(LLShaderMgr::RAINBOW_MAP, rainbow_tex, ALSamplers::AnisoWrap);
-        sky_shader->bindTexture(LLShaderMgr::HALO_MAP, halo_tex, ALSamplers::AnisoWrap);
-
-        F32 moisture_level  = (float)psky->getSkyMoistureLevel();
-        F32 droplet_radius  = (float)psky->getSkyDropletRadius();
-        F32 ice_level       = (float)psky->getSkyIceLevel();
-
-        // hobble halos and rainbows when there's no light source to generate them
-        if (!psky->getIsSunUp() && !psky->getIsMoonUp())
-        {
-            moisture_level = 0.0f;
-            ice_level      = 0.0f;
-        }
-
-        sky_shader->uniform1f(LLShaderMgr::MOISTURE_LEVEL, moisture_level);
-        sky_shader->uniform1f(LLShaderMgr::DROPLET_RADIUS, droplet_radius);
-        sky_shader->uniform1f(LLShaderMgr::ICE_LEVEL, ice_level);
-
-        sky_shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, psky->getSunMoonGlowFactor());
-
-        sky_shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, psky->getIsSunUp() ? 1 : 0);
+        sky_shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, LLEnvironment::instance().getCurrentSky()->getIsSunUp() ? 1 : 0);
 
         {
             LL_PROFILE_GPU_ZONE("sky dome");

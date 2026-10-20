@@ -67,6 +67,10 @@ public:
 
     static void cleanupGL();
     static void restoreGL();
+
+    /// What windlight/windlightDomeF.glsl reads besides the Environment block, on the bound @a shader: the rainbow
+    /// and halo maps and their levels, the glow, density and light, and the dome's geometry.
+    static void bindDome(LLGLSLShader& shader);
 private:
     void renderDome(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader * shader) const;
 

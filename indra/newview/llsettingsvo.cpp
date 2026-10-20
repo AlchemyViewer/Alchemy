@@ -862,7 +862,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 
     // The WindLight haze's terms that take nothing per pixel, worked here once rather than at every
     // pixel of every lit pass, in the arithmetic the shaders did them in. Keep in step with
-    // calcAtmosphericVars (windlight/atmosphericsFuncs.glsl), skyF.glsl and cloudsF.glsl.
+    // calcAtmosphericVars (windlight/atmosphericsFuncs.glsl), windlight/windlightDomeF.glsl and cloudsF.glsl.
     {
         const F32 haze_density = getHazeDensity();
 

@@ -2187,6 +2187,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterRim");
 
     mReservedUniforms.push_back("eyeToSky");
+    mReservedUniforms.push_back("skyDomeRadius");
     mReservedUniforms.push_back("skyBehindMap");
 
     mReservedUniforms.push_back("haze_extinction");
