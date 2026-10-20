@@ -908,6 +908,8 @@ namespace
         // fewer; and an item written as the list holds it.
         LSLASTNode* soleItem(LSLExpression* e) const;
         std::string itemText(LSLASTNode* item);
+        // An item looked for in a list, as table.find is to be given it.
+        std::string soughtText(LSLASTNode* item, LSLExpression* list);
         // Why a read of a list hands the list itself on, or null where it
         // does not.
         Shared handedOn(LSLASTNode* read) const;
@@ -3603,7 +3605,7 @@ namespace
             if (LSLASTNode* sought = soleItem(argumentAt(e, 1)))
             {
                 called = "table.find";
-                const std::string found = "table.find(" + anyItems(argumentAt(e, 0), arg(0)) + ", " + itemText(sought) + ")";
+                const std::string found = "table.find(" + anyItems(argumentAt(e, 0), arg(0)) + ", " + soughtText(sought, argumentAt(e, 0)) + ")";
                 return Expr{ "(" + found + " or 0) - 1", ADD, false, found };
             }
         }
@@ -3769,7 +3771,7 @@ namespace
         LSLASTNode* sought = mOptions.idioms && lsl == "llListFindList" ? soleItem(argumentAt(call, 1)) : nullptr;
         if (sought)
         {
-            asked = "table.find(" + anyItems(argumentAt(call, 0), value(argumentAt(call, 0))) + ", " + itemText(sought) + ")";
+            asked = "table.find(" + anyItems(argumentAt(call, 0), value(argumentAt(call, 0))) + ", " + soughtText(sought, argumentAt(call, 0)) + ")";
         }
         // Text in other text: string.find's plain search from the start,
         // which finds it where LSL's did -- the empty text anywhere, as
@@ -6548,6 +6550,26 @@ namespace
         }
         auto* e = static_cast<LSLExpression*>(item);
         return coerced(e, itemType(e)).text;
+    }
+
+    std::string Writer::soughtText(LSLASTNode* item, LSLExpression* list)
+    {
+        // A key SLua holds as text -- link_message's id -- looked for in a
+        // list whose keys are all uuids: LSL found a key among the keys by
+        // its text, so the uuid made of it, or the text where it is no
+        // UUID. touuid("") is NULL_KEY, which LSL's "" was not.
+        const std::string text = itemText(item);
+        if (!mOptions.uuidKeys || item->getNodeType() == NODE_CONSTANT)
+        {
+            return text;
+        }
+        auto*    e    = static_cast<LSLExpression*>(item);
+        const U8 held = itemTypes(list);
+        if (wholeVariable(e) && e->getIType() == LST_KEY && slType(e) == LST_STRING && (held & ItemKey) != 0 && (held & ItemString) == 0)
+        {
+            return "touuid(" + text + ") or " + text;
+        }
+        return text;
     }
 
     Shared Writer::handedOn(LSLASTNode* read) const

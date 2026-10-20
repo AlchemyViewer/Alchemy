@@ -4754,6 +4754,51 @@ namespace
         }
     }
 
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key held as text looked for among uuids is looked for as one", "[ALLSLToSLua]")
+    {
+        // Tapple's: a uuid kept, sent as a link message's id, and looked
+        // for again in the list by the id SLua passes as text.
+        const std::string lsl = "list l = [];\n"
+                                "list seen;\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        key k = llGenerateKey();\n"
+                                "        l += [k];\n"
+                                "        llMessageLinked(LINK_SET, 0, \"\", k);\n"
+                                "    }\n"
+                                "    link_message(integer sender_num, integer num, string str, key id) {\n"
+                                "        integer i = llListFindList(l, [id]);\n"
+                                "        if (~i) {\n"
+                                "            llOwnerSay(\"found\");\n"
+                                "        }\n"
+                                "        if (llListFindList(l, [id]) != -1) llOwnerSay(\"again\");\n"
+                                "        if (llListFindList(seen, [id]) == -1) seen += [id];\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLToSLua::Options o;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("among uuids: the uuid made of it, or the text where it is none");
+            CHECK(has(r, "local i: number = (table.find(l, touuid(id) or id) or 0) - 1\n"));
+            CHECK(has(r, "if table.find(l, touuid(id) or id) ~= nil then"));
+        }
+        UNSCOPED_INFO("among keys held as text, as it is");
+        CHECK(has(r, "if table.find(seen, id) == nil then"));
+        require_checks_clean(r);
+
+        o.uuidKeys                    = false;
+        const ALLSLToSLua::Result off = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(off.text);
+        REQUIRE(off.converted);
+        UNSCOPED_INFO("every key text: as it is");
+        CHECK(has(off, "local i: number = (table.find(l, id) or 0) - 1\n"));
+        CHECK_FALSE(has(off, "touuid(id) or id"));
+        require_checks_clean(off);
+    }
+
     TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: with uuidKeys off llList2Key's item is read as text as List2String reads it", "[ALLSLToSLua]")
     {
         const std::string lsl = "list gMixed;\n"
