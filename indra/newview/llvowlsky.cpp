@@ -40,10 +40,9 @@
 #include "llsettingssky.h"
 
 #include "alrandmap.h"
+#include "alskydome.h"
 
 #include <random>
-
-constexpr U32 SKY_DETAIL = 18; // Any lower and there will be artifacts
 
 // Three tiers of stars, layered at different simulated distances. The counts
 // stack to ~155k stars; the faint "dust" tier dominates density, giving the
@@ -254,26 +253,6 @@ namespace
     }
 }
 
-inline U32 LLVOWLSky::getNumStacks(void)
-{
-    return SKY_DETAIL;
-}
-
-inline U32 LLVOWLSky::getNumSlices(void)
-{
-    return 2 * SKY_DETAIL;
-}
-
-inline U32 LLVOWLSky::getStripsNumVerts(void)
-{
-    return (getNumStacks() - 1) * getNumSlices();
-}
-
-inline U32 LLVOWLSky::getStripsNumIndices(void)
-{
-    return 2 * ((getNumStacks() - 2) * (getNumSlices() + 1)) + 1 ;
-}
-
 U32 LLVOWLSky::getStarsNumVerts(void) const
 {
     // mStarPositions is the source of truth — its size reflects whatever
@@ -321,27 +300,6 @@ LLDrawable * LLVOWLSky::createDrawable(LLPipeline * pipeline)
     return mDrawable;
 }
 
-// a tiny helper function for controlling the sky dome tesselation.
-inline F32 calcPhi(const U32 &i, const F32 &reciprocal_num_stacks)
-{
-    // Calc: PI/8 * 1-((1-t^4)*(1-t^4))  { 0<t<1 }
-    // Demos: \pi/8*\left(1-((1-x^{4})*(1-x^{4}))\right)\ \left\{0<x\le1\right\}
-
-    // i should range from [0..SKY_STACKS] so t will range from [0.f .. 1.f]
-    F32 t = float(i) * reciprocal_num_stacks; //SL-16127: remove: / float(getNumStacks());
-
-    // ^4 the parameter of the tesselation to bias things toward 0 (the dome's apex)
-    t *= t;
-    t *= t;
-
-    // invert and square the parameter of the tesselation to bias things toward 1 (the horizon)
-    t = 1.f - t;
-    t = t*t;
-    t = 1.f - t;
-
-    return (F_PI / 8.f) * t;
-}
-
 void LLVOWLSky::resetVertexBuffers()
 {
     mStripsVerts.clear();
@@ -380,9 +338,9 @@ bool LLVOWLSky::updateGeometry(LLDrawable * drawable)
         const U32 data_mask = LLDrawPoolWLSky::SKY_VERTEX_DATA_MASK;
         const U32 max_verts = max_buffer_bytes / LLVertexBuffer::calcVertexSize(data_mask);
 
-        const U32 total_stacks = getNumStacks();
+        const U32 total_stacks = ALSkyDome::STACKS;
 
-        const U32 verts_per_stack = getNumSlices();
+        const U32 verts_per_stack = ALSkyDome::SLICES;
 
         // each seg has to have one more row of verts than it has stacks
         // then round down
@@ -417,10 +375,10 @@ bool LLVOWLSky::updateGeometry(LLDrawable * drawable)
             const U32 end_stack = begin_stack + num_stacks_this_seg;
             llassert(end_stack <= total_stacks);
 
-            const U32 num_verts_this_seg = verts_per_stack * (num_stacks_this_seg+1);
+            const U32 num_verts_this_seg = ALSkyDome::vertexCount(num_stacks_this_seg);
             llassert(num_verts_this_seg <= max_verts);
 
-            const U32 num_indices_this_seg = 1+num_stacks_this_seg*(2+2*verts_per_stack);
+            const U32 num_indices_this_seg = ALSkyDome::indexCount(num_stacks_this_seg);
             llassert(num_indices_this_seg * sizeof(U16) <= max_buffer_bytes);
 
             bool allocated = segment->allocateBuffer(num_verts_this_seg, num_indices_this_seg);
@@ -450,7 +408,7 @@ bool LLVOWLSky::updateGeometry(LLDrawable * drawable)
 #endif
 
             // fill it
-            buildStripsBuffer(begin_stack, end_stack, vertices, texCoords, indices, dome_radius, verts_per_stack, total_stacks);
+            ALSkyDome::buildStrips(begin_stack, end_stack, dome_radius, vertices, texCoords, indices);
 
             // and unlock the buffer
             segment->unmapBuffer();
@@ -554,91 +512,6 @@ void LLVOWLSky::initStars()
             c.mV[VALPHA] = intensity;
             mStarColors.push_back(c);
         }
-    }
-}
-
-void LLVOWLSky::buildStripsBuffer(U32 begin_stack,
-                                  U32 end_stack,
-                                  LLStrider<LLVector3> & vertices,
-                                  LLStrider<LLVector2> & texCoords,
-                                  LLStrider<U16> & indices,
-                                  const F32 dome_radius,
-                                  const U32& num_slices,
-                                  const U32& num_stacks)
-{
-    U32 i, j;
-    F32 phi0, theta, x0, y0, z0;
-    const F32 reciprocal_num_stacks = 1.f / num_stacks;
-
-    llassert(end_stack <= num_stacks);
-
-    // stacks are iterated one-indexed since phi(0) was handled by the fan above
-#if NEW_TESS
-    for(i = begin_stack; i <= end_stack; ++i)
-#else
-    for(i = begin_stack + 1; i <= end_stack+1; ++i)
-#endif
-    {
-        phi0 = calcPhi(i, reciprocal_num_stacks);
-
-        for(j = 0; j < num_slices; ++j)
-        {
-            theta = F_TWO_PI * (float(j) / float(num_slices));
-
-            // standard transformation from  spherical to
-            // rectangular coordinates
-            x0 = sin(phi0) * cos(theta);
-            y0 = cos(phi0);
-            z0 = sin(phi0) * sin(theta);
-
-#if NEW_TESS
-            *vertices++ = LLVector3(x0 * dome_radius, y0 * dome_radius, z0 * dome_radius);
-#else
-            if (i == num_stacks-2)
-            {
-                *vertices++ = LLVector3(x0*dome_radius, y0*dome_radius-1024.f*2.f, z0*dome_radius);
-            }
-            else if (i == num_stacks-1)
-            {
-                *vertices++ = LLVector3(0, y0*dome_radius-1024.f*2.f, 0);
-            }
-            else
-            {
-                *vertices++     = LLVector3(x0 * dome_radius, y0 * dome_radius, z0 * dome_radius);
-            }
-#endif
-
-            // generate planar uv coordinates
-            // note: x and z are transposed in order for things to animate
-            // correctly in the global coordinate system where +x is east and
-            // +y is north
-            *texCoords++    = LLVector2((-z0 + 1.f) / 2.f, (-x0 + 1.f) / 2.f);
-        }
-    }
-
-    //build triangle strip...
-    *indices++ = 0 ;
-
-    S32 k = 0 ;
-    for(i = 1; i <= end_stack - begin_stack; ++i)
-    {
-        *indices++ = i * num_slices + k ;
-
-        k = (k+1) % num_slices ;
-        for(j = 0; j < num_slices ; ++j)
-        {
-            *indices++ = (i-1) * num_slices + k ;
-            *indices++ = i * num_slices + k ;
-
-            k = (k+1) % num_slices ;
-        }
-
-        if((--k) < 0)
-        {
-            k = num_slices - 1 ;
-        }
-
-        *indices++ = i * num_slices + k ;
     }
 }
 

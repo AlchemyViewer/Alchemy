@@ -4,10 +4,11 @@
 # pipeline's render resources and programs are built from and when they
 # change, the far plane, the water's field, wave heights and stencil bits,
 # the depth pyramid, the light map's blur, the depth under the HUD,
-# which placed reflection probes swallow automatic ones,
-# snapshot cutouts and whether a spot light's shadow map is drawn again; and
-# the pool that lends the frame's short-lived render targets by description.
-# Whatever reads settings or the scene hands these their inputs as values.
+# which placed reflection probes swallow automatic ones, snapshot cutouts,
+# whether a spot light's shadow map is drawn again and the sky dome's mesh;
+# and the pool that lends the frame's short-lived render targets by
+# description. Whatever reads settings or the scene hands these their inputs
+# as values.
 
 set(
   alrender_SOURCES
@@ -20,6 +21,7 @@ set(
   alrenderinputrequests.cpp
   alrenderresourceplan.cpp
   alshaderinputs.cpp
+  alskydome.cpp
   alspotshadowcache.cpp
   altransienttargetpool.cpp
   altransienttargets.cpp
@@ -42,6 +44,7 @@ set(
   alrenderresourceinputs.h
   alrenderresourceplan.h
   alshaderinputs.h
+  alskydome.h
   alspotshadowcache.h
   altransienttargetpool.h
   altransienttargets.h

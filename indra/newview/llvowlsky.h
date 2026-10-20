@@ -36,10 +36,6 @@
 
 class LLVOWLSky : public LLStaticViewerObject {
 private:
-    inline static U32 getNumStacks(void);
-    inline static U32 getNumSlices(void);
-    inline static U32 getStripsNumVerts(void);
-    inline static U32 getStripsNumIndices(void);
     U32 getStarsNumVerts(void) const;
 
 public:
@@ -68,18 +64,6 @@ private:
 
     // helper function for initializing the stars.
     void initStars();
-
-    // helper function for building the strips vertex buffer.
-    // note begin_stack and end_stack follow stl iterator conventions,
-    // begin_stack is the first stack to be included, end_stack is the first
-    // stack not to be included.
-    static void buildStripsBuffer(U32 begin_stack, U32 end_stack,
-                                  LLStrider<LLVector3> & vertices,
-                                  LLStrider<LLVector2> & texCoords,
-                                  LLStrider<U16> & indices,
-                                  const F32 RADIUS,
-                                  const U32& num_slices,
-                                  const U32& num_stacks);
 
     // helper function for updating the stars geometry.
     bool updateStarGeometry(LLDrawable *drawable);
