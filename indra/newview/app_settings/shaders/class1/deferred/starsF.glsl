@@ -78,14 +78,10 @@ void main()
     // from the draw pool without alpha weirdness.
     vec3 premult = vary_star_color * shape;
 
-    // GBuffer: stars opt out of atmospheric haze (SKIP_ATMOS).
-    frag_data[1] = vec4(0.0);
-    frag_data[2] = vec4(0.0, 1.0, 0.0, GBUFFER_FLAG_SKIP_ATMOS);
-
+    // The stars draw into one attachment and leave the rest as the sky wrote them, its flags among them
+    // (LLDrawPoolWLSky::renderStarsDeferred narrows the G-buffer's draw buffers to it).
 #if defined(HAS_EMISSIVE)
-    // With a dedicated emissive buffer the stars live there (bloom source);
-    // main diffuse stays zero so atmospheric haze doesn't pick them up.
-    frag_data[0] = vec4(0.0);
+    // With a dedicated emissive buffer the stars live there (bloom source).
     frag_data[3] = vec4(premult, shape);
 #else
     frag_data[0] = vec4(premult, shape);

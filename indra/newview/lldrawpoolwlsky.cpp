@@ -245,6 +245,17 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
         return;
     }
 
+    // The G-buffer the stars draw into, and their attachment of it: the emissive with the emissive buffer, the albedo
+    // without it. The fragment stage writes that output alone, so a target without it takes no stars.
+    const bool emissive = gPipeline.shaderInputs().mGlobal.mEmissive;
+    const U32 attachment = emissive ? 3 : 0;
+    LLRenderTarget* gbuffer = LLRenderTarget::getCurrentBoundTarget();
+    if (!gbuffer || attachment >= gbuffer->getNumTextures())
+    {
+        llassert(false);
+        return;
+    }
+
     gGL.pushMatrix();
     gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
     // Subtle rotation so fixed patterns drift over long time scales.
@@ -335,9 +346,12 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
     // under half a step rounds away. The float one, the emissive under HDR, rounds nothing away and the exposure, the
     // tonemapper and the grade may show any of it, so every star in view is drawn there.
     const F32 moon_power = moon_brightness * llmax(0.f, moon_dir.mV[VZ]);
-    const bool emissive = gPipeline.shaderInputs().mGlobal.mEmissive;
     const U32 faintest =
         emissive && LLPipeline::hdrEnabled() ? 0 : ALStarField::faintestVisible(star_alpha, moon_power, emissive);
+
+    // The stars add into one attachment of the G-buffer, the emissive with the emissive buffer and the albedo without
+    // it (starsF.glsl), and leave the rest unread and unwritten.
+    gbuffer->setDrawAttachment(attachment);
 
     {
         LL_PROFILE_GPU_ZONE("sky stars");
@@ -359,6 +373,8 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
         gSky.mVOWLSkyp->drawStarPoints(frustum, faintest);
         unbind_stars(gDeferredStarProgram);
     }
+
+    gbuffer->setDrawBuffers();
 
     gGL.popMatrix();
 }

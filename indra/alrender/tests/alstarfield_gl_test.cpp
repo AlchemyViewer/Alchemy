@@ -2,7 +2,8 @@
  * @file alstarfield_gl_test.cpp
  * @brief The stars two ways on the hidden window, from the same fixed-seed field: as they were drawn before their
  *        rework (a quad of six vertices a star, every term worked per fragment, into all four attachments), and as
- *        LLDrawPoolWLSky draws them now. The two must leave the same picture.
+ *        LLDrawPoolWLSky draws them now (a point a star, a quad for each spiked one, the cells in view, the stars bright
+ *        enough to show, into the one attachment the sky's colour is in). The two must leave the same picture.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -661,6 +662,7 @@ void main()
                 LLGLDisable   srgb(GL_FRAMEBUFFER_SRGB);
                 LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
                 gGL.setSceneBlendType(LLRender::BT_ADD);
+                target.setDrawAttachment(emissive ? 3 : 0);
                 gGL.pushMatrix();
                 gGL.translatef(CAMERA.mV[VX], CAMERA.mV[VY], CAMERA.mV[VZ]);
                 gGL.rotatef(scene.mRotation, 0.f, 0.f, 1.f);
@@ -698,6 +700,7 @@ void main()
                                              (U32)mDraws.mFirst.size());
                 points.unbind();
                 gGL.popMatrix();
+                target.setDrawBuffers();
                 gGL.setSceneBlendType(LLRender::BT_ALPHA);
             }
             Picture picture = readBack(target, emissive ? 4 : 3);
@@ -806,6 +809,15 @@ TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the stars leave the pictu
             CHECK(raster.mBeyond == 0);
             CHECK(raster.mDiffer <= jitter.mDiffer);
             CHECK(d.mBeyond == 0);
+            // Every other attachment is as the sky left it, where the old stars added into all of them.
+            for (S32 other = 0; other < (emissive ? 4 : 3); ++other)
+            {
+                if (other != attachment)
+                {
+                    CAPTURE(other);
+                    CHECK(after.mAttachments[other] == blank.mAttachments[other]);
+                }
+            }
             if (scene.mMoonBrightness > 0.f)
             {
                 const Difference moon = compare(before, drawOld(scene, emissive, false), blank, attachment);
