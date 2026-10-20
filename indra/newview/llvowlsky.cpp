@@ -39,6 +39,10 @@
 #include "llenvironment.h"
 #include "llsettingssky.h"
 
+#include "alrandmap.h"
+
+#include <random>
+
 constexpr U32 SKY_DETAIL = 18; // Any lower and there will be artifacts
 
 // Three tiers of stars, layered at different simulated distances. The counts
@@ -69,6 +73,46 @@ namespace
 
     // Hard cap on configurable star count to bound peak VB allocation.
     constexpr U32 kMaxStarTotal = 700000;
+
+    // The stars draw from a generator of their own with a fixed seed, so a star count lays out the same field in
+    // every session and on every platform, and images of the sky compare. Each star takes one draw of it, the seed of
+    // a generator of the star's own that every draw of the star comes from; so where a platform's maths rounds one of
+    // a star's comparisons the other way, as expf may for the band's, that star may differ, and no other does. The
+    // meteors draw from the global one.
+    class FieldRandom
+    {
+    public:
+        U64 operator()() { return mGenerator(); }
+
+    private:
+        static constexpr U64 SEED = 0x53746172466965ull;
+        std::mt19937_64      mGenerator{ SEED };
+    };
+
+    // A star's own generator, SplitMix64 from its seed, its draws mapped to [0, 1) as ll_frand maps the global one's.
+    // Integer arithmetic alone, so a seed draws the same numbers on every platform.
+    class StarRandom
+    {
+    public:
+        explicit StarRandom(U64 seed) : mState(seed) {}
+
+        F32 operator()() { return ALRandMap::unitF32(next()); }
+
+    private:
+        U64 next()
+        {
+            mState += 0x9E3779B97F4A7C15ull;
+            U64 z = mState;
+            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+            z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+            return z ^ (z >> 31);
+        }
+
+        U64 mState;
+    };
+
+    // The global generator, for the meteors.
+    F32 globalRandom() { return ll_frand(); }
 
     // Meteor tuning. kMeteorHardMax is a fixed upper bound used for dynamic VB
     // sizing — the user-facing RenderMeteorMaxCount setting is clamped to this
@@ -135,33 +179,33 @@ namespace
     // Sample a stellar temperature. The distribution roughly tracks stellar
     // population statistics - dominated by cool M/K dwarfs with a long tail
     // toward the blue.
-    F32 sampleStellarTemperature()
+    template <typename Rand> F32 sampleStellarTemperature(Rand& draw)
     {
-        const F32 u = ll_frand();
-        if (u < 0.0025f)      return 18000.0f + ll_frand() * 22000.0f; // O/B class (rare, very blue)
-        if (u < 0.02f)        return 10000.0f + ll_frand() *  8000.0f; // late-B / A class (blue-white)
-        if (u < 0.10f)        return  7000.0f + ll_frand() *  3000.0f; // F class (yellow-white)
-        if (u < 0.30f)        return  5500.0f + ll_frand() *  1500.0f; // G class (sun-like)
-        if (u < 0.60f)        return  4000.0f + ll_frand() *  1500.0f; // K class (orange)
-        return                       2600.0f + ll_frand() *  1400.0f; // M class (cool red, majority)
+        const F32 u = draw();
+        if (u < 0.0025f)      return 18000.0f + draw() * 22000.0f; // O/B class (rare, very blue)
+        if (u < 0.02f)        return 10000.0f + draw() *  8000.0f; // late-B / A class (blue-white)
+        if (u < 0.10f)        return  7000.0f + draw() *  3000.0f; // F class (yellow-white)
+        if (u < 0.30f)        return  5500.0f + draw() *  1500.0f; // G class (sun-like)
+        if (u < 0.60f)        return  4000.0f + draw() *  1500.0f; // K class (orange)
+        return                       2600.0f + draw() *  1400.0f; // M class (cool red, majority)
     }
 
     // Power-law luminosity, biased heavily toward the faint end. Returned
     // value is normalized to [0..1]. Callers remap to the tier's intensity
     // range so the per-tier distribution forms a plausible magnitude scale.
-    F32 samplePowerLawIntensity()
+    template <typename Rand> F32 samplePowerLawIntensity(Rand& draw)
     {
-        const F32 u = ll_frand();
+        const F32 u = draw();
         // Exponent 4 is a rough visual match to the Salpeter-like tail: most
         // stars are near the floor, a few outliers reach the ceiling.
         return powf(u, 4.0f);
     }
 
     // Uniformly sample a direction on the upper hemisphere (z >= 0).
-    LLVector3 uniformUpperHemisphere()
+    template <typename Rand> LLVector3 uniformUpperHemisphere(Rand& draw)
     {
-        const F32 z = ll_frand();                         // area-weighted
-        const F32 phi = F_TWO_PI * ll_frand();
+        const F32 z = draw();                         // area-weighted
+        const F32 phi = F_TWO_PI * draw();
         const F32 r = sqrtf(llmax(0.0f, 1.0f - z * z));
         return LLVector3(r * cosf(phi), r * sinf(phi), z);
     }
@@ -169,7 +213,7 @@ namespace
     // Pick a random unit vector perpendicular to `n`. Uses a deterministic
     // orthogonal basis built from `n` and a fixed "up" swap for robustness
     // at the poles, then rotates around `n` by a uniform angle.
-    LLVector3 randomTangentTo(const LLVector3& n)
+    template <typename Rand> LLVector3 randomTangentTo(const LLVector3& n, Rand& draw)
     {
         const LLVector3 fallback = (fabsf(n.mV[2]) < 0.9f)
                                        ? LLVector3(0.f, 0.f, 1.f)
@@ -178,7 +222,7 @@ namespace
         a.normVec();
         LLVector3 b = (n % a);
         b.normVec();
-        const F32 rot = F_TWO_PI * ll_frand();
+        const F32 rot = F_TWO_PI * draw();
         return a * cosf(rot) + b * sinf(rot);
     }
 
@@ -186,13 +230,13 @@ namespace
     // A Gaussian density around cos(angle_from_plane)=0 yields a band a few
     // tens of degrees wide, which reads as a believable Milky Way without
     // relying on a texture.
-    LLVector3 generateStarDirection(const LLVector3& galactic_pole, bool milky_way_biased)
+    template <typename Rand> LLVector3 generateStarDirection(const LLVector3& galactic_pole, bool milky_way_biased, Rand& draw)
     {
         constexpr U32 MAX_ATTEMPTS = 24;
 
         for (U32 attempt = 0; attempt < MAX_ATTEMPTS; ++attempt)
         {
-            LLVector3 dir = uniformUpperHemisphere();
+            LLVector3 dir = uniformUpperHemisphere(draw);
 
             if (!milky_way_biased)
                 return dir;
@@ -201,12 +245,12 @@ namespace
             const F32 cos_to_pole = fabsf(dir * galactic_pole);
             // Gaussian density peaking at the plane. sigma ~ 18 degrees.
             const F32 density = expf(-cos_to_pole * cos_to_pole * 10.0f);
-            if (ll_frand() < density)
+            if (draw() < density)
                 return dir;
         }
 
         // Unlikely to ever hit this fallback, but keeps the function total.
-        return uniformUpperHemisphere();
+        return uniformUpperHemisphere(draw);
     }
 }
 
@@ -533,6 +577,7 @@ void LLVOWLSky::initStars()
     mStarPositions.reserve(target_total);
     mStarColors.reserve(target_total);
 
+    FieldRandom field;
     for (const StarTier& tier : kStarTiers)
     {
         const F32 tier_radius = DISTANCE_TO_STARS * tier.distance_factor;
@@ -540,20 +585,21 @@ void LLVOWLSky::initStars()
 
         for (U32 i = 0; i < tier_count; ++i)
         {
-            const bool in_milky_way = ll_frand() < tier.milky_way_fraction;
-            LLVector3 dir = generateStarDirection(galactic_pole, in_milky_way);
+            StarRandom draw(field());
+            const bool in_milky_way = draw() < tier.milky_way_fraction;
+            LLVector3 dir = generateStarDirection(galactic_pole, in_milky_way, draw);
 
             mStarPositions.push_back(dir * tier_radius);
 
             // Distance-tier dimming is baked into intensity_floor/ceil so the
             // far "dust" tier naturally renders faint. We only remap the
             // power-law sample into that range here.
-            const F32 raw = samplePowerLawIntensity();
+            const F32 raw = samplePowerLawIntensity(draw);
             const F32 intensity = llclamp(
                 tier.intensity_floor + raw * (tier.intensity_ceil - tier.intensity_floor),
                 0.0f, 1.0f);
 
-            const F32 temperature_K = sampleStellarTemperature();
+            const F32 temperature_K = sampleStellarTemperature(draw);
             const LLColor3 bb = blackBodyColor(temperature_K);
 
             LLColor4 c;
@@ -759,7 +805,7 @@ void LLVOWLSky::tickMeteors(F32 dt_seconds)
 
         // Start point anywhere on the upper hemisphere, but prefer a bit above
         // the horizon so meteors don't immediately pop out of view.
-        LLVector3 start_dir = uniformUpperHemisphere();
+        LLVector3 start_dir = uniformUpperHemisphere(globalRandom);
         // Lift horizon-hugging starts slightly so short streaks stay visible.
         if (start_dir.mV[2] < 0.1f)
         {
@@ -769,7 +815,7 @@ void LLVOWLSky::tickMeteors(F32 dt_seconds)
 
         // Travel direction is a random tangent in the sky tangent plane at
         // start_dir. This gives great-circle-like paths.
-        LLVector3 travel_dir = randomTangentTo(start_dir);
+        LLVector3 travel_dir = randomTangentTo(start_dir, globalRandom);
 
         // Classify each new meteor into a visual archetype. The weighted mix
         // makes showers feel alive at high spawn rates — most meteors are
