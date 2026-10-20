@@ -30,6 +30,7 @@
 
 #include "alfarplane.h"
 #include "llappviewer.h"
+#include "llenvironment.h"
 #include "lltexturecache.h"
 #include "lltexturefetch.h"
 #include "llimageworker.h"
@@ -1439,6 +1440,14 @@ S32 LLSpatialPartition::cull(LLCamera &camera, bool do_occlusion)
 #if LL_OCTREE_PARANOIA_CHECK
     ((LLSpatialGroup*)mOctree->getListener(0))->validate();
 #endif
+
+    // Terrain is not drawn from where the water is not, GROUND_FADE_END or more above it (ALFarPlane::groundDrawnFrom),
+    // in any pass, its shadows' among them.
+    if (mPartitionType == LLViewerRegion::PARTITION_TERRAIN &&
+        !ALFarPlane::groundDrawnFrom(LLViewerCamera::getInstance()->getOrigin().mV[VZ] - LLEnvironment::instance().getWaterHeight()))
+    {
+        return 0;
+    }
 
     if (LLPipeline::sShadowRender)
     {

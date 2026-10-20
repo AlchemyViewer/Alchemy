@@ -3370,8 +3370,9 @@ bool LLPipeline::getVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& 
 
     // The water has no partition: its field, whole, with its lowest and highest water, and a receiver wherever the
     // camera meets it. Left out, a view of open sea, or a shadow split holding nothing but water, finds no receivers
-    // and its split is left empty.
-    if (hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.inView(camera))
+    // and its split is left empty. Not from where the water is not drawn at all.
+    if (hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.inView(camera) &&
+        mWaterSurface.drawnFrom(*LLViewerCamera::getInstance()))
     {
         mWaterSurface.addExtents(min, max);
         res = false;
@@ -12249,9 +12250,9 @@ bool LLPipeline::skyBehindWanted() const
     {
         return false;
     }
-    // The water's slab, rim to rim, against the frustum. What the frustum holds but the world hides, as water under the
-    // land, the sky pool's query finds (LLDrawPoolWLSky::renderSkyHazeDeferred).
-    return mWaterPool && hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.inView(*LLViewerCamera::getInstance());
+    // The water's slab, rim to rim, against the frustum, from where the water is drawn. What the frustum holds but the
+    // world hides, as water under the land, the sky pool's query finds (LLDrawPoolWLSky::renderSkyHazeDeferred).
+    return mWaterPool && hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.drawnFrom(*LLViewerCamera::getInstance());
 }
 
 void LLPipeline::doAtmospherics()
@@ -12293,6 +12294,10 @@ void LLPipeline::doAtmospherics()
             if (on_water)
             {
                 haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, mSkyBehind, ALSamplers::BilinearClamp);
+                // From high above the water, the water fades into the sky behind it, wholly by the height it is no
+                // longer drawn from.
+                const F32 height = LLViewerCamera::getInstance()->getOrigin().mV[VZ] - environment.getWaterHeight();
+                haze_shader.uniform1f(LLShaderMgr::WATER_GROUND_FADE, ALFarPlane::groundFade(height));
             }
 
             // full screen blit
@@ -12341,6 +12346,12 @@ void LLPipeline::doWaterHaze()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     if (sImpostorRender)
     { // do not attempt water haze on impostors
+        return;
+    }
+
+    // From above, only where the water itself is drawn: from higher, the field would fog the sky under it as void water.
+    if (!sUnderWaterRender && !mWaterSurface.drawnFrom(*LLViewerCamera::getInstance()))
+    {
         return;
     }
 

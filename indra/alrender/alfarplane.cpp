@@ -78,9 +78,20 @@ F32 edgeWaterStretch(bool infinite)
     return infinite ? EDGE_WATER_STRETCH : FINITE_EDGE_WATER_STRETCH;
 }
 
+F32 groundFade(F32 height)
+{
+    const F32 t = llclamp((height - GROUND_FADE_START) / (GROUND_FADE_END - GROUND_FADE_START), 0.f, 1.f);
+    return t * t * (3.f - 2.f * t);
+}
+
+bool groundDrawnFrom(F32 height)
+{
+    return height < GROUND_FADE_END;
+}
+
 bool waterVisibleFrom(F32 camera_z, F32 water_height, F32 projection_far)
 {
-    return isInfinite(projection_far) ? camera_z - water_height < EDGE_WATER_STRETCH : camera_z < projection_far;
+    return groundDrawnFrom(camera_z - water_height) && (isInfinite(projection_far) || camera_z < projection_far);
 }
 
 WaterFar waterFar(F32 projection_far, bool have_rim, const LLVector2& rim_min, const LLVector2& rim_max)

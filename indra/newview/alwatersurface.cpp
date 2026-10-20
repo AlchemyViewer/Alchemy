@@ -33,6 +33,7 @@
 #include "llappviewer.h"
 #include "llcamera.h"
 #include "lldrawpoolwater.h"
+#include "llenvironment.h"
 #include "llglslshader.h"
 #include "llimage.h"
 #include "llimagegl.h"
@@ -281,6 +282,13 @@ bool ALWaterSurface::inView(LLCamera& camera) const
     const LLVector4a centre(mCentre.mV[VX], mCentre.mV[VY], 0.5f * (mLowest + mHighest));
     const LLVector4a radius(rim, rim, 0.5f * (mHighest - mLowest) + maxDisplacement() + 0.01f);
     return camera.AABBInFrustumNoFarClip(centre, radius) != 0;
+}
+
+bool ALWaterSurface::drawnFrom(LLViewerCamera& camera) const
+{
+    return exists() &&
+           ALFarPlane::waterVisibleFrom(camera.getOrigin().mV[VZ], LLEnvironment::instance().getWaterHeight(), camera.getProjectionFar()) &&
+           inView(camera);
 }
 
 bool ALWaterSurface::patchesInView(LLCamera& camera) const

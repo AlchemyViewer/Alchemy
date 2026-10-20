@@ -44,7 +44,8 @@ class LLMatrix4a;
 /// - The sky lies on the far plane and writes no depth, so it is wherever the depth buffer still holds the
 ///   cleared value, under either projection. No distance places it.
 /// - Terrain and water, whose partitions ignore the draw distance, reach as far as the projection lets them:
-///   under an infinite one, terrain to TERRAIN_REACH and water to the horizon.
+///   under an infinite one, terrain to TERRAIN_REACH and water to the horizon. Neither is drawn from GROUND_FADE_END
+///   or more above the water (groundDrawnFrom).
 namespace ALFarPlane
 {
 
@@ -64,6 +65,19 @@ constexpr F32 EDGE_WATER_STRETCH = 256000.f;
 /// The edge water stretch and the wave clamp a finite projection keeps.
 constexpr F32 FINITE_EDGE_WATER_STRETCH = 2048.f;
 constexpr F32 FINITE_WAVE_CLAMP = 2560.f;
+
+/// The heights above the water over which the world below leaves the view: the water fades into the sky behind it
+/// from GROUND_FADE_START, the height LL's finite far plane hid it from, and from GROUND_FADE_END neither water nor
+/// terrain is drawn.
+constexpr F32 GROUND_FADE_START = 1024.f;
+constexpr F32 GROUND_FADE_END = 2048.f;
+
+/// How far the water has faded into the sky from a camera `height` above it: 0 up to GROUND_FADE_START, 1 from
+/// GROUND_FADE_END, and eased between.
+F32 groundFade(F32 height);
+
+/// Whether water and terrain are drawn from a camera `height` above the water: below GROUND_FADE_END.
+bool groundDrawnFrom(F32 height);
 
 /// The highest draw distance the depth convention supports: MAX_FAR_CLIP under reverse-Z, whose float depth
 /// keeps its precision there, FORWARD_Z_MAX_FAR_CLIP under forward 24-bit depth.
@@ -95,7 +109,7 @@ F32 terrainReach(F32 projection_far);
 F32 edgeWaterStretch(bool infinite);
 
 /// Whether water is drawn from a camera this high: below a finite projection's far plane, which has clipped the water
-/// away from higher, and while the edge water stretches under an infinite one.
+/// away from higher, and under any projection while the ground is drawn (groundDrawnFrom).
 bool waterVisibleFrom(F32 camera_z, F32 water_height, F32 projection_far);
 
 /// The water shaders' far terms (waterFar). A finite projection keeps the defaults, which leave the shaders as
