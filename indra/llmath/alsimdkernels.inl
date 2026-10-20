@@ -419,6 +419,42 @@ void transform_impl(const LLMatrix4a& m, const LLVector4a* src, LLVector4a* dst,
         });
 }
 
+// One register of directions through rows m, then offset added.
+template <class K>
+AL_SIMD_INLINE void transform_offset_step(const typename K::reg* m, typename K::reg offset, const F32* in, F32* out)
+{
+    const typename K::reg v = K::load(in);
+    typename K::reg r = K::mul(K::template splat<0>(v), m[0]);
+    r = K::template fmadd_lane<1>(m[1], v, r);
+    r = K::template fmadd_lane<2>(m[2], v, r);
+    K::store(out, K::add(r, offset));
+}
+
+template <class W>
+void transform_offset_impl(const LLMatrix4a& m, const LLVector4a& offset, const LLVector4a* src, LLVector4a* dst, size_t n)
+{
+    const f32x4 m4[3] = {m.getRow<0>(), m.getRow<1>(), m.getRow<2>()};
+    const typename W::reg mw[3] = {W::broadcast(m4[0]), W::broadcast(m4[1]), W::broadcast(m4[2])};
+    const f32x4 o4 = offset;
+    const typename W::reg ow = W::broadcast(o4);
+    const F32* s = reinterpret_cast<const F32*>(src);
+    F32* d = reinterpret_cast<F32*>(dst);
+
+    for_vectors<W>(n,
+        [&](size_t i)
+        {
+            for (int u = 0; u < W::unroll; ++u)
+            {
+                const size_t at = 4 * (i + size_t(u) * W::lanes);
+                transform_offset_step<W>(mw, ow, s + at, d + at);
+            }
+        },
+        [&](size_t i)
+        {
+            transform_offset_step<ALSimd4>(m4, o4, s + 4 * i, d + 4 * i);
+        });
+}
+
 // <s0, t0, s1, t1> + trans, then rot0 * <s0, s0, s1, s1> + rot1 * <t0, t0,
 // t1, t1>, then scaled and offset.
 template <class K>
@@ -1339,6 +1375,37 @@ void grid_tangents_impl(const LLVector4a* positions, const LLVector4a* normals, 
     {
         sign_faceless(lane_sum<W>(total) + lane_sum<ALSimd4>(total4), tangents, vertices);
     }
+}
+
+////////////////////////////////////
+// Normalizing
+////////////////////////////////////
+
+template <class W>
+bool normalize3_or_mark_impl(LLVector4a* v, size_t n)
+{
+    using reg = typename W::reg;
+    using mask = typename W::mask;
+    constexpr size_t F = W::floats;
+    mask marked = W::none();
+    alignas(16) F32 spill[4];
+    for (size_t first = 0; first < n; first += F)
+    {
+        const auto at = [&](int i) { return first + i < n ? first + i : n - 1; };
+        Lanes3<W> a;
+        reg w;
+        W::load_columns([&](int i) { return v[at(i)].getF32ptr(); }, a.x, a.y, a.z, w);
+        const reg length2 = dot_lanes3(a, a);
+        const mask none = W::cmple(length2, W::set1(FLT_MIN));
+        const reg scale = W::rsqrt(W::max(length2, W::set1(FLT_MIN)));
+        a = { W::select(none, W::zero(), W::mul(a.x, scale)), W::select(none, W::zero(), W::mul(a.y, scale)),
+              W::select(none, W::zero(), W::mul(a.z, scale)) };
+        w = W::select(none, W::set1(1.f), W::mul(w, scale));
+        const mask real = W::cmplt(W::add(W::ramp(), W::set1(F32(first))), W::set1(F32(n)));
+        marked = W::or_(marked, W::and_(real, none));
+        W::store_columns(a.x, a.y, a.z, w, [&](int i) { return first + i < n ? v[first + i].getF32ptr() : spill; });
+    }
+    return W::any(marked);
 }
 
 } // namespace kernels

@@ -606,8 +606,30 @@ LLProfile::Face* LLProfile::addHole(const LLProfileParams& params, bool flat, F3
     // triangle, is drawn in along its own direction to where it meets the
     // wall, which is of no thickness there. The wall is convex about the
     // origin, so the ray from the origin through a point leaves it where it
-    // first crosses the line of any of its edges.
+    // first crosses the line of any of its edges. A point nearer the origin
+    // than an edge's line cannot cross it, and an edge of no length or one
+    // whose line runs through the origin stops no ray, so the points are
+    // only tried where the hole's farthest reaches the line of some edge.
+    F32 farthest2 = 0.f;
     for (S32 i=mTotalOut;i<mTotal;i++)
+    {
+        farthest2 = llmax(farthest2, pt[i][0] * pt[i][0] + pt[i][1] * pt[i][1]);
+    }
+    bool may_reach = false;
+    for (S32 k = 0; k + 1 < mTotalOut && !may_reach; k++)
+    {
+        const F32 ex = mProfile[k + 1][0] - mProfile[k][0];
+        const F32 ey = mProfile[k + 1][1] - mProfile[k][1];
+        const F32 toward = mProfile[k][0] * ey - mProfile[k][1] * ex;
+        const F32 length2 = ex * ex + ey * ey;
+        if (length2 == 0.f || toward == 0.f)
+        {
+            continue;
+        }
+        // The line is toward / |e| from the origin.
+        may_reach = toward < 0.f || farthest2 * length2 * 1.0001f >= toward * toward;
+    }
+    for (S32 i=mTotalOut;i<mTotal && may_reach;i++)
     {
         const F32 px = pt[i][0];
         const F32 py = pt[i][1];
@@ -2144,8 +2166,6 @@ bool LLVolume::generate()
             LLMatrix4a rot_mat;
             rot_mat.set(scale_mat);
 
-            LLVector4a* profile = mProfilep->mProfile.mArray;
-            LLVector4a* end_profile = profile+sizeT;
             LLVector4a offset = mPathp->mPath[s].mPos;
 
             // hack to work around MAINT-5660 for debug until we can suss out
@@ -2155,15 +2175,9 @@ bool LLVolume::generate()
                 offset.clear();
             }
 
-            LLVector4a tmp;
-
             // Run along the profile.
-            while (profile < end_profile)
-            {
-                rot_mat.rotate(*profile++, tmp);
-                dst->setAdd(tmp,offset);
-                ++dst;
-            }
+            alsimd::transform_directions_offset(rot_mat, offset, mProfilep->mProfile.mArray, dst, sizeT);
+            dst += sizeT;
         }
 
         for (std::vector<LLProfile::Face>::iterator iter = mProfilep->mFaces.begin();
@@ -5713,21 +5727,7 @@ namespace
     void normalize_grid_normals(LLVector4a* norm, S32 num_s, S32 num_t)
     {
         const S32 count = num_s * num_t;
-        bool any_missing = false;
-        for (S32 v = 0; v < count; ++v)
-        {
-            if (norm[v].dot3(norm[v]).getF32() > FLT_MIN)
-            {
-                norm[v].normalize3();
-            }
-            else
-            {
-                norm[v].set(0.f, 0.f, 0.f, 1.f);
-                any_missing = true;
-            }
-        }
-
-        if (!any_missing)
+        if (!alsimd::normalize3_or_mark(norm, count))
         {
             return;
         }
@@ -6697,7 +6697,7 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
 
     S32 max_s = volume->getProfile().getTotal();
 
-    S32 s, t, i;
+    S32 s, t;
     F32 ss, tt;
 
     num_vertices = mNumS*mNumT;
@@ -6726,89 +6726,87 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     S32 end_t = mBeginT+mNumT;
     bool test = (mTypeMask & INNER_MASK) && (mTypeMask & FLAT_MASK) && mNumS > 2;
 
-    // Copy the vertices into the array
+    // Copy the vertices into the array. Every row takes the same columns of
+    // its mesh row with the same s texture coordinates, and the path's t for
+    // its own: the columns and their s are worked out once, so the rows are
+    // copies.
     { LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("llvfcs - copy verts");
-    for (t = mBeginT; t < end_t; t++)
+    struct Column
     {
-        tt = path_data[t].mTexT;
-        for (s = 0; s < num_s; s++)
+        S32 mesh;
+        F32 s;
+    };
+    constexpr S32 STACK_COLUMNS = 256;
+    Column stack_columns[STACK_COLUMNS];
+    std::vector<Column> heap_columns;
+    Column* columns = stack_columns;
+    if (mNumS > STACK_COLUMNS)
+    {
+        heap_columns.resize(mNumS);
+        columns = heap_columns.data();
+    }
+    S32 column_count = 0;
+    for (s = 0; s < num_s; s++)
+    {
+        if (mTypeMask & END_MASK)
         {
-            if (mTypeMask & END_MASK)
+            if (s)
             {
-                if (s)
-                {
-                    ss = 1.f;
-                }
-                else
-                {
-                    ss = 0.f;
-                }
+                ss = 1.f;
             }
             else
             {
-                // Get s value for tex-coord.
-                S32 index = mBeginS + s;
-                if (index >= (S32)profile.size())
-                {
-                    // edge?
-                    ss = flat ? 1.f - begin_stex : 1.f;
-                }
-                else if (!flat)
-                {
-                    ss = profile[index][2];
-                }
-                else
-                {
-                    ss = profile[index][2] - begin_stex;
-                }
+                ss = 0.f;
             }
-
-            if (sculpt_reverse_horizontal)
+        }
+        else
+        {
+            // Get s value for tex-coord.
+            S32 index = mBeginS + s;
+            if (index >= (S32)profile.size())
             {
-                ss = 1.f - ss;
+                // edge?
+                ss = flat ? 1.f - begin_stex : 1.f;
             }
-
-            // Check to see if this triangle wraps around the array.
-            if (mBeginS + s >= max_s)
+            else if (!flat)
             {
-                // We're wrapping
-                i = mBeginS + s + max_s*(t-1);
+                ss = profile[index][2];
             }
             else
             {
-                i = mBeginS + s + max_s*t;
-            }
-
-            mesh[i].store4a((F32*)(pos+cur_vertex));
-            tc[cur_vertex].set(ss,tt);
-
-            cur_vertex++;
-
-            if (test && s > 0)
-            {
-                mesh[i].store4a((F32*)(pos+cur_vertex));
-                tc[cur_vertex].set(ss,tt);
-                cur_vertex++;
+                ss = profile[index][2] - begin_stex;
             }
         }
 
-        if ((mTypeMask & INNER_MASK) && (mTypeMask & FLAT_MASK) && mNumS > 2)
+        if (sculpt_reverse_horizontal)
         {
-            if (mTypeMask & OPEN_MASK)
-            {
-                s = num_s-1;
-            }
-            else
-            {
-                s = 0;
-            }
+            ss = 1.f - ss;
+        }
 
-            i = mBeginS + s + max_s*t;
-            ss = profile[mBeginS + s][2] - begin_stex;
+        // A column past the profile's end wraps to its start.
+        const S32 column = mBeginS + s >= max_s ? mBeginS + s - max_s : mBeginS + s;
+        columns[column_count++] = { column, ss };
+        if (test && s > 0)
+        {
+            columns[column_count++] = { column, ss };
+        }
+    }
+    if (test)
+    {
+        s = (mTypeMask & OPEN_MASK) ? num_s - 1 : 0;
+        columns[column_count++] = { mBeginS + s, profile[mBeginS + s][2] - begin_stex };
+    }
+    llassert(column_count == mNumS);
 
-            mesh[i].store4a((F32*)(pos+cur_vertex));
-            tc[cur_vertex].set(ss,tt);
-
+    const LLVector4a* mesh_points = mesh.data();
+    for (t = mBeginT; t < end_t; t++)
+    {
+        const LLVector4a* row = mesh_points + max_s * t;
+        tt = path_data[t].mTexT;
+        for (S32 k = 0; k < column_count; ++k)
+        {
+            pos[cur_vertex] = row[columns[k].mesh];
+            tc[cur_vertex].set(columns[k].s, tt);
             cur_vertex++;
         }
     }
@@ -6823,12 +6821,8 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     LLVector4a face_min;
     LLVector4a face_max;
 
-    face_min = face_max = *cur_pos++;
-
-    while (cur_pos < end_pos)
-    {
-        update_min_max(face_min, face_max, *cur_pos++);
-    }
+    face_min = face_max = *cur_pos;
+    alsimd::extents(cur_pos, end_pos - cur_pos, face_min, face_max);
     // VFExtents change
     mExtents[0] = face_min;
     mExtents[1] = face_max;
@@ -6840,26 +6834,11 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         mTexCoords[mNumVertices] = mTexCoords[mNumVertices-1];
     }
 
-    // mTexCoords is LLVector2* into a 16-byte-aligned slab; iterate as
-    // floats 4-at-a-time and let load4a build each LLVector4a, avoiding
-    // a cast to LLVector4a* of unrelated-class storage.
-    const F32* cur_tc = (const F32*) mTexCoords;
-    const F32* const end_tc = (const F32*) (mTexCoords + tc_count);
-
+    // mTexCoords is LLVector2* into a 16-byte-aligned slab, two to a
+    // vector; the kernel reads it as floats.
     LLVector4a tc_min;
     LLVector4a tc_max;
-
-    tc_min.load4a(cur_tc);
-    cur_tc += 4;
-    tc_max = tc_min;
-
-    while (cur_tc < end_tc)
-    {
-        LLVector4a tc;
-        tc.load4a(cur_tc);
-        cur_tc += 4;
-        update_min_max(tc_min, tc_max, tc);
-    }
+    alsimd::extents(reinterpret_cast<const LLVector4a*>(mTexCoords), tc_count / 2, tc_min, tc_max);
 
     F32* minp = tc_min.getF32ptr();
     F32* maxp = tc_max.getF32ptr();

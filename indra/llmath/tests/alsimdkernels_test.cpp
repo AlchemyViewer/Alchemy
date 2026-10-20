@@ -265,6 +265,51 @@ namespace
         }
     }
 
+    // Directions turned and then moved, against rotate and an add, bit for
+    // bit at every count and width; nothing written past the count.
+    TEST_CASE("alsimdkernels: transform_directions_offset against rotate and add at every count and width", "[alsimdkernels]")
+    {
+        const LLMatrix4a m = some_matrix();
+        const LLVector4a offset(1.f, -20.f, 300.f, 0.25f);
+        for (size_t n : COUNTS)
+        {
+            const std::vector<LLVector4a> src = some_vectors(n, 3);
+            std::vector<LLVector4a> expected(n + 1, SENTINEL);
+            for (size_t i = 0; i < n; ++i)
+            {
+                LLVector4a turned;
+                m.rotate(src[i], turned);
+                expected[i].setAdd(turned, offset);
+            }
+
+            for_each_width([&]<class W>(const char* width)
+            {
+                std::vector<LLVector4a> dst(n + 1, SENTINEL);
+                transform_offset_impl<W>(m, offset, src.data(), dst.data(), n);
+                for (size_t i = 0; i <= n; ++i)
+                {
+                    CAPTURE(width, n, i);
+                    require_same_bits("transform_directions_offset", dst[i], expected[i]);
+                }
+            });
+
+            // The library is built at the tree's level, which may fuse
+            // where this file does not.
+            std::vector<LLVector4a> dst(n + 1, SENTINEL);
+            alsimd::transform_directions_offset(m, offset, src.data(), dst.data(), n);
+            require_same_bits("past the count through the library", dst[n], SENTINEL);
+            for (size_t i = 0; i < n; ++i)
+            {
+                INFO("through the library");
+                CAPTURE(n, i);
+                for (int lane = 0; lane < 4; ++lane)
+                {
+                    require_close("transform_directions_offset", dst[i][lane], expected[i][lane], 1e-6, 1000.0);
+                }
+            }
+        }
+    }
+
     // Texture coordinates: two per vector, against the scalar arithmetic
     // in double within the two roundings the fused form takes, and every
     // width bit for bit against the first.
@@ -893,6 +938,62 @@ namespace
                     }
                 });
             }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Normalizing
+
+    // Vectors at unit length, or marked (0, 0, 0, 1) where they have none,
+    // against normalize3 to within its rounding at every width and count.
+    TEST_CASE("alsimdkernels: normalize3_or_mark against normalize3 at every width", "[alsimdkernels]")
+    {
+        for (size_t n : COUNTS)
+        {
+            std::vector<LLVector4a> src = some_vectors(n, 12);
+            for (size_t i = 0; i < n; i += 5)
+            {
+                src[i].set(0.f, 0.f, 0.f, 0.f);
+            }
+            for (size_t i = 3; i < n; i += 7)
+            {
+                src[i].set(1e-25f, 0.f, 0.f, 0.f);
+            }
+            for (size_t i = 0; i < n; ++i)
+            {
+                src[i].getF32ptr()[3] = 0.f;
+            }
+            bool any_expected = false;
+            std::vector<LLVector4a> expected(src.begin(), src.begin() + n);
+            for (LLVector4a& e : expected)
+            {
+                if (e.dot3(e).getF32() > FLT_MIN)
+                {
+                    e.normalize3();
+                }
+                else
+                {
+                    e.set(0.f, 0.f, 0.f, 1.f);
+                    any_expected = true;
+                }
+            }
+            for_each_lane_width([&]<class W>(const char* width)
+            {
+                std::vector<LLVector4a> v(src.begin(), src.end());
+                v[n] = SENTINEL;
+                const bool any = normalize3_or_mark_impl<W>(v.data(), n);
+                CAPTURE(width, n);
+                REQUIRE(any == any_expected);
+                require_same_bits("past the end", v[n], SENTINEL);
+                for (size_t i = 0; i < n; ++i)
+                {
+                    CAPTURE(i);
+                    for (int lane = 0; lane < 4; ++lane)
+                    {
+                        require_close("normalized", v[i][lane], expected[i][lane], 4.0 * std::numeric_limits<F32>::epsilon());
+                    }
+                }
+            });
         }
     }
 }

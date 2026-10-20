@@ -54,6 +54,12 @@ void transform_directions(const LLMatrix4a& m, const LLVector4a* src, LLVector4a
 // The same, with lane w of every result taken from its source.
 void transform_directions_keep_w(const LLMatrix4a& m, const LLVector4a* src, LLVector4a* dst, size_t n);
 
+// Every direction through the upper three rows, then offset added: a point
+// turned and scaled about the origin and then moved, rounded as
+// LLMatrix4a::rotate and an add round it, where transform_points folds the
+// move into the rows' sum.
+void transform_directions_offset(const LLMatrix4a& m, const LLVector4a& offset, const LLVector4a* src, LLVector4a* dst, size_t n);
+
 // Two texture coordinates per vector, <s0, t0, s1, t1>: translated by
 // trans, rotated by rot0 and rot1 (<cos, -sin, cos, -sin> and <sin, cos,
 // sin, cos>), scaled, then offset. n counts vectors.
@@ -147,6 +153,11 @@ void grid_tangents(const LLVector4a* positions, const LLVector4a* normals, const
 // The same over triangles from an index buffer.
 void indexed_tangents(const LLVector4a* positions, const LLVector4a* normals, const LLVector2* uvs, size_t vertex_count,
                       const U16* indices, size_t index_count, LLVector4a* tangents);
+
+// Every vector at unit length in x, y and z, w scaled with them, where its
+// squared length in x, y and z is above FLT_MIN; elsewhere (0, 0, 0, 1).
+// Returns whether any was set so.
+bool normalize3_or_mark(LLVector4a* v, size_t n);
 
 } // namespace alsimd
 
