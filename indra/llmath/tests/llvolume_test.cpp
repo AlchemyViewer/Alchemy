@@ -3832,9 +3832,9 @@ namespace
                 checkCorners(*volume, fmt::format("flexible hollow box, {} sections, LOD {}", sections, lod), report);
             }
         }
-        // A hollow sphere's flat inner side runs from pole to pole; its
-        // last point takes the normal the strip it ends gives it, not the
-        // axis.
+        // A hollow sphere's flat inner side runs from pole to pole, a cone
+        // at each: both its ends take the normals the strips they end give
+        // them, not the axis.
         for (U8 hole : { LL_PCODE_HOLE_SQUARE, LL_PCODE_HOLE_TRIANGLE })
         {
             for (S32 lod = 0; lod < LOD_COUNT; ++lod)
@@ -3851,7 +3851,7 @@ namespace
                     {
                         continue;
                     }
-                    for (S32 column : { face.mNumS - 1 })
+                    for (S32 column : { 0, face.mNumS - 1 })
                     {
                         for (S32 t = 0; t < face.mNumT; ++t)
                         {

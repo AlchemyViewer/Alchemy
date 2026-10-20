@@ -7368,8 +7368,9 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     // On a sphere's side, a column that is one place in every row is a pole
     // on the axis the half circle sweeps about, and takes the axis. A cut
     // end of a hollow sphere lies on the axis, and has no area. A flat inner
-    // side's last point keeps the normal of the strip it ends.
-    if (sculpt_stitching == LL_SCULPT_TYPE_NONE && !(mTypeMask & END_MASK) && volume->getPathType() == LL_PCODE_PATH_CIRCLE &&
+    // side is a cone at a pole, and its ends keep the normals of the strips
+    // they end.
+    if (sculpt_stitching == LL_SCULPT_TYPE_NONE && !(mTypeMask & END_MASK) && !doubled && volume->getPathType() == LL_PCODE_PATH_CIRCLE &&
         ((volume->getProfileType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF))
     {
         if (column_is_point(pos, mNumS, mNumT, 0))
@@ -7380,7 +7381,7 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
             }
         }
 
-        if (!doubled && column_is_point(pos, mNumS, mNumT, mNumS - 1))
+        if (column_is_point(pos, mNumS, mNumT, mNumS - 1))
         { //all upper S have same normal
             for (S32 i = 0; i < mNumT; i++)
             {
