@@ -38,6 +38,11 @@ flat in vec3 vary_point;      // the star's centre in window coordinates, and ha
 flat in vec3 vary_star_color; // the star's colour where its shape is 1 (starsV.glsl)
 flat in float vary_spike;     // the diffraction spikes' strength
 
+// The shape's terms at the star's centre, which ALStarField::brightest bounds a star by under the same names less
+// STAR_ (alstarfield_test holds the two to each other); the core is 1 there.
+const float STAR_HALO  = 0.06; // the halo's
+const float STAR_SPIKE = 0.30; // each spike's at full strength
+
 void main()
 {
 #ifdef STAR_QUADS
@@ -54,14 +59,14 @@ void main()
     // integrate into the HDR/bloom pipeline.
     float r2   = dot(corner, corner);
     float core = exp(-r2 * 9.0);
-    float halo = exp(-r2 * 1.8) * 0.06;
+    float halo = exp(-r2 * 1.8) * STAR_HALO;
 
     // Diffraction spikes on the brightest tail only (starsV.glsl).
     float ax = 1.0 - abs(corner.x);
     float ay = 1.0 - abs(corner.y);
     float spike_h = exp(-abs(corner.y) * 32.0) * ax;
     float spike_v = exp(-abs(corner.x) * 32.0) * ay;
-    float spike = (spike_h + spike_v) * vary_spike * 0.30;
+    float spike = (spike_h + spike_v) * vary_spike * STAR_SPIKE;
 
     float shape = core + halo + spike;
 

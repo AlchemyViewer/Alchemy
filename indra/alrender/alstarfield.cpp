@@ -125,40 +125,66 @@ U32 cellOf(const LLVector3& direction)
 
 Layout layOut(std::vector<Star>& stars)
 {
-    const auto points = std::stable_partition(stars.begin(), stars.end(), spiked);
+    // The stars in the buffer's order by a counting sort, which is stable: one key for each kind, cell and intensity,
+    // the spiked stars' first, by intensity alone, then each cell's points', brightest first within each, and stars as
+    // bright in the field's own order.
+    constexpr U32 INTENSITIES = 256;
+    constexpr U32 QUAD_KEYS   = INTENSITIES;
+    constexpr U32 KEYS        = QUAD_KEYS + CELLS * INTENSITIES;
+
+    const U32 count = (U32)stars.size();
+    std::vector<U32> keys(count);
+    std::vector<U32> starts(KEYS + 1, 0); // each key's count, then where its stars start
+    U32 quads = 0;
+    for (U32 s = 0; s < count; ++s)
+    {
+        const Star& star = stars[s];
+        const U32 dimmer = INTENSITIES - 1 - star.mColour.mV[VALPHA];
+        U32 key = dimmer;
+        if (spiked(star))
+        {
+            ++quads;
+        }
+        else
+        {
+            key = QUAD_KEYS + cellOf(star.mPosition) * INTENSITIES + dimmer;
+        }
+        keys[s] = key;
+        ++starts[key + 1];
+    }
+    for (U32 k = 1; k <= KEYS; ++k)
+    {
+        starts[k] += starts[k - 1];
+    }
 
     Layout layout;
-    layout.mQuads  = (U32)(points - stars.begin());
-    layout.mPoints = (U32)(stars.end() - points);
+    layout.mQuads  = quads;
+    layout.mPoints = count - quads;
 
-    // The points by cell.
-    std::vector<U32> cell(layout.mPoints);
-    std::vector<U32> order(layout.mPoints);
-    for (U32 p = 0; p < layout.mPoints; ++p)
+    // Where each cell's points start among the points, before the scatter moves the starts on.
+    std::vector<U32> cell_starts(CELLS + 1);
+    for (U32 c = 0; c < CELLS; ++c)
     {
-        cell[p]  = cellOf(points[p].mPosition);
-        order[p] = p;
+        cell_starts[c] = starts[QUAD_KEYS + c * INTENSITIES] - quads;
     }
-    std::stable_sort(order.begin(), order.end(), [&cell](U32 a, U32 b) { return cell[a] < cell[b]; });
-    std::vector<Star> sorted;
-    sorted.reserve(layout.mPoints);
-    for (U32 p : order)
+    cell_starts[CELLS] = layout.mPoints;
+
+    std::vector<Star> sorted(count);
+    for (U32 s = 0; s < count; ++s)
     {
-        sorted.push_back(points[p]);
+        sorted[starts[keys[s]]++] = stars[s];
     }
-    std::copy(sorted.begin(), sorted.end(), points);
+    stars.swap(sorted);
+    const auto points = stars.begin() + quads;
 
     // Each cell's run, and the cone its stars' directions lie in: about their mean, as wide as the farthest.
     layout.mCells.resize(CELLS);
-    U32 first = 0;
     for (U32 c = 0; c < CELLS; ++c)
     {
+        const U32 first = cell_starts[c];
         Cell& run = layout.mCells[c];
         run.mFirst = layout.firstPoint() + first;
-        while (first + run.mCount < layout.mPoints && cell[order[first + run.mCount]] == c)
-        {
-            ++run.mCount;
-        }
+        run.mCount = cell_starts[c + 1] - first;
 
         LLVector3 sum;
         for (U32 p = first; p < first + run.mCount; ++p)
@@ -180,10 +206,78 @@ Layout layOut(std::vector<Star>& stars)
             }
             run.mSinRadius = least_cos > 0.f ? sqrtf(llmax(0.f, 1.f - least_cos * least_cos)) : 1.f;
         }
-        first += run.mCount;
     }
-    llassert(first == layout.mPoints);
+
+    layout.mIntensities.reserve(stars.size());
+    for (const Star& star : stars)
+    {
+        layout.mIntensities.push_back(star.mColour.mV[VALPHA]);
+    }
     return layout;
+}
+
+F32 brightest(F32 intensity, F32 star_alpha, F32 moon_power, bool emissive)
+{
+    const F32 i = llclamp(intensity, 0.f, 1.f);
+
+    // starsV.glsl's extent: the spikes' strength, the star's ideal width, and the fade of one widened to MIN_PX.
+    const F32 t      = llclamp((i - SPIKE_START) / (1.0f - SPIKE_START), 0.f, 1.f);
+    const F32 spike  = t * t * (3.f - 2.f * t);
+    const F32 ideal  = FAINT_PX + (BRIGHT_PX - FAINT_PX) * i + spike * SPIKE_PX;
+    const F32 width  = llmax(ideal, MIN_PX);
+    const F32 fade   = (ideal * ideal) / (width * width);
+
+    // The scintillation at its peak: twinkle_amount reaches TWINKLE_MAX of the intensity, and the colour jitter
+    // CHROMA of that.
+    const F32 twinkle = 1.f + TWINKLE_MAX * i;
+    const F32 jitter  = 1.f + CHROMA * TWINKLE_MAX * i;
+
+    // The moon's glare at its least, none, which leaves its wash the whole of moon_fade.
+    const F32 wash = 1.f - llmin(llmax(moon_power, 0.f) * (1.f - i) * MOON_WASH, MOON_FADE_MAX);
+
+    // The bloom boost, or the albedo path's gain.
+    const F32 gain = emissive ? 1.f + i * i * BLOOM_BOOST : 1.f + i;
+
+    // starsF.glsl's shape at the star's centre: the core, the halo and both spikes.
+    const F32 shape = 1.f + HALO + 2.f * SPIKE * spike;
+
+    return jitter * twinkle * i * llmax(star_alpha, 0.f) * wash * fade * gain * shape;
+}
+
+U32 faintestVisible(F32 star_alpha, F32 moon_power, bool emissive)
+{
+    // brightest() rises with the intensity, so the first byte to reach LEFT_OUT is found by bisection; 256 if none.
+    U32 low  = 0;
+    U32 high = 256;
+    while (low < high)
+    {
+        const U32 mid = (low + high) / 2;
+        if (brightest((F32)mid / 255.f, star_alpha, moon_power, emissive) >= LEFT_OUT)
+        {
+            high = mid;
+        }
+        else
+        {
+            low = mid + 1;
+        }
+    }
+    return low;
+}
+
+namespace
+{
+    // How many of the run of intensities from @a first, @a count long and brightest first, are at @a faintest or brighter.
+    U32 drawnOf(const ALStarField::Layout& layout, U32 first, U32 count, U32 faintest)
+    {
+        const auto begin = layout.mIntensities.begin() + first;
+        return (U32)(std::partition_point(begin, begin + count, [faintest](U8 intensity) { return intensity >= faintest; })
+                     - begin);
+    }
+}
+
+U32 quadsDrawn(const Layout& layout, U32 faintest)
+{
+    return drawnOf(layout, 0, layout.mQuads, faintest);
 }
 
 void fillVertices(const std::vector<Star>& stars, const Layout& layout, LLStrider<LLVector4a> vertices)
@@ -257,7 +351,7 @@ bool inView(const Frustum& frustum, const Cell& cell)
     return true;
 }
 
-void pointDraws(const Layout& layout, const Frustum& frustum, Draws& draws)
+void pointDraws(const Layout& layout, const Frustum& frustum, U32 faintest, Draws& draws)
 {
     draws.clear();
     for (const Cell& cell : layout.mCells)
@@ -266,14 +360,19 @@ void pointDraws(const Layout& layout, const Frustum& frustum, Draws& draws)
         {
             continue;
         }
+        const U32 drawn = drawnOf(layout, cell.mFirst - layout.firstPoint() + layout.mQuads, cell.mCount, faintest);
+        if (drawn == 0)
+        {
+            continue;
+        }
         if (!draws.mFirst.empty() && (U32)(draws.mFirst.back() + draws.mCount.back()) == cell.mFirst)
         {
-            draws.mCount.back() += (S32)cell.mCount;
+            draws.mCount.back() += (S32)drawn;
         }
         else
         {
             draws.mFirst.push_back((S32)cell.mFirst);
-            draws.mCount.push_back((S32)cell.mCount);
+            draws.mCount.push_back((S32)drawn);
         }
     }
 }

@@ -642,9 +642,15 @@ void main()
         }
 
         // The stars drawn as LLDrawPoolWLSky::renderStarsDeferred draws them, into the G-buffer of @a emissive's path;
-        // every point, the cull's aside, where @a everything.
-        Picture drawStars(const Scene& scene, bool emissive, bool everything = false)
+        // every point, the frustum's cull aside, where @a everything, and every star however faint where
+        // @a every_star.
+        Picture drawStars(const Scene& scene, bool emissive, bool everything = false, bool every_star = false)
         {
+            {
+                const F32 moon_power = scene.mMoonBrightness * llmax(0.f, sinf(scene.mMoonElevation * DEG_TO_RAD));
+                mQuadsDrawn = ALStarField::quadsDrawn(
+                    mLayout, every_star ? 0 : ALStarField::faintestVisible(scene.mStarAlpha, moon_power, emissive));
+            }
             LLRenderTarget& target = mTarget[emissive];
             target.bindTarget();
             clearDome(emissive);
@@ -663,18 +669,24 @@ void main()
                 quads.bind();
                 bindUniforms(quads, scene);
                 mStarBuffer->setBuffer();
-                mStarBuffer->drawArrays(LLRender::TRIANGLES, 0, mLayout.firstPoint());
+                mStarBuffer->drawArrays(LLRender::TRIANGLES, 0, mQuadsDrawn * ALStarField::QUAD_VERTICES);
                 quads.unbind();
 
                 LLMatrix4a mvp;
                 mvp.setMul(gGL.getModelviewMatrix(), gGL.getProjectionMatrix());
-                ALStarField::pointDraws(mLayout, ALStarField::pointFrustum(mvp, W, H), mDraws);
+                const F32 moon_power = scene.mMoonBrightness * llmax(0.f, sinf(scene.mMoonElevation * DEG_TO_RAD));
+                const U32 faintest =
+                    every_star ? 0 : ALStarField::faintestVisible(scene.mStarAlpha, moon_power, emissive);
+                ALStarField::pointDraws(mLayout, ALStarField::pointFrustum(mvp, W, H), faintest, mDraws);
                 if (everything)
                 {
-                    mDraws.clear();
-                    mDraws.mFirst.push_back((S32)mLayout.firstPoint());
-                    mDraws.mCount.push_back((S32)mLayout.mPoints);
-                    mDraws.mPoints = mLayout.mPoints;
+                    // Every cell, each down to the faintest star the frame keeps.
+                    ALStarField::Frustum whole;
+                    for (LLVector3& normal : whole.mNormals)
+                    {
+                        normal.set(0.f, 0.f, 0.f);
+                    }
+                    ALStarField::pointDraws(mLayout, whole, faintest, mDraws);
                 }
 
                 LLGLEnable    point_size(GL_PROGRAM_POINT_SIZE);
@@ -748,6 +760,7 @@ void main()
         std::vector<ALStarField::Star> mLaidOut;
         ALStarField::Layout mLayout;
         ALStarField::Draws mDraws;
+        U32 mQuadsDrawn = 0;
         LLPointer<LLVertexBuffer> mOldQuads;
         LLPointer<LLVertexBuffer> mStarBuffer;
         LLPointer<LLImageGL> mMoonTexture;
@@ -762,9 +775,10 @@ TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the stars leave the pictu
                  "[alstarfield_gl]")
 {
     // The old quads' corners are snapped to the rasterizer's sub-pixel grid, 1/256 of a pixel, where a point's centre
-    // is worked exactly; so the old picture moved by one step of that grid is the measure of what may differ. The new
-    // picture may differ from the old at no more pixels than that, and at no pixel by more than the most it moves any
-    // pixel, besides the roundings compare() allows.
+    // is worked exactly; so the old picture moved by one step of that grid is the measure of what may differ. With
+    // every star drawn, the new picture may differ from the old at no more pixels than that, and at no pixel by more
+    // than the most it moves any pixel, besides the roundings compare() allows. The brightness cull then leaves out
+    // stars that add under half a step each (its own test): many pixels at dusk, each by no more than compare() allows.
     constexpr F32 SUBPIXEL = 1.f / 256.f;
 
     setUp();
@@ -778,16 +792,20 @@ TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the stars leave the pictu
             const Picture blank   = drawNothing(emissive);
             const Picture before  = drawOld(scene, emissive);
             const Picture shifted = drawOld(scene, emissive, true, SUBPIXEL);
+            const Picture every   = drawStars(scene, emissive, false, true);
             const Picture after   = drawStars(scene, emissive);
             const Difference jitter = compare(before, shifted, blank, attachment);
-            const Difference d = compare(before, after, blank, attachment, jitter.mMost);
+            const Difference raster = compare(before, every, blank, attachment, jitter.mMost);
+            const Difference d      = compare(before, after, blank, attachment, jitter.mMost);
             const std::string summary = d.summary();
+            const std::string every_star = raster.summary();
             const std::string old_moved = jitter.summary();
-            CAPTURE(summary, old_moved);
+            CAPTURE(summary, every_star, old_moved);
             UNSCOPED_INFO("the scene shows stars");
             CHECK(d.mLit > 100);
+            CHECK(raster.mBeyond == 0);
+            CHECK(raster.mDiffer <= jitter.mDiffer);
             CHECK(d.mBeyond == 0);
-            CHECK(d.mDiffer <= jitter.mDiffer);
             if (scene.mMoonBrightness > 0.f)
             {
                 const Difference moon = compare(before, drawOld(scene, emissive, false), blank, attachment);
@@ -821,4 +839,43 @@ TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the cull leaves out only 
             CHECK(drawn < mLayout.mPoints * 3 / 4);
         }
     }
+}
+
+TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the brightness cull leaves out only stars that add under half a step",
+                 "[alstarfield_gl]")
+{
+    setUp();
+    U32 left_out_somewhere = 0;
+    for (const Scene& scene : SCENES)
+    {
+        for (S32 path = 0; path < 2; ++path)
+        {
+            const bool emissive = path == 1;
+            const S32 attachment = emissive ? 3 : 0;
+            CAPTURE(scene.mName, emissive);
+            const Picture blank   = drawNothing(emissive);
+            const Picture every   = drawStars(scene, emissive, false, true);
+            const U32 all_points  = al_star_test::drawnPoints(mDraws);
+            const U32 all_quads   = mQuadsDrawn;
+            const Picture visible = drawStars(scene, emissive);
+            const U32 points      = al_star_test::drawnPoints(mDraws);
+            const U32 quads       = mQuadsDrawn;
+            // Each star left out adds under half a step to any pixel. On the 8-bit path every blend rounds, so what
+            // each adds rounds away and the picture is the same; on the emissive path two left out where they overlap
+            // add together, so a pixel may differ by twice that, and few do by more than once.
+            const Difference d = compare(every, visible, blank, attachment, emissive ? ALStarField::LEFT_OUT : 0.f);
+            const Difference once = compare(every, visible, blank, attachment);
+            const std::string summary = d.summary();
+            CAPTURE(summary, once.mBeyond, all_points, points, all_quads, quads);
+            CHECK(d.mBeyond == 0);
+            CHECK(once.mBeyond * 1000 <= d.mLit);
+            if (!emissive)
+            {
+                CHECK(d.mDiffer == 0);
+            }
+            left_out_somewhere += all_points - points;
+        }
+    }
+    UNSCOPED_INFO("the dusk scenes leave stars out");
+    CHECK(left_out_somewhere > 0);
 }

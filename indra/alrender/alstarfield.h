@@ -88,10 +88,25 @@ F32 milkyWayDensity(const LLVector3& direction);
 /// differ, and no other does.
 std::vector<Star> generate(U32 count, F32 dome_radius);
 
+/// The bounds of starsV.glsl's and starsF.glsl's per-star terms, each the shader's constant of the same name with
+/// STAR_ before it, which brightest bounds what a star can add by.
+constexpr F32 FAINT_PX      = 1.8f;  ///< the ideal width of a star of intensity 0, in pixels
+constexpr F32 BRIGHT_PX     = 7.0f;  ///< and of intensity 1, before its spikes
+constexpr F32 SPIKE_START   = 0.90f; ///< the intensity past which a star grows diffraction spikes
+constexpr F32 SPIKE_PX      = 12.0f; ///< the width the spikes add at intensity 1
+constexpr F32 MIN_PX        = 2.6f;  ///< the least width a star is drawn at, its brightness spread over the area
+constexpr F32 TWINKLE_MAX   = 0.65f; ///< the most the scintillation moves a star's brightness, a share of its intensity
+constexpr F32 CHROMA        = 0.18f; ///< the colour scintillation, a share of the brightness's
+constexpr F32 MOON_WASH     = 0.55f; ///< how far a moon at full power washes out a star of intensity 0
+constexpr F32 MOON_FADE_MAX = 0.95f; ///< the most the moon's wash and glare dim a star together
+constexpr F32 BLOOM_BOOST   = 1.2f;  ///< the emissive's gain past 1, times the intensity squared
+constexpr F32 HALO          = 0.06f; ///< the shape's halo at the star's centre, where its core is 1 (starsF.glsl)
+constexpr F32 SPIKE         = 0.30f; ///< each spike's there at full strength (starsF.glsl)
+
 /// The faintest intensity, as the colour's alpha holds it, that has diffraction spikes: starsV.glsl's
-/// smoothstep(0.90, 1.0, intensity) is above 0 past 0.90, and 230 / 255 is the first step past it. Such a star reaches
-/// up to 19 pixels across, and GL drops a point whose centre leaves the screen, so its arms would pop at the edge: it
-/// is drawn as a quad instead. Every other star is a point, at most 7 pixels across.
+/// smoothstep(STAR_SPIKE_START, 1.0, intensity) is above 0 past SPIKE_START, and 230 / 255 is the first step past it.
+/// Such a star reaches up to 19 pixels across, and GL drops a point whose centre leaves the screen, so its arms would
+/// pop at the edge: it is drawn as a quad instead. Every other star is a point, at most 7 pixels across.
 constexpr U8 SPIKE_INTENSITY = 230;
 
 inline bool spiked(const Star& star)
@@ -123,12 +138,14 @@ struct Cell
 };
 
 /// Where the stars lie in the buffer: the spiked stars' quads first, QUAD_VERTICES vertices each, then every other
-/// star, one vertex each, drawn as points, cell by cell.
+/// star, one vertex each, drawn as points, cell by cell. The quads, and each cell's points, run brightest first, so the
+/// stars a frame can see are a prefix of each run (faintestVisible).
 struct Layout
 {
     U32 mQuads = 0;  ///< spiked stars
     U32 mPoints = 0; ///< the rest
     std::vector<Cell> mCells; ///< CELLS of them, in order, each starting where the one before ends
+    std::vector<U8> mIntensities; ///< each star's intensity byte, in the order the stars are laid out
 
     U32 firstPoint() const { return mQuads * QUAD_VERTICES; }
     U32 vertices() const { return firstPoint() + mPoints; }
@@ -136,6 +153,30 @@ struct Layout
 
 /// Orders @a stars as the buffer lays them out, and says where each kind and each cell lies.
 Layout layOut(std::vector<Star>& stars);
+
+/// A step of 8 bits, and the most a star left out may add to any pixel: half that step. The cull is an 8-bit
+/// attachment's, the albedo or the emissive without HDR (RGB8), which the stars blend into a step at a time, so what a
+/// star adds under half a step rounds away and leaves the picture as it was. The float one, the emissive under HDR
+/// (R11G11B10F), rounds nothing away, and the exposure, the tonemapper and the grade after it may show any of it, so
+/// every star in view is drawn there.
+constexpr F32 QUANTUM = 1.f / 255.f;
+constexpr F32 LEFT_OUT = 0.5f * QUANTUM;
+
+/// The most a star of intensity @a intensity can add to any pixel, by starsV.glsl and starsF.glsl at their bounds, for a
+/// frame's star brightness (custom_alpha), the moon's power over the sky (moon_brightness times the sine of its
+/// elevation, 0 below the horizon) and the attachment's gain (the emissive's or the albedo's). Every term is at its most
+/// but the star's own: its colour and extinction at 1, its scintillation and colour jitter at their peaks (up to
+/// TWINKLE_MAX and CHROMA of that, +65% and +12%), the moon's glare at 0 and its wash at its least, the shape at its
+/// centre. It rises with the intensity.
+F32 brightest(F32 intensity, F32 star_alpha, F32 moon_power, bool emissive);
+
+/// The faintest intensity byte that can add LEFT_OUT or more to a pixel of an 8-bit attachment this frame (brightest),
+/// so every fainter star may be left out; 256 where none can.
+U32 faintestVisible(F32 star_alpha, F32 moon_power, bool emissive);
+
+/// The spiked stars a frame draws, those at @a faintest or brighter: a prefix of the quads, QUAD_VERTICES vertices
+/// each.
+U32 quadsDrawn(const Layout& layout, U32 faintest);
 
 /// The most a point reaches past its centre, in pixels: half the widest star drawn as a point (6.5 pixels across, just
 /// under SPIKE_INTENSITY) and the half pixel starsV.glsl widens each side by. GL drops a point whose centre leaves the
@@ -171,8 +212,8 @@ struct Draws
     }
 };
 
-/// The points of @a layout that a view through @a frustum draws, into @a draws.
-void pointDraws(const Layout& layout, const Frustum& frustum, Draws& draws);
+/// The points of @a layout that a view through @a frustum draws, at @a faintest or brighter, into @a draws.
+void pointDraws(const Layout& layout, const Frustum& frustum, U32 faintest, Draws& draws);
 
 /// The buffer's vertices for @a stars laid out as @a layout, layout.vertices() of them: a star's centre in xyz and its
 /// colour's four bytes in w, the word where LLVertexBuffer keeps the texture index, so a star is 16 bytes. A quad's

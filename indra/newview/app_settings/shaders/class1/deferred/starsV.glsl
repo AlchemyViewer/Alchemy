@@ -57,6 +57,19 @@ uniform vec3 moonQuadU;
 uniform vec3 moonQuadV;
 uniform sampler2D diffuseMap;
 
+// The bounds of the per-star terms. ALStarField::brightest bounds what a star can add from the same values, under the
+// same names less STAR_, and alstarfield_test holds the two to each other.
+const float STAR_FAINT_PX      = 1.8;  // the ideal width of a star of intensity 0, in pixels
+const float STAR_BRIGHT_PX     = 7.0;  // and of intensity 1, before its spikes
+const float STAR_SPIKE_START   = 0.90; // the intensity past which a star grows diffraction spikes
+const float STAR_SPIKE_PX      = 12.0; // the width the spikes add at intensity 1
+const float STAR_MIN_PX        = 2.6;  // the least width a star is drawn at, its brightness spread over the area
+const float STAR_TWINKLE_MAX   = 0.65; // the most the scintillation moves a star's brightness, a share of its intensity
+const float STAR_CHROMA        = 0.18; // the colour scintillation, a share of the brightness's
+const float STAR_MOON_WASH     = 0.55; // how far a moon at full power washes out a star of intensity 0
+const float STAR_MOON_FADE_MAX = 0.95; // the most the moon's wash and glare dim a star together
+const float STAR_BLOOM_BOOST   = 1.2;  // the emissive's gain past 1, times the intensity squared
+
 // sRGB -> linear approximation; good enough for stars since BB color is smooth.
 vec3 srgb_to_linear(vec3 c)
 {
@@ -152,8 +165,8 @@ void main()
     // brightest ~5% expand to give diffraction spikes room. The smoothstep
     // ensures the expansion isn't a hard step — spikes fade in smoothly as
     // intensity approaches 1.
-    float base_px   = mix(1.8, 7.0, intensity);
-    float spike_px  = smoothstep(0.90, 1.0, intensity) * 12.0;
+    float base_px   = mix(STAR_FAINT_PX, STAR_BRIGHT_PX, intensity);
+    float spike_px  = smoothstep(STAR_SPIKE_START, 1.0, intensity) * STAR_SPIKE_PX;
     float ideal_px  = base_px + spike_px;
 
     // Sub-pixel stability: faint stars rendered into a <3px quad flicker as
@@ -161,8 +174,7 @@ void main()
     // and compensate by scaling output energy by the area ratio — integrated
     // brightness stays the same, but the distribution is smooth enough for
     // the pixel grid to resolve stably.
-    const float min_px     = 2.6;
-    float quad_pixels      = max(ideal_px, min_px);
+    float quad_pixels      = max(ideal_px, STAR_MIN_PX);
     float subpixel_fade    = (ideal_px * ideal_px) / (quad_pixels * quad_pixels);
 
 #ifdef STAR_QUADS
@@ -233,7 +245,7 @@ void main()
 
     // Scintillation is much stronger near the horizon (airmass) and for the
     // brighter stars our eye actually resolves flickering on.
-    float twinkle_amount = clamp(0.18 + 0.14 * (airmass - 1.0), 0.0, 0.65) * intensity;
+    float twinkle_amount = clamp(0.18 + 0.14 * (airmass - 1.0), 0.0, STAR_TWINKLE_MAX) * intensity;
     float twinkle = 1.0 + (twinkle_base - 0.5) * 2.0 * twinkle_amount;
 
     // Subtle color scintillation: each channel samples its own noise with a
@@ -242,7 +254,7 @@ void main()
         valueNoise3D(seed * 0.55 + vec3(0.0, 0.0, time * 1.7 +  0.0)),
         valueNoise3D(seed * 0.55 + vec3(0.0, 0.0, time * 1.3 +  5.7)),
         valueNoise3D(seed * 0.55 + vec3(0.0, 0.0, time * 2.1 + 13.1)));
-    float chroma_amt = 0.18 * twinkle_amount;
+    float chroma_amt = STAR_CHROMA * twinkle_amount;
     vec3  color_jitter = 1.0 + (chroma_noise - 0.5) * 2.0 * chroma_amt;
 
     // --- Moon glare ----------------------------------------------------------
@@ -253,10 +265,10 @@ void main()
     // scattered background), but nothing survives direct glare at a full moon.
     float moon_up    = max(0.0, moon_dir.z);                  // horizon clip
     float moon_power = moon_brightness * moon_up;             // 0..~1
-    float sky_wash   = moon_power * (1.0 - intensity) * 0.55;
+    float sky_wash   = moon_power * (1.0 - intensity) * STAR_MOON_WASH;
     float moon_cos   = max(0.0, dot(dir, moon_dir));
     float direct_glare = pow(moon_cos, 10.0) * moon_power * 0.85;
-    float moon_fade  = clamp(sky_wash + direct_glare, 0.0, 0.95);
+    float moon_fade  = clamp(sky_wash + direct_glare, 0.0, STAR_MOON_FADE_MAX);
 
     // --- Composition ---------------------------------------------------------
     vec3 star_color = color * color_jitter * extinction * twinkle;
@@ -270,7 +282,7 @@ void main()
     // bloom pyramid with a larger signal than their on-screen dot suggests.
     // Kept modest so the bloom pass doesn't smear every mid-tier star into a
     // halo blob.
-    star_color *= 1.0 + intensity * intensity * 1.2;
+    star_color *= 1.0 + intensity * intensity * STAR_BLOOM_BOOST;
 #else
     // No emissive buffer - the stars go to diffuse. The glow extraction still catches
     // the bright peaks via thresholding, so scale slightly up to compensate.
@@ -282,5 +294,5 @@ void main()
     // Diffraction spikes on the brightest tail only. Gated tight (0.90..1.0)
     // so only real stand-out stars get crosses — their quads expand above,
     // so the spike has room to render.
-    vary_spike = smoothstep(0.90, 1.0, intensity);
+    vary_spike = smoothstep(STAR_SPIKE_START, 1.0, intensity);
 }

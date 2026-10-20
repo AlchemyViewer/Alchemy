@@ -330,12 +330,21 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
         program.unbind();
     };
 
+    // On an 8-bit attachment, the faintest star that can still add anything a pixel keeps this frame, for the star
+    // brightness, the moon's wash and the attachment's gain, and every fainter one is left out: what a star adds
+    // under half a step rounds away. The float one, the emissive under HDR, rounds nothing away and the exposure, the
+    // tonemapper and the grade may show any of it, so every star in view is drawn there.
+    const F32 moon_power = moon_brightness * llmax(0.f, moon_dir.mV[VZ]);
+    const bool emissive = gPipeline.shaderInputs().mGlobal.mEmissive;
+    const U32 faintest =
+        emissive && LLPipeline::hdrEnabled() ? 0 : ALStarField::faintestVisible(star_alpha, moon_power, emissive);
+
     {
         LL_PROFILE_GPU_ZONE("sky stars");
 
         // The spiked stars, few and bright, as quads (ALStarField::SPIKE_INTENSITY).
         bind_stars(gDeferredStarQuadProgram);
-        gSky.mVOWLSkyp->drawStarQuads();
+        gSky.mVOWLSkyp->drawStarQuads(faintest);
         unbind_stars(gDeferredStarQuadProgram);
 
         // Every other star as a point, sized by its vertex shader, from the cells the view takes in: its frustum in
@@ -347,7 +356,7 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
 
         LLGLEnable point_size(GL_PROGRAM_POINT_SIZE);
         bind_stars(gDeferredStarProgram);
-        gSky.mVOWLSkyp->drawStarPoints(frustum);
+        gSky.mVOWLSkyp->drawStarPoints(frustum, faintest);
         unbind_stars(gDeferredStarProgram);
     }
 

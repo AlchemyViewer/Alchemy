@@ -46,9 +46,10 @@ public:
     /*virtual*/ bool         updateGeometry(LLDrawable *drawable);
 
     // The stars drawn as points, those of the cells in view through @a frustum, and the spiked stars as quads
-    // (ALStarField::Layout), each with its own program bound.
-    void drawStarPoints(const ALStarField::Frustum& frustum);
-    void drawStarQuads();
+    // (ALStarField::Layout), each with its own program bound; only those at @a faintest or brighter
+    // (ALStarField::faintestVisible).
+    void drawStarPoints(const ALStarField::Frustum& frustum, U32 faintest);
+    void drawStarQuads(U32 faintest);
     void drawDome(void);
     void resetVertexBuffers(void);
 
