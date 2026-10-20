@@ -2965,6 +2965,72 @@ namespace
         CHECK(agreement.compared > 0);
     }
 
+    // Lengyel's tangents, which a mesh LOD too large for meshoptimizer's
+    // weld still takes, give a vertex no triangle gives a direction an axis
+    // put in the plane of its normal: unit length and orthogonal to it,
+    // whichever way the normal points.
+    TEST_CASE("llvolume: Lengyel's tangent with no direction lies in the plane of its normal", "[llvolume]")
+    {
+        // Two triangles whose UVs are one point, so that neither gives a
+        // tangent, with a normal along each axis and between them.
+        const LLVector3 positions[] = { { 0, 0, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 } };
+        const LLVector2 uvs[] = { { 0.5f, 0.5f }, { 0.5f, 0.5f }, { 0.5f, 0.5f }, { 0.5f, 0.5f } };
+        const U16 indices[] = { 0, 1, 2, 2, 1, 3 };
+        const LLVector3 normals[] = { { 0, 0, 1 }, { 1, 0, 0 }, { 0, 1, 0 }, { 0.6f, 0.f, 0.8f }, { 0.8f, -0.6f, 0.f } };
+        for (const LLVector3& normal : normals)
+        {
+            LLVector4a positions4[4], normals4[4], tangents[4];
+            for (S32 v = 0; v < 4; ++v)
+            {
+                positions4[v].load3(positions[v].mV);
+                normals4[v].load3(normal.mV);
+                tangents[v].clear();
+            }
+            LLCalculateTangentArray(4, positions4, normals4, uvs, 2, indices, tangents);
+            for (S32 v = 0; v < 4; ++v)
+            {
+                const LLVector3 t = v3(tangents[v]);
+                INFO(fmt::format("normal ({}, {}, {}): vertex {} has the tangent ({}, {}, {}, {})", normal.mV[0], normal.mV[1], normal.mV[2], v,
+                                 t.mV[0], t.mV[1], t.mV[2], tangents[v][3]));
+                CHECK(fabsf(t.length() - 1.f) <= UNIT_TOLERANCE);
+                CHECK(fabsf(t * normal) <= 2e-3f);
+                CHECK((tangents[v][3] == 1.f || tangents[v][3] == -1.f));
+            }
+        }
+    }
+
+    // A circle path's stations step around it and end at its end cut. The
+    // steps add up with rounding, and a station they bring a rounding short
+    // of the end would leave a row with no height before the end's: no two
+    // stations are within rounding of each other.
+    TEST_CASE("llvolume: a circle path's stations are apart", "[llvolume]")
+    {
+        Report report;
+        for (const Shape& s : sweepShapes())
+        {
+            if (s.path == LL_PCODE_PATH_LINE)
+            {
+                continue;
+            }
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                const auto& path = volume->getPath().mPath;
+                for (S32 i = 0; i + 1 < (S32)path.size(); ++i)
+                {
+                    if (!(path[i + 1].mTexT - path[i].mTexT > 1e-4f))
+                    {
+                        report.fail(fmt::format("{}: stations {} and {} of {} are at t {} and {}", lodName(s, lod), i, i + 1, path.size(),
+                                                path[i].mTexT, path[i + 1].mTexT));
+                        break;
+                    }
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
     // A triangle whose UVs have no area has no dP/du, and one whose
     // positions have no area has no surface to give one: neither adds to
     // its corners' tangents, so a real neighbour's tangent stands alone.

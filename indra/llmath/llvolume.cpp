@@ -1380,8 +1380,12 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
     // affect most sample points.
     t = ((S32)(t * sides)) / (F32)sides;
 
-    // Run through the non-cut dependent points.
-    while (t < params.getEnd())
+    // Run through the non-cut dependent points. A point within a hundredth
+    // of a step of the end cut is the end's own, short of it only by the
+    // rounding the steps add up to: it would leave a row with no height
+    // before the end's.
+    const F32 end_before = params.getEnd() - step * 0.01f;
+    while (t < end_before)
     {
         pt      = mPath.append(1);
 
@@ -7105,8 +7109,27 @@ void LLCalculateTangentArray(U32 vertexCount, const LLVector4a *vertex, const LL
             tangent[a] = tsubn;
         }
         else
-        { //degenerate, make up a value
-            tangent[a].set(0,0,1,1);
+        {
+            // Nothing gives the tangent a direction: +x in the plane of the
+            // normal, or +y where the normal is within 45 degrees of x, as
+            // the prims' tangents take it.
+            const LLVector4a& normal_a = normal[a];
+            const F32 nx = normal_a[0];
+            LLVector4a axis;
+            if (nx * nx > 0.5f)
+            {
+                axis.set(0.f, 1.f, 0.f);
+            }
+            else
+            {
+                axis.set(1.f, 0.f, 0.f);
+            }
+            LLVector4a along = normal_a;
+            along.mul(axis.dot3(normal_a).getF32());
+            axis.sub(along);
+            axis.normalize3fast();
+            axis.getF32ptr()[3] = 1.f;
+            tangent[a] = axis;
         }
     }
 
