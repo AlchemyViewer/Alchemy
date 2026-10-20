@@ -573,29 +573,23 @@ namespace
         constexpr U32 HardEdges = 1 << 8;   // a flat inner side is hard at every point
         constexpr U32 Tangents = 1 << 9;    // after genTangents: unit normals, unit tangents, w = +/-1
         constexpr U32 Orthogonal = 1 << 10; // after genTangents: tangent orthogonal to normal
+        constexpr U32 LoneNormals = 1 << 11; // a vertex in no triangle with area takes a normal the face has
 
-        // What the sweep holds every face to. RawUnit is broken on every
-        // side today, and Orthogonal on most curved ones: each has a case of
-        // its own.
-        constexpr U32 Sweep = Layout | Finite | Inversion | CapFacing | AffineUV | Oracle | SeamsAgree | HardEdges | Tangents;
+        // What the sweep holds every face to. Orthogonal is broken wherever
+        // the tangent generator makes a tangent up, and has a case of its
+        // own.
+        constexpr U32 Sweep =
+            Layout | Finite | RawUnit | Inversion | CapFacing | AffineUV | Oracle | SeamsAgree | HardEdges | Tangents | LoneNormals;
     }
 
     namespace Regions
     {
         // A cap with no area. Where its path leaves it within its plane, its
-        // normal is far from the way its wall runs; and its tangent, from
-        // triangles with no area, is the one the tangent generator makes up,
-        // whatever the normal.
+        // normal is far from the way its wall runs.
         constexpr U32 CapNoArea = 1 << 2;
         // A square hole above 0.707 in a round or triangular profile,
         // whose corners go through the wall.
         constexpr U32 SquareHole = 1 << 3;
-        // A vertex in no triangle with area sums to no normal, or to the
-        // rounding left of one, which createTangents' normalize turns into
-        // NaN or infinity where its copies are exactly one point: the copied
-        // last column of a cut flat inner side, a half circle's square or
-        // triangle hole on its axis, the middle of a sculpt's pinch.
-        constexpr U32 ZeroNormal = 1 << 5;
     }
 
     U32 excusedBy(U32 regions)
@@ -603,7 +597,7 @@ namespace
         U32 checks = 0;
         if (regions & Regions::CapNoArea)
         {
-            checks |= Checks::CapFacing | Checks::Orthogonal;
+            checks |= Checks::CapFacing;
         }
         if (regions & Regions::SquareHole)
         {
@@ -634,7 +628,7 @@ namespace
         return (volume.getParams().getSculptType() & LL_SCULPT_TYPE_MASK) != LL_SCULPT_TYPE_NONE;
     }
 
-    U32 regionsOf(const LLVolume& volume, const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<bool>& lone)
+    U32 regionsOf(const LLVolume& volume, const LLVolumeFace& face, const std::vector<Triangle>& triangles)
     {
         U32 regions = 0;
         const LLVolumeParams& params = volume.getParams();
@@ -647,10 +641,6 @@ namespace
         if (isCap(face) && std::all_of(triangles.begin(), triangles.end(), [](const Triangle& t) { return t.degenerate; }))
         {
             regions |= Regions::CapNoArea;
-        }
-        if (std::find(lone.begin(), lone.end(), true) != lone.end())
-        {
-            regions |= Regions::ZeroNormal;
         }
         return regions;
     }
@@ -735,16 +725,11 @@ namespace
         }
     }
 
-    // A vertex in skip is left to the ZeroNormal region's case.
-    void checkRawUnit(const LLVolumeFace& face, const std::vector<LLVector3>& normals, const std::vector<bool>& skip, Report& report, const std::string& where)
+    void checkRawUnit(const LLVolumeFace& face, const std::vector<LLVector3>& normals, Report& report, const std::string& where)
     {
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
             const F32 length = normals[v].length();
-            if (skip[v])
-            {
-                continue;
-            }
             if (!(fabsf(length - 1.f) <= UNIT_TOLERANCE))
             {
                 report.fail(fmt::format("{}: vertex {} has a normal of length {}", where, v, length));
@@ -1007,8 +992,8 @@ namespace
     // Where a side's first and last columns are one point, it is one
     // smooth surface across them, and both take one normal; so with the
     // rows of a closed path.
-    void checkSeamsAgree(const LLVolume& volume, const LLVolumeFace& face, const std::vector<LLVector3>& normals, const std::vector<bool>& skip,
-                         Report& report, const std::string& where)
+    void checkSeamsAgree(const LLVolume& volume, const LLVolumeFace& face, const std::vector<LLVector3>& normals, Report& report,
+                         const std::string& where)
     {
         if (!isGrid(face) || isDoubled(face))
         {
@@ -1021,7 +1006,7 @@ namespace
         auto agree = [&](S32 a, S32 b, F32& off)
         {
             off = degreesBetween(normals[a], normals[b]);
-            return skip[a] || skip[b] || off <= 1.f;
+            return off <= 1.f;
         };
         if (wraps_s && columnsMeet(face))
         {
@@ -1054,19 +1039,22 @@ namespace
     // profile is cut), so the quads after even columns are the real ones
     // and the quads after odd columns have no width: a vertex takes its
     // normal from the one strip of real quads beside it, up and down the
-    // path, and from no other strip at its point.
+    // path, and from no other strip at its point. A vertex in no triangle
+    // with area, as the copies that close the side or an apex's copies,
+    // is beside no strip.
     S32 stripOf(S32 column)
     {
         return column % 2 == 0 ? column : column - 1;
     }
 
-    void checkHardEdges(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals,
-                        const std::vector<bool>& skip, Report& report, const std::string& where)
+    void checkHardEdges(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals, Report& report,
+                        const std::string& where)
     {
         if (!isDoubled(face) || !isGrid(face))
         {
             return;
         }
+        const std::vector<bool> lone = loneVertices(face, triangles);
         const std::vector<U32> groups = weldGroups(face);
         std::map<std::pair<U32, S32>, std::vector<U32>> in_strip;
         for (size_t t = 0; t < triangles.size(); ++t)
@@ -1088,7 +1076,7 @@ namespace
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
             const S32 column = v % face.mNumS;
-            if (skip[v])
+            if (lone[v])
             {
                 continue;
             }
@@ -1117,7 +1105,56 @@ namespace
         }
     }
 
-    void checkTangents(const LLVolumeFace& face, const std::vector<bool>& skip, U32 checks, Report& report, const std::string& where)
+    // A side's vertex in no triangle with area has no normal of its own, and
+    // takes the normal of a vertex that has one: never none, never what
+    // rounding leaves, and never a made-up one while the face has any. A
+    // sphere's pole, a column that is one place in every row, takes the
+    // axis instead.
+    void checkLoneNormals(const LLVolume& volume, const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals,
+                          Report& report, const std::string& where)
+    {
+        if (!isGrid(face))
+        {
+            return;
+        }
+        const bool sphere = !isSculpt(volume) && (volume.getParams().getProfileParams().getCurveType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF &&
+                            volume.getParams().getPathParams().getCurveType() == LL_PCODE_PATH_CIRCLE;
+        auto pole = [&](S32 column)
+        {
+            for (S32 t = 1; t < face.mNumT; ++t)
+            {
+                if (!coincide(face.mPositions[gridIndex(face, column, 0)], face.mPositions[gridIndex(face, column, t)]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+        const std::vector<bool> lone = loneVertices(face, triangles);
+        std::vector<S32> donors;
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            if (!lone[v])
+            {
+                donors.push_back(v);
+            }
+        }
+        if (donors.empty())
+        {
+            return;
+        }
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            if (lone[v] && !(sphere && pole(v % face.mNumS)) &&
+                std::none_of(donors.begin(), donors.end(), [&](S32 d) { return degreesBetween(normals[v], normals[d]) <= 0.1f; }))
+            {
+                report.fail(fmt::format("{}: vertex {} (column {}, row {}) has none of the face's normals", where, v, v % face.mNumS, v / face.mNumS));
+                return;
+            }
+        }
+    }
+
+    void checkTangents(const LLVolumeFace& face, U32 checks, Report& report, const std::string& where)
     {
         if (!face.mTangents)
         {
@@ -1128,10 +1165,6 @@ namespace
         bool orthogonal_failed = false;
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
-            if (skip[v])
-            {
-                continue;
-            }
             const LLVector3 n = v3(face.mNormals[v]);
             const LLVector3 t = v3(face.mTangents[v]);
             const F32 w = face.mTangents[v][3];
@@ -1161,7 +1194,8 @@ namespace
     }
 
     // Every check the inspection asks for, on every face of the volume.
-    // Tangents come last: genTangents normalizes the normals it is given.
+    // Tangents come last, from genTangents, once every face's normals have
+    // been checked as generation left them.
     void inspect(LLVolume& volume, const std::string& name, const Inspect& how, Report& report)
     {
         const S32 faces = volume.getNumVolumeFaces();
@@ -1171,7 +1205,6 @@ namespace
             U32 checks = 0;
             U32 regions = 0;
             std::vector<LLVector3> raw;
-            std::vector<bool> skip;
         };
         std::vector<State> states(faces);
         for (S32 i = 0; i < faces; ++i)
@@ -1183,9 +1216,8 @@ namespace
                 continue;
             }
             const std::vector<Triangle> triangles = trianglesOf(face);
-            const std::vector<bool> lone = loneVertices(face, triangles);
             State& state = states[i];
-            state.regions = regionsOf(volume, face, triangles, lone);
+            state.regions = regionsOf(volume, face, triangles);
             if (how.only_regions && !(state.regions & how.only_regions))
             {
                 continue;
@@ -1199,9 +1231,6 @@ namespace
             {
                 state.raw[v] = v3(face.mNormals[v]);
             }
-            // The ZeroNormal region is of vertices, not faces: everything
-            // else passes over those vertices alone.
-            state.skip = (how.only_regions & Regions::ZeroNormal) ? std::vector<bool>(face.mNumVertices, false) : lone;
 
             if (state.checks & Checks::Finite)
             {
@@ -1209,7 +1238,7 @@ namespace
             }
             if (state.checks & Checks::RawUnit)
             {
-                checkRawUnit(face, state.raw, state.skip, report, where);
+                checkRawUnit(face, state.raw, report, where);
             }
             if (state.checks & Checks::Inversion)
             {
@@ -1230,11 +1259,15 @@ namespace
             }
             if (state.checks & Checks::SeamsAgree)
             {
-                checkSeamsAgree(volume, face, state.raw, state.skip, report, where);
+                checkSeamsAgree(volume, face, state.raw, report, where);
             }
             if (state.checks & Checks::HardEdges)
             {
-                checkHardEdges(face, triangles, state.raw, state.skip, report, where);
+                checkHardEdges(face, triangles, state.raw, report, where);
+            }
+            if (state.checks & Checks::LoneNormals)
+            {
+                checkLoneNormals(volume, face, triangles, state.raw, report, where);
             }
         }
 
@@ -1247,7 +1280,7 @@ namespace
             }
             volume.genTangents(i);
             const LLVolumeFace& face = volume.getVolumeFace(i);
-            checkTangents(face, state.skip, state.checks, report, fmt::format("{}: {}", name, faceName(face)));
+            checkTangents(face, state.checks, report, fmt::format("{}: {}", name, faceName(face)));
         }
     }
 
@@ -2658,9 +2691,12 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // Lengyel's Gram-Schmidt step runs on the normals before
-    // createTangents normalizes them, removing only |n|^2 of the normal's
-    // part, so a tangent leans out of the plane its normal makes.
+    // Lengyel's Gram-Schmidt step removes only |n|^2 of the normal's part,
+    // so it needs unit normals, or a tangent leans out of the plane its
+    // normal makes. Where a vertex's triangles give its tangent no
+    // direction, it makes one up, +Z whatever the normal: at a cap with no
+    // area, a vertex in no triangle with area, and the point where a
+    // twisted half circle's pole crosses the axis it sweeps about.
     TEST_CASE("llvolume: every prim tangent is orthogonal to its normal", "[llvolume][!shouldfail]")
     {
         Inspect how;
@@ -2713,9 +2749,10 @@ namespace
         }
     }
 
-    // A side's normals are area sums, and are unit length only once
-    // createTangents has normalized them.
-    TEST_CASE("llvolume: normals are unit length straight out of generation", "[llvolume][!shouldfail]")
+    // A side's normals are sums over the quads around each vertex, and must
+    // leave the build unit length: the vertex buffer takes them as they are
+    // where a face has no tangents.
+    TEST_CASE("llvolume: normals are unit length straight out of generation", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::RawUnit;
@@ -2918,16 +2955,17 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // A vertex whose every triangle has no area sums to a zero normal, and
-    // createTangents' normalize3fast makes it NaN: the copied last column
-    // of a cut flat inner side, the inner side of a half circle with a
-    // square or triangle hole, the middle of a sculpt's pinch, the whole of
-    // the empty placeholder.
-    TEST_CASE("llvolume: a vertex with only zero-area triangles gets a finite normal", "[llvolume][!shouldfail]")
+    // A vertex whose every triangle has no area sums to a zero normal, which
+    // a normalize makes NaN: the copied last column of a cut flat inner
+    // side, the inner side of a half circle with a square or triangle hole,
+    // the middle of a sculpt's pinch, the whole of the empty placeholder.
+    // It takes a neighbour's normal instead; where a copy is one place with
+    // its neighbour only to rounding, the edge between them must count as
+    // having no length, or it gives the copy a normal of rounding.
+    TEST_CASE("llvolume: a vertex with only zero-area triangles takes a neighbour's normal", "[llvolume]")
     {
         Inspect how;
-        how.checks = Checks::Tangents;
-        how.only_regions = Regions::ZeroNormal;
+        how.checks = Checks::Tangents | Checks::LoneNormals;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);

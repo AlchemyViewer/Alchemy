@@ -5423,7 +5423,12 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
             {
                 LL_WARNS_ONCE("LLVOLUME") << "meshopt_generateVertexRemapMulti failed to process a model or model was invalid" << LL_ENDL;
             }
-            // blew past the max vertex size limit, use legacy tangent generation which never adds verts
+            // blew past the max vertex size limit, use legacy tangent generation which never adds verts;
+            // it takes unit normals, as the bump map and planar projection code do
+            for (S32 i = 0; i < mNumVertices; i++)
+            {
+                mNormals[i].normalize3fast();
+            }
             createTangents();
         }
     }
@@ -5606,7 +5611,9 @@ namespace
     // triangle it is not in. Each cross product is taken at the corner off
     // the diagonal: where a copied or collapsed row or column puts two of a
     // triangle's corners in one place, an edge there has no length and the
-    // product is exactly zero, fused multiply-add or not. A quad between a
+    // product is exactly zero, fused multiply-add or not. An edge between
+    // two points that are one place but for rounding, as a closed profile's
+    // last point and its first, counts as having none. A quad between a
     // copied row or column adds nothing, so the edge there stays hard.
     void add_quad_to_normals(LLVector4a* norm, const LLVector4a* pos, S32 bl, S32 br, S32 tl, S32 tr)
     {
@@ -5615,6 +5622,15 @@ namespace
         right.setSub(pos[tr], pos[br]);
         top.setSub(pos[tr], pos[tl]);
         left.setSub(pos[tl], pos[bl]);
+
+        const LLVector4a zero = LLVector4a::getZero();
+        const LLVector4a same_place(SAME_PLACE * SAME_PLACE);
+        for (LLVector4a* edge : { &bottom, &right, &top, &left })
+        {
+            LLVector4a length;
+            length.setAllDot3(*edge, *edge);
+            edge->setSelectWithMask(length.lessThan(same_place), zero, *edge);
+        }
 
         LLVector4a lower, upper;
         lower.setCross3(bottom, right);
@@ -5628,6 +5644,121 @@ namespace
         norm[br].add(lower);
         norm[tr].add(shared);
         norm[tl].add(upper);
+    }
+
+    // Brings every normal of a grid to unit length. A vertex whose quads all
+    // have no area, as a copy that closes a cut flat inner side or a row in
+    // the middle of a sculpt's pinch, has no normal of its own, and takes
+    // the nearest one up or down its column, or, where the whole column has
+    // none, along its row, or, where neither has one, as where a copied
+    // column crosses a copied row, the nearest around it: only a normal a
+    // vertex had of its own, so that what one such vertex takes does not
+    // pass on to the next. A grid with no normal at all faces +Z. While they
+    // wait, such vertices are marked with a w of 1, which every normal of
+    // its own has as 0.
+    void normalize_grid_normals(LLVector4a* norm, S32 num_s, S32 num_t)
+    {
+        const S32 count = num_s * num_t;
+        bool any_missing = false;
+        for (S32 v = 0; v < count; ++v)
+        {
+            if (norm[v].dot3(norm[v]).getF32() > FLT_MIN)
+            {
+                norm[v].normalize3();
+            }
+            else
+            {
+                norm[v].set(0.f, 0.f, 0.f, 1.f);
+                any_missing = true;
+            }
+        }
+
+        if (!any_missing)
+        {
+            return;
+        }
+
+        auto own = [](const LLVector4a& n) { return n[3] == 0.f; };
+        if (std::none_of(norm, norm + count, own))
+        {
+            for (S32 v = 0; v < count; ++v)
+            {
+                norm[v].set(0.f, 0.f, 1.f, 0.f);
+            }
+            return;
+        }
+
+        for (S32 t = 0; t < num_t; ++t)
+        {
+            for (S32 s = 0; s < num_s; ++s)
+            {
+                LLVector4a& n = norm[s + num_s * t];
+                if (own(n))
+                {
+                    continue;
+                }
+                const LLVector4a* donor = nullptr;
+                for (S32 d = 1; d < num_t && !donor; ++d)
+                {
+                    for (S32 row : { t - d, t + d })
+                    {
+                        if (row >= 0 && row < num_t && own(norm[s + num_s * row]))
+                        {
+                            donor = &norm[s + num_s * row];
+                            break;
+                        }
+                    }
+                }
+                for (S32 d = 1; d < num_s && !donor; ++d)
+                {
+                    for (S32 column : { s - d, s + d })
+                    {
+                        if (column >= 0 && column < num_s && own(norm[column + num_s * t]))
+                        {
+                            donor = &norm[column + num_s * t];
+                            break;
+                        }
+                    }
+                }
+                // Each square looks only at its ring, since every point inside
+                // it was looked at by the square before.
+                for (S32 d = 1; d < llmax(num_s, num_t) && !donor; ++d)
+                {
+                    for (S32 row = llmax(t - d, 0); row <= llmin(t + d, num_t - 1) && !donor; ++row)
+                    {
+                        if (row == t - d || row == t + d)
+                        {
+                            for (S32 column = llmax(s - d, 0); column <= llmin(s + d, num_s - 1); ++column)
+                            {
+                                if (own(norm[column + num_s * row]))
+                                {
+                                    donor = &norm[column + num_s * row];
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            for (S32 column : { s - d, s + d })
+                            {
+                                if (column >= 0 && column < num_s && own(norm[column + num_s * row]))
+                                {
+                                    donor = &norm[column + num_s * row];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                n = donor ? *donor : LLVector4a(0.f, 0.f, 1.f);
+                n.getF32ptr()[3] = 1.f;
+            }
+        }
+
+        for (S32 v = 0; v < count; ++v)
+        {
+            norm[v].getF32ptr()[3] = 0.f;
+        }
     }
 
     // The path station a cap closes: the last for a top cap, the first for a
@@ -6301,13 +6432,6 @@ void LLVolumeFace::createTangents()
         }
 
         LLCalculateTangentArray(mNumVertices, mPositions, mNormals, mTexCoords, mNumIndices / 3, mIndices, mTangents);
-
-        //normalize normals
-        for (S32 i = 0; i < mNumVertices; i++)
-        {
-            //bump map/planar projection code requires normals to be normalized
-            mNormals[i].normalize3fast();
-        }
     }
 
 }
@@ -6854,6 +6978,8 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
             }
         }
     }
+
+    normalize_grid_normals(norm, mNumS, mNumT);
 
     return true;
 }
