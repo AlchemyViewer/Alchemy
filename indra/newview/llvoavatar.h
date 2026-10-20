@@ -28,6 +28,7 @@
 #ifndef LL_VOAVATAR_H
 #define LL_VOAVATAR_H
 
+#include <bitset>
 #include <map>
 #include <deque>
 #include <string>
@@ -938,6 +939,14 @@ public:
     void            updateMeshData();
     void            updateMeshVisibility();
     LLViewerTexture*        getBakedTexture(const U8 te);
+
+    // A set of bakes, by EBakedTextureIndex
+    typedef std::bitset<LLAvatarAppearanceDefines::BAKED_NUM_INDICES> bake_set_t;
+    // The bakes a face draws, by its image or any slot of its PBR material: an avatar wearing it
+    // hides the body parts they are baked for (updateMeshVisibility)
+    static bake_set_t getBakesDrawnBy(const LLTextureEntry& te);
+    // The bakes a PBR material's slots name
+    static bake_set_t getBakesNamedBy(const LLGLTFMaterial* material);
 
     // Matrix palette cache entry
     class alignas(16) MatrixPaletteCache
