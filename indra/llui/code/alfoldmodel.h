@@ -38,8 +38,8 @@
 // Where whoever holds the text knows its syntax -- the editor, from its
 // bracket index and its grammar -- a block is what the syntax opens and
 // closes: a bracket and its partner, `function` and its `end`, across
-// lines, from the line it opens on -- or, where it opens a line of its
-// own, as a brace under its header does, from the header -- through the
+// lines, from the line it opens on -- or, where a bracket opens a line of
+// its own, as a brace under its header does, from the header -- through the
 // line it closes on, unless something opens again after the close there
 // (`} else {`), which that line then starts. Elsewhere a block is a line
 // and the deeper lines after it, by indentation alone -- any language, a
@@ -83,7 +83,8 @@ public:
     {
         S32   column = 0;
         Event event  = Event::Open;
-        // The first thing on its line, as the model reads it.
+        // A bracket that is the first thing on its line, as the model reads
+        // it: one that stands under the header above it.
         bool  first  = false;
     };
     typedef std::function<void(S32 line, std::vector<Block>& out)> blocks_t;
